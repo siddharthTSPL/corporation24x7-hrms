@@ -1,0 +1,60 @@
+const mongoose = require("mongoose");
+
+const reviewSchema = new mongoose.Schema({
+  reviewerRole: {
+    type: String,
+    enum: ["admin", "manager"],
+    required: true
+  },
+
+  reviewer: {
+    type: mongoose.Schema.Types.ObjectId,
+    refPath: "reviewerRoleModel",
+    required: true
+  },
+
+  reviewerRoleModel: {
+    type: String,
+    enum: ["admin", "manager"],
+    required: true
+  },
+
+  revieweeRole: {
+    type: String,
+    enum: ["manager", "employee"],
+    required: true
+  },
+
+  reviewee: {
+    type: mongoose.Schema.Types.ObjectId,
+    refPath: "revieweeRoleModel",
+    required: true
+  },
+
+  revieweeRoleModel: {
+    type: String,
+    enum: ["manager", "employee"],
+    required: true
+  },
+
+  rating: {
+    type: Number,
+    min: 1,
+    max: 5,
+    required: true
+  },
+
+  comment: {
+    type: String,
+    trim: true
+  },
+
+  reviewPeriod: {
+    type: String,
+    enum: ["monthly", "quarterly", "yearly"],
+    default: "monthly"
+  }
+
+}, { timestamps: true });
+
+module.exports = mongoose.model("Review", reviewSchema);
