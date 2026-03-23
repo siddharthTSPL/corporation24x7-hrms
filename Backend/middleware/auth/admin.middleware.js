@@ -12,10 +12,11 @@ const adminauth=async (req,res,next)=>{
             return res.status(401).json({message:"Unauthorized"});
         }
          const username=decode.username;
-         
+
         next();
      }catch(error){
         res.status(500).json({error:error.message});
      }
 }
 
+module.exports=adminauth;
