@@ -1,4 +1,5 @@
 const jwt=require('jsonwebtoken');
+const usermodel=require("../../Models/user.model");
 
 const authemployee=async(req,res,next)=>{
      const token=req.cookies.token;
@@ -10,8 +11,11 @@ const authemployee=async(req,res,next)=>{
         if(!decode){
             return res.status(401).json({message:"Unauthorized"});
         }
-        req.employeeid=decode.employeeid;
-        req.role=decode.role;
+        const employee=await usermodel.findOne({work_email:decode.work_email});
+        if(!employee){
+            return res.status(401).json({message:"Unauthorized"});
+        }
+        req.employee=employee;
         next();
      }catch(error){
         res.status(500).json({error:error.message});
