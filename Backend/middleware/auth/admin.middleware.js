@@ -1,4 +1,5 @@
 const jwt=require('jsonwebtoken');
+const adminmodel=require("../../Models/Admin.model");
 
 
 const adminauth=async (req,res,next)=>{
@@ -11,8 +12,12 @@ const adminauth=async (req,res,next)=>{
         if(!decode){
             return res.status(401).json({message:"Unauthorized"});
         }
-         const username=decode.username;
-
+        
+   const admin=await adminmodel.findOne({username:decode.username,email:decode.email});
+        if(!admin){
+            return res.status(401).json({message:"Unauthorized"});
+        }
+        req.admin=admin;
         next();
      }catch(error){
         res.status(500).json({error:error.message});

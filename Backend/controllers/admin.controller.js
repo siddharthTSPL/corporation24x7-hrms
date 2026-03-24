@@ -34,6 +34,8 @@ const adminlogin = async (req, res) => {
         username: validusername.username,
         adminid: validusername._id,
         role: validusername.role,
+        email: validusername.email,
+
       },
       process.env.JWT_SECRET,
       { expiresIn: "15d" },
