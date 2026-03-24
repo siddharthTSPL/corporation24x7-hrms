@@ -1,27 +1,28 @@
-const jwt=require('jsonwebtoken');
-const adminmodel=require("../../Models/Admin.model");
+const jwt = require("jsonwebtoken");
+const Adminmodel = require("../../Models/Admin.model");
 
+const adminauth = async (req, res, next) => {
+  try {
+    const token = req.cookies.token;
 
-const adminauth=async (req,res,next)=>{
-     const token=req.cookies.token;
-     if(!token){
-        return res.status(401).json({message:"Unauthorized"});
-     }
-     try{
-        const decode=jwt.verify(token,process.env.JWT_SECRET);
-        if(!decode){
-            return res.status(401).json({message:"Unauthorized"});
-        }
-        
-   const admin=await adminmodel.findOne({username:decode.username,email:decode.email});
-        if(!admin){
-            return res.status(401).json({message:"Unauthorized"});
-        }
-        req.admin=admin;
-        next();
-     }catch(error){
-        res.status(500).json({error:error.message});
-     }
-}
+    if (!token) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
-module.exports=adminauth;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const admin = await Adminmodel.findById(decoded.adminid);
+
+    if (!admin) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    req.admin = admin;
+    next();
+
+  } catch (error) {
+    return res.status(401).json({ message: "Invalid token" });
+  }
+};
+
+module.exports = adminauth;
