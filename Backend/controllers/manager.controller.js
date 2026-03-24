@@ -45,17 +45,22 @@ const verifyManagerEmail = async (req,res)=>{
 
 };
 
-// Done
+
 const managerlogin = async (req, res) => {
   try {
-
     const { work_email, password } = req.body;
+
+    if (!work_email || !password) {
+      return res.status(400).json({
+        message: "Email and password are required"
+      });
+    }
 
     const manager = await managermodel.findOne({ work_email });
 
     if (!manager) {
-      return res.status(404).json({
-        message: "Manager not found"
+      return res.status(401).json({
+        message: "Invalid credentials"
       });
     }
 
@@ -63,7 +68,7 @@ const managerlogin = async (req, res) => {
 
     if (!isValidPassword) {
       return res.status(401).json({
-        message: "Invalid password"
+        message: "Invalid credentials"
       });
     }
 
@@ -74,7 +79,6 @@ const managerlogin = async (req, res) => {
     }
 
     if (manager.isFirstLogin) {
-
       const resetToken = jwt.sign(
         { work_email: manager.work_email },
         process.env.JWT_SECRET,
@@ -100,17 +104,22 @@ const managerlogin = async (req, res) => {
       });
     }
 
-   const token = jwt.sign(
-  {
-    managerid: manager._id,
-    work_email: manager.work_email,
-    role: manager.role
-  },
-  process.env.JWT_SECRET,
-  { expiresIn: "15d" }
-);
+    const token = jwt.sign(
+      {
+        managerid: manager._id,
+        work_email: manager.work_email,
+        role: manager.role
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "15d" }
+    );
 
-    res.cookie("token", token);
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Strict",
+      maxAge: 15 * 24 * 60 * 60 * 1000 
+    });
 
     manager.status = "active";
     await manager.save();
@@ -120,37 +129,42 @@ const managerlogin = async (req, res) => {
     });
 
   } catch (error) {
-
     res.status(500).json({
       message: error.message
     });
-
   }
 };
 
 
 const managerlogout = async (req, res) => {
-  const token = req.cookies.token;
   try {
-    if (!token) {
+
+    if (!req.manager) {
       return res.status(401).json({ message: "Unauthorized" });
     }
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
-    if (!decode) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-    await managermodel.findOneAndUpdate(
-      { work_email: decode.work_email },
-      { status: "inactive" },
+
+    await managermodel.findByIdAndUpdate(
+      req.manager._id,
+      { status: "inactive" }
     );
+
     res.clearCookie("token", {
       httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Strict",
     });
-    res.status(200).json({ message: "Manager logout successful" });
+
+    return res.status(200).json({
+      message: "Manager logout successful"
+    });
+
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({
+      message: error.message
+    });
   }
 };
+
 
 const showPasswordPage = (req, res) => {
 
@@ -227,139 +241,117 @@ const managerFirstLoginPasswordChange = async (req, res) => {
 
 
 
-const managerUpdatePassword = async (req,res)=>{
+const managerUpdatePassword = async (req, res) => {
+  try {
+   
+    if (!req.manager) {
+      return res.status(401).json({
+        message: "Unauthorized"
+      });
+    }
 
-  const token = req.cookies.token;
+    const { oldpassword, newpassword } = req.body;
 
-  if(!token){
-     return res.status(401).json({
-        message:"Unauthorized"
-     });
+   
+    if (!oldpassword || !newpassword) {
+      return res.status(400).json({
+        message: "Old password and new password are required"
+      });
+    }
+
+    const manager = req.manager;
+
+    const isvalid = await manager.isValidPassword(oldpassword);
+
+    if (!isvalid) {
+      return res.status(400).json({
+        message: "Old password is incorrect"
+      });
+    }
+
+  
+    if (oldpassword === newpassword) {
+      return res.status(400).json({
+        message: "New password must be different from old password"
+      });
+    }
+
+    manager.password = newpassword;
+    manager.passwordUpdatedAt = Date.now();
+
+    await manager.save();
+
+    return res.status(200).json({
+      message: "Password updated successfully"
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      message: error.message
+    });
   }
+};
 
-  const { oldpassword,newpassword } = req.body;
-
-  try{
-
-     const decode = jwt.verify(token,process.env.JWT_SECRET);
-
-     const manager = await Managermodel.findOne({
-        work_email: decode.work_email
-     });
-
-     if(!manager){
-        return res.status(404).json({
-           message:"Manager not found"
-        });
-     }
-
-     const isvalid = await manager.isValidPassword(oldpassword);
-
-     if(!isvalid){
-        return res.status(400).json({
-           message:"Old password is incorrect"
-        });
-     }
-
-     manager.password = newpassword;
-     manager.passwordUpdatedAt = Date.now();
-
-     await manager.save();
-
-     res.status(200).json({
-        message:"Password updated successfully"
-     });
-
-  }catch(error){
-
-     res.status(500).json({
-        error:error.message
-     });
-
-  }
-
-}
 
 const userunderme = async (req, res) => {
-  const token = req.cookies.token;
-
-  if (!token) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+   
+    if (!req.manager) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
-    const managerid = decoded.managerid;
+    const managerid = req.manager._id;
 
-    const users = await usermodel.find({ Under_manager: managerid }).select('-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt');
+    const users = await usermodel
+      .find({ Under_manager: managerid })
+      .select(
+        "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt"
+      );
 
-    if (users.length === 0) {
-      return res.status(404).json({ message: "No users found under this manager" });
+    if (!users || users.length === 0) {
+      return res.status(404).json({
+        message: "No users found under this manager"
+      });
     }
 
     return res.status(200).json(users);
 
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({
+      message: error.message
+    });
   }
 };
 
+
 const viewallleaves = async (req, res) => {
- const token = req.cookies.token;
-
-  if (!token) return res.status(401).json({ message: "Unauthorized" });
-
   try {
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
-    console.log(decode);
-    const managerId = decode.managerid;
+  
+    if (!req.manager) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
-    if (!managerId) return res.status(403).json({ message: "Forbidden" });
+    const managerId = req.manager._id;
 
     const leaves = await leavemodel.find({ manager: managerId })
       .populate("employee", "f_name l_name work_email role")
       .sort({ createdAt: -1 });
 
-    res.status(200).json(leaves);
+    return res.status(200).json(leaves);
+
   } catch (error) {
     console.error("View Leaves Error:", error);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ message: error.message });
   }
-
- 
 };
 
-const managerupdatepassword=async(req,res)=>{
-  const token = req.cookies.token;
-  if (!token) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-  try {
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
-    const managerid = decode.managerid;
-    const { oldpassword, newpassword } = req.body;
-    const isvalidmanager = await managermodel.findById(managerid);
-    if (!isvalidmanager) {
-      return res.status(404).json({ message: "Manager not found" });
-    }
-    const isvalidpassword = await isvalidmanager.isValidPassword(oldpassword);
-    if (!isvalidpassword) {
-      return res.status(401).json({ message: "Invalid password" });
-    }
-    isvalidmanager.password = newpassword;
-    await isvalidmanager.save();
-    res.status(200).json({ message: "Password updated successfully" });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-}
+
+
 
 const acceptleaverequest = async (req, res) => {
-  const token = req.cookies.token;
   const { leaveId } = req.body;
 
-  if (!token) {
+  if (!req.manager) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
@@ -404,16 +396,16 @@ const acceptleaverequest = async (req, res) => {
 
   } catch (error) {
     console.error("Approve Leave Error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
 
+
 const rejectleaverequest = async (req, res) => {
-  const token = req.cookies.token;
   const { leaveId } = req.body;
 
-  if (!token) {
+  if (!req.manager) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
@@ -441,16 +433,15 @@ const rejectleaverequest = async (req, res) => {
 
   } catch (error) {
     console.error("Reject Leave Error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-const forwardedtoadmin = async (req, res) => {
 
-  const token = req.cookies.token;
+const forwardedtoadmin = async (req, res) => {
   const { leaveId } = req.body;
 
-  if (!token) {
+  if (!req.manager) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
@@ -477,21 +468,20 @@ const forwardedtoadmin = async (req, res) => {
 
   } catch (error) {
     console.error("Forward Leave Error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
+
 const applyleavem = async (req, res) => {
-
-  const token = req.cookies.token;
-  if (!token) return res.status(401).json({ message: "Unauthorized" });
-
   const { leaveType, startDate, endDate, reason } = req.body;
 
-  try {
+  if (!req.manager) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
 
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
-    const managerid = decode.managerid;
+  try {
+    const managerId = req.manager._id;
 
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -502,11 +492,10 @@ const applyleavem = async (req, res) => {
       });
     }
 
-    const days =
-      Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+    const days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
     const overlapping = await leavemodel.findOne({
-      manager: managerid,
+      manager: managerId,
       status: { $nin: ["rejected_admin"] },
       startDate: { $lte: end },
       endDate: { $gte: start }
@@ -519,7 +508,7 @@ const applyleavem = async (req, res) => {
     }
 
     const leave = new leavemodel({
-      manager: managerid,
+      manager: managerId,
       leaveType,
       startDate: start,
       endDate: end,
@@ -537,38 +526,43 @@ const applyleavem = async (req, res) => {
 
   } catch (error) {
     console.error("Manager Leave Error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-const showannouncements = async (req, res) => {
 
+const showannouncements = async (req, res) => {
   try {
+   
+    if (!req.manager) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
     const announcements = await announcementmodel.find({
-       audience: { $in: ["managers", "all"] }
+      audience: { $in: ["managers", "all"] }
     });
 
     res.status(200).json(announcements);
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
 
 const viewEmployeeDocuments = async (req, res) => {
   try {
+    const { employeeId } = req.params;
 
-    const token = req.cookies.token;
-    if (!token) {
+    
+    if (!req.manager) {
       return res.status(401).json({ message: "Unauthorized" });
     }
-    const { employeeId } = req.params;
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
+
+   
     const employee = await usermodel.findOne({
       _id: employeeId,
-      Under_manager: decode.managerid
+      Under_manager: req.manager._id
     });
 
     if (!employee) {
@@ -576,42 +570,46 @@ const viewEmployeeDocuments = async (req, res) => {
         message: "This employee is not under your management"
       });
     }
+
     const documents = await Document.find({ employee: employeeId });
-    console.log(documents);
 
     if (!documents.length) {
       return res.status(404).json({ message: "No documents found" });
     }
-   
 
     res.status(200).json({
       message: "Documents downloaded successfully",
       url: documents.map((document) => document.fileUrl)
-      
-
     });
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-const viewallemployeewhounderme=async(req,res)=>{
-  const token = req.cookies.token;
-  if (!token) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
+
+
+const viewallemployeewhounderme = async (req, res) => {
   try {
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
-    if(!decode){
+   
+    if (!req.manager) {
       return res.status(401).json({ message: "Unauthorized" });
     }
-    const employee = await usermodel.find({Under_manager:decode.managerid})
-    res.status(200).json(employee);
+
+    const employees = await usermodel.find({ Under_manager: req.manager._id })
+      .select('-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordUpdatedAt');
+
+    if (!employees.length) {
+      return res.status(404).json({ message: "No employees found under this manager" });
+    }
+
+    res.status(200).json(employees);
+
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: error.message });
   }
-}
+};
+
 
 const forgetpasswordloginbyotp = async (req, res) => {
 
@@ -821,94 +819,80 @@ const resetManagerPassword = async (req, res) => {
 };
 
 const getmyleaves = async (req, res) => {
-  const token = req.cookies.token;
-  if (!token) {
-    return res.status(401).json({
-      message: "Unauthorized"
-    })
-  }
-  try { 
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
-    const manager = await managermodel.findOne({
-      work_email: decode.work_email
-    });
-    if (!manager) {
-      return res.status(404).json({
-        message: "Manager not found"
-      });
+  try {
+ 
+    if (!req.manager) {
+      return res.status(401).json({ message: "Unauthorized" });
     }
-    const leaves = await  LeaveBalance.find({
-      employee: manager._id
-    })
+
+    const manager = req.manager;
+
+    const leaves = await LeaveBalance.find({ employee: manager._id });
+
+    if (!leaves.length) {
+      return res.status(404).json({ message: "No leaves found for this manager" });
+    }
+
     res.status(200).json(leaves);
+
   } catch (error) {
-    res.status(500).json({
-      error: error.message
-    });
+    res.status(500).json({ message: error.message });
   }
-}
+};
 
 
-const reviewtoemployee=async(req,res)=>{
-  const token = req.cookies.token;
-  const { employeeid, rating, comment } = req.body;
-  if(!token){
-    return res.status(401).json({
-      message:"Unauthorized"
-    })
-  }
-  let decode;
-  try{
-    decode= jwt.verify(token,process.env.JWT_SECRET);
-     if (decode.role !== "manager") {
-      return res.status(403).json({
-        message: "Only managers can review employees"
-      });
+const reviewtoemployee = async (req, res) => {
+  try {
+    const { employeeid, rating, comment } = req.body;
+
+    if (!req.manager) {
+      return res.status(401).json({ message: "Unauthorized" });
     }
-    let managerid=decode.managerid;
-    const employee = await usermodel.findById({
+
+    const manager = req.manager;
+
+    if (!rating || !comment) {
+      return res.status(400).json({ message: "Rating and comment are required" });
+    }
+
+    const employee = await usermodel.findOne({
       _id: employeeid,
-      under_manager: managerid
+      Under_manager: manager._id
     });
+
     if (!employee) {
-      return res.status(404).json({
-        message: "Employee not found"
-      });
+      return res.status(404).json({ message: "Employee not found under your management" });
     }
-     const existingReview = await Review.findOne({
-  reviewer: managerid,
-  reviewee: employeeid
-});
 
-if (existingReview) {
-  return res.status(400).json({
-    message: "You already reviewed this employee"
-  });
-}
+    const existingReview = await Review.findOne({
+      reviewer: manager._id,
+      reviewee: employeeid
+    });
 
-      const review = await Review.create({
-      reviewerRole: decode.role,
-      reviewer: managerid,
-      reviewerRoleModel: decode.role,
+    if (existingReview) {
+      return res.status(400).json({ message: "You already reviewed this employee" });
+    }
+
+    const review = await Review.create({
+      reviewerRole: manager.role,
+      reviewer: manager._id,
+      reviewerRoleModel: manager.role,
       revieweeRole: employee.role,
-      reviewee: employeeid,
+      reviewee: employee._id,
       revieweeRoleModel: employee.role,
       rating,
       comment
     });
 
-       res.status(201).json({
+    res.status(201).json({
       message: "Employee reviewed successfully",
       review
     });
-    
-  }
-  catch(error){
-    res.status(500).json({
-      error:error.message
-    })
-  }
-}
 
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+// Done
 
-module.exports = { verifyManagerEmail  , managerlogin, managerlogout, showPasswordPage,managerFirstLoginPasswordChange, managerUpdatePassword, userunderme, managerupdatepassword, viewallleaves, acceptleaverequest, rejectleaverequest, forwardedtoadmin, showannouncements, viewEmployeeDocuments, viewallemployeewhounderme, forgetpasswordloginbyotp, showPasswordPageotp,verifyManagerOtp, resetManagerPassword ,getmyleaves,applyleavem,reviewtoemployee};
+module.exports = { verifyManagerEmail  , managerlogin, managerlogout, showPasswordPage,managerFirstLoginPasswordChange, managerUpdatePassword, userunderme,  viewallleaves, acceptleaverequest, rejectleaverequest, forwardedtoadmin, showannouncements, viewEmployeeDocuments, viewallemployeewhounderme, forgetpasswordloginbyotp, showPasswordPageotp,verifyManagerOtp, resetManagerPassword ,getmyleaves,applyleavem,reviewtoemployee};
