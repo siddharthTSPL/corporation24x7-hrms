@@ -15,68 +15,85 @@ const Review = require("../Models/review.model");
 
 const adminlogin = async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { identifier, password } = req.body;
 
-    const validusername = await Adminmodel.findOne({ username: username });
-
-    if (!validusername) {
-      return res.status(404).json({ message: "Admin not found" });
+    if (!identifier || !password) {
+      return res.status(400).json({ message: "All fields are required" });
     }
 
-    const validpassword = await validusername.isValidPassword(password);
+    const admin = await Adminmodel.findOne({
+      $or: [{ email: identifier }, { username: identifier }],
+    });
 
-    if (!validpassword) {
-      return res.status(401).json({ message: "Invalid password" });
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found" });
+    }
+    const isMatch = await admin.isValidPassword(password);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid credentials" });
     }
 
     const token = jwt.sign(
       {
-        username: validusername.username,
-        adminid: validusername._id,
-        role: validusername.role,
-        email: validusername.email,
-
+        adminid: admin._id,
+        role: admin.role,
+        email: admin.email,
       },
       process.env.JWT_SECRET,
-      { expiresIn: "15d" },
+      { expiresIn: "15d" }
     );
-    res.cookie("token", token, { httpOnly: true });
-    await Adminmodel.findOneAndUpdate(
-      { username: validusername.username },
-      { status: "active" },
-    );
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: false, 
+      sameSite: "strict",
+    });
+
+    admin.status = "active";
+    await admin.save();
 
     res.status(200).json({
-      message: "Admin login successful",
-      admin: validusername.username,
+      message: "Login successful",
+      admin: {
+        id: admin._id,
+        username: admin.username,
+        email: admin.email,
+      },
     });
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
+
 const adminlogout = async (req, res) => {
-  const token = req.cookies.token;
   try {
-    if (!token) {
+    const admin = req.admin;
+    console.log(admin);
+
+    if (!admin) {
       return res.status(401).json({ message: "Unauthorized" });
     }
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
-    if (!decode) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-    await Adminmodel.findOneAndUpdate(
-      { username: decode.username },
-      { status: "inactive" },
-    );
+
+    admin.status = "inactive";
+    await admin.save();
+
     res.clearCookie("token", {
       httpOnly: true,
+      secure: false, 
+      sameSite: "strict",
     });
-    res.status(200).json({ message: "Admin logout successful" });
+
+    return res.status(200).json({
+      message: "Admin logout successful",
+    });
+
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 };
+
 
 const addmanager = async (req, res) => {
   const {
