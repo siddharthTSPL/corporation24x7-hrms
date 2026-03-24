@@ -2,6 +2,7 @@ const express = require("express");
 const userrouter = express.Router();
 
 const usercontroller = require("../controllers/user.controller");
+const employeemiddleware = require("../middleware/auth/employee.middleware");
 
 userrouter.get("/verify/:token", usercontroller.verifyUserEmail);
 
@@ -14,19 +15,28 @@ userrouter.post(
   usercontroller.firstloginresetUserPassword,
 );
 
-userrouter.post("/logout", usercontroller.userlogout);
-userrouter.post("/updatepassword", usercontroller.updatepassword);
+userrouter.post("/logout",employeemiddleware,employeemiddleware,usercontroller.userlogout);
 
-userrouter.post("/applyleave", usercontroller.applyleave);
-userrouter.get("/resultofleaverequest", usercontroller.resultofleaverequest);
 
-userrouter.get("/showannouncements", usercontroller.showannouncements);
+userrouter.post("/updatepassword",employeemiddleware,usercontroller.updatepassword);
+
+userrouter.post("/applyleave", employeemiddleware,usercontroller.applyleave);
+
+
+userrouter.get("/resultofleaverequest/:id",employeemiddleware,usercontroller.resultofleaverequest);
+userrouter.get("/getallleave",employeemiddleware, usercontroller.getallleave);
+
+userrouter.get("/showannouncements", employeemiddleware,usercontroller.showannouncements);
+
+
+
 userrouter.post("/forgetpassword", usercontroller.forgetpasswordloginbyotp);
-userrouter.post("/verifyuOtp", usercontroller.verifyOtp);
+userrouter.post("/verifyotp", usercontroller.verifyOtp);
 userrouter.post(
   "/resetPasswordafterforget",
   usercontroller.resetPasswordafterforget,
 );
-userrouter.get("/getallleave", usercontroller.getallleave);
+
+// done
 
 module.exports = userrouter;
