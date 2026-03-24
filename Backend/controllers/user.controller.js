@@ -34,11 +34,34 @@ const verifyUserEmail = async (req, res) => {
   }
 };
 
+const showUserPasswordPage = (req, res) => {
+  const token = req.query.token;
+
+  res.send(`
+    <h2>Set Your Password</h2>
+
+    <form action="/user/resetUserPassword" method="POST">
+
+      <input type="hidden" name="token" value="${token}" />
+
+      <input type="password" name="newPassword" placeholder="Enter new password" required/>
+
+      <button type="submit">Update Password</button>
+
+    </form>
+  `);
+};
+
 const userlogin = async (req, res) => {
   try {
-    const { work_email, password } = req.body;
+    const { identifier, password } = req.body; 
 
-    const isvaliduser = await usermodel.findOne({ work_email });
+    const isvaliduser = await usermodel.findOne({
+      $or: [
+        { work_email: identifier },
+        { username: identifier }
+      ]
+    });
 
     if (!isvaliduser) {
       return res.status(404).json({
@@ -64,7 +87,7 @@ const userlogin = async (req, res) => {
       const resetToken = jwt.sign(
         { work_email: isvaliduser.work_email },
         process.env.JWT_SECRET,
-        { expiresIn: "15m" },
+        { expiresIn: "15m" }
       );
 
       const link = `http://localhost:5000/user/change-password?token=${resetToken}`;
@@ -74,21 +97,15 @@ const userlogin = async (req, res) => {
         subject: "Set Your Password",
         html: `
           <h2>Hello ${isvaliduser.f_name}</h2>
-
           <p>This is your first login.</p>
-
-          <p>Please click the link below to set your password:</p>
-
-          <a href="${link}">
-            Change Password
-          </a>
-
+          <p>Please click below to set your password:</p>
+          <a href="${link}">Change Password</a>
           <p>This link expires in 15 minutes.</p>
         `,
       });
 
       return res.status(403).json({
-        message: "First login detected. Check your email to set password.",
+        message: "First login detected. Check your email.",
       });
     }
 
@@ -98,19 +115,19 @@ const userlogin = async (req, res) => {
         work_email: isvaliduser.work_email,
       },
       process.env.JWT_SECRET,
-      { expiresIn: "15d" },
+      { expiresIn: "15d" }
     );
 
     res.cookie("token", token, { httpOnly: true });
 
-    await usermodel.findOneAndUpdate(
-      { work_email: isvaliduser.work_email },
-      { status: "active" },
-    );
+    await usermodel.findByIdAndUpdate(isvaliduser._id, {
+      status: "active",
+    });
 
     res.status(200).json({
       message: "Login successful",
     });
+
   } catch (error) {
     res.status(500).json({
       message: error.message,
@@ -118,23 +135,8 @@ const userlogin = async (req, res) => {
   }
 };
 
-const showUserPasswordPage = (req, res) => {
-  const token = req.query.token;
 
-  res.send(`
-    <h2>Set Your Password</h2>
 
-    <form action="/user/resetUserPassword" method="POST">
-
-      <input type="hidden" name="token" value="${token}" />
-
-      <input type="password" name="newPassword" placeholder="Enter new password" required/>
-
-      <button type="submit">Update Password</button>
-
-    </form>
-  `);
-};
 
 const firstloginresetUserPassword = async (req, res) => {
   const { token, newPassword } = req.body;
@@ -168,102 +170,142 @@ const firstloginresetUserPassword = async (req, res) => {
   }
 };
 
+
+
 const userlogout = async (req, res) => {
-  const token = req.cookies.token;
   try {
-    if (!token) {
+    const employee = req.employee; 
+
+    if (!employee) {
       return res.status(401).json({ message: "Unauthorized" });
     }
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
-    if (!decode) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-    await usermodel.findOneAndUpdate(
-      { work_email: decode.work_email },
-      { status: "inactive" },
-    );
+    await usermodel.findByIdAndUpdate(employee._id, {
+      status: "inactive",
+    });
+
     res.clearCookie("token", {
       httpOnly: true,
+      sameSite: "lax",
+      secure: false, 
     });
-    res.status(200).json({ message: "User logout successful" });
+
+    return res.status(200).json({
+      message: "User logout successful",
+    });
+
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({
+      message: error.message,
+    });
   }
 };
+
 
 const updatepassword = async (req, res) => {
-  const token = req.cookies.token;
-  if (!token) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-  const { oldpassword, newpassword } = req.body;
   try {
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await usermodel.findOne({ work_email: decode.work_email });
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    const employee = req.employee;
+    const { oldpassword, newpassword } = req.body;
+  
+    if (!oldpassword || !newpassword) {
+      return res.status(400).json({
+        message: "Old and new password required",
+      });
     }
-    const isvalid = await user.isValidPassword(oldpassword);
+
+    if (!employee || !employee.password) {
+      return res.status(400).json({
+        message: "User password not found",
+      });
+    }
+
+    let isvalid;
+    try {
+      isvalid = await employee.isValidPassword(oldpassword);
+    } catch (err) {
+      return res.status(400).json({
+        message: "Invalid password data",
+      });
+    }
+
     if (!isvalid) {
-      return res.status(400).json({ message: "Old password is incorrect" });
+      return res.status(400).json({
+        message: "Old password is incorrect",
+      });
     }
 
-    user.password = newpassword;
+    employee.password = newpassword;
+    employee.passwordupdatedAt = Date.now();
 
-    await user.save();
+    await employee.save();
 
-    res.status(200).json({
+    return res.status(200).json({
       message: "Password updated successfully",
     });
+
   } catch (error) {
-    res.status(500).json({
-      error: error.message,
+    console.log(error);
+    return res.status(500).json({
+      message: error.message,
     });
   }
 };
 
+
+
 const applyleave = async (req, res) => {
-  const token = req.cookies.token;
-  if (!token) return res.status(401).json({ message: "Unauthorized" });
-
-  const { leaveType, startDate, endDate, reason } = req.body;
-
   try {
+    const user = req.employee; 
+    const { leaveType, startDate, endDate, reason } = req.body;
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
-
-    const user = await usermodel.findOne({ work_email: decode.work_email });
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!leaveType || !startDate || !endDate || !reason) {
+      return res.status(400).json({
+        message: "All fields are required",
+      });
+    }
 
     const start = new Date(startDate);
     const end = new Date(endDate);
 
     if (end < start) {
-      return res.status(400).json({ message: "End date cannot be before start date" });
+      return res.status(400).json({
+        message: "End date cannot be before start date",
+      });
     }
 
     const days =
       Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
-    if (leaveType === "ml" && (user.gender !== "female" || user.marital_status !== "married")) {
-      return res.status(400).json({ message: "Not eligible for maternity leave" });
+    if (
+      leaveType === "ml" &&
+      (user.gender !== "female" || user.marital_status !== "married")
+    ) {
+      return res.status(400).json({
+        message: "Not eligible for maternity leave",
+      });
     }
 
-    if (leaveType === "pl" && (user.gender !== "male" || user.marital_status !== "married")) {
-      return res.status(400).json({ message: "Not eligible for paternity leave" });
+    if (
+      leaveType === "pl" &&
+      (user.gender !== "male" || user.marital_status !== "married")
+    ) {
+      return res.status(400).json({
+        message: "Not eligible for paternity leave",
+      });
     }
-
 
     const overlapping = await Leave.findOne({
       employee: user._id,
       status: { $nin: ["rejected_admin", "rejected_manager"] },
       startDate: { $lte: end },
-      endDate: { $gte: start }
+      endDate: { $gte: start },
     });
 
     if (overlapping) {
       return res.status(400).json({
-        message: "Leave already applied for these dates"
+        message: "Leave already applied for these dates",
       });
     }
 
@@ -275,43 +317,58 @@ const applyleave = async (req, res) => {
       endDate: end,
       days,
       reason,
-      status: "pending_manager"
+      status: "pending_manager",
     });
 
     await leave.save();
 
-    res.status(200).json({
+    return res.status(200).json({
       message: "Leave request submitted successfully. Awaiting manager approval.",
-      leave
+      leave,
     });
 
   } catch (error) {
     console.error("Apply Leave Error:", error);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
+
 const resultofleaverequest = async (req, res) => {
-  const token = req.cookies.token;
-  const leaveid = req.params.id;
-  if (!token) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
   try {
-    const leave = await leavemodel.findById(leaveid);
-    if (!leave) {
-      return res.status(404).json({ message: "Leave rejected" });
+    const employee = req.employee; 
+    const leaveid = req.params.id;
+
+    if (!employee) {
+      return res.status(401).json({ message: "Unauthorized" });
     }
+
+    const leave = await Leave.findById(leaveid);
+
+    if (!leave) {
+      return res.status(404).json({ message: "Leave not found" });
+    }
+
+    if (leave.employee.toString() !== employee._id.toString()) {
+      return res.status(403).json({
+        message: "Access denied",
+      });
+    }
+
     if (leave.status === "pending_manager") {
       return res.status(200).json({
         message: "Leave request pending",
       });
     }
+
     if (leave.status === "forwarded_admin") {
       return res.status(200).json({
         message: "Leave request forwarded to admin",
       });
     }
+
     if (
       leave.status === "approved_manager" ||
       leave.status === "approved_admin"
@@ -320,58 +377,90 @@ const resultofleaverequest = async (req, res) => {
         message: "Leave request approved",
       });
     }
-    res.status(200).json({
+
+    return res.status(200).json({
       message: "Leave request status",
       status: leave.status,
     });
+
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
-const getallleave = async (req, res) => {
-  const token = req.cookies.token;
-  if (!token) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-  try {
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await usermodel.findOne({ id: decode.id });
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    const leave = await LeaveBalance.find({ employee: user._id });
-    const { EL, SL, ML, PL, pbc, lwp } = leave[0];
 
-    res.status(200).json({
-      EL: EL.entitled,
-      SL: SL.entitled,
+
+const getallleave = async (req, res) => {
+  try {
+    const user = req.employee; 
+
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const leave = await LeaveBalance.findOne({ employee: user._id });
+
+    if (!leave) {
+      return res.status(404).json({
+        message: "Leave balance not found",
+      });
+    }
+
+    const { EL, SL, ML, PL, pbc, lwp } = leave;
+
+    return res.status(200).json({
+      EL: EL?.entitled || 0,
+      SL: SL?.entitled || 0,
       ML,
       PL,
       pbc,
       lwp,
     });
+
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
+
 const showannouncements = async (req, res) => {
   try {
+    const employee = req.employee; 
+
+    if (!employee) {
+      return res.status(401).json({
+        message: "Unauthorized",
+      });
+    }
+
     const announcements = await announcementmodel.find({
       audience: { $in: ["employees", "all"] },
     });
 
-    res.status(200).json(announcements);
+    return res.status(200).json(announcements);
+
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
-const forgetpasswordloginbyotp = async (req, res) => {
-  const { work_email } = req.body;
 
+const forgetpasswordloginbyotp = async (req, res) => {
   try {
+    const { work_email } = req.body;
+
+    if (!work_email) {
+      return res.status(400).json({
+        message: "Email is required",
+      });
+    }
+
     const user = await usermodel.findOne({ work_email });
 
     if (!user) {
@@ -382,36 +471,40 @@ const forgetpasswordloginbyotp = async (req, res) => {
 
     const otp = generateOTP();
 
+    // ⏱ Expiry (5 min)
+    const expiry = Date.now() + 5 * 60 * 1000;
+
     await OtpModel.findOneAndUpdate(
       { email: work_email },
-      { otp },
-      { upsert: true, new: true },
+      { otp, expiry },
+      { upsert: true, new: true }
     );
 
     await sendEmail({
       to: work_email,
       subject: "Password Reset OTP",
       html: `
-      <h2>Password Reset OTP</h2>
-      <p>Your OTP is:</p>
-      <h1>${otp}</h1>
-      <p>This OTP will expire in 5 minutes.</p>
+        <h2>Password Reset OTP</h2>
+        <p>Your OTP is:</p>
+        <h1>${otp}</h1>
+        <p>This OTP will expire in 5 minutes.</p>
       `,
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       message: "OTP sent to email",
     });
+
   } catch (error) {
-    res.status(500).json({
-      error: error.message,
+    return res.status(500).json({
+      message: error.message,
     });
   }
 };
 
 const verifyOtp = async (req, res) => {
   const { work_email, otp } = req.body;
-
+ console.log(work_email,otp);
   try {
     const otpRecord = await OtpModel.findOne({ email: work_email });
 
@@ -526,7 +619,7 @@ const resetPasswordafterforget = async (req, res) => {
     });
   }
 };
-
+// done
 module.exports = {
   verifyUserEmail,
   userlogin,
