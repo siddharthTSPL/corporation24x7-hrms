@@ -1,6 +1,7 @@
 const express=require('express');
 const managerrouter=express.Router();
 const managercontroller=require('../controllers/manager.controller');
+const managermiddleware=require('../middleware/auth/manager.middleware');
 
 managerrouter.get("/verify/:token", managercontroller.verifyManagerEmail);
 managerrouter.post('/login',managercontroller.managerlogin);

@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const Adminmodel = require("../../Models/Admin.model");
+const adminmodel = require("../../Models/Admin.model");
 
 const adminauth = async (req, res, next) => {
   try {
@@ -10,8 +10,7 @@ const adminauth = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    const admin = await Adminmodel.findById(decoded.adminid);
+    const admin = await adminmodel.findById(decoded.adminid);
 
     if (!admin) {
       return res.status(401).json({ message: "Unauthorized" });
