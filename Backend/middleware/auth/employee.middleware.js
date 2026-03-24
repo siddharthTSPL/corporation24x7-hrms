@@ -16,7 +16,10 @@ const authemployee = async (req, res, next) => {
     if (!employee) {
       return res.status(401).json({ message: "Unauthorized" });
     }
- console.log(employee)
+    if(decoded.role !== "employee"){
+      return res.status(403).json({ message: "Access denied" });
+    }
+
     req.employee = employee;
 
     next();
