@@ -1,5 +1,6 @@
 const express = require("express");
 const adminrouter = express.Router();
+const adminauthmiddleware=require('../middleware/auth/admin.middleware')
 const {
   adminlogin,
   adminlogout,
@@ -17,9 +18,9 @@ const {
 } = require("../controllers/admin.controller");
 
 adminrouter.post("/login", adminlogin);
-adminrouter.post("/logout", adminlogout);
-adminrouter.post("/addmanager", addmanager);
-adminrouter.post("/adduser", adduser);
+adminrouter.post("/logout", adminauthmiddleware, adminlogout);
+adminrouter.post("/addmanager",adminauthmiddleware,addmanager);
+adminrouter.post("/adduser",adminauthmiddleware, adduser);
 adminrouter.get("/getallusers", getallusers);
 adminrouter.get("/getperticularuser/:uid", getperticularuser);
 adminrouter.delete("/deleteuser/:uid", deleteemployee);
