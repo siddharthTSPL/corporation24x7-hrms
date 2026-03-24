@@ -45,7 +45,7 @@ const verifyManagerEmail = async (req,res)=>{
 
 };
 
-
+// Done
 const managerlogin = async (req, res) => {
   try {
 
@@ -127,6 +127,7 @@ const managerlogin = async (req, res) => {
 
   }
 };
+
 
 const managerlogout = async (req, res) => {
   const token = req.cookies.token;
@@ -223,6 +224,8 @@ const managerFirstLoginPasswordChange = async (req, res) => {
 
   }
 };
+
+
 
 const managerUpdatePassword = async (req,res)=>{
 
@@ -906,5 +909,6 @@ if (existingReview) {
     })
   }
 }
+
 
 module.exports = { verifyManagerEmail  , managerlogin, managerlogout, showPasswordPage,managerFirstLoginPasswordChange, managerUpdatePassword, userunderme, managerupdatepassword, viewallleaves, acceptleaverequest, rejectleaverequest, forwardedtoadmin, showannouncements, viewEmployeeDocuments, viewallemployeewhounderme, forgetpasswordloginbyotp, showPasswordPageotp,verifyManagerOtp, resetManagerPassword ,getmyleaves,applyleavem,reviewtoemployee};

@@ -5,9 +5,9 @@ const {
   adminlogin,
   adminlogout,
   addmanager,
-  adduser,
-  getallusers,
-  getperticularuser,
+  addemployee,
+  getallemployee,
+  getperticularemployee,
   deleteemployee,
   acceptleavebyadmin,
   rejectleavebyadmin,
@@ -20,15 +20,15 @@ const {
 adminrouter.post("/login", adminlogin);
 adminrouter.post("/logout", adminauthmiddleware, adminlogout);
 adminrouter.post("/addmanager",adminauthmiddleware,addmanager);
-adminrouter.post("/adduser",adminauthmiddleware, adduser);
-adminrouter.get("/getallusers", getallusers);
-adminrouter.get("/getperticularuser/:uid", getperticularuser);
-adminrouter.delete("/deleteuser/:uid", deleteemployee);
-adminrouter.get("/showforwardedleaves", showforwardedleaves);
-adminrouter.put("/acceptleave/:id", acceptleavebyadmin);
-adminrouter.put("/rejectleave/:id", rejectleavebyadmin);
-adminrouter.get("/noofemployee", noofemployee);
-adminrouter.post("/createannouncement", createannouncement);
-adminrouter.post("/reviewtomanager", reviewtomanager);
+adminrouter.post("/addemployee",adminauthmiddleware, addemployee);
+adminrouter.get("/getallemployee",adminauthmiddleware, getallemployee);
+adminrouter.get("/getperticularemployee/:uid", adminauthmiddleware,getperticularemployee);
+adminrouter.delete("/deleteuser/:uid", adminauthmiddleware,deleteemployee);
+adminrouter.get("/showforwardedleaves",adminauthmiddleware,showforwardedleaves);
+adminrouter.put("/acceptleave/:id",adminauthmiddleware,acceptleavebyadmin);
+adminrouter.put("/rejectleave/:id",adminauthmiddleware,rejectleavebyadmin);
+adminrouter.get("/noofemployee",adminauthmiddleware, noofemployee);
+adminrouter.post("/createannouncement",adminauthmiddleware, createannouncement);
+adminrouter.post("/reviewtomanager",adminauthmiddleware, reviewtomanager);
 
 module.exports = adminrouter;

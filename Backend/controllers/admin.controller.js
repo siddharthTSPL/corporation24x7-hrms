@@ -13,6 +13,7 @@ const LeaveBalance = require("../Models/leavebalance.model");
 const Leave = require("../Models/leave.model");
 const Review = require("../Models/review.model");
 
+// Admin login-identifier and password are required
 const adminlogin = async (req, res) => {
   try {
     const { identifier, password } = req.body;
@@ -109,6 +110,9 @@ const addmanager = async (req, res) => {
     department,
   } = req.body;
 
+  if (!req.admin) {
+  return res.status(401).json({ message: "Unauthorized" });
+}
   try {
     const existingManager = await Managermodel.findOne({ work_email });
 
@@ -171,7 +175,7 @@ const addmanager = async (req, res) => {
   }
 };
 
-const adduser = async (req, res) => {
+const addemployee = async (req, res) => {
   const {
     f_name,
     l_name,
@@ -185,6 +189,10 @@ const adduser = async (req, res) => {
     department,
     Under_manager,
   } = req.body;
+
+  if (!req.admin) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
 
   try {
     const existingUser = await Usermodel.findOne({ work_email });
@@ -249,12 +257,15 @@ const adduser = async (req, res) => {
   }
 };
 
-const getallusers = async (req, res) => {
+const getallemployee = async (req, res) => {
+    if (!req.admin) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
   try {
     const users = await Usermodel.find().populate({
       path: "Under_manager",
       select: "uid f_name l_name work_email role ",
-    });
+    }).select('-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt');
 
     if (!users || users.length === 0) {
       return res.status(404).json({
@@ -274,13 +285,16 @@ const getallusers = async (req, res) => {
   }
 };
 
-const getperticularuser = async (req, res) => {
+const getperticularemployee = async (req, res) => {
+  if (!req.admin) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
   try {
     const { uid } = req.params;
     const user = await Usermodel.findById(uid).populate({
       path: "Under_manager",
       select: "uid f_name l_name work_email role ",
-    });
+    }).select('-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt');
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -291,68 +305,63 @@ const getperticularuser = async (req, res) => {
 };
 
 const deleteemployee = async (req, res) => {
-  const token = req.cookies.token;
-  if (!token) {
+
+  if (!req.admin) {
     return res.status(401).json({ message: "Unauthorized" });
   }
+
   try {
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
-    if (!decode) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
     const { uid } = req.params;
     const user = await Usermodel.findByIdAndDelete(uid);
     const manager = await Managermodel.findByIdAndDelete(uid);
+
     if (!user && !manager) {
       return res.status(404).json({ message: "User not found" });
     }
-    res.status(200).json({ message: "User deleted successfully" });
+
+    res.status(200).json({
+      message: "User deleted successfully",
+    });
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
 const showforwardedleaves = async (req, res) => {
-  const token = req.cookies.token;
-
-  if (!token) {
+  if (!req.admin) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
   try {
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
-    if (!decode) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
     const leaves = await Leave.find({
       status: { $in: ["forwarded_admin", "pending_admin"] },
     })
-      .populate("employee", "name work_email")
-      .populate("manager", "name work_email")
+      .populate("employee", "f_name l_name work_email")
+      .populate("manager", "f_name l_name work_email")
       .sort({ createdAt: -1 });
 
     res.status(200).json({
       count: leaves.length,
       leaves,
     });
+
   } catch (error) {
     console.error("Show Forwarded Leaves Error:", error);
     res.status(500).json({ error: error.message });
   }
 };
 
-const acceptleavebyadmin = async (req, res) => {
-  const token = req.cookies.token;
-  const leaveId = req.params.id;
 
-  if (!token) {
+const acceptleavebyadmin = async (req, res) => {
+
+  if (!req.admin) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  try {
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
+  const leaveId = req.params.id;
 
+  try {
     const leave = await Leave.findById(leaveId);
 
     if (!leave) {
@@ -386,9 +395,8 @@ const acceptleavebyadmin = async (req, res) => {
     }
 
     const updatedBalance = await processLeaveDeduction(leave);
-
     leave.status = "approved_admin";
-    leave.approvedBy = decode.id;
+    leave.approvedBy = req.admin._id;
 
     await leave.save();
 
@@ -397,23 +405,23 @@ const acceptleavebyadmin = async (req, res) => {
       leave,
       leaveBalance: updatedBalance,
     });
+
   } catch (error) {
     console.error("Admin Approve Error:", error);
     res.status(500).json({ error: error.message });
   }
 };
 
-const rejectleavebyadmin = async (req, res) => {
-  const token = req.cookies.token;
-  const leaveId = req.params.id;
 
-  if (!token) {
+const rejectleavebyadmin = async (req, res) => {
+
+  if (!req.admin) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  try {
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
+  const leaveId = req.params.id;
 
+  try {
     const leave = await Leave.findById(leaveId);
 
     if (!leave) {
@@ -428,7 +436,8 @@ const rejectleavebyadmin = async (req, res) => {
     }
 
     leave.status = "rejected_admin";
-    leave.rejectedBy = decode.id;
+    leave.rejectedBy = req.admin._id;
+
     leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     await leave.save();
@@ -437,28 +446,25 @@ const rejectleavebyadmin = async (req, res) => {
       message: "Leave rejected by admin successfully",
       leave,
     });
+
   } catch (error) {
     console.error("Admin Reject Error:", error);
     res.status(500).json({ error: error.message });
   }
 };
 
-const noofemployee = async (req, res) => {
-  const token = req.cookies.token;
 
-  if (!token) {
+
+const noofemployee = async (req, res) => {
+
+  if (!req.admin) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
   try {
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
-    if (!decode) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
     const departments = await uidmodel.find(
       {},
-      { department: 1, lastNumber: 1, _id: 0 },
+      { department: 1, lastNumber: 1, _id: 0 }
     );
 
     let total = 0;
@@ -471,34 +477,30 @@ const noofemployee = async (req, res) => {
       departments,
       totalEmployees: total,
     });
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
+
+
 const createannouncement = async (req, res) => {
-  const token = req.cookies.token;
 
-  const { title, message, audience, priority, expiresAt } = req.body;
-
-  if (!token) {
+  if (!req.admin) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
+  const { title, message, audience, priority, expiresAt } = req.body;
+
   try {
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
-
-    if (!decode) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
     const announcement = new announcementmodel({
       title,
       message,
       audience,
       priority,
       expiresAt,
-      createdBy: decode.adminid,
+      createdBy: req.admin._id,
     });
 
     await announcement.save();
@@ -507,40 +509,39 @@ const createannouncement = async (req, res) => {
       message: "Announcement created successfully",
       announcement,
     });
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const reviewtomanager = async (req, res) => {
-  const token = req.cookies.token;
-  const { managerid, rating, comment } = req.body;
 
-  if (!token) {
+const reviewtomanager = async (req, res) => {
+  if (!req.admin) {
     return res.status(401).json({
       message: "Unauthorized",
     });
   }
+
+  const { managerid, rating, comment } = req.body;
+
   try {
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
-    if (!decode) {
-      return res.status(401).json({
-        message: "Unauthorized",
-      });
-    }
-    const adminrole = decode.role;
-    const adminid = decode.adminid;
+    const adminid = req.admin._id;
+    const adminrole = req.admin.role;
+
     if (adminrole !== "admin") {
       return res.status(403).json({
         message: "Only admin can review managers",
       });
     }
+
     const manager = await Managermodel.findById(managerid);
     if (!manager) {
       return res.status(404).json({
         message: "Manager not found",
       });
     }
+
     const existingreview = await Review.findOne({
       reviewer: adminid,
       reviewee: managerid,
@@ -553,9 +554,9 @@ const reviewtomanager = async (req, res) => {
     }
 
     const review = await Review.create({
-      reviewerRole: decode.role,
+      reviewerRole: adminrole,
       reviewer: adminid,
-      reviewerRoleModel: decode.role,
+      reviewerRoleModel: adminrole,
       revieweeRole: manager.role,
       reviewee: managerid,
       revieweeRoleModel: manager.role,
@@ -567,18 +568,20 @@ const reviewtomanager = async (req, res) => {
       message: "Review submitted successfully",
       review,
     });
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
+// DONE
 
 module.exports = {
   adminlogin,
   adminlogout,
   addmanager,
-  adduser,
-  getallusers,
-  getperticularuser,
+  addemployee,
+  getallemployee,
+  getperticularemployee,
   deleteemployee,
   showforwardedleaves,
   acceptleavebyadmin,
