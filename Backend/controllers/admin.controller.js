@@ -13,7 +13,7 @@ const LeaveBalance = require("../Models/leavebalance.model");
 const Leave = require("../Models/leave.model");
 const Review = require("../Models/review.model");
 
-// Admin login-identifier and password are required
+
 const adminlogin = async (req, res, next) => {
   const { identifier, password } = req.body;
 
@@ -86,9 +86,10 @@ const adminlogout = async (req, res, next) => {
     message: "Admin logout successful",
   });
 };
-//done error handling
 
-const addmanager = async (req, res) => {
+
+
+const addmanager = async (req, res, next) => {
   const {
     f_name,
     l_name,
@@ -103,45 +104,47 @@ const addmanager = async (req, res) => {
   } = req.body;
 
   if (!req.admin) {
-  return res.status(401).json({ message: "Unauthorized" });
-}
-  try {
-    const existingManager = await Managermodel.findOne({ work_email });
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  }
 
-    if (existingManager) {
-      return res.status(400).json({ message: "Manager already exists" });
-    }
+  const existingManager = await Managermodel.findOne({ work_email });
 
-    const uid = await generateUID(department);
+  if (existingManager) {
+    return next(Object.assign(new Error("Manager already exists"), { statusCode: 400 }));
+  }
 
-    const newmanager = new Managermodel({
-      uid,
-      department,
-      f_name,
-      l_name,
-      work_email,
-      gender,
-      marital_status,
-      password,
-      personal_contact,
-      e_contact,
-      role,
-    });
+  const uid = await generateUID(department);
 
-    await newmanager.save();
+  const newmanager = new Managermodel({
+    uid,
+    department,
+    f_name,
+    l_name,
+    work_email,
+    gender,
+    marital_status,
+    password,
+    personal_contact,
+    e_contact,
+    role,
+  });
 
-    const token = jwt.sign(
-      { managerid: newmanager._id },
-      process.env.JWT_SECRET,
-      { expiresIn: "1h" },
-    );
-    await assignDefaultLeave(newmanager);
-    const verifyLink = `http://localhost:5000/manager/verify/${token}`;
+  await newmanager.save();
 
-    await sendEmail({
-      to: work_email,
-      subject: "Verify Your Manager Account",
-      html: `
+  const token = jwt.sign(
+    { managerid: newmanager._id },
+    process.env.JWT_SECRET,
+    { expiresIn: "1h" }
+  );
+
+  await assignDefaultLeave(newmanager);
+
+  const verifyLink = `http://localhost:5000/manager/verify/${token}`;
+
+  await sendEmail({
+    to: work_email,
+    subject: "Verify Your Manager Account",
+    html: `
       <h2>Welcome ${f_name}</h2>
       <p>Your manager account has been created.</p>
       <p>Please verify your email by clicking the button below.</p>
@@ -156,18 +159,15 @@ const addmanager = async (req, res) => {
       ">
       Verify Email
       </a>
-      `,
-    });
+    `,
+  });
 
-    res.status(200).json({
-      message: "Manager added successfully. Verification email sent.",
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+  res.status(200).json({
+    message: "Manager added successfully. Verification email sent.",
+  });
 };
 
-const addemployee = async (req, res) => {
+const addemployee = async (req, res, next) => {
   const {
     f_name,
     l_name,
@@ -181,47 +181,53 @@ const addemployee = async (req, res) => {
     department,
     Under_manager,
   } = req.body;
-
+ 
   if (!req.admin) {
-    return res.status(401).json({ message: "Unauthorized" });
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
 
-  try {
-    const existingUser = await Usermodel.findOne({ work_email });
+if (!f_name || !work_email || !password) {
+  return next(Object.assign(new Error("Required fields missing"), { statusCode: 400 }));
+}
+  const existingUser = await Usermodel.findOne({ work_email });
 
-    if (existingUser) {
-      return res.status(400).json({ message: "User already exists" });
-    }
+  if (existingUser) {
+    return next(Object.assign(new Error("User already exists"), { statusCode: 400 }));
+  }
 
-    const uid = await generateUID(department);
+  const uid = await generateUID(department);
 
-    const newuser = new Usermodel({
-      uid,
-      f_name,
-      l_name,
-      work_email,
-      gender,
-      marital_status,
-      password,
-      personal_contact,
-      e_contact,
-      role,
-      department,
-      Under_manager,
-    });
+  const newuser = new Usermodel({
+    uid,
+    f_name,
+    l_name,
+    work_email,
+    gender,
+    marital_status,
+    password,
+    personal_contact,
+    e_contact,
+    role,
+    department,
+    Under_manager,
+  });
 
-    await newuser.save();
+  await newuser.save();
 
-    const token = jwt.sign({ userid: newuser._id }, process.env.JWT_SECRET, {
-      expiresIn: "1h",
-    });
-    await assignDefaultLeave(newuser);
-    const verifyLink = `http://localhost:5000/user/verify/${token}`;
+  const token = jwt.sign(
+    { userid: newuser._id },
+    process.env.JWT_SECRET,
+    { expiresIn: "1h" }
+  );
 
-    await sendEmail({
-      to: work_email,
-      subject: "Verify Your Employee Account",
-      html: `
+  await assignDefaultLeave(newuser);
+
+  const verifyLink = `http://localhost:5000/user/verify/${token}`;
+
+  await sendEmail({
+    to: work_email,
+    subject: "Verify Your Employee Account",
+    html: `
       <h2>Welcome ${f_name}</h2>
       <p>Your employee account has been created.</p>
       <p>Please verify your email by clicking the button below.</p>
@@ -236,344 +242,305 @@ const addemployee = async (req, res) => {
       ">
       Verify Email
       </a>
-      `,
-    });
+    `,
+  });
 
-    res.status(200).json({
-      message: "User added successfully. Verification email sent.",
-    });
-  } catch (error) {
-    res.status(500).json({
-      error: error.message,
-    });
-  }
+  res.status(200).json({
+    message: "User added successfully. Verification email sent.",
+  });
 };
 
-const getallemployee = async (req, res) => {
-    if (!req.admin) {
-    return res.status(401).json({ message: "Unauthorized" });
+
+const getallemployee = async (req, res, next) => {
+  if (!req.admin) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
-  try {
-    const users = await Usermodel.find().populate({
+
+  const users = await Usermodel.find()
+    .populate({
       path: "Under_manager",
-      select: "uid f_name l_name work_email role ",
-    }).select('-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt');
-
-    if (!users || users.length === 0) {
-      return res.status(404).json({
-        message: "No users found",
-      });
-    }
-
-    res.status(200).json({
-      count: users.length,
-      users,
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: "Error fetching users",
-      error: error.message,
-    });
-  }
-};
-
-const getperticularemployee = async (req, res) => {
-  if (!req.admin) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-  try {
-    const { uid } = req.params;
-    const user = await Usermodel.findById(uid).populate({
-      path: "Under_manager",
-      select: "uid f_name l_name work_email role ",
-    }).select('-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt');
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    res.status(200).json(user);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-const deleteemployee = async (req, res) => {
-
-  if (!req.admin) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  try {
-    const { uid } = req.params;
-    const user = await Usermodel.findByIdAndDelete(uid);
-    const manager = await Managermodel.findByIdAndDelete(uid);
-
-    if (!user && !manager) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.status(200).json({
-      message: "User deleted successfully",
-    });
-
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-const showforwardedleaves = async (req, res) => {
-  if (!req.admin) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  try {
-    const leaves = await Leave.find({
-      status: { $in: ["forwarded_admin", "pending_admin"] },
+      select: "uid f_name l_name work_email role",
     })
-      .populate("employee", "f_name l_name work_email")
-      .populate("manager", "f_name l_name work_email")
-      .sort({ createdAt: -1 });
-
-    res.status(200).json({
-      count: leaves.length,
-      leaves,
-    });
-
-  } catch (error) {
-    console.error("Show Forwarded Leaves Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-};
-
-
-const acceptleavebyadmin = async (req, res) => {
-
-  if (!req.admin) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  const leaveId = req.params.id;
-
-  try {
-    const leave = await Leave.findById(leaveId);
-
-    if (!leave) {
-      return res.status(404).json({ message: "Leave not found" });
-    }
-
-    if (
-      leave.status.startsWith("approved") ||
-      leave.status.startsWith("rejected")
-    ) {
-      return res.status(400).json({ message: "Leave already processed" });
-    }
-
-    const leaveBalance = await LeaveBalance.findOne({
-      employee: leave.employee,
-    });
-
-    if (!leaveBalance) {
-      return res.status(404).json({ message: "Leave balance not found" });
-    }
-
-    if (leave.leaveType === "ml") {
-      const start = new Date(leave.startDate);
-      const end = new Date(start);
-      end.setDate(end.getDate() + 181);
-
-      leaveBalance.mlStartDate = start;
-      leaveBalance.mlEndDate = end;
-
-      await leaveBalance.save();
-    }
-
-    const updatedBalance = await processLeaveDeduction(leave);
-    leave.status = "approved_admin";
-    leave.approvedBy = req.admin._id;
-
-    await leave.save();
-
-    res.status(200).json({
-      message: "Leave approved by admin",
-      leave,
-      leaveBalance: updatedBalance,
-    });
-
-  } catch (error) {
-    console.error("Admin Approve Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-};
-
-
-const rejectleavebyadmin = async (req, res) => {
-
-  if (!req.admin) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  const leaveId = req.params.id;
-
-  try {
-    const leave = await Leave.findById(leaveId);
-
-    if (!leave) {
-      return res.status(404).json({ message: "Leave not found" });
-    }
-
-    if (
-      leave.status.startsWith("approved") ||
-      leave.status.startsWith("rejected")
-    ) {
-      return res.status(400).json({ message: "Leave already processed" });
-    }
-
-    leave.status = "rejected_admin";
-    leave.rejectedBy = req.admin._id;
-
-    leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-    await leave.save();
-
-    res.status(200).json({
-      message: "Leave rejected by admin successfully",
-      leave,
-    });
-
-  } catch (error) {
-    console.error("Admin Reject Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-};
-
-
-
-const noofemployee = async (req, res) => {
-
-  if (!req.admin) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  try {
-    const departments = await uidmodel.find(
-      {},
-      { department: 1, lastNumber: 1, _id: 0 }
+    .select(
+      "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt"
     );
 
-    let total = 0;
-
-    departments.forEach((dep) => {
-      total += dep.lastNumber;
-    });
-
-    res.status(200).json({
-      departments,
-      totalEmployees: total,
-    });
-
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  if (!users || users.length === 0) {
+    return next(Object.assign(new Error("No users found"), { statusCode: 404 }));
   }
+
+  res.status(200).json({
+    count: users.length,
+    users,
+  });
+};
+
+
+const getperticularemployee = async (req, res, next) => {
+  if (!req.admin) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  }
+
+  const { uid } = req.params;
+
+  const user = await Usermodel.findById(uid)
+    .populate({
+      path: "Under_manager",
+      select: "uid f_name l_name work_email role",
+    })
+    .select(
+      "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt"
+    );
+
+  if (!user) {
+    return next(Object.assign(new Error("User not found"), { statusCode: 404 }));
+  }
+
+  res.status(200).json(user);
 };
 
 
 
-const createannouncement = async (req, res) => {
-
+const deleteemployee = async (req, res, next) => {
   if (!req.admin) {
-    return res.status(401).json({ message: "Unauthorized" });
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  }
+
+  const { uid } = req.params;
+
+  const user = await Usermodel.findByIdAndDelete(uid);
+  const manager = await Managermodel.findByIdAndDelete(uid);
+
+  if (!user && !manager) {
+    return next(Object.assign(new Error("User not found"), { statusCode: 404 }));
+  }
+
+  res.status(200).json({
+    message: "User deleted successfully",
+  });
+};
+
+const showforwardedleaves = async (req, res, next) => {
+  if (!req.admin) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  }
+
+  const leaves = await Leave.find({
+    status: { $in: ["forwarded_admin", "pending_admin"] },
+  })
+    .populate("employee", "f_name l_name work_email")
+    .populate("manager", "f_name l_name work_email")
+    .sort({ createdAt: -1 });
+
+  res.status(200).json({
+    count: leaves.length,
+    leaves,
+  });
+};
+
+
+
+const acceptleavebyadmin = async (req, res, next) => {
+  if (!req.admin) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  }
+
+  const leaveId = req.params.id;
+
+  const leave = await Leave.findById(leaveId);
+
+  if (!leave) {
+    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
+  }
+
+  if (
+    leave.status.startsWith("approved") ||
+    leave.status.startsWith("rejected")
+  ) {
+    return next(Object.assign(new Error("Leave already processed"), { statusCode: 400 }));
+  }
+
+  const leaveBalance = await LeaveBalance.findOne({
+    employee: leave.employee,
+  });
+
+  if (!leaveBalance) {
+    return next(Object.assign(new Error("Leave balance not found"), { statusCode: 404 }));
+  }
+
+  if (leave.leaveType === "ml") {
+    const start = new Date(leave.startDate);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 181);
+
+    leaveBalance.mlStartDate = start;
+    leaveBalance.mlEndDate = end;
+
+    await leaveBalance.save();
+  }
+
+  const updatedBalance = await processLeaveDeduction(leave);
+
+  leave.status = "approved_admin";
+  leave.approvedBy = req.admin._id;
+
+  await leave.save();
+
+  res.status(200).json({
+    message: "Leave approved by admin",
+    leave,
+    leaveBalance: updatedBalance,
+  });
+};
+
+
+const rejectleavebyadmin = async (req, res, next) => {
+  if (!req.admin) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  }
+
+  const leaveId = req.params.id;
+
+  const leave = await Leave.findById(leaveId);
+
+  if (!leave) {
+    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
+  }
+
+  if (
+    leave.status.startsWith("approved") ||
+    leave.status.startsWith("rejected")
+  ) {
+    return next(Object.assign(new Error("Leave already processed"), { statusCode: 400 }));
+  }
+
+  leave.status = "rejected_admin";
+  leave.rejectedBy = req.admin._id;
+
+  leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+  await leave.save();
+
+  res.status(200).json({
+    message: "Leave rejected by admin successfully",
+    leave,
+  });
+};
+
+
+//done error handling
+
+const noofemployee = async (req, res, next) => {
+  if (!req.admin) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  }
+
+  const departments = await uidmodel.find(
+    {},
+    { department: 1, lastNumber: 1, _id: 0 }
+  );
+
+  let total = 0;
+
+  departments.forEach((dep) => {
+    total += dep.lastNumber;
+  });
+
+  res.status(200).json({
+    departments,
+    totalEmployees: total,
+  });
+};
+
+
+const createannouncement = async (req, res, next) => {
+  if (!req.admin) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
 
   const { title, message, audience, priority, expiresAt } = req.body;
 
-  try {
-    const announcement = new announcementmodel({
-      title,
-      message,
-      audience,
-      priority,
-      expiresAt,
-      createdBy: req.admin._id,
-    });
+  const announcement = new announcementmodel({
+    title,
+    message,
+    audience,
+    priority,
+    expiresAt,
+    createdBy: req.admin._id,
+  });
 
-    await announcement.save();
+  await announcement.save();
 
-    res.status(201).json({
-      message: "Announcement created successfully",
-      announcement,
-    });
-
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+  res.status(201).json({
+    message: "Announcement created successfully",
+    announcement,
+  });
 };
 
 
-const reviewtomanager = async (req, res) => {
+const reviewtomanager = async (req, res, next) => {
   if (!req.admin) {
-    return res.status(401).json({
-      message: "Unauthorized",
-    });
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
 
   const { managerid, rating, comment } = req.body;
 
-  try {
-    const adminid = req.admin._id;
-    const adminrole = req.admin.role;
+  const adminid = req.admin._id;
+  const adminrole = req.admin.role;
 
-    if (adminrole !== "admin") {
-      return res.status(403).json({
-        message: "Only admin can review managers",
-      });
-    }
-
-    const manager = await Managermodel.findById(managerid);
-    if (!manager) {
-      return res.status(404).json({
-        message: "Manager not found",
-      });
-    }
-
-    const existingreview = await Review.findOne({
-      reviewer: adminid,
-      reviewee: managerid,
-    });
-
-    if (existingreview) {
-      return res.status(400).json({
-        message: "Review already submitted",
-      });
-    }
-
-    const review = await Review.create({
-      reviewerRole: adminrole,
-      reviewer: adminid,
-      reviewerRoleModel: adminrole,
-      revieweeRole: manager.role,
-      reviewee: managerid,
-      revieweeRoleModel: manager.role,
-      rating,
-      comment,
-    });
-
-    res.status(201).json({
-      message: "Review submitted successfully",
-      review,
-    });
-
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  if (adminrole !== "admin") {
+    return next(
+      Object.assign(new Error("Only admin can review managers"), {
+        statusCode: 403,
+      })
+    );
   }
+
+  const manager = await Managermodel.findById(managerid);
+
+  if (!manager) {
+    return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
+  }
+
+  const existingreview = await Review.findOne({
+    reviewer: adminid,
+    reviewee: managerid,
+  });
+
+  if (existingreview) {
+    return next(
+      Object.assign(new Error("Review already submitted"), {
+        statusCode: 400,
+      })
+    );
+  }
+
+  const review = await Review.create({
+    reviewerRole: adminrole,
+    reviewer: adminid,
+    reviewerRoleModel: adminrole,
+    revieweeRole: manager.role,
+    reviewee: managerid,
+    revieweeRoleModel: manager.role,
+    rating,
+    comment,
+  });
+
+  res.status(201).json({
+    message: "Review submitted successfully",
+    review,
+  });
 };
 
+const getme = async (req, res, next) => {
+  if (!req.admin) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  }
 
-const getme=async(req,res)=>{
-    if(!req.admin){
-        return res.status(401).json({message:"Unauthorized"});
-    }
-    const admin=req.admin;
-    res.status(200).json(admin);
-}
+  const admin = req.admin;
+
+  res.status(200).json(admin);
+};
 
 
 module.exports = {
