@@ -39,4 +39,5 @@ managerrouter.get('/getme',managermiddleware,managercontroller.getme);
 
 
 
+
 module.exports=managerrouter;
