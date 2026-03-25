@@ -21,7 +21,7 @@ app.use('/manager',managerrouter);
 app.use('/user',userrouter);
 app.use('/document',documentroute);
 app.use('/attendance',attendancerouter);
-
+app.get("/favicon.ico", (req, res) => res.status(204).end());
 app.use((req, res, next) => {
   const err = new Error(`Cannot find ${req.originalUrl}`);
   err.statusCode = 404;
