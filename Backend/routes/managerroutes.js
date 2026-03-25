@@ -35,6 +35,7 @@ managerrouter.post('/resetManagerPassword',managercontroller.resetManagerPasswor
 managerrouter.get('/getmyleaves',managermiddleware,managercontroller.getmyleaves);
 managerrouter.post('/applyleavem',managermiddleware,managercontroller.applyleavem);
 managerrouter.post('/reviewtoemployee',managermiddleware,managercontroller.reviewtoemployee);
+managerrouter.get('/getme',managermiddleware,managercontroller.getme);
 
 
 

@@ -113,6 +113,7 @@ const userlogin = async (req, res) => {
       {
         userId: isvaliduser._id,
         work_email: isvaliduser.work_email,
+        role: isvaliduser.role
       },
       process.env.JWT_SECRET,
       { expiresIn: "15d" }
@@ -619,6 +620,23 @@ const resetPasswordafterforget = async (req, res) => {
     });
   }
 };
+
+const getme = async (req, res) => {
+  try {
+    if(!req.employee){
+      return res.status(401).json({message:"Unauthorized"});
+    }
+
+    const employee = req.employee;
+    const leavebalance=await LeaveBalance.find({employee:employee._id});
+    res.status(200).json({
+      employee,
+      leavebalance
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+}
 // done
 module.exports = {
   verifyUserEmail,
@@ -634,4 +652,5 @@ module.exports = {
   verifyOtp,
   resetPasswordafterforget,
   getallleave,
+  getme
 };

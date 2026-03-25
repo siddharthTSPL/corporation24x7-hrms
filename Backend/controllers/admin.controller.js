@@ -14,87 +14,79 @@ const Leave = require("../Models/leave.model");
 const Review = require("../Models/review.model");
 
 // Admin login-identifier and password are required
-const adminlogin = async (req, res) => {
-  try {
-    const { identifier, password } = req.body;
+const adminlogin = async (req, res, next) => {
+  const { identifier, password } = req.body;
 
-    if (!identifier || !password) {
-      return res.status(400).json({ message: "All fields are required" });
-    }
-
-    const admin = await Adminmodel.findOne({
-      $or: [{ email: identifier }, { username: identifier }],
-    });
-
-    if (!admin) {
-      return res.status(404).json({ message: "Admin not found" });
-    }
-    const isMatch = await admin.isValidPassword(password);
-    if (!isMatch) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-
-    const token = jwt.sign(
-      {
-        adminid: admin._id,
-        role: admin.role,
-        email: admin.email,
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "15d" }
-    );
-
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: false, 
-      sameSite: "strict",
-    });
-
-    admin.status = "active";
-    await admin.save();
-
-    res.status(200).json({
-      message: "Login successful",
-      admin: {
-        id: admin._id,
-        username: admin.username,
-        email: admin.email,
-      },
-    });
-
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  if (!identifier || !password) {
+    return next(Object.assign(new Error("All fields are required"), { statusCode: 400 }));
   }
+
+  const admin = await Adminmodel.findOne({
+    $or: [{ email: identifier }, { username: identifier }],
+  });
+
+  if (!admin) {
+    return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
+  }
+
+  const isMatch = await admin.isValidPassword(password);
+  if (!isMatch) {
+    return next(Object.assign(new Error("Invalid credentials"), { statusCode: 401 }));
+  }
+
+  const token = jwt.sign(
+    {
+      adminid: admin._id,
+      role: admin.role,
+      email: admin.email,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "15d" }
+  );
+
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: false,
+    sameSite: "strict",
+  });
+
+  admin.status = "active";
+  await admin.save();
+
+  res.status(200).json({
+    message: "Login successful",
+    admin: {
+      id: admin._id,
+      username: admin.username,
+      email: admin.email,
+    },
+  });
 };
 
 
-const adminlogout = async (req, res) => {
-  try {
-    const admin = req.admin;
-    console.log(admin);
+const adminlogout = async (req, res, next) => {
+  const admin = req.admin;
 
-    if (!admin) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
-    admin.status = "inactive";
-    await admin.save();
-
-    res.clearCookie("token", {
-      httpOnly: true,
-      secure: false, 
-      sameSite: "strict",
-    });
-
-    return res.status(200).json({
-      message: "Admin logout successful",
-    });
-
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
+  if (!admin) {
+    const err = new Error("Unauthorized");
+    err.statusCode = 401;
+    return next(err);
   }
-};
 
+  admin.status = "inactive";
+  await admin.save();
+
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: false,
+    sameSite: "strict",
+  });
+
+  res.status(200).json({
+    message: "Admin logout successful",
+  });
+};
+//done error handling
 
 const addmanager = async (req, res) => {
   const {
@@ -573,7 +565,16 @@ const reviewtomanager = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
-// DONE
+
+
+const getme=async(req,res)=>{
+    if(!req.admin){
+        return res.status(401).json({message:"Unauthorized"});
+    }
+    const admin=req.admin;
+    res.status(200).json(admin);
+}
+
 
 module.exports = {
   adminlogin,
@@ -589,4 +590,5 @@ module.exports = {
   noofemployee,
   createannouncement,
   reviewtomanager,
+  getme
 };
