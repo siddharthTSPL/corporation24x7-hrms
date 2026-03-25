@@ -37,6 +37,7 @@ userrouter.post(
   usercontroller.resetPasswordafterforget,
 );
 
+userrouter.get("/getme",employeemiddleware, usercontroller.getme);
 // done
 
 module.exports = userrouter;
