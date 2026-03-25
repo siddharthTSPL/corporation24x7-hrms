@@ -893,6 +893,28 @@ const reviewtoemployee = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+const getme = async (req, res) => {
+  try {
+
+    if (!req.manager) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const manager = req.manager;
+    const leavebalance = await LeaveBalance.find({ employee: manager._id });
+    const review = await Review.find({ reviewer: manager._id });
+
+    res.status(200).json({
+      manager,
+      leavebalance,
+      review
+    });
+  }
+  catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+}
 // Done
 
-module.exports = { verifyManagerEmail  , managerlogin, managerlogout, showPasswordPage,managerFirstLoginPasswordChange, managerUpdatePassword, userunderme,  viewallleaves, acceptleaverequest, rejectleaverequest, forwardedtoadmin, showannouncements, viewEmployeeDocuments, viewallemployeewhounderme, forgetpasswordloginbyotp, showPasswordPageotp,verifyManagerOtp, resetManagerPassword ,getmyleaves,applyleavem,reviewtoemployee};
+module.exports = { verifyManagerEmail  , managerlogin, managerlogout, showPasswordPage,managerFirstLoginPasswordChange, managerUpdatePassword, userunderme,  viewallleaves, acceptleaverequest, rejectleaverequest, forwardedtoadmin, showannouncements, viewEmployeeDocuments, viewallemployeewhounderme, forgetpasswordloginbyotp, showPasswordPageotp,verifyManagerOtp, resetManagerPassword ,getmyleaves,applyleavem,reviewtoemployee,getme};
