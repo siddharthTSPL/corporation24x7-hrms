@@ -1,5 +1,6 @@
 const express = require("express");
 const adminrouter = express.Router();
+const asyncHandler = require('../middleware/errorhandling/asynchandler');
 const adminauthmiddleware=require('../middleware/auth/admin.middleware')
 const {
   adminlogin,
@@ -14,11 +15,12 @@ const {
   showforwardedleaves,
   noofemployee,
   createannouncement,
-  reviewtomanager
+  reviewtomanager,
+  getme
 } = require("../controllers/admin.controller");
 
-adminrouter.post("/login", adminlogin);
-adminrouter.post("/logout", adminauthmiddleware, adminlogout);
+adminrouter.post("/login", asyncHandler(adminlogin));
+adminrouter.post("/logout", adminauthmiddleware,asyncHandler(adminlogout));
 adminrouter.post("/addmanager",adminauthmiddleware,addmanager);
 adminrouter.post("/addemployee",adminauthmiddleware, addemployee);
 adminrouter.get("/getallemployee",adminauthmiddleware, getallemployee);
@@ -30,5 +32,6 @@ adminrouter.put("/rejectleave/:id",adminauthmiddleware,rejectleavebyadmin);
 adminrouter.get("/noofemployee",adminauthmiddleware, noofemployee);
 adminrouter.post("/createannouncement",adminauthmiddleware, createannouncement);
 adminrouter.post("/reviewtomanager",adminauthmiddleware, reviewtomanager);
+adminrouter.get("/getme",adminauthmiddleware, getme);
 
 module.exports = adminrouter;
