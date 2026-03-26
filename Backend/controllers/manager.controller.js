@@ -14,155 +14,120 @@ const Review = require("../Models/review.model");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 
-const verifyManagerEmail = async (req,res)=>{
-
+const verifyManagerEmail = async (req, res, next) => {
   const { token } = req.params;
 
-  try {
+  const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    const decoded = jwt.verify(token,process.env.JWT_SECRET);
+  const manager = await managermodel.findById(decoded.managerid);
 
-    const manager = await managermodel.findById(decoded.managerid);
-
-    if(!manager){
-      return res.status(404).json({
-        message:"Manager not found"
-      });
-    }
-
-    manager.isVerified = true;
-    await manager.save();
-
-    res.send("Manager email verified successfully");
-
-  } catch (error) {
-
-    res.status(400).json({
-      message:"Invalid or expired verification link"
-    });
-
+  if (!manager) {
+    return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
   }
 
+  manager.isVerified = true;
+  await manager.save();
+
+  res.send("Manager email verified successfully");
 };
 
 
-const managerlogin = async (req, res) => {
-  try {
-    const { work_email, password } = req.body;
+const managerlogin = async (req, res, next) => {
+  const { work_email, password } = req.body;
 
-    if (!work_email || !password) {
-      return res.status(400).json({
-        message: "Email and password are required"
-      });
-    }
+  if (!work_email || !password) {
+    return next(Object.assign(new Error("Email and password are required"), { statusCode: 400 }));
+  }
 
-    const manager = await managermodel.findOne({ work_email });
+  const manager = await managermodel.findOne({ work_email });
 
-    if (!manager) {
-      return res.status(401).json({
-        message: "Invalid credentials"
-      });
-    }
+  if (!manager) {
+    return next(Object.assign(new Error("Invalid credentials"), { statusCode: 401 }));
+  }
 
-    const isValidPassword = await manager.isValidPassword(password);
+  const isValidPassword = await manager.isValidPassword(password);
 
-    if (!isValidPassword) {
-      return res.status(401).json({
-        message: "Invalid credentials"
-      });
-    }
+  if (!isValidPassword) {
+    return next(Object.assign(new Error("Invalid credentials"), { statusCode: 401 }));
+  }
 
-    if (!manager.isVerified) {
-      return res.status(400).json({
-        message: "Please verify your email before login"
-      });
-    }
+  if (!manager.isVerified) {
+    return next(Object.assign(new Error("Please verify your email before login"), { statusCode: 400 }));
+  }
 
-    if (manager.isFirstLogin) {
-      const resetToken = jwt.sign(
-        { work_email: manager.work_email },
-        process.env.JWT_SECRET,
-        { expiresIn: "15m" }
-      );
-
-      const link = `http://localhost:5000/manager/change-password?token=${resetToken}`;
-
-      await sendEmail({
-        to: manager.work_email,
-        subject: "Set Your Password",
-        html: `
-          <h2>Hello ${manager.f_name}</h2>
-          <p>This is your first login.</p>
-          <p>Please click the link below to set your password:</p>
-          <a href="${link}">Change Password</a>
-          <p>This link expires in 15 minutes.</p>
-        `
-      });
-
-      return res.status(403).json({
-        message: "First login detected. Check your email to set password."
-      });
-    }
-
-    const token = jwt.sign(
-      {
-        managerid: manager._id,
-        work_email: manager.work_email,
-        role: manager.role
-      },
+  if (manager.isFirstLogin) {
+    const resetToken = jwt.sign(
+      { work_email: manager.work_email },
       process.env.JWT_SECRET,
-      { expiresIn: "15d" }
+      { expiresIn: "15m" }
     );
 
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "Strict",
-      maxAge: 15 * 24 * 60 * 60 * 1000 
+    const link = `http://localhost:5000/manager/change-password?token=${resetToken}`;
+
+    await sendEmail({
+      to: manager.work_email,
+      subject: "Set Your Password",
+      html: `
+        <h2>Hello ${manager.f_name}</h2>
+        <p>This is your first login.</p>
+        <p>Please click the link below to set your password:</p>
+        <a href="${link}">Change Password</a>
+        <p>This link expires in 15 minutes.</p>
+      `
     });
 
-    manager.status = "active";
-    await manager.save();
-
-    res.status(200).json({
-      message: "Manager login successful"
-    });
-
-  } catch (error) {
-    res.status(500).json({
-      message: error.message
-    });
+    return next(Object.assign(
+      new Error("First login detected. Check your email to set password."),
+      { statusCode: 403 }
+    ));
   }
+
+  const token = jwt.sign(
+    {
+      managerid: manager._id,
+      work_email: manager.work_email,
+      role: manager.role
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "15d" }
+  );
+
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "Strict",
+    maxAge: 15 * 24 * 60 * 60 * 1000
+  });
+
+  manager.status = "active";
+  await manager.save();
+
+  res.status(200).json({
+    message: "Manager login successful"
+  });
 };
 
 
-const managerlogout = async (req, res) => {
-  try {
+const managerlogout = async (req, res, next) => {
 
-    if (!req.manager) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
-    await managermodel.findByIdAndUpdate(
-      req.manager._id,
-      { status: "inactive" }
-    );
-
-    res.clearCookie("token", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "Strict",
-    });
-
-    return res.status(200).json({
-      message: "Manager logout successful"
-    });
-
-  } catch (error) {
-    return res.status(500).json({
-      message: error.message
-    });
+  if (!req.manager) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
+
+  await managermodel.findByIdAndUpdate(
+    req.manager._id,
+    { status: "inactive" }
+  );
+
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "Strict",
+  });
+
+  res.status(200).json({
+    message: "Manager logout successful"
+  });
 };
 
 
@@ -190,567 +155,481 @@ const showPasswordPage = (req, res) => {
 
 };
 
-const managerFirstLoginPasswordChange = async (req, res) => {
+const managerFirstLoginPasswordChange = async (req, res, next) => {
 
   const { token, newpassword } = req.body;
 
   if (!token) {
-    return res.status(401).json({
-      message: "Token missing"
-    });
+    return next(Object.assign(new Error("Token missing"), { statusCode: 401 }));
   }
 
-  try {
-
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
-
-    const manager = await managermodel.findOne({
-      work_email: decode.work_email
-    });
-
-    if (!manager) {
-      return res.status(404).json({
-        message: "Manager not found"
-      });
-    }
-
-    if (!manager.isFirstLogin) {
-      return res.status(400).json({
-        message: "Password already updated"
-      });
-    }
-
-    manager.password = newpassword;
-    manager.isFirstLogin = false;
-    manager.updatedAt = Date.now();
-
-    await manager.save();
-
-    res.status(200).json({
-      message: "Password updated successfully"
-    });
-
-  } catch (error) {
-
-    res.status(500).json({
-      error: error.message
-    });
-
+  if (!newpassword) {
+    return next(Object.assign(new Error("New password is required"), { statusCode: 400 }));
   }
+
+  const decode = jwt.verify(token, process.env.JWT_SECRET);
+
+  const manager = await managermodel.findOne({
+    work_email: decode.work_email
+  });
+
+  if (!manager) {
+    return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
+  }
+
+  if (!manager.isFirstLogin) {
+    return next(Object.assign(new Error("Password already updated"), { statusCode: 400 }));
+  }
+
+  manager.password = newpassword;
+  manager.isFirstLogin = false;
+  manager.updatedAt = Date.now();
+
+  await manager.save();
+
+  res.status(200).json({
+    message: "Password updated successfully"
+  });
 };
 
 
 
-const managerUpdatePassword = async (req, res) => {
-  try {
-   
-    if (!req.manager) {
-      return res.status(401).json({
-        message: "Unauthorized"
-      });
-    }
+const managerUpdatePassword = async (req, res, next) => {
 
-    const { oldpassword, newpassword } = req.body;
-
-   
-    if (!oldpassword || !newpassword) {
-      return res.status(400).json({
-        message: "Old password and new password are required"
-      });
-    }
-
-    const manager = req.manager;
-
-    const isvalid = await manager.isValidPassword(oldpassword);
-
-    if (!isvalid) {
-      return res.status(400).json({
-        message: "Old password is incorrect"
-      });
-    }
-
-  
-    if (oldpassword === newpassword) {
-      return res.status(400).json({
-        message: "New password must be different from old password"
-      });
-    }
-
-    manager.password = newpassword;
-    manager.passwordUpdatedAt = Date.now();
-
-    await manager.save();
-
-    return res.status(200).json({
-      message: "Password updated successfully"
-    });
-
-  } catch (error) {
-    return res.status(500).json({
-      message: error.message
-    });
+  if (!req.manager) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
+
+  const { oldpassword, newpassword } = req.body;
+
+  if (!oldpassword || !newpassword) {
+    return next(Object.assign(
+      new Error("Old password and new password are required"),
+      { statusCode: 400 }
+    ));
+  }
+
+  const manager = req.manager;
+
+  const isvalid = await manager.isValidPassword(oldpassword);
+
+  if (!isvalid) {
+    return next(Object.assign(new Error("Old password is incorrect"), { statusCode: 400 }));
+  }
+
+  if (oldpassword === newpassword) {
+    return next(Object.assign(
+      new Error("New password must be different from old password"),
+      { statusCode: 400 }
+    ));
+  }
+
+  manager.password = newpassword;
+  manager.passwordUpdatedAt = Date.now();
+
+  await manager.save();
+
+  res.status(200).json({
+    message: "Password updated successfully"
+  });
 };
 
 
-const userunderme = async (req, res) => {
-  try {
-   
-    if (!req.manager) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+const userunderme = async (req, res, next) => {
 
-    const managerid = req.manager._id;
-
-    const users = await usermodel
-      .find({ Under_manager: managerid })
-      .select(
-        "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt"
-      );
-
-    if (!users || users.length === 0) {
-      return res.status(404).json({
-        message: "No users found under this manager"
-      });
-    }
-
-    return res.status(200).json(users);
-
-  } catch (error) {
-    return res.status(500).json({
-      message: error.message
-    });
+  if (!req.manager) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
+
+  const managerid = req.manager._id;
+
+  const users = await usermodel
+    .find({ Under_manager: managerid })
+    .select(
+      "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt"
+    );
+
+  if (!users || users.length === 0) {
+    return next(Object.assign(
+      new Error("No users found under this manager"),
+      { statusCode: 404 }
+    ));
+  }
+
+  res.status(200).json(users);
 };
 
 
-const viewallleaves = async (req, res) => {
-  try {
-  
-    if (!req.manager) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
 
-    const managerId = req.manager._id;
+const viewallleaves = async (req, res, next) => {
 
-    const leaves = await leavemodel.find({ manager: managerId })
-      .populate("employee", "f_name l_name work_email role")
-      .sort({ createdAt: -1 });
-
-    return res.status(200).json(leaves);
-
-  } catch (error) {
-    console.error("View Leaves Error:", error);
-    return res.status(500).json({ message: error.message });
+  if (!req.manager) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
+
+  const managerId = req.manager._id;
+
+  const leaves = await leavemodel.find({ manager: managerId })
+    .populate("employee", "f_name l_name work_email role")
+    .sort({ createdAt: -1 });
+
+  res.status(200).json(leaves);
 };
 
 
 
 
-const acceptleaverequest = async (req, res) => {
+const acceptleaverequest = async (req, res, next) => {
   const { leaveId } = req.body;
 
   if (!req.manager) {
-    return res.status(401).json({ message: "Unauthorized" });
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
 
-  try {
-
-    const leave = await leavemodel.findById(leaveId);
-    if (!leave) {
-      return res.status(404).json({ message: "Leave not found" });
-    }
-
-    if (leave.status.startsWith("approved") || leave.status.startsWith("rejected")) {
-      return res.status(400).json({ message: "Leave already processed" });
-    }
-
-    const leaveBalance = await LeaveBalance.findOne({ employee: leave.employee });
-
-    if (!leaveBalance) {
-      return res.status(404).json({ message: "Leave balance not found" });
-    }
-
-    if (leave.leaveType === "ml") {
-      const start = new Date(leave.startDate);
-      const end = new Date(start);
-      end.setDate(end.getDate() + 181);
-
-      leaveBalance.mlStartDate = start;
-      leaveBalance.mlEndDate = end;
-
-      await leaveBalance.save();
-    }
-
-    const updatedBalance = await processLeaveDeduction(leave);
-
-    leave.status = "approved_manager";
-    await leave.save();
-
-    res.status(200).json({
-      message: "Leave approved successfully",
-      leave,
-      leaveBalance: updatedBalance
-    });
-
-  } catch (error) {
-    console.error("Approve Leave Error:", error);
-    res.status(500).json({ message: error.message });
+  if (!leaveId) {
+    return next(Object.assign(new Error("Leave ID is required"), { statusCode: 400 }));
   }
+
+  const leave = await leavemodel.findById(leaveId);
+
+  if (!leave) {
+    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
+  }
+
+  if (
+    leave.status.startsWith("approved") ||
+    leave.status.startsWith("rejected")
+  ) {
+    return next(Object.assign(new Error("Leave already processed"), { statusCode: 400 }));
+  }
+
+  const leaveBalance = await LeaveBalance.findOne({
+    employee: leave.employee,
+  });
+
+  if (!leaveBalance) {
+    return next(Object.assign(new Error("Leave balance not found"), { statusCode: 404 }));
+  }
+
+  if (leave.leaveType === "ml") {
+    const start = new Date(leave.startDate);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 181);
+
+    leaveBalance.mlStartDate = start;
+    leaveBalance.mlEndDate = end;
+
+    await leaveBalance.save();
+  }
+
+  const updatedBalance = await processLeaveDeduction(leave);
+
+  leave.status = "approved_manager";
+  await leave.save();
+
+  res.status(200).json({
+    message: "Leave approved successfully",
+    leave,
+    leaveBalance: updatedBalance,
+  });
 };
 
 
 
-const rejectleaverequest = async (req, res) => {
+const rejectleaverequest = async (req, res, next) => {
   const { leaveId } = req.body;
 
   if (!req.manager) {
-    return res.status(401).json({ message: "Unauthorized" });
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
 
-  try {
-
-    const leave = await leavemodel.findById(leaveId);
-
-    if (!leave) {
-      return res.status(404).json({ message: "Leave not found" });
-    }
-
-    if (leave.status.startsWith("approved") || leave.status.startsWith("rejected")) {
-      return res.status(400).json({ message: "Leave already processed" });
-    }
-
-    leave.status = "rejected_manager";
-    leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-    await leave.save();
-
-    res.status(200).json({
-      message: "Leave rejected successfully",
-      leave
-    });
-
-  } catch (error) {
-    console.error("Reject Leave Error:", error);
-    res.status(500).json({ message: error.message });
+  if (!leaveId) {
+    return next(Object.assign(new Error("Leave ID is required"), { statusCode: 400 }));
   }
+
+  const leave = await leavemodel.findById(leaveId);
+
+  if (!leave) {
+    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
+  }
+
+  if (
+    leave.status.startsWith("approved") ||
+    leave.status.startsWith("rejected")
+  ) {
+    return next(Object.assign(new Error("Leave already processed"), { statusCode: 400 }));
+  }
+
+  leave.status = "rejected_manager";
+  leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+  await leave.save();
+
+  res.status(200).json({
+    message: "Leave rejected successfully",
+    leave
+  });
 };
 
 
-const forwardedtoadmin = async (req, res) => {
+const forwardedtoadmin = async (req, res, next) => {
   const { leaveId } = req.body;
 
   if (!req.manager) {
-    return res.status(401).json({ message: "Unauthorized" });
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
 
-  try {
-
-    const leave = await leavemodel.findById(leaveId);
-
-    if (!leave) {
-      return res.status(404).json({ message: "Leave not found" });
-    }
-
-    if (leave.status.startsWith("approved") || leave.status.startsWith("rejected")) {
-      return res.status(400).json({ message: "Leave already processed" });
-    }
-
-    leave.status = "forwarded_admin";
-
-    await leave.save();
-
-    res.status(200).json({
-      message: "Leave forwarded to admin successfully",
-      leave
-    });
-
-  } catch (error) {
-    console.error("Forward Leave Error:", error);
-    res.status(500).json({ message: error.message });
+  if (!leaveId) {
+    return next(Object.assign(new Error("Leave ID is required"), { statusCode: 400 }));
   }
+
+  const leave = await leavemodel.findById(leaveId);
+
+  if (!leave) {
+    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
+  }
+
+  if (
+    leave.status.startsWith("approved") ||
+    leave.status.startsWith("rejected")
+  ) {
+    return next(Object.assign(new Error("Leave already processed"), { statusCode: 400 }));
+  }
+
+  leave.status = "forwarded_admin";
+
+  await leave.save();
+
+  res.status(200).json({
+    message: "Leave forwarded to admin successfully",
+    leave
+  });
 };
 
 
-const applyleavem = async (req, res) => {
+const applyleavem = async (req, res, next) => {
   const { leaveType, startDate, endDate, reason } = req.body;
 
   if (!req.manager) {
-    return res.status(401).json({ message: "Unauthorized" });
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
 
-  try {
-    const managerId = req.manager._id;
-
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-
-    if (end < start) {
-      return res.status(400).json({
-        message: "End date cannot be before start date"
-      });
-    }
-
-    const days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
-
-    const overlapping = await leavemodel.findOne({
-      manager: managerId,
-      status: { $nin: ["rejected_admin"] },
-      startDate: { $lte: end },
-      endDate: { $gte: start }
-    });
-
-    if (overlapping) {
-      return res.status(400).json({
-        message: "Leave already applied for these dates"
-      });
-    }
-
-    const leave = new leavemodel({
-      manager: managerId,
-      leaveType,
-      startDate: start,
-      endDate: end,
-      days,
-      reason,
-      status: "pending_admin"
-    });
-
-    await leave.save();
-
-    res.status(200).json({
-      message: "Leave request submitted to admin",
-      leave
-    });
-
-  } catch (error) {
-    console.error("Manager Leave Error:", error);
-    res.status(500).json({ message: error.message });
+  if (!startDate || !endDate || !leaveType) {
+    return next(Object.assign(
+      new Error("Required fields missing"),
+      { statusCode: 400 }
+    ));
   }
+
+  const managerId = req.manager._id;
+
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  if (end < start) {
+    return next(Object.assign(
+      new Error("End date cannot be before start date"),
+      { statusCode: 400 }
+    ));
+  }
+
+  const days =
+    Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+
+  const overlapping = await leavemodel.findOne({
+    manager: managerId,
+    status: { $nin: ["rejected_admin"] },
+    startDate: { $lte: end },
+    endDate: { $gte: start }
+  });
+
+  if (overlapping) {
+    return next(Object.assign(
+      new Error("Leave already applied for these dates"),
+      { statusCode: 400 }
+    ));
+  }
+
+  const leave = new leavemodel({
+    manager: managerId,
+    leaveType,
+    startDate: start,
+    endDate: end,
+    days,
+    reason,
+    status: "pending_admin"
+  });
+
+  await leave.save();
+
+  res.status(200).json({
+    message: "Leave request submitted to admin",
+    leave
+  });
 };
 
 
-const showannouncements = async (req, res) => {
-  try {
-   
-    if (!req.manager) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+const showannouncements = async (req, res, next) => {
 
-    const announcements = await announcementmodel.find({
-      audience: { $in: ["managers", "all"] }
-    });
-
-    res.status(200).json(announcements);
-
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  if (!req.manager) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
+
+  const announcements = await announcementmodel.find({
+    audience: { $in: ["managers", "all"] }
+  });
+
+  res.status(200).json(announcements);
 };
 
 
-const viewEmployeeDocuments = async (req, res) => {
-  try {
-    const { employeeId } = req.params;
+const viewEmployeeDocuments = async (req, res, next) => {
+  const { employeeId } = req.params;
 
-    
-    if (!req.manager) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
-   
-    const employee = await usermodel.findOne({
-      _id: employeeId,
-      Under_manager: req.manager._id
-    });
-
-    if (!employee) {
-      return res.status(403).json({
-        message: "This employee is not under your management"
-      });
-    }
-
-    const documents = await Document.find({ employee: employeeId });
-
-    if (!documents.length) {
-      return res.status(404).json({ message: "No documents found" });
-    }
-
-    res.status(200).json({
-      message: "Documents downloaded successfully",
-      url: documents.map((document) => document.fileUrl)
-    });
-
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  if (!req.manager) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
+
+  const employee = await usermodel.findOne({
+    _id: employeeId,
+    Under_manager: req.manager._id
+  });
+
+  if (!employee) {
+    return next(
+      Object.assign(new Error("This employee is not under your management"), {
+        statusCode: 403
+      })
+    );
+  }
+
+  const documents = await Document.find({ employee: employeeId });
+
+  if (!documents.length) {
+    return next(
+      Object.assign(new Error("No documents found"), { statusCode: 404 })
+    );
+  }
+
+  res.status(200).json({
+    message: "Documents fetched successfully",
+    url: documents.map((doc) => doc.fileUrl)
+  });
 };
 
 
-
-const viewallemployeewhounderme = async (req, res) => {
-  try {
-   
-    if (!req.manager) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
-    const employees = await usermodel.find({ Under_manager: req.manager._id })
-      .select('-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordUpdatedAt');
-
-    if (!employees.length) {
-      return res.status(404).json({ message: "No employees found under this manager" });
-    }
-
-    res.status(200).json(employees);
-
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-
-const forgetpasswordloginbyotp = async (req, res) => {
-
+const forgetpasswordloginbyotp = async (req, res, next) => {
   const { work_email } = req.body;
 
-  try {
-
-    const manager = await managermodel.findOne({ work_email });
-
-    if (!manager) {
-      return res.status(404).json({
-        message: "Manager not found"
-      });
-    }
-
-    const otp = generateOTP();
-
-    await OtpModel.findOneAndUpdate(
-      { email: work_email },
-      { otp, createdAt: Date.now() },
-      { upsert: true, new: true }
-    );
-
-    await sendEmail({
-      to: work_email,
-      subject: "Password Reset OTP",
-      html: `
-        <h2>Password Reset Request</h2>
-        <p>Your OTP is:</p>
-        <h1>${otp}</h1>
-        <p>This OTP will expire in 5 minutes.</p>
-      `
-    });
-
-    res.status(200).json({
-      message: "OTP sent to email"
-    });
-
-  } catch (error) {
-
-    res.status(500).json({
-      error: error.message
-    });
-
+  if (!work_email) {
+    return next(Object.assign(new Error("Email is required"), { statusCode: 400 }));
   }
 
+  const manager = await managermodel.findOne({ work_email });
+
+  if (!manager) {
+    return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
+  }
+
+  const otp = generateOTP();
+
+  await OtpModel.findOneAndUpdate(
+    { email: work_email },
+    { otp, createdAt: Date.now() },
+    { upsert: true, new: true }
+  );
+
+  await sendEmail({
+    to: work_email,
+    subject: "Password Reset OTP",
+    html: `
+      <h2>Password Reset Request</h2>
+      <p>Your OTP is:</p>
+      <h1>${otp}</h1>
+      <p>This OTP will expire in 5 minutes.</p>
+    `,
+  });
+
+  res.status(200).json({
+    message: "OTP sent to email",
+  });
 };
 
-const verifyManagerOtp = async (req, res) => {
-
+const verifyManagerOtp = async (req, res, next) => {
   const { work_email, otp } = req.body;
 
-  try {
-
-    const otpRecord = await OtpModel.findOne({ email: work_email });
-
-    if (!otpRecord) {
-      return res.status(404).json({
-        message: "OTP not found"
-      });
-    }
-
-    if (otpRecord.isExpired()) {
-      return res.status(400).json({
-        message: "OTP expired"
-      });
-    }
-
-    const isMatch = otpRecord.compareOtp(otp);
-
-    if (!isMatch) {
-      return res.status(400).json({
-        message: "Invalid OTP"
-      });
-    }
-
-    const manager = await managermodel.findOne({ work_email });
-
-    if (!manager) {
-      return res.status(404).json({
-        message: "Manager not found"
-      });
-    }
-
-
-    const token = jwt.sign(
-      {
-        managerid: manager._id,
-        work_email: manager.work_email
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
-
-    res.cookie("token", token, { httpOnly: true });
-
-    const resetToken = jwt.sign(
-      { work_email: manager.work_email },
-      process.env.JWT_SECRET,
-      { expiresIn: "15m" }
-    );
-
-    const link = `http://localhost:5000/manager/showPasswordPageotp?token=${resetToken}`;
-
-   
-    await sendEmail({
-      to: manager.work_email,
-      subject: "Optional Password Change",
-      html: `
-        <h2>Hello ${manager.f_name}</h2>
-        <p>Your OTP verification was successful.</p>
-
-        <p>If you want to change your password, click the link below:</p>
-
-        <a href="${link}">
-          Change Password
-        </a>
-
-        <p>If you do not want to change your password, you can ignore this email.</p>
-      `
-    });
-
-    await OtpModel.deleteOne({ email: work_email });
-
-    res.status(200).json({
-      message: "OTP verified. Login successful.",
-      my_details: {
-        id: manager._id,
-        email: manager.work_email
-      },
-      passwordResetOptional: true
-    });
-
-  } catch (error) {
-
-    res.status(500).json({
-      error: error.message
-    });
-
+  if (!work_email || !otp) {
+    return next(Object.assign(new Error("Email and OTP are required"), { statusCode: 400 }));
   }
 
+  const otpRecord = await OtpModel.findOne({ email: work_email });
+
+  if (!otpRecord) {
+    return next(Object.assign(new Error("OTP not found"), { statusCode: 404 }));
+  }
+
+  if (otpRecord.isExpired()) {
+    return next(Object.assign(new Error("OTP expired"), { statusCode: 400 }));
+  }
+
+  const isMatch = otpRecord.compareOtp(otp);
+
+  if (!isMatch) {
+    return next(Object.assign(new Error("Invalid OTP"), { statusCode: 400 }));
+  }
+
+  const manager = await managermodel.findOne({ work_email });
+
+  if (!manager) {
+    return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
+  }
+
+  const token = jwt.sign(
+    {
+      managerid: manager._id,
+      work_email: manager.work_email,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "1d" }
+  );
+
+  res.cookie("token", token, { httpOnly: true });
+
+  const resetToken = jwt.sign(
+    { work_email: manager.work_email },
+    process.env.JWT_SECRET,
+    { expiresIn: "15m" }
+  );
+
+  const link = `http://localhost:5000/manager/showPasswordPageotp?token=${resetToken}`;
+
+  await sendEmail({
+    to: manager.work_email,
+    subject: "Optional Password Change",
+    html: `
+      <h2>Hello ${manager.f_name}</h2>
+      <p>Your OTP verification was successful.</p>
+
+      <p>If you want to change your password, click the link below:</p>
+
+      <a href="${link}">
+        Change Password
+      </a>
+
+      <p>If you do not want to change your password, you can ignore this email.</p>
+    `,
+  });
+
+  await OtpModel.deleteOne({ email: work_email });
+
+  res.status(200).json({
+    message: "OTP verified. Login successful.",
+    my_details: {
+      id: manager._id,
+      email: manager.work_email,
+    },
+    passwordResetOptional: true,
+  });
 };
 
 const showPasswordPageotp = (req, res) => {
@@ -775,146 +654,142 @@ const showPasswordPageotp = (req, res) => {
 
 };
 
-const resetManagerPassword = async (req, res) => {
-
+const resetManagerPassword = async (req, res, next) => {
   const { token, newPassword } = req.body;
 
   if (!token) {
-    return res.status(401).json({
-      message: "Token missing"
-    });
+    return next(Object.assign(new Error("Token missing"), { statusCode: 401 }));
   }
 
+  if (!newPassword) {
+    return next(Object.assign(new Error("New password is required"), { statusCode: 400 }));
+  }
+
+  let decode;
+
+
   try {
-
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
-
-    const manager = await managermodel.findOne({
-      work_email: decode.work_email
-    });
-
-    if (!manager) {
-      return res.status(404).json({
-        message: "Manager not found"
-      });
-    }
-
-    manager.password = newPassword;
-
-    await manager.save();
-
-    res.send(`
-      <h2>Password updated successfully</h2>
-      <p>You can now login with your new password.</p>
-    `);
-
+    decode = jwt.verify(token, process.env.JWT_SECRET);
   } catch (error) {
-
-    res.status(500).json({
-      error: "Invalid or expired token"
-    });
-
+    return next(Object.assign(new Error("Invalid or expired token"), { statusCode: 400 }));
   }
 
-};
 
-const getmyleaves = async (req, res) => {
-  try {
+  const manager = await managermodel.findOne({
+    work_email: decode.work_email
+  });
+
+  if (!manager) {
+    return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
+  }
+
  
-    if (!req.manager) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+  manager.password = newPassword;
+  await manager.save();
 
-    const manager = req.manager;
+  res.send(`
+    <h2>Password updated successfully</h2>
+    <p>You can now login with your new password.</p>
+  `);
+};
 
-    const leaves = await LeaveBalance.find({ employee: manager._id });
-
-    if (!leaves.length) {
-      return res.status(404).json({ message: "No leaves found for this manager" });
-    }
-
-    res.status(200).json(leaves);
-
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+const getmyleaves = async (req, res, next) => {
+  if (!req.manager) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
+
+  const manager = req.manager;
+
+  const leaves = await LeaveBalance.find({ employee: manager._id });
+
+  if (!leaves.length) {
+    return next(
+      Object.assign(new Error("No leaves found for this manager"), {
+        statusCode: 404,
+      })
+    );
+  }
+
+  res.status(200).json(leaves);
 };
 
 
-const reviewtoemployee = async (req, res) => {
-  try {
-    const { employeeid, rating, comment } = req.body;
+const reviewtoemployee = async (req, res, next) => {
+  const { employeeid, rating, comment } = req.body;
 
-    if (!req.manager) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
-    const manager = req.manager;
-
-    if (!rating || !comment) {
-      return res.status(400).json({ message: "Rating and comment are required" });
-    }
-
-    const employee = await usermodel.findOne({
-      _id: employeeid,
-      Under_manager: manager._id
-    });
-
-    if (!employee) {
-      return res.status(404).json({ message: "Employee not found under your management" });
-    }
-
-    const existingReview = await Review.findOne({
-      reviewer: manager._id,
-      reviewee: employeeid
-    });
-
-    if (existingReview) {
-      return res.status(400).json({ message: "You already reviewed this employee" });
-    }
-
-    const review = await Review.create({
-      reviewerRole: manager.role,
-      reviewer: manager._id,
-      reviewerRoleModel: manager.role,
-      revieweeRole: employee.role,
-      reviewee: employee._id,
-      revieweeRoleModel: employee.role,
-      rating,
-      comment
-    });
-
-    res.status(201).json({
-      message: "Employee reviewed successfully",
-      review
-    });
-
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  if (!req.manager) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
+
+  if (!rating || !comment) {
+    return next(
+      Object.assign(new Error("Rating and comment are required"), {
+        statusCode: 400,
+      })
+    );
+  }
+
+  const manager = req.manager;
+
+  const employee = await usermodel.findOne({
+    _id: employeeid,
+    Under_manager: manager._id,
+  });
+
+  if (!employee) {
+    return next(
+      Object.assign(
+        new Error("Employee not found under your management"),
+        { statusCode: 404 }
+      )
+    );
+  }
+
+  const existingReview = await Review.findOne({
+    reviewer: manager._id,
+    reviewee: employeeid,
+  });
+
+  if (existingReview) {
+    return next(
+      Object.assign(new Error("You already reviewed this employee"), {
+        statusCode: 400,
+      })
+    );
+  }
+
+  const review = await Review.create({
+    reviewerRole: manager.role,
+    reviewer: manager._id,
+    reviewerRoleModel: manager.role,
+    revieweeRole: employee.role,
+    reviewee: employee._id,
+    revieweeRoleModel: employee.role,
+    rating,
+    comment,
+  });
+
+  res.status(201).json({
+    message: "Employee reviewed successfully",
+    review,
+  });
 };
 
-const getme = async (req, res) => {
-  try {
-
-    if (!req.manager) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
-    const manager = req.manager;
-    const leavebalance = await LeaveBalance.find({ employee: manager._id });
-    const review = await Review.find({ reviewer: manager._id });
-
-    res.status(200).json({
-      manager,
-      leavebalance,
-      review
-    });
+const getme = async (req, res, next) => {
+  if (!req.manager) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
-  catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-}
+
+  const manager = req.manager;
+
+  const leavebalance = await LeaveBalance.find({ employee: manager._id });
+  const review = await Review.find({ reviewer: manager._id });
+
+  res.status(200).json({
+    manager,
+    leavebalance,
+    review,
+  });
+};
 // Done
-
-module.exports = { verifyManagerEmail  , managerlogin, managerlogout, showPasswordPage,managerFirstLoginPasswordChange, managerUpdatePassword, userunderme,  viewallleaves, acceptleaverequest, rejectleaverequest, forwardedtoadmin, showannouncements, viewEmployeeDocuments, viewallemployeewhounderme, forgetpasswordloginbyotp, showPasswordPageotp,verifyManagerOtp, resetManagerPassword ,getmyleaves,applyleavem,reviewtoemployee,getme};
+module.exports = { verifyManagerEmail  , managerlogin, managerlogout, showPasswordPage,managerFirstLoginPasswordChange, managerUpdatePassword, userunderme,  viewallleaves, acceptleaverequest, rejectleaverequest, forwardedtoadmin, showannouncements, viewEmployeeDocuments,  forgetpasswordloginbyotp, showPasswordPageotp,verifyManagerOtp, resetManagerPassword ,getmyleaves,applyleavem,reviewtoemployee,getme};

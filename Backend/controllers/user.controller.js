@@ -137,8 +137,6 @@ const userlogin = async (req, res) => {
 };
 
 
-
-
 const firstloginresetUserPassword = async (req, res) => {
   const { token, newPassword } = req.body;
 
