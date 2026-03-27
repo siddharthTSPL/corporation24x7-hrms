@@ -2,8 +2,9 @@ const express = require("express");
 const userrouter = express.Router();
 const usercontroller = require("../controllers/user.controller");
 const employeemiddleware = require("../middleware/auth/employee.middleware");
+const asyncHandler = require("../middleware/errorhandling/asynchandler");
 
-userrouter.get("/verify/:token", usercontroller.verifyUserEmail);
+userrouter.get("/verify/:token", asyncHandler(usercontroller.verifyUserEmail));
 
 userrouter.post("/login", usercontroller.userlogin);
 
