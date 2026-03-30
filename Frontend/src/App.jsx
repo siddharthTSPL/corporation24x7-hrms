@@ -8,7 +8,9 @@ import Doc from "./pages/document/Doc";
 import Set from "./pages/settings/Set";
 import MainLayout from "./layout/MainLayout";
 
+
 function App() {
+
   return (
     <BrowserRouter>
       <Routes>
@@ -21,6 +23,8 @@ function App() {
          <Route path="/announcement" element={<Announce/>} />
           <Route path="/document" element={<Doc/>} />
           <Route path="/settings" element={<Set/>} />
+
+
           
         </Route>
       </Routes>

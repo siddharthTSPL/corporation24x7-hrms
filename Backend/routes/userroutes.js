@@ -6,38 +6,38 @@ const asyncHandler = require("../middleware/errorhandling/asynchandler");
 
 userrouter.get("/verify/:token", asyncHandler(usercontroller.verifyUserEmail));
 
-userrouter.post("/login", usercontroller.userlogin);
+userrouter.post("/login", asyncHandler(usercontroller.userlogin));
 
 userrouter.get("/change-password", usercontroller.showUserPasswordPage);
 
 userrouter.post(
   "/resetUserPassword",
-  usercontroller.firstloginresetUserPassword,
+  asyncHandler(usercontroller.firstloginresetUserPassword),
 );
 
-userrouter.post("/logout",employeemiddleware,employeemiddleware,usercontroller.userlogout);
+userrouter.post("/logout",employeemiddleware,asyncHandler(usercontroller.userlogout));
 
 
-userrouter.post("/updatepassword",employeemiddleware,usercontroller.updatepassword);
+userrouter.post("/updatepassword",employeemiddleware,asyncHandler(usercontroller.updatepassword));
 
-userrouter.post("/applyleave", employeemiddleware,usercontroller.applyleave);
-
-
-userrouter.get("/resultofleaverequest/:id",employeemiddleware,usercontroller.resultofleaverequest);
-userrouter.get("/getallleave",employeemiddleware, usercontroller.getallleave);
-
-userrouter.get("/showannouncements", employeemiddleware,usercontroller.showannouncements);
+userrouter.post("/applyleave", employeemiddleware,asyncHandler(usercontroller.applyleave));
 
 
+userrouter.get("/resultofleaverequest/:id",employeemiddleware,asyncHandler(usercontroller.resultofleaverequest));
+userrouter.get("/getallleave",employeemiddleware, asyncHandler(usercontroller.getallleave));
 
-userrouter.post("/forgetpassword", usercontroller.forgetpasswordloginbyotp);
-userrouter.post("/verifyotp", usercontroller.verifyOtp);
+userrouter.get("/showannouncements", employeemiddleware,asyncHandler(usercontroller.showannouncements));
+
+
+
+userrouter.post("/forgetpassword",asyncHandler(usercontroller.forgetpasswordloginbyotp));
+userrouter.post("/verifyotp", asyncHandler(usercontroller.verifyOtp));
 userrouter.post(
   "/resetPasswordafterforget",
-  usercontroller.resetPasswordafterforget,
+  asyncHandler(usercontroller.resetPasswordafterforget),
 );
 
-userrouter.get("/getme",employeemiddleware, usercontroller.getme);
+userrouter.get("/getme",employeemiddleware, asyncHandler(usercontroller.getme));
 // done
 
 module.exports = userrouter;
