@@ -1,15 +1,21 @@
-const mongoose=require('mongoose');
-const admingenerate=require('../automatic/admingenarete');
+const mongoose = require('mongoose');
+const admingenerate = require('../automatic/admingenarete');
 require('dotenv').config();
+
 mongoose.set("strictQuery", false);
-const dbconnect=async()=>{
+
+const dbconnect = async () => {
   try {
-     await mongoose.connect(process.env.LINK);
-     await admingenerate();
-     console.log('database connected');
+    console.log("👉 ENV LINK:", process.env.LINK); 
+
+    await mongoose.connect(process.env.LINK);
+
+    await admingenerate();
+
+    console.log('✅ database connected');
   } catch (error) {
-     console.log(error);
+    console.log('❌ DB ERROR:', error);
   }
 }
 
-module.exports=dbconnect
+module.exports = dbconnect;
