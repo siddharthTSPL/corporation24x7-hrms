@@ -57,12 +57,12 @@ export default function LandingPage() {
         {/* LEFT */}
         <div className="flex-1 text-center md:text-left">
           <h1 className="text-3xl md:text-5xl font-bold mb-4 leading-tight">
-            Build Your Website <br /> Without Complexity
+            Streamline Workforce, Strengthen Performance.
           </h1>
 
           <p className="text-gray-600 mb-6">
-            Build a professional website quickly and easily with our user-friendly tools.
-            Whether it's a blog, online store, or business website, SimpliSite has everything you need.
+            Optimize every stage of the employee lifecycle with a robust and reliable Human Resource Management System.
+            
           </p>
 
           {/* BUTTONS */}
@@ -91,9 +91,9 @@ export default function LandingPage() {
       {/* STATS */}
 <section className="grid grid-cols-2 md:grid-cols-4 gap-8 px-6 md:px-12 py-12">
   {[
-    { number: "2K+", text: "Loyal Clients this month" },
-    { number: "5M+", text: "Pages created with ease" },
-    { number: "1M+", text: "Users to collaborate" },
+    { number: "100+", text: "Happy customers of TourchX" },
+    { number: "1k+", text: "No. of live demos" },
+    { number: "10+", text: "Partners to collaborate" },
     { number: "98%", text: "Customer satisfaction" },
   ].map((item, i) => (
     <div key={i} className="flex justify-center">
