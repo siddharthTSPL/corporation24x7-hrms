@@ -27,12 +27,14 @@ function App() {
         {/* Protected / Layout Routes */}
         <Route element={<MainLayout />}>
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/employee" element={<EmployeeTable />} />
-          <Route path="/leave" element={<LeaveTable />} />
-          <Route path="/announcement" element={<Announce />} />
-          <Route path="/document" element={<Doc />} />
-          <Route path="/settings" element={<Set />} />
-          <Route path="/file" element={<File />} />
+         <Route path="/employee" element={<EmployeeTable />} />
+         <Route path="/leave" element={<LeaveTable />} />
+         <Route path="/announcement" element={<Announce/>} />
+          <Route path="/document" element={<Doc/>} />
+          <Route path="/settings" element={<Set/>} />
+
+
+          
         </Route>
       </Routes>
     </BrowserRouter>
