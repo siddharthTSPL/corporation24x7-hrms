@@ -1,17 +1,16 @@
-import { FaBars, FaSearch } from "react-icons/fa";
+import { FaBars, FaSearch, FaBell } from "react-icons/fa";
 import { useEffect, useState } from "react";
 
-export default function Navbar({ collapsed, setCollapsed }) {
+export default function Navbar({ collapsed, setCollapsed, data = [] }) {
   const [dateTime, setDateTime] = useState("");
-  const [thought, setThought] = useState("");
+  const [search, setSearch] = useState("");
+  const [results, setResults] = useState([]);
 
-  // TIME + THOUGHT LOGIC
+  // ✅ LIVE DATE + TIME
   useEffect(() => {
-    const updateTimeAndThought = () => {
+    const updateTime = () => {
       const now = new Date();
-      const hours = now.getHours();
 
-      // FORMAT DATE
       const formatted = now.toLocaleString("en-IN", {
         weekday: "short",
         day: "numeric",
@@ -22,75 +21,86 @@ export default function Navbar({ collapsed, setCollapsed }) {
       });
 
       setDateTime(formatted);
-
-      // THOUGHT BASED ON TIME
-      if (hours >= 5 && hours < 12) {
-        setThought("🌅 Start your day with focus and positivity");
-      } else if (hours >= 12 && hours < 18) {
-        setThought("🌤 Keep pushing, you're doing great");
-      } else {
-        setThought("🌙 Reflect, relax and prepare for tomorrow");
-      }
     };
 
-    updateTimeAndThought();
-    const interval = setInterval(updateTimeAndThought, 60000);
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
 
     return () => clearInterval(interval);
   }, []);
 
+  // ✅ SEARCH FILTER
+  useEffect(() => {
+    if (!search) {
+      setResults([]);
+      return;
+    }
+
+    const filtered = data.filter((item) =>
+      Object.values(item)
+        .join(" ")
+        .toLowerCase()
+        .includes(search.toLowerCase())
+    );
+
+    setResults(filtered);
+  }, [search, data]);
+
   return (
-    <div className="h-auto md:h-16 bg-white shadow px-4 md:px-6 py-2 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+    <div className="w-full bg-white border-b px-4 md:px-6 py-2 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
 
-      {/* TOP ROW */}
-      <div className="flex items-center justify-between md:justify-start gap-3 md:gap-4">
+      {/* LEFT SECTION */}
+      <div className="flex items-center gap-3">
 
-        {/* TOGGLE */}
+        {/* SIDEBAR TOGGLE */}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200"
+          className="hidden md:flex p-2 rounded-lg hover:bg-gray-200"
         >
-          <FaBars />
+          <FaBars className="text-black" />
         </button>
 
-        {/* TITLE */}
-        <h2 className="hidden sm:block font-semibold text-[var(--primary)]">
-          Overview
-        </h2>
-      </div>
-
-      {/* MIDDLE ROW */}
-      <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 flex-1">
-
-        {/* SMALL SEARCH */}
-        <div className="relative w-full md:max-w-xs">
+        {/* SEARCH */}
+        <div className="relative w-full sm:w-60 md:w-72">
           <input
             type="text"
-            placeholder="Search..."
-            className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+            placeholder="Search employees, departments..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 rounded-lg border text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#730042]"
           />
-          <FaSearch className="absolute left-2 top-2 text-gray-400 text-sm" />
-        </div>
-
-        {/* THOUGHT OF THE DAY */}
-        <div className="text-xs md:text-sm text-gray-600 italic truncate">
-          {thought}
+          <FaSearch className="absolute left-3 top-3 text-gray-400 text-sm" />
         </div>
       </div>
 
-      {/* RIGHT SIDE */}
-      <div className="flex items-center justify-between md:justify-end gap-3 md:gap-6">
+      {/* RIGHT SECTION */}
+      <div className="flex items-center justify-between md:justify-end gap-4">
 
-        {/* DATE */}
-        <div className="hidden md:block text-sm text-gray-600 whitespace-nowrap">
+        {/* DATE + TIME */}
+        <div className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">
           {dateTime}
         </div>
 
+        {/* NOTIFICATION */}
+        <div className="relative cursor-pointer">
+          <FaBell className=" text-lg" />
+          <span className="absolute -top-2 -right-2 bg-[#730042] text-white text-[10px] px-1.5 rounded-full">
+            2
+          </span>
+        </div>
+
         {/* PROFILE */}
-        <div className="w-9 h-9 rounded-full bg-[var(--primary)] text-white flex items-center justify-center font-semibold">
-          A
+        <div className="w-9 h-9 rounded-full bg-[#730042] text-white flex items-center justify-center text-sm font-semibold">
+          JA
         </div>
       </div>
+
+      {/* SEARCH RESULTS */}
+      {search && (
+        <div className="text-xs text-[#730042] w-full">
+          {results.length} result(s) found
+        </div>
+      )}
     </div>
   );
 }
