@@ -10,7 +10,9 @@ import File from "./pages/file/File";
 import Login from "./pages/auth/Login";
 import MainLayout from "./layout/MainLayout";
 
+
 function App() {
+
   return (
     <BrowserRouter>
       <Routes>
@@ -24,7 +26,9 @@ function App() {
          <Route path="/announcement" element={<Announce/>} />
           <Route path="/document" element={<Doc/>} />
           <Route path="/settings" element={<Set/>} />
-          <Route path="/file" element={<File/>} />
+
+
+          
         </Route>
       </Routes>
     </BrowserRouter>
