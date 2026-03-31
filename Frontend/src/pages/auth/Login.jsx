@@ -77,7 +77,7 @@ export default function Login() {
                 Sign in
               </h2>
               <p className="text-gray-500 text-sm mb-4">
-                Access your HRMS account
+                Access your Talent account
               </p>
 
               <input
