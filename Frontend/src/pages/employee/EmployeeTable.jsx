@@ -135,6 +135,7 @@ export default function EmployeeTable() {
                 <option value="OPR">OPR</option>
                 <option value="BPO">BPO</option>
                 <option value="ENG">ENG</option>
+                <option value="ENG">MGMT</option>
               </select>
 
               <input name="under_manager" placeholder="Manager ID" onChange={handleChange} className="p-3 border rounded-lg" />
@@ -151,9 +152,9 @@ export default function EmployeeTable() {
               </select>
 
               <select name="marital_status" onChange={handleChange} className="p-3 border rounded-lg">
-                <option value="single">Single</option>
+                <option value="single">Martial Status</option>
                 <option value="married">Married</option>
-                <option value="divorced">Divorced</option>
+                <option value="divorced">Single</option>
               </select>
 
               <input type="password" name="password" placeholder="Password" onChange={handleChange} className="p-3 border rounded-lg" />
