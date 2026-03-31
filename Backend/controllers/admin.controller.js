@@ -14,6 +14,76 @@ const Leave = require("../Models/leave.model");
 const Review = require("../Models/review.model");
 
 
+const registerAdmin = async (req, res, next) => {
+  const { organisation_name, email, password } = req.body;
+
+  if (!organisation_name || !email || !password) {
+    return next(
+      Object.assign(new Error("All fields are required"), { statusCode: 400 })
+    );
+  }
+
+  const existingAdmin = await Adminmodel.findOne();
+
+  if (existingAdmin) {
+    return next(
+      Object.assign(new Error("Only one admin allowed in system"), {
+        statusCode: 403,
+      })
+    );
+  }
+
+  const admin = await Adminmodel.create({
+    organisation_name,
+    email,
+    password,
+  });
+
+  const token = jwt.sign(
+    { adminid: admin._id },
+    process.env.JWT_SECRET,
+    { expiresIn: "1h" }
+  );
+
+  const verifyLink = `http://localhost:5000/admin/verify/${token}`;
+
+  await sendEmail({
+    to: email,
+    subject: "Verify Your Admin Account",
+    html: `<h2>Welcome ${organisation_name}</h2>
+    <p>Please verify your admin account:</p>
+    <a href="${verifyLink}" style="padding:10px 20px;background:#007bff;color:white;text-decoration:none;border-radius:5px;">Verify Email</a>`,
+  });
+
+  res.status(201).json({
+    message: "Admin registered. Please verify your email.",
+  });
+};
+
+const verifyAdmin = async (req, res, next) => {
+  const { token } = req.params;
+
+  const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+  const admin = await Adminmodel.findById(decoded.adminid);
+
+  if (!admin) {
+    return next(
+      Object.assign(new Error("Invalid token"), { statusCode: 400 })
+    );
+  }
+
+  admin.isVerified = true;
+  await admin.save();
+
+  res.status(200).json({
+    message: "Admin verified successfully",
+  });
+};
+
+
+
+
 const adminlogin = async (req, res, next) => {
   const { identifier, password } = req.body;
 
@@ -544,6 +614,8 @@ const getme = async (req, res, next) => {
 
 
 module.exports = {
+  registerAdmin,
+  verifyAdmin,
   adminlogin,
   adminlogout,
   addmanager,
