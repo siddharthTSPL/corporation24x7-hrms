@@ -3,6 +3,8 @@ const adminrouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const adminauthmiddleware = require("../middleware/auth/admin.middleware");
 const {
+  registerAdmin,
+  verifyAdmin,
   adminlogin,
   adminlogout,
   addmanager,
@@ -18,6 +20,9 @@ const {
   reviewtomanager,
   getme,
 } = require("../controllers/admin.controller");
+
+adminrouter.post("/register", asyncHandler(registerAdmin));
+adminrouter.get("/verify/:token", asyncHandler(verifyAdmin));
 
 adminrouter.post("/login", asyncHandler(adminlogin));
 adminrouter.post("/logout", adminauthmiddleware, asyncHandler(adminlogout));
