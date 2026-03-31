@@ -1,110 +1,133 @@
-import { FaEllipsisH, FaArrowUp, FaArrowDown } from "react-icons/fa";
+import { useEffect, useState } from "react";
+import {
+  FaUsers,
+  FaClock,
+  FaDollarSign,
+  FaCalendarAlt,
+} from "react-icons/fa";
 import Charts from "./Charts";
 
 export default function Dashboard() {
+  const [greeting, setGreeting] = useState("");
+  const [thought, setThought] = useState("");
+
+  // ✅ Thoughts (10–15)
+  const thoughts = [
+    "Success is not final, failure is not fatal.",
+    "Small steps every day lead to big results.",
+    "Teamwork makes the dream work.",
+    "Stay positive, work hard, make it happen.",
+    "Your only limit is your mindset.",
+    "Consistency beats talent.",
+    "Dream big. Start small. Act now.",
+    "Focus on progress, not perfection.",
+    "Great things take time.",
+    "Discipline is the bridge to success.",
+    "Push yourself, no one else will.",
+    "Make today productive.",
+    "Success starts with self-belief.",
+    "Keep learning, keep growing.",
+    "Every day is a new opportunity.",
+  ];
+
+  // ✅ Greeting + Thought
+  useEffect(() => {
+    const hour = new Date().getHours();
+
+    if (hour < 12) setGreeting("Good Morning");
+    else if (hour < 18) setGreeting("Good Afternoon");
+    else setGreeting("Good Evening");
+
+    const randomThought =
+      thoughts[Math.floor(Math.random() * thoughts.length)];
+    setThought(randomThought);
+  }, []);
+
+  // ✅ Stats (like image)
   const stats = [
     {
       title: "Total Employees",
-      value: 763,
-      change: "+3.6%",
-      positive: true,
-    },
-    {
-      title: "Leaves Today",
-      value: 127,
-      change: "-3.6%",
-      positive: false,
+      value: 156,
+      sub: "+2% from last month",
+      icon: <FaUsers />,
+      color: "text-green-500",
     },
     {
       title: "Present Today",
-      value: 88,
-      change: "+3.6%",
-      positive: true,
+      value: 142,
+      sub: "8 employees on leave",
+      icon: <FaClock />,
     },
     {
-      title: "Absent",
-      value: 32,
-      change: "-3.6%",
-      positive: false,
+      title: "Monthly Payroll",
+      value: "$450,000",
+      sub: "-1.2% from last month",
+      color: "text-red-500",
+      icon: <FaDollarSign />,
+    },
+    {
+      title: "Pending Approvals",
+      value: 12,
+      sub: "require attention",
+      icon: <FaCalendarAlt />,
     },
   ];
 
   return (
-    <div className="bg-[var(--background)] min-h-full">
-      
-      {/* HEADER */}
-      <h1 className="text-2xl font-bold text-[var(--primary)] mb-6">
-        Dashboard
-      </h1>
+    <div className=" min-h-screen p-4 md:p-6">
 
-      {/* STATS CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      {/* 🔥 TOP GREETING BANNER */}
+      <div className="bg-gradient-to-r from-[#00A8E8] to-[#00A8E8] text-white rounded-xl p-5 md:p-6 mb-6">
+        <h1 className="text-lg sm:text-xl md:text-2xl font-semibold">
+          {greeting}, John Admin!
+        </h1>
+        <p className="text-xs sm:text-sm opacity-90 mt-1">
+          {thought}
+        </p>
+      </div>
+
+      {/* 📊 STATS CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+
         {stats.map((item, index) => (
           <div
             key={index}
-            className="bg-white p-5 rounded-2xl shadow-sm hover:shadow-md transition"
+            className="bg-white rounded-xl p-4 md:p-5 shadow-sm hover:shadow-md transition"
           >
-            
             {/* TOP */}
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex justify-between items-center mb-3">
               <p className="text-gray-500 text-sm">{item.title}</p>
-              <button className="text-gray-400 hover:text-gray-600">
-                <FaEllipsisH />
-              </button>
+              <span className="text-gray-400 text-lg">{item.icon}</span>
             </div>
 
             {/* VALUE */}
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+            <h2 className="text-xl md:text-2xl font-bold text-gray-800">
               {item.value}
             </h2>
 
-            {/* CHANGE */}
-            <div className="flex items-center gap-2">
-              <span
-                className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full
-                  ${
-                    item.positive
-                      ? "bg-green-100 text-green-600"
-                      : "bg-red-100 text-red-500"
-                  }`}
-              >
-                {item.positive ? <FaArrowUp /> : <FaArrowDown />}
-                {item.change}
-              </span>
+            {/* SUBTEXT */}
+            <p
+              className={`text-xs mt-2 ${
+                item.color ? item.color : "text-gray-400"
+              }`}
+            >
+              {item.sub}
+            </p>
 
-              <span className="text-xs text-gray-400">
-                vs last month
-              </span>
-            </div>
+            {/* OPTIONAL PROGRESS BAR (only for Present) */}
+            {item.title === "Present Today" && (
+              <div className="w-full bg-gray-200 h-2 rounded-full mt-3">
+                <div className="bg-[#730042] h-2 rounded-full w-[85%]"></div>
+              </div>
+            )}
           </div>
         ))}
       </div>
 
-      {/* EXTRA SECTION (OPTIONAL - FUTURE READY) */}
-      <div className="grid lg:grid-cols-2 gap-5 mt-8">
-        
-        {/* Placeholder Card */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm">
-          <h3 className="text-lg font-semibold text-[var(--primary)] mb-3">
-            Employee Overview
-          </h3>
-          <p className="text-gray-400 text-sm">
-            (You can add charts here later)
-          </p>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow-sm">
-          <h3 className="text-lg font-semibold text-[var(--primary)] mb-3">
-            Recent Activity
-          </h3>
-          <p className="text-gray-400 text-sm">
-            (Recent HR activities will appear here)
-          </p>
-        </div>
+      {/* 📈 CHART */}
+      <div className="mt-6">
+        <Charts />
       </div>
-      {/* CHART COMPONENT */}
-      <Charts/>
-    
     </div>
   );
 }
