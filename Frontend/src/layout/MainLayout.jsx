@@ -7,7 +7,7 @@ export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="flex h-screen bg-[var(--background)]">
+    <div className="flex h-screen bg-(--background)">
       <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
 
       <div className="flex-1 flex flex-col">

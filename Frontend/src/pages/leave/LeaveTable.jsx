@@ -38,15 +38,15 @@ export default function LeavePage() {
   };
 
   return (
-    <div className="p-4 md:p-6 bg-[var(--background)] min-h-screen">
+    <div className="p-4 md:p-6 bg-(--background) min-h-screen">
 
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4 gap-3">
-        <h1 className="text-2xl font-bold text-[var(--primary)]">Leave</h1>
+        <h1 className="text-2xl font-bold text-(--primary)">Leave</h1>
 
         <button
           onClick={() => setOpen(true)}
-          className="bg-[var(--primary)] text-white px-4 py-2 rounded-lg"
+          className="bg-(--primary) text-white px-4 py-2 rounded-lg"
         >
           + Add Leave
         </button>
@@ -57,7 +57,7 @@ export default function LeavePage() {
         {["Pending", "Approved", "Rejected"].map((item, i) => (
           <div key={i} className="bg-white p-4 rounded-xl shadow">
             <h2 className="text-gray-500">{item}</h2>
-            <p className="text-2xl font-bold text-[var(--primary)]">0</p>
+            <p className="text-2xl font-bold text-(--primary)">0</p>
           </div>
         ))}
       </div>
@@ -86,12 +86,11 @@ export default function LeavePage() {
         </table>
       </div>
 
-      {/* MODAL */}
       {open && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-3">
           <div className="bg-white w-full max-w-lg p-6 rounded-xl">
 
-            <h2 className="text-xl font-bold mb-4 text-[var(--primary)]">
+            <h2 className="text-xl font-bold mb-4 text-(--primary)">
               Apply Leave
             </h2>
 
@@ -154,7 +153,7 @@ export default function LeavePage() {
 
               <button
                 onClick={handleSubmit}
-                className="px-4 py-2 bg-[var(--primary)] text-white rounded-lg"
+                className="px-4 py-2 bg-(--primary) text-white rounded-lg"
               >
                 Submit
               </button>

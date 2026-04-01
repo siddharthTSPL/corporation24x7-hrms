@@ -1,7 +1,8 @@
+
 import axios from "axios";
 
 export const api = axios.create({
-  baseURL: "http://localhost:5000/admin", 
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/admin",
   withCredentials: true,
 });
 
@@ -10,9 +11,14 @@ api.interceptors.response.use(
   (error) => {
     const message =
       error.response?.data?.message || "Something went wrong";
+    if (error.response?.status === 401) {
+      return Promise.reject(null); 
+    }
+
     return Promise.reject(new Error(message));
   }
 );
+
 
 
 export const registerAdmin = async (data) => {

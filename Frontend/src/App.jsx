@@ -3,11 +3,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 // Auth Pages
 import LandingPage from "./pages/auth/LandingPage";
 import Login from "./pages/auth/Login";
-
-// Layout
+import Register from "./pages/auth/signup";
 import MainLayout from "./layout/MainLayout";
 
-// Dashboard Pages
+import ProtectedRoute from "./components/Protectedroute";
 import Dashboard from "./pages/dashboard/Dashboard";
 import EmployeeTable from "./pages/employee/EmployeeTable";
 import LeaveTable from "./pages/leave/LeaveTable";
@@ -20,21 +19,25 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public Routes */}
+
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
 
-        {/* Protected / Layout Routes */}
-        <Route element={<MainLayout />}>
+        <Route
+          element={
+            <ProtectedRoute>
+              <MainLayout />
+            </ProtectedRoute>
+          }
+        >
           <Route path="/dashboard" element={<Dashboard />} />
-         <Route path="/employee" element={<EmployeeTable />} />
-         <Route path="/leave" element={<LeaveTable />} />
-         <Route path="/announcement" element={<Announce/>} />
-          <Route path="/document" element={<Doc/>} />
-          <Route path="/settings" element={<Set/>} />
-
-
-          
+          <Route path="/employee" element={<EmployeeTable />} />
+          <Route path="/leave" element={<LeaveTable />} />
+          <Route path="/announcement" element={<Announce />} />
+          <Route path="/document" element={<Doc />} />
+          <Route path="/file" element={<File />} />
+          <Route path="/settings" element={<Set />} />
         </Route>
       </Routes>
     </BrowserRouter>
