@@ -31,17 +31,23 @@ function Dashboard() {
     "Every day is a new opportunity.",
   ];
 
-  useEffect(() => {
-    const hour = new Date().getHours();
+ useEffect(() => {
+  const hour = new Date().getHours();
 
-    if (hour < 12) setGreeting("Good Morning");
-    else if (hour < 18) setGreeting("Good Afternoon");
-    else setGreeting("Good Evening");
+  if (hour < 12) {
+    setGreeting("Good Morning ☀️");
+  } else if (hour < 17) {
+    setGreeting("Good Afternoon 🌤️");
+  } else if (hour < 21) {
+    setGreeting("Good Evening 🌆");
+  } else {
+    setGreeting("Good Night 🌙");
+  }
 
-    const randomThought =
-      thoughts[Math.floor(Math.random() * thoughts.length)];
-    setThought(randomThought);
-  }, []);
+  const randomThought =
+    thoughts[Math.floor(Math.random() * thoughts.length)];
+  setThought(randomThought);
+}, []);
 
   const stats = [
     {
