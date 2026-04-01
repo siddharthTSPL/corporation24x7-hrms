@@ -76,7 +76,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
         >
           {!collapsed && (
             <span className="font-medium flex items-center gap-2">
-              <FaBuilding /> HRMS
+              <FaBuilding /> Talent
             </span>
           )}
           <FaChevronDown
