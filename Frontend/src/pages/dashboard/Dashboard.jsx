@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   FaUsers,
   FaClock,
@@ -6,12 +6,13 @@ import {
   FaCalendarAlt,
 } from "react-icons/fa";
 import Charts from "./Charts";
+import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
 
-export default function Dashboard() {
+function Dashboard() {
   const [greeting, setGreeting] = useState("");
   const [thought, setThought] = useState("");
+  const { data: admin } = useGetMeAdmin();
 
-  // ✅ Thoughts (10–15)
   const thoughts = [
     "Success is not final, failure is not fatal.",
     "Small steps every day lead to big results.",
@@ -30,7 +31,6 @@ export default function Dashboard() {
     "Every day is a new opportunity.",
   ];
 
-  // ✅ Greeting + Thought
   useEffect(() => {
     const hour = new Date().getHours();
 
@@ -43,7 +43,6 @@ export default function Dashboard() {
     setThought(randomThought);
   }, []);
 
-  // ✅ Stats (like image)
   const stats = [
     {
       title: "Total Employees",
@@ -74,38 +73,30 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className=" min-h-screen p-4 md:p-6">
-
-      {/* 🔥 TOP GREETING BANNER */}
-      <div className="bg-gradient-to-r from-[#00A8E8] to-[#00A8E8] text-white rounded-xl p-5 md:p-6 mb-6">
+    <div className="min-h-screen p-4 md:p-6">
+      <div className="bg-linear-to-r from-[#00A8E8] to-[#00A8E8] text-white rounded-xl p-5 md:p-6 mb-6">
         <h1 className="text-lg sm:text-xl md:text-2xl font-semibold">
-          {greeting}, John Admin!
+          {greeting},{" "}
+          {admin?.organisation_name ? admin.organisation_name : "Admin"}!
         </h1>
-        <p className="text-xs sm:text-sm opacity-90 mt-1">
-          {thought}
-        </p>
+        <p className="text-xs sm:text-sm opacity-90 mt-1">{thought}</p>
       </div>
 
-      {/* 📊 STATS CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
-
         {stats.map((item, index) => (
           <div
             key={index}
             className="bg-white rounded-xl p-4 md:p-5 shadow-sm hover:shadow-md transition"
           >
-            {/* TOP */}
             <div className="flex justify-between items-center mb-3">
               <p className="text-gray-500 text-sm">{item.title}</p>
               <span className="text-gray-400 text-lg">{item.icon}</span>
             </div>
 
-            {/* VALUE */}
             <h2 className="text-xl md:text-2xl font-bold text-gray-800">
               {item.value}
             </h2>
 
-            {/* SUBTEXT */}
             <p
               className={`text-xs mt-2 ${
                 item.color ? item.color : "text-gray-400"
@@ -114,7 +105,6 @@ export default function Dashboard() {
               {item.sub}
             </p>
 
-            {/* OPTIONAL PROGRESS BAR (only for Present) */}
             {item.title === "Present Today" && (
               <div className="w-full bg-gray-200 h-2 rounded-full mt-3">
                 <div className="bg-[#730042] h-2 rounded-full w-[85%]"></div>
@@ -124,10 +114,11 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* 📈 CHART */}
       <div className="mt-6">
         <Charts />
       </div>
     </div>
   );
 }
+
+export default React.memo(Dashboard);

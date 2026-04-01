@@ -2,15 +2,11 @@ import { Navigate } from "react-router-dom";
 import { useGetMeAdmin } from "../auth/server-state/adminauth/adminauth.hook";
 
 const ProtectedRoute = ({ children }) => {
-  const { data: admin, isLoading, isError } = useGetMeAdmin();
+  const { data: admin, isLoading } = useGetMeAdmin();
 
   if (isLoading) return <p>Loading...</p>;
 
-  if (!admin || isError) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return children;
+  return admin ? children : <Navigate to="/login" replace />;
 };
 
 export default ProtectedRoute;
