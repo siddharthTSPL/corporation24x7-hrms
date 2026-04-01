@@ -8,7 +8,6 @@ import {
 export default function Login() {
   const navigate = useNavigate();
   const { data: admin } = useGetMeAdmin();
-
   const { mutate: loginAdminFn, isPending, error } = useAdminLogin();
 
   const [form, setForm] = useState({
@@ -16,17 +15,31 @@ export default function Login() {
     password: "",
   });
 
+  const [errors, setErrors] = useState({});
+
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  // redirect if already logged in
   useEffect(() => {
     if (admin) {
       navigate("/dashboard", { replace: true });
     }
   }, [admin, navigate]);
+
+  const validate = () => {
+    let newErrors = {};
+
+    if (!form.email) newErrors.email = "Email is required";
+    if (!form.password) newErrors.password = "Password is required";
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleLogin = () => {
-    if (!form.email || !form.password) return;
+    if (!validate()) return;
 
     loginAdminFn(
       {
@@ -57,9 +70,13 @@ export default function Login() {
             type="text"
             name="email"
             placeholder="Enter your email"
+            value={form.email}
             onChange={handleChange}
             className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
+          {errors.email && (
+            <p className="text-red-500 text-sm">{errors.email}</p>
+          )}
         </div>
 
         <div className="mb-4">
@@ -67,9 +84,13 @@ export default function Login() {
             type="password"
             name="password"
             placeholder="Enter your password"
+            value={form.password}
             onChange={handleChange}
             className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
+          {errors.password && (
+            <p className="text-red-500 text-sm">{errors.password}</p>
+          )}
         </div>
 
         {error && (

@@ -75,7 +75,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
           onClick={() => setOpen(!open)}
         >
           {!collapsed && (
-            <span className="flex items-center gap-2">
+            <span className="font-medium flex items-center gap-2">
               <FaBuilding /> HRMS
             </span>
           )}
@@ -104,7 +104,6 @@ export default function Sidebar({ collapsed, setCollapsed }) {
               );
             })}
 
-            {/* LOGOUT */}
             <button
               onClick={handleLogout}
               disabled={isPending}
