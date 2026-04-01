@@ -1,8 +1,11 @@
 const express=require('express');
 const cookieparser=require('cookie-parser');
+const morgan=require('morgan');
 const cors=require('cors');
 require('../automatic/autoelcredit');
+
 const app=express();
+app.use(morgan("dev"));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieparser());
@@ -10,6 +13,7 @@ app.use(cors({
      origin:'http://localhost:5173',
      credentials:true
 }));
+// app.options("*", cors());
 const adminrouter=require('../routes/adminroutes');
 const managerrouter=require('../routes/managerroutes');
 const userrouter=require('../routes/userroutes');
