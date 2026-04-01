@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-
+import api from "../../api";
 export default function Login() {
   const navigate = useNavigate();
 
@@ -25,18 +25,41 @@ export default function Login() {
   };
 
   const validateLogin = () => {
-    let newErrors = {};
-    if (!form.email) newErrors.email = "Email required";
-    if (!form.password) newErrors.password = "Password required";
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  let newErrors = {};
 
-  const handleLogin = () => {
-    if (validateLogin()) {
-      navigate("/dashboard");
-    }
-  };
+  if (!form.email) newErrors.email = "Email required";
+  if (!form.password) newErrors.password = "Password required";
+
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+};
+
+  const handleLogin = async () => {
+  if (!validateLogin()) return;
+
+  try {
+    const res = await api.post("", {
+  identifier: form.email,   
+  password: form.password
+});
+
+    console.log(res.data);
+
+    alert("Login successful ✅");
+
+    // store data (optional)
+    localStorage.setItem("admin", JSON.stringify(res.data.admin));
+
+    navigate("/dashboard");
+
+  } catch (error) {
+    console.log(error);
+
+    setErrors({
+      api: error.response?.data?.message || "Login failed"
+    });
+  }
+};
 
   const handleSendOtp = () => {
     if (!form.email) {
@@ -69,7 +92,7 @@ export default function Login() {
 
         {/* LEFT SIDE */}
         <div className="w-full md:w-1/2 p-8">
-          <img src="/logo.jpeg" alt="logo" className="w-28 mb-6" />
+          <img src="src/assets/logo1.png" alt="logo" className="w-28 mb-6" />
 
           {step === "login" && (
             <>
@@ -116,6 +139,12 @@ export default function Login() {
                 className="text-sm text-gray-500 mt-4 cursor-pointer hover:text-[var(--primary)]"
               >
                 Forgot Password?
+              </p>
+              <p
+                onClick={() => setStep("email")}
+                className="text-sm text-gray-500 mt-4 cursor-pointer hover:text-[var(--primary)]"
+              >
+                Sign Up ?
               </p>
             </>
           )}
@@ -185,7 +214,7 @@ export default function Login() {
             </h3>
 
             <p className="text-gray-500 text-sm mt-2">
-              Experience secure and seamless HRMS access with OTP & password.
+              Experience secure and seamless HRMS access with 2 factor authentication.
             </p>
 
             <div className="flex justify-center mt-4 gap-2">
