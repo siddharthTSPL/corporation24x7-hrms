@@ -1,11 +1,47 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function LandingPage() {
   const navigate = useNavigate();
 
+  
+  const statsData = [
+    { number: 100, suffix: "+", text: "Happy customers of TourchX" },
+    { number: 1000, suffix: "+", text: "No. of live demos" },
+    { number: 10, suffix: "+", text: "Partners to collaborate" },
+    { number: 98, suffix: "%", text: "Customer satisfaction" },
+  ];
+
+  const [counts, setCounts] = useState(statsData.map(() => 0));
+
+ 
+  useEffect(() => {
+    const intervals = statsData.map((item, index) => {
+      let start = 0;
+      const end = item.number;
+      const duration = 1500;
+      const increment = end / (duration / 20);
+
+      return setInterval(() => {
+        start += increment;
+        if (start >= end) {
+          start = end;
+          clearInterval(intervals[index]);
+        }
+
+        setCounts((prev) => {
+          const newCounts = [...prev];
+          newCounts[index] = Math.floor(start);
+          return newCounts;
+        });
+      }, 20);
+    });
+
+    return () => intervals.forEach((i) => clearInterval(i));
+  }, []);
+
   return (
-   <div className="min-h-screen bg-transparent text-[var(--text)]">
+    <div className="min-h-screen bg-transparent text-[var(--text)]">
       
       {/* NAVBAR */}
       <nav className="flex justify-between items-center px-6 md:px-12 py-4">
@@ -13,13 +49,10 @@ export default function LandingPage() {
         {/* Logo */}
         <div className="flex items-center gap-2">
           <img
-         src="/login.jpeg"
+            src="/src/assets/logo1.png"
             alt="logo"
-            className="w-8 h-8"
+            className="w-50 h-15"
           />
-          <h2 className="text-xl font-bold text-[var(--primary)]">
-            Tourch X Talent 
-          </h2>
         </div>
 
         {/* Desktop Links */}
@@ -62,13 +95,16 @@ export default function LandingPage() {
 
           <p className="text-gray-600 mb-6">
             Optimize every stage of the employee lifecycle with a robust and reliable Human Resource Management System.
-            
           </p>
 
           {/* BUTTONS */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
             
-            <button className="bg-[var(--primary)] text-white px-6 py-3  hover:scale-105 transition">
+           
+            <button
+              onClick={() => navigate("/signup")}
+              className="bg-[var(--primary)] text-white px-6 py-3 hover:scale-105 transition"
+            >
               Sign Up for Free Trial
             </button>
 
@@ -89,35 +125,40 @@ export default function LandingPage() {
       </section>
 
       {/* STATS */}
-<section className="grid grid-cols-2 md:grid-cols-4 gap-8 px-6 md:px-12 py-12">
-  {[
-    { number: "100+", text: "Happy customers of TourchX" },
-    { number: "1k+", text: "No. of live demos" },
-    { number: "10+", text: "Partners to collaborate" },
-    { number: "98%", text: "Customer satisfaction" },
-  ].map((item, i) => (
-    <div key={i} className="flex justify-center">
-      
-      {/* Blob Wrapper */}
-      <div className="relative w-36 h-36 md:w-40 md:h-40">
-        
-        {/* BACK SHAPE */}
-        <div className="absolute inset-0 bg-[var(--secondary)] opacity-40 blur-md rounded-[60%_40%_50%_50%/50%_60%_40%_50%]"></div>
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-8 px-6 md:px-12 py-12">
+        {statsData.map((item, i) => (
+          <div key={i} className="flex justify-center">
+            
+            {/* Blob Wrapper */}
+            <div className="relative w-36 h-36 md:w-40 md:h-40">
+              
+              {/* BACK SHAPE */}
+              <div className="absolute inset-0 bg-[var(--secondary)] opacity-40 blur-md rounded-[60%_40%_50%_50%/50%_60%_40%_50%]"></div>
 
-        {/* FRONT SHAPE */}
-        <div className="relative z-10 w-full h-full flex flex-col items-center justify-center text-center text-white
-          bg-gradient-to-br from-blue-500 to-blue-700
-          rounded-[60%_40%_50%_50%/50%_60%_40%_50%]
-          shadow-xl hover:scale-105 transition duration-300"
-        >
-          <h2 className="text-lg md:text-xl font-bold">{item.number}</h2>
-          <p className="text-xs px-2">{item.text}</p>
-        </div>
+              {/* FRONT SHAPE */}
+              <div className="relative z-10 w-full h-full flex flex-col items-center justify-center text-center text-white
+                bg-gradient-to-br from-blue-500 to-blue-700
+                rounded-[60%_40%_50%_50%/50%_60%_40%_50%]
+                shadow-xl hover:scale-105 transition duration-300"
+              >
+               
+                <h2 className="text-lg md:text-xl font-bold">
+                  {counts[i]}
+                  {item.suffix}
+                </h2>
 
-      </div>
-    </div>
-  ))}
-</section>
+                <p className="text-xs px-2">{item.text}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </section>
+
+   
+      <footer className="text-center py-6 text-sm text-gray-500 border-t">
+        Powered by <span className="font-semibold text-[var(--primary)]">Tech Torch</span> 2026
+      </footer>
+
     </div>
   );
 }

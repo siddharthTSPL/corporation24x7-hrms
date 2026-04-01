@@ -64,7 +64,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
         ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
       >
         <div className="p-4 flex items-center justify-between border-b">
-          <img src="/logo1.jpeg" alt="logo" className="w-40" />
+          <img src="/src/assets/logo1.png" alt="logo" className="w-40" />
           <button className="md:hidden" onClick={() => setMobileOpen(false)}>
             <FaTimes />
           </button>
@@ -76,7 +76,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
         >
           {!collapsed && (
             <span className="font-medium flex items-center gap-2">
-              <FaBuilding /> HRMS
+              <FaBuilding /> Talent
             </span>
           )}
           <FaChevronDown className={open ? "rotate-180" : ""} />
