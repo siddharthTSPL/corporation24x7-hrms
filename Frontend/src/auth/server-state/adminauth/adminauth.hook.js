@@ -27,12 +27,9 @@ export const useGetMeAdmin = () => {
   return useQuery({
     queryKey: ["admin"],
     queryFn: getMeAdmin,
-    retry: false,
-    staleTime: Infinity,
-    cacheTime: Infinity,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    staleTime: 0, 
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 };
 
@@ -42,7 +39,7 @@ export const useAdminLogout = () => {
   return useMutation({
     mutationFn: logoutAdmin,
     onSuccess: () => {
-      queryClient.removeQueries(["admin"]);
+      queryClient.removeQueries({ queryKey: ["admin"] });
     },
   });
 };

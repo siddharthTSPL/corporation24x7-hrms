@@ -21,7 +21,6 @@ export default function Login() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // redirect if already logged in
   useEffect(() => {
     if (admin) {
       navigate("/dashboard", { replace: true });
@@ -41,21 +40,13 @@ export default function Login() {
   const handleLogin = () => {
     if (!validate()) return;
 
-    loginAdminFn(
-      {
-        identifier: form.email,
-        password: form.password,
-      },
-      {
-        onSuccess: () => {
-          navigate("/dashboard");
-        },
-      }
-    );
+    loginAdminFn({
+      identifier: form.email,
+      password: form.password,
+    });
   };
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-r from-indigo-500 via-purple-500 to-pink-500 px-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8">
         <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">
           Welcome Back 👋
