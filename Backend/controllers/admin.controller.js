@@ -63,14 +63,17 @@ const registerAdmin = async (req, res, next) => {
 const verifyAdmin = async (req, res, next) => {
   const { token } = req.params;
 
-  const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  let decoded;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (err) {
+    return next(Object.assign(new Error("Invalid or expired token"), { statusCode: 400 }));
+  }
 
   const admin = await Adminmodel.findById(decoded.adminid);
 
   if (!admin) {
-    return next(
-      Object.assign(new Error("Invalid token"), { statusCode: 400 })
-    );
+    return next(Object.assign(new Error("Invalid token"), { statusCode: 400 }));
   }
 
   admin.isVerified = true;
@@ -116,8 +119,8 @@ const adminlogin = async (req, res, next) => {
 
   res.cookie("token", token, {
     httpOnly: true,
-    secure: false,
-    sameSite: "strict",
+    secure: false, 
+    sameSite: "lax", 
   });
 
   admin.status = "active";

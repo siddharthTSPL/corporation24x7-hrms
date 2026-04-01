@@ -1,73 +1,48 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  loginAdmin,
+  registerAdmin,
+  logoutAdmin,
+  getMeAdmin,
+} from "../../api/adminapi/auth/ad.auth.api";
 
-// import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-// import {
-//   registerAdmin,
-//   loginAdmin,
-//   logoutAdmin,
-//   getMeAdmin,
-//   addManager,
-//   addEmployee,
-// } from "../../api/adminapi/auth/ad.auth.api.js";
+export const useRegisterAdmin = () => {
+  return useMutation({
+    mutationFn: registerAdmin,
+  });
+};
 
-// import { useDispatch } from "react-redux";
-// import { setAdmin, logoutAdminState } from "./authSlice";
+export const useAdminLogin = () => {
+  const queryClient = useQueryClient();
 
+  return useMutation({
+    mutationFn: loginAdmin,
+    onSuccess: (data) => {
+      queryClient.setQueryData(["admin"], data.admin || data);
+    },
+  });
+};
 
-// export const useRegisterAdmin = () => {
-//   return useMutation({
-//     mutationFn: registerAdmin,
-//   });
-// };
+export const useGetMeAdmin = () => {
+  return useQuery({
+    queryKey: ["admin"],
+    queryFn: getMeAdmin,
+    retry: false,
+    staleTime: Infinity,
+    cacheTime: Infinity,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+};
 
-// export const useAdminLogin = () => {
-//   const dispatch = useDispatch();
+export const useAdminLogout = () => {
+  const queryClient = useQueryClient();
 
-//   return useMutation({
-//     mutationFn: loginAdmin,
-//     onSuccess: (data) => {
-//       dispatch(setAdmin(data.admin));
-//     },
-//   });
-// };
-
-
-// export const useGetMeAdmin = () => {
-//   const dispatch = useDispatch();
-
-//   return useQuery({
-//     queryKey: ["admin"],
-//     queryFn: getMeAdmin,
-//     onSuccess: (data) => {
-//       dispatch(setAdmin(data));
-//     },
-//     retry: false,
-//   });
-// };
-
-
-// export const useAdminLogout = () => {
-//   const dispatch = useDispatch();
-//   const queryClient = useQueryClient();
-
-//   return useMutation({
-//     mutationFn: logoutAdmin,
-//     onSuccess: () => {
-//       dispatch(logoutAdminState());
-//       queryClient.clear(); 
-//     },
-//   });
-// };
-
-
-// export const useAddManager = () => {
-//   return useMutation({
-//     mutationFn: addManager,
-//   });
-// };
-
-
-// export const useAddEmployee = () => {
-//   return useMutation({
-//     mutationFn: addEmployee,
-//   });
-// };
+  return useMutation({
+    mutationFn: logoutAdmin,
+    onSuccess: () => {
+      queryClient.removeQueries(["admin"]);
+    },
+  });
+};
