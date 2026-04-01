@@ -34,32 +34,7 @@ export default function Login() {
   return Object.keys(newErrors).length === 0;
 };
 
-  const handleLogin = async () => {
-  if (!validateLogin()) return;
-
-  try {
-    const res = await api.post("", {
-  identifier: form.email,   
-  password: form.password
-});
-
-    console.log(res.data);
-
-    alert("Login successful ✅");
-
-    // store data (optional)
-    localStorage.setItem("admin", JSON.stringify(res.data.admin));
-
-    navigate("/dashboard");
-
-  } catch (error) {
-    console.log(error);
-
-    setErrors({
-      api: error.response?.data?.message || "Login failed"
-    });
-  }
-};
+  const handleLogin = () => { if (validateLogin()) { navigate("/dashboard"); } };
 
   const handleSendOtp = () => {
     if (!form.email) {
