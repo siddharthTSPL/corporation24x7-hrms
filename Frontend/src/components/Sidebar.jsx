@@ -94,7 +94,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
                   className={`flex items-center gap-3 p-3 rounded-lg
                   ${
                     active
-                      ? "bg-[var(--primary)] text-white"
+                      ? "bg-(--primary) text-white"
                       : "hover:bg-gray-100"
                   }`}
                 >
