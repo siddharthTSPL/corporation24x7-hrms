@@ -69,6 +69,10 @@ const userSchema = new mongoose.Schema({
     default: "employee",
     required: [true, "Role is required"],
   },
+  designation:{
+     type:String,
+     required:[true,'Designation is required']
+  },
   status: {
     type: String,
     enum: ["active", "inactive"],
