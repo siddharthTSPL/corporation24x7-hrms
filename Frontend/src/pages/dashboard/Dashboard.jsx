@@ -7,11 +7,19 @@ import {
 } from "react-icons/fa";
 import Charts from "./Charts";
 import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
+import { useGetAllEmployee } from "../../auth/server-state/adminother/adminother.hook";
+import { useGetForwardedLeaves } from "../../auth/server-state/adminleave/adminleave.hook";
 
 function Dashboard() {
   const [greeting, setGreeting] = useState("");
   const [thought, setThought] = useState("");
+
   const { data: admin } = useGetMeAdmin();
+  const { data: employeeData, isLoading: employeeLoading } = useGetAllEmployee();
+  const { data: leaveData, isLoading: leaveLoading } = useGetForwardedLeaves();
+
+  const totalEmployees = employeeData?.count || 0;
+  const pendingApprovals = leaveData?.count || 0;
 
   const thoughts = [
     "Success is not final, failure is not fatal.",
@@ -31,28 +39,28 @@ function Dashboard() {
     "Every day is a new opportunity.",
   ];
 
- useEffect(() => {
-  const hour = new Date().getHours();
+  useEffect(() => {
+    const hour = new Date().getHours();
 
-  if (hour < 12) {
-    setGreeting("Good Morning ☀️");
-  } else if (hour < 17) {
-    setGreeting("Good Afternoon 🌤️");
-  } else if (hour < 21) {
-    setGreeting("Good Evening 🌆");
-  } else {
-    setGreeting("Good Night 🌙");
-  }
+    if (hour < 12) {
+      setGreeting("Good Morning ☀️");
+    } else if (hour < 17) {
+      setGreeting("Good Afternoon 🌤️");
+    } else if (hour < 21) {
+      setGreeting("Good Evening 🌆");
+    } else {
+      setGreeting("Good Night 🌙");
+    }
 
-  const randomThought =
-    thoughts[Math.floor(Math.random() * thoughts.length)];
-  setThought(randomThought);
-}, []);
+    const randomThought =
+      thoughts[Math.floor(Math.random() * thoughts.length)];
+    setThought(randomThought);
+  }, []);
 
   const stats = [
     {
       title: "Total Employees",
-      value: 156,
+      value: employeeLoading ? "..." : totalEmployees,
       sub: "+2% from last month",
       icon: <FaUsers />,
       color: "text-green-500",
@@ -72,7 +80,7 @@ function Dashboard() {
     },
     {
       title: "Pending Approvals",
-      value: 12,
+      value: leaveLoading ? "..." : pendingApprovals,
       sub: "require attention",
       icon: <FaCalendarAlt />,
     },
