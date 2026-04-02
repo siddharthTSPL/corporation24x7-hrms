@@ -10,7 +10,9 @@ export default function Login() {
   const navigate = useNavigate();
   const { data: admin } = useGetMeAdmin();
   const { mutate: loginAdminFn, isPending, error } = useAdminLogin();
-const [showLoader, setShowLoader] = useState(false);
+
+  console.log("Admin data:", admin);
+
   const [form, setForm] = useState({
     email: "",
     password: "",
@@ -21,7 +23,11 @@ const [showLoader, setShowLoader] = useState(false);
   const [step, setStep] = useState("login");
   const [verified, setVerified] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-const [animationData, setAnimationData] = useState(null);
+
+  // ✅ kept from feature branch
+  const [animationData, setAnimationData] = useState(null);
+  const [showLoader, setShowLoader] = useState(false);
+
   const images = [
     "/src/assets/slide1.png",
     "/src/assets/slide2.png",
@@ -34,22 +40,22 @@ const [animationData, setAnimationData] = useState(null);
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  
   useEffect(() => {
     if (admin) {
       navigate("/dashboard", { replace: true });
     }
   }, [admin, navigate]);
 
- useEffect(() => {
-  fetch("/loader.json")
-    .then((res) => res.json())
-    .then((data) => setAnimationData(data));
-}, []);
+  useEffect(() => {
+    fetch("/loader.json")
+      .then((res) => res.json())
+      .then((data) => setAnimationData(data));
+  }, []);
+
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % images.length);
-    }, 2500); // 2.5 sec
+    }, 2500);
 
     return () => clearInterval(interval);
   }, []);
@@ -65,28 +71,29 @@ const [animationData, setAnimationData] = useState(null);
   };
 
   const handleLogin = () => {
-  if (!validate()) return;
+    if (!validate()) return;
 
-  setShowLoader(true); // start loader
+    setShowLoader(true);
 
-  const startTime = Date.now();
+    const startTime = Date.now();
 
-  loginAdminFn(
-    {
-      identifier: form.email,
-      password: form.password,
-    },
-    {
-      onSettled: () => {
-        const elapsed = Date.now() - startTime;
-      const remainingTime = 300000 - elapsed; 
-        setTimeout(() => {
-          setShowLoader(false);
-        }, remainingTime > 0 ? remainingTime : 0);
+    loginAdminFn(
+      {
+        identifier: form.email,
+        password: form.password,
       },
-    }
-  );
-};
+      {
+        onSettled: () => {
+          const elapsed = Date.now() - startTime;
+          const remainingTime = 3000 - elapsed; // fixed (5 min → 3 sec)
+
+          setTimeout(() => {
+            setShowLoader(false);
+          }, remainingTime > 0 ? remainingTime : 0);
+        },
+      }
+    );
+  };
 
   const handleSendOtp = () => {
     setStep("otp");
@@ -103,26 +110,26 @@ const [animationData, setAnimationData] = useState(null);
       style={{ backgroundImage: "url('/bg.jpeg')" }}
     >
       {/* ✅ LOADER */}
-     {showLoader && animationData && (
-  <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
-    <Player
-      autoplay
-      loop
-      src={animationData}
-      style={{ height: "140px", width: "140px" }}
-    />
-  </div>
-)}
+      {showLoader && animationData && (
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Player
+            autoplay
+            loop
+            src={animationData}
+            style={{ height: "140px", width: "140px" }}
+          />
+        </div>
+      )}
+
       {/* MAIN CONTAINER */}
       <div className="w-full max-w-5xl bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden">
-
         {/* LEFT SIDE */}
         <div className="w-full md:w-1/2 p-8">
           <img src="src/assets/logo1.png" alt="logo" className="w-28 mb-6" />
 
           {step === "login" && (
             <>
-              <h2 className="text-2xl font-bold text-[var(--primary)] mb-2">
+              <h2 className="text-2xl font-bold text-(--primary) mb-2">
                 Sign in
               </h2>
               <p className="text-gray-500 text-sm mb-4">
@@ -135,7 +142,7 @@ const [animationData, setAnimationData] = useState(null);
                 placeholder="Email address"
                 value={form.email}
                 onChange={handleChange}
-                className="w-full mb-3 p-3 border rounded-lg focus:ring-2 focus:ring-[var(--primary)]"
+                className="w-full mb-3 p-3 border rounded-lg focus:ring-2 focus:ring-(--primary)"
               />
               {errors.email && (
                 <p className="text-red-500 text-sm">{errors.email}</p>
@@ -167,12 +174,11 @@ const [animationData, setAnimationData] = useState(null);
 
               <button
                 onClick={handleLogin}
-                className="w-full bg-[var(--primary)] text-white py-3 rounded-lg mt-3"
+                className="w-full bg-(--primary) text-white py-3 rounded-lg mt-3"
               >
                 Next
               </button>
 
-              {/* ✅ SAME ROW */}
               <div className="flex justify-between mt-4 text-sm text-gray-500">
                 <p
                   onClick={() => setStep("email")}
@@ -199,7 +205,7 @@ const [animationData, setAnimationData] = useState(null);
 
           {step === "email" && (
             <>
-              <h2 className="text-xl font-bold text-[var(--primary)] mb-4">
+              <h2 className="text-xl font-bold text-(--primary) mb-4">
                 Enter Email
               </h2>
 
@@ -214,7 +220,7 @@ const [animationData, setAnimationData] = useState(null);
 
               <button
                 onClick={handleSendOtp}
-                className="w-full bg-[var(--primary)] text-white py-3 rounded-lg"
+                className="w-full bg-(--primary) text-white py-3 rounded-lg"
               >
                 Send OTP
               </button>
@@ -223,7 +229,7 @@ const [animationData, setAnimationData] = useState(null);
 
           {step === "otp" && (
             <>
-              <h2 className="text-xl font-bold text-[var(--primary)] mb-4">
+              <h2 className="text-xl font-bold text-(--primary) mb-4">
                 Enter OTP
               </h2>
 
@@ -238,7 +244,7 @@ const [animationData, setAnimationData] = useState(null);
 
               <button
                 onClick={handleVerifyOtp}
-                className="w-full bg-[var(--primary)] text-white py-3 rounded-lg"
+                className="w-full bg-(--primary) text-white py-3 rounded-lg"
               >
                 Verify OTP
               </button>
@@ -255,7 +261,7 @@ const [animationData, setAnimationData] = useState(null);
               className="w-full max-h-65 object-contain"
             />
 
-            <h3 className="text-lg font-semibold text-[var(--primary)] mt-4">
+            <h3 className="text-lg font-semibold text-(--primary) mt-4">
               Smart Secure Login
             </h3>
 
@@ -269,7 +275,7 @@ const [animationData, setAnimationData] = useState(null);
                   key={index}
                   className={`w-2 h-2 rounded-full ${
                     currentSlide === index
-                      ? "bg-[var(--primary)]"
+                      ? "bg-(--primary)"
                       : "bg-gray-300"
                   }`}
                 />
