@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import React from "react";
 import {
   FaHome,
   FaCalendarAlt,
@@ -16,7 +17,7 @@ import {
 } from "react-icons/fa";
 import { useAdminLogout } from "../auth/server-state/adminauth/adminauth.hook";
 
-export default function Sidebar({ collapsed, setCollapsed }) {
+ function Sidebar({ collapsed, setCollapsed }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { mutate: logoutFn, isPending } = useAdminLogout();
@@ -118,3 +119,4 @@ export default function Sidebar({ collapsed, setCollapsed }) {
     </>
   );
 }
+export default React.memo(Sidebar);
