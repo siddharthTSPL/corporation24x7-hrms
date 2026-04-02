@@ -12,6 +12,8 @@ const { processLeaveDeduction } = require("../automatic/calculateleave");
 const LeaveBalance = require("../Models/leavebalance.model");
 const Leave = require("../Models/leave.model");
 const Review = require("../Models/review.model");
+const generateOTP = require("../automatic/otpgenerator");
+const OtpModel = require("../Models/otpbasedlogin.model");
 
 
 const registerAdmin = async (req, res, next) => {
@@ -83,8 +85,6 @@ const verifyAdmin = async (req, res, next) => {
     message: "Admin verified successfully",
   });
 };
-
-
 
 
 const adminlogin = async (req, res, next) => {
@@ -159,8 +159,6 @@ const adminlogout = async (req, res, next) => {
     message: "Admin logout successful",
   });
 };
-
-
 
 const addmanager = async (req, res, next) => {
   const {
@@ -606,6 +604,167 @@ const reviewtomanager = async (req, res, next) => {
   });
 };
 
+const forgetpasswordloginotp = async (req, res, next) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return next(Object.assign(new Error("Email is required"), { statusCode: 400 }));
+  }
+
+  const admin = await Adminmodel.findOne({ email });
+
+  if (!admin) {
+    return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
+  }
+
+  const otp = generateOTP();
+  const expiry = Date.now() + 5 * 60 * 1000;
+
+  await OtpModel.findOneAndUpdate(
+    { email },
+    { otp, expiry },
+    { upsert: true, new: true }
+  );
+
+  await sendEmail({
+    to: email,
+    subject: "Admin Password Reset OTP",
+    html: `
+      <h2>Password Reset Request</h2>
+      <p>Your OTP is:</p>
+      <h1>${otp}</h1>
+      <p>This OTP will expire in 5 minutes.</p>
+    `,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "OTP sent successfully",
+  });
+};
+
+const verifyAotp = async (req, res, next) => {
+  const { email, otp } = req.body;
+
+  const otpRecord = await OtpModel.findOne({ email });
+
+  if (!otpRecord) {
+    return next(Object.assign(new Error("OTP not found"), { statusCode: 404 }));
+  }
+
+  if (otpRecord.isExpired()) {
+    return next(Object.assign(new Error("OTP has expired"), { statusCode: 400 }));
+  }
+
+  const isMatch = otpRecord.compareOtp(otp);
+
+  if (!isMatch) {
+    return next(Object.assign(new Error("Invalid OTP"), { statusCode: 400 }));
+  }
+
+  const admin = await Adminmodel.findOne({ email });
+
+  if (!admin) {
+    return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
+  }
+
+
+  const loginToken = jwt.sign(
+    {
+      adminId: admin._id,
+      email: admin.email,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "1d" }
+  );
+
+  res.cookie("token", loginToken, { httpOnly: true });
+
+  const resetToken = jwt.sign(
+    { email: admin.email },
+    process.env.JWT_SECRET,
+    { expiresIn: "15m" }
+  );
+
+  const link = `http://localhost:5000/admin/change-password?token=${resetToken}`;
+
+
+  await sendEmail({
+    to: admin.email,
+    subject: "Optional Password Change",
+    html: `
+      <h2>Hello ${admin.organisation_name || "Admin"}</h2>
+      <p>Your OTP verification was successful.</p>
+      <p>If you want to change your password, click below:</p>
+      <a href="${link}">Change Password</a>
+      <p>If not, you can ignore this email.</p>
+    `,
+  });
+
+  await OtpModel.deleteOne({ email });
+
+  res.status(200).json({
+    success: true,
+    message: "OTP verified successfully",
+    login: true,
+    passwordResetOptional: true,
+    user: {
+      id: admin._id,
+      email: admin.email,
+    },
+  });
+};
+
+
+const showUserPasswordPage = (req, res) => {
+  const token = req.query.token;
+
+  res.send(`
+    <h2>Set Your Password</h2>
+
+    <form action="/admin/resetAdminPassword" method="POST">
+
+      <input type="hidden" name="token" value="${token}" />
+
+      <input type="password" name="newPassword" placeholder="Enter new password" required/>
+
+      <button type="submit">Update Password</button>
+
+    </form>
+  `);
+};
+const resetAdminPassword = async (req, res, next) => {
+  const { token, newPassword } = req.body;
+
+  let decode;
+  try {
+    decode = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (err) {
+    return next(
+      Object.assign(new Error("Invalid or expired token"), {
+        statusCode: 400,
+      })
+    );
+  }
+
+  const admin = await Adminmodel.findOne({ email: decode.email });
+
+  if (!admin) {
+    return next(
+      Object.assign(new Error("Admin not found"), {
+        statusCode: 404,
+      })
+    );
+  }
+
+  admin.password = newPassword;
+  await admin.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Password updated successfully",
+  });
+};
 const getme = async (req, res, next) => {
   if (!req.admin) {
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
@@ -633,5 +792,9 @@ module.exports = {
   noofemployee,
   createannouncement,
   reviewtomanager,
+  forgetpasswordloginotp,
+  verifyAotp,
+  resetAdminPassword,
+  showUserPasswordPage,
   getme
 };
