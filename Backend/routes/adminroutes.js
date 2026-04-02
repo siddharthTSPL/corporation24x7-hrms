@@ -18,6 +18,10 @@ const {
   noofemployee,
   createannouncement,
   reviewtomanager,
+  forgetpasswordloginotp,
+  verifyAotp,
+  resetAdminPassword,
+  showUserPasswordPage,
   getme,
 } = require("../controllers/admin.controller");
 
@@ -77,6 +81,21 @@ adminrouter.post(
   "/reviewtomanager",
   adminauthmiddleware,
   asyncHandler(reviewtomanager),
+);
+adminrouter.post(
+  "/forgetpassword",
+  asyncHandler(forgetpasswordloginotp),
+);
+adminrouter.post("/verifyotp", asyncHandler(verifyAotp));
+// adminrouter.get(
+//   "/resetpassword",
+//   asyncHandler(forgetpasswordchange),
+// );
+adminrouter.get("/change-password", asyncHandler(showUserPasswordPage));
+adminrouter.post(
+  "/resetAdminPassword",
+  adminauthmiddleware,
+  asyncHandler(resetAdminPassword),
 );
 adminrouter.get("/getme", adminauthmiddleware, asyncHandler(getme));
 
