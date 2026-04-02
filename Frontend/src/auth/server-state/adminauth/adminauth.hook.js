@@ -4,6 +4,8 @@ import {
   registerAdmin,
   logoutAdmin,
   getMeAdmin,
+  addManager,
+  addEmployee,
 } from "../../api/adminapi/auth/ad.auth.api";
 
 export const useRegisterAdmin = () => {
@@ -40,6 +42,26 @@ export const useAdminLogout = () => {
     mutationFn: logoutAdmin,
     onSuccess: () => {
       queryClient.removeQueries({ queryKey: ["admin"] });
+    },
+  });
+};
+
+
+export const useAddManager = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: addManager,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["managers"] });
+    },
+  });
+};
+export const useAddEmployee = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: addEmployee,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
     },
   });
 };

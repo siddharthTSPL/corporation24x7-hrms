@@ -173,6 +173,7 @@ const addmanager = async (req, res, next) => {
     personal_contact,
     e_contact,
     role,
+    designation,
     department,
   } = req.body;
 
@@ -200,6 +201,7 @@ const addmanager = async (req, res, next) => {
     personal_contact,
     e_contact,
     role,
+    designation,
   });
 
   await newmanager.save();
@@ -251,6 +253,7 @@ const addemployee = async (req, res, next) => {
     personal_contact,
     e_contact,
     role,
+    designation,
     department,
     Under_manager,
   } = req.body;
@@ -281,6 +284,7 @@ if (!f_name || !work_email || !password) {
     personal_contact,
     e_contact,
     role,
+    designation,
     department,
     Under_manager,
   });
@@ -373,7 +377,6 @@ const getperticularemployee = async (req, res, next) => {
 };
 
 
-
 const deleteemployee = async (req, res, next) => {
   if (!req.admin) {
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
@@ -410,8 +413,6 @@ const showforwardedleaves = async (req, res, next) => {
     leaves,
   });
 };
-
-
 
 const acceptleavebyadmin = async (req, res, next) => {
   if (!req.admin) {
@@ -501,7 +502,7 @@ const rejectleavebyadmin = async (req, res, next) => {
 };
 
 
-//done error handling
+
 
 const noofemployee = async (req, res, next) => {
   if (!req.admin) {
