@@ -61,9 +61,9 @@ export default function ActivityEvents() {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-6">
 
       {/* 🔹 RECENT ACTIVITIES */}
-      <div className=" rounded-2xl p-4 sm:p-6 shadow-sm">
+      <div className=" bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
 
-        <h2 className="text-base sm:text-lg font-semibold text-[#730042]">
+        <h2 className="text-base sm:text-lg font-semibold text-[#1F2937]">
           Recent Activities
         </h2>
         <p className="text-xs sm:text-sm text-gray-500 mb-4">
@@ -112,7 +112,7 @@ export default function ActivityEvents() {
       {/* 🔹 UPCOMING EVENTS */}
       <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
 
-        <h2 className="text-base sm:text-lg font-semibold text-[#730042]">
+        <h2 className="text-base sm:text-lg font-semibold text-[#1F2937]">
           Upcoming Events
         </h2>
         <p className="text-xs sm:text-sm text-gray-500 mb-4">

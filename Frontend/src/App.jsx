@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 // Auth Pages
 import LandingPage from "./pages/auth/LandingPage";
 import Login from "./pages/auth/Login";
-import Register from "./pages/auth/signup";
+import Signup from "./pages/auth/Signup";
 import MainLayout from "./layout/MainLayout";
 
 import ProtectedRoute from "./components/Protectedroute";
@@ -14,7 +14,7 @@ import Announce from "./pages/announcement/Announce";
 import Doc from "./pages/document/Doc";
 import Set from "./pages/settings/Set";
 import File from "./pages/file/File";
-
+import Organisation from "./pages/organisation/Organisation";
 function App() {
   return (
     <BrowserRouter>
@@ -22,7 +22,7 @@ function App() {
 
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        <Route path="/signup" element={<Signup />} />
 
         <Route
           element={
@@ -38,6 +38,7 @@ function App() {
           <Route path="/document" element={<Doc />} />
           <Route path="/file" element={<File />} />
           <Route path="/settings" element={<Set />} />
+          <Route path="/organisation" element={<Organisation />} />
         </Route>
       </Routes>
     </BrowserRouter>
