@@ -31,22 +31,20 @@ export default function Register() {
     >
       <div className="w-full max-w-5xl bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden">
         
-        {/* LEFT SIDE */}
         <div className="w-full md:w-1/2 p-8">
-          
-          {/* HEADER */}
+       
           <div className="flex justify-between items-center mb-6">
             <img src="/src/assets/logo1.png" alt="logo" className="w-28" />
             
             <p
               onClick={() => navigate("/login")}
-              className="text-sm text-gray-500 cursor-pointer hover:text-[var(--primary)]"
+              className="text-sm text-gray-500 cursor-pointer hover:text-(--primary)"
             >
               Have a Talent Account? <span className="font-semibold">SIGN IN</span>
             </p>
           </div>
 
-          <h2 className="text-2xl font-bold text-[var(--primary)] mb-2">
+          <h2 className="text-2xl font-bold text-(--primary) mb-2">
             Sign up
           </h2>
 
@@ -54,27 +52,26 @@ export default function Register() {
             Create your Talent account
           </p>
 
-          {/* ORGANISATION */}
+      
           <input
             type="text"
             name="organisation_name"
             placeholder="Organisation Name"
             value={form.organisation_name}
             onChange={handleChange}
-            className="w-full mb-3 p-3 border rounded-lg focus:ring-2 focus:ring-[var(--primary)]"
+            className="w-full mb-3 p-3 border rounded-lg focus:ring-2 focus:ring-(--primary)"
           />
 
-          {/* EMAIL */}
           <input
             type="email"
             name="email"
             placeholder="Email address"
             value={form.email}
             onChange={handleChange}
-            className="w-full mb-3 p-3 border rounded-lg focus:ring-2 focus:ring-[var(--primary)]"
+            className="w-full mb-3 p-3 border rounded-lg focus:ring-2 focus:ring-(--primary)"
           />
 
-          {/* PASSWORD WITH EYE */}
+      
           <div className="relative mb-3">
             <input
               type={showPassword ? "text" : "password"}
@@ -82,7 +79,7 @@ export default function Register() {
               placeholder="Password"
               value={form.password}
               onChange={handleChange}
-              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-[var(--primary)]"
+              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-(--primary)"
             />
 
             <span
@@ -93,7 +90,7 @@ export default function Register() {
             </span>
           </div>
 
-          {/* TERMS */}
+        
           <div className="flex items-start gap-2 mb-4 text-sm text-gray-600">
             <input
               type="checkbox"
@@ -102,46 +99,45 @@ export default function Register() {
             />
             <p>
               I agree to the{" "}
-              <span className="text-[var(--primary)] cursor-pointer">
+              <span className="text-(--primary) cursor-pointer">
                 Terms of Service
               </span>{" "}
               and{" "}
-              <span className="text-[var(--primary)] cursor-pointer">
+              <span className="text-(--primary) cursor-pointer">
                 Privacy Policy
               </span>.
             </p>
           </div>
 
-          {/* ERROR */}
+        
           {error && <p className="text-red-500 text-sm">{error.message}</p>}
 
-          {/* SUCCESS */}
           {isSuccess && (
             <p className="text-green-600 text-sm">
               ✅ Check your email to verify account
             </p>
           )}
 
-          {/* BUTTON */}
+        
           <button
             onClick={handleRegister}
             disabled={isPending}
-            className="w-full bg-[var(--primary)] text-white py-3 rounded-lg mt-2 hover:opacity-90"
+            className="w-full bg-(--primary) text-white py-3 rounded-lg mt-2 hover:opacity-90"
           >
             {isPending ? "Registering..." : "Register"}
           </button>
         </div>
 
-        {/* RIGHT SIDE */}
+   
         <div className="hidden md:flex w-1/2 bg-gray-50 items-center justify-center p-6">
           <div className="text-center">
             <img
               src="/login.jpeg"
               alt="illustration"
-              className="w-full max-h-[260px] object-contain"
+              className="w-full max-h-65 object-contain"
             />
 
-            <h3 className="text-lg font-semibold text-[var(--primary)] mt-4">
+            <h3 className="text-lg font-semibold text-(--primary) mt-4">
               Smart Secure Signup
             </h3>
 
