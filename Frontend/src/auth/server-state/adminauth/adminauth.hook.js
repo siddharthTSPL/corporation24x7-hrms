@@ -4,6 +4,9 @@ import {
   registerAdmin,
   logoutAdmin,
   getMeAdmin,
+  sendForgetPasswordOtp,
+  verifyAdminOtp,
+  resetAdminPassword,
   addManager,
   addEmployee,
 } from "../../api/adminapi/auth/ad.auth.api";
@@ -47,6 +50,33 @@ export const useAdminLogout = () => {
 };
 
 
+
+export const useSendForgetPasswordOtp = () => {
+  return useMutation({
+    mutationFn: sendForgetPasswordOtp,
+  });
+};
+
+
+export const useVerifyAdminOtp = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: verifyAdminOtp,
+    onSuccess: (data) => {
+      if (data?.login) {
+        queryClient.setQueryData(["admin"], data.user);
+      }
+    },
+  });
+};
+
+
+export const useResetAdminPassword = () => {
+  return useMutation({
+    mutationFn: resetAdminPassword,
+  });
+};
 export const useAddManager = () => {
   const queryClient = useQueryClient();
   return useMutation({

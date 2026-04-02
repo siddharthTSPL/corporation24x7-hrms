@@ -3,13 +3,23 @@ import { useNavigate } from "react-router-dom";
 import {
   useAdminLogin,
   useGetMeAdmin,
+  useSendForgetPasswordOtp,
+  useVerifyAdminOtp,
 } from "../../auth/server-state/adminauth/adminauth.hook";
 
 export default function Login() {
   const navigate = useNavigate();
   const { data: admin } = useGetMeAdmin();
-  const { mutate: loginAdminFn, isPending, error } = useAdminLogin();
- console.log("Admin data:", admin);
+
+  const { mutate: loginAdminFn, isPending: isLoggingIn, error } =
+    useAdminLogin();
+
+  const { mutate: sendOtpFn, isPending: sendingOtp } =
+    useSendForgetPasswordOtp();
+
+  const { mutate: verifyOtpFn, isPending: verifyingOtp } =
+    useVerifyAdminOtp();
+
   const [form, setForm] = useState({
     email: "",
     password: "",
@@ -30,6 +40,7 @@ export default function Login() {
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
+    setErrors({});
   };
 
   useEffect(() => {
@@ -51,19 +62,55 @@ export default function Login() {
   const handleLogin = () => {
     if (!validate()) return;
 
-    loginAdminFn({
-      identifier: form.email,
-      password: form.password,
+    loginAdminFn(
+      {
+        identifier: form.email,
+        password: form.password,
+      },
+      {
+        onError: (err) => {
+          setErrors({ password: err.message });
+        },
+      }
+    );
+  };
+
+  // ✅ SEND OTP
+  const handleSendOtp = () => {
+    if (!form.email) {
+      setErrors({ email: "Email is required" });
+      return;
+    }
+
+    sendOtpFn(form.email, {
+      onSuccess: () => {
+        setStep("otp");
+      },
+      onError: (err) => {
+        setErrors({ email: err.message });
+      },
     });
   };
 
-  const handleSendOtp = () => {
-    setStep("otp");
-  };
-
+  // ✅ VERIFY OTP
   const handleVerifyOtp = () => {
-    setVerified(true);
-    setStep("login");
+    if (!form.otp) {
+      setErrors({ otp: "OTP is required" });
+      return;
+    }
+
+    verifyOtpFn(
+      { email: form.email, otp: form.otp },
+      {
+        onSuccess: () => {
+          setVerified(true);
+          setStep("login");
+        },
+        onError: (err) => {
+          setErrors({ otp: err.message });
+        },
+      }
+    );
   };
 
   return (
@@ -90,7 +137,7 @@ export default function Login() {
                 placeholder="Email address"
                 value={form.email}
                 onChange={handleChange}
-                className="w-full mb-3 p-3 border rounded-lg focus:ring-2 focus:ring-(--primary)"
+                className="w-full mb-3 p-3 border rounded-lg"
               />
               {errors.email && (
                 <p className="text-red-500 text-sm">{errors.email}</p>
@@ -103,7 +150,7 @@ export default function Login() {
                   placeholder="Password"
                   value={form.password}
                   onChange={handleChange}
-                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-(--primary)"
+                  className="w-full p-3 border rounded-lg"
                 />
 
                 <span
@@ -114,29 +161,35 @@ export default function Login() {
                 </span>
 
                 {errors.password && (
-                  <p className="text-red-500 text-sm mt-1">{errors.password}</p>
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.password}
+                  </p>
                 )}
               </div>
+
               <button
                 onClick={handleLogin}
                 className="w-full bg-(--primary) text-white py-3 rounded-lg mt-3"
               >
-                Next
+                {isLoggingIn ? "Logging in..." : "Next"}
               </button>
 
               {verified && (
-                <p className="text-green-600 text-sm mt-2">✅ Email Verified</p>
+                <p className="text-green-600 text-sm mt-2">
+                  ✅ Email Verified
+                </p>
               )}
 
               <p
                 onClick={() => setStep("email")}
-                className="text-sm text-gray-500 mt-4 cursor-pointer hover:text-(--primary)"
+                className="text-sm text-gray-500 mt-4 cursor-pointer"
               >
                 Forgot Password?
               </p>
+
               <p
                 onClick={() => navigate("/signup")}
-                className="text-sm text-gray-500 mt-4 cursor-pointer hover:text-(--primary)"
+                className="text-sm text-gray-500 mt-4 cursor-pointer"
               >
                 Sign Up ?
               </p>
@@ -158,11 +211,15 @@ export default function Login() {
                 className="w-full mb-3 p-3 border rounded-lg"
               />
 
+              {errors.email && (
+                <p className="text-red-500 text-sm">{errors.email}</p>
+              )}
+
               <button
                 onClick={handleSendOtp}
                 className="w-full bg-(--primary) text-white py-3 rounded-lg"
               >
-                Send OTP
+                {sendingOtp ? "Sending..." : "Send OTP"}
               </button>
             </>
           )}
@@ -190,13 +247,12 @@ export default function Login() {
                 onClick={handleVerifyOtp}
                 className="w-full bg-(--primary) text-white py-3 rounded-lg"
               >
-                Verify OTP
+                {verifyingOtp ? "Verifying..." : "Verify OTP"}
               </button>
             </>
           )}
         </div>
 
-     
         <div className="hidden md:flex w-1/2 bg-gray-50 items-center justify-center p-6">
           <div className="text-center">
             <img
@@ -210,8 +266,7 @@ export default function Login() {
             </h3>
 
             <p className="text-gray-500 text-sm mt-2">
-              Experience secure and seamless HRMS access with 2 factor
-              authentication.
+              Experience secure and seamless HRMS access with 2 factor authentication.
             </p>
 
             <div className="flex justify-center mt-4 gap-2">
