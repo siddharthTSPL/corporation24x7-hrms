@@ -27,9 +27,9 @@ export default function Sidebar({ collapsed, setCollapsed }) {
   const menu = [
     { name: "Dashboard", path: "/dashboard", icon: <FaHome /> },
     { name: "Employee Register", path: "/employee", icon: <FaUsers /> },
-    { name: "Organisation", path: "/organisation", icon: <FaBuilding /> },
     { name: "Leave", path: "/leave", icon: <FaCalendarAlt /> },
     { name: "Announcement", path: "/announcement", icon: <FaBullhorn /> },
+     { name: "Organisation", path: "/organisation", icon: <FaBuilding /> },
     { name: "Document", path: "/document", icon: <FaFileAlt /> },
     { name: "File", path: "/file", icon: <FaFolder /> },
     { name: "Settings", path: "/settings", icon: <FaCog /> },

@@ -1,180 +1,578 @@
+"use client";
+
 import { useState } from "react";
-import { FaEdit, FaTrash } from "react-icons/fa";
+import { FaEdit, FaTrash, FaSearch, FaFilter, FaTimes, FaUserTie, FaUserPlus } from "react-icons/fa";
+
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const DEPARTMENTS = ["OPR", "BPO", "ENG", "MGMT", "HR"];
+const LOCATIONS   = ["Noida", "Bareilly", "Delhi", "Mumbai"];
+
+const EMPTY_EMP = {
+  department: "", under_manager: "", f_name: "", l_name: "",
+  work_email: "", gender: "", marital_status: "single",
+  password: "", personal_contact: "", e_contact: "",
+  role: "employee", office_location: "", designation: "",
+};
+
+const EMPTY_MGR = {
+  department: "", f_name: "", l_name: "", work_email: "",
+  gender: "", marital_status: "single", password: "",
+  personal_contact: "", e_contact: "", role: "manager", designation: "",
+};
+
+// ─── Reusable Field ───────────────────────────────────────────────────────────
+
+function Field({ label, error, children }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+        {label}
+      </label>
+      {children}
+      {error && (
+        <span className="text-xs text-[var(--error)] flex items-center gap-1">
+          ⚠ {error}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ─── Input / Select shared style ─────────────────────────────────────────────
+
+const inputCls =
+  "w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-[var(--background)] text-sm text-[var(--text)] " +
+  "focus:outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 transition-all placeholder-gray-400";
+
+// ─── Modal Wrapper ────────────────────────────────────────────────────────────
+
+function Modal({ title, icon, onClose, onSubmit, children, accentColor = "var(--primary)" }) {
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[92vh]">
+
+        {/* Header */}
+        <div
+          className="flex items-center justify-between px-6 py-4 rounded-t-2xl"
+          style={{ background: accentColor }}
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-white text-xl">{icon}</span>
+            <div>
+              <h2 className="text-lg font-bold text-white">{title}</h2>
+              <p className="text-xs text-white/70">Fill in all required fields</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg bg-white/20 text-white flex items-center justify-center hover:bg-white/30 transition-colors"
+          >
+            <FaTimes size={14} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto p-6 flex-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {children}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-5 py-2.5 rounded-xl border border-gray-200 text-[var(--text)] text-sm font-semibold hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onSubmit}
+            className="px-6 py-2.5 rounded-xl text-white text-sm font-semibold transition-all hover:opacity-90 active:scale-95 shadow-md"
+            style={{ background: accentColor }}
+          >
+            Submit
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Avatar initials ──────────────────────────────────────────────────────────
+
+function Avatar({ name }) {
+  const initials = name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  const colors = ["#00A8E8", "#FDCB6E", "#90DBF4", "#6C63FF", "#FF6584"];
+  const color  = colors[name.charCodeAt(0) % colors.length];
+
+  return (
+    <div
+      className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+      style={{ background: color }}
+    >
+      {initials}
+    </div>
+  );
+}
+
+// ─── Badge ────────────────────────────────────────────────────────────────────
+
+function Badge({ label, type = "dept" }) {
+  const styles = {
+    dept:   "bg-[var(--secondary)]/30 text-[#007BAE]",
+    role:   "bg-[var(--accent)]/30 text-yellow-700",
+    active: "bg-green-100 text-green-700",
+  };
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${styles[type] ?? styles.dept}`}>
+      {label}
+    </span>
+  );
+}
+
+// ─── Empty State ──────────────────────────────────────────────────────────────
+
+function EmptyState({ onAdd }) {
+  return (
+    <tr>
+      <td colSpan={7}>
+        <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+          <div className="text-5xl">👥</div>
+          <p className="text-gray-500 font-medium">No employees found</p>
+          <p className="text-gray-400 text-sm">Add your first employee to get started</p>
+          <button
+            onClick={onAdd}
+            className="mt-2 px-4 py-2 rounded-xl text-white text-sm font-semibold bg-[var(--primary)] hover:opacity-90 transition"
+          >
+            + Add Employee
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function EmployeeTable() {
-  const [open, setOpen] = useState(false);
+  const [open,        setOpen]        = useState(false);
+  const [openManager, setOpenManager] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   const [employees, setEmployees] = useState([]);
+  const [empForm,   setEmpForm]   = useState(EMPTY_EMP);
+  const [mgrForm,   setMgrForm]   = useState(EMPTY_MGR);
+  const [empErrors, setEmpErrors] = useState({});
+  const [mgrErrors, setMgrErrors] = useState({});
 
-  const [form, setForm] = useState({
-    uid: "",
-    department: "",
-    under_manager: "",
-    f_name: "",
-    l_name: "",
-    work_email: "",
-    gender: "",
-    marital_status: "single",
-    password: "",
-    personal_contact: "",
-    e_contact: "",
-    role: "employee",
-    status: "active",
-  });
+  const [filters, setFilters] = useState({ search: "", department: "", status: "" });
 
-  const [errors, setErrors] = useState({});
+  // ── Handlers ───────────────────────────────────────────────────────────────
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+  const handleEmpChange = (e) => setEmpForm({ ...empForm, [e.target.name]: e.target.value });
+  const handleMgrChange = (e) => setMgrForm({ ...mgrForm, [e.target.name]: e.target.value });
 
-  const validate = () => {
-    let err = {};
-
-    if (!form.uid) err.uid = "Required";
-    if (!form.department) err.department = "Required";
-    if (!form.under_manager) err.under_manager = "Required";
-    if (!form.f_name) err.f_name = "Required";
-    if (!form.l_name) err.l_name = "Required";
-    if (!form.work_email || !/\S+@\S+\.\S+/.test(form.work_email)) err.work_email = "Valid email required";
-    if (!form.gender) err.gender = "Required";
-    if (!form.password || form.password.length < 6) err.password = "Min 6 chars";
-    if (!form.personal_contact) err.personal_contact = "Required";
-    if (!form.e_contact) err.e_contact = "Required";
-
-    setErrors(err);
+  const validateEmp = () => {
+    const err = {};
+    if (!empForm.f_name)        err.f_name        = "Required";
+    if (!empForm.l_name)        err.l_name        = "Required";
+    if (!empForm.work_email)    err.work_email    = "Required";
+    if (!empForm.department)    err.department    = "Required";
+    if (!empForm.designation)   err.designation   = "Required";
+    if (!empForm.password)      err.password      = "Required";
+    setEmpErrors(err);
     return Object.keys(err).length === 0;
   };
 
-  const handleSubmit = () => {
-    if (validate()) {
-      setEmployees([...employees, { ...form, id: Date.now() }]);
-      setOpen(false);
-    }
+  const validateMgr = () => {
+    const err = {};
+    if (!mgrForm.f_name)      err.f_name      = "Required";
+    if (!mgrForm.l_name)      err.l_name      = "Required";
+    if (!mgrForm.work_email)  err.work_email  = "Required";
+    if (!mgrForm.department)  err.department  = "Required";
+    if (!mgrForm.designation) err.designation = "Required";
+    setMgrErrors(err);
+    return Object.keys(err).length === 0;
   };
 
-  const getStatusStyle = (status) => {
-    return status === "active"
-      ? "bg-green-100 text-green-600"
-      : "bg-red-100 text-red-500";
+  const handleEmpSubmit = () => {
+    if (!validateEmp()) return;
+    setEmployees([...employees, { ...empForm, id: Date.now() }]);
+    setOpen(false);
+    setEmpForm(EMPTY_EMP);
+    setEmpErrors({});
   };
+
+  const handleMgrSubmit = () => {
+    if (!validateMgr()) return;
+    setEmployees([...employees, { ...mgrForm, id: Date.now() }]);
+    setOpenManager(false);
+    setMgrForm(EMPTY_MGR);
+    setMgrErrors({});
+  };
+
+  const handleDelete = (id) => setEmployees(employees.filter((e) => e.id !== id));
+
+  const filtered = employees.filter((emp) => {
+    const name  = `${emp.f_name} ${emp.l_name}`.toLowerCase();
+    const email = (emp.work_email || "").toLowerCase();
+    const q     = filters.search.toLowerCase();
+    return (
+      (name.includes(q) || email.includes(q)) &&
+      (filters.department ? emp.department === filters.department : true)
+    );
+  });
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-4 md:p-6 mt-6">
+    <div className="min-h-screen bg-[var(--background)] p-4 md:p-6">
+      <div className="max-w-7xl mx-auto">
 
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
-        <h2 className="text-xl font-bold text-[var(--primary)]">
-          Employee List
-        </h2>
+        {/* ── Page Header ── */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-[var(--text)]">Employee Directory</h1>
+            <p className="text-sm text-gray-400 mt-0.5">
+              {employees.length} total · {filtered.length} shown
+            </p>
+          </div>
 
-        <button
-          onClick={() => setOpen(true)}
-          className="bg-[var(--primary)] text-white px-4 py-2 rounded-lg"
-        >
-          + Add Employee
-        </button>
-      </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setOpenManager(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-[var(--primary)] text-[var(--primary)] text-sm font-semibold hover:bg-[var(--primary)] hover:text-white transition-all"
+            >
+              <FaUserTie size={13} />
+              <span>Add Manager</span>
+            </button>
 
-      {/* TABLE */}
-      <div className="overflow-x-auto bg-white rounded-xl shadow">
-        <table className="w-full min-w-[800px] text-sm">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="p-3 text-left">Name</th>
-              <th className="p-3">Department</th>
-              <th className="p-3">Email</th>
-              <th className="p-3">Contact</th>
-              <th className="p-3">Status</th>
-              <th className="p-3 text-center">Actions</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {employees.map((emp) => (
-              <tr key={emp.id} className="border-b hover:bg-[var(--background)]">
-                <td className="p-3 font-medium">
-                  {emp.f_name} {emp.l_name}
-                </td>
-                <td className="p-3">{emp.department}</td>
-                <td className="p-3">{emp.work_email}</td>
-                <td className="p-3">{emp.personal_contact}</td>
-                <td className="p-3">
-                  <span className={`px-3 py-1 text-xs rounded-full ${getStatusStyle(emp.status)}`}>
-                    {emp.status}
-                  </span>
-                </td>
-                <td className="p-3">
-                  <div className="flex justify-center gap-3">
-                    <FaEdit className="cursor-pointer text-gray-500 hover:text-[var(--primary)]" />
-                    <FaTrash className="cursor-pointer text-gray-500 hover:text-red-500" />
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* MODAL FORM */}
-      {open && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-3">
-          <div className="bg-white w-full max-w-2xl p-6 rounded-xl max-h-[90vh] overflow-y-auto">
-
-            <h2 className="text-xl font-bold mb-4 text-[var(--primary)]">
-              Add Employee
-            </h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-
-              <input name="uid" placeholder="UID" onChange={handleChange} className="p-3 border rounded-lg" />
-              {errors.uid && <p className="text-red-500 text-sm">{errors.uid}</p>}
-
-              <select name="department" onChange={handleChange} className="p-3 border rounded-lg">
-                <option value="">Department</option>
-                <option value="OPR">OPR</option>
-                <option value="BPO">BPO</option>
-                <option value="ENG">ENG</option>
-                <option value="ENG">MGMT</option>
-              </select>
-
-              <input name="under_manager" placeholder="Manager ID" onChange={handleChange} className="p-3 border rounded-lg" />
-
-              <input name="f_name" placeholder="First Name" onChange={handleChange} className="p-3 border rounded-lg" />
-              <input name="l_name" placeholder="Last Name" onChange={handleChange} className="p-3 border rounded-lg" />
-
-              <input name="work_email" placeholder="Email" onChange={handleChange} className="p-3 border rounded-lg" />
-
-              <select name="gender" onChange={handleChange} className="p-3 border rounded-lg">
-                <option value="">Gender</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-              </select>
-
-              <select name="marital_status" onChange={handleChange} className="p-3 border rounded-lg">
-                <option value="single">Martial Status</option>
-                <option value="married">Married</option>
-                <option value="divorced">Single</option>
-              </select>
-
-              <input type="password" name="password" placeholder="Password" onChange={handleChange} className="p-3 border rounded-lg" />
-
-              <input name="personal_contact" placeholder="Phone" onChange={handleChange} className="p-3 border rounded-lg" />
-              <input name="e_contact" placeholder="Emergency Contact" onChange={handleChange} className="p-3 border rounded-lg" />
-
-              <select name="status" onChange={handleChange} className="p-3 border rounded-lg">
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-
-            </div>
-
-            <div className="flex justify-end gap-3 mt-4">
-              <button onClick={() => setOpen(false)} className="px-4 py-2 border rounded-lg">Cancel</button>
-              <button onClick={handleSubmit} className="px-4 py-2 bg-[var(--primary)] text-white rounded-lg">Submit</button>
-            </div>
+            <button
+              onClick={() => setOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white text-sm font-semibold hover:opacity-90 transition-all shadow-md shadow-[var(--primary)]/30"
+            >
+              <FaUserPlus size={13} />
+              <span>Add Employee</span>
+            </button>
           </div>
         </div>
+
+        {/* ── Table Card ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-[var(--secondary)]/30 overflow-hidden">
+
+          {/* Filters Bar */}
+          <div className="p-4 border-b border-gray-100">
+            <div className="flex flex-col sm:flex-row gap-3">
+
+              {/* Search */}
+              <div className="relative flex-1">
+                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={13} />
+                <input
+                  placeholder="Search name or email…"
+                  className={`${inputCls} pl-9`}
+                  value={filters.search}
+                  onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                />
+              </div>
+
+              {/* Department filter */}
+              <select
+                className={`${inputCls} sm:w-44`}
+                value={filters.department}
+                onChange={(e) => setFilters({ ...filters, department: e.target.value })}
+              >
+                <option value="">All Departments</option>
+                {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+
+              {/* Status filter */}
+              <select
+                className={`${inputCls} sm:w-36`}
+                value={filters.status}
+                onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+              >
+                <option value="">All Status</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+
+              {/* More filters toggle */}
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                  showFilters
+                    ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                    : "border-gray-200 text-gray-500 hover:border-[var(--primary)] hover:text-[var(--primary)]"
+                }`}
+              >
+                <FaFilter size={11} />
+                <span className="hidden sm:inline">More Filters</span>
+              </button>
+            </div>
+
+            {/* Expanded filters */}
+            {showFilters && (
+              <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <select className={inputCls}>
+                  <option value="">All Roles</option>
+                  <option value="employee">Employee</option>
+                  <option value="manager">Manager</option>
+                </select>
+                <select className={inputCls}>
+                  <option value="">All Locations</option>
+                  {LOCATIONS.map((l) => <option key={l} value={l}>{l}</option>)}
+                </select>
+                <select className={inputCls}>
+                  <option value="">All Genders</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                </select>
+                <button
+                  onClick={() => setFilters({ search: "", department: "", status: "" })}
+                  className="text-sm text-[var(--error)] font-medium hover:underline text-left px-3"
+                >
+                  Clear All
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Table — horizontal scroll on small screens */}
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[750px] text-sm">
+              <thead>
+                <tr className="bg-[var(--background)] border-b border-gray-100">
+                  {["Employee", "Department", "Designation", "Location", "Contact", "Role", "Actions"].map((h) => (
+                    <th
+                      key={h}
+                      className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-gray-50">
+                {filtered.length === 0 ? (
+                  <EmptyState onAdd={() => setOpen(true)} />
+                ) : (
+                  filtered.map((emp) => (
+                    <tr key={emp.id} className="hover:bg-[var(--background)]/60 transition-colors group">
+
+                      {/* Name + Email */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar name={`${emp.f_name} ${emp.l_name}`} />
+                          <div className="min-w-0">
+                            <p className="font-semibold text-[var(--text)] truncate">
+                              {emp.f_name} {emp.l_name}
+                            </p>
+                            <p className="text-xs text-gray-400 truncate">{emp.work_email}</p>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <Badge label={emp.department || "—"} type="dept" />
+                      </td>
+
+                      <td className="px-4 py-3 text-gray-600">{emp.designation || "—"}</td>
+                      <td className="px-4 py-3 text-gray-600">{emp.office_location || "—"}</td>
+                      <td className="px-4 py-3 text-gray-500">{emp.personal_contact || "—"}</td>
+
+                      <td className="px-4 py-3">
+                        <Badge label={emp.role} type="role" />
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            className="w-8 h-8 rounded-lg bg-[var(--background)] flex items-center justify-center text-gray-400 hover:text-[var(--primary)] hover:bg-[var(--secondary)]/30 transition-colors"
+                            title="Edit"
+                          >
+                            <FaEdit size={13} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(emp.id)}
+                            className="w-8 h-8 rounded-lg bg-[var(--background)] flex items-center justify-center text-gray-400 hover:text-[var(--error)] hover:bg-red-50 transition-colors"
+                            title="Delete"
+                          >
+                            <FaTrash size={12} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footer row count */}
+          {filtered.length > 0 && (
+            <div className="px-4 py-3 border-t border-gray-50 text-xs text-gray-400">
+              Showing {filtered.length} of {employees.length} employees
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Employee Modal ── */}
+      {open && (
+        <Modal
+          title="Add Employee"
+          icon={<FaUserPlus />}
+          onClose={() => { setOpen(false); setEmpErrors({}); }}
+          onSubmit={handleEmpSubmit}
+          accentColor="var(--primary)"
+        >
+          <Field label="Department" error={empErrors.department}>
+            <select name="department" value={empForm.department} onChange={handleEmpChange} className={inputCls}>
+              <option value="">Select Department</option>
+              {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </Field>
+
+          <Field label="Manager ID">
+            <input name="under_manager" placeholder="Manager Employee ID" value={empForm.under_manager} onChange={handleEmpChange} className={inputCls} />
+          </Field>
+
+          <Field label="First Name" error={empErrors.f_name}>
+            <input name="f_name" placeholder="First name" value={empForm.f_name} onChange={handleEmpChange} className={inputCls} />
+          </Field>
+
+          <Field label="Last Name" error={empErrors.l_name}>
+            <input name="l_name" placeholder="Last name" value={empForm.l_name} onChange={handleEmpChange} className={inputCls} />
+          </Field>
+
+          <Field label="Work Email" error={empErrors.work_email}>
+            <input name="work_email" type="email" placeholder="name@company.com" value={empForm.work_email} onChange={handleEmpChange} className={inputCls} />
+          </Field>
+
+          <Field label="Password" error={empErrors.password}>
+            <input name="password" type="password" placeholder="Set password" value={empForm.password} onChange={handleEmpChange} className={inputCls} />
+          </Field>
+
+          <Field label="Gender">
+            <select name="gender" value={empForm.gender} onChange={handleEmpChange} className={inputCls}>
+              <option value="">Select Gender</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+          </Field>
+
+          <Field label="Marital Status">
+            <select name="marital_status" value={empForm.marital_status} onChange={handleEmpChange} className={inputCls}>
+              <option value="single">Single</option>
+              <option value="married">Married</option>
+              <option value="divorced">Divorced</option>
+            </select>
+          </Field>
+
+          <Field label="Phone">
+            <input name="personal_contact" placeholder="+91 XXXXX XXXXX" value={empForm.personal_contact} onChange={handleEmpChange} className={inputCls} />
+          </Field>
+
+          <Field label="Emergency Contact">
+            <input name="e_contact" placeholder="Emergency contact" value={empForm.e_contact} onChange={handleEmpChange} className={inputCls} />
+          </Field>
+
+          <Field label="Office Location">
+            <select name="office_location" value={empForm.office_location} onChange={handleEmpChange} className={inputCls}>
+              <option value="">Select Location</option>
+              {LOCATIONS.map((l) => <option key={l} value={l}>{l}</option>)}
+            </select>
+          </Field>
+
+          <Field label="Designation" error={empErrors.designation}>
+            <input name="designation" placeholder="e.g. Software Engineer" value={empForm.designation} onChange={handleEmpChange} className={inputCls} />
+          </Field>
+        </Modal>
+      )}
+
+      {/* ── Manager Modal ── */}
+      {openManager && (
+        <Modal
+          title="Add Manager"
+          icon={<FaUserTie />}
+          onClose={() => { setOpenManager(false); setMgrErrors({}); }}
+          onSubmit={handleMgrSubmit}
+          accentColor="var(--accent)"
+        >
+          <Field label="Department" error={mgrErrors.department}>
+            <select name="department" value={mgrForm.department} onChange={handleMgrChange} className={inputCls}>
+              <option value="">Select Department</option>
+              {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </Field>
+
+          <Field label="Role">
+            <select name="role" value={mgrForm.role} onChange={handleMgrChange} className={inputCls}>
+              <option value="manager">Manager</option>
+              <option value="senior_manager">Senior Manager</option>
+              <option value="official">Official</option>
+            </select>
+          </Field>
+
+          <Field label="First Name" error={mgrErrors.f_name}>
+            <input name="f_name" placeholder="First name" value={mgrForm.f_name} onChange={handleMgrChange} className={inputCls} />
+          </Field>
+
+          <Field label="Last Name" error={mgrErrors.l_name}>
+            <input name="l_name" placeholder="Last name" value={mgrForm.l_name} onChange={handleMgrChange} className={inputCls} />
+          </Field>
+
+          <Field label="Work Email" error={mgrErrors.work_email}>
+            <input name="work_email" type="email" placeholder="name@company.com" value={mgrForm.work_email} onChange={handleMgrChange} className={inputCls} />
+          </Field>
+
+          <Field label="Password">
+            <input name="password" type="password" placeholder="Set password" value={mgrForm.password} onChange={handleMgrChange} className={inputCls} />
+          </Field>
+
+          <Field label="Gender">
+            <select name="gender" value={mgrForm.gender} onChange={handleMgrChange} className={inputCls}>
+              <option value="">Select Gender</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+          </Field>
+
+          <Field label="Marital Status">
+            <select name="marital_status" value={mgrForm.marital_status} onChange={handleMgrChange} className={inputCls}>
+              <option value="single">Single</option>
+              <option value="married">Married</option>
+              <option value="divorced">Divorced</option>
+            </select>
+          </Field>
+
+          <Field label="Phone">
+            <input name="personal_contact" placeholder="+91 XXXXX XXXXX" value={mgrForm.personal_contact} onChange={handleMgrChange} className={inputCls} />
+          </Field>
+
+          <Field label="Emergency Contact">
+            <input name="e_contact" placeholder="Emergency contact" value={mgrForm.e_contact} onChange={handleMgrChange} className={inputCls} />
+          </Field>
+
+          <Field label="Designation" error={mgrErrors.designation} className="sm:col-span-2">
+            <input name="designation" placeholder="e.g. Head of Engineering" value={mgrForm.designation} onChange={handleMgrChange} className={inputCls} />
+          </Field>
+        </Modal>
       )}
     </div>
   );
