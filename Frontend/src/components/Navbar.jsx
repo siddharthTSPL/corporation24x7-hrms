@@ -74,18 +74,18 @@ function Navbar({ collapsed, setCollapsed, data = [] }) {
 
         <div className="relative cursor-pointer">
           <FaBell className="text-lg" />
-          <span className="absolute -top-2 -right-2 bg-[#730042] text-white text-[10px] px-1.5 rounded-full">
+          <span className="absolute -top-2 -right-2 bg-[#00A8E8] text-white text-[10px] px-1.5 rounded-full">
             2
           </span>
         </div>
 
-        <div className="w-9 h-9 rounded-full bg-[#730042] text-white flex items-center justify-center text-sm font-semibold">
+        <div className="w-9 h-9 rounded-full bg-[#00A8E8] text-white flex items-center justify-center text-sm font-semibold">
           {adminInitial}
         </div>
       </div>
 
       {search.trim() && (
-        <div className="text-xs text-[#730042] w-full">
+        <div className="text-xs text-[#00A8E8] w-full">
           {results.length} result(s) found
         </div>
       )}

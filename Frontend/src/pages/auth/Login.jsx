@@ -13,9 +13,16 @@ export default function Login() {
   const [form, setForm] = useState({
     email: "",
     password: "",
+    otp: "",
   });
 
   const [errors, setErrors] = useState({});
+  const [step, setStep] = useState("login");
+  const [verified, setVerified] = useState(false); 
+const [showPassword, setShowPassword] = useState(false);
+  
+  const images = ["/src/assets/slide1.png", "/src/assets/slide2.png", "/src/assets/slide3.png"];
+  const [currentSlide, setCurrentSlide] = useState(0);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -45,62 +52,186 @@ export default function Login() {
       password: form.password,
     });
   };
+
+
+  const handleSendOtp = () => {
+    setStep("otp");
+  };
+
+  const handleVerifyOtp = () => {
+    setVerified(true);
+    setStep("login");
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-linear-to-r from-indigo-500 via-purple-500 to-pink-500 px-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8">
-        <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">
-          Welcome Back 👋
-        </h2>
+    <div
+      className="min-h-screen flex items-center justify-center bg-cover bg-center px-4"
+      style={{ backgroundImage: "url('/bg.jpeg')" }}
+    >
+      {/* MAIN CONTAINER */}
+      <div className="w-full max-w-5xl bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden">
+        
+        {/* LEFT SIDE */}
+        <div className="w-full md:w-1/2 p-8">
+          <img src="src/assets/logo1.png" alt="logo" className="w-28 mb-6" />
 
-        <p className="text-center text-gray-500 mb-6">
-          Login to your admin account
-        </p>
+          {step === "login" && (
+            <>
+              <h2 className="text-2xl font-bold text-[var(--primary)] mb-2">
+                Sign in
+              </h2>
+              <p className="text-gray-500 text-sm mb-4">
+                Access your Talent account
+              </p>
 
-        <div className="mb-4">
-          <input
-            type="text"
-            name="email"
-            placeholder="Enter your email"
-            value={form.email}
-            onChange={handleChange}
-            className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-          {errors.email && (
-            <p className="text-red-500 text-sm">{errors.email}</p>
+              <input
+                type="text"
+                name="email"
+                placeholder="Email address"
+                value={form.email}
+                onChange={handleChange}
+                className="w-full mb-3 p-3 border rounded-lg focus:ring-2 focus:ring-[var(--primary)]"
+              />
+              {errors.email && (
+                <p className="text-red-500 text-sm">{errors.email}</p>
+              )}
+
+             <div className="relative mb-3">
+  <input
+    type={showPassword ? "text" : "password"}
+    name="password"
+    placeholder="Password"
+    value={form.password}
+    onChange={handleChange}
+    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-[var(--primary)]"
+  />
+
+  {/* 👁️ Eye Icon */}
+  <span
+    onClick={() => setShowPassword(!showPassword)}
+    className="absolute right-3 top-3 cursor-pointer text-gray-500"
+  >
+    {showPassword ? "🙈" : "👁️"}
+  </span>
+
+  {/* Error */}
+  {errors.password && (
+    <p className="text-red-500 text-sm mt-1">{errors.password}</p>
+  )}
+</div>
+              <button
+                onClick={handleLogin}
+                className="w-full bg-[var(--primary)] text-white py-3 rounded-lg mt-3"
+              >
+                Next
+              </button>
+
+              {verified && (
+                <p className="text-green-600 text-sm mt-2">
+                  ✅ Email Verified
+                </p>
+              )}
+
+              <p
+                onClick={() => setStep("email")}
+                className="text-sm text-gray-500 mt-4 cursor-pointer hover:text-[var(--primary)]"
+              >
+                Forgot Password?
+              </p>
+              <p
+                 onClick={() => navigate("/signup")}
+                className="text-sm text-gray-500 mt-4 cursor-pointer hover:text-[var(--primary)]"
+              >
+                Sign Up ?
+              </p>
+            </>
+          )}
+
+          {step === "email" && (
+            <>
+              <h2 className="text-xl font-bold text-[var(--primary)] mb-4">
+                Enter Email
+              </h2>
+
+              <input
+                type="text"
+                name="email"
+                placeholder="Enter your email"
+                value={form.email}
+                onChange={handleChange}
+                className="w-full mb-3 p-3 border rounded-lg"
+              />
+
+              <button
+                onClick={handleSendOtp}
+                className="w-full bg-[var(--primary)] text-white py-3 rounded-lg"
+              >
+                Send OTP
+              </button>
+            </>
+          )}
+
+          {step === "otp" && (
+            <>
+              <h2 className="text-xl font-bold text-[var(--primary)] mb-4">
+                Enter OTP
+              </h2>
+
+              <input
+                type="text"
+                name="otp"
+                placeholder="Enter OTP"
+                value={form.otp}
+                onChange={handleChange}
+                className="w-full mb-3 p-3 border rounded-lg"
+              />
+
+              {errors.otp && (
+                <p className="text-red-500 text-sm">{errors.otp}</p>
+              )}
+
+              <button
+                onClick={handleVerifyOtp}
+                className="w-full bg-[var(--primary)] text-white py-3 rounded-lg"
+              >
+                Verify OTP
+              </button>
+            </>
           )}
         </div>
 
-        <div className="mb-4">
-          <input
-            type="password"
-            name="password"
-            placeholder="Enter your password"
-            value={form.password}
-            onChange={handleChange}
-            className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-          {errors.password && (
-            <p className="text-red-500 text-sm">{errors.password}</p>
-          )}
+        {/* RIGHT SIDE */}
+        <div className="hidden md:flex w-1/2 bg-gray-50 items-center justify-center p-6">
+          <div className="text-center">
+            <img
+              src={images[currentSlide]}
+              alt="slide"
+              className="w-full max-h-[260px] object-contain"
+            />
+
+            <h3 className="text-lg font-semibold text-[var(--primary)] mt-4">
+              Smart Secure Login
+            </h3>
+
+            <p className="text-gray-500 text-sm mt-2">
+              Experience secure and seamless HRMS access with 2 factor
+              authentication.
+            </p>
+
+            <div className="flex justify-center mt-4 gap-2">
+              {images.map((_, index) => (
+                <div
+                  key={index}
+                  className={`w-2 h-2 rounded-full ${
+                    currentSlide === index
+                      ? "bg-[var(--primary)]"
+                      : "bg-gray-300"
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
         </div>
-
-        {error && (
-          <p className="text-red-500 text-sm mb-3 text-center">
-            {error.message}
-          </p>
-        )}
-
-        <button
-          onClick={handleLogin}
-          disabled={isPending}
-          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg"
-        >
-          {isPending ? "Logging in..." : "Login"}
-        </button>
-
-        <p className="text-sm text-center text-gray-500 mt-6">
-          Secure HRMS Access 🔐
-        </p>
       </div>
     </div>
   );

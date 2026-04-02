@@ -99,7 +99,7 @@ function Dashboard() {
               <span className="text-gray-400 text-lg">{item.icon}</span>
             </div>
 
-            <h2 className="text-xl md:text-2xl font-bold text-gray-800">
+            <h2 className="text-xl md:text-2xl font-bold text-[#1F2937]">
               {item.value}
             </h2>
 
@@ -113,7 +113,7 @@ function Dashboard() {
 
             {item.title === "Present Today" && (
               <div className="w-full bg-gray-200 h-2 rounded-full mt-3">
-                <div className="bg-[#730042] h-2 rounded-full w-[85%]"></div>
+                <div className="bg-[#00A8E8] h-2 rounded-full w-[85%]"></div>
               </div>
             )}
           </div>
