@@ -1,163 +1,162 @@
-import { useState } from "react";
+"use client";
+import { useState, useEffect } from "react";
+
+const leaveTypes = [
+  { value: "el", label: "EL — Earned Leave" },
+  { value: "sl", label: "SL — Sick Leave" },
+  { value: "ml", label: "ML — Maternity Leave" },
+  { value: "pl", label: "PL — Privilege Leave" },
+];
+
+const statusConfig = [
+  { label: "Pending", icon: "⏳", color: "text-yellow-500", border: "border-yellow-400" },
+  { label: "Approved", icon: "✅", color: "text-green-500", border: "border-green-400" },
+  { label: "Rejected", icon: "❌", color: "text-error", border: "border-error" },
+];
+
+const EMPTY_FORM = { leaveType: "", startDate: "", endDate: "", reason: "" };
 
 export default function LeavePage() {
   const [open, setOpen] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
 
-  const [form, setForm] = useState({
-    leaveType: "",
-    startDate: "",
-    endDate: "",
-    days: "",
-    reason: "",
-  });
-
-  const [errors, setErrors] = useState({});
-
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const calcDays = () => {
+    if (!form.startDate || !form.endDate) return 0;
+    const diff =
+      Math.ceil(
+        (new Date(form.endDate) - new Date(form.startDate)) /
+          (1000 * 60 * 60 * 24)
+      ) + 1;
+    return diff > 0 ? diff : 0;
   };
 
-  const validate = () => {
-    let err = {};
-
-    if (!form.leaveType) err.leaveType = "Required";
-    if (!form.startDate) err.startDate = "Required";
-    if (!form.endDate) err.endDate = "Required";
-    if (!form.days) err.days = "Required";
-    if (!form.reason) err.reason = "Required";
-
-    setErrors(err);
-    return Object.keys(err).length === 0;
-  };
-
-  const handleSubmit = () => {
-    if (validate()) {
-      alert("Leave Submitted");
-      setOpen(false);
-    }
-  };
+  const days = calcDays();
 
   return (
-    <div className="p-4 md:p-6 bg-(--background) min-h-screen">
+    <div className="min-h-screen bg-background px-3 sm:px-6 md:px-10 py-6">
+      <div className="max-w-6xl mx-auto">
 
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4 gap-3">
-        <h1 className="text-2xl font-bold text-(--primary)">Leave</h1>
-
-        <button
-          onClick={() => setOpen(true)}
-          className="bg-(--primary) text-white px-4 py-2 rounded-lg"
-        >
-          + Add Leave
-        </button>
-      </div>
-
-      {/* CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-        {["Pending", "Approved", "Rejected"].map((item, i) => (
-          <div key={i} className="bg-white p-4 rounded-xl shadow">
-            <h2 className="text-gray-500">{item}</h2>
-            <p className="text-2xl font-bold text-(--primary)">0</p>
+        {/* HEADER */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <div>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-primary">
+              Leave Management
+            </h1>
+            <p className="text-xs sm:text-sm text-gray-500">
+              Track and manage your leave requests
+            </p>
           </div>
-        ))}
+
+          <button
+            onClick={() => setOpen(true)}
+            className=" bg-[var(--primary)] text-white px-4 py-2 rounded-lg text-sm shadow hover:scale-95 transition"
+          >
+            + Apply Leave
+          </button>
+        </div>
+
+        {/* STATUS CARDS */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          {statusConfig.map((s) => (
+            <div
+              key={s.label}
+              className={`bg-white p-4 rounded-xl shadow border-t-4 ${s.border} flex justify-between items-center`}
+            >
+              <div>
+                <p className="text-xs text-gray-400">{s.label}</p>
+                <p className={`text-2xl font-bold ${s.color}`}>0</p>
+              </div>
+              <div className="text-2xl">{s.icon}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* EXTRA CARDS (NEW) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+
+          <div className="bg-white p-4 rounded-xl shadow border-l-4 border-primary">
+            <p className="text-xs text-gray-400">Total Leaves</p>
+            <h2 className="text-xl font-bold text-primary">12</h2>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl shadow border-l-4 border-secondary">
+            <p className="text-xs text-gray-400">Remaining Leaves</p>
+            <h2 className="text-xl font-bold text-secondary">8</h2>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl shadow border-l-4 border-accent">
+            <p className="text-xs text-gray-400">This Month</p>
+            <h2 className="text-xl font-bold text-accent">2</h2>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl shadow border-l-4 border-error">
+            <p className="text-xs text-gray-400">Rejected</p>
+            <h2 className="text-xl font-bold text-error">1</h2>
+          </div>
+
+        </div>
+
+        {/* HISTORY */}
+        <div className="bg-white rounded-xl shadow p-5 text-center">
+          <p className="text-gray-500 text-sm">No leave records found</p>
+        </div>
       </div>
 
-      {/* TABLE */}
-      <div className="overflow-x-auto bg-white rounded-xl shadow">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="p-3 text-left">Type</th>
-              <th className="p-3 text-left">Start</th>
-              <th className="p-3 text-left">End</th>
-              <th className="p-3 text-left">Days</th>
-              <th className="p-3 text-left">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td className="p-3">EL</td>
-              <td className="p-3">2026-01-01</td>
-              <td className="p-3">2026-01-03</td>
-              <td className="p-3">3</td>
-              <td className="p-3 text-yellow-500">Pending</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
+      {/* MODAL */}
       {open && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-3">
-          <div className="bg-white w-full max-w-lg p-6 rounded-xl">
+        <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center">
+          <div className="bg-white w-full sm:max-w-md rounded-t-xl sm:rounded-xl p-5">
 
-            <h2 className="text-xl font-bold mb-4 text-(--primary)">
+            <h2 className="text-lg font-bold text-primary mb-4">
               Apply Leave
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <select
+              className="w-full border p-2 rounded mb-3"
+              onChange={(e) => setForm({ ...form, leaveType: e.target.value })}
+            >
+              <option>Select Leave Type</option>
+              {leaveTypes.map((t) => (
+                <option key={t.value}>{t.label}</option>
+              ))}
+            </select>
 
-              <select
-                name="leaveType"
-                onChange={handleChange}
-                className="p-3 border rounded-lg"
-              >
-                <option value="">Select Type</option>
-                <option value="el">EL</option>
-                <option value="sl">SL</option>
-                <option value="ml">ML</option>
-                <option value="pl">PL</option>
-              </select>
-              {errors.leaveType && <p className="text-red-500 text-sm">{errors.leaveType}</p>}
+            <input
+              type="date"
+              className="w-full border p-2 rounded mb-3"
+              onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+            />
 
-              <input
-                type="date"
-                name="startDate"
-                onChange={handleChange}
-                className="p-3 border rounded-lg"
-              />
-              {errors.startDate && <p className="text-red-500 text-sm">{errors.startDate}</p>}
+            <input
+              type="date"
+              className="w-full border p-2 rounded mb-3"
+              onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+            />
 
-              <input
-                type="date"
-                name="endDate"
-                onChange={handleChange}
-                className="p-3 border rounded-lg"
-              />
-              {errors.endDate && <p className="text-red-500 text-sm">{errors.endDate}</p>}
+            {days > 0 && (
+              <p className="text-primary text-sm mb-2">
+                {days} days selected
+              </p>
+            )}
 
-              <input
-                type="number"
-                name="days"
-                placeholder="Days"
-                onChange={handleChange}
-                className="p-3 border rounded-lg"
-              />
-              {errors.days && <p className="text-red-500 text-sm">{errors.days}</p>}
+            <textarea
+              placeholder="Reason"
+              className="w-full border p-2 rounded mb-3"
+              onChange={(e) => setForm({ ...form, reason: e.target.value })}
+            />
 
-              <textarea
-                name="reason"
-                placeholder="Reason"
-                onChange={handleChange}
-                className="p-3 border rounded-lg md:col-span-2"
-              />
-              {errors.reason && <p className="text-red-500 text-sm">{errors.reason}</p>}
-            </div>
-
-            <div className="flex justify-end gap-3 mt-4">
+            <div className="flex gap-2">
               <button
                 onClick={() => setOpen(false)}
-                className="px-4 py-2 border rounded-lg"
+                className="w-1/2 border p-2 rounded"
               >
                 Cancel
               </button>
-
-              <button
-                onClick={handleSubmit}
-                className="px-4 py-2 bg-(--primary) text-white rounded-lg"
-              >
+              <button className="w-1/2 bg-primary text-white p-2 rounded">
                 Submit
               </button>
             </div>
+
           </div>
         </div>
       )}
