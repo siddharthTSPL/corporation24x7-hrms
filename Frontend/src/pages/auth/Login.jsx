@@ -3,15 +3,20 @@ import { useNavigate } from "react-router-dom";
 import {
   useAdminLogin,
   useGetMeAdmin,
+  useSendForgetPasswordOtp,
+  useVerifyAdminOtp,
 } from "../../auth/server-state/adminauth/adminauth.hook";
 import { Player } from "@lottiefiles/react-lottie-player";
 
 export default function Login() {
   const navigate = useNavigate();
   const { data: admin } = useGetMeAdmin();
-  const { mutate: loginAdminFn, isPending, error } = useAdminLogin();
 
-  console.log("Admin data:", admin);
+  const { mutate: loginAdminFn, isPending: isLoggingIn } = useAdminLogin();
+  const { mutate: sendOtpFn, isPending: sendingOtp } =
+    useSendForgetPasswordOtp();
+  const { mutate: verifyOtpFn, isPending: verifyingOtp } =
+    useVerifyAdminOtp();
 
   const [form, setForm] = useState({
     email: "",
@@ -23,8 +28,6 @@ export default function Login() {
   const [step, setStep] = useState("login");
   const [verified, setVerified] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-
-  // ✅ kept from feature branch
   const [animationData, setAnimationData] = useState(null);
   const [showLoader, setShowLoader] = useState(false);
 
@@ -38,6 +41,7 @@ export default function Login() {
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
+    setErrors({});
   };
 
   useEffect(() => {
@@ -56,16 +60,13 @@ export default function Login() {
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % images.length);
     }, 2500);
-
     return () => clearInterval(interval);
   }, []);
 
   const validate = () => {
     let newErrors = {};
-
     if (!form.email) newErrors.email = "Email is required";
     if (!form.password) newErrors.password = "Password is required";
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -74,7 +75,6 @@ export default function Login() {
     if (!validate()) return;
 
     setShowLoader(true);
-
     const startTime = Date.now();
 
     loginAdminFn(
@@ -83,25 +83,54 @@ export default function Login() {
         password: form.password,
       },
       {
+        onError: (err) => {
+          setErrors({ password: err.message });
+        },
         onSettled: () => {
           const elapsed = Date.now() - startTime;
-          const remainingTime = 3000 - elapsed; // fixed (5 min → 3 sec)
-
+          const remaining = 3000 - elapsed;
           setTimeout(() => {
             setShowLoader(false);
-          }, remainingTime > 0 ? remainingTime : 0);
+          }, remaining > 0 ? remaining : 0);
         },
       }
     );
   };
 
   const handleSendOtp = () => {
-    setStep("otp");
+    if (!form.email) {
+      setErrors({ email: "Email is required" });
+      return;
+    }
+
+    sendOtpFn(form.email, {
+      onSuccess: () => {
+        setStep("otp");
+      },
+      onError: (err) => {
+        setErrors({ email: err.message });
+      },
+    });
   };
 
   const handleVerifyOtp = () => {
-    setVerified(true);
-    setStep("login");
+    if (!form.otp) {
+      setErrors({ otp: "OTP is required" });
+      return;
+    }
+
+    verifyOtpFn(
+      { email: form.email, otp: form.otp },
+      {
+        onSuccess: () => {
+          setVerified(true);
+          setStep("login");
+        },
+        onError: (err) => {
+          setErrors({ otp: err.message });
+        },
+      }
+    );
   };
 
   return (
@@ -109,7 +138,6 @@ export default function Login() {
       className="min-h-screen flex items-center justify-center bg-cover bg-center px-4 relative"
       style={{ backgroundImage: "url('/bg.jpeg')" }}
     >
-      {/* ✅ LOADER */}
       {showLoader && animationData && (
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
           <Player
@@ -121,9 +149,7 @@ export default function Login() {
         </div>
       )}
 
-      {/* MAIN CONTAINER */}
       <div className="w-full max-w-5xl bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden">
-        {/* LEFT SIDE */}
         <div className="w-full md:w-1/2 p-8">
           <img src="src/assets/logo1.png" alt="logo" className="w-28 mb-6" />
 
@@ -142,7 +168,7 @@ export default function Login() {
                 placeholder="Email address"
                 value={form.email}
                 onChange={handleChange}
-                className="w-full mb-3 p-3 border rounded-lg focus:ring-2 focus:ring-(--primary)"
+                className="w-full mb-3 p-3 border rounded-lg"
               />
               {errors.email && (
                 <p className="text-red-500 text-sm">{errors.email}</p>
@@ -155,7 +181,7 @@ export default function Login() {
                   placeholder="Password"
                   value={form.password}
                   onChange={handleChange}
-                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-[var(--primary)]"
+                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-(--primary)"
                 />
 
                 <span
@@ -176,20 +202,20 @@ export default function Login() {
                 onClick={handleLogin}
                 className="w-full bg-(--primary) text-white py-3 rounded-lg mt-3"
               >
-                Next
+                {isLoggingIn ? "Logging in..." : "Next"}
               </button>
 
               <div className="flex justify-between mt-4 text-sm text-gray-500">
                 <p
                   onClick={() => setStep("email")}
-                  className="cursor-pointer hover:text-[var(--primary)]"
+                  className="cursor-pointer hover:text-(--primary)"
                 >
                   Forgot Password?
                 </p>
 
                 <p
                   onClick={() => navigate("/signup")}
-                  className="cursor-pointer hover:text-[var(--primary)]"
+                  className="cursor-pointer hover:text-(--primary)"
                 >
                   Sign Up
                 </p>
@@ -218,11 +244,15 @@ export default function Login() {
                 className="w-full mb-3 p-3 border rounded-lg"
               />
 
+              {errors.email && (
+                <p className="text-red-500 text-sm">{errors.email}</p>
+              )}
+
               <button
                 onClick={handleSendOtp}
                 className="w-full bg-(--primary) text-white py-3 rounded-lg"
               >
-                Send OTP
+                {sendingOtp ? "Sending..." : "Send OTP"}
               </button>
             </>
           )}
@@ -246,13 +276,12 @@ export default function Login() {
                 onClick={handleVerifyOtp}
                 className="w-full bg-(--primary) text-white py-3 rounded-lg"
               >
-                Verify OTP
+                {verifyingOtp ? "Verifying..." : "Verify OTP"}
               </button>
             </>
           )}
         </div>
 
-        {/* RIGHT SIDE */}
         <div className="hidden md:flex w-1/2 bg-gray-50 items-center justify-center p-6">
           <div className="text-center">
             <img
