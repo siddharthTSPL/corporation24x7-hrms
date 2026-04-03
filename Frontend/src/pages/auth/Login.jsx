@@ -6,17 +6,15 @@ import {
   useSendForgetPasswordOtp,
   useVerifyAdminOtp,
 } from "../../auth/server-state/adminauth/adminauth.hook";
+import { Player } from "@lottiefiles/react-lottie-player";
 
 export default function Login() {
   const navigate = useNavigate();
   const { data: admin } = useGetMeAdmin();
 
-  const { mutate: loginAdminFn, isPending: isLoggingIn, error } =
-    useAdminLogin();
-
+  const { mutate: loginAdminFn, isPending: isLoggingIn } = useAdminLogin();
   const { mutate: sendOtpFn, isPending: sendingOtp } =
     useSendForgetPasswordOtp();
-
   const { mutate: verifyOtpFn, isPending: verifyingOtp } =
     useVerifyAdminOtp();
 
@@ -30,12 +28,15 @@ export default function Login() {
   const [step, setStep] = useState("login");
   const [verified, setVerified] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [animationData, setAnimationData] = useState(null);
+  const [showLoader, setShowLoader] = useState(false);
 
   const images = [
     "/src/assets/slide1.png",
     "/src/assets/slide2.png",
     "/src/assets/slide3.png",
   ];
+
   const [currentSlide, setCurrentSlide] = useState(0);
 
   const handleChange = (e) => {
@@ -49,18 +50,32 @@ export default function Login() {
     }
   }, [admin, navigate]);
 
+  useEffect(() => {
+    fetch("/loader.json")
+      .then((res) => res.json())
+      .then((data) => setAnimationData(data));
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % images.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, []);
+
   const validate = () => {
     let newErrors = {};
-
     if (!form.email) newErrors.email = "Email is required";
     if (!form.password) newErrors.password = "Password is required";
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleLogin = () => {
     if (!validate()) return;
+
+    setShowLoader(true);
+    const startTime = Date.now();
 
     loginAdminFn(
       {
@@ -71,11 +86,17 @@ export default function Login() {
         onError: (err) => {
           setErrors({ password: err.message });
         },
+        onSettled: () => {
+          const elapsed = Date.now() - startTime;
+          const remaining = 3000 - elapsed;
+          setTimeout(() => {
+            setShowLoader(false);
+          }, remaining > 0 ? remaining : 0);
+        },
       }
     );
   };
 
-  // ✅ SEND OTP
   const handleSendOtp = () => {
     if (!form.email) {
       setErrors({ email: "Email is required" });
@@ -92,7 +113,6 @@ export default function Login() {
     });
   };
 
-  // ✅ VERIFY OTP
   const handleVerifyOtp = () => {
     if (!form.otp) {
       setErrors({ otp: "OTP is required" });
@@ -115,9 +135,20 @@ export default function Login() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center bg-cover bg-center px-4"
+      className="min-h-screen flex items-center justify-center bg-cover bg-center px-4 relative"
       style={{ backgroundImage: "url('/bg.jpeg')" }}
     >
+      {showLoader && animationData && (
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Player
+            autoplay
+            loop
+            src={animationData}
+            style={{ height: "140px", width: "140px" }}
+          />
+        </div>
+      )}
+
       <div className="w-full max-w-5xl bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden">
         <div className="w-full md:w-1/2 p-8">
           <img src="src/assets/logo1.png" alt="logo" className="w-28 mb-6" />
@@ -150,7 +181,7 @@ export default function Login() {
                   placeholder="Password"
                   value={form.password}
                   onChange={handleChange}
-                  className="w-full p-3 border rounded-lg"
+                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-(--primary)"
                 />
 
                 <span
@@ -174,25 +205,27 @@ export default function Login() {
                 {isLoggingIn ? "Logging in..." : "Next"}
               </button>
 
+              <div className="flex justify-between mt-4 text-sm text-gray-500">
+                <p
+                  onClick={() => setStep("email")}
+                  className="cursor-pointer hover:text-(--primary)"
+                >
+                  Forgot Password?
+                </p>
+
+                <p
+                  onClick={() => navigate("/signup")}
+                  className="cursor-pointer hover:text-(--primary)"
+                >
+                  Sign Up
+                </p>
+              </div>
+
               {verified && (
                 <p className="text-green-600 text-sm mt-2">
                   ✅ Email Verified
                 </p>
               )}
-
-              <p
-                onClick={() => setStep("email")}
-                className="text-sm text-gray-500 mt-4 cursor-pointer"
-              >
-                Forgot Password?
-              </p>
-
-              <p
-                onClick={() => navigate("/signup")}
-                className="text-sm text-gray-500 mt-4 cursor-pointer"
-              >
-                Sign Up ?
-              </p>
             </>
           )}
 
@@ -239,10 +272,6 @@ export default function Login() {
                 className="w-full mb-3 p-3 border rounded-lg"
               />
 
-              {errors.otp && (
-                <p className="text-red-500 text-sm">{errors.otp}</p>
-              )}
-
               <button
                 onClick={handleVerifyOtp}
                 className="w-full bg-(--primary) text-white py-3 rounded-lg"
@@ -274,7 +303,9 @@ export default function Login() {
                 <div
                   key={index}
                   className={`w-2 h-2 rounded-full ${
-                    currentSlide === index ? "bg-(--primary)" : "bg-gray-300"
+                    currentSlide === index
+                      ? "bg-(--primary)"
+                      : "bg-gray-300"
                   }`}
                 />
               ))}
