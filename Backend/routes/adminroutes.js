@@ -14,7 +14,7 @@ const {
   deleteemployee,
   acceptleavebyadmin,
   rejectleavebyadmin,
-  showforwardedleaves,
+  showallleaves,
   noofemployee,
   createannouncement,
   reviewtomanager,
@@ -52,9 +52,9 @@ adminrouter.delete(
   asyncHandler(deleteemployee),
 );
 adminrouter.get(
-  "/showforwardedleaves",
+  "/showallleaves",
   adminauthmiddleware,
-  asyncHandler(showforwardedleaves),
+  asyncHandler(showallleaves),
 );
 
 adminrouter.put(
@@ -87,14 +87,9 @@ adminrouter.post(
   asyncHandler(forgetpasswordloginotp),
 );
 adminrouter.post("/verifyotp", asyncHandler(verifyAotp));
-// adminrouter.get(
-//   "/resetpassword",
-//   asyncHandler(forgetpasswordchange),
-// );
 adminrouter.get("/change-password", asyncHandler(showUserPasswordPage));
 adminrouter.post(
   "/resetAdminPassword",
-  adminauthmiddleware,
   asyncHandler(resetAdminPassword),
 );
 adminrouter.get("/getme", adminauthmiddleware, asyncHandler(getme));

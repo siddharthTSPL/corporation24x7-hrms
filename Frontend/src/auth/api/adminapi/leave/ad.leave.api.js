@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api/admin",
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/admin",
   withCredentials: true,
 });
 
@@ -17,8 +17,8 @@ api.interceptors.response.use(
   }
 );
 
-export const getForwardedLeaves = async () => {
-  const res = await api.get("/showforwardedleaves");
+export const getAllLeaves = async () => {
+  const res = await api.get("/showallleaves");
   return res.data;
 };
 

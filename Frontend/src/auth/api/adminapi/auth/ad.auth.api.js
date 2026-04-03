@@ -46,7 +46,21 @@ export const getMeAdmin = async () => {
   return res.data;
 };
 
+export const sendForgetPasswordOtp = async (email) => {
+  const res = await api.post("/forgetpassword", { email });
+  return res.data;
+};
 
+export const verifyAdminOtp = async (data) => {
+  const res = await api.post("/verifyotp", data); 
+  // data = { email, otp }
+  return res.data;
+};
+
+export const resetAdminPassword = async (data) => {
+  const res = await api.post("/resetAdminPassword", data);
+  return res.data;
+};
 export const addManager = async (data) => {
   const res = await api.post("/addmanager", data);
   return res.data;

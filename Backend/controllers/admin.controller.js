@@ -340,13 +340,9 @@ const getallemployee = async (req, res, next) => {
       "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt"
     );
 
-  if (!users || users.length === 0) {
-    return next(Object.assign(new Error("No users found"), { statusCode: 404 }));
-  }
-
   res.status(200).json({
     count: users.length,
-    users,
+    users, 
   });
 };
 
@@ -394,7 +390,7 @@ const deleteemployee = async (req, res, next) => {
   });
 };
 
-const showforwardedleaves = async (req, res, next) => {
+const showallleaves = async (req, res, next) => {
   if (!req.admin) {
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
@@ -669,16 +665,24 @@ const verifyAotp = async (req, res, next) => {
   }
 
 
-  const loginToken = jwt.sign(
+  const token = jwt.sign(
     {
-      adminId: admin._id,
+      adminid: admin._id, 
+      role: admin.role,
       email: admin.email,
     },
     process.env.JWT_SECRET,
-    { expiresIn: "1d" }
+    { expiresIn: "15d" }
   );
 
-  res.cookie("token", loginToken, { httpOnly: true });
+  
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: false,
+    sameSite: "lax",
+    maxAge: 15 * 24 * 60 * 60 * 1000,
+  });
+
 
   const resetToken = jwt.sign(
     { email: admin.email },
@@ -686,8 +690,7 @@ const verifyAotp = async (req, res, next) => {
     { expiresIn: "15m" }
   );
 
-  const link = `http://localhost:5000/admin/change-password?token=${resetToken}`;
-
+  const link = `http://localhost:5173/reset-password?token=${resetToken}`;
 
   await sendEmail({
     to: admin.email,
@@ -695,9 +698,7 @@ const verifyAotp = async (req, res, next) => {
     html: `
       <h2>Hello ${admin.organisation_name || "Admin"}</h2>
       <p>Your OTP verification was successful.</p>
-      <p>If you want to change your password, click below:</p>
       <a href="${link}">Change Password</a>
-      <p>If not, you can ignore this email.</p>
     `,
   });
 
@@ -707,7 +708,6 @@ const verifyAotp = async (req, res, next) => {
     success: true,
     message: "OTP verified successfully",
     login: true,
-    passwordResetOptional: true,
     user: {
       id: admin._id,
       email: admin.email,
@@ -786,7 +786,7 @@ module.exports = {
   getallemployee,
   getperticularemployee,
   deleteemployee,
-  showforwardedleaves,
+  showallleaves,
   acceptleavebyadmin,
   rejectleavebyadmin,
   noofemployee,
