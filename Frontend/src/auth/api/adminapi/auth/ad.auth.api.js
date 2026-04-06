@@ -53,7 +53,6 @@ export const sendForgetPasswordOtp = async (email) => {
 
 export const verifyAdminOtp = async (data) => {
   const res = await api.post("/verifyotp", data); 
-  // data = { email, otp }
   return res.data;
 };
 
@@ -68,5 +67,10 @@ export const addManager = async (data) => {
 
 export const addEmployee = async (data) => {
   const res = await api.post("/addemployee", data);
+  return res.data;
+};
+
+export const findAllManagers = async () => {
+  const res = await api.get("/findallmanagers");
   return res.data;
 };

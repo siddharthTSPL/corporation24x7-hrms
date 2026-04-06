@@ -53,6 +53,11 @@ const managerSchema = new mongoose.Schema({
     enum: ["manager","senior_manager", "official"],
     default: "manager",
   },
+   office_location:{
+    type:String,
+    enum:["Noida", "Bareilly", "Delhi", "Mumbai"],
+    required:[true,'Office location is required']
+  },
    designation:{
      type:String,
      required:[true,'Designation is required']
@@ -81,12 +86,10 @@ const managerSchema = new mongoose.Schema({
 },
 });
 
-managerSchema.pre("save", async function (next) {
+managerSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
 
-  if(!this.isModified("password")) return next();
-
-  this.password = await bcrypt.hash(this.password,10);
-  next();
+  this.password = await bcrypt.hash(this.password, 10);
 });
 managerSchema.methods.isValidPassword = async function (password) {
   return await bcrypt.compare(password, this.password);

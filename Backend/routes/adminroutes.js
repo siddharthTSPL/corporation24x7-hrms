@@ -5,11 +5,13 @@ const adminauthmiddleware = require("../middleware/auth/admin.middleware");
 const {
   registerAdmin,
   verifyAdmin,
+  findallmanagers,
   adminlogin,
   adminlogout,
   addmanager,
   addemployee,
   getallemployee,
+  editemployee,
   getperticularemployee,
   deleteemployee,
   acceptleavebyadmin,
@@ -28,6 +30,8 @@ const {
 adminrouter.post("/register", asyncHandler(registerAdmin));
 adminrouter.get("/verify/:token", asyncHandler(verifyAdmin));
 
+adminrouter.get("/findallmanagers", adminauthmiddleware, asyncHandler(findallmanagers));
+
 adminrouter.post("/login", asyncHandler(adminlogin));
 adminrouter.post("/logout", adminauthmiddleware, asyncHandler(adminlogout));
 adminrouter.post("/addmanager", adminauthmiddleware, asyncHandler(addmanager));
@@ -40,6 +44,11 @@ adminrouter.get(
   "/getallemployee",
   adminauthmiddleware,
   asyncHandler(getallemployee),
+);
+adminrouter.put(
+  "/editemployee/:uid",
+  adminauthmiddleware,
+  asyncHandler(editemployee),
 );
 adminrouter.get(
   "/getperticularemployee/:uid",

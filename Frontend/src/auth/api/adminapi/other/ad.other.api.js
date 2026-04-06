@@ -33,6 +33,11 @@ export const deleteUser = async (uid) => {
   return res.data;
 };
 
+export const editEmployee = async (uid, data) => {
+  const res = await api.put(`/editemployee/${uid}`, data);
+  return res.data;
+};
+
 export const getEmployeeStats = async () => {
   const res = await api.get("/noofemployee");
   return res.data;
