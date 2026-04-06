@@ -1,28 +1,54 @@
 "use client";
-
 import { useState } from "react";
-import { FaEdit, FaTrash, FaSearch, FaFilter, FaTimes, FaUserTie, FaUserPlus } from "react-icons/fa";
+import {
+  FaEdit,
+  FaTrash,
+  FaSearch,
+  FaFilter,
+  FaTimes,
+  FaUserTie,
+  FaUserPlus,
+} from "react-icons/fa";
+import {
+  useAddManager,
+  useAddEmployee,
+  useFindAllManagers,
+} from "../../auth/server-state/adminauth/adminauth.hook";
 
-
-// ─── Constants ────────────────────────────────────────────────────────────────
+import { useGetAllEmployee, useDeleteUser, useEditEmployee } from "../../auth/server-state/adminother/adminother.hook";
 
 const DEPARTMENTS = ["OPR", "BPO", "ENG", "MGMT", "HR"];
-const LOCATIONS   = ["Noida", "Bareilly", "Delhi", "Mumbai"];
+const LOCATIONS = ["Noida", "Bareilly", "Delhi", "Mumbai"];
 
 const EMPTY_EMP = {
-  department: "", under_manager: "", f_name: "", l_name: "",
-  work_email: "", gender: "", marital_status: "single",
-  password: "", personal_contact: "", e_contact: "",
-  role: "employee", office_location: "", designation: "",
+  department: "",
+  under_manager: "",
+  f_name: "",
+  l_name: "",
+  work_email: "",
+  gender: "",
+  marital_status: "single",
+  password: "",
+  personal_contact: "",
+  e_contact: "",
+  role: "employee",
+  office_location: "",
+  designation: "",
 };
 
 const EMPTY_MGR = {
-  department: "", f_name: "", l_name: "", work_email: "",
-  gender: "", marital_status: "single", password: "",
-  personal_contact: "", e_contact: "", role: "manager", designation: "",
+  department: "",
+  f_name: "",
+  l_name: "",
+  work_email: "",
+  gender: "",
+  marital_status: "single",
+  password: "",
+  personal_contact: "",
+  e_contact: "",
+  role: "manager",
+  designation: "",
 };
-
-// ─── Reusable Field ───────────────────────────────────────────────────────────
 
 function Field({ label, error, children }) {
   return (
@@ -32,7 +58,7 @@ function Field({ label, error, children }) {
       </label>
       {children}
       {error && (
-        <span className="text-xs text-[var(--error)] flex items-center gap-1">
+        <span className="text-xs text-(--error) flex items-center gap-1">
           ⚠ {error}
         </span>
       )}
@@ -40,13 +66,9 @@ function Field({ label, error, children }) {
   );
 }
 
-// ─── Input / Select shared style ─────────────────────────────────────────────
-
 const inputCls =
   "w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-[var(--background)] text-sm text-[var(--text)] " +
   "focus:outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 transition-all placeholder-gray-400";
-
-// ─── Modal Wrapper ────────────────────────────────────────────────────────────
 
 function Modal({ title, icon, onClose, onSubmit, children, accentColor = "var(--primary)" }) {
   return (
@@ -55,8 +77,6 @@ function Modal({ title, icon, onClose, onSubmit, children, accentColor = "var(--
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[92vh]">
-
-        {/* Header */}
         <div
           className="flex items-center justify-between px-6 py-4 rounded-t-2xl"
           style={{ background: accentColor }}
@@ -76,18 +96,14 @@ function Modal({ title, icon, onClose, onSubmit, children, accentColor = "var(--
           </button>
         </div>
 
-        {/* Body */}
         <div className="overflow-y-auto p-6 flex-1">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {children}
-          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>
         </div>
 
-        {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-5 py-2.5 rounded-xl border border-gray-200 text-[var(--text)] text-sm font-semibold hover:bg-gray-50 transition-colors"
+            className="px-5 py-2.5 rounded-xl border border-gray-200 text-(--text) text-sm font-semibold hover:bg-gray-50 transition-colors"
           >
             Cancel
           </button>
@@ -104,22 +120,14 @@ function Modal({ title, icon, onClose, onSubmit, children, accentColor = "var(--
   );
 }
 
-// ─── Avatar initials ──────────────────────────────────────────────────────────
-
 function Avatar({ name }) {
-  const initials = name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-
+  const safe = name || "??";
+  const initials = safe.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
   const colors = ["#00A8E8", "#FDCB6E", "#90DBF4", "#6C63FF", "#FF6584"];
-  const color  = colors[name.charCodeAt(0) % colors.length];
-
+  const color = colors[safe.charCodeAt(0) % colors.length];
   return (
     <div
-      className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+      className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
       style={{ background: color }}
     >
       {initials}
@@ -127,12 +135,11 @@ function Avatar({ name }) {
   );
 }
 
-// ─── Badge ────────────────────────────────────────────────────────────────────
-
 function Badge({ label, type = "dept" }) {
   const styles = {
-    dept:   "bg-[var(--secondary)]/30 text-[#007BAE]",
-    role:   "bg-[var(--accent)]/30 text-yellow-700",
+    dept: "bg-[var(--secondary)]/30 text-[#007BAE]",
+    role: "bg-[var(--accent)]/30 text-yellow-700",
+    manager: "bg-purple-100 text-purple-700",
     active: "bg-green-100 text-green-700",
   };
   return (
@@ -142,7 +149,21 @@ function Badge({ label, type = "dept" }) {
   );
 }
 
-// ─── Empty State ──────────────────────────────────────────────────────────────
+
+function SkeletonRows() {
+  return Array.from({ length: 5 }).map((_, i) => (
+    <tr key={i} className="border-b border-gray-50">
+      {Array.from({ length: 7 }).map((_, j) => (
+        <td key={j} className="px-4 py-3">
+          <div
+            className="h-4 bg-gray-100 rounded animate-pulse"
+            style={{ width: j === 0 ? "80%" : "60%" }}
+          />
+        </td>
+      ))}
+    </tr>
+  ));
+}
 
 function EmptyState({ onAdd }) {
   return (
@@ -154,7 +175,7 @@ function EmptyState({ onAdd }) {
           <p className="text-gray-400 text-sm">Add your first employee to get started</p>
           <button
             onClick={onAdd}
-            className="mt-2 px-4 py-2 rounded-xl text-white text-sm font-semibold bg-[var(--primary)] hover:opacity-90 transition"
+            className="mt-2 px-4 py-2 rounded-xl text-white text-sm font-semibold bg-(--primary) hover:opacity-90 transition"
           >
             + Add Employee
           </button>
@@ -164,119 +185,179 @@ function EmptyState({ onAdd }) {
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+function Popup({ type = "success", message, onClose }) {
+  const styles = {
+    success: "bg-green-500",
+    error: "bg-red-500",
+    info: "bg-blue-500",
+  };
+  return (
+    <div
+      className="fixed top-5 right-5 z-100"
+      style={{ animation: "slideInPopup 0.3s ease forwards" }}
+    >
+      <style>{`
+        @keyframes slideInPopup {
+          from { opacity: 0; transform: translateX(60px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+      `}</style>
+      <div
+        className={`min-w-70 max-w-sm px-4 py-3 rounded-xl shadow-lg text-white flex items-start justify-between gap-3 ${styles[type]}`}
+      >
+        <span className="text-sm font-medium">{message}</span>
+        <button onClick={onClose} className="text-white/80 hover:text-white shrink-0">✕</button>
+      </div>
+    </div>
+  );
+}
 
 export default function EmployeeTable() {
-  const [open,        setOpen]        = useState(false);
+  const [open, setOpen] = useState(false);
   const [openManager, setOpenManager] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-
-  const [employees, setEmployees] = useState([]);
-  const [empForm,   setEmpForm]   = useState(EMPTY_EMP);
-  const [mgrForm,   setMgrForm]   = useState(EMPTY_MGR);
+  const [popup, setPopup] = useState({ show: false, type: "success", message: "" });
+  const [empForm, setEmpForm] = useState(EMPTY_EMP);
+  const [mgrForm, setMgrForm] = useState(EMPTY_MGR);
   const [empErrors, setEmpErrors] = useState({});
   const [mgrErrors, setMgrErrors] = useState({});
 
-  const [filters, setFilters] = useState({ search: "", department: "", status: "" });
+  const [filters, setFilters] = useState({
+    search: "",
+    department: "",
+    role: "",       
+    location: "",   
+    gender: "",    
+  });
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
+  const { mutate: addEmployeeApi, isPending: empLoading } = useAddEmployee();
+  const { mutate: addManagerApi, isPending: mgrLoading } = useAddManager();
+  const { data: managers } = useFindAllManagers();
+
+ 
+  const { data: employeeData, isLoading: listLoading, refetch: refetchList } = useGetAllEmployee();
+  const allUsers = employeeData?.users ?? [];
+
+  const showPopup = (type, message) => {
+    setPopup({ show: true, type, message });
+    setTimeout(() => setPopup({ show: false, type: "", message: "" }), 3000);
+  };
 
   const handleEmpChange = (e) => setEmpForm({ ...empForm, [e.target.name]: e.target.value });
   const handleMgrChange = (e) => setMgrForm({ ...mgrForm, [e.target.name]: e.target.value });
 
   const validateEmp = () => {
     const err = {};
-    if (!empForm.f_name)        err.f_name        = "Required";
-    if (!empForm.l_name)        err.l_name        = "Required";
-    if (!empForm.work_email)    err.work_email    = "Required";
-    if (!empForm.department)    err.department    = "Required";
-    if (!empForm.designation)   err.designation   = "Required";
-    if (!empForm.password)      err.password      = "Required";
+    if (!empForm.f_name) err.f_name = "Required";
+    if (!empForm.l_name) err.l_name = "Required";
+    if (!empForm.work_email) err.work_email = "Required";
+    if (!empForm.department) err.department = "Required";
+    if (!empForm.designation) err.designation = "Required";
+    if (!empForm.password) err.password = "Required";
     setEmpErrors(err);
     return Object.keys(err).length === 0;
   };
 
   const validateMgr = () => {
     const err = {};
-    if (!mgrForm.f_name)      err.f_name      = "Required";
-    if (!mgrForm.l_name)      err.l_name      = "Required";
-    if (!mgrForm.work_email)  err.work_email  = "Required";
-    if (!mgrForm.department)  err.department  = "Required";
+    if (!mgrForm.f_name) err.f_name = "Required";
+    if (!mgrForm.l_name) err.l_name = "Required";
+    if (!mgrForm.work_email) err.work_email = "Required";
+    if (!mgrForm.department) err.department = "Required";
     if (!mgrForm.designation) err.designation = "Required";
     setMgrErrors(err);
     return Object.keys(err).length === 0;
   };
 
   const handleEmpSubmit = () => {
-    if (!validateEmp()) return;
-    setEmployees([...employees, { ...empForm, id: Date.now() }]);
-    setOpen(false);
-    setEmpForm(EMPTY_EMP);
-    setEmpErrors({});
+    if (!validateEmp()) { showPopup("error", "Please fill all required employee fields"); return; }
+    const payload = {
+      f_name: empForm.f_name, l_name: empForm.l_name, work_email: empForm.work_email,
+      password: empForm.password, gender: empForm.gender, marital_status: empForm.marital_status,
+      personal_contact: empForm.personal_contact, e_contact: empForm.e_contact,
+      role: empForm.role, office_location: empForm.office_location,
+      designation: empForm.designation, department: empForm.department,
+      Under_manager: empForm.under_manager,
+    };
+    addEmployeeApi(payload, {
+      onSuccess: (res) => {
+        showPopup("success", res?.message || "Employee added successfully");
+        setOpen(false); setEmpForm(EMPTY_EMP); setEmpErrors({});
+        refetchList(); 
+      },
+      onError: (err) => showPopup("error", err?.response?.data?.message || err?.message || "Something went wrong"),
+    });
   };
 
   const handleMgrSubmit = () => {
-    if (!validateMgr()) return;
-    setEmployees([...employees, { ...mgrForm, id: Date.now() }]);
-    setOpenManager(false);
-    setMgrForm(EMPTY_MGR);
-    setMgrErrors({});
+    if (!validateMgr()) { showPopup("error", "Please fill all required manager fields"); return; }
+    const payload = {
+      f_name: mgrForm.f_name, l_name: mgrForm.l_name, work_email: mgrForm.work_email,
+      password: mgrForm.password, gender: mgrForm.gender, marital_status: mgrForm.marital_status,
+      personal_contact: mgrForm.personal_contact, e_contact: mgrForm.e_contact,
+      role: mgrForm.role, office_location: mgrForm.office_location,
+      designation: mgrForm.designation, department: mgrForm.department,
+    };
+    addManagerApi(payload, {
+      onSuccess: (res) => {
+        showPopup("success", res?.message || "Manager added & login link sent to email");
+        setOpenManager(false); setMgrForm(EMPTY_MGR); setMgrErrors({});
+        refetchList(); 
+      },
+      onError: (err) => showPopup("error", err?.response?.data?.message || err?.message || "Something went wrong"),
+    });
   };
 
-  const handleDelete = (id) => setEmployees(employees.filter((e) => e.id !== id));
-
-  const filtered = employees.filter((emp) => {
-    const name  = `${emp.f_name} ${emp.l_name}`.toLowerCase();
-    const email = (emp.work_email || "").toLowerCase();
-    const q     = filters.search.toLowerCase();
+  
+  const filtered = allUsers.filter((u) => {
+    const name = `${u.f_name ?? ""} ${u.l_name ?? ""}`.toLowerCase();
+    const q = filters.search.toLowerCase();
     return (
-      (name.includes(q) || email.includes(q)) &&
-      (filters.department ? emp.department === filters.department : true)
+      (name.includes(q) || (u.work_email ?? "").toLowerCase().includes(q)) &&
+      (filters.department ? u.department === filters.department : true) &&
+      (filters.role       ? u.role === filters.role               : true) &&
+      (filters.location   ? u.office_location === filters.location : true) &&
+      (filters.gender     ? u.gender === filters.gender            : true)
     );
   });
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  const clearFilters = () => setFilters({ search: "", department: "", role: "", location: "", gender: "" });
+  const activeFilterCount = [filters.department, filters.role, filters.location, filters.gender].filter(Boolean).length;
 
   return (
-    <div className="min-h-screen bg-[var(--background)] p-4 md:p-6">
+    <div className="min-h-screen bg-(--background) p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
 
-        {/* ── Page Header ── */}
+       
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-[var(--text)]">Employee Directory</h1>
+            <h1 className="text-2xl font-bold text-(--text)">Employee Directory</h1>
             <p className="text-sm text-gray-400 mt-0.5">
-              {employees.length} total · {filtered.length} shown
+              {allUsers.length} total · {filtered.length} shown
             </p>
           </div>
-
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setOpenManager(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-[var(--primary)] text-[var(--primary)] text-sm font-semibold hover:bg-[var(--primary)] hover:text-white transition-all"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-(--primary) text-(--primary) text-sm font-semibold hover:bg-(--primary) hover:text-white transition-all"
             >
-              <FaUserTie size={13} />
-              <span>Add Manager</span>
+              <FaUserTie size={13} /><span>Add Manager</span>
             </button>
-
             <button
               onClick={() => setOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white text-sm font-semibold hover:opacity-90 transition-all shadow-md shadow-[var(--primary)]/30"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-(--primary) text-white text-sm font-semibold hover:opacity-90 transition-all shadow-md shadow-(--primary)/30"
             >
-              <FaUserPlus size={13} />
-              <span>Add Employee</span>
+              <FaUserPlus size={13} /><span>Add Employee</span>
             </button>
           </div>
         </div>
 
-        {/* ── Table Card ── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-[var(--secondary)]/30 overflow-hidden">
+      
+        <div className="bg-white rounded-2xl shadow-sm border border-(--secondary)/30overflow-hidden">
 
-          {/* Filters Bar */}
           <div className="p-4 border-b border-gray-100">
             <div className="flex flex-col sm:flex-row gap-3">
-
-              {/* Search */}
+             
               <div className="relative flex-1">
                 <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={13} />
                 <input
@@ -287,7 +368,7 @@ export default function EmployeeTable() {
                 />
               </div>
 
-              {/* Department filter */}
+              
               <select
                 className={`${inputCls} sm:w-44`}
                 value={filters.department}
@@ -297,68 +378,84 @@ export default function EmployeeTable() {
                 {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
 
-              {/* Status filter */}
+             
               <select
-                className={`${inputCls} sm:w-36`}
-                value={filters.status}
-                onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                className={`${inputCls} sm:w-40`}
+                value={filters.role}
+                onChange={(e) => setFilters({ ...filters, role: e.target.value })}
               >
-                <option value="">All Status</option>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
+                <option value="">All Roles</option>
+                <option value="employee">Employee</option>
+                <option value="manager">Manager</option>
+                <option value="senior_manager">Senior Manager</option>
+                <option value="official">Official</option>
               </select>
 
-              {/* More filters toggle */}
+              
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                className={`relative flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
                   showFilters
-                    ? "bg-[var(--primary)] text-white border-[var(--primary)]"
-                    : "border-gray-200 text-gray-500 hover:border-[var(--primary)] hover:text-[var(--primary)]"
+                    ? "bg-(--primary) text-white border-(--primary)"
+                    : "border-gray-200 text-gray-500 hover:border-(--primary) hover:text-(--primary)"
                 }`}
               >
                 <FaFilter size={11} />
                 <span className="hidden sm:inline">More Filters</span>
+                {activeFilterCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    {activeFilterCount}
+                  </span>
+                )}
               </button>
             </div>
 
-            {/* Expanded filters */}
+           
             {showFilters && (
               <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <select className={inputCls}>
-                  <option value="">All Roles</option>
-                  <option value="employee">Employee</option>
-                  <option value="manager">Manager</option>
-                </select>
-                <select className={inputCls}>
+                <select
+                  className={inputCls}
+                  value={filters.location}
+                  onChange={(e) => setFilters({ ...filters, location: e.target.value })}
+                >
                   <option value="">All Locations</option>
                   {LOCATIONS.map((l) => <option key={l} value={l}>{l}</option>)}
                 </select>
-                <select className={inputCls}>
+
+                <select
+                  className={inputCls}
+                  value={filters.gender}
+                  onChange={(e) => setFilters({ ...filters, gender: e.target.value })}
+                >
                   <option value="">All Genders</option>
                   <option value="male">Male</option>
                   <option value="female">Female</option>
+                  <option value="other">Other</option>
                 </select>
-                <button
-                  onClick={() => setFilters({ search: "", department: "", status: "" })}
-                  className="text-sm text-[var(--error)] font-medium hover:underline text-left px-3"
-                >
-                  Clear All
-                </button>
+
+               
+                <div className="col-span-2 flex flex-wrap gap-2 items-center">
+                  {filters.department && <FilterChip label={`Dept: ${filters.department}`} onRemove={() => setFilters({ ...filters, department: "" })} />}
+                  {filters.role       && <FilterChip label={`Role: ${filters.role}`}       onRemove={() => setFilters({ ...filters, role: "" })} />}
+                  {filters.location   && <FilterChip label={`Loc: ${filters.location}`}    onRemove={() => setFilters({ ...filters, location: "" })} />}
+                  {filters.gender     && <FilterChip label={`Gender: ${filters.gender}`}   onRemove={() => setFilters({ ...filters, gender: "" })} />}
+                  {activeFilterCount > 0 && (
+                    <button onClick={clearFilters} className="text-xs text-(--error) font-semibold hover:underline ml-1">
+                      Clear All
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </div>
 
-          {/* Table — horizontal scroll on small screens */}
+          
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[750px] text-sm">
+            <table className="w-full min-w-225 text-sm">
               <thead>
-                <tr className="bg-[var(--background)] border-b border-gray-100">
-                  {["Employee", "Department", "Designation", "Location", "Contact", "Role", "Actions"].map((h) => (
-                    <th
-                      key={h}
-                      className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400"
-                    >
+                <tr className="bg-(--background) border-b border-gray-100">
+                  {["Employee", "Department", "Designation", "Location", "Manager", "Role", "Actions"].map((h) => (
+                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">
                       {h}
                     </th>
                   ))}
@@ -366,50 +463,60 @@ export default function EmployeeTable() {
               </thead>
 
               <tbody className="divide-y divide-gray-50">
-                {filtered.length === 0 ? (
+                {listLoading ? (
+                  <SkeletonRows />
+                ) : filtered.length === 0 ? (
                   <EmptyState onAdd={() => setOpen(true)} />
                 ) : (
-                  filtered.map((emp) => (
-                    <tr key={emp.id} className="hover:bg-[var(--background)]/60 transition-colors group">
+                  filtered.map((u) => (
+                    <tr key={u._id} className="hover:bg-(--background)/60
+                    transition-colors group">
 
-                      {/* Name + Email */}
+                      
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <Avatar name={`${emp.f_name} ${emp.l_name}`} />
+                          <Avatar name={`${u.f_name ?? ""} ${u.l_name ?? ""}`} />
                           <div className="min-w-0">
-                            <p className="font-semibold text-[var(--text)] truncate">
-                              {emp.f_name} {emp.l_name}
-                            </p>
-                            <p className="text-xs text-gray-400 truncate">{emp.work_email}</p>
+                            <p className="font-semibold text-(--text) truncate">{u.f_name} {u.l_name}</p>
+                            <p className="text-xs text-gray-400 truncate">{u.work_email}</p>
                           </div>
                         </div>
                       </td>
 
+                     
                       <td className="px-4 py-3">
-                        <Badge label={emp.department || "—"} type="dept" />
+                        <Badge label={u.department || "—"} type="dept" />
                       </td>
 
-                      <td className="px-4 py-3 text-gray-600">{emp.designation || "—"}</td>
-                      <td className="px-4 py-3 text-gray-600">{emp.office_location || "—"}</td>
-                      <td className="px-4 py-3 text-gray-500">{emp.personal_contact || "—"}</td>
+                      
+                      <td className="px-4 py-3 text-gray-600">{u.designation || "—"}</td>
+
+                      
+                      <td className="px-4 py-3 text-gray-600">{u.office_location || "—"}</td>
 
                       <td className="px-4 py-3">
-                        <Badge label={emp.role} type="role" />
+                        {u.Under_manager ? (
+                          <div className="text-xs">
+                            <p className="font-medium text-gray-700">{u.Under_manager.f_name} {u.Under_manager.l_name}</p>
+                            <p className="text-gray-400">{u.Under_manager.uid}</p>
+                          </div>
+                        ) : <span className="text-gray-300 text-xs">—</span>}
+                      </td>
+
+                      {/* Role */}
+                      <td className="px-4 py-3">
+                        <Badge
+                          label={u.role?.replace("_", " ") || "—"}
+                          type={u.role === "employee" ? "role" : "manager"}
+                        />
                       </td>
 
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            className="w-8 h-8 rounded-lg bg-[var(--background)] flex items-center justify-center text-gray-400 hover:text-[var(--primary)] hover:bg-[var(--secondary)]/30 transition-colors"
-                            title="Edit"
-                          >
+                          <button className="w-8 h-8 rounded-lg bg-(--background) flex items-center justify-center text-gray-400 hover:text-(--primary) hover:bg-(--secondary)/30 transition-colors" title="Edit">
                             <FaEdit size={13} />
                           </button>
-                          <button
-                            onClick={() => handleDelete(emp.id)}
-                            className="w-8 h-8 rounded-lg bg-[var(--background)] flex items-center justify-center text-gray-400 hover:text-[var(--error)] hover:bg-red-50 transition-colors"
-                            title="Delete"
-                          >
+                          <button className="w-8 h-8 rounded-lg bg-(--background) flex items-center justify-center text-gray-400 hover:text-(--error) hover:bg-red-50 transition-colors" title="Delete">
                             <FaTrash size={12} />
                           </button>
                         </div>
@@ -421,16 +528,19 @@ export default function EmployeeTable() {
             </table>
           </div>
 
-          {/* Footer row count */}
-          {filtered.length > 0 && (
-            <div className="px-4 py-3 border-t border-gray-50 text-xs text-gray-400">
-              Showing {filtered.length} of {employees.length} employees
+          {!listLoading && filtered.length > 0 && (
+            <div className="px-4 py-3 border-t border-gray-50 text-xs text-gray-400 flex items-center justify-between">
+              <span>Showing {filtered.length} of {allUsers.length} employees</span>
+              {activeFilterCount > 0 && (
+                <button onClick={clearFilters} className="text-(--error) font-medium hover:underline">
+                  Clear filters
+                </button>
+              )}
             </div>
           )}
         </div>
       </div>
 
-      {/* ── Employee Modal ── */}
       {open && (
         <Modal
           title="Add Employee"
@@ -446,8 +556,13 @@ export default function EmployeeTable() {
             </select>
           </Field>
 
-          <Field label="Manager ID">
-            <input name="under_manager" placeholder="Manager Employee ID" value={empForm.under_manager} onChange={handleEmpChange} className={inputCls} />
+          <Field label="Under Manager">
+            <select name="under_manager" value={empForm.under_manager} onChange={handleEmpChange} className={inputCls}>
+              <option value="">Select Manager</option>
+              {managers?.managers?.map((mgr) => (
+                <option key={mgr._id} value={mgr._id}>{mgr.f_name} {mgr.l_name} ({mgr.uid})</option>
+              ))}
+            </select>
           </Field>
 
           <Field label="First Name" error={empErrors.f_name}>
@@ -469,17 +584,13 @@ export default function EmployeeTable() {
           <Field label="Gender">
             <select name="gender" value={empForm.gender} onChange={handleEmpChange} className={inputCls}>
               <option value="">Select Gender</option>
-              <option value="male">Male</option>
-              <option value="female">Female</option>
-              <option value="other">Other</option>
+              <option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
             </select>
           </Field>
 
           <Field label="Marital Status">
             <select name="marital_status" value={empForm.marital_status} onChange={handleEmpChange} className={inputCls}>
-              <option value="single">Single</option>
-              <option value="married">Married</option>
-              <option value="divorced">Divorced</option>
+              <option value="single">Single</option><option value="married">Married</option><option value="divorced">Divorced</option>
             </select>
           </Field>
 
@@ -504,7 +615,6 @@ export default function EmployeeTable() {
         </Modal>
       )}
 
-      {/* ── Manager Modal ── */}
       {openManager && (
         <Modal
           title="Add Manager"
@@ -547,17 +657,13 @@ export default function EmployeeTable() {
           <Field label="Gender">
             <select name="gender" value={mgrForm.gender} onChange={handleMgrChange} className={inputCls}>
               <option value="">Select Gender</option>
-              <option value="male">Male</option>
-              <option value="female">Female</option>
-              <option value="other">Other</option>
+              <option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
             </select>
           </Field>
 
           <Field label="Marital Status">
             <select name="marital_status" value={mgrForm.marital_status} onChange={handleMgrChange} className={inputCls}>
-              <option value="single">Single</option>
-              <option value="married">Married</option>
-              <option value="divorced">Divorced</option>
+              <option value="single">Single</option><option value="married">Married</option><option value="divorced">Divorced</option>
             </select>
           </Field>
 
@@ -569,11 +675,33 @@ export default function EmployeeTable() {
             <input name="e_contact" placeholder="Emergency contact" value={mgrForm.e_contact} onChange={handleMgrChange} className={inputCls} />
           </Field>
 
+          <Field label="Office Location">
+            <select name="office_location" value={mgrForm.office_location} onChange={handleMgrChange} className={inputCls}>
+              <option value="">Select Location</option>
+              {LOCATIONS.map((l) => <option key={l} value={l}>{l}</option>)}
+            </select>
+          </Field>
+
           <Field label="Designation" error={mgrErrors.designation} className="sm:col-span-2">
             <input name="designation" placeholder="e.g. Head of Engineering" value={mgrForm.designation} onChange={handleMgrChange} className={inputCls} />
           </Field>
         </Modal>
       )}
+
+      {popup.show && (
+        <Popup type={popup.type} message={popup.message} onClose={() => setPopup({ show: false, type: "", message: "" })} />
+      )}
     </div>
+  );
+}
+
+function FilterChip({ label, onRemove }) {
+  return (
+    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-xs font-medium">
+      {label}
+      <button onClick={onRemove} className="hover:text-red-500 transition-colors">
+        <FaTimes size={9} />
+      </button>
+    </span>
   );
 }

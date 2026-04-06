@@ -161,6 +161,7 @@ const adminlogout = async (req, res, next) => {
 };
 
 const addmanager = async (req, res, next) => {
+  console.log("NEXT TYPE:", typeof next);
   const {
     f_name,
     l_name,
@@ -171,6 +172,7 @@ const addmanager = async (req, res, next) => {
     personal_contact,
     e_contact,
     role,
+    office_location,
     designation,
     department,
   } = req.body;
@@ -199,6 +201,7 @@ const addmanager = async (req, res, next) => {
     personal_contact,
     e_contact,
     role,
+    office_location,
     designation,
   });
 
@@ -251,6 +254,7 @@ const addemployee = async (req, res, next) => {
     personal_contact,
     e_contact,
     role,
+    office_location,
     designation,
     department,
     Under_manager,
@@ -282,6 +286,7 @@ if (!f_name || !work_email || !password) {
     personal_contact,
     e_contact,
     role,
+    office_location,
     designation,
     department,
     Under_manager,
@@ -325,6 +330,20 @@ if (!f_name || !work_email || !password) {
   });
 };
 
+const findallmanagers = async (req, res, next) => {
+  if (!req.admin) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  }
+
+  const managers = await Managermodel.find()
+    .select(
+      "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt"
+    );
+
+  res.status(200).json({
+    managers,
+  });
+};
 
 const getallemployee = async (req, res, next) => {
   if (!req.admin) {
@@ -332,17 +351,72 @@ const getallemployee = async (req, res, next) => {
   }
 
   const users = await Usermodel.find()
+  .select('uid f_name l_name work_email role department designation office_location gender')
     .populate({
       path: "Under_manager",
-      select: "uid f_name l_name work_email role",
+      select: "uid f_name l_name work_email role ",
     })
     .select(
-      "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt"
+      "-password -__v  -marital_status  -personal_contact -e_contact -gender -designation -office_location -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt"
     );
+    const managers = await Managermodel.find().select("uid f_name l_name work_email role designation office_location department gender");
+
+    users.push(...managers);
 
   res.status(200).json({
     count: users.length,
-    users, 
+    users,
+  });
+};
+
+const editemployee = async (req, res, next) => {
+  if (!req.admin) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  }
+
+  const { uid } = req.params;
+
+  const updateData = {
+    f_name: req.body.f_name,
+    l_name: req.body.l_name,
+    work_email: req.body.work_email,
+    gender: req.body.gender,
+    marital_status: req.body.marital_status,
+    personal_contact: req.body.personal_contact,
+    e_contact: req.body.e_contact,
+    role: req.body.role,
+    office_location: req.body.office_location,
+    designation: req.body.designation,
+    department: req.body.department,
+    Under_manager: req.body.Under_manager,
+  };
+
+ 
+  const user = await Usermodel.findByIdAndUpdate(uid, updateData, {
+    new: true,
+    runValidators: true,
+  });
+
+  if (!user) {
+    return next(Object.assign(new Error("User not found"), { statusCode: 404 }));
+  }
+
+  
+  let manager = null;
+
+  if (updateData.role === "manager") {
+    manager = await Managermodel.findOneAndUpdate(
+      { userId: uid }, 
+      updateData,
+      { new: true, upsert: true } 
+    );
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Employee updated successfully",
+    user,
+    manager,
   });
 };
 
@@ -781,9 +855,11 @@ module.exports = {
   verifyAdmin,
   adminlogin,
   adminlogout,
+  findallmanagers,
   addmanager,
   addemployee,
   getallemployee,
+  editemployee,
   getperticularemployee,
   deleteemployee,
   showallleaves,

@@ -11,7 +11,7 @@ const assignDefaultLeave = async (user) => {
     case "senior_manager":
       yearlyEL = 20;
       break;
-    case "officers":
+    case "official":
       yearlyEL = 24;
       break;
   }

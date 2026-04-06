@@ -6,6 +6,7 @@ import {
   deleteUser,
   getEmployeeStats,
   reviewToManager,
+  editEmployee
 } from "../../api/adminapi/other/ad.other.api";
 
 export const useGetAllEmployee = () => {
@@ -36,16 +37,25 @@ export const useDeleteUser = () => {
 };
 
 
-export const useGetEmployeeStats = () => {
-  return useQuery({
-    queryKey: ["employeeStats"],
-    queryFn: getEmployeeStats,
+export const useEditEmployee = (uid) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => editEmployee(uid, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+    },
   });
 };
-
 
 export const useReviewToManager = () => {
   return useMutation({
     mutationFn: reviewToManager,
+  });
+};
+
+export const useGetEmployeeStats = () => {
+  return useQuery({
+    queryKey: ["employeeStats"],
+    queryFn: getEmployeeStats,
   });
 };

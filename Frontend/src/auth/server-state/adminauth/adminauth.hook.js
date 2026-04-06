@@ -9,6 +9,7 @@ import {
   resetAdminPassword,
   addManager,
   addEmployee,
+  findAllManagers,
 } from "../../api/adminapi/auth/ad.auth.api";
 
 export const useRegisterAdmin = () => {
@@ -93,5 +94,12 @@ export const useAddEmployee = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
     },
+  });
+};
+
+export const useFindAllManagers = () => {
+  return useQuery({
+    queryKey: ["managers"],
+    queryFn: findAllManagers,
   });
 };

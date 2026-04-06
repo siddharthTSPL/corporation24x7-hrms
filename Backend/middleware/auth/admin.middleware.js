@@ -10,7 +10,7 @@ const adminauth = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const admin = await adminmodel.findById(decoded.adminid);
+    const admin = await adminmodel.findById(decoded.adminid).select("-password -isVerified -status");
 
     if (!admin) {
       return res.status(401).json({ message: "Unauthorized" });
