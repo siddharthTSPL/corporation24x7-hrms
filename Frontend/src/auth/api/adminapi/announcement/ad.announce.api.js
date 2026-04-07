@@ -1,11 +1,11 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api/admin",
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/admin",
   withCredentials: true,
 });
 
-// ✅ INTERCEPTOR (same pattern everywhere)
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -22,9 +22,21 @@ api.interceptors.response.use(
 
 
 export const createAnnouncement = async (data) => {
-  if (!data?.title || !data?.message) {
-    throw new Error("Title and message are required");
-  }
   const res = await api.post("/createannouncement", data);
   return res.data;
 };
+
+export const getAllAnnouncement = async () => {
+  const res = await api.get("/getallannouncement");
+  return res.data;
+};
+
+export const deleteAnnouncement = async (id) => {
+  const res = await api.delete(`/deleteannouncement/${id}`);
+  return res.data;
+};
+
+export const updateAnnouncement = async ({ id, data }) => {
+  const res = await api.put(`/updateannouncement/${id}`, data);
+  return res.data;
+}

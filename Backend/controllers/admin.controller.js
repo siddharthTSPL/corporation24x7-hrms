@@ -14,6 +14,8 @@ const Leave = require("../Models/leave.model");
 const Review = require("../Models/review.model");
 const generateOTP = require("../automatic/otpgenerator");
 const OtpModel = require("../Models/otpbasedlogin.model");
+const leavebalanceModel = require("../Models/leavebalance.model");
+const reviewModel = require("../Models/review.model");
 
 
 const registerAdmin = async (req, res, next) => {
@@ -349,9 +351,9 @@ const getallemployee = async (req, res, next) => {
   if (!req.admin) {
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
-
+ 
   const users = await Usermodel.find()
-  .select('uid f_name l_name work_email role department designation office_location gender')
+  .select('uid f_name l_name work_email role department designation office_location gender personal_contact e_contact')
     .populate({
       path: "Under_manager",
       select: "uid f_name l_name work_email role ",
@@ -359,7 +361,8 @@ const getallemployee = async (req, res, next) => {
     .select(
       "-password -__v  -marital_status  -personal_contact -e_contact -gender -designation -office_location -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt"
     );
-    const managers = await Managermodel.find().select("uid f_name l_name work_email role designation office_location department gender");
+    
+    const managers = await Managermodel.find().select("uid f_name l_name work_email role designation office_location department gender personal_contact e_contact");
 
     users.push(...managers);
 
@@ -422,26 +425,64 @@ const editemployee = async (req, res, next) => {
 
 
 const getperticularemployee = async (req, res, next) => {
-  if (!req.admin) {
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  }
+  try {
+    if (!req.admin) {
+      return next(
+        Object.assign(new Error("Unauthorized"), { statusCode: 401 })
+      );
+    }
 
-  const { uid } = req.params;
+    const { uid } = req.params;
 
-  const user = await Usermodel.findById(uid)
-    .populate({
-      path: "Under_manager",
-      select: "uid f_name l_name work_email role",
-    })
-    .select(
+    const user = await Usermodel.findById(uid)
+      .populate({
+        path: "Under_manager",
+        select: "uid f_name l_name work_email role",
+      })
+      .select(
+        "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt"
+      );
+
+    if (!user) {
+      return next(
+        Object.assign(new Error("User not found"), { statusCode: 404 })
+      );
+    }
+
+    const manager = await Managermodel.findOne({ userId: uid }).select(
       "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt"
     );
 
-  if (!user) {
-    return next(Object.assign(new Error("User not found"), { statusCode: 404 }));
-  }
+   
+    const leaveBalance = await leavebalanceModel.findOne({
+      employee: user._id,
+    });
 
-  res.status(200).json(user);
+    if (!leaveBalance) {
+      return next(
+        Object.assign(new Error("Leave balance not found"), {
+          statusCode: 404,
+        })
+      );
+    }
+
+    const reviews = await reviewModel
+      .find({ reviewee: user._id })
+      .populate({
+        path: "reviewer",
+        select: "f_name l_name work_email role",
+      });
+
+    res.status(200).json({
+      success: true,
+      user,
+      manager: manager || null,
+      leaveBalance,
+      reviews: reviews || [],
+    });
+  } catch (error) {
+    return next(error);
+  }
 };
 
 
@@ -453,7 +494,7 @@ const deleteemployee = async (req, res, next) => {
   const { uid } = req.params;
 
   const user = await Usermodel.findByIdAndDelete(uid);
-  const manager = await Managermodel.findByIdAndDelete(uid);
+ const manager = await Managermodel.findOneAndDelete(uid);
 
   if (!user && !manager) {
     return next(Object.assign(new Error("User not found"), { statusCode: 404 }));
@@ -597,28 +638,124 @@ const noofemployee = async (req, res, next) => {
 
 const createannouncement = async (req, res, next) => {
   if (!req.admin) {
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+    const error = new Error("Unauthorized");
+    error.statusCode = 401;
+    throw error;
   }
 
-  const { title, message, audience, priority, expiresAt } = req.body;
+  const { title, message, audience, priority, notice_image, expiresAt } = req.body;
 
-  const announcement = new announcementmodel({
+  if (!title || !message) {
+    const error = new Error("Title and message are required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const announcement = await announcementmodel.create({
     title,
     message,
     audience,
     priority,
+    notice_image,
     expiresAt,
     createdBy: req.admin._id,
   });
 
-  await announcement.save();
-
   res.status(201).json({
+    success: true,
     message: "Announcement created successfully",
     announcement,
   });
 };
 
+const getallannouncement = async (req, res, next) => {
+  if (!req.admin) {
+    const error = new Error("Unauthorized");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const announcements = await announcementmodel.find();
+    
+
+  res.status(200).json({
+    success: true,
+    count: announcements.length,
+    announcements,
+  });
+};
+
+const updateAnnouncement = async (req, res, next) => {
+  if (!req.admin) {
+    const error = new Error("Unauthorized");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const { id } = req.params;
+
+  const announcement = await announcementmodel.findById(id);
+
+  if (!announcement) {
+    const error = new Error("Announcement not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (announcement.createdBy.toString() !== req.admin._id.toString()) {
+    const error = new Error("You are not allowed to edit this announcement");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const { title, message, audience, priority, notice_image, expiresAt } = req.body;
+
+  if (title) announcement.title = title;
+  if (message) announcement.message = message;
+  if (audience) announcement.audience = audience;
+  if (priority) announcement.priority = priority;
+  if (notice_image !== undefined) announcement.notice_image = notice_image;
+  if (expiresAt) announcement.expiresAt = expiresAt;
+
+  await announcement.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Announcement updated successfully",
+    announcement,
+  });
+};
+
+const deleteAnnouncement = async (req, res, next) => {
+  if (!req.admin) {
+    const error = new Error("Unauthorized");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const { id } = req.params;
+
+  const announcement = await announcementmodel.findById(id);
+
+  if (!announcement) {
+    const error = new Error("Announcement not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (announcement.createdBy.toString() !== req.admin._id.toString()) {
+    const error = new Error("You are not allowed to delete this announcement");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  await announcement.deleteOne();
+
+  res.status(200).json({
+    success: true,
+    message: "Announcement deleted successfully",
+  });
+};
 
 const reviewtomanager = async (req, res, next) => {
   if (!req.admin) {
@@ -849,6 +986,100 @@ const getme = async (req, res, next) => {
   res.status(200).json(admin);
 };
 
+const editadminprofile = async (req, res, next) => {
+  try {
+    if (!req.admin) {
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+    }
+
+    const admin = req.admin;
+    const { phone, profile_image } = req.body;
+
+    if (phone !== undefined) {
+      admin.phone = phone;
+    }
+
+    if (profile_image !== undefined) {
+      if (typeof profile_image === "string") {
+        if (profile_image === "" || profile_image.includes("api.dicebear.com")) {
+          admin.profile_image = profile_image;
+        } else {
+          return next(
+            Object.assign(new Error("Invalid avatar format"), { statusCode: 400 })
+          );
+        }
+      } else {
+        return next(
+          Object.assign(new Error("Profile image must be a string"), { statusCode: 400 })
+        );
+      }
+    }
+    await admin.save();
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      admin: {
+        _id: admin._id,
+        organisation_name: admin.organisation_name,
+        email: admin.email,
+        phone: admin.phone,
+        profile_image: admin.profile_image,
+      },
+    });
+  } catch (error) {
+    console.error("Profile update error:", error);
+    return next(
+      Object.assign(new Error(error.message), { statusCode: 500 })
+    );
+  }
+};
+
+
+const changepassword = async (req, res, next) => {
+  if (!req.admin) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  }
+
+  const adminid = req.admin._id;
+  const admin = await Adminmodel.findById(adminid).select("+password");
+
+  const { currentPassword, newPassword } = req.body;
+
+  console.log("Entered:", currentPassword);
+  console.log("Stored Hash:", admin.password);
+
+  if (!currentPassword || !newPassword) {
+    return next(
+      Object.assign(new Error("Current password and new password are required"), {
+        statusCode: 400,
+      })
+    );
+  }
+
+  const isvalid = await admin.isValidPassword(currentPassword);
+
+  if (!isvalid) {
+    return next(Object.assign(new Error("Current password is incorrect"), { statusCode: 400 }));
+  }
+
+  if (currentPassword === newPassword) {
+    return next(
+      Object.assign(new Error("New password must be different from current password"), {
+        statusCode: 400,
+      })
+    );
+  }
+
+  admin.password = newPassword;
+
+  await admin.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Password updated successfully",
+  });
+};
+
 
 module.exports = {
   registerAdmin,
@@ -867,10 +1098,15 @@ module.exports = {
   rejectleavebyadmin,
   noofemployee,
   createannouncement,
+  getallannouncement,
+  updateAnnouncement,
+  deleteAnnouncement,
   reviewtomanager,
   forgetpasswordloginotp,
   verifyAotp,
   resetAdminPassword,
   showUserPasswordPage,
-  getme
+  getme,
+  editadminprofile,
+  changepassword
 };
