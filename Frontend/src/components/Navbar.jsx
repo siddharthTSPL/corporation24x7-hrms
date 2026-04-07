@@ -79,9 +79,17 @@ function Navbar({ collapsed, setCollapsed, data = [] }) {
           </span>
         </div>
 
-        <div className="w-9 h-9 rounded-full bg-[#00A8E8] text-white flex items-center justify-center text-sm font-semibold">
-          {adminInitial}
-        </div>
+        {admin?.profile_image ? (
+  <img
+    src={admin.profile_image}
+    alt="avatar"
+    className="w-10 h-10 rounded-full object-cover"
+  />
+) : (
+  <div className="w-10 h-10 rounded-full bg-gray-500 text-white flex items-center justify-center font-semibold">
+    {adminInitial}
+  </div>
+)}
       </div>
 
       {search.trim() && (
