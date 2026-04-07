@@ -598,28 +598,124 @@ const noofemployee = async (req, res, next) => {
 
 const createannouncement = async (req, res, next) => {
   if (!req.admin) {
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+    const error = new Error("Unauthorized");
+    error.statusCode = 401;
+    throw error;
   }
 
-  const { title, message, audience, priority, expiresAt } = req.body;
+  const { title, message, audience, priority, notice_image, expiresAt } = req.body;
 
-  const announcement = new announcementmodel({
+  if (!title || !message) {
+    const error = new Error("Title and message are required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const announcement = await announcementmodel.create({
     title,
     message,
     audience,
     priority,
+    notice_image,
     expiresAt,
     createdBy: req.admin._id,
   });
 
-  await announcement.save();
-
   res.status(201).json({
+    success: true,
     message: "Announcement created successfully",
     announcement,
   });
 };
 
+const getallannouncement = async (req, res, next) => {
+  if (!req.admin) {
+    const error = new Error("Unauthorized");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const announcements = await announcementmodel.find();
+    
+
+  res.status(200).json({
+    success: true,
+    count: announcements.length,
+    announcements,
+  });
+};
+
+const updateAnnouncement = async (req, res, next) => {
+  if (!req.admin) {
+    const error = new Error("Unauthorized");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const { id } = req.params;
+
+  const announcement = await announcementmodel.findById(id);
+
+  if (!announcement) {
+    const error = new Error("Announcement not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (announcement.createdBy.toString() !== req.admin._id.toString()) {
+    const error = new Error("You are not allowed to edit this announcement");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const { title, message, audience, priority, notice_image, expiresAt } = req.body;
+
+  if (title) announcement.title = title;
+  if (message) announcement.message = message;
+  if (audience) announcement.audience = audience;
+  if (priority) announcement.priority = priority;
+  if (notice_image !== undefined) announcement.notice_image = notice_image;
+  if (expiresAt) announcement.expiresAt = expiresAt;
+
+  await announcement.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Announcement updated successfully",
+    announcement,
+  });
+};
+
+const deleteAnnouncement = async (req, res, next) => {
+  if (!req.admin) {
+    const error = new Error("Unauthorized");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const { id } = req.params;
+
+  const announcement = await announcementmodel.findById(id);
+
+  if (!announcement) {
+    const error = new Error("Announcement not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (announcement.createdBy.toString() !== req.admin._id.toString()) {
+    const error = new Error("You are not allowed to delete this announcement");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  await announcement.deleteOne();
+
+  res.status(200).json({
+    success: true,
+    message: "Announcement deleted successfully",
+  });
+};
 
 const reviewtomanager = async (req, res, next) => {
   if (!req.admin) {
@@ -962,6 +1058,9 @@ module.exports = {
   rejectleavebyadmin,
   noofemployee,
   createannouncement,
+  getallannouncement,
+  updateAnnouncement,
+  deleteAnnouncement,
   reviewtomanager,
   forgetpasswordloginotp,
   verifyAotp,
