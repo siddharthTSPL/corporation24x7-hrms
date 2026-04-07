@@ -14,6 +14,8 @@ const Leave = require("../Models/leave.model");
 const Review = require("../Models/review.model");
 const generateOTP = require("../automatic/otpgenerator");
 const OtpModel = require("../Models/otpbasedlogin.model");
+const leavebalanceModel = require("../Models/leavebalance.model");
+const reviewModel = require("../Models/review.model");
 
 
 const registerAdmin = async (req, res, next) => {
@@ -423,26 +425,64 @@ const editemployee = async (req, res, next) => {
 
 
 const getperticularemployee = async (req, res, next) => {
-  if (!req.admin) {
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  }
+  try {
+    if (!req.admin) {
+      return next(
+        Object.assign(new Error("Unauthorized"), { statusCode: 401 })
+      );
+    }
 
-  const { uid } = req.params;
+    const { uid } = req.params;
 
-  const user = await Usermodel.findById(uid)
-    .populate({
-      path: "Under_manager",
-      select: "uid f_name l_name work_email role",
-    })
-    .select(
+    const user = await Usermodel.findById(uid)
+      .populate({
+        path: "Under_manager",
+        select: "uid f_name l_name work_email role",
+      })
+      .select(
+        "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt"
+      );
+
+    if (!user) {
+      return next(
+        Object.assign(new Error("User not found"), { statusCode: 404 })
+      );
+    }
+
+    const manager = await Managermodel.findOne({ userId: uid }).select(
       "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt"
     );
 
-  if (!user) {
-    return next(Object.assign(new Error("User not found"), { statusCode: 404 }));
-  }
+   
+    const leaveBalance = await leavebalanceModel.findOne({
+      employee: user._id,
+    });
 
-  res.status(200).json(user);
+    if (!leaveBalance) {
+      return next(
+        Object.assign(new Error("Leave balance not found"), {
+          statusCode: 404,
+        })
+      );
+    }
+
+    const reviews = await reviewModel
+      .find({ reviewee: user._id })
+      .populate({
+        path: "reviewer",
+        select: "f_name l_name work_email role",
+      });
+
+    res.status(200).json({
+      success: true,
+      user,
+      manager: manager || null,
+      leaveBalance,
+      reviews: reviews || [],
+    });
+  } catch (error) {
+    return next(error);
+  }
 };
 
 
