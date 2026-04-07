@@ -41,7 +41,6 @@ export default function AnnouncementPage() {
    const { data, isLoading, isError } = useGetAllAnnouncement();
 
 const announcements = data?.announcements || [];
-console.log("AnnouncementPage data:", data);
   const openCreate = () => {
     setForm(EMPTY_FORM);
     setErrors({});
@@ -168,7 +167,7 @@ console.log("AnnouncementPage data:", data);
                     onError={(e) => (e.target.style.display = "none")}
                   />
                 ) : (
-                  <div className="w-full h-36 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-5xl">
+                  <div className="w-full h-36 bg-linear-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-5xl">
                     📢
                   </div>
                 )}
@@ -208,7 +207,7 @@ console.log("AnnouncementPage data:", data);
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[820px] text-sm">
+          <table className="w-full min-w-205 text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100 text-gray-400 text-xs uppercase tracking-wider">
                 <th className="px-6 py-3 text-left font-medium">Image</th>
@@ -264,14 +263,14 @@ console.log("AnnouncementPage data:", data);
                           onError={(e) => (e.target.style.display = "none")}
                         />
                       ) : (
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-xl shadow-sm">
+                        <div className="w-12 h-12 rounded-xl bg-linear-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-xl shadow-sm">
                           📢
                         </div>
                       )}
                     </td>
 
                     {/* Title + Message */}
-                    <td className="px-6 py-4 max-w-[220px]">
+                    <td className="px-6 py-4 max-w-55">
                       <p className="font-semibold text-gray-800 truncate">{item.title}</p>
                       <p className="text-xs text-gray-400 truncate mt-0.5">{item.message}</p>
                     </td>
