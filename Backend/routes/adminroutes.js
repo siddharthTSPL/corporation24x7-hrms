@@ -19,6 +19,9 @@ const {
   showallleaves,
   noofemployee,
   createannouncement,
+  getallannouncement,
+  updateAnnouncement,
+  deleteAnnouncement,
   reviewtomanager,
   forgetpasswordloginotp,
   verifyAotp,
@@ -83,11 +86,30 @@ adminrouter.get(
   adminauthmiddleware,
   asyncHandler(noofemployee),
 );
+
 adminrouter.post(
   "/createannouncement",
   adminauthmiddleware,
   asyncHandler(createannouncement),
 );
+
+adminrouter.get(
+  "/getallannouncement",
+  adminauthmiddleware,
+  asyncHandler(getallannouncement),
+);
+adminrouter.put(
+  "/updateannouncement/:id",
+  adminauthmiddleware,
+  asyncHandler(updateAnnouncement),
+);
+
+adminrouter.delete(
+  "/deleteannouncement/:id",
+  adminauthmiddleware,
+  asyncHandler(deleteAnnouncement),
+);
+
 adminrouter.post(
   "/reviewtomanager",
   adminauthmiddleware,
