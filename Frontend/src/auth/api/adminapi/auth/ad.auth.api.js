@@ -74,3 +74,13 @@ export const findAllManagers = async () => {
   const res = await api.get("/findallmanagers");
   return res.data;
 };
+
+export const editAdminProfile = async (data) => {
+  const res = await api.put("/editadminprofile", data);
+  return res.data;
+};
+
+export const changeAdminPassword = async (data) => {
+  const res = await api.put("/changepassword", data);
+  return res.data;
+};

@@ -25,6 +25,8 @@ const {
   resetAdminPassword,
   showUserPasswordPage,
   getme,
+  editadminprofile,
+  changepassword
 } = require("../controllers/admin.controller");
 
 adminrouter.post("/register", asyncHandler(registerAdmin));
@@ -102,5 +104,7 @@ adminrouter.post(
   asyncHandler(resetAdminPassword),
 );
 adminrouter.get("/getme", adminauthmiddleware, asyncHandler(getme));
+adminrouter.put("/editadminprofile", adminauthmiddleware, asyncHandler(editadminprofile));
+adminrouter.put("/changepassword", adminauthmiddleware, asyncHandler(changepassword));
 
 module.exports = adminrouter;
