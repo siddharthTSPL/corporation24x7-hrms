@@ -2,6 +2,9 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 
 const adminSchema = new mongoose.Schema({
+  profile_image: {
+    type: String,
+  },
   organisation_name: {
     type: String,
     required: [true, "Organisation name is required"],
@@ -24,6 +27,9 @@ const adminSchema = new mongoose.Schema({
     type: String,
     required: [true, "Email is required"],
     unique: true,
+  },
+  phone:{
+    type: String,
   },
   isVerified: {
     type: Boolean,

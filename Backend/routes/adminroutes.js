@@ -19,12 +19,17 @@ const {
   showallleaves,
   noofemployee,
   createannouncement,
+  getallannouncement,
+  updateAnnouncement,
+  deleteAnnouncement,
   reviewtomanager,
   forgetpasswordloginotp,
   verifyAotp,
   resetAdminPassword,
   showUserPasswordPage,
   getme,
+  editadminprofile,
+  changepassword
 } = require("../controllers/admin.controller");
 
 adminrouter.post("/register", asyncHandler(registerAdmin));
@@ -81,11 +86,30 @@ adminrouter.get(
   adminauthmiddleware,
   asyncHandler(noofemployee),
 );
+
 adminrouter.post(
   "/createannouncement",
   adminauthmiddleware,
   asyncHandler(createannouncement),
 );
+
+adminrouter.get(
+  "/getallannouncement",
+  adminauthmiddleware,
+  asyncHandler(getallannouncement),
+);
+adminrouter.put(
+  "/updateannouncement/:id",
+  adminauthmiddleware,
+  asyncHandler(updateAnnouncement),
+);
+
+adminrouter.delete(
+  "/deleteannouncement/:id",
+  adminauthmiddleware,
+  asyncHandler(deleteAnnouncement),
+);
+
 adminrouter.post(
   "/reviewtomanager",
   adminauthmiddleware,
@@ -102,5 +126,7 @@ adminrouter.post(
   asyncHandler(resetAdminPassword),
 );
 adminrouter.get("/getme", adminauthmiddleware, asyncHandler(getme));
+adminrouter.put("/editadminprofile", adminauthmiddleware, asyncHandler(editadminprofile));
+adminrouter.put("/changepassword", adminauthmiddleware, asyncHandler(changepassword));
 
 module.exports = adminrouter;

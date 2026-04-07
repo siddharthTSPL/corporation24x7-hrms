@@ -10,6 +10,8 @@ import {
   addManager,
   addEmployee,
   findAllManagers,
+  editAdminProfile,
+  changeAdminPassword
 } from "../../api/adminapi/auth/ad.auth.api";
 
 export const useRegisterAdmin = () => {
@@ -101,5 +103,22 @@ export const useFindAllManagers = () => {
   return useQuery({
     queryKey: ["managers"],
     queryFn: findAllManagers,
+  });
+};
+
+
+export const useEditAdminProfile = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: editAdminProfile,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin"] });
+    },
+  });
+};
+
+export const useChangeAdminPassword = () => {
+  return useMutation({
+    mutationFn: changeAdminPassword,
   });
 };
