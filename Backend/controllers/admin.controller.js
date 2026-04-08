@@ -431,9 +431,7 @@ const getperticularemployee = async (req, res, next) => {
         Object.assign(new Error("Unauthorized"), { statusCode: 401 })
       );
     }
-
     const { uid } = req.params;
-
     const user = await Usermodel.findById(uid)
       .populate({
         path: "Under_manager",
@@ -448,12 +446,10 @@ const getperticularemployee = async (req, res, next) => {
         Object.assign(new Error("User not found"), { statusCode: 404 })
       );
     }
-
-    const manager = await Managermodel.findOne({ userId: uid }).select(
+    const manager = await Managermodel.findOne({ userId: user._id }).select(
       "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt"
     );
-
-   
+    
     const leaveBalance = await leavebalanceModel.findOne({
       employee: user._id,
     });
@@ -485,6 +481,53 @@ const getperticularemployee = async (req, res, next) => {
   }
 };
 
+const getperticularemanager = async (req, res, next) => {
+  try {
+    if (!req.admin) {
+      return next(
+        Object.assign(new Error("Unauthorized"), { statusCode: 401 })
+      );
+    }
+    const { uid } = req.params;
+    const manager = await Managermodel.findById(uid)
+      .select(
+        "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt"
+      );
+
+    if (!manager) {
+      return next(
+        Object.assign(new Error("Manager not found"), { statusCode: 404 })
+      );
+    }
+    const leaveBalance = await leavebalanceModel.findOne({
+      employee: manager._id,
+    });
+
+    if (!leaveBalance) {
+      return next(
+        Object.assign(new Error("Leave balance not found"), {
+          statusCode: 404,
+        })
+      );
+    }
+    const reviews = await reviewModel
+      .find({ reviewee: manager._id })
+      .populate({
+        path: "reviewer",
+        select: "f_name l_name work_email role",
+      });
+
+    res.status(200).json({
+      success: true,
+      manager,
+      leaveBalance,
+      reviews: reviews || [],
+    });
+}
+    catch (error) {
+    return next(error);
+  }
+};
 
 const deleteemployee = async (req, res, next) => {
   if (!req.admin) {
@@ -1092,6 +1135,7 @@ module.exports = {
   getallemployee,
   editemployee,
   getperticularemployee,
+  getperticularemanager,
   deleteemployee,
   showallleaves,
   acceptleavebyadmin,

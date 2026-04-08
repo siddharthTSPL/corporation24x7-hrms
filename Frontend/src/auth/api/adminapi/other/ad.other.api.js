@@ -47,3 +47,12 @@ export const reviewToManager = async (data) => {
   const res = await api.post("/reviewtomanager", data);
   return res.data;
 };
+export const getparticularEmployeeStats = async (uid) => {
+  const res = await api.get(`/getperticularemployee/${uid}`);
+  return res.data;
+};
+
+export const getParticularManager = async (uid) => {
+  const res = await api.get(`/getperticularemanager/${uid}`);
+  return res.data;
+};

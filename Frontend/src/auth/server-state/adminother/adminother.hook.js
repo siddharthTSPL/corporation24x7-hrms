@@ -6,7 +6,9 @@ import {
   deleteUser,
   getEmployeeStats,
   reviewToManager,
-  editEmployee
+  editEmployee,
+  getparticularEmployeeStats,
+  getParticularManager,
 } from "../../api/adminapi/other/ad.other.api";
 
 export const useGetAllEmployee = () => {
@@ -57,5 +59,21 @@ export const useGetEmployeeStats = () => {
   return useQuery({
     queryKey: ["employeeStats"],
     queryFn: getEmployeeStats,
+  });
+};
+
+export const useGetParticularEmployeeStats = (uid) => {
+  return useQuery({
+    queryKey: ["employeeStats", uid],
+    queryFn: () => getparticularEmployeeStats(uid),
+    enabled: !!uid, 
+  });
+};
+
+export const useGetParticularManager = (uid) => {
+  return useQuery({
+    queryKey: ["manager", uid],
+    queryFn: () => getParticularManager(uid),
+    enabled: !!uid, 
   });
 };
