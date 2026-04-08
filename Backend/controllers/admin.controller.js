@@ -529,7 +529,6 @@ const getperticularemanager = async (req, res, next) => {
   }
 };
 
-
 const deleteemployee = async (req, res, next) => {
   if (!req.admin) {
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
