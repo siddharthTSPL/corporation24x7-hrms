@@ -32,7 +32,6 @@ export const updatePassword = async (data) => {
 };
 
 
-
 export const forgetPassword = async (data) => {
   const res = await api.post("/forgetpassword", data);
   return res.data;

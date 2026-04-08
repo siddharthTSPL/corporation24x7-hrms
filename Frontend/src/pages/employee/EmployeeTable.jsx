@@ -8,7 +8,9 @@ import {
 } from "../../auth/server-state/adminauth/adminauth.hook";
 import {
   useGetAllEmployee, useDeleteUser, useEditEmployee,
+  useGetParticularEmployeeStats
 } from "../../auth/server-state/adminother/adminother.hook";
+import EmployeeDetailModal from "./EmployeeDetailModal";  
 
 const DEPARTMENTS = ["OPR", "BPO", "ENG", "MGMT", "HR"];
 const LOCATIONS = ["Noida", "Bareilly", "Delhi", "Mumbai"];
@@ -171,6 +173,9 @@ export default function EmployeeTable() {
   const [openManager, setOpenManager] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [popup, setPopup] = useState({ show: false, type: "success", message: "" });
+
+  // ← ADD DETAIL MODAL STATE
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
 
   // Add forms
   const [empForm, setEmpForm] = useState(EMPTY_EMP);
@@ -435,7 +440,11 @@ export default function EmployeeTable() {
               <tbody className="divide-y divide-gray-50">
                 {listLoading ? <SkeletonRows /> : filtered.length === 0 ? <EmptyState onAdd={() => setOpen(true)} /> : (
                   filtered.map((u) => (
-                    <tr key={u._id} className="hover:bg-(--background)/60 transition-colors group">
+                    <tr 
+                      key={u._id} 
+                      className="hover:bg-(--background)/60 transition-colors group cursor-pointer"
+                      onClick={() => setSelectedEmployeeId(u._id)}  
+                    >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <Avatar name={`${u.f_name ?? ""} ${u.l_name ?? ""}`} />
@@ -461,7 +470,7 @@ export default function EmployeeTable() {
                       </td>
                       {/* ── FIXED: wired-up action buttons ── */}
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => handleOpenEdit(u)}
                             className="w-8 h-8 rounded-lg bg-(--background) flex items-center justify-center text-gray-400 hover:text-(--primary) hover:bg-(--secondary)/30 transition-colors"
@@ -637,6 +646,14 @@ export default function EmployeeTable() {
           user={deleteTarget}
           onConfirm={handleConfirmDelete}
           onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {/* ← ADD DETAIL MODAL */}
+      {selectedEmployeeId && (
+        <EmployeeDetailModal
+          employeeId={selectedEmployeeId}
+          onClose={() => setSelectedEmployeeId(null)}
         />
       )}
 

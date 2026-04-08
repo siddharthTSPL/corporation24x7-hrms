@@ -13,6 +13,7 @@ const {
   getallemployee,
   editemployee,
   getperticularemployee,
+  getperticularemanager,
   deleteemployee,
   acceptleavebyadmin,
   rejectleavebyadmin,
@@ -59,6 +60,11 @@ adminrouter.get(
   "/getperticularemployee/:uid",
   adminauthmiddleware,
   asyncHandler(getperticularemployee),
+);
+adminrouter.get(
+  "/getperticularemanager/:uid",
+  adminauthmiddleware,
+  asyncHandler(getperticularemanager),
 );
 adminrouter.delete(
   "/deleteuser/:uid",
