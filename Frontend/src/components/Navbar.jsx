@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { FaBars, FaSearch, FaBell } from "react-icons/fa";
 import { useGetMeAdmin } from "../auth/server-state/adminauth/adminauth.hook";
+import { useAuth } from "../auth/store/getmeauth/getmeauth";
 
 function Navbar({ collapsed, setCollapsed, data = [] }) {
   const { data: admin } = useGetMeAdmin();
- console.log("Navbar admin data:", admin);
+  const { data: auth } = useAuth();
+  const user = data?.data
   const [dateTime, setDateTime] = useState("");
   const [search, setSearch] = useState("");
 
