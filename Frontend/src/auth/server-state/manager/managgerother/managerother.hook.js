@@ -2,31 +2,73 @@ import { getEmployeeDocuments,forgetPasswordManager, resetManagerPassword, verif
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export const useGetEmployeeDocuments = (uid) => {
-     return useQuery({
-          queryKey: ["employeeDocuments", uid],
-          queryFn: () => getEmployeeDocuments(uid),
-     });
+    const queryClient = useQueryClient();
+
+    return useMutation(getEmployeeDocuments, {
+         mutationKey: ["getEmployeeDocuments"],
+         mutationFn:getEmployeeDocuments,
+         onSuccess: () => {
+              queryClient.removeQueries({ queryKey: ["manager"] });
+         },
+    })
 };
 
 export const useForgetPasswordManager = () => {
-     return useMutation(forgetPasswordManager);
+   const queryClient = useQueryClient();
+
+   return useMutation(forgetPasswordManager, {
+        mutationKey: ["forgetPasswordManager"],
+        mutationFn:forgetPasswordManager,
+        onSuccess: () => {
+             queryClient.removeQueries({ queryKey: ["manager"] });
+        },
+   })
 }
 
 export const useResetManagerPassword = () => {
-     return useMutation(resetManagerPassword);
+    const queryClient = useQueryClient();
+
+    return useMutation(resetManagerPassword, {
+         mutationKey: ["resetManagerPassword"],
+         mutationFn:resetManagerPassword,
+         onSuccess: () => {
+              queryClient.removeQueries({ queryKey: ["manager"] });
+         },
+    })
 }
 
 export const useVerifyManagerOtpApi = () => {
-     return useMutation(verifyManagerOtpApi);
+    const queryClient = useQueryClient();
+
+    return useMutation(verifyManagerOtpApi, {
+         mutationKey: ["verifyManagerOtpApi"],
+         mutationFn:verifyManagerOtpApi,
+         onSuccess: () => {
+              queryClient.removeQueries({ queryKey: ["manager"] });
+         },
+    })
 }
 
 export const useGetUsersUnderManager = () => {
-     return useQuery({
-          queryKey: ["usersUnderManager"],
-          queryFn: () => getUsersUnderManager(),
-     });
+   const queryClient = useQueryClient();
+
+   return useMutation(getUsersUnderManager, {
+        mutationKey: ["getUsersUnderManager"],
+        mutationFn:getUsersUnderManager,
+        onSuccess: () => {
+             queryClient.removeQueries({ queryKey: ["manager"] });
+        },
+   })
 };
 
 export const useReviewEmployee = () => {
-     return useMutation(reviewEmployee);
+   const queryClient = useQueryClient();
+
+   return useMutation(reviewEmployee, {
+        mutationKey: ["reviewEmployee"],
+        mutationFn:reviewEmployee,
+        onSuccess: () => {
+             queryClient.removeQueries({ queryKey: ["manager"] });
+        },
+   })
 }

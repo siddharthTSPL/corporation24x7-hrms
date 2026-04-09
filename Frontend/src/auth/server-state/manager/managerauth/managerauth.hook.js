@@ -4,30 +4,71 @@ import { verifyManager,loginManager,logoutManager,updateManagerPassword,firstLog
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export const useVerifyManager = (token) => {
-     return useQuery({
-          queryKey: ["verifyManager", token],
-          queryFn: () => verifyManager(token),
-          enabled: !!token,
-     });
+    const queryClient = useQueryClient();
+
+    return useQuery({
+         queryKey: ["verifyManager", token],
+         queryFn: () => verifyManager(token),
+         enabled: !!token,
+    })
 };
 
 
 export const useLoginManager = () => {
-     return useMutation(loginManager);
+     const queryClient = useQueryClient();
+
+     return useMutation(loginManager, {
+          mutationKey: ["loginManager"],
+          mutationFn:loginManager,
+          onSuccess: (data) => {
+               queryClient.setQueryData(["manager"], data.manager || data);
+          },
+     })
 };
 
 export const useLogoutManager = () => {
-     return useMutation(logoutManager);
+     const queryClient = useQueryClient();
+
+     return useMutation(logoutManager, {
+          mutationKey: ["logoutManager"],
+          mutationFn:logoutManager,
+          onSuccess: () => {
+               queryClient.removeQueries({ queryKey: ["manager"] });
+          },
+     })
 };
 
 export const useFirstLoginPasswordChange = () => {
-     return useMutation(firstLoginPasswordChange);
+      const queryClient = useQueryClient();
+
+     return useMutation(firstLoginPasswordChange, {
+          mutationKey: ["firstLoginPasswordChange"],
+          mutationFn:firstLoginPasswordChange,
+          onSuccess: () => {
+               queryClient.removeQueries({ queryKey: ["manager"] });
+          },
+     })
 };
 
 export const useUpdateManagerPassword = () => {
-     return useMutation(updateManagerPassword);
+  const queryClient = useQueryClient();
+
+     return useMutation(updateManagerPassword, {
+          mutationKey: ["updateManagerPassword"],
+          mutationFn:updateManagerPassword,
+          onSuccess: () => {
+               queryClient.removeQueries({ queryKey: ["manager"] });
+          },
+     })
 };
 
 export const useGetMeManager = () => {
-     return useQuery(["meManager"], getMeManager);
+     const queryClient = useQueryClient();
+     return useQuery({
+          queryKey: ["meManager"],
+          queryFn: getMeManager,
+          onSuccess: (data) => {
+               queryClient.setQueryData(["manager"], data.manager || data);
+          },
+     });
 };
