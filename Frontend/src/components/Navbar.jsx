@@ -4,8 +4,11 @@ import { useAuth } from "../auth/store/getmeauth/getmeauth";
 
 function Navbar({ collapsed, setCollapsed, data = [] }) {
   const { data: auth } = useAuth();
-  const user = auth?.data;
-  console.log(user);
+
+  const employee = auth?.data?.employee;
+  const manager = auth?.data?.manager;
+  const admin = auth?.data;
+
   const [dateTime, setDateTime] = useState("");
   const [search, setSearch] = useState("");
 
@@ -42,30 +45,31 @@ function Navbar({ collapsed, setCollapsed, data = [] }) {
     setCollapsed((prev) => !prev);
   }, [setCollapsed]);
 
-  // Get display name and initial based on role
   const displayName = useMemo(() => {
-    if (!user) return "";
     if (auth?.role === "admin")
-      return user.organisation_name || user.email || "Admin";
+      return admin?.organisation_name || admin?.email || "Admin";
+
     if (auth?.role === "manager")
       return (
-        `${user.manager?.f_name || ""} ${user.manager?.l_name || ""}`.trim() ||
+        `${manager?.f_name || ""} ${manager?.l_name || ""}`.trim() ||
         "Manager"
       );
+
     if (auth?.role === "employee")
       return (
-        `${user.employee?.f_name || ""} ${user.employee?.l_name || ""}`.trim() ||
+        `${employee?.f_name || ""} ${employee?.l_name || ""}`.trim() ||
         "Employee"
       );
+
     return "";
-  }, [user, auth?.role]);
+  }, [auth, employee, manager, admin]);
 
   const initial = displayName?.trim().charAt(0).toUpperCase() || "U";
 
   const profileImage = useMemo(() => {
-    if (auth?.role === "admin") return user.profile_image || null;
+    if (auth?.role === "admin") return admin?.profile_image || null;
     return null;
-  }, [user, auth?.role]);
+  }, [auth, admin]);
 
   return (
     <div className="w-full bg-white border-b px-4 md:px-6 py-2 flex flex-col md:flex-row md:items-center md:justify-between gap-3">

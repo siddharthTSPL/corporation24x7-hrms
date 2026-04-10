@@ -26,6 +26,9 @@ userrouter.post("/applyleave", employeemiddleware,asyncHandler(usercontroller.ap
 userrouter.get("/resultofleaverequest/:id",employeemiddleware,asyncHandler(usercontroller.resultofleaverequest));
 userrouter.get("/getallleave",employeemiddleware, asyncHandler(usercontroller.getallleave));
 
+userrouter.put("/editleave/:id",employeemiddleware,asyncHandler(usercontroller.editleave));
+userrouter.delete("/deleteleave/:id",employeemiddleware,asyncHandler(usercontroller.deleteleave));
+
 userrouter.get("/showannouncements", employeemiddleware,asyncHandler(usercontroller.showannouncements));
 
 
