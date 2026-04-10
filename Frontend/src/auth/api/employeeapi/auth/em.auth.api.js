@@ -51,3 +51,8 @@ export const getMeUser = async () => {
   const res = await api.get("/getme");
   return res.data;
 };
+
+export const updateProfile = async (data) => {
+  const res = await api.put("/updateprofile", data);
+  return res.data;
+}

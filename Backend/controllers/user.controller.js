@@ -669,6 +669,92 @@ const getme = async (req, res, next) => {
   });
 };
 
+const editprofileemployee = async (req, res, next) => {
+  try {
+    if (!req.employee) {
+      return next(
+        Object.assign(new Error("Unauthorized"), { statusCode: 401 })
+      );
+    }
+
+    const employee = req.employee;
+
+    const {
+      personal_contact,
+      e_contact,
+      marital_status,
+      profile_image,
+    } = req.body;
+
+    if (personal_contact !== undefined) {
+      employee.personal_contact = personal_contact;
+    }
+
+    if (e_contact !== undefined) {
+      employee.e_contact = e_contact;
+    }
+
+    if (marital_status !== undefined) {
+      const allowedStatus = ["single", "married", "divorced"];
+      if (!allowedStatus.includes(marital_status)) {
+        return next(
+          Object.assign(new Error("Invalid marital status"), {
+            statusCode: 400,
+          })
+        );
+      }
+      employee.marital_status = marital_status;
+    }
+
+    if (profile_image !== undefined) {
+      if (typeof profile_image === "string") {
+        if (
+          profile_image === "" ||
+          profile_image.includes("api.dicebear.com")
+        ) {
+          employee.profile_image = profile_image;
+        } else {
+          return next(
+            Object.assign(new Error("Invalid avatar format"), {
+              statusCode: 400,
+            })
+          );
+        }
+      } else {
+        return next(
+          Object.assign(new Error("Profile image must be a string"), {
+            statusCode: 400,
+          })
+        );
+      }
+    }
+
+    employee.updatedAt = Date.now();
+
+    await employee.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Employee profile updated successfully",
+      employee: {
+        _id: employee._id,
+        f_name: employee.f_name,
+        l_name: employee.l_name,
+        work_email: employee.work_email,
+        personal_contact: employee.personal_contact,
+        e_contact: employee.e_contact,
+        marital_status: employee.marital_status,
+        profile_image: employee.profile_image,
+      },
+    });
+  } catch (error) {
+    console.error("Employee profile update error:", error);
+    return next(
+      Object.assign(new Error(error.message), { statusCode: 500 })
+    );
+  }
+};
+
 module.exports = {       
   verifyUserEmail,
   userlogin,
@@ -683,5 +769,6 @@ module.exports = {
   verifyOtp,
   resetPasswordafterforget,
   getallleave,
-  getme
+  getme,
+  editprofileemployee
 };

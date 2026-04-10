@@ -2,6 +2,9 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 
 const managerSchema = new mongoose.Schema({
+  profile_image: {
+    type: String,
+  },
   uid: {
     type: String,
     required: [true, "UID is required"],
