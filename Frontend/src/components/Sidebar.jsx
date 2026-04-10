@@ -2,46 +2,63 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import React from "react";
 import {
-  FaHome,
-  FaCalendarAlt,
-  FaBullhorn,
-  FaFileAlt,
-  FaFolder,
-  FaCog,
-  FaSignOutAlt,
-  FaUsers,
-  FaBuilding,
-  FaChevronDown,
-  FaBars,
-  FaTimes,
+  FaHome, FaCalendarAlt, FaBullhorn, FaFileAlt,
+  FaFolder, FaCog, FaSignOutAlt, FaUsers,
+  FaBuilding, FaChevronDown, FaBars, FaTimes,
 } from "react-icons/fa";
+import { useAuth } from "../auth/store/getmeauth/getmeauth";
 import { useAdminLogout } from "../auth/server-state/adminauth/adminauth.hook";
+import { useLogoutManager } from "../auth/server-state/manager/managerauth/managerauth.hook";
+import { useLogoutUser } from "../auth/server-state/employee/employeeauth/employeeauth.hook";
 
- function Sidebar({ collapsed, setCollapsed }) {
+const adminMenu = [
+  { name: "Dashboard", path: "/dashboard", icon: <FaHome /> },
+  { name: "Employee Register", path: "/employee", icon: <FaUsers /> },
+  { name: "Leave", path: "/leave", icon: <FaCalendarAlt /> },
+  { name: "Announcement", path: "/announcement", icon: <FaBullhorn /> },
+  { name: "Organisation", path: "/organisation", icon: <FaBuilding /> },
+  { name: "Document", path: "/document", icon: <FaFileAlt /> },
+  { name: "File", path: "/file", icon: <FaFolder /> },
+  { name: "Settings", path: "/settings", icon: <FaCog /> },
+];
+
+const managerMenu = [
+  { name: "Dashboard", path: "/manager-dashboard", icon: <FaHome /> },
+  { name: "Leave", path: "/leave", icon: <FaCalendarAlt /> },
+  { name: "Announcement", path: "/announcement", icon: <FaBullhorn /> },
+];
+
+const employeeMenu = [
+  { name: "Dashboard", path: "/employee-dashboard", icon: <FaHome /> },
+  { name: "Leave", path: "/leave", icon: <FaCalendarAlt /> },
+  { name: "Announcement", path: "/announcement", icon: <FaBullhorn /> },
+];
+
+function Sidebar({ collapsed, setCollapsed }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { mutate: logoutFn, isPending } = useAdminLogout();
+  const { data: auth } = useAuth();
+  const role = auth?.role;
+
+  const { mutate: logoutAdmin, isPending: pendingAdmin } = useAdminLogout();
+  const { mutate: logoutManager, isPending: pendingManager } = useLogoutManager();
+  const { mutate: logoutEmployee, isPending: pendingEmployee } = useLogoutUser();
 
   const [open, setOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const menu = [
-    { name: "Dashboard", path: "/dashboard", icon: <FaHome /> },
-    { name: "Employee Register", path: "/employee", icon: <FaUsers /> },
-    { name: "Leave", path: "/leave", icon: <FaCalendarAlt /> },
-    { name: "Announcement", path: "/announcement", icon: <FaBullhorn /> },
-     { name: "Organisation", path: "/organisation", icon: <FaBuilding /> },
-    { name: "Document", path: "/document", icon: <FaFileAlt /> },
-    { name: "File", path: "/file", icon: <FaFolder /> },
-    { name: "Settings", path: "/settings", icon: <FaCog /> },
-  ];
+  const menu = role === "admin" ? adminMenu : role === "manager" ? managerMenu : employeeMenu;
+  const isPending = pendingAdmin || pendingManager || pendingEmployee;
 
   const handleLogout = () => {
-    logoutFn(undefined, {
-      onSuccess: () => {
-        navigate("/login");
-      },
-    });
+    const onSuccess = () => {
+      localStorage.removeItem("role");
+      navigate("/login");
+    };
+
+    if (role === "admin") logoutAdmin(undefined, { onSuccess });
+    else if (role === "manager") logoutManager(undefined, { onSuccess });
+    else logoutEmployee(undefined, { onSuccess });
   };
 
   return (
@@ -87,16 +104,12 @@ import { useAdminLogout } from "../auth/server-state/adminauth/adminauth.hook";
           <nav className="px-2 flex flex-col gap-1">
             {menu.map((item, index) => {
               const active = location.pathname === item.path;
-
               return (
                 <Link
                   key={index}
                   to={item.path}
-                  className={`flex items-center gap-3 p-3 rounded-lg
-                  ${
-                    active
-                      ? "bg-(--primary) text-white"
-                      : "hover:bg-gray-100"
+                  className={`flex items-center gap-3 p-3 rounded-lg ${
+                    active ? "bg-(--primary) text-white" : "hover:bg-gray-100"
                   }`}
                 >
                   {item.icon}
@@ -119,4 +132,5 @@ import { useAdminLogout } from "../auth/server-state/adminauth/adminauth.hook";
     </>
   );
 }
+
 export default React.memo(Sidebar);
