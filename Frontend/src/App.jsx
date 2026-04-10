@@ -8,6 +8,7 @@ import Dashboard from "./pages/dashboard/Dashboard";
 import EmployeeDashboard from "./pages/dashboard/EmployeeDashboard";
 import EmployeeTable from "./pages/employee/EmployeeTable";
 import LeaveTable from "./pages/leave/LeaveTable";
+import LeaveTableem from "./pages/leave/LeaveTableem";
 import Announce from "./pages/announcement/Announce";
 import Doc from "./pages/document/Doc";
 import Set from "./pages/settings/Set";
@@ -46,6 +47,7 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
           <Route path="/employee" element={<EmployeeTable />} />
+          <Route path="/leave-employee" element={<LeaveTableem />} />
           <Route path="/leave" element={<LeaveTable />} />
           <Route path="/announcement" element={<Announce />} />
           <Route path="/document" element={<Doc />} />

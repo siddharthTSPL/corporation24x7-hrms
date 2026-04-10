@@ -35,7 +35,7 @@ const managerMenu = [
 
 const employeeMenu = [
   { name: "Dashboard", path: "/employee-dashboard", icon: <FaHome /> },
-  { name: "Leave", path: "/leave", icon: <FaCalendarAlt /> },
+  { name: "Leave", path: "/leave-employee", icon: <FaCalendarAlt /> },
   { name: "Announcement", path: "/announcement", icon: <FaBullhorn /> },
   { name: "Organisation", path: "/organisation", icon: <FaBuilding /> },
   { name: "Document", path: "/document", icon: <FaFileAlt /> },
