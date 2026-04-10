@@ -19,3 +19,13 @@ export const getAllLeaves = async () => {
   const res = await api.get("/getallleave");
   return res.data;
 };
+
+export const editLeave = async (data) => {
+  const res = await api.put("/editleave", data);
+  return res.data;
+};
+
+export const deleteLeave = async (id) => {
+  const res = await api.delete(`/deleteleave/${id}`);
+  return res.data;
+};
