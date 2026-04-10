@@ -1,70 +1,65 @@
-import { loginUser,verifyUser,getMeUser,logoutUser,verifyOtp,forgetPassword,updatePassword,firstLoginResetPassword,resetPasswordAfterForget,getMeUser  } from "../../../api/employeeapi/auth/em.auth.api";
-
+import { loginUser, verifyUser, getMeUser, logoutUser, verifyOtp, forgetPassword, updatePassword, firstLoginResetPassword, resetPasswordAfterForget, updateProfile } from "../../../api/employeeapi/auth/em.auth.api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const useLoginUser = () => {
-     const queryClient = useQueryClient();
-     return useMutation(loginUser, {
-          mutationKey: ["loginUser"],
-          mutationFn:loginUser,
-          onSuccess: (data) => {
-               queryClient.setQueryData(["meUser"], data.user);
-          },
-     })
-}
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: ["loginUser"],
+    mutationFn: loginUser,
+    onSuccess: (data) => {
+      queryClient.setQueryData(["meUser"], data.user);
+    },
+  });
+};
 
 export const useVerifyUser = (token) => {
-   const queryClient = useQueryClient();
-
-   return useQuery({
-        queryKey: ["verifyUser", token],
-        queryFn: () => verifyUser(token),
-        enabled: !!token,
-   })
+  return useQuery({
+    queryKey: ["verifyUser", token],
+    queryFn: () => verifyUser(token),
+    enabled: !!token,
+  });
 };
 
 export const useGetMeUser = () => {
-     const queryClient = useQueryClient();
-
-     return useQuery({
-          queryKey: ["meUser"],
-          queryFn: () => getMeUser(),
-          onSuccess: (data) => {
-               queryClient.setQueryData(["meUser"], data.user);
-          },
-          staleTime: 1000 * 60 * 5,
-          refetchOnMount: true,
-     })
-     
+  return useQuery({
+    queryKey: ["meUser"],
+    queryFn: getMeUser,
+    staleTime: 1000 * 60 * 5,
+    refetchOnMount: true,
+  });
 };
 
 export const useLogoutUser = () => {
-     const queryClient = useQueryClient();
-     return useMutation(logoutUser, {
-          mutationKey: ["logoutUser"],
-          mutationFn:logoutUser,
-          onSuccess: () => {
-               queryClient.removeQueries({ queryKey: ["meUser"] });
-          },
-     })
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: logoutUser,
+    onSuccess: () => {
+      localStorage.removeItem("role");
+      queryClient.removeQueries({ queryKey: ["auth"] });
+    },
+  });
 };
 
 export const useVerifyOtp = () => {
-     return useMutation(verifyOtp);
-}
+  return useMutation({ mutationFn: verifyOtp });
+};
 
 export const useForgetPassword = () => {
-     return useMutation(forgetPassword);
-}
+  return useMutation({ mutationFn: forgetPassword });
+};
 
 export const useUpdatePassword = () => {
-     return useMutation(updatePassword);
-}
+  return useMutation({ mutationFn: updatePassword });
+};
 
 export const useFirstLoginResetPassword = () => {
-     return useMutation(firstLoginResetPassword);
-}
+  return useMutation({ mutationFn: firstLoginResetPassword });
+};
 
 export const useResetPasswordAfterForget = () => {
-     return useMutation(resetPasswordAfterForget);
-}
+  return useMutation({ mutationFn: resetPasswordAfterForget });
+};
+
+export const useUpdateProfile = () => {
+  return useMutation({ mutationFn: updateProfile });
+};
