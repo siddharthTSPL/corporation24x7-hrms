@@ -5,13 +5,13 @@ import Signup from "./pages/auth/Signup";
 import MainLayout from "./layout/MainLayout";
 import ProtectedRoute from "./components/Protectedroute";
 import Dashboard from "./pages/dashboard/Dashboard";
-import Dashboardem from "./pages/dashboard/Dashboardem";
-import Dashboardma from "./pages/dashboard/Dashboardma";
+import EmployeeDashboard from "./pages/dashboard/EmployeeDashboard";
 import EmployeeTable from "./pages/employee/EmployeeTable";
 import LeaveTable from "./pages/leave/LeaveTable";
 import Announce from "./pages/announcement/Announce";
 import Doc from "./pages/document/Doc";
 import Set from "./pages/settings/Set";
+import Setem from "./pages/settings/Setem";
 import File from "./pages/file/File";
 import Organisation from "./pages/organisation/Organisation";
 
@@ -34,44 +34,25 @@ function App() {
           }
         />
 
-        {/* Admin only */}
+       
         <Route
           element={
-            <ProtectedRoute allowedRoles={["admin"]}>
+            <ProtectedRoute allowedRoles={["admin", "manager", "employee"]}>
               <MainLayout />
             </ProtectedRoute>
           }
         >
+          
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
           <Route path="/employee" element={<EmployeeTable />} />
           <Route path="/leave" element={<LeaveTable />} />
           <Route path="/announcement" element={<Announce />} />
           <Route path="/document" element={<Doc />} />
           <Route path="/file" element={<File />} />
           <Route path="/settings" element={<Set />} />
+          <Route path="/settings-employee" element={<Setem />} />
           <Route path="/organisation" element={<Organisation />} />
-        </Route>
-
-        {/* Manager only */}
-        <Route
-          element={
-            <ProtectedRoute allowedRoles={["manager"]}>
-              <MainLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route path="/manager-dashboard" element={<Dashboardma />} />
-        </Route>
-
-        {/* Employee only */}
-        <Route
-          element={
-            <ProtectedRoute allowedRoles={["employee"]}>
-              <MainLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route path="/employee-dashboard" element={<Dashboardem />} />
         </Route>
       </Routes>
     </BrowserRouter>

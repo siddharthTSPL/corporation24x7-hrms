@@ -11,6 +11,7 @@ import { useAdminLogout } from "../auth/server-state/adminauth/adminauth.hook";
 import { useLogoutManager } from "../auth/server-state/manager/managerauth/managerauth.hook";
 import { useLogoutUser } from "../auth/server-state/employee/employeeauth/employeeauth.hook";
 
+// Unified menu for all roles - same paths
 const adminMenu = [
   { name: "Dashboard", path: "/dashboard", icon: <FaHome /> },
   { name: "Employee Register", path: "/employee", icon: <FaUsers /> },
@@ -23,15 +24,23 @@ const adminMenu = [
 ];
 
 const managerMenu = [
-  { name: "Dashboard", path: "/manager-dashboard", icon: <FaHome /> },
+  { name: "Dashboard", path: "/dashboard", icon: <FaHome /> },
   { name: "Leave", path: "/leave", icon: <FaCalendarAlt /> },
   { name: "Announcement", path: "/announcement", icon: <FaBullhorn /> },
+  { name: "Organisation", path: "/organisation", icon: <FaBuilding /> },
+  { name: "Document", path: "/document", icon: <FaFileAlt /> },
+  { name: "File", path: "/file", icon: <FaFolder /> },
+  { name: "Settings", path: "/settings", icon: <FaCog /> },
 ];
 
 const employeeMenu = [
   { name: "Dashboard", path: "/employee-dashboard", icon: <FaHome /> },
   { name: "Leave", path: "/leave", icon: <FaCalendarAlt /> },
   { name: "Announcement", path: "/announcement", icon: <FaBullhorn /> },
+  { name: "Organisation", path: "/organisation", icon: <FaBuilding /> },
+  { name: "Document", path: "/document", icon: <FaFileAlt /> },
+  { name: "File", path: "/file", icon: <FaFolder /> },
+  { name: "Settings", path: "/settings-employee", icon: <FaCog /> },
 ];
 
 function Sidebar({ collapsed, setCollapsed }) {
@@ -109,7 +118,7 @@ function Sidebar({ collapsed, setCollapsed }) {
                   key={index}
                   to={item.path}
                   className={`flex items-center gap-3 p-3 rounded-lg ${
-                    active ? "bg-(--primary) text-white" : "hover:bg-gray-100"
+                    active ? "bg-[#730042] text-white" : "hover:bg-gray-100"
                   }`}
                 >
                   {item.icon}
@@ -121,7 +130,7 @@ function Sidebar({ collapsed, setCollapsed }) {
             <button
               onClick={handleLogout}
               disabled={isPending}
-              className="flex items-center gap-3 p-3 rounded-lg hover:bg-red-100 text-red-600"
+              className="flex items-center gap-3 p-3 rounded-lg hover:bg-red-100 text-gray-800"
             >
               <FaSignOutAlt />
               {!collapsed && (isPending ? "Logging out..." : "Logout")}

@@ -1,4 +1,4 @@
-import { loginUser, verifyUser, getMeUser, logoutUser, verifyOtp, forgetPassword, updatePassword, firstLoginResetPassword, resetPasswordAfterForget } from "../../../api/employeeapi/auth/em.auth.api";
+import { loginUser, verifyUser, getMeUser, logoutUser, verifyOtp, forgetPassword, updatePassword, firstLoginResetPassword, resetPasswordAfterForget, updateProfile } from "../../../api/employeeapi/auth/em.auth.api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const useLoginUser = () => {
@@ -58,4 +58,8 @@ export const useFirstLoginResetPassword = () => {
 
 export const useResetPasswordAfterForget = () => {
   return useMutation({ mutationFn: resetPasswordAfterForget });
+};
+
+export const useUpdateProfile = () => {
+  return useMutation({ mutationFn: updateProfile });
 };

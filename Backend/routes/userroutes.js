@@ -38,6 +38,8 @@ userrouter.post(
 );
 
 userrouter.get("/getme",employeemiddleware, asyncHandler(usercontroller.getme));
-// done
+
+userrouter.put("/updateprofile",employeemiddleware, asyncHandler(usercontroller.editprofileemployee));
+
 
 module.exports = userrouter;

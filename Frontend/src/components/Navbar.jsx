@@ -5,7 +5,7 @@ import { useAuth } from "../auth/store/getmeauth/getmeauth";
 function Navbar({ collapsed, setCollapsed, data = [] }) {
   const { data: auth } = useAuth();
   const user = auth?.data;
-
+  console.log(user);
   const [dateTime, setDateTime] = useState("");
   const [search, setSearch] = useState("");
 
@@ -20,7 +20,7 @@ function Navbar({ collapsed, setCollapsed, data = [] }) {
           year: "numeric",
           hour: "2-digit",
           minute: "2-digit",
-        })
+        }),
       );
     };
     updateTime();
@@ -31,7 +31,10 @@ function Navbar({ collapsed, setCollapsed, data = [] }) {
   const results = useMemo(() => {
     if (!search.trim()) return [];
     return data.filter((item) =>
-      Object.values(item).join(" ").toLowerCase().includes(search.toLowerCase())
+      Object.values(item)
+        .join(" ")
+        .toLowerCase()
+        .includes(search.toLowerCase()),
     );
   }, [search, data]);
 
@@ -42,16 +45,25 @@ function Navbar({ collapsed, setCollapsed, data = [] }) {
   // Get display name and initial based on role
   const displayName = useMemo(() => {
     if (!user) return "";
-    if (auth?.role === "admin") return user.organisation_name || user.email || "Admin";
-    if (auth?.role === "manager") return `${user.manager?.f_name || ""} ${user.manager?.l_name || ""}`.trim() || "Manager";
-    if (auth?.role === "employee") return `${user.employee?.f_name || ""} ${user.employee?.l_name || ""}`.trim() || "Employee";
+    if (auth?.role === "admin")
+      return user.organisation_name || user.email || "Admin";
+    if (auth?.role === "manager")
+      return (
+        `${user.manager?.f_name || ""} ${user.manager?.l_name || ""}`.trim() ||
+        "Manager"
+      );
+    if (auth?.role === "employee")
+      return (
+        `${user.employee?.f_name || ""} ${user.employee?.l_name || ""}`.trim() ||
+        "Employee"
+      );
     return "";
   }, [user, auth?.role]);
 
   const initial = displayName?.trim().charAt(0).toUpperCase() || "U";
 
   const profileImage = useMemo(() => {
-    if (auth?.role === "admin") return user?.profile_image || null;
+    if (auth?.role === "admin") return user.profile_image || null;
     return null;
   }, [user, auth?.role]);
 
@@ -78,7 +90,9 @@ function Navbar({ collapsed, setCollapsed, data = [] }) {
       </div>
 
       <div className="flex items-center justify-between md:justify-end gap-4">
-        <div className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">{dateTime}</div>
+        <div className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">
+          {dateTime}
+        </div>
 
         <div className="relative cursor-pointer">
           <FaBell className="text-lg" />
@@ -88,7 +102,11 @@ function Navbar({ collapsed, setCollapsed, data = [] }) {
         </div>
 
         {profileImage ? (
-          <img src={profileImage} alt="avatar" className="w-10 h-10 rounded-full object-cover" />
+          <img
+            src={profileImage}
+            alt="avatar"
+            className="w-10 h-10 rounded-full object-cover"
+          />
         ) : (
           <div className="w-10 h-10 rounded-full bg-gray-500 text-white flex items-center justify-center font-semibold">
             {initial}
@@ -97,7 +115,9 @@ function Navbar({ collapsed, setCollapsed, data = [] }) {
       </div>
 
       {search.trim() && (
-        <div className="text-xs text-[#00A8E8] w-full">{results.length} result(s) found</div>
+        <div className="text-xs text-[#00A8E8] w-full">
+          {results.length} result(s) found
+        </div>
       )}
     </div>
   );

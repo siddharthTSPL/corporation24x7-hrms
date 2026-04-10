@@ -2,6 +2,9 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 
 const userSchema = new mongoose.Schema({
+  profile_image: {
+    type: String,
+  },
   uid: {
     type: String,
     required: [true, "UID is required"],
@@ -94,6 +97,14 @@ const userSchema = new mongoose.Schema({
   isverified: {
     type: Boolean,
     default: false,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now,
   },
 });
 
