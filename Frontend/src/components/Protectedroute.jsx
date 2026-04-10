@@ -1,4 +1,4 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/store/getmeauth/getmeauth";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -6,10 +6,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
   if (isLoading) return <p>Loading...</p>;
 
-  if (!data) {
-    return <Navigate to="/login" replace />;
-  }
-console.log(data.role);
+  if (!data) return <Navigate to="/login" replace />;
 
   if (allowedRoles && !allowedRoles.includes(data.role)) {
     return <Navigate to="/unauthorized" replace />;

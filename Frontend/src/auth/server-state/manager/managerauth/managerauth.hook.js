@@ -26,17 +26,7 @@ export const useLoginManager = () => {
      })
 };
 
-export const useLogoutManager = () => {
-     const queryClient = useQueryClient();
 
-     return useMutation(logoutManager, {
-          mutationKey: ["logoutManager"],
-          mutationFn:logoutManager,
-          onSuccess: () => {
-               queryClient.removeQueries({ queryKey: ["manager"] });
-          },
-     })
-};
 
 export const useFirstLoginPasswordChange = () => {
       const queryClient = useQueryClient();
@@ -71,4 +61,14 @@ export const useGetMeManager = () => {
                queryClient.setQueryData(["manager"], data.manager || data);
           },
      });
+};
+export const useLogoutManager = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: logoutManager,
+    onSuccess: () => {
+      localStorage.removeItem("role");
+      queryClient.removeQueries({ queryKey: ["auth"] });
+    },
+  });
 };

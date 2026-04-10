@@ -43,11 +43,11 @@ export const useGetMeAdmin = () => {
 
 export const useAdminLogout = () => {
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: logoutAdmin,
     onSuccess: () => {
-      queryClient.removeQueries({ queryKey: ["admin"] });
+      localStorage.removeItem("role");
+      queryClient.removeQueries({ queryKey: ["auth"] });
     },
   });
 };
