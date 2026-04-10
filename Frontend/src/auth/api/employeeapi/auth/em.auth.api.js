@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api/employee',
+  baseURL: 'http://localhost:5000/user',
   withCredentials: true,
 });
 
@@ -51,3 +51,8 @@ export const getMeUser = async () => {
   const res = await api.get("/getme");
   return res.data;
 };
+
+export const updateProfile = async (data) => {
+  const res = await api.put("/updateprofile", data);
+  return res.data;
+}

@@ -1,59 +1,37 @@
 import { useState, useEffect } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  useAdminLogin,
-  useGetMeAdmin,
-  useSendForgetPasswordOtp,
-  useVerifyAdminOtp,
-} from "../../auth/server-state/adminauth/adminauth.hook";
 import { Player } from "@lottiefiles/react-lottie-player";
+import { useLogin } from "../../auth/store/getmeauth/getuselogin";
+import { useSendForgetPasswordOtp, useVerifyAdminOtp } from "../../auth/server-state/adminauth/adminauth.hook";
+import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 
-export default function Login() {
+function Login() {
   const navigate = useNavigate();
-  const { data: admin } = useGetMeAdmin();
-
-  const { mutate: loginAdminFn, isPending: isLoggingIn } = useAdminLogin();
-  const { mutate: sendOtpFn, isPending: sendingOtp } =
-    useSendForgetPasswordOtp();
-  const { mutate: verifyOtpFn, isPending: verifyingOtp } =
-    useVerifyAdminOtp();
-
-  const [form, setForm] = useState({
-    email: "",
-    password: "",
-    otp: "",
-  });
-
+  const { data: authData, isLoading: authLoading } = useAuth();
+  const { mutate: loginFn, isPending: isLoggingIn } = useLogin();
+  const { mutate: sendOtpFn, isPending: sendingOtp } = useSendForgetPasswordOtp();
+  const { mutate: verifyOtpFn, isPending: verifyingOtp } = useVerifyAdminOtp();
+  const [form, setForm] = useState({ email: "", password: "", otp: "", role: "admin" });
   const [errors, setErrors] = useState({});
   const [step, setStep] = useState("login");
   const [verified, setVerified] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [animationData, setAnimationData] = useState(null);
   const [showLoader, setShowLoader] = useState(false);
-
-  const images = [
-    "/src/assets/slide1.png",
-    "/src/assets/slide2.png",
-    "/src/assets/slide3.png",
-  ];
-
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-    setErrors({});
-  };
+  const images = ["/src/assets/slide1.png", "/src/assets/slide2.png", "/src/assets/slide3.png"];
 
+  // Redirect all authenticated users to /dashboard
   useEffect(() => {
-    if (admin) {
+    if (!authLoading && authData) {
       navigate("/dashboard", { replace: true });
     }
-  }, [admin, navigate]);
+  }, [authData, authLoading, navigate]);
 
   useEffect(() => {
-    fetch("/loader.json")
-      .then((res) => res.json())
-      .then((data) => setAnimationData(data));
+    fetch("/loader.json").then((r) => r.json()).then(setAnimationData);
   }, []);
 
   useEffect(() => {
@@ -63,8 +41,16 @@ export default function Login() {
     return () => clearInterval(interval);
   }, []);
 
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+    setErrors({});
+  };
+
+  const getErrorMessage = (err) =>
+    err?.response?.data?.message || err?.message || "Something went wrong. Please try again.";
+
   const validate = () => {
-    let newErrors = {};
+    const newErrors = {};
     if (!form.email) newErrors.email = "Email is required";
     if (!form.password) newErrors.password = "Password is required";
     setErrors(newErrors);
@@ -77,58 +63,52 @@ export default function Login() {
     setShowLoader(true);
     const startTime = Date.now();
 
-    loginAdminFn(
-      {
-        identifier: form.email,
-        password: form.password,
-      },
-      {
-        onError: (err) => {
-          setErrors({ password: err.message });
-        },
-        onSettled: () => {
-          const elapsed = Date.now() - startTime;
-          const remaining = 3000 - elapsed;
-          setTimeout(() => {
-            setShowLoader(false);
-          }, remaining > 0 ? remaining : 0);
-        },
-      }
-    );
-  };
+    // Build payload based on role — admin/employee use `identifier`, manager uses `work_email`
+    const payload =
+      form.role === "manager"
+        ? { role: form.role, work_email: form.email, password: form.password }
+        : { role: form.role, identifier: form.email, password: form.password };
 
-  const handleSendOtp = () => {
-    if (!form.email) {
-      setErrors({ email: "Email is required" });
-      return;
-    }
-
-    sendOtpFn(form.email, {
+    loginFn(payload, {
       onSuccess: () => {
-        setStep("otp");
+        // All roles redirect to the same dashboard
+        navigate("/dashboard", { replace: true });
       },
       onError: (err) => {
-        setErrors({ email: err.message });
+        setErrors({ general: getErrorMessage(err) });
+      },
+      onSettled: () => {
+        const elapsed = Date.now() - startTime;
+        const remaining = 3000 - elapsed;
+        setTimeout(() => setShowLoader(false), remaining > 0 ? remaining : 0);
       },
     });
   };
 
-  const handleVerifyOtp = () => {
-    if (!form.otp) {
-      setErrors({ otp: "OTP is required" });
-      return;
+  const handleSendOtp = () => {
+    if (!form.email) { 
+      setErrors({ email: "Email is required" }); 
+      return; 
     }
+    sendOtpFn(form.email, {
+      onSuccess: () => setStep("otp"),
+      onError: (err) => setErrors({ email: getErrorMessage(err) }),
+    });
+  };
 
+  const handleVerifyOtp = () => {
+    if (!form.otp) { 
+      setErrors({ otp: "OTP is required" }); 
+      return; 
+    }
     verifyOtpFn(
       { email: form.email, otp: form.otp },
       {
-        onSuccess: () => {
-          setVerified(true);
-          setStep("login");
+        onSuccess: () => { 
+          setVerified(true); 
+          setStep("login"); 
         },
-        onError: (err) => {
-          setErrors({ otp: err.message });
-        },
+        onError: (err) => setErrors({ otp: getErrorMessage(err) }),
       }
     );
   };
@@ -140,12 +120,7 @@ export default function Login() {
     >
       {showLoader && animationData && (
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Player
-            autoplay
-            loop
-            src={animationData}
-            style={{ height: "140px", width: "140px" }}
-          />
+          <Player autoplay loop src={animationData} style={{ height: "140px", width: "140px" }} />
         </div>
       )}
 
@@ -155,12 +130,25 @@ export default function Login() {
 
           {step === "login" && (
             <>
-              <h2 className="text-2xl font-bold text-(--primary) mb-2">
-                Sign in
-              </h2>
-              <p className="text-gray-500 text-sm mb-4">
-                Access your Talent account
-              </p>
+              <h2 className="text-2xl font-bold text-[#730042] mb-2">Sign in</h2>
+              <p className="text-gray-500 text-sm mb-4">Access your Talent account</p>
+
+              <select
+                name="role"
+                value={form.role}
+                onChange={handleChange}
+                className="w-full mb-3 p-3 border rounded-lg bg-white text-gray-700"
+              >
+                <option value="admin">Admin</option>
+                <option value="manager">Manager</option>
+                <option value="employee">Employee</option>
+              </select>
+
+              {errors.general && (
+                <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-red-600 text-sm">{errors.general}</p>
+                </div>
+              )}
 
               <input
                 type="text"
@@ -168,145 +156,114 @@ export default function Login() {
                 placeholder="Email address"
                 value={form.email}
                 onChange={handleChange}
-                className="w-full mb-3 p-3 border rounded-lg"
+                className="w-full mb-1 p-3 border rounded-lg"
               />
-              {errors.email && (
-                <p className="text-red-500 text-sm">{errors.email}</p>
-              )}
+              {errors.email && <p className="text-red-500 text-sm mb-2">{errors.email}</p>}
 
-              <div className="relative mb-3">
+              <div className="relative mt-2 mb-1">
                 <input
                   type={showPassword ? "text" : "password"}
                   name="password"
                   placeholder="Password"
                   value={form.password}
                   onChange={handleChange}
-                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-(--primary)"
+                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#730042]"
                 />
-
                 <span
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-3 cursor-pointer text-gray-500"
                 >
                   {showPassword ? "🙈" : "👁️"}
                 </span>
-
-                {errors.password && (
-                  <p className="text-red-500 text-sm mt-1">
-                    {errors.password}
-                  </p>
-                )}
               </div>
+              {errors.password && <p className="text-red-500 text-sm mb-2">{errors.password}</p>}
 
               <button
                 onClick={handleLogin}
-                className="w-full bg-(--primary) text-white py-3 rounded-lg mt-3"
+                disabled={isLoggingIn}
+                className="w-full bg-[#730042] text-white py-3 rounded-lg mt-3 disabled:opacity-60"
               >
-                {isLoggingIn ? "Logging in..." : "Next"}
+                {isLoggingIn ? "Signing in..." : "Sign in"}
               </button>
 
               <div className="flex justify-between mt-4 text-sm text-gray-500">
-                <p
-                  onClick={() => setStep("email")}
-                  className="cursor-pointer hover:text-(--primary)"
-                >
-                  Forgot Password?
-                </p>
-
-                <p
-                  onClick={() => navigate("/signup")}
-                  className="cursor-pointer hover:text-(--primary)"
-                >
+                {form.role === "admin" && (
+                  <p onClick={() => setStep("email")} className="cursor-pointer hover:text-[#730042]">
+                    Forgot Password?
+                  </p>
+                )}
+                <p onClick={() => navigate("/signup")} className="cursor-pointer hover:text-[#730042] ml-auto">
                   Sign Up
                 </p>
               </div>
 
-              {verified && (
-                <p className="text-green-600 text-sm mt-2">
-                  ✅ Email Verified
-                </p>
-              )}
+              {verified && <p className="text-green-600 text-sm mt-2">✅ Email Verified</p>}
             </>
           )}
 
           {step === "email" && (
             <>
-              <h2 className="text-xl font-bold text-(--primary) mb-4">
-                Enter Email
-              </h2>
-
+              <h2 className="text-xl font-bold text-[#730042] mb-4">Forgot Password</h2>
               <input
                 type="text"
                 name="email"
                 placeholder="Enter your email"
                 value={form.email}
                 onChange={handleChange}
-                className="w-full mb-3 p-3 border rounded-lg"
+                className="w-full mb-1 p-3 border rounded-lg"
               />
-
-              {errors.email && (
-                <p className="text-red-500 text-sm">{errors.email}</p>
-              )}
-
-              <button
-                onClick={handleSendOtp}
-                className="w-full bg-(--primary) text-white py-3 rounded-lg"
+              {errors.email && <p className="text-red-500 text-sm mb-2">{errors.email}</p>}
+              <button 
+                onClick={handleSendOtp} 
+                disabled={sendingOtp}
+                className="w-full bg-[#730042] text-white py-3 rounded-lg disabled:opacity-60"
               >
                 {sendingOtp ? "Sending..." : "Send OTP"}
               </button>
+              <p onClick={() => setStep("login")} className="text-sm text-gray-500 mt-3 cursor-pointer hover:text-[#730042]">
+                ← Back to login
+              </p>
             </>
           )}
 
           {step === "otp" && (
             <>
-              <h2 className="text-xl font-bold text-(--primary) mb-4">
-                Enter OTP
-              </h2>
-
+              <h2 className="text-xl font-bold text-[#730042] mb-4">Enter OTP</h2>
               <input
                 type="text"
                 name="otp"
                 placeholder="Enter OTP"
                 value={form.otp}
                 onChange={handleChange}
-                className="w-full mb-3 p-3 border rounded-lg"
+                className="w-full mb-1 p-3 border rounded-lg"
               />
-
-              <button
-                onClick={handleVerifyOtp}
-                className="w-full bg-(--primary) text-white py-3 rounded-lg"
+              {errors.otp && <p className="text-red-500 text-sm mb-2">{errors.otp}</p>}
+              <button 
+                onClick={handleVerifyOtp} 
+                disabled={verifyingOtp}
+                className="w-full bg-[#730042] text-white py-3 rounded-lg disabled:opacity-60"
               >
                 {verifyingOtp ? "Verifying..." : "Verify OTP"}
               </button>
+              <p onClick={() => setStep("login")} className="text-sm text-gray-500 mt-3 cursor-pointer hover:text-[#730042]">
+                ← Back to login
+              </p>
             </>
           )}
         </div>
 
         <div className="hidden md:flex w-1/2 bg-gray-50 items-center justify-center p-6">
           <div className="text-center">
-            <img
-              src={images[currentSlide]}
-              alt="slide"
-              className="w-full max-h-65 object-contain"
-            />
-
-            <h3 className="text-lg font-semibold text-(--primary) mt-4">
-              Smart Secure Login
-            </h3>
-
+            <img src={images[currentSlide]} alt="slide" className="w-full max-h-65 object-contain" />
+            <h3 className="text-lg font-semibold text-[#730042] mt-4">Smart Secure Login</h3>
             <p className="text-gray-500 text-sm mt-2">
               Experience secure and seamless HRMS access with 2 factor authentication.
             </p>
-
             <div className="flex justify-center mt-4 gap-2">
               {images.map((_, index) => (
                 <div
                   key={index}
-                  className={`w-2 h-2 rounded-full ${
-                    currentSlide === index
-                      ? "bg-(--primary)"
-                      : "bg-gray-300"
-                  }`}
+                  className={`w-2 h-2 rounded-full ${currentSlide === index ? "bg-[#730042]" : "bg-gray-300"}`}
                 />
               ))}
             </div>
@@ -316,3 +273,5 @@ export default function Login() {
     </div>
   );
 }
+
+export default React.memo(Login);
