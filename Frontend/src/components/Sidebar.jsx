@@ -37,7 +37,7 @@ const employeeMenu = [
   { name: "Leave", path: "/leave-employee", icon: <FaCalendarAlt /> },
   { name: "Announcement", path: "/announcement-employee", icon: <FaBullhorn /> },
   { name: "Organisation", path: "/organisation", icon: <FaBuilding /> },
-  { name: "File", path: "/file", icon: <FaFolder /> },
+  { name: "File", path: "/file-employee", icon: <FaFolder /> },
   { name: "Settings", path: "/settings-employee", icon: <FaCog /> },
 ];
 

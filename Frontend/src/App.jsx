@@ -15,6 +15,7 @@ import Doc from "./pages/document/Doc";
 import Set from "./pages/settings/Set";
 import Setem from "./pages/settings/Setem";
 import File from "./pages/file/File";
+import Fileem from "./pages/file/Fileem";
 import Organisation from "./pages/organisation/Organisation";
 
 function App() {
@@ -54,6 +55,7 @@ function App() {
           <Route path="/announcement-employee" element={<Announceem />} />
           <Route path="/document" element={<Doc />} />
           <Route path="/file" element={<File />} />
+          <Route path="/file-employee" element={<Fileem />} />
           <Route path="/settings" element={<Set />} />
           <Route path="/settings-employee" element={<Setem />} />
           <Route path="/organisation" element={<Organisation />} />

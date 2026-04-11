@@ -1,69 +1,86 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   useApplyLeave,
   useGetAllLeaves,
   useDeleteLeave,
   useEditLeave,
   useGetAllLeaveHistory,
-} from '../../auth/server-state/employee/employeeleave/employeeleave.hook';
-import { useGetMeUser } from '../../auth/server-state/employee/employeeauth/employeeauth.hook';
-import {
-  X, Calendar, CheckCircle, XCircle, Clock,
-  Plus, Trash2, Edit2, ChevronRight, ArrowRight,
-} from 'lucide-react';
+} from "../../auth/server-state/employee/employeeleave/employeeleave.hook";
+import { useGetMeUser } from "../../auth/server-state/employee/employeeauth/employeeauth.hook";
 
-/* ── DESIGN TOKENS ─────────────────────────── */
+/* ── BRAND PALETTE — three colors only ────────
+   #730042  deep wine
+   #CD166E  vivid magenta
+   #F9F8F2  cream paper
+   Everything else is opacity variants.          */
 const C = {
-  wine:    '#730042',
-  wineD:   '#4d002c',
-  wineM:   '#8c0050',
-  wineL:   '#f5eaf0',
-  wineFog: '#faf3f7',
-  cream:   '#f9f8f2',
-  slate:   '#2c2c3a',
-  muted:   '#8a8a9a',
-  line:    '#ede8eb',
-  white:   '#ffffff',
-  green:   '#1a6b3c',
-  greenL:  '#eaf4ee',
-  red:     '#b91c1c',
-  redL:    '#fef2f2',
-  blue:    '#1e40af',
-  blueL:   '#eff6ff',
-  amber:   '#92400e',
-  amberL:  '#fffbeb',
+  deep:     "#730042",
+  mid:      "#CD166E",
+  cream:    "#F9F8F2",
+  white:    "#ffffff",
+  d08:      "rgba(115,0,66,.08)",
+  d10:      "rgba(115,0,66,.10)",
+  d12:      "rgba(115,0,66,.12)",
+  d15:      "rgba(115,0,66,.15)",
+  d20:      "rgba(115,0,66,.20)",
+  d25:      "rgba(115,0,66,.25)",
+  d35:      "rgba(115,0,66,.35)",
+  d45:      "rgba(115,0,66,.45)",
+  d55:      "rgba(115,0,66,.55)",
+  m08:      "rgba(205,22,110,.08)",
+  m15:      "rgba(205,22,110,.15)",
+  m20:      "rgba(205,22,110,.20)",
+  m25:      "rgba(205,22,110,.25)",
 };
 
-/* ── LEAVE TYPE CONFIG ──────────────────────── */
+/* ── FONT INJECTOR ─────────────────────────── */
+const Fonts = () => (
+  <style>{`
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@300;400;500&display=swap');
+    *{box-sizing:border-box;}
+    select,input,textarea,button{font-family:'DM Sans',sans-serif;}
+    input[type=date]::-webkit-calendar-picker-indicator{opacity:.35;cursor:pointer;}
+    ::-webkit-scrollbar{width:4px;height:4px;}
+    ::-webkit-scrollbar-thumb{background:${C.d15};border-radius:99px;}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .lv-row:hover{background:rgba(249,248,242,.75)!important;}
+    .lv-action:hover{background:${C.m08}!important;border-color:${C.m25}!important;color:${C.mid}!important;}
+    .lv-apply:hover{background:${C.mid}!important;}
+    .lv-submit:hover{background:${C.deep}!important;}
+  `}</style>
+);
+
+/* ── LEAVE TYPE CONFIG ─────────────────────── */
 const LEAVE_TYPES = [
-  { value: 'el',          label: 'Earned Leave',    short: 'EL',   color: C.wine },
-  { value: 'sl',          label: 'Sick Leave',      short: 'SL',   color: '#9b4d6e' },
-  { value: 'ml',          label: 'Maternity Leave', short: 'ML',   color: '#c2637a', restricted: 'ml' },
-  { value: 'pl',          label: 'Paternity Leave', short: 'PL',   color: '#b07850', restricted: 'pl' },
-  { value: 'half_day_el', label: 'Half Day EL',     short: '1/2 EL', color: '#7a3060' },
-  { value: 'half_day_sl', label: 'Half Day SL',     short: '1/2 SL', color: '#a05070' },
+  { value: "el",          label: "Earned Leave",    short: "EL"    },
+  { value: "sl",          label: "Sick Leave",      short: "SL"    },
+  { value: "ml",          label: "Maternity Leave", short: "ML",  restricted: "ml" },
+  { value: "pl",          label: "Paternity Leave", short: "PL",  restricted: "pl" },
+  { value: "half_day_el", label: "Half Day EL",     short: "½ EL" },
+  { value: "half_day_sl", label: "Half Day SL",     short: "½ SL" },
 ];
 
-/* ── STATUS CONFIG ──────────────────────────── */
+/* ── STATUS CONFIG ─────────────────────────── */
 const STATUS = {
-  pending_manager:     { label: 'Pending Manager', dot: C.amber,  bg: C.amberL, Icon: Clock },
-  'pending_r-manager': { label: 'Pending Manager', dot: C.amber,  bg: C.amberL, Icon: Clock },
-  forwarded_admin:     { label: 'Forwarded HR',    dot: C.blue,   bg: C.blueL,  Icon: ChevronRight },
-  forwarded_toHr:      { label: 'Forwarded HR',    dot: C.blue,   bg: C.blueL,  Icon: ChevronRight },
-  approved_manager:    { label: 'Approved',        dot: C.green,  bg: C.greenL, Icon: CheckCircle },
-  'approved_r-manager':{ label: 'Approved',        dot: C.green,  bg: C.greenL, Icon: CheckCircle },
-  approved_by_hr:      { label: 'Approved by HR',  dot: C.green,  bg: C.greenL, Icon: CheckCircle },
-  approved_admin:      { label: 'Approved',        dot: C.green,  bg: C.greenL, Icon: CheckCircle },
-  rejected_manager:    { label: 'Rejected',        dot: C.red,    bg: C.redL,   Icon: XCircle },
-  rejected_by_hr:      { label: 'Rejected by HR',  dot: C.red,    bg: C.redL,   Icon: XCircle },
-  rejected_admin:      { label: 'Rejected',        dot: C.red,    bg: C.redL,   Icon: XCircle },
+  pending_manager:      { label: "Pending Manager", dot: C.deep, bg: C.d08,  border: C.d20 },
+  "pending_r-manager":  { label: "Pending Manager", dot: C.deep, bg: C.d08,  border: C.d20 },
+  forwarded_admin:      { label: "Forwarded HR",    dot: C.mid,  bg: C.m08,  border: C.m20 },
+  forwarded_toHr:       { label: "Forwarded HR",    dot: C.mid,  bg: C.m08,  border: C.m20 },
+  approved_manager:     { label: "Approved",        dot: C.mid,  bg: C.m08,  border: C.m20 },
+  "approved_r-manager": { label: "Approved",        dot: C.mid,  bg: C.m08,  border: C.m20 },
+  approved_by_hr:       { label: "Approved by HR",  dot: C.mid,  bg: C.m08,  border: C.m20 },
+  approved_admin:       { label: "Approved",        dot: C.mid,  bg: C.m08,  border: C.m20 },
+  rejected_manager:     { label: "Rejected",        dot: C.deep, bg: C.d08,  border: C.d15 },
+  rejected_by_hr:       { label: "Rejected by HR",  dot: C.deep, bg: C.d08,  border: C.d15 },
+  rejected_admin:       { label: "Rejected",        dot: C.deep, bg: C.d08,  border: C.d15 },
 };
 
-const JOURNEY_STEPS = ['Submitted', 'Manager Review', 'HR / Admin', 'Approved'];
+const JOURNEY = ["Submitted", "Manager Review", "HR / Admin", "Approved"];
 
-/* ── HELPERS ────────────────────────────────── */
-const fmt = d =>
-  d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+/* ── HELPERS ───────────────────────────────── */
+const fmt = (d) =>
+  d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
 const daysBetween = (s, e) => {
   if (!s || !e) return 0;
@@ -71,106 +88,147 @@ const daysBetween = (s, e) => {
   return n > 0 ? n : 0;
 };
 
-const isPending = s => s === 'pending_manager' || s === 'pending_r-manager';
-const EMPTY = { leaveType: '', startDate: '', endDate: '', reason: '' };
-const todayStr = () => new Date().toISOString().split('T')[0];
+const isPending = (s) => s === "pending_manager" || s === "pending_r-manager";
 
-const stepIdx = status => {
-  if (!status || status === 'submitted') return 0;
+const todayStr = () => new Date().toISOString().split("T")[0];
+
+const stepIdx = (status) => {
+  if (!status || status === "submitted") return 0;
   if (isPending(status)) return 1;
-  if (status.includes('forwarded')) return 2;
-  if (status.includes('approved')) return 3;
+  if (status.includes("forwarded")) return 2;
+  if (status.includes("approved")) return 3;
   return -1;
 };
 
-/* ── ATOMS ──────────────────────────────────── */
+const EMPTY = { leaveType: "", startDate: "", endDate: "", reason: "" };
+
+/* ── ATOMS ─────────────────────────────────── */
 const StatusPill = ({ status }) => {
-  const s = STATUS[status] || { label: status || 'Unknown', dot: C.muted, bg: '#f5f5f5' };
+  const s = STATUS[status] || { label: status || "Unknown", dot: C.deep, bg: C.d08, border: C.d15 };
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6,
-      background: s.bg, color: s.dot, padding: '4px 12px',
-      borderRadius: 99, fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap' }}>
-      <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.dot, display: 'inline-block' }} />
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 6,
+      background: s.bg, color: s.dot,
+      padding: "4px 12px", borderRadius: 99,
+      fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
+      border: `.5px solid ${s.border}`,
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.dot, display: "inline-block" }} />
       {s.label}
     </span>
   );
 };
 
 const TypeTag = ({ value }) => {
-  const t = LEAVE_TYPES.find(x => x.value === value) || { short: (value || '?').toUpperCase(), color: C.wine };
+  const t = LEAVE_TYPES.find((x) => x.value === value) || { short: (value || "?").toUpperCase() };
   return (
-    <span style={{ background: t.color + '15', color: t.color, border: `1px solid ${t.color}25`,
-      padding: '3px 11px', borderRadius: 99, fontSize: 11.5, fontWeight: 800, letterSpacing: '0.03em' }}>
+    <span style={{
+      display: "inline-flex", alignItems: "center",
+      padding: "3px 10px", borderRadius: 99,
+      fontSize: 11, fontWeight: 500,
+      background: C.d08, color: C.deep,
+      border: `.5px solid ${C.d20}`,
+    }}>
       {t.short}
     </span>
   );
 };
 
-/* ── JOURNEY TRACKER ────────────────────────── */
+const SectionLabel = ({ children }) => (
+  <p style={{
+    margin: "0 0 12px", fontSize: 10.5, fontWeight: 500,
+    letterSpacing: ".18em", textTransform: "uppercase",
+    color: C.d45, fontFamily: "'DM Sans', sans-serif",
+  }}>
+    {children}
+  </p>
+);
+
+/* ── JOURNEY TRACKER ───────────────────────── */
 const Journey = ({ leave }) => {
   if (!leave) return (
-    <div style={{ textAlign: 'center', padding: '44px 0', color: C.muted }}>
-      <Calendar size={38} style={{ opacity: 0.25, display: 'block', margin: '0 auto 12px' }} />
-      <p style={{ margin: 0, fontSize: 14 }}>No leave applications yet.</p>
+    <div style={{ textAlign: "center", padding: "44px 0" }}>
+      <div style={{
+        width: 52, height: 52, borderRadius: "50%",
+        border: `.5px solid ${C.m25}`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        margin: "0 auto 14px",
+      }}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={C.mid} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+      </div>
+      <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 600, fontStyle: "italic", color: C.deep, margin: "0 0 4px" }}>
+        No applications yet
+      </p>
+      <p style={{ fontSize: 13, color: C.d45, margin: 0 }}>Submit your first leave request above.</p>
     </div>
   );
 
   const idx = stepIdx(leave.status);
-  const rejected = leave.status?.includes('rejected');
-  const leaveLabel = LEAVE_TYPES.find(t => t.value === leave.leaveType)?.label || leave.leaveType;
+  const rejected = leave.status?.includes("rejected");
+  const leaveLabel = LEAVE_TYPES.find((t) => t.value === leave.leaveType)?.label || leave.leaveType;
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-        flexWrap: 'wrap', gap: 12, marginBottom: 30 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 28 }}>
         <div>
-          <p style={{ margin: 0, fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
-            letterSpacing: '0.09em', color: C.muted, fontFamily: 'monospace' }}>Latest Application</p>
-          <h3 style={{ margin: '5px 0 0', fontSize: 18, fontWeight: 800, color: C.wineD }}>
+          <p style={{ fontSize: 10.5, fontWeight: 500, letterSpacing: ".12em", textTransform: "uppercase", color: C.d35, marginBottom: 4 }}>
+            Latest Application
+          </p>
+          <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 600, color: C.deep, margin: "0 0 3px" }}>
             {leaveLabel}
           </h3>
-          <p style={{ margin: '3px 0 0', fontSize: 13, color: C.muted }}>
-            {fmt(leave.startDate)} to {fmt(leave.endDate)} &middot; {leave.days} day{leave.days !== 1 ? 's' : ''}
+          <p style={{ fontSize: 12, color: C.d45, margin: 0 }}>
+            {fmt(leave.startDate)} → {fmt(leave.endDate)} · {leave.days} day{leave.days !== 1 ? "s" : ""}
           </p>
         </div>
         <StatusPill status={leave.status} />
       </div>
 
-      {/* Progress */}
-      <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-        {JOURNEY_STEPS.map((step, i) => {
-          const done    = !rejected && i < idx;
+      <div style={{ display: "flex", alignItems: "flex-start" }}>
+        {JOURNEY.map((step, i) => {
+          const done = !rejected && i < idx;
           const current = !rejected && i === idx;
-          const isLast  = i === JOURNEY_STEPS.length - 1;
-          const showRejected = rejected && i === JOURNEY_STEPS.length - 1;
+          const isLast = i === JOURNEY.length - 1;
+          const showRejected = rejected && i === JOURNEY.length - 1;
 
           return (
             <React.Fragment key={step}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
                 <div style={{
-                  width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
-                  background: showRejected ? C.red : (done || current) ? C.wine : C.line,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: current ? `0 0 0 5px ${C.wine}20` : 'none',
-                  border: current ? `2.5px solid ${C.wineD}` : '2.5px solid transparent',
-                  transition: 'all 0.3s',
+                  width: 38, height: 38, borderRadius: "50%",
+                  background: showRejected ? C.deep : (done || current) ? (current ? C.mid : C.deep) : C.d08,
+                  border: `2.5px solid ${current ? C.deep : (done || showRejected) ? "transparent" : C.d15}`,
+                  boxShadow: current ? `0 0 0 5px ${C.m15}` : "none",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all .25s",
                 }}>
-                  {showRejected
-                    ? <XCircle size={18} color="#fff" />
-                    : (done || current)
-                      ? <CheckCircle size={18} color="#fff" />
-                      : <div style={{ width: 10, height: 10, borderRadius: '50%', background: C.muted }} />}
+                  {(done || current || showRejected) ? (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F9F8F2" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      {showRejected
+                        ? <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>
+                        : <polyline points="20 6 9 17 4 12"/>}
+                    </svg>
+                  ) : (
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.d25 }} />
+                  )}
                 </div>
-                <span style={{ fontSize: 11, fontWeight: current ? 800 : 500, textAlign: 'center',
-                  lineHeight: 1.3, paddingInline: 2,
-                  color: showRejected ? C.red : (done || current) ? C.wineD : C.muted }}>
-                  {showRejected ? 'Rejected' : step}
+                <span style={{
+                  fontSize: 11, fontWeight: current ? 500 : 400,
+                  textAlign: "center", lineHeight: 1.3, paddingInline: 2,
+                  color: showRejected ? C.deep : (done || current) ? (current ? C.mid : C.deep) : C.d35,
+                }}>
+                  {showRejected ? "Rejected" : step}
                 </span>
               </div>
               {!isLast && (
-                <div style={{ flex: 2, height: 3, marginTop: 19, position: 'relative', borderRadius: 4, background: C.line, overflow: 'hidden' }}>
+                <div style={{
+                  flex: 2, height: 2.5, marginTop: 18, borderRadius: 4,
+                  background: C.d10, position: "relative", overflow: "hidden",
+                }}>
                   {!rejected && i < idx && (
-                    <div style={{ position: 'absolute', inset: 0, background: C.wine, borderRadius: 4 }} />
+                    <div style={{ position: "absolute", inset: 0, background: C.deep, borderRadius: 4 }} />
                   )}
                 </div>
               )}
@@ -180,136 +238,182 @@ const Journey = ({ leave }) => {
       </div>
 
       {leave.reason && (
-        <div style={{ marginTop: 22, padding: '12px 16px', background: C.wineFog,
-          borderLeft: `3px solid ${C.wine}`, borderRadius: '0 10px 10px 0',
-          fontSize: 13.5, color: C.slate, lineHeight: 1.6 }}>
-          <span style={{ fontWeight: 700, color: C.wineD }}>Reason:</span> {leave.reason}
+        <div style={{
+          marginTop: 20, padding: "12px 16px",
+          background: "rgba(249,248,242,.9)",
+          borderLeft: `2px solid ${C.mid}`, borderRadius: "0 10px 10px 0",
+          fontSize: 13, color: C.d55, lineHeight: 1.65,
+        }}>
+          <span style={{ fontWeight: 500, color: C.deep, marginRight: 4 }}>Reason:</span>
+          {leave.reason}
         </div>
       )}
     </div>
   );
 };
 
-/* ── BALANCE CARD ───────────────────────────── */
-const BalCard = ({ label, value, color, sub }) => (
-  <div style={{ background: C.white, borderRadius: 16, padding: '20px 22px',
-    borderTop: `3px solid ${color}`,
-    boxShadow: '0 1px 4px #00000008, 0 4px 16px #00000006',
-    display: 'flex', flexDirection: 'column', gap: 4,
-    transition: 'transform 0.2s, box-shadow 0.2s', cursor: 'default' }}
-    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 8px 28px ${color}28`; }}
-    onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 1px 4px #00000008, 0 4px 16px #00000006'; }}>
-    <p style={{ margin: 0, fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
-      letterSpacing: '0.09em', color: C.muted, fontFamily: 'monospace' }}>{label}</p>
-    <p style={{ margin: 0, fontSize: 36, fontWeight: 900, color, lineHeight: 1.05 }}>{value ?? 0}</p>
-    <p style={{ margin: 0, fontSize: 11.5, color: C.muted }}>{sub || 'days available'}</p>
+/* ── BALANCE CARD ──────────────────────────── */
+const BalCard = ({ label, value, accent = "mid" }) => (
+  <div style={{
+    background: C.white, borderRadius: 14,
+    border: `.5px solid ${C.d12}`,
+    padding: "20px 18px", position: "relative", overflow: "hidden",
+    transition: "border-color .18s",
+  }}
+    onMouseEnter={(e) => e.currentTarget.style.borderColor = C.m25}
+    onMouseLeave={(e) => e.currentTarget.style.borderColor = C.d12}
+  >
+    <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: accent === "mid" ? C.mid : C.deep }} />
+    <p style={{ fontSize: 11, fontWeight: 400, color: C.d45, marginBottom: 6 }}>{label}</p>
+    <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 44, fontWeight: 700, color: C.deep, lineHeight: 1, margin: 0 }}>
+      {value ?? 0}
+    </p>
+    <p style={{ fontSize: 11, color: C.d35, marginTop: 4 }}>days available</p>
   </div>
 );
 
-/* ── FORM ───────────────────────────────────── */
+/* ── FORM FIELD ────────────────────────────── */
 const Field = ({ label, error, children }) => (
-  <div style={{ marginBottom: 18 }}>
-    <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700,
-      color: C.slate, marginBottom: 7, textTransform: 'uppercase',
-      letterSpacing: '0.07em', fontFamily: 'monospace' }}>
-      {label} <span style={{ color: C.red }}>*</span>
+  <div style={{ marginBottom: 16 }}>
+    <label style={{
+      display: "block", fontSize: 11, fontWeight: 500,
+      letterSpacing: ".12em", textTransform: "uppercase",
+      color: C.deep, marginBottom: 6,
+    }}>
+      {label} <span style={{ color: C.mid }}>*</span>
     </label>
     {children}
-    {error && <p style={{ color: C.red, fontSize: 12, marginTop: 5 }}>{error}</p>}
+    {error && <p style={{ color: C.mid, fontSize: 12, marginTop: 4 }}>{error}</p>}
   </div>
 );
 
-const iStyle = err => ({
-  width: '100%', padding: '11px 14px',
-  border: `1.5px solid ${err ? C.red : C.line}`,
-  borderRadius: 10, fontSize: 14, outline: 'none',
-  background: err ? C.redL : '#fafaf9', color: C.slate,
-  fontFamily: 'inherit', boxSizing: 'border-box', transition: 'border-color 0.2s',
+const inputSt = (err) => ({
+  width: "100%", padding: "10px 13px",
+  border: `.5px solid ${err ? C.mid : C.d25}`,
+  borderRadius: 10, fontSize: 13.5,
+  color: C.deep, background: err ? C.m08 : C.white,
+  outline: "none", fontFamily: "'DM Sans', sans-serif",
+  transition: "border-color .15s",
 });
 
-const LeaveForm = ({ form, onChange, errors, types, accent }) => {
+const LeaveForm = ({ form, onChange, errors, types }) => {
   const days = daysBetween(form.startDate, form.endDate);
   return (
     <>
       {errors.submit && (
-        <div style={{ marginBottom: 18, padding: '12px 16px', background: C.redL,
-          border: `1px solid ${C.red}30`, borderRadius: 10, color: C.red, fontSize: 13.5 }}>
+        <div style={{ marginBottom: 16, padding: "11px 14px", background: C.m08, border: `.5px solid ${C.m25}`, borderRadius: 10, color: C.deep, fontSize: 13 }}>
           {errors.submit}
         </div>
       )}
-      <Field label="Leave Type" error={errors.leaveType}>
-        <select name="leaveType" value={form.leaveType} onChange={onChange} style={iStyle(errors.leaveType)}>
-          <option value="">Select a type...</option>
-          {types.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+      <Field label="Leave type" error={errors.leaveType}>
+        <select name="leaveType" value={form.leaveType} onChange={onChange} style={inputSt(errors.leaveType)}>
+          <option value="">Select a type…</option>
+          {types.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
       </Field>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-        <Field label="Start Date" error={errors.startDate}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+        <Field label="Start date" error={errors.startDate}>
           <input type="date" name="startDate" value={form.startDate}
-            onChange={onChange} min={todayStr()} style={iStyle(errors.startDate)} />
+            onChange={onChange} min={todayStr()} style={inputSt(errors.startDate)} />
         </Field>
-        <Field label="End Date" error={errors.endDate}>
+        <Field label="End date" error={errors.endDate}>
           <input type="date" name="endDate" value={form.endDate}
-            onChange={onChange} min={form.startDate || todayStr()} style={iStyle(errors.endDate)} />
+            onChange={onChange} min={form.startDate || todayStr()} style={inputSt(errors.endDate)} />
         </Field>
       </div>
       {days > 0 && (
-        <div style={{ margin: '-4px 0 18px', padding: '10px 14px',
-          background: accent + '12', border: `1px solid ${accent}28`,
-          borderRadius: 10, display: 'flex', alignItems: 'center', gap: 8,
-          color: accent, fontWeight: 700, fontSize: 13.5 }}>
-          <Calendar size={15} /> {days} {days === 1 ? 'day' : 'days'} requested
+        <div style={{
+          margin: "-4px 0 16px", padding: "10px 14px",
+          background: C.m08, border: `.5px solid ${C.m20}`, borderRadius: 10,
+          display: "flex", alignItems: "center", gap: 8,
+          color: C.deep, fontWeight: 500, fontSize: 13,
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.mid} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          {days} {days === 1 ? "day" : "days"} requested
         </div>
       )}
       <Field label="Reason" error={errors.reason}>
         <textarea name="reason" value={form.reason} onChange={onChange} rows={4}
-          placeholder="Briefly explain the reason for your leave..."
-          style={{ ...iStyle(errors.reason), resize: 'vertical' }} />
+          placeholder="Briefly explain the reason for your leave…"
+          style={{ ...inputSt(errors.reason), resize: "vertical" }} />
       </Field>
-      <p style={{ fontSize: 11.5, color: C.muted, marginTop: -10, marginBottom: 20, fontFamily: 'monospace' }}>
+      <p style={{ fontSize: 11, color: C.d35, marginTop: -8, marginBottom: 18 }}>
         {form.reason.length} / 500 chars (min 10)
       </p>
     </>
   );
 };
 
-/* ── MODAL ──────────────────────────────────── */
-const Modal = ({ open, onClose, title, accent, children }) => {
+/* ── MODAL ─────────────────────────────────── */
+const Modal = ({ open, onClose, title, children }) => {
   if (!open) return null;
   return (
-    <div onClick={e => e.target === e.currentTarget && onClose()}
-      style={{ position: 'fixed', inset: 0, background: '#1a001088',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 9999, padding: 20, backdropFilter: 'blur(4px)' }}>
-      <div style={{ background: C.white, borderRadius: 22, width: '100%', maxWidth: 540,
-        maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 32px 80px #00000040' }}>
-        <div style={{ background: `linear-gradient(135deg, ${accent}, ${accent}bb)`,
-          padding: '22px 28px', borderRadius: '22px 22px 0 0',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h2 style={{ margin: 0, color: C.white, fontSize: 17, fontWeight: 800 }}>{title}</h2>
-          <button onClick={onClose} style={{ background: '#ffffff25', border: 'none',
-            borderRadius: 8, padding: '6px 7px', cursor: 'pointer', color: C.white,
-            display: 'flex', alignItems: 'center' }}>
-            <X size={18} />
+    <div
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "rgba(115,0,66,.16)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 20,
+      }}
+    >
+      <div style={{
+        background: C.cream, borderRadius: 20,
+        border: `.5px solid ${C.m25}`,
+        width: "100%", maxWidth: 520,
+        maxHeight: "92vh", overflowY: "auto",
+      }}>
+        <div style={{
+          background: C.deep, padding: "18px 24px",
+          borderRadius: "20px 20px 0 0",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 600, fontStyle: "italic", color: C.cream, margin: 0 }}>
+            {title}
+          </h2>
+          <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 8, background: "rgba(249,248,242,.15)", border: "none", cursor: "pointer", color: C.cream, fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            ✕
           </button>
         </div>
-        <div style={{ padding: '26px 28px' }}>{children}</div>
+        <div style={{ padding: "24px 24px 28px" }}>{children}</div>
       </div>
     </div>
   );
 };
 
-/* ── MAIN COMPONENT ─────────────────────────── */
+/* ── ICON COMPONENTS ───────────────────────── */
+const IconPlus = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+);
+const IconEdit = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </svg>
+);
+const IconTrash = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6"/>
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+    <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
+  </svg>
+);
+
+/* ── MAIN ──────────────────────────────────── */
 const LeaveTableem = () => {
   const [showApply, setShowApply] = useState(false);
-  const [showEdit,  setShowEdit]  = useState(false);
-  const [selected,  setSelected]  = useState(null);
-  const [form,      setForm]      = useState(EMPTY);
-  const [errors,    setErrors]    = useState({});
+  const [showEdit, setShowEdit] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [form, setForm] = useState(EMPTY);
+  const [errors, setErrors] = useState({});
 
-  const { data: userData }                             = useGetMeUser();
-  const { data: balanceData, isLoading: balLoading }   = useGetAllLeaves();
-  const { data: historyData, isLoading: histLoading }  = useGetAllLeaveHistory();
+  const { data: userData }                           = useGetMeUser();
+  const { data: balanceData, isLoading: balLoading } = useGetAllLeaves();
+  const { data: historyData, isLoading: histLoading } = useGetAllLeaveHistory();
   const applyMut  = useApplyLeave();
   const deleteMut = useDeleteLeave();
   const editMut   = useEditLeave();
@@ -320,255 +424,199 @@ const LeaveTableem = () => {
   const latest  = history[0] || null;
   const loading = balLoading || histLoading;
 
-  const availTypes = LEAVE_TYPES.filter(t => {
-    if (t.restricted === 'ml') return user?.gender === 'female' && user?.marital_status === 'married';
-    if (t.restricted === 'pl') return user?.gender === 'male'   && user?.marital_status === 'married';
+  const availTypes = LEAVE_TYPES.filter((t) => {
+    if (t.restricted === "ml") return user?.gender === "female" && user?.marital_status === "married";
+    if (t.restricted === "pl") return user?.gender === "male" && user?.marital_status === "married";
     return true;
   });
 
-  const onChange = e => {
+  const onChange = (e) => {
     const { name, value } = e.target;
-    setForm(p => ({ ...p, [name]: value }));
-    if (errors[name]) setErrors(p => ({ ...p, [name]: '' }));
+    setForm((p) => ({ ...p, [name]: value }));
+    if (errors[name]) setErrors((p) => ({ ...p, [name]: "" }));
   };
 
   const validate = () => {
     const e = {};
-    if (!form.leaveType) e.leaveType = 'Select a leave type';
-    if (!form.startDate) e.startDate = 'Required';
-    if (!form.endDate)   e.endDate   = 'Required';
-    if ((form.reason || '').trim().length < 10) e.reason = 'Minimum 10 characters required';
+    if (!form.leaveType) e.leaveType = "Select a leave type";
+    if (!form.startDate) e.startDate = "Required";
+    if (!form.endDate) e.endDate = "Required";
+    if ((form.reason || "").trim().length < 10) e.reason = "Minimum 10 characters";
     if (form.startDate && form.endDate && new Date(form.endDate) < new Date(form.startDate))
-      e.endDate = 'End date cannot precede start date';
+      e.endDate = "End date cannot precede start date";
     setErrors(e);
     return !Object.keys(e).length;
   };
 
   const closeApply = () => { setShowApply(false); setForm(EMPTY); setErrors({}); };
-  const closeEdit  = () => { setShowEdit(false);  setSelected(null); setForm(EMPTY); setErrors({}); };
+  const closeEdit  = () => { setShowEdit(false); setSelected(null); setForm(EMPTY); setErrors({}); };
 
-  const handleApply = async e => {
+  const handleApply = async (e) => {
     e.preventDefault();
     if (!validate()) return;
-    try {
-      await applyMut.mutateAsync(form);
-      closeApply();
-    } catch (err) {
-      setErrors({ submit: err.response?.data?.message || 'Failed to submit leave' });
-    }
+    try { await applyMut.mutateAsync(form); closeApply(); }
+    catch (err) { setErrors({ submit: err.response?.data?.message || "Failed to submit leave" }); }
   };
 
-  const openEdit = leave => {
+  const openEdit = (leave) => {
     setSelected(leave);
     setForm({
       leaveType: leave.leaveType,
-      startDate: new Date(leave.startDate).toISOString().split('T')[0],
-      endDate:   new Date(leave.endDate).toISOString().split('T')[0],
+      startDate: new Date(leave.startDate).toISOString().split("T")[0],
+      endDate:   new Date(leave.endDate).toISOString().split("T")[0],
       reason:    leave.reason,
     });
     setShowEdit(true);
   };
 
-  const handleEdit = async e => {
+  const handleEdit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
-    try {
-      await editMut.mutateAsync({ id: selected._id, ...form });
-      closeEdit();
-    } catch (err) {
-      setErrors({ submit: err.response?.data?.message || 'Failed to update leave' });
-    }
+    try { await editMut.mutateAsync({ id: selected._id, ...form }); closeEdit(); }
+    catch (err) { setErrors({ submit: err.response?.data?.message || "Failed to update" }); }
   };
 
-  const handleDelete = async id => {
-    if (!window.confirm('Delete this leave application?')) return;
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this leave application?")) return;
     try { await deleteMut.mutateAsync(id); }
-    catch (err) { alert(err.response?.data?.message || 'Delete failed'); }
+    catch (err) { alert(err.response?.data?.message || "Delete failed"); }
   };
 
   const balCards = [
-    { label: 'Earned Leave',        value: balance.EL,  color: C.wine },
-    { label: 'Sick Leave',          value: balance.SL,  color: '#9b4d6e' },
-    ...(user?.gender === 'female' && user?.marital_status === 'married'
-      ? [{ label: 'Maternity Leave', value: balance.ML, color: '#c2637a' }] : []),
-    ...(user?.gender === 'male' && user?.marital_status === 'married'
-      ? [{ label: 'Paternity Leave', value: balance.PL, color: '#b07850' }] : []),
-    { label: 'Past Balance Credit', value: balance.pbc, color: '#7a5080', sub: 'days credited' },
-    { label: 'Leave Without Pay',   value: balance.lwp, color: '#a0413d', sub: 'days used' },
+    { label: "Earned Leave",     value: balance.EL,  accent: "deep" },
+    { label: "Sick Leave",       value: balance.SL,  accent: "mid"  },
+    ...(user?.gender === "female" && user?.marital_status === "married"
+      ? [{ label: "Maternity Leave", value: balance.ML, accent: "mid" }] : []),
+    ...(user?.gender === "male" && user?.marital_status === "married"
+      ? [{ label: "Paternity Leave", value: balance.PL, accent: "deep" }] : []),
+    { label: "Past Balance",       value: balance.pbc, accent: "deep" },
+    { label: "Leave Without Pay",  value: balance.lwp, accent: "mid"  },
   ];
 
   if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center',
-      minHeight: '60vh', background: C.cream }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ width: 42, height: 42, border: `3px solid ${C.wineL}`,
-          borderTopColor: C.wine, borderRadius: '50%',
-          animation: 'spin 0.75s linear infinite', margin: '0 auto 14px' }} />
-        <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>Loading...</p>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", background: C.cream }}>
+      <Fonts />
+      <div style={{ textAlign: "center" }}>
+        <div style={{ width: 38, height: 38, border: `3px solid ${C.d10}`, borderTopColor: C.mid, borderRadius: "50%", animation: "spin .75s linear infinite", margin: "0 auto 14px" }} />
+        <p style={{ color: C.d45, fontSize: 13, margin: 0 }}>Loading…</p>
       </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   );
 
-  /* ── SECTION LABEL ── */
-  const SectionLabel = ({ children }) => (
-    <p style={{ margin: '0 0 14px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
-      letterSpacing: '0.13em', color: C.muted, fontFamily: 'monospace' }}>
+  const TH = ({ children }) => (
+    <th style={{ textAlign: "left", padding: "12px 18px", fontSize: 10.5, fontWeight: 500, letterSpacing: ".14em", textTransform: "uppercase", color: C.d45, whiteSpace: "nowrap" }}>
       {children}
-    </p>
+    </th>
   );
 
   return (
-    <div style={{ background: C.cream, minHeight: '100vh', fontFamily: "'Fraunces', Georgia, serif" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700;9..144,800;9..144,900&display=swap');
-        * { box-sizing: border-box; }
-        select, input, textarea, button { font-family: 'Fraunces', Georgia, serif; }
-        input[type=date]::-webkit-calendar-picker-indicator { opacity: 0.35; cursor: pointer; }
-        ::-webkit-scrollbar { width: 5px; height: 5px; }
-        ::-webkit-scrollbar-thumb { background: ${C.wine}30; border-radius: 10px; }
-        .card { animation: fadeUp 0.4s ease both; }
-        @keyframes fadeUp { from { opacity:0; transform:translateY(14px) } to { opacity:1; transform:none } }
-        tbody tr { transition: background 0.15s; }
-        tbody tr:hover { background: ${C.wineFog}; }
-      `}</style>
+    <div style={{ background: C.cream, minHeight: "100vh", fontFamily: "'DM Sans', sans-serif" }}>
+      <Fonts />
 
-      <div style={{ maxWidth: 1180, margin: '0 auto', padding: '36px 24px' }}>
+      <div style={{ maxWidth: 1180, margin: "0 auto", padding: "36px 24px" }}>
 
         {/* HEADER */}
-        <div className="card" style={{ display: 'flex', alignItems: 'flex-end',
-          justifyContent: 'space-between', marginBottom: 36,
-          flexWrap: 'wrap', gap: 16, animationDelay: '0s' }}>
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: "2.5rem", animation: "fadeUp .4s ease both" }}>
           <div>
-            <p style={{ margin: 0, fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
-              letterSpacing: '0.15em', color: C.wine, fontFamily: 'monospace' }}>
-              Employee Portal
-            </p>
-            <h1 style={{ margin: '6px 0 4px', fontSize: 34, fontWeight: 900,
-              color: C.wineD, letterSpacing: '-0.5px', lineHeight: 1.08 }}>
-              Leave Management
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: "1rem" }}>
+              <div style={{ width: 28, height: 1, background: C.deep }} />
+              <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: ".18em", textTransform: "uppercase", color: C.deep }}>
+                Employee Portal
+              </span>
+            </div>
+            <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 52, fontWeight: 300, fontStyle: "italic", color: C.deep, letterSpacing: "-1px", lineHeight: 1, margin: "0 0 .25rem" }}>
+              Leave <span style={{ fontStyle: "normal", fontWeight: 700, color: C.mid }}>Management</span>
             </h1>
-            <p style={{ margin: 0, color: C.muted, fontSize: 14 }}>
+            <p style={{ fontSize: 13, color: C.d45, margin: 0 }}>
               Track balances · Apply · Monitor approvals
             </p>
           </div>
-          <button onClick={() => setShowApply(true)} style={{
-            display: 'inline-flex', alignItems: 'center', gap: 9,
-            background: `linear-gradient(135deg, ${C.wine} 0%, ${C.wineM} 100%)`,
-            color: C.white, border: 'none', padding: '13px 24px',
-            borderRadius: 13, fontSize: 14.5, fontWeight: 800,
-            cursor: 'pointer', boxShadow: `0 6px 24px ${C.wine}44`,
-            fontFamily: 'inherit', letterSpacing: '0.01em',
-            transition: 'transform 0.2s, box-shadow 0.2s',
-          }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 12px 32px ${C.wine}55`; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = `0 6px 24px ${C.wine}44`; }}>
-            <Plus size={18} /> Apply for Leave
+          <button
+            className="lv-apply"
+            onClick={() => setShowApply(true)}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              background: C.deep, color: C.cream,
+              border: "none", borderRadius: 12,
+              padding: "11px 22px", fontSize: 13.5, fontWeight: 500,
+              cursor: "pointer", transition: "background .18s",
+            }}
+          >
+            <IconPlus /> Apply for leave
           </button>
         </div>
 
         {/* BALANCE */}
-        <section style={{ marginBottom: 36 }}>
-          <SectionLabel>Leave Balance</SectionLabel>
-          <div style={{ display: 'grid', gap: 14,
-            gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
-            {balCards.map((c, i) => (
-              <div key={c.label} className="card" style={{ animationDelay: `${0.05 + i * 0.06}s` }}>
-                <BalCard {...c} />
-              </div>
-            ))}
+        <section style={{ marginBottom: "2.5rem", animation: "fadeUp .45s ease both" }}>
+          <SectionLabel>Leave balance</SectionLabel>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
+            {balCards.map((c) => <BalCard key={c.label} {...c} />)}
           </div>
         </section>
 
-        {/* LATEST STATUS */}
-        <section className="card" style={{ marginBottom: 36, animationDelay: '0.3s' }}>
-          <SectionLabel>Latest Leave Status</SectionLabel>
-          <div style={{ background: C.white, borderRadius: 20, padding: '28px 32px',
-            boxShadow: '0 2px 8px #00000008, 0 8px 32px #0000000a',
-            border: `1px solid ${C.line}` }}>
+        {/* JOURNEY */}
+        <section style={{ marginBottom: "2.5rem", animation: "fadeUp .5s ease both" }}>
+          <SectionLabel>Latest leave status</SectionLabel>
+          <div style={{ background: C.white, borderRadius: 16, border: `.5px solid ${C.d12}`, padding: "26px 28px" }}>
             <Journey leave={latest} />
           </div>
         </section>
 
-        {/* HISTORY TABLE */}
-        <section className="card" style={{ animationDelay: '0.38s' }}>
-          <SectionLabel>Leave History</SectionLabel>
-          <div style={{ background: C.white, borderRadius: 20, overflow: 'hidden',
-            boxShadow: '0 2px 8px #00000008, 0 8px 32px #0000000a',
-            border: `1px solid ${C.line}` }}>
+        {/* HISTORY */}
+        <section style={{ animation: "fadeUp .55s ease both" }}>
+          <SectionLabel>Leave history</SectionLabel>
+          <div style={{ background: C.white, borderRadius: 16, border: `.5px solid ${C.d12}`, overflow: "hidden" }}>
             {history.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '64px 24px' }}>
-                <div style={{ width: 64, height: 64, borderRadius: '50%', background: C.wineL,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  margin: '0 auto 16px' }}>
-                  <Calendar size={28} color={C.wine} />
+              <div style={{ textAlign: "center", padding: "64px 24px" }}>
+                <div style={{ width: 56, height: 56, borderRadius: "50%", border: `.5px solid ${C.m25}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={C.mid} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                  </svg>
                 </div>
-                <p style={{ fontWeight: 800, fontSize: 16, color: C.slate, margin: '0 0 6px' }}>
+                <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 600, fontStyle: "italic", color: C.deep, margin: "0 0 6px" }}>
                   No leave records yet
                 </p>
-                <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>
-                  Click <strong style={{ color: C.wine }}>Apply for Leave</strong> to submit your first request
+                <p style={{ fontSize: 13, color: C.d45, margin: 0 }}>
+                  Click <span style={{ color: C.deep, fontWeight: 500 }}>Apply for leave</span> to get started.
                 </p>
               </div>
             ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
-                    <tr style={{ background: C.wineFog, borderBottom: `2px solid ${C.wine}18` }}>
-                      {['Type', 'Duration', 'Days', 'Reason', 'Status', 'Applied', 'Actions'].map(h => (
-                        <th key={h} style={{ textAlign: 'left', padding: '13px 18px',
-                          fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
-                          letterSpacing: '0.1em', color: C.wine,
-                          whiteSpace: 'nowrap', fontFamily: 'monospace' }}>{h}</th>
-                      ))}
+                    <tr style={{ background: "rgba(249,248,242,.95)", borderBottom: `1px solid ${C.d10}` }}>
+                      <TH>Type</TH><TH>Duration</TH><TH>Days</TH><TH>Reason</TH><TH>Status</TH><TH>Applied</TH><TH>Actions</TH>
                     </tr>
                   </thead>
                   <tbody>
                     {history.map((leave, i) => (
-                      <tr key={leave._id || i} style={{ borderBottom: `1px solid ${C.line}` }}>
-                        <td style={{ padding: '14px 18px' }}>
-                          <TypeTag value={leave.leaveType} />
+                      <tr key={leave._id || i} className="lv-row" style={{ borderBottom: `.5px solid ${C.d08}` }}>
+                        <td style={{ padding: "14px 18px" }}><TypeTag value={leave.leaveType} /></td>
+                        <td style={{ padding: "14px 18px" }}>
+                          <div style={{ fontWeight: 500, color: C.deep, fontSize: 13 }}>{fmt(leave.startDate)}</div>
+                          <div style={{ fontSize: 11.5, color: C.d35, marginTop: 2 }}>→ {fmt(leave.endDate)}</div>
                         </td>
-                        <td style={{ padding: '14px 18px', fontSize: 13, color: C.slate }}>
-                          <div>
-                            <div style={{ fontWeight: 600 }}>{fmt(leave.startDate)}</div>
-                            <div style={{ color: C.muted, fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}>
-                              <ArrowRight size={10} /> {fmt(leave.endDate)}
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: '14px 18px' }}>
-                          <span style={{ fontWeight: 900, fontSize: 24, color: C.wine, fontFamily: 'monospace' }}>
+                        <td style={{ padding: "14px 18px" }}>
+                          <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 32, fontWeight: 700, color: C.deep, lineHeight: 1 }}>
                             {leave.days}
                           </span>
                         </td>
-                        <td style={{ padding: '14px 18px', maxWidth: 200 }}>
-                          <span style={{ fontSize: 13, color: C.muted,
-                            display: '-webkit-box', WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                        <td style={{ padding: "14px 18px", maxWidth: 180 }}>
+                          <span style={{ fontSize: 13, color: C.d55, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}
                             title={leave.reason}>{leave.reason}</span>
                         </td>
-                        <td style={{ padding: '14px 18px' }}>
-                          <StatusPill status={leave.status} />
-                        </td>
-                        <td style={{ padding: '14px 18px', fontSize: 12, color: C.muted,
-                          whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
-                          {fmt(leave.createdAt)}
-                        </td>
-                        <td style={{ padding: '14px 18px' }}>
+                        <td style={{ padding: "14px 18px" }}><StatusPill status={leave.status} /></td>
+                        <td style={{ padding: "14px 18px", fontSize: 12, color: C.d35, whiteSpace: "nowrap" }}>{fmt(leave.createdAt)}</td>
+                        <td style={{ padding: "14px 18px" }}>
                           {isPending(leave.status) && (
-                            <div style={{ display: 'flex', gap: 6 }}>
-                              <button onClick={() => openEdit(leave)} title="Edit"
-                                style={{ background: C.blueL, border: 'none', borderRadius: 8,
-                                  padding: '7px 8px', cursor: 'pointer', color: C.blue,
-                                  display: 'flex', alignItems: 'center' }}>
-                                <Edit2 size={14} />
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button className="lv-action" onClick={() => openEdit(leave)} title="Edit"
+                                style={{ width: 30, height: 30, borderRadius: 8, border: `.5px solid ${C.d20}`, background: "transparent", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", color: C.deep, transition: "all .15s" }}>
+                                <IconEdit />
                               </button>
-                              <button onClick={() => handleDelete(leave._id)} title="Delete"
-                                style={{ background: C.redL, border: 'none', borderRadius: 8,
-                                  padding: '7px 8px', cursor: 'pointer', color: C.red,
-                                  display: 'flex', alignItems: 'center' }}>
-                                <Trash2 size={14} />
+                              <button className="lv-action" onClick={() => handleDelete(leave._id)} title="Delete"
+                                style={{ width: 30, height: 30, borderRadius: 8, border: `.5px solid ${C.d20}`, background: "transparent", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", color: C.deep, transition: "all .15s" }}>
+                                <IconTrash />
                               </button>
                             </div>
                           )}
@@ -584,21 +632,17 @@ const LeaveTableem = () => {
       </div>
 
       {/* APPLY MODAL */}
-      <Modal open={showApply} onClose={closeApply} title="Apply for Leave" accent={C.wine}>
+      <Modal open={showApply} onClose={closeApply} title="Apply for Leave">
         <form onSubmit={handleApply}>
-          <LeaveForm form={form} onChange={onChange} errors={errors} types={availTypes} accent={C.wine} />
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button type="submit" disabled={applyMut.isLoading}
-              style={{ flex: 1, background: C.wine, color: C.white, border: 'none',
-                padding: '13px', borderRadius: 11, fontSize: 14.5, fontWeight: 700,
-                cursor: applyMut.isLoading ? 'not-allowed' : 'pointer',
-                opacity: applyMut.isLoading ? 0.65 : 1, fontFamily: 'inherit' }}>
-              {applyMut.isLoading ? 'Submitting...' : 'Submit Request'}
+          <LeaveForm form={form} onChange={onChange} errors={errors} types={availTypes} />
+          <div style={{ display: "flex", gap: 10 }}>
+            <button type="submit" disabled={applyMut.isPending}
+              className="lv-submit"
+              style={{ flex: 1, background: C.mid, color: C.cream, border: "none", padding: 12, borderRadius: 11, fontSize: 14, fontWeight: 500, cursor: applyMut.isPending ? "not-allowed" : "pointer", opacity: applyMut.isPending ? .65 : 1, transition: "background .15s" }}>
+              {applyMut.isPending ? "Submitting…" : "Submit request"}
             </button>
             <button type="button" onClick={closeApply}
-              style={{ padding: '13px 22px', border: `1.5px solid ${C.line}`,
-                background: 'transparent', borderRadius: 11, fontSize: 14.5,
-                fontWeight: 600, color: C.muted, cursor: 'pointer', fontFamily: 'inherit' }}>
+              style={{ padding: "12px 20px", border: `.5px solid ${C.d25}`, background: "transparent", borderRadius: 11, fontSize: 14, fontWeight: 400, color: C.d45, cursor: "pointer" }}>
               Cancel
             </button>
           </div>
@@ -606,21 +650,17 @@ const LeaveTableem = () => {
       </Modal>
 
       {/* EDIT MODAL */}
-      <Modal open={showEdit} onClose={closeEdit} title="Edit Leave Request" accent={C.blue}>
+      <Modal open={showEdit} onClose={closeEdit} title="Edit Leave Request">
         <form onSubmit={handleEdit}>
-          <LeaveForm form={form} onChange={onChange} errors={errors} types={availTypes} accent={C.blue} />
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button type="submit" disabled={editMut.isLoading}
-              style={{ flex: 1, background: C.blue, color: C.white, border: 'none',
-                padding: '13px', borderRadius: 11, fontSize: 14.5, fontWeight: 700,
-                cursor: editMut.isLoading ? 'not-allowed' : 'pointer',
-                opacity: editMut.isLoading ? 0.65 : 1, fontFamily: 'inherit' }}>
-              {editMut.isLoading ? 'Updating...' : 'Update Request'}
+          <LeaveForm form={form} onChange={onChange} errors={errors} types={availTypes} />
+          <div style={{ display: "flex", gap: 10 }}>
+            <button type="submit" disabled={editMut.isPending}
+              className="lv-submit"
+              style={{ flex: 1, background: C.mid, color: C.cream, border: "none", padding: 12, borderRadius: 11, fontSize: 14, fontWeight: 500, cursor: editMut.isPending ? "not-allowed" : "pointer", opacity: editMut.isPending ? .65 : 1, transition: "background .15s" }}>
+              {editMut.isPending ? "Updating…" : "Update request"}
             </button>
             <button type="button" onClick={closeEdit}
-              style={{ padding: '13px 22px', border: `1.5px solid ${C.line}`,
-                background: 'transparent', borderRadius: 11, fontSize: 14.5,
-                fontWeight: 600, color: C.muted, cursor: 'pointer', fontFamily: 'inherit' }}>
+              style={{ padding: "12px 20px", border: `.5px solid ${C.d25}`, background: "transparent", borderRadius: 11, fontSize: 14, fontWeight: 400, color: C.d45, cursor: "pointer" }}>
               Cancel
             </button>
           </div>
