@@ -7,6 +7,11 @@ const documentSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
+  fileType: {
+    type: String,
+    enum: ["personal", "expense"],
+    required: true,
+  },
   fileUrl: { type: String, required: true },
   size: { type: Number, required: true },
   uploadedAt: { type: Date, default: Date.now },

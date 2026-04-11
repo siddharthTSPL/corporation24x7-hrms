@@ -6,14 +6,22 @@ import MainLayout from "./layout/MainLayout";
 import ProtectedRoute from "./components/Protectedroute";
 import Dashboard from "./pages/dashboard/Dashboard";
 import EmployeeDashboard from "./pages/dashboard/EmployeeDashboard";
+import Managerdashboard from "./pages/dashboard/Dashboardma";
 import EmployeeTable from "./pages/employee/EmployeeTable";
 import LeaveTable from "./pages/leave/LeaveTable";
 import LeaveTableem from "./pages/leave/LeaveTableem";
+import LeaveTablema from "./pages/leave/LeaveTablema";
 import Announce from "./pages/announcement/Announce";
+import Announceem from "./pages/announcement/Announceem";
+import Announcema from "./pages/announcement/Announcema";
 import Doc from "./pages/document/Doc";
+import Docma from "./pages/document/Docma";
 import Set from "./pages/settings/Set";
 import Setem from "./pages/settings/Setem";
+import Setma from "./pages/settings/Setma";
 import File from "./pages/file/File";
+import Fileem from "./pages/file/Fileem";
+import Filema from "./pages/file/Filema";
 import Organisation from "./pages/organisation/Organisation";
 
 function App() {
@@ -46,14 +54,22 @@ function App() {
           
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
+          <Route path="/manager-dashboard" element={<Managerdashboard />} />
           <Route path="/employee" element={<EmployeeTable />} />
+          <Route path="/leave-manager" element={<LeaveTablema />} />
           <Route path="/leave-employee" element={<LeaveTableem />} />
           <Route path="/leave" element={<LeaveTable />} />
           <Route path="/announcement" element={<Announce />} />
+          <Route path="/announcement-employee" element={<Announceem />} />
+          <Route path="/announcement-manager" element={<Announcema />} />
           <Route path="/document" element={<Doc />} />
+          <Route path="/document-manager" element={<Docma />} />
           <Route path="/file" element={<File />} />
+          <Route path="/file-employee" element={<Fileem />} />
+          <Route path="/file-manager" element={<Filema />} />
           <Route path="/settings" element={<Set />} />
           <Route path="/settings-employee" element={<Setem />} />
+          <Route path="/settings-manager" element={<Setma />} />
           <Route path="/organisation" element={<Organisation />} />
         </Route>
       </Routes>

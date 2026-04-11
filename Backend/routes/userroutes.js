@@ -3,6 +3,7 @@ const userrouter = express.Router();
 const usercontroller = require("../controllers/user.controller");
 const employeemiddleware = require("../middleware/auth/employee.middleware");
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
+const { use } = require("react");
 
 userrouter.get("/verify/:token", asyncHandler(usercontroller.verifyUserEmail));
 
@@ -26,10 +27,21 @@ userrouter.post("/applyleave", employeemiddleware,asyncHandler(usercontroller.ap
 userrouter.get("/resultofleaverequest/:id",employeemiddleware,asyncHandler(usercontroller.resultofleaverequest));
 userrouter.get("/getallleave",employeemiddleware, asyncHandler(usercontroller.getallleave));
 
-userrouter.put("/editleave/:id",employeemiddleware,asyncHandler(usercontroller.editleave));
+userrouter.put(
+  "/editleave/:id",
+  employeemiddleware,
+  asyncHandler(usercontroller.editleave)
+);
 userrouter.delete("/deleteleave/:id",employeemiddleware,asyncHandler(usercontroller.deleteleave));
 
+userrouter.get("/getallleavehistory",employeemiddleware,asyncHandler(usercontroller.getallleavehistory));
+
 userrouter.get("/showannouncements", employeemiddleware,asyncHandler(usercontroller.showannouncements));
+userrouter.get(
+  "/showannouncement/:id",
+  employeemiddleware,
+  asyncHandler(usercontroller.showparticlausannouncements)
+);
 
 
 
