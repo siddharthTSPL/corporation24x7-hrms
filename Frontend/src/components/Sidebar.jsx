@@ -23,13 +23,13 @@ const adminMenu = [
 ];
 
 const managerMenu = [
-  { name: "Dashboard", path: "/dashboard", icon: <FaHome /> },
-  { name: "Leave", path: "/leave", icon: <FaCalendarAlt /> },
-  { name: "Announcement", path: "/announcement", icon: <FaBullhorn /> },
+  { name: "Dashboard", path: "/manager-dashboard", icon: <FaHome /> },
+  { name: "Leave", path: "/leave-manager", icon: <FaCalendarAlt /> },
+  { name: "Announcement", path: "/announcement-manager", icon: <FaBullhorn /> },
   { name: "Organisation", path: "/organisation", icon: <FaBuilding /> },
-  { name: "Document", path: "/document", icon: <FaFileAlt /> },
-  { name: "File", path: "/file", icon: <FaFolder /> },
-  { name: "Settings", path: "/settings", icon: <FaCog /> },
+  { name: "Document", path: "/document-manager", icon: <FaFileAlt /> },
+  { name: "File", path: "/file-manager", icon: <FaFolder /> },
+  { name: "Settings", path: "/settings-manager", icon: <FaCog /> },
 ];
 
 const employeeMenu = [
