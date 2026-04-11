@@ -10,6 +10,7 @@ import EmployeeTable from "./pages/employee/EmployeeTable";
 import LeaveTable from "./pages/leave/LeaveTable";
 import LeaveTableem from "./pages/leave/LeaveTableem";
 import Announce from "./pages/announcement/Announce";
+import Announceem from "./pages/announcement/Announceem";
 import Doc from "./pages/document/Doc";
 import Set from "./pages/settings/Set";
 import Setem from "./pages/settings/Setem";
@@ -50,6 +51,7 @@ function App() {
           <Route path="/leave-employee" element={<LeaveTableem />} />
           <Route path="/leave" element={<LeaveTable />} />
           <Route path="/announcement" element={<Announce />} />
+          <Route path="/announcement-employee" element={<Announceem />} />
           <Route path="/document" element={<Doc />} />
           <Route path="/file" element={<File />} />
           <Route path="/settings" element={<Set />} />

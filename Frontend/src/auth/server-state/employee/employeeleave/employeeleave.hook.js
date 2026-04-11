@@ -1,18 +1,19 @@
-import { applyLeave,getAllLeaves,getLeaveResult ,deleteLeave,editLeave} from "../../../api/employeeapi/leave/em.leave.api";
+import { applyLeave,getAllLeaves,getLeaveResult ,deleteLeave,editLeave,getallleavehistory} from "../../../api/employeeapi/leave/em.leave.api";
 
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export const useApplyLeave = () => {
-    const queryClient = useQueryClient();
-     return useMutation(applyLeave, {
-          mutationKey: ["applyLeave"],
-          mutationFn:applyLeave,
-          onSuccess: () => {
-               queryClient.invalidateQueries({ queryKey: ["leaves"] });
-          },
-     })
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: ["applyLeave"],
+    mutationFn: applyLeave,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leaves"] });
+    },
+  });
 };
+
 
 export const useGetAllLeaves = () => {
      return useQuery({
@@ -29,23 +30,31 @@ export const useGetLeaveResult = (id) => {
 };
 
 export const useDeleteLeave = () => {
-     const queryClient = useQueryClient();
-     return useMutation(deleteLeave, {
-          mutationKey: ["deleteLeave"],
-          mutationFn:deleteLeave,
-          onSuccess: () => {
-               queryClient.invalidateQueries({ queryKey: ["leaves"] });
-          },
-     })
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: ["deleteLeave"],
+    mutationFn: deleteLeave,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leaves"] });
+    },
+  });
 };
 
+
 export const useEditLeave = () => {
-     const queryClient = useQueryClient();
-     return useMutation(editLeave, {
-          mutationKey: ["editLeave"],
-          mutationFn:editLeave,
-          onSuccess: () => {
-               queryClient.invalidateQueries({ queryKey: ["leaves"] });
-          },
-     })
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: ["editLeave"],
+    mutationFn: editLeave,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leaves"] });
+    },
+  });
+};
+
+export const useGetAllLeaveHistory = () => {
+     return useQuery({
+          queryKey: ["leaveHistory"],
+          queryFn: () => getallleavehistory(),
+     });
 };

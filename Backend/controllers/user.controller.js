@@ -254,7 +254,18 @@ const updatepassword = async (req, res, next) => {
 };
 
 const applyleave = async (req, res, next) => {
-  const user = req.employee;
+  if(!req.employee) {
+    return next(
+      Object.assign(new Error("Unauthorized"), {
+        statusCode: 401,
+      }),
+    );
+  }
+  const user = await usermodel.findById(req.employee._id).select("gender marital_status")
+  .populate({
+    path: "Under_manager",
+    select: "uid f_name l_name work_email role",
+  });
   const { leaveType, startDate, endDate, reason } = req.body;
 
   if (!user) {
@@ -322,7 +333,7 @@ const applyleave = async (req, res, next) => {
       }),
     );
   }
-
+ console.log(user);
   const leave = new Leave({
     employee: user._id,
     manager: user.Under_manager,
@@ -372,28 +383,32 @@ const editleave = async (req, res, next) => {
   });
 };
 const deleteleave = async (req, res, next) => {
-  if(!req.employee){
+  if (!req.employee) {
     return next(
       Object.assign(new Error("Unauthorized"), {
         statusCode: 401,
-      }),
+      })
     );
   }
+
   const leaveid = req.params.id;
+
   const leave = await Leave.findById(leaveid);
   if (!leave) {
     return next(
       Object.assign(new Error("Leave not found"), {
         statusCode: 404,
-      }),
+      })
     );
   }
-  await leave.remove();
+
+  await Leave.findByIdAndDelete(leaveid);
+
   return res.status(200).json({
     success: true,
     message: "Leave deleted successfully",
   });
-}
+};
 const resultofleaverequest = async (req, res, next) => {
   const employee = req.employee;
   const leaveid = req.params.id;
@@ -489,6 +504,26 @@ const getallleave = async (req, res, next) => {
   });
 };
 
+const getallleavehistory = async (req, res, next) => {
+  const user = req.employee;
+
+  if (!user) {
+    return next(
+      Object.assign(new Error("Unauthorized"), {
+        statusCode: 401,
+      }),
+    );
+  }
+
+  const leaves = await Leave.find({ employee: user._id });
+
+  return res.status(200).json({
+    success: true,
+    leaves,
+  });
+};
+
+
 const showannouncements = async (req, res, next) => {
   const employee = req.employee;
 
@@ -509,6 +544,37 @@ const showannouncements = async (req, res, next) => {
     announcements,
   });
 };
+
+const showparticlausannouncements = async (req, res, next) => {
+  if(!req.employee){
+    return next(
+      Object.assign(new Error("Unauthorized"), {
+        statusCode: 401,
+      }),
+    );
+  }
+
+  const announcementid = req.params.id;
+  const announcement = await announcementmodel.findById(announcementid);
+  if (!announcement) {
+    return next(
+      Object.assign(new Error("Announcement not found"), {
+        statusCode: 404,
+      }),
+    );
+  }
+  if (announcement.audience !== "employees" && announcement.audience !== "all") {
+    return next(
+      Object.assign(new Error("Unauthorized"), {
+        statusCode: 401,
+      }),
+    );
+  }
+  return res.status(200).json({
+    success: true,
+    announcement,
+  });
+}
 
 const forgetpasswordloginbyotp = async (req, res, next) => {
   const { work_email } = req.body;
@@ -807,10 +873,12 @@ module.exports = {
   deleteleave,
   resultofleaverequest,
   showannouncements,
+  showparticlausannouncements,
   forgetpasswordloginbyotp,
   verifyOtp,
   resetPasswordafterforget,
   getallleave,
+  getallleavehistory,
   getme,
   editprofileemployee,
 };

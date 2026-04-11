@@ -11,7 +11,6 @@ import { useAdminLogout } from "../auth/server-state/adminauth/adminauth.hook";
 import { useLogoutManager } from "../auth/server-state/manager/managerauth/managerauth.hook";
 import { useLogoutUser } from "../auth/server-state/employee/employeeauth/employeeauth.hook";
 
-// Unified menu for all roles - same paths
 const adminMenu = [
   { name: "Dashboard", path: "/dashboard", icon: <FaHome /> },
   { name: "Employee Register", path: "/employee", icon: <FaUsers /> },
@@ -36,9 +35,8 @@ const managerMenu = [
 const employeeMenu = [
   { name: "Dashboard", path: "/employee-dashboard", icon: <FaHome /> },
   { name: "Leave", path: "/leave-employee", icon: <FaCalendarAlt /> },
-  { name: "Announcement", path: "/announcement", icon: <FaBullhorn /> },
+  { name: "Announcement", path: "/announcement-employee", icon: <FaBullhorn /> },
   { name: "Organisation", path: "/organisation", icon: <FaBuilding /> },
-  { name: "Document", path: "/document", icon: <FaFileAlt /> },
   { name: "File", path: "/file", icon: <FaFolder /> },
   { name: "Settings", path: "/settings-employee", icon: <FaCog /> },
 ];
