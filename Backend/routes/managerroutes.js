@@ -68,6 +68,12 @@ managerrouter.get(
   asyncHandler(managercontroller.showannouncements),
 );
 
+managerrouter.get(
+  "/showannouncement/:id",
+  managermiddleware,
+  asyncHandler(managercontroller.particularannouncement),
+);
+
 managerrouter.post(
   "/forgetpassword",
   asyncHandler(managercontroller.forgetpasswordloginbyotp),

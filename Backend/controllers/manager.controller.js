@@ -482,7 +482,25 @@ const showannouncements = async (req, res, next) => {
   res.status(200).json(announcements);
 };
 
+const particularannouncement = async (req, res, next) => {
 
+  if (!req.manager) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  }
+
+  const announcementid = req.params.id;
+  const announcement = await announcementmodel.findById(announcementid);
+  if (!announcement) {
+    return next(Object.assign(new Error("Announcement not found"), { statusCode: 404 }));
+  }
+  if (announcement.audience !== "managers" && announcement.audience !== "all") {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  }
+  return res.status(200).json({
+    success: true,
+    announcement,
+  });
+}
 const viewEmployeeDocuments = async (req, res, next) => {
   const { employeeId } = req.params;
 
@@ -792,4 +810,5 @@ const getme = async (req, res, next) => {
   });
 };
 // Done
-module.exports = { verifyManagerEmail  , managerlogin, managerlogout, showPasswordPage,managerFirstLoginPasswordChange, managerUpdatePassword, userunderme,  viewallleaves, acceptleaverequest, rejectleaverequest, forwardedtoadmin, showannouncements, viewEmployeeDocuments,  forgetpasswordloginbyotp, showPasswordPageotp,verifyManagerOtp, resetManagerPassword ,getmyleaves,applyleavem,reviewtoemployee,getme};
+module.exports = { verifyManagerEmail  , managerlogin, managerlogout, showPasswordPage,managerFirstLoginPasswordChange, managerUpdatePassword, userunderme,  viewallleaves, acceptleaverequest, rejectleaverequest, forwardedtoadmin, showannouncements,
+  particularannouncement, viewEmployeeDocuments,  forgetpasswordloginbyotp, showPasswordPageotp,verifyManagerOtp, resetManagerPassword ,getmyleaves,applyleavem,reviewtoemployee,getme};
