@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api= axios.create({
-  baseURL: 'http://localhost:5000/api/manager',
+  baseURL: 'http://localhost:5000/manager',
   withCredentials: true,
 });
 
@@ -37,4 +37,25 @@ export const getUsersUnderManager = async () => {
   return res.data;
 };
 
+export const editManagerProfile = async (data) => {
+  const res = await api.put("/manager/edit-profile", data);
+  return res.data;
+};
 
+export const changeManagerPassword = async (data) => {
+  const res = await api.put("/manager/change-password", data);
+  return res.data;
+};
+
+export const getAllPersonalDocuments = async () => {
+  const res = await api.get("/getAllPersonalDocuments");
+  return res.data;
+};
+export const getAllExpenseDocuments = async () => {
+  const res = await api.get("/getAllExpenseDocuments");
+  return res.data;
+};
+export const getDocumentDetails = async (documentId) => {
+  const res = await api.get(`/getDocumentDetails/${documentId}`);
+  return res.data;
+};

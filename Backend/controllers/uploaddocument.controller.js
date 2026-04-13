@@ -48,6 +48,9 @@ const uploadDocument = async (req, res) => {
     const document = new Document({
       title,
       employee: employee._id,
+      uploadedAt: new Date(),
+      viewedByManager: false,
+      underManager: employee.Under_manager,
       fileType,
       fileUrl: uploadResponse.url,
       fileId: uploadResponse.fileId,
