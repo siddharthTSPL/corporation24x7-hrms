@@ -47,3 +47,15 @@ export const changeManagerPassword = async (data) => {
   return res.data;
 };
 
+export const getAllPersonalDocuments = async () => {
+  const res = await api.get("/getAllPersonalDocuments");
+  return res.data;
+};
+export const getAllExpenseDocuments = async () => {
+  const res = await api.get("/getAllExpenseDocuments");
+  return res.data;
+};
+export const getDocumentDetails = async (documentId) => {
+  const res = await api.get(`/getDocumentDetails/${documentId}`);
+  return res.data;
+};

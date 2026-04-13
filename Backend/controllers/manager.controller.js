@@ -194,7 +194,6 @@ const managerFirstLoginPasswordChange = async (req, res, next) => {
 };
 
 
-
 const managerUpdatePassword = async (req, res, next) => {
 
   if (!req.manager) {
@@ -261,7 +260,6 @@ const userunderme = async (req, res, next) => {
 };
 
 
-
 const viewallleaves = async (req, res, next) => {
 
   if (!req.manager) {
@@ -276,8 +274,6 @@ const viewallleaves = async (req, res, next) => {
 
   res.status(200).json(leaves);
 };
-
-
 
 
 const acceptleaverequest = async (req, res, next) => {
@@ -334,8 +330,6 @@ const acceptleaverequest = async (req, res, next) => {
     leaveBalance: updatedBalance,
   });
 };
-
-
 
 const rejectleaverequest = async (req, res, next) => {
   const { leaveId } = req.body;
@@ -502,41 +496,155 @@ const particularannouncement = async (req, res, next) => {
     announcement,
   });
 }
-const viewEmployeeDocuments = async (req, res, next) => {
-  const { employeeId } = req.params;
+const getAllPersonalDocuments = async (req, res, next) => {
+  try {
+    if (!req.manager) {
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+    }
 
-  if (!req.manager) {
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+    const employees = await usermodel.find({
+      Under_manager: req.manager._id
+    }).select("_id");
+
+    const employeeIds = employees.map(emp => emp._id);
+
+    const documents = await Document.find({
+      employee: { $in: employeeIds },
+      fileType: "personal"
+    })
+    .populate("employee", "f_name l_name work_email personal_contact")
+    .sort({ createdAt: -1 });
+
+    if (!documents.length) {
+      return next(
+        Object.assign(new Error("No personal documents found"), { statusCode: 404 })
+      );
+    }
+
+    res.status(200).json({
+      message: "All personal documents fetched successfully",
+      total: documents.length,
+      documents: documents.map(doc => ({
+        id: doc._id,
+        title: doc.title,
+        fileUrl: doc.fileUrl,
+        fileType: doc.fileType,
+        sizeKB: doc.size,
+        uploadedAt: doc.uploadedAt,
+        viewedByManager: doc.viewedByManager,
+        employee: {
+          id: doc.employee._id,
+          name: `${doc.employee.f_name} ${doc.employee.l_name}`,
+          email: doc.employee.work_email,
+          contact: doc.employee.personal_contact
+        }
+      }))
+    });
+
+  } catch (error) {
+    next(error);
   }
-
-  const employee = await usermodel.findOne({
-    _id: employeeId,
-    Under_manager: req.manager._id
-  });
-
-  if (!employee) {
-    return next(
-      Object.assign(new Error("This employee is not under your management"), {
-        statusCode: 403
-      })
-    );
-  }
-
-  const documents = await Document.find({ employee: employeeId });
-
-  if (!documents.length) {
-    return next(
-      Object.assign(new Error("No documents found"), { statusCode: 404 })
-    );
-  }
-
-  res.status(200).json({
-    message: "Documents fetched successfully",
-    url: documents.map((doc) => doc.fileUrl)
-  });
 };
+const getAllExpenseDocuments = async (req, res, next) => {
+  try {
+    if (!req.manager) {
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+    }
 
+    const employees = await usermodel.find({
+      Under_manager: req.manager._id
+    }).select("_id");
 
+    const employeeIds = employees.map(emp => emp._id);
+
+    const documents = await Document.find({
+      employee: { $in: employeeIds },
+      fileType: "expense"
+    })
+    .populate("employee", "f_name l_name work_email personal_contact")
+    .sort({ createdAt: -1 });
+
+    if (!documents.length) {
+      return next(
+        Object.assign(new Error("No expense documents found"), { statusCode: 404 })
+      );
+    }
+
+    res.status(200).json({
+      message: "All expense documents fetched successfully",
+      total: documents.length,
+      documents: documents.map(doc => ({
+        id: doc._id,
+        title: doc.title,
+        fileUrl: doc.fileUrl,
+        fileType: doc.fileType,
+        sizeKB: doc.size,
+        uploadedAt: doc.uploadedAt,
+        viewedByManager: doc.viewedByManager,
+        employee: {
+          id: doc.employee._id,
+          name: `${doc.employee.f_name} ${doc.employee.l_name}`,
+          email: doc.employee.work_email,
+          contact: doc.employee.personal_contact
+        }
+      }))
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+const getDocumentDetails = async (req, res, next) => {
+  try {
+    const { documentId } = req.params;
+  console.log(documentId);
+    if (!req.manager) {
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+    }
+
+    const document = await Document.findById(documentId)
+      .populate("employee", "f_name l_name work_email personal_contact Under_manager");
+
+    if (!document) {
+      return next(
+        Object.assign(new Error("Document not found"), { statusCode: 404 })
+      );
+    }
+
+    // Security check
+    if (document.employee.Under_manager.toString() !== req.manager._id.toString()) {
+      return next(
+        Object.assign(new Error("Not authorized"), { statusCode: 403 })
+      );
+    }
+
+    // Mark as viewed
+    document.viewedByManager = true;
+    await document.save();
+
+    res.status(200).json({
+      message: "Document details fetched successfully",
+      document: {
+        id: document._id,
+        title: document.title,
+        fileUrl: document.fileUrl,
+        fileType: document.fileType,
+        sizeKB: document.size,
+        uploadedAt: document.uploadedAt,
+        viewedByManager: document.viewedByManager,
+        employee: {
+          id: document.employee._id,
+          name: `${document.employee.f_name} ${document.employee.l_name}`,
+          email: document.employee.work_email,
+          contact: document.employee.personal_contact
+        }
+      }
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
 const forgetpasswordloginbyotp = async (req, res, next) => {
   const { work_email } = req.body;
 
@@ -948,4 +1056,4 @@ const changepassword = async (req, res, next) => {
 };
 
 module.exports = { verifyManagerEmail  , managerlogin, managerlogout, showPasswordPage,managerFirstLoginPasswordChange, managerUpdatePassword, userunderme,  viewallleaves, acceptleaverequest, rejectleaverequest, forwardedtoadmin, showannouncements,
-  particularannouncement, viewEmployeeDocuments,  forgetpasswordloginbyotp, showPasswordPageotp,verifyManagerOtp, resetManagerPassword ,getmyleaves,applyleavem,reviewtoemployee,getme,changepassword,editprofilemanager };
+  particularannouncement, getAllExpenseDocuments,getAllPersonalDocuments,getDocumentDetails, forgetpasswordloginbyotp, showPasswordPageotp,verifyManagerOtp, resetManagerPassword ,getmyleaves,applyleavem,reviewtoemployee,getme,changepassword,editprofilemanager };
