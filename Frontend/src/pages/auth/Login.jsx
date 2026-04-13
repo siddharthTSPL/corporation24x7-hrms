@@ -23,7 +23,7 @@ function Login() {
 
   const images = ["/src/assets/slide1.png", "/src/assets/slide2.png", "/src/assets/slide3.png"];
 
-  // Redirect all authenticated users to /dashboard
+ 
   useEffect(() => {
     if (!authLoading && authData) {
       navigate("/dashboard", { replace: true });
