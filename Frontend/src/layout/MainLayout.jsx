@@ -11,7 +11,7 @@ export default function MainLayout() {
       <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
 
       <div className="flex-1 flex flex-col">
-        <Navbar collapsed={collapsed} setCollapsed={setCollapsed} />
+        {/* <Navbar collapsed={collapsed} setCollapsed={setCollapsed} /> */}
         <div className="p-6 overflow-auto flex-1">
           <Outlet />
         </div>
