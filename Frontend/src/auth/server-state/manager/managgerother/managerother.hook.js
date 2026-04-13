@@ -1,4 +1,4 @@
-import { getEmployeeDocuments,forgetPasswordManager, resetManagerPassword, verifyManagerOtpApi,getUsersUnderManager,reviewEmployee , editManagerProfile, changeManagerPassword } from "../../../api/managerapi/other/ma.other.api";
+import { getEmployeeDocuments,forgetPasswordManager, resetManagerPassword, verifyManagerOtpApi,getUsersUnderManager,reviewEmployee , editManagerProfile, changeManagerPassword ,getAllExpenseDocuments, getDocumentDetails,getAllPersonalDocuments} from "../../../api/managerapi/other/ma.other.api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export const useGetEmployeeDocuments = (uid) => {
@@ -94,5 +94,27 @@ export const useUpdatePassword= () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["manager"] });
     },
+  });
+};
+
+export const useGetAllExpenseDocuments = () => {
+  return useQuery({
+    queryKey: ["expenseDocuments"],
+    queryFn: getAllExpenseDocuments,
+  });
+};
+
+export const useGetAllPersonalDocuments = () => {
+  return useQuery({
+    queryKey: ["personalDocuments"],
+    queryFn: getAllPersonalDocuments,
+  });
+};
+
+export const useGetDocumentDetails = (documentId) => {
+  return useQuery({
+    queryKey: ["documentDetails", documentId],
+    queryFn: () => getDocumentDetails(documentId),
+    enabled: !!documentId, 
   });
 };

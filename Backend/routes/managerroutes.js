@@ -57,10 +57,21 @@ managerrouter.post(
 );
 
 managerrouter.get(
-  "/employeedocuments/:employeeId",
+  "/getAllExpenseDocuments",
   managermiddleware,
-  managercontroller.viewEmployeeDocuments,
+  asyncHandler(managercontroller.getAllExpenseDocuments),
 );
+managerrouter.get(
+  "/getAllPersonalDocuments",
+  managermiddleware,
+  asyncHandler(managercontroller.getAllPersonalDocuments),
+);
+managerrouter.get(
+  "/getDocumentDetails/:documentId",
+  managermiddleware,
+  asyncHandler(managercontroller.getDocumentDetails),
+);
+
 
 managerrouter.get(
   "/showannouncements",
