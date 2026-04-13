@@ -57,15 +57,32 @@ managerrouter.post(
 );
 
 managerrouter.get(
-  "/employeedocuments/:employeeId",
+  "/getAllExpenseDocuments",
   managermiddleware,
-  managercontroller.viewEmployeeDocuments,
+  asyncHandler(managercontroller.getAllExpenseDocuments),
 );
+managerrouter.get(
+  "/getAllPersonalDocuments",
+  managermiddleware,
+  asyncHandler(managercontroller.getAllPersonalDocuments),
+);
+managerrouter.get(
+  "/getDocumentDetails/:documentId",
+  managermiddleware,
+  asyncHandler(managercontroller.getDocumentDetails),
+);
+
 
 managerrouter.get(
   "/showannouncements",
   managermiddleware,
   asyncHandler(managercontroller.showannouncements),
+);
+
+managerrouter.get(
+  "/showannouncement/:id",
+  managermiddleware,
+  asyncHandler(managercontroller.particularannouncement),
 );
 
 managerrouter.post(
@@ -103,6 +120,17 @@ managerrouter.get(
   "/getme",
   managermiddleware,
   asyncHandler(managercontroller.getme),
+);
+managerrouter.put(
+  "/manager/edit-profile",
+  managermiddleware,
+  asyncHandler(managercontroller.editprofilemanager)
+);
+
+managerrouter.put(
+  "/manager/change-password",
+  managermiddleware,
+  asyncHandler(managercontroller.changepassword)
 );
 
 module.exports = managerrouter;
