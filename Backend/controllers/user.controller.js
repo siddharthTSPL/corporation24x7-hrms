@@ -781,18 +781,27 @@ const getme = async (req, res, next) => {
   });
 };
 
+
+
 const editprofileemployee = async (req, res, next) => {
   try {
     if (!req.employee) {
       return next(
-        Object.assign(new Error("Unauthorized"), { statusCode: 401 }),
+        Object.assign(new Error("Unauthorized"), { statusCode: 401 })
       );
     }
 
     const employee = req.employee;
 
-    const { personal_contact, e_contact, marital_status, profile_image } =
-      req.body;
+    const {
+      personal_contact,
+      e_contact,
+      marital_status,
+      profile_image,
+      gender 
+    } = req.body;
+
+    let leaveUpdateRequired = false;
 
     if (personal_contact !== undefined) {
       employee.personal_contact = personal_contact;
@@ -802,16 +811,38 @@ const editprofileemployee = async (req, res, next) => {
       employee.e_contact = e_contact;
     }
 
+  
+    if (gender !== undefined) {
+      const allowedGender = ["male", "female"];
+      if (!allowedGender.includes(gender)) {
+        return next(
+          Object.assign(new Error("Invalid gender"), {
+            statusCode: 400,
+          })
+        );
+      }
+
+      if (gender !== employee.gender) {
+        leaveUpdateRequired = true;
+        employee.gender = gender;
+      }
+    }
+
+   
     if (marital_status !== undefined) {
       const allowedStatus = ["single", "married", "divorced"];
       if (!allowedStatus.includes(marital_status)) {
         return next(
           Object.assign(new Error("Invalid marital status"), {
             statusCode: 400,
-          }),
+          })
         );
       }
-      employee.marital_status = marital_status;
+
+      if (marital_status !== employee.marital_status) {
+        leaveUpdateRequired = true;
+        employee.marital_status = marital_status;
+      }
     }
 
     if (profile_image !== undefined) {
@@ -825,14 +856,14 @@ const editprofileemployee = async (req, res, next) => {
           return next(
             Object.assign(new Error("Invalid avatar format"), {
               statusCode: 400,
-            }),
+            })
           );
         }
       } else {
         return next(
           Object.assign(new Error("Profile image must be a string"), {
             statusCode: 400,
-          }),
+          })
         );
       }
     }
@@ -840,6 +871,34 @@ const editprofileemployee = async (req, res, next) => {
     employee.updatedAt = Date.now();
 
     await employee.save();
+
+    if (leaveUpdateRequired) {
+      const leave = await LeaveBalance.findOne({
+        employee: employee._id,
+      });
+
+      if (leave) {
+    
+        leave.ML = 0;
+        leave.PL = 0;
+
+        if (
+          employee.gender === "female" &&
+          employee.marital_status === "married"
+        ) {
+          leave.ML = 182;
+        }
+
+        if (
+          employee.gender === "male" &&
+          employee.marital_status === "married"
+        ) {
+          leave.PL = 7;
+        }
+
+        await leave.save();
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -851,15 +910,21 @@ const editprofileemployee = async (req, res, next) => {
         work_email: employee.work_email,
         personal_contact: employee.personal_contact,
         e_contact: employee.e_contact,
+        gender: employee.gender,
         marital_status: employee.marital_status,
         profile_image: employee.profile_image,
       },
     });
+
   } catch (error) {
     console.error("Employee profile update error:", error);
-    return next(Object.assign(new Error(error.message), { statusCode: 500 }));
+    return next(
+      Object.assign(new Error(error.message), { statusCode: 500 })
+    );
   }
 };
+
+
 
 module.exports = {
   verifyUserEmail,
