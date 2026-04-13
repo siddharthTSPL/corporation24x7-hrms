@@ -919,6 +919,8 @@ const getme = async (req, res, next) => {
   });
 };
 
+
+
 const editprofilemanager = async (req, res, next) => {
   try {
     if (!req.manager) {
@@ -936,7 +938,10 @@ const editprofilemanager = async (req, res, next) => {
       profile_image,
       office_location,
       designation,
+      gender,
     } = req.body;
+
+    let leaveUpdateRequired = false;
 
     if (personal_contact !== undefined) {
       manager.personal_contact = personal_contact;
@@ -944,6 +949,25 @@ const editprofilemanager = async (req, res, next) => {
 
     if (e_contact !== undefined) {
       manager.e_contact = e_contact;
+    }
+
+    if (designation !== undefined) {
+      manager.designation = designation;
+    }
+    if (gender !== undefined) {
+      const allowedGender = ["male", "female"];
+      if (!allowedGender.includes(gender)) {
+        return next(
+          Object.assign(new Error("Invalid gender"), {
+            statusCode: 400,
+          })
+        );
+      }
+
+      if (gender !== manager.gender) {
+        leaveUpdateRequired = true;
+        manager.gender = gender;
+      }
     }
 
     if (marital_status !== undefined) {
@@ -955,7 +979,11 @@ const editprofilemanager = async (req, res, next) => {
           })
         );
       }
-      manager.marital_status = marital_status;
+
+      if (marital_status !== manager.marital_status) {
+        leaveUpdateRequired = true;
+        manager.marital_status = marital_status;
+      }
     }
 
     if (office_location !== undefined) {
@@ -968,10 +996,6 @@ const editprofilemanager = async (req, res, next) => {
         );
       }
       manager.office_location = office_location;
-    }
-
-    if (designation !== undefined) {
-      manager.designation = designation;
     }
 
     if (profile_image !== undefined) {
@@ -1001,6 +1025,33 @@ const editprofilemanager = async (req, res, next) => {
 
     await manager.save();
 
+    if (leaveUpdateRequired) {
+      const leave = await LeaveBalance.findOne({
+        employee: manager._id,
+      });
+
+      if (leave) {
+        leave.ML = 0;
+        leave.PL = 0;
+
+        if (
+          manager.gender === "female" &&
+          manager.marital_status === "married"
+        ) {
+          leave.ML = 182;
+        }
+
+        if (
+          manager.gender === "male" &&
+          manager.marital_status === "married"
+        ) {
+          leave.PL = 7;
+        }
+
+        await leave.save();
+      }
+    }
+
     res.status(200).json({
       success: true,
       message: "Manager profile updated successfully",
@@ -1011,6 +1062,7 @@ const editprofilemanager = async (req, res, next) => {
         work_email: manager.work_email,
         personal_contact: manager.personal_contact,
         e_contact: manager.e_contact,
+        gender: manager.gender,
         marital_status: manager.marital_status,
         office_location: manager.office_location,
         designation: manager.designation,
@@ -1020,9 +1072,13 @@ const editprofilemanager = async (req, res, next) => {
     });
   } catch (error) {
     console.error("Manager profile update error:", error);
-    return next(Object.assign(new Error(error.message), { statusCode: 500 }));
+    return next(
+      Object.assign(new Error(error.message), { statusCode: 500 })
+    );
   }
 };
+
+
 
 const changepassword = async (req, res, next) => {
   try {
