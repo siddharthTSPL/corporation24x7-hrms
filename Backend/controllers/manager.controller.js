@@ -12,6 +12,7 @@ const axios = require("axios");
 const Review = require("../Models/review.model");
 
 const jwt = require("jsonwebtoken");
+
 require("dotenv").config();
 
 const verifyManagerEmail = async (req, res, next) => {
@@ -809,6 +810,142 @@ const getme = async (req, res, next) => {
     review,
   });
 };
-// Done
+
+const editprofilemanager = async (req, res, next) => {
+  try {
+    if (!req.manager) {
+      return next(
+        Object.assign(new Error("Unauthorized"), { statusCode: 401 })
+      );
+    }
+
+    const manager = req.manager;
+
+    const {
+      personal_contact,
+      e_contact,
+      marital_status,
+      profile_image,
+      office_location,
+      designation,
+    } = req.body;
+
+    if (personal_contact !== undefined) {
+      manager.personal_contact = personal_contact;
+    }
+
+    if (e_contact !== undefined) {
+      manager.e_contact = e_contact;
+    }
+
+    if (marital_status !== undefined) {
+      const allowedStatus = ["single", "married", "divorced"];
+      if (!allowedStatus.includes(marital_status)) {
+        return next(
+          Object.assign(new Error("Invalid marital status"), {
+            statusCode: 400,
+          })
+        );
+      }
+      manager.marital_status = marital_status;
+    }
+
+    if (office_location !== undefined) {
+      const allowedLocations = ["Noida", "Bareilly", "Delhi", "Mumbai"];
+      if (!allowedLocations.includes(office_location)) {
+        return next(
+          Object.assign(new Error("Invalid office location"), {
+            statusCode: 400,
+          })
+        );
+      }
+      manager.office_location = office_location;
+    }
+
+    if (designation !== undefined) {
+      manager.designation = designation;
+    }
+
+    if (profile_image !== undefined) {
+      if (typeof profile_image === "string") {
+        if (
+          profile_image === "" ||
+          profile_image.includes("api.dicebear.com")
+        ) {
+          manager.profile_image = profile_image;
+        } else {
+          return next(
+            Object.assign(new Error("Invalid avatar format"), {
+              statusCode: 400,
+            })
+          );
+        }
+      } else {
+        return next(
+          Object.assign(new Error("Profile image must be a string"), {
+            statusCode: 400,
+          })
+        );
+      }
+    }
+
+    manager.updatedAt = Date.now();
+
+    await manager.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Manager profile updated successfully",
+      manager: {
+        _id: manager._id,
+        f_name: manager.f_name,
+        l_name: manager.l_name,
+        work_email: manager.work_email,
+        personal_contact: manager.personal_contact,
+        e_contact: manager.e_contact,
+        marital_status: manager.marital_status,
+        office_location: manager.office_location,
+        designation: manager.designation,
+        profile_image: manager.profile_image,
+        role: manager.role,
+      },
+    });
+  } catch (error) {
+    console.error("Manager profile update error:", error);
+    return next(Object.assign(new Error(error.message), { statusCode: 500 }));
+  }
+};
+
+const changepassword = async (req, res, next) => {
+  try {
+    const managerId = req.manager.id;
+    const { oldPassword, newPassword } = req.body;
+
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    const manager = await managermodel.findById(managerId);
+
+    if (!manager) {
+      return res.status(404).json({ message: "Manager not found" });
+    }
+
+    const isMatch = await manager.isValidPassword(oldPassword);
+
+    if (!isMatch) {
+      return res.status(400).json({ message: "Old password is incorrect" });
+    }
+
+    manager.password = newPassword; 
+    await manager.save();
+
+    res.status(200).json({ message: "Password updated successfully" });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = { verifyManagerEmail  , managerlogin, managerlogout, showPasswordPage,managerFirstLoginPasswordChange, managerUpdatePassword, userunderme,  viewallleaves, acceptleaverequest, rejectleaverequest, forwardedtoadmin, showannouncements,
-  particularannouncement, viewEmployeeDocuments,  forgetpasswordloginbyotp, showPasswordPageotp,verifyManagerOtp, resetManagerPassword ,getmyleaves,applyleavem,reviewtoemployee,getme};
+  particularannouncement, viewEmployeeDocuments,  forgetpasswordloginbyotp, showPasswordPageotp,verifyManagerOtp, resetManagerPassword ,getmyleaves,applyleavem,reviewtoemployee,getme,changepassword,editprofilemanager };

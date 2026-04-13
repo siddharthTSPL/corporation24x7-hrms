@@ -1,4 +1,4 @@
-import { getEmployeeDocuments,forgetPasswordManager, resetManagerPassword, verifyManagerOtpApi,getUsersUnderManager,reviewEmployee  } from "../../../api/managerapi/other/ma.other.api";
+import { getEmployeeDocuments,forgetPasswordManager, resetManagerPassword, verifyManagerOtpApi,getUsersUnderManager,reviewEmployee , editManagerProfile, changeManagerPassword } from "../../../api/managerapi/other/ma.other.api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export const useGetEmployeeDocuments = (uid) => {
@@ -72,3 +72,27 @@ export const useReviewEmployee = () => {
         },
    })
 }
+
+export const useUpdateProfile = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationKey: ["editManagerProfile"],
+    mutationFn: editManagerProfile,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["manager"] });
+    },
+  });
+};
+
+export const useUpdatePassword= () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationKey: ["changeManagerPassword"],
+    mutationFn: changeManagerPassword,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["manager"] });
+    },
+  });
+};

@@ -110,5 +110,16 @@ managerrouter.get(
   managermiddleware,
   asyncHandler(managercontroller.getme),
 );
+managerrouter.put(
+  "/manager/edit-profile",
+  managermiddleware,
+  asyncHandler(managercontroller.editprofilemanager)
+);
+
+managerrouter.put(
+  "/manager/change-password",
+  managermiddleware,
+  asyncHandler(managercontroller.changepassword)
+);
 
 module.exports = managerrouter;
