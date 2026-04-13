@@ -14,7 +14,6 @@ import { useLogoutUser } from "../auth/server-state/employee/employeeauth/employ
 const adminMenu = [
   { name: "Dashboard", path: "/dashboard", icon: <FaHome /> },
   { name: "Employee Register", path: "/employee", icon: <FaUsers /> },
-  { name: "Leave", path: "/leave", icon: <FaCalendarAlt /> },
   { name: "Announcement", path: "/announcement", icon: <FaBullhorn /> },
   { name: "Organisation", path: "/organisation", icon: <FaBuilding /> },
   { name: "Settings", path: "/settings", icon: <FaCog /> },

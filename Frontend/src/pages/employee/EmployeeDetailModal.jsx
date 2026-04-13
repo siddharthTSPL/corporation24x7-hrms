@@ -1,13 +1,13 @@
 "use client";
 import { FaTimes, FaPhone, FaEnvelope, FaMapMarkerAlt, FaBriefcase, FaCalendarAlt, FaClipboard } from "react-icons/fa";
-import { useGetParticularEmployeeStats,useGetParticularManager } from "../../auth/server-state/adminother/adminother.hook";
+import { useGetParticularEmployeeStats } from "../../auth/server-state/adminother/adminother.hook";
 
 function DetailSection({ title, icon, children }) {
   return (
     <div className="mb-6">
-      <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-200">
-        <span className="text-[var(--primary)] text-lg">{icon}</span>
-        <h3 className="text-sm font-bold uppercase tracking-wider text-gray-600">{title}</h3>
+      <div className="flex items-center gap-2 mb-4 pb-3 border-b border-[#F4C0D1]">
+        <span className="text-[#CD166E] text-lg">{icon}</span>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-[#993556]">{title}</h3>
       </div>
       <div className="space-y-3">{children}</div>
     </div>
@@ -16,11 +16,11 @@ function DetailSection({ title, icon, children }) {
 
 function DetailRow({ label, value, icon }) {
   return (
-    <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
-      {icon && <span className="text-gray-400 text-sm mt-0.5 flex-shrink-0">{icon}</span>}
+    <div className="flex items-start gap-3 p-3 rounded-lg bg-[#F9F8F2] hover:bg-[#FBEAF0] transition-colors border border-[#F4C0D1]">
+      {icon && <span className="text-[#993556] text-sm mt-0.5 flex-shrink-0">{icon}</span>}
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">{label}</p>
-        <p className="text-sm text-gray-700 break-words">{value || "—"}</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-[#993556]">{label}</p>
+        <p className="text-sm text-[#730042] break-words">{value || "—"}</p>
       </div>
     </div>
   );
@@ -28,22 +28,25 @@ function DetailRow({ label, value, icon }) {
 
 function Badge({ label, type = "dept" }) {
   const styles = {
-    dept: "bg-[var(--secondary)]/30 text-[#007BAE]",
-    role: "bg-[var(--accent)]/30 text-yellow-700",
-    manager: "bg-purple-100 text-purple-700",
-    active: "bg-green-100 text-green-700",
+    dept:    "bg-[#FBEAF0] text-[#730042]",
+    role:    "bg-[#FEF3E8] text-[#7A3500]",
+    manager: "bg-[#EEEDFE] text-[#3C3489]",
+    smgr:    "bg-[#E1F5EE] text-[#085041]",
+    active:  "bg-[#E1F5EE] text-[#085041]",
   };
   return (
-    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${styles[type] ?? styles.dept}`}>{label}</span>
+    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${styles[type] ?? styles.dept}`}>
+      {label}
+    </span>
   );
 }
 
 function Avatar({ name, size = "lg" }) {
   const safe = name || "??";
   const initials = safe.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
-  const colors = ["#00A8E8", "#FDCB6E", "#90DBF4", "#6C63FF", "#FF6584"];
+  const colors = ["#CD166E", "#730042", "#993556", "#72243E", "#A0186A"];
   const color = colors[safe.charCodeAt(0) % colors.length];
-  
+
   const sizeClasses = {
     sm: "w-8 h-8 text-xs",
     md: "w-12 h-12 text-sm",
@@ -51,7 +54,10 @@ function Avatar({ name, size = "lg" }) {
   };
 
   return (
-    <div className={`${sizeClasses[size]} rounded-full flex items-center justify-center font-bold text-white flex-shrink-0`} style={{ background: color }}>
+    <div
+      className={`${sizeClasses[size]} rounded-full flex items-center justify-center font-bold text-white flex-shrink-0`}
+      style={{ background: color }}
+    >
       {initials}
     </div>
   );
@@ -62,54 +68,65 @@ export default function EmployeeDetailModal({ employeeId, onClose }) {
 
   if (!employeeId) return null;
 
-  const user = data?.user;
-  const manager = data?.manager;
+  const user        = data?.user;
   const leaveBalance = data?.leaveBalance;
-  const reviews = data?.reviews || [];
+  const reviews     = data?.reviews || [];
 
   return (
     <div
-      className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 flex items-center justify-center z-50 p-4"
+      style={{ background: "rgba(115,0,66,0.32)", backdropFilter: "blur(2px)" }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
+      <div className="bg-white w-full max-w-4xl rounded-2xl flex flex-col max-h-[92vh] overflow-hidden border border-[#F4C0D1]">
+
         {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)]">
+        <div
+          className="flex items-start justify-between p-6 border-b border-[#F4C0D1]"
+          style={{ background: "#730042" }}
+        >
           <div className="flex items-start gap-4">
             <Avatar name={`${user?.f_name ?? ""} ${user?.l_name ?? ""}`} size="lg" />
             <div className="text-white">
               <h2 className="text-2xl font-bold">{user?.f_name} {user?.l_name}</h2>
-              <p className="text-sm text-white/80 mt-1">{user?.work_email}</p>
+              <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.6)" }}>{user?.work_email}</p>
               <div className="flex items-center gap-2 mt-3">
                 <Badge label={user?.department || "—"} type="dept" />
-                <Badge label={user?.role?.replace("_", " ") || "—"} type={user?.role === "employee" ? "role" : "manager"} />
+                <Badge
+                  label={user?.role?.replace("_", " ") || "—"}
+                  type={user?.role === "employee" ? "role" : user?.role === "senior_manager" ? "smgr" : "manager"}
+                />
               </div>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-lg bg-white/20 text-white flex items-center justify-center hover:bg-white/30 transition-colors"
+            className="w-10 h-10 rounded-lg flex items-center justify-center text-white transition-colors"
+            style={{ background: "rgba(255,255,255,0.18)" }}
+            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.28)"}
+            onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.18)"}
           >
             <FaTimes size={16} />
           </button>
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto flex-1 p-6">
+        <div className="overflow-y-auto flex-1 p-6" style={{ background: "#F9F8F2" }}>
           {isLoading ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
-                <div className="w-10 h-10 border-4 border-gray-200 border-t-[var(--primary)] rounded-full animate-spin mx-auto mb-3"></div>
-                <p className="text-sm text-gray-500">Loading employee details...</p>
+                <div className="w-10 h-10 border-4 border-[#F4C0D1] border-t-[#CD166E] rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-sm text-[#993556]">Loading employee details...</p>
               </div>
             </div>
           ) : error ? (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-              <p className="text-sm text-red-600 font-medium">Failed to load employee details</p>
-              <p className="text-xs text-red-500 mt-1">{error?.message}</p>
+            <div className="bg-[#FBEAF0] border border-[#F4C0D1] rounded-lg p-4 text-center">
+              <p className="text-sm text-[#730042] font-medium">Failed to load employee details</p>
+              <p className="text-xs text-[#993556] mt-1">{error?.message}</p>
             </div>
           ) : (
             <div className="space-y-6">
+
               {/* Personal Information */}
               <DetailSection title="Personal Information" icon="👤">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -133,16 +150,20 @@ export default function EmployeeDetailModal({ employeeId, onClose }) {
               {/* Manager Information */}
               {user?.Under_manager && (
                 <DetailSection title="Manager" icon={<FaBriefcase size={14} />}>
-                  <div className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-100">
+                  <div className="p-4 rounded-lg border border-[#F4C0D1]" style={{ background: "#FBEAF0" }}>
                     <div className="flex items-start gap-3">
                       <Avatar name={`${user.Under_manager.f_name} ${user.Under_manager.l_name}`} size="md" />
                       <div className="flex-1">
-                        <p className="font-semibold text-gray-700">{user.Under_manager.f_name} {user.Under_manager.l_name}</p>
-                        <p className="text-xs text-gray-500 mt-1">ID: {user.Under_manager.uid}</p>
-                        <p className="text-xs text-gray-600 mt-2 flex items-center gap-1">
+                        <p className="font-semibold text-[#730042]">
+                          {user.Under_manager.f_name} {user.Under_manager.l_name}
+                        </p>
+                        <p className="text-xs text-[#993556] mt-1">ID: {user.Under_manager.uid}</p>
+                        <p className="text-xs text-[#993556] mt-2 flex items-center gap-1">
                           <FaEnvelope size={10} /> {user.Under_manager.work_email}
                         </p>
-                        <Badge label={user.Under_manager.role?.replace("_", " ") || "—"} type="manager" />
+                        <div className="mt-2">
+                          <Badge label={user.Under_manager.role?.replace("_", " ") || "—"} type="manager" />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -152,115 +173,114 @@ export default function EmployeeDetailModal({ employeeId, onClose }) {
               {/* Leave Balance */}
               {leaveBalance && (
                 <DetailSection title="Leave Balance" icon={<FaCalendarAlt size={14} />}>
-                  <div className="space-y-4">
-                    {/* Earned Leave (EL) */}
+                  <div className="space-y-3">
+
                     {leaveBalance.EL && typeof leaveBalance.EL === "object" && (
-                      <div className="p-4 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg border border-yellow-200">
+                      <div className="p-4 rounded-lg border border-[#FAC775]" style={{ background: "#FEF9EC" }}>
                         <div className="flex items-center justify-between mb-3">
-                          <h4 className="font-bold text-gray-800">Earned Leave (EL)</h4>
-                          <span className="text-2xl font-bold text-yellow-600">{(leaveBalance.EL.entitled || 0) - (leaveBalance.EL.availed || 0)}</span>
+                          <h4 className="font-semibold text-[#730042]">Earned Leave (EL)</h4>
+                          <span className="text-2xl font-bold text-[#854F0B]">
+                            {(leaveBalance.EL.entitled || 0) - (leaveBalance.EL.availed || 0)}
+                          </span>
                         </div>
                         <div className="grid grid-cols-3 gap-3">
                           <div className="bg-white rounded p-3 text-center">
-                            <p className="text-xs text-gray-500 font-semibold">Entitled</p>
-                            <p className="text-lg font-bold text-gray-700 mt-1">{leaveBalance.EL.entitled || 0}</p>
+                            <p className="text-xs text-[#993556] font-semibold uppercase tracking-wider">Entitled</p>
+                            <p className="text-lg font-bold text-[#730042] mt-1">{leaveBalance.EL.entitled || 0}</p>
                           </div>
                           <div className="bg-white rounded p-3 text-center">
-                            <p className="text-xs text-gray-500 font-semibold">Availed</p>
-                            <p className="text-lg font-bold text-red-600 mt-1">{leaveBalance.EL.availed || 0}</p>
+                            <p className="text-xs text-[#993556] font-semibold uppercase tracking-wider">Availed</p>
+                            <p className="text-lg font-bold text-[#A32D2D] mt-1">{leaveBalance.EL.availed || 0}</p>
                           </div>
                           <div className="bg-white rounded p-3 text-center">
-                            <p className="text-xs text-gray-500 font-semibold">Accrued</p>
-                            <p className="text-lg font-bold text-green-600 mt-1">{leaveBalance.EL.accrued || 0}</p>
+                            <p className="text-xs text-[#993556] font-semibold uppercase tracking-wider">Accrued</p>
+                            <p className="text-lg font-bold text-[#3B6D11] mt-1">{leaveBalance.EL.accrued || 0}</p>
                           </div>
                         </div>
                       </div>
                     )}
 
-                    {/* Sick Leave (SL) */}
                     {leaveBalance.SL && typeof leaveBalance.SL === "object" && (
-                      <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+                      <div className="p-4 rounded-lg border border-[#85B7EB]" style={{ background: "#E6F1FB" }}>
                         <div className="flex items-center justify-between mb-3">
-                          <h4 className="font-bold text-gray-800">Sick Leave (SL)</h4>
-                          <span className="text-2xl font-bold text-blue-600">{(leaveBalance.SL.entitled || 0) - (leaveBalance.SL.availed || 0)}</span>
+                          <h4 className="font-semibold text-[#730042]">Sick Leave (SL)</h4>
+                          <span className="text-2xl font-bold text-[#0C447C]">
+                            {(leaveBalance.SL.entitled || 0) - (leaveBalance.SL.availed || 0)}
+                          </span>
                         </div>
                         <div className="grid grid-cols-3 gap-3">
                           <div className="bg-white rounded p-3 text-center">
-                            <p className="text-xs text-gray-500 font-semibold">Entitled</p>
-                            <p className="text-lg font-bold text-gray-700 mt-1">{leaveBalance.SL.entitled || 0}</p>
+                            <p className="text-xs text-[#993556] font-semibold uppercase tracking-wider">Entitled</p>
+                            <p className="text-lg font-bold text-[#730042] mt-1">{leaveBalance.SL.entitled || 0}</p>
                           </div>
                           <div className="bg-white rounded p-3 text-center">
-                            <p className="text-xs text-gray-500 font-semibold">Availed</p>
-                            <p className="text-lg font-bold text-red-600 mt-1">{leaveBalance.SL.availed || 0}</p>
+                            <p className="text-xs text-[#993556] font-semibold uppercase tracking-wider">Availed</p>
+                            <p className="text-lg font-bold text-[#A32D2D] mt-1">{leaveBalance.SL.availed || 0}</p>
                           </div>
                           <div className="bg-white rounded p-3 text-center">
-                            <p className="text-xs text-gray-500 font-semibold">Accrued</p>
-                            <p className="text-lg font-bold text-green-600 mt-1">{leaveBalance.SL.accrued || 0}</p>
+                            <p className="text-xs text-[#993556] font-semibold uppercase tracking-wider">Accrued</p>
+                            <p className="text-lg font-bold text-[#3B6D11] mt-1">{leaveBalance.SL.accrued || 0}</p>
                           </div>
                         </div>
                       </div>
                     )}
 
-                    {/* Maternity Leave (ML) */}
                     {leaveBalance.ML !== undefined && (
-                      <div className="p-4 bg-gradient-to-br from-pink-50 to-pink-100 rounded-lg border border-pink-200">
+                      <div className="p-4 rounded-lg border border-[#F4C0D1]" style={{ background: "#FBEAF0" }}>
                         <div className="flex items-center justify-between">
-                          <h4 className="font-bold text-gray-800">Maternity Leave (ML)</h4>
-                          <span className="text-2xl font-bold text-pink-600">{leaveBalance.ML || 0}</span>
+                          <h4 className="font-semibold text-[#730042]">Maternity Leave (ML)</h4>
+                          <span className="text-2xl font-bold text-[#CD166E]">{leaveBalance.ML || 0}</span>
                         </div>
                       </div>
                     )}
 
-                    {/* Personal Leave (PL) */}
                     {leaveBalance.PL !== undefined && (
-                      <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border border-purple-200">
+                      <div className="p-4 rounded-lg border border-[#F4C0D1]" style={{ background: "#FBEAF0" }}>
                         <div className="flex items-center justify-between">
-                          <h4 className="font-bold text-gray-800">Personal Leave (PL)</h4>
-                          <span className="text-2xl font-bold text-purple-600">{leaveBalance.PL || 0}</span>
+                          <h4 className="font-semibold text-[#730042]">Personal Leave (PL)</h4>
+                          <span className="text-2xl font-bold text-[#CD166E]">{leaveBalance.PL || 0}</span>
                         </div>
                       </div>
                     )}
 
-                    {/* Privilege Bonus Casual (PBC) */}
                     {leaveBalance.pbc !== undefined && (
-                      <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
+                      <div className="p-4 rounded-lg border border-[#9FE1CB]" style={{ background: "#E1F5EE" }}>
                         <div className="flex items-center justify-between">
-                          <h4 className="font-bold text-gray-800">Privilege Bonus Casual (PBC)</h4>
-                          <span className="text-2xl font-bold text-green-600">{leaveBalance.pbc || 0}</span>
+                          <h4 className="font-semibold text-[#730042]">Privilege Bonus Casual (PBC)</h4>
+                          <span className="text-2xl font-bold text-[#085041]">{leaveBalance.pbc || 0}</span>
                         </div>
                       </div>
                     )}
 
-                    {/* Loss of Pay (LWP) */}
                     {leaveBalance.lwp !== undefined && (
-                      <div className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg border border-orange-200">
+                      <div className="p-4 rounded-lg border border-[#FAC775]" style={{ background: "#FAEEDA" }}>
                         <div className="flex items-center justify-between">
-                          <h4 className="font-bold text-gray-800">Loss of Pay (LWP)</h4>
-                          <span className="text-2xl font-bold text-orange-600">{leaveBalance.lwp || 0}</span>
+                          <h4 className="font-semibold text-[#730042]">Loss of Pay (LWP)</h4>
+                          <span className="text-2xl font-bold text-[#633806]">{leaveBalance.lwp || 0}</span>
                         </div>
                       </div>
                     )}
                   </div>
 
                   {/* Summary Card */}
-                  <div className="mt-6 p-4 bg-gray-900 text-white rounded-lg">
-                    <h4 className="font-bold mb-3">Balance Summary</h4>
+                  <div className="mt-4 p-4 rounded-lg" style={{ background: "#730042" }}>
+                    <h4 className="font-semibold mb-3 text-white">Balance Summary</h4>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       <div>
-                        <p className="text-xs text-gray-300">Total Entitled</p>
-                        <p className="text-xl font-bold">
-                          {((leaveBalance.EL?.entitled || 0) + (leaveBalance.SL?.entitled || 0) + (leaveBalance.ML || 0) + (leaveBalance.PL || 0) + (leaveBalance.pbc || 0))}
+                        <p className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>Total Entitled</p>
+                        <p className="text-xl font-bold text-white">
+                          {(leaveBalance.EL?.entitled || 0) + (leaveBalance.SL?.entitled || 0) + (leaveBalance.ML || 0) + (leaveBalance.PL || 0) + (leaveBalance.pbc || 0)}
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-300">Total Availed</p>
-                        <p className="text-xl font-bold text-red-400">
-                          {((leaveBalance.EL?.availed || 0) + (leaveBalance.SL?.availed || 0))}
+                        <p className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>Total Availed</p>
+                        <p className="text-xl font-bold text-[#F09595]">
+                          {(leaveBalance.EL?.availed || 0) + (leaveBalance.SL?.availed || 0)}
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-300">Total Balance</p>
-                        <p className="text-xl font-bold text-green-400">
+                        <p className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>Total Balance</p>
+                        <p className="text-xl font-bold text-[#9FE1CB]">
                           {((leaveBalance.EL?.entitled || 0) + (leaveBalance.SL?.entitled || 0) + (leaveBalance.ML || 0) + (leaveBalance.PL || 0) + (leaveBalance.pbc || 0)) - ((leaveBalance.EL?.availed || 0) + (leaveBalance.SL?.availed || 0))}
                         </p>
                       </div>
@@ -274,22 +294,22 @@ export default function EmployeeDetailModal({ employeeId, onClose }) {
                 <DetailSection title="Performance Reviews" icon={<FaClipboard size={14} />}>
                   <div className="space-y-3">
                     {reviews.map((review, idx) => (
-                      <div key={idx} className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
+                      <div key={idx} className="p-4 rounded-lg border border-[#F4C0D1] hover:border-[#CD166E] transition-colors" style={{ background: "#F9F8F2" }}>
                         <div className="flex items-start justify-between mb-2">
                           <div>
-                            <p className="font-semibold text-gray-700">
+                            <p className="font-semibold text-[#730042]">
                               {review.reviewer?.f_name} {review.reviewer?.l_name}
                             </p>
-                            <p className="text-xs text-gray-500 mt-0.5">{review.reviewer?.role?.replace("_", " ")}</p>
+                            <p className="text-xs text-[#993556] mt-0.5">{review.reviewer?.role?.replace("_", " ")}</p>
                           </div>
                           {review.rating && (
-                            <div className="text-sm font-bold px-3 py-1 rounded-full bg-yellow-100 text-yellow-700">
+                            <div className="text-sm font-bold px-3 py-1 rounded-full bg-[#FEF9EC] text-[#854F0B]">
                               ⭐ {review.rating}/5
                             </div>
                           )}
                         </div>
                         {review.feedback && (
-                          <p className="text-sm text-gray-600 mt-2 leading-relaxed">{review.feedback}</p>
+                          <p className="text-sm text-[#730042] mt-2 leading-relaxed">{review.feedback}</p>
                         )}
                       </div>
                     ))}
@@ -297,10 +317,9 @@ export default function EmployeeDetailModal({ employeeId, onClose }) {
                 </DetailSection>
               )}
 
-              {/* Empty reviews message */}
               {(!reviews || reviews.length === 0) && (
                 <DetailSection title="Performance Reviews" icon={<FaClipboard size={14} />}>
-                  <div className="text-center py-6 text-gray-400">
+                  <div className="text-center py-6 text-[#993556]">
                     <p className="text-sm">No reviews yet</p>
                   </div>
                 </DetailSection>
@@ -310,10 +329,10 @@ export default function EmployeeDetailModal({ employeeId, onClose }) {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+        <div className="px-6 py-4 border-t border-[#F4C0D1] flex justify-end bg-[#F9F8F2]">
           <button
             onClick={onClose}
-            className="px-6 py-2.5 rounded-xl border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors"
+            className="px-6 py-2.5 rounded-xl border border-[#F4C0D1] text-[#730042] text-sm font-semibold hover:bg-[#FBEAF0] transition-colors"
           >
             Close
           </button>
