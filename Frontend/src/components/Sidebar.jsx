@@ -84,7 +84,7 @@ function Sidebar({ collapsed, setCollapsed }) {
       )}
 
       <div
-        className={`fixed md:static z-50 top-0 left-0 h-full bg-white shadow-md transition-all duration-300
+        className={`fixed md:static z-50 top-0 left-0 h-full bg-white shadow-md transition-all duration-300 flex flex-col
         ${collapsed ? "w-16" : "w-56"}
         ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
       >
@@ -107,33 +107,43 @@ function Sidebar({ collapsed, setCollapsed }) {
           <FaChevronDown className={open ? "rotate-180" : ""} />
         </div>
 
-        {open && (
-          <nav className="px-2 flex flex-col gap-1">
-            {menu.map((item, index) => {
-              const active = location.pathname === item.path;
-              return (
-                <Link
-                  key={index}
-                  to={item.path}
-                  className={`flex items-center gap-3 p-3 rounded-lg ${
-                    active ? "bg-[#730042] text-white" : "hover:bg-gray-100"
-                  }`}
-                >
-                  {item.icon}
-                  {!collapsed && item.name}
-                </Link>
-              );
-            })}
+        <div className="flex-1 overflow-y-auto">
+          {open && (
+            <nav className="px-2 flex flex-col gap-1">
+              {menu.map((item, index) => {
+                const active = location.pathname === item.path;
+                return (
+                  <Link
+                    key={index}
+                    to={item.path}
+                    className={`flex items-center gap-3 p-3 rounded-lg ${
+                      active ? "bg-[#730042] text-white" : "hover:bg-gray-100"
+                    }`}
+                  >
+                    {item.icon}
+                    {!collapsed && item.name}
+                  </Link>
+                );
+              })}
 
-            <button
-              onClick={handleLogout}
-              disabled={isPending}
-              className="flex items-center gap-3 p-3 rounded-lg hover:bg-red-100 text-gray-800"
-            >
-              <FaSignOutAlt />
-              {!collapsed && (isPending ? "Logging out..." : "Logout")}
-            </button>
-          </nav>
+              <button
+                onClick={handleLogout}
+                disabled={isPending}
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-red-100 text-gray-800"
+              >
+                <FaSignOutAlt />
+                {!collapsed && (isPending ? "Logging out..." : "Logout")}
+              </button>
+            </nav>
+          )}
+        </div>
+
+        {!collapsed && (
+          <div className="mt-auto border-t border-gray-200 p-4">
+            <p className="text-xs text-center text-gray-500">
+              Powered by TechTorch | &copy; 2026
+            </p>
+          </div>
         )}
       </div>
     </>
