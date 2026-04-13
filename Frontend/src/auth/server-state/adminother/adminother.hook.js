@@ -77,3 +77,10 @@ export const useGetParticularManager = (uid) => {
     enabled: !!uid, 
   });
 };
+export const useGetParticularManagerStats = (uid) => {
+  return useQuery({
+    queryKey: ["manager-stats", uid],
+    queryFn: () => getParticularManager(uid),
+    enabled: !!uid,
+  });
+};

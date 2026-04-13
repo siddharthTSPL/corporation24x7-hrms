@@ -1,6 +1,9 @@
 "use client";
 import { FaTimes, FaPhone, FaEnvelope, FaMapMarkerAlt, FaBriefcase, FaCalendarAlt, FaClipboard } from "react-icons/fa";
-import { useGetParticularEmployeeStats } from "../../auth/server-state/adminother/adminother.hook";
+import {
+  useGetParticularEmployeeStats,
+  useGetParticularManagerStats,
+} from "../../auth/server-state/adminother/adminother.hook";
 
 function DetailSection({ title, icon, children }) {
   return (
@@ -46,13 +49,11 @@ function Avatar({ name, size = "lg" }) {
   const initials = safe.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
   const colors = ["#CD166E", "#730042", "#993556", "#72243E", "#A0186A"];
   const color = colors[safe.charCodeAt(0) % colors.length];
-
   const sizeClasses = {
     sm: "w-8 h-8 text-xs",
     md: "w-12 h-12 text-sm",
     lg: "w-20 h-20 text-2xl",
   };
-
   return (
     <div
       className={`${sizeClasses[size]} rounded-full flex items-center justify-center font-bold text-white flex-shrink-0`}
@@ -63,14 +64,19 @@ function Avatar({ name, size = "lg" }) {
   );
 }
 
-export default function EmployeeDetailModal({ employeeId, onClose }) {
-  const { data, isLoading, error } = useGetParticularEmployeeStats(employeeId);
+export default function EmployeeDetailModal({ employeeId, employeeRole, onClose }) {
+  const isManager = employeeRole === "manager" || employeeRole === "senior_manager" || employeeRole === "official";
+
+  const empQuery = useGetParticularEmployeeStats(!isManager ? employeeId : null);
+  const mgrQuery = useGetParticularManagerStats(isManager ? employeeId : null);
+
+  const { data, isLoading, error } = isManager ? mgrQuery : empQuery;
 
   if (!employeeId) return null;
 
-  const user        = data?.user;
+  const user         = isManager ? data?.manager : data?.user;
   const leaveBalance = data?.leaveBalance;
-  const reviews     = data?.reviews || [];
+  const reviews      = data?.reviews || [];
 
   return (
     <div
@@ -81,10 +87,7 @@ export default function EmployeeDetailModal({ employeeId, onClose }) {
       <div className="bg-white w-full max-w-4xl rounded-2xl flex flex-col max-h-[92vh] overflow-hidden border border-[#F4C0D1]">
 
         {/* Header */}
-        <div
-          className="flex items-start justify-between p-6 border-b border-[#F4C0D1]"
-          style={{ background: "#730042" }}
-        >
+        <div className="flex items-start justify-between p-6 border-b border-[#F4C0D1]" style={{ background: "#730042" }}>
           <div className="flex items-start gap-4">
             <Avatar name={`${user?.f_name ?? ""} ${user?.l_name ?? ""}`} size="lg" />
             <div className="text-white">
@@ -116,18 +119,17 @@ export default function EmployeeDetailModal({ employeeId, onClose }) {
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
                 <div className="w-10 h-10 border-4 border-[#F4C0D1] border-t-[#CD166E] rounded-full animate-spin mx-auto mb-3" />
-                <p className="text-sm text-[#993556]">Loading employee details...</p>
+                <p className="text-sm text-[#993556]">Loading details...</p>
               </div>
             </div>
           ) : error ? (
             <div className="bg-[#FBEAF0] border border-[#F4C0D1] rounded-lg p-4 text-center">
-              <p className="text-sm text-[#730042] font-medium">Failed to load employee details</p>
+              <p className="text-sm text-[#730042] font-medium">Failed to load details</p>
               <p className="text-xs text-[#993556] mt-1">{error?.message}</p>
             </div>
           ) : (
             <div className="space-y-6">
 
-              {/* Personal Information */}
               <DetailSection title="Personal Information" icon="👤">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <DetailRow label="Gender" value={user?.gender} />
@@ -137,7 +139,6 @@ export default function EmployeeDetailModal({ employeeId, onClose }) {
                 </div>
               </DetailSection>
 
-              {/* Professional Information */}
               <DetailSection title="Professional Information" icon={<FaBriefcase size={14} />}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <DetailRow label="Designation" value={user?.designation} />
@@ -147,16 +148,13 @@ export default function EmployeeDetailModal({ employeeId, onClose }) {
                 </div>
               </DetailSection>
 
-              {/* Manager Information */}
-              {user?.Under_manager && (
+              {!isManager && user?.Under_manager && (
                 <DetailSection title="Manager" icon={<FaBriefcase size={14} />}>
                   <div className="p-4 rounded-lg border border-[#F4C0D1]" style={{ background: "#FBEAF0" }}>
                     <div className="flex items-start gap-3">
                       <Avatar name={`${user.Under_manager.f_name} ${user.Under_manager.l_name}`} size="md" />
                       <div className="flex-1">
-                        <p className="font-semibold text-[#730042]">
-                          {user.Under_manager.f_name} {user.Under_manager.l_name}
-                        </p>
+                        <p className="font-semibold text-[#730042]">{user.Under_manager.f_name} {user.Under_manager.l_name}</p>
                         <p className="text-xs text-[#993556] mt-1">ID: {user.Under_manager.uid}</p>
                         <p className="text-xs text-[#993556] mt-2 flex items-center gap-1">
                           <FaEnvelope size={10} /> {user.Under_manager.work_email}
@@ -170,18 +168,14 @@ export default function EmployeeDetailModal({ employeeId, onClose }) {
                 </DetailSection>
               )}
 
-              {/* Leave Balance */}
               {leaveBalance && (
                 <DetailSection title="Leave Balance" icon={<FaCalendarAlt size={14} />}>
                   <div className="space-y-3">
-
                     {leaveBalance.EL && typeof leaveBalance.EL === "object" && (
                       <div className="p-4 rounded-lg border border-[#FAC775]" style={{ background: "#FEF9EC" }}>
                         <div className="flex items-center justify-between mb-3">
                           <h4 className="font-semibold text-[#730042]">Earned Leave (EL)</h4>
-                          <span className="text-2xl font-bold text-[#854F0B]">
-                            {(leaveBalance.EL.entitled || 0) - (leaveBalance.EL.availed || 0)}
-                          </span>
+                          <span className="text-2xl font-bold text-[#854F0B]">{(leaveBalance.EL.entitled || 0) - (leaveBalance.EL.availed || 0)}</span>
                         </div>
                         <div className="grid grid-cols-3 gap-3">
                           <div className="bg-white rounded p-3 text-center">
@@ -199,14 +193,11 @@ export default function EmployeeDetailModal({ employeeId, onClose }) {
                         </div>
                       </div>
                     )}
-
                     {leaveBalance.SL && typeof leaveBalance.SL === "object" && (
                       <div className="p-4 rounded-lg border border-[#85B7EB]" style={{ background: "#E6F1FB" }}>
                         <div className="flex items-center justify-between mb-3">
                           <h4 className="font-semibold text-[#730042]">Sick Leave (SL)</h4>
-                          <span className="text-2xl font-bold text-[#0C447C]">
-                            {(leaveBalance.SL.entitled || 0) - (leaveBalance.SL.availed || 0)}
-                          </span>
+                          <span className="text-2xl font-bold text-[#0C447C]">{(leaveBalance.SL.entitled || 0) - (leaveBalance.SL.availed || 0)}</span>
                         </div>
                         <div className="grid grid-cols-3 gap-3">
                           <div className="bg-white rounded p-3 text-center">
@@ -224,7 +215,6 @@ export default function EmployeeDetailModal({ employeeId, onClose }) {
                         </div>
                       </div>
                     )}
-
                     {leaveBalance.ML !== undefined && (
                       <div className="p-4 rounded-lg border border-[#F4C0D1]" style={{ background: "#FBEAF0" }}>
                         <div className="flex items-center justify-between">
@@ -233,7 +223,6 @@ export default function EmployeeDetailModal({ employeeId, onClose }) {
                         </div>
                       </div>
                     )}
-
                     {leaveBalance.PL !== undefined && (
                       <div className="p-4 rounded-lg border border-[#F4C0D1]" style={{ background: "#FBEAF0" }}>
                         <div className="flex items-center justify-between">
@@ -242,7 +231,6 @@ export default function EmployeeDetailModal({ employeeId, onClose }) {
                         </div>
                       </div>
                     )}
-
                     {leaveBalance.pbc !== undefined && (
                       <div className="p-4 rounded-lg border border-[#9FE1CB]" style={{ background: "#E1F5EE" }}>
                         <div className="flex items-center justify-between">
@@ -251,7 +239,6 @@ export default function EmployeeDetailModal({ employeeId, onClose }) {
                         </div>
                       </div>
                     )}
-
                     {leaveBalance.lwp !== undefined && (
                       <div className="p-4 rounded-lg border border-[#FAC775]" style={{ background: "#FAEEDA" }}>
                         <div className="flex items-center justify-between">
@@ -261,8 +248,6 @@ export default function EmployeeDetailModal({ employeeId, onClose }) {
                       </div>
                     )}
                   </div>
-
-                  {/* Summary Card */}
                   <div className="mt-4 p-4 rounded-lg" style={{ background: "#730042" }}>
                     <h4 className="font-semibold mb-3 text-white">Balance Summary</h4>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -289,17 +274,14 @@ export default function EmployeeDetailModal({ employeeId, onClose }) {
                 </DetailSection>
               )}
 
-              {/* Reviews */}
-              {reviews && reviews.length > 0 && (
+              {reviews && reviews.length > 0 ? (
                 <DetailSection title="Performance Reviews" icon={<FaClipboard size={14} />}>
                   <div className="space-y-3">
                     {reviews.map((review, idx) => (
                       <div key={idx} className="p-4 rounded-lg border border-[#F4C0D1] hover:border-[#CD166E] transition-colors" style={{ background: "#F9F8F2" }}>
                         <div className="flex items-start justify-between mb-2">
                           <div>
-                            <p className="font-semibold text-[#730042]">
-                              {review.reviewer?.f_name} {review.reviewer?.l_name}
-                            </p>
+                            <p className="font-semibold text-[#730042]">{review.reviewer?.f_name} {review.reviewer?.l_name}</p>
                             <p className="text-xs text-[#993556] mt-0.5">{review.reviewer?.role?.replace("_", " ")}</p>
                           </div>
                           {review.rating && (
@@ -308,16 +290,12 @@ export default function EmployeeDetailModal({ employeeId, onClose }) {
                             </div>
                           )}
                         </div>
-                        {review.feedback && (
-                          <p className="text-sm text-[#730042] mt-2 leading-relaxed">{review.feedback}</p>
-                        )}
+                        {review.feedback && <p className="text-sm text-[#730042] mt-2 leading-relaxed">{review.feedback}</p>}
                       </div>
                     ))}
                   </div>
                 </DetailSection>
-              )}
-
-              {(!reviews || reviews.length === 0) && (
+              ) : (
                 <DetailSection title="Performance Reviews" icon={<FaClipboard size={14} />}>
                   <div className="text-center py-6 text-[#993556]">
                     <p className="text-sm">No reviews yet</p>
@@ -330,10 +308,7 @@ export default function EmployeeDetailModal({ employeeId, onClose }) {
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-[#F4C0D1] flex justify-end bg-[#F9F8F2]">
-          <button
-            onClick={onClose}
-            className="px-6 py-2.5 rounded-xl border border-[#F4C0D1] text-[#730042] text-sm font-semibold hover:bg-[#FBEAF0] transition-colors"
-          >
+          <button onClick={onClose} className="px-6 py-2.5 rounded-xl border border-[#F4C0D1] text-[#730042] text-sm font-semibold hover:bg-[#FBEAF0] transition-colors">
             Close
           </button>
         </div>
