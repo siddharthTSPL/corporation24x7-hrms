@@ -36,9 +36,12 @@ const C = {
 /* ── FONT INJECTOR ─────────────────────────── */
 const Fonts = () => (
   <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@300;400;500&display=swap');
-    *{box-sizing:border-box;}
-    select,input,textarea,button{font-family:'DM Sans',sans-serif;}
+    *{
+      box-sizing:border-box;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    select,input,textarea,button{font-family:'Segoe UI',sans-serif;}
     input[type=date]::-webkit-calendar-picker-indicator{opacity:.35;cursor:pointer;}
     ::-webkit-scrollbar{width:4px;height:4px;}
     ::-webkit-scrollbar-thumb{background:${C.d15};border-radius:99px;}
@@ -138,7 +141,7 @@ const SectionLabel = ({ children }) => (
   <p style={{
     margin: "0 0 12px", fontSize: 10.5, fontWeight: 500,
     letterSpacing: ".18em", textTransform: "uppercase",
-    color: C.d45, fontFamily: "'DM Sans', sans-serif",
+    color: C.d45, fontFamily: "'Segoe UI', sans-serif",
   }}>
     {children}
   </p>
@@ -158,7 +161,7 @@ const Journey = ({ leave }) => {
           <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
         </svg>
       </div>
-      <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 600, fontStyle: "italic", color: C.deep, margin: "0 0 4px" }}>
+      <p style={{ fontFamily: "'Segoe UI', sans-serif", fontSize: 20, fontWeight: 600, color: C.deep, margin: "0 0 4px" }}>
         No applications yet
       </p>
       <p style={{ fontSize: 13, color: C.d45, margin: 0 }}>Submit your first leave request above.</p>
@@ -176,7 +179,7 @@ const Journey = ({ leave }) => {
           <p style={{ fontSize: 10.5, fontWeight: 500, letterSpacing: ".12em", textTransform: "uppercase", color: C.d35, marginBottom: 4 }}>
             Latest Application
           </p>
-          <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 600, color: C.deep, margin: "0 0 3px" }}>
+          <h3 style={{ fontFamily: "'Segoe UI', sans-serif", fontSize: 22, fontWeight: 600, color: C.deep, margin: "0 0 3px", letterSpacing: "-0.3px" }}>
             {leaveLabel}
           </h3>
           <p style={{ fontSize: 12, color: C.d45, margin: 0 }}>
@@ -265,7 +268,7 @@ const BalCard = ({ label, value, accent = "mid" }) => (
   >
     <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: accent === "mid" ? C.mid : C.deep }} />
     <p style={{ fontSize: 11, fontWeight: 400, color: C.d45, marginBottom: 6 }}>{label}</p>
-    <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 44, fontWeight: 700, color: C.deep, lineHeight: 1, margin: 0 }}>
+    <p style={{ fontFamily: "'Segoe UI', sans-serif", fontSize: 44, fontWeight: 600, color: C.deep, lineHeight: 1, margin: 0, letterSpacing: "-0.5px" }}>
       {value ?? 0}
     </p>
     <p style={{ fontSize: 11, color: C.d35, marginTop: 4 }}>days available</p>
@@ -292,7 +295,7 @@ const inputSt = (err) => ({
   border: `.5px solid ${err ? C.mid : C.d25}`,
   borderRadius: 10, fontSize: 13.5,
   color: C.deep, background: err ? C.m08 : C.white,
-  outline: "none", fontFamily: "'DM Sans', sans-serif",
+  outline: "none", fontFamily: "'Segoe UI', sans-serif",
   transition: "border-color .15s",
 });
 
@@ -370,7 +373,7 @@ const Modal = ({ open, onClose, title, children }) => {
           borderRadius: "20px 20px 0 0",
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 600, fontStyle: "italic", color: C.cream, margin: 0 }}>
+          <h2 style={{ fontFamily: "'Segoe UI', sans-serif", fontSize: 22, fontWeight: 600, color: C.cream, margin: 0, letterSpacing: "-0.3px" }}>
             {title}
           </h2>
           <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 8, background: "rgba(249,248,242,.15)", border: "none", cursor: "pointer", color: C.cream, fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -510,7 +513,7 @@ const LeaveTableem = () => {
   );
 
   return (
-    <div style={{ background: C.cream, minHeight: "100vh", fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ background: C.cream, minHeight: "100vh", fontFamily: "'Segoe UI', sans-serif" }}>
       <Fonts />
 
       <div style={{ maxWidth: 1180, margin: "0 auto", padding: "36px 24px" }}>
@@ -524,8 +527,8 @@ const LeaveTableem = () => {
                 Employee Portal
               </span>
             </div>
-            <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 52, fontWeight: 300, fontStyle: "italic", color: C.deep, letterSpacing: "-1px", lineHeight: 1, margin: "0 0 .25rem" }}>
-              Leave <span style={{ fontStyle: "normal", fontWeight: 700, color: C.mid }}>Management</span>
+            <h1 style={{ fontFamily: "'Segoe UI', sans-serif", fontSize: 48, fontWeight: 600, color: C.deep, letterSpacing: "-1px", lineHeight: 1.1, margin: "0 0 .25rem" }}>
+              Leave <span style={{ fontWeight: 600, color: C.mid }}>Management</span>
             </h1>
             <p style={{ fontSize: 13, color: C.d45, margin: 0 }}>
               Track balances · Apply · Monitor approvals
@@ -573,7 +576,7 @@ const LeaveTableem = () => {
                     <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
                   </svg>
                 </div>
-                <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 600, fontStyle: "italic", color: C.deep, margin: "0 0 6px" }}>
+                <p style={{ fontFamily: "'Segoe UI', sans-serif", fontSize: 20, fontWeight: 600, color: C.deep, margin: "0 0 6px" }}>
                   No leave records yet
                 </p>
                 <p style={{ fontSize: 13, color: C.d45, margin: 0 }}>
@@ -597,7 +600,7 @@ const LeaveTableem = () => {
                           <div style={{ fontSize: 11.5, color: C.d35, marginTop: 2 }}>→ {fmt(leave.endDate)}</div>
                         </td>
                         <td style={{ padding: "14px 18px" }}>
-                          <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 32, fontWeight: 700, color: C.deep, lineHeight: 1 }}>
+                          <span style={{ fontFamily: "'Segoe UI', sans-serif", fontSize: 32, fontWeight: 600, color: C.deep, lineHeight: 1, letterSpacing: "-0.5px" }}>
                             {leave.days}
                           </span>
                         </td>
