@@ -15,6 +15,7 @@ const adminMenu = [
   { name: "Dashboard", path: "/dashboard", icon: <FaHome /> },
   { name: "Employee Register", path: "/employee", icon: <FaUsers /> },
   { name: "Announcement", path: "/announcement", icon: <FaBullhorn /> },
+  { name:"Review", path: "/review-admin", icon: <FaBullhorn /> },
   { name: "Organisation", path: "/organisation", icon: <FaBuilding /> },
   { name: "Settings", path: "/settings", icon: <FaCog /> },
 ];
@@ -24,6 +25,7 @@ const managerMenu = [
   { name: "Leave", path: "/leave-manager", icon: <FaCalendarAlt /> },
   { name: "Announcement", path: "/announcement-manager", icon: <FaBullhorn /> },
   { name: "Organisation", path: "/organisation", icon: <FaBuilding /> },
+  { name: "Review", path: "/review-manager", icon: <FaBullhorn /> },
   { name: "Document", path: "/document-manager", icon: <FaFileAlt /> },
   { name: "File", path: "/file-manager", icon: <FaFolder /> },
   { name: "Settings", path: "/settings-manager", icon: <FaCog /> },
