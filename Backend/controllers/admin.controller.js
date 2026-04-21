@@ -654,8 +654,6 @@ const rejectleavebyadmin = async (req, res, next) => {
 };
 
 
-
-
 const noofemployee = async (req, res, next) => {
   if (!req.admin) {
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
@@ -1032,35 +1030,53 @@ const getme = async (req, res, next) => {
 const editadminprofile = async (req, res, next) => {
   try {
     if (!req.admin) {
-      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+      return next(
+        Object.assign(new Error("Unauthorized"), { statusCode: 401 })
+      );
     }
 
     const admin = req.admin;
     const { phone, profile_image } = req.body;
 
     if (phone !== undefined) {
+      if (typeof phone !== "string") {
+        return next(
+          Object.assign(new Error("Phone must be a string"), {
+            statusCode: 400,
+          })
+        );
+      }
       admin.phone = phone;
     }
 
     if (profile_image !== undefined) {
-      if (typeof profile_image === "string") {
-        if (profile_image === "" || profile_image.includes("api.dicebear.com")) {
-          admin.profile_image = profile_image;
-        } else {
-          return next(
-            Object.assign(new Error("Invalid avatar format"), { statusCode: 400 })
-          );
-        }
+      if (typeof profile_image !== "string") {
+        return next(
+          Object.assign(new Error("Profile image must be a string"), {
+            statusCode: 400,
+          })
+        );
+      }
+
+      if (
+        profile_image === "" ||
+        profile_image.includes("api.dicebear.com")
+      ) {
+        admin.profile_image = profile_image;
       } else {
         return next(
-          Object.assign(new Error("Profile image must be a string"), { statusCode: 400 })
+          Object.assign(new Error("Invalid avatar format"), {
+            statusCode: 400,
+          })
         );
       }
     }
+
     await admin.save();
+
     res.status(200).json({
       success: true,
-      message: "Profile updated successfully",
+      message: "Admin profile updated successfully",
       admin: {
         _id: admin._id,
         organisation_name: admin.organisation_name,
@@ -1070,13 +1086,12 @@ const editadminprofile = async (req, res, next) => {
       },
     });
   } catch (error) {
-    console.error("Profile update error:", error);
+    console.error("Admin profile update error:", error);
     return next(
       Object.assign(new Error(error.message), { statusCode: 500 })
     );
   }
 };
-
 
 const changepassword = async (req, res, next) => {
   if (!req.admin) {

@@ -549,6 +549,14 @@ const getAllPersonalDocuments = async (req, res, next) => {
     })
       .populate("employee", "f_name l_name work_email personal_contact")
       .sort({ createdAt: -1 });
+     
+       if (documents.length === 0) {
+      return res.status(200).json({
+        message: "No expense documents found",
+        total: 0,
+        documents: [],
+      });
+    }
 
     if (!documents.length) {
       return next(
@@ -697,6 +705,7 @@ const getDocumentDetails = async (req, res, next) => {
     next(error);
   }
 };
+
 const forgetpasswordloginbyotp = async (req, res, next) => {
   const { work_email } = req.body;
 

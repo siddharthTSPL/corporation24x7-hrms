@@ -4,7 +4,7 @@ import {
   useGetAnnouncement,
 } from "../../auth/server-state/employee/employeeannounce/employeeannounce.hook";
 
-/* ── BRAND TOKENS ─────────────────────────── */
+/* ── COLOR PALETTE ─────────────────────────── */
 const C = {
   deep:    "#730042",
   mid:     "#CD166E",
@@ -20,13 +20,18 @@ const C = {
   midA25:  "rgba(205,22,110,0.25)",
 };
 
-/* ── FONTS (inject once) ───────────────────── */
+/* ── FONTS & ANIMATIONS ────────────────────── */
 const FontInjector = () => (
   <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,600&family=DM+Sans:wght@300;400;500&display=swap');
+    * {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
     @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:none} }
     @keyframes spin   { to{transform:rotate(360deg)} }
+    
     .ann-card-hover:hover {
       border-color: rgba(205,22,110,0.45) !important;
       transform: translateY(-3px);
@@ -42,12 +47,14 @@ const fmtDate = (d) => {
     day: "2-digit", month: "long", year: "numeric",
   });
 };
+
 const fmtTime = (d) => {
   if (!d) return "";
   return new Date(d).toLocaleTimeString("en-IN", {
     hour: "2-digit", minute: "2-digit",
   });
 };
+
 const excerpt = (text, len = 130) => {
   if (!text) return "";
   return text.length > len ? text.slice(0, len).trimEnd() + "…" : text;
@@ -67,7 +74,7 @@ const PriorityPill = ({ priority }) => {
       display: "inline-flex", alignItems: "center",
       padding: "3px 10px", borderRadius: 99,
       fontSize: 10, fontWeight: 500, letterSpacing: ".1em",
-      textTransform: "uppercase", fontFamily: "'DM Sans', sans-serif",
+      textTransform: "uppercase", fontFamily: "'Segoe UI', sans-serif",
       background: s.bg, border: `1px solid ${s.border}`, color: s.color,
     }}>
       {s.label}
@@ -87,7 +94,7 @@ const DetailModal = ({ id, onClose }) => {
         position: "fixed", inset: 0, zIndex: 9999,
         background: "rgba(115,0,66,0.18)",
         display: "flex", alignItems: "center", justifyContent: "center",
-        padding: 20,
+        padding: 20, backdropFilter: "blur(4px)",
       }}
     >
       <div style={{
@@ -95,7 +102,8 @@ const DetailModal = ({ id, onClose }) => {
         border: `.5px solid ${C.midA25}`,
         width: "100%", maxWidth: 600,
         maxHeight: "88vh", overflowY: "auto",
-        fontFamily: "'DM Sans', sans-serif",
+        fontFamily: "'Segoe UI', sans-serif",
+        boxShadow: "0 24px 48px rgba(115,0,66,0.12)",
       }}>
         {/* Modal header */}
         <div style={{
@@ -129,7 +137,10 @@ const DetailModal = ({ id, onClose }) => {
               background: C.deepA10, border: "none", cursor: "pointer",
               color: C.deep, fontSize: 16, display: "flex",
               alignItems: "center", justifyContent: "center",
+              transition: "background .2s",
             }}
+            onMouseEnter={(e) => e.target.style.background = C.deepA15}
+            onMouseLeave={(e) => e.target.style.background = C.deepA10}
           >✕</button>
         </div>
 
@@ -144,7 +155,9 @@ const DetailModal = ({ id, onClose }) => {
                 animation: "spin 0.8s linear infinite",
                 margin: "0 auto 12px",
               }} />
-              <p style={{ color: C.deepA45, fontSize: 13, margin: 0 }}>Loading…</p>
+              <p style={{ color: C.deepA45, fontSize: 13, margin: 0 }}>
+                Loading…
+              </p>
             </div>
           ) : ann ? (
             <>
@@ -153,23 +166,22 @@ const DetailModal = ({ id, onClose }) => {
                 {ann.category && (
                   <span style={{
                     fontSize: 10.5, letterSpacing: ".1em", textTransform: "uppercase",
-                    color: C.deepA45, fontFamily: "'DM Sans', sans-serif",
+                    color: C.deepA45,
                   }}>
                     {ann.category}
                   </span>
                 )}
                 <span style={{
                   marginLeft: "auto", fontSize: 11, color: C.deepA45,
-                  fontFamily: "'DM Sans', sans-serif",
                 }}>
                   {fmtDate(ann.createdAt)} · {fmtTime(ann.createdAt)}
                 </span>
               </div>
 
               <h2 style={{
-                fontFamily: "'Cormorant Garamond', serif",
-                fontSize: 30, fontWeight: 600, color: C.deep,
-                lineHeight: 1.2, margin: 0,
+                fontFamily: "'Segoe UI', sans-serif",
+                fontSize: 28, fontWeight: 600, color: C.deep,
+                lineHeight: 1.3, margin: 0, letterSpacing: "-0.3px",
               }}>
                 {ann.title}
               </h2>
@@ -178,7 +190,7 @@ const DetailModal = ({ id, onClose }) => {
 
               <p style={{
                 fontSize: 15, color: C.deepA55, lineHeight: 1.85,
-                fontFamily: "'DM Sans', sans-serif", margin: 0,
+                margin: 0,
               }}>
                 {ann.content || ann.message || ann.description || "No content available."}
               </p>
@@ -193,7 +205,6 @@ const DetailModal = ({ id, onClose }) => {
                     width: 36, height: 36, borderRadius: "50%",
                     background: C.midA10, border: `.5px solid ${C.midA25}`,
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontFamily: "'Cormorant Garamond', serif",
                     fontSize: 15, fontWeight: 600, color: C.deep,
                   }}>
                     {(ann.postedBy?.f_name || ann.postedBy?.name || "A")[0].toUpperCase()}
@@ -242,7 +253,7 @@ const AnnCard = ({ ann, index, onClick }) => {
         overflow: "hidden",
         animation: `fadeUp 0.4s ease both`,
         animationDelay: `${index * 0.06}s`,
-        fontFamily: "'DM Sans', sans-serif",
+        fontFamily: "'Segoe UI', sans-serif",
       }}
     >
       {isFeatured && (
@@ -276,9 +287,10 @@ const AnnCard = ({ ann, index, onClick }) => {
       </div>
 
       <h3 style={{
-        fontFamily: "'Cormorant Garamond', serif",
-        fontSize: isFeatured ? 26 : 18, fontWeight: 600,
-        color: C.deep, lineHeight: 1.22, marginBottom: 10,
+        fontFamily: "'Segoe UI', sans-serif",
+        fontSize: isFeatured ? 22 : 17, fontWeight: 600,
+        color: C.deep, lineHeight: 1.3, marginBottom: 10,
+        letterSpacing: "-0.2px",
       }}>
         {ann.title}
       </h3>
@@ -327,7 +339,7 @@ const Announceem = () => {
   return (
     <div style={{
       background: C.cream, minHeight: "100vh",
-      fontFamily: "'DM Sans', sans-serif",
+      fontFamily: "'Segoe UI', sans-serif",
     }}>
       <FontInjector />
 
@@ -365,12 +377,12 @@ const Announceem = () => {
 
         {/* Title */}
         <h1 style={{
-          fontFamily: "'Cormorant Garamond', serif",
-          fontSize: 54, fontWeight: 300, color: C.deep,
-          letterSpacing: "-1px", lineHeight: 1, fontStyle: "italic",
+          fontFamily: "'Segoe UI', sans-serif",
+          fontSize: 48, fontWeight: 600, color: C.deep,
+          letterSpacing: "-1px", lineHeight: 1.1,
           margin: "0 0 .35rem", animation: "fadeUp .5s ease both",
         }}>
-          Announce<span style={{ fontStyle: "normal", fontWeight: 600, color: C.mid }}>ments</span>
+          Announce<span style={{ fontWeight: 600, color: C.mid }}>ments</span>
         </h1>
 
         {/* Rule */}
@@ -431,8 +443,8 @@ const Announceem = () => {
               </svg>
             </div>
             <h3 style={{
-              fontFamily: "'Cormorant Garamond', serif",
-              fontSize: 26, fontWeight: 600, fontStyle: "italic",
+              fontFamily: "'Segoe UI', sans-serif",
+              fontSize: 24, fontWeight: 600,
               color: C.deep, marginBottom: ".5rem",
             }}>
               Nothing yet
