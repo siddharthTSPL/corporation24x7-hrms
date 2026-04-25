@@ -18,9 +18,9 @@ const userSchema = new mongoose.Schema({
   },
 
   Under_manager: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Manager",
-    required: true,
+      type: mongoose.Schema.Types.ObjectId,
+  ref: "Manager",
+  default: null,
   },
 
   f_name: {
