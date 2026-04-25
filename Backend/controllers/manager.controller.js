@@ -913,17 +913,15 @@ const getmyleaves = async (req, res, next) => {
 };
 
 const reviewtoemployee = async (req, res, next) => {
-  const { employeeid, rating, comment } = req.body;
-
   if (!req.manager) {
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
 
+  const { employeeid, rating, comment } = req.body;
+
   if (!rating || !comment) {
     return next(
-      Object.assign(new Error("Rating and comment are required"), {
-        statusCode: 400,
-      }),
+      Object.assign(new Error("Rating and comment are required"), { statusCode: 400 })
     );
   }
 
@@ -936,40 +934,43 @@ const reviewtoemployee = async (req, res, next) => {
 
   if (!employee) {
     return next(
-      Object.assign(new Error("Employee not found under your management"), {
-        statusCode: 404,
-      }),
+      Object.assign(new Error("Employee not found under your management"), { statusCode: 404 })
     );
   }
 
-  const existingReview = await Review.findOne({
-    reviewer: manager._id,
-    reviewee: employeeid,
-  });
+  
+  const now = new Date();
+  const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-  if (existingReview) {
-    return next(
-      Object.assign(new Error("You already reviewed this employee"), {
-        statusCode: 400,
-      }),
-    );
+  try {
+    const review = await Review.create({
+      reviewerRole: manager.role,
+      reviewer: manager._id,
+      reviewerRoleModel: manager.role,
+      revieweeRole: employee.role,
+      reviewee: employee._id,
+      revieweeRoleModel: employee.role,
+      rating,
+      comment,
+      monthYear,
+    });
+
+    res.status(201).json({
+      message: "Employee reviewed successfully",
+      review,
+    });
+
+  } catch (err) {
+    if (err.code === 11000) {
+      return next(
+        Object.assign(
+          new Error("You have already reviewed this employee this month. You can submit again next month."),
+          { statusCode: 400 }
+        )
+      );
+    }
+    next(err);
   }
-
-  const review = await Review.create({
-    reviewerRole: manager.role,
-    reviewer: manager._id,
-    reviewerRoleModel: manager.role,
-    revieweeRole: employee.role,
-    reviewee: employee._id,
-    revieweeRoleModel: employee.role,
-    rating,
-    comment,
-  });
-
-  res.status(201).json({
-    message: "Employee reviewed successfully",
-    review,
-  });
 };
 
 const getme = async (req, res, next) => {

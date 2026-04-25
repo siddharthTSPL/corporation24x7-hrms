@@ -53,8 +53,19 @@ const reviewSchema = new mongoose.Schema({
     type: String,
     enum: ["monthly", "quarterly", "yearly"],
     default: "monthly"
+  },
+
+  monthYear: {
+    type: String,
+    required: true
   }
 
 }, { timestamps: true });
+
+
+reviewSchema.index(
+  { reviewer: 1, reviewee: 1, monthYear: 1 },
+  { unique: true }
+);
 
 module.exports = mongoose.model("Review", reviewSchema);

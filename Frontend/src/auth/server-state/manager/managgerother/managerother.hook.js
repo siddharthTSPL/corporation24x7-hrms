@@ -1,120 +1,109 @@
-import { getEmployeeDocuments,forgetPasswordManager, resetManagerPassword, verifyManagerOtpApi,getUsersUnderManager,reviewEmployee , editManagerProfile, changeManagerPassword ,getAllExpenseDocuments, getDocumentDetails,getAllPersonalDocuments} from "../../../api/managerapi/other/ma.other.api";
+import { getEmployeeDocuments, forgetPasswordManager, resetManagerPassword, verifyManagerOtpApi, getUsersUnderManager, reviewEmployee, editManagerProfile, changeManagerPassword, getAllExpenseDocuments, getDocumentDetails, getAllPersonalDocuments } from "../../../api/managerapi/other/ma.other.api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export const useGetEmployeeDocuments = (uid) => {
     const queryClient = useQueryClient();
-
     return useMutation(getEmployeeDocuments, {
-         mutationKey: ["getEmployeeDocuments"],
-         mutationFn:getEmployeeDocuments,
-         onSuccess: () => {
-              queryClient.removeQueries({ queryKey: ["manager"] });
-         },
-    })
+        mutationKey: ["getEmployeeDocuments"],
+        mutationFn: getEmployeeDocuments,
+        onSuccess: () => {
+            queryClient.removeQueries({ queryKey: ["manager"] });
+        },
+    });
 };
 
 export const useForgetPasswordManager = () => {
-   const queryClient = useQueryClient();
-
-   return useMutation(forgetPasswordManager, {
+    const queryClient = useQueryClient();
+    return useMutation(forgetPasswordManager, {
         mutationKey: ["forgetPasswordManager"],
-        mutationFn:forgetPasswordManager,
+        mutationFn: forgetPasswordManager,
         onSuccess: () => {
-             queryClient.removeQueries({ queryKey: ["manager"] });
+            queryClient.removeQueries({ queryKey: ["manager"] });
         },
-   })
-}
+    });
+};
 
 export const useResetManagerPassword = () => {
     const queryClient = useQueryClient();
-
     return useMutation(resetManagerPassword, {
-         mutationKey: ["resetManagerPassword"],
-         mutationFn:resetManagerPassword,
-         onSuccess: () => {
-              queryClient.removeQueries({ queryKey: ["manager"] });
-         },
-    })
-}
+        mutationKey: ["resetManagerPassword"],
+        mutationFn: resetManagerPassword,
+        onSuccess: () => {
+            queryClient.removeQueries({ queryKey: ["manager"] });
+        },
+    });
+};
 
 export const useVerifyManagerOtpApi = () => {
     const queryClient = useQueryClient();
-
     return useMutation(verifyManagerOtpApi, {
-         mutationKey: ["verifyManagerOtpApi"],
-         mutationFn:verifyManagerOtpApi,
-         onSuccess: () => {
-              queryClient.removeQueries({ queryKey: ["manager"] });
-         },
-    })
-}
+        mutationKey: ["verifyManagerOtpApi"],
+        mutationFn: verifyManagerOtpApi,
+        onSuccess: () => {
+            queryClient.removeQueries({ queryKey: ["manager"] });
+        },
+    });
+};
+
 
 export const useGetUsersUnderManager = () => {
-   const queryClient = useQueryClient();
-
-   return useMutation(getUsersUnderManager, {
-        mutationKey: ["getUsersUnderManager"],
-        mutationFn:getUsersUnderManager,
-        onSuccess: () => {
-             queryClient.removeQueries({ queryKey: ["manager"] });
-        },
-   })
+    return useQuery({
+        queryKey: ["usersUnderManager"],
+        queryFn: getUsersUnderManager,
+    });
 };
 
 export const useReviewEmployee = () => {
-   const queryClient = useQueryClient();
-
-   return useMutation(reviewEmployee, {
+    const queryClient = useQueryClient();
+    return useMutation({
         mutationKey: ["reviewEmployee"],
-        mutationFn:reviewEmployee,
+        mutationFn: reviewEmployee,
         onSuccess: () => {
-             queryClient.removeQueries({ queryKey: ["manager"] });
+            queryClient.removeQueries({ queryKey: ["manager"] });
         },
-   })
-}
-
-export const useUpdateProfile = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationKey: ["editManagerProfile"],
-    mutationFn: editManagerProfile,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["manager"] });
-    },
-  });
+    });
 };
 
-export const useUpdatePassword= () => {
-  const queryClient = useQueryClient();
+export const useUpdateProfile = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationKey: ["editManagerProfile"],
+        mutationFn: editManagerProfile,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["manager"] });
+        },
+    });
+};
 
-  return useMutation({
-    mutationKey: ["changeManagerPassword"],
-    mutationFn: changeManagerPassword,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["manager"] });
-    },
-  });
+export const useUpdatePassword = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationKey: ["changeManagerPassword"],
+        mutationFn: changeManagerPassword,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["manager"] });
+        },
+    });
 };
 
 export const useGetAllExpenseDocuments = () => {
-  return useQuery({
-    queryKey: ["expenseDocuments"],
-    queryFn: getAllExpenseDocuments,
-  });
+    return useQuery({
+        queryKey: ["expenseDocuments"],
+        queryFn: getAllExpenseDocuments,
+    });
 };
 
 export const useGetAllPersonalDocuments = () => {
-  return useQuery({
-    queryKey: ["personalDocuments"],
-    queryFn: getAllPersonalDocuments,
-  });
+    return useQuery({
+        queryKey: ["personalDocuments"],
+        queryFn: getAllPersonalDocuments,
+    });
 };
 
 export const useGetDocumentDetails = (documentId) => {
-  return useQuery({
-    queryKey: ["documentDetails", documentId],
-    queryFn: () => getDocumentDetails(documentId),
-    enabled: !!documentId, 
-  });
+    return useQuery({
+        queryKey: ["documentDetails", documentId],
+        queryFn: () => getDocumentDetails(documentId),
+        enabled: !!documentId,
+    });
 };

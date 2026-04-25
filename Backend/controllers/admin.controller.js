@@ -816,22 +816,37 @@ const reviewtomanager = async (req, res, next) => {
     );
   }
 
+  if (!rating || !comment) {
+    return next(
+      Object.assign(new Error("Rating and comment are required"), {
+        statusCode: 400,
+      })
+    );
+  }
+
   const manager = await Managermodel.findById(managerid);
 
   if (!manager) {
     return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
   }
 
+
+  const now = new Date();
+  const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+
   const existingreview = await Review.findOne({
     reviewer: adminid,
     reviewee: managerid,
+    monthYear,
   });
 
   if (existingreview) {
     return next(
-      Object.assign(new Error("Review already submitted"), {
-        statusCode: 400,
-      })
+      Object.assign(
+        new Error("You have already reviewed this manager this month."),
+        { statusCode: 400 }
+      )
     );
   }
 
@@ -844,6 +859,7 @@ const reviewtomanager = async (req, res, next) => {
     revieweeRoleModel: manager.role,
     rating,
     comment,
+    monthYear,
   });
 
   res.status(201).json({
