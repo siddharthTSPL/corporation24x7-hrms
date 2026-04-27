@@ -10,28 +10,47 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export const useApplyLeaveManager = () => {
-  return useMutation(applyLeaveManager);
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: applyLeaveManager,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["myLeavesManager"] }),
+  });
 };
 
 export const useAcceptLeaveRequest = () => {
-  return useMutation(acceptLeaveRequest);
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: acceptLeaveRequest,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["allManagerLeaves"] }),
+  });
 };
 
 export const useRejectLeaveRequest = () => {
-  return useMutation(rejectLeaveRequest);
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: rejectLeaveRequest,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["allManagerLeaves"] }),
+  });
 };
 
 export const useForwardLeaveToAdmin = () => {
-  return useMutation(forwardLeaveToAdmin);
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: forwardLeaveToAdmin,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["allManagerLeaves"] }),
+  });
 };
 
 export const useGetMyLeavesManager = () => {
-  return useQuery(["myLeavesManager"], getMyLeavesManager);
+  return useQuery({
+    queryKey: ["myLeavesManager"],
+    queryFn: getMyLeavesManager,
+  });
 };
 
 export const useGetAllManagerLeaves = () => {
-  const queryClient = useQueryClient();
-  return useQuery(["allManagerLeaves"], getAllManagerLeaves, {
-    onSuccess: () => queryClient.invalidateQueries(["myLeavesManager"]),
+  return useQuery({
+    queryKey: ["allManagerLeaves"],
+    queryFn: getAllManagerLeaves,
   });
 };
