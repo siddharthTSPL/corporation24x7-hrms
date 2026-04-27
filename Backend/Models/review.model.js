@@ -15,7 +15,7 @@ const reviewSchema = new mongoose.Schema({
 
   reviewerRoleModel: {
     type: String,
-    enum: ["admin", "manager"],
+    enum: ["Admin", "Manager"], 
     required: true
   },
 
@@ -33,7 +33,7 @@ const reviewSchema = new mongoose.Schema({
 
   revieweeRoleModel: {
     type: String,
-    enum: ["manager", "employee"],
+    enum: ["Manager", "User"], 
     required: true
   },
 
@@ -61,7 +61,6 @@ const reviewSchema = new mongoose.Schema({
   }
 
 }, { timestamps: true });
-
 
 reviewSchema.index(
   { reviewer: 1, reviewee: 1, monthYear: 1 },
