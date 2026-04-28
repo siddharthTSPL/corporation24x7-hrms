@@ -16,6 +16,7 @@ const adminMenu = [
   { name: "Employee Register", path: "/employee", icon: <FaUsers /> },
   { name: "Announcement", path: "/announcement", icon: <FaBullhorn /> },
   { name:"Review", path: "/review-admin", icon: <FaBullhorn /> },
+  { name: "Leave", path: "/leave-admin", icon: <FaCalendarAlt /> },
   { name: "Organisation", path: "/organisation", icon: <FaBuilding /> },
   { name: "Settings", path: "/settings", icon: <FaCog /> },
 ];
