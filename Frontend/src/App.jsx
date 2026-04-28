@@ -11,6 +11,7 @@ import EmployeeTable from "./pages/employee/EmployeeTable";
 import LeaveTable from "./pages/leave/LeaveTable";
 import LeaveTableem from "./pages/leave/LeaveTableem";
 import LeaveTablema from "./pages/leave/LeaveTablema";
+import LeaveTablead from "./pages/leave/LeaveTablead";
 import Announce from "./pages/announcement/Announce";
 import Announceem from "./pages/announcement/Announceem";
 import Announcema from "./pages/announcement/Announcema";
@@ -59,6 +60,7 @@ function App() {
           <Route path="/employee" element={<EmployeeTable />} />
           <Route path="/leave-manager" element={<LeaveTablema />} />
           <Route path="/leave-employee" element={<LeaveTableem />} />
+          <Route path="/leave-admin" element={<LeaveTablead />} />
           <Route path="/leave" element={<LeaveTable />} />
           <Route path="/announcement" element={<Announce />} />
           <Route path="/announcement-employee" element={<Announceem />} />
