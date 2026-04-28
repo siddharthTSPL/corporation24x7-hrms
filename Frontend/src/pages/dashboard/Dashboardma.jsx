@@ -193,7 +193,7 @@ function Calendar({ leaveData = [] }) {
   );
 }
 
-// ─── announcements ───────────────────────────────────────────────────────────
+
 const DEMO_ANN = [
   { _id: "1", title: "hi", priority: "high", body: "ehuhe", age: "4 days ago", expires: "15 Apr", audience: "all" },
   { _id: "2", title: "emergency for document", priority: "low", body: "Subject: Emergency Notice – Immediate Attention Required Dear Employees and Managers, This is to inf...", age: "4 days ago", expires: "30 Apr", audience: "managers" },
