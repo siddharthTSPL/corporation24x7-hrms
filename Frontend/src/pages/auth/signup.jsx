@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useRegisterAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
 
 export default function Register() {
+  
   const navigate = useNavigate();
   const { mutate: registerFn, isPending, error, isSuccess } = useRegisterAdmin();
 
@@ -26,13 +27,13 @@ export default function Register() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center bg-cover bg-center px-4"
+      className="min-h-screen relative flex items-center justify-center bg-cover bg-center px-4"
       style={{ backgroundImage: "url('/bg.jpeg')" }}
     >
       <div className="w-full max-w-5xl bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden">
         
+        {/* LEFT SIDE */}
         <div className="w-full md:w-1/2 p-8">
-       
           <div className="flex justify-between items-center mb-6">
             <img src="/src/assets/logo1.png" alt="logo" className="w-28" />
             
@@ -52,7 +53,6 @@ export default function Register() {
             Create your Talent account
           </p>
 
-      
           <input
             type="text"
             name="organisation_name"
@@ -71,7 +71,6 @@ export default function Register() {
             className="w-full mb-3 p-3 border rounded-lg focus:ring-2 focus:ring-(--primary)"
           />
 
-      
           <div className="relative mb-3">
             <input
               type={showPassword ? "text" : "password"}
@@ -90,7 +89,6 @@ export default function Register() {
             </span>
           </div>
 
-        
           <div className="flex items-start gap-2 mb-4 text-sm text-gray-600">
             <input
               type="checkbox"
@@ -109,7 +107,6 @@ export default function Register() {
             </p>
           </div>
 
-        
           {error && <p className="text-red-500 text-sm">{error.message}</p>}
 
           {isSuccess && (
@@ -118,7 +115,6 @@ export default function Register() {
             </p>
           )}
 
-        
           <button
             onClick={handleRegister}
             disabled={isPending}
@@ -128,11 +124,11 @@ export default function Register() {
           </button>
         </div>
 
-   
+        {/* RIGHT SIDE */}
         <div className="hidden md:flex w-1/2 bg-gray-50 items-center justify-center p-6">
           <div className="text-center">
             <img
-              src="/login.jpeg"
+              src="/Group 551.png"
               alt="illustration"
               className="w-full max-h-65 object-contain"
             />
@@ -147,6 +143,11 @@ export default function Register() {
           </div>
         </div>
       </div>
+
+    
+      <p className="absolute bottom-22 right-1/3 translate-x-1/2 text-gray-600 text-sm font-medium">
+        © 2026, TechTorch Solutions Pvt. Ltd. All Rights Reserved.
+      </p>
     </div>
   );
 }
