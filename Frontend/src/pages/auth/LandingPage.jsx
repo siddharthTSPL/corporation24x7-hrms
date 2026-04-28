@@ -117,7 +117,7 @@ export default function LandingPage() {
         {/* RIGHT IMAGE */}
         <div className="flex-1 flex justify-center">
           <img
-            src="/login.jpeg"
+            src="/Group 551.png"
             alt="hero"
             className="w-full max-w-md"
           />
@@ -137,7 +137,7 @@ export default function LandingPage() {
 
               {/* FRONT SHAPE */}
               <div className="relative z-10 w-full h-full flex flex-col items-center justify-center text-center text-white
-                bg-gradient-to-br from-blue-500 to-blue-700
+                bg-gradient-to-br  from-[#800000] to-[#5c0000]
                 rounded-[60%_40%_50%_50%/50%_60%_40%_50%]
                 shadow-xl hover:scale-105 transition duration-300"
               >
