@@ -270,7 +270,12 @@ function Login() {
           </div>
         </div>
       </div>
-    </div>
+
+      <p className="absolute bottom-22 right-1/3 translate-x-1/2 text-gray-700 text-sm font-medium">
+        © 2026, TechTorch Solutions Pvt. Ltd. All Rights Reserved.
+      </p>
+
+      </div>
   );
 }
 
