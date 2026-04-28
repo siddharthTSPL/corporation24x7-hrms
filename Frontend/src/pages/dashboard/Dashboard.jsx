@@ -285,8 +285,8 @@ const AttendanceMap = () => {
         const s = isMgr ? 15 : 11;
         const icon = L.divIcon({
           className: "",
-          html: `<div style="position:relative;width:${s+14}px;height:${s+14}px;">
-            <div style="position:absolute;top:50%;left:50%;width:${s+14}px;height:${s+14}px;border-radius:50%;background:${c}33;animation:mPulse 2.2s infinite;"></div>
+          html: `<div style="position:relative;width:${s + 14}px;height:${s + 14}px;">
+            <div style="position:absolute;top:50%;left:50%;width:${s + 14}px;height:${s + 14}px;border-radius:50%;background:${c}33;animation:mPulse 2.2s infinite;"></div>
             <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${s}px;height:${s}px;border-radius:50%;background:${c};border:2.5px solid white;box-shadow:0 2px 10px ${c}66;"></div>
           </div>`,
           iconSize: [s + 14, s + 14],
@@ -304,7 +304,12 @@ const AttendanceMap = () => {
       instanceRef.current = map;
     };
     load();
-    return () => { if (instanceRef.current) { instanceRef.current.remove(); instanceRef.current = null; } };
+    return () => {
+      if (instanceRef.current) {
+        instanceRef.current.remove();
+        instanceRef.current = null;
+      }
+    };
   }, []);
 
   return <div ref={mapRef} style={{ height: "100%", width: "100%" }} />;
@@ -389,16 +394,16 @@ const AnnModal = ({ open, onClose, initial, onSave, loading }) => {
 function Dashboard() {
   useInjectStyles();
 
-  const [greeting, setGreeting]     = useState("");
-  const [thought, setThought]       = useState("");
-  const [annModal, setAnnModal]     = useState({ open: false, editing: null });
-  const [empExpand, setEmpExpand]   = useState(false);
+  const [greeting, setGreeting]   = useState("");
+  const [thought, setThought]     = useState("");
+  const [annModal, setAnnModal]   = useState({ open: false, editing: null });
+  const [empExpand, setEmpExpand] = useState(false);
 
   /* ── API Hooks ── */
-  const { data: admin }                              = useGetMeAdmin();
-  const { data: empData,   isLoading: empLoading  } = useGetAllEmployee();
-  const { data: leaveData, isLoading: leaveLoading} = useGetForwardedLeaves();
-  const { data: annRaw,    isLoading: annLoading  } = useGetAllAnnouncement();
+  const { data: admin }                               = useGetMeAdmin();
+  const { data: empData,   isLoading: empLoading  }  = useGetAllEmployee();
+  const { data: leaveData, isLoading: leaveLoading } = useGetForwardedLeaves();
+  const { data: annRaw,    isLoading: annLoading  }  = useGetAllAnnouncement();
 
   const { mutate: acceptLeave, isPending: accepting } = useAcceptLeave();
   const { mutate: rejectLeave, isPending: rejecting } = useRejectLeave();
@@ -425,11 +430,11 @@ function Dashboard() {
     ? annRaw
     : [];
 
-  const totalEmployees  = empData?.count   || employees.length  || 0;
-  const pendingLeaves   = leaves.filter((l) => (l.status || "").toLowerCase() === "pending").length
+  const totalEmployees = empData?.count   || employees.length  || 0;
+  const pendingLeaves  = leaves.filter((l) => (l.status || "").toLowerCase() === "pending").length
     || leaveData?.count
     || 0;
-  const totalAnn        = announcements.length;
+  const totalAnn = announcements.length;
 
   /* ── Greeting ── */
   const THOUGHTS = [
@@ -580,7 +585,7 @@ function Dashboard() {
             {pendingLeaves > 0 && (
               <span style={{
                 background: "#fff8e1", color: "var(--gold)", fontSize: 11,
-                fontWeight: 700, padding: "3px 10px", borderRadius: 99, border: "1px solid #f0d870"
+                fontWeight: 700, padding: "3px 10px", borderRadius: 99, border: "1px solid #f0d870",
               }}>
                 {pendingLeaves} pending
               </span>
@@ -597,11 +602,11 @@ function Dashboard() {
               </div>
             ) : (
               leaves.map((leave) => {
-                const name     = leave.employeeName || leave.name || leave.user?.name || "Employee";
-                const type     = leave.leaveType    || leave.type || "Leave";
-                const from     = leave.from         || leave.startDate || leave.fromDate || "";
-                const to       = leave.to           || leave.endDate   || leave.toDate   || "";
-                const status   = (leave.status || "pending").toLowerCase();
+                const name      = leave.employeeName || leave.name || leave.user?.name || "Employee";
+                const type      = leave.leaveType    || leave.type || "Leave";
+                const from      = leave.from         || leave.startDate || leave.fromDate || "";
+                const to        = leave.to           || leave.endDate   || leave.toDate   || "";
+                const status    = (leave.status || "pending").toLowerCase();
                 const isPending = status === "pending";
 
                 const fmtDate = (d) => {
@@ -612,10 +617,7 @@ function Dashboard() {
 
                 return (
                   <div key={leave._id || leave.id} className="leave-item">
-                    <div
-                      className="leave-avatar"
-                      style={{ background: leaveTypeColor(type) }}
-                    >
+                    <div className="leave-avatar" style={{ background: leaveTypeColor(type) }}>
                       {initials(name)}
                     </div>
                     <div className="leave-meta">
@@ -739,17 +741,17 @@ function Dashboard() {
         ) : (
           <div className="emp-grid">
             {displayEmployees.map((emp, i) => {
-              const name = emp.name || emp.fullName || emp.username || "Employee";
-              const role = emp.role || emp.designation || emp.position || "";
-              const dept = emp.department || emp.dept || "";
+              const name  = emp.name || emp.fullName || emp.username || "Employee";
+              const role  = emp.role || emp.designation || emp.position || "";
+              const dept  = emp.department || emp.dept || "";
               const email = emp.email || emp.workEmail || "";
               return (
                 <div className="emp-card" key={emp._id || emp.id || i}>
                   <div className="emp-ava">{initials(name)}</div>
                   <div style={{ minWidth: 0 }}>
                     <div className="emp-name">{name}</div>
-                    {role && <div className="emp-role">{role}</div>}
-                    {dept && <span className="emp-dept">{dept}</span>}
+                    {role  && <div className="emp-role">{role}</div>}
+                    {dept  && <span className="emp-dept">{dept}</span>}
                     {email && (
                       <div style={{ fontSize: 10, color: "var(--light)", marginTop: 4 }}>
                         <FaEnvelope style={{ marginRight: 4 }} />{email}
@@ -763,7 +765,7 @@ function Dashboard() {
         )}
       </div>
 
-      {/* ━━━━━━ CHARTS ━━━━━━ */}
+      {/* ━━━━━━ CHARTS (commented out — preserved from develop) ━━━━━━ */}
       {/* <div className="charts-panel">
         <div className="panel-head">
           <div className="panel-title">Analytics Overview</div>
