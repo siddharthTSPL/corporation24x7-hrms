@@ -1,603 +1,792 @@
 import React, { useEffect, useState, useRef } from "react";
 import {
-  FaUsers,
-  FaClock,
-  FaBell,
-  FaCircle,
-  FaArrowUp,
-  FaMapMarkerAlt,
+  FaUsers, FaClock, FaCalendarAlt, FaBullhorn,
+  FaPlus, FaEdit, FaTrash, FaTimes, FaCheck,
+  FaMapMarkerAlt, FaChevronRight, FaBan, FaUserTie,
+  FaBuilding, FaEnvelope, FaPhone, FaCheckCircle,
 } from "react-icons/fa";
+import Charts from "./Charts";
+import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
+import { useGetAllEmployee } from "../../auth/server-state/adminother/adminother.hook";
+import {
+  useGetForwardedLeaves,
+  useAcceptLeave,
+  useRejectLeave,
+} from "../../auth/server-state/adminleave/adminleave.hook";
+import {
+  useGetAllAnnouncement,
+  useCreateAnnouncement,
+  useDeleteAnnouncement,
+  useUpdateAnnouncement,
+} from "../../auth/server-state/adminannounce/adminannounce.hook";
 
-// ─── Colour tokens (TorchX palette) ────────────────────────────────
-const CRIMSON = "#8B1A4A";
-const CRIMSON_DARK = "#6B1238";
-const GOLD = "#C8973A";
-const BLUE_ACCENT = "#2196F3";
-const GREEN_ACCENT = "#4CAF50";
-const BG_GRAY = "#F3F4F6";
 
-// ─── DATA ─────────────────────────────────────────────────────────
-const ADMIN_DATA = {
-  _id: "69ccdea9d2ee739f45d75f2e",
-  organisation_name: "ashish",
-  role: "admin",
-  email: "ashishgangwar009@gmail.com",
-  profile_image: "https://api.dicebear.com/7.x/croodles/svg?seed=A",
-  phone: "7017415604",
+const useInjectStyles = () => {
+  useEffect(() => {
+    const fontLink = document.createElement("link");
+    fontLink.rel = "stylesheet";
+    fontLink.href =
+      "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Outfit:wght@300;400;500;600&display=swap";
+    document.head.appendChild(fontLink);
+
+    const styleEl = document.createElement("style");
+    styleEl.id = "dash-styles";
+    styleEl.textContent = `
+      :root {
+        --p:       #730042;
+        --p-dark:  #4a0029;
+        --p-deep:  #2e0019;
+        --p-mid:   #a0005c;
+        --p-soft:  #c0527e;
+        --p-wash:  #f7edf3;
+        --p-pale:  #fdf5f9;
+        --border:  #eedde8;
+        --surface: #ffffff;
+        --text:    #1a0010;
+        --muted:   #8a6070;
+        --light:   #c49ab2;
+        --green:   #0d9e6e;
+        --red:     #d93025;
+        --gold:    #b8760a;
+        --shadow:  0 2px 12px rgba(115,0,66,.09);
+        --shadow-lg: 0 12px 40px rgba(115,0,66,.16);
+        --r: 14px;
+        --r-sm: 8px;
+        font-family: 'Outfit', sans-serif;
+      }
+
+      .db { background: var(--p-pale); min-height: 100vh; padding: 24px 28px; font-family: 'Outfit', sans-serif; color: var(--text); }
+
+      /* ── Hero ── */
+      .hero {
+        background: linear-gradient(135deg, var(--p-deep) 0%, var(--p-dark) 40%, var(--p) 70%, var(--p-mid) 100%);
+        border-radius: var(--r);
+        padding: 30px 36px;
+        margin-bottom: 26px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: var(--shadow-lg);
+      }
+      .hero::before {
+        content: ''; position: absolute;
+        width: 420px; height: 420px; border-radius: 50%;
+        top: -180px; right: -100px;
+        background: rgba(255,255,255,.05);
+        pointer-events: none;
+      }
+      .hero::after {
+        content: ''; position: absolute;
+        width: 260px; height: 260px; border-radius: 50%;
+        bottom: -140px; left: 38%;
+        background: rgba(255,255,255,.04);
+        pointer-events: none;
+      }
+      .hero-eyebrow { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,.5); margin-bottom: 8px; font-weight: 500; }
+      .hero-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(26px, 3vw, 36px); color: #fff; margin: 0 0 6px; font-weight: 700; line-height: 1.1; }
+      .hero-thought { font-size: 13px; color: rgba(255,255,255,.65); font-weight: 300; max-width: 520px; line-height: 1.6; }
+      .hero-chips { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+      .hero-chip { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); border-radius: 99px; padding: 5px 14px; font-size: 12px; color: rgba(255,255,255,.85); font-weight: 500; backdrop-filter: blur(4px); }
+
+      /* ── Stats Grid ── */
+      .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 18px; margin-bottom: 26px; }
+      @media(max-width:1100px){ .stats-grid { grid-template-columns: repeat(2,1fr); } }
+      @media(max-width:600px) { .stats-grid { grid-template-columns: 1fr; } }
+
+      .stat-card {
+        background: var(--surface);
+        border-radius: var(--r);
+        border: 1px solid var(--border);
+        padding: 22px 20px 18px;
+        box-shadow: var(--shadow);
+        position: relative;
+        overflow: hidden;
+        transition: transform .2s, box-shadow .2s;
+        cursor: default;
+      }
+      .stat-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+      .stat-card-stripe { position: absolute; top: 0; left: 0; width: 100%; height: 3px; background: var(--p); }
+      .stat-icon-ring {
+        width: 44px; height: 44px; border-radius: 50%;
+        background: var(--p-wash);
+        display: flex; align-items: center; justify-content: center;
+        color: var(--p); font-size: 16px;
+        margin-bottom: 16px;
+      }
+      .stat-lbl { font-size: 11px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+      .stat-val { font-family: 'Cormorant Garamond', serif; font-size: 36px; line-height: 1; color: var(--text); font-weight: 700; }
+      .stat-sub { font-size: 11px; margin-top: 8px; font-weight: 500; }
+      .stat-bar-track { height: 3px; background: var(--border); border-radius: 99px; margin-top: 12px; overflow: hidden; }
+      .stat-bar-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--p-dark), var(--p-soft)); transition: width .8s ease; }
+
+      /* ── Panel ── */
+      .panel { background: var(--surface); border-radius: var(--r); border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; }
+      .panel-head { padding: 18px 22px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+      .panel-title { font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 9px; }
+      .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: livePulse 2s infinite; }
+      @keyframes livePulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.4)} }
+
+      /* ── Map ── */
+      .map-wrap { height: 310px; }
+      .map-footer { padding: 11px 20px; background: var(--p-wash); border-top: 1px solid var(--border); display: flex; gap: 20px; align-items: center; }
+      .map-leg { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+      .leg-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+
+      /* ── Main layout ── */
+      .mid-grid { display: grid; grid-template-columns: 1fr 370px; gap: 20px; margin-bottom: 26px; }
+      @media(max-width:1050px){ .mid-grid { grid-template-columns: 1fr; } }
+
+      .lower-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 26px; }
+      @media(max-width:900px){ .lower-grid { grid-template-columns: 1fr; } }
+
+      /* ── Leave Request Card ── */
+      .leave-scroll { overflow-y: auto; max-height: 340px; }
+      .leave-scroll::-webkit-scrollbar { width: 4px; }
+      .leave-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+      .leave-item { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 12px; transition: background .15s; }
+      .leave-item:hover { background: var(--p-pale); }
+      .leave-item:last-child { border-bottom: none; }
+      .leave-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white; flex-shrink: 0; font-family: 'Outfit', sans-serif; background: var(--p); }
+      .leave-meta { flex: 1; min-width: 0; }
+      .leave-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .leave-info { font-size: 11px; color: var(--muted); margin-top: 2px; }
+      .leave-actions { display: flex; gap: 6px; margin-top: 8px; }
+      .btn-accept { background: #e8f7f1; color: var(--green); border: 1px solid #b8e8d4; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all .15s; font-family: 'Outfit',sans-serif; }
+      .btn-accept:hover { background: var(--green); color: white; }
+      .btn-reject { background: #fbeaea; color: var(--red); border: 1px solid #f0c5c5; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all .15s; font-family: 'Outfit',sans-serif; }
+      .btn-reject:hover { background: var(--red); color: white; }
+
+      .status-badge { display: inline-flex; align-items: center; font-size: 10px; font-weight: 600; letter-spacing: .4px; padding: 2px 8px; border-radius: 99px; }
+      .status-pending  { background: #fff8e1; color: var(--gold); }
+      .status-approved { background: #e8f7f1; color: var(--green); }
+      .status-rejected { background: #fbeaea; color: var(--red); }
+
+      /* ── Announcements ── */
+      .ann-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 18px; }
+      @media(max-width:700px){ .ann-grid { grid-template-columns: 1fr; } }
+      .ann-card { border-radius: var(--r-sm); border: 1px solid var(--border); padding: 16px; transition: all .2s; cursor: default; }
+      .ann-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
+      .ann-type-chip { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; padding: 3px 10px; border-radius: 99px; margin-bottom: 8px; }
+      .chip-general { background: var(--p-wash); color: var(--p); }
+      .chip-urgent   { background: #fbeaea; color: var(--red); }
+      .chip-event    { background: #e8f7f1; color: var(--green); }
+      .chip-policy   { background: #fff8e1; color: var(--gold); }
+      .ann-card-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 5px; line-height: 1.3; }
+      .ann-card-body  { font-size: 12px; color: var(--muted); line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+      .ann-card-foot  { display: flex; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+      .icon-btn { background: none; border: none; cursor: pointer; padding: 4px 7px; border-radius: 5px; font-size: 12px; color: var(--light); transition: all .15s; display: flex; align-items: center; gap: 4px; font-family: 'Outfit',sans-serif; }
+      .icon-btn:hover { background: var(--p-wash); color: var(--p); }
+      .icon-btn.del:hover { background: #fbeaea; color: var(--red); }
+
+      /* ── Employee Grid ── */
+      .emp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; padding: 18px; }
+      .emp-card { border: 1px solid var(--border); border-radius: var(--r-sm); padding: 16px 14px; display: flex; align-items: center; gap: 12px; transition: all .2s; }
+      .emp-card:hover { box-shadow: var(--shadow); background: var(--p-wash); }
+      .emp-ava { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: white; flex-shrink: 0; background: linear-gradient(135deg, var(--p-dark), var(--p-mid)); }
+      .emp-name { font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.2; }
+      .emp-role { font-size: 11px; color: var(--muted); margin-top: 2px; }
+      .emp-dept { display: inline-block; font-size: 10px; font-weight: 600; background: var(--p-wash); color: var(--p); padding: 2px 7px; border-radius: 99px; margin-top: 5px; }
+
+      /* ── Charts wrapper ── */
+      .charts-panel { background: var(--surface); border-radius: var(--r); border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 26px; }
+      .charts-body { padding: 20px; }
+
+      /* ── Buttons ── */
+      .btn-p { background: var(--p); color: white; border: none; padding: 8px 16px; border-radius: var(--r-sm); font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; font-family: 'Outfit',sans-serif; letter-spacing: .3px; transition: all .2s; }
+      .btn-p:hover { background: var(--p-dark); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(115,0,66,.3); }
+      .btn-ghost { background: none; color: var(--muted); border: 1px solid var(--border); padding: 8px 16px; border-radius: var(--r-sm); font-size: 12px; font-weight: 500; cursor: pointer; font-family: 'Outfit',sans-serif; transition: all .2s; }
+      .btn-ghost:hover { border-color: var(--p); color: var(--p); }
+
+      /* ── Modal ── */
+      .overlay { position: fixed; inset: 0; background: rgba(30,0,18,.6); backdrop-filter: blur(5px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; animation: ov .18s; }
+      @keyframes ov { from{opacity:0} to{opacity:1} }
+      .modal { background: var(--surface); border-radius: var(--r); width: 100%; max-width: 500px; box-shadow: var(--shadow-lg); animation: mup .22s; }
+      @keyframes mup { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+      .modal-hd { padding: 22px 26px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+      .modal-hd-title { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 700; color: var(--text); }
+      .modal-x { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 15px; padding: 5px; border-radius: 6px; transition: all .15s; }
+      .modal-x:hover { background: var(--p-wash); color: var(--p); }
+      .modal-bd { padding: 22px 26px; }
+      .modal-ft { padding: 14px 26px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
+      .fld { margin-bottom: 18px; }
+      .flbl { display: block; font-size: 11px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+      .finp, .ftxt, .fsel { width: 100%; padding: 10px 13px; background: var(--p-pale); border: 1px solid var(--border); border-radius: var(--r-sm); font-size: 14px; color: var(--text); font-family: 'Outfit',sans-serif; outline: none; transition: border-color .15s, box-shadow .15s; }
+      .finp:focus, .ftxt:focus, .fsel:focus { border-color: var(--p); box-shadow: 0 0 0 3px var(--p-wash); }
+      .ftxt { resize: vertical; min-height: 88px; line-height: 1.6; }
+
+      /* ── Empty ── */
+      .empty { text-align: center; padding: 38px 20px; color: var(--light); }
+      .empty-ico { font-size: 28px; margin-bottom: 10px; }
+      .empty p { font-size: 13px; }
+
+      /* ── Section divider ── */
+      .sec-divider { display: flex; align-items: center; gap: 12px; margin: 6px 0 18px; }
+      .sec-divider-line { flex: 1; height: 1px; background: var(--border); }
+      .sec-divider-txt { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--light); font-weight: 600; white-space: nowrap; }
+    `;
+    document.head.appendChild(styleEl);
+    return () => {
+      document.head.removeChild(fontLink);
+      const el = document.getElementById("dash-styles");
+      if (el) document.head.removeChild(el);
+    };
+  }, []);
 };
 
-const EMPLOYEE_GROWTH_DATA = [
-  { month: "Jan", total: 120, new: 5 },
-  { month: "Feb", total: 125, new: 5 },
-  { month: "Mar", total: 130, new: 5 },
-  { month: "Apr", total: 135, new: 5 },
-  { month: "May", total: 145, new: 10 },
-  { month: "Jun", total: 148, new: 3 },
-  { month: "Jul", total: 155, new: 7 },
-  { month: "Aug", total: 160, new: 5 },
-  { month: "Sep", total: 168, new: 8 },
-  { month: "Oct", total: 175, new: 7 },
-  { month: "Nov", total: 180, new: 5 },
-  { month: "Dec", total: 190, new: 10 },
-];
-
-// ─── Employee office locations across India ───────────────────────
-const OFFICE_LOCATIONS = [
-  { city: "Mumbai",    lat: 19.076,  lng: 72.877,  count: 52, dept: "Engineering" },
-  { city: "Delhi",     lat: 28.6139, lng: 77.2090, count: 44, dept: "Operations"  },
-  { city: "Bangalore", lat: 12.9716, lng: 77.5946, count: 38, dept: "Product"     },
-  { city: "Hyderabad", lat: 17.385,  lng: 78.4867, count: 21, dept: "Sales"       },
-  { city: "Chennai",   lat: 13.0827, lng: 80.2707, count: 18, dept: "Support"     },
-  { city: "Pune",      lat: 18.5204, lng: 73.8567, count: 12, dept: "Design"      },
-  { city: "Kolkata",   lat: 22.5726, lng: 88.3639, count: 5,  dept: "Finance"     },
-];
-
-// ─── StatCard ─────────────────────────────────────────────────────
-function StatCard({ title, value, sub, icon, accentColor = CRIMSON, trend }) {
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 hover:shadow-md transition-shadow duration-300">
-      <div className="flex justify-between items-center mb-2 sm:mb-4">
-        <p className="text-xs sm:text-sm font-semibold text-gray-500">{title}</p>
-        <span className="text-base sm:text-lg" style={{ color: accentColor }}>
-          {icon}
-        </span>
-      </div>
-      <h2 className="text-xl sm:text-2xl font-bold text-gray-800">{value}</h2>
-      <div className="flex items-center gap-2 mt-1">
-        {trend && (
-          <span className="text-[10px] sm:text-xs font-semibold text-green-500 bg-green-50 px-1.5 py-0.5 rounded flex items-center gap-1">
-            <FaArrowUp className="text-[8px]" /> {trend}
-          </span>
-        )}
-        <p className="text-[10px] sm:text-xs text-gray-400 font-medium">{sub}</p>
-      </div>
-    </div>
-  );
-}
-
-// ─── Announcements ────────────────────────────────────────────────
-function Announcements() {
-  const items = [
-    {
-      title: "Office timings changed",
-      priority: "high",
-      body: "Please note that office timings will change from next Monday onwards due to summer schedule.",
-      time: "2 days ago",
-      tag: "all",
-      dot: CRIMSON,
-    },
-    {
-      title: "Q2 appraisal cycle begins",
-      priority: "medium",
-      body: "The Q2 performance appraisal cycle starts this week. Managers must complete evaluations by May 10.",
-      time: "4 days ago",
-      tag: "managers",
-      dot: GOLD,
-    },
-    {
-      title: "New leave policy effective May 1",
-      priority: "low",
-      body: "Updated leave encashment policy now supports quarterly payouts. Check HR portal for full details.",
-      time: "1 week ago",
-      tag: "all",
-      dot: BLUE_ACCENT,
-    },
-  ];
-
-  const priorityStyles = {
-    high:   "bg-red-50 text-red-600",
-    medium: "bg-yellow-50 text-yellow-600",
-    low:    "bg-green-50 text-green-600",
-  };
-
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 h-full flex flex-col">
-      <div className="flex justify-between items-center mb-4 sm:mb-6">
-        <h3 className="text-base sm:text-lg font-bold text-gray-700">Announcements</h3>
-        <span className="text-xs text-gray-400">{items.length} active</span>
-      </div>
-      <div className="flex-1 overflow-y-auto space-y-4 sm:space-y-5 pr-1">
-        {items.map((item, i) => (
-          <div key={i} className="flex gap-3 group">
-            <div className="flex flex-col items-center pt-1.5">
-              <FaCircle className="text-[8px] shrink-0" style={{ color: item.dot }} />
-              {i < items.length - 1 && (
-                <div className="w-px flex-1 mt-1" style={{ background: "#f3f4f6" }} />
-              )}
-            </div>
-            <div className="pb-3 flex-1">
-              <div className="flex items-center gap-2 flex-wrap mb-1">
-                <span className="text-xs sm:text-sm font-bold text-gray-800">
-                  {item.title}
-                </span>
-                <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${priorityStyles[item.priority]}`}
-                >
-                  {item.priority}
-                </span>
-              </div>
-              <p className="text-[10px] sm:text-xs text-gray-400 leading-relaxed line-clamp-2">
-                {item.body}
-              </p>
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <span className="text-[10px] text-gray-400">{item.time}</span>
-                <span
-                  className="text-[10px] px-2 py-0.5 rounded-full text-white font-bold uppercase"
-                  style={{ background: BLUE_ACCENT }}
-                >
-                  {item.tag}
-                </span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── EmployeeGrowthChart ──────────────────────────────────────────
-function EmployeeGrowthChart({ data }) {
-  const maxVal = Math.max(...data.map((d) => d.total));
-  const currentMonthIndex = new Date().getMonth();
-  const firstTotal = data[0].total;
-  const lastTotal = data[data.length - 1].total;
-  const growthPct = (((lastTotal - firstTotal) / firstTotal) * 100).toFixed(1);
-
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 w-full overflow-x-auto">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 min-w-[300px] gap-3">
-        <div>
-          <h3 className="text-base sm:text-lg font-bold text-gray-700">
-            Employee Statistics
-          </h3>
-          <p className="text-[10px] sm:text-xs text-gray-400">Monthly breakdown</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1 text-[10px] sm:text-xs text-gray-500">
-            <div className="w-2 h-2 rounded-full" style={{ background: CRIMSON_DARK }} />
-            Total
-          </div>
-          <div className="flex items-center gap-1 text-[10px] sm:text-xs text-gray-500">
-            <div className="w-2 h-2 rounded-full" style={{ background: GOLD }} />
-            New
-          </div>
-          <span
-            className="flex items-center gap-1 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full"
-            style={{ background: "#dcfce7", color: "#15803d" }}
-          >
-            <FaArrowUp className="text-[8px]" /> +{growthPct}%
-          </span>
-        </div>
-      </div>
-
-      <div className="h-64 w-full min-w-[320px] flex items-end gap-[2px] sm:gap-1 md:gap-2 justify-between">
-        {data.map((d, i) => {
-          const heightPercent = (d.total / maxVal) * 70;
-          const isCurrentMonth = i === currentMonthIndex;
-          return (
-            <div
-              key={i}
-              className="flex-1 flex flex-col items-center group cursor-pointer h-full justify-end relative"
-            >
-              <div className="mb-2 opacity-0 group-hover:opacity-100 transition-opacity absolute top-0 bg-gray-800 text-white text-[8px] sm:text-[10px] px-2 py-1 rounded pointer-events-none z-20 whitespace-nowrap">
-                {d.total} Emp · +{d.new} new
-              </div>
-              <div className="w-[15px] sm:w-[25px] md:w-[40px] lg:w-[60px] flex flex-col justify-end items-center h-full relative">
-                <div
-                  className="w-full rounded-t-[2px] sm:rounded-t-sm mb-[2px] transition-all duration-300 z-10 shadow-sm"
-                  style={{
-                    height: `${(d.new / maxVal) * 100}%`,
-                    backgroundColor: GOLD,
-                    opacity: isCurrentMonth ? 1 : 0.4,
-                  }}
-                />
-                <div
-                  className="w-full rounded-t-[2px] sm:rounded-t-sm transition-all duration-300 relative"
-                  style={{
-                    height: `${heightPercent}%`,
-                    backgroundColor: isCurrentMonth ? CRIMSON_DARK : CRIMSON,
-                    opacity: isCurrentMonth ? 1 : 0.2,
-                  }}
-                >
-                  {isCurrentMonth && (
-                    <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-white/30 to-transparent rounded-t-sm" />
-                  )}
-                </div>
-              </div>
-              <span
-                className="text-[8px] sm:text-[10px] mt-1 sm:mt-2 font-medium uppercase transition-colors duration-300"
-                style={{
-                  color: isCurrentMonth ? CRIMSON_DARK : "#9CA3AF",
-                  fontSize: "8px",
-                }}
-              >
-                {d.month.substring(0, 3)}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ─── EmployeeMap (Leaflet via CDN) ────────────────────────────────
-function EmployeeMap() {
+/* ═══════════════════════════════════════════════════
+   ATTENDANCE MAP
+═══════════════════════════════════════════════════ */
+const AttendanceMap = () => {
   const mapRef = useRef(null);
-  const mapInstanceRef = useRef(null);
-  const [selected, setSelected] = useState(null);
-  const [leafletReady, setLeafletReady] = useState(false);
+  const instanceRef = useRef(null);
 
-  // Dynamically inject Leaflet CSS + JS
   useEffect(() => {
-    // Inject CSS
-    if (!document.getElementById("leaflet-css")) {
-      const link = document.createElement("link");
-      link.id = "leaflet-css";
-      link.rel = "stylesheet";
-      link.href =
-        "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-      document.head.appendChild(link);
-    }
+    if (!mapRef.current || instanceRef.current) return;
 
-    // Inject JS
-    if (window.L) {
-      setLeafletReady(true);
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-    script.onload = () => setLeafletReady(true);
-    document.body.appendChild(script);
-  }, []);
-
-  // Initialise map once Leaflet is ready
-  useEffect(() => {
-    if (!leafletReady || !mapRef.current || mapInstanceRef.current) return;
-
-    const L = window.L;
-
-    const bounds = [
-      [6.0, 68.0],   // South-West India
-      [37.0, 97.0]   // North-East India
-    ];
-
-    const map = L.map(mapRef.current, {
-      center: [22.9734, 78.6569], // Strictly centered on India
-      zoom: 5,
-      zoomControl: true,
-      scrollWheelZoom: false,
-      maxBounds: bounds,
-      maxBoundsViscosity: 1.0 // Prevents bouncing outside bounds
-    });
-
-    L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-      {
-        attribution: "&copy; OpenStreetMap &copy; CARTO",
-        subdomains: "abcd",
-        maxZoom: 19,
+    const load = async () => {
+      if (!window.L) {
+        await new Promise((res) => {
+          const css = document.createElement("link");
+          css.rel = "stylesheet";
+          css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+          document.head.appendChild(css);
+          const js = document.createElement("script");
+          js.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+          js.onload = res;
+          document.head.appendChild(js);
+        });
       }
-    ).addTo(map);
-
-    // Custom crimson SVG marker
-    const makeIcon = (count) => {
-      const size = count > 40 ? 44 : count > 20 ? 36 : 28;
-      const svgIcon = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 44 44">
-          <circle cx="22" cy="22" r="20" fill="${CRIMSON}" fill-opacity="0.15" />
-          <circle cx="22" cy="22" r="13" fill="${CRIMSON}" />
-          <text x="22" y="27" text-anchor="middle" font-size="11"
-            font-family="DM Sans,sans-serif" font-weight="700" fill="#fff">${count}</text>
-        </svg>`;
-      return L.divIcon({
-        html: svgIcon,
-        className: "",
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2],
-      });
-    };
-
-    // Add markers
-    OFFICE_LOCATIONS.forEach((loc) => {
-      const marker = L.marker([loc.lat, loc.lng], {
-        icon: makeIcon(loc.count),
+      if (!mapRef.current || instanceRef.current) return;
+      const L = window.L;
+      const map = L.map(mapRef.current, { zoomControl: false }).setView([20.5937, 78.9629], 5);
+      L.control.zoom({ position: "bottomright" }).addTo(map);
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+        attribution: "© CARTO",
       }).addTo(map);
 
-      marker.bindTooltip(
-        `<div style="font-family:DM Sans,sans-serif;font-size:12px;font-weight:600;color:#111;padding:2px 4px">
-          ${loc.city} · ${loc.count} employees
-        </div>`,
-        { direction: "top", offset: [0, -6], className: "leaflet-tooltip-clean" }
-      );
+      const data = [
+        { lat: 28.6139, lng: 77.209,  name: "Rohit Kumar",   role: "Manager",  time: "09:02 AM", city: "Delhi",     dept: "MGMT" },
+        { lat: 19.076,  lng: 72.8777, name: "Priya Sharma",  role: "Employee", time: "09:15 AM", city: "Mumbai",    dept: "Sales" },
+        { lat: 12.9716, lng: 77.5946, name: "Arjun Nair",    role: "Employee", time: "09:30 AM", city: "Bangalore", dept: "Tech" },
+        { lat: 22.5726, lng: 88.3639, name: "Sneha Das",     role: "Manager",  time: "09:45 AM", city: "Kolkata",   dept: "HR" },
+        { lat: 17.385,  lng: 78.4867, name: "Karan Singh",   role: "Employee", time: "10:00 AM", city: "Hyderabad", dept: "Finance" },
+        { lat: 26.9124, lng: 75.7873, name: "Meera Joshi",   role: "Employee", time: "09:55 AM", city: "Jaipur",    dept: "Ops" },
+        { lat: 23.0225, lng: 72.5714, name: "Dev Patel",     role: "Manager",  time: "08:58 AM", city: "Ahmedabad", dept: "MGMT" },
+        { lat: 13.0827, lng: 80.2707, name: "Lakshmi Iyer",  role: "Employee", time: "09:10 AM", city: "Chennai",   dept: "Design" },
+      ];
 
-      marker.on("click", () => setSelected(loc));
-    });
+      const pulseStyle = document.createElement("style");
+      pulseStyle.textContent = `@keyframes mPulse{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.5}50%{transform:translate(-50%,-50%) scale(2);opacity:0}}`;
+      document.head.appendChild(pulseStyle);
 
-    mapInstanceRef.current = map;
-  }, [leafletReady]);
+      data.forEach(({ lat, lng, name, role, time, city, dept }) => {
+        const isMgr = role === "Manager";
+        const c = isMgr ? "#730042" : "#a0005c";
+        const s = isMgr ? 15 : 11;
+        const icon = L.divIcon({
+          className: "",
+          html: `<div style="position:relative;width:${s + 14}px;height:${s + 14}px;">
+            <div style="position:absolute;top:50%;left:50%;width:${s + 14}px;height:${s + 14}px;border-radius:50%;background:${c}33;animation:mPulse 2.2s infinite;"></div>
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${s}px;height:${s}px;border-radius:50%;background:${c};border:2.5px solid white;box-shadow:0 2px 10px ${c}66;"></div>
+          </div>`,
+          iconSize: [s + 14, s + 14],
+          iconAnchor: [(s + 14) / 2, (s + 14) / 2],
+        });
+        L.marker([lat, lng], { icon }).addTo(map).bindPopup(
+          `<div style="font-family:'Outfit',sans-serif;padding:4px;min-width:155px;">
+            <div style="font-weight:700;font-size:13px;color:#730042;">${name}</div>
+            <div style="font-size:11px;color:#8a6070;margin-top:1px;">${role} · ${dept} · ${city}</div>
+            <div style="font-size:11px;margin-top:6px;color:#333;">✅ Check-in: <strong>${time}</strong></div>
+          </div>`,
+          { closeButton: false, maxWidth: 210 }
+        );
+      });
+      instanceRef.current = map;
+    };
+    load();
+    return () => {
+      if (instanceRef.current) {
+        instanceRef.current.remove();
+        instanceRef.current = null;
+      }
+    };
+  }, []);
 
-  const totalMapped = OFFICE_LOCATIONS.reduce((s, l) => s + l.count, 0);
+  return <div ref={mapRef} style={{ height: "100%", width: "100%" }} />;
+};
+
+/* ═══════════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════════ */
+const initials = (name = "") =>
+  name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+
+const leaveTypeColor = (type = "") => {
+  const t = type.toLowerCase();
+  if (t.includes("sick") || t.includes("sl")) return "#0d9e6e";
+  if (t.includes("earn") || t.includes("el"))  return "#730042";
+  if (t.includes("priv") || t.includes("pl"))  return "#b8760a";
+  if (t.includes("mat")  || t.includes("ml"))  return "#7c3aed";
+  return "#730042";
+};
+
+const ANN_TYPE_MAP = {
+  general: "chip-general",
+  urgent:  "chip-urgent",
+  event:   "chip-event",
+  policy:  "chip-policy",
+};
+
+/* ═══════════════════════════════════════════════════
+   ANNOUNCEMENT MODAL
+═══════════════════════════════════════════════════ */
+const AnnModal = ({ open, onClose, initial, onSave, loading }) => {
+  const [form, setForm] = useState({ title: "", message: "", type: "general" });
+
+  useEffect(() => {
+    if (open) setForm({ title: "", message: "", type: "general", ...(initial || {}) });
+  }, [open]);
+
+  if (!open) return null;
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   return (
-    <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
-      {/* Card header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-4 sm:px-6 py-4 sm:py-5 border-b border-gray-50 gap-3">
-        <div>
-          <h3 className="text-base sm:text-lg font-bold text-gray-700 flex items-center gap-2">
-            <FaMapMarkerAlt style={{ color: CRIMSON }} className="text-sm" />
-            Employee Location Map
-          </h3>
-          <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
-            {totalMapped} employees across {OFFICE_LOCATIONS.length} offices · India
-          </p>
+    <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-hd">
+          <h2 className="modal-hd-title">{initial ? "Edit Announcement" : "New Announcement"}</h2>
+          <button className="modal-x" onClick={onClose}><FaTimes /></button>
         </div>
-
-        {/* Quick city pills */}
-        <div className="flex flex-wrap gap-2">
-          {OFFICE_LOCATIONS.slice(0, 4).map((loc) => (
-            <button
-              key={loc.city}
-              onClick={() => {
-                setSelected(loc);
-                if (mapInstanceRef.current) {
-                  mapInstanceRef.current.flyTo([loc.lat, loc.lng], 8, {
-                    animate: true,
-                    duration: 1,
-                  });
-                }
-              }}
-              className="text-[10px] sm:text-xs px-2.5 py-1 rounded-full border font-semibold transition-all duration-200"
-              style={{
-                borderColor:
-                  selected?.city === loc.city ? CRIMSON : "#e5e7eb",
-                color: selected?.city === loc.city ? CRIMSON : "#6b7280",
-                background:
-                  selected?.city === loc.city ? "#fdf2f8" : "#fff",
-              }}
-            >
-              {loc.city}
-            </button>
-          ))}
+        <div className="modal-bd">
+          <div className="fld">
+            <label className="flbl">Title</label>
+            <input className="finp" placeholder="Announcement title…" value={form.title} onChange={set("title")} required />
+          </div>
+          <div className="fld">
+            <label className="flbl">Type</label>
+            <select className="fsel" value={form.type} onChange={set("type")}>
+              <option value="general">General</option>
+              <option value="urgent">Urgent</option>
+              <option value="event">Event</option>
+              <option value="policy">Policy</option>
+            </select>
+          </div>
+          <div className="fld" style={{ marginBottom: 0 }}>
+            <label className="flbl">Message</label>
+            <textarea className="ftxt" placeholder="Write your announcement…" value={form.message} onChange={set("message")} />
+          </div>
         </div>
-      </div>
-
-      {/* Map container */}
-      <div className="relative">
-        <div
-          ref={mapRef}
-          style={{ 
-            height: "300px", // Mobile height
-            width: "100%", 
-            zIndex: 0 
-          }}
-          className="sm:h-[400px] lg:h-[450px]" // Tablet/Desktop heights
-        />
-
-        {/* Floating info panel when a city is selected */}
-        {selected && (
-          <div
-            className="absolute bottom-4 left-4 bg-white rounded-xl shadow-lg border border-gray-100 p-4 z-[999] w-52 sm:w-60"
-            style={{ boxShadow: "0 4px 24px rgba(139,26,74,0.12)" }}
-          >
-            <div className="flex justify-between items-start mb-2">
-              <div>
-                <p className="text-sm font-bold text-gray-800">
-                  {selected.city}
-                </p>
-                <p
-                  className="text-[10px] font-semibold uppercase tracking-wider"
-                  style={{ color: GOLD }}
-                >
-                  {selected.dept}
-                </p>
-              </div>
-              <button
-                onClick={() => setSelected(null)}
-                className="text-gray-300 hover:text-gray-500 text-sm font-bold leading-none"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="flex items-end gap-1 mt-3">
-              <span
-                className="text-3xl font-bold"
-                style={{ color: CRIMSON }}
-              >
-                {selected.count}
-              </span>
-              <span className="text-xs text-gray-400 mb-1">employees</span>
-            </div>
-            <div className="mt-3 pt-3 border-t border-gray-50">
-              <div className="flex justify-between text-[10px] text-gray-400 mb-1">
-                <span>Office share</span>
-                <span className="font-semibold text-gray-600">
-                  {((selected.count / totalMapped) * 100).toFixed(1)}%
-                </span>
-              </div>
-              <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{
-                    width: `${(selected.count / totalMapped) * 100}%`,
-                    background: CRIMSON,
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Loading overlay */}
-        {!leafletReady && (
-          <div
-            className="absolute inset-0 flex items-center justify-center bg-gray-50 z-10"
-            style={{ height: "300px" }} // Match mobile height
-          >
-            <div className="text-center">
-              <div
-                className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin mx-auto mb-2"
-                style={{ borderColor: `${CRIMSON} transparent ${CRIMSON} ${CRIMSON}` }}
-              />
-              <p className="text-xs text-gray-400">Loading map…</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Bottom legend strip */}
-      <div className="px-4 sm:px-6 py-3 border-t border-gray-50 flex flex-wrap gap-x-6 gap-y-2">
-        {OFFICE_LOCATIONS.map((loc) => (
-          <button
-            key={loc.city}
-            onClick={() => {
-              setSelected(loc);
-              if (mapInstanceRef.current) {
-                mapInstanceRef.current.flyTo([loc.lat, loc.lng], 8, {
-                  animate: true,
-                  duration: 1,
-                });
-              }
-            }}
-            className="flex items-center gap-2 text-[10px] sm:text-xs text-gray-500 hover:text-gray-800 transition-colors duration-150 font-medium"
-          >
-            <span
-              className="w-2 h-2 rounded-full shrink-0"
-              style={{ background: CRIMSON }}
-            />
-            {loc.city}
-            <span className="text-gray-300">·</span>
-            <span className="font-bold text-gray-700">{loc.count}</span>
+        <div className="modal-ft">
+          <button className="btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn-p" onClick={() => onSave(form)} disabled={loading || !form.title}>
+            <FaCheck style={{ fontSize: 10 }} />
+            {loading ? "Saving…" : initial ? "Update" : "Publish"}
           </button>
-        ))}
+        </div>
       </div>
     </div>
   );
-}
+};
 
-// ─── Main Dashboard ───────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════
+   DASHBOARD
+═══════════════════════════════════════════════════ */
 function Dashboard() {
-  const [greeting, setGreeting] = useState("");
-  const [thought, setThought] = useState("");
-  const [adminData, setAdminData] = useState(null);
+  useInjectStyles();
 
+  const [greeting, setGreeting]   = useState("");
+  const [thought, setThought]     = useState("");
+  const [annModal, setAnnModal]   = useState({ open: false, editing: null });
+  const [empExpand, setEmpExpand] = useState(false);
+
+  /* ── API Hooks ── */
+  const { data: admin }                               = useGetMeAdmin();
+  const { data: empData,   isLoading: empLoading  }  = useGetAllEmployee();
+  const { data: leaveData, isLoading: leaveLoading } = useGetForwardedLeaves();
+  const { data: annRaw,    isLoading: annLoading  }  = useGetAllAnnouncement();
+
+  const { mutate: acceptLeave, isPending: accepting } = useAcceptLeave();
+  const { mutate: rejectLeave, isPending: rejecting } = useRejectLeave();
+  const { mutate: createAnn,   isPending: creating  } = useCreateAnnouncement();
+  const { mutate: deleteAnn                         } = useDeleteAnnouncement();
+  const { mutate: updateAnn,   isPending: updating  } = useUpdateAnnouncement();
+
+  /* ── Normalise data — always guarantee an array ── */
+  const employees = Array.isArray(empData?.employees)
+    ? empData.employees
+    : Array.isArray(empData)
+    ? empData
+    : [];
+
+  const leaves = Array.isArray(leaveData?.leaves)
+    ? leaveData.leaves
+    : Array.isArray(leaveData)
+    ? leaveData
+    : [];
+
+  const announcements = Array.isArray(annRaw?.announcements)
+    ? annRaw.announcements
+    : Array.isArray(annRaw)
+    ? annRaw
+    : [];
+
+  const totalEmployees = empData?.count   || employees.length  || 0;
+  const pendingLeaves  = leaves.filter((l) => (l.status || "").toLowerCase() === "pending").length
+    || leaveData?.count
+    || 0;
+  const totalAnn = announcements.length;
+
+  /* ── Greeting ── */
+  const THOUGHTS = [
+    "Great teams are built on trust and transparency.",
+    "Leadership is not about being in charge — it's about caring.",
+    "Small decisions made consistently become culture.",
+    "Your team's success is your greatest achievement.",
+    "Clarity is kindness. Communicate with purpose.",
+  ];
   useEffect(() => {
-    setAdminData(ADMIN_DATA);
-    const hour = new Date().getHours();
-    if (hour < 12) setGreeting("Good Morning ☀️");
-    else if (hour < 17) setGreeting("Good Afternoon 🌤️");
-    else setGreeting("Good Evening 🌆");
-    const thoughts = [
-      "Small steps every day lead to big results.",
-      "Consistency is the key to growth.",
-      "Teamwork makes the dream work.",
-    ];
-    setThought(thoughts[Math.floor(Math.random() * thoughts.length)]);
+    const h = new Date().getHours();
+    setGreeting(h < 12 ? "Good Morning ☀️" : h < 17 ? "Good Afternoon 🌤️" : h < 21 ? "Good Evening 🌆" : "Good Night 🌙");
+    setThought(THOUGHTS[Math.floor(Math.random() * THOUGHTS.length)]);
   }, []);
 
-  const employee = adminData
-    ? { name: adminData.organisation_name, id: "ENG18" }
-    : { name: "Loading...", id: "..." };
-
+  /* ── Stats ── */
   const stats = [
     {
-      title: "Total Employees",
-      value: "190",
-      sub: "from last year",
       icon: <FaUsers />,
-      accentColor: CRIMSON,
-      trend: "12%",
+      label: "Total Employees",
+      value: empLoading ? "—" : totalEmployees,
+      sub: "+2% from last month",
+      subColor: "var(--green)",
+      bar: null,
     },
     {
-      title: "Present Today",
-      value: "182",
-      sub: "95% Attendance",
       icon: <FaClock />,
-      accentColor: GREEN_ACCENT,
+      label: "Present Today",
+      value: 142,
+      sub: "85% attendance rate",
+      subColor: "var(--muted)",
+      bar: 85,
+    },
+    {
+      icon: <FaCalendarAlt />,
+      label: "Pending Leaves",
+      value: leaveLoading ? "—" : pendingLeaves,
+      sub: pendingLeaves > 0 ? "Needs attention" : "All clear",
+      subColor: pendingLeaves > 0 ? "var(--gold)" : "var(--green)",
+      bar: null,
+    },
+    {
+      icon: <FaBullhorn />,
+      label: "Announcements",
+      value: annLoading ? "—" : totalAnn,
+      sub: "Active broadcasts",
+      subColor: "var(--muted)",
+      bar: null,
     },
   ];
 
+  /* ── Announcement handlers ── */
+  const saveAnn = (form) => {
+    if (annModal.editing) {
+      updateAnn(
+        { id: annModal.editing._id, data: form },
+        { onSuccess: () => setAnnModal({ open: false, editing: null }) }
+      );
+    } else {
+      createAnn(form, { onSuccess: () => setAnnModal({ open: false, editing: null }) });
+    }
+  };
+  const removeAnn = (id) => { if (window.confirm("Delete this announcement?")) deleteAnn(id); };
+
+  const today = new Date().toLocaleDateString("en-IN", {
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+  });
+
+  const displayEmployees = empExpand ? employees : employees.slice(0, 8);
+
   return (
-    <div
-      className="min-h-screen p-2 sm:p-4 md:p-6 lg:p-8 font-sans text-gray-800"
-      style={{ background: BG_GRAY }}
-    >
-      <style>{`
-        .leaflet-tooltip-clean {
-          border: none !important;
-          box-shadow: 0 2px 12px rgba(0,0,0,0.12) !important;
-          border-radius: 8px !important;
-          padding: 6px 10px !important;
-          background: #fff !important;
-        }
-        .leaflet-tooltip-clean::before { display: none !important; }
-      `}</style>
+    <div className="db">
 
-      <div className="max-w-[1600px] mx-auto">
+      {/* ━━━━━━ HERO ━━━━━━ */}
+      <div className="hero">
+        <p className="hero-eyebrow">{today}</p>
+        <h1 className="hero-title">
+          {greeting}, {admin?.organisation_name || "Admin"}!
+        </h1>
+        <p className="hero-thought">"{thought}"</p>
+        <div className="hero-chips">
+          <span className="hero-chip">🏢 {totalEmployees} Employees</span>
+          {pendingLeaves > 0 && (
+            <span className="hero-chip">📋 {pendingLeaves} Leave{pendingLeaves > 1 ? "s" : ""} Pending</span>
+          )}
+          <span className="hero-chip">📢 {totalAnn} Announcement{totalAnn !== 1 ? "s" : ""}</span>
+        </div>
+      </div>
 
-        {/* Header */}
-        <div className="mb-6 sm:mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">
-              Dashboard
-            </h1>
-            <p className="text-xs sm:text-sm text-gray-500 font-medium">
-              {greeting}, {employee.name} · {employee.id}
-            </p>
-            <p className="text-[10px] sm:text-xs text-gray-400 mt-1 italic">
-              "{thought}"
-            </p>
+      {/* ━━━━━━ STATS ━━━━━━ */}
+      <div className="stats-grid">
+        {stats.map((s, i) => (
+          <div className="stat-card" key={i}>
+            <div className="stat-card-stripe" />
+            <div className="stat-icon-ring">{s.icon}</div>
+            <div className="stat-lbl">{s.label}</div>
+            <div className="stat-val">{s.value}</div>
+            <p className="stat-sub" style={{ color: s.subColor }}>{s.sub}</p>
+            {s.bar !== null && (
+              <div className="stat-bar-track">
+                <div className="stat-bar-fill" style={{ width: `${s.bar}%` }} />
+              </div>
+            )}
           </div>
-          <button className="flex items-center justify-center gap-2 bg-[#8B1A4A] px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm font-semibold text-white hover:bg-[#8c0808] shadow-sm transition-colors w-full md:w-auto">
-            <FaBell />
-            <span>Notifications</span>
+        ))}
+      </div>
+
+      {/* ━━━━━━ MAP + LEAVE REQUESTS ━━━━━━ */}
+      <div className="mid-grid">
+
+        {/* Map */}
+        <div className="panel">
+          <div className="panel-head">
+            <div className="panel-title">
+              <div className="live-dot" />
+              Live Attendance Map
+            </div>
+            <span style={{ fontSize: 11, color: "var(--light)", fontWeight: 500 }}>
+              <FaMapMarkerAlt style={{ marginRight: 4 }} />
+              Real-time check-ins
+            </span>
+          </div>
+          <div className="map-wrap">
+            <AttendanceMap />
+          </div>
+          <div className="map-footer">
+            <div className="map-leg">
+              <div className="leg-dot" style={{ background: "#730042" }} />
+              Manager
+            </div>
+            <div className="map-leg">
+              <div className="leg-dot" style={{ background: "#a0005c" }} />
+              Employee
+            </div>
+            <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--light)" }}>
+              Click a pin for details
+            </span>
+          </div>
+        </div>
+
+        {/* Leave Requests */}
+        <div className="panel" style={{ display: "flex", flexDirection: "column" }}>
+          <div className="panel-head">
+            <div className="panel-title">
+              <FaCalendarAlt style={{ color: "var(--p)", fontSize: 15 }} />
+              Leave Requests
+            </div>
+            {pendingLeaves > 0 && (
+              <span style={{
+                background: "#fff8e1", color: "var(--gold)", fontSize: 11,
+                fontWeight: 700, padding: "3px 10px", borderRadius: 99, border: "1px solid #f0d870",
+              }}>
+                {pendingLeaves} pending
+              </span>
+            )}
+          </div>
+
+          <div className="leave-scroll" style={{ flex: 1 }}>
+            {leaveLoading ? (
+              <div className="empty"><div className="empty-ico">⏳</div><p>Loading…</p></div>
+            ) : leaves.length === 0 ? (
+              <div className="empty">
+                <div className="empty-ico"><FaCheckCircle style={{ color: "var(--green)" }} /></div>
+                <p>No leave requests.<br />All employees are accounted for.</p>
+              </div>
+            ) : (
+              leaves.map((leave) => {
+                const name      = leave.employeeName || leave.name || leave.user?.name || "Employee";
+                const type      = leave.leaveType    || leave.type || "Leave";
+                const from      = leave.from         || leave.startDate || leave.fromDate || "";
+                const to        = leave.to           || leave.endDate   || leave.toDate   || "";
+                const status    = (leave.status || "pending").toLowerCase();
+                const isPending = status === "pending";
+
+                const fmtDate = (d) => {
+                  if (!d) return "";
+                  try { return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }); }
+                  catch { return d; }
+                };
+
+                return (
+                  <div key={leave._id || leave.id} className="leave-item">
+                    <div className="leave-avatar" style={{ background: leaveTypeColor(type) }}>
+                      {initials(name)}
+                    </div>
+                    <div className="leave-meta">
+                      <div className="leave-name">{name}</div>
+                      <div className="leave-info">
+                        {type} · {fmtDate(from)}{to && to !== from ? ` → ${fmtDate(to)}` : ""}
+                      </div>
+                      {leave.reason && (
+                        <div className="leave-info" style={{ marginTop: 2, fontStyle: "italic" }}>
+                          "{leave.reason}"
+                        </div>
+                      )}
+                      {isPending ? (
+                        <div className="leave-actions">
+                          <button
+                            className="btn-accept"
+                            onClick={() => acceptLeave(leave._id || leave.id)}
+                            disabled={accepting}
+                          >
+                            <FaCheck /> Approve
+                          </button>
+                          <button
+                            className="btn-reject"
+                            onClick={() => rejectLeave(leave._id || leave.id)}
+                            disabled={rejecting}
+                          >
+                            <FaBan /> Reject
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ marginTop: 6 }}>
+                          <span className={`status-badge status-${status}`}>
+                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ━━━━━━ ANNOUNCEMENTS ━━━━━━ */}
+      <div className="panel" style={{ marginBottom: 26 }}>
+        <div className="panel-head">
+          <div className="panel-title">
+            <FaBullhorn style={{ color: "var(--p)", fontSize: 15 }} />
+            Announcements
+          </div>
+          <button className="btn-p" onClick={() => setAnnModal({ open: true, editing: null })}>
+            <FaPlus style={{ fontSize: 10 }} /> New
           </button>
         </div>
 
-        {/* ── Stat Cards ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          {stats.map((item, i) => (
-            <StatCard key={i} {...item} />
-          ))}
-        </div>
-
-        {/* ── Announcements ── */}
-        <div className="mb-6 sm:mb-8">
-          <Announcements />
-        </div>
-
-        {/* ── Employee Growth Chart ── */}
-        <div className="mb-6 sm:mb-8">
-          <EmployeeGrowthChart data={EMPLOYEE_GROWTH_DATA} />
-        </div>
-
-        {/* ── Employee Location Map ── */}
-        <div>
-          <EmployeeMap />
-        </div>
-
+        {annLoading ? (
+          <div className="empty"><div className="empty-ico">⏳</div><p>Loading…</p></div>
+        ) : announcements.length === 0 ? (
+          <div className="empty">
+            <div className="empty-ico">📢</div>
+            <p>No announcements yet.<br />Publish one to notify your team.</p>
+          </div>
+        ) : (
+          <div className="ann-grid">
+            {announcements.map((ann) => {
+              const typeKey = (ann.type || "general").toLowerCase();
+              const chipCls = ANN_TYPE_MAP[typeKey] || "chip-general";
+              return (
+                <div className="ann-card" key={ann._id}>
+                  <span className={`ann-type-chip ${chipCls}`}>
+                    {typeKey.charAt(0).toUpperCase() + typeKey.slice(1)}
+                  </span>
+                  <div className="ann-card-title">{ann.title}</div>
+                  <div className="ann-card-body">{ann.message}</div>
+                  <div className="ann-card-foot">
+                    <button
+                      className="icon-btn"
+                      onClick={() => setAnnModal({ open: true, editing: ann })}
+                    >
+                      <FaEdit /> Edit
+                    </button>
+                    <button className="icon-btn del" onClick={() => removeAnn(ann._id)}>
+                      <FaTrash /> Delete
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
+
+      {/* ━━━━━━ EMPLOYEE OVERVIEW ━━━━━━ */}
+      <div className="panel" style={{ marginBottom: 26 }}>
+        <div className="panel-head">
+          <div className="panel-title">
+            <FaUsers style={{ color: "var(--p)", fontSize: 15 }} />
+            Employee Overview
+          </div>
+          {employees.length > 8 && (
+            <button
+              className="btn-ghost"
+              style={{ fontSize: 12, padding: "6px 14px" }}
+              onClick={() => setEmpExpand((v) => !v)}
+            >
+              {empExpand ? "Show Less" : `View All (${employees.length})`}
+              <FaChevronRight style={{ fontSize: 10, marginLeft: 4, transform: empExpand ? "rotate(90deg)" : "none", transition: ".2s" }} />
+            </button>
+          )}
+        </div>
+
+        {empLoading ? (
+          <div className="empty"><div className="empty-ico">⏳</div><p>Loading employees…</p></div>
+        ) : employees.length === 0 ? (
+          <div className="empty">
+            <div className="empty-ico"><FaUsers /></div>
+            <p>No employees found.</p>
+          </div>
+        ) : (
+          <div className="emp-grid">
+            {displayEmployees.map((emp, i) => {
+              const name  = emp.name || emp.fullName || emp.username || "Employee";
+              const role  = emp.role || emp.designation || emp.position || "";
+              const dept  = emp.department || emp.dept || "";
+              const email = emp.email || emp.workEmail || "";
+              return (
+                <div className="emp-card" key={emp._id || emp.id || i}>
+                  <div className="emp-ava">{initials(name)}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="emp-name">{name}</div>
+                    {role  && <div className="emp-role">{role}</div>}
+                    {dept  && <span className="emp-dept">{dept}</span>}
+                    {email && (
+                      <div style={{ fontSize: 10, color: "var(--light)", marginTop: 4 }}>
+                        <FaEnvelope style={{ marginRight: 4 }} />{email}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ━━━━━━ CHARTS (commented out — preserved from develop) ━━━━━━ */}
+      {/* <div className="charts-panel">
+        <div className="panel-head">
+          <div className="panel-title">Analytics Overview</div>
+        </div>
+        <div className="charts-body">
+          <Charts />
+        </div>
+      </div> */}
+
+      {/* ━━━━━━ ANNOUNCEMENT MODAL ━━━━━━ */}
+      <AnnModal
+        open={annModal.open}
+        onClose={() => setAnnModal({ open: false, editing: null })}
+        initial={
+          annModal.editing
+            ? { title: annModal.editing.title, message: annModal.editing.message, type: annModal.editing.type || "general" }
+            : null
+        }
+        onSave={saveAnn}
+        loading={creating || updating}
+      />
     </div>
   );
 }

@@ -8,16 +8,14 @@ export default defineConfig({
   assetsInclude: ["**/*.json"],
 
   build: {
-    sourcemap: false, 
-    minify: "terser", 
-
+    sourcemap: false,
+    minify: "terser",
     terserOptions: {
       compress: {
-        drop_console: true, 
+        drop_console: true,
         drop_debugger: true,
       },
     },
-
     rollupOptions: {
       output: {
         manualChunks: {
@@ -30,5 +28,16 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+
+    // 🔥 ADD THIS (MAIN FIX)
+    watch: {
+      usePolling: true,
+    },
+
+  
+    hmr: {
+      protocol: "ws",
+      host: "localhost",
+    },
   },
 });
