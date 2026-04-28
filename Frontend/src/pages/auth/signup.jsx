@@ -128,7 +128,7 @@ export default function Register() {
         <div className="hidden md:flex w-1/2 bg-gray-50 items-center justify-center p-6">
           <div className="text-center">
             <img
-              src="/login.jpeg"
+              src="/Group 551.png"
               alt="illustration"
               className="w-full max-h-65 object-contain"
             />
@@ -144,8 +144,8 @@ export default function Register() {
         </div>
       </div>
 
-      {/* ✅ TEXT ON BACKGROUND (IMAGE KE NEECHE ALIGN) */}
-      <p className="absolute bottom-20 right-1/3 translate-x-1/2 text-gray-700 text-sm font-medium">
+    
+      <p className="absolute bottom-22 right-1/3 translate-x-1/2 text-gray-600 text-sm font-medium">
         © 2026, TechTorch Solutions Pvt. Ltd. All Rights Reserved.
       </p>
     </div>
