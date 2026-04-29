@@ -30,7 +30,8 @@ const {
   showUserPasswordPage,
   getme,
   editadminprofile,
-  changepassword
+  changepassword,
+  getTodayCheckins
 } = require("../controllers/admin.controller");
 
 adminrouter.post("/register", asyncHandler(registerAdmin));
@@ -134,5 +135,6 @@ adminrouter.post(
 adminrouter.get("/getme", adminauthmiddleware, asyncHandler(getme));
 adminrouter.put("/editadminprofile", adminauthmiddleware, asyncHandler(editadminprofile));
 adminrouter.put("/changepassword", adminauthmiddleware, asyncHandler(changepassword));
+adminrouter.get("/gettodaycheckins", adminauthmiddleware, asyncHandler(getTodayCheckins));
 
 module.exports = adminrouter;
