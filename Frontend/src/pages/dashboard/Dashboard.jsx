@@ -20,6 +20,9 @@ import {
   useUpdateAnnouncement,
 } from "../../auth/server-state/adminannounce/adminannounce.hook";
 
+// ── NEW: real check-in data hook ──────────────────────────────────────────────
+import { useGetTodayCheckins } from "../../auth/server-state/adminother/adminother.hook";
+
 
 const useInjectStyles = () => {
   useEffect(() => {
@@ -126,7 +129,7 @@ const useInjectStyles = () => {
       @keyframes livePulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.4)} }
 
       /* ── Map ── */
-      .map-wrap { height: 310px; }
+      .map-wrap { height: 310px; position: relative; }
       .map-footer { padding: 11px 20px; background: var(--p-wash); border-top: 1px solid var(--border); display: flex; gap: 20px; align-items: center; }
       .map-leg { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
       .leg-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
@@ -210,7 +213,7 @@ const useInjectStyles = () => {
       .modal-ft { padding: 14px 26px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
       .fld { margin-bottom: 18px; }
       .flbl { display: block; font-size: 11px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
-      .finp, .ftxt, .fsel { width: 100%; padding: 10px 13px; background: var(--p-pale); border: 1px solid var(--border); border-radius: var(--r-sm); font-size: 14px; color: var(--text); font-family: 'Outfit',sans-serif; outline: none; transition: border-color .15s, box-shadow .15s; }
+      .finp, .ftxt, .fsel { width: 100%; padding: 10px 13px; background: var(--p-pale); border: 1px solid var(--border); border-radius: var(--r-sm); font-size: 14px; color: var(--text); font-family: 'Outfit',sans-serif; outline: none; transition: border-color .15s, box-shadow .15s; box-sizing: border-box; }
       .finp:focus, .ftxt:focus, .fsel:focus { border-color: var(--p); box-shadow: 0 0 0 3px var(--p-wash); }
       .ftxt { resize: vertical; min-height: 88px; line-height: 1.6; }
 
@@ -223,6 +226,12 @@ const useInjectStyles = () => {
       .sec-divider { display: flex; align-items: center; gap: 12px; margin: 6px 0 18px; }
       .sec-divider-line { flex: 1; height: 1px; background: var(--border); }
       .sec-divider-txt { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--light); font-weight: 600; white-space: nowrap; }
+
+      /* ── Map pulse (injected once globally) ── */
+      @keyframes mPulse {
+        0%,100% { transform: translate(-50%,-50%) scale(1); opacity: .5; }
+        50%      { transform: translate(-50%,-50%) scale(2.2); opacity: 0; }
+      }
     `;
     document.head.appendChild(styleEl);
     return () => {
@@ -234,76 +243,112 @@ const useInjectStyles = () => {
 };
 
 /* ═══════════════════════════════════════════════════
-   ATTENDANCE MAP
+   ATTENDANCE MAP  — uses real check-in data
 ═══════════════════════════════════════════════════ */
-const AttendanceMap = () => {
-  const mapRef = useRef(null);
+const ROLE_COLOR = { manager: "#730042", employee: "#a0005c" };
+
+const fmtTime = (iso) => {
+  if (!iso) return "—";
+  try { return new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }); }
+  catch { return "—"; }
+};
+
+const AttendanceMap = ({ checkins = [], loading = false }) => {
+  const mapRef      = useRef(null);
   const instanceRef = useRef(null);
+  const markersRef  = useRef([]);
 
+  /* ── Boot Leaflet once ── */
   useEffect(() => {
-    if (!mapRef.current || instanceRef.current) return;
-
-    const load = async () => {
+    let active = true;
+    (async () => {
+      if (instanceRef.current || !mapRef.current) return;
       if (!window.L) {
         await new Promise((res) => {
           const css = document.createElement("link");
-          css.rel = "stylesheet";
+          css.rel  = "stylesheet";
           css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
           document.head.appendChild(css);
-          const js = document.createElement("script");
-          js.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+          const js  = document.createElement("script");
+          js.src    = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
           js.onload = res;
           document.head.appendChild(js);
         });
       }
-      if (!mapRef.current || instanceRef.current) return;
-      const L = window.L;
-      const map = L.map(mapRef.current, { zoomControl: false }).setView([20.5937, 78.9629], 5);
+      if (!active || !mapRef.current || instanceRef.current) return;
+      const L   = window.L;
+      const map = L.map(mapRef.current, { zoomControl: false }).setView([22.5, 80.0], 5);
       L.control.zoom({ position: "bottomright" }).addTo(map);
       L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-        attribution: "© CARTO",
+        attribution: "© CARTO", maxZoom: 18,
       }).addTo(map);
-
-      const data = [
-        { lat: 28.6139, lng: 77.209,  name: "Rohit Kumar",   role: "Manager",  time: "09:02 AM", city: "Delhi",     dept: "MGMT" },
-        { lat: 19.076,  lng: 72.8777, name: "Priya Sharma",  role: "Employee", time: "09:15 AM", city: "Mumbai",    dept: "Sales" },
-        { lat: 12.9716, lng: 77.5946, name: "Arjun Nair",    role: "Employee", time: "09:30 AM", city: "Bangalore", dept: "Tech" },
-        { lat: 22.5726, lng: 88.3639, name: "Sneha Das",     role: "Manager",  time: "09:45 AM", city: "Kolkata",   dept: "HR" },
-        { lat: 17.385,  lng: 78.4867, name: "Karan Singh",   role: "Employee", time: "10:00 AM", city: "Hyderabad", dept: "Finance" },
-        { lat: 26.9124, lng: 75.7873, name: "Meera Joshi",   role: "Employee", time: "09:55 AM", city: "Jaipur",    dept: "Ops" },
-        { lat: 23.0225, lng: 72.5714, name: "Dev Patel",     role: "Manager",  time: "08:58 AM", city: "Ahmedabad", dept: "MGMT" },
-        { lat: 13.0827, lng: 80.2707, name: "Lakshmi Iyer",  role: "Employee", time: "09:10 AM", city: "Chennai",   dept: "Design" },
-      ];
-
-      const pulseStyle = document.createElement("style");
-      pulseStyle.textContent = `@keyframes mPulse{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.5}50%{transform:translate(-50%,-50%) scale(2);opacity:0}}`;
-      document.head.appendChild(pulseStyle);
-
-      data.forEach(({ lat, lng, name, role, time, city, dept }) => {
-        const isMgr = role === "Manager";
-        const c = isMgr ? "#730042" : "#a0005c";
-        const s = isMgr ? 15 : 11;
-        const icon = L.divIcon({
-          className: "",
-          html: `<div style="position:relative;width:${s + 14}px;height:${s + 14}px;">
-            <div style="position:absolute;top:50%;left:50%;width:${s + 14}px;height:${s + 14}px;border-radius:50%;background:${c}33;animation:mPulse 2.2s infinite;"></div>
-            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${s}px;height:${s}px;border-radius:50%;background:${c};border:2.5px solid white;box-shadow:0 2px 10px ${c}66;"></div>
-          </div>`,
-          iconSize: [s + 14, s + 14],
-          iconAnchor: [(s + 14) / 2, (s + 14) / 2],
-        });
-        L.marker([lat, lng], { icon }).addTo(map).bindPopup(
-          `<div style="font-family:'Outfit',sans-serif;padding:4px;min-width:155px;">
-            <div style="font-weight:700;font-size:13px;color:#730042;">${name}</div>
-            <div style="font-size:11px;color:#8a6070;margin-top:1px;">${role} · ${dept} · ${city}</div>
-            <div style="font-size:11px;margin-top:6px;color:#333;">✅ Check-in: <strong>${time}</strong></div>
-          </div>`,
-          { closeButton: false, maxWidth: 210 }
-        );
-      });
       instanceRef.current = map;
-    };
-    load();
+    })();
+    return () => { active = false; };
+  }, []);
+
+  /* ── Redraw markers whenever checkins changes ── */
+  useEffect(() => {
+    const L   = window.L;
+    const map = instanceRef.current;
+    if (!L || !map) return;
+
+    // Clear old markers
+    markersRef.current.forEach((m) => map.removeLayer(m));
+    markersRef.current = [];
+
+    if (!checkins.length) return;
+
+    const bounds = [];
+
+    checkins.forEach(({ lat, lng, name, role, dept, email, checkIn, checkedOut }) => {
+      if (!lat || !lng) return;
+      const color  = ROLE_COLOR[role?.toLowerCase()] ?? ROLE_COLOR.employee;
+      const size   = role?.toLowerCase() === "manager" ? 15 : 11;
+      const pulse  = size + 14;
+      const inits  = (name || "?").split(" ").map((w) => w[0] ?? "").slice(0, 2).join("").toUpperCase();
+
+      const icon = L.divIcon({
+        className: "",
+        html: `<div style="position:relative;width:${pulse}px;height:${pulse}px;">
+          <div style="position:absolute;top:50%;left:50%;width:${pulse}px;height:${pulse}px;border-radius:50%;background:${color}33;animation:mPulse 2.2s infinite;"></div>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2.5px solid white;box-shadow:0 2px 10px ${color}66;${checkedOut ? "opacity:.4;" : ""}"></div>
+        </div>`,
+        iconSize: [pulse, pulse], iconAnchor: [pulse / 2, pulse / 2],
+      });
+
+      const marker = L.marker([lat, lng], { icon })
+        .bindPopup(
+          `<div style="font-family:'Outfit',sans-serif;padding:6px 4px;min-width:175px;">
+            <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px;">
+              <div style="width:32px;height:32px;border-radius:50%;background:${color};color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">${inits}</div>
+              <div>
+                <div style="font-weight:700;font-size:13px;color:${color};">${name}</div>
+                <div style="font-size:11px;color:#8a6070;text-transform:capitalize;">${role ?? ""}${dept ? " · " + dept : ""}</div>
+              </div>
+            </div>
+            ${email ? `<div style="font-size:11px;color:#8a6070;margin-bottom:6px;">✉ ${email}</div>` : ""}
+            <div style="font-size:11px;color:#333;">✅ <strong>Check-in:</strong> ${fmtTime(checkIn)}</div>
+            ${checkedOut
+              ? `<div style="font-size:11px;color:#0d9e6e;margin-top:3px;">🏁 Checked out</div>`
+              : `<div style="font-size:11px;color:#b8760a;margin-top:3px;">🟡 Still on duty</div>`}
+          </div>`,
+          { closeButton: false, maxWidth: 220 }
+        )
+        .addTo(map);
+
+      markersRef.current.push(marker);
+      bounds.push([lat, lng]);
+    });
+
+    if (bounds.length > 0) {
+      try { map.fitBounds(bounds, { padding: [40, 40], maxZoom: 10 }); }
+      catch (_) {}
+    }
+  }, [checkins]);
+
+  /* ── Cleanup ── */
+  useEffect(() => {
     return () => {
       if (instanceRef.current) {
         instanceRef.current.remove();
@@ -312,7 +357,34 @@ const AttendanceMap = () => {
     };
   }, []);
 
-  return <div ref={mapRef} style={{ height: "100%", width: "100%" }} />;
+  return (
+    <div style={{ height: "100%", width: "100%", position: "relative" }}>
+      <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
+
+      {/* Loading overlay */}
+      {loading && (
+        <div style={{
+          position: "absolute", inset: 0, background: "rgba(253,245,249,.75)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 13, color: "#8a6070", gap: 8, zIndex: 500,
+        }}>
+          <span style={{ fontSize: 18 }}>⏳</span> Fetching check-ins…
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && checkins.length === 0 && (
+        <div style={{
+          position: "absolute", inset: 0, display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center",
+          gap: 8, zIndex: 500, pointerEvents: "none",
+        }}>
+          <span style={{ fontSize: 32 }}>📍</span>
+          <p style={{ fontSize: 13, color: "#8a6070", margin: 0 }}>No check-ins recorded yet today</p>
+        </div>
+      )}
+    </div>
+  );
 };
 
 /* ═══════════════════════════════════════════════════
@@ -400,10 +472,12 @@ function Dashboard() {
   const [empExpand, setEmpExpand] = useState(false);
 
   /* ── API Hooks ── */
-  const { data: admin }                               = useGetMeAdmin();
-  const { data: empData,   isLoading: empLoading  }  = useGetAllEmployee();
-  const { data: leaveData, isLoading: leaveLoading } = useGetForwardedLeaves();
-  const { data: annRaw,    isLoading: annLoading  }  = useGetAllAnnouncement();
+  const { data: admin }                                         = useGetMeAdmin();
+  const { data: empData,      isLoading: empLoading     }      = useGetAllEmployee();
+  const { data: leaveData,    isLoading: leaveLoading   }      = useGetForwardedLeaves();
+  const { data: annRaw,       isLoading: annLoading     }      = useGetAllAnnouncement();
+  // ── REAL MAP DATA ──
+  const { data: checkinData,  isLoading: mapLoading     }      = useGetTodayCheckins();
 
   const { mutate: acceptLeave, isPending: accepting } = useAcceptLeave();
   const { mutate: rejectLeave, isPending: rejecting } = useRejectLeave();
@@ -411,29 +485,30 @@ function Dashboard() {
   const { mutate: deleteAnn                         } = useDeleteAnnouncement();
   const { mutate: updateAnn,   isPending: updating  } = useUpdateAnnouncement();
 
-  /* ── Normalise data — always guarantee an array ── */
+  /* ── Normalise data ── */
   const employees = Array.isArray(empData?.employees)
     ? empData.employees
-    : Array.isArray(empData)
-    ? empData
-    : [];
+    : Array.isArray(empData) ? empData : [];
 
   const leaves = Array.isArray(leaveData?.leaves)
     ? leaveData.leaves
-    : Array.isArray(leaveData)
-    ? leaveData
-    : [];
+    : Array.isArray(leaveData) ? leaveData : [];
 
   const announcements = Array.isArray(annRaw?.announcements)
     ? annRaw.announcements
-    : Array.isArray(annRaw)
-    ? annRaw
-    : [];
+    : Array.isArray(annRaw) ? annRaw : [];
 
-  const totalEmployees = empData?.count   || employees.length  || 0;
+  // Real check-ins for the map + "Present Today" stat
+  const checkins      = checkinData?.checkins ?? [];
+  const presentToday  = checkinData?.total    ?? checkins.length;
+  const stillOnDuty   = checkins.filter((c) => !c.checkedOut).length;
+  const attendanceRate = employees.length > 0
+    ? Math.round((presentToday / employees.length) * 100)
+    : 0;
+
+  const totalEmployees = empData?.count || employees.length || 0;
   const pendingLeaves  = leaves.filter((l) => (l.status || "").toLowerCase() === "pending").length
-    || leaveData?.count
-    || 0;
+    || leaveData?.count || 0;
   const totalAnn = announcements.length;
 
   /* ── Greeting ── */
@@ -450,7 +525,7 @@ function Dashboard() {
     setThought(THOUGHTS[Math.floor(Math.random() * THOUGHTS.length)]);
   }, []);
 
-  /* ── Stats ── */
+  /* ── Stats — "Present Today" now uses live checkin count ── */
   const stats = [
     {
       icon: <FaUsers />,
@@ -463,10 +538,10 @@ function Dashboard() {
     {
       icon: <FaClock />,
       label: "Present Today",
-      value: 142,
-      sub: "85% attendance rate",
+      value: mapLoading ? "—" : presentToday,
+      sub: mapLoading ? "Loading…" : `${attendanceRate}% attendance · ${stillOnDuty} on duty`,
       subColor: "var(--muted)",
-      bar: 85,
+      bar: mapLoading ? null : attendanceRate,
     },
     {
       icon: <FaCalendarAlt />,
@@ -517,6 +592,9 @@ function Dashboard() {
         <p className="hero-thought">"{thought}"</p>
         <div className="hero-chips">
           <span className="hero-chip">🏢 {totalEmployees} Employees</span>
+          {presentToday > 0 && (
+            <span className="hero-chip">✅ {presentToday} Present Today</span>
+          )}
           {pendingLeaves > 0 && (
             <span className="hero-chip">📋 {pendingLeaves} Leave{pendingLeaves > 1 ? "s" : ""} Pending</span>
           )}
@@ -545,7 +623,7 @@ function Dashboard() {
       {/* ━━━━━━ MAP + LEAVE REQUESTS ━━━━━━ */}
       <div className="mid-grid">
 
-        {/* Map */}
+        {/* ── Live Attendance Map ── */}
         <div className="panel">
           <div className="panel-head">
             <div className="panel-title">
@@ -554,12 +632,17 @@ function Dashboard() {
             </div>
             <span style={{ fontSize: 11, color: "var(--light)", fontWeight: 500 }}>
               <FaMapMarkerAlt style={{ marginRight: 4 }} />
-              Real-time check-ins
+              {mapLoading
+                ? "Loading…"
+                : `${checkins.length} check-in${checkins.length !== 1 ? "s" : ""} today`}
             </span>
           </div>
+
           <div className="map-wrap">
-            <AttendanceMap />
+            {/* Pass real data — no more hardcoded pins */}
+            <AttendanceMap checkins={checkins} loading={mapLoading} />
           </div>
+
           <div className="map-footer">
             <div className="map-leg">
               <div className="leg-dot" style={{ background: "#730042" }} />
@@ -569,13 +652,17 @@ function Dashboard() {
               <div className="leg-dot" style={{ background: "#a0005c" }} />
               Employee
             </div>
+            <div className="map-leg" style={{ marginLeft: 4 }}>
+              <div className="leg-dot" style={{ background: "#aaa", opacity: .5 }} />
+              Checked out
+            </div>
             <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--light)" }}>
-              Click a pin for details
+              Click a pin for details · updates every 2 min
             </span>
           </div>
         </div>
 
-        {/* Leave Requests */}
+        {/* ── Leave Requests ── */}
         <div className="panel" style={{ display: "flex", flexDirection: "column" }}>
           <div className="panel-head">
             <div className="panel-title">
@@ -726,7 +813,11 @@ function Dashboard() {
               onClick={() => setEmpExpand((v) => !v)}
             >
               {empExpand ? "Show Less" : `View All (${employees.length})`}
-              <FaChevronRight style={{ fontSize: 10, marginLeft: 4, transform: empExpand ? "rotate(90deg)" : "none", transition: ".2s" }} />
+              <FaChevronRight style={{
+                fontSize: 10, marginLeft: 4,
+                transform: empExpand ? "rotate(90deg)" : "none",
+                transition: ".2s",
+              }} />
             </button>
           )}
         </div>
@@ -765,7 +856,7 @@ function Dashboard() {
         )}
       </div>
 
-      {/* ━━━━━━ CHARTS (commented out — preserved from develop) ━━━━━━ */}
+      {/* ━━━━━━ CHARTS (preserved, uncomment to enable) ━━━━━━ */}
       {/* <div className="charts-panel">
         <div className="panel-head">
           <div className="panel-title">Analytics Overview</div>
