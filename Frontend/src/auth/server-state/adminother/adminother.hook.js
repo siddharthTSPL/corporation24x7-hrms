@@ -9,6 +9,7 @@ import {
   editEmployee,
   getparticularEmployeeStats,
   getParticularManager,
+  getTodayCheckins,
 } from "../../api/adminapi/other/ad.other.api";
 
 export const useGetAllEmployee = () => {
@@ -82,5 +83,16 @@ export const useGetParticularManagerStats = (uid) => {
     queryKey: ["manager-stats", uid],
     queryFn: () => getParticularManager(uid),
     enabled: !!uid,
+  });
+};
+
+export const useGetTodayCheckins = () => {
+  return useQuery({
+    queryKey: ["todayCheckins"],
+    queryFn: getTodayCheckins,
+    // Refetch every 2 minutes so the map stays live without a page reload
+    refetchInterval: 2 * 60 * 1000,
+    refetchIntervalInBackground: false,
+    staleTime: 60 * 1000,
   });
 };

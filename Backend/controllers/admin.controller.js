@@ -16,6 +16,7 @@ const generateOTP = require("../automatic/otpgenerator");
 const OtpModel = require("../Models/otpbasedlogin.model");
 const leavebalanceModel = require("../Models/leavebalance.model");
 const reviewModel = require("../Models/review.model");
+const Attendance = require("../Models/attendance.model");
 
 
 const registerAdmin = async (req, res, next) => {
@@ -1155,6 +1156,37 @@ const changepassword = async (req, res, next) => {
 };
 
 
+
+
+const getTodayCheckins = async (req, res) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const checkins = await Attendance.find({
+    date: today,
+    checkIn: { $exists: true },       
+    latitude:  { $exists: true, $ne: null },
+    longitude: { $exists: true, $ne: null },
+  })
+    .populate("employee", "name email department designation")
+    .select("employee role latitude longitude checkIn checkOut");
+
+  const payload = checkins.map((c) => ({
+    id:         c._id,
+    name:       c.employee?.name  || "Unknown",
+    email:      c.employee?.email || "",
+    dept:       c.employee?.department || c.employee?.designation || "",
+    role:       c.role,                   
+    lat:        c.latitude,
+    lng:        c.longitude,
+    checkIn:    c.checkIn,
+    checkedOut: !!c.checkOut,
+  }));
+
+  res.json({ checkins: payload, total: payload.length });
+};
+
+
 module.exports = {
   registerAdmin,
   verifyAdmin,
@@ -1183,5 +1215,6 @@ module.exports = {
   showUserPasswordPage,
   getme,
   editadminprofile,
-  changepassword
+  changepassword,
+  getTodayCheckins
 };

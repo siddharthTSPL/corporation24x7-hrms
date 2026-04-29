@@ -1,47 +1,41 @@
-const jwt = require("jsonwebtoken");
 const Attendance = require("../Models/attendance.model");
 const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
 
 
-
 const checkin = async (req, res) => {
-
-  const token = req.cookies.token;
-
-  if (!token) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
   try {
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
     const { latitude, longitude, selfie } = req.body;
+    const user = req.user;
+
+    if (!latitude || !longitude) {
+      return res.status(400).json({ message: "Location required" });
+    }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const existing = await Attendance.findOne({
-      employee: decoded.id,
-      role: decoded.role,
+      employee: user.id,
+      role: user.role,
       date: today
     });
 
-    if (existing) {
-      return res.json({ message: "Already checked in" });
+    if (existing && !existing.checkOut) {
+      return res.status(400).json({ message: "Already checked in" });
     }
 
-    const newAttendance = new Attendance({
-      employee: decoded.id,
-      role: decoded.role,
+    const newAttendance = await Attendance.create({
+      employee: user.id,
+      role: user.role,
       date: today,
       checkIn: new Date(),
       latitude,
       longitude,
-      selfie
+      selfie,
+      activeMinutes: 0,
+      idleMinutes: 0,
+      lastUpdated: Date.now()
     });
-
-    await newAttendance.save();
 
     res.json({
       message: "Check-in successful",
@@ -55,25 +49,22 @@ const checkin = async (req, res) => {
 
 
 
+
 const activity = async (req, res) => {
-
-  const token = req.cookies.token;
-
-  if (!token) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
   try {
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const { status } = req.body;
+    const user = req.user;
+
+    if (!["active", "idle"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status" });
+    }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const attendance = await Attendance.findOne({
-      employee: decoded.id,
-      role: decoded.role,
+      employee: user.id,
+      role: user.role,
       date: today
     });
 
@@ -81,17 +72,27 @@ const activity = async (req, res) => {
       return res.status(404).json({ message: "Check-in first" });
     }
 
-    if (status === "active") {
-      attendance.activeMinutes += 1;
+    // 🔥 Anti-spam (1 minute rule)
+    const now = Date.now();
+    if (attendance.lastUpdated && now - attendance.lastUpdated < 60000) {
+      return res.status(429).json({ message: "Too many requests" });
     }
 
-    if (status === "idle") {
+    if (status === "active") {
+      attendance.activeMinutes += 1;
+    } else {
       attendance.idleMinutes += 1;
     }
 
+    attendance.lastUpdated = now;
+
     await attendance.save();
 
-    res.json({ message: "Activity updated" });
+    res.json({
+      message: "Activity updated",
+      activeMinutes: attendance.activeMinutes,
+      idleMinutes: attendance.idleMinutes
+    });
 
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -100,24 +101,17 @@ const activity = async (req, res) => {
 
 
 
+
 const checkout = async (req, res) => {
-
-  const token = req.cookies.token;
-
-  if (!token) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
   try {
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = req.user;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const attendance = await Attendance.findOne({
-      employee: decoded.id,
-      role: decoded.role,
+      employee: user.id,
+      role: user.role,
       date: today
     });
 
@@ -125,11 +119,13 @@ const checkout = async (req, res) => {
       return res.status(404).json({ message: "Attendance not found" });
     }
 
+    if (attendance.checkOut) {
+      return res.status(400).json({ message: "Already checked out" });
+    }
+
     attendance.checkOut = new Date();
 
-
     const status = calculateStatus(attendance.activeMinutes);
-
     attendance.status = status;
 
     await attendance.save();
@@ -139,13 +135,13 @@ const checkout = async (req, res) => {
     res.json({
       message: "Checkout successful",
       status,
-      activeMinutes: attendance.activeMinutes
+      activeMinutes: attendance.activeMinutes,
+      idleMinutes: attendance.idleMinutes
     });
 
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
-
 
 module.exports = { checkin, activity, checkout };
