@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useGetMeManager } from "../../auth/server-state/manager/managerauth/managerauth.hook";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -242,6 +243,8 @@ function Announcements({ data = [] }) {
 export default function ManagerDashboard() {
   const { data, isLoading } = useGetMeManager();
 
+  const navigate = useNavigate();
+
   const manager   = data?.manager           || {};
   const balance   = data?.leavebalance?.[0] || {};
   const announces = data?.announcements     || [];
@@ -278,12 +281,19 @@ export default function ManagerDashboard() {
           <div style={{ fontSize: 22, fontWeight: 600, color: "#1a1a1a", letterSpacing: "-0.3px" }}>Dashboard</div>
           <div style={{ fontSize: 13, color: "#888", marginTop: 1 }}>Welcome back, {manager.f_name || "Ashish"} · {manager.uid || "MGMT03"}</div>
         </div>
+  <button
+      onClick={() => navigate("/mark-attendance")}
+      className="bg-[#730042] text-white px-6 py-2 rounded-lg shadow-md hover:opacity-90 transition"
+    >
+      Check In
+    </button>
+
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <span style={{ fontSize: 13, color: "#888" }}>📍 {manager.office_location || "Bareilly"}</span>
           <span style={{ fontSize: 18, cursor: "pointer", color: "#888" }}>🔔</span>
           <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#7b1450", color: "#fff", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>{av}</div>
         </div>
-      </div>
+      </div> 
 
       <div style={{ padding: "20px 28px" }}>
 
