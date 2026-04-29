@@ -6,7 +6,7 @@ export default function LandingPage() {
 
   
   const statsData = [
-    { number: 100, suffix: "+", text: "Happy customers of TourchX" },
+    { number: 100, suffix: "+", text: "Happy customers of TorchX" },
     { number: 1000, suffix: "+", text: "No. of live demos" },
     { number: 10, suffix: "+", text: "Partners to collaborate" },
     { number: 98, suffix: "%", text: "Customer satisfaction" },

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useGetAnnouncements } from "../../auth/server-state/employee/employeeannounce/employeeannounce.hook";
 import { useGetMeUser } from "../../auth/server-state/employee/employeeauth/employeeauth.hook";
 
@@ -291,6 +292,7 @@ function InfoField({ label, value, loading }) {
 // ─── MAIN DASHBOARD ───────────────────────────────────────────────────────
 export default function EmployeeDashboard() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+ const navigate = useNavigate();
 
   // ── API hooks ──
   const { data: meData, isLoading: meLoading, isError: meError } = useGetMeUser();
@@ -380,6 +382,12 @@ export default function EmployeeDashboard() {
             {employee ? `Welcome back, ${employee.f_name} · ${employee.uid}` : "Welcome back"}
           </p>
         </div>
+         <button
+      onClick={() => navigate("/mark-attendance")}
+      className="bg-[#730042] text-white px-6 py-2 rounded-lg shadow-md hover:opacity-90 transition"
+    >
+      Check In
+    </button>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {/* Office location pill */}
           {employee?.office_location && (
