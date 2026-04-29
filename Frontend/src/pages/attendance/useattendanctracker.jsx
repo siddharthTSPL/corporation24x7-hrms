@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useCheckin, useActivity, useCheckout } from "../hooks/useAttendanceMutations";
+import { useCheckin, useActivity, useCheckout } from "../../auth/server-state/attendance/attendance.hook";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PING_INTERVAL_MS      = 60_000;   // send activity ping every 1 min

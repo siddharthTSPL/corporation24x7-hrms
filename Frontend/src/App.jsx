@@ -26,6 +26,7 @@ import Filema from "./pages/file/Filema";
 import Organisation from "./pages/organisation/Organisation";
 import Reviewad from "./pages/review/reviewad";
 import Reviewma from "./pages/review/reviewma";
+import Attendancepage from './pages/attendance/attendancepage'
 function App() {
   return (
     <BrowserRouter>
@@ -76,6 +77,7 @@ function App() {
           <Route path="/organisation" element={<Organisation />} />
           <Route path="/review-admin" element={<Reviewad />} />
           <Route path="/review-manager" element={<Reviewma />} />
+          <Route path='/mark-attendance' element={<Attendancepage/>} />
         </Route>
       </Routes>
     </BrowserRouter>

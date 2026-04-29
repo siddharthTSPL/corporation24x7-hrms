@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useAttendanceTracker } from "../../hooks/useAttendanceTracker";
+import { useAttendanceTracker } from "./useattendanctracker";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import SelfieCapture from "./selfietracker";
 
