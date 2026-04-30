@@ -3,14 +3,14 @@ const { calculateStatus, updateSummary } = require("../automatic/monthattendance
 
 const getUserId = (user) => user._id || user.id;
 
-// ── Helper: map role → model name ─────────────────────────────────────────────
+
 const getOnModel = (role) => {
   if (role === "manager") return "Manager";
   if (role === "admin")   return "Admin";
-  return "Employee";
+  return "User"; // ← "User" not "Employee"
 };
 
-// ── Check In ──────────────────────────────────────────────────────────────────
+
 const checkin = async (req, res) => {
   try {
     const { latitude, longitude, selfie } = req.body;
@@ -31,7 +31,7 @@ const checkin = async (req, res) => {
     });
 
     if (attendance) {
-      // ── Already completed for today (checked out) — block re-checkin ──────
+      
       if (attendance.checkOut) {
         return res.status(400).json({
           message: "You have already completed your attendance for today.",
@@ -39,7 +39,7 @@ const checkin = async (req, res) => {
         });
       }
 
-      // ── Agent created placeholder — upgrade to manual ─────────────────────
+     
       if (attendance.source === "agent") {
         attendance.latitude  = latitude;
         attendance.longitude = longitude;
@@ -51,11 +51,11 @@ const checkin = async (req, res) => {
         return res.json({ message: "Check-in successful", attendance });
       }
 
-      // ── Already manually checked in ───────────────────────────────────────
+    
       return res.status(400).json({ message: "Already checked in" });
     }
 
-    // ── Fresh check-in ────────────────────────────────────────────────────────
+  
     const newAttendance = await Attendance.create({
       employee:      userId,
       onModel:       getOnModel(user.role), // ← add
@@ -78,7 +78,7 @@ const checkin = async (req, res) => {
   }
 };
 
-// ── Activity Ping ─────────────────────────────────────────────────────────────
+
 const activity = async (req, res) => {
   try {
     const { status } = req.body;
@@ -98,7 +98,7 @@ const activity = async (req, res) => {
       date:     today,
     });
 
-    // Agent pings before manual checkin — create placeholder
+  
     if (!attendance) {
       attendance = await Attendance.create({
         employee:      userId,
@@ -113,12 +113,12 @@ const activity = async (req, res) => {
       });
     }
 
-    // Already checked out — ignore ping
+   
     if (attendance.checkOut) {
       return res.status(400).json({ message: "Already checked out" });
     }
 
-    // Anti-spam (1 minute rule)
+ 
     const now = Date.now();
     if (attendance.lastUpdated && now - attendance.lastUpdated < 60000) {
       return res.status(429).json({ message: "Too many requests" });
@@ -144,7 +144,7 @@ const activity = async (req, res) => {
   }
 };
 
-// ── Check Out ─────────────────────────────────────────────────────────────────
+
 const checkout = async (req, res) => {
   try {
     const user   = req.user;
@@ -190,7 +190,7 @@ const checkout = async (req, res) => {
   }
 };
 
-// ── Get Today ─────────────────────────────────────────────────────────────────
+
 const getToday = async (req, res) => {
   try {
     const user   = req.user;
@@ -220,7 +220,7 @@ const getToday = async (req, res) => {
   }
 };
 
-// ── Auto Checkout All (cron at 7 PM) ─────────────────────────────────────────
+
 const autoCheckoutAll = async () => {
   try {
     const today = new Date();

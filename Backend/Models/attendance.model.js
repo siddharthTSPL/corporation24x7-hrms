@@ -9,8 +9,8 @@ const attendanceSchema = new mongoose.Schema({
   onModel: {
     type: String,
     required: true,
-    enum: ["Employee", "Manager", "Admin"],
-    default: "Employee"
+    enum: ["User", "Manager", "Admin"],
+    default: "User"
   },
   role: {
     type: String,
@@ -50,35 +50,47 @@ const attendanceSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-
-attendanceSchema.post("init", () => {}); 
+attendanceSchema.post("init", () => {});
 
 const Attendance = mongoose.model("Attendance", attendanceSchema);
 
 const runMigration = async () => {
   try {
     const missing = await Attendance.countDocuments({ onModel: { $exists: false } });
-    if (missing === 0) return; 
+    const wrong   = await Attendance.countDocuments({ onModel: "Employee" }); // old wrong value
 
-    await Attendance.updateMany(
-      { role: "employee", onModel: { $exists: false } },
-      { $set: { onModel: "Employee" } }
-    );
-    await Attendance.updateMany(
-      { role: "manager", onModel: { $exists: false } },
-      { $set: { onModel: "Manager" } }
-    );
-    await Attendance.updateMany(
-      { role: "admin", onModel: { $exists: false } },
-      { $set: { onModel: "Admin" } }
-    );
+    if (missing === 0 && wrong === 0) return; 
 
-    console.log(`[Migration] Fixed ${missing} attendance records with missing onModel`);
+
+    if (missing > 0) {
+      await Attendance.updateMany(
+        { role: "employee", onModel: { $exists: false } },
+        { $set: { onModel: "User" } }      
+      );
+      await Attendance.updateMany(
+        { role: "manager", onModel: { $exists: false } },
+        { $set: { onModel: "Manager" } }
+      );
+      await Attendance.updateMany(
+        { role: "admin", onModel: { $exists: false } },
+        { $set: { onModel: "Admin" } }
+      );
+      console.log(`[Migration] Fixed ${missing} records missing onModel`);
+    }
+
+    
+    if (wrong > 0) {
+      await Attendance.updateMany(
+        { onModel: "Employee" },
+        { $set: { onModel: "User" } }
+      );
+      console.log(`[Migration] Fixed ${wrong} records with wrong onModel "Employee" → "User"`);
+    }
+
   } catch (err) {
     console.error("[Migration] attendance onModel fix failed:", err.message);
   }
 };
-
 
 mongoose.connection.once("open", runMigration);
 
