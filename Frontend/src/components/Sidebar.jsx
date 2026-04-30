@@ -57,16 +57,24 @@ function Sidebar({ collapsed, setCollapsed }) {
   const menu = role === "admin" ? adminMenu : role === "manager" ? managerMenu : employeeMenu;
   const isPending = pendingAdmin || pendingManager || pendingEmployee;
 
-  const handleLogout = () => {
-    const onSuccess = () => {
-      localStorage.removeItem("role");
-      navigate("/login");
-    };
+const handleLogout = () => {
+  const onSuccess = async () => {
+    localStorage.removeItem("role");
 
-    if (role === "admin") logoutAdmin(undefined, { onSuccess });
-    else if (role === "manager") logoutManager(undefined, { onSuccess });
-    else logoutEmployee(undefined, { onSuccess });
+    // Tell desktop agent to stop tracking
+    try {
+      await fetch("http://localhost:47821/clear-token");
+    } catch (_) {
+      // Agent not running — fine, skip silently
+    }
+
+    navigate("/login");
   };
+
+  if (role === "admin") logoutAdmin(undefined, { onSuccess });
+  else if (role === "manager") logoutManager(undefined, { onSuccess });
+  else logoutEmployee(undefined, { onSuccess });
+};
 
   return (
     <>

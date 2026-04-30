@@ -69,20 +69,27 @@ function Login() {
         ? { role: form.role, work_email: form.email, password: form.password }
         : { role: form.role, identifier: form.email, password: form.password };
 
-    loginFn(payload, {
-      onSuccess: () => {
-        // All roles redirect to the same dashboard
-        navigate("/dashboard", { replace: true });
-      },
-      onError: (err) => {
-        setErrors({ general: getErrorMessage(err) });
-      },
-      onSettled: () => {
-        const elapsed = Date.now() - startTime;
-        const remaining = 3000 - elapsed;
-        setTimeout(() => setShowLoader(false), remaining > 0 ? remaining : 0);
-      },
-    });
+   loginFn(payload, {
+  onSuccess: async (data) => {
+    // Tell desktop agent about the token
+    if (data?.token) {
+      try {
+        await fetch("http://localhost:47821/set-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: data.token }),
+        });
+      } catch (_) {
+        // Agent not running — that's fine, skip silently
+      }
+    }
+
+    navigate("/dashboard", { replace: true });
+  },
+  onError: (err) => {
+    setErrors({ general: getErrorMessage(err) });
+  },
+});
   };
 
   const handleSendOtp = () => {
