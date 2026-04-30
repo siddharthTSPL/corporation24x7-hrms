@@ -3,6 +3,7 @@ const { calculateStatus, updateSummary } = require("../automatic/monthattendance
 
 const getUserId = (user) => user._id || user.id;
 
+// ── Check In ──────────────────────────────────────────────────────────────────
 const checkin = async (req, res) => {
   try {
     const { latitude, longitude, selfie } = req.body;
@@ -16,27 +17,46 @@ const checkin = async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const existing = await Attendance.findOne({
+    let attendance = await Attendance.findOne({
       employee: userId,
       role: user.role,
       date: today,
     });
 
-    if (existing && !existing.checkOut) {
-      return res.status(400).json({ message: "Already checked in" });
+    if (attendance) {
+      if (attendance.source === "agent") {
+        // Agent created it — upgrade to manual checkin with location/selfie
+        attendance.latitude  = latitude;
+        attendance.longitude = longitude;
+        attendance.selfie    = selfie || attendance.selfie;
+        attendance.checkIn   = new Date();
+        attendance.source    = "manual";
+        await attendance.save();
+
+        return res.json({
+          message: "Check-in successful",
+          attendance,
+        });
+      }
+
+      if (!attendance.checkOut) {
+        return res.status(400).json({ message: "Already checked in" });
+      }
     }
 
+    // Fresh checkin
     const newAttendance = await Attendance.create({
-      employee: userId,
-      role: user.role,
-      date: today,
-      checkIn: new Date(),
+      employee:      userId,
+      role:          user.role,
+      date:          today,
+      checkIn:       new Date(),
       latitude,
       longitude,
       selfie,
       activeMinutes: 0,
-      idleMinutes: 0,
-      lastUpdated: Date.now(),
+      idleMinutes:   0,
+      lastUpdated:   Date.now(),
+      source:        "manual",
     });
 
     res.json({
@@ -49,6 +69,7 @@ const checkin = async (req, res) => {
   }
 };
 
+// ── Activity Ping (from desktop agent) ───────────────────────────────────────
 const activity = async (req, res) => {
   try {
     const { status } = req.body;
@@ -68,17 +89,17 @@ const activity = async (req, res) => {
       date: today,
     });
 
-    // Auto create attendance record if agent pings before manual check-in
+    // Agent pings before manual checkin — create a placeholder record
     if (!attendance) {
       attendance = await Attendance.create({
-        employee: userId,
-        role: user.role,
-        date: today,
-        checkIn: new Date(),
+        employee:      userId,
+        role:          user.role,
+        date:          today,
+        checkIn:       new Date(),
         activeMinutes: 0,
-        idleMinutes: 0,
-        lastUpdated: 0,
-        source: "agent", // mark it came from agent
+        idleMinutes:   0,
+        lastUpdated:   0,
+        source:        "agent", // placeholder — upgraded on manual checkin
       });
     }
 
@@ -103,9 +124,9 @@ const activity = async (req, res) => {
     await attendance.save();
 
     res.json({
-      message: "Activity updated",
+      message:       "Activity updated",
       activeMinutes: attendance.activeMinutes,
-      idleMinutes: attendance.idleMinutes,
+      idleMinutes:   attendance.idleMinutes,
     });
 
   } catch (error) {
@@ -113,6 +134,7 @@ const activity = async (req, res) => {
   }
 };
 
+// ── Check Out ─────────────────────────────────────────────────────────────────
 const checkout = async (req, res) => {
   try {
     const user = req.user;
@@ -128,7 +150,12 @@ const checkout = async (req, res) => {
     });
 
     if (!attendance) {
-      return res.status(404).json({ message: "Attendance not found" });
+      return res.status(404).json({ message: "Please check in first" });
+    }
+
+    // Block checkout if agent created record but employee never manually checked in
+    if (attendance.source === "agent") {
+      return res.status(400).json({ message: "Please check in first before checking out" });
     }
 
     if (attendance.checkOut) {
@@ -143,10 +170,39 @@ const checkout = async (req, res) => {
     await updateSummary(attendance);
 
     res.json({
-      message: "Checkout successful",
+      message:       "Checkout successful",
       status,
       activeMinutes: attendance.activeMinutes,
-      idleMinutes: attendance.idleMinutes,
+      idleMinutes:   attendance.idleMinutes,
+    });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+const getToday = async (req, res) => {
+  try {
+    const user   = req.user;
+    const userId = getUserId(user);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const attendance = await Attendance.findOne({
+      employee: userId,
+      role:     user.role,
+      date:     today,
+    });
+
+    if (!attendance) {
+      return res.json({ attendance: null, isCheckedIn: false });
+    }
+
+    res.json({
+      attendance,
+      // only manual checkins count as "checked in" for UI purposes
+      isCheckedIn: attendance.source === "manual" && !attendance.checkOut,
+      isCheckedOut: !!attendance.checkOut,
     });
 
   } catch (error) {
@@ -154,4 +210,34 @@ const checkout = async (req, res) => {
   }
 };
 
-module.exports = { checkin, activity, checkout };
+// ── Auto Checkout All (called by cron at 7 PM) ────────────────────────────────
+const autoCheckoutAll = async () => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Find all manual checkins that haven't checked out yet
+    const openSessions = await Attendance.find({
+      date:     today,
+      source:   "manual",
+      checkIn:  { $exists: true },
+      checkOut: { $exists: false },
+    });
+
+    console.log(`[Cron] Auto checkout: ${openSessions.length} open sessions found`);
+
+    for (const attendance of openSessions) {
+      attendance.checkOut = new Date();
+      const status = calculateStatus(attendance.activeMinutes);
+      attendance.status = status;
+      await attendance.save();
+      await updateSummary(attendance);
+      console.log(`[Cron] Auto checked out employee: ${attendance.employee}`);
+    }
+
+  } catch (error) {
+    console.error("[Cron] Auto checkout failed:", error.message);
+  }
+};
+
+module.exports = { checkin, activity, checkout, getToday, autoCheckoutAll };
