@@ -74,7 +74,7 @@ function StatCard({ icon, label, value, sub, accent }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function AttendancePage() {
   const { data: auth, isLoading: authLoading } = useAuth();
-
+console.log(auth);
   // FIX: unwrap nested data shape before extracting name
   const userName = extractName(auth?.data);
   const userRole = auth?.role ?? "employee";
