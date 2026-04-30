@@ -120,6 +120,8 @@ const managerlogin = async (req, res, next) => {
 
   res.status(200).json({
     message: "Manager login successful",
+    role: manager.role,
+    token
   });
 };
 

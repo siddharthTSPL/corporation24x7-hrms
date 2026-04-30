@@ -14,9 +14,13 @@ const getGreeting = () => {
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 };
 
-// Pull a display name from whichever shape the API returns
-const extractName = (data) =>
-  data?.name ?? data?.fullName ?? data?.username ?? data?.email ?? "User";
+// FIX: handle both { name } and { data: { name } } response shapes
+const extractName = (data) => {
+  // auth.data shape: { employee: { f_name, l_name }, leavebalance, success }
+  const emp = data?.employee;
+  if (!emp) return "User";
+  return `${emp.f_name ?? ""} ${emp.l_name ?? ""}`.trim() || emp.work_email || "User";
+};
 
 // Role → accent color + label
 const ROLE_META = {
@@ -78,10 +82,12 @@ function StatCard({ icon, label, value, sub, accent }) {
 export default function AttendancePage() {
   // ── Auth ──
   const { data: auth, isLoading: authLoading } = useAuth();
+
+  // FIX: unwrap nested data shape before extracting name
   const userName = extractName(auth?.data);
   const userRole = auth?.role ?? "employee";
   const roleMeta = ROLE_META[userRole] ?? ROLE_META.employee;
-
+ console.log("Authenticated user:", { auth, userName, userRole });
   // ── Tracker ──
   const tracker = useAttendanceTracker();
   const {
@@ -110,7 +116,6 @@ export default function AttendancePage() {
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        // Got location → now ask for selfie (or skip if camera unavailable)
         window._pendingLocation = {
           latitude:  pos.coords.latitude,
           longitude: pos.coords.longitude,
@@ -242,7 +247,6 @@ export default function AttendancePage() {
   // ── Main render ──
   return (
     <div style={css.page}>
-      {/* Animated background blobs */}
       <div style={css.blob1} />
       <div style={css.blob2} />
 
@@ -316,7 +320,6 @@ export default function AttendancePage() {
       {/* ── CHECKED IN ── */}
       {isCheckedIn && (
         <>
-          {/* Live timer + gauge */}
           <div style={{ ...css.card, alignItems: "center", gap: 0 }}>
             <div style={css.gaugeWrapper}>
               <ArcGauge
@@ -331,7 +334,6 @@ export default function AttendancePage() {
               </div>
             </div>
 
-            {/* Activity pulse */}
             <div style={{ ...css.activityPill, background: actColor + "18", color: actColor }}>
               <span style={{ ...css.pulseDot, background: actColor }} />
               {actLabel}
@@ -343,7 +345,6 @@ export default function AttendancePage() {
             </div>
           </div>
 
-          {/* Stats row */}
           <div style={css.statsRow}>
             <StatCard icon="⚡" label="Active" value={`${activeMinutes} min`}
               sub={`${activePercent}% of session`} accent="#22c55e" />
@@ -353,7 +354,6 @@ export default function AttendancePage() {
               sub={`${totalMinutes} min total`} accent={prodColor} />
           </div>
 
-          {/* Check-in info */}
           <div style={css.card}>
             <div style={css.infoLine}>
               <span style={css.infoKey}>Checked in at</span>
@@ -368,7 +368,6 @@ export default function AttendancePage() {
             </div>
           </div>
 
-          {/* Checkout button */}
           {!checkoutConfirm ? (
             <button
               style={{ ...css.dangerBtn, ...(isLoading ? css.btnDisabled : {}) }}
@@ -394,7 +393,6 @@ export default function AttendancePage() {
         </>
       )}
 
-      {/* ── Selfie modal ── */}
       {showSelfie && (
         <SelfieCapture onCapture={onSelfieCapture} onCancel={onSelfieCancel} />
       )}
@@ -442,7 +440,6 @@ const css = {
     pointerEvents: "none",
     animation: "float 10s ease-in-out infinite reverse",
   },
-
   header: {
     display: "flex", justifyContent: "space-between", alignItems: "center",
     padding: "4px 0",
@@ -458,7 +455,6 @@ const css = {
   },
   greeting: { margin: 0, fontSize: 17, fontWeight: 700, color: "#f9fafb" },
   date:     { margin: "3px 0 0", fontSize: 11, color: "#6b7280" },
-
   roleBadge: {
     fontSize: 11, fontWeight: 700, borderRadius: 999,
     padding: "3px 10px", textTransform: "uppercase", letterSpacing: 1,
@@ -469,7 +465,6 @@ const css = {
   },
   badgeIn:  { background: "#14532d", color: "#22c55e" },
   badgeOut: { background: "#1f2937", color: "#9ca3af" },
-
   authSpinner: {
     width: 40, height: 40, margin: "0 auto",
     border: "3px solid #1f2937",
@@ -477,7 +472,6 @@ const css = {
     borderRadius: "50%",
     animation: "spin 0.8s linear infinite",
   },
-
   errorBanner: {
     background: "#450a0a", border: "1px solid #7f1d1d",
     borderRadius: 12, padding: "12px 16px",
@@ -489,7 +483,6 @@ const css = {
     background: "none", border: "none", color: "#fca5a5",
     cursor: "pointer", fontSize: 16, padding: 0,
   },
-
   stillWorkingBanner: {
     background: "#1c1917", border: "1px solid #78350f",
     borderRadius: 12, padding: "14px 16px",
@@ -502,7 +495,6 @@ const css = {
     borderRadius: 8, padding: "8px 16px",
     fontWeight: 700, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap",
   },
-
   card: {
     background: "#0f172a",
     border: "1px solid #1e293b",
@@ -514,7 +506,6 @@ const css = {
     position: "relative",
     zIndex: 1,
   },
-
   clockFace: {
     textAlign: "center",
     background: "#1e293b",
@@ -524,15 +515,12 @@ const css = {
   },
   clockTime:  { margin: 0, fontSize: 48, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", letterSpacing: -2 },
   clockLabel: { margin: "4px 0 0", fontSize: 12, color: "#6b7280", textTransform: "uppercase", letterSpacing: 2 },
-
   infoRow: { display: "flex", gap: 12, justifyContent: "center" },
   infoItem: {
     background: "#1e293b", borderRadius: 8, padding: "6px 14px",
     fontSize: 13, color: "#94a3b8",
   },
-
   hint: { margin: 0, fontSize: 12, color: "#4b5563", textAlign: "center", lineHeight: 1.6 },
-
   gaugeWrapper: {
     position: "relative", width: 200, height: 200,
     display: "flex", alignItems: "center", justifyContent: "center",
@@ -542,7 +530,6 @@ const css = {
   },
   elapsedTime:  { margin: 0, fontSize: 26, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" },
   elapsedLabel: { margin: "4px 0 0", fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1.5 },
-
   activityPill: {
     display: "flex", alignItems: "center", gap: 8,
     borderRadius: 999, padding: "8px 18px",
@@ -555,7 +542,6 @@ const css = {
     flexShrink: 0,
   },
   lastPing: { color: "#6b7280", fontWeight: 400, fontSize: 12 },
-
   statsRow: {
     display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10,
   },
@@ -571,7 +557,6 @@ const css = {
   statValue: { margin: 0, fontWeight: 700, fontSize: 16, fontFamily: "'JetBrains Mono', monospace" },
   statLabel: { margin: "2px 0 0", fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5 },
   statSub:   { margin: "2px 0 0", fontSize: 10, color: "#4b5563" },
-
   infoLine: {
     display: "flex", justifyContent: "space-between", alignItems: "center",
   },
@@ -586,7 +571,6 @@ const css = {
     flexShrink: 0, animation: "pulse 2s ease-in-out infinite",
   },
   trackingText: { fontSize: 11, color: "#4b5563", lineHeight: 1.5 },
-
   primaryBtn: {
     width: "100%",
     background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
@@ -612,7 +596,6 @@ const css = {
     cursor: "pointer", fontFamily: "'Sora', sans-serif",
   },
   btnDisabled: { opacity: 0.5, cursor: "not-allowed" },
-
   confirmBox: {
     background: "#0f172a", border: "1px solid #374151",
     borderRadius: 16, padding: "20px",
@@ -621,7 +604,6 @@ const css = {
   },
   confirmText:    { margin: 0, fontSize: 15, color: "#d1d5db", textAlign: "center" },
   confirmActions: { display: "flex", gap: 10 },
-
   resultGrid: {
     display: "flex", gap: 24, justifyContent: "center",
   },
@@ -631,7 +613,6 @@ const css = {
   },
   resultVal: { margin: 0, fontWeight: 700, fontSize: 20, fontFamily: "'JetBrains Mono', monospace" },
   resultKey: { margin: 0, fontSize: 12, color: "#6b7280" },
-
   heading: { color: "#f9fafb", fontSize: 24, fontWeight: 700 },
   sub:     { margin: 0, color: "#6b7280", fontSize: 13 },
 };

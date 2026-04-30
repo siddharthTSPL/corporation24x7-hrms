@@ -5,12 +5,10 @@ const api = axios.create({
   withCredentials: true,
 });
 
-
 export const checkin = async (data) => {
   const res = await api.post("/checkin", data);
   return res.data;
 };
-
 
 export const activity = async (status) => {
   const res = await api.post("/activity", { status });
@@ -19,5 +17,10 @@ export const activity = async (status) => {
 
 export const checkout = async () => {
   const res = await api.post("/checkout");
+  return res.data;
+};
+
+export const getTodayAttendance = async () => {
+  const res = await api.get("/today");
   return res.data;
 };

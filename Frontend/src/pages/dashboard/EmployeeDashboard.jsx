@@ -384,7 +384,7 @@ export default function EmployeeDashboard() {
         </div>
          <button
       onClick={() => navigate("/mark-attendance")}
-      className="bg-[#730042] text-white px-6 py-2 rounded-lg shadow-md hover:opacity-90 transition"
+      className=" ml-185 bg-[#730042] text-white px-6 py-2 rounded-lg shadow-md hover:opacity-90 transition"
     >
       Check In
     </button>
