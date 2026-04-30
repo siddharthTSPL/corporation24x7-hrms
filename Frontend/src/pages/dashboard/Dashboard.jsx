@@ -298,7 +298,7 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
     markersRef.current = [];
 
     if (!checkins.length) return;
-
+ console.log("Rendering check-ins on map:", checkins);
     const bounds = [];
 
     checkins.forEach(({ lat, lng, name, role, dept, email, checkIn, checkedOut }) => {
