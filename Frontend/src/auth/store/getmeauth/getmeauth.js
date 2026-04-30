@@ -3,6 +3,7 @@ import { getMeAdmin } from "../../api/adminapi/auth/ad.auth.api";
 import { getMeManager } from "../../api/managerapi/auth/ma.auth.api";
 import { getMeUser } from "../../api/employeeapi/auth/em.auth.api";
 
+
 export const useAuth = () => {
   return useQuery({
     queryKey: ["auth"],

@@ -1,11 +1,13 @@
 const Attendance = require("../Models/attendance.model");
 const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
 
+const getUserId = (user) => user._id || user.id;
 
 const checkin = async (req, res) => {
   try {
     const { latitude, longitude, selfie } = req.body;
     const user = req.user;
+    const userId = getUserId(user);
 
     if (!latitude || !longitude) {
       return res.status(400).json({ message: "Location required" });
@@ -15,9 +17,9 @@ const checkin = async (req, res) => {
     today.setHours(0, 0, 0, 0);
 
     const existing = await Attendance.findOne({
-      employee: user.id,
+      employee: userId,
       role: user.role,
-      date: today
+      date: today,
     });
 
     if (existing && !existing.checkOut) {
@@ -25,7 +27,7 @@ const checkin = async (req, res) => {
     }
 
     const newAttendance = await Attendance.create({
-      employee: user.id,
+      employee: userId,
       role: user.role,
       date: today,
       checkIn: new Date(),
@@ -34,12 +36,12 @@ const checkin = async (req, res) => {
       selfie,
       activeMinutes: 0,
       idleMinutes: 0,
-      lastUpdated: Date.now()
+      lastUpdated: Date.now(),
     });
 
     res.json({
       message: "Check-in successful",
-      attendance: newAttendance
+      attendance: newAttendance,
     });
 
   } catch (error) {
@@ -47,13 +49,11 @@ const checkin = async (req, res) => {
   }
 };
 
-
-
-
 const activity = async (req, res) => {
   try {
     const { status } = req.body;
     const user = req.user;
+    const userId = getUserId(user);
 
     if (!["active", "idle"].includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
@@ -62,17 +62,32 @@ const activity = async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const attendance = await Attendance.findOne({
-      employee: user.id,
+    let attendance = await Attendance.findOne({
+      employee: userId,
       role: user.role,
-      date: today
+      date: today,
     });
 
+    // Auto create attendance record if agent pings before manual check-in
     if (!attendance) {
-      return res.status(404).json({ message: "Check-in first" });
+      attendance = await Attendance.create({
+        employee: userId,
+        role: user.role,
+        date: today,
+        checkIn: new Date(),
+        activeMinutes: 0,
+        idleMinutes: 0,
+        lastUpdated: 0,
+        source: "agent", // mark it came from agent
+      });
     }
 
-    // 🔥 Anti-spam (1 minute rule)
+    // Already checked out — ignore ping
+    if (attendance.checkOut) {
+      return res.status(400).json({ message: "Already checked out" });
+    }
+
+    // Anti-spam (1 minute rule)
     const now = Date.now();
     if (attendance.lastUpdated && now - attendance.lastUpdated < 60000) {
       return res.status(429).json({ message: "Too many requests" });
@@ -85,13 +100,12 @@ const activity = async (req, res) => {
     }
 
     attendance.lastUpdated = now;
-
     await attendance.save();
 
     res.json({
       message: "Activity updated",
       activeMinutes: attendance.activeMinutes,
-      idleMinutes: attendance.idleMinutes
+      idleMinutes: attendance.idleMinutes,
     });
 
   } catch (error) {
@@ -99,20 +113,18 @@ const activity = async (req, res) => {
   }
 };
 
-
-
-
 const checkout = async (req, res) => {
   try {
     const user = req.user;
+    const userId = getUserId(user);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const attendance = await Attendance.findOne({
-      employee: user.id,
+      employee: userId,
       role: user.role,
-      date: today
+      date: today,
     });
 
     if (!attendance) {
@@ -124,10 +136,8 @@ const checkout = async (req, res) => {
     }
 
     attendance.checkOut = new Date();
-
     const status = calculateStatus(attendance.activeMinutes);
     attendance.status = status;
-
     await attendance.save();
 
     await updateSummary(attendance);
@@ -136,7 +146,7 @@ const checkout = async (req, res) => {
       message: "Checkout successful",
       status,
       activeMinutes: attendance.activeMinutes,
-      idleMinutes: attendance.idleMinutes
+      idleMinutes: attendance.idleMinutes,
     });
 
   } catch (error) {
