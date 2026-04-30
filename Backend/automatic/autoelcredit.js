@@ -1,5 +1,6 @@
 const cron = require("node-cron");
 const LeaveBalance = require("../Models/leavebalance.model");
+const { autoCheckoutAll } = require("../controllers/attendance.controller");
 
 
 cron.schedule("0 0 1 * *", async () => {
@@ -93,4 +94,9 @@ cron.schedule("0 0 1 1 *", async () => {
   } catch (error) {
     console.error("Yearly carry forward error:", error.message);
   }
+});
+
+cron.schedule("0 19 * * *", () => {
+  console.log("[Cron] 7 PM auto checkout running...");
+  autoCheckoutAll();
 });

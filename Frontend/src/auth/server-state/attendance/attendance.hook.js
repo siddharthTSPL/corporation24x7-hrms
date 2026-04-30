@@ -1,5 +1,14 @@
-import { activity,checkin,checkout } from "../../api/attendance/attendance.api";
+import { activity, checkin, checkout, getTodayAttendance } from "../../api/attendance/attendance.api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+export const useTodayAttendance = () => {
+  return useQuery({
+    queryKey: ["attendance", "today"],
+    queryFn: getTodayAttendance,
+    retry: false,
+    staleTime: 30_000,
+  });
+};
 
 export const useCheckin = () => {
   const queryClient = useQueryClient();
