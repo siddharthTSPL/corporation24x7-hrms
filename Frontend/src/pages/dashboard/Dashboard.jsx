@@ -19,8 +19,6 @@ import {
   useDeleteAnnouncement,
   useUpdateAnnouncement,
 } from "../../auth/server-state/adminannounce/adminannounce.hook";
-
-// ── NEW: real check-in data hook ──────────────────────────────────────────────
 import { useGetTodayCheckins } from "../../auth/server-state/adminother/adminother.hook";
 
 
@@ -60,7 +58,6 @@ const useInjectStyles = () => {
 
       .db { background: var(--p-pale); min-height: 100vh; padding: 24px 28px; font-family: 'Outfit', sans-serif; color: var(--text); }
 
-      /* ── Hero ── */
       .hero {
         background: linear-gradient(135deg, var(--p-deep) 0%, var(--p-dark) 40%, var(--p) 70%, var(--p-mid) 100%);
         border-radius: var(--r);
@@ -90,7 +87,6 @@ const useInjectStyles = () => {
       .hero-chips { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
       .hero-chip { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); border-radius: 99px; padding: 5px 14px; font-size: 12px; color: rgba(255,255,255,.85); font-weight: 500; backdrop-filter: blur(4px); }
 
-      /* ── Stats Grid ── */
       .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 18px; margin-bottom: 26px; }
       @media(max-width:1100px){ .stats-grid { grid-template-columns: repeat(2,1fr); } }
       @media(max-width:600px) { .stats-grid { grid-template-columns: 1fr; } }
@@ -121,27 +117,23 @@ const useInjectStyles = () => {
       .stat-bar-track { height: 3px; background: var(--border); border-radius: 99px; margin-top: 12px; overflow: hidden; }
       .stat-bar-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--p-dark), var(--p-soft)); transition: width .8s ease; }
 
-      /* ── Panel ── */
       .panel { background: var(--surface); border-radius: var(--r); border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; }
       .panel-head { padding: 18px 22px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
       .panel-title { font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 9px; }
       .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: livePulse 2s infinite; }
       @keyframes livePulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.4)} }
 
-      /* ── Map ── */
       .map-wrap { height: 310px; position: relative; }
       .map-footer { padding: 11px 20px; background: var(--p-wash); border-top: 1px solid var(--border); display: flex; gap: 20px; align-items: center; }
       .map-leg { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
       .leg-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
 
-      /* ── Main layout ── */
       .mid-grid { display: grid; grid-template-columns: 1fr 370px; gap: 20px; margin-bottom: 26px; }
       @media(max-width:1050px){ .mid-grid { grid-template-columns: 1fr; } }
 
       .lower-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 26px; }
       @media(max-width:900px){ .lower-grid { grid-template-columns: 1fr; } }
 
-      /* ── Leave Request Card ── */
       .leave-scroll { overflow-y: auto; max-height: 340px; }
       .leave-scroll::-webkit-scrollbar { width: 4px; }
       .leave-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
@@ -164,7 +156,6 @@ const useInjectStyles = () => {
       .status-approved { background: #e8f7f1; color: var(--green); }
       .status-rejected { background: #fbeaea; color: var(--red); }
 
-      /* ── Announcements ── */
       .ann-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 18px; }
       @media(max-width:700px){ .ann-grid { grid-template-columns: 1fr; } }
       .ann-card { border-radius: var(--r-sm); border: 1px solid var(--border); padding: 16px; transition: all .2s; cursor: default; }
@@ -181,7 +172,6 @@ const useInjectStyles = () => {
       .icon-btn:hover { background: var(--p-wash); color: var(--p); }
       .icon-btn.del:hover { background: #fbeaea; color: var(--red); }
 
-      /* ── Employee Grid ── */
       .emp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; padding: 18px; }
       .emp-card { border: 1px solid var(--border); border-radius: var(--r-sm); padding: 16px 14px; display: flex; align-items: center; gap: 12px; transition: all .2s; }
       .emp-card:hover { box-shadow: var(--shadow); background: var(--p-wash); }
@@ -190,17 +180,14 @@ const useInjectStyles = () => {
       .emp-role { font-size: 11px; color: var(--muted); margin-top: 2px; }
       .emp-dept { display: inline-block; font-size: 10px; font-weight: 600; background: var(--p-wash); color: var(--p); padding: 2px 7px; border-radius: 99px; margin-top: 5px; }
 
-      /* ── Charts wrapper ── */
       .charts-panel { background: var(--surface); border-radius: var(--r); border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 26px; }
       .charts-body { padding: 20px; }
 
-      /* ── Buttons ── */
       .btn-p { background: var(--p); color: white; border: none; padding: 8px 16px; border-radius: var(--r-sm); font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; font-family: 'Outfit',sans-serif; letter-spacing: .3px; transition: all .2s; }
       .btn-p:hover { background: var(--p-dark); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(115,0,66,.3); }
       .btn-ghost { background: none; color: var(--muted); border: 1px solid var(--border); padding: 8px 16px; border-radius: var(--r-sm); font-size: 12px; font-weight: 500; cursor: pointer; font-family: 'Outfit',sans-serif; transition: all .2s; }
       .btn-ghost:hover { border-color: var(--p); color: var(--p); }
 
-      /* ── Modal ── */
       .overlay { position: fixed; inset: 0; background: rgba(30,0,18,.6); backdrop-filter: blur(5px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; animation: ov .18s; }
       @keyframes ov { from{opacity:0} to{opacity:1} }
       .modal { background: var(--surface); border-radius: var(--r); width: 100%; max-width: 500px; box-shadow: var(--shadow-lg); animation: mup .22s; }
@@ -217,17 +204,14 @@ const useInjectStyles = () => {
       .finp:focus, .ftxt:focus, .fsel:focus { border-color: var(--p); box-shadow: 0 0 0 3px var(--p-wash); }
       .ftxt { resize: vertical; min-height: 88px; line-height: 1.6; }
 
-      /* ── Empty ── */
       .empty { text-align: center; padding: 38px 20px; color: var(--light); }
       .empty-ico { font-size: 28px; margin-bottom: 10px; }
       .empty p { font-size: 13px; }
 
-      /* ── Section divider ── */
       .sec-divider { display: flex; align-items: center; gap: 12px; margin: 6px 0 18px; }
       .sec-divider-line { flex: 1; height: 1px; background: var(--border); }
       .sec-divider-txt { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--light); font-weight: 600; white-space: nowrap; }
 
-      /* ── Map pulse (injected once globally) ── */
       @keyframes mPulse {
         0%,100% { transform: translate(-50%,-50%) scale(1); opacity: .5; }
         50%      { transform: translate(-50%,-50%) scale(2.2); opacity: 0; }
@@ -243,8 +227,29 @@ const useInjectStyles = () => {
 };
 
 /* ═══════════════════════════════════════════════════
-   ATTENDANCE MAP  — uses real check-in data
+   HELPERS
 ═══════════════════════════════════════════════════ */
+
+// ← fixed: guard against empty/undefined, returns "?" if no initials
+const initials = (name = "") =>
+  name.trim().split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
+
+const leaveTypeColor = (type = "") => {
+  const t = type.toLowerCase();
+  if (t.includes("sick") || t.includes("sl")) return "#0d9e6e";
+  if (t.includes("earn") || t.includes("el"))  return "#730042";
+  if (t.includes("priv") || t.includes("pl"))  return "#b8760a";
+  if (t.includes("mat")  || t.includes("ml"))  return "#7c3aed";
+  return "#730042";
+};
+
+const ANN_TYPE_MAP = {
+  general: "chip-general",
+  urgent:  "chip-urgent",
+  event:   "chip-event",
+  policy:  "chip-policy",
+};
+
 const ROLE_COLOR = { manager: "#730042", employee: "#a0005c" };
 
 const fmtTime = (iso) => {
@@ -253,12 +258,14 @@ const fmtTime = (iso) => {
   catch { return "—"; }
 };
 
+/* ═══════════════════════════════════════════════════
+   ATTENDANCE MAP
+═══════════════════════════════════════════════════ */
 const AttendanceMap = ({ checkins = [], loading = false }) => {
   const mapRef      = useRef(null);
   const instanceRef = useRef(null);
   const markersRef  = useRef([]);
 
-  /* ── Boot Leaflet once ── */
   useEffect(() => {
     let active = true;
     (async () => {
@@ -287,26 +294,24 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
     return () => { active = false; };
   }, []);
 
-  /* ── Redraw markers whenever checkins changes ── */
   useEffect(() => {
     const L   = window.L;
     const map = instanceRef.current;
     if (!L || !map) return;
 
-    // Clear old markers
     markersRef.current.forEach((m) => map.removeLayer(m));
     markersRef.current = [];
 
     if (!checkins.length) return;
- console.log("Rendering check-ins on map:", checkins);
+
     const bounds = [];
 
     checkins.forEach(({ lat, lng, name, role, dept, email, checkIn, checkedOut }) => {
       if (!lat || !lng) return;
-      const color  = ROLE_COLOR[role?.toLowerCase()] ?? ROLE_COLOR.employee;
-      const size   = role?.toLowerCase() === "manager" ? 15 : 11;
-      const pulse  = size + 14;
-      const inits  = (name || "?").split(" ").map((w) => w[0] ?? "").slice(0, 2).join("").toUpperCase();
+      const color = ROLE_COLOR[role?.toLowerCase()] ?? ROLE_COLOR.employee;
+      const size  = role?.toLowerCase() === "manager" ? 15 : 11;
+      const pulse = size + 14;
+      const inits = initials(name || "?");
 
       const icon = L.divIcon({
         className: "",
@@ -323,7 +328,7 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
             <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px;">
               <div style="width:32px;height:32px;border-radius:50%;background:${color};color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">${inits}</div>
               <div>
-                <div style="font-weight:700;font-size:13px;color:${color};">${name}</div>
+                <div style="font-weight:700;font-size:13px;color:${color};">${name || "Unknown"}</div>
                 <div style="font-size:11px;color:#8a6070;text-transform:capitalize;">${role ?? ""}${dept ? " · " + dept : ""}</div>
               </div>
             </div>
@@ -347,7 +352,6 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
     }
   }, [checkins]);
 
-  /* ── Cleanup ── */
   useEffect(() => {
     return () => {
       if (instanceRef.current) {
@@ -360,8 +364,6 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
   return (
     <div style={{ height: "100%", width: "100%", position: "relative" }}>
       <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
-
-      {/* Loading overlay */}
       {loading && (
         <div style={{
           position: "absolute", inset: 0, background: "rgba(253,245,249,.75)",
@@ -371,8 +373,6 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
           <span style={{ fontSize: 18 }}>⏳</span> Fetching check-ins…
         </div>
       )}
-
-      {/* Empty state */}
       {!loading && checkins.length === 0 && (
         <div style={{
           position: "absolute", inset: 0, display: "flex", flexDirection: "column",
@@ -385,28 +385,6 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
       )}
     </div>
   );
-};
-
-/* ═══════════════════════════════════════════════════
-   HELPERS
-═══════════════════════════════════════════════════ */
-const initials = (name = "") =>
-  name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
-
-const leaveTypeColor = (type = "") => {
-  const t = type.toLowerCase();
-  if (t.includes("sick") || t.includes("sl")) return "#0d9e6e";
-  if (t.includes("earn") || t.includes("el"))  return "#730042";
-  if (t.includes("priv") || t.includes("pl"))  return "#b8760a";
-  if (t.includes("mat")  || t.includes("ml"))  return "#7c3aed";
-  return "#730042";
-};
-
-const ANN_TYPE_MAP = {
-  general: "chip-general",
-  urgent:  "chip-urgent",
-  event:   "chip-event",
-  policy:  "chip-policy",
 };
 
 /* ═══════════════════════════════════════════════════
@@ -471,13 +449,11 @@ function Dashboard() {
   const [annModal, setAnnModal]   = useState({ open: false, editing: null });
   const [empExpand, setEmpExpand] = useState(false);
 
-  /* ── API Hooks ── */
-  const { data: admin }                                         = useGetMeAdmin();
-  const { data: empData,      isLoading: empLoading     }      = useGetAllEmployee();
-  const { data: leaveData,    isLoading: leaveLoading   }      = useGetForwardedLeaves();
-  const { data: annRaw,       isLoading: annLoading     }      = useGetAllAnnouncement();
-  // ── REAL MAP DATA ──
-  const { data: checkinData,  isLoading: mapLoading     }      = useGetTodayCheckins();
+  const { data: admin }                                    = useGetMeAdmin();
+  const { data: empData,     isLoading: empLoading  }     = useGetAllEmployee();
+  const { data: leaveData,   isLoading: leaveLoading }    = useGetForwardedLeaves();
+  const { data: annRaw,      isLoading: annLoading  }     = useGetAllAnnouncement();
+  const { data: checkinData, isLoading: mapLoading  }     = useGetTodayCheckins();
 
   const { mutate: acceptLeave, isPending: accepting } = useAcceptLeave();
   const { mutate: rejectLeave, isPending: rejecting } = useRejectLeave();
@@ -485,7 +461,6 @@ function Dashboard() {
   const { mutate: deleteAnn                         } = useDeleteAnnouncement();
   const { mutate: updateAnn,   isPending: updating  } = useUpdateAnnouncement();
 
-  /* ── Normalise data ── */
   const employees = Array.isArray(empData?.employees)
     ? empData.employees
     : Array.isArray(empData) ? empData : [];
@@ -498,10 +473,9 @@ function Dashboard() {
     ? annRaw.announcements
     : Array.isArray(annRaw) ? annRaw : [];
 
-  // Real check-ins for the map + "Present Today" stat
-  const checkins      = checkinData?.checkins ?? [];
-  const presentToday  = checkinData?.total    ?? checkins.length;
-  const stillOnDuty   = checkins.filter((c) => !c.checkedOut).length;
+  const checkins       = checkinData?.checkins ?? [];
+  const presentToday   = checkinData?.total    ?? checkins.length;
+  const stillOnDuty    = checkins.filter((c) => !c.checkedOut).length;
   const attendanceRate = employees.length > 0
     ? Math.round((presentToday / employees.length) * 100)
     : 0;
@@ -511,7 +485,6 @@ function Dashboard() {
     || leaveData?.count || 0;
   const totalAnn = announcements.length;
 
-  /* ── Greeting ── */
   const THOUGHTS = [
     "Great teams are built on trust and transparency.",
     "Leadership is not about being in charge — it's about caring.",
@@ -519,13 +492,13 @@ function Dashboard() {
     "Your team's success is your greatest achievement.",
     "Clarity is kindness. Communicate with purpose.",
   ];
+
   useEffect(() => {
     const h = new Date().getHours();
     setGreeting(h < 12 ? "Good Morning ☀️" : h < 17 ? "Good Afternoon 🌤️" : h < 21 ? "Good Evening 🌆" : "Good Night 🌙");
     setThought(THOUGHTS[Math.floor(Math.random() * THOUGHTS.length)]);
   }, []);
 
-  /* ── Stats — "Present Today" now uses live checkin count ── */
   const stats = [
     {
       icon: <FaUsers />,
@@ -561,7 +534,6 @@ function Dashboard() {
     },
   ];
 
-  /* ── Announcement handlers ── */
   const saveAnn = (form) => {
     if (annModal.editing) {
       updateAnn(
@@ -572,6 +544,7 @@ function Dashboard() {
       createAnn(form, { onSuccess: () => setAnnModal({ open: false, editing: null }) });
     }
   };
+
   const removeAnn = (id) => { if (window.confirm("Delete this announcement?")) deleteAnn(id); };
 
   const today = new Date().toLocaleDateString("en-IN", {
@@ -623,7 +596,6 @@ function Dashboard() {
       {/* ━━━━━━ MAP + LEAVE REQUESTS ━━━━━━ */}
       <div className="mid-grid">
 
-        {/* ── Live Attendance Map ── */}
         <div className="panel">
           <div className="panel-head">
             <div className="panel-title">
@@ -637,12 +609,9 @@ function Dashboard() {
                 : `${checkins.length} check-in${checkins.length !== 1 ? "s" : ""} today`}
             </span>
           </div>
-
           <div className="map-wrap">
-            {/* Pass real data — no more hardcoded pins */}
             <AttendanceMap checkins={checkins} loading={mapLoading} />
           </div>
-
           <div className="map-footer">
             <div className="map-leg">
               <div className="leg-dot" style={{ background: "#730042" }} />
@@ -689,11 +658,20 @@ function Dashboard() {
               </div>
             ) : (
               leaves.map((leave) => {
-                const name      = leave.employeeName || leave.name || leave.user?.name || "Employee";
-                const type      = leave.leaveType    || leave.type || "Leave";
-                const from      = leave.from         || leave.startDate || leave.fromDate || "";
-                const to        = leave.to           || leave.endDate   || leave.toDate   || "";
-                const status    = (leave.status || "pending").toLowerCase();
+                // ← fixed: covers f_name/l_name for populated employee object
+                const name =
+                  leave.employeeName ||
+                  leave.name ||
+                  (leave.employee
+                    ? [leave.employee.f_name, leave.employee.l_name].filter(Boolean).join(" ")
+                    : "") ||
+                  leave.user?.name ||
+                  "Employee";
+
+                const type   = leave.leaveType || leave.type || "Leave";
+                const from   = leave.from      || leave.startDate || leave.fromDate || "";
+                const to     = leave.to        || leave.endDate   || leave.toDate   || "";
+                const status = (leave.status || "pending").toLowerCase();
                 const isPending = status === "pending";
 
                 const fmtDate = (d) => {
@@ -761,7 +739,6 @@ function Dashboard() {
             <FaPlus style={{ fontSize: 10 }} /> New
           </button>
         </div>
-
         {annLoading ? (
           <div className="empty"><div className="empty-ico">⏳</div><p>Loading…</p></div>
         ) : announcements.length === 0 ? (
@@ -782,10 +759,7 @@ function Dashboard() {
                   <div className="ann-card-title">{ann.title}</div>
                   <div className="ann-card-body">{ann.message}</div>
                   <div className="ann-card-foot">
-                    <button
-                      className="icon-btn"
-                      onClick={() => setAnnModal({ open: true, editing: ann })}
-                    >
+                    <button className="icon-btn" onClick={() => setAnnModal({ open: true, editing: ann })}>
                       <FaEdit /> Edit
                     </button>
                     <button className="icon-btn del" onClick={() => removeAnn(ann._id)}>
@@ -832,10 +806,11 @@ function Dashboard() {
         ) : (
           <div className="emp-grid">
             {displayEmployees.map((emp, i) => {
-              const name  = emp.name || emp.fullName || emp.username || "Employee";
-              const role  = emp.role || emp.designation || emp.position || "";
-              const dept  = emp.department || emp.dept || "";
-              const email = emp.email || emp.workEmail || "";
+              // ← fixed: use f_name/l_name and work_email matching actual schema
+              const name  = [emp.f_name, emp.l_name].filter(Boolean).join(" ") || "Employee";
+              const role  = emp.designation || emp.role || "";
+              const dept  = emp.department  || "";
+              const email = emp.work_email  || "";
               return (
                 <div className="emp-card" key={emp._id || emp.id || i}>
                   <div className="emp-ava">{initials(name)}</div>
@@ -855,16 +830,6 @@ function Dashboard() {
           </div>
         )}
       </div>
-
-      {/* ━━━━━━ CHARTS (preserved, uncomment to enable) ━━━━━━ */}
-      {/* <div className="charts-panel">
-        <div className="panel-head">
-          <div className="panel-title">Analytics Overview</div>
-        </div>
-        <div className="charts-body">
-          <Charts />
-        </div>
-      </div> */}
 
       {/* ━━━━━━ ANNOUNCEMENT MODAL ━━━━━━ */}
       <AnnModal
