@@ -1161,33 +1161,40 @@ const changepassword = async (req, res, next) => {
 
 
 const getTodayCheckins = async (req, res) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-  const checkins = await Attendance.find({
-    date: today,
-    checkIn: { $exists: true },       
-    latitude:  { $exists: true, $ne: null },
-    longitude: { $exists: true, $ne: null },
-  })
-    .populate("employee", "name email department designation")
-    .select("employee role latitude longitude checkIn checkOut");
+    const checkins = await Attendance.find({
+      date:      today,
+      checkIn:   { $exists: true },
+      latitude:  { $exists: true, $ne: null },
+      longitude: { $exists: true, $ne: null },
+    })
+      .populate(
+        "employee",
+        "f_name l_name work_email department designation" // ← exact field names from both schemas
+      )
+      .select("employee role latitude longitude checkIn checkOut");
 
-  const payload = checkins.map((c) => ({
-    id:         c._id,
-    name:       c.employee?.name  || "Unknown",
-    email:      c.employee?.email || "",
-    dept:       c.employee?.department || c.employee?.designation || "",
-    role:       c.role,                   
-    lat:        c.latitude,
-    lng:        c.longitude,
-    checkIn:    c.checkIn,
-    checkedOut: !!c.checkOut,
-  }));
+    const payload = checkins.map((c) => ({
+      id:    c._id,
+      name:  [c.employee?.f_name, c.employee?.l_name].filter(Boolean).join(" ") || "Unknown",
+      email: c.employee?.work_email || "",
+      dept:  c.employee?.department || c.employee?.designation || "",
+      role:  c.role,
+      lat:   c.latitude,
+      lng:   c.longitude,
+      checkIn:    c.checkIn,
+      checkedOut: !!c.checkOut,
+    }));
 
-  res.json({ checkins: payload, total: payload.length });
+    res.json({ checkins: payload, total: payload.length });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
-
 
 module.exports = {
   registerAdmin,
