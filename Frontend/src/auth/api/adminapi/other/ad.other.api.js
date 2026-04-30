@@ -58,6 +58,6 @@ export const getParticularManager = async (uid) => {
 };
 
 export const getTodayCheckins = async () => {
-  const res = await api.get("/todaycheckins");
+  const res = await api.get("/gettodaycheckins");
   return res.data;
 };

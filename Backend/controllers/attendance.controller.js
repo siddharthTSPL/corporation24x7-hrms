@@ -3,6 +3,13 @@ const { calculateStatus, updateSummary } = require("../automatic/monthattendance
 
 const getUserId = (user) => user._id || user.id;
 
+// ── Helper: map role → model name ─────────────────────────────────────────────
+const getOnModel = (role) => {
+  if (role === "manager") return "Manager";
+  if (role === "admin")   return "Admin";
+  return "Employee";
+};
+
 // ── Check In ──────────────────────────────────────────────────────────────────
 const checkin = async (req, res) => {
   try {
@@ -39,6 +46,7 @@ const checkin = async (req, res) => {
         attendance.selfie    = selfie || attendance.selfie;
         attendance.checkIn   = new Date();
         attendance.source    = "manual";
+        attendance.onModel   = getOnModel(user.role); // ← add
         await attendance.save();
         return res.json({ message: "Check-in successful", attendance });
       }
@@ -50,6 +58,7 @@ const checkin = async (req, res) => {
     // ── Fresh check-in ────────────────────────────────────────────────────────
     const newAttendance = await Attendance.create({
       employee:      userId,
+      onModel:       getOnModel(user.role), // ← add
       role:          user.role,
       date:          today,
       checkIn:       new Date(),
@@ -69,7 +78,7 @@ const checkin = async (req, res) => {
   }
 };
 
-// ── Activity Ping (from desktop agent) ───────────────────────────────────────
+// ── Activity Ping ─────────────────────────────────────────────────────────────
 const activity = async (req, res) => {
   try {
     const { status } = req.body;
@@ -93,6 +102,7 @@ const activity = async (req, res) => {
     if (!attendance) {
       attendance = await Attendance.create({
         employee:      userId,
+        onModel:       getOnModel(user.role), // ← add
         role:          user.role,
         date:          today,
         checkIn:       new Date(),
@@ -202,7 +212,7 @@ const getToday = async (req, res) => {
     res.json({
       attendance,
       isCheckedIn:  attendance.source === "manual" && !attendance.checkOut,
-      isCheckedOut: !!attendance.checkOut,   // ← used by frontend to block re-checkin
+      isCheckedOut: !!attendance.checkOut,
     });
 
   } catch (error) {
@@ -210,7 +220,7 @@ const getToday = async (req, res) => {
   }
 };
 
-// ── Auto Checkout All (cron at 7 PM) ──────────────────────────────────────────
+// ── Auto Checkout All (cron at 7 PM) ─────────────────────────────────────────
 const autoCheckoutAll = async () => {
   try {
     const today = new Date();
