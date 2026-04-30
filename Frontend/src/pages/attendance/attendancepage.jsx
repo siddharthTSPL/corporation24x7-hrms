@@ -14,8 +14,18 @@ const getGreeting = () => {
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 };
 
+<<<<<<< HEAD
 const extractName = (data) =>
   data?.name ?? data?.fullName ?? data?.username ?? data?.email ?? "User";
+=======
+// FIX: handle both { name } and { data: { name } } response shapes
+const extractName = (data) => {
+  // auth.data shape: { employee: { f_name, l_name }, leavebalance, success }
+  const emp = data?.employee;
+  if (!emp) return "User";
+  return `${emp.f_name ?? ""} ${emp.l_name ?? ""}`.trim() || emp.work_email || "User";
+};
+>>>>>>> 76bffedc535c73a34c255577c67fcbc5cf9ea6a1
 
 const ROLE_META = {
   admin:    { color: "#7B1C3E", label: "Admin" },
@@ -74,10 +84,17 @@ function StatCard({ icon, label, value, sub, accent }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function AttendancePage() {
   const { data: auth, isLoading: authLoading } = useAuth();
+
+  // FIX: unwrap nested data shape before extracting name
   const userName = extractName(auth?.data);
   const userRole = auth?.role ?? "employee";
   const roleMeta = ROLE_META[userRole] ?? ROLE_META.employee;
+<<<<<<< HEAD
 
+=======
+ console.log("Authenticated user:", { auth, userName, userRole });
+  // ── Tracker ──
+>>>>>>> 76bffedc535c73a34c255577c67fcbc5cf9ea6a1
   const tracker = useAttendanceTracker();
   const {
     isCheckedIn, checkInTime,
@@ -102,7 +119,14 @@ export default function AttendancePage() {
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+<<<<<<< HEAD
         window._pendingLocation = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+=======
+        window._pendingLocation = {
+          latitude:  pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        };
+>>>>>>> 76bffedc535c73a34c255577c67fcbc5cf9ea6a1
         setShowSelfie(true);
       },
       (err) => {
@@ -214,6 +238,7 @@ export default function AttendancePage() {
 
   return (
     <div style={css.page}>
+<<<<<<< HEAD
       <div style={css.bgPattern} />
 
       {/* Top brand strip */}
@@ -224,6 +249,10 @@ export default function AttendancePage() {
         </div>
         <span style={css.brandTagline}>Workforce Intelligence</span>
       </div>
+=======
+      <div style={css.blob1} />
+      <div style={css.blob2} />
+>>>>>>> 76bffedc535c73a34c255577c67fcbc5cf9ea6a1
 
       {/* ── User identity header ── */}
       <div style={css.header}>
@@ -295,7 +324,11 @@ export default function AttendancePage() {
       {/* ── CHECKED IN ── */}
       {isCheckedIn && (
         <>
+<<<<<<< HEAD
           <div style={{ ...css.card, alignItems: "center", gap: 0, zIndex: 1 }}>
+=======
+          <div style={{ ...css.card, alignItems: "center", gap: 0 }}>
+>>>>>>> 76bffedc535c73a34c255577c67fcbc5cf9ea6a1
             <div style={css.gaugeWrapper}>
               <ArcGauge percent={activePercent} size={200} strokeWidth={14} color={prodColor} />
               <div style={css.gaugeCenter}>
@@ -303,7 +336,12 @@ export default function AttendancePage() {
                 <p style={css.elapsedLabel}>Total Time</p>
               </div>
             </div>
+<<<<<<< HEAD
             <div style={{ ...css.activityPill, background: actColor + "15", color: actColor, border: `1px solid ${actColor}30` }}>
+=======
+
+            <div style={{ ...css.activityPill, background: actColor + "18", color: actColor }}>
+>>>>>>> 76bffedc535c73a34c255577c67fcbc5cf9ea6a1
               <span style={{ ...css.pulseDot, background: actColor }} />
               {actLabel}
               {lastPingResult && (
@@ -321,7 +359,11 @@ export default function AttendancePage() {
               sub={`${totalMinutes} min total`} accent={prodColor} />
           </div>
 
+<<<<<<< HEAD
           <div style={{ ...css.card, zIndex: 1 }}>
+=======
+          <div style={css.card}>
+>>>>>>> 76bffedc535c73a34c255577c67fcbc5cf9ea6a1
             <div style={css.infoLine}>
               <span style={css.infoKey}>Checked in at</span>
               <span style={css.infoVal}>{formatTime(checkInTime)}</span>
@@ -439,7 +481,6 @@ const css = {
     fontWeight: 500,
     letterSpacing: 0.3,
   },
-
   header: {
     display: "flex", justifyContent: "space-between", alignItems: "center",
     padding: "4px 0",
@@ -454,9 +495,14 @@ const css = {
     fontWeight: 700, fontSize: 16, flexShrink: 0,
     fontFamily: "'Sora', sans-serif",
   },
+<<<<<<< HEAD
   greeting: { margin: 0, fontSize: 17, fontWeight: 700, color: "#111827" },
   date:     { margin: "3px 0 0", fontSize: 11, color: "#6B7280" },
 
+=======
+  greeting: { margin: 0, fontSize: 17, fontWeight: 700, color: "#f9fafb" },
+  date:     { margin: "3px 0 0", fontSize: 11, color: "#6b7280" },
+>>>>>>> 76bffedc535c73a34c255577c67fcbc5cf9ea6a1
   roleBadge: {
     fontSize: 11, fontWeight: 700, borderRadius: 999,
     padding: "3px 10px", textTransform: "uppercase", letterSpacing: 1,
@@ -465,9 +511,14 @@ const css = {
     fontSize: 12, fontWeight: 600, borderRadius: 999,
     padding: "4px 12px", whiteSpace: "nowrap",
   },
+<<<<<<< HEAD
   badgeIn:  { background: "#DCFCE7", color: "#16A34A", border: "1px solid #86EFAC" },
   badgeOut: { background: "#F3F4F6", color: "#9CA3AF", border: "1px solid #E5E7EB" },
 
+=======
+  badgeIn:  { background: "#14532d", color: "#22c55e" },
+  badgeOut: { background: "#1f2937", color: "#9ca3af" },
+>>>>>>> 76bffedc535c73a34c255577c67fcbc5cf9ea6a1
   authSpinner: {
     width: 40, height: 40, margin: "0 auto",
     border: "3px solid #E5E7EB",
@@ -475,7 +526,6 @@ const css = {
     borderRadius: "50%",
     animation: "spin 0.8s linear infinite",
   },
-
   errorBanner: {
     background: "#FEF2F2", border: "1px solid #FECACA",
     borderRadius: 12, padding: "12px 16px",
@@ -488,7 +538,6 @@ const css = {
     background: "none", border: "none", color: "#DC2626",
     cursor: "pointer", fontSize: 16, padding: 0,
   },
-
   stillWorkingBanner: {
     background: "#FFFBEB", border: "1px solid #FDE68A",
     borderRadius: 12, padding: "14px 16px",
@@ -502,7 +551,6 @@ const css = {
     borderRadius: 8, padding: "8px 16px",
     fontWeight: 700, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap",
   },
-
   card: {
     background: "#FFFFFF",
     border: "1px solid #E5E7EB",
@@ -515,7 +563,6 @@ const css = {
     boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(123,28,62,0.04)",
     zIndex: 1,
   },
-
   clockFace: {
     textAlign: "center",
     background: "linear-gradient(135deg, #F9FAFB 0%, #F3F4F6 100%)",
@@ -523,18 +570,27 @@ const css = {
     padding: "24px 40px",
     border: "1px solid #E5E7EB",
   },
+<<<<<<< HEAD
   clockTime:  { margin: 0, fontSize: 48, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", letterSpacing: -2, color: "#111827" },
   clockLabel: { margin: "4px 0 0", fontSize: 12, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 2 },
 
+=======
+  clockTime:  { margin: 0, fontSize: 48, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", letterSpacing: -2 },
+  clockLabel: { margin: "4px 0 0", fontSize: 12, color: "#6b7280", textTransform: "uppercase", letterSpacing: 2 },
+>>>>>>> 76bffedc535c73a34c255577c67fcbc5cf9ea6a1
   infoRow: { display: "flex", gap: 12, justifyContent: "center" },
   infoItem: {
     background: "#F9FAFB", border: "1px solid #E5E7EB",
     borderRadius: 8, padding: "6px 14px",
     fontSize: 13, color: "#6B7280",
   },
+<<<<<<< HEAD
 
   hint: { margin: 0, fontSize: 12, color: "#9CA3AF", textAlign: "center", lineHeight: 1.6 },
 
+=======
+  hint: { margin: 0, fontSize: 12, color: "#4b5563", textAlign: "center", lineHeight: 1.6 },
+>>>>>>> 76bffedc535c73a34c255577c67fcbc5cf9ea6a1
   gaugeWrapper: {
     position: "relative", width: 200, height: 200,
     display: "flex", alignItems: "center", justifyContent: "center",
@@ -542,9 +598,14 @@ const css = {
   gaugeCenter: {
     position: "absolute", textAlign: "center",
   },
+<<<<<<< HEAD
   elapsedTime:  { margin: 0, fontSize: 26, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: "#111827" },
   elapsedLabel: { margin: "4px 0 0", fontSize: 11, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 1.5 },
 
+=======
+  elapsedTime:  { margin: 0, fontSize: 26, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" },
+  elapsedLabel: { margin: "4px 0 0", fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1.5 },
+>>>>>>> 76bffedc535c73a34c255577c67fcbc5cf9ea6a1
   activityPill: {
     display: "flex", alignItems: "center", gap: 8,
     borderRadius: 999, padding: "8px 18px",
@@ -556,8 +617,12 @@ const css = {
     animation: "pulse 1.5s ease-in-out infinite",
     flexShrink: 0,
   },
+<<<<<<< HEAD
   lastPing: { color: "#9CA3AF", fontWeight: 400, fontSize: 12 },
 
+=======
+  lastPing: { color: "#6b7280", fontWeight: 400, fontSize: 12 },
+>>>>>>> 76bffedc535c73a34c255577c67fcbc5cf9ea6a1
   statsRow: {
     display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10,
     zIndex: 1,
@@ -572,10 +637,16 @@ const css = {
     width: 36, height: 36, borderRadius: 10,
     display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16,
   },
+<<<<<<< HEAD
   statValue: { margin: 0, fontWeight: 700, fontSize: 16, fontFamily: "'JetBrains Mono', monospace", color: "#111827" },
   statLabel: { margin: "2px 0 0", fontSize: 11, color: "#6B7280", textTransform: "uppercase", letterSpacing: 0.5 },
   statSub:   { margin: "2px 0 0", fontSize: 10, color: "#9CA3AF" },
 
+=======
+  statValue: { margin: 0, fontWeight: 700, fontSize: 16, fontFamily: "'JetBrains Mono', monospace" },
+  statLabel: { margin: "2px 0 0", fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5 },
+  statSub:   { margin: "2px 0 0", fontSize: 10, color: "#4b5563" },
+>>>>>>> 76bffedc535c73a34c255577c67fcbc5cf9ea6a1
   infoLine: {
     display: "flex", justifyContent: "space-between", alignItems: "center",
   },
@@ -589,8 +660,12 @@ const css = {
     width: 6, height: 6, borderRadius: "50%", background: "#16A34A",
     flexShrink: 0, animation: "pulse 2s ease-in-out infinite",
   },
+<<<<<<< HEAD
   trackingText: { fontSize: 11, color: "#9CA3AF", lineHeight: 1.5 },
 
+=======
+  trackingText: { fontSize: 11, color: "#4b5563", lineHeight: 1.5 },
+>>>>>>> 76bffedc535c73a34c255577c67fcbc5cf9ea6a1
   primaryBtn: {
     width: "100%",
     background: "linear-gradient(135deg, #7B1C3E 0%, #9B2554 100%)",
@@ -618,7 +693,6 @@ const css = {
     cursor: "pointer", fontFamily: "'Sora', sans-serif",
   },
   btnDisabled: { opacity: 0.5, cursor: "not-allowed" },
-
   confirmBox: {
     background: "#FFFFFF", border: "1px solid #E5E7EB",
     borderRadius: 16, padding: "20px",
@@ -628,7 +702,6 @@ const css = {
   },
   confirmText:    { margin: 0, fontSize: 15, color: "#374151", textAlign: "center" },
   confirmActions: { display: "flex", gap: 10 },
-
   resultGrid: {
     display: "flex", gap: 24, justifyContent: "center",
   },
@@ -636,9 +709,17 @@ const css = {
     textAlign: "center", display: "flex", flexDirection: "column",
     alignItems: "center", gap: 4,
   },
+<<<<<<< HEAD
   resultVal: { margin: 0, fontWeight: 700, fontSize: 20, fontFamily: "'JetBrains Mono', monospace", color: "#111827" },
   resultKey: { margin: 0, fontSize: 12, color: "#9CA3AF" },
 
   heading: { color: "#111827", fontSize: 24, fontWeight: 700 },
   sub:     { margin: 0, color: "#6B7280", fontSize: 13 },
 };
+=======
+  resultVal: { margin: 0, fontWeight: 700, fontSize: 20, fontFamily: "'JetBrains Mono', monospace" },
+  resultKey: { margin: 0, fontSize: 12, color: "#6b7280" },
+  heading: { color: "#f9fafb", fontSize: 24, fontWeight: 700 },
+  sub:     { margin: 0, color: "#6b7280", fontSize: 13 },
+};
+>>>>>>> 76bffedc535c73a34c255577c67fcbc5cf9ea6a1

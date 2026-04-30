@@ -136,6 +136,8 @@ const adminlogin = async (req, res, next) => {
       username: admin.username,
       email: admin.email,
     },
+    role: admin.role,
+    token
   });
 };
 
