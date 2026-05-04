@@ -365,7 +365,6 @@ function Calendar({ month, approvedLeaves = [] }) {
   const daysInMo  = new Date(year, month + 1, 0).getDate();
   const today     = new Date();
 
-  // Build a Set of leave days in this month
   const leaveDays = useMemo(() => {
     const set = new Set();
     approvedLeaves.forEach(lv => {
@@ -631,6 +630,9 @@ function LeaveHistoryList({ leaves = [], loading }) {
 
 /* ─────────────────────────────────────────────
    REVIEW STARS CARD
+   Reviews are received by the employee from their manager.
+   Backend field: "review" (not "reviews") — array of Review documents
+   where reviewee = employee._id
 ───────────────────────────────────────────── */
 function ReviewCard({ reviews = [], loading }) {
   if (loading) return (
@@ -680,12 +682,15 @@ function ReviewCard({ reviews = [], loading }) {
             })}
           </div>
 
+          {/* Latest review — shows reviewer name + comment */}
           {latest?.comment && (
             <div style={{ background:"#faf8f2", borderRadius:8, padding:"9px 12px",
               borderLeft:"3px solid #e8b84b", fontSize:11, color:"#5a4030", lineHeight:1.6,
               fontFamily:"'DM Sans',sans-serif" }}>
               <span style={{ color:"#b0948a", fontSize:10, display:"block", marginBottom:4 }}>
-                Latest · {latest.monthYear}
+                {latest.reviewer
+                  ? `${latest.reviewer.f_name} ${latest.reviewer.l_name} · ${latest.monthYear}`
+                  : `Latest · ${latest.monthYear}`}
               </span>
               "{latest.comment}"
             </div>
@@ -725,8 +730,11 @@ export default function EmployeeDashboard() {
   const allLeaves = histData?.leaves   ?? [];
   const announcements = annData?.announcements ?? [];
 
-  /* ── Reviews — from getme if backend returns, else empty ── */
-  const reviews = meData?.reviews ?? [];
+  /* ── Reviews received by this employee
+        Backend returns key "review" (not "reviews")
+        Each item: { rating, comment, monthYear, reviewer: { f_name, l_name, ... } }
+  ── */
+  const reviews = meData?.review ?? [];
 
   /* ── Approved leaves for calendar ── */
   const approvedLeaves = useMemo(() =>

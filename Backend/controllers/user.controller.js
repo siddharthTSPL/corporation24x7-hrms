@@ -7,6 +7,7 @@ const { sendEmail } = require("../utils/nodemailer.utils");
 const announcementmodel = require("../Models/announcement.model");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
+const Review = require("../Models/review.model");
 
 const verifyUserEmail = async (req, res, next) => {
   const { token } = req.params;
@@ -773,6 +774,13 @@ const getme = async (req, res, next) => {
   const leavebalance = await LeaveBalance.find({
     employee: employee._id,
   });
+  const review = await Review.find({
+    reviewee: employee._id,
+    revieweeRoleModel: "User",
+  }).populate({
+    path: "reviewer",
+    select: "f_name l_name work_email role",
+  });
 
   return res.status(200).json({
     success: true,
@@ -780,6 +788,7 @@ const getme = async (req, res, next) => {
     employee: emp,
 
     leavebalance,
+    review,
   });
 };
 
