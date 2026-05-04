@@ -854,16 +854,16 @@ const reviewtomanager = async (req, res, next) => {
   }
 
   const review = await Review.create({
-    reviewerRole: adminrole,
-    reviewer: adminid,
-    reviewerRoleModel: adminrole,
-    revieweeRole: manager.role,
-    reviewee: managerid,
-    revieweeRoleModel: manager.role,
-    rating,
-    comment,
-    monthYear,
-  });
+  reviewerRole: adminrole,                         
+  reviewer: adminid,
+  reviewerRoleModel: "Admin",                       
+  revieweeRole: manager.role,                       
+  reviewee: managerid,
+  revieweeRoleModel: "Manager",                     
+  rating,
+  comment,
+  monthYear,
+});
 
   res.status(201).json({
     message: "Review submitted successfully",

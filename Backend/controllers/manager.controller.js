@@ -945,17 +945,17 @@ const reviewtoemployee = async (req, res, next) => {
   const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
   try {
-    const review = await Review.create({
-      reviewerRole: manager.role,
-      reviewer: manager._id,
-      reviewerRoleModel: manager.role,
-      revieweeRole: employee.role,
-      reviewee: employee._id,
-      revieweeRoleModel: employee.role,
-      rating,
-      comment,
-      monthYear,
-    });
+   const review = await Review.create({
+  reviewerRole: manager.role,    
+  reviewer: manager._id,
+  reviewerRoleModel: "Manager",   
+  revieweeRole: "employee",       
+  reviewee: employee._id,
+  revieweeRoleModel: "User",      
+  rating,
+  comment,
+  monthYear,
+});
 
     res.status(201).json({
       message: "Employee reviewed successfully",
