@@ -19,6 +19,7 @@ const reviewModel = require("../Models/review.model");
 const Attendance = require("../Models/attendance.model");
 
 
+
 const registerAdmin = async (req, res, next) => {
   const { organisation_name, email, password } = req.body;
 
@@ -55,9 +56,97 @@ const registerAdmin = async (req, res, next) => {
   await sendEmail({
     to: email,
     subject: "Verify Your Admin Account",
-    html: `<h2>Welcome ${organisation_name}</h2>
-    <p>Please verify your admin account:</p>
-    <a href="${verifyLink}" style="padding:10px 20px;background:#007bff;color:white;text-decoration:none;border-radius:5px;">Verify Email</a>`,
+    html: `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    </head>
+
+    <body style="margin:0; padding:0; background:#F9F8F2; font-family: 'Segoe UI', sans-serif;">
+
+      <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
+        <tr>
+          <td align="center">
+
+            <!-- Card -->
+            <table width="600" cellpadding="0" cellspacing="0" 
+              style="background:#ffffff; border-radius:14px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.08);">
+
+              <!-- Header -->
+              <tr>
+                <td style="background: linear-gradient(135deg, #730042, #CD166E); padding:30px; text-align:center; color:white;">
+                  <h1 style="margin:0;">🚀 Welcome</h1>
+                  <p style="margin-top:8px; font-size:14px;">Admin Account Verification</p>
+                </td>
+              </tr>
+
+              <!-- Body -->
+              <tr>
+                <td style="padding:40px; color:#333;">
+                  
+                  <h2 style="color:#730042;">Hello ${organisation_name},</h2>
+
+                  <p style="font-size:15px; line-height:1.6; color:#444;">
+                    You're just one step away from activating your admin account.
+                    Please verify your email to access your dashboard.
+                  </p>
+
+                  <!-- Button -->
+                  <div style="text-align:center; margin:30px 0;">
+                    <a href="${verifyLink}" 
+                      style="
+                        background:#CD166E;
+                        color:white;
+                        padding:14px 28px;
+                        text-decoration:none;
+                        border-radius:8px;
+                        font-weight:600;
+                        display:inline-block;
+                        box-shadow:0 6px 16px rgba(205,22,110,0.3);
+                      ">
+                      Verify Email
+                    </a>
+                  </div>
+
+                  <p style="font-size:14px; color:#666;">
+                    If the button doesn't work, use this link:
+                  </p>
+
+                  <p style="font-size:13px; word-break:break-all; color:#CD166E;">
+                    ${verifyLink}
+                  </p>
+
+                  <hr style="border:none; border-top:1px solid #eee; margin:30px 0;" />
+
+                  <p style="font-size:13px; color:#777;">
+                    ⏳ This link expires in <strong>1 hour</strong>.
+                  </p>
+
+                  <p style="font-size:13px; color:#777;">
+                    If you didn’t request this, you can ignore this email.
+                  </p>
+
+                </td>
+              </tr>
+
+              <!-- Footer -->
+              <tr>
+                <td style="background:#F9F8F2; padding:20px; text-align:center; font-size:12px; color:#888;">
+                  © 2026 Your Company • Modern SaaS Platform
+                </td>
+              </tr>
+
+            </table>
+
+          </td>
+        </tr>
+      </table>
+
+    </body>
+    </html>
+    `,
   });
 
   res.status(201).json({
@@ -222,26 +311,92 @@ const addmanager = async (req, res, next) => {
 
   const verifyLink = `http://localhost:5000/manager/verify/${token}`;
 
-  await sendEmail({
-    to: work_email,
-    subject: "Verify Your Manager Account",
-    html: `
-      <h2>Welcome ${f_name}</h2>
-      <p>Your manager account has been created.</p>
-      <p>Please verify your email by clicking the button below.</p>
+ await sendEmail({
+  to: work_email,
+  subject: "🚀 Activate Your Manager Account",
+  html: `
+  <!DOCTYPE html>
+  <html>
+  <body style="margin:0; padding:0; background:#F9F8F2; font-family:Segoe UI, sans-serif;">
 
-      <a href="${verifyLink}"
-      style="
-      padding:10px 20px;
-      background:#28a745;
-      color:white;
-      text-decoration:none;
-      border-radius:5px;
-      ">
-      Verify Email
-      </a>
-    `,
-  });
+    <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
+      <tr>
+        <td align="center">
+
+          <table width="600" style="background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.08);">
+
+            <!-- Header -->
+            <tr>
+              <td style="background:linear-gradient(135deg,#730042,#CD166E); padding:30px; text-align:center; color:white;">
+                <h1 style="margin:0;">👔 Manager Onboarding</h1>
+                <p style="margin-top:6px; font-size:14px;">You're now part of the system</p>
+              </td>
+            </tr>
+
+            <!-- Body -->
+            <tr>
+              <td style="padding:40px; color:#333;">
+
+                <h2 style="color:#730042;">Hi ${f_name},</h2>
+
+                <p style="font-size:15px; line-height:1.6;">
+                  Your <strong>Manager Account</strong> has been successfully created.
+                  You can now manage your team, track performance, and streamline operations.
+                </p>
+
+                <div style="background:#F9F8F2; padding:15px; border-radius:8px; margin:20px 0;">
+                  <p style="margin:0;"><strong>Role:</strong> ${designation}</p>
+                  <p style="margin:5px 0;"><strong>Department:</strong> ${department}</p>
+                  <p style="margin:0;"><strong>Location:</strong> ${office_location}</p>
+                </div>
+
+                <!-- CTA -->
+                <div style="text-align:center; margin:30px 0;">
+                  <a href="${verifyLink}" style="
+                    background:#CD166E;
+                    color:white;
+                    padding:14px 30px;
+                    text-decoration:none;
+                    border-radius:8px;
+                    font-weight:600;
+                    display:inline-block;
+                    box-shadow:0 6px 16px rgba(205,22,110,0.3);
+                  ">
+                    Verify & Activate
+                  </a>
+                </div>
+
+                <p style="font-size:13px; color:#777;">
+                  Or copy this link:<br/>
+                  <span style="color:#CD166E;">${verifyLink}</span>
+                </p>
+
+                <hr style="margin:25px 0; border:none; border-top:1px solid #eee;" />
+
+                <p style="font-size:13px; color:#777;">
+                  ⏳ Link expires in 1 hour. Ignore if not requested.
+                </p>
+
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td style="background:#F9F8F2; padding:20px; text-align:center; font-size:12px; color:#888;">
+                © 2026 Your Company • Manager Panel
+              </td>
+            </tr>
+
+          </table>
+
+        </td>
+      </tr>
+    </table>
+
+  </body>
+  </html>
+  `,
+});
 
   res.status(200).json({
     message: "Manager added successfully. Verification email sent.",
@@ -309,26 +464,92 @@ if (!f_name || !work_email || !password) {
 
   const verifyLink = `http://localhost:5000/user/verify/${token}`;
 
-  await sendEmail({
-    to: work_email,
-    subject: "Verify Your Employee Account",
-    html: `
-      <h2>Welcome ${f_name}</h2>
-      <p>Your employee account has been created.</p>
-      <p>Please verify your email by clicking the button below.</p>
+ await sendEmail({
+  to: work_email,
+  subject: "🎉 Welcome! Verify Your Employee Account",
+  html: `
+  <!DOCTYPE html>
+  <html>
+  <body style="margin:0; padding:0; background:#F9F8F2; font-family:Segoe UI, sans-serif;">
 
-      <a href="${verifyLink}"
-      style="
-      padding:10px 20px;
-      background:#28a745;
-      color:white;
-      text-decoration:none;
-      border-radius:5px;
-      ">
-      Verify Email
-      </a>
-    `,
-  });
+    <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
+      <tr>
+        <td align="center">
+
+          <table width="600" style="background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.08);">
+
+            <!-- Header -->
+            <tr>
+              <td style="background:linear-gradient(135deg,#730042,#CD166E); padding:30px; text-align:center; color:white;">
+                <h1 style="margin:0;">🎉 Welcome Aboard</h1>
+                <p style="margin-top:6px; font-size:14px;">Your journey starts here</p>
+              </td>
+            </tr>
+
+            <!-- Body -->
+            <tr>
+              <td style="padding:40px; color:#333;">
+
+                <h2 style="color:#730042;">Hello ${f_name},</h2>
+
+                <p style="font-size:15px; line-height:1.6;">
+                  Your employee account has been successfully created.
+                  You're now part of the team — let's get started 🚀
+                </p>
+
+                <div style="background:#F9F8F2; padding:15px; border-radius:8px; margin:20px 0;">
+                  <p style="margin:0;"><strong>Department:</strong> ${department}</p>
+                  <p style="margin:5px 0;"><strong>Manager:</strong> ${Under_manager || "Assigned Soon"}</p>
+                  <p style="margin:0;"><strong>Location:</strong> ${office_location}</p>
+                </div>
+
+                <!-- CTA -->
+                <div style="text-align:center; margin:30px 0;">
+                  <a href="${verifyLink}" style="
+                    background:#730042;
+                    color:white;
+                    padding:14px 30px;
+                    text-decoration:none;
+                    border-radius:8px;
+                    font-weight:600;
+                    display:inline-block;
+                    box-shadow:0 6px 16px rgba(115,0,66,0.3);
+                  ">
+                    Verify Account
+                  </a>
+                </div>
+
+                <p style="font-size:13px; color:#777;">
+                  If button doesn't work:<br/>
+                  <span style="color:#CD166E;">${verifyLink}</span>
+                </p>
+
+                <hr style="margin:25px 0; border:none; border-top:1px solid #eee;" />
+
+                <p style="font-size:13px; color:#777;">
+                  ⏳ Link valid for 1 hour only.
+                </p>
+
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td style="background:#F9F8F2; padding:20px; text-align:center; font-size:12px; color:#888;">
+                © 2026 Your Company • Employee Portal
+              </td>
+            </tr>
+
+          </table>
+
+        </td>
+      </tr>
+    </table>
+
+  </body>
+  </html>
+  `,
+});
 
   res.status(200).json({
     message: "User added successfully. Verification email sent.",
@@ -854,16 +1075,16 @@ const reviewtomanager = async (req, res, next) => {
   }
 
   const review = await Review.create({
-    reviewerRole: adminrole,
-    reviewer: adminid,
-    reviewerRoleModel: adminrole,
-    revieweeRole: manager.role,
-    reviewee: managerid,
-    revieweeRoleModel: manager.role,
-    rating,
-    comment,
-    monthYear,
-  });
+  reviewerRole: adminrole,                         
+  reviewer: adminid,
+  reviewerRoleModel: "Admin",                       
+  revieweeRole: manager.role,                       
+  reviewee: managerid,
+  revieweeRoleModel: "Manager",                     
+  rating,
+  comment,
+  monthYear,
+});
 
   res.status(201).json({
     message: "Review submitted successfully",
@@ -1161,33 +1382,40 @@ const changepassword = async (req, res, next) => {
 
 
 const getTodayCheckins = async (req, res) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-  const checkins = await Attendance.find({
-    date: today,
-    checkIn: { $exists: true },       
-    latitude:  { $exists: true, $ne: null },
-    longitude: { $exists: true, $ne: null },
-  })
-    .populate("employee", "name email department designation")
-    .select("employee role latitude longitude checkIn checkOut");
+    const checkins = await Attendance.find({
+      date:      today,
+      checkIn:   { $exists: true },
+      latitude:  { $exists: true, $ne: null },
+      longitude: { $exists: true, $ne: null },
+    })
+      .populate(
+        "employee",
+        "f_name l_name work_email department designation" // ← exact field names from both schemas
+      )
+      .select("employee role latitude longitude checkIn checkOut");
 
-  const payload = checkins.map((c) => ({
-    id:         c._id,
-    name:       c.employee?.name  || "Unknown",
-    email:      c.employee?.email || "",
-    dept:       c.employee?.department || c.employee?.designation || "",
-    role:       c.role,                   
-    lat:        c.latitude,
-    lng:        c.longitude,
-    checkIn:    c.checkIn,
-    checkedOut: !!c.checkOut,
-  }));
+    const payload = checkins.map((c) => ({
+      id:    c._id,
+      name:  [c.employee?.f_name, c.employee?.l_name].filter(Boolean).join(" ") || "Unknown",
+      email: c.employee?.work_email || "",
+      dept:  c.employee?.department || c.employee?.designation || "",
+      role:  c.role,
+      lat:   c.latitude,
+      lng:   c.longitude,
+      checkIn:    c.checkIn,
+      checkedOut: !!c.checkOut,
+    }));
 
-  res.json({ checkins: payload, total: payload.length });
+    res.json({ checkins: payload, total: payload.length });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
-
 
 module.exports = {
   registerAdmin,

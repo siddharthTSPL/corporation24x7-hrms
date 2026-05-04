@@ -23,12 +23,17 @@ function Login() {
 
   const images = ["/src/assets/slide1.png", "/src/assets/slide2.png", "/src/assets/slide3.png"];
 
- 
+  const navigateByRole = (role) => {
+    if (role === "admin") navigate("/dashboard", { replace: true });
+    else if (role === "manager") navigate("/manager-dashboard", { replace: true });
+    else navigate("/employee-dashboard", { replace: true });
+  };
+
   useEffect(() => {
     if (!authLoading && authData) {
-      navigate("/dashboard", { replace: true });
+      navigateByRole(authData.role);
     }
-  }, [authData, authLoading, navigate]);
+  }, [authData, authLoading]);
 
   useEffect(() => {
     fetch("/loader.json").then((r) => r.json()).then(setAnimationData);
@@ -61,41 +66,38 @@ function Login() {
     if (!validate()) return;
 
     setShowLoader(true);
-    const startTime = Date.now();
 
-    // Build payload based on role — admin/employee use `identifier`, manager uses `work_email`
     const payload =
       form.role === "manager"
         ? { role: form.role, work_email: form.email, password: form.password }
         : { role: form.role, identifier: form.email, password: form.password };
 
-   loginFn(payload, {
-  onSuccess: async (data) => {
-    // Tell desktop agent about the token
-    if (data?.token) {
-      try {
-        await fetch("http://localhost:47821/set-token", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: data.token }),
-        });
-      } catch (_) {
-        // Agent not running — that's fine, skip silently
-      }
-    }
-
-    navigate("/dashboard", { replace: true });
-  },
-  onError: (err) => {
-    setErrors({ general: getErrorMessage(err) });
-  },
-});
+    loginFn(payload, {
+      onSuccess: async (data) => {
+        if (data?.token) {
+          try {
+            await fetch("http://localhost:47821/set-token", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ token: data.token }),
+            });
+          } catch (_) {
+            // Agent not running — skip silently
+          }
+        }
+        navigateByRole(form.role);
+      },
+      onError: (err) => {
+        setShowLoader(false);
+        setErrors({ general: getErrorMessage(err) });
+      },
+    });
   };
 
   const handleSendOtp = () => {
-    if (!form.email) { 
-      setErrors({ email: "Email is required" }); 
-      return; 
+    if (!form.email) {
+      setErrors({ email: "Email is required" });
+      return;
     }
     sendOtpFn(form.email, {
       onSuccess: () => setStep("otp"),
@@ -104,16 +106,16 @@ function Login() {
   };
 
   const handleVerifyOtp = () => {
-    if (!form.otp) { 
-      setErrors({ otp: "OTP is required" }); 
-      return; 
+    if (!form.otp) {
+      setErrors({ otp: "OTP is required" });
+      return;
     }
     verifyOtpFn(
       { email: form.email, otp: form.otp },
       {
-        onSuccess: () => { 
-          setVerified(true); 
-          setStep("login"); 
+        onSuccess: () => {
+          setVerified(true);
+          setStep("login");
         },
         onError: (err) => setErrors({ otp: getErrorMessage(err) }),
       }
@@ -220,8 +222,8 @@ function Login() {
                 className="w-full mb-1 p-3 border rounded-lg"
               />
               {errors.email && <p className="text-red-500 text-sm mb-2">{errors.email}</p>}
-              <button 
-                onClick={handleSendOtp} 
+              <button
+                onClick={handleSendOtp}
                 disabled={sendingOtp}
                 className="w-full bg-[#730042] text-white py-3 rounded-lg disabled:opacity-60"
               >
@@ -245,8 +247,8 @@ function Login() {
                 className="w-full mb-1 p-3 border rounded-lg"
               />
               {errors.otp && <p className="text-red-500 text-sm mb-2">{errors.otp}</p>}
-              <button 
-                onClick={handleVerifyOtp} 
+              <button
+                onClick={handleVerifyOtp}
                 disabled={verifyingOtp}
                 className="w-full bg-[#730042] text-white py-3 rounded-lg disabled:opacity-60"
               >
@@ -277,10 +279,11 @@ function Login() {
           </div>
         </div>
       </div>
+
       <p className="fixed bottom-2 left-0 w-full text-center text-gray-600 text-sm font-medium">
         © 2026, TechTorch Solutions Private Limited. All Rights Reserved.
       </p>
-      </div>
+    </div>
   );
 }
 

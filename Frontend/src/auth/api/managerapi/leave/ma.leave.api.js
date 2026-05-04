@@ -22,7 +22,7 @@ export const forwardLeaveToAdmin = async (data) => {
 };
 
 export const applyLeaveManager = async (data) => {
-  const res = await api.post("/applyleave", data);
+  const res = await api.post("/applyleavem", data);
   return res.data;
 };
 
