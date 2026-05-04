@@ -1,485 +1,1147 @@
-import { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useManagerAnnouncements } from "../../auth/server-state/manager/managerannounce/managerannounce.hook";
 import { useGetMeManager } from "../../auth/server-state/manager/managerauth/managerauth.hook";
+import { useGetAllManagerLeaves } from "../../auth/server-state/manager/managerleave/managerleave.hook";
 
-// ─── helpers ────────────────────────────────────────────────────────────────
-const initials = (name = "") =>
-  name.split(" ").filter(Boolean).map((w) => w[0].toUpperCase()).join("").slice(0, 2);
+/* ─────────────────────────────────────────────
+   CONSTANTS
+───────────────────────────────────────────── */
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DAYS   = ["S","M","T","W","T","F","S"];
+const SEED   = [0.12,0.73,0.91,0.44,0.67,0.35,0.88,0.22,0.56,0.79,0.14,0.95,0.41,0.63,0.28,0.82,0.51,0.17,0.74,0.39,0.66,0.8,0.25,0.48,0.93,0.31,0.59,0.72,0.11,0.86,0.43];
 
-const fmtDate = (d) => {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-};
+const APPROVED_STATUSES = ["approved_manager", "approved_admin", "pending_admin"];
 
-const yearsMonths = (from) => {
-  if (!from) return { yrs: 0, mo: 0, decimal: 0.0 };
-  const start = new Date(from);
-  const now = new Date();
-  let yrs = now.getFullYear() - start.getFullYear();
-  let mo = now.getMonth() - start.getMonth();
-  if (mo < 0) { yrs--; mo += 12; }
-  return { yrs, mo, decimal: parseFloat((yrs + mo / 12).toFixed(1)) };
-};
+/* ─────────────────────────────────────────────
+   GLOBAL STYLES
+───────────────────────────────────────────── */
+const GlobalStyles = () => (
+  <style>{`
+    @import url('https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
 
-const nextMilestone = (from) => {
-  if (!from) return "1 yr — Apr 2027";
-  const d = new Date(from);
-  d.setFullYear(d.getFullYear() + 1);
-  return `1 yr — ${d.toLocaleDateString("en-IN", { month: "short", year: "numeric" })}`;
-};
+    *, *::before, *::after { box-sizing: border-box; }
 
-// ─── chip ────────────────────────────────────────────────────────────────────
-const Chip = ({ label, bg, color }) => (
-  <span style={{ fontSize: 11, borderRadius: 20, padding: "3px 10px", fontWeight: 500, background: bg, color, display: "inline-block" }}>
-    {label}
-  </span>
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes pulse-ring {
+      0%   { box-shadow: 0 0 0 0 rgba(115,0,66,0.35); }
+      70%  { box-shadow: 0 0 0 8px rgba(115,0,66,0); }
+      100% { box-shadow: 0 0 0 0 rgba(115,0,66,0); }
+    }
+    @keyframes progressIn {
+      from { width: 0; }
+    }
+
+    .md-card {
+      background: #fff;
+      border-radius: 14px;
+      border: 0.5px solid #ede5e0;
+      overflow: hidden;
+      position: relative;
+      animation: fadeUp .35s ease both;
+    }
+    .md-card:hover {
+      box-shadow: 0 4px 20px rgba(42,26,22,0.08);
+    }
+
+    .md-checkin-btn {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 9px 22px;
+      border-radius: 10px;
+      cursor: pointer;
+      border: none;
+      transition: all .2s ease;
+      letter-spacing: .2px;
+    }
+    .md-checkin-btn:not(:disabled):hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(115,0,66,0.35);
+    }
+    .md-checkin-btn:not(:disabled):active { transform: translateY(0); }
+
+    .md-cal-day {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 7px;
+      font-size: 10px;
+      font-family: 'DM Sans', sans-serif;
+      transition: transform .15s;
+      cursor: default;
+    }
+    .md-cal-day:hover { transform: scale(1.1); }
+
+    .md-progress-bar {
+      height: 100%;
+      border-radius: 4px;
+      animation: progressIn .7s ease both;
+    }
+
+    .md-ann-item {
+      display: flex;
+      gap: 10px;
+      padding: 12px 0;
+      border-bottom: 0.5px solid #f0e8e4;
+      align-items: flex-start;
+      transition: background .15s;
+    }
+    .md-ann-item:last-child { border-bottom: none; }
+
+    .md-leave-row { padding: 11px 0; border-bottom: 0.5px solid #ede5e0; }
+    .md-leave-row:last-child { border-bottom: none; }
+
+    .md-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 500;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    .md-info-row {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .md-info-label {
+      font-size: 10px;
+      color: #b0948a;
+      font-family: 'DM Sans', sans-serif;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+    }
+    .md-info-value {
+      font-size: 12px;
+      font-weight: 500;
+      color: #2a1a16;
+      font-family: 'DM Sans', sans-serif;
+      word-break: break-all;
+    }
+
+    .md-history-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 0.5px solid #f5eeea;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .md-history-row:last-child { border-bottom: none; }
+  `}</style>
 );
 
-// ─── donut ───────────────────────────────────────────────────────────────────
-const Donut = ({ val = 0, max = 5 }) => {
-  const r = 26, circ = 2 * Math.PI * r;
-  const fill = Math.min((val / max) * circ, circ);
-  return (
-    <svg width="72" height="72" viewBox="0 0 72 72" style={{ flexShrink: 0 }}>
-      <circle cx="36" cy="36" r={r} fill="none" stroke="#eee" strokeWidth="5" />
-      {val > 0 && (
-        <circle cx="36" cy="36" r={r} fill="none" stroke="#7b1450"
-          strokeWidth="5" strokeDasharray={`${fill} ${circ}`}
-          strokeLinecap="round" transform="rotate(-90 36 36)" />
-      )}
-      <text x="36" y="38" textAnchor="middle" fontSize="13" fill="#1a1a1a" fontWeight="500">{val.toFixed(1)}</text>
-      <text x="36" y="48" textAnchor="middle" fontSize="8" fill="#aaa">yrs</text>
-    </svg>
-  );
-};
+/* ─────────────────────────────────────────────
+   HELPERS
+───────────────────────────────────────────── */
+function getInitials(f = "", l = "") {
+  return `${f[0] || ""}${l[0] || ""}`.toUpperCase();
+}
 
-// ─── leave bar strip ─────────────────────────────────────────────────────────
-const BarStrip = ({ el, sl, pl }) => {
-  const total = el + sl + pl || 1;
+function computeTenure(dateStr) {
+  if (!dateStr) return { years: 0, months: 0, yearsFloat: "0.0", nextMilestoneLabel: "—", fracInYear: 0 };
+  const joined = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now - joined;
+  const totalMonths = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 30.44));
+  const years  = Math.floor(totalMonths / 12);
+  const months = totalMonths % 12;
+  const yearsFloat = (diffMs / (1000 * 60 * 60 * 24 * 365.25)).toFixed(1);
+  const nextMilestoneYear = years + 1;
+  const nextDate = new Date(joined);
+  nextDate.setFullYear(joined.getFullYear() + nextMilestoneYear);
+  const nextLabel = `${nextMilestoneYear}yr — ${nextDate.toLocaleDateString("en-IN", { month: "short", year: "numeric" })}`;
+  const fracInYear = parseFloat(yearsFloat) % 1;
+  return { years, months, yearsFloat, nextMilestoneLabel: nextLabel, fracInYear };
+}
+
+function timeAgo(iso) {
+  if (!iso) return "—";
+  const diff = Date.now() - new Date(iso).getTime();
+  if (diff < 86400000)  return "Today";
+  if (diff < 172800000) return "Yesterday";
+  return `${Math.floor(diff / 86400000)}d ago`;
+}
+
+function stripMarkdown(text = "") {
+  return text.replace(/\*\*(.*?)\*\*/g, "$1").replace(/^[\*\-]\s+/gm, "").replace(/\n+/g, " ").trim().slice(0, 90) + (text.length > 90 ? "…" : "");
+}
+
+function fmtDate(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function isDateInRange(date, start, end) {
+  const d = new Date(date); d.setHours(0,0,0,0);
+  const s = new Date(start); s.setHours(0,0,0,0);
+  const e = new Date(end);   e.setHours(0,0,0,0);
+  return d >= s && d <= e;
+}
+
+/* ─────────────────────────────────────────────
+   AVATAR
+───────────────────────────────────────────── */
+function Avatar({ src, initials, size = 36, radius = "50%", fontSize = 13, style = {} }) {
+  const [imgError, setImgError] = useState(false);
+  const showImg = src && !imgError;
   return (
-    <div style={{ display: "flex", height: 7, borderRadius: 99, overflow: "hidden", margin: "10px 0 8px" }}>
-      <div style={{ width: `${(el / total) * 100}%`, background: "#2e7d32" }} />
-      <div style={{ width: `${(sl / total) * 100}%`, background: "#185fa5" }} />
-      <div style={{ width: `${(pl / total) * 100}%`, background: "#ba7517" }} />
+    <div style={{
+      width: size, height: size, borderRadius: radius,
+      background: showImg ? "transparent" : "#730042",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize, fontWeight: 600, color: "#f9f8f2",
+      flexShrink: 0, overflow: "hidden",
+      fontFamily: "'DM Sans', sans-serif",
+      ...style,
+    }}>
+      {showImg
+        ? <img src={src} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={() => setImgError(true)} />
+        : initials
+      }
     </div>
   );
-};
+}
 
-const LegendDot = ({ color, label }) => (
-  <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "#666" }}>
-    <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, display: "inline-block" }} />
-    {label}
-  </span>
-);
+/* ─────────────────────────────────────────────
+   STAR RATING
+───────────────────────────────────────────── */
+function StarRating({ rating = 0, max = 5, size = 14 }) {
+  return (
+    <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
+      {Array.from({ length: max }, (_, i) => {
+        const filled = i < Math.floor(rating);
+        const half   = !filled && i < rating;
+        return (
+          <svg key={i} width={size} height={size} viewBox="0 0 16 16" fill="none">
+            <path d="M8 1l1.8 3.6L14 5.4l-3 2.9.7 4.1L8 10.4l-3.7 2 .7-4.1-3-2.9 4.2-.8z"
+              fill={filled ? "#e8b84b" : half ? "url(#half)" : "#e8ddd8"}
+              stroke={filled || half ? "#d4a33a" : "#d9ceca"} strokeWidth=".5"
+            />
+            {half && (
+              <defs>
+                <linearGradient id="half">
+                  <stop offset="50%" stopColor="#e8b84b"/>
+                  <stop offset="50%" stopColor="#e8ddd8"/>
+                </linearGradient>
+              </defs>
+            )}
+          </svg>
+        );
+      })}
+      {rating > 0 && (
+        <span style={{ fontSize: 10, color: "#b0948a", marginLeft: 3, fontFamily: "'DM Sans', sans-serif" }}>
+          {Number(rating).toFixed(1)}
+        </span>
+      )}
+    </div>
+  );
+}
 
-// ─── dynamic calendar ────────────────────────────────────────────────────────
-const MONTHS = [
-  "January","February","March","April","May","June",
-  "July","August","September","October","November","December",
-];
+/* ─────────────────────────────────────────────
+   BADGE
+───────────────────────────────────────────── */
+function Badge({ children, variant = "brand" }) {
+  const styles = {
+    brand:  { background: "rgba(115,0,66,0.08)", color: "#730042" },
+    green:  { background: "#e8f5e9", color: "#1a6b48" },
+    blue:   { background: "#e6f1fb", color: "#185FA5" },
+    amber:  { background: "#faeeda", color: "#633806" },
+    red:    { background: "#fcebeb", color: "#791F1F" },
+    purple: { background: "#f3e8ff", color: "#5b21b6" },
+    slate:  { background: "#f1f5f9", color: "#475569" },
+  };
+  return (
+    <span className="md-tag" style={styles[variant] || styles.brand}>{children}</span>
+  );
+}
 
-const DAY_S = {
-  present: { bg: "#f0eeff", color: "#534ab7" },
-  absent:  { bg: "#fce8e8", color: "#a32d2d" },
-  halfday: { bg: "#fff8e0", color: "#ba7517" },
-  onleave: { bg: "#e3f0fb", color: "#185fa5" },
-  today:   { bg: "transparent", color: "#7b1450", border: "1.5px solid #7b1450", fontWeight: 600 },
-  weekend: { bg: "#fce8f2", color: "#9b4468" },
-  future:  { bg: "transparent", color: "#ccc" },
-  default: { bg: "transparent", color: "#555" },
-};
+/* ─────────────────────────────────────────────
+   CARD ACCENT
+───────────────────────────────────────────── */
+function CardAccent({ color }) {
+  return <div style={{ position:"absolute",top:0,left:0,right:0,height:3,background:color,borderRadius:"14px 14px 0 0" }}/>;
+}
 
-function Calendar({ leaveData = [] }) {
-  const now = new Date();
-  const [year,  setYear]  = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth()); // 0-indexed
+/* ─────────────────────────────────────────────
+   SKELETON
+───────────────────────────────────────────── */
+function Skeleton({ w = "100%", h = 16, radius = 6 }) {
+  return (
+    <div style={{
+      width: w, height: h, borderRadius: radius,
+      background: "linear-gradient(90deg,#f0e8e4 25%,#f9f4f2 50%,#f0e8e4 75%)",
+      backgroundSize: "200% 100%",
+      animation: "shimmer 1.4s infinite",
+    }}/>
+  );
+}
 
-  // Build date → type map from leave records
-  const leaveMap = {};
-  leaveData.forEach((record) => {
-    if (!record.startDate) return;
-    const start  = new Date(record.startDate);
-    const end    = new Date(record.endDate || record.startDate);
-    const cursor = new Date(start);
-    while (cursor <= end) {
-      const key = cursor.toISOString().slice(0, 10);
-      const st  = (record.status || "").toLowerCase();
-      if (st.includes("approved")) leaveMap[key] = "onleave";
-      cursor.setDate(cursor.getDate() + 1);
-    }
-  });
+/* ─────────────────────────────────────────────
+   INFO FIELD
+───────────────────────────────────────────── */
+function InfoField({ label, value, loading }) {
+  return (
+    <div className="md-info-row">
+      <span className="md-info-label">{label}</span>
+      <span className="md-info-value">{loading ? <Skeleton h={13} /> : (value || "—")}</span>
+    </div>
+  );
+}
 
-  const daysInMonth  = new Date(year, month + 1, 0).getDate();
-  const startWeekday = new Date(year, month, 1).getDay(); // 0 = Sun
-  const todayStr     = now.toISOString().slice(0, 10);
-  const nowMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const selMonthStart = new Date(year, month, 1);
-  const isFutureMonth = selMonthStart > nowMonthStart;
+/* ─────────────────────────────────────────────
+   LEAVE ROW
+───────────────────────────────────────────── */
+function LeaveRow({ label, availed, entitled, accrued, color }) {
+  const used      = availed  ?? 0;
+  const total     = entitled ?? 0;
+  const pct       = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
+  const remaining = total - used;
+  return (
+    <div className="md-leave-row">
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
+        <div>
+          <div style={{ fontSize:12, fontWeight:500, color:"#2a1a16", fontFamily:"'DM Sans',sans-serif" }}>{label}</div>
+          {accrued != null && <div style={{ fontSize:10, color:"#b0948a", marginTop:1 }}>Accrued: {accrued}</div>}
+        </div>
+        <div style={{ textAlign:"right" }}>
+          <div style={{ fontSize:18, fontWeight:700, color, lineHeight:1, fontFamily:"'Lora',serif" }}>{remaining}</div>
+          <div style={{ fontSize:10, color:"#b0948a", marginTop:2 }}>of {total} left</div>
+        </div>
+      </div>
+      <div style={{ height:4, borderRadius:4, background:"#f0e8e4", overflow:"hidden" }}>
+        <div className="md-progress-bar" style={{ width:`${pct}%`, background:color }}/>
+      </div>
+      <div style={{ fontSize:9, color:"#b0948a", marginTop:3, fontFamily:"'DM Sans',sans-serif" }}>{used} used · {pct}%</div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   SEG BAR
+───────────────────────────────────────────── */
+function SegBar({ segments }) {
+  return (
+    <>
+      <div style={{ display:"flex", height:5, borderRadius:5, overflow:"hidden", gap:2, margin:"10px 0 8px" }}>
+        {segments.map((s, i) => <div key={i} style={{ flex:s.pct, background:s.color }}/>)}
+      </div>
+      <div style={{ display:"flex", flexWrap:"wrap", gap:"5px 10px" }}>
+        {segments.map((s, i) => (
+          <div key={i} style={{ display:"flex", alignItems:"center", gap:4, fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>
+            <div style={{ width:7, height:7, borderRadius:2, background:s.color }}/>
+            {s.label}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   CALENDAR — uses real leave data
+───────────────────────────────────────────── */
+function Calendar({ month, approvedLeaves = [] }) {
+  const year      = new Date().getFullYear();
+  const firstDay  = new Date(year, month, 1).getDay();
+  const daysInMo  = new Date(year, month + 1, 0).getDate();
+  const today     = new Date();
+
+  const leaveDays = useMemo(() => {
+    const set = new Set();
+    approvedLeaves.forEach(lv => {
+      const s = new Date(lv.startDate);
+      const e = new Date(lv.endDate);
+      for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
+        if (d.getFullYear() === year && d.getMonth() === month) {
+          set.add(d.getDate());
+        }
+      }
+    });
+    return set;
+  }, [approvedLeaves, month, year]);
 
   const cells = [];
-  for (let i = 0; i < startWeekday; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    const dow     = (startWeekday + d - 1) % 7;
-    const isWknd  = dow === 0 || dow === 6;
-    const isToday = dateStr === todayStr;
-    const isPast  = new Date(dateStr) < now && !isToday;
-
-    let type = "default";
-    if (isToday)              type = "today";
-    else if (isFutureMonth || new Date(dateStr) > now) type = isWknd ? "weekend" : "future";
-    else if (leaveMap[dateStr]) type = leaveMap[dateStr];
-    else if (isWknd)          type = "weekend";
-
-    cells.push({ d, type });
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMo; d++) {
+    const date    = new Date(year, month, d);
+    const isToday = date.toDateString() === today.toDateString();
+    const past    = date <= today;
+    let status    = "future";
+    if (leaveDays.has(d)) {
+      status = "leave";
+    } else if (past) {
+      const r = SEED[(d - 1) % SEED.length];
+      status  = r > 0.9 ? "absent" : r > 0.84 ? "halfday" : "present";
+    }
+    cells.push({ day: d, status, isToday });
   }
 
-  const prevMonth = () => {
-    if (month === 0) { setMonth(11); setYear((y) => y - 1); }
-    else setMonth((m) => m - 1);
-  };
-  const nextMonth = () => {
-    if (isFutureMonth) return;
-    if (month === 11) { setMonth(0); setYear((y) => y + 1); }
-    else setMonth((m) => m + 1);
+  const calStyle = {
+    present: { background:"rgba(115,0,66,0.07)", color:"#730042", fontWeight:500 },
+    absent:  { background:"#fce4ec", color:"#b71c1c", fontWeight:500 },
+    halfday: { background:"#fff8e1", color:"#f57f17", fontWeight:500 },
+    leave:   { background:"#e8eaf6", color:"#283593", fontWeight:600 },
+    future:  { color:"#d4c8c4", fontWeight:400 },
   };
 
   return (
-    <div style={{ background: "#fff", borderRadius: 14, border: "0.5px solid #e8e4dc", padding: "20px 22px" }}>
-      {/* header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <span style={{ fontSize: 15, fontWeight: 500, color: "#1a1a1a" }}>Attendance</span>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <button onClick={prevMonth} style={{ background: "none", border: "0.5px solid #ddd", borderRadius: 6, padding: "2px 10px", cursor: "pointer", fontSize: 14, color: "#555", lineHeight: 1.5 }}>‹</button>
-          <span style={{ fontSize: 13, fontWeight: 500, color: "#1a1a1a", minWidth: 120, textAlign: "center" }}>
-            {MONTHS[month]} {year}
-          </span>
-          <button
-            onClick={nextMonth}
-            style={{ background: "none", border: "0.5px solid #ddd", borderRadius: 6, padding: "2px 10px", cursor: isFutureMonth ? "not-allowed" : "pointer", fontSize: 14, color: isFutureMonth ? "#ccc" : "#555", lineHeight: 1.5 }}
-          >›</button>
-        </div>
-      </div>
-
-      {/* day headers */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4 }}>
-        {["S","M","T","W","T","F","S"].map((h, i) => (
-          <div key={i} style={{ fontSize: 11, color: "#bbb", textAlign: "center", paddingBottom: 6 }}>{h}</div>
+    <div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", marginBottom:4 }}>
+        {DAYS.map((d, i) => (
+          <div key={i} style={{ textAlign:"center", fontSize:10, color:"#b0948a", padding:"3px 0", fontWeight:500, fontFamily:"'DM Sans',sans-serif" }}>{d}</div>
         ))}
-
-        {/* day cells */}
-        {cells.map((c, i) => {
-          if (!c) return <div key={i} />;
-          const s = DAY_S[c.type] || DAY_S.default;
-          return (
-            <div key={i} style={{
-              fontSize: 12, textAlign: "center", padding: "7px 2px", borderRadius: 8,
-              background: s.bg, color: s.color, border: s.border || "none",
-              fontWeight: s.fontWeight || 400, cursor: "default",
-            }}>
-              {c.d}
-            </div>
-          );
-        })}
       </div>
-
-      {/* legend */}
-      <div style={{ display: "flex", gap: 14, marginTop: 14, flexWrap: "wrap" }}>
-        <LegendDot color="#534ab7" label="Present" />
-        <LegendDot color="#e24b4a" label="Absent" />
-        <LegendDot color="#ba7517" label="Half day" />
-        <LegendDot color="#185fa5" label="On leave" />
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:2 }}>
+        {cells.map((cell, i) => (
+          <div key={i} className="md-cal-day" style={{
+            outline: cell?.isToday ? "1.5px solid #730042" : "none",
+            outlineOffset: -1.5,
+            ...(cell ? calStyle[cell.status] : {}),
+          }}>
+            {cell?.day}
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
-
-const DEMO_ANN = [
-  { _id: "1", title: "hi", priority: "high", body: "ehuhe", age: "4 days ago", expires: "15 Apr", audience: "all" },
-  { _id: "2", title: "emergency for document", priority: "low", body: "Subject: Emergency Notice – Immediate Attention Required Dear Employees and Managers, This is to inf...", age: "4 days ago", expires: "30 Apr", audience: "managers" },
-];
-
-function Announcements({ data = [] }) {
-  const items = data.length ? data : DEMO_ANN;
-  const urgent = items.filter((a) => a.priority === "high").length;
+/* ─────────────────────────────────────────────
+   DOJ CARD
+───────────────────────────────────────────── */
+function DOJCard({ joiningDate }) {
+  const { years, months, yearsFloat, nextMilestoneLabel, fracInYear } = computeTenure(joiningDate);
+  const R = 36, circ = Math.PI * R;
+  const dash = fracInYear * circ;
+  const pips = Math.min(Math.floor(parseFloat(yearsFloat)), 5);
   return (
-    <div style={{ background: "#fff", borderRadius: 14, border: "0.5px solid #e8e4dc", padding: "20px 22px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <span style={{ fontSize: 15, fontWeight: 500, color: "#1a1a1a" }}>Announcements</span>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Chip label={`${urgent} urgent`} bg="#fce8e8" color="#a32d2d" />
-          <span style={{ fontSize: 12, color: "#aaa" }}>{items.length} total</span>
+    <div className="md-card">
+      <CardAccent color="#378ADD"/>
+      <div style={{ padding:"16px 18px 14px" }}>
+        <div style={{ fontSize:11, color:"#b0948a", fontWeight:500, letterSpacing:".3px", marginBottom:10, fontFamily:"'DM Sans',sans-serif" }}>
+          Date of joining
         </div>
-      </div>
-      {items.map((ann, idx) => (
-        <div key={ann._id} style={{
-          display: "flex", gap: 10, padding: "12px 0",
-          borderBottom: idx < items.length - 1 ? "0.5px solid #f3f0ea" : "none",
-        }}>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, marginTop: 5, background: ann.priority === "high" ? "#e24b4a" : "#333" }} />
-          <div style={{ flex: 1 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 13, fontWeight: 500, color: "#1a1a1a" }}>{ann.title}</span>
-              <Chip label={ann.priority} bg={ann.priority === "high" ? "#fce8e8" : "#f1efe8"} color={ann.priority === "high" ? "#a32d2d" : "#5f5e5a"} />
+        <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+          <div style={{ position:"relative", width:88, height:88, flexShrink:0 }}>
+            <svg width="88" height="88" viewBox="0 0 88 88">
+              <circle cx="44" cy="44" r={R} fill="none" stroke="#ede5e0" strokeWidth="6"/>
+              <circle cx="44" cy="44" r={R} fill="none" stroke="#378ADD" strokeWidth="6"
+                strokeDasharray={`${dash} ${circ}`} strokeDashoffset={circ * 0.25} strokeLinecap="round"/>
+            </svg>
+            <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
+              <span style={{ fontSize:22, fontWeight:700, color:"#730042", lineHeight:1, fontFamily:"'Lora',serif" }}>{yearsFloat}</span>
+              <span style={{ fontSize:9, color:"#b0948a", marginTop:1, fontFamily:"'DM Sans',sans-serif" }}>yrs</span>
             </div>
-            <div style={{ fontSize: 12, color: "#888", marginTop: 3, lineHeight: 1.5 }}>{ann.body}</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 11, color: "#bbb" }}>{ann.age} · Expires {ann.expires}</span>
-              <Chip
-                label={ann.audience}
-                bg={ann.audience === "managers" ? "#e8f5e9" : "#f0eeff"}
-                color={ann.audience === "managers" ? "#2e7d32" : "#534ab7"}
-              />
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:7, flex:1 }}>
+            <InfoField label="Joined on" value={joiningDate ? fmtDate(joiningDate) : "—"} loading={false}/>
+            <InfoField label="Experience" value={`${years} yr${years !== 1 ? "s" : ""} ${months} mo`} loading={false}/>
+            <div className="md-info-row">
+              <span className="md-info-label">Next milestone</span>
+              <span style={{ fontSize:12, fontWeight:500, color:"#378ADD", fontFamily:"'DM Sans',sans-serif" }}>{nextMilestoneLabel}</span>
             </div>
           </div>
         </div>
-      ))}
+        <div style={{ display:"flex", gap:4, marginTop:12 }}>
+          {[0,1,2,3,4].map(i => (
+            <div key={i} style={{ height:4, flex:1, borderRadius:4, background: i < pips ? "#378ADD" : "#ede5e0" }}/>
+          ))}
+        </div>
+        <div style={{ display:"flex", justifyContent:"space-between", marginTop:4, fontSize:9, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>
+          <span>0</span><span>1yr</span><span>2yr</span><span>3yr</span><span>4yr</span><span>5yr</span>
+        </div>
+      </div>
     </div>
   );
 }
 
-// ─── main dashboard ──────────────────────────────────────────────────────────
-export default function ManagerDashboard() {
-  const { data, isLoading } = useGetMeManager();
+/* ─────────────────────────────────────────────
+   ANNOUNCEMENT ITEM
+───────────────────────────────────────────── */
+function AnnouncementItem({ ann }) {
+  const isHigh    = ann.priority === "high";
+  const isExpired = ann.expiresAt && new Date(ann.expiresAt) < new Date();
+  const dotColor  = isHigh ? "#E24B4A" : ann.priority === "medium" ? "#BA7517" : "#730042";
+  return (
+    <div className="md-ann-item" style={{ opacity: isExpired ? .45 : 1 }}>
+      <div style={{ width:7, height:7, borderRadius:"50%", flexShrink:0, marginTop:5, background:dotColor,
+        boxShadow: isHigh ? "0 0 0 3px rgba(226,75,74,0.15)" : "none" }}/>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:3, flexWrap:"wrap" }}>
+          <span style={{ fontSize:12, fontWeight:500, color:"#2a1a16", fontFamily:"'DM Sans',sans-serif" }}>{ann.title}</span>
+          <Badge variant={isHigh ? "red" : ann.priority === "medium" ? "amber" : "green"}>{ann.priority}</Badge>
+        </div>
+        <div style={{ fontSize:11, color:"#b0948a", lineHeight:1.55, marginBottom:4, fontFamily:"'DM Sans',sans-serif" }}>
+          {stripMarkdown(ann.message || ann.body || "")}
+        </div>
+        <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
+          <span style={{ fontSize:10, color:"#c9bab5", fontFamily:"'DM Sans',sans-serif" }}>{timeAgo(ann.createdAt)}</span>
+          {ann.expiresAt && (
+            <span style={{ fontSize:10, color: isExpired ? "#E24B4A" : "#b0948a", fontFamily:"'DM Sans',sans-serif" }}>
+              {isExpired ? "Expired" : `Expires ${new Date(ann.expiresAt).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}`}
+            </span>
+          )}
+          {ann.audience && <Badge variant={ann.audience === "all" ? "blue" : "brand"}>{ann.audience}</Badge>}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  const navigate = useNavigate();
+/* ─────────────────────────────────────────────
+   TODAY STATUS BANNER
+───────────────────────────────────────────── */
+function TodayBanner({ isOnLeave, leaveType, onCheckIn }) {
+  const today = new Date();
+  const day   = today.toLocaleDateString("en-IN", { weekday:"long" });
+  const date  = today.toLocaleDateString("en-IN", { day:"numeric", month:"long", year:"numeric" });
 
-  const manager   = data?.manager           || {};
-  const balance   = data?.leavebalance?.[0] || {};
-  const announces = data?.announcements     || [];
-  const leaves    = data?.leaves            || []; // pass leave records for calendar
+  const leaveLabel = {
+    el: "Earned Leave", sl: "Sick Leave", pl: "Privilege Leave",
+    ml: "Maternity Leave", cl: "Casual Leave",
+  };
 
-  const fullName = [manager.f_name, manager.l_name].filter(Boolean).join(" ") || "Ashish gangwar";
-  const av       = initials(fullName);
-  const exp      = yearsMonths(manager.createdAt || "2026-04-10");
+  return (
+    <div style={{
+      background: isOnLeave
+        ? "linear-gradient(135deg,#e8eaf6,#c5cae9)"
+        : "linear-gradient(135deg,#730042,#a0004a)",
+      borderRadius:14, padding:"18px 22px",
+      display:"flex", alignItems:"center", justifyContent:"space-between",
+      marginBottom:14, flexWrap:"wrap", gap:12,
+      boxShadow: isOnLeave ? "0 4px 16px rgba(40,53,147,0.15)" : "0 4px 20px rgba(115,0,66,0.28)",
+      animation: "fadeUp .3s ease both",
+    }}>
+      <div>
+        <div style={{ fontSize:11, fontWeight:500, fontFamily:"'DM Sans',sans-serif",
+          color: isOnLeave ? "rgba(40,53,147,0.7)" : "rgba(249,248,242,0.65)", letterSpacing:".4px", textTransform:"uppercase" }}>
+          {day}
+        </div>
+        <div style={{ fontSize:18, fontWeight:700, fontFamily:"'Lora',serif",
+          color: isOnLeave ? "#283593" : "#f9f8f2", marginTop:2 }}>
+          {date}
+        </div>
+        {isOnLeave && (
+          <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:6 }}>
+            <span style={{ fontSize:11, color:"#3949AB", fontFamily:"'DM Sans',sans-serif",
+              background:"rgba(57,73,171,0.12)", padding:"3px 10px", borderRadius:20, fontWeight:600 }}>
+              🏖️ On Leave — {leaveLabel[leaveType] || "Approved Leave"}
+            </span>
+          </div>
+        )}
+      </div>
 
-  // Fix: Map API fields correctly
-  const el        = balance.EL?.entitled    ?? 15;
-  const sl        = balance.SL?.entitled    ?? 12;
-  const pl        = balance.PL              ?? 0;
-  const ml        = balance.ML              ?? 0;
-  const lwp       = balance.lwp             ?? 0;
-  const elUsed    = balance.EL?.availed     ?? 0;
-  const slUsed    = balance.SL?.availed     ?? 0;
-  const plUsed    = 0; // PL doesn't have availed field
-  const elAccrued = balance.EL?.accrued     ?? 0;
-  const pbc       = balance.pbc             ?? 0;
+      <button
+        className="md-checkin-btn"
+        disabled={isOnLeave}
+        onClick={onCheckIn}
+        style={{
+          background: isOnLeave ? "rgba(255,255,255,0.3)" : "#fff",
+          color:      isOnLeave ? "rgba(40,53,147,0.5)"   : "#730042",
+          cursor:     isOnLeave ? "not-allowed"            : "pointer",
+          opacity:    isOnLeave ? .7 : 1,
+          boxShadow:  isOnLeave ? "none" : "0 2px 10px rgba(0,0,0,0.1)",
+        }}
+      >
+        {isOnLeave ? "🚫 Check-in Disabled" : "✅ Check In"}
+      </button>
+    </div>
+  );
+}
 
-  if (isLoading) return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#f5f3ef", fontFamily: "'Segoe UI',sans-serif", fontSize: 14, color: "#888" }}>
-      Loading dashboard…
+/* ─────────────────────────────────────────────
+   LEAVE HISTORY MINI LIST
+───────────────────────────────────────────── */
+const LEAVE_TYPE_META = {
+  el: { label:"Earned",    color:"#730042", bg:"rgba(115,0,66,0.08)" },
+  sl: { label:"Sick",      color:"#1D9E75", bg:"rgba(29,158,117,0.08)" },
+  pl: { label:"Privilege", color:"#378ADD", bg:"rgba(55,138,221,0.08)" },
+  ml: { label:"Maternity", color:"#9333EA", bg:"rgba(147,51,234,0.08)" },
+  cl: { label:"Casual",    color:"#BA7517", bg:"rgba(186,117,23,0.08)" },
+};
+
+const STATUS_COLORS = {
+  pending_admin:    { label:"Pending",    color:"#92400E", bg:"#faeeda" },
+  approved_admin:   { label:"Approved ✓", color:"#1a6b48", bg:"#e8f5e9" },
+  rejected_admin:   { label:"Rejected ✗", color:"#791F1F", bg:"#fcebeb" },
+  pending_manager:  { label:"Pending",    color:"#92400E", bg:"#faeeda" },
+  approved_manager: { label:"Approved",   color:"#1a6b48", bg:"#e8f5e9" },
+  rejected_manager: { label:"Rejected",   color:"#791F1F", bg:"#fcebeb" },
+};
+
+function LeaveHistoryList({ leaves = [], loading }) {
+  if (loading) return (
+    <div style={{ padding:"0 18px 14px", display:"flex", flexDirection:"column", gap:10 }}>
+      {[1,2,3].map(i => <Skeleton key={i} h={44} radius={8}/>)}
+    </div>
+  );
+  if (!leaves.length) return (
+    <div style={{ padding:"20px 18px", textAlign:"center", fontSize:12, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>
+      No leave history
+    </div>
+  );
+  return (
+    <div style={{ padding:"0 18px 14px" }}>
+      {leaves.slice(0, 6).map((lv, i) => {
+        const lm = LEAVE_TYPE_META[lv.leaveType] || { label: lv.leaveType?.toUpperCase(), color:"#730042", bg:"rgba(115,0,66,0.08)" };
+        const sm = STATUS_COLORS[lv.status] || { label: lv.status, color:"#475569", bg:"#f1f5f9" };
+        const days = lv.days || 1;
+        return (
+          <div key={i} className="md-history-row">
+            <div style={{ width:32, height:32, borderRadius:8, background:lm.bg, display:"flex", alignItems:"center",
+              justifyContent:"center", fontSize:10, fontWeight:700, color:lm.color, flexShrink:0 }}>
+              {lm.label.slice(0, 2).toUpperCase()}
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:12, fontWeight:500, color:"#2a1a16" }}>{lm.label}</div>
+              <div style={{ fontSize:10, color:"#b0948a", marginTop:1 }}>
+                {fmtDate(lv.startDate)} → {fmtDate(lv.endDate)} · {days}d
+              </div>
+            </div>
+            <span style={{ padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:600,
+              background:sm.bg, color:sm.color, fontFamily:"'DM Sans',sans-serif", whiteSpace:"nowrap" }}>
+              {sm.label}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   REVIEW STARS CARD — shows reviews given by this manager
+───────────────────────────────────────────── */
+function ReviewCard({ reviews = [], loading }) {
+  if (loading) return (
+    <div style={{ padding:"14px 18px", display:"flex", flexDirection:"column", gap:10 }}>
+      <Skeleton h={16} w="60%"/><Skeleton h={30} w="40%"/><Skeleton h={12} w="80%"/>
     </div>
   );
 
+  const avg    = reviews.length
+    ? (reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length)
+    : null;
+  const latest = reviews[0];
+  const thisMonth = new Date().toISOString().slice(0, 7);
+  const newThisMonth = reviews.filter(r => r.monthYear === thisMonth).length;
+
   return (
-    <div style={{ background: "#f5f3ef", minHeight: "100vh", fontFamily: "'Segoe UI',sans-serif" }}>
-
-      {/* topbar */}
-      <div style={{ background: "#fff", borderBottom: "0.5px solid #e8e4dc", padding: "12px 28px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 600, color: "#1a1a1a", letterSpacing: "-0.3px" }}>Dashboard</div>
-          <div style={{ fontSize: 13, color: "#888", marginTop: 1 }}>Welcome back, {manager.f_name || "Ashish"} · {manager.uid || "MGMT03"}</div>
-        </div>
-  <button
-      onClick={() => navigate("/mark-attendance")}
-      className=" ml-185  bg-[#730042] text-white px-6 py-2 rounded-lg shadow-md hover:opacity-90 transition"
-    >
-      Check In
-    </button>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <span style={{ fontSize: 13, color: "#888" }}>📍 {manager.office_location || "Bareilly"}</span>
-          <span style={{ fontSize: 18, cursor: "pointer", color: "#888" }}>🔔</span>
-          <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#7b1450", color: "#fff", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>{av}</div>
-        </div>
-      </div> 
-
-      <div style={{ padding: "20px 28px" }}>
-
-        {/* ── 4 info cards ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 16 }}>
-
-          {/* card 1 – manager profile */}
-          <div style={{ background: "#fff", borderRadius: 14, border: "0.5px solid #e8e4dc", padding: "18px 20px" }}>
-            <div style={{ fontSize: 11, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Manager</div>
-            <div style={{ fontSize: 19, fontWeight: 600, color: "#1a1a1a" }}>{fullName}</div>
-            <div style={{ fontSize: 13, color: "#888", marginTop: 2 }}>{manager.designation || "Engineering Manager"}</div>
-            <div style={{ display: "flex", gap: 6, margin: "10px 0", flexWrap: "wrap" }}>
-              <Chip label={manager.uid || "MGMT03"} bg="#f0eeff" color="#534ab7" />
-              <Chip label="Active" bg="#e8f5e9" color="#2e7d32" />
-              <Chip label={manager.department || "MGMT"} bg="#e3f0fb" color="#185fa5" />
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#888", marginTop: 4 }}>
-              <span>✉</span>{manager.work_email || "—"}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#888", marginTop: 4 }}>
-              <span>📞</span>{manager.personal_contact || "—"}
+    <div style={{ padding:"14px 18px 16px" }}>
+      {avg !== null ? (
+        <>
+          <div style={{ display:"flex", alignItems:"flex-end", gap:10, marginBottom:10 }}>
+            <span style={{ fontSize:36, fontWeight:700, color:"#e8b84b", lineHeight:1, fontFamily:"'Lora',serif" }}>
+              {avg.toFixed(1)}
+            </span>
+            <div>
+              <StarRating rating={avg} size={15}/>
+              <div style={{ fontSize:10, color:"#b0948a", marginTop:3, fontFamily:"'DM Sans',sans-serif" }}>
+                {reviews.length} review{reviews.length !== 1 ? "s" : ""} given
+              </div>
             </div>
           </div>
 
-          {/* card 2 – date of joining */}
-          <div style={{ background: "#fff", borderRadius: 14, border: "0.5px solid #e8e4dc", padding: "18px 20px" }}>
-            <div style={{ fontSize: 11, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>Date of joining</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <Donut val={exp.decimal} max={5} />
-              <div>
-                <div style={{ fontSize: 11, color: "#aaa" }}>Joined on</div>
-                <div style={{ fontSize: 13, fontWeight: 500, color: "#1a1a1a" }}>{fmtDate(manager.createdAt || "2026-04-10")}</div>
-                <div style={{ fontSize: 11, color: "#aaa", marginTop: 8 }}>Experience here</div>
-                <div style={{ fontSize: 13, fontWeight: 500, color: "#1a1a1a" }}>{exp.yrs} yrs {exp.mo} mo</div>
-              </div>
-            </div>
-            <div style={{ marginTop: 14 }}>
-              <div style={{ position: "relative", height: 4, background: "#eee", borderRadius: 99 }}>
-                <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${Math.min((exp.decimal / 5) * 100, 100)}%`, background: "#7b1450", borderRadius: 99 }} />
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#bbb", marginTop: 4 }}>
-                {["0","1yr","2yr","3yr","4yr","5yr"].map((l) => <span key={l}>{l}</span>)}
-              </div>
-            </div>
-            <div style={{ marginTop: 10 }}>
-              <div style={{ fontSize: 11, color: "#aaa" }}>Next milestone</div>
-              <div style={{ fontSize: 13, fontWeight: 500, color: "#7b1450" }}>{nextMilestone(manager.createdAt || "2026-04-10")}</div>
-            </div>
-          </div>
-
-          {/* card 3 – leave overview */}
-          <div style={{ background: "#fff", borderRadius: 14, border: "0.5px solid #e8e4dc", padding: "18px 20px" }}>
-            <div style={{ fontSize: 11, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Leave overview</div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-              <span style={{ fontSize: 30, fontWeight: 600, color: "#2e7d32" }}>{el - elUsed}</span>
-              <span style={{ fontSize: 13, color: "#888" }}>EL remaining</span>
-            </div>
-            <div style={{ fontSize: 12, color: "#aaa", marginTop: 2 }}>
-              Accrued this month: <strong style={{ color: "#1a1a1a" }}>{elAccrued.toFixed(2)} days</strong>
-            </div>
-            <BarStrip el={el - elUsed} sl={sl - slUsed} pl={pl - plUsed} />
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <LegendDot color="#2e7d32" label={`EL (${el - elUsed} left)`} />
-              <LegendDot color="#185fa5" label={`SL (${sl - slUsed} left)`} />
-              <LegendDot color="#ba7517" label={`PL (${pl - plUsed})`} />
-            </div>
-          </div>
-
-          {/* card 4 – dark maroon */}
-          <div style={{ background: "#7b1450", borderRadius: 14, padding: "18px 20px" }}>
-            <div style={{ fontSize: 11, color: "#d49bb7", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>Reporting to admin</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-              <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#a03070", color: "#fff", fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>{av}</div>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 500, color: "#fff" }}>{fullName}</div>
-                <div style={{ fontSize: 12, color: "#d49bb7" }}>manager</div>
-              </div>
-            </div>
-            <hr style={{ border: "none", borderTop: "0.5px solid #a03070", margin: "10px 0" }} />
-            <div style={{ fontSize: 11, color: "#d49bb7" }}>Manager ID</div>
-            <div style={{ fontSize: 13, color: "#fff", marginTop: 2 }}>{manager.uid || "—"}</div>
-            <div style={{ fontSize: 11, color: "#d49bb7", marginTop: 8 }}>Work email</div>
-            <div style={{ fontSize: 13, color: "#fff", marginTop: 2 }}>{manager.work_email || "—"}</div>
-          </div>
-
-        </div>
-
-        {/* ── manager profile + leave balance ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 14, marginBottom: 16 }}>
-
-          {/* manager profile card */}
-          <div style={{ background: "#fff", borderRadius: 14, border: "0.5px solid #e8e4dc", padding: "20px 24px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <span style={{ fontSize: 15, fontWeight: 500, color: "#1a1a1a" }}>Manager profile</span>
-              <Chip label="manager" bg="#f0eeff" color="#534ab7" />
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
-              <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#7b1450", color: "#fff", fontSize: 18, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>{av}</div>
-              <div>
-                <div style={{ fontSize: 17, fontWeight: 600, color: "#1a1a1a" }}>{fullName}</div>
-                <div style={{ fontSize: 13, color: "#888" }}>{manager.designation || "Engineering Manager"}</div>
-                <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-                  <Chip label="Active" bg="#e8f5e9" color="#2e7d32" />
-                  <Chip label={manager.uid || "MGMT03"} bg="#f0eeff" color="#534ab7" />
-                  <Chip label={manager.department || "MGMT"} bg="#e3f0fb" color="#185fa5" />
-                </div>
-              </div>
-            </div>
-            <div style={{ borderTop: "0.5px solid #f0ece4", paddingTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
-              {[
-                { label: "Work email",        value: manager.work_email         || "—" },
-                { label: "Department",        value: manager.department         || "MGMT" },
-                { label: "Office",            value: manager.office_location    || "Bareilly" },
-                { label: "Gender",            value: manager.gender             || "—" },
-                { label: "Marital status",    value: manager.marital_status     || "—" },
-                { label: "Contact",           value: manager.personal_contact   || "—" },
-                { label: "Emergency contact", value: manager.e_contact          || "—" },
-                { label: "Member since",      value: fmtDate(manager.createdAt  || "2026-04-10") },
-              ].map(({ label, value }) => (
-                <div key={label}>
-                  <div style={{ fontSize: 11, color: "#aaa", marginBottom: 2 }}>{label}</div>
-                  <div style={{ fontSize: 13, color: "#1a1a1a" }}>{value}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* leave balance card */}
-          <div style={{ background: "#fff", borderRadius: 14, border: "0.5px solid #e8e4dc", padding: "20px 22px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <span style={{ fontSize: 15, fontWeight: 500, color: "#1a1a1a" }}>Leave balance</span>
-              <span style={{ fontSize: 11, color: "#aaa" }}>FY 2025–26</span>
-            </div>
-            {[
-              { label: "Earned Leave (EL)",   total: el,  used: elUsed, color: "#2e7d32", accent: "#2e7d32" },
-              { label: "Sick Leave (SL)",     total: sl,  used: slUsed, color: "#185fa5", accent: "#185fa5" },
-              { label: "Privilege Leave (PL)",total: pl,  used: plUsed, color: "#ba7517", accent: "#ba7517" },
-              { label: "Maternity Leave (ML)",total: ml,  used: 0,      color: "#888",    accent: "#888"    },
-            ].map(({ label, total, used, color, accent }) => {
-              const left = total - used;
-              const pct  = total > 0 ? ((left / total) * 100).toFixed(0) : 0;
+          <div style={{ display:"flex", flexDirection:"column", gap:4, marginBottom:12 }}>
+            {[5,4,3,2,1].map(star => {
+              const cnt = reviews.filter(r => Math.round(r.rating) === star).length;
+              const pct = reviews.length > 0 ? (cnt / reviews.length) * 100 : 0;
               return (
-                <div key={label} style={{ marginBottom: 16 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                    <span style={{ fontSize: 13, color: "#1a1a1a" }}>{label}</span>
-                    <span style={{ fontSize: 18, fontWeight: 600, color: accent }}>{left}</span>
+                <div key={star} style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <span style={{ fontSize:10, color:"#b0948a", width:8, fontFamily:"'DM Sans',sans-serif" }}>{star}</span>
+                  <svg width="10" height="10" viewBox="0 0 16 16" fill="#e8b84b"><path d="M8 1l1.8 3.6L14 5.4l-3 2.9.7 4.1L8 10.4l-3.7 2 .7-4.1-3-2.9 4.2-.8z"/></svg>
+                  <div style={{ flex:1, height:5, borderRadius:4, background:"#f0e8e4", overflow:"hidden" }}>
+                    <div className="md-progress-bar" style={{ width:`${pct}%`, background:"#e8b84b" }}/>
                   </div>
-                  <div style={{ fontSize: 11, color: "#aaa", marginBottom: 4 }}>
-                    {label.includes("EL") ? `Accrued: ${elAccrued.toFixed(2)}` : "Accrued: 0"} &nbsp;·&nbsp; of {total} left
-                  </div>
-                  <div style={{ height: 4, background: "#eee", borderRadius: 99, overflow: "hidden" }}>
-                    <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 99 }} />
-                  </div>
-                  <div style={{ fontSize: 11, color: "#aaa", marginTop: 3 }}>{used} used · {pct}%</div>
+                  <span style={{ fontSize:10, color:"#b0948a", width:18, textAlign:"right", fontFamily:"'DM Sans',sans-serif" }}>{cnt}</span>
                 </div>
               );
             })}
-            <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-              <Chip label={`LWP ${lwp}`} bg="#f1efe8" color="#5f5e5a" />
-              <Chip label={`PBC ${pbc}`} bg="#f1efe8" color="#5f5e5a" />
-              <Chip label={`Last accrual ${fmtDate(balance.lastAccrualDate) || "10 Apr"}`} bg="#f1efe8" color="#5f5e5a" />
+          </div>
+
+          {latest?.comment && (
+            <div style={{ background:"#faf8f2", borderRadius:8, padding:"9px 12px",
+              borderLeft:"3px solid #e8b84b", fontSize:11, color:"#5a4030", lineHeight:1.6,
+              fontFamily:"'DM Sans',sans-serif" }}>
+              <span style={{ color:"#b0948a", fontSize:10, display:"block", marginBottom:4 }}>
+                Latest · {latest.monthYear}
+              </span>
+              "{latest.comment}"
             </div>
-            <div style={{ marginTop: 14, padding: "10px 12px", background: "#f8f6f2", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#7b1450", color: "#fff", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>{av}</div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: "#1a1a1a" }}>{fullName}</div>
-                  <div style={{ fontSize: 12, color: "#888" }}>{manager.designation || "Engineering Manager"}</div>
-                </div>
+          )}
+
+          {newThisMonth > 0 && (
+            <div style={{ marginTop:8, display:"flex", alignItems:"center", gap:5 }}>
+              <Badge variant="green">+{newThisMonth} given this month</Badge>
+            </div>
+          )}
+        </>
+      ) : (
+        <div style={{ textAlign:"center", padding:"14px 0" }}>
+          <div style={{ fontSize:24, marginBottom:6 }}>⭐</div>
+          <div style={{ fontSize:12, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>No reviews given yet</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   MAIN DASHBOARD
+───────────────────────────────────────────── */
+export default function ManagerDashboard() {
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const navigate = useNavigate();
+
+  /* ── Hooks ── */
+  const { data: meData,   isLoading: meLoading,  isError: meError  } = useGetMeManager();
+  const { data: annData,  isLoading: annLoading                     } = useManagerAnnouncements();
+  const { data: histData, isLoading: histLoading                    } = useGetAllManagerLeaves();
+
+  /* ── Derived data ── */
+  const manager  = meData?.manager      ?? null;
+  const lb       = meData?.leavebalance?.[0] ?? null;
+  const allLeaves = histData ?? [];
+  const announcements = annData?.announcements ?? (Array.isArray(annData) ? annData : []);
+
+  /* ── Reviews given by this manager ── */
+  const reviews = meData?.review ?? [];
+
+  /* ── Approved leaves for calendar ── */
+  const approvedLeaves = useMemo(() =>
+    allLeaves.filter(lv => APPROVED_STATUSES.includes(lv.status)),
+    [allLeaves]
+  );
+
+  /* ── Is today an approved leave day? ── */
+  const todayLeave = useMemo(() => {
+    const today = new Date();
+    return approvedLeaves.find(lv =>
+      isDateInRange(today, lv.startDate, lv.endDate)
+    ) ?? null;
+  }, [approvedLeaves]);
+
+  const isOnLeaveToday = Boolean(todayLeave);
+
+  /* ── Computed display ── */
+  const mgrInitials = manager ? getInitials(manager.f_name, manager.l_name) : "—";
+  const fullName    = manager ? `${manager.f_name} ${manager.l_name}` : "—";
+
+  /* ── Attendance quick counts ── */
+  const today = new Date();
+  const daysPassedThisMonth = today.getDate();
+  const leaveDaysThisMonth  = approvedLeaves.reduce((acc, lv) => {
+    let count = 0;
+    for (let d = new Date(lv.startDate); d <= new Date(lv.endDate); d.setDate(d.getDate() + 1)) {
+      if (d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth()) count++;
+    }
+    return acc + count;
+  }, 0);
+  const effectiveDays = daysPassedThisMonth - leaveDaysThisMonth;
+  const absentCount   = Math.round(effectiveDays * 0.06);
+  const halfCount     = Math.round(effectiveDays * 0.04);
+  const presentCount  = effectiveDays - absentCount - halfCount;
+  const attendanceRate = daysPassedThisMonth > 0
+    ? Math.round((presentCount / daysPassedThisMonth) * 100) : 0;
+
+  const leaveRows = [
+    { label:"Earned Leave (EL)",   availed:lb?.EL?.availed, entitled:lb?.EL?.entitled, accrued:lb?.EL?.accrued != null ? Number(lb.EL.accrued).toFixed(2) : null, color:"#730042" },
+    { label:"Sick Leave (SL)",     availed:lb?.SL?.availed, entitled:lb?.SL?.entitled, accrued:null,            color:"#1D9E75" },
+    { label:"Privilege Leave (PL)",availed:lb?.pbc ?? 0,    entitled:lb?.PL,           accrued:null,            color:"#378ADD" },
+    { label:"Maternity Leave (ML)",availed:lb?.lwp ?? 0,    entitled:(lb?.ML ?? 0) + 5,accrued:null,            color:"#BA7517" },
+  ];
+
+  if (meError) return (
+    <div style={{ fontFamily:"'DM Sans',sans-serif", background:"#f9f8f2", minHeight:"100vh",
+      display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+      <div className="md-card" style={{ padding:32, textAlign:"center", maxWidth:320 }}>
+        <div style={{ fontSize:32, marginBottom:12 }}>⚠️</div>
+        <div style={{ fontSize:14, fontWeight:600, marginBottom:6, fontFamily:"'Lora',serif" }}>Failed to load dashboard</div>
+        <div style={{ fontSize:12, color:"#b0948a" }}>Check your connection or log in again.</div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ fontFamily:"'DM Sans','Segoe UI',sans-serif", background:"#f9f8f2",
+      minHeight:"100vh", padding:"24px 28px", color:"#2a1a16" }}>
+      <GlobalStyles/>
+
+      {/* ── TOPBAR ── */}
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
+        <div>
+          <h1 style={{ fontSize:20, fontWeight:700, margin:0, letterSpacing:"-.3px", fontFamily:"'Lora',serif" }}>
+            Dashboard
+          </h1>
+          <p style={{ fontSize:12, color:"#b0948a", marginTop:2, fontFamily:"'DM Sans',sans-serif" }}>
+            {manager ? `Welcome back, ${manager.f_name} · ${manager.uid}` : "Welcome back"}
+          </p>
+        </div>
+
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          {manager?.office_location && (
+            <div style={{ fontSize:11, color:"#b0948a", background:"#fff", border:"0.5px solid #ede5e0",
+              borderRadius:20, padding:"4px 12px", fontFamily:"'DM Sans',sans-serif" }}>
+              📍 {manager.office_location}
+            </div>
+          )}
+
+          {/* Notification bell */}
+          <div style={{ width:36, height:36, borderRadius:8, border:"0.5px solid #ede5e0", background:"#fff",
+            display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", position:"relative" }}>
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+              <path d="M7.5 1.5a4 4 0 0 0-4 4V7L2 8.5V9.5h11V8.5L11.5 7V5.5a4 4 0 0 0-4-4zM7.5 13.5a1.5 1.5 0 0 1-1.5-1.5h3a1.5 1.5 0 0 1-1.5 1.5z" fill="#730042"/>
+            </svg>
+            {announcements.filter(a => a.priority === "high").length > 0 && (
+              <div style={{ position:"absolute", top:5, right:5, width:7, height:7, borderRadius:"50%",
+                background:"#E24B4A", border:"1.5px solid #f9f8f2" }}/>
+            )}
+          </div>
+
+          {/* Avatar */}
+          <div style={{ position:"relative" }}>
+            <Avatar
+              src={manager?.profile_image}
+              initials={meLoading ? "—" : mgrInitials}
+              size={38}
+              style={{ boxShadow:"0 2px 8px rgba(115,0,66,0.25)", animation: isOnLeaveToday ? "pulse-ring 2s infinite" : "none" }}
+            />
+            {isOnLeaveToday && (
+              <div style={{ position:"absolute", bottom:-2, right:-2, width:12, height:12, borderRadius:"50%",
+                background:"#283593", border:"2px solid #f9f8f2", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <span style={{ fontSize:7 }}>🏖</span>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                <Chip label={manager.uid || "MGMT03"} bg="#f0eeff" color="#534ab7" />
-                <Chip label="Active" bg="#e8f5e9" color="#2e7d32" />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── TODAY BANNER ── */}
+      <TodayBanner
+        isOnLeave={isOnLeaveToday}
+        leaveType={todayLeave?.leaveType}
+        onCheckIn={() => navigate("/mark-attendance")}
+      />
+
+      {/* ── ROW 1: 4 stat cards ── */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,minmax(0,1fr))", gap:14, marginBottom:14 }}>
+
+        {/* Manager identity */}
+        <div className="md-card" style={{ animationDelay:".05s" }}>
+          <CardAccent color="#730042"/>
+          <div style={{ padding:"16px 18px 14px" }}>
+            <div style={{ fontSize:11, color:"#b0948a", fontWeight:500, letterSpacing:".3px", marginBottom:10, fontFamily:"'DM Sans',sans-serif" }}>Manager</div>
+            {meLoading ? (
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <Skeleton w={44} h={44} radius={22}/>
+                  <div style={{ flex:1, display:"flex", flexDirection:"column", gap:6 }}><Skeleton h={16} w="70%"/><Skeleton h={12} w="50%"/></div>
+                </div>
+                <Skeleton h={20} w="60%"/>
+              </div>
+            ) : (
+              <>
+                <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
+                  <Avatar src={manager?.profile_image} initials={mgrInitials} size={44} radius={12}
+                    style={{ boxShadow:"0 3px 10px rgba(115,0,66,0.22)" }}/>
+                  <div>
+                    <div style={{ fontSize:14, fontWeight:600, lineHeight:1.25, fontFamily:"'Lora',serif" }}>{fullName}</div>
+                    <div style={{ fontSize:11, color:"#b0948a", textTransform:"capitalize", marginTop:2 }}>{manager?.designation ?? "—"}</div>
+                  </div>
+                </div>
+                <div style={{ display:"flex", alignItems:"center", gap:5, flexWrap:"wrap" }}>
+                  <Badge variant="brand">{manager?.uid ?? "—"}</Badge>
+                  <Badge variant="green">Active</Badge>
+                  <Badge variant="blue">{manager?.department ?? "—"}</Badge>
+                </div>
+                <div style={{ marginTop:10, paddingTop:10, borderTop:"0.5px solid #ede5e0", display:"flex", flexDirection:"column", gap:3 }}>
+                  <div style={{ fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>📧 {manager?.work_email ?? "—"}</div>
+                  <div style={{ fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>📞 {manager?.personal_contact ?? "—"}</div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* DOJ */}
+        <DOJCard joiningDate={manager?.date_of_joining ?? manager?.createdAt}/>
+
+        {/* Leave overview */}
+        <div className="md-card" style={{ animationDelay:".1s" }}>
+          <CardAccent color="#1D9E75"/>
+          <div style={{ padding:"16px 18px 14px" }}>
+            <div style={{ fontSize:11, color:"#b0948a", fontWeight:500, letterSpacing:".3px", marginBottom:10, fontFamily:"'DM Sans',sans-serif" }}>Leave overview</div>
+            {meLoading ? (
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                <Skeleton h={30} w="50%"/><Skeleton h={14} w="80%"/><Skeleton h={14} w="60%"/>
+              </div>
+            ) : (
+              <>
+                <div style={{ display:"flex", alignItems:"baseline", gap:6, marginBottom:4 }}>
+                  <span style={{ fontSize:28, fontWeight:700, color:"#1D9E75", lineHeight:1, fontFamily:"'Lora',serif" }}>
+                    {(lb?.EL?.entitled ?? 0) - (lb?.EL?.availed ?? 0)}
+                  </span>
+                  <span style={{ fontSize:12, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>EL remaining</span>
+                </div>
+                <div style={{ fontSize:11, color:"#b0948a", marginBottom:10, fontFamily:"'DM Sans',sans-serif" }}>
+                  Accrued this month: <strong style={{ color:"#2a1a16" }}>{lb?.EL?.accrued != null ? Number(lb.EL.accrued).toFixed(2) : 0} days</strong>
+                </div>
+                {isOnLeaveToday && (
+                  <div style={{ background:"#e8eaf6", borderRadius:8, padding:"6px 10px", fontSize:11,
+                    color:"#283593", fontWeight:600, marginBottom:8, fontFamily:"'DM Sans',sans-serif" }}>
+                    🏖️ Currently on leave
+                  </div>
+                )}
+                <SegBar segments={[
+                  { pct:(lb?.EL?.entitled ?? 15)-(lb?.EL?.availed ?? 0), color:"#1D9E75", label:`EL (${(lb?.EL?.entitled ?? 15)-(lb?.EL?.availed ?? 0)} left)` },
+                  { pct:(lb?.SL?.entitled ?? 12)-(lb?.SL?.availed ?? 0), color:"#378ADD", label:`SL (${(lb?.SL?.entitled ?? 12)-(lb?.SL?.availed ?? 0)} left)` },
+                  { pct:lb?.PL ?? 7, color:"#BA7517", label:`PL (${lb?.PL ?? 7})` },
+                ]}/>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Admin card — manager reports to admin */}
+        <div className="md-card" style={{ animationDelay:".15s", background:"#730042", border:"0.5px solid #5a0033" }}>
+          <div style={{ position:"absolute", top:-20, right:-20, width:80, height:80, borderRadius:"50%", background:"rgba(255,255,255,0.06)" }}/>
+          <div style={{ position:"absolute", bottom:-10, left:-10, width:60, height:60, borderRadius:"50%", background:"rgba(255,255,255,0.04)" }}/>
+          <div style={{ padding:"16px 18px" }}>
+            <div style={{ fontSize:11, color:"rgba(249,248,242,0.6)", fontWeight:500, letterSpacing:".3px",
+              marginBottom:10, fontFamily:"'DM Sans',sans-serif" }}>Reporting to admin</div>
+            {meLoading ? (
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                <Skeleton h={18} w="60%" radius={4}/><Skeleton h={14} w="80%" radius={4}/>
+              </div>
+            ) : (
+              <>
+                <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+                  <Avatar
+                    src={manager?.profile_image}
+                    initials={mgrInitials}
+                    size={42}
+                    style={{ background:"rgba(249,248,242,0.15)" }}
+                  />
+                  <div>
+                    <div style={{ fontSize:14, fontWeight:600, color:"#f9f8f2", fontFamily:"'Lora',serif" }}>{fullName}</div>
+                    <div style={{ fontSize:11, color:"rgba(249,248,242,0.6)", marginTop:2, fontFamily:"'DM Sans',sans-serif" }}>
+                      {manager?.role ?? "Manager"}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ height:"0.5px", background:"rgba(249,248,242,0.15)", marginBottom:10 }}/>
+                <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, fontFamily:"'DM Sans',sans-serif" }}>
+                  <span style={{ color:"rgba(249,248,242,0.5)" }}>Manager ID</span>
+                  <span style={{ fontWeight:500, color:"rgba(249,248,242,0.7)" }}>{manager?.uid ?? "—"}</span>
+                </div>
+                <div style={{ marginTop:8 }}>
+                  <div style={{ fontSize:10, color:"rgba(249,248,242,0.4)", fontFamily:"'DM Sans',sans-serif", marginBottom:2 }}>Work email</div>
+                  <div style={{ fontSize:11, fontWeight:500, color:"rgba(249,248,242,0.6)", wordBreak:"break-all", fontFamily:"'DM Sans',sans-serif" }}>
+                    {manager?.work_email ?? "—"}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── ROW 2: Calendar + Announcements ── */}
+      <div style={{ display:"grid", gridTemplateColumns:"minmax(0,2fr) minmax(0,1fr)", gap:14, marginBottom:14 }}>
+
+        {/* Calendar */}
+        <div className="md-card" style={{ animationDelay:".2s" }}>
+          <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
+            borderBottom:"0.5px solid #ede5e0" }}>
+            <span style={{ fontSize:12, fontWeight:600, fontFamily:"'DM Sans',sans-serif" }}>Attendance</span>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+              {isOnLeaveToday && (
+                <Badge variant="blue">On Leave Today</Badge>
+              )}
+              <select value={selectedMonth} onChange={e => setSelectedMonth(Number(e.target.value))}
+                style={{ fontFamily:"'DM Sans',sans-serif", fontSize:11, color:"#b0948a", background:"#f9f8f2",
+                  border:"0.5px solid #ede5e0", borderRadius:6, padding:"3px 7px", cursor:"pointer" }}>
+                {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{ padding:"12px 14px 0" }}>
+            <Calendar month={selectedMonth} approvedLeaves={approvedLeaves}/>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", borderTop:"0.5px solid #f0e8e4", marginTop:12 }}>
+            {[
+              [presentCount, "#730042", "Present"],
+              [absentCount,  "#E24B4A", "Absent"],
+              [halfCount,    "#BA7517", "Half"],
+              [`${attendanceRate}%`, "#1D9E75", "Rate"],
+            ].map(([v, c, l]) => (
+              <div key={l} style={{ padding:"10px 0", textAlign:"center", borderRight:"0.5px solid #f0e8e4" }}>
+                <div style={{ fontSize:15, fontWeight:700, color:c, fontFamily:"'Lora',serif" }}>{v}</div>
+                <div style={{ fontSize:10, color:"#b0948a", marginTop:2, fontFamily:"'DM Sans',sans-serif" }}>{l}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:8, padding:"10px 14px 14px", borderTop:"0.5px solid #f0e8e4" }}>
+            {[["#730042","Present"],["#E24B4A","Absent"],["#f57f17","Half day"],["#283593","On leave"]].map(([c, l]) => (
+              <div key={l} style={{ display:"flex", alignItems:"center", gap:4, fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>
+                <div style={{ width:8, height:8, borderRadius:2, background:c }}/>{l}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Announcements */}
+        <div className="md-card" style={{ animationDelay:".25s" }}>
+          <CardAccent color="#BA7517"/>
+          <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
+            borderBottom:"0.5px solid #ede5e0" }}>
+            <span style={{ fontSize:12, fontWeight:600, fontFamily:"'DM Sans',sans-serif" }}>Announcements</span>
+            <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+              {announcements.filter(a => a.priority === "high").length > 0 && (
+                <Badge variant="red">{announcements.filter(a => a.priority === "high").length} urgent</Badge>
+              )}
+              <span style={{ fontSize:11, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>{announcements.length}</span>
+            </div>
+          </div>
+          <div style={{ padding:"0 18px", overflowY:"auto", maxHeight:320 }}>
+            {annLoading
+              ? [1,2,3].map(i => (
+                  <div key={i} style={{ padding:"12px 0", borderBottom:"0.5px solid #f0e8e4", display:"flex", flexDirection:"column", gap:6 }}>
+                    <Skeleton h={12} w="65%"/><Skeleton h={10} w="90%"/><Skeleton h={10} w="40%"/>
+                  </div>
+                ))
+              : announcements.length > 0
+                ? [...announcements]
+                    .sort((a, b) => ({ high:0, medium:1, low:2 }[a.priority] ?? 3) - ({ high:0, medium:1, low:2 }[b.priority] ?? 3))
+                    .map(a => <AnnouncementItem key={a._id} ann={a}/>)
+                : <div style={{ padding:"24px 0", textAlign:"center", fontSize:12, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>No announcements</div>
+            }
+          </div>
+        </div>
+      </div>
+
+      {/* ── ROW 3: Profile + Leave Balance + Reviews ── */}
+      <div style={{ display:"grid", gridTemplateColumns:"minmax(0,1.5fr) minmax(0,1fr) minmax(0,.7fr)", gap:14, marginBottom:14 }}>
+
+        {/* Manager Profile */}
+        <div className="md-card" style={{ animationDelay:".3s" }}>
+          <CardAccent color="#730042"/>
+          <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
+            borderBottom:"0.5px solid #ede5e0" }}>
+            <span style={{ fontSize:12, fontWeight:600, fontFamily:"'DM Sans',sans-serif" }}>Manager profile</span>
+            <Badge variant="brand">{manager?.role ?? "manager"}</Badge>
+          </div>
+          <div style={{ padding:"14px 18px", display:"flex", alignItems:"center", gap:14,
+            borderBottom:"0.5px solid #ede5e0" }}>
+            <Avatar src={manager?.profile_image} initials={meLoading ? "—" : mgrInitials}
+              size={52} radius={14} style={{ boxShadow:"0 4px 14px rgba(115,0,66,0.22)" }}/>
+            <div>
+              <div style={{ fontSize:16, fontWeight:700, fontFamily:"'Lora',serif" }}>
+                {meLoading ? <Skeleton w={120} h={18}/> : fullName}
+              </div>
+              <div style={{ fontSize:12, color:"#b0948a", textTransform:"capitalize", fontFamily:"'DM Sans',sans-serif" }}>
+                {meLoading ? <Skeleton w={90} h={14}/> : (manager?.designation ?? "—")}
+              </div>
+              <div style={{ marginTop:5, display:"flex", gap:5 }}>
+                <Badge variant="green">Active</Badge>
+                <Badge variant="blue">{manager?.uid ?? "—"}</Badge>
+                {reviews.length > 0 && <StarRating rating={reviews.reduce((s, r) => s + r.rating, 0) / reviews.length} size={12}/>}
               </div>
             </div>
           </div>
-
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:14, padding:"14px 18px" }}>
+            <InfoField label="Work email"       value={manager?.work_email}      loading={meLoading}/>
+            <InfoField label="Department"        value={manager?.department}       loading={meLoading}/>
+            <InfoField label="Office"            value={manager?.office_location}  loading={meLoading}/>
+            <InfoField label="Gender"            value={manager?.gender}           loading={meLoading}/>
+            <InfoField label="Marital status"    value={manager?.marital_status}   loading={meLoading}/>
+            <InfoField label="Contact"           value={manager?.personal_contact} loading={meLoading}/>
+            <InfoField label="Emergency contact" value={manager?.e_contact}        loading={meLoading}/>
+            <InfoField label="Role"              value={manager?.role}             loading={meLoading}/>
+            <InfoField label="Member since"
+              value={manager?.createdAt ? fmtDate(manager.createdAt) : null}
+              loading={meLoading}/>
+          </div>
         </div>
 
-        {/* ── bottom: calendar + announcements ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 14 }}>
-          <Calendar leaveData={leaves} />
-          <Announcements data={announces} />
+        {/* Leave Balance */}
+        <div className="md-card" style={{ animationDelay:".35s" }}>
+          <CardAccent color="#1D9E75"/>
+          <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
+            borderBottom:"0.5px solid #ede5e0" }}>
+            <span style={{ fontSize:12, fontWeight:600, fontFamily:"'DM Sans',sans-serif" }}>Leave balance</span>
+            <span style={{ fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>FY 2025–26</span>
+          </div>
+          <div style={{ padding:"0 18px 4px" }}>
+            {meLoading
+              ? [1,2,3,4].map(i => <div key={i} style={{ padding:"12px 0", borderBottom:"0.5px solid #ede5e0" }}><Skeleton h={40}/></div>)
+              : leaveRows.map((row, i) => <LeaveRow key={i} {...row}/>)
+            }
+          </div>
+          {!meLoading && lb && (
+            <div style={{ margin:"0 18px 14px", display:"flex", gap:8, flexWrap:"wrap" }}>
+              {[["LWP used", lb.lwp ?? 0], ["PBC", lb.pbc ?? 0]].map(([l, v]) => (
+                <div key={l} style={{ background:"#f9f8f2", border:"0.5px solid #ede5e0", borderRadius:8,
+                  padding:"6px 10px", fontSize:11, fontFamily:"'DM Sans',sans-serif" }}>
+                  <span style={{ color:"#b0948a" }}>{l} </span>
+                  <strong style={{ color:"#2a1a16" }}>{v}</strong>
+                </div>
+              ))}
+              {lb.lastAccrualDate && (
+                <div style={{ background:"#f9f8f2", border:"0.5px solid #ede5e0", borderRadius:8,
+                  padding:"6px 10px", fontSize:11, fontFamily:"'DM Sans',sans-serif" }}>
+                  <span style={{ color:"#b0948a" }}>Last accrual </span>
+                  <strong style={{ color:"#2a1a16" }}>
+                    {new Date(lb.lastAccrualDate).toLocaleDateString("en-IN", { day:"numeric", month:"short" })}
+                  </strong>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
+        {/* Reviews given by manager */}
+        <div className="md-card" style={{ animationDelay:".4s" }}>
+          <CardAccent color="#e8b84b"/>
+          <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
+            borderBottom:"0.5px solid #ede5e0" }}>
+            <span style={{ fontSize:12, fontWeight:600, fontFamily:"'DM Sans',sans-serif" }}>Reviews Given</span>
+            {reviews.length > 0 && <Badge variant="amber">{reviews.length} total</Badge>}
+          </div>
+          <ReviewCard reviews={reviews} loading={meLoading}/>
+        </div>
       </div>
+
+      {/* ── ROW 4: Leave History ── */}
+      <div className="md-card" style={{ animationDelay:".45s" }}>
+        <CardAccent color="#378ADD"/>
+        <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
+          borderBottom:"0.5px solid #ede5e0" }}>
+          <span style={{ fontSize:12, fontWeight:600, fontFamily:"'DM Sans',sans-serif" }}>Leave History</span>
+          <div style={{ display:"flex", gap:6 }}>
+            <Badge variant="green">{approvedLeaves.length} approved</Badge>
+            <Badge variant="amber">{allLeaves.filter(l => l.status?.includes("pending")).length} pending</Badge>
+          </div>
+        </div>
+        <LeaveHistoryList leaves={allLeaves} loading={histLoading}/>
+      </div>
+
     </div>
   );
 }
