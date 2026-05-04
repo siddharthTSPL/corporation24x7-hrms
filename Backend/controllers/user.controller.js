@@ -13,34 +13,138 @@ const verifyUserEmail = async (req, res, next) => {
   const { token } = req.params;
 
   let decoded;
+
   try {
     decoded = jwt.verify(token, process.env.JWT_SECRET);
   } catch (err) {
-    return next(
-      Object.assign(new Error("Invalid or expired verification link"), {
-        statusCode: 400,
-      }),
-    );
+    return res.status(400).send(`
+      <!DOCTYPE html>
+      <html>
+      <body style="margin:0; font-family:Segoe UI; background:#F9F8F2; display:flex; align-items:center; justify-content:center; height:100vh;">
+
+        <div style="background:white; padding:40px; border-radius:12px; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,0.1); max-width:400px;">
+          
+          <h1 style="color:#CD166E;">❌ Link Invalid</h1>
+          <p style="color:#555;">This verification link is expired or invalid.</p>
+
+          <a href="http://localhost:3000/login" style="
+            margin-top:20px;
+            display:inline-block;
+            padding:12px 25px;
+            background:#730042;
+            color:white;
+            text-decoration:none;
+            border-radius:8px;
+          ">
+            Go to Login
+          </a>
+
+        </div>
+
+      </body>
+      </html>
+    `);
   }
 
   const user = await usermodel.findById(decoded.userid);
 
   if (!user) {
-    return next(
-      Object.assign(new Error("User not found"), {
-        statusCode: 404,
-      }),
-    );
+    return res.status(404).send(`
+      <!DOCTYPE html>
+      <html>
+      <body style="margin:0; font-family:Segoe UI; background:#F9F8F2; display:flex; align-items:center; justify-content:center; height:100vh;">
+        
+        <div style="background:white; padding:40px; border-radius:12px; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,0.1); max-width:400px;">
+          
+          <h1 style="color:#CD166E;">⚠️ User Not Found</h1>
+          <p style="color:#555;">We couldn’t find your account.</p>
+
+        </div>
+
+      </body>
+      </html>
+    `);
   }
 
-  // update verification
   user.isverified = true;
   await user.save();
 
-  res.status(200).json({
-    success: true,
-    message: "User email verified successfully",
-  });
+  // ✅ SUCCESS UI
+  res.status(200).send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    </head>
+
+    <body style="
+      margin:0;
+      font-family:Segoe UI, sans-serif;
+      background:linear-gradient(135deg,#730042,#CD166E);
+      height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    ">
+
+      <div style="
+        background:white;
+        padding:50px 40px;
+        border-radius:16px;
+        text-align:center;
+        box-shadow:0 15px 40px rgba(0,0,0,0.2);
+        max-width:420px;
+        width:90%;
+      ">
+
+        <!-- Icon -->
+        <div style="
+          width:70px;
+          height:70px;
+          margin:0 auto 20px;
+          background:#F9F8F2;
+          border-radius:50%;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          font-size:30px;
+        ">
+          ✅
+        </div>
+
+        <h1 style="color:#730042; margin-bottom:10px;">
+          Email Verified!
+        </h1>
+
+        <p style="color:#555; font-size:15px; line-height:1.6;">
+          Your account has been successfully verified.  
+          You can now access your dashboard and start using the platform.
+        </p>
+
+        <a href="http://localhost:3000/login" style="
+          margin-top:25px;
+          display:inline-block;
+          padding:14px 30px;
+          background:#CD166E;
+          color:white;
+          text-decoration:none;
+          border-radius:10px;
+          font-weight:600;
+          box-shadow:0 6px 16px rgba(205,22,110,0.3);
+        ">
+          Go to Login →
+        </a>
+
+        <p style="margin-top:20px; font-size:12px; color:#999;">
+          Secure • Fast • Reliable
+        </p>
+
+      </div>
+
+    </body>
+    </html>
+  `);
 };
 
 const showUserPasswordPage = (req, res) => {
