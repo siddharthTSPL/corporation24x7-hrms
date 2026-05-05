@@ -387,7 +387,7 @@ const css = {
     flexDirection: "column",
     gap: 16,
     padding: "24px 20px 48px",
-    maxWidth: 560,
+    maxWidth: 600,
     margin: "0 auto",
     position: "relative",
     overflow: "hidden",
