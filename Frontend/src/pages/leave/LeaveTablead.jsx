@@ -2,28 +2,34 @@ import React, { useState } from "react";
 import { useGetForwardedLeaves, useAcceptLeave, useRejectLeave } from "../../auth/server-state/adminleave/adminleave.hook";
 
 const palette = {
-  pink: "#CD166E",
-  maroon: "#730042",
+  pink: "#8B1A4A",
+  maroon: "#5C0F30",
   cream: "#F9F8F2",
-  darkMaroon: "#4a0029",
-  softPink: "rgba(205,22,110,0.12)",
-  softMaroon: "rgba(115,0,66,0.35)",
+  darkMaroon: "#3d0a20",
+  softPink: "rgba(139,26,74,0.10)",
+  softMaroon: "rgba(92,15,48,0.18)",
+  pageBackground: "#EDEDEE",
+  cardBg: "#FFFFFF",
+  cardBorder: "#E0D0D8",
+  textPrimary: "#2D0A1A",
+  mutedText: "#9B7A8A",
+  theadBg: "#F5EEF2",
 };
 
 const styles = {
   wrapper: {
     minHeight: "100vh",
-    background: `linear-gradient(135deg, #1a0010 0%, #2d0020 50%, #1a0010 100%)`,
+    background: palette.pageBackground,
     fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
     padding: "40px 32px",
-    color: palette.cream,
+    color: palette.textPrimary,
   },
   header: {
     display: "flex",
     alignItems: "flex-end",
     justifyContent: "space-between",
     marginBottom: "36px",
-    borderBottom: `1px solid ${palette.softMaroon}`,
+    borderBottom: `1px solid ${palette.cardBorder}`,
     paddingBottom: "24px",
   },
   titleGroup: {},
@@ -38,7 +44,7 @@ const styles = {
   title: {
     fontSize: "30px",
     fontWeight: 700,
-    color: palette.cream,
+    color: palette.textPrimary,
     margin: 0,
     lineHeight: 1.1,
     letterSpacing: "-0.5px",
@@ -62,18 +68,18 @@ const styles = {
     fontWeight: 500,
   },
   tableContainer: {
-    background: "rgba(255,255,255,0.03)",
+    background: palette.cardBg,
     borderRadius: "16px",
-    border: `1px solid rgba(115,0,66,0.4)`,
+    border: `2px solid ${palette.maroon}`,
     overflow: "hidden",
-    boxShadow: "0 8px 48px rgba(0,0,0,0.5)",
+    boxShadow: "0 4px 24px rgba(92,15,48,0.08)",
   },
   table: {
     width: "100%",
     borderCollapse: "collapse",
   },
   thead: {
-    background: `linear-gradient(90deg, ${palette.maroon}, #5a0035)`,
+    background: palette.theadBg,
   },
   th: {
     padding: "14px 20px",
@@ -82,18 +88,19 @@ const styles = {
     fontWeight: 700,
     letterSpacing: "2px",
     textTransform: "uppercase",
-    color: "rgba(249,248,242,0.6)",
+    color: palette.mutedText,
     whiteSpace: "nowrap",
+    borderBottom: `1px solid ${palette.cardBorder}`,
   },
   row: (isEven) => ({
-    background: isEven ? "rgba(255,255,255,0.015)" : "transparent",
+    background: isEven ? "#FAF7F9" : palette.cardBg,
     transition: "background 0.2s",
-    borderBottom: "1px solid rgba(115,0,66,0.2)",
+    borderBottom: `1px solid ${palette.cardBorder}`,
   }),
   td: {
     padding: "16px 20px",
     fontSize: "14px",
-    color: palette.cream,
+    color: palette.textPrimary,
     verticalAlign: "middle",
   },
   employeeCell: {
@@ -111,38 +118,38 @@ const styles = {
     justifyContent: "center",
     fontSize: "12px",
     fontWeight: 700,
-    color: palette.cream,
+    color: "#FFFFFF",
     flexShrink: 0,
   },
   managerAvatarBox: {
     width: "30px",
     height: "30px",
     borderRadius: "8px",
-    background: `linear-gradient(135deg, ${palette.maroon}, #4a0029)`,
+    background: `linear-gradient(135deg, ${palette.maroon}, #3d0a20)`,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     fontSize: "10px",
     fontWeight: 700,
-    color: palette.cream,
+    color: "#FFFFFF",
     flexShrink: 0,
   },
   nameText: {
     fontWeight: 600,
     fontSize: "14px",
-    color: palette.cream,
+    color: palette.textPrimary,
   },
   emailText: {
     fontSize: "12px",
-    color: "rgba(249,248,242,0.45)",
+    color: palette.mutedText,
     marginTop: "2px",
   },
   leaveTypeBadge: (type) => {
     const colors = {
-      ml: { bg: "rgba(205,22,110,0.15)", color: palette.pink, border: `1px solid rgba(205,22,110,0.4)` },
-      cl: { bg: "rgba(115,0,66,0.3)", color: "#e8a0c8", border: "1px solid rgba(232,160,200,0.3)" },
-      sl: { bg: "rgba(249,248,242,0.08)", color: palette.cream, border: "1px solid rgba(249,248,242,0.2)" },
-      el: { bg: "rgba(180,50,100,0.2)", color: "#f0b0d0", border: "1px solid rgba(240,176,208,0.3)" },
+      ml: { bg: "rgba(139,26,74,0.10)", color: palette.pink, border: `1px solid rgba(139,26,74,0.3)` },
+      cl: { bg: "rgba(92,15,48,0.10)", color: palette.maroon, border: `1px solid rgba(92,15,48,0.3)` },
+      sl: { bg: "rgba(45,10,26,0.06)", color: palette.textPrimary, border: `1px solid ${palette.cardBorder}` },
+      el: { bg: "rgba(180,50,100,0.10)", color: "#7a1040", border: "1px solid rgba(180,50,100,0.3)" },
     };
     const c = colors[type?.toLowerCase()] || colors.sl;
     return {
@@ -169,22 +176,22 @@ const styles = {
       letterSpacing: "0.5px",
     };
     if (s.includes("forwarded"))
-      return { ...base, background: "rgba(255,190,0,0.12)", color: "#ffd966", border: "1px solid rgba(255,217,102,0.3)" };
+      return { ...base, background: "rgba(180,130,0,0.10)", color: "#7a5800", border: "1px solid rgba(180,130,0,0.3)" };
     if (s.includes("pending"))
-      return { ...base, background: "rgba(255,140,0,0.12)", color: "#ffb066", border: "1px solid rgba(255,176,102,0.3)" };
+      return { ...base, background: "rgba(200,100,0,0.10)", color: "#7a4000", border: "1px solid rgba(200,100,0,0.3)" };
     if (s.includes("approved"))
-      return { ...base, background: "rgba(0,200,100,0.12)", color: "#66e0a0", border: "1px solid rgba(102,224,160,0.3)" };
+      return { ...base, background: "rgba(0,140,70,0.10)", color: "#005a2a", border: "1px solid rgba(0,140,70,0.3)" };
     if (s.includes("rejected"))
-      return { ...base, background: "rgba(255,60,60,0.12)", color: "#ff9090", border: "1px solid rgba(255,144,144,0.3)" };
-    return { ...base, background: "rgba(249,248,242,0.08)", color: palette.cream };
+      return { ...base, background: "rgba(200,0,0,0.10)", color: "#7a0000", border: "1px solid rgba(200,0,0,0.3)" };
+    return { ...base, background: palette.softPink, color: palette.pink };
   },
   dateText: {
     fontSize: "13px",
-    color: "rgba(249,248,242,0.8)",
+    color: palette.textPrimary,
   },
   dateRange: {
     fontSize: "11px",
-    color: "rgba(249,248,242,0.4)",
+    color: palette.mutedText,
     marginTop: "2px",
   },
   actionGroup: {
@@ -196,8 +203,8 @@ const styles = {
     padding: "7px 16px",
     borderRadius: "8px",
     border: "none",
-    background: `linear-gradient(135deg, ${palette.pink}, #a0104e)`,
-    color: palette.cream,
+    background: `linear-gradient(135deg, ${palette.pink}, ${palette.maroon})`,
+    color: "#FFFFFF",
     fontSize: "12px",
     fontWeight: 700,
     cursor: "pointer",
@@ -208,9 +215,9 @@ const styles = {
   rejectBtn: {
     padding: "7px 16px",
     borderRadius: "8px",
-    border: `1px solid rgba(249,248,242,0.2)`,
-    background: "rgba(249,248,242,0.05)",
-    color: "rgba(249,248,242,0.6)",
+    border: `1px solid ${palette.cardBorder}`,
+    background: "#F5EEF2",
+    color: palette.mutedText,
     fontSize: "12px",
     fontWeight: 600,
     cursor: "pointer",
@@ -230,14 +237,14 @@ const styles = {
     width: "40px",
     height: "40px",
     borderRadius: "50%",
-    border: `3px solid rgba(205,22,110,0.2)`,
+    border: `3px solid rgba(139,26,74,0.15)`,
     borderTop: `3px solid ${palette.pink}`,
     animation: "spin 0.8s linear infinite",
   },
   emptyState: {
     textAlign: "center",
     padding: "60px 40px",
-    color: "rgba(249,248,242,0.35)",
+    color: palette.mutedText,
   },
   emptyIcon: {
     fontSize: "40px",
@@ -249,11 +256,11 @@ const styles = {
     fontWeight: 500,
   },
   errorState: {
-    background: "rgba(255,60,60,0.08)",
-    border: "1px solid rgba(255,60,60,0.3)",
+    background: "rgba(200,0,0,0.06)",
+    border: "1px solid rgba(200,0,0,0.25)",
     borderRadius: "12px",
     padding: "20px 24px",
-    color: "#ff9090",
+    color: "#7a0000",
     fontSize: "14px",
     marginBottom: "24px",
   },
@@ -271,12 +278,12 @@ const styles = {
     borderRadius: "10px",
     fontSize: "13px",
     fontWeight: 600,
-    color: palette.cream,
+    color: "#FFFFFF",
     background:
       type === "success"
         ? `linear-gradient(135deg, ${palette.maroon}, ${palette.pink})`
-        : "linear-gradient(135deg, #600000, #a00000)",
-    boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+        : "linear-gradient(135deg, #7a0000, #b00000)",
+    boxShadow: "0 4px 20px rgba(92,15,48,0.20)",
     animation: "slideIn 0.3s ease",
     display: "flex",
     alignItems: "center",
@@ -285,7 +292,7 @@ const styles = {
   confirmOverlay: {
     position: "fixed",
     inset: 0,
-    background: "rgba(0,0,0,0.7)",
+    background: "rgba(45,10,26,0.45)",
     backdropFilter: "blur(4px)",
     display: "flex",
     alignItems: "center",
@@ -293,25 +300,25 @@ const styles = {
     zIndex: 9998,
   },
   confirmModal: {
-    background: `linear-gradient(145deg, #2d0020, #1a0010)`,
-    border: `1px solid rgba(205,22,110,0.3)`,
+    background: palette.cardBg,
+    border: `2px solid ${palette.maroon}`,
     borderRadius: "20px",
     padding: "36px 40px",
     maxWidth: "400px",
     width: "90%",
-    boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
+    boxShadow: "0 24px 80px rgba(92,15,48,0.18)",
     textAlign: "center",
   },
   modalIcon: { fontSize: "40px", marginBottom: "16px" },
   modalTitle: {
     fontSize: "20px",
     fontWeight: 700,
-    color: palette.cream,
+    color: palette.textPrimary,
     marginBottom: "8px",
   },
   modalDesc: {
     fontSize: "14px",
-    color: "rgba(249,248,242,0.55)",
+    color: palette.mutedText,
     marginBottom: "28px",
     lineHeight: 1.6,
   },
@@ -326,9 +333,9 @@ const styles = {
     border: "none",
     background:
       action === "accept"
-        ? `linear-gradient(135deg, ${palette.pink}, #a0104e)`
-        : "linear-gradient(135deg, #a00030, #600020)",
-    color: palette.cream,
+        ? `linear-gradient(135deg, ${palette.pink}, ${palette.maroon})`
+        : "linear-gradient(135deg, #7a0000, #b00020)",
+    color: "#FFFFFF",
     fontSize: "14px",
     fontWeight: 700,
     cursor: "pointer",
@@ -336,9 +343,9 @@ const styles = {
   modalCancelBtn: {
     padding: "10px 28px",
     borderRadius: "10px",
-    border: `1px solid rgba(249,248,242,0.15)`,
-    background: "transparent",
-    color: "rgba(249,248,242,0.55)",
+    border: `1px solid ${palette.cardBorder}`,
+    background: "#F5EEF2",
+    color: palette.mutedText,
     fontSize: "14px",
     fontWeight: 600,
     cursor: "pointer",
@@ -390,13 +397,13 @@ const ConfirmModal = ({ confirm, onClose, onConfirm, isLoading }) => {
         </div>
         <div style={styles.modalDesc}>
           Are you sure you want to{" "}
-          <strong style={{ color: isAccept ? palette.pink : "#ff9090" }}>
+          <strong style={{ color: isAccept ? palette.pink : "#7a0000" }}>
             {isAccept ? "approve" : "reject"}
           </strong>{" "}
           the leave request for{" "}
-          <strong style={{ color: palette.cream }}>{confirm.personName}</strong>?
+          <strong style={{ color: palette.textPrimary }}>{confirm.personName}</strong>?
           {!isAccept && (
-            <div style={{ marginTop: "8px", fontSize: "12px", color: "rgba(249,248,242,0.4)" }}>
+            <div style={{ marginTop: "8px", fontSize: "12px", color: palette.mutedText }}>
               This leave will be auto-deleted after 24 hours.
             </div>
           )}
@@ -455,10 +462,10 @@ const LeaveTable = ({ leaves, leaveFor, hoveredRow, setHoveredRow, isProcessing,
                 ...styles.row(idx % 2 === 0),
                 animationDelay: `${idx * 50}ms`,
                 background: isHovered
-                  ? "rgba(205,22,110,0.06)"
+                  ? "rgba(139,26,74,0.05)"
                   : idx % 2 === 0
-                  ? "rgba(255,255,255,0.015)"
-                  : "transparent",
+                  ? "#FAF7F9"
+                  : palette.cardBg,
               }}
               onMouseEnter={() => setHoveredRow(leave._id)}
               onMouseLeave={() => setHoveredRow(null)}
@@ -522,7 +529,7 @@ const LeaveTable = ({ leaves, leaveFor, hoveredRow, setHoveredRow, isProcessing,
               {/* Actions */}
               <td style={styles.td}>
                 {alreadyDone ? (
-                  <span style={{ fontSize: "12px", color: "rgba(249,248,242,0.3)", fontStyle: "italic" }}>
+                  <span style={{ fontSize: "12px", color: palette.mutedText, fontStyle: "italic" }}>
                     Processed
                   </span>
                 ) : (
@@ -570,7 +577,6 @@ const LeaveTablead = () => {
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
   };
 
-  // ← leaveFor: "employee" | "manager"
   const handleAction = (leave, action, leaveFor) => {
     const person = leaveFor === "manager" ? leave.manager : leave.employee;
     const personName = person
@@ -584,10 +590,10 @@ const LeaveTablead = () => {
     const { leaveId, action, personName, leaveFor } = confirm;
     try {
       if (action === "accept") {
-        await acceptMutation.mutateAsync({ id: leaveId, leaveFor }); // ← pass both
+        await acceptMutation.mutateAsync({ id: leaveId, leaveFor });
         addToast(`Leave approved for ${personName}`, "success");
       } else {
-        await rejectMutation.mutateAsync({ id: leaveId, leaveFor }); // ← pass both
+        await rejectMutation.mutateAsync({ id: leaveId, leaveFor });
         addToast(`Leave rejected for ${personName}`, "error");
       }
     } catch (err) {
@@ -597,7 +603,6 @@ const LeaveTablead = () => {
     }
   };
 
-  // ← pull from correct response keys
   const employeeLeaves = data?.employeeLeaves?.leaves || [];
   const managerLeaves = data?.managerLeaves?.leaves || [];
   const totalCount =
@@ -613,7 +618,7 @@ const LeaveTablead = () => {
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         .leave-row { animation: fadeIn 0.3s ease both; }
         .accept-btn:hover { opacity: 0.85 !important; transform: translateY(-1px) !important; }
-        .reject-btn:hover { background: rgba(249,248,242,0.1) !important; color: rgba(249,248,242,0.9) !important; border-color: rgba(249,248,242,0.35) !important; }
+        .reject-btn:hover { background: #EDD5E3 !important; color: ${palette.pink} !important; border-color: ${palette.pink} !important; }
       `}</style>
 
       <div style={styles.wrapper}>
@@ -640,7 +645,7 @@ const LeaveTablead = () => {
           <div style={styles.tableContainer}>
             <div style={styles.loadingState}>
               <div style={styles.spinner} />
-              <span style={{ color: "rgba(249,248,242,0.4)", fontSize: "14px" }}>
+              <span style={{ color: palette.mutedText, fontSize: "14px" }}>
                 Loading leave requests…
               </span>
             </div>
