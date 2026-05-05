@@ -111,9 +111,11 @@ function BrandStrip() {
     <div style={css.brandStrip}>
       <div style={css.brandLogo}>
         <span style={css.brandTorch}>Torch</span>
-        <span style={css.brandX}>X</span>
-        <span style={css.brandSub}>TALENT</span>
-      </div>
+        <span style={css.brandX}>X</span> 
+        <br />
+        <span style={css.brandSub}>TALENT</span>  
+
+    </div>
       <span style={css.brandTagline}>Workforce Intelligence</span>
     </div>
   );

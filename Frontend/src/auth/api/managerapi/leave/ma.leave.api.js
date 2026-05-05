@@ -7,12 +7,12 @@ const api= axios.create({
 
 
 export const acceptLeaveRequest = async (data) => {
-  const res = await api.post("/acceptleave", data);
+  const res = await api.post("/acceptleaverequest", data);
   return res.data;
 };
 
 export const rejectLeaveRequest = async (data) => {
-  const res = await api.post("/rejectleave", data);
+  const res = await api.post("/rejectleaverequest", data);
   return res.data;
 };
 
