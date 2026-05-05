@@ -18,20 +18,139 @@ require("dotenv").config();
 const verifyManagerEmail = async (req, res, next) => {
   const { token } = req.params;
 
-  const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  let decoded;
+
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (err) {
+    return res.status(400).send(`
+      <!DOCTYPE html>
+      <html>
+      <body style="margin:0; font-family:Segoe UI; background:#F9F8F2; display:flex; align-items:center; justify-content:center; height:100vh;">
+        
+        <div style="background:white; padding:40px; border-radius:14px; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,0.1); max-width:420px;">
+          
+          <h1 style="color:#CD166E;">❌ Invalid Link</h1>
+          <p style="color:#555;">This verification link is expired or invalid.</p>
+
+          <a href="http://localhost:3000/login" style="
+            display:inline-block;
+            margin-top:20px;
+            padding:12px 25px;
+            background:#730042;
+            color:white;
+            text-decoration:none;
+            border-radius:8px;
+          ">
+            Go to Login
+          </a>
+
+        </div>
+
+      </body>
+      </html>
+    `);
+  }
 
   const manager = await managermodel.findById(decoded.managerid);
 
   if (!manager) {
-    return next(
-      Object.assign(new Error("Manager not found"), { statusCode: 404 }),
-    );
+    return res.status(404).send(`
+      <!DOCTYPE html>
+      <html>
+      <body style="margin:0; font-family:Segoe UI; background:#F9F8F2; display:flex; align-items:center; justify-content:center; height:100vh;">
+        
+        <div style="background:white; padding:40px; border-radius:14px; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,0.1); max-width:420px;">
+          
+          <h1 style="color:#CD166E;">⚠️ Manager Not Found</h1>
+          <p style="color:#555;">We couldn’t find your account.</p>
+
+        </div>
+
+      </body>
+      </html>
+    `);
   }
 
   manager.isVerified = true;
   await manager.save();
 
-  res.send("Manager email verified successfully");
+  // ✅ SUCCESS UI
+  res.status(200).send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8"/>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    </head>
+
+    <body style="
+      margin:0;
+      font-family:Segoe UI, sans-serif;
+      background:linear-gradient(135deg,#730042,#CD166E);
+      height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    ">
+
+      <div style="
+        background:white;
+        padding:50px 40px;
+        border-radius:16px;
+        text-align:center;
+        box-shadow:0 15px 40px rgba(0,0,0,0.2);
+        max-width:420px;
+        width:90%;
+      ">
+
+        <!-- Icon -->
+        <div style="
+          width:70px;
+          height:70px;
+          margin:0 auto 20px;
+          background:#F9F8F2;
+          border-radius:50%;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          font-size:30px;
+        ">
+          🎉
+        </div>
+
+        <h1 style="color:#730042; margin-bottom:10px;">
+          Manager Verified!
+        </h1>
+
+        <p style="color:#555; font-size:15px; line-height:1.6;">
+          Your manager account has been successfully verified.  
+          You now have full access to manage your team and dashboard.
+        </p>
+
+        <a href="http://localhost:3000/login" style="
+          margin-top:25px;
+          display:inline-block;
+          padding:14px 30px;
+          background:#CD166E;
+          color:white;
+          text-decoration:none;
+          border-radius:10px;
+          font-weight:600;
+          box-shadow:0 6px 16px rgba(205,22,110,0.3);
+        ">
+          Go to Dashboard →
+        </a>
+
+        <p style="margin-top:20px; font-size:12px; color:#999;">
+          Secure • Scalable • Modern SaaS
+        </p>
+
+      </div>
+
+    </body>
+    </html>
+  `);
 };
 
 const managerlogin = async (req, res, next) => {
@@ -146,22 +265,93 @@ const managerlogout = async (req, res, next) => {
 const showPasswordPage = (req, res) => {
   const token = req.query.token;
 
-  console.log("TOKEN:", token);
-
   res.send(`
-    <h2>Set Your Password</h2>
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Set Password</title>
+  </head>
 
-    <form action="/manager/firstloginpasswordchange" method="POST">
+  <body style="
+    margin:0;
+    font-family:Segoe UI, sans-serif;
+    background:linear-gradient(135deg,#730042,#CD166E);
+    height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  ">
 
-      <input type="hidden" name="token" value="${token}" />
+    <div style="
+      background:white;
+      padding:40px;
+      border-radius:16px;
+      box-shadow:0 15px 40px rgba(0,0,0,0.2);
+      width:100%;
+      max-width:400px;
+    ">
 
-      <input type="password" name="newpassword" placeholder="Enter new password" required/>
+      <!-- Title -->
+      <h1 style="text-align:center; color:#730042; margin-bottom:10px;">
+        🔐 Set Your Password
+      </h1>
 
-      <button type="submit">
-        Update Password
-      </button>
+      <p style="text-align:center; color:#666; font-size:14px; margin-bottom:25px;">
+        Create a strong password to secure your account
+      </p>
 
-    </form>
+      <!-- Form -->
+      <form action="/manager/firstloginpasswordchange" method="POST">
+
+        <input type="hidden" name="token" value="${token}" />
+
+        <!-- Password Input -->
+        <div style="margin-bottom:20px;">
+          <input 
+            type="password" 
+            name="newpassword" 
+            placeholder="Enter new password"
+            required
+            style="
+              width:100%;
+              padding:12px;
+              border-radius:8px;
+              border:1px solid #ddd;
+              font-size:14px;
+              outline:none;
+            "
+          />
+        </div>
+
+        <!-- Button -->
+        <button type="submit" style="
+          width:100%;
+          padding:12px;
+          background:#CD166E;
+          color:white;
+          border:none;
+          border-radius:8px;
+          font-size:15px;
+          font-weight:600;
+          cursor:pointer;
+          box-shadow:0 6px 16px rgba(205,22,110,0.3);
+        ">
+          Update Password
+        </button>
+
+      </form>
+
+      <!-- Tips -->
+      <p style="margin-top:20px; font-size:12px; color:#999; text-align:center;">
+        Use at least 8 characters with numbers & symbols
+      </p>
+
+    </div>
+
+  </body>
+  </html>
   `);
 };
 
@@ -945,17 +1135,17 @@ const reviewtoemployee = async (req, res, next) => {
   const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
   try {
-    const review = await Review.create({
-      reviewerRole: manager.role,
-      reviewer: manager._id,
-      reviewerRoleModel: manager.role,
-      revieweeRole: employee.role,
-      reviewee: employee._id,
-      revieweeRoleModel: employee.role,
-      rating,
-      comment,
-      monthYear,
-    });
+   const review = await Review.create({
+  reviewerRole: manager.role,    
+  reviewer: manager._id,
+  reviewerRoleModel: "Manager",   
+  revieweeRole: "employee",       
+  reviewee: employee._id,
+  revieweeRoleModel: "User",      
+  rating,
+  comment,
+  monthYear,
+});
 
     res.status(201).json({
       message: "Employee reviewed successfully",

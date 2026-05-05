@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useAuth } from "./auth/store/getmeauth/getmeauth";
 import LandingPage from "./pages/auth/LandingPage";
 import Login from "./pages/auth/Login";
 import Signup from "./pages/auth/Signup";
@@ -26,7 +27,18 @@ import Filema from "./pages/file/Filema";
 import Organisation from "./pages/organisation/Organisation";
 import Reviewad from "./pages/review/reviewad";
 import Reviewma from "./pages/review/reviewma";
-import Attendancepage from './pages/attendance/attendancepage'
+import Attendancepage from "./pages/attendance/attendancepage";
+
+function RoleBasedRedirect() {
+  const { data: auth, isLoading } = useAuth();
+
+  if (isLoading) return <p>Loading...</p>;
+  if (!auth) return <Navigate to="/login" replace />;
+  if (auth.role === "admin") return <Navigate to="/dashboard" replace />;
+  if (auth.role === "manager") return <Navigate to="/manager-dashboard" replace />;
+  return <Navigate to="/employee-dashboard" replace />;
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -46,7 +58,6 @@ function App() {
           }
         />
 
-       
         <Route
           element={
             <ProtectedRoute allowedRoles={["admin", "manager", "employee"]}>
@@ -54,7 +65,9 @@ function App() {
             </ProtectedRoute>
           }
         >
-          
+          {/* Redirects to the correct dashboard based on role */}
+          <Route index element={<RoleBasedRedirect />} />
+
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
           <Route path="/manager-dashboard" element={<Managerdashboard />} />
@@ -77,7 +90,7 @@ function App() {
           <Route path="/organisation" element={<Organisation />} />
           <Route path="/review-admin" element={<Reviewad />} />
           <Route path="/review-manager" element={<Reviewma />} />
-          <Route path='/mark-attendance' element={<Attendancepage/>} />
+          <Route path="/mark-attendance" element={<Attendancepage />} />
         </Route>
       </Routes>
     </BrowserRouter>
