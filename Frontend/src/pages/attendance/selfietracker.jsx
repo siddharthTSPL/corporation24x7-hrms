@@ -1,22 +1,16 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 
-/**
- * SelfieCapture
- * Opens the user's webcam, lets them take a photo, returns base64 string via onCapture.
- * Props:
- *   onCapture(base64String) — called when photo is confirmed
- *   onCancel()              — called when user dismisses
- */
 export default function SelfieCapture({ onCapture, onCancel }) {
-  const videoRef   = useRef(null);
-  const canvasRef  = useRef(null);
-  const streamRef  = useRef(null);
+  const videoRef  = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
 
-  const [phase,    setPhase]    = useState("loading"); // loading | preview | captured | error
-  const [snapshot, setSnapshot] = useState(null);      // base64
+  const [phase,    setPhase]    = useState("loading");
+  const [snapshot, setSnapshot] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
+  const [timer,    setTimer]    = useState(null); // countdown
 
-  // ── Start webcam ──
+  // ── Start webcam ──────────────────────────────────────────────────────────────
   useEffect(() => {
     let active = true;
     (async () => {
@@ -50,8 +44,23 @@ export default function SelfieCapture({ onCapture, onCancel }) {
     };
   }, []);
 
-  // ── Take photo ──
-  const takePhoto = useCallback(() => {
+  // ── Countdown then auto-capture ───────────────────────────────────────────────
+  const startCountdown = useCallback(() => {
+    let count = 3;
+    setTimer(count);
+    const id = setInterval(() => {
+      count -= 1;
+      if (count <= 0) {
+        clearInterval(id);
+        setTimer(null);
+        doCapture();
+      } else {
+        setTimer(count);
+      }
+    }, 1000);
+  }, []); // eslint-disable-line
+
+  const doCapture = useCallback(() => {
     const video  = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
@@ -59,32 +68,29 @@ export default function SelfieCapture({ onCapture, onCancel }) {
     const size = 400;
     canvas.width  = size;
     canvas.height = size;
-
-    const ctx = canvas.getContext("2d");
-    // Mirror and crop to square
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
+    const ctx  = canvas.getContext("2d");
+    const vw   = video.videoWidth;
+    const vh   = video.videoHeight;
     const side = Math.min(vw, vh);
-    const sx = (vw - side) / 2;
-    const sy = (vh - side) / 2;
+    const sx   = (vw - side) / 2;
+    const sy   = (vh - side) / 2;
 
     ctx.save();
     ctx.translate(size, 0);
-    ctx.scale(-1, 1); // mirror horizontally
+    ctx.scale(-1, 1);
     ctx.drawImage(video, sx, sy, side, side, 0, 0, size, size);
     ctx.restore();
 
-    const base64 = canvas.toDataURL("image/jpeg", 0.8);
+    const base64 = canvas.toDataURL("image/jpeg", 0.85);
     setSnapshot(base64);
     setPhase("captured");
-
-    // Stop stream to turn off camera indicator light
     streamRef.current?.getTracks().forEach((t) => t.stop());
   }, []);
 
-  // ── Retake ──
+  // ── Retake ────────────────────────────────────────────────────────────────────
   const retake = useCallback(async () => {
     setSnapshot(null);
+    setTimer(null);
     setPhase("loading");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -105,158 +111,211 @@ export default function SelfieCapture({ onCapture, onCancel }) {
     }
   }, []);
 
-  // ── Confirm ──
   const confirm = useCallback(() => {
     if (snapshot) onCapture(snapshot);
   }, [snapshot, onCapture]);
 
   return (
-    <div style={styles.overlay}>
-      <div style={styles.modal}>
-        <div style={styles.header}>
-          <span style={styles.title}>📸 Verify Identity</span>
-          <button style={styles.closeBtn} onClick={onCancel}>✕</button>
+    <div style={s.overlay}>
+      <div style={s.modal}>
+
+        {/* Header */}
+        <div style={s.header}>
+          <div style={s.headerLeft}>
+            <span style={s.headerIcon}>📸</span>
+            <div>
+              <p style={s.title}>Identity Verification</p>
+              <p style={s.subtitle}>Take a clear selfie to check in</p>
+            </div>
+          </div>
+          <button style={s.closeBtn} onClick={onCancel} title="Cancel">✕</button>
         </div>
 
-        <div style={styles.viewfinder}>
-          {/* Live video */}
-          <video
-            ref={videoRef}
-            style={{ ...styles.media, display: phase === "preview" ? "block" : "none", transform: "scaleX(-1)" }}
-            playsInline
-            muted
-          />
+        {/* Viewfinder */}
+        <div style={s.viewfinderWrap}>
+          <div style={s.viewfinder}>
+            <video
+              ref={videoRef}
+              style={{ ...s.media, display: phase === "preview" ? "block" : "none", transform: "scaleX(-1)" }}
+              playsInline muted
+            />
+            {snapshot && (
+              <img src={snapshot} alt="selfie" style={{ ...s.media, display: phase === "captured" ? "block" : "none" }} />
+            )}
+            {phase === "loading" && (
+              <div style={s.placeholder}>
+                <div style={s.spinner} />
+                <p style={s.placeholderText}>Starting camera…</p>
+              </div>
+            )}
+            {phase === "error" && (
+              <div style={s.placeholder}>
+                <span style={{ fontSize: 40 }}>🚫</span>
+                <p style={s.placeholderText}>{errorMsg}</p>
+              </div>
+            )}
 
-          {/* Captured photo */}
-          {snapshot && (
-            <img src={snapshot} alt="selfie" style={{ ...styles.media, display: phase === "captured" ? "block" : "none" }} />
-          )}
+            {/* Countdown overlay */}
+            {timer !== null && (
+              <div style={s.countdownOverlay}>
+                <span style={s.countdownNum}>{timer}</span>
+              </div>
+            )}
 
-          {/* Loading */}
-          {phase === "loading" && (
-            <div style={styles.placeholder}>
-              <div style={styles.spinner} />
-              <p style={styles.placeholderText}>Starting camera…</p>
-            </div>
-          )}
+            {/* Corner guides */}
+            {phase === "preview" && (
+              <>
+                <div style={{ ...s.corner, top: 12, left: 12, borderTop: "3px solid #7B1C3E", borderLeft: "3px solid #7B1C3E" }} />
+                <div style={{ ...s.corner, top: 12, right: 12, borderTop: "3px solid #7B1C3E", borderRight: "3px solid #7B1C3E" }} />
+                <div style={{ ...s.corner, bottom: 12, left: 12, borderBottom: "3px solid #7B1C3E", borderLeft: "3px solid #7B1C3E" }} />
+                <div style={{ ...s.corner, bottom: 12, right: 12, borderBottom: "3px solid #7B1C3E", borderRight: "3px solid #7B1C3E" }} />
+              </>
+            )}
 
-          {/* Error */}
-          {phase === "error" && (
-            <div style={styles.placeholder}>
-              <span style={{ fontSize: 36 }}>🚫</span>
-              <p style={styles.placeholderText}>{errorMsg}</p>
-            </div>
-          )}
+            {/* Captured checkmark */}
+            {phase === "captured" && (
+              <div style={s.capturedBadge}>✓</div>
+            )}
+          </div>
 
-          {/* Overlay circle frame */}
-          <div style={styles.circleFrame} />
+          {/* Status pill */}
+          <div style={{
+            ...s.statusPill,
+            background: phase === "preview"  ? "#DCFCE7" :
+                        phase === "captured" ? "#EFF6FF" :
+                        phase === "error"    ? "#FEF2F2" : "#F3F4F6",
+            color:      phase === "preview"  ? "#16A34A" :
+                        phase === "captured" ? "#1D4ED8" :
+                        phase === "error"    ? "#DC2626" : "#6B7280",
+            border: `1px solid ${
+                        phase === "preview"  ? "#86EFAC" :
+                        phase === "captured" ? "#BFDBFE" :
+                        phase === "error"    ? "#FECACA" : "#E5E7EB"}`,
+          }}>
+            <span style={{ ...s.statusDot, background:
+                        phase === "preview"  ? "#16A34A" :
+                        phase === "captured" ? "#1D4ED8" :
+                        phase === "error"    ? "#DC2626" : "#9CA3AF" }} />
+            {phase === "preview"  && "Camera live"}
+            {phase === "captured" && "Photo captured"}
+            {phase === "loading"  && "Starting camera…"}
+            {phase === "error"    && "Camera unavailable"}
+          </div>
         </div>
 
         <canvas ref={canvasRef} style={{ display: "none" }} />
 
-        <p style={styles.hint}>
-          {phase === "preview"   && "Position your face in the circle and take a photo."}
-          {phase === "captured"  && "Looks good? Confirm or retake."}
-          {phase === "loading"   && "Requesting camera access…"}
-          {phase === "error"     && "Cannot access camera."}
+        {/* Hint */}
+        <p style={s.hint}>
+          {phase === "preview"  && "Align your face within the frame, then tap Take Photo."}
+          {phase === "captured" && "Happy with the photo? Confirm to check in."}
+          {phase === "loading"  && "Requesting camera access…"}
+          {phase === "error"    && "You can skip selfie verification and check in without a photo."}
         </p>
 
-        <div style={styles.actions}>
+        {/* Tips (preview only) */}
+        {phase === "preview" && (
+          <div style={s.tips}>
+            <span style={s.tip}>💡 Face forward</span>
+            <span style={s.tip}>☀️ Good lighting</span>
+            <span style={s.tip}>🚫 No sunglasses</span>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div style={s.actions}>
           {phase === "preview" && (
-            <button style={styles.primaryBtn} onClick={takePhoto}>
-              📷 Take Photo
-            </button>
+            <>
+              <button style={s.ghostBtn} onClick={onCancel}>Skip</button>
+              <button style={s.primaryBtn} onClick={startCountdown} disabled={timer !== null}>
+                {timer !== null ? `📷 Taking in ${timer}…` : "📷 Take Photo"}
+              </button>
+            </>
           )}
           {phase === "captured" && (
             <>
-              <button style={styles.secondaryBtn} onClick={retake}>↩ Retake</button>
-              <button style={styles.primaryBtn} onClick={confirm}>✓ Confirm</button>
+              <button style={s.ghostBtn} onClick={retake}>↩ Retake</button>
+              <button style={s.primaryBtn} onClick={confirm}>✓ Use Photo</button>
             </>
           )}
           {phase === "error" && (
-            <button style={styles.secondaryBtn} onClick={onCancel}>
-              Skip (No Selfie)
-            </button>
+            <>
+              <button style={s.ghostBtn} onClick={onCancel}>Cancel</button>
+              <button style={s.primaryBtn} onClick={onCancel}>Skip Selfie →</button>
+            </>
           )}
         </div>
       </div>
+
+      <style>{`
+        @keyframes spin     { to { transform: rotate(360deg); } }
+        @keyframes fadeIn   { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+        @keyframes countPop { 0%,100% { transform: scale(1); } 50% { transform: scale(1.3); } }
+      `}</style>
     </div>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-const styles = {
+const s = {
   overlay: {
     position: "fixed", inset: 0,
-    background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)",
+    background: "rgba(0,0,0,0.72)", backdropFilter: "blur(8px)",
     display: "flex", alignItems: "center", justifyContent: "center",
-    zIndex: 1000,
+    zIndex: 1000, padding: 16,
   },
   modal: {
-    background: "#111827",
-    border: "1px solid #374151",
-    borderRadius: 20,
-    padding: "24px",
-    width: 360,
+    background: "#FFFFFF",
+    border: "1px solid #E5E7EB",
+    borderRadius: 24,
+    padding: "24px 22px",
+    width: "100%",
+    maxWidth: 380,
     display: "flex", flexDirection: "column", gap: 16,
-    boxShadow: "0 25px 60px rgba(0,0,0,0.6)",
+    boxShadow: "0 32px 80px rgba(0,0,0,0.22)",
+    animation: "fadeIn 0.25s ease",
   },
-  header: {
-    display: "flex", justifyContent: "space-between", alignItems: "center",
-  },
-  title: { color: "#f9fafb", fontWeight: 700, fontSize: 18 },
-  closeBtn: {
-    background: "none", border: "none", color: "#9ca3af",
-    cursor: "pointer", fontSize: 18, padding: 4,
-  },
+
+  // Header
+  header:     { display: "flex", justifyContent: "space-between", alignItems: "flex-start" },
+  headerLeft: { display: "flex", alignItems: "center", gap: 12 },
+  headerIcon: { fontSize: 28 },
+  title:      { margin: 0, fontSize: 17, fontWeight: 700, color: "#111827" },
+  subtitle:   { margin: "2px 0 0", fontSize: 12, color: "#9CA3AF" },
+  closeBtn:   { background: "#F9FAFB", border: "1px solid #E5E7EB", color: "#6B7280", cursor: "pointer", fontSize: 14, borderRadius: 8, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+
+  // Viewfinder
+  viewfinderWrap: { display: "flex", flexDirection: "column", alignItems: "center", gap: 12 },
   viewfinder: {
     position: "relative",
-    width: 280, height: 280,
-    alignSelf: "center",
+    width: 260, height: 260,
     borderRadius: "50%",
     overflow: "hidden",
-    background: "#1f2937",
-    border: "3px solid #374151",
+    background: "#F3F4F6",
+    border: "3px solid #E5E7EB",
+    flexShrink: 0,
   },
-  media: {
-    width: "100%", height: "100%",
-    objectFit: "cover",
-    borderRadius: "50%",
-  },
-  circleFrame: {
-    position: "absolute", inset: 0,
-    borderRadius: "50%",
-    border: "3px solid rgba(99,102,241,0.6)",
-    boxShadow: "inset 0 0 30px rgba(99,102,241,0.15)",
-    pointerEvents: "none",
-  },
-  placeholder: {
-    width: "100%", height: "100%",
-    display: "flex", flexDirection: "column",
-    alignItems: "center", justifyContent: "center", gap: 12,
-  },
-  placeholderText: { color: "#9ca3af", fontSize: 13, textAlign: "center", margin: 0, padding: "0 16px" },
-  spinner: {
-    width: 36, height: 36,
-    border: "3px solid #374151",
-    borderTopColor: "#6366f1",
-    borderRadius: "50%",
-    animation: "spin 0.8s linear infinite",
-  },
-  hint: { color: "#6b7280", fontSize: 13, textAlign: "center", margin: 0 },
-  actions: { display: "flex", gap: 10, justifyContent: "center" },
-  primaryBtn: {
-    flex: 1,
-    background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-    color: "#fff", border: "none", borderRadius: 12,
-    padding: "12px 0", fontWeight: 700, fontSize: 15,
-    cursor: "pointer",
-  },
-  secondaryBtn: {
-    flex: 1,
-    background: "#1f2937", color: "#9ca3af",
-    border: "1px solid #374151", borderRadius: 12,
-    padding: "12px 0", fontWeight: 600, fontSize: 15,
-    cursor: "pointer",
-  },
+  media:   { width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" },
+  corner:  { position: "absolute", width: 20, height: 20, borderRadius: 2 },
+  placeholder: { width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 },
+  placeholderText: { color: "#9CA3AF", fontSize: 12, textAlign: "center", margin: 0, padding: "0 16px" },
+  spinner: { width: 32, height: 32, border: "3px solid #E5E7EB", borderTopColor: "#7B1C3E", borderRadius: "50%", animation: "spin 0.8s linear infinite" },
+
+  countdownOverlay: { position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%" },
+  countdownNum:     { fontSize: 80, fontWeight: 800, color: "#FFFFFF", animation: "countPop 1s ease-in-out infinite", lineHeight: 1 },
+
+  capturedBadge: { position: "absolute", bottom: 14, right: 14, background: "#16A34A", color: "#fff", width: 28, height: 28, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700 },
+
+  statusPill: { display: "flex", alignItems: "center", gap: 6, borderRadius: 999, padding: "5px 14px", fontSize: 12, fontWeight: 600 },
+  statusDot:  { width: 6, height: 6, borderRadius: "50%", flexShrink: 0 },
+
+  // Tips
+  tips: { display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" },
+  tip:  { background: "#F9FAFB", border: "1px solid #E5E7EB", borderRadius: 8, padding: "4px 10px", fontSize: 11, color: "#6B7280" },
+
+  hint: { margin: 0, fontSize: 12, color: "#6B7280", textAlign: "center", lineHeight: 1.6 },
+
+  // Actions
+  actions:    { display: "flex", gap: 10 },
+  primaryBtn: { flex: 1, background: "linear-gradient(135deg, #7B1C3E 0%, #9B2554 100%)", color: "#fff", border: "none", borderRadius: 12, padding: "13px 0", fontWeight: 700, fontSize: 14, cursor: "pointer", boxShadow: "0 4px 14px rgba(123,28,62,0.25)" },
+  ghostBtn:   { flex: 1, background: "#F9FAFB", color: "#6B7280", border: "1px solid #E5E7EB", borderRadius: 12, padding: "13px 0", fontWeight: 600, fontSize: 14, cursor: "pointer" },
 };

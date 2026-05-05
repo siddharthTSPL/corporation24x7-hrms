@@ -3,11 +3,18 @@ const { calculateStatus, updateSummary } = require("../automatic/monthattendance
 
 const getUserId = (user) => user._id || user.id;
 
-// ── Check In ──────────────────────────────────────────────────────────────────
+
+const getOnModel = (role) => {
+  if (role === "manager") return "Manager";
+  if (role === "admin")   return "Admin";
+  return "User"; // ← "User" not "Employee"
+};
+
+
 const checkin = async (req, res) => {
   try {
     const { latitude, longitude, selfie } = req.body;
-    const user = req.user;
+    const user   = req.user;
     const userId = getUserId(user);
 
     if (!latitude || !longitude) {
@@ -17,36 +24,41 @@ const checkin = async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    let attendance = await Attendance.findOne({
+    const attendance = await Attendance.findOne({
       employee: userId,
-      role: user.role,
-      date: today,
+      role:     user.role,
+      date:     today,
     });
 
     if (attendance) {
+      
+      if (attendance.checkOut) {
+        return res.status(400).json({
+          message: "You have already completed your attendance for today.",
+          alreadyDone: true,
+        });
+      }
+
+     
       if (attendance.source === "agent") {
-        // Agent created it — upgrade to manual checkin with location/selfie
         attendance.latitude  = latitude;
         attendance.longitude = longitude;
         attendance.selfie    = selfie || attendance.selfie;
         attendance.checkIn   = new Date();
         attendance.source    = "manual";
+        attendance.onModel   = getOnModel(user.role); // ← add
         await attendance.save();
-
-        return res.json({
-          message: "Check-in successful",
-          attendance,
-        });
+        return res.json({ message: "Check-in successful", attendance });
       }
 
-      if (!attendance.checkOut) {
-        return res.status(400).json({ message: "Already checked in" });
-      }
+    
+      return res.status(400).json({ message: "Already checked in" });
     }
 
-    // Fresh checkin
+  
     const newAttendance = await Attendance.create({
       employee:      userId,
+      onModel:       getOnModel(user.role), // ← add
       role:          user.role,
       date:          today,
       checkIn:       new Date(),
@@ -59,21 +71,18 @@ const checkin = async (req, res) => {
       source:        "manual",
     });
 
-    res.json({
-      message: "Check-in successful",
-      attendance: newAttendance,
-    });
+    res.json({ message: "Check-in successful", attendance: newAttendance });
 
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// ── Activity Ping (from desktop agent) ───────────────────────────────────────
+
 const activity = async (req, res) => {
   try {
     const { status } = req.body;
-    const user = req.user;
+    const user   = req.user;
     const userId = getUserId(user);
 
     if (!["active", "idle"].includes(status)) {
@@ -85,30 +94,31 @@ const activity = async (req, res) => {
 
     let attendance = await Attendance.findOne({
       employee: userId,
-      role: user.role,
-      date: today,
+      role:     user.role,
+      date:     today,
     });
 
-    // Agent pings before manual checkin — create a placeholder record
+  
     if (!attendance) {
       attendance = await Attendance.create({
         employee:      userId,
+        onModel:       getOnModel(user.role), // ← add
         role:          user.role,
         date:          today,
         checkIn:       new Date(),
         activeMinutes: 0,
         idleMinutes:   0,
         lastUpdated:   0,
-        source:        "agent", // placeholder — upgraded on manual checkin
+        source:        "agent",
       });
     }
 
-    // Already checked out — ignore ping
+   
     if (attendance.checkOut) {
       return res.status(400).json({ message: "Already checked out" });
     }
 
-    // Anti-spam (1 minute rule)
+ 
     const now = Date.now();
     if (attendance.lastUpdated && now - attendance.lastUpdated < 60000) {
       return res.status(429).json({ message: "Too many requests" });
@@ -134,10 +144,10 @@ const activity = async (req, res) => {
   }
 };
 
-// ── Check Out ─────────────────────────────────────────────────────────────────
+
 const checkout = async (req, res) => {
   try {
-    const user = req.user;
+    const user   = req.user;
     const userId = getUserId(user);
 
     const today = new Date();
@@ -145,15 +155,14 @@ const checkout = async (req, res) => {
 
     const attendance = await Attendance.findOne({
       employee: userId,
-      role: user.role,
-      date: today,
+      role:     user.role,
+      date:     today,
     });
 
     if (!attendance) {
       return res.status(404).json({ message: "Please check in first" });
     }
 
-    // Block checkout if agent created record but employee never manually checked in
     if (attendance.source === "agent") {
       return res.status(400).json({ message: "Please check in first before checking out" });
     }
@@ -180,6 +189,8 @@ const checkout = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+
 const getToday = async (req, res) => {
   try {
     const user   = req.user;
@@ -195,13 +206,12 @@ const getToday = async (req, res) => {
     });
 
     if (!attendance) {
-      return res.json({ attendance: null, isCheckedIn: false });
+      return res.json({ attendance: null, isCheckedIn: false, isCheckedOut: false });
     }
 
     res.json({
       attendance,
-      // only manual checkins count as "checked in" for UI purposes
-      isCheckedIn: attendance.source === "manual" && !attendance.checkOut,
+      isCheckedIn:  attendance.source === "manual" && !attendance.checkOut,
       isCheckedOut: !!attendance.checkOut,
     });
 
@@ -210,13 +220,12 @@ const getToday = async (req, res) => {
   }
 };
 
-// ── Auto Checkout All (called by cron at 7 PM) ────────────────────────────────
+
 const autoCheckoutAll = async () => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Find all manual checkins that haven't checked out yet
     const openSessions = await Attendance.find({
       date:     today,
       source:   "manual",
