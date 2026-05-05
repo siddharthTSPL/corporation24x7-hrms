@@ -1,8 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./auth/store/getmeauth/getmeauth";
-import LandingPage from "./pages/auth/LandingPage";
 import Login from "./pages/auth/Login";
 import Signup from "./pages/auth/Signup";
+import LandingPage from "./pages/auth/LandingPage";
 import MainLayout from "./layout/MainLayout";
 import ProtectedRoute from "./components/Protectedroute";
 import Dashboard from "./pages/dashboard/Dashboard";
@@ -43,9 +43,11 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+      
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/redirect" element={<RoleBasedRedirect />} />
         <Route
           path="/unauthorized"
           element={
@@ -58,6 +60,7 @@ function App() {
           }
         />
 
+       
         <Route
           element={
             <ProtectedRoute allowedRoles={["admin", "manager", "employee"]}>
@@ -65,9 +68,6 @@ function App() {
             </ProtectedRoute>
           }
         >
-          {/* Redirects to the correct dashboard based on role */}
-          <Route index element={<RoleBasedRedirect />} />
-
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
           <Route path="/manager-dashboard" element={<Managerdashboard />} />

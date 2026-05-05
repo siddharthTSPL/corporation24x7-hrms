@@ -17,6 +17,7 @@ const OtpModel = require("../Models/otpbasedlogin.model");
 const leavebalanceModel = require("../Models/leavebalance.model");
 const reviewModel = require("../Models/review.model");
 const Attendance = require("../Models/attendance.model");
+const  ManagerLeave = require("../Models/maleave.model");
 
 
 
@@ -772,21 +773,38 @@ const deleteemployee = async (req, res, next) => {
   });
 };
 
+
 const showallleaves = async (req, res, next) => {
   if (!req.admin) {
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
 
-  const leaves = await Leave.find({
-    status: { $in: ["forwarded_admin", "pending_admin"] },
-  })
-    .populate("employee", "f_name l_name work_email")
-    .populate("manager", "f_name l_name work_email")
-    .sort({ createdAt: -1 });
+  const [employeeLeaves, managerLeaves] = await Promise.all([
+    Leave.find({ status: { $in: ["forwarded_admin"] } })
+      .populate("employee", "f_name l_name work_email")
+      .populate("manager", "f_name l_name work_email")
+      .sort({ createdAt: -1 }),
+
+    ManagerLeave.find({
+      status: { $in: ["pending_admin", "approved_admin", "rejected_admin"] }, // ← fetch all statuses
+    })
+      .populate("manager", "f_name l_name work_email")
+      .sort({ createdAt: -1 }),
+  ]);
+
+  // Debug — remove after confirming it works
+  console.log("Employee Leaves:", employeeLeaves.length);
+  console.log("Manager Leaves:", managerLeaves.length);
 
   res.status(200).json({
-    count: leaves.length,
-    leaves,
+    employeeLeaves: {
+      count: employeeLeaves.length,
+      leaves: employeeLeaves,
+    },
+    managerLeaves: {
+      count: managerLeaves.length,
+      leaves: managerLeaves,
+    },
   });
 };
 
@@ -795,9 +813,13 @@ const acceptleavebyadmin = async (req, res, next) => {
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
 
-  const leaveId = req.params.id;
+  const { id } = req.params;
+  const { leaveFor } = req.query; 
 
-  const leave = await Leave.findById(leaveId);
+ 
+  const LeaveModel = leaveFor === "manager" ? ManagerLeave : Leave;
+
+  const leave = await LeaveModel.findById(id);
 
   if (!leave) {
     return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
@@ -810,36 +832,35 @@ const acceptleavebyadmin = async (req, res, next) => {
     return next(Object.assign(new Error("Leave already processed"), { statusCode: 400 }));
   }
 
-  const leaveBalance = await LeaveBalance.findOne({
-    employee: leave.employee,
-  });
 
-  if (!leaveBalance) {
-    return next(Object.assign(new Error("Leave balance not found"), { statusCode: 404 }));
+  if (leaveFor !== "manager") {
+    const leaveBalance = await LeaveBalance.findOne({ employee: leave.employee });
+
+    if (!leaveBalance) {
+      return next(Object.assign(new Error("Leave balance not found"), { statusCode: 404 }));
+    }
+
+    if (leave.leaveType === "ml") {
+      const start = new Date(leave.startDate);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 181);
+
+      leaveBalance.mlStartDate = start;
+      leaveBalance.mlEndDate = end;
+
+      await leaveBalance.save();
+    }
+
+    await processLeaveDeduction(leave);
   }
-
-  if (leave.leaveType === "ml") {
-    const start = new Date(leave.startDate);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 181);
-
-    leaveBalance.mlStartDate = start;
-    leaveBalance.mlEndDate = end;
-
-    await leaveBalance.save();
-  }
-
-  const updatedBalance = await processLeaveDeduction(leave);
 
   leave.status = "approved_admin";
   leave.approvedBy = req.admin._id;
-
   await leave.save();
 
   res.status(200).json({
     message: "Leave approved by admin",
     leave,
-    leaveBalance: updatedBalance,
   });
 };
 
@@ -849,9 +870,12 @@ const rejectleavebyadmin = async (req, res, next) => {
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
 
-  const leaveId = req.params.id;
+  const { id } = req.params;
+  const { leaveFor } = req.query; 
 
-  const leave = await Leave.findById(leaveId);
+  const LeaveModel = leaveFor === "manager" ? ManagerLeave : Leave;
+
+  const leave = await LeaveModel.findById(id);
 
   if (!leave) {
     return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
@@ -866,9 +890,7 @@ const rejectleavebyadmin = async (req, res, next) => {
 
   leave.status = "rejected_admin";
   leave.rejectedBy = req.admin._id;
-
   leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
   await leave.save();
 
   res.status(200).json({
