@@ -3,14 +3,18 @@ import { useFindAllManagers } from "../../auth/server-state/adminauth/adminauth.
 import { useReviewToManager } from "../../auth/server-state/adminother/adminother.hook";
 
 const BRAND = {
-  pink: "#CD166E",
-  maroon: "#730042",
+  pink: "#8B1A4A",
+  maroon: "#5C0F30",
   cream: "#F9F8F2",
   dark: "#1A0010",
-  darkSurface: "#23001A",
-  cardBg: "#2D0020",
-  cardBorder: "#5a0038",
-  mutedText: "#c49fb5",
+  darkSurface: "#FFFFFF",
+  cardBg: "#F5F0F3",
+  cardBorder: "#E8D5DF",
+  mutedText: "#9B7A8A",
+  pageBackground: "#F2EEF0",
+  textPrimary: "#2D0A1A",
+  accentLight: "#FAF0F5",
+  accentBorder: "#D4A0B8",
 };
 
 // field helpers — handles f_name/l_name/work_email from your API
@@ -81,12 +85,12 @@ function ManagerCard({ manager, selected, onClick }) {
         borderRadius: 14,
         border: `1.5px solid ${isSelected ? BRAND.pink : BRAND.cardBorder}`,
         background: isSelected
-          ? `linear-gradient(135deg, #3d0028 0%, #580035 100%)`
-          : BRAND.cardBg,
+          ? `linear-gradient(135deg, #F5E8EF 0%, #EDD5E3 100%)`
+          : BRAND.darkSurface,
         transition: "all 0.2s",
         boxShadow: isSelected
-          ? `0 0 0 3px ${BRAND.pink}33, 0 4px 24px #00000060`
-          : "0 2px 8px #00000030",
+          ? `0 0 0 3px ${BRAND.pink}22, 0 4px 24px #00000015`
+          : "0 2px 8px #00000010",
         position: "relative",
         overflow: "hidden",
       }}
@@ -107,16 +111,16 @@ function ManagerCard({ manager, selected, onClick }) {
           borderRadius: "50%",
           background: isSelected
             ? `linear-gradient(135deg, ${BRAND.maroon}, ${BRAND.pink})`
-            : `#4a0032`,
+            : `linear-gradient(135deg, #C9829E, ${BRAND.pink})`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           fontFamily: "'Playfair Display', Georgia, serif",
           fontWeight: 700,
           fontSize: 15,
-          color: BRAND.cream,
+          color: "#FFFFFF",
           flexShrink: 0,
-          border: `1px solid ${isSelected ? BRAND.pink : "#6a0045"}`,
+          border: `1px solid ${isSelected ? BRAND.pink : BRAND.accentBorder}`,
         }}
       >
         {getInitials(manager)}
@@ -128,7 +132,7 @@ function ManagerCard({ manager, selected, onClick }) {
             fontFamily: "'Playfair Display', Georgia, serif",
             fontSize: 15,
             fontWeight: 600,
-            color: BRAND.cream,
+            color: BRAND.textPrimary,
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -206,7 +210,7 @@ export default function ReviewManager() {
     <div
       style={{
         minHeight: "100vh",
-        background: `radial-gradient(ellipse at top left, #3d0028 0%, ${BRAND.dark} 55%)`,
+        background: BRAND.pageBackground,
         fontFamily: "'Inter', 'Helvetica Neue', sans-serif",
         padding: "48px 24px",
         display: "flex",
@@ -221,10 +225,15 @@ export default function ReviewManager() {
       <div style={{ width: "100%", maxWidth: 960 }}>
         {/* Header */}
         <div style={{ marginBottom: 48, textAlign: "center" }}>
-          <div style={{ display: "inline-block", padding: "4px 16px", border: `1px solid ${BRAND.cardBorder}`, borderRadius: 20, fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: BRAND.pink, marginBottom: 16 }}>
+          <div style={{
+            display: "inline-block", padding: "4px 16px",
+            border: `1px solid ${BRAND.accentBorder}`, borderRadius: 20,
+            fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase",
+            color: BRAND.pink, marginBottom: 16, background: BRAND.accentLight,
+          }}>
             Performance Review
           </div>
-          <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "clamp(28px, 5vw, 44px)", fontWeight: 700, color: BRAND.cream, margin: "0 0 12px", letterSpacing: "-0.01em" }}>
+          <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "clamp(28px, 5vw, 44px)", fontWeight: 700, color: BRAND.textPrimary, margin: "0 0 12px", letterSpacing: "-0.01em" }}>
             Review a Manager
           </h1>
           <p style={{ fontSize: 15, color: BRAND.mutedText, margin: 0, maxWidth: 440, marginLeft: "auto", marginRight: "auto", lineHeight: 1.6 }}>
@@ -233,7 +242,7 @@ export default function ReviewManager() {
         </div>
 
         {submitted && (
-          <div style={{ background: `linear-gradient(135deg, ${BRAND.maroon}, #4a0032)`, border: `1px solid ${BRAND.pink}55`, borderRadius: 12, padding: "14px 20px", marginBottom: 28, display: "flex", alignItems: "center", gap: 12, color: BRAND.cream, fontSize: 14 }}>
+          <div style={{ background: `linear-gradient(135deg, #EDD5E3, #F5E8EF)`, border: `1px solid ${BRAND.pink}55`, borderRadius: 12, padding: "14px 20px", marginBottom: 28, display: "flex", alignItems: "center", gap: 12, color: BRAND.textPrimary, fontSize: 14 }}>
             <div style={{ width: 22, height: 22, borderRadius: "50%", background: BRAND.pink, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <svg width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </div>
@@ -242,7 +251,7 @@ export default function ReviewManager() {
         )}
 
         {submitError && (
-          <div style={{ background: "#2a0010", border: "1px solid #cc3355", borderRadius: 12, padding: "14px 20px", marginBottom: 28, color: "#f9c0cc", fontSize: 14 }}>
+          <div style={{ background: "#FFF0F0", border: "1px solid #cc3355", borderRadius: 12, padding: "14px 20px", marginBottom: 28, color: "#8B1A2A", fontSize: 14 }}>
             {submitError?.response?.data?.message ?? "Something went wrong. Please try again."}
           </div>
         )}
@@ -250,11 +259,11 @@ export default function ReviewManager() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1.1fr", gap: 28, alignItems: "start" }}>
 
           {/* Left — Manager List */}
-          <div style={{ background: BRAND.darkSurface, borderRadius: 20, border: `1px solid ${BRAND.cardBorder}`, overflow: "hidden" }}>
+          <div style={{ background: BRAND.darkSurface, borderRadius: 20, border: `2px solid ${BRAND.maroon}`, overflow: "hidden", boxShadow: "0 2px 16px #00000010" }}>
             <div style={{ padding: "20px 20px 14px", borderBottom: `1px solid ${BRAND.cardBorder}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <p style={{ margin: 0, fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: BRAND.mutedText, fontWeight: 500 }}>Select Manager</p>
               {managers.length > 0 && (
-                <span style={{ fontSize: 11, color: BRAND.pink, background: `${BRAND.pink}18`, padding: "2px 10px", borderRadius: 20 }}>
+                <span style={{ fontSize: 11, color: BRAND.pink, background: `${BRAND.pink}15`, padding: "2px 10px", borderRadius: 20 }}>
                   {managers.length} available
                 </span>
               )}
@@ -271,10 +280,10 @@ export default function ReviewManager() {
               )}
               {isError && (
                 <div style={{ padding: "12px 8px" }}>
-                  <div style={{ color: "#f9c0cc", fontSize: 13, marginBottom: 6 }}>
+                  <div style={{ color: "#8B1A2A", fontSize: 13, marginBottom: 6 }}>
                     {error?.response?.data?.message ?? error?.message ?? "Failed to load managers."}
                   </div>
-                  <button type="button" onClick={() => refetch()} style={{ all: "unset", cursor: "pointer", fontSize: 12, color: BRAND.pink, border: `1px solid ${BRAND.pink}55`, borderRadius: 8, padding: "6px 14px" }}>
+                  <button type="button" onClick={() => refetch()} style={{ all: "unset", cursor: "pointer", fontSize: 12, color: BRAND.pink, border: `1px solid ${BRAND.pink}55`, borderRadius: 8, padding: "6px 14px", background: BRAND.accentLight }}>
                     Retry
                   </button>
                 </div>
@@ -289,7 +298,7 @@ export default function ReviewManager() {
           </div>
 
           {/* Right — Review Form */}
-          <div style={{ background: BRAND.darkSurface, borderRadius: 20, border: `1px solid ${BRAND.cardBorder}`, overflow: "hidden" }}>
+          <div style={{ background: BRAND.darkSurface, borderRadius: 20, border: `2px solid ${BRAND.maroon}`, overflow: "hidden", boxShadow: "0 2px 16px #00000010" }}>
             <div style={{ padding: "20px 24px 14px", borderBottom: `1px solid ${BRAND.cardBorder}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <p style={{ margin: 0, fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: BRAND.mutedText, fontWeight: 500 }}>Your Review</p>
               {selected && (
@@ -302,7 +311,7 @@ export default function ReviewManager() {
             <div style={{ padding: "24px 24px 28px" }}>
               {!selected ? (
                 <div style={{ textAlign: "center", padding: "36px 20px", color: BRAND.mutedText, fontSize: 14, lineHeight: 1.6 }}>
-                  <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#3d0028", border: `1px dashed ${BRAND.cardBorder}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                  <div style={{ width: 56, height: 56, borderRadius: "50%", background: BRAND.accentLight, border: `1px dashed ${BRAND.accentBorder}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" stroke={BRAND.mutedText} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -313,12 +322,12 @@ export default function ReviewManager() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
 
                   {/* Selected manager pill */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: `${BRAND.pink}12`, borderRadius: 12, border: `1px solid ${BRAND.pink}30` }}>
-                    <div style={{ width: 38, height: 38, borderRadius: "50%", background: `linear-gradient(135deg, ${BRAND.maroon}, ${BRAND.pink})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: BRAND.cream, fontFamily: "'Playfair Display', Georgia, serif", flexShrink: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: BRAND.accentLight, borderRadius: 12, border: `1px solid ${BRAND.accentBorder}` }}>
+                    <div style={{ width: 38, height: 38, borderRadius: "50%", background: `linear-gradient(135deg, ${BRAND.maroon}, ${BRAND.pink})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#FFFFFF", fontFamily: "'Playfair Display', Georgia, serif", flexShrink: 0 }}>
                       {getInitials(selected)}
                     </div>
                     <div>
-                      <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: BRAND.cream }}>{getFullName(selected)}</p>
+                      <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: BRAND.textPrimary }}>{getFullName(selected)}</p>
                       <p style={{ margin: 0, fontSize: 11, color: BRAND.mutedText, textTransform: "capitalize" }}>
                         {selected.designation} · {selected.department}
                       </p>
@@ -359,7 +368,7 @@ export default function ReviewManager() {
                         border: `1px solid ${comment.length > 0 ? BRAND.pink + "66" : BRAND.cardBorder}`,
                         borderRadius: 12,
                         padding: "14px 16px",
-                        color: BRAND.cream,
+                        color: BRAND.textPrimary,
                         fontSize: 14,
                         lineHeight: 1.6,
                         resize: "vertical",
@@ -392,8 +401,8 @@ export default function ReviewManager() {
                       borderRadius: 12,
                       background: canSubmit
                         ? `linear-gradient(135deg, ${BRAND.maroon} 0%, ${BRAND.pink} 100%)`
-                        : "#3d0028",
-                      color: canSubmit ? BRAND.cream : BRAND.mutedText,
+                        : BRAND.cardBg,
+                      color: canSubmit ? "#FFFFFF" : BRAND.mutedText,
                       fontSize: 14,
                       fontWeight: 500,
                       letterSpacing: "0.02em",
@@ -427,9 +436,12 @@ export default function ReviewManager() {
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        textarea::placeholder { color: #7a4060; }
+        textarea::placeholder { color: ${BRAND.mutedText}; }
         textarea:focus { border-color: ${BRAND.pink} !important; }
-        button:not([disabled]):hover { filter: brightness(1.08); }
+        button:not([disabled]):hover { filter: brightness(1.05); }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: ${BRAND.cardBorder}; border-radius: 4px; }
       `}</style>
     </div>
   );
