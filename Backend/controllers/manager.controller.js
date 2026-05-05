@@ -12,6 +12,7 @@ const axios = require("axios");
 const Review = require("../Models/review.model");
 
 const jwt = require("jsonwebtoken");
+const managerLeaveModel = require("../Models/maleave.model");
 
 require("dotenv").config();
 
@@ -626,6 +627,8 @@ const forwardedtoadmin = async (req, res, next) => {
   });
 };
 
+
+
 const applyleavem = async (req, res, next) => {
   const { leaveType, startDate, endDate, reason } = req.body;
 
@@ -635,26 +638,23 @@ const applyleavem = async (req, res, next) => {
 
   if (!startDate || !endDate || !leaveType) {
     return next(
-      Object.assign(new Error("Required fields missing"), { statusCode: 400 }),
+      Object.assign(new Error("Required fields missing"), { statusCode: 400 })
     );
   }
 
   const managerId = req.manager._id;
-
   const start = new Date(startDate);
   const end = new Date(endDate);
 
   if (end < start) {
     return next(
-      Object.assign(new Error("End date cannot be before start date"), {
-        statusCode: 400,
-      }),
+      Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 })
     );
   }
 
   const days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
-  const overlapping = await leavemodel.findOne({
+  const overlapping = await managerLeaveModel.findOne({ // ← use new model
     manager: managerId,
     status: { $nin: ["rejected_admin"] },
     startDate: { $lte: end },
@@ -663,13 +663,11 @@ const applyleavem = async (req, res, next) => {
 
   if (overlapping) {
     return next(
-      Object.assign(new Error("Leave already applied for these dates"), {
-        statusCode: 400,
-      }),
+      Object.assign(new Error("Leave already applied for these dates"), { statusCode: 400 })
     );
   }
 
-  const leave = new leavemodel({
+  const leave = new managerLeaveModel({ // ← use new model
     manager: managerId,
     leaveType,
     startDate: start,

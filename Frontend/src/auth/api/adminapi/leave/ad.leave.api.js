@@ -8,11 +8,8 @@ const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message =
-      error.response?.data?.message || "Something went wrong";
-    if (error.response?.status === 401) {
-      return Promise.reject(null);
-    }
+    const message = error.response?.data?.message || "Something went wrong";
+    if (error.response?.status === 401) return Promise.reject(null);
     return Promise.reject(new Error(message));
   }
 );
@@ -22,15 +19,15 @@ export const getAllLeaves = async () => {
   return res.data;
 };
 
-export const acceptLeave = async (id) => {
-  if (!id) throw new Error("Leave ID is required");
 
-  const res = await api.put(`/acceptleave/${id}`);
+export const acceptLeave = async ({ id, leaveFor }) => {
+  if (!id) throw new Error("Leave ID is required");
+  const res = await api.put(`/acceptleave/${id}?leaveFor=${leaveFor}`);
   return res.data;
 };
 
-export const rejectLeave = async (id) => {
+export const rejectLeave = async ({ id, leaveFor }) => {
   if (!id) throw new Error("Leave ID is required");
-  const res = await api.put(`/rejectleave/${id}`);
+  const res = await api.put(`/rejectleave/${id}?leaveFor=${leaveFor}`);
   return res.data;
 };

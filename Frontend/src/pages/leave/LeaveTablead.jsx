@@ -53,6 +53,14 @@ const styles = {
     fontWeight: 600,
     letterSpacing: "0.5px",
   },
+  sectionLabel: {
+    fontSize: "11px",
+    letterSpacing: "3px",
+    textTransform: "uppercase",
+    color: palette.pink,
+    marginBottom: "12px",
+    fontWeight: 500,
+  },
   tableContainer: {
     background: "rgba(255,255,255,0.03)",
     borderRadius: "16px",
@@ -78,9 +86,7 @@ const styles = {
     whiteSpace: "nowrap",
   },
   row: (isEven) => ({
-    background: isEven
-      ? "rgba(255,255,255,0.015)"
-      : "transparent",
+    background: isEven ? "rgba(255,255,255,0.015)" : "transparent",
     transition: "background 0.2s",
     borderBottom: "1px solid rgba(115,0,66,0.2)",
   }),
@@ -95,12 +101,6 @@ const styles = {
     alignItems: "center",
     gap: "12px",
   },
-  avatar: (name) => {
-    const initials = name
-      ? name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
-      : "??";
-    return { initials };
-  },
   avatarBox: {
     width: "36px",
     height: "36px",
@@ -110,6 +110,19 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     fontSize: "12px",
+    fontWeight: 700,
+    color: palette.cream,
+    flexShrink: 0,
+  },
+  managerAvatarBox: {
+    width: "30px",
+    height: "30px",
+    borderRadius: "8px",
+    background: `linear-gradient(135deg, ${palette.maroon}, #4a0029)`,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "10px",
     fontWeight: 700,
     color: palette.cream,
     flexShrink: 0,
@@ -223,16 +236,16 @@ const styles = {
   },
   emptyState: {
     textAlign: "center",
-    padding: "80px 40px",
+    padding: "60px 40px",
     color: "rgba(249,248,242,0.35)",
   },
   emptyIcon: {
-    fontSize: "48px",
-    marginBottom: "16px",
+    fontSize: "40px",
+    marginBottom: "12px",
     opacity: 0.4,
   },
   emptyText: {
-    fontSize: "16px",
+    fontSize: "15px",
     fontWeight: 500,
   },
   errorState: {
@@ -289,10 +302,7 @@ const styles = {
     boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
     textAlign: "center",
   },
-  modalIcon: {
-    fontSize: "40px",
-    marginBottom: "16px",
-  },
+  modalIcon: { fontSize: "40px", marginBottom: "16px" },
   modalTitle: {
     fontSize: "20px",
     fontWeight: 700,
@@ -384,7 +394,7 @@ const ConfirmModal = ({ confirm, onClose, onConfirm, isLoading }) => {
             {isAccept ? "approve" : "reject"}
           </strong>{" "}
           the leave request for{" "}
-          <strong style={{ color: palette.cream }}>{confirm.employeeName}</strong>?
+          <strong style={{ color: palette.cream }}>{confirm.personName}</strong>?
           {!isAccept && (
             <div style={{ marginTop: "8px", fontSize: "12px", color: "rgba(249,248,242,0.4)" }}>
               This leave will be auto-deleted after 24 hours.
@@ -408,6 +418,143 @@ const ConfirmModal = ({ confirm, onClose, onConfirm, isLoading }) => {
   );
 };
 
+// ─── Reusable Leave Table ────────────────────────────────────────────────────
+const LeaveTable = ({ leaves, leaveFor, hoveredRow, setHoveredRow, isProcessing, onAction }) => {
+  const isManager = leaveFor === "manager";
+  const headers = isManager
+    ? ["Manager", "Leave Type", "Duration", "Status", "Actions"]
+    : ["Employee", "Manager", "Leave Type", "Duration", "Status", "Actions"];
+
+  return (
+    <table style={styles.table}>
+      <thead style={styles.thead}>
+        <tr>
+          {headers.map((h) => (
+            <th key={h} style={styles.th}>{h}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {leaves.map((leave, idx) => {
+          const emp = leave.employee || {};
+          const mgr = leave.manager || {};
+          const person = isManager ? mgr : emp;
+          const personName = `${person.f_name || ""} ${person.l_name || ""}`.trim() || "Unknown";
+          const initials = getInitials(person.f_name, person.l_name);
+          const mgrInitials = getInitials(mgr.f_name, mgr.l_name);
+          const mgrName = `${mgr.f_name || ""} ${mgr.l_name || ""}`.trim() || "—";
+          const isHovered = hoveredRow === leave._id;
+          const alreadyDone =
+            leave.status?.startsWith("approved") || leave.status?.startsWith("rejected");
+
+          return (
+            <tr
+              key={leave._id}
+              className="leave-row"
+              style={{
+                ...styles.row(idx % 2 === 0),
+                animationDelay: `${idx * 50}ms`,
+                background: isHovered
+                  ? "rgba(205,22,110,0.06)"
+                  : idx % 2 === 0
+                  ? "rgba(255,255,255,0.015)"
+                  : "transparent",
+              }}
+              onMouseEnter={() => setHoveredRow(leave._id)}
+              onMouseLeave={() => setHoveredRow(null)}
+            >
+              {/* Primary person cell (Employee or Manager) */}
+              <td style={styles.td}>
+                <div style={styles.employeeCell}>
+                  <div style={styles.avatarBox}>{initials}</div>
+                  <div>
+                    <div style={styles.nameText}>{personName}</div>
+                    <div style={styles.emailText}>{person.work_email || "—"}</div>
+                  </div>
+                </div>
+              </td>
+
+              {/* Manager cell — employee leaves only */}
+              {!isManager && (
+                <td style={styles.td}>
+                  <div style={styles.employeeCell}>
+                    <div style={styles.managerAvatarBox}>{mgrInitials}</div>
+                    <div>
+                      <div style={{ ...styles.nameText, fontSize: "13px" }}>{mgrName}</div>
+                      <div style={styles.emailText}>{mgr.work_email || "—"}</div>
+                    </div>
+                  </div>
+                </td>
+              )}
+
+              {/* Leave Type */}
+              <td style={styles.td}>
+                <span style={styles.leaveTypeBadge(leave.leaveType)}>
+                  {leave.leaveType?.toUpperCase() || "—"}
+                </span>
+              </td>
+
+              {/* Duration */}
+              <td style={styles.td}>
+                <div style={styles.dateText}>{formatDate(leave.startDate)}</div>
+                <div style={styles.dateRange}>→ {formatDate(leave.endDate)}</div>
+                <div style={{ ...styles.dateRange, marginTop: "4px" }}>
+                  {leave.days} day{leave.days !== 1 ? "s" : ""}
+                </div>
+              </td>
+
+              {/* Status */}
+              <td style={styles.td}>
+                <span style={styles.statusBadge(leave.status)}>
+                  <span
+                    style={{
+                      width: "5px",
+                      height: "5px",
+                      borderRadius: "50%",
+                      background: "currentColor",
+                      display: "inline-block",
+                    }}
+                  />
+                  {getStatusLabel(leave.status)}
+                </span>
+              </td>
+
+              {/* Actions */}
+              <td style={styles.td}>
+                {alreadyDone ? (
+                  <span style={{ fontSize: "12px", color: "rgba(249,248,242,0.3)", fontStyle: "italic" }}>
+                    Processed
+                  </span>
+                ) : (
+                  <div style={styles.actionGroup}>
+                    <button
+                      className="accept-btn"
+                      style={styles.acceptBtn}
+                      onClick={() => onAction(leave, "accept", leaveFor)}
+                      disabled={isProcessing}
+                    >
+                      Approve
+                    </button>
+                    <button
+                      className="reject-btn"
+                      style={styles.rejectBtn}
+                      onClick={() => onAction(leave, "reject", leaveFor)}
+                      disabled={isProcessing}
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+};
+
+// ─── Main Component ──────────────────────────────────────────────────────────
 const LeaveTablead = () => {
   const { data, isLoading, isError, error } = useGetForwardedLeaves();
   const acceptMutation = useAcceptLeave();
@@ -423,24 +570,25 @@ const LeaveTablead = () => {
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
   };
 
-  const handleAction = (leave, action) => {
-    const emp = leave.employee;
-    const employeeName = emp
-      ? `${emp.f_name || ""} ${emp.l_name || ""}`.trim()
-      : "this employee";
-    setConfirm({ leaveId: leave._id, action, employeeName });
+  // ← leaveFor: "employee" | "manager"
+  const handleAction = (leave, action, leaveFor) => {
+    const person = leaveFor === "manager" ? leave.manager : leave.employee;
+    const personName = person
+      ? `${person.f_name || ""} ${person.l_name || ""}`.trim()
+      : "this person";
+    setConfirm({ leaveId: leave._id, action, personName, leaveFor });
   };
 
   const handleConfirm = async () => {
     if (!confirm) return;
-    const { leaveId, action, employeeName } = confirm;
+    const { leaveId, action, personName, leaveFor } = confirm;
     try {
       if (action === "accept") {
-        await acceptMutation.mutateAsync(leaveId);
-        addToast(`Leave approved for ${employeeName}`, "success");
+        await acceptMutation.mutateAsync({ id: leaveId, leaveFor }); // ← pass both
+        addToast(`Leave approved for ${personName}`, "success");
       } else {
-        await rejectMutation.mutateAsync(leaveId);
-        addToast(`Leave rejected for ${employeeName}`, "error");
+        await rejectMutation.mutateAsync({ id: leaveId, leaveFor }); // ← pass both
+        addToast(`Leave rejected for ${personName}`, "error");
       }
     } catch (err) {
       addToast(err?.message || "Something went wrong", "error");
@@ -449,7 +597,11 @@ const LeaveTablead = () => {
     }
   };
 
-  const leaves = data?.leaves || [];
+  // ← pull from correct response keys
+  const employeeLeaves = data?.employeeLeaves?.leaves || [];
+  const managerLeaves = data?.managerLeaves?.leaves || [];
+  const totalCount =
+    (data?.employeeLeaves?.count || 0) + (data?.managerLeaves?.count || 0);
   const isProcessing = acceptMutation.isPending || rejectMutation.isPending;
 
   return (
@@ -472,9 +624,7 @@ const LeaveTablead = () => {
             <h1 style={styles.title}>Pending Requests</h1>
           </div>
           {!isLoading && (
-            <span style={styles.badge}>
-              {data?.count ?? 0} Requests
-            </span>
+            <span style={styles.badge}>{totalCount} Requests</span>
           )}
         </div>
 
@@ -485,163 +635,67 @@ const LeaveTablead = () => {
           </div>
         )}
 
-        {/* Table */}
-        <div style={styles.tableContainer}>
-          {isLoading ? (
+        {/* Loading */}
+        {isLoading ? (
+          <div style={styles.tableContainer}>
             <div style={styles.loadingState}>
               <div style={styles.spinner} />
               <span style={{ color: "rgba(249,248,242,0.4)", fontSize: "14px" }}>
                 Loading leave requests…
               </span>
             </div>
-          ) : leaves.length === 0 ? (
-            <div style={styles.emptyState}>
-              <div style={styles.emptyIcon}>📭</div>
-              <div style={styles.emptyText}>No pending leave requests</div>
-              <div style={{ marginTop: "8px", fontSize: "13px" }}>
-                All caught up! Requests will appear here when forwarded.
+          </div>
+        ) : (
+          <>
+            {/* ── Employee Leaves ── */}
+            <div style={{ marginBottom: "32px" }}>
+              <div style={styles.sectionLabel}>
+                Employee Leaves ({data?.employeeLeaves?.count || 0})
+              </div>
+              <div style={styles.tableContainer}>
+                {employeeLeaves.length === 0 ? (
+                  <div style={styles.emptyState}>
+                    <div style={styles.emptyIcon}>📭</div>
+                    <div style={styles.emptyText}>No pending employee leave requests</div>
+                  </div>
+                ) : (
+                  <LeaveTable
+                    leaves={employeeLeaves}
+                    leaveFor="employee"
+                    hoveredRow={hoveredRow}
+                    setHoveredRow={setHoveredRow}
+                    isProcessing={isProcessing}
+                    onAction={handleAction}
+                  />
+                )}
               </div>
             </div>
-          ) : (
-            <table style={styles.table}>
-              <thead style={styles.thead}>
-                <tr>
-                  {["Employee", "Manager", "Leave Type", "Duration", "Status", "Actions"].map(
-                    (h) => (
-                      <th key={h} style={styles.th}>{h}</th>
-                    )
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {leaves.map((leave, idx) => {
-                  const emp = leave.employee || {};
-                  const mgr = leave.manager || {};
-                  const empName = `${emp.f_name || ""} ${emp.l_name || ""}`.trim() || "Unknown";
-                  const mgrName = `${mgr.f_name || ""} ${mgr.l_name || ""}`.trim() || "—";
-                  const initials = getInitials(emp.f_name, emp.l_name);
-                  const mgrInitials = getInitials(mgr.f_name, mgr.l_name);
-                  const isHovered = hoveredRow === leave._id;
-                  const alreadyDone =
-                    leave.status?.startsWith("approved") ||
-                    leave.status?.startsWith("rejected");
 
-                  return (
-                    <tr
-                      key={leave._id}
-                      className="leave-row"
-                      style={{
-                        ...styles.row(idx % 2 === 0),
-                        animationDelay: `${idx * 50}ms`,
-                        background: isHovered
-                          ? "rgba(205,22,110,0.06)"
-                          : idx % 2 === 0
-                          ? "rgba(255,255,255,0.015)"
-                          : "transparent",
-                      }}
-                      onMouseEnter={() => setHoveredRow(leave._id)}
-                      onMouseLeave={() => setHoveredRow(null)}
-                    >
-                      {/* Employee */}
-                      <td style={styles.td}>
-                        <div style={styles.employeeCell}>
-                          <div style={styles.avatarBox}>{initials}</div>
-                          <div>
-                            <div style={styles.nameText}>{empName}</div>
-                            <div style={styles.emailText}>{emp.work_email || "—"}</div>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Manager */}
-                      <td style={styles.td}>
-                        <div style={styles.employeeCell}>
-                          <div
-                            style={{
-                              ...styles.avatarBox,
-                              background: `linear-gradient(135deg, ${palette.maroon}, #4a0029)`,
-                              width: "30px",
-                              height: "30px",
-                              fontSize: "10px",
-                              borderRadius: "8px",
-                            }}
-                          >
-                            {mgrInitials}
-                          </div>
-                          <div>
-                            <div style={{ ...styles.nameText, fontSize: "13px" }}>{mgrName}</div>
-                            <div style={styles.emailText}>{mgr.work_email || "—"}</div>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Leave Type */}
-                      <td style={styles.td}>
-                        <span style={styles.leaveTypeBadge(leave.leaveType)}>
-                          {leave.leaveType?.toUpperCase() || "—"}
-                        </span>
-                      </td>
-
-                      {/* Duration */}
-                      <td style={styles.td}>
-                        <div style={styles.dateText}>
-                          {formatDate(leave.startDate)}
-                        </div>
-                        <div style={styles.dateRange}>
-                          → {formatDate(leave.endDate)}
-                        </div>
-                      </td>
-
-                      {/* Status */}
-                      <td style={styles.td}>
-                        <span style={styles.statusBadge(leave.status)}>
-                          <span
-                            style={{
-                              width: "5px",
-                              height: "5px",
-                              borderRadius: "50%",
-                              background: "currentColor",
-                              display: "inline-block",
-                            }}
-                          />
-                          {getStatusLabel(leave.status)}
-                        </span>
-                      </td>
-
-                      {/* Actions */}
-                      <td style={styles.td}>
-                        {alreadyDone ? (
-                          <span style={{ fontSize: "12px", color: "rgba(249,248,242,0.3)", fontStyle: "italic" }}>
-                            Processed
-                          </span>
-                        ) : (
-                          <div style={styles.actionGroup}>
-                            <button
-                              className="accept-btn"
-                              style={styles.acceptBtn}
-                              onClick={() => handleAction(leave, "accept")}
-                              disabled={isProcessing}
-                            >
-                              Approve
-                            </button>
-                            <button
-                              className="reject-btn"
-                              style={styles.rejectBtn}
-                              onClick={() => handleAction(leave, "reject")}
-                              disabled={isProcessing}
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
+            {/* ── Manager Leaves ── */}
+            <div>
+              <div style={styles.sectionLabel}>
+                Manager Leaves ({data?.managerLeaves?.count || 0})
+              </div>
+              <div style={styles.tableContainer}>
+                {managerLeaves.length === 0 ? (
+                  <div style={styles.emptyState}>
+                    <div style={styles.emptyIcon}>📭</div>
+                    <div style={styles.emptyText}>No pending manager leave requests</div>
+                  </div>
+                ) : (
+                  <LeaveTable
+                    leaves={managerLeaves}
+                    leaveFor="manager"
+                    hoveredRow={hoveredRow}
+                    setHoveredRow={setHoveredRow}
+                    isProcessing={isProcessing}
+                    onAction={handleAction}
+                  />
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Confirm Modal */}
