@@ -1439,6 +1439,11 @@ const getTodayCheckins = async (req, res) => {
   }
 };
 
+const getOrgInfo = async (req, res) => {
+  const admin = await Adminmodel.findOne().select('organisation_name profile_image');
+  res.json({ organisation_name: admin.organisation_name, profile_image: admin.profile_image });
+};
+
 module.exports = {
   registerAdmin,
   verifyAdmin,
@@ -1468,5 +1473,6 @@ module.exports = {
   getme,
   editadminprofile,
   changepassword,
-  getTodayCheckins
+  getTodayCheckins,
+  getOrgInfo
 };

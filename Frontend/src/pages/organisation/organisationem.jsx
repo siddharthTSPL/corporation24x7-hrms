@@ -8,6 +8,7 @@ import {
 
 import { useGetMeAdmin, useFindAllManagers } from "../../auth/server-state/adminauth/adminauth.hook";
 import { useGetAllEmployee, useGetEmployeeStats, useGetOrgInfo } from "../../auth/server-state/adminother/adminother.hook";
+import { useGetMeUser } from "../../auth/server-state/employee/employeeauth/employeeauth.hook";
 
 // ── Helpers ───────────────────────────────────────────────────────
 const getInitials = (f = "", l = "") => `${f[0] || ""}${l[0] || ""}`.toUpperCase();
@@ -46,16 +47,21 @@ const STYLES = `
   @keyframes drawV    { from { transform:scaleY(0); } to { transform:scaleY(1); } }
   @keyframes spin     { to { transform:rotate(360deg); } }
   @keyframes slideDown{ from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes pulseRing {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.35), 0 6px 20px rgba(99,102,241,0.18); }
+    50%       { box-shadow: 0 0 0 7px rgba(99,102,241,0.08), 0 8px 26px rgba(99,102,241,0.24); }
+  }
 
   .org-card-hover { transition: transform 0.18s ease, box-shadow 0.18s ease; }
   .org-card-hover:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,0.08) !important; }
 
   .org-card-highlight {
-    outline: 2px solid #6366f1 !important;
+    outline: 2.5px solid #6366f1 !important;
     outline-offset: 2px;
     box-shadow: 0 0 0 5px rgba(99,102,241,0.13) !important;
   }
   .org-card-dim { opacity: 0.22; filter: grayscale(0.3); transition: opacity 0.2s, filter 0.2s; }
+  .org-card-me  { animation: pulseRing 2.6s ease-in-out infinite !important; }
 
   .stat-card-hover { transition: transform 0.15s ease, box-shadow 0.15s ease; }
   .stat-card-hover:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.06) !important; }
@@ -122,6 +128,13 @@ const STYLES = `
     display: flex; align-items: center; gap: 8px;
     animation: slideDown 0.2s ease forwards;
   }
+
+  /* Export snapshot mode – overrides all animation opacity so nothing is invisible */
+  .export-mode, .export-mode * {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
 `;
 
 // ── Skeleton ──────────────────────────────────────────────────────
@@ -173,7 +186,7 @@ function Hi({ text = "", query = "", style = {} }) {
   );
 }
 
-// ── CEO node ──────────────────────────────────────────────────────
+// ── CEO / Admin node ──────────────────────────────────────────────
 function CeoNode({ name, initials, delay = 0, dimmed, highlighted }) {
   return (
     <div style={{ animation: `scaleIn 0.35s ease ${delay}ms forwards`, opacity: 0, flexShrink: 0 }}>
@@ -192,26 +205,50 @@ function CeoNode({ name, initials, delay = 0, dimmed, highlighted }) {
 }
 
 // ── Manager node ──────────────────────────────────────────────────
-function ManagerNode({ name, subtitle, initials, colorCfg, delay = 0, dimmed, highlighted, q }) {
+function ManagerNode({ name, subtitle, initials, colorCfg, delay = 0, dimmed, highlighted, isMyManager, q }) {
   return (
     <div style={{ animation: `fadeUp 0.35s ease ${delay}ms forwards`, opacity: 0, flexShrink: 0 }}>
-      <div className={`org-card-hover${highlighted ? " org-card-highlight" : ""}${dimmed ? " org-card-dim" : ""}`} style={{ width: 156, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "14px 12px 12px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", display: "flex", flexDirection: "column", alignItems: "center", position: "relative", overflow: "hidden" }}>
+      <div
+        className={[
+          "org-card-hover",
+          highlighted ? "org-card-highlight" : "",
+          dimmed ? "org-card-dim" : "",
+          isMyManager ? "org-card-me" : "",
+        ].filter(Boolean).join(" ")}
+        style={{ width: 156, background: "#fff", border: `1px solid ${isMyManager ? colorCfg.bar : "#e2e8f0"}`, borderRadius: 12, padding: "14px 12px 12px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", display: "flex", flexDirection: "column", alignItems: "center", position: "relative", overflow: "hidden" }}
+      >
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2.5, background: colorCfg.bar, borderRadius: "12px 12px 0 0" }} />
         <div style={{ width: 38, height: 38, borderRadius: "50%", background: colorCfg.light, color: colorCfg.text, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 600, marginBottom: 9, flexShrink: 0 }}>{initials}</div>
         <Hi text={name}     query={q} style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", textAlign: "center", maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }} />
         <Hi text={subtitle} query={q} style={{ fontSize: 11, color: "#64748b", marginTop: 3, textAlign: "center", maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }} />
-        <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 4, background: colorCfg.light, color: colorCfg.text, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginTop: 9 }}>Manager</span>
+        <div style={{ display: "flex", gap: 4, marginTop: 9, flexWrap: "wrap", justifyContent: "center" }}>
+          <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 4, background: colorCfg.light, color: colorCfg.text, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>Manager</span>
+          {isMyManager && (
+            <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 4, background: "#eef2ff", color: "#4338ca", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>Your Manager</span>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
 // ── Employee node ─────────────────────────────────────────────────
-function EmployeeNode({ name, subtitle, initials, delay = 0, dimmed, highlighted, q }) {
+function EmployeeNode({ name, subtitle, initials, delay = 0, dimmed, highlighted, isMe, q }) {
   return (
     <div style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards`, opacity: 0, flexShrink: 0 }}>
-      <div className={`org-card-hover${highlighted ? " org-card-highlight" : ""}${dimmed ? " org-card-dim" : ""}`} style={{ width: 120, background: "#f8fafc", border: "1px solid #e9eef5", borderRadius: 10, padding: "10px 8px", display: "flex", flexDirection: "column", alignItems: "center" }}>
-        <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#e2e8f0", color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 600, marginBottom: 7, flexShrink: 0 }}>{initials}</div>
+      <div
+        className={[
+          "org-card-hover",
+          highlighted ? "org-card-highlight" : "",
+          dimmed ? "org-card-dim" : "",
+          isMe ? "org-card-me" : "",
+        ].filter(Boolean).join(" ")}
+        style={{ width: 120, background: isMe ? "#f0f4ff" : "#f8fafc", border: `1px solid ${isMe ? "#a5b4fc" : "#e9eef5"}`, borderRadius: 10, padding: "10px 8px", display: "flex", flexDirection: "column", alignItems: "center", position: "relative" }}
+      >
+        {isMe && (
+          <span style={{ position: "absolute", top: -9, left: "50%", transform: "translateX(-50%)", fontSize: 8, fontWeight: 700, letterSpacing: "0.06em", padding: "2px 8px", borderRadius: 10, background: "#6366f1", color: "#fff", whiteSpace: "nowrap" }}>YOU</span>
+        )}
+        <div style={{ width: 30, height: 30, borderRadius: "50%", background: isMe ? "#c7d2fe" : "#e2e8f0", color: isMe ? "#4338ca" : "#64748b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, marginBottom: 7, flexShrink: 0 }}>{initials}</div>
         <Hi text={name}     query={q} style={{ fontSize: 11, fontWeight: 600, color: "#1e293b", textAlign: "center", maxWidth: 106, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }} />
         <Hi text={subtitle} query={q} style={{ fontSize: 10, color: "#94a3b8", marginTop: 2, textAlign: "center", maxWidth: 106, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }} />
       </div>
@@ -273,7 +310,10 @@ function SkeletonTree() {
 }
 
 // ── Org Tree ──────────────────────────────────────────────────────
-function OrgTree({ adminName, orgName, managers, employeesByMgr, loading, searchQuery }) {
+function OrgTree({
+  adminName, orgName, managers, employeesByMgr,
+  loading, searchQuery, currentUserId, reportingManagerId,
+}) {
   if (loading) return <SkeletonTree />;
 
   const q = normalize(searchQuery);
@@ -319,13 +359,14 @@ function OrgTree({ adminName, orgName, managers, employeesByMgr, loading, search
 
       <div style={{ display: "flex", gap: MGR_GAP, justifyContent: "center", alignItems: "flex-start" }}>
         {managers.map((mgr, mi) => {
-          const emps = employeesByMgr[mgr._id] || [];
-          const colorCfg = DEPT_COLORS[mi % DEPT_COLORS.length];
-          const mgrDelay = 460 + mi * 80;
-          const empTotalW = emps.length > 1 ? (emps.length - 1) * (120 + EMP_GAP) : 0;
-          const mgrMatch     = hasQ && matchesPerson(mgr.f_name, mgr.l_name, mgr.department, mgr.designation, q);
-          const branchMatch  = hasQ && matchedMgrIds.has(mgr._id);
-          const mgrDimmed    = hasQ && !branchMatch;
+          const emps       = employeesByMgr[mgr._id] || [];
+          const colorCfg   = DEPT_COLORS[mi % DEPT_COLORS.length];
+          const mgrDelay   = 460 + mi * 80;
+          const empTotalW  = emps.length > 1 ? (emps.length - 1) * (120 + EMP_GAP) : 0;
+          const mgrMatch   = hasQ && matchesPerson(mgr.f_name, mgr.l_name, mgr.department, mgr.designation, q);
+          const branchMatch = hasQ && matchedMgrIds.has(mgr._id);
+          const mgrDimmed  = hasQ && !branchMatch;
+          const isMyMgr    = mgr._id === reportingManagerId;
 
           return (
             <div key={mgr._id} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -334,8 +375,12 @@ function OrgTree({ adminName, orgName, managers, employeesByMgr, loading, search
                 name={`${mgr.f_name} ${mgr.l_name}`}
                 subtitle={mgr.department || mgr.designation || "Manager"}
                 initials={getInitials(mgr.f_name, mgr.l_name)}
-                colorCfg={colorCfg} delay={mgrDelay}
-                highlighted={mgrMatch} dimmed={mgrDimmed} q={searchQuery}
+                colorCfg={colorCfg}
+                delay={mgrDelay}
+                highlighted={mgrMatch}
+                dimmed={mgrDimmed}
+                isMyManager={isMyMgr}
+                q={searchQuery}
               />
 
               {emps.length > 0 && (
@@ -349,6 +394,7 @@ function OrgTree({ adminName, orgName, managers, employeesByMgr, loading, search
                 {emps.map((emp, ei) => {
                   const empMatch  = hasQ && matchesPerson(emp.f_name, emp.l_name, emp.department, emp.designation, q);
                   const empDimmed = hasQ && !empMatch && !mgrMatch;
+                  const isMe      = emp._id === currentUserId;
                   return (
                     <div key={emp._id} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                       <VLine h={16} delay={mgrDelay + 220 + ei * 40} />
@@ -357,7 +403,10 @@ function OrgTree({ adminName, orgName, managers, employeesByMgr, loading, search
                         subtitle={emp.department || emp.designation || "Employee"}
                         initials={getInitials(emp.f_name, emp.l_name)}
                         delay={mgrDelay + 260 + ei * 40}
-                        highlighted={empMatch} dimmed={empDimmed} q={searchQuery}
+                        highlighted={empMatch}
+                        dimmed={empDimmed}
+                        isMe={isMe}
+                        q={searchQuery}
                       />
                     </div>
                   );
@@ -384,22 +433,28 @@ function OrgTree({ adminName, orgName, managers, employeesByMgr, loading, search
 
 // ── Main Page ─────────────────────────────────────────────────────
 export default function OrganizationPage() {
-  const { data: adminData }   = useGetMeAdmin();
-  const { data: orgData }     = useGetOrgInfo();
+  // Admin hooks (may return null if viewer is an employee)
+  const { data: adminData }    = useGetMeAdmin();
+  const { data: orgData }      = useGetOrgInfo();
   const { data: managersRes, isLoading: loadingMgrs } = useFindAllManagers();
   const { data: employeesRes, isLoading: loadingEmps } = useGetAllEmployee();
-  const { data: statsRes }    = useGetEmployeeStats();
+  const { data: statsRes }     = useGetEmployeeStats();
 
-  // ── Search ────────────────────────────────────────────────────
+  // Employee hook – identifies the current user when they are an employee
+  const { data: meUserData }   = useGetMeUser();
+  const currentUserId          = meUserData?._id || null;
+  const reportingManagerId     = meUserData?.Under_manager?._id || meUserData?.Under_manager || null;
+
+  // ── Search ─────────────────────────────────────────────────────
   const [searchOpen,  setSearchOpen]  = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const inputRef = useRef(null);
 
-  // ── Export ────────────────────────────────────────────────────
+  // ── Export ─────────────────────────────────────────────────────
   const [exportStatus, setExportStatus] = useState(null); // null | "loading" | "done"
   const chartRef = useRef(null);
 
-  // ── Data ──────────────────────────────────────────────────────
+  // ── Data ───────────────────────────────────────────────────────
   const managers  = managersRes?.managers || [];
   const employees = useMemo(() =>
     (employeesRes?.users || []).filter(u => u.Under_manager != null),
@@ -422,7 +477,7 @@ export default function OrganizationPage() {
   const orgName    = orgData?.organisation_name || adminData?.organisation_name;
   const adminName  = adminData?.username || adminData?.email?.split("@")[0] || "Admin";
 
-  // ── Search match count ────────────────────────────────────────
+  // ── Search match count ─────────────────────────────────────────
   const matchCount = useMemo(() => {
     if (!searchQuery) return 0;
     const q = normalize(searchQuery);
@@ -436,23 +491,27 @@ export default function OrganizationPage() {
     return n;
   }, [searchQuery, managers, employeesByMgr]);
 
-  // ── Keyboard: Escape closes search ───────────────────────────
+  // ── Keyboard: Escape closes search ────────────────────────────
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); } };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // ── Auto-focus on open ────────────────────────────────────────
+  // ── Auto-focus on search open ──────────────────────────────────
   useEffect(() => {
     if (searchOpen) setTimeout(() => inputRef.current?.focus(), 40);
   }, [searchOpen]);
 
-  // ── Export PNG via html2canvas ────────────────────────────────
+  // ── Export PNG – fixed blank-page issue ───────────────────────
+  // Root cause: CSS animations leave nodes at opacity:0 / transform != none
+  // at capture time. Fix: add .export-mode class to remove all animations,
+  // wait a frame for React to repaint, then capture, then remove the class.
   const handleExport = useCallback(async () => {
     if (!chartRef.current || exportStatus === "loading") return;
     setExportStatus("loading");
     try {
+      // 1. Load html2canvas if not yet present
       if (!window.html2canvas) {
         await new Promise((res, rej) => {
           const s = document.createElement("script");
@@ -461,27 +520,49 @@ export default function OrganizationPage() {
           document.head.appendChild(s);
         });
       }
-      const canvas = await window.html2canvas(chartRef.current, {
+
+      // 2. Strip all animations so no node is invisible at capture time
+      const target = chartRef.current;
+      target.classList.add("export-mode");
+
+      // 3. Give browser one full frame to repaint
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+      // 4. Capture
+      const canvas = await window.html2canvas(target, {
         backgroundColor: "#ffffff",
         scale: 2,
         useCORS: true,
+        allowTaint: false,
         logging: false,
         scrollX: 0,
         scrollY: 0,
+        // Ignore elements that are purely decorative / loaded from external CDN
+        ignoreElements: (el) => el.tagName === "STYLE" && el.innerText.includes("@import"),
       });
+
+      // 5. Restore animations
+      target.classList.remove("export-mode");
+
+      // 6. Download
       const link = document.createElement("a");
       link.download = `org-chart-${(orgName || "organization").replace(/\s+/g, "-").toLowerCase()}.png`;
       link.href = canvas.toDataURL("image/png");
       link.click();
+
       setExportStatus("done");
       setTimeout(() => setExportStatus(null), 2600);
     } catch (err) {
       console.error("Export failed:", err);
+      chartRef.current?.classList.remove("export-mode");
       setExportStatus(null);
     }
   }, [exportStatus, orgName]);
 
   const closeSearch = () => { setSearchOpen(false); setSearchQuery(""); };
+
+  // ── Determine if viewer is an employee (not admin) ─────────────
+  const isEmployee = !!currentUserId && !adminData;
 
   return (
     <div className="org-root" style={{ minHeight: "100vh", background: "#f8fafc" }}>
@@ -495,12 +576,14 @@ export default function OrganizationPage() {
           <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>{orgName || "Organization"}</span>
           <ChevronRight size={13} style={{ color: "#cbd5e1" }} />
           <span style={{ fontSize: 13, color: "#1e293b", fontWeight: 600 }}>Org Chart</span>
+          {isEmployee && (
+            <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, background: "#eef2ff", color: "#4338ca", fontWeight: 600, marginLeft: 4 }}>Employee View</span>
+          )}
         </div>
 
         {/* Actions */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
 
-          {/* Search toggle → inline search bar */}
           {searchOpen ? (
             <div style={{ display: "flex", alignItems: "center", gap: 8, animation: "slideDown 0.2s ease forwards" }}>
               <div className="search-wrap">
@@ -533,7 +616,6 @@ export default function OrganizationPage() {
             </button>
           )}
 
-          {/* Export */}
           <button
             className="hdr-btn hdr-btn-primary"
             onClick={handleExport}
@@ -554,6 +636,7 @@ export default function OrganizationPage() {
           <h1 style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", margin: 0, letterSpacing: "-0.3px" }}>Organization structure</h1>
           <p style={{ fontSize: 13, color: "#94a3b8", margin: "5px 0 0" }}>
             {loading ? "Loading…" : `${totalAll} total members across ${totalDepts || managers.length} departments`}
+            {isEmployee && " · Your position is highlighted"}
           </p>
         </div>
 
@@ -598,13 +681,14 @@ export default function OrganizationPage() {
                   <span key={mgr._id} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#64748b", padding: "3px 9px", borderRadius: 6, background: DEPT_COLORS[i % DEPT_COLORS.length].light, fontWeight: 500 }}>
                     <span style={{ width: 6, height: 6, borderRadius: "50%", background: DEPT_COLORS[i % DEPT_COLORS.length].bar, flexShrink: 0 }} />
                     {mgr.f_name}
+                    {mgr._id === reportingManagerId && " ★"}
                   </span>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Chart canvas (ref = export target) */}
+          {/* Chart canvas – this is the export target */}
           <div ref={chartRef} className="org-scroll" style={{ overflowX: "auto", padding: "40px 32px 36px", background: "#fff" }}>
             <OrgTree
               adminName={adminName}
@@ -613,6 +697,8 @@ export default function OrganizationPage() {
               employeesByMgr={employeesByMgr}
               loading={loading}
               searchQuery={searchQuery}
+              currentUserId={currentUserId}
+              reportingManagerId={reportingManagerId}
             />
           </div>
         </div>
@@ -621,10 +707,14 @@ export default function OrganizationPage() {
         {!loading && (
           <div style={{ display: "flex", gap: 24, marginTop: 16, justifyContent: "center", flexWrap: "wrap", animation: "fadeIn 0.4s ease 600ms forwards", opacity: 0 }}>
             {[
-              { dot: "#1e293b", label: "Administrator" },
-              { dot: "#6366f1", label: "Manager" },
-              { dot: "#e2e8f0", label: "Employee", border: "#cbd5e1" },
-              { dot: "#6366f1", label: "Search match", ring: true },
+              { dot: "#1e293b",  label: "Administrator" },
+              { dot: "#6366f1",  label: "Manager" },
+              { dot: "#e2e8f0",  label: "Employee", border: "#cbd5e1" },
+              { dot: "#6366f1",  label: "Search match", ring: true },
+              ...(isEmployee ? [
+                { dot: "#c7d2fe", label: "You", border: "#a5b4fc" },
+                { dot: "#a5b4fc", label: "Your Manager", ring: true },
+              ] : []),
             ].map(({ dot, label, border, ring }) => (
               <div key={label} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "#94a3b8" }}>
                 <span style={{ width: 10, height: 10, borderRadius: "50%", background: dot, flexShrink: 0, border: border ? `1.5px solid ${border}` : "none", boxShadow: ring ? "0 0 0 3px rgba(99,102,241,0.2)" : "none" }} />
