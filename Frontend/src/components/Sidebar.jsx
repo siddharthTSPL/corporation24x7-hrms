@@ -25,7 +25,7 @@ const managerMenu = [
   { name: "Dashboard", path: "/manager-dashboard", icon: <FaHome /> },
   { name: "Leave", path: "/leave-manager", icon: <FaCalendarAlt /> },
   { name: "Announcement", path: "/announcement-manager", icon: <FaBullhorn /> },
-  { name: "Organisation", path: "/organisation", icon: <FaBuilding /> },
+  { name: "Organisation", path: "/organisation-manager", icon: <FaBuilding /> },
   { name: "Review", path: "/review-manager", icon: <FaBullhorn /> },
   { name: "Document", path: "/document-manager", icon: <FaFileAlt /> },
   { name: "File", path: "/file-manager", icon: <FaFolder /> },
@@ -36,7 +36,7 @@ const employeeMenu = [
   { name: "Dashboard", path: "/employee-dashboard", icon: <FaHome /> },
   { name: "Leave", path: "/leave-employee", icon: <FaCalendarAlt /> },
   { name: "Announcement", path: "/announcement-employee", icon: <FaBullhorn /> },
-  { name: "Organisation", path: "/organisation", icon: <FaBuilding /> },
+  { name: "Organisation", path: "/organisation-employee", icon: <FaBuilding /> },
   { name: "File", path: "/file-employee", icon: <FaFolder /> },
   { name: "Settings", path: "/settings-employee", icon: <FaCog /> },
 ];

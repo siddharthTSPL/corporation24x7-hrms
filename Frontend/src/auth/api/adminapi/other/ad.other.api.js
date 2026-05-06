@@ -61,3 +61,8 @@ export const getTodayCheckins = async () => {
   const res = await api.get("/gettodaycheckins");
   return res.data;
 };
+
+export const getOrgInfo = async () => {
+  const res = await api.get("/getorginfo");
+  return res.data;
+};
