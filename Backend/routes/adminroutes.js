@@ -31,7 +31,8 @@ const {
   getme,
   editadminprofile,
   changepassword,
-  getTodayCheckins
+  getTodayCheckins,
+  getOrgInfo,
 } = require("../controllers/admin.controller");
 
 adminrouter.post("/register", asyncHandler(registerAdmin));
@@ -136,5 +137,6 @@ adminrouter.get("/getme", adminauthmiddleware, asyncHandler(getme));
 adminrouter.put("/editadminprofile", adminauthmiddleware, asyncHandler(editadminprofile));
 adminrouter.put("/changepassword", adminauthmiddleware, asyncHandler(changepassword));
 adminrouter.get("/gettodaycheckins", adminauthmiddleware, asyncHandler(getTodayCheckins));
+adminrouter.get("/getorginfo", adminauthmiddleware, asyncHandler(getOrgInfo));
 
 module.exports = adminrouter;

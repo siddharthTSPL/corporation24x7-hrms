@@ -25,6 +25,8 @@ import File from "./pages/file/File";
 import Fileem from "./pages/file/Fileem";
 import Filema from "./pages/file/Filema";
 import Organisation from "./pages/organisation/Organisation";
+import Organisationem from "./pages/organisation/organisationem";
+import Organisationma from "./pages/organisation/organisationma";
 import Reviewad from "./pages/review/reviewad";
 import Reviewma from "./pages/review/reviewma";
 import Attendancepage from "./pages/attendance/attendancepage";
@@ -88,6 +90,8 @@ function App() {
           <Route path="/settings-employee" element={<Setem />} />
           <Route path="/settings-manager" element={<Setma />} />
           <Route path="/organisation" element={<Organisation />} />
+          <Route path="/organisation-employee" element={<Organisationem />} />
+          <Route path="/organisation-manager" element={<Organisationma />} />
           <Route path="/review-admin" element={<Reviewad />} />
           <Route path="/review-manager" element={<Reviewma />} />
           <Route path="/mark-attendance" element={<Attendancepage />} />
