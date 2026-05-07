@@ -13,7 +13,9 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173",
-      "https://torchx-talent.techtorch.solutions"
+      "https://torchx-talent.techtorch.solutions",
+      "http://torchx-talent.techtorch.solutions",
+      "https://www.torchx-talent.techtorch.solutions"
     ],
     credentials: true,
   })
