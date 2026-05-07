@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/admin",
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/",
   withCredentials: true,
 });
 
@@ -19,50 +19,50 @@ api.interceptors.response.use(
 );
 
 export const getAllEmployee = async () => {
-  const res = await api.get("/getallemployee");
+  const res = await api.get("admin/getallemployee");
   return res.data;
 };
 
 export const getParticularEmployee = async (uid) => {
-  const res = await api.get(`/getperticularemployee/${uid}`);
+  const res = await api.get(`admin/getperticularemployee/${uid}`);
   return res.data;
 };
 
 export const deleteUser = async (uid) => {
-  const res = await api.delete(`/deleteuser/${uid}`);
+  const res = await api.delete(`admin/deleteuser/${uid}`);
   return res.data;
 };
 
 export const editEmployee = async (uid, data) => {
-  const res = await api.put(`/editemployee/${uid}`, data);
+  const res = await api.put(`admin/editemployee/${uid}`, data);
   return res.data;
 };
 
 export const getEmployeeStats = async () => {
-  const res = await api.get("/noofemployee");
+  const res = await api.get("admin/noofemployee");
   return res.data;
 };
 
 export const reviewToManager = async (data) => {
-  const res = await api.post("/reviewtomanager", data);
+  const res = await api.post("admin/reviewtomanager", data);
   return res.data;
 };
 export const getparticularEmployeeStats = async (uid) => {
-  const res = await api.get(`/getperticularemployee/${uid}`);
+  const res = await api.get(`admin/getperticularemployee/${uid}`);
   return res.data;
 };
 
 export const getParticularManager = async (uid) => {
-  const res = await api.get(`/getperticularemanager/${uid}`);
+  const res = await api.get(`admin/getperticularemanager/${uid}`);
   return res.data;
 };
 
 export const getTodayCheckins = async () => {
-  const res = await api.get("/gettodaycheckins");
+  const res = await api.get("admin/gettodaycheckins");
   return res.data;
 };
 
 export const getOrgInfo = async () => {
-  const res = await api.get("/getorginfo");
+  const res = await api.get("admin/getorginfo");
   return res.data;
 };

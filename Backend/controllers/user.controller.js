@@ -29,7 +29,7 @@ const verifyUserEmail = async (req, res, next) => {
           <h1 style="color:#CD166E;">❌ Link Invalid</h1>
           <p style="color:#555;">This verification link is expired or invalid.</p>
 
-          <a href="http://localhost:3000/login" style="
+          <a href="https://corporation24x7-hrms.onrender.com/user/login" style="
             margin-top:20px;
             display:inline-block;
             padding:12px 25px;
@@ -203,7 +203,7 @@ const userlogin = async (req, res, next) => {
       { expiresIn: "15m" },
     );
 
-    const link = `http://localhost:5000/user/change-password?token=${resetToken}`;
+    const link = `https://corporation24x7-hrms.onrender.com/user/change-password?token=${resetToken}`;
 
     await sendEmail({
       to: isvaliduser.work_email,
@@ -234,7 +234,14 @@ const userlogin = async (req, res, next) => {
     { expiresIn: "15d" },
   );
 
-  res.cookie("token", token, { httpOnly: true });
+ const isProduction = process.env.NODE_ENV === "production";
+
+res.cookie("token", token, {
+  httpOnly: true,
+  secure: isProduction,
+  sameSite: isProduction ? "none" : "lax",
+  maxAge: 15 * 24 * 60 * 60 * 1000,
+});
 
   await usermodel.findByIdAndUpdate(isvaliduser._id, {
     status: "active",
