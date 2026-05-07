@@ -562,7 +562,7 @@ function TodayBanner({ isOnLeave, leaveType, onCheckIn }) {
           boxShadow:  isOnLeave ? "none" : "0 2px 10px rgba(0,0,0,0.1)",
         }}
       >
-        {isOnLeave ? "🚫 Check-in Disabled" : "✅ Check In"}
+        {isOnLeave ? "🚫 Check-in Disabled" : " Check In"}
       </button>
     </div>
   );
