@@ -13,6 +13,7 @@ const Review = require("../Models/review.model");
 
 const jwt = require("jsonwebtoken");
 const managerLeaveModel = require("../Models/maleave.model");
+const Attendance = require("../Models/attendance.model");
 
 require("dotenv").config();
 

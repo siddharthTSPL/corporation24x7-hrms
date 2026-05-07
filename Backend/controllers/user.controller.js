@@ -8,6 +8,8 @@ const announcementmodel = require("../Models/announcement.model");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const Review = require("../Models/review.model");
+const Attendance = require("../Models/attendance.model");
+const ManagerLeave = require("../Models/maleave.model");
 
 const verifyUserEmail = async (req, res, next) => {
   const { token } = req.params;
