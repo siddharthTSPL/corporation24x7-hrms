@@ -34,3 +34,8 @@ export const getallleavehistory = async () => {
   const res = await api.get("/getallleavehistory");
   return res.data;
 };
+
+export const getattendance = async () => {
+  const res = await api.get("/getattendance");
+  return res.data;
+};

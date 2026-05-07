@@ -5,17 +5,13 @@ import { useGetMeUser } from "../../auth/server-state/employee/employeeauth/empl
 import { useGetAllLeaveHistory } from "../../auth/server-state/employee/employeeleave/employeeleave.hook";
 import { useGetAttendance } from "../../auth/server-state/employee/employeeother/employeeother.hook"; 
 
-/* ─────────────────────────────────────────────
-   CONSTANTS
-───────────────────────────────────────────── */
+
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS   = ["S","M","T","W","T","F","S"];
 
 const APPROVED_STATUSES = ["approved_manager", "approved_admin"];
 
-/* ─────────────────────────────────────────────
-   GLOBAL STYLES
-───────────────────────────────────────────── */
+
 const GlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
@@ -149,9 +145,7 @@ const GlobalStyles = () => (
   `}</style>
 );
 
-/* ─────────────────────────────────────────────
-   HELPERS
-───────────────────────────────────────────── */
+
 function getInitials(f = "", l = "") {
   return `${f[0] || ""}${l[0] || ""}`.toUpperCase();
 }
@@ -197,11 +191,7 @@ function isDateInRange(date, start, end) {
   return d >= s && d <= e;
 }
 
-/* ─────────────────────────────────────────────
-   MAP BACKEND ATTENDANCE STATUS → CALENDAR STATUS
-   Backend: present | absent | half_day | late | lwp | etc.
-   Normalised to: present | absent | halfday | late | checkedin
-───────────────────────────────────────────── */
+
 function resolveAttendanceStatus(record) {
   if (!record) return null;
 
@@ -215,15 +205,12 @@ function resolveAttendanceStatus(record) {
   if (s === "late")       return "late";
   if (s === "lwp")        return "absent";
 
-  // Fallback: has both check-in and check-out → present
+
   if (record.checkIn && record.checkOut) return "present";
 
   return "absent";
 }
 
-/* ─────────────────────────────────────────────
-   AVATAR
-───────────────────────────────────────────── */
 function Avatar({ src, initials, size = 36, radius = "50%", fontSize = 13, style = {} }) {
   const [imgError, setImgError] = useState(false);
   const showImg = src && !imgError;
@@ -245,9 +232,7 @@ function Avatar({ src, initials, size = 36, radius = "50%", fontSize = 13, style
   );
 }
 
-/* ─────────────────────────────────────────────
-   STAR RATING
-───────────────────────────────────────────── */
+
 function StarRating({ rating = 0, max = 5, size = 14 }) {
   return (
     <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
@@ -280,9 +265,7 @@ function StarRating({ rating = 0, max = 5, size = 14 }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   BADGE
-───────────────────────────────────────────── */
+
 function Badge({ children, variant = "brand" }) {
   const styles = {
     brand:  { background: "rgba(115,0,66,0.08)", color: "#730042" },
@@ -298,16 +281,12 @@ function Badge({ children, variant = "brand" }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   CARD ACCENT
-───────────────────────────────────────────── */
+
 function CardAccent({ color }) {
   return <div style={{ position:"absolute",top:0,left:0,right:0,height:3,background:color,borderRadius:"14px 14px 0 0" }}/>;
 }
 
-/* ─────────────────────────────────────────────
-   SKELETON
-───────────────────────────────────────────── */
+
 function Skeleton({ w = "100%", h = 16, radius = 6 }) {
   return (
     <div style={{
@@ -319,9 +298,7 @@ function Skeleton({ w = "100%", h = 16, radius = 6 }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   INFO FIELD
-───────────────────────────────────────────── */
+
 function InfoField({ label, value, loading }) {
   return (
     <div className="ed-info-row">
@@ -331,9 +308,7 @@ function InfoField({ label, value, loading }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   LEAVE ROW
-───────────────────────────────────────────── */
+
 function LeaveRow({ label, availed, entitled, accrued, color }) {
   const used      = availed  ?? 0;
   const total     = entitled ?? 0;
@@ -359,9 +334,7 @@ function LeaveRow({ label, availed, entitled, accrued, color }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   SEG BAR
-───────────────────────────────────────────── */
+
 function SegBar({ segments }) {
   return (
     <>
@@ -380,21 +353,22 @@ function SegBar({ segments }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   CALENDAR — real backend attendance data
-   Shows ALL days from day 1 of the month.
-   No joining-date cut-off: every past day resolves to
-   an attendance status from the backend map or falls
-   back to "absent". Future days show as "future".
-   Leave days are overlaid from approvedLeaves.
-───────────────────────────────────────────── */
-function Calendar({ month, attendanceMap = new Map(), approvedLeaves = [] }) {
+
+function Calendar({ month, joiningDate, attendanceMap = new Map(), approvedLeaves = [] }) {
   const year     = new Date().getFullYear();
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMo = new Date(year, month + 1, 0).getDate();
-  const today    = new Date();
+  const today    = new Date(); today.setHours(0, 0, 0, 0);
 
-  // Build a set of leave days for this month
+  // Joining date normalised to midnight (local)
+  const joiningMidnight = useMemo(() => {
+    if (!joiningDate) return null;
+    const d = new Date(joiningDate);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, [joiningDate]);
+
+
   const leaveDaySet = useMemo(() => {
     const set = new Set();
     approvedLeaves.forEach(lv => {
@@ -407,24 +381,28 @@ function Calendar({ month, attendanceMap = new Map(), approvedLeaves = [] }) {
     return set;
   }, [approvedLeaves, month, year]);
 
-  // Build calendar cells — starts from day 1, no joining-date skip
+
   const cells = [];
-  for (let i = 0; i < firstDay; i++) cells.push(null); // blank padding cells
+  for (let i = 0; i < firstDay; i++) cells.push(null); // grid padding
 
   for (let d = 1; d <= daysInMo; d++) {
     const date = new Date(year, month, d);
     date.setHours(0, 0, 0, 0);
 
-    const isToday  = date.toDateString() === today.toDateString();
-    const isFuture = date > today;
-
-    const key = date.toISOString().slice(0, 10); // "YYYY-MM-DD"
+    const isToday        = date.toDateString() === today.toDateString();
+    const isFuture       = date > today;
+    const isBeforeJoining = joiningMidnight && date < joiningMidnight;
 
     let status = "future";
 
-    if (leaveDaySet.has(d)) {
+    if (isBeforeJoining) {
+     
+      status = "before_joining";
+    } else if (leaveDaySet.has(d)) {
       status = "leave";
     } else if (!isFuture) {
+   
+      const key    = date.toISOString().slice(0, 10); // "YYYY-MM-DD"
       const record = attendanceMap.get(key);
       status = resolveAttendanceStatus(record) ?? "absent";
     }
@@ -433,13 +411,15 @@ function Calendar({ month, attendanceMap = new Map(), approvedLeaves = [] }) {
   }
 
   const calStyle = {
-    present:   { background: "rgba(115,0,66,0.07)", color: "#730042", fontWeight: 500 },
-    absent:    { background: "#fce4ec", color: "#b71c1c", fontWeight: 500 },
-    halfday:   { background: "#fff8e1", color: "#f57f17", fontWeight: 500 },
-    late:      { background: "#fff3e0", color: "#e65100", fontWeight: 500 },
-    leave:     { background: "#e8eaf6", color: "#283593", fontWeight: 600 },
-    checkedin: { background: "rgba(29,158,117,0.12)", color: "#1D9E75", fontWeight: 600 },
-    future:    { color: "#d4c8c4", fontWeight: 400 },
+    present:        { background: "rgba(115,0,66,0.07)", color: "#730042", fontWeight: 500 },
+    absent:         { background: "#fce4ec",             color: "#b71c1c", fontWeight: 500 },
+    halfday:        { background: "#fff8e1",             color: "#f57f17", fontWeight: 500 },
+    late:           { background: "#fff3e0",             color: "#e65100", fontWeight: 500 },
+    leave:          { background: "#e8eaf6",             color: "#283593", fontWeight: 600 },
+    checkedin:      { background: "rgba(29,158,117,0.12)", color: "#1D9E75", fontWeight: 600 },
+    future:         { color: "#d4c8c4", fontWeight: 400 },
+
+    before_joining: { color: "#cfc6c1", fontWeight: 400, background: "transparent" },
   };
 
   return (
@@ -454,10 +434,17 @@ function Calendar({ month, attendanceMap = new Map(), approvedLeaves = [] }) {
           <div
             key={i}
             className="ed-cal-day"
-            title={cell ? cell.status.replace(/_/g, " ") : ""}
+            title={
+              cell
+                ? cell.status === "before_joining"
+                  ? "Before joining"
+                  : cell.status.replace(/_/g, " ")
+                : ""
+            }
             style={{
-              outline: cell?.isToday ? "1.5px solid #730042" : "none",
+              outline:      cell?.isToday ? "1.5px solid #730042" : "none",
               outlineOffset: -1.5,
+              opacity:       cell?.status === "before_joining" ? 0.35 : 1,
               ...(cell ? calStyle[cell.status] ?? {} : {}),
             }}
           >
@@ -469,9 +456,7 @@ function Calendar({ month, attendanceMap = new Map(), approvedLeaves = [] }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   DOJ CARD
-───────────────────────────────────────────── */
+
 function DOJCard({ joiningDate }) {
   const { years, months, yearsFloat, nextMilestoneLabel, fracInYear } = computeTenure(joiningDate);
   const R = 36, circ = Math.PI * R;
@@ -518,9 +503,6 @@ function DOJCard({ joiningDate }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   ANNOUNCEMENT ITEM
-───────────────────────────────────────────── */
 function AnnouncementItem({ ann }) {
   const isHigh    = ann.priority === "high";
   const isExpired = ann.expiresAt && new Date(ann.expiresAt) < new Date();
@@ -551,9 +533,7 @@ function AnnouncementItem({ ann }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   TODAY STATUS BANNER
-───────────────────────────────────────────── */
+
 function TodayBanner({ isOnLeave, leaveType, onCheckIn }) {
   const today = new Date();
   const day   = today.toLocaleDateString("en-IN", { weekday:"long" });
@@ -612,9 +592,7 @@ function TodayBanner({ isOnLeave, leaveType, onCheckIn }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   LEAVE HISTORY MINI LIST
-───────────────────────────────────────────── */
+
 const LEAVE_TYPE_META = {
   el: { label:"Earned",    color:"#730042", bg:"rgba(115,0,66,0.08)" },
   sl: { label:"Sick",      color:"#1D9E75", bg:"rgba(29,158,117,0.08)" },
@@ -672,9 +650,7 @@ function LeaveHistoryList({ leaves = [], loading }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   REVIEW STARS CARD
-───────────────────────────────────────────── */
+
 function ReviewCard({ reviews = [], loading }) {
   if (loading) return (
     <div style={{ padding:"14px 18px", display:"flex", flexDirection:"column", gap:10 }}>
@@ -751,9 +727,7 @@ function ReviewCard({ reviews = [], loading }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   MAIN DASHBOARD
-───────────────────────────────────────────── */
+
 export default function EmployeeDashboard() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const navigate = useNavigate();
@@ -762,18 +736,20 @@ export default function EmployeeDashboard() {
   const { data: meData,   isLoading: meLoading,  isError: meError  } = useGetMeUser();
   const { data: annData,  isLoading: annLoading                     } = useGetAnnouncements();
   const { data: histData, isLoading: histLoading                    } = useGetAllLeaveHistory();
-  const { data: attData,  isLoading: attLoading                     } = useGetAttendance(); // ← real attendance
+  const { data: attData,  isLoading: attLoading                     } = useGetAttendance(); 
 
-  /* ── Derived data ── */
+
   const employee      = meData?.employee      ?? null;
   const lb            = meData?.leavebalance?.[0] ?? null;
   const allLeaves     = histData?.leaves      ?? [];
   const announcements = annData?.announcements ?? [];
   const reviews       = meData?.review        ?? [];
 
-  /* ── Build attendance Map: "YYYY-MM-DD" → record ──
-     Handles both array root and { attendance: [...] } shapes.
-  ─────────────────────────────────────────────────── */
+ 
+  const joiningDate = employee?.date_of_joining ?? employee?.createdAt ?? null;
+
+ 
+ 
   const attendanceMap = useMemo(() => {
     const records = Array.isArray(attData)
       ? attData
@@ -781,22 +757,27 @@ export default function EmployeeDashboard() {
         ? attData.attendance
         : [];
 
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // +05:30
     const map = new Map();
+
     records.forEach(rec => {
       if (!rec.date) return;
-      const key = new Date(rec.date).toISOString().slice(0, 10);
-      map.set(key, rec);
+     
+      const istKey = new Date(new Date(rec.date).getTime() + IST_OFFSET_MS)
+        .toISOString()
+        .slice(0, 10);
+      map.set(istKey, rec);
     });
     return map;
   }, [attData]);
 
-  /* ── Approved leaves for calendar ── */
+
   const approvedLeaves = useMemo(() =>
     allLeaves.filter(lv => APPROVED_STATUSES.includes(lv.status)),
     [allLeaves]
   );
 
-  /* ── Is today an approved leave day? ── */
+
   const todayLeave = useMemo(() => {
     const today = new Date();
     return approvedLeaves.find(lv =>
@@ -806,13 +787,17 @@ export default function EmployeeDashboard() {
 
   const isOnLeaveToday = Boolean(todayLeave);
 
-  /* ── Computed display ── */
+
   const empInitials = employee ? getInitials(employee.f_name, employee.l_name) : "—";
   const fullName    = employee ? `${employee.f_name} ${employee.l_name}` : "—";
   const managerName = employee?.Under_manager
     ? `${employee.Under_manager.f_name} ${employee.Under_manager.l_name}` : "—";
 
-  /* ── Attendance quick counts from REAL data for selected month ── */
+  const joiningMidnight = useMemo(() => {
+    if (!joiningDate) return null;
+    const d = new Date(joiningDate); d.setHours(0, 0, 0, 0); return d;
+  }, [joiningDate]);
+
   const { presentCount, absentCount, halfCount, checkedInCount, attendanceRate } = useMemo(() => {
     const year  = new Date().getFullYear();
     const today = new Date(); today.setHours(0,0,0,0);
@@ -824,9 +809,8 @@ export default function EmployeeDashboard() {
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(year, selectedMonth, d);
       date.setHours(0,0,0,0);
-      if (date > today) break; // don't count future days
-
-      // Skip approved leave days from the count
+      if (date > today) break;                                             // future
+      if (joiningMidnight && date < joiningMidnight) continue;            // before joining
       if (approvedLeaves.some(lv => isDateInRange(date, lv.startDate, lv.endDate))) continue;
 
       counted++;
@@ -834,15 +818,15 @@ export default function EmployeeDashboard() {
       const rec    = attendanceMap.get(key);
       const status = resolveAttendanceStatus(rec);
 
-      if (status === "present")                  present++;
-      else if (status === "absent" || !status)   absent++;
+      if (status === "present")                           present++;
+      else if (status === "absent" || !status)            absent++;
       else if (status === "halfday" || status === "late") half++;
-      else if (status === "checkedin")           checkedIn++;
+      else if (status === "checkedin")                    checkedIn++;
     }
 
     const rate = counted > 0 ? Math.round(((present + checkedIn) / counted) * 100) : 0;
     return { presentCount: present, absentCount: absent, halfCount: half, checkedInCount: checkedIn, attendanceRate: rate };
-  }, [attendanceMap, selectedMonth, approvedLeaves]);
+  }, [attendanceMap, selectedMonth, approvedLeaves, joiningMidnight]);
 
   const leaveRows = [
     { label:"Earned Leave (EL)",   availed:lb?.EL?.availed, entitled:lb?.EL?.entitled, accrued:lb?.EL?.accrued, color:"#730042" },
@@ -962,7 +946,7 @@ export default function EmployeeDashboard() {
         </div>
 
         {/* DOJ */}
-        <DOJCard joiningDate={employee?.date_of_joining ?? employee?.createdAt}/>
+        <DOJCard joiningDate={joiningDate}/>
 
         {/* Leave overview */}
         <div className="ed-card" style={{ animationDelay:".1s" }}>
@@ -1066,13 +1050,18 @@ export default function EmployeeDashboard() {
           </div>
 
           <div style={{ padding:"12px 14px 0" }}>
-            {/*
-              Calendar now shows every day from day 1 of the month.
-              No joining date skip — every past day resolves from
-              the real attendance map or defaults to "absent".
-            */}
+            {/* Joining date hint */}
+          {joiningDate && (
+            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:6 }}>
+              <div style={{ width:7, height:7, borderRadius:2, background:"#cfc6c1" }}/>
+              <span style={{ fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>
+                Joined {fmtDate(joiningDate)} · days before this are not counted
+              </span>
+            </div>
+          )}
             <Calendar
               month={selectedMonth}
+              joiningDate={joiningDate}
               attendanceMap={attendanceMap}
               approvedLeaves={approvedLeaves}
             />

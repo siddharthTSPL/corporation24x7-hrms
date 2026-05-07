@@ -1,5 +1,6 @@
-import { uploadDocument, getDocuments, editDocument, deleteDocument, getattendance } from "../../../api/employeeapi/other/em.other.api";
+import { uploadDocument, getDocuments, editDocument, deleteDocument } from "../../../api/employeeapi/other/em.other.api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getattendance } from "../../../api/employeeapi/leave/em.leave.api";
 
 export const useUploadDocument = () => {
   const queryClient = useQueryClient();
