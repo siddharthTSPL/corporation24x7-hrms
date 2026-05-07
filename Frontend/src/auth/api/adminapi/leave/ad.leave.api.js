@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/admin",
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/",
   withCredentials: true,
 });
 
@@ -15,19 +15,19 @@ api.interceptors.response.use(
 );
 
 export const getAllLeaves = async () => {
-  const res = await api.get("/showallleaves");
+  const res = await api.get("admin/showallleaves");
   return res.data;
 };
 
 
 export const acceptLeave = async ({ id, leaveFor }) => {
   if (!id) throw new Error("Leave ID is required");
-  const res = await api.put(`/acceptleave/${id}?leaveFor=${leaveFor}`);
+  const res = await api.put(`admin/acceptleave/${id}?leaveFor=${leaveFor}`);
   return res.data;
 };
 
 export const rejectLeave = async ({ id, leaveFor }) => {
   if (!id) throw new Error("Leave ID is required");
-  const res = await api.put(`/rejectleave/${id}?leaveFor=${leaveFor}`);
+  const res = await api.put(`admin/rejectleave/${id}?leaveFor=${leaveFor}`);
   return res.data;
 };

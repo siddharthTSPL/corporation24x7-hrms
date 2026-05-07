@@ -52,7 +52,7 @@ const registerAdmin = async (req, res, next) => {
     { expiresIn: "1h" }
   );
 
-  const verifyLink = `http://localhost:5000/admin/verify/${token}`;
+  const verifyLink = `https://corporation24x7-hrms.onrender.com/admin/verify/${token}`;
 
   await sendEmail({
     to: email,
@@ -184,7 +184,11 @@ const adminlogin = async (req, res, next) => {
   const { identifier, password } = req.body;
 
   if (!identifier || !password) {
-    return next(Object.assign(new Error("All fields are required"), { statusCode: 400 }));
+    return next(
+      Object.assign(new Error("All fields are required"), {
+        statusCode: 400,
+      })
+    );
   }
 
   const admin = await Adminmodel.findOne({
@@ -192,12 +196,21 @@ const adminlogin = async (req, res, next) => {
   });
 
   if (!admin) {
-    return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
+    return next(
+      Object.assign(new Error("Admin not found"), {
+        statusCode: 404,
+      })
+    );
   }
 
   const isMatch = await admin.isValidPassword(password);
+
   if (!isMatch) {
-    return next(Object.assign(new Error("Invalid credentials"), { statusCode: 401 }));
+    return next(
+      Object.assign(new Error("Invalid credentials"), {
+        statusCode: 401,
+      })
+    );
   }
 
   const token = jwt.sign(
@@ -210,10 +223,13 @@ const adminlogin = async (req, res, next) => {
     { expiresIn: "15d" }
   );
 
+  const isProduction = process.env.NODE_ENV === "production";
+
   res.cookie("token", token, {
     httpOnly: true,
-    secure: false, 
-    sameSite: "lax", 
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+    maxAge: 15 * 24 * 60 * 60 * 1000,
   });
 
   admin.status = "active";
@@ -227,7 +243,7 @@ const adminlogin = async (req, res, next) => {
       email: admin.email,
     },
     role: admin.role,
-    token
+    token,
   });
 };
 
@@ -244,10 +260,12 @@ const adminlogout = async (req, res, next) => {
   admin.status = "inactive";
   await admin.save();
 
+  const isProduction = process.env.NODE_ENV === "production";
+
   res.clearCookie("token", {
     httpOnly: true,
-    secure: false,
-    sameSite: "strict",
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
   });
 
   res.status(200).json({
@@ -310,7 +328,7 @@ const addmanager = async (req, res, next) => {
 
   await assignDefaultLeave(newmanager);
 
-  const verifyLink = `http://localhost:5000/manager/verify/${token}`;
+  const verifyLink = `https://corporation24x7-hrms.onrender.com/manager/verify/${token}`;
 
  await sendEmail({
   to: work_email,
@@ -463,7 +481,7 @@ if (!f_name || !work_email || !password) {
 
   await assignDefaultLeave(newuser);
 
-  const verifyLink = `http://localhost:5000/user/verify/${token}`;
+  const verifyLink = `https://corporation24x7-hrms.onrender.com/user/verify/${token}`;
 
  await sendEmail({
   to: work_email,
@@ -1190,12 +1208,14 @@ const verifyAotp = async (req, res, next) => {
   );
 
   
-  res.cookie("token", token, {
-    httpOnly: true,
-    secure: false,
-    sameSite: "lax",
-    maxAge: 15 * 24 * 60 * 60 * 1000,
-  });
+  const isProduction = process.env.NODE_ENV === "production";
+
+res.cookie("token", token, {
+  httpOnly: true,
+  secure: isProduction,
+  sameSite: isProduction ? "none" : "lax",
+  maxAge: 15 * 24 * 60 * 60 * 1000,
+});
 
 
   const resetToken = jwt.sign(

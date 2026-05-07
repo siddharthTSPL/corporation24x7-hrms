@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:5000/document",
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/",
   withCredentials: true,
 });
 
@@ -18,14 +18,14 @@ export const getDocuments = async () => {
 };
 
 export const editDocument = async ({ id, ...data }) => {
-  const res = await api.put(`/${id}`, data, {
+  const res = await api.put(`document/${id}`, data, {
     headers: { "Content-Type": "multipart/form-data" },
   });
   return res.data;
 };
 
 export const deleteDocument = async (id) => {
-  const res = await api.delete(`/${id}`);
+  const res = await api.delete(`document/${id}`);
   return res.data;
 };
 
