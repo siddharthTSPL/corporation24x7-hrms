@@ -3,19 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { useGetAnnouncements } from "../../auth/server-state/employee/employeeannounce/employeeannounce.hook";
 import { useGetMeUser } from "../../auth/server-state/employee/employeeauth/employeeauth.hook";
 import { useGetAllLeaveHistory } from "../../auth/server-state/employee/employeeleave/employeeleave.hook";
+import { useGetAttendance } from "../../auth/server-state/employee/employeeother/employeeother.hook"; 
 
-/* ─────────────────────────────────────────────
-   CONSTANTS
-───────────────────────────────────────────── */
+
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS   = ["S","M","T","W","T","F","S"];
-const SEED   = [0.12,0.73,0.91,0.44,0.67,0.35,0.88,0.22,0.56,0.79,0.14,0.95,0.41,0.63,0.28,0.82,0.51,0.17,0.74,0.39,0.66,0.8,0.25,0.48,0.93,0.31,0.59,0.72,0.11,0.86,0.43];
 
 const APPROVED_STATUSES = ["approved_manager", "approved_admin"];
 
-/* ─────────────────────────────────────────────
-   GLOBAL STYLES
-───────────────────────────────────────────── */
+
 const GlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
@@ -149,9 +145,7 @@ const GlobalStyles = () => (
   `}</style>
 );
 
-/* ─────────────────────────────────────────────
-   HELPERS
-───────────────────────────────────────────── */
+
 function getInitials(f = "", l = "") {
   return `${f[0] || ""}${l[0] || ""}`.toUpperCase();
 }
@@ -197,9 +191,26 @@ function isDateInRange(date, start, end) {
   return d >= s && d <= e;
 }
 
-/* ─────────────────────────────────────────────
-   AVATAR — shows profile_image or initials
-───────────────────────────────────────────── */
+
+function resolveAttendanceStatus(record) {
+  if (!record) return null;
+
+  // Checked in but not yet checked out — still active
+  if (record.checkIn && !record.checkOut) return "checkedin";
+
+  const s = (record.status || "").toLowerCase();
+  if (s.includes("half")) return "halfday";
+  if (s === "present")    return "present";
+  if (s === "absent")     return "absent";
+  if (s === "late")       return "late";
+  if (s === "lwp")        return "absent";
+
+
+  if (record.checkIn && record.checkOut) return "present";
+
+  return "absent";
+}
+
 function Avatar({ src, initials, size = 36, radius = "50%", fontSize = 13, style = {} }) {
   const [imgError, setImgError] = useState(false);
   const showImg = src && !imgError;
@@ -221,9 +232,7 @@ function Avatar({ src, initials, size = 36, radius = "50%", fontSize = 13, style
   );
 }
 
-/* ─────────────────────────────────────────────
-   STAR RATING
-───────────────────────────────────────────── */
+
 function StarRating({ rating = 0, max = 5, size = 14 }) {
   return (
     <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
@@ -256,9 +265,7 @@ function StarRating({ rating = 0, max = 5, size = 14 }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   BADGE
-───────────────────────────────────────────── */
+
 function Badge({ children, variant = "brand" }) {
   const styles = {
     brand:  { background: "rgba(115,0,66,0.08)", color: "#730042" },
@@ -274,16 +281,12 @@ function Badge({ children, variant = "brand" }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   CARD ACCENT
-───────────────────────────────────────────── */
+
 function CardAccent({ color }) {
   return <div style={{ position:"absolute",top:0,left:0,right:0,height:3,background:color,borderRadius:"14px 14px 0 0" }}/>;
 }
 
-/* ─────────────────────────────────────────────
-   SKELETON
-───────────────────────────────────────────── */
+
 function Skeleton({ w = "100%", h = 16, radius = 6 }) {
   return (
     <div style={{
@@ -295,9 +298,7 @@ function Skeleton({ w = "100%", h = 16, radius = 6 }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   INFO FIELD
-───────────────────────────────────────────── */
+
 function InfoField({ label, value, loading }) {
   return (
     <div className="ed-info-row">
@@ -307,9 +308,7 @@ function InfoField({ label, value, loading }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   LEAVE ROW
-───────────────────────────────────────────── */
+
 function LeaveRow({ label, availed, entitled, accrued, color }) {
   const used      = availed  ?? 0;
   const total     = entitled ?? 0;
@@ -335,9 +334,7 @@ function LeaveRow({ label, availed, entitled, accrued, color }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   SEG BAR
-───────────────────────────────────────────── */
+
 function SegBar({ segments }) {
   return (
     <>
@@ -356,21 +353,26 @@ function SegBar({ segments }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   CALENDAR — uses real leave data
-───────────────────────────────────────────── */
-function Calendar({ month, approvedLeaves = [] }) {
-  const year      = new Date().getFullYear();
-  const firstDay  = new Date(year, month, 1).getDay();
-  const daysInMo  = new Date(year, month + 1, 0).getDate();
-  const today     = new Date();
 
-  const leaveDays = useMemo(() => {
+function Calendar({ month, joiningDate, attendanceMap = new Map(), approvedLeaves = [] }) {
+  const year     = new Date().getFullYear();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMo = new Date(year, month + 1, 0).getDate();
+  const today    = new Date(); today.setHours(0, 0, 0, 0);
+
+  // Joining date normalised to midnight (local)
+  const joiningMidnight = useMemo(() => {
+    if (!joiningDate) return null;
+    const d = new Date(joiningDate);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, [joiningDate]);
+
+
+  const leaveDaySet = useMemo(() => {
     const set = new Set();
     approvedLeaves.forEach(lv => {
-      const s = new Date(lv.startDate);
-      const e = new Date(lv.endDate);
-      for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
+      for (let d = new Date(lv.startDate); d <= new Date(lv.endDate); d.setDate(d.getDate() + 1)) {
         if (d.getFullYear() === year && d.getMonth() === month) {
           set.add(d.getDate());
         }
@@ -379,28 +381,45 @@ function Calendar({ month, approvedLeaves = [] }) {
     return set;
   }, [approvedLeaves, month, year]);
 
+
   const cells = [];
-  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let i = 0; i < firstDay; i++) cells.push(null); // grid padding
+
   for (let d = 1; d <= daysInMo; d++) {
-    const date    = new Date(year, month, d);
-    const isToday = date.toDateString() === today.toDateString();
-    const past    = date <= today;
-    let status    = "future";
-    if (leaveDays.has(d)) {
+    const date = new Date(year, month, d);
+    date.setHours(0, 0, 0, 0);
+
+    const isToday        = date.toDateString() === today.toDateString();
+    const isFuture       = date > today;
+    const isBeforeJoining = joiningMidnight && date < joiningMidnight;
+
+    let status = "future";
+
+    if (isBeforeJoining) {
+     
+      status = "before_joining";
+    } else if (leaveDaySet.has(d)) {
       status = "leave";
-    } else if (past) {
-      const r = SEED[(d - 1) % SEED.length];
-      status  = r > 0.9 ? "absent" : r > 0.84 ? "halfday" : "present";
+    } else if (!isFuture) {
+   
+      const key    = date.toISOString().slice(0, 10); // "YYYY-MM-DD"
+      const record = attendanceMap.get(key);
+      status = resolveAttendanceStatus(record) ?? "absent";
     }
+
     cells.push({ day: d, status, isToday });
   }
 
   const calStyle = {
-    present: { background:"rgba(115,0,66,0.07)", color:"#730042", fontWeight:500 },
-    absent:  { background:"#fce4ec", color:"#b71c1c", fontWeight:500 },
-    halfday: { background:"#fff8e1", color:"#f57f17", fontWeight:500 },
-    leave:   { background:"#e8eaf6", color:"#283593", fontWeight:600 },
-    future:  { color:"#d4c8c4", fontWeight:400 },
+    present:        { background: "rgba(115,0,66,0.07)", color: "#730042", fontWeight: 500 },
+    absent:         { background: "#fce4ec",             color: "#b71c1c", fontWeight: 500 },
+    halfday:        { background: "#fff8e1",             color: "#f57f17", fontWeight: 500 },
+    late:           { background: "#fff3e0",             color: "#e65100", fontWeight: 500 },
+    leave:          { background: "#e8eaf6",             color: "#283593", fontWeight: 600 },
+    checkedin:      { background: "rgba(29,158,117,0.12)", color: "#1D9E75", fontWeight: 600 },
+    future:         { color: "#d4c8c4", fontWeight: 400 },
+
+    before_joining: { color: "#cfc6c1", fontWeight: 400, background: "transparent" },
   };
 
   return (
@@ -412,11 +431,23 @@ function Calendar({ month, approvedLeaves = [] }) {
       </div>
       <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:2 }}>
         {cells.map((cell, i) => (
-          <div key={i} className="ed-cal-day" style={{
-            outline: cell?.isToday ? "1.5px solid #730042" : "none",
-            outlineOffset: -1.5,
-            ...(cell ? calStyle[cell.status] : {}),
-          }}>
+          <div
+            key={i}
+            className="ed-cal-day"
+            title={
+              cell
+                ? cell.status === "before_joining"
+                  ? "Before joining"
+                  : cell.status.replace(/_/g, " ")
+                : ""
+            }
+            style={{
+              outline:      cell?.isToday ? "1.5px solid #730042" : "none",
+              outlineOffset: -1.5,
+              opacity:       cell?.status === "before_joining" ? 0.35 : 1,
+              ...(cell ? calStyle[cell.status] ?? {} : {}),
+            }}
+          >
             {cell?.day}
           </div>
         ))}
@@ -425,9 +456,7 @@ function Calendar({ month, approvedLeaves = [] }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   DOJ CARD
-───────────────────────────────────────────── */
+
 function DOJCard({ joiningDate }) {
   const { years, months, yearsFloat, nextMilestoneLabel, fracInYear } = computeTenure(joiningDate);
   const R = 36, circ = Math.PI * R;
@@ -474,9 +503,6 @@ function DOJCard({ joiningDate }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   ANNOUNCEMENT ITEM
-───────────────────────────────────────────── */
 function AnnouncementItem({ ann }) {
   const isHigh    = ann.priority === "high";
   const isExpired = ann.expiresAt && new Date(ann.expiresAt) < new Date();
@@ -507,9 +533,7 @@ function AnnouncementItem({ ann }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   TODAY STATUS BANNER
-───────────────────────────────────────────── */
+
 function TodayBanner({ isOnLeave, leaveType, onCheckIn }) {
   const today = new Date();
   const day   = today.toLocaleDateString("en-IN", { weekday:"long" });
@@ -568,9 +592,7 @@ function TodayBanner({ isOnLeave, leaveType, onCheckIn }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   LEAVE HISTORY MINI LIST
-───────────────────────────────────────────── */
+
 const LEAVE_TYPE_META = {
   el: { label:"Earned",    color:"#730042", bg:"rgba(115,0,66,0.08)" },
   sl: { label:"Sick",      color:"#1D9E75", bg:"rgba(29,158,117,0.08)" },
@@ -628,12 +650,7 @@ function LeaveHistoryList({ leaves = [], loading }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   REVIEW STARS CARD
-   Reviews are received by the employee from their manager.
-   Backend field: "review" (not "reviews") — array of Review documents
-   where reviewee = employee._id
-───────────────────────────────────────────── */
+
 function ReviewCard({ reviews = [], loading }) {
   if (loading) return (
     <div style={{ padding:"14px 18px", display:"flex", flexDirection:"column", gap:10 }}>
@@ -664,7 +681,6 @@ function ReviewCard({ reviews = [], loading }) {
             </div>
           </div>
 
-          {/* Distribution bars */}
           <div style={{ display:"flex", flexDirection:"column", gap:4, marginBottom:12 }}>
             {[5,4,3,2,1].map(star => {
               const cnt = reviews.filter(r => Math.round(r.rating) === star).length;
@@ -682,7 +698,6 @@ function ReviewCard({ reviews = [], loading }) {
             })}
           </div>
 
-          {/* Latest review — shows reviewer name + comment */}
           {latest?.comment && (
             <div style={{ background:"#faf8f2", borderRadius:8, padding:"9px 12px",
               borderLeft:"3px solid #e8b84b", fontSize:11, color:"#5a4030", lineHeight:1.6,
@@ -712,9 +727,7 @@ function ReviewCard({ reviews = [], loading }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   MAIN DASHBOARD
-───────────────────────────────────────────── */
+
 export default function EmployeeDashboard() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const navigate = useNavigate();
@@ -723,26 +736,48 @@ export default function EmployeeDashboard() {
   const { data: meData,   isLoading: meLoading,  isError: meError  } = useGetMeUser();
   const { data: annData,  isLoading: annLoading                     } = useGetAnnouncements();
   const { data: histData, isLoading: histLoading                    } = useGetAllLeaveHistory();
+  const { data: attData,  isLoading: attLoading                     } = useGetAttendance(); 
 
-  /* ── Derived data ── */
-  const employee = meData?.employee    ?? null;
-  const lb       = meData?.leavebalance?.[0] ?? null;
-  const allLeaves = histData?.leaves   ?? [];
+
+  const employee      = meData?.employee      ?? null;
+  const lb            = meData?.leavebalance?.[0] ?? null;
+  const allLeaves     = histData?.leaves      ?? [];
   const announcements = annData?.announcements ?? [];
+  const reviews       = meData?.review        ?? [];
 
-  /* ── Reviews received by this employee
-        Backend returns key "review" (not "reviews")
-        Each item: { rating, comment, monthYear, reviewer: { f_name, l_name, ... } }
-  ── */
-  const reviews = meData?.review ?? [];
+ 
+  const joiningDate = employee?.date_of_joining ?? employee?.createdAt ?? null;
 
-  /* ── Approved leaves for calendar ── */
+ 
+ 
+  const attendanceMap = useMemo(() => {
+    const records = Array.isArray(attData)
+      ? attData
+      : Array.isArray(attData?.attendance)
+        ? attData.attendance
+        : [];
+
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // +05:30
+    const map = new Map();
+
+    records.forEach(rec => {
+      if (!rec.date) return;
+     
+      const istKey = new Date(new Date(rec.date).getTime() + IST_OFFSET_MS)
+        .toISOString()
+        .slice(0, 10);
+      map.set(istKey, rec);
+    });
+    return map;
+  }, [attData]);
+
+
   const approvedLeaves = useMemo(() =>
     allLeaves.filter(lv => APPROVED_STATUSES.includes(lv.status)),
     [allLeaves]
   );
 
-  /* ── Is today an approved leave day? ── */
+
   const todayLeave = useMemo(() => {
     const today = new Date();
     return approvedLeaves.find(lv =>
@@ -752,34 +787,52 @@ export default function EmployeeDashboard() {
 
   const isOnLeaveToday = Boolean(todayLeave);
 
-  /* ── Computed display ── */
+
   const empInitials = employee ? getInitials(employee.f_name, employee.l_name) : "—";
   const fullName    = employee ? `${employee.f_name} ${employee.l_name}` : "—";
   const managerName = employee?.Under_manager
     ? `${employee.Under_manager.f_name} ${employee.Under_manager.l_name}` : "—";
 
-  /* ── Attendance quick counts (seeded + leave days) ── */
-  const today = new Date();
-  const daysPassedThisMonth = today.getDate();
-  const leaveDaysThisMonth  = approvedLeaves.reduce((acc, lv) => {
-    let count = 0;
-    for (let d = new Date(lv.startDate); d <= new Date(lv.endDate); d.setDate(d.getDate() + 1)) {
-      if (d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth()) count++;
+  const joiningMidnight = useMemo(() => {
+    if (!joiningDate) return null;
+    const d = new Date(joiningDate); d.setHours(0, 0, 0, 0); return d;
+  }, [joiningDate]);
+
+  const { presentCount, absentCount, halfCount, checkedInCount, attendanceRate } = useMemo(() => {
+    const year  = new Date().getFullYear();
+    const today = new Date(); today.setHours(0,0,0,0);
+
+    let present = 0, absent = 0, half = 0, checkedIn = 0, counted = 0;
+
+    const daysInMonth = new Date(year, selectedMonth + 1, 0).getDate();
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(year, selectedMonth, d);
+      date.setHours(0,0,0,0);
+      if (date > today) break;                                             // future
+      if (joiningMidnight && date < joiningMidnight) continue;            // before joining
+      if (approvedLeaves.some(lv => isDateInRange(date, lv.startDate, lv.endDate))) continue;
+
+      counted++;
+      const key    = date.toISOString().slice(0, 10);
+      const rec    = attendanceMap.get(key);
+      const status = resolveAttendanceStatus(rec);
+
+      if (status === "present")                           present++;
+      else if (status === "absent" || !status)            absent++;
+      else if (status === "halfday" || status === "late") half++;
+      else if (status === "checkedin")                    checkedIn++;
     }
-    return acc + count;
-  }, 0);
-  const effectiveDays = daysPassedThisMonth - leaveDaysThisMonth;
-  const absentCount   = Math.round(effectiveDays * 0.06);
-  const halfCount     = Math.round(effectiveDays * 0.04);
-  const presentCount  = effectiveDays - absentCount - halfCount;
-  const attendanceRate = daysPassedThisMonth > 0
-    ? Math.round((presentCount / daysPassedThisMonth) * 100) : 0;
+
+    const rate = counted > 0 ? Math.round(((present + checkedIn) / counted) * 100) : 0;
+    return { presentCount: present, absentCount: absent, halfCount: half, checkedInCount: checkedIn, attendanceRate: rate };
+  }, [attendanceMap, selectedMonth, approvedLeaves, joiningMidnight]);
 
   const leaveRows = [
-    { label:"Earned Leave (EL)",  availed:lb?.EL?.availed, entitled:lb?.EL?.entitled, accrued:lb?.EL?.accrued, color:"#730042" },
-    { label:"Sick Leave (SL)",    availed:lb?.SL?.availed, entitled:lb?.SL?.entitled, accrued:null,            color:"#1D9E75" },
-    { label:"Privilege Leave (PL)",availed:lb?.pbc ?? 0,   entitled:lb?.PL,           accrued:null,            color:"#378ADD" },
-    { label:"LWP / Maternity",    availed:lb?.lwp ?? 0,    entitled:(lb?.ML ?? 0) + 5,accrued:null,            color:"#BA7517" },
+    { label:"Earned Leave (EL)",   availed:lb?.EL?.availed, entitled:lb?.EL?.entitled, accrued:lb?.EL?.accrued, color:"#730042" },
+    { label:"Sick Leave (SL)",     availed:lb?.SL?.availed, entitled:lb?.SL?.entitled, accrued:null,            color:"#1D9E75" },
+    { label:"Privilege Leave (PL)",availed:lb?.pbc ?? 0,    entitled:lb?.PL,           accrued:null,            color:"#378ADD" },
+    { label:"LWP / Maternity",     availed:lb?.lwp ?? 0,    entitled:(lb?.ML ?? 0) + 5,accrued:null,            color:"#BA7517" },
   ];
 
   if (meError) return (
@@ -817,7 +870,6 @@ export default function EmployeeDashboard() {
             </div>
           )}
 
-          {/* Notification bell */}
           <div style={{ width:36, height:36, borderRadius:8, border:"0.5px solid #ede5e0", background:"#fff",
             display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", position:"relative" }}>
             <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
@@ -829,7 +881,6 @@ export default function EmployeeDashboard() {
             )}
           </div>
 
-          {/* Avatar — shows profile_image or initials */}
           <div style={{ position:"relative" }}>
             <Avatar
               src={employee?.profile_image}
@@ -847,7 +898,7 @@ export default function EmployeeDashboard() {
         </div>
       </div>
 
-      {/* ── TODAY BANNER (check-in aware) ── */}
+      {/* ── TODAY BANNER ── */}
       <TodayBanner
         isOnLeave={isOnLeaveToday}
         leaveType={todayLeave?.leaveType}
@@ -895,7 +946,7 @@ export default function EmployeeDashboard() {
         </div>
 
         {/* DOJ */}
-        <DOJCard joiningDate={employee?.date_of_joining ?? employee?.createdAt}/>
+        <DOJCard joiningDate={joiningDate}/>
 
         {/* Leave overview */}
         <div className="ed-card" style={{ animationDelay:".1s" }}>
@@ -980,15 +1031,16 @@ export default function EmployeeDashboard() {
       {/* ── ROW 2: Calendar + Announcements ── */}
       <div style={{ display:"grid", gridTemplateColumns:"minmax(0,2fr) minmax(0,1fr)", gap:14, marginBottom:14 }}>
 
-        {/* Calendar */}
+        {/* Calendar — real attendance, full month from day 1 */}
         <div className="ed-card" style={{ animationDelay:".2s" }}>
           <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
             borderBottom:"0.5px solid #ede5e0" }}>
             <span style={{ fontSize:12, fontWeight:600, fontFamily:"'DM Sans',sans-serif" }}>Attendance</span>
             <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-              {isOnLeaveToday && (
-                <Badge variant="blue">On Leave Today</Badge>
+              {attLoading && (
+                <span style={{ fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>Loading…</span>
               )}
+              {isOnLeaveToday && <Badge variant="blue">On Leave Today</Badge>}
               <select value={selectedMonth} onChange={e => setSelectedMonth(Number(e.target.value))}
                 style={{ fontFamily:"'DM Sans',sans-serif", fontSize:11, color:"#b0948a", background:"#f9f8f2",
                   border:"0.5px solid #ede5e0", borderRadius:6, padding:"3px 7px", cursor:"pointer" }}>
@@ -996,15 +1048,33 @@ export default function EmployeeDashboard() {
               </select>
             </div>
           </div>
+
           <div style={{ padding:"12px 14px 0" }}>
-            <Calendar month={selectedMonth} approvedLeaves={approvedLeaves}/>
+            {/* Joining date hint */}
+          {joiningDate && (
+            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:6 }}>
+              <div style={{ width:7, height:7, borderRadius:2, background:"#cfc6c1" }}/>
+              <span style={{ fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>
+                Joined {fmtDate(joiningDate)} · days before this are not counted
+              </span>
+            </div>
+          )}
+            <Calendar
+              month={selectedMonth}
+              joiningDate={joiningDate}
+              attendanceMap={attendanceMap}
+              approvedLeaves={approvedLeaves}
+            />
           </div>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", borderTop:"0.5px solid #f0e8e4", marginTop:12 }}>
+
+          {/* Stats row — 5 columns (added "Active Now") */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", borderTop:"0.5px solid #f0e8e4", marginTop:12 }}>
             {[
-              [presentCount, "#730042", "Present"],
-              [absentCount,  "#E24B4A", "Absent"],
-              [halfCount,    "#BA7517", "Half"],
-              [`${attendanceRate}%`, "#1D9E75", "Rate"],
+              [presentCount,        "#730042", "Present"],
+              [absentCount,         "#E24B4A", "Absent"],
+              [halfCount,           "#BA7517", "Half/Late"],
+              [checkedInCount,      "#1D9E75", "Active Now"],
+              [`${attendanceRate}%`,"#378ADD", "Rate"],
             ].map(([v, c, l]) => (
               <div key={l} style={{ padding:"10px 0", textAlign:"center", borderRight:"0.5px solid #f0e8e4" }}>
                 <div style={{ fontSize:15, fontWeight:700, color:c, fontFamily:"'Lora',serif" }}>{v}</div>
@@ -1012,8 +1082,17 @@ export default function EmployeeDashboard() {
               </div>
             ))}
           </div>
+
+          {/* Legend */}
           <div style={{ display:"flex", flexWrap:"wrap", gap:8, padding:"10px 14px 14px", borderTop:"0.5px solid #f0e8e4" }}>
-            {[["#730042","Present"],["#E24B4A","Absent"],["#f57f17","Half day"],["#283593","On leave"]].map(([c, l]) => (
+            {[
+              ["#730042","Present"],
+              ["#E24B4A","Absent"],
+              ["#f57f17","Half day"],
+              ["#e65100","Late"],
+              ["#1D9E75","Checked in"],
+              ["#283593","On leave"],
+            ].map(([c, l]) => (
               <div key={l} style={{ display:"flex", alignItems:"center", gap:4, fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>
                 <div style={{ width:8, height:8, borderRadius:2, background:c }}/>{l}
               </div>

@@ -6,7 +6,7 @@ const createDefaultAdmin = async () => {
     try {
 
         const adminExists = await Admin.findOne({ role: "admin" });
-
+   
         if (!adminExists) {
             await Admin.create({
                 username: process.env.ADMIN_USERNAME,

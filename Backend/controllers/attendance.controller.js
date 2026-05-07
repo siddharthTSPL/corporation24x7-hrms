@@ -3,11 +3,10 @@ const { calculateStatus, updateSummary } = require("../automatic/monthattendance
 
 const getUserId = (user) => user._id || user.id;
 
-
 const getOnModel = (role) => {
   if (role === "manager") return "Manager";
   if (role === "admin")   return "Admin";
-  return "User"; // ← "User" not "Employee"
+  return "User";
 };
 
 
@@ -31,7 +30,7 @@ const checkin = async (req, res) => {
     });
 
     if (attendance) {
-      
+
       if (attendance.checkOut) {
         return res.status(400).json({
           message: "You have already completed your attendance for today.",
@@ -39,26 +38,27 @@ const checkin = async (req, res) => {
         });
       }
 
-     
       if (attendance.source === "agent") {
-        attendance.latitude  = latitude;
-        attendance.longitude = longitude;
-        attendance.selfie    = selfie || attendance.selfie;
-        attendance.checkIn   = new Date();
-        attendance.source    = "manual";
-        attendance.onModel   = getOnModel(user.role); // ← add
+        attendance.latitude      = latitude;
+        attendance.longitude     = longitude;
+        attendance.selfie        = selfie || attendance.selfie;
+        attendance.checkIn       = new Date();
+        attendance.source        = "manual";
+        attendance.onModel       = getOnModel(user.role);
+        attendance.activeMinutes = 0;
+        attendance.idleMinutes   = 0;
+        attendance.lastUpdated   = Date.now();
+
         await attendance.save();
         return res.json({ message: "Check-in successful", attendance });
       }
 
-    
       return res.status(400).json({ message: "Already checked in" });
     }
 
-  
     const newAttendance = await Attendance.create({
       employee:      userId,
-      onModel:       getOnModel(user.role), // ← add
+      onModel:       getOnModel(user.role),
       role:          user.role,
       date:          today,
       checkIn:       new Date(),
@@ -98,11 +98,10 @@ const activity = async (req, res) => {
       date:     today,
     });
 
-  
     if (!attendance) {
       attendance = await Attendance.create({
         employee:      userId,
-        onModel:       getOnModel(user.role), // ← add
+        onModel:       getOnModel(user.role),
         role:          user.role,
         date:          today,
         checkIn:       new Date(),
@@ -113,21 +112,21 @@ const activity = async (req, res) => {
       });
     }
 
-   
     if (attendance.checkOut) {
       return res.status(400).json({ message: "Already checked out" });
     }
 
- 
     const now = Date.now();
     if (attendance.lastUpdated && now - attendance.lastUpdated < 60000) {
       return res.status(429).json({ message: "Too many requests" });
     }
 
-    if (status === "active") {
-      attendance.activeMinutes += 1;
-    } else {
-      attendance.idleMinutes += 1;
+    if (attendance.source === "manual") {
+      if (status === "active") {
+        attendance.activeMinutes += 1;
+      } else {
+        attendance.idleMinutes += 1;
+      }
     }
 
     attendance.lastUpdated = now;
