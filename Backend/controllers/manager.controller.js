@@ -197,7 +197,7 @@ const managerlogin = async (req, res, next) => {
       { expiresIn: "15m" },
     );
 
-    const link = `http://localhost:5000/manager/change-password?token=${resetToken}`;
+    const link = `https://corporation24x7-hrms.onrender.com/manager/change-password?token=${resetToken}`;
 
     await sendEmail({
       to: manager.work_email,
@@ -229,12 +229,14 @@ const managerlogin = async (req, res, next) => {
     { expiresIn: "15d" },
   );
 
-  res.cookie("token", token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "Strict",
-    maxAge: 15 * 24 * 60 * 60 * 1000,
-  });
+ const isProduction = process.env.NODE_ENV === "production";
+
+res.cookie("token", token, {
+  httpOnly: true,
+  secure: isProduction,
+  sameSite: isProduction ? "none" : "lax",
+  maxAge: 15 * 24 * 60 * 60 * 1000,
+});
 
   manager.status = "active";
   await manager.save();
@@ -247,21 +249,34 @@ const managerlogin = async (req, res, next) => {
 };
 
 const managerlogout = async (req, res, next) => {
-  if (!req.manager) {
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  try {
+    if (!req.manager) {
+      return next(
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
+        })
+      );
+    }
+
+    await Managermodel.findByIdAndUpdate(req.manager._id, {
+      status: "inactive",
+    });
+
+    const isProduction = process.env.NODE_ENV === "production";
+
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+    });
+
+    res.status(200).json({
+      message: "Manager logout successful",
+    });
+
+  } catch (error) {
+    next(error);
   }
-
-  await managermodel.findByIdAndUpdate(req.manager._id, { status: "inactive" });
-
-  res.clearCookie("token", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "Strict",
-  });
-
-  res.status(200).json({
-    message: "Manager logout successful",
-  });
 };
 
 const showPasswordPage = (req, res) => {
