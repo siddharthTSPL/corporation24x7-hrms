@@ -55,6 +55,6 @@ userrouter.post(
 userrouter.get("/getme",employeemiddleware, asyncHandler(usercontroller.getme));
 
 userrouter.put("/updateprofile",employeemiddleware, asyncHandler(usercontroller.editprofileemployee));
-
+userrouter.get("/getattendance",employeemiddleware, asyncHandler(usercontroller.getattendance));
 
 module.exports = userrouter;

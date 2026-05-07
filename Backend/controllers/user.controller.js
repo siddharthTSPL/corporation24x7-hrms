@@ -8,6 +8,8 @@ const announcementmodel = require("../Models/announcement.model");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const Review = require("../Models/review.model");
+const Attendance = require("../Models/attendance.model");
+const ManagerLeave = require("../Models/maleave.model");
 
 const verifyUserEmail = async (req, res, next) => {
   const { token } = req.params;
@@ -1040,6 +1042,24 @@ const editprofileemployee = async (req, res, next) => {
 };
 
 
+const getattendance = async (req, res, next) => {
+  try {
+    const employee = req.employee;
+
+    const attendance = await Attendance.find({
+      employee: employee._id,
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: attendance.length,
+      attendance,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 module.exports = {
   verifyUserEmail,
@@ -1061,4 +1081,5 @@ module.exports = {
   getallleavehistory,
   getme,
   editprofileemployee,
+  getattendance,
 };

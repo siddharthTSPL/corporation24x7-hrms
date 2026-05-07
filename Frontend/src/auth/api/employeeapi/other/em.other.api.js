@@ -28,3 +28,4 @@ export const deleteDocument = async (id) => {
   const res = await api.delete(`/${id}`);
   return res.data;
 };
+

@@ -133,4 +133,10 @@ managerrouter.put(
   asyncHandler(managercontroller.changepassword)
 );
 
+managerrouter.get(
+  "/getattendance",
+  managermiddleware,
+  asyncHandler(managercontroller.getattendance)
+);
+
 module.exports = managerrouter;
