@@ -1362,6 +1362,31 @@ const changepassword = async (req, res, next) => {
   }
 };
 
+
+const getattendance = async (req, res, next) => {
+  try {
+    if (!req.manager) {
+      return next(
+        Object.assign(new Error("Unauthorized"), { statusCode: 401 })
+      );
+    }
+
+    const manager = req.manager;
+
+    const attendance = await Attendance.find({
+      employee: manager._id,
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: attendance.length,
+      attendance,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   verifyManagerEmail,
   managerlogin,
@@ -1389,4 +1414,5 @@ module.exports = {
   getme,
   changepassword,
   editprofilemanager,
+  getattendance,
 };

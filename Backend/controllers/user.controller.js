@@ -1040,6 +1040,24 @@ const editprofileemployee = async (req, res, next) => {
 };
 
 
+const getattendance = async (req, res, next) => {
+  try {
+    const employee = req.employee;
+
+    const attendance = await Attendance.find({
+      employee: employee._id,
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: attendance.length,
+      attendance,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 module.exports = {
   verifyUserEmail,
@@ -1061,4 +1079,5 @@ module.exports = {
   getallleavehistory,
   getme,
   editprofileemployee,
+  getattendance,
 };

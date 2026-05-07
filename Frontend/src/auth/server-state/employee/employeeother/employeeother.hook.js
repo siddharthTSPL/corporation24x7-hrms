@@ -1,4 +1,4 @@
-import { uploadDocument, getDocuments, editDocument, deleteDocument } from "../../../api/employeeapi/other/em.other.api";
+import { uploadDocument, getDocuments, editDocument, deleteDocument, getattendance } from "../../../api/employeeapi/other/em.other.api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export const useUploadDocument = () => {
@@ -35,4 +35,11 @@ export const useDeleteDocument = () => {
       queryClient.invalidateQueries({ queryKey: ["documents"] });
     },
   });
+};
+
+export const useGetAttendance = () => {
+    return useQuery({
+        queryKey: ["attendance"],
+        queryFn: getattendance,
+    });
 };

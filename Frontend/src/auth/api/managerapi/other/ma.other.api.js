@@ -59,3 +59,8 @@ export const getDocumentDetails = async (documentId) => {
   const res = await api.get(`/getDocumentDetails/${documentId}`);
   return res.data;
 };
+
+export const getattendance = async () => {
+  const res = await api.get("/getattendance");
+  return res.data;
+};
