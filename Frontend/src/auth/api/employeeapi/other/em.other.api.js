@@ -28,3 +28,8 @@ export const deleteDocument = async (id) => {
   const res = await api.delete(`/${id}`);
   return res.data;
 };
+
+export const getattendance = async () => {
+  const res = await api.get("/getattendance");
+  return res.data;
+};
