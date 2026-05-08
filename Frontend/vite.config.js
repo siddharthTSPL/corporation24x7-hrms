@@ -9,17 +9,17 @@ export default defineConfig({
 
   build: {
     sourcemap: false,
-    minify: "terser",
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-      },
-    },
+
+    minify: "esbuild",
+
+    chunkSizeWarningLimit: 1000,
+
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ["react", "react-dom"],
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            return "vendor";
+          }
         },
       },
     },
@@ -29,12 +29,10 @@ export default defineConfig({
     host: true,
     port: 5173,
 
-    // 🔥 ADD THIS (MAIN FIX)
     watch: {
       usePolling: true,
     },
 
-  
     hmr: {
       protocol: "ws",
       host: "localhost",
