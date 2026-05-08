@@ -15,7 +15,9 @@ app.use(
       "http://localhost:5173",
       "https://torchx-talent.techtorch.solutions",
       "http://torchx-talent.techtorch.solutions",
-      "https://www.torchx-talent.techtorch.solutions"
+      "https://www.torchx-talent.techtorch.solutions",
+      "http://talent.techtorch.solutions/",
+      "https://talent.techtorch.solutions",
     ],
     credentials: true,
   })
