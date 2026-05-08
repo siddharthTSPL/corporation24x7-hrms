@@ -258,7 +258,7 @@ const managerlogout = async (req, res, next) => {
       );
     }
 
-    await Managermodel.findByIdAndUpdate(req.manager._id, {
+    await managermodel.findByIdAndUpdate(req.manager._id, {
       status: "inactive",
     });
 
