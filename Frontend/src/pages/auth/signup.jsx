@@ -35,8 +35,7 @@ export default function Register() {
         {/* LEFT SIDE */}
         <div className="w-full md:w-1/2 p-8">
           <div className="flex justify-between items-center mb-6">
-            <img src="/src/assets/logo1.png" alt="logo" className="w-28" />
-            
+            <img src="/src/assets/TorchX.svg" alt="logo" className="w-28" />
             <p
               onClick={() => navigate("/login")}
               className="text-sm text-gray-500 cursor-pointer hover:text-(--primary)"

@@ -49,7 +49,7 @@ export default function LandingPage() {
         {/* Logo */}
         <div className="flex items-center gap-2">
           <img
-            src="/src/assets/logo1.png"
+            src="/src/assets/TorchX.svg"
             alt="logo"
             className="w-50 h-15"
           />
