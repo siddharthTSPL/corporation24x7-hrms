@@ -26,8 +26,7 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
-app.use(cors(corsOptions));
-app.options("*", cors(corsOptions)); 
+app.use(cors(corsOptions)); 
 
 const adminrouter = require('../routes/adminroutes');
 const managerrouter = require('../routes/managerroutes');
