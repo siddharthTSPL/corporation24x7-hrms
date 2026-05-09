@@ -64,3 +64,8 @@ export const getattendance = async () => {
   const res = await api.get("manager/getattendance");
   return res.data;
 };
+
+export const fetchOrgInfo = async () => {
+  const res = await api.get("manager/getorginfo");
+  return res.data;
+};
