@@ -3,6 +3,7 @@ const userrouter = express.Router();
 const usercontroller = require("../controllers/user.controller");
 const employeemiddleware = require("../middleware/auth/employee.middleware");
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
+const admincontroller = require("../controllers/admin.controller");
 
 
 userrouter.get("/verify/:token", asyncHandler(usercontroller.verifyUserEmail));
@@ -56,5 +57,10 @@ userrouter.get("/getme",employeemiddleware, asyncHandler(usercontroller.getme));
 
 userrouter.put("/updateprofile",employeemiddleware, asyncHandler(usercontroller.editprofileemployee));
 userrouter.get("/getattendance",employeemiddleware, asyncHandler(usercontroller.getattendance));
+userrouter.get(
+  "/getorginfo",
+  employeemiddleware,
+  asyncHandler(admincontroller.getOrgInfo)
+);
 
 module.exports = userrouter;
