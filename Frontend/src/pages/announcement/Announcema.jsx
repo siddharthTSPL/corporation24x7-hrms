@@ -1,536 +1,509 @@
 import { useState } from "react";
-import { useManagerAnnouncements, useParticularAnnouncement } from "../../auth/server-state/manager/managerannounce/managerannounce.hook";
+import {
+  useManagerAnnouncements,
+  useParticularAnnouncement,
+} from "../../auth/server-state/manager/managerannounce/managerannounce.hook";
 
-// ─── helpers ────────────────────────────────────────────────────────────────
-const fmtDate = (d) => {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+/* ── COLOR PALETTE ─────────────────────────── */
+const C = {
+  deep:    "#730042",
+  mid:     "#CD166E",
+  cream:   "#F9F8F2",
+  white:   "#ffffff",
+  deepA10: "rgba(115,0,66,0.10)",
+  deepA15: "rgba(115,0,66,0.15)",
+  deepA25: "rgba(115,0,66,0.25)",
+  deepA45: "rgba(115,0,66,0.45)",
+  deepA55: "rgba(115,0,66,0.55)",
+  midA10:  "rgba(205,22,110,0.10)",
+  midA20:  "rgba(205,22,110,0.20)",
+  midA25:  "rgba(205,22,110,0.25)",
 };
 
-const timeAgo = (date) => {
-  if (!date) return "—";
-  const now = new Date();
-  const past = new Date(date);
-  const diffMs = now - past;
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "1 day ago";
-  if (diffDays < 7) return `${diffDays} days ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-  return `${Math.floor(diffDays / 30)} months ago`;
-};
-
-const priorityConfig = {
-  high: { bg: "#fce8e8", color: "#a32d2d", dot: "#e24b4a" },
-  medium: { bg: "#fff8e0", color: "#ba7517", dot: "#ba7517" },
-  low: { bg: "#f1efe8", color: "#5f5e5a", dot: "#888" },
-};
-
-const audienceConfig = {
-  managers: { bg: "#e8f5e9", color: "#2e7d32" },
-  all: { bg: "#f0eeff", color: "#534ab7" },
-};
-
-// ─── chip ────────────────────────────────────────────────────────────────────
-const Chip = ({ label, bg, color }) => (
-  <span style={{ 
-    fontSize: 11, 
-    borderRadius: 20, 
-    padding: "3px 10px", 
-    fontWeight: 500, 
-    background: bg, 
-    color, 
-    display: "inline-block" 
-  }}>
-    {label}
-  </span>
+/* ── FONTS & ANIMATIONS ────────────────────── */
+const FontInjector = () => (
+  <style>{`
+    * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+    @keyframes blink  { 0%,100%{opacity:1} 50%{opacity:.25} }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:none} }
+    @keyframes spin   { to{transform:rotate(360deg)} }
+    .ann-card-hover:hover { border-color: rgba(205,22,110,0.45) !important; transform: translateY(-3px); }
+    .read-more-btn:hover  { color: #730042 !important; }
+    .filter-btn:hover     { background: rgba(115,0,66,0.08) !important; }
+  `}</style>
 );
 
-// ─── announcement card ───────────────────────────────────────────────────────
-const AnnouncementCard = ({ announcement, onClick, isExpanded }) => {
-  const priority = (announcement.priority || "low").toLowerCase();
-  const audience = (announcement.audience || "all").toLowerCase();
-  const pConfig = priorityConfig[priority] || priorityConfig.low;
-  const aConfig = audienceConfig[audience] || audienceConfig.all;
+/* ── HELPERS ───────────────────────────────── */
+const fmtDate = (d) => {
+  if (!d) return "";
+  return new Date(d).toLocaleDateString("en-IN", {
+    day: "2-digit", month: "long", year: "numeric",
+  });
+};
+const fmtTime = (d) => {
+  if (!d) return "";
+  return new Date(d).toLocaleTimeString("en-IN", {
+    hour: "2-digit", minute: "2-digit",
+  });
+};
+const excerpt = (text, len = 130) => {
+  if (!text) return "";
+  return text.length > len ? text.slice(0, len).trimEnd() + "…" : text;
+};
 
+/* ── PRIORITY PILL ─────────────────────────── */
+const PRIORITY_STYLES = {
+  high:   { label: "Urgent",  bg: C.midA10,  border: C.midA25,  color: C.deep },
+  medium: { label: "Info",    bg: C.deepA10, border: C.deepA15, color: C.deep },
+  low:    { label: "General", bg: "rgba(249,248,242,0.9)", border: C.deepA15, color: C.deep },
+};
+
+const PriorityPill = ({ priority }) => {
+  const s = PRIORITY_STYLES[(priority || "low").toLowerCase()] || PRIORITY_STYLES.low;
   return (
-    <div
-      onClick={() => onClick(announcement._id)}
-      style={{
-        background: "#fff",
-        borderRadius: 14,
-        border: "0.5px solid #e8e4dc",
-        padding: "18px 20px",
-        cursor: "pointer",
-        transition: "all 0.2s ease",
-        boxShadow: isExpanded ? "0 4px 12px rgba(0,0,0,0.08)" : "none",
-        transform: isExpanded ? "translateY(-2px)" : "none",
-      }}
-    >
-      <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-        {/* Priority indicator dot */}
-        <div style={{
-          width: 10,
-          height: 10,
-          borderRadius: "50%",
-          flexShrink: 0,
-          marginTop: 6,
-          background: pConfig.dot,
-          boxShadow: priority === "high" ? "0 0 8px rgba(227, 75, 74, 0.4)" : "none",
-        }} />
-
-        <div style={{ flex: 1 }}>
-          {/* Title and priority */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-            <span style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>
-              {announcement.title || "Untitled Announcement"}
-            </span>
-            <Chip label={priority} bg={pConfig.bg} color={pConfig.color} />
-            {priority === "high" && (
-              <span style={{ fontSize: 11, color: "#e24b4a", fontWeight: 600 }}>⚠ URGENT</span>
-            )}
-          </div>
-
-          {/* Body preview */}
-          <div style={{ 
-            fontSize: 13, 
-            color: "#555", 
-            lineHeight: 1.6, 
-            marginBottom: 10,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            display: "-webkit-box",
-            WebkitLineClamp: isExpanded ? "none" : 2,
-            WebkitBoxOrient: "vertical",
-          }}>
-            {announcement.body || "No content available"}
-          </div>
-
-          {/* Metadata */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 11, color: "#bbb" }}>
-              {timeAgo(announcement.createdAt)}
-            </span>
-            {announcement.expiresAt && (
-              <>
-                <span style={{ fontSize: 11, color: "#bbb" }}>•</span>
-                <span style={{ fontSize: 11, color: "#bbb" }}>
-                  Expires {fmtDate(announcement.expiresAt)}
-                </span>
-              </>
-            )}
-            <span style={{ fontSize: 11, color: "#bbb" }}>•</span>
-            <Chip label={audience} bg={aConfig.bg} color={aConfig.color} />
-          </div>
-        </div>
-      </div>
-    </div>
+    <span style={{
+      display: "inline-flex", alignItems: "center",
+      padding: "3px 10px", borderRadius: 99,
+      fontSize: 10, fontWeight: 500, letterSpacing: ".1em",
+      textTransform: "uppercase", fontFamily: "'Segoe UI', sans-serif",
+      background: s.bg, border: `1px solid ${s.border}`, color: s.color,
+    }}>
+      {s.label}
+    </span>
   );
 };
 
-// ─── detailed announcement modal ─────────────────────────────────────────────
-const AnnouncementDetail = ({ id, onClose }) => {
+/* ── AUDIENCE PILL ─────────────────────────── */
+const AudiencePill = ({ audience }) => {
+  const isManagers = (audience || "").toLowerCase() === "managers";
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center",
+      padding: "3px 10px", borderRadius: 99,
+      fontSize: 10, fontWeight: 500, letterSpacing: ".1em",
+      textTransform: "uppercase", fontFamily: "'Segoe UI', sans-serif",
+      background: isManagers ? C.midA10 : C.deepA10,
+      border: `1px solid ${isManagers ? C.midA25 : C.deepA15}`,
+      color: C.deep,
+    }}>
+      {isManagers ? "Managers" : "All Staff"}
+    </span>
+  );
+};
+
+/* ── DETAIL MODAL ──────────────────────────── */
+const DetailModal = ({ id, onClose }) => {
   const { data, isLoading, error } = useParticularAnnouncement(id);
+  const ann = data?.announcement;
 
-  if (isLoading) {
-    return (
+  return (
+    <div
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "rgba(115,0,66,0.18)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 20, backdropFilter: "blur(4px)",
+      }}
+    >
       <div style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: "rgba(0,0,0,0.4)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-        fontFamily: "'Segoe UI',sans-serif",
+        background: C.cream, borderRadius: 20,
+        border: `.5px solid ${C.midA25}`,
+        width: "100%", maxWidth: 600,
+        maxHeight: "88vh", overflowY: "auto",
+        fontFamily: "'Segoe UI', sans-serif",
+        boxShadow: "0 24px 48px rgba(115,0,66,0.12)",
       }}>
-        <div style={{ fontSize: 14, color: "#fff" }}>Loading announcement...</div>
-      </div>
-    );
-  }
-
-  if (error || !data?.announcement) {
-    return (
-      <div style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: "rgba(0,0,0,0.4)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-        fontFamily: "'Segoe UI',sans-serif",
-      }} onClick={onClose}>
+        {/* Modal header */}
         <div style={{
-          background: "#fff",
-          borderRadius: 14,
-          padding: "24px",
-          maxWidth: 400,
+          background: C.white, padding: "18px 24px",
+          borderBottom: `.5px solid ${C.deepA10}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          borderRadius: "20px 20px 0 0",
         }}>
-          <div style={{ fontSize: 15, fontWeight: 500, color: "#a32d2d", marginBottom: 8 }}>
-            Error Loading Announcement
-          </div>
-          <div style={{ fontSize: 13, color: "#888" }}>
-            {error?.message || "Announcement not found"}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 9,
+              background: C.midA10, border: `.5px solid ${C.midA25}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                stroke={C.mid} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+              </svg>
+            </div>
+            <span style={{
+              fontSize: 11, fontWeight: 500, letterSpacing: ".14em",
+              textTransform: "uppercase", color: C.deep,
+            }}>
+              Announcement detail
+            </span>
           </div>
           <button
             onClick={onClose}
             style={{
-              marginTop: 16,
-              padding: "8px 16px",
-              background: "#7b1450",
-              color: "#fff",
-              border: "none",
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 500,
-              cursor: "pointer",
+              width: 30, height: 30, borderRadius: 8,
+              background: C.deepA10, border: "none", cursor: "pointer",
+              color: C.deep, fontSize: 16, display: "flex",
+              alignItems: "center", justifyContent: "center",
+              transition: "background .2s",
             }}
-          >
-            Close
-          </button>
+            onMouseEnter={(e) => e.currentTarget.style.background = C.deepA15}
+            onMouseLeave={(e) => e.currentTarget.style.background = C.deepA10}
+          >✕</button>
         </div>
-      </div>
-    );
-  }
 
-  const announcement = data.announcement;
-  const priority = (announcement.priority || "low").toLowerCase();
-  const audience = (announcement.audience || "all").toLowerCase();
-  const pConfig = priorityConfig[priority] || priorityConfig.low;
-  const aConfig = audienceConfig[audience] || audienceConfig.all;
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: "rgba(0,0,0,0.4)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-        fontFamily: "'Segoe UI',sans-serif",
-        padding: 20,
-      }}
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "#fff",
-          borderRadius: 14,
-          maxWidth: 700,
-          width: "100%",
-          maxHeight: "90vh",
-          overflow: "auto",
-          boxShadow: "0 10px 40px rgba(0,0,0,0.15)",
-        }}
-      >
-        {/* Header with priority indicator */}
-        <div style={{
-          background: priority === "high" ? "#7b1450" : "#f8f6f2",
-          padding: "20px 24px",
-          borderRadius: "14px 14px 0 0",
-          borderBottom: "0.5px solid #e8e4dc",
-        }}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-            <div style={{
-              width: 12,
-              height: 12,
-              borderRadius: "50%",
-              flexShrink: 0,
-              marginTop: 4,
-              background: priority === "high" ? "#fff" : pConfig.dot,
-            }} />
-            <div style={{ flex: 1 }}>
-              <h2 style={{
-                margin: 0,
-                fontSize: 20,
-                fontWeight: 600,
-                color: priority === "high" ? "#fff" : "#1a1a1a",
-                marginBottom: 8,
+        {/* Modal body */}
+        <div style={{ padding: "28px 28px 32px" }}>
+          {isLoading ? (
+            <div style={{ textAlign: "center", padding: "48px 0" }}>
+              <div style={{
+                width: 36, height: 36,
+                border: `3px solid ${C.deepA10}`,
+                borderTopColor: C.mid, borderRadius: "50%",
+                animation: "spin 0.8s linear infinite",
+                margin: "0 auto 12px",
+              }} />
+              <p style={{ color: C.deepA45, fontSize: 13, margin: 0 }}>Loading…</p>
+            </div>
+          ) : error || !ann ? (
+            <p style={{ color: C.deepA45, textAlign: "center", padding: "32px 0" }}>
+              Announcement not found.
+            </p>
+          ) : (
+            <>
+              <div style={{
+                display: "flex", alignItems: "center",
+                gap: 10, flexWrap: "wrap", marginBottom: 16,
               }}>
-                {announcement.title || "Untitled Announcement"}
+                {ann.priority && <PriorityPill priority={ann.priority} />}
+                {ann.audience && <AudiencePill audience={ann.audience} />}
+                <span style={{ marginLeft: "auto", fontSize: 11, color: C.deepA45 }}>
+                  {fmtDate(ann.createdAt)} · {fmtTime(ann.createdAt)}
+                </span>
+              </div>
+
+              <h2 style={{
+                fontFamily: "'Segoe UI', sans-serif",
+                fontSize: 28, fontWeight: 600, color: C.deep,
+                lineHeight: 1.3, margin: 0, letterSpacing: "-0.3px",
+              }}>
+                {ann.title}
               </h2>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                <Chip label={priority} bg={pConfig.bg} color={pConfig.color} />
-                <Chip label={audience} bg={aConfig.bg} color={aConfig.color} />
-                {priority === "high" && (
-                  <span style={{
-                    fontSize: 11,
-                    color: priority === "high" ? "#fff" : "#e24b4a",
-                    fontWeight: 600,
-                  }}>
-                    ⚠ URGENT
+
+              <div style={{ height: .5, background: C.midA20, margin: "18px 0 22px" }} />
+
+              <p style={{ fontSize: 15, color: C.deepA55, lineHeight: 1.85, margin: 0 }}>
+                {ann.body || ann.content || ann.message || ann.description || "No content available."}
+              </p>
+
+              {ann.expiresAt && (
+                <div style={{
+                  marginTop: 20, padding: "12px 16px",
+                  background: C.deepA10, borderRadius: 10,
+                  border: `.5px solid ${C.deepA15}`,
+                  display: "flex", alignItems: "center", gap: 8,
+                }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                    stroke={C.deep} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+                  </svg>
+                  <span style={{ fontSize: 12, color: C.deep }}>
+                    Expires {fmtDate(ann.expiresAt)}
                   </span>
-                )}
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              style={{
-                background: "none",
-                border: "none",
-                fontSize: 24,
-                color: priority === "high" ? "#fff" : "#888",
-                cursor: "pointer",
-                padding: 0,
-                lineHeight: 1,
-              }}
-            >
-              ×
-            </button>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div style={{ padding: "24px" }}>
-          <div style={{
-            fontSize: 14,
-            color: "#1a1a1a",
-            lineHeight: 1.7,
-            whiteSpace: "pre-wrap",
-            marginBottom: 20,
-          }}>
-            {announcement.body || "No content available"}
-          </div>
-
-          {/* Metadata footer */}
-          <div style={{
-            borderTop: "0.5px solid #f0ece4",
-            paddingTop: 16,
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 16,
-          }}>
-            <div>
-              <div style={{ fontSize: 11, color: "#aaa", marginBottom: 4 }}>Published</div>
-              <div style={{ fontSize: 13, color: "#1a1a1a", fontWeight: 500 }}>
-                {fmtDate(announcement.createdAt)}
-              </div>
-            </div>
-            {announcement.expiresAt && (
-              <div>
-                <div style={{ fontSize: 11, color: "#aaa", marginBottom: 4 }}>Expires</div>
-                <div style={{ fontSize: 13, color: "#a32d2d", fontWeight: 500 }}>
-                  {fmtDate(announcement.expiresAt)}
                 </div>
-              </div>
-            )}
-            <div>
-              <div style={{ fontSize: 11, color: "#aaa", marginBottom: 4 }}>Audience</div>
-              <div style={{ fontSize: 13, color: "#1a1a1a", fontWeight: 500 }}>
-                {audience === "all" ? "All Employees" : "Managers Only"}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, color: "#aaa", marginBottom: 4 }}>Priority</div>
-              <div style={{ fontSize: 13, color: pConfig.color, fontWeight: 500, textTransform: "capitalize" }}>
-                {priority}
-              </div>
-            </div>
-          </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-// ─── main announcements component ────────────────────────────────────────────
-export default function Announcema() {
-  const { data, isLoading, error } = useManagerAnnouncements();
-  const [selectedId, setSelectedId] = useState(null);
-  const [filter, setFilter] = useState("all"); // all, high, managers
-
-  const announcements = data || [];
-
-  // Filter announcements
-  const filteredAnnouncements = announcements.filter((ann) => {
-    if (filter === "all") return true;
-    if (filter === "high") return (ann.priority || "").toLowerCase() === "high";
-    if (filter === "managers") return (ann.audience || "").toLowerCase() === "managers";
-    return true;
-  });
-
-  // Sort by priority (high first) then by date
-  const sortedAnnouncements = [...filteredAnnouncements].sort((a, b) => {
-    const priorityOrder = { high: 0, medium: 1, low: 2 };
-    const aPriority = priorityOrder[(a.priority || "low").toLowerCase()] ?? 2;
-    const bPriority = priorityOrder[(b.priority || "low").toLowerCase()] ?? 2;
-    
-    if (aPriority !== bPriority) return aPriority - bPriority;
-    return new Date(b.createdAt) - new Date(a.createdAt);
-  });
-
-  const urgentCount = announcements.filter((a) => (a.priority || "").toLowerCase() === "high").length;
-  const managersCount = announcements.filter((a) => (a.audience || "").toLowerCase() === "managers").length;
-
-  if (isLoading) {
-    return (
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: "100vh",
-        background: "#f5f3ef",
-        fontFamily: "'Segoe UI',sans-serif",
-        fontSize: 14,
-        color: "#888",
-      }}>
-        Loading announcements…
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: "100vh",
-        background: "#f5f3ef",
-        fontFamily: "'Segoe UI',sans-serif",
-      }}>
-        <div style={{
-          background: "#fff",
-          borderRadius: 14,
-          border: "0.5px solid #e8e4dc",
-          padding: "24px",
-          textAlign: "center",
-        }}>
-          <div style={{ fontSize: 15, fontWeight: 500, color: "#a32d2d", marginBottom: 8 }}>
-            Error Loading Announcements
-          </div>
-          <div style={{ fontSize: 13, color: "#888" }}>
-            {error.message || "Please try again later"}
-          </div>
-        </div>
-      </div>
-    );
-  }
+/* ── CARD ──────────────────────────────────── */
+const AnnCard = ({ ann, index, onClick }) => {
+  const isFeatured = index === 0;
 
   return (
-    <div style={{ background: "#f5f3ef", minHeight: "100vh", fontFamily: "'Segoe UI',sans-serif" }}>
-      
-      {/* Top bar */}
+    <div
+      onClick={() => onClick(ann._id)}
+      className="ann-card-hover"
+      style={{
+        background: C.white,
+        border: `.5px solid ${C.deepA15}`,
+        borderRadius: 16,
+        padding: isFeatured ? "30px 28px 24px" : "22px 22px 20px",
+        cursor: "pointer",
+        transition: "border-color .2s, transform .2s",
+        gridColumn: isFeatured ? "span 2" : "span 1",
+        position: "relative",
+        overflow: "hidden",
+        animation: `fadeUp 0.4s ease both`,
+        animationDelay: `${index * 0.06}s`,
+        fontFamily: "'Segoe UI', sans-serif",
+      }}
+    >
+      {isFeatured && (
+        <div style={{
+          position: "absolute", top: 0, left: 0, right: 0,
+          height: 2, background: C.mid,
+        }} />
+      )}
+
       <div style={{
-        background: "#fff",
-        borderBottom: "0.5px solid #e8e4dc",
-        padding: "16px 28px",
+        display: "flex", alignItems: "center",
+        justifyContent: "space-between", gap: 8,
+        marginBottom: 14, flexWrap: "wrap",
       }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div>
-            <h1 style={{
-              margin: 0,
-              fontSize: 22,
-              fontWeight: 600,
-              color: "#1a1a1a",
-              letterSpacing: "-0.3px",
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {ann.priority && <PriorityPill priority={ann.priority} />}
+          {ann.audience && <AudiencePill audience={ann.audience} />}
+          {isFeatured && (
+            <span style={{
+              fontSize: 10, fontWeight: 500, color: C.mid,
+              letterSpacing: ".14em", textTransform: "uppercase",
+              display: "flex", alignItems: "center", gap: 4,
             }}>
-              Announcements
-            </h1>
-            <div style={{ fontSize: 13, color: "#888", marginTop: 4 }}>
-              Stay updated with important company announcements
-            </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {urgentCount > 0 && (
-              <Chip label={`${urgentCount} urgent`} bg="#fce8e8" color="#a32d2d" />
-            )}
-            <span style={{ fontSize: 12, color: "#aaa" }}>
-              {announcements.length} total
+              <svg width="8" height="8" viewBox="0 0 10 10" fill={C.mid}><circle cx="5" cy="5" r="5"/></svg>
+              Featured
+            </span>
+          )}
+        </div>
+        <span style={{ fontSize: 11, color: C.deepA45, letterSpacing: ".03em" }}>
+          {fmtDate(ann.createdAt)}
+        </span>
+      </div>
+
+      <h3 style={{
+        fontFamily: "'Segoe UI', sans-serif",
+        fontSize: isFeatured ? 22 : 17, fontWeight: 600,
+        color: C.deep, lineHeight: 1.3, marginBottom: 10,
+        letterSpacing: "-0.2px",
+      }}>
+        {ann.title || "Untitled Announcement"}
+      </h3>
+
+      <p style={{
+        fontSize: 13.5, color: C.deepA55, lineHeight: 1.75, marginBottom: 18,
+      }}>
+        {excerpt(ann.body || ann.content || ann.message || ann.description, isFeatured ? 200 : 100)}
+      </p>
+
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        paddingTop: 14, borderTop: `.5px solid ${C.deepA10}`,
+      }}>
+        {ann.expiresAt && (
+          <span style={{ fontSize: 10.5, color: C.deepA45, letterSpacing: ".06em" }}>
+            Expires {fmtDate(ann.expiresAt)}
+          </span>
+        )}
+        <span
+          className="read-more-btn"
+          style={{
+            marginLeft: "auto", fontSize: 11.5, fontWeight: 500,
+            color: C.mid, letterSpacing: ".06em", textTransform: "uppercase",
+            display: "flex", alignItems: "center", gap: 3,
+            transition: "color .15s",
+          }}
+        >
+          Read more ›
+        </span>
+      </div>
+    </div>
+  );
+};
+
+/* ── MAIN ──────────────────────────────────── */
+const Announcema = () => {
+  const { data, isLoading, isError: error } = useManagerAnnouncements();
+  const [selectedId, setSelectedId] = useState(null);
+  const [filter, setFilter] = useState("all");
+
+  const allAnnouncements = data || [];
+
+  const filtered = allAnnouncements
+    .filter((ann) => {
+      if (filter === "high")     return (ann.priority || "").toLowerCase() === "high";
+      if (filter === "managers") return (ann.audience || "").toLowerCase() === "managers";
+      return true;
+    })
+    .sort((a, b) => {
+      const order = { high: 0, medium: 1, low: 2 };
+      const ap = order[(a.priority || "low").toLowerCase()] ?? 2;
+      const bp = order[(b.priority || "low").toLowerCase()] ?? 2;
+      if (ap !== bp) return ap - bp;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+  const urgentCount   = allAnnouncements.filter((a) => (a.priority || "").toLowerCase() === "high").length;
+  const managersCount = allAnnouncements.filter((a) => (a.audience || "").toLowerCase() === "managers").length;
+
+  const FILTERS = [
+    { id: "all",      label: `All`,           count: allAnnouncements.length },
+    { id: "high",     label: `Urgent`,        count: urgentCount },
+    { id: "managers", label: `Managers only`, count: managersCount },
+  ];
+
+  return (
+    <div style={{
+      background: C.cream, minHeight: "100vh",
+      fontFamily: "'Segoe UI', sans-serif",
+    }}>
+      <FontInjector />
+
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 24px" }}>
+
+        {/* Eyebrow */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10,
+          marginBottom: "1.25rem", animation: "fadeUp .45s ease both",
+        }}>
+          <div style={{ width: 32, height: 1, background: C.deep }} />
+          <span style={{
+            fontSize: 11, fontWeight: 500, letterSpacing: ".18em",
+            textTransform: "uppercase", color: C.deep,
+          }}>
+            Company Bulletin
+          </span>
+          <div style={{
+            marginLeft: "auto", display: "flex", alignItems: "center", gap: 6,
+            background: C.deepA10, border: `1px solid ${C.deepA25}`,
+            padding: "4px 11px", borderRadius: 99,
+          }}>
+            <div style={{
+              width: 6, height: 6, borderRadius: "50%", background: C.mid,
+              animation: "blink 1.8s ease-in-out infinite",
+            }} />
+            <span style={{
+              fontSize: 10, fontWeight: 500, letterSpacing: ".14em",
+              textTransform: "uppercase", color: C.deep,
+            }}>
+              Live
             </span>
           </div>
         </div>
-      </div>
 
-      <div style={{ padding: "24px 28px" }}>
-        
-        {/* Filters */}
+        {/* Title */}
+        <h1 style={{
+          fontFamily: "'Segoe UI', sans-serif",
+          fontSize: 48, fontWeight: 600, color: C.deep,
+          letterSpacing: "-1px", lineHeight: 1.1,
+          margin: "0 0 .35rem", animation: "fadeUp .5s ease both",
+        }}>
+          Announce<span style={{ fontWeight: 600, color: C.mid }}>ments</span>
+        </h1>
+
+        {/* Rule + filters */}
         <div style={{
-          display: "flex",
-          gap: 10,
-          marginBottom: 20,
+          display: "flex", alignItems: "center", gap: 14,
+          margin: "1.25rem 0 2rem", animation: "fadeUp .55s ease both",
           flexWrap: "wrap",
         }}>
-          {[
-            { id: "all", label: `All (${announcements.length})` },
-            { id: "high", label: `Urgent (${urgentCount})` },
-            { id: "managers", label: `Managers only (${managersCount})` },
-          ].map((f) => (
-            <button
-              key={f.id}
-              onClick={() => setFilter(f.id)}
-              style={{
-                padding: "8px 16px",
-                background: filter === f.id ? "#7b1450" : "#fff",
-                color: filter === f.id ? "#fff" : "#1a1a1a",
-                border: filter === f.id ? "none" : "0.5px solid #e8e4dc",
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 500,
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-              }}
-            >
-              {f.label}
-            </button>
-          ))}
+          <div style={{ flex: 1, height: .5, background: C.deepA25, minWidth: 40 }} />
+
+          {/* Filter pills */}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {FILTERS.map((f) => (
+              <button
+                key={f.id}
+                className="filter-btn"
+                onClick={() => setFilter(f.id)}
+                style={{
+                  padding: "5px 14px", borderRadius: 99, cursor: "pointer",
+                  fontSize: 11, fontWeight: 500, letterSpacing: ".08em",
+                  textTransform: "uppercase", transition: "all .2s",
+                  background: filter === f.id ? C.deep : "transparent",
+                  color:      filter === f.id ? C.white : C.deepA45,
+                  border: `1px solid ${filter === f.id ? C.deep : C.deepA25}`,
+                }}
+              >
+                {f.label} · {f.count}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ flex: 1, height: .5, background: C.deepA25, minWidth: 40 }} />
         </div>
 
-        {/* Announcements grid */}
-        {sortedAnnouncements.length === 0 ? (
+        {/* Loading */}
+        {isLoading && (
           <div style={{
-            background: "#fff",
-            borderRadius: 14,
-            border: "0.5px solid #e8e4dc",
-            padding: "40px 24px",
-            textAlign: "center",
+            display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center",
+            padding: "80px 0", gap: 16,
           }}>
-            <div style={{ fontSize: 15, color: "#888", marginBottom: 8 }}>
-              No announcements found
-            </div>
-            <div style={{ fontSize: 13, color: "#bbb" }}>
-              {filter !== "all" ? "Try changing the filter" : "Check back later for updates"}
-            </div>
+            <div style={{
+              width: 38, height: 38,
+              border: `3px solid ${C.deepA10}`,
+              borderTopColor: C.mid, borderRadius: "50%",
+              animation: "spin .8s linear infinite",
+            }} />
+            <p style={{ color: C.deepA45, fontSize: 13, margin: 0 }}>
+              Loading announcements…
+            </p>
           </div>
-        ) : (
+        )}
+
+        {/* Error */}
+        {error && (
+          <div style={{ textAlign: "center", padding: "64px 0" }}>
+            <p style={{ color: C.mid, fontWeight: 500, fontSize: 15, margin: "0 0 6px" }}>
+              Failed to load announcements
+            </p>
+            <p style={{ color: C.deepA45, fontSize: 13, margin: 0 }}>
+              Please try refreshing the page.
+            </p>
+          </div>
+        )}
+
+        {/* Empty */}
+        {!isLoading && !error && filtered.length === 0 && (
+          <div style={{ textAlign: "center", padding: "5rem 1rem" }}>
+            <div style={{
+              width: 60, height: 60, borderRadius: "50%",
+              border: `1.5px solid ${C.midA25}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              margin: "0 auto 1.25rem",
+            }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke={C.mid} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+              </svg>
+            </div>
+            <h3 style={{
+              fontFamily: "'Segoe UI', sans-serif",
+              fontSize: 24, fontWeight: 600,
+              color: C.deep, marginBottom: ".5rem",
+            }}>
+              Nothing yet
+            </h3>
+            <p style={{ fontSize: 13, color: C.deepA45, margin: 0 }}>
+              {filter !== "all" ? "Try a different filter." : "New announcements will appear here."}
+            </p>
+          </div>
+        )}
+
+        {/* Grid */}
+        {!isLoading && filtered.length > 0 && (
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(380px, 1fr))",
-            gap: 16,
+            gridTemplateColumns: "repeat(auto-fill, minmax(290px, 1fr))",
+            gap: 14,
           }}>
-            {sortedAnnouncements.map((announcement) => (
-              <AnnouncementCard
-                key={announcement._id}
-                announcement={announcement}
-                onClick={setSelectedId}
-                isExpanded={selectedId === announcement._id}
-              />
+            {filtered.map((ann, i) => (
+              <AnnCard key={ann._id} ann={ann} index={i} onClick={setSelectedId} />
             ))}
           </div>
         )}
       </div>
 
-      {/* Detail modal */}
       {selectedId && (
-        <AnnouncementDetail
-          id={selectedId}
-          onClose={() => setSelectedId(null)}
-        />
+        <DetailModal id={selectedId} onClose={() => setSelectedId(null)} />
       )}
     </div>
   );
-}
+};
+
+export default Announcema;
