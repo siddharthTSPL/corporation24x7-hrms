@@ -6,14 +6,14 @@ const api = axios.create({
 });
 
 export const uploadDocument = async (data) => {
-  const res = await api.post("/upload", data, {
+  const res = await api.post("document/upload", data, {
     headers: { "Content-Type": "multipart/form-data" },
   });
   return res.data;
 };
 
 export const getDocuments = async () => {
-  const res = await api.get("/");
+  const res = await api.get("document/");
   return res.data;
 };
 
