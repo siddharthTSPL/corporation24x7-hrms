@@ -3,6 +3,7 @@ const managerrouter = express.Router();
 const managercontroller = require("../controllers/manager.controller");
 const managermiddleware = require("../middleware/auth/manager.middleware");
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
+const admincontroller = require("../controllers/admin.controller");
 
 managerrouter.get(
   "/verify/:token",
@@ -137,6 +138,12 @@ managerrouter.get(
   "/getattendance",
   managermiddleware,
   asyncHandler(managercontroller.getattendance)
+);
+
+managerrouter.get(
+  "/getorginfo",
+  managermiddleware,
+  asyncHandler(admincontroller.getOrgInfo)
 );
 
 module.exports = managerrouter;
