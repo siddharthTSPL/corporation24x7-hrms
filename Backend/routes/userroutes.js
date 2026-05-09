@@ -3,7 +3,7 @@ const userrouter = express.Router();
 const usercontroller = require("../controllers/user.controller");
 const employeemiddleware = require("../middleware/auth/employee.middleware");
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
-const { use } = require("react");
+
 
 userrouter.get("/verify/:token", asyncHandler(usercontroller.verifyUserEmail));
 
