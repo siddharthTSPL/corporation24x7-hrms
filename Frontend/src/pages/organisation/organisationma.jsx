@@ -6,12 +6,12 @@ import {
   Download, Search, ChevronRight, X, Loader2, CheckCircle2,
 } from "lucide-react";
 
-// ─── Manager hooks ────────────────────────────────────────────────────────────
-import { useGetMeManager } from "../../auth/server-state/manager/managerauth/managerauth.hook";
-import { useGetUsersUnderManager } from "../../auth/server-state/manager/managgerother/managerother.hook";
-
-// ─── Shared org info hook (same as admin/employee) ────────────────────────────
-import { useGetOrgInfo } from "../../auth/server-state/adminother/adminother.hook";
+import { useGetMeManager }
+  from "../../auth/server-state/manager/managerauth/managerauth.hook";
+import {
+  useGetUsersUnderManager,
+  useGetOrgInfoManager,
+} from "../../auth/server-state/manager/managgerother/managerother.hook";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const getInitials = (f = "", l = "") => `${f[0] || ""}${l[0] || ""}`.toUpperCase();
@@ -21,7 +21,7 @@ const matchesPerson = (fname, lname, dept, desig, q) => {
   if (!q) return false;
   return (
     normalize(`${fname} ${lname}`).includes(q) ||
-    normalize(dept || "").includes(q) ||
+    normalize(dept  || "").includes(q) ||
     normalize(desig || "").includes(q)
   );
 };
@@ -42,16 +42,16 @@ const STYLES = `
 
   .org-root, .org-root * { font-family: 'DM Sans', sans-serif; box-sizing: border-box; }
 
-  @keyframes fadeUp   { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
-  @keyframes fadeIn   { from { opacity:0; } to { opacity:1; } }
-  @keyframes scaleIn  { from { opacity:0; transform:scale(0.95); } to { opacity:1; transform:scale(1); } }
-  @keyframes shimmer  { 0% { background-position:-600px 0; } 100% { background-position:600px 0; } }
-  @keyframes drawH    { from { transform:scaleX(0); } to { transform:scaleX(1); } }
-  @keyframes drawV    { from { transform:scaleY(0); } to { transform:scaleY(1); } }
-  @keyframes spin     { to { transform:rotate(360deg); } }
-  @keyframes slideDown{ from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes fadeUp    { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes fadeIn    { from { opacity:0; } to { opacity:1; } }
+  @keyframes scaleIn   { from { opacity:0; transform:scale(0.95); } to { opacity:1; transform:scale(1); } }
+  @keyframes shimmer   { 0% { background-position:-600px 0; } 100% { background-position:600px 0; } }
+  @keyframes drawH     { from { transform:scaleX(0); } to { transform:scaleX(1); } }
+  @keyframes drawV     { from { transform:scaleY(0); } to { transform:scaleY(1); } }
+  @keyframes spin      { to { transform:rotate(360deg); } }
+  @keyframes slideDown { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
   @keyframes pulseRing {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.35), 0 6px 20px rgba(99,102,241,0.18); }
+    0%, 100% { box-shadow: 0 0 0 0   rgba(99,102,241,0.35), 0 6px 20px rgba(99,102,241,0.18); }
     50%       { box-shadow: 0 0 0 7px rgba(99,102,241,0.08), 0 8px 26px rgba(99,102,241,0.24); }
   }
 
@@ -69,7 +69,7 @@ const STYLES = `
   .stat-card-hover { transition: transform 0.15s ease, box-shadow 0.15s ease; }
   .stat-card-hover:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.06) !important; }
 
-  .org-scroll::-webkit-scrollbar { height: 4px; width: 4px; }
+  .org-scroll::-webkit-scrollbar       { height: 4px; width: 4px; }
   .org-scroll::-webkit-scrollbar-track { background: transparent; }
   .org-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 4px; }
 
@@ -82,9 +82,9 @@ const STYLES = `
     transition: background 0.13s, border-color 0.13s, color 0.13s;
     white-space: nowrap;
   }
-  .hdr-btn:hover { background: #f8fafc; border-color: #cbd5e1; color: #1e293b; }
+  .hdr-btn:hover    { background: #f8fafc; border-color: #cbd5e1; color: #1e293b; }
   .hdr-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .hdr-btn-primary { background: #1e293b; color: #fff; border-color: #1e293b; }
+  .hdr-btn-primary  { background: #1e293b; color: #fff; border-color: #1e293b; }
   .hdr-btn-primary:hover { background: #0f172a; border-color: #0f172a; color: #fff; }
 
   .search-wrap {
@@ -132,7 +132,6 @@ const STYLES = `
     animation: slideDown 0.2s ease forwards;
   }
 
-  /* Export mode – strips all animations so no node is invisible at capture time */
   .export-mode, .export-mode * {
     animation: none !important;
     opacity: 1 !important;
@@ -189,7 +188,86 @@ function Hi({ text = "", query = "", style = {} }) {
   );
 }
 
-// ── Manager (self) node — styled like admin CeoNode ───────────────────────────
+// ── Org Header Node (shows org logo + name, replaces plain CEO node) ───────────
+function OrgHeaderNode({ orgName, orgLogo, delay = 0, dimmed, highlighted }) {
+  const initials = orgName
+    ? orgName.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()
+    : "ORG";
+
+  return (
+    <div style={{ animation: `scaleIn 0.35s ease ${delay}ms forwards`, opacity: 0, flexShrink: 0 }}>
+      <div
+        className={[
+          "org-card-hover",
+          highlighted ? "org-card-highlight" : "",
+          dimmed      ? "org-card-dim"       : "",
+        ].filter(Boolean).join(" ")}
+        style={{
+          width: 210, background: "#fff", border: "1px solid #e2e8f0",
+          borderRadius: 14, padding: "20px 16px 16px",
+          boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+          display: "flex", flexDirection: "column", alignItems: "center",
+          position: "relative", overflow: "hidden",
+        }}
+      >
+        {/* top accent */}
+        <div style={{
+          position: "absolute", top: 0, left: 0, right: 0,
+          height: 3, background: "#1e293b", borderRadius: "14px 14px 0 0",
+        }} />
+
+        <span style={{
+          position: "absolute", top: 11, right: 12,
+          fontSize: 9, fontWeight: 600, letterSpacing: "0.08em",
+          color: "#94a3b8", textTransform: "uppercase",
+          fontFamily: "'DM Mono', monospace",
+        }}>ORG</span>
+
+        {/* logo or initials */}
+        {orgLogo ? (
+          <img
+            src={orgLogo}
+            alt={orgName}
+            style={{
+              width: 54, height: 54, borderRadius: 12,
+              objectFit: "contain", marginBottom: 12, flexShrink: 0,
+              border: "1px solid #e2e8f0",
+            }}
+          />
+        ) : (
+          <div style={{
+            width: 54, height: 54, borderRadius: 12,
+            background: "#1e293b", color: "#fff",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 18, fontWeight: 600, marginBottom: 12, flexShrink: 0,
+            letterSpacing: "1px",
+          }}>
+            {initials}
+          </div>
+        )}
+
+        <p style={{
+          fontSize: 15, fontWeight: 600, color: "#0f172a",
+          margin: 0, textAlign: "center", lineHeight: 1.3,
+        }}>
+          {orgName || "Organisation"}
+        </p>
+
+        <div style={{ marginTop: 10 }}>
+          <span style={{
+            fontSize: 10, padding: "3px 8px", borderRadius: 5,
+            background: "#f8fafc", border: "1px solid #e2e8f0",
+            color: "#64748b", fontWeight: 500,
+          }}>
+            Organisation
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Manager (self) node ───────────────────────────────────────────────────────
 function ManagerSelfNode({ name, subtitle, location, initials, delay = 0, dimmed, highlighted }) {
   return (
     <div style={{ animation: `scaleIn 0.35s ease ${delay}ms forwards`, opacity: 0, flexShrink: 0 }}>
@@ -198,7 +276,7 @@ function ManagerSelfNode({ name, subtitle, location, initials, delay = 0, dimmed
           "org-card-hover",
           "org-card-me",
           highlighted ? "org-card-highlight" : "",
-          dimmed ? "org-card-dim" : "",
+          dimmed      ? "org-card-dim"       : "",
         ].filter(Boolean).join(" ")}
         style={{
           width: 200, background: "#fff", border: "1px solid #e2e8f0",
@@ -208,10 +286,11 @@ function ManagerSelfNode({ name, subtitle, location, initials, delay = 0, dimmed
           position: "relative", overflow: "hidden",
         }}
       >
-        {/* Top accent bar */}
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "#1e293b", borderRadius: "14px 14px 0 0" }} />
+        <div style={{
+          position: "absolute", top: 0, left: 0, right: 0,
+          height: 3, background: "#6366f1", borderRadius: "14px 14px 0 0",
+        }} />
 
-        {/* YOU · MANAGER badge */}
         <span style={{
           position: "absolute", top: 11, right: 12,
           fontSize: 9, fontWeight: 600, letterSpacing: "0.08em",
@@ -219,16 +298,21 @@ function ManagerSelfNode({ name, subtitle, location, initials, delay = 0, dimmed
           fontFamily: "'DM Mono', monospace",
         }}>MGR</span>
 
-        {/* Avatar */}
         <div style={{
           width: 54, height: 54, borderRadius: "50%",
-          background: "#1e293b", color: "#fff",
+          background: "#6366f1", color: "#fff",
           display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: 18, fontWeight: 600, marginBottom: 12, flexShrink: 0,
-        }}>{initials}</div>
+        }}>
+          {initials}
+        </div>
 
-        <p style={{ fontSize: 15, fontWeight: 600, color: "#0f172a", margin: 0, textAlign: "center" }}>{name}</p>
-        <p style={{ fontSize: 12, color: "#64748b", margin: "4px 0 0", textAlign: "center" }}>{subtitle}</p>
+        <p style={{ fontSize: 15, fontWeight: 600, color: "#0f172a", margin: 0, textAlign: "center" }}>
+          {name}
+        </p>
+        <p style={{ fontSize: 12, color: "#64748b", margin: "4px 0 0", textAlign: "center" }}>
+          {subtitle}
+        </p>
 
         {location && (
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 6, fontSize: 10, color: "#94a3b8" }}>
@@ -238,15 +322,23 @@ function ManagerSelfNode({ name, subtitle, location, initials, delay = 0, dimmed
         )}
 
         <div style={{ marginTop: 10, display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "center" }}>
-          <span style={{ fontSize: 10, padding: "3px 8px", borderRadius: 5, background: "#f8fafc", border: "1px solid #e2e8f0", color: "#64748b", fontWeight: 500 }}>You</span>
-          <span style={{ fontSize: 10, padding: "3px 8px", borderRadius: 5, background: "#eef2ff", border: "1px solid #c7d2fe", color: "#4338ca", fontWeight: 600 }}>Manager</span>
+          <span style={{
+            fontSize: 10, padding: "3px 8px", borderRadius: 5,
+            background: "#f8fafc", border: "1px solid #e2e8f0",
+            color: "#64748b", fontWeight: 500,
+          }}>You</span>
+          <span style={{
+            fontSize: 10, padding: "3px 8px", borderRadius: 5,
+            background: "#eef2ff", border: "1px solid #c7d2fe",
+            color: "#4338ca", fontWeight: 600,
+          }}>Manager</span>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Employee node — same style as admin page ───────────────────────────────────
+// ── Employee node ─────────────────────────────────────────────────────────────
 function EmployeeNode({ name, subtitle, location, initials, delay = 0, dimmed, highlighted, q }) {
   return (
     <div style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards`, opacity: 0, flexShrink: 0 }}>
@@ -254,7 +346,7 @@ function EmployeeNode({ name, subtitle, location, initials, delay = 0, dimmed, h
         className={[
           "org-card-hover",
           highlighted ? "org-card-highlight" : "",
-          dimmed ? "org-card-dim" : "",
+          dimmed      ? "org-card-dim"       : "",
         ].filter(Boolean).join(" ")}
         style={{
           width: 130, background: "#f8fafc", border: "1px solid #e9eef5",
@@ -267,21 +359,19 @@ function EmployeeNode({ name, subtitle, location, initials, delay = 0, dimmed, h
           background: "#e2e8f0", color: "#64748b",
           display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: 10, fontWeight: 600, marginBottom: 7, flexShrink: 0,
-        }}>{initials}</div>
+        }}>
+          {initials}
+        </div>
 
-        <Hi
-          text={name} query={q}
-          style={{ fontSize: 11, fontWeight: 600, color: "#1e293b", textAlign: "center", maxWidth: 114, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}
-        />
-        <Hi
-          text={subtitle} query={q}
-          style={{ fontSize: 10, color: "#94a3b8", marginTop: 2, textAlign: "center", maxWidth: 114, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}
-        />
+        <Hi text={name}     query={q} style={{ fontSize: 11, fontWeight: 600, color: "#1e293b", textAlign: "center", maxWidth: 114, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }} />
+        <Hi text={subtitle} query={q} style={{ fontSize: 10, color: "#94a3b8", marginTop: 2,   textAlign: "center", maxWidth: 114, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }} />
 
         {location && (
           <div style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 5, fontSize: 9, color: "#b0c4d8" }}>
             <MapPin size={9} style={{ flexShrink: 0 }} />
-            <span style={{ maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{location}</span>
+            <span style={{ maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {location}
+            </span>
           </div>
         )}
       </div>
@@ -289,15 +379,20 @@ function EmployeeNode({ name, subtitle, location, initials, delay = 0, dimmed, h
   );
 }
 
-// ── Stat card — identical to admin page ───────────────────────────────────────
+// ── Stat card ─────────────────────────────────────────────────────────────────
 function StatCard({ label, value, icon: Icon, accent, delay = 0 }) {
   const [count, setCount] = useState(0);
   const num = parseInt(value) || 0;
+
   useEffect(() => {
     if (!num) return;
     let cur = 0;
     const step = Math.max(1, Math.ceil(num / 18));
-    const t = setInterval(() => { cur = Math.min(cur + step, num); setCount(cur); if (cur >= num) clearInterval(t); }, 40);
+    const t = setInterval(() => {
+      cur = Math.min(cur + step, num);
+      setCount(cur);
+      if (cur >= num) clearInterval(t);
+    }, 40);
     return () => clearInterval(t);
   }, [num]);
 
@@ -324,9 +419,14 @@ function StatCard({ label, value, icon: Icon, accent, delay = 0 }) {
 function SkeletonTree() {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+      {/* org node */}
+      <Skeleton w={210} h={120} r={14} />
+      <div style={{ width: 1, height: 28, background: "#e2e8f0" }} />
+      {/* manager node */}
       <Skeleton w={200} h={116} r={14} />
-      <div style={{ width: 1, height: 32, background: "#e2e8f0" }} />
-      <div style={{ display: "flex", gap: 16 }}>
+      <div style={{ width: 1, height: 28, background: "#e2e8f0" }} />
+      {/* employee row */}
+      <div style={{ display: "flex", gap: 14 }}>
         {[1, 2, 3, 4].map(i => (
           <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
             <div style={{ width: 1, height: 20, background: "#e2e8f0" }} />
@@ -339,7 +439,7 @@ function SkeletonTree() {
 }
 
 // ── Org Tree ──────────────────────────────────────────────────────────────────
-function OrgTree({ manager, employees, loading, searchQuery }) {
+function OrgTree({ orgName, orgLogo, manager, employees, loading, searchQuery }) {
   if (loading) return <SkeletonTree />;
 
   const q    = normalize(searchQuery);
@@ -357,8 +457,10 @@ function OrgTree({ manager, employees, loading, searchQuery }) {
     manager?.department, manager?.designation, q
   );
 
-  const EMP_GAP = 14;
-  const EMP_W   = 130;
+  const orgMatch = hasQ && normalize(orgName || "").includes(q);
+
+  const EMP_GAP   = 14;
+  const EMP_W     = 130;
   const empTotalW = employees.length > 1
     ? (employees.length - 1) * (EMP_W + EMP_GAP)
     : 0;
@@ -368,28 +470,40 @@ function OrgTree({ manager, employees, loading, searchQuery }) {
       display: "flex", flexDirection: "column", alignItems: "center",
       minWidth: Math.max(600, employees.length * (EMP_W + EMP_GAP) + 60),
     }}>
-      {/* Manager (self) node */}
+
+      {/* ── Level 1: Organisation ── */}
+      <OrgHeaderNode
+        orgName={orgName}
+        orgLogo={orgLogo}
+        delay={60}
+        highlighted={orgMatch}
+        dimmed={hasQ && !orgMatch && (mgrMatch || matchCount > 0)}
+      />
+
+      <VLine h={28} delay={240} />
+
+      {/* ── Level 2: Manager (self) ── */}
       <ManagerSelfNode
         name={`${manager?.f_name || ""} ${manager?.l_name || ""}`.trim() || "Manager"}
         subtitle={manager?.department || manager?.designation || "Manager"}
         location={manager?.office_location}
         initials={getInitials(manager?.f_name, manager?.l_name)}
-        delay={80}
+        delay={300}
         highlighted={mgrMatch}
         dimmed={hasQ && !mgrMatch && matchCount > 0}
       />
 
       {employees.length > 0 && (
         <>
-          <VLine h={30} delay={300} />
-          {employees.length > 1 && <HLine w={empTotalW} delay={360} />}
+          <VLine h={28} delay={460} />
+          {employees.length > 1 && <HLine w={empTotalW} delay={520} />}
         </>
       )}
 
-      {/* Employees row */}
+      {/* ── Level 3: Employees ── */}
       <div style={{ display: "flex", gap: EMP_GAP, justifyContent: "center", alignItems: "flex-start" }}>
         {employees.map((emp, ei) => {
-          const empDelay  = 440 + ei * 55;
+          const empDelay  = 560 + ei * 55;
           const empMatch  = hasQ && matchesPerson(emp.f_name, emp.l_name, emp.department, emp.designation, q);
           const empDimmed = hasQ && !empMatch && !mgrMatch;
           return (
@@ -425,23 +539,27 @@ function OrgTree({ manager, employees, loading, searchQuery }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function OrganizationPageManager() {
-  // ── Hooks ─────────────────────────────────────────────────────────────────
-  const { data: meManagerData, isLoading: loadingMe }     = useGetMeManager();
+  const { data: meManagerData,  isLoading: loadingMe }    = useGetMeManager();
   const { data: usersUnderData, isLoading: loadingUnder } = useGetUsersUnderManager();
-  const { data: orgData }                                 = useGetOrgInfo();   // ← same as admin/employee
+  const { data: orgData }                                 = useGetOrgInfoManager();
 
-  // ── Search ────────────────────────────────────────────────────────────────
-  const [searchOpen,  setSearchOpen]  = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen,   setSearchOpen]   = useState(false);
+  const [searchQuery,  setSearchQuery]  = useState("");
+  const [exportStatus, setExportStatus] = useState(null);
   const inputRef = useRef(null);
-
-  // ── Export ────────────────────────────────────────────────────────────────
-  const [exportStatus, setExportStatus] = useState(null); // null | "loading" | "done"
   const chartRef = useRef(null);
 
-  // ── Derived data ──────────────────────────────────────────────────────────
-  const manager   = meManagerData?.manager || meManagerData;
-  const orgName   = orgData?.organisation_name;
+  // ── Derived data ────────────────────────────────────────────────────────────
+  const manager = meManagerData?.manager || meManagerData;
+
+  // org info from API (via /manager/getorginfo), falls back to manager profile
+  const orgName = orgData?.organisation_name
+    || manager?.organisation_name
+    || manager?.company
+    || manager?.org_name
+    || "My Organisation";
+
+  const orgLogo = orgData?.profile_image || null;
 
   const employees = useMemo(() => {
     const raw = usersUnderData?.users || usersUnderData || [];
@@ -454,33 +572,34 @@ export default function OrganizationPageManager() {
   const locations  = [...new Set(employees.map(e => e.office_location).filter(Boolean))];
   const loading    = loadingMe || loadingUnder;
 
-  // ── Search match count ────────────────────────────────────────────────────
+  // ── Search match count ──────────────────────────────────────────────────────
   const matchCount = useMemo(() => {
     if (!searchQuery) return 0;
     const q = normalize(searchQuery);
     let n = 0;
+    if (normalize(orgName).includes(q)) n++;
     if (matchesPerson(manager?.f_name, manager?.l_name, manager?.department, manager?.designation, q)) n++;
     employees.forEach(e => {
       if (matchesPerson(e.f_name, e.l_name, e.department, e.designation, q)) n++;
     });
     return n;
-  }, [searchQuery, manager, employees]);
+  }, [searchQuery, orgName, manager, employees]);
 
-  // ── Keyboard: Escape closes search ───────────────────────────────────────
+  // ── Keyboard: Escape ────────────────────────────────────────────────────────
   useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); } };
+    const onKey = (e) => {
+      if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); }
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // ── Auto-focus on open ────────────────────────────────────────────────────
+  // ── Auto-focus search ───────────────────────────────────────────────────────
   useEffect(() => {
     if (searchOpen) setTimeout(() => inputRef.current?.focus(), 40);
   }, [searchOpen]);
 
-  // ── Export PNG (fixed blank-page issue) ───────────────────────────────────
-  // Animations leave nodes at opacity:0 at capture time.
-  // Fix: add .export-mode → strips all animations → wait 2 frames → capture → remove.
+  // ── Export PNG ──────────────────────────────────────────────────────────────
   const handleExport = useCallback(async () => {
     if (!chartRef.current || exportStatus === "loading") return;
     setExportStatus("loading");
@@ -493,31 +612,19 @@ export default function OrganizationPageManager() {
           document.head.appendChild(s);
         });
       }
-
       const target = chartRef.current;
       target.classList.add("export-mode");
-
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
       const canvas = await window.html2canvas(target, {
-        backgroundColor: "#ffffff",
-        scale: 2,
-        useCORS: true,
-        allowTaint: false,
-        logging: false,
-        scrollX: 0,
-        scrollY: 0,
+        backgroundColor: "#ffffff", scale: 2,
+        useCORS: true, allowTaint: false, logging: false,
+        scrollX: 0, scrollY: 0,
       });
-
       target.classList.remove("export-mode");
-
-      const link     = document.createElement("a");
-      const fileName = (orgName || manager?.department || "team")
-        .replace(/\s+/g, "-").toLowerCase();
-      link.download = `org-chart-${fileName}.png`;
+      const link    = document.createElement("a");
+      link.download = `org-chart-${orgName.replace(/\s+/g, "-").toLowerCase()}.png`;
       link.href     = canvas.toDataURL("image/png");
       link.click();
-
       setExportStatus("done");
       setTimeout(() => setExportStatus(null), 2600);
     } catch (err) {
@@ -525,10 +632,11 @@ export default function OrganizationPageManager() {
       chartRef.current?.classList.remove("export-mode");
       setExportStatus(null);
     }
-  }, [exportStatus, orgName, manager]);
+  }, [exportStatus, orgName]);
 
   const closeSearch = () => { setSearchOpen(false); setSearchQuery(""); };
 
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="org-root" style={{ minHeight: "100vh", background: "#f8fafc" }}>
       <style>{STYLES}</style>
@@ -541,13 +649,21 @@ export default function OrganizationPageManager() {
         justifyContent: "space-between", height: 60, gap: 16,
       }}>
         {/* Breadcrumb */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-          <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>
-            {orgName || manager?.department || "My Team"}
-          </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          {orgLogo && (
+            <img
+              src={orgLogo}
+              alt={orgName}
+              style={{ width: 24, height: 24, borderRadius: 5, objectFit: "contain", border: "1px solid #e2e8f0" }}
+            />
+          )}
+          <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>{orgName}</span>
           <ChevronRight size={13} style={{ color: "#cbd5e1" }} />
           <span style={{ fontSize: 13, color: "#1e293b", fontWeight: 600 }}>Org Chart</span>
-          <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, background: "#eef2ff", color: "#4338ca", fontWeight: 600, marginLeft: 4 }}>
+          <span style={{
+            fontSize: 10, padding: "2px 8px", borderRadius: 10,
+            background: "#eef2ff", color: "#4338ca", fontWeight: 600, marginLeft: 4,
+          }}>
             Manager View
           </span>
         </div>
@@ -609,17 +725,17 @@ export default function OrganizationPageManager() {
           <p style={{ fontSize: 13, color: "#94a3b8", margin: "5px 0 0" }}>
             {loading
               ? "Loading…"
-              : `${totalEmps} employee${totalEmps !== 1 ? "s" : ""} reporting to you · ${totalDepts} department${totalDepts !== 1 ? "s" : ""}`
+              : `${orgName} · ${totalEmps} employee${totalEmps !== 1 ? "s" : ""} reporting to you · ${totalDepts} department${totalDepts !== 1 ? "s" : ""}`
             }
           </p>
         </div>
 
         {/* Stats row */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 28 }}>
-          <StatCard label="Team Size"      value={totalEmps}       icon={Users}     accent="#6366f1" delay={100} />
-          <StatCard label="Departments"    value={totalDepts}      icon={Building2} accent="#f59e0b" delay={150} />
-          <StatCard label="Locations"      value={locations.length} icon={MapPin}   accent="#0ea5e9" delay={200} />
-          <StatCard label="Direct Reports" value={totalEmps}       icon={User}      accent="#10b981" delay={250} />
+          <StatCard label="Team Size"      value={totalEmps}        icon={Users}     accent="#6366f1" delay={100} />
+          <StatCard label="Departments"    value={totalDepts}       icon={Building2} accent="#f59e0b" delay={150} />
+          <StatCard label="Locations"      value={locations.length} icon={MapPin}    accent="#0ea5e9" delay={200} />
+          <StatCard label="Direct Reports" value={totalEmps}        icon={User}      accent="#10b981" delay={250} />
         </div>
 
         {/* No-results banner */}
@@ -633,8 +749,8 @@ export default function OrganizationPageManager() {
         {/* Chart panel */}
         <div style={{
           animation: "fadeIn 0.4s ease 300ms forwards", opacity: 0,
-          background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16,
-          boxShadow: "0 1px 4px rgba(0,0,0,0.04)", overflow: "hidden",
+          background: "#fff", border: "1px solid #e2e8f0",
+          borderRadius: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.04)", overflow: "hidden",
         }}>
           {/* Panel header */}
           <div style={{
@@ -651,10 +767,13 @@ export default function OrganizationPageManager() {
                 letterSpacing: "0.05em", textTransform: "uppercase",
                 fontFamily: "'DM Mono', monospace",
               }}>
-                {loading ? "—" : `${totalEmps + 1} nodes`}
+                {loading ? "—" : `${totalEmps + 2} nodes`}
               </span>
               {searchQuery && matchCount > 0 && (
-                <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, background: "#eef2ff", color: "#4338ca", fontWeight: 600 }}>
+                <span style={{
+                  fontSize: 10, padding: "2px 8px", borderRadius: 20,
+                  background: "#eef2ff", color: "#4338ca", fontWeight: 600,
+                }}>
                   {matchCount} highlighted
                 </span>
               )}
@@ -667,9 +786,13 @@ export default function OrganizationPageManager() {
                   <span key={dept} style={{
                     display: "flex", alignItems: "center", gap: 5,
                     fontSize: 11, color: "#64748b", padding: "3px 9px",
-                    borderRadius: 6, background: DEPT_COLORS[i % DEPT_COLORS.length].light, fontWeight: 500,
+                    borderRadius: 6, background: DEPT_COLORS[i % DEPT_COLORS.length].light,
+                    fontWeight: 500,
                   }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: DEPT_COLORS[i % DEPT_COLORS.length].bar, flexShrink: 0 }} />
+                    <span style={{
+                      width: 6, height: 6, borderRadius: "50%",
+                      background: DEPT_COLORS[i % DEPT_COLORS.length].bar, flexShrink: 0,
+                    }} />
                     {dept}
                   </span>
                 ))}
@@ -684,6 +807,8 @@ export default function OrganizationPageManager() {
             style={{ overflowX: "auto", padding: "40px 32px 36px", background: "#fff" }}
           >
             <OrgTree
+              orgName={orgName}
+              orgLogo={orgLogo}
               manager={manager}
               employees={employees}
               loading={loading}
@@ -700,14 +825,16 @@ export default function OrganizationPageManager() {
             animation: "fadeIn 0.4s ease 600ms forwards", opacity: 0,
           }}>
             {[
-              { dot: "#1e293b", label: "You (Manager)", ring: true },
-              { dot: "#e2e8f0", label: "Employee",  border: "#cbd5e1" },
-              { dot: "#6366f1", label: "Search match", ring: true },
-            ].map(({ dot, label, border, ring }) => (
+              { dot: "#1e293b", label: "Organisation" },
+              { dot: "#6366f1", label: "You (Manager)", ring: true },
+              { dot: "#e2e8f0", label: "Employee",      border: "#cbd5e1" },
+              { dot: "#6366f1", label: "Search match",  ring: true, dashed: true },
+            ].map(({ dot, label, border, ring, dashed }) => (
               <div key={label} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "#94a3b8" }}>
                 <span style={{
-                  width: 10, height: 10, borderRadius: "50%", background: dot, flexShrink: 0,
-                  border: border ? `1.5px solid ${border}` : "none",
+                  width: 10, height: 10, borderRadius: "50%",
+                  background: dot, flexShrink: 0,
+                  border: border ? `1.5px solid ${border}` : dashed ? `1.5px dashed ${dot}` : "none",
                   boxShadow: ring ? "0 0 0 3px rgba(99,102,241,0.2)" : "none",
                 }} />
                 {label}
