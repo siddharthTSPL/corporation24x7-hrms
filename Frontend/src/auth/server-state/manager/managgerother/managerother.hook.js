@@ -119,7 +119,7 @@ export const useGetAttendance = () => {
 export const useGetOrgInfoManager = () => {
   return useQuery({
     queryKey: ["orgInfo-manager"],
-    queryFn:  fetchOrgInfo,        // ← calls the API, not itself
+    queryFn:  fetchOrgInfo,        
     staleTime: 5 * 60 * 1000,
     retry: false,
   });

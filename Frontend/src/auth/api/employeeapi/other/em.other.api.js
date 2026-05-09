@@ -29,3 +29,8 @@ export const deleteDocument = async (id) => {
   return res.data;
 };
 
+export const fetchOrgInfo = async () => {
+  const res = await api.get("user/getorginfo");
+  return res.data;
+};
+
