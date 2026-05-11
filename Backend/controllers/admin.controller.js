@@ -273,8 +273,9 @@ const adminlogout = async (req, res, next) => {
   });
 };
 
-const addmanager = async (req, res, next) => {
-  console.log("NEXT TYPE:", typeof next);
+
+
+const addmanager = (async (req, res, next) => {
   const {
     f_name,
     l_name,
@@ -294,8 +295,11 @@ const addmanager = async (req, res, next) => {
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
 
-  const existingManager = await Managermodel.findOne({ work_email });
+  if (!f_name || !work_email || !password || !department) {
+    return next(Object.assign(new Error("Required fields missing"), { statusCode: 400 }));
+  }
 
+  const existingManager = await Managermodel.findOne({ work_email });
   if (existingManager) {
     return next(Object.assign(new Error("Manager already exists"), { statusCode: 400 }));
   }
@@ -330,99 +334,79 @@ const addmanager = async (req, res, next) => {
 
   const verifyLink = `https://corporation24x7-hrms.onrender.com/manager/verify/${token}`;
 
- await sendEmail({
-  to: work_email,
-  subject: "🚀 Activate Your Manager Account",
-  html: `
-  <!DOCTYPE html>
-  <html>
-  <body style="margin:0; padding:0; background:#F9F8F2; font-family:Segoe UI, sans-serif;">
+  await sendEmail({
+    to: work_email,
+    subject: "🚀 Activate Your Manager Account",
+    html: `
+    <!DOCTYPE html>
+    <html>
+    <body style="margin:0; padding:0; background:#F9F8F2; font-family:Segoe UI, sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
+        <tr>
+          <td align="center">
+            <table width="600" style="background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.08);">
+              <tr>
+                <td style="background:linear-gradient(135deg,#730042,#CD166E); padding:30px; text-align:center; color:white;">
+                  <h1 style="margin:0;">👔 Manager Onboarding</h1>
+                  <p style="margin-top:6px; font-size:14px;">You're now part of the system</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:40px; color:#333;">
+                  <h2 style="color:#730042;">Hi ${f_name},</h2>
+                  <p style="font-size:15px; line-height:1.6;">
+                    Your <strong>Manager Account</strong> has been successfully created.
+                    You can now manage your team, track performance, and streamline operations.
+                  </p>
+                  <div style="background:#F9F8F2; padding:15px; border-radius:8px; margin:20px 0;">
+                    <p style="margin:0;"><strong>Role:</strong> ${designation}</p>
+                    <p style="margin:5px 0;"><strong>Department:</strong> ${department}</p>
+                    <p style="margin:0;"><strong>Location:</strong> ${office_location}</p>
+                  </div>
+                  <div style="text-align:center; margin:30px 0;">
+                    <a href="${verifyLink}" style="
+                      background:#CD166E;
+                      color:white;
+                      padding:14px 30px;
+                      text-decoration:none;
+                      border-radius:8px;
+                      font-weight:600;
+                      display:inline-block;
+                      box-shadow:0 6px 16px rgba(205,22,110,0.3);
+                    ">
+                      Verify & Activate
+                    </a>
+                  </div>
+                  <p style="font-size:13px; color:#777;">
+                    Or copy this link:<br/>
+                    <span style="color:#CD166E;">${verifyLink}</span>
+                  </p>
+                  <hr style="margin:25px 0; border:none; border-top:1px solid #eee;" />
+                  <p style="font-size:13px; color:#777;">⏳ Link expires in 1 hour. Ignore if not requested.</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="background:#F9F8F2; padding:20px; text-align:center; font-size:12px; color:#888;">
+                  © 2026 Your Company • Manager Panel
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+    `,
+  });
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
-      <tr>
-        <td align="center">
-
-          <table width="600" style="background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.08);">
-
-            <!-- Header -->
-            <tr>
-              <td style="background:linear-gradient(135deg,#730042,#CD166E); padding:30px; text-align:center; color:white;">
-                <h1 style="margin:0;">👔 Manager Onboarding</h1>
-                <p style="margin-top:6px; font-size:14px;">You're now part of the system</p>
-              </td>
-            </tr>
-
-            <!-- Body -->
-            <tr>
-              <td style="padding:40px; color:#333;">
-
-                <h2 style="color:#730042;">Hi ${f_name},</h2>
-
-                <p style="font-size:15px; line-height:1.6;">
-                  Your <strong>Manager Account</strong> has been successfully created.
-                  You can now manage your team, track performance, and streamline operations.
-                </p>
-
-                <div style="background:#F9F8F2; padding:15px; border-radius:8px; margin:20px 0;">
-                  <p style="margin:0;"><strong>Role:</strong> ${designation}</p>
-                  <p style="margin:5px 0;"><strong>Department:</strong> ${department}</p>
-                  <p style="margin:0;"><strong>Location:</strong> ${office_location}</p>
-                </div>
-
-                <!-- CTA -->
-                <div style="text-align:center; margin:30px 0;">
-                  <a href="${verifyLink}" style="
-                    background:#CD166E;
-                    color:white;
-                    padding:14px 30px;
-                    text-decoration:none;
-                    border-radius:8px;
-                    font-weight:600;
-                    display:inline-block;
-                    box-shadow:0 6px 16px rgba(205,22,110,0.3);
-                  ">
-                    Verify & Activate
-                  </a>
-                </div>
-
-                <p style="font-size:13px; color:#777;">
-                  Or copy this link:<br/>
-                  <span style="color:#CD166E;">${verifyLink}</span>
-                </p>
-
-                <hr style="margin:25px 0; border:none; border-top:1px solid #eee;" />
-
-                <p style="font-size:13px; color:#777;">
-                  ⏳ Link expires in 1 hour. Ignore if not requested.
-                </p>
-
-              </td>
-            </tr>
-
-            <!-- Footer -->
-            <tr>
-              <td style="background:#F9F8F2; padding:20px; text-align:center; font-size:12px; color:#888;">
-                © 2026 Your Company • Manager Panel
-              </td>
-            </tr>
-
-          </table>
-
-        </td>
-      </tr>
-    </table>
-
-  </body>
-  </html>
-  `,
-});
-
-  res.status(200).json({
+  res.status(201).json({
+    success: true,
     message: "Manager added successfully. Verification email sent.",
   });
-};
+});
 
-const addemployee = async (req, res, next) => {
+
+const addemployee = (async (req, res, next) => {
   const {
     f_name,
     l_name,
@@ -438,16 +422,16 @@ const addemployee = async (req, res, next) => {
     department,
     Under_manager,
   } = req.body;
- 
+
   if (!req.admin) {
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
 
-if (!f_name || !work_email || !password) {
-  return next(Object.assign(new Error("Required fields missing"), { statusCode: 400 }));
-}
-  const existingUser = await Usermodel.findOne({ work_email });
+  if (!f_name || !work_email || !password || !department) {
+    return next(Object.assign(new Error("Required fields missing"), { statusCode: 400 }));
+  }
 
+  const existingUser = await Usermodel.findOne({ work_email });
   if (existingUser) {
     return next(Object.assign(new Error("User already exists"), { statusCode: 400 }));
   }
@@ -483,97 +467,77 @@ if (!f_name || !work_email || !password) {
 
   const verifyLink = `https://corporation24x7-hrms.onrender.com/user/verify/${token}`;
 
- await sendEmail({
-  to: work_email,
-  subject: "🎉 Welcome! Verify Your Employee Account",
-  html: `
-  <!DOCTYPE html>
-  <html>
-  <body style="margin:0; padding:0; background:#F9F8F2; font-family:Segoe UI, sans-serif;">
+  await sendEmail({
+    to: work_email,
+    subject: "🎉 Welcome! Verify Your Employee Account",
+    html: `
+    <!DOCTYPE html>
+    <html>
+    <body style="margin:0; padding:0; background:#F9F8F2; font-family:Segoe UI, sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
+        <tr>
+          <td align="center">
+            <table width="600" style="background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.08);">
+              <tr>
+                <td style="background:linear-gradient(135deg,#730042,#CD166E); padding:30px; text-align:center; color:white;">
+                  <h1 style="margin:0;">🎉 Welcome Aboard</h1>
+                  <p style="margin-top:6px; font-size:14px;">Your journey starts here</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:40px; color:#333;">
+                  <h2 style="color:#730042;">Hello ${f_name},</h2>
+                  <p style="font-size:15px; line-height:1.6;">
+                    Your employee account has been successfully created.
+                    You're now part of the team — let's get started 🚀
+                  </p>
+                  <div style="background:#F9F8F2; padding:15px; border-radius:8px; margin:20px 0;">
+                    <p style="margin:0;"><strong>Department:</strong> ${department}</p>
+                    <p style="margin:5px 0;"><strong>Manager:</strong> ${Under_manager || "Assigned Soon"}</p>
+                    <p style="margin:0;"><strong>Location:</strong> ${office_location}</p>
+                  </div>
+                  <div style="text-align:center; margin:30px 0;">
+                    <a href="${verifyLink}" style="
+                      background:#730042;
+                      color:white;
+                      padding:14px 30px;
+                      text-decoration:none;
+                      border-radius:8px;
+                      font-weight:600;
+                      display:inline-block;
+                      box-shadow:0 6px 16px rgba(115,0,66,0.3);
+                    ">
+                      Verify Account
+                    </a>
+                  </div>
+                  <p style="font-size:13px; color:#777;">
+                    If button doesn't work:<br/>
+                    <span style="color:#CD166E;">${verifyLink}</span>
+                  </p>
+                  <hr style="margin:25px 0; border:none; border-top:1px solid #eee;" />
+                  <p style="font-size:13px; color:#777;">⏳ Link valid for 1 hour only.</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="background:#F9F8F2; padding:20px; text-align:center; font-size:12px; color:#888;">
+                  © 2026 Your Company • Employee Portal
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+    `,
+  });
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
-      <tr>
-        <td align="center">
-
-          <table width="600" style="background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.08);">
-
-            <!-- Header -->
-            <tr>
-              <td style="background:linear-gradient(135deg,#730042,#CD166E); padding:30px; text-align:center; color:white;">
-                <h1 style="margin:0;">🎉 Welcome Aboard</h1>
-                <p style="margin-top:6px; font-size:14px;">Your journey starts here</p>
-              </td>
-            </tr>
-
-            <!-- Body -->
-            <tr>
-              <td style="padding:40px; color:#333;">
-
-                <h2 style="color:#730042;">Hello ${f_name},</h2>
-
-                <p style="font-size:15px; line-height:1.6;">
-                  Your employee account has been successfully created.
-                  You're now part of the team — let's get started 🚀
-                </p>
-
-                <div style="background:#F9F8F2; padding:15px; border-radius:8px; margin:20px 0;">
-                  <p style="margin:0;"><strong>Department:</strong> ${department}</p>
-                  <p style="margin:5px 0;"><strong>Manager:</strong> ${Under_manager || "Assigned Soon"}</p>
-                  <p style="margin:0;"><strong>Location:</strong> ${office_location}</p>
-                </div>
-
-                <!-- CTA -->
-                <div style="text-align:center; margin:30px 0;">
-                  <a href="${verifyLink}" style="
-                    background:#730042;
-                    color:white;
-                    padding:14px 30px;
-                    text-decoration:none;
-                    border-radius:8px;
-                    font-weight:600;
-                    display:inline-block;
-                    box-shadow:0 6px 16px rgba(115,0,66,0.3);
-                  ">
-                    Verify Account
-                  </a>
-                </div>
-
-                <p style="font-size:13px; color:#777;">
-                  If button doesn't work:<br/>
-                  <span style="color:#CD166E;">${verifyLink}</span>
-                </p>
-
-                <hr style="margin:25px 0; border:none; border-top:1px solid #eee;" />
-
-                <p style="font-size:13px; color:#777;">
-                  ⏳ Link valid for 1 hour only.
-                </p>
-
-              </td>
-            </tr>
-
-            <!-- Footer -->
-            <tr>
-              <td style="background:#F9F8F2; padding:20px; text-align:center; font-size:12px; color:#888;">
-                © 2026 Your Company • Employee Portal
-              </td>
-            </tr>
-
-          </table>
-
-        </td>
-      </tr>
-    </table>
-
-  </body>
-  </html>
-  `,
-});
-
-  res.status(200).json({
+  res.status(201).json({
+    success: true,
     message: "User added successfully. Verification email sent.",
   });
-};
+});
+
 
 const findallmanagers = async (req, res, next) => {
   if (!req.admin) {
