@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRegisterAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
+import logo from "../../assets/logo1.png";
+import slide1 from "../../assets/slide1.png";
+import slide2 from "../../assets/slide2.png";
+import slide3 from "../../assets/slide3.png";
 
 export default function Register() {
   
@@ -35,7 +39,7 @@ export default function Register() {
         {/* LEFT SIDE */}
         <div className="w-full md:w-1/2 p-8">
           <div className="flex justify-between items-center mb-6">
-            <img src="/src/assets/logo1.png" alt="logo" className="w-28" />
+            <img src={logo} alt="logo" className="w-28" />
             
             <p
               onClick={() => navigate("/login")}
@@ -128,7 +132,7 @@ export default function Register() {
         <div className="hidden md:flex w-1/2 bg-gray-50 items-center justify-center p-6">
           <div className="text-center">
             <img
-              src="/Group 551.png"
+              src={slide1}
               alt="illustration"
               className="w-full max-h-65 object-contain"
             />

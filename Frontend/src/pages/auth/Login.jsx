@@ -5,6 +5,10 @@ import { Player } from "@lottiefiles/react-lottie-player";
 import { useLogin } from "../../auth/store/getmeauth/getuselogin";
 import { useSendForgetPasswordOtp, useVerifyAdminOtp } from "../../auth/server-state/adminauth/adminauth.hook";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
+import logo from "../../assets/logo1.png";
+import slide1 from "../../assets/slide1.png";
+import slide2 from "../../assets/slide2.png";
+import slide3 from "../../assets/slide3.png";
 
 function Login() {
   const navigate = useNavigate();
@@ -21,7 +25,7 @@ function Login() {
   const [showLoader, setShowLoader] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  const images = ["/src/assets/slide1.png", "/src/assets/slide2.png", "/src/assets/slide3.png"];
+  const images = [slide1, slide2, slide3];
 
   const navigateByRole = (role) => {
     if (role === "admin") navigate("/dashboard", { replace: true });
@@ -135,7 +139,7 @@ function Login() {
 
       <div className="w-full max-w-5xl bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden">
         <div className="w-full md:w-1/2 p-8">
-          <img src="src/assets/logo1.png" alt="logo" className="w-28 mb-6" />
+          <img src={logo} alt="logo" className="w-28 mb-6" />
 
           {step === "login" && (
             <>
