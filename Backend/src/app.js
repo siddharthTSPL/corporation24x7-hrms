@@ -20,6 +20,7 @@ const corsOptions = {
     "http://talent.techtorch.solutions",
     "https://talent.techtorch.solutions",
     "https://corporation24x7-hrms.onrender.com",
+    "http://talent.techtorch.solutions"
   ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
