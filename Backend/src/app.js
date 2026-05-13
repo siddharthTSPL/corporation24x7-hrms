@@ -2,6 +2,7 @@ const express = require('express');
 const cookieparser = require('cookie-parser');
 const morgan = require('morgan');
 const cors = require('cors');
+const compression = require('compression');
 require('../automatic/autoelcredit');
 
 const app = express();
@@ -10,6 +11,7 @@ app.use(morgan("dev"));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieparser());
+app.use(compression());
 
 const corsOptions = {
   origin: [
