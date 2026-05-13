@@ -3,9 +3,20 @@ const cookieparser = require('cookie-parser');
 const morgan = require('morgan');
 const cors = require('cors');
 const compression = require('compression');
+
 require('../automatic/autoelcredit');
 
 const app = express();
+
+app.enable("trust proxy");
+
+app.use((req, res, next) => {
+  if (req.secure) {
+    next();
+  } else {
+    res.redirect(`https://${req.headers.host}${req.url}`);
+  }
+});
 
 app.use(morgan("dev"));
 app.use(express.urlencoded({ extended: true }));
@@ -29,7 +40,7 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
-app.use(cors(corsOptions)); 
+app.use(cors(corsOptions));
 
 const adminrouter = require('../routes/adminroutes');
 const managerrouter = require('../routes/managerroutes');
