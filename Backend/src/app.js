@@ -2,14 +2,31 @@ const express = require('express');
 const cookieparser = require('cookie-parser');
 const morgan = require('morgan');
 const cors = require('cors');
+const compression = require('compression');
+
 require('../automatic/autoelcredit');
 
 const app = express();
+
+app.enable("trust proxy");
+
+app.use((req, res, next) => {
+  if (
+    req.hostname === "localhost" ||
+    req.method === "OPTIONS" ||
+    req.secure
+  ) {
+    return next();
+  }
+
+  res.redirect(`https://${req.headers.host}${req.url}`);
+});
 
 app.use(morgan("dev"));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieparser());
+app.use(compression());
 
 const corsOptions = {
   origin: [
@@ -27,7 +44,7 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
-app.use(cors(corsOptions)); 
+app.use(cors(corsOptions));
 
 const adminrouter = require('../routes/adminroutes');
 const managerrouter = require('../routes/managerroutes');
