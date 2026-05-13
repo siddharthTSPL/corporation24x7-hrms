@@ -11,11 +11,15 @@ const app = express();
 app.enable("trust proxy");
 
 app.use((req, res, next) => {
-  if (req.secure) {
-    next();
-  } else {
-    res.redirect(`https://${req.headers.host}${req.url}`);
+  if (
+    req.hostname === "localhost" ||
+    req.method === "OPTIONS" ||
+    req.secure
+  ) {
+    return next();
   }
+
+  res.redirect(`https://${req.headers.host}${req.url}`);
 });
 
 app.use(morgan("dev"));
