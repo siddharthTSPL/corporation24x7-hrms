@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken");
-const AdminModel = require("../../Models/Admin.model");
+const SuperAdminModel = require("../../Models/superadmin.model");
 
-const adminAuth = async (req, res, next) => {
+const superAdminAuth = async (req, res, next) => {
   try {
     const token = req.cookies.token;
 
@@ -11,33 +11,29 @@ const adminAuth = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    if (!decoded.role || decoded.role !== "admin") {
+    if (!decoded.role || decoded.role !== "super_admin") {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    const admin = await AdminModel.findById(decoded.adminid).select("-password");
+    const superAdmin = await SuperAdminModel.findById(decoded.superadminid).select("-password");
 
-    if (!admin) {
+    if (!superAdmin) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    if (!admin.isVerified) {
-      return res.status(403).json({ message: "Please verify your email first" });
-    }
-
-    if (admin.status === "suspended") {
+    if (superAdmin.status === "suspended") {
       return res.status(403).json({ message: "Your account has been suspended" });
     }
 
-    if (admin.status === "inactive") {
-      return res.status(403).json({ message: "Your account is inactive" });
+    if (!superAdmin.isVerified) {
+      return res.status(403).json({ message: "Please verify your email first" });
     }
 
-    req.admin = admin;
+    req.superAdmin = superAdmin;
     next();
   } catch (error) {
     return res.status(401).json({ message: "Invalid token" });
   }
 };
 
-module.exports = adminAuth;
+module.exports = superAdminAuth;
