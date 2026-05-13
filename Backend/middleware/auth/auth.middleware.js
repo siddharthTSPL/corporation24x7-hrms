@@ -1,4 +1,5 @@
-const jwt = require("jsonwebtoken"); // ← MISSING
+const jwt = require("jsonwebtoken"); 
+
 
 const authMiddleware = (req, res, next) => {
   let token = req.cookies?.token;
