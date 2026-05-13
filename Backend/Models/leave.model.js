@@ -4,33 +4,33 @@ const leaveSchema = new mongoose.Schema({
   employee: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
-    required: true
+    required: true,
   },
   manager: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Manager",
-    required: true
+    required: true,
   },
   leaveType: {
     type: String,
-    enum: ["el","sl","ml","pl","half_day_el","half_day_sl"],
-    required: true
+    enum: ["el", "sl", "ml", "pl", "half_day_el", "half_day_sl"],
+    required: true,
   },
   startDate: {
     type: Date,
-    required: true
+    required: true,
   },
   endDate: {
     type: Date,
-    required: true
+    required: true,
   },
   days: {
     type: Number,
-    required: true
+    required: true,
   },
   reason: {
     type: String,
-    required: true
+    required: true,
   },
   status: {
     type: String,
@@ -40,26 +40,31 @@ const leaveSchema = new mongoose.Schema({
       "rejected_manager",
       "forwarded_admin",
       "approved_admin",
-      "rejected_admin"
+      "rejected_admin",
     ],
-    default: "pending_manager"
+    default: "pending_manager",
   },
   approvedBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User"
+    ref: "User",
   },
   remarks: {
-    type: String
+    type: String,
   },
   createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   },
   deleteAt: {
     type: Date,
     default: null,
-    index: { expires: 0 }   
-  }
+    index: { expires: 0 },
+  },
 });
+
+leaveSchema.index({ employee: 1, status: 1 });
+leaveSchema.index({ employee: 1, startDate: 1, endDate: 1 });
+leaveSchema.index({ manager: 1, status: 1 });
+leaveSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model("Leave", leaveSchema);

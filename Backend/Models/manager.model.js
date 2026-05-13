@@ -10,9 +10,9 @@ const managerSchema = new mongoose.Schema({
     required: [true, "UID is required"],
     unique: [true, "UID already exists"],
   },
-   department: {
+  department: {
     type: String,
-    enum: ["MGMT",  "HR"],
+    enum: ["MGMT", "HR"],
     required: [true, "Department is required"],
   },
   f_name: {
@@ -53,24 +53,23 @@ const managerSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ["manager","senior_manager", "official"],
+    enum: ["manager", "senior_manager", "official"],
     default: "manager",
   },
-   office_location:{
-    type:String,
-    enum:["Noida", "Bareilly", "Delhi", "Mumbai"],
-    required:[true,'Office location is required']
+  office_location: {
+    type: String,
+    enum: ["Noida", "Bareilly", "Delhi", "Mumbai"],
+    required: [true, "Office location is required"],
   },
-   designation:{
-     type:String,
-     required:[true,'Designation is required']
+  designation: {
+    type: String,
+    required: [true, "Designation is required"],
   },
   status: {
     type: String,
     enum: ["active", "inactive"],
     default: "active",
-  }
- ,
+  },
   isFirstLogin: {
     type: Boolean,
     default: true,
@@ -83,19 +82,23 @@ const managerSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
- isVerified: {
-  type: Boolean,
-  default: false,
-},
+  isVerified: {
+    type: Boolean,
+    default: false,
+  },
 });
+
+managerSchema.index({ department: 1, status: 1 });
+managerSchema.index({ status: 1 });
 
 managerSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
-
   this.password = await bcrypt.hash(this.password, 10);
 });
+
 managerSchema.methods.isValidPassword = async function (password) {
   return await bcrypt.compare(password, this.password);
 };
+
 const Managermodel = mongoose.model("Manager", managerSchema);
 module.exports = Managermodel;
