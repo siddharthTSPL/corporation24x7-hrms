@@ -10,7 +10,6 @@ const calculateStatus = (activeMinutes) => {
   return "absent";
 };
 
-// Check if employee has an approved leave for this date
 const hasApprovedLeave = async (employeeId, date) => {
   const checkDate = new Date(date);
   const leave = await Leave.findOne({
@@ -18,69 +17,48 @@ const hasApprovedLeave = async (employeeId, date) => {
     status: { $in: ["approved_manager", "approved_admin"] },
     startDate: { $lte: checkDate },
     endDate:   { $gte: checkDate },
-  });
+  }).select("_id").lean();
   return !!leave;
 };
 
 const updateSummary = async (attendance) => {
-  const date = new Date(attendance.date);
+  const date  = new Date(attendance.date);
+  const empId = new mongoose.Types.ObjectId(attendance.employee);
 
-  // ── Update monthly summary ──────────────────────────────────────────────────
-  let summary = await AttendanceSummary.findOne({
-    employee: attendance.employee,
-    role:     attendance.role,
-    month:    date.getMonth() + 1,
-    year:     date.getFullYear()
-  });
+  const summaryInc = { totalWorkingMinutes: attendance.activeMinutes || 0 };
 
-  if (!summary) {
-    summary = new AttendanceSummary({
-      employee:            attendance.employee,
-      role:                attendance.role,
-      month:               date.getMonth() + 1,
-      year:                date.getFullYear(),
-      presentDays:         0,
-      halfDays:            0,
-      absentDays:          0,
-      totalWorkingMinutes: 0
-    });
-  }
+  if      (attendance.status === "present")  { summaryInc.presentDays = 1; }
+  else if (attendance.status === "half_day") { summaryInc.halfDays = 1; summaryInc.presentDays = 0.5; }
+  else if (attendance.status === "absent")   { summaryInc.absentDays = 1; }
 
-  summary.totalWorkingMinutes += attendance.activeMinutes || 0;
+  const summaryWrite = AttendanceSummary.findOneAndUpdate(
+    {
+      employee: attendance.employee,
+      role:     attendance.role,
+      month:    date.getMonth() + 1,
+      year:     date.getFullYear(),
+    },
+    { $inc: summaryInc },
+    { upsert: true, new: true }
+  );
 
-  if (attendance.status === "present") {
+  if (attendance.status === "half_day" || attendance.status === "absent") {
+    const lwpAmount = attendance.status === "half_day" ? 0.5 : 1;
 
-    summary.presentDays += 1;
+    const [, onLeave] = await Promise.all([
+      summaryWrite,
+      hasApprovedLeave(attendance.employee, attendance.date),
+    ]);
 
-  } else if (attendance.status === "half_day") {
-
-    summary.halfDays    += 1;
-    summary.presentDays += 0.5;
-
-    const onLeave = await hasApprovedLeave(attendance.employee, attendance.date);
     if (!onLeave) {
-      const lb = await LeaveBalance.findOne({ employee: new mongoose.Types.ObjectId(attendance.employee) });
-      if (lb) {
-        lb.lwp = Number(((lb.lwp || 0) + 0.5).toFixed(2));
-        await lb.save();
-      }
+      await LeaveBalance.findOneAndUpdate(
+        { employee: empId },
+        { $inc: { lwp: lwpAmount } }
+      );
     }
-
-  } else if (attendance.status === "absent") {
-    
-    summary.absentDays += 1;
-
-    const onLeave = await hasApprovedLeave(attendance.employee, attendance.date);
-    if (!onLeave) {
-      const lb = await LeaveBalance.findOne({ employee: new mongoose.Types.ObjectId(attendance.employee) });
-      if (lb) {
-        lb.lwp = Number(((lb.lwp || 0) + 1).toFixed(2));
-        await lb.save();
-      }
-    }
+  } else {
+    await summaryWrite;
   }
-
-  await summary.save();
 };
 
 module.exports = { calculateStatus, updateSummary };

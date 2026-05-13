@@ -18,4 +18,7 @@ const documentSchema = new mongoose.Schema({
   viewedByManager: { type: Boolean, default: false },
 });
 
+documentSchema.index({ employee: 1, fileType: 1 });
+documentSchema.index({ employee: 1, uploadedAt: -1 });
+
 module.exports = mongoose.model("Document", documentSchema);

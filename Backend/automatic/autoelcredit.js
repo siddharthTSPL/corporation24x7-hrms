@@ -2,94 +2,66 @@ const cron = require("node-cron");
 const LeaveBalance = require("../Models/leavebalance.model");
 const { autoCheckoutAll } = require("../controllers/attendance.controller");
 
-
 cron.schedule("0 0 1 * *", async () => {
   try {
-
     const today = new Date();
-    const balances = await LeaveBalance.find();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const monthStart = new Date(year, month, 1);
+    const monthEnd = new Date(year, month, daysInMonth);
 
-    for (let balance of balances) {
+    const balances = await LeaveBalance.find().lean();
+    const ops = balances.map((balance) => {
+      const $set = {};
 
       if (
         balance.mlStartDate &&
         balance.mlEndDate &&
-        today >= balance.mlStartDate &&
-        today <= balance.mlEndDate
+        today >= new Date(balance.mlStartDate) &&
+        today <= new Date(balance.mlEndDate)
       ) {
-
-        const year = today.getFullYear();
-        const month = today.getMonth();
-
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-        const start = new Date(balance.mlStartDate);
-        const end = new Date(balance.mlEndDate);
-
-        const monthStart = new Date(year, month, 1);
-        const monthEnd = new Date(year, month, daysInMonth);
-
-        const actualStart = start > monthStart ? start : monthStart;
-        const actualEnd = end < monthEnd ? end : monthEnd;
-
-        const diff =
-          Math.floor((actualEnd - actualStart) / (1000 * 60 * 60 * 24)) + 1;
-
-        balance.pbc = diff;
-
-        await balance.save();
-        continue;
+        const actualStart = new Date(balance.mlStartDate) > monthStart ? new Date(balance.mlStartDate) : monthStart;
+        const actualEnd = new Date(balance.mlEndDate) < monthEnd ? new Date(balance.mlEndDate) : monthEnd;
+        $set.pbc = Math.floor((actualEnd - actualStart) / (1000 * 60 * 60 * 24)) + 1;
+      } else {
+        $set.pbc = 0;
       }
 
-      balance.pbc = 0;
-      await balance.save();
-    }
-
-    console.log("Monthly PBC calculation done");
-
-  } catch (error) {
-    console.error("PBC cron error:", error.message);
-  }
-});
-
-cron.schedule("0 0 1 * *", async () => {
-  try {
-    const leaves = await LeaveBalance.find();
-    console.log(leaves);
-    for (let leave of leaves) {
-      const monthlyEL = leave.EL.entitled / 12;
-      const maxEL = leave.EL.entitled;
-      if (leave.EL.accrued < maxEL) {
-        leave.EL.accrued = Number((leave.EL.accrued + monthlyEL).toFixed(2));
-
-        if (leave.EL.accrued > maxEL) {
-          leave.EL.accrued = maxEL;
-        }
-        await leave.save();
+      if (balance.EL.accrued < balance.EL.entitled) {
+        $set["EL.accrued"] = Math.min(
+          Number((balance.EL.accrued + balance.EL.entitled / 12).toFixed(2)),
+          balance.EL.entitled
+        );
       }
-    }
 
-    console.log("Monthly EL credited successfully");
+      return { updateOne: { filter: { _id: balance._id }, update: { $set } } };
+    });
+
+    if (ops.length) await LeaveBalance.bulkWrite(ops, { ordered: false });
+    console.log("Monthly PBC + EL update done");
   } catch (error) {
-    console.error("Monthly EL credit error:", error.message);
+    console.error("Monthly cron error:", error.message);
   }
 });
 
 cron.schedule("0 0 1 1 *", async () => {
   try {
-    const leaves = await LeaveBalance.find();
+    const balances = await LeaveBalance.find().lean();
 
-    for (let leave of leaves) {
-      const remaining = leave.EL.accrued - leave.EL.availed;
+    const ops = balances.map((b) => ({
+      updateOne: {
+        filter: { _id: b._id },
+        update: {
+          $set: {
+            "EL.accrued": Number(((b.EL.accrued - b.EL.availed) * 0.5).toFixed(2)),
+            "EL.availed": 0,
+          },
+        },
+      },
+    }));
 
-      const carryForward = Number((remaining * 0.5).toFixed(2));
-
-      leave.EL.accrued = carryForward;
-      leave.EL.availed = 0;
-
-      await leave.save();
-    }
-
+    if (ops.length) await LeaveBalance.bulkWrite(ops, { ordered: false });
     console.log("Yearly EL carry forward applied successfully");
   } catch (error) {
     console.error("Yearly carry forward error:", error.message);
@@ -97,6 +69,5 @@ cron.schedule("0 0 1 1 *", async () => {
 });
 
 cron.schedule("0 19 * * *", () => {
-  console.log("[Cron] 7 PM auto checkout running...");
   autoCheckoutAll();
 });
