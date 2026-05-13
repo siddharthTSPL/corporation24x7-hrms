@@ -1,102 +1,135 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { lazy, Suspense } from "react";
 import { useAuth } from "./auth/store/getmeauth/getmeauth";
-import Login from "./pages/auth/Login";
-import Signup from "./pages/auth/Signup";
-import LandingPage from "./pages/auth/LandingPage";
-import MainLayout from "./layout/MainLayout";
-import ProtectedRoute from "./components/Protectedroute";
-import Dashboard from "./pages/dashboard/Dashboard";
-import EmployeeDashboard from "./pages/dashboard/EmployeeDashboard";
-import Managerdashboard from "./pages/dashboard/Dashboardma";
-import EmployeeTable from "./pages/employee/EmployeeTable";
-import LeaveTable from "./pages/leave/LeaveTable";
-import LeaveTableem from "./pages/leave/LeaveTableem";
-import LeaveTablema from "./pages/leave/LeaveTablema";
-import LeaveTablead from "./pages/leave/LeaveTablead";
-import Announce from "./pages/announcement/Announce";
-import Announceem from "./pages/announcement/Announceem";
-import Announcema from "./pages/announcement/Announcema";
-import Doc from "./pages/document/Doc";
-import Docma from "./pages/document/Docma";
-import Set from "./pages/settings/Set";
-import Setem from "./pages/settings/Setem";
-import Setma from "./pages/settings/Setma";
-import File from "./pages/file/File";
-import Fileem from "./pages/file/Fileem";
-import Filema from "./pages/file/Filema";
-import Organisation from "./pages/organisation/Organisation";
-import Organisationem from "./pages/organisation/organisationem";
-import Organisationma from "./pages/organisation/organisationma";
-import Reviewad from "./pages/review/reviewad";
-import Reviewma from "./pages/review/reviewma";
-import Attendancepage from "./pages/attendance/attendancepage";
+
+
+const Login           = lazy(() => import("./pages/auth/Login"));
+const Signup          = lazy(() => import("./pages/auth/Signup"));
+const LandingPage     = lazy(() => import("./pages/auth/LandingPage"));
+const MainLayout      = lazy(() => import("./layout/MainLayout"));
+const ProtectedRoute  = lazy(() => import("./components/Protectedroute"));
+const Dashboard       = lazy(() => import("./pages/dashboard/Dashboard"));
+const EmployeeDashboard = lazy(() => import("./pages/dashboard/EmployeeDashboard"));
+const Managerdashboard  = lazy(() => import("./pages/dashboard/Dashboardma"));
+const EmployeeTable   = lazy(() => import("./pages/employee/EmployeeTable"));
+const LeaveTable      = lazy(() => import("./pages/leave/LeaveTable"));
+const LeaveTableem    = lazy(() => import("./pages/leave/LeaveTableem"));
+const LeaveTablema    = lazy(() => import("./pages/leave/LeaveTablema"));
+const LeaveTablead    = lazy(() => import("./pages/leave/LeaveTablead"));
+const Announce        = lazy(() => import("./pages/announcement/Announce"));
+const Announceem      = lazy(() => import("./pages/announcement/Announceem"));
+const Announcema      = lazy(() => import("./pages/announcement/Announcema"));
+const Doc             = lazy(() => import("./pages/document/Doc"));
+const Docma           = lazy(() => import("./pages/document/Docma"));
+const Set             = lazy(() => import("./pages/settings/Set"));
+const Setem           = lazy(() => import("./pages/settings/Setem"));
+const Setma           = lazy(() => import("./pages/settings/Setma"));
+const File            = lazy(() => import("./pages/file/File"));
+const Fileem          = lazy(() => import("./pages/file/Fileem"));
+const Filema          = lazy(() => import("./pages/file/Filema"));
+const Organisation    = lazy(() => import("./pages/organisation/Organisation"));
+const Organisationem  = lazy(() => import("./pages/organisation/organisationem"));
+const Organisationma  = lazy(() => import("./pages/organisation/organisationma"));
+const Reviewad        = lazy(() => import("./pages/review/reviewad"));
+const Reviewma        = lazy(() => import("./pages/review/reviewma"));
+const Attendancepage  = lazy(() => import("./pages/attendance/attendancepage"));
+
+
+function PageSkeleton() {
+  return (
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: "100vh",
+      background: "#f9fafb",
+    }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+        <div style={{
+          width: 36,
+          height: 36,
+          border: "3px solid #e5e7eb",
+          borderTop: "3px solid #6366f1",
+          borderRadius: "50%",
+          animation: "spin 0.7s linear infinite",
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <span style={{ fontSize: 13, color: "#9ca3af", letterSpacing: "0.05em" }}>Loading…</span>
+      </div>
+    </div>
+  );
+}
+
 
 function RoleBasedRedirect() {
   const { data: auth, isLoading } = useAuth();
-
-  if (isLoading) return <p>Loading...</p>;
+  if (isLoading) return <PageSkeleton />;
   if (!auth) return <Navigate to="/login" replace />;
-  if (auth.role === "admin") return <Navigate to="/dashboard" replace />;
+  if (auth.role === "admin")   return <Navigate to="/dashboard" replace />;
   if (auth.role === "manager") return <Navigate to="/manager-dashboard" replace />;
   return <Navigate to="/employee-dashboard" replace />;
 }
 
+
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-      
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/redirect" element={<RoleBasedRedirect />} />
-        <Route
-          path="/unauthorized"
-          element={
-            <div className="min-h-screen flex items-center justify-center">
-              <div className="text-center">
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">Access Denied</h2>
-                <p className="text-gray-500">You don't have permission to view this page.</p>
+      {/* Single top-level Suspense wraps everything */}
+      <Suspense fallback={<PageSkeleton />}>
+        <Routes>
+          {/* Public */}
+          <Route path="/"         element={<LandingPage />} />
+          <Route path="/login"    element={<Login />} />
+          <Route path="/signup"   element={<Signup />} />
+          <Route path="/redirect" element={<RoleBasedRedirect />} />
+          <Route
+            path="/unauthorized"
+            element={
+              <div className="min-h-screen flex items-center justify-center">
+                <div className="text-center">
+                  <h2 className="text-2xl font-bold text-gray-800 mb-2">Access Denied</h2>
+                  <p className="text-gray-500">You don't have permission to view this page.</p>
+                </div>
               </div>
-            </div>
-          }
-        />
+            }
+          />
 
-       
-        <Route
-          element={
-            <ProtectedRoute allowedRoles={["admin", "manager", "employee"]}>
-              <MainLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
-          <Route path="/manager-dashboard" element={<Managerdashboard />} />
-          <Route path="/employee" element={<EmployeeTable />} />
-          <Route path="/leave-manager" element={<LeaveTablema />} />
-          <Route path="/leave-employee" element={<LeaveTableem />} />
-          <Route path="/leave-admin" element={<LeaveTablead />} />
-          <Route path="/leave" element={<LeaveTable />} />
-          <Route path="/announcement" element={<Announce />} />
-          <Route path="/announcement-employee" element={<Announceem />} />
-          <Route path="/announcement-manager" element={<Announcema />} />
-          <Route path="/document" element={<Doc />} />
-          <Route path="/document-manager" element={<Docma />} />
-          <Route path="/file" element={<File />} />
-          <Route path="/file-employee" element={<Fileem />} />
-          <Route path="/file-manager" element={<Filema />} />
-          <Route path="/settings" element={<Set />} />
-          <Route path="/settings-employee" element={<Setem />} />
-          <Route path="/settings-manager" element={<Setma />} />
-          <Route path="/organisation" element={<Organisation />} />
-          <Route path="/organisation-employee" element={<Organisationem />} />
-          <Route path="/organisation-manager" element={<Organisationma />} />
-          <Route path="/review-admin" element={<Reviewad />} />
-          <Route path="/review-manager" element={<Reviewma />} />
-          <Route path="/mark-attendance" element={<Attendancepage />} />
-        </Route>
-      </Routes>
+    
+          <Route
+            element={
+              <ProtectedRoute allowedRoles={["admin", "manager", "employee"]}>
+                <MainLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/dashboard"              element={<Dashboard />} />
+            <Route path="/employee-dashboard"     element={<EmployeeDashboard />} />
+            <Route path="/manager-dashboard"      element={<Managerdashboard />} />
+            <Route path="/employee"               element={<EmployeeTable />} />
+            <Route path="/leave-manager"          element={<LeaveTablema />} />
+            <Route path="/leave-employee"         element={<LeaveTableem />} />
+            <Route path="/leave-admin"            element={<LeaveTablead />} />
+            <Route path="/leave"                  element={<LeaveTable />} />
+            <Route path="/announcement"           element={<Announce />} />
+            <Route path="/announcement-employee"  element={<Announceem />} />
+            <Route path="/announcement-manager"   element={<Announcema />} />
+            <Route path="/document"               element={<Doc />} />
+            <Route path="/document-manager"       element={<Docma />} />
+            <Route path="/file"                   element={<File />} />
+            <Route path="/file-employee"          element={<Fileem />} />
+            <Route path="/file-manager"           element={<Filema />} />
+            <Route path="/settings"               element={<Set />} />
+            <Route path="/settings-employee"      element={<Setem />} />
+            <Route path="/settings-manager"       element={<Setma />} />
+            <Route path="/organisation"           element={<Organisation />} />
+            <Route path="/organisation-employee"  element={<Organisationem />} />
+            <Route path="/organisation-manager"   element={<Organisationma />} />
+            <Route path="/review-admin"           element={<Reviewad />} />
+            <Route path="/review-manager"         element={<Reviewma />} />
+            <Route path="/mark-attendance"        element={<Attendancepage />} />
+          </Route>
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }
