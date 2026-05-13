@@ -1,19 +1,21 @@
 const Attendance = require("../Models/attendance.model");
-const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
+const {
+  calculateStatus,
+  updateSummary,
+} = require("../automatic/monthattendanceupdate");
 
 const getUserId = (user) => user._id || user.id;
 
 const getOnModel = (role) => {
   if (role === "manager") return "Manager";
-  if (role === "admin")   return "Admin";
+  if (role === "admin") return "Admin";
   return "User";
 };
-
 
 const checkin = async (req, res) => {
   try {
     const { latitude, longitude, selfie } = req.body;
-    const user   = req.user;
+    const user = req.user;
     const userId = getUserId(user);
 
     if (!latitude || !longitude) {
@@ -25,64 +27,60 @@ const checkin = async (req, res) => {
 
     const attendance = await Attendance.findOne({
       employee: userId,
-      role:     user.role,
-      date:     today,
+      role: user.role,
+      date: today,
     });
 
     if (attendance) {
-
       if (attendance.checkOut) {
-        return res.status(400).json({
-          message: "You have already completed your attendance for today.",
-          alreadyDone: true,
-        });
+        return res
+          .status(400)
+          .json({
+            message: "You have already completed your attendance for today.",
+            alreadyDone: true,
+          });
       }
-
       if (attendance.source === "agent") {
-        attendance.latitude      = latitude;
-        attendance.longitude     = longitude;
-        attendance.selfie        = selfie || attendance.selfie;
-        attendance.checkIn       = new Date();
-        attendance.source        = "manual";
-        attendance.onModel       = getOnModel(user.role);
+        attendance.latitude = latitude;
+        attendance.longitude = longitude;
+        attendance.selfie = selfie || attendance.selfie;
+        attendance.checkIn = new Date();
+        attendance.source = "manual";
+        attendance.onModel = getOnModel(user.role);
         attendance.activeMinutes = 0;
-        attendance.idleMinutes   = 0;
-        attendance.lastUpdated   = Date.now();
-
+        attendance.idleMinutes = 0;
+        attendance.lastUpdated = Date.now();
         await attendance.save();
         return res.json({ message: "Check-in successful", attendance });
       }
-
       return res.status(400).json({ message: "Already checked in" });
     }
 
     const newAttendance = await Attendance.create({
-      employee:      userId,
-      onModel:       getOnModel(user.role),
-      role:          user.role,
-      date:          today,
-      checkIn:       new Date(),
+      employee: userId,
+      onModel: getOnModel(user.role),
+      role: user.role,
+      date: today,
+      checkIn: new Date(),
       latitude,
       longitude,
       selfie,
       activeMinutes: 0,
-      idleMinutes:   0,
-      lastUpdated:   Date.now(),
-      source:        "manual",
+      idleMinutes: 0,
+      lastUpdated: Date.now(),
+      source: "manual",
     });
 
     res.json({ message: "Check-in successful", attendance: newAttendance });
-
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-
 const activity = async (req, res) => {
   try {
     const { status } = req.body;
-    const user   = req.user;
+    const user = req.user;
     const userId = getUserId(user);
 
     if (!["active", "idle"].includes(status)) {
@@ -94,21 +92,21 @@ const activity = async (req, res) => {
 
     let attendance = await Attendance.findOne({
       employee: userId,
-      role:     user.role,
-      date:     today,
+      role: user.role,
+      date: today,
     });
 
     if (!attendance) {
       attendance = await Attendance.create({
-        employee:      userId,
-        onModel:       getOnModel(user.role),
-        role:          user.role,
-        date:          today,
-        checkIn:       new Date(),
+        employee: userId,
+        onModel: getOnModel(user.role),
+        role: user.role,
+        date: today,
+        checkIn: new Date(),
         activeMinutes: 0,
-        idleMinutes:   0,
-        lastUpdated:   0,
-        source:        "agent",
+        idleMinutes: 0,
+        lastUpdated: 0,
+        source: "agent",
       });
     }
 
@@ -122,31 +120,26 @@ const activity = async (req, res) => {
     }
 
     if (attendance.source === "manual") {
-      if (status === "active") {
-        attendance.activeMinutes += 1;
-      } else {
-        attendance.idleMinutes += 1;
-      }
+      if (status === "active") attendance.activeMinutes += 1;
+      else attendance.idleMinutes += 1;
     }
 
     attendance.lastUpdated = now;
     await attendance.save();
 
     res.json({
-      message:       "Activity updated",
+      message: "Activity updated",
       activeMinutes: attendance.activeMinutes,
-      idleMinutes:   attendance.idleMinutes,
+      idleMinutes: attendance.idleMinutes,
     });
-
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-
 const checkout = async (req, res) => {
   try {
-    const user   = req.user;
+    const user = req.user;
     const userId = getUserId(user);
 
     const today = new Date();
@@ -154,21 +147,18 @@ const checkout = async (req, res) => {
 
     const attendance = await Attendance.findOne({
       employee: userId,
-      role:     user.role,
-      date:     today,
+      role: user.role,
+      date: today,
     });
 
-    if (!attendance) {
+    if (!attendance)
       return res.status(404).json({ message: "Please check in first" });
-    }
-
-    if (attendance.source === "agent") {
-      return res.status(400).json({ message: "Please check in first before checking out" });
-    }
-
-    if (attendance.checkOut) {
+    if (attendance.source === "agent")
+      return res
+        .status(400)
+        .json({ message: "Please check in first before checking out" });
+    if (attendance.checkOut)
       return res.status(400).json({ message: "Already checked out" });
-    }
 
     attendance.checkOut = new Date();
     const status = calculateStatus(attendance.activeMinutes);
@@ -178,21 +168,19 @@ const checkout = async (req, res) => {
     await updateSummary(attendance);
 
     res.json({
-      message:       "Checkout successful",
+      message: "Checkout successful",
       status,
       activeMinutes: attendance.activeMinutes,
-      idleMinutes:   attendance.idleMinutes,
+      idleMinutes: attendance.idleMinutes,
     });
-
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-
 const getToday = async (req, res) => {
   try {
-    const user   = req.user;
+    const user = req.user;
     const userId = getUserId(user);
 
     const today = new Date();
@@ -200,25 +188,27 @@ const getToday = async (req, res) => {
 
     const attendance = await Attendance.findOne({
       employee: userId,
-      role:     user.role,
-      date:     today,
-    });
+      role: user.role,
+      date: today,
+    }).lean();
 
     if (!attendance) {
-      return res.json({ attendance: null, isCheckedIn: false, isCheckedOut: false });
+      return res.json({
+        attendance: null,
+        isCheckedIn: false,
+        isCheckedOut: false,
+      });
     }
 
     res.json({
       attendance,
-      isCheckedIn:  attendance.source === "manual" && !attendance.checkOut,
+      isCheckedIn: attendance.source === "manual" && !attendance.checkOut,
       isCheckedOut: !!attendance.checkOut,
     });
-
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
-
 
 const autoCheckoutAll = async () => {
   try {
@@ -226,23 +216,33 @@ const autoCheckoutAll = async () => {
     today.setHours(0, 0, 0, 0);
 
     const openSessions = await Attendance.find({
-      date:     today,
-      source:   "manual",
-      checkIn:  { $exists: true },
+      date: today,
+      source: "manual",
+      checkIn: { $exists: true },
       checkOut: { $exists: false },
-    });
+    }).lean();
 
-    console.log(`[Cron] Auto checkout: ${openSessions.length} open sessions found`);
+    if (!openSessions.length) return;
 
-    for (const attendance of openSessions) {
-      attendance.checkOut = new Date();
-      const status = calculateStatus(attendance.activeMinutes);
-      attendance.status = status;
-      await attendance.save();
-      await updateSummary(attendance);
-      console.log(`[Cron] Auto checked out employee: ${attendance.employee}`);
-    }
+    const now = new Date();
+    const ops = openSessions.map((a) => ({
+      updateOne: {
+        filter: { _id: a._id },
+        update: {
+          $set: { checkOut: now, status: calculateStatus(a.activeMinutes) },
+        },
+      },
+    }));
 
+    await Attendance.bulkWrite(ops, { ordered: false });
+
+    await Promise.all(
+      openSessions.map((a) => {
+        a.checkOut = now;
+        a.status = calculateStatus(a.activeMinutes);
+        return updateSummary(a);
+      }),
+    );
   } catch (error) {
     console.error("[Cron] Auto checkout failed:", error.message);
   }
