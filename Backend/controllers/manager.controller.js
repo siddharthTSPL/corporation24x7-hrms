@@ -461,27 +461,35 @@ const managerUpdatePassword = async (req, res, next) => {
 };
 
 const userunderme = async (req, res, next) => {
-  if (!req.manager) {
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  try {
+    if (!req.manager) {
+      return next(
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
+        }),
+      );
+    }
+
+    const managerid = req.manager._id;
+
+    const users = await usermodel
+      .find({ Under_manager: managerid })
+      .select(
+        "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt",
+      );
+
+    return res.status(200).json({
+      success: true,
+      count: users.length,
+      users,
+      message:
+        users.length === 0
+          ? "No employees under this manager"
+          : "Employees fetched successfully",
+    });
+  } catch (error) {
+    next(error);
   }
-
-  const managerid = req.manager._id;
-
-  const users = await usermodel
-    .find({ Under_manager: managerid })
-    .select(
-      "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt",
-    );
-
-  if (!users || users.length === 0) {
-    return next(
-      Object.assign(new Error("No users found under this manager"), {
-        statusCode: 404,
-      }),
-    );
-  }
-
-  res.status(200).json(users);
 };
 
 const viewallleaves = async (req, res, next) => {

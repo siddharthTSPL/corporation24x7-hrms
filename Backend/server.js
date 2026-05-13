@@ -10,6 +10,8 @@ app.listen(5000, () => {
 
 if (process.env.NODE_ENV === 'production') {
   setInterval(() => {
-    https.get(process.env.SERVER_URL).on('error', () => {});
+    https
+      .get('https://corporation24x7-hrms.onrender.com')
+      .on('error', () => {});
   }, 14 * 60 * 1000);
 }
