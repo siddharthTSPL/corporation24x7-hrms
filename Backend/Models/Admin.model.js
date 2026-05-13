@@ -28,7 +28,7 @@ const adminSchema = new mongoose.Schema({
     required: [true, "Email is required"],
     unique: true,
   },
-  phone:{
+  phone: {
     type: String,
   },
   isVerified: {
@@ -36,6 +36,8 @@ const adminSchema = new mongoose.Schema({
     default: false,
   },
 });
+
+adminSchema.index({ status: 1 });
 
 adminSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
