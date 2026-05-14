@@ -4,7 +4,7 @@ const reviewSchema = new mongoose.Schema(
   {
     reviewerRole: {
       type: String,
-      enum: ["admin", "manager"],
+      enum: ["super_admin", "admin", "manager"],
       required: true,
     },
     reviewer: {
@@ -14,12 +14,12 @@ const reviewSchema = new mongoose.Schema(
     },
     reviewerRoleModel: {
       type: String,
-      enum: ["Admin", "Manager"],
+      enum: ["SuperAdmin", "Admin", "Manager"],
       required: true,
     },
     revieweeRole: {
       type: String,
-      enum: ["manager", "employee"],
+      enum: ["admin", "manager", "employee"],
       required: true,
     },
     reviewee: {
@@ -29,7 +29,7 @@ const reviewSchema = new mongoose.Schema(
     },
     revieweeRoleModel: {
       type: String,
-      enum: ["Manager", "User"],
+      enum: ["Admin", "Manager", "User"],
       required: true,
     },
     rating: {
