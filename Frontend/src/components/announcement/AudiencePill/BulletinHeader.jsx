@@ -1,4 +1,4 @@
-import { C } from "./constants";
+import { C } from "../shared/constants";
 
 /* Top eyebrow row: "Company Bulletin" label + live badge */
 export default function BulletinHeader({ count, children }) {

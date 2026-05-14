@@ -1,4 +1,4 @@
-import { C } from "./constants";
+import { C } from "../shared/constants";
 
 /* Reusable modal shell for both employee and manager detail views */
 export default function DetailModalShell({ onClose, children }) {

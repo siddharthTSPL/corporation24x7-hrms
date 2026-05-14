@@ -1,5 +1,5 @@
-import { C } from "./constants";
-import { fmtDate, excerpt } from "./helpers";
+import { C } from "../shared/constants";
+import { fmtDate, excerpt } from "../shared/helpers";
 
 /* AnnCard is used in both employee and manager views.
    Pass `badges` as a JSX node to render priority/audience pills. */
