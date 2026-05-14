@@ -1,6 +1,6 @@
 import { useParticularAnnouncement } from "../../../auth/server-state/manager/managerannounce/managerannounce.hook";
-import DetailModalShell from "../../../components/announcement/shared/DetailModalShell";
-import { ModalSpinner } from "../../../components/announcement/shared/Spinner";
+import DetailModalShell from "../../../components/announcement/AudiencePill/DetailModalShell";
+import { ModalSpinner } from "../../../components/announcement/AudiencePill/Spinner";
 import { PriorityPill, AudiencePill } from "../../../components/announcement/shared/Badges";
 import { fmtDate, fmtTime } from "../../../components/announcement/shared/helpers";
 import { C } from "../../../components/announcement/shared/constants";

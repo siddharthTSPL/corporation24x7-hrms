@@ -1,4 +1,4 @@
-import { C } from "./constants";
+import { C } from "../shared/constants";
 
 /* ── Inline-style spinner (employee / manager) ────────────────────────────── */
 export function Spinner({ size = 38 }) {

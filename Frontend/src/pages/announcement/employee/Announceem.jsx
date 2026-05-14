@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { useGetAnnouncements } from "../../auth/server-state/employee/employeeannounce/employeeannounce.hook";
+import { useGetAnnouncements } from "../../../auth/server-state/employee/employeeannounce/employeeannounce.hook";
 import FontInjector    from "../../../components/announcement/shared/FontInjector";
-import BulletinHeader  from "../../../components/announcement/shared/BulletinHeader";
-import AnnCard         from "../../../components/announcement/shared/AnnCard";
-import { Spinner }     from "../../../components/announcement/shared/Spinner";
+import BulletinHeader  from "../../../components/announcement/AudiencePill/BulletinHeader";
+import AnnCard         from "../../../components/announcement/AudiencePill/AnnCard";
+import { Spinner }     from "../../../components/announcement/AudiencePill/Spinner";
 import { PriorityPill } from "../../../components/announcement/shared/Badges";
 import { C }           from "../../../components/announcement/shared/constants";
 import EmployeeDetailModal from "./EmployeeDetailModal";
