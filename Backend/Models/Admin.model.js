@@ -3,6 +3,11 @@ const bcrypt = require("bcrypt");
 
 const adminSchema = new mongoose.Schema(
   {
+    organisation_id: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "SuperAdmin",
+  // required: true,
+},
     f_name: {
       type: String,
       required: [true, "First name is required"],

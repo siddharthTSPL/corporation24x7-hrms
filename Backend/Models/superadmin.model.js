@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 
 const extractDomain = (email) => {
   if (!email || !email.includes("@")) return null;
@@ -7,109 +8,121 @@ const extractDomain = (email) => {
 };
 
 const BLOCKED_DOMAINS = [
-  // "gmail.com",
   "yahoo.com",
   "hotmail.com",
   "outlook.com",
   "live.com",
   "icloud.com",
-  "me.com",
   "aol.com",
-  "protonmail.com",
-  "zohomail.com",
-  "yandex.com",
-  "mail.com",
-  "inbox.com",
-  "rediffmail.com",
-  "msn.com",
 ];
+
+const SOFTWARE_PRODUCTS = [
+  "torchx_talent",
+  "torchx_engage",
+  "torchx_finance",
+  "torchx_inventory",
+  "torchx_pay",
+];
+
+const generateLicenseKey = (product) => {
+  const random = crypto.randomBytes(8).toString("hex").toUpperCase();
+
+  return `TORCHX-${product.replace("torchx_", "").toUpperCase()}-${random}`;
+};
+
+const licenseSchema = new mongoose.Schema(
+  {
+    product: {
+      type: String,
+      enum: SOFTWARE_PRODUCTS,
+      required: true,
+    },
+
+    license_key: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+
+    activatedAt: {
+      type: Date,
+      default: Date.now,
+    },
+
+    expiresAt: {
+      type: Date,
+      required: true,
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+
+    plan: {
+      type: String,
+      enum: ["monthly", "yearly", "lifetime"],
+      default: "monthly",
+    },
+  },
+  { _id: false }
+);
 
 const superAdminSchema = new mongoose.Schema(
   {
-    f_name: {
-      type: String,
-      required: [true, "First name is required"],
-      trim: true,
-    },
+    f_name: String,
 
-    l_name: {
-      type: String,
-      required: [true, "Last name is required"],
-      trim: true,
-    },
+    l_name: String,
 
     email: {
       type: String,
-      required: [true, "Work email is required"],
       unique: true,
-      lowercase: true,
-      trim: true,
+      required: true,
     },
 
     password: {
       type: String,
-      required: [true, "Password is required"],
-    },
-
-    phone: {
-      type: String,
-      trim: true,
-    },
-
-    profile_image: {
-      type: String,
-      default: null,
+      required: true,
     },
 
     organisation_name: {
       type: String,
-      required: [true, "Organisation name is required"],
-      trim: true,
+      required: true,
     },
 
     company_domain: {
       type: String,
       unique: true,
-      lowercase: true,
-      trim: true,
     },
 
-    company_address: {
-      type: String,
-      trim: true,
-    },
+    purchased_products: [
+      {
+        type: String,
+        enum: SOFTWARE_PRODUCTS,
+      },
+    ],
 
-    company_size: {
-      type: String,
-      enum: ["1-10", "11-50", "51-200", "201-500", "500+"],
-      default: "1-10",
-    },
+    licenses: [licenseSchema],
 
-    industry: {
-      type: String,
-      trim: true,
-    },
-
-    plan: {
-      type: String,
-      enum: ["trial", "basic", "professional", "enterprise"],
-      default: "trial",
-    },
-
-    plan_started_at: {
+    trial_started_at: {
       type: Date,
       default: Date.now,
     },
 
-    plan_expires_at: {
+    trial_expires_at: {
       type: Date,
-      default: () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      default: () =>
+        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    },
+
+    is_trial_active: {
+      type: Boolean,
+      default: true,
     },
 
     role: {
       type: String,
       default: "super_admin",
-      immutable: true,
     },
 
     status: {
@@ -122,16 +135,6 @@ const superAdminSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-
-    isFirstLogin: {
-      type: Boolean,
-      default: true,
-    },
-
-    last_login: {
-      type: Date,
-      default: null,
-    },
   },
   {
     timestamps: true,
@@ -140,42 +143,106 @@ const superAdminSchema = new mongoose.Schema(
 
 superAdminSchema.pre("validate", function () {
   if (!this.email) return;
+
   const domain = extractDomain(this.email);
+
   if (BLOCKED_DOMAINS.includes(domain)) {
-    throw new Error(
-      `Personal email domains like "${domain}" are not allowed. Please use your company work email.`
-    );
+    throw new Error("Use company email only");
   }
+
   this.company_domain = domain;
 });
 
 superAdminSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
+
   this.password = await bcrypt.hash(this.password, 10);
 });
 
 superAdminSchema.methods.isValidPassword = async function (password) {
-  return await bcrypt.compare(password, this.password);
+  return bcrypt.compare(password, this.password);
 };
 
-superAdminSchema.statics.checkDomainAvailable = async function (email) {
-  const domain = extractDomain(email);
-  if (!domain) throw new Error("Invalid email format.");
-  if (BLOCKED_DOMAINS.includes(domain)) {
-    throw new Error(
-      `"${domain}" is a personal email provider. Use your company work email.`
-    );
-  }
-  const existing = await this.findOne({ company_domain: domain });
+superAdminSchema.methods.isTrialValid = function () {
+  return new Date() < new Date(this.trial_expires_at);
+};
+
+superAdminSchema.methods.generateLicense = function (
+  product,
+  durationDays = 30,
+  plan = "monthly"
+) {
+  const existing = this.licenses.find(
+    (l) => l.product === product
+  );
+
   if (existing) {
-    throw new Error(
-      `An account for "${domain}" already exists. Each company can only have one super admin account.`
-    );
+    throw new Error(`${product} already purchased`);
   }
-  return true;
+
+  const license = {
+    product,
+    license_key: generateLicenseKey(product),
+    activatedAt: new Date(),
+    expiresAt: new Date(
+      Date.now() + durationDays * 24 * 60 * 60 * 1000
+    ),
+    isActive: true,
+    plan,
+  };
+
+  this.licenses.push(license);
+
+  this.purchased_products.push(product);
+
+  return license;
 };
 
-superAdminSchema.index({ status: 1, plan: 1 });
+superAdminSchema.methods.canAccessProduct = function (
+  product
+) {
+  if (this.isTrialValid()) {
+    return true;
+  }
 
-const SuperAdminModel = mongoose.model("SuperAdmin", superAdminSchema);
+  const license = this.licenses.find(
+    (l) => l.product === product
+  );
+
+  if (!license) {
+    return false;
+  }
+
+  return (
+    license.isActive &&
+    new Date(license.expiresAt) > new Date()
+  );
+};
+
+superAdminSchema.statics.checkDomainAvailable =
+  async function (email) {
+    const domain = extractDomain(email);
+
+    if (!domain) {
+      throw new Error("Invalid email");
+    }
+
+    const existing = await this.findOne({
+      company_domain: domain,
+    });
+
+    if (existing) {
+      throw new Error(
+        "Company already registered"
+      );
+    }
+
+    return true;
+  };
+
+const SuperAdminModel = mongoose.model(
+  "SuperAdmin",
+  superAdminSchema
+);
+
 module.exports = SuperAdminModel;
