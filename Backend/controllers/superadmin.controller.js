@@ -791,31 +791,41 @@ const deleteemployee = async (req, res, next) => {
 };
 
 const showallleaves = async (req, res, next) => {
-  const [employeeLeaves, managerLeaves] = await Promise.all([
-    Leave.find({ status: "forwarded_admin" })
+  const adminIds = await AdminModel.find({
+    created_by: req.superAdmin._id,
+  }).distinct("_id");
+  const [employeeLeaves, adminLeaves] = await Promise.all([
+    Leave.find({
+      status: {
+        $in: [
+          "forwarded_reporting_manager",
+          "approved_reporting_manager",
+          "rejected_reporting_manager",
+        ],
+      },
+    })
       .populate("employee", "f_name l_name work_email")
       .populate("manager", "f_name l_name work_email")
       .sort({ createdAt: -1 })
       .lean(),
     ManagerLeave.find({
-      status: { $in: ["pending_admin", "approved_admin", "rejected_admin"] },
+      manager: { $in: adminIds },
+      status: "pending_reporting_manager",
     })
-      .populate("manager", "f_name l_name work_email")
+      .populate("manager", "f_name l_name work_email designation")
       .sort({ createdAt: -1 })
       .lean(),
   ]);
-  res
-    .status(200)
-    .json({
-      employeeLeaves: { count: employeeLeaves.length, leaves: employeeLeaves },
-      managerLeaves: { count: managerLeaves.length, leaves: managerLeaves },
-    });
+  res.status(200).json({
+    employeeLeaves: { count: employeeLeaves.length, leaves: employeeLeaves },
+    adminLeaves: { count: adminLeaves.length, leaves: adminLeaves },
+  });
 };
 
 const acceptleavebyadmin = async (req, res, next) => {
   const { id } = req.params;
   const { leaveFor } = req.query;
-  const LeaveModel = leaveFor === "manager" ? ManagerLeave : Leave;
+  const LeaveModel = leaveFor === "admin" ? ManagerLeave : Leave;
   const leave = await LeaveModel.findById(id);
   if (!leave)
     return next(
@@ -828,7 +838,19 @@ const acceptleavebyadmin = async (req, res, next) => {
     return next(
       Object.assign(new Error("Leave already processed"), { statusCode: 400 }),
     );
-  if (leaveFor !== "manager") {
+  if (leaveFor === "admin") {
+    const adminIds = await AdminModel.find({
+      created_by: req.superAdmin._id,
+    }).distinct("_id");
+    if (!adminIds.some((id) => id.toString() === leave.manager.toString()))
+      return next(
+        Object.assign(
+          new Error("This leave does not belong to your organisation"),
+          { statusCode: 403 },
+        ),
+      );
+    leave.status = "approved_reporting_manager";
+  } else {
     const leaveBalance = await LeaveBalance.findOne({
       employee: leave.employee,
     });
@@ -847,8 +869,8 @@ const acceptleavebyadmin = async (req, res, next) => {
       await leaveBalance.save();
     }
     await processLeaveDeduction(leave);
+    leave.status = "approved_reporting_manager";
   }
-  leave.status = "approved_admin";
   leave.approvedBy = req.superAdmin._id;
   await leave.save();
   res.status(200).json({ message: "Leave approved", leave });
@@ -857,7 +879,7 @@ const acceptleavebyadmin = async (req, res, next) => {
 const rejectleavebyadmin = async (req, res, next) => {
   const { id } = req.params;
   const { leaveFor } = req.query;
-  const LeaveModel = leaveFor === "manager" ? ManagerLeave : Leave;
+  const LeaveModel = leaveFor === "admin" ? ManagerLeave : Leave;
   const leave = await LeaveModel.findById(id);
   if (!leave)
     return next(
@@ -870,7 +892,19 @@ const rejectleavebyadmin = async (req, res, next) => {
     return next(
       Object.assign(new Error("Leave already processed"), { statusCode: 400 }),
     );
-  leave.status = "rejected_admin";
+  if (leaveFor === "admin") {
+    const adminIds = await AdminModel.find({
+      created_by: req.superAdmin._id,
+    }).distinct("_id");
+    if (!adminIds.some((id) => id.toString() === leave.manager.toString()))
+      return next(
+        Object.assign(
+          new Error("This leave does not belong to your organisation"),
+          { statusCode: 403 },
+        ),
+      );
+  }
+  leave.status = "rejected_reporting_manager";
   leave.rejectedBy = req.superAdmin._id;
   leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   await leave.save();
