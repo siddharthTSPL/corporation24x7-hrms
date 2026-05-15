@@ -107,7 +107,7 @@ export const deleteEmployee = async (uid) => {
 
 
 export const getNoOfEmployees = async () => {
-  const res = await api.get("superadmin/no-of-employees");
+  const res = await api.get("superadmin/noofemployee");
   return res.data;
 };
 
