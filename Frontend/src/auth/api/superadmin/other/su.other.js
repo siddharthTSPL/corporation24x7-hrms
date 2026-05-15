@@ -7,12 +7,12 @@ const api = axios.create({
 
 
 export const reviewToAdmin = async (data) => {
-  const res = await api.post("superadmin/review-admin", data);
+  const res = await api.post("superadmin/reviewtoadmin", data);
   return res.data;
 };
 
 export const getTodayCheckins = async () => {
-  const res = await api.get("superadmin/today-checkins");
+  const res = await api.get("superadmin/getTodayCheckins");
   return res.data;
 };
 
@@ -45,12 +45,12 @@ export const resetSuperAdminPassword = async (data) => {
 };
 
 export const createAdmin = async (data) => {
-  const res = await api.post("superadmin/create-admin", data);
+  const res = await api.post("superadmin/admin/create", data);
   return res.data;
 };
 
 export const updateAdmin = async (id, data) => {
-  const res = await api.put(`superadmin/update-admin/${id}`, data);
+  const res = await api.put(`superadmin/admin/update/${id}`, data);
   return res.data;
 };
 
@@ -60,7 +60,7 @@ export const deleteAdmin = async (id) => {
 };
 
 export const getAllAdmins = async () => {
-  const res = await api.get("superadmin/all-admins");
+  const res = await api.get("superadmin/admin/all");
   return res.data;
 };
 
@@ -75,12 +75,12 @@ export const addEmployee = async (data) => {
 };
 
 export const getAllManagers = async () => {
-  const res = await api.get("superadmin/all-managers");
+  const res = await api.get("superadmin/findallmanagers");
   return res.data;
 };
 
 export const getAllEmployees = async () => {
-  const res = await api.get("superadmin/all-employees");
+  const res = await api.get("superadmin/getallemployee");
   return res.data;
 };
 
@@ -107,7 +107,7 @@ export const deleteEmployee = async (uid) => {
 
 
 export const getNoOfEmployees = async () => {
-  const res = await api.get("superadmin/no-of-employees");
+  const res = await api.get("superadmin/noofemployee");
   return res.data;
 };
 
