@@ -12,7 +12,7 @@ export const createAnnouncement = async (data) => {
 };
 
 export const getAllAnnouncements = async () => {
-  const res = await api.get("superadmin/all-announcements");
+  const res = await api.get("superadmin/getallannouncement");
   return res.data;
 };
 
