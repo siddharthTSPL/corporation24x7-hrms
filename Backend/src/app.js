@@ -51,6 +51,7 @@ const managerrouter = require('../routes/managerroutes');
 const userrouter = require('../routes/userroutes');
 const documentroute = require('../routes/documentroute');
 const attendancerouter = require('../routes/attendanceroutes');
+const superadminrouter = require('../routes/superadminroutes');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 app.use('/admin', adminrouter);
@@ -58,6 +59,7 @@ app.use('/manager', managerrouter);
 app.use('/user', userrouter);
 app.use('/document', documentroute);
 app.use('/attendance', attendancerouter);
+app.use('/superadmin', superadminrouter);
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 
