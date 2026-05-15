@@ -30,6 +30,10 @@ const {
   changepassword,
   getTodayCheckins,
   getOrgInfo,
+  getAllPersonalDocumentsAdmin,
+  getAllExpenseDocumentsAdmin,
+  getDocumentDetailsAdmin,
+  adminActionOnLeave,
 } = require("../controllers/admin.controller");
 
 adminrouter.get("/verify/:token", asyncHandler(verifyAdmin));
@@ -89,12 +93,19 @@ adminrouter.delete(
   asyncHandler(deleteemployee),
 );
 
+// Leave
 adminrouter.get(
   "/showallleaves",
   adminauthmiddleware,
   asyncHandler(showallleaves),
 );
 adminrouter.post("/applyleave", adminauthmiddleware, asyncHandler(applyleave));
+// Admin can approve / reject any pending or forwarded leave (acts as reporting manager)
+adminrouter.post(
+  "/actionleave",
+  adminauthmiddleware,
+  asyncHandler(adminActionOnLeave),
+);
 
 adminrouter.get(
   "/noofemployee",
@@ -132,6 +143,22 @@ adminrouter.get(
   "/gettodaycheckins",
   adminauthmiddleware,
   asyncHandler(getTodayCheckins),
+);
+
+adminrouter.get(
+  "/documents/personal",
+  adminauthmiddleware,
+  asyncHandler(getAllPersonalDocumentsAdmin),
+);
+adminrouter.get(
+  "/documents/expense",
+  adminauthmiddleware,
+  asyncHandler(getAllExpenseDocumentsAdmin),
+);
+adminrouter.get(
+  "/documents/:documentId",
+  adminauthmiddleware,
+  asyncHandler(getDocumentDetailsAdmin),
 );
 
 module.exports = adminrouter;

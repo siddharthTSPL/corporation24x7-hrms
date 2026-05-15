@@ -7,7 +7,7 @@ const api = axios.create({
 
 
 export const showAllLeaves = async () => {
-  const res = await api.get("superadmin/all-leaves");
+  const res = await api.get("superadmin/showallleaves");
   return res.data;
 };
 

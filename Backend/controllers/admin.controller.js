@@ -17,6 +17,7 @@ const reviewModel = require("../Models/review.model");
 const Attendance = require("../Models/attendance.model");
 const ManagerLeave = require("../Models/maleave.model");
 const SuperAdminModel = require("../Models/superadmin.model");
+const Document = require("../Models/document.model");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
@@ -178,12 +179,10 @@ const addmanager = async (req, res, next) => {
       html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F9F8F2;font-family:Segoe UI,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center"><table width="600" style="background:#fff;border-radius:14px;overflow:hidden;"><tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h1 style="margin:0;">Manager Onboarding</h1></td></tr><tr><td style="padding:40px;color:#333;"><h2 style="color:#730042;">Hi ${f_name},</h2><p>Your <strong>Manager Account</strong> has been created.</p><div style="background:#F9F8F2;padding:15px;border-radius:8px;margin:20px 0;"><p><strong>Role:</strong> ${designation}</p><p><strong>Department:</strong> ${department}</p><p><strong>Location:</strong> ${office_location}</p></div><div style="text-align:center;margin:30px 0;"><a href="${verifyLink}" style="background:#CD166E;color:white;padding:14px 30px;text-decoration:none;border-radius:8px;font-weight:600;">Verify & Activate</a></div><p style="font-size:13px;color:#777;">Link expires in 1 hour.</p></td></tr><tr><td style="background:#F9F8F2;padding:20px;text-align:center;font-size:12px;color:#888;">© 2026 Your Company</td></tr></table></td></tr></table></body></html>`,
     }),
   ]);
-  res
-    .status(201)
-    .json({
-      success: true,
-      message: "Manager added successfully. Verification email sent.",
-    });
+  res.status(201).json({
+    success: true,
+    message: "Manager added successfully. Verification email sent.",
+  });
 };
 
 const addemployee = async (req, res, next) => {
@@ -244,12 +243,10 @@ const addemployee = async (req, res, next) => {
       html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F9F8F2;font-family:Segoe UI,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center"><table width="600" style="background:#fff;border-radius:14px;overflow:hidden;"><tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h1 style="margin:0;">Welcome Aboard</h1></td></tr><tr><td style="padding:40px;color:#333;"><h2 style="color:#730042;">Hello ${f_name},</h2><p>Your employee account has been created.</p><div style="background:#F9F8F2;padding:15px;border-radius:8px;margin:20px 0;"><p><strong>Department:</strong> ${department}</p><p><strong>Location:</strong> ${office_location}</p></div><div style="text-align:center;margin:30px 0;"><a href="${verifyLink}" style="background:#730042;color:white;padding:14px 30px;text-decoration:none;border-radius:8px;font-weight:600;">Verify Account</a></div><p style="font-size:13px;color:#777;">Link valid for 1 hour only.</p></td></tr><tr><td style="background:#F9F8F2;padding:20px;text-align:center;font-size:12px;color:#888;">© 2026 Your Company</td></tr></table></td></tr></table></body></html>`,
     }),
   ]);
-  res
-    .status(201)
-    .json({
-      success: true,
-      message: "User added successfully. Verification email sent.",
-    });
+  res.status(201).json({
+    success: true,
+    message: "User added successfully. Verification email sent.",
+  });
 };
 
 const findallmanagers = async (req, res, next) => {
@@ -282,12 +279,10 @@ const getallemployee = async (req, res, next) => {
       .populate("reporting_manager", "f_name l_name work_email")
       .lean(),
   ]);
-  res
-    .status(200)
-    .json({
-      count: users.length + managers.length,
-      users: [...users, ...managers],
-    });
+  res.status(200).json({
+    count: users.length + managers.length,
+    users: [...users, ...managers],
+  });
 };
 
 const editemployee = async (req, res, next) => {
@@ -322,14 +317,12 @@ const editemployee = async (req, res, next) => {
       new: true,
       upsert: true,
     });
-  res
-    .status(200)
-    .json({
-      success: true,
-      message: "Employee updated successfully",
-      user,
-      manager,
-    });
+  res.status(200).json({
+    success: true,
+    message: "Employee updated successfully",
+    user,
+    manager,
+  });
 };
 
 const getperticularemployee = async (req, res, next) => {
@@ -361,15 +354,13 @@ const getperticularemployee = async (req, res, next) => {
   const manager = await Managermodel.findOne({ userId: user._id })
     .select(EXCLUDE)
     .lean();
-  res
-    .status(200)
-    .json({
-      success: true,
-      user,
-      manager: manager || null,
-      leaveBalance,
-      reviews: reviews || [],
-    });
+  res.status(200).json({
+    success: true,
+    user,
+    manager: manager || null,
+    leaveBalance,
+    reviews: reviews || [],
+  });
 };
 
 const getperticularemanager = async (req, res, next) => {
@@ -485,13 +476,11 @@ const applyleave = async (req, res, next) => {
     reason,
     status: "pending_reporting_manager",
   });
-  res
-    .status(201)
-    .json({
-      success: true,
-      message: "Leave request submitted to super admin",
-      leave,
-    });
+  res.status(201).json({
+    success: true,
+    message: "Leave request submitted to super admin",
+    leave,
+  });
 };
 
 const noofemployee = async (req, res, next) => {
@@ -524,13 +513,11 @@ const createannouncement = async (req, res, next) => {
     expiresAt,
     createdBy: req.admin._id,
   });
-  res
-    .status(201)
-    .json({
-      success: true,
-      message: "Announcement created successfully",
-      announcement,
-    });
+  res.status(201).json({
+    success: true,
+    message: "Announcement created successfully",
+    announcement,
+  });
 };
 
 const getallannouncement = async (req, res, next) => {
@@ -573,13 +560,11 @@ const updateAnnouncement = async (req, res, next) => {
   const updated = await announcementmodel
     .findByIdAndUpdate(id, { $set }, { new: true })
     .lean();
-  res
-    .status(200)
-    .json({
-      success: true,
-      message: "Announcement updated successfully",
-      announcement: updated,
-    });
+  res.status(200).json({
+    success: true,
+    message: "Announcement updated successfully",
+    announcement: updated,
+  });
 };
 
 const deleteAnnouncement = async (req, res, next) => {
@@ -851,6 +836,214 @@ const getOrgInfo = async (req, res) => {
   });
 };
 
+// ─── DOCUMENT ACCESS (Admin = Manager-level + can see ALL org documents) ───
+
+/**
+ * Admin can view ALL personal documents across the organisation.
+ * Sets viewedByAdmin = true on each document fetched.
+ */
+const getAllPersonalDocumentsAdmin = async (req, res, next) => {
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  const documents = await Document.find({ fileType: "personal" })
+    .populate(
+      "employee",
+      "f_name l_name work_email personal_contact department designation",
+    )
+    .populate("underManager", "f_name l_name work_email")
+    .sort({ uploadedAt: -1 })
+    .lean();
+  // Mark unread docs as viewed (fire-and-forget)
+  Document.updateMany(
+    { fileType: "personal", viewedByAdmin: false },
+    { $set: { viewedByAdmin: true } },
+  ).exec();
+  res.status(200).json({
+    message: "All personal documents fetched successfully",
+    total: documents.length,
+    documents: documents.map((doc) => ({
+      id: doc._id,
+      title: doc.title,
+      fileUrl: doc.fileUrl,
+      fileType: doc.fileType,
+      sizeKB: doc.size,
+      uploadedAt: doc.uploadedAt,
+      viewedByManager: doc.viewedByManager,
+      viewedByAdmin: doc.viewedByAdmin,
+      employee: doc.employee
+        ? {
+            id: doc.employee._id,
+            name: `${doc.employee.f_name} ${doc.employee.l_name}`,
+            email: doc.employee.work_email,
+            contact: doc.employee.personal_contact,
+            department: doc.employee.department,
+            designation: doc.employee.designation,
+          }
+        : null,
+      reportingManager: doc.underManager
+        ? {
+            id: doc.underManager._id,
+            name: `${doc.underManager.f_name} ${doc.underManager.l_name}`,
+            email: doc.underManager.work_email,
+          }
+        : null,
+    })),
+  });
+};
+
+/**
+ * Admin can view ALL expense documents across the organisation.
+ */
+const getAllExpenseDocumentsAdmin = async (req, res, next) => {
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  const documents = await Document.find({ fileType: "expense" })
+    .populate(
+      "employee",
+      "f_name l_name work_email personal_contact department designation",
+    )
+    .populate("underManager", "f_name l_name work_email")
+    .sort({ uploadedAt: -1 })
+    .lean();
+  Document.updateMany(
+    { fileType: "expense", viewedByAdmin: false },
+    { $set: { viewedByAdmin: true } },
+  ).exec();
+  res.status(200).json({
+    message: "All expense documents fetched successfully",
+    total: documents.length,
+    documents: documents.map((doc) => ({
+      id: doc._id,
+      title: doc.title,
+      fileUrl: doc.fileUrl,
+      fileType: doc.fileType,
+      sizeKB: doc.size,
+      uploadedAt: doc.uploadedAt,
+      viewedByManager: doc.viewedByManager,
+      viewedByAdmin: doc.viewedByAdmin,
+      employee: doc.employee
+        ? {
+            id: doc.employee._id,
+            name: `${doc.employee.f_name} ${doc.employee.l_name}`,
+            email: doc.employee.work_email,
+            contact: doc.employee.personal_contact,
+            department: doc.employee.department,
+            designation: doc.employee.designation,
+          }
+        : null,
+      reportingManager: doc.underManager
+        ? {
+            id: doc.underManager._id,
+            name: `${doc.underManager.f_name} ${doc.underManager.l_name}`,
+            email: doc.underManager.work_email,
+          }
+        : null,
+    })),
+  });
+};
+
+/**
+ * Admin: view detail of a single document (any employee).
+ */
+const getDocumentDetailsAdmin = async (req, res, next) => {
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  const { documentId } = req.params;
+  if (!documentId)
+    return next(
+      Object.assign(new Error("Document ID is required"), { statusCode: 400 }),
+    );
+  const document = await Document.findById(documentId)
+    .populate(
+      "employee",
+      "f_name l_name work_email personal_contact department designation",
+    )
+    .populate("underManager", "f_name l_name work_email");
+  if (!document)
+    return next(
+      Object.assign(new Error("Document not found"), { statusCode: 404 }),
+    );
+  document.viewedByAdmin = true;
+  await document.save();
+  res.status(200).json({
+    message: "Document details fetched successfully",
+    document: {
+      id: document._id,
+      title: document.title,
+      fileUrl: document.fileUrl,
+      fileType: document.fileType,
+      sizeKB: document.size,
+      uploadedAt: document.uploadedAt,
+      viewedByManager: document.viewedByManager,
+      viewedByAdmin: document.viewedByAdmin,
+      employee: document.employee
+        ? {
+            id: document.employee._id,
+            name: `${document.employee.f_name} ${document.employee.l_name}`,
+            email: document.employee.work_email,
+            department: document.employee.department,
+          }
+        : null,
+      reportingManager: document.underManager
+        ? {
+            id: document.underManager._id,
+            name: `${document.underManager.f_name} ${document.underManager.l_name}`,
+            email: document.underManager.work_email,
+          }
+        : null,
+    },
+  });
+};
+
+
+const adminActionOnLeave = async (req, res, next) => {
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  const { leaveId, action, remarks } = req.body;
+  if (!leaveId || !action)
+    return next(
+      Object.assign(new Error("leaveId and action are required"), {
+        statusCode: 400,
+      }),
+    );
+  if (!["approve", "reject"].includes(action))
+    return next(
+      Object.assign(new Error("action must be 'approve' or 'reject'"), {
+        statusCode: 400,
+      }),
+    );
+  const leave = await Leave.findById(leaveId);
+  if (!leave)
+    return next(
+      Object.assign(new Error("Leave not found"), { statusCode: 404 }),
+    );
+  if (
+    leave.status !== "forwarded_reporting_manager" &&
+    leave.status !== "pending_manager"
+  )
+    return next(
+      Object.assign(
+        new Error("Only pending or forwarded leaves can be actioned by admin"),
+        { statusCode: 400 },
+      ),
+    );
+  if (action === "approve") {
+    leave.status = "approved_reporting_manager";
+    leave.approvedBy = null; // admin approved, no manager ref
+    leave.remarks = remarks || "Approved by Admin";
+  } else {
+    leave.status = "rejected_reporting_manager";
+    leave.rejectedBy = null;
+    leave.remarks = remarks || "Rejected by Admin";
+    leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  }
+  await leave.save();
+  res.status(200).json({
+    message: `Leave ${action === "approve" ? "approved" : "rejected"} successfully by Admin`,
+    leave,
+  });
+};
+
 module.exports = {
   verifyAdmin,
   adminlogin,
@@ -879,4 +1072,8 @@ module.exports = {
   changepassword,
   getTodayCheckins,
   getOrgInfo,
+  getAllPersonalDocumentsAdmin,
+  getAllExpenseDocumentsAdmin,
+  getDocumentDetailsAdmin,
+  adminActionOnLeave,
 };
