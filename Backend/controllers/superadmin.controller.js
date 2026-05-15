@@ -18,6 +18,7 @@ const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const { sendEmail } = require("../utils/nodemailer.utils");
 const generateOTP = require("../automatic/otpgenerator");
+const Document = require("../Models/document.model");
 const OtpModel = require("../Models/otpbasedlogin.model");
 
 const EXCLUDE =
