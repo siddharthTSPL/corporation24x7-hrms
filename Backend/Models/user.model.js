@@ -2,6 +2,11 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 
 const userSchema = new mongoose.Schema({
+  organisation_id: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "SuperAdmin",
+  // required: true,
+},
   profile_image: {
     type: String,
   },
