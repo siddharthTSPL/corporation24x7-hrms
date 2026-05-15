@@ -45,7 +45,7 @@ superAdminRouter.post("/forgotpassword", asyncHandler(forgotPassword));
 superAdminRouter.post("/verifyotp", asyncHandler(verifyOtp));
 superAdminRouter.post("/resetpassword", asyncHandler(resetPassword));
 
-superAdminRouter.get("/getme", superAdminAuth, asyncHandler(getMe));
+superAdminRouter.get("/me", superAdminAuth, asyncHandler(getMe));
 superAdminRouter.put("/update", superAdminAuth, asyncHandler(updateSuperAdmin));
 superAdminRouter.put(
   "/changepassword",

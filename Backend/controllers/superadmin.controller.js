@@ -65,7 +65,7 @@ const registerSuperAdmin = async (req, res, next) => {
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
-
+  console.log(process.env.BASE_URL);
     const verifyLink = `${process.env.BASE_URL}/superadmin/verify/${verifyToken}`;
 
     sendEmail({
@@ -273,79 +273,94 @@ const verifySuperAdmin = async (req, res, next) => {
 };
 
 const loginSuperAdmin = async (req, res, next) => {
-  const { email, password } = req.body;
-  if (!email || !password)
-    return next(
-      Object.assign(new Error("Email and password are required"), {
-        statusCode: 400,
-      }),
+  try {
+    const { identifier, password } = req.body;
+
+    if (!identifier || !password)
+      return next(
+        Object.assign(new Error("Email and password are required"), {
+          statusCode: 400,
+        })
+      );
+
+    const superAdmin = await SuperAdminModel.findOne({
+      email: identifier.toLowerCase().trim(), 
+    });
+
+    if (!superAdmin)
+      return next(
+        Object.assign(new Error("No account found with this email"), {
+          statusCode: 404,
+        })
+      );
+
+    if (!superAdmin.isVerified)
+      return next(
+        Object.assign(new Error("Please verify your email before logging in"), {
+          statusCode: 403,
+        })
+      );
+
+    if (superAdmin.status === "suspended")
+      return next(
+        Object.assign(
+          new Error("Your account has been suspended. Contact support."),
+          { statusCode: 403 }
+        )
+      );
+
+    if (superAdmin.status === "inactive")
+      return next(
+        Object.assign(new Error("Your account is inactive"), { statusCode: 403 })
+      );
+
+    const isMatch = await superAdmin.isValidPassword(password);
+    if (!isMatch)
+      return next(
+        Object.assign(new Error("Invalid credentials"), { statusCode: 401 })
+      );
+
+    const token = jwt.sign(
+      {
+        superadminid: superAdmin._id,
+        role: superAdmin.role,
+        email: superAdmin.email,
+        company_domain: superAdmin.company_domain,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "15d" }
     );
-  const superAdmin = await SuperAdminModel.findOne({
-    email: email.toLowerCase().trim(),
-  });
-  if (!superAdmin)
-    return next(
-      Object.assign(new Error("No account found with this email"), {
-        statusCode: 404,
-      }),
-    );
-  if (!superAdmin.isVerified)
-    return next(
-      Object.assign(new Error("Please verify your email before logging in"), {
-        statusCode: 403,
-      }),
-    );
-  if (superAdmin.status === "suspended")
-    return next(
-      Object.assign(
-        new Error("Your account has been suspended. Contact support."),
-        { statusCode: 403 },
-      ),
-    );
-  if (superAdmin.status === "inactive")
-    return next(
-      Object.assign(new Error("Your account is inactive"), { statusCode: 403 }),
-    );
-  const isMatch = await superAdmin.isValidPassword(password);
-  if (!isMatch)
-    return next(
-      Object.assign(new Error("Invalid credentials"), { statusCode: 401 }),
-    );
-  const token = jwt.sign(
-    {
-      superadminid: superAdmin._id,
-      role: superAdmin.role,
-      email: superAdmin.email,
-      company_domain: superAdmin.company_domain,
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: "15d" },
-  );
-  const isProduction = process.env.NODE_ENV === "production";
-  res.cookie("token", token, {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? "none" : "lax",
-    maxAge: 15 * 24 * 60 * 60 * 1000,
-  });
-  superAdmin.last_login = new Date();
-  superAdmin.status = "active";
-  await superAdmin.save();
-  res.status(200).json({
-    success: true,
-    message: "Login successful",
-    superAdmin: {
-      id: superAdmin._id,
-      f_name: superAdmin.f_name,
-      l_name: superAdmin.l_name,
-      email: superAdmin.email,
-      organisation_name: superAdmin.organisation_name,
-      company_domain: superAdmin.company_domain,
-      plan: superAdmin.plan,
-      plan_expires_at: superAdmin.plan_expires_at,
-      role: superAdmin.role,
-    },
-  });
+
+    const isProduction = process.env.NODE_ENV === "production";
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+      maxAge: 15 * 24 * 60 * 60 * 1000,
+    });
+
+    superAdmin.last_login = new Date();
+    superAdmin.status = "active";
+    await superAdmin.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Login successful",
+      superAdmin: {
+        id: superAdmin._id,
+        f_name: superAdmin.f_name,
+        l_name: superAdmin.l_name,
+        email: superAdmin.email,
+        organisation_name: superAdmin.organisation_name,
+        company_domain: superAdmin.company_domain,
+        plan: superAdmin.plan,
+        plan_expires_at: superAdmin.plan_expires_at,
+        role: superAdmin.role,
+      },
+    });
+  } catch (err) {
+    next(Object.assign(err, { statusCode: err.statusCode || 500 }));
+  }
 };
 
 const getMe = async (req, res, next) => {
