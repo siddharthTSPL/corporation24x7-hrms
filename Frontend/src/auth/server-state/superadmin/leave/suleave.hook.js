@@ -8,7 +8,7 @@ import {
   showAllLeaves,
   acceptLeaveByAdmin,
   rejectLeaveByAdmin,
-} from "../../../api/superadmin/leave/leave.api";
+} from "../../../api/superadmin/leave/su.leave";
 
 
 

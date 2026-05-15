@@ -25,7 +25,7 @@ import {
   getParticularManager,
   deleteEmployee,
   getNoOfEmployees,
-} from "../../../api/superadmin/superadmin.api";
+} from "../../../api/superadmin/other/su.other";
 
 
 
