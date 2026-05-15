@@ -40,9 +40,11 @@ const registerSuperAdmin = async (req, res, next) => {
     if (!f_name || !l_name || !email || !password || !organisation_name) {
       return next(
         Object.assign(
-          new Error("f_name, l_name, email, password and organisation_name are required"),
-          { statusCode: 400 }
-        )
+          new Error(
+            "f_name, l_name, email, password and organisation_name are required",
+          ),
+          { statusCode: 400 },
+        ),
       );
     }
 
@@ -63,9 +65,9 @@ const registerSuperAdmin = async (req, res, next) => {
     const verifyToken = jwt.sign(
       { superadminid: superAdmin._id },
       process.env.JWT_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: "1h" },
     );
-  console.log(process.env.BASE_URL);
+    console.log(process.env.BASE_URL);
     const verifyLink = `${process.env.BASE_URL}/superadmin/verify/${verifyToken}`;
 
     sendEmail({
@@ -235,7 +237,6 @@ const registerSuperAdmin = async (req, res, next) => {
       success: true,
       message: "Account created successfully. Please verify your email.",
     });
-
   } catch (err) {
     next(Object.assign(err, { statusCode: err.statusCode || 400 }));
   }
@@ -264,12 +265,10 @@ const verifySuperAdmin = async (req, res, next) => {
       .json({ message: "Email already verified. Please login." });
   superAdmin.isVerified = true;
   await superAdmin.save();
-  res
-    .status(200)
-    .json({
-      success: true,
-      message: "Email verified successfully. You can now login.",
-    });
+  res.status(200).json({
+    success: true,
+    message: "Email verified successfully. You can now login.",
+  });
 };
 
 const loginSuperAdmin = async (req, res, next) => {
@@ -280,33 +279,33 @@ const loginSuperAdmin = async (req, res, next) => {
       return next(
         Object.assign(new Error("Email and password are required"), {
           statusCode: 400,
-        })
+        }),
       );
 
     const superAdmin = await SuperAdminModel.findOne({
-      email: identifier.toLowerCase().trim(), 
+      email: identifier.toLowerCase().trim(),
     });
 
     if (!superAdmin)
       return next(
         Object.assign(new Error("No account found with this email"), {
           statusCode: 404,
-        })
+        }),
       );
 
     if (!superAdmin.isVerified)
       return next(
         Object.assign(new Error("Please verify your email before logging in"), {
           statusCode: 403,
-        })
+        }),
       );
 
     if (superAdmin.status === "suspended")
       return next(
         Object.assign(
           new Error("Your account has been suspended. Contact support."),
-          { statusCode: 403 }
-        )
+          { statusCode: 403 },
+        ),
       );
 
     // if (superAdmin.status === "inactive")
@@ -317,7 +316,7 @@ const loginSuperAdmin = async (req, res, next) => {
     const isMatch = await superAdmin.isValidPassword(password);
     if (!isMatch)
       return next(
-        Object.assign(new Error("Invalid credentials"), { statusCode: 401 })
+        Object.assign(new Error("Invalid credentials"), { statusCode: 401 }),
       );
 
     const token = jwt.sign(
@@ -328,7 +327,7 @@ const loginSuperAdmin = async (req, res, next) => {
         company_domain: superAdmin.company_domain,
       },
       process.env.JWT_SECRET,
-      { expiresIn: "15d" }
+      { expiresIn: "15d" },
     );
 
     const isProduction = process.env.NODE_ENV === "production";
@@ -566,67 +565,228 @@ const resetPassword = async (req, res, next) => {
     );
   superAdmin.password = newPassword;
   await superAdmin.save();
-  res
-    .status(200)
-    .json({
-      success: true,
-      message: "Password reset successfully. You can now login.",
-    });
+  res.status(200).json({
+    success: true,
+    message: "Password reset successfully. You can now login.",
+  });
 };
 
 const createAdmin = async (req, res, next) => {
-  const { f_name, l_name, work_email, password, gender, designation, phone } =
-    req.body;
-  if (
-    !f_name ||
-    !l_name ||
-    !work_email ||
-    !password ||
-    !gender ||
-    !designation
-  ) {
-    return next(
-      Object.assign(
-        new Error(
-          "f_name, l_name, work_email, password, gender and designation are required",
+  try {
+    const { f_name, l_name, work_email, password, gender, designation, phone } =
+      req.body;
+
+    if (
+      !f_name ||
+      !l_name ||
+      !work_email ||
+      !password ||
+      !gender ||
+      !designation
+    ) {
+      return next(
+        Object.assign(
+          new Error(
+            "f_name, l_name, work_email, password, gender and designation are required",
+          ),
+          { statusCode: 400 },
         ),
-        { statusCode: 400 },
-      ),
+      );
+    }
+
+    const email = work_email.toLowerCase().trim();
+
+    const existing = await AdminModel.findOne({
+      work_email: email,
+    })
+      .select("_id")
+      .lean();
+
+    if (existing) {
+      return next(
+        Object.assign(new Error("An admin with this email already exists"), {
+          statusCode: 400,
+        }),
+      );
+    }
+
+    const admin = await AdminModel.create({
+      f_name,
+      l_name,
+      work_email: email,
+      password,
+      gender,
+      designation,
+      phone,
+      created_by: req.superAdmin._id,
+    });
+
+    await assignDefaultLeave({
+      ...admin.toObject(),
+      role: "admin",
+    });
+
+    const verifyToken = jwt.sign(
+      { adminid: admin._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" },
     );
-  }
-  const existing = await AdminModel.findOne({
-    work_email: work_email.toLowerCase().trim(),
-  })
-    .select("_id")
-    .lean();
-  if (existing)
-    return next(
-      Object.assign(new Error("An admin with this email already exists"), {
-        statusCode: 400,
-      }),
-    );
-  const admin = await AdminModel.create({
-    f_name,
-    l_name,
-    work_email,
-    password,
-    gender,
-    designation,
-    phone,
-    created_by: req.superAdmin._id,
-  });
-  const verifyToken = jwt.sign({ adminid: admin._id }, process.env.JWT_SECRET, {
-    expiresIn: "1h",
-  });
-  const verifyLink = `${process.env.BASE_URL}/admin/verify/${verifyToken}`;
-  sendEmail({
-    to: work_email,
-    subject: "Activate Your Admin Account",
-    html: `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#F9F8F2;font-family:'Segoe UI',sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.08);"><tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h1 style="margin:0;">Admin Account Created</h1></td></tr><tr><td style="padding:40px;color:#333;"><h2 style="color:#730042;">Hello ${f_name} ${l_name},</h2><p>Your admin account has been created. Please verify your email to activate it.</p><div style="background:#F9F8F2;padding:15px;border-radius:8px;margin:20px 0;"><p style="margin:0;"><strong>Role:</strong> Admin</p><p style="margin:5px 0;"><strong>Designation:</strong> ${designation}</p><p style="margin:0;"><strong>Email:</strong> ${work_email}</p></div><div style="text-align:center;margin:30px 0;"><a href="${verifyLink}" style="background:#CD166E;color:white;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:600;display:inline-block;">Verify & Activate Account</a></div><p style="font-size:13px;word-break:break-all;color:#CD166E;">${verifyLink}</p><p style="font-size:13px;color:#777;">This link expires in <strong>1 hour</strong>.</p></td></tr><tr><td style="background:#F9F8F2;padding:20px;text-align:center;font-size:12px;color:#888;">© 2026 HRMS Platform</td></tr></table></td></tr></table></body></html>`,
-  });
-  res
-    .status(201)
-    .json({
+
+    const verifyLink = `${process.env.BASE_URL}/admin/verify/${verifyToken}`;
+
+    await sendEmail({
+      to: email,
+      subject: "Activate Your Admin Account",
+      html: `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Admin Account Activation</title>
+</head>
+
+<body style="margin:0;padding:0;background:#F4F6F9;font-family:Arial,sans-serif;">
+
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="padding:40px 0;">
+<tr>
+<td align="center">
+
+<table width="650" cellpadding="0" cellspacing="0" border="0"
+style="background:#ffffff;border-radius:14px;overflow:hidden;
+box-shadow:0 10px 30px rgba(0,0,0,0.08);">
+
+<tr>
+<td
+style="background:linear-gradient(135deg,#730042,#CD166E);
+padding:35px;
+text-align:center;
+color:#ffffff;"
+>
+<h1 style="margin:0;font-size:28px;">
+Welcome to HRMS Platform
+</h1>
+
+<p style="margin-top:10px;font-size:15px;opacity:0.9;">
+Your admin account has been successfully created
+</p>
+</td>
+</tr>
+
+<tr>
+<td style="padding:40px;color:#333333;">
+
+<h2 style="margin-top:0;color:#730042;">
+Hello ${f_name} ${l_name},
+</h2>
+
+<p style="font-size:15px;line-height:1.8;color:#555;">
+Your admin account is now ready.
+Please verify your email address to activate your account
+and access the HRMS dashboard.
+</p>
+
+<table width="100%" cellpadding="0" cellspacing="0"
+style="margin:30px 0;background:#F9F8F2;border-radius:10px;padding:20px;">
+
+<tr>
+<td style="padding:8px 0;">
+<strong>Role:</strong> Admin
+</td>
+</tr>
+
+<tr>
+<td style="padding:8px 0;">
+<strong>Designation:</strong> ${designation}
+</td>
+</tr>
+
+<tr>
+<td style="padding:8px 0;">
+<strong>Email:</strong> ${email}
+</td>
+</tr>
+
+<tr>
+<td style="padding:8px 0;">
+<strong>Default Leave Balance:</strong> Assigned Successfully
+</td>
+</tr>
+
+</table>
+
+<div style="text-align:center;margin:40px 0;">
+
+<a
+href="${verifyLink}"
+style="
+background:#CD166E;
+color:#ffffff;
+padding:15px 35px;
+text-decoration:none;
+border-radius:8px;
+font-size:16px;
+font-weight:600;
+display:inline-block;
+"
+>
+Verify & Activate Account
+</a>
+
+</div>
+
+<p style="font-size:14px;color:#666;line-height:1.7;">
+This verification link will expire in
+<strong>1 hour</strong>.
+</p>
+
+<p style="font-size:14px;color:#666;line-height:1.7;">
+If the button above does not work,
+copy and paste the following link into your browser:
+</p>
+
+<p
+style="
+word-break:break-all;
+font-size:13px;
+color:#CD166E;
+background:#F9F8F2;
+padding:12px;
+border-radius:6px;
+"
+>
+${verifyLink}
+</p>
+
+</td>
+</tr>
+
+<tr>
+<td
+style="
+background:#F4F6F9;
+padding:25px;
+text-align:center;
+font-size:12px;
+color:#888888;
+"
+>
+© 2026 HRMS Platform. All rights reserved.
+</td>
+</tr>
+
+</table>
+
+</td>
+</tr>
+</table>
+
+</body>
+</html>
+      `,
+    });
+
+    res.status(201).json({
       success: true,
       message: "Admin created successfully. Verification email sent.",
       admin: {
@@ -638,6 +798,9 @@ const createAdmin = async (req, res, next) => {
         role: admin.role,
       },
     });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const updateAdmin = async (req, res, next) => {
@@ -661,22 +824,20 @@ const updateAdmin = async (req, res, next) => {
     if (req.body[field] !== undefined) admin[field] = req.body[field];
   });
   await admin.save();
-  res
-    .status(200)
-    .json({
-      success: true,
-      message: "Admin updated successfully",
-      admin: {
-        id: admin._id,
-        f_name: admin.f_name,
-        l_name: admin.l_name,
-        work_email: admin.work_email,
-        phone: admin.phone,
-        gender: admin.gender,
-        designation: admin.designation,
-        status: admin.status,
-      },
-    });
+  res.status(200).json({
+    success: true,
+    message: "Admin updated successfully",
+    admin: {
+      id: admin._id,
+      f_name: admin.f_name,
+      l_name: admin.l_name,
+      work_email: admin.work_email,
+      phone: admin.phone,
+      gender: admin.gender,
+      designation: admin.designation,
+      status: admin.status,
+    },
+  });
 };
 
 const deleteAdmin = async (req, res, next) => {
@@ -758,12 +919,10 @@ const addmanager = async (req, res, next) => {
       html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F9F8F2;font-family:Segoe UI,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center"><table width="600" style="background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.08);"><tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h1 style="margin:0;">Manager Onboarding</h1></td></tr><tr><td style="padding:40px;color:#333;"><h2 style="color:#730042;">Hi ${f_name},</h2><p>Your <strong>Manager Account</strong> has been successfully created.</p><div style="background:#F9F8F2;padding:15px;border-radius:8px;margin:20px 0;"><p style="margin:0;"><strong>Role:</strong> ${designation}</p><p style="margin:5px 0;"><strong>Department:</strong> ${department}</p><p style="margin:0;"><strong>Location:</strong> ${office_location}</p></div><div style="text-align:center;margin:30px 0;"><a href="${verifyLink}" style="background:#CD166E;color:white;padding:14px 30px;text-decoration:none;border-radius:8px;font-weight:600;display:inline-block;">Verify & Activate</a></div><p style="font-size:13px;color:#777;">Or copy: <span style="color:#CD166E;">${verifyLink}</span></p><p style="font-size:13px;color:#777;">Link expires in 1 hour.</p></td></tr><tr><td style="background:#F9F8F2;padding:20px;text-align:center;font-size:12px;color:#888;">© 2026 Your Company</td></tr></table></td></tr></table></body></html>`,
     }),
   ]);
-  res
-    .status(201)
-    .json({
-      success: true,
-      message: "Manager added successfully. Verification email sent.",
-    });
+  res.status(201).json({
+    success: true,
+    message: "Manager added successfully. Verification email sent.",
+  });
 };
 
 const addemployee = async (req, res, next) => {
@@ -822,12 +981,10 @@ const addemployee = async (req, res, next) => {
       html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F9F8F2;font-family:Segoe UI,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center"><table width="600" style="background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.08);"><tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h1 style="margin:0;">Welcome Aboard</h1></td></tr><tr><td style="padding:40px;color:#333;"><h2 style="color:#730042;">Hello ${f_name},</h2><p>Your employee account has been successfully created.</p><div style="background:#F9F8F2;padding:15px;border-radius:8px;margin:20px 0;"><p style="margin:0;"><strong>Department:</strong> ${department}</p><p style="margin:5px 0;"><strong>Manager:</strong> ${Under_manager || "Assigned Soon"}</p><p style="margin:0;"><strong>Location:</strong> ${office_location}</p></div><div style="text-align:center;margin:30px 0;"><a href="${verifyLink}" style="background:#730042;color:white;padding:14px 30px;text-decoration:none;border-radius:8px;font-weight:600;display:inline-block;">Verify Account</a></div><p style="font-size:13px;color:#777;">Or copy: <span style="color:#CD166E;">${verifyLink}</span></p><p style="font-size:13px;color:#777;">Link valid for 1 hour only.</p></td></tr><tr><td style="background:#F9F8F2;padding:20px;text-align:center;font-size:12px;color:#888;">© 2026 Your Company</td></tr></table></td></tr></table></body></html>`,
     }),
   ]);
-  res
-    .status(201)
-    .json({
-      success: true,
-      message: "User added successfully. Verification email sent.",
-    });
+  res.status(201).json({
+    success: true,
+    message: "User added successfully. Verification email sent.",
+  });
 };
 
 const findallmanagers = async (req, res, next) => {
@@ -886,14 +1043,12 @@ const editemployee = async (req, res, next) => {
       new: true,
       upsert: true,
     });
-  res
-    .status(200)
-    .json({
-      success: true,
-      message: "Employee updated successfully",
-      user,
-      manager,
-    });
+  res.status(200).json({
+    success: true,
+    message: "Employee updated successfully",
+    user,
+    manager,
+  });
 };
 
 const getperticularemployee = async (req, res, next) => {
@@ -923,15 +1078,13 @@ const getperticularemployee = async (req, res, next) => {
   const manager = await Managermodel.findOne({ userId: user._id })
     .select(EXCLUDE)
     .lean();
-  res
-    .status(200)
-    .json({
-      success: true,
-      user,
-      manager: manager || null,
-      leaveBalance,
-      reviews: reviews || [],
-    });
+  res.status(200).json({
+    success: true,
+    user,
+    manager: manager || null,
+    leaveBalance,
+    reviews: reviews || [],
+  });
 };
 
 const getperticularemanager = async (req, res, next) => {
@@ -1117,13 +1270,11 @@ const createannouncement = async (req, res, next) => {
     expiresAt,
     createdBy: req.superAdmin._id,
   });
-  res
-    .status(201)
-    .json({
-      success: true,
-      message: "Announcement created successfully",
-      announcement,
-    });
+  res.status(201).json({
+    success: true,
+    message: "Announcement created successfully",
+    announcement,
+  });
 };
 
 const getallannouncement = async (req, res, next) => {
@@ -1162,13 +1313,11 @@ const updateAnnouncement = async (req, res, next) => {
   const updated = await announcementmodel
     .findByIdAndUpdate(id, { $set }, { new: true })
     .lean();
-  res
-    .status(200)
-    .json({
-      success: true,
-      message: "Announcement updated successfully",
-      announcement: updated,
-    });
+  res.status(200).json({
+    success: true,
+    message: "Announcement updated successfully",
+    announcement: updated,
+  });
 };
 
 const deleteAnnouncement = async (req, res, next) => {
