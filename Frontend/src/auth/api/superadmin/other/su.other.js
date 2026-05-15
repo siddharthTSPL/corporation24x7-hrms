@@ -7,12 +7,12 @@ const api = axios.create({
 
 
 export const reviewToAdmin = async (data) => {
-  const res = await api.post("superadmin/review-admin", data);
+  const res = await api.post("superadmin/reviewtoadmin", data);
   return res.data;
 };
 
 export const getTodayCheckins = async () => {
-  const res = await api.get("superadmin/today-checkins");
+  const res = await api.get("superadmin/getTodayCheckins");
   return res.data;
 };
 
@@ -75,7 +75,7 @@ export const addEmployee = async (data) => {
 };
 
 export const getAllManagers = async () => {
-  const res = await api.get("superadmin/all-managers");
+  const res = await api.get("superadmin/findallmanagers");
   return res.data;
 };
 
