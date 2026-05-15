@@ -5,19 +5,19 @@ const adminSchema = new mongoose.Schema(
   {
     f_name: {
       type: String,
-      // required: [true, "First name is required"],
+      required: [true, "First name is required"],
       trim: true,
     },
 
     l_name: {
       type: String,
-      // required: [true, "Last name is required"],
+      required: [true, "Last name is required"],
       trim: true,
     },
 
     work_email: {
       type: String,
-      // required: [true, "Work email is required"],
+      required: [true, "Work email is required"],
       unique: true,
       lowercase: true,
       trim: true,
@@ -41,12 +41,12 @@ const adminSchema = new mongoose.Schema(
     gender: {
       type: String,
       enum: ["male", "female"],
-      // required: [true, "Gender is required"],
+      required: [true, "Gender is required"],
     },
 
     designation: {
       type: String,
-      // required: [true, "Designation is required"],
+      required: [true, "Designation is required"],
       trim: true,
     },
 
@@ -59,7 +59,7 @@ const adminSchema = new mongoose.Schema(
     created_by: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SuperAdmin",
-      // required: true,
+      required: true,
     },
 
     status: {
