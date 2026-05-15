@@ -60,7 +60,7 @@ export const deleteAdmin = async (id) => {
 };
 
 export const getAllAdmins = async () => {
-  const res = await api.get("superadmin/all-admins");
+  const res = await api.get("superadmin/getAllAdmins");
   return res.data;
 };
 
@@ -80,7 +80,7 @@ export const getAllManagers = async () => {
 };
 
 export const getAllEmployees = async () => {
-  const res = await api.get("superadmin/all-employees");
+  const res = await api.get("superadmin/getallemployee");
   return res.data;
 };
 
