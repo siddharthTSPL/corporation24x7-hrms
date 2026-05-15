@@ -24,56 +24,221 @@ const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
 
 const registerSuperAdmin = async (req, res, next) => {
-  const {
-    f_name,
-    l_name,
-    email,
-    password,
-    organisation_name,
-    phone,
-    company_address,
-    company_size,
-    industry,
-  } = req.body;
-  if (!f_name || !l_name || !email || !password || !organisation_name) {
-    return next(
-      Object.assign(
-        new Error(
-          "f_name, l_name, email, password and organisation_name are required",
-        ),
-        { statusCode: 400 },
-      ),
+  try {
+    const {
+      f_name,
+      l_name,
+      email,
+      password,
+      organisation_name,
+      phone,
+      company_address,
+      company_size,
+      industry,
+    } = req.body;
+
+    if (!f_name || !l_name || !email || !password || !organisation_name) {
+      return next(
+        Object.assign(
+          new Error("f_name, l_name, email, password and organisation_name are required"),
+          { statusCode: 400 }
+        )
+      );
+    }
+
+    await SuperAdminModel.checkDomainAvailable(email);
+
+    const superAdmin = await SuperAdminModel.create({
+      f_name,
+      l_name,
+      email,
+      password,
+      organisation_name,
+      phone,
+      company_address,
+      company_size,
+      industry,
+    });
+
+    const verifyToken = jwt.sign(
+      { superadminid: superAdmin._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
     );
-  }
-  await SuperAdminModel.checkDomainAvailable(email);
-  const superAdmin = await SuperAdminModel.create({
-    f_name,
-    l_name,
-    email,
-    password,
-    organisation_name,
-    phone,
-    company_address,
-    company_size,
-    industry,
-  });
-  const verifyToken = jwt.sign(
-    { superadminid: superAdmin._id },
-    process.env.JWT_SECRET,
-    { expiresIn: "1h" },
-  );
-  const verifyLink = `${process.env.BASE_URL}/superadmin/verify/${verifyToken}`;
-  sendEmail({
-    to: email,
-    subject: "Verify Your Super Admin Account",
-    html: `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#F9F8F2;font-family:'Segoe UI',sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.08);"><tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h1 style="margin:0;">Welcome to the Platform</h1><p style="margin-top:8px;font-size:14px;">Super Admin Account Verification</p></td></tr><tr><td style="padding:40px;color:#333;"><h2 style="color:#730042;">Hello ${f_name} ${l_name},</h2><p style="font-size:15px;line-height:1.6;color:#444;">Your super admin account for <strong>${organisation_name}</strong> has been created. Please verify your email to activate your account.</p><div style="text-align:center;margin:30px 0;"><a href="${verifyLink}" style="background:#CD166E;color:white;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:600;display:inline-block;">Verify Email</a></div><p style="font-size:14px;color:#666;">If the button doesn't work, copy this link:</p><p style="font-size:13px;word-break:break-all;color:#CD166E;">${verifyLink}</p><hr style="border:none;border-top:1px solid #eee;margin:30px 0;"/><p style="font-size:13px;color:#777;">This link expires in <strong>1 hour</strong>.</p></td></tr><tr><td style="background:#F9F8F2;padding:20px;text-align:center;font-size:12px;color:#888;">© 2026 HRMS Platform</td></tr></table></td></tr></table></body></html>`,
-  });
-  res
-    .status(201)
-    .json({
+  console.log(process.env.BASE_URL);
+    const verifyLink = `${process.env.BASE_URL}/superadmin/verify/${verifyToken}`;
+
+    sendEmail({
+      to: email,
+      subject: "✅ Verify Your Super Admin Account — Action Required",
+      html: `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Verify Your Account</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f1ee;font-family:'Segoe UI',Arial,sans-serif;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding: 40px 16px;">
+    <tr>
+      <td align="center">
+
+        <!-- Card -->
+        <table width="600" cellpadding="0" cellspacing="0"
+          style="background:#ffffff;border-radius:16px;overflow:hidden;
+                 box-shadow:0 8px 32px rgba(115,0,66,0.10);max-width:100%;">
+
+          <!-- Header Banner -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#730042 0%,#CD166E 100%);
+                        padding:40px 40px 32px 40px;text-align:center;">
+              <div style="display:inline-block;background:rgba(255,255,255,0.15);
+                          border-radius:50%;padding:16px;margin-bottom:16px;">
+                <span style="font-size:36px;">🛡️</span>
+              </div>
+              <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;
+                          letter-spacing:-0.5px;">
+                Welcome to the Platform
+              </h1>
+              <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">
+                Super Admin Account Verification
+              </p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:40px;">
+
+              <!-- Greeting -->
+              <h2 style="margin:0 0 8px;color:#730042;font-size:20px;">
+                Hello, ${f_name} ${l_name} 👋
+              </h2>
+              <p style="margin:0 0 24px;color:#555;font-size:15px;line-height:1.7;">
+                Your Super Admin account for
+                <strong style="color:#730042;">${organisation_name}</strong>
+                has been successfully created. You're just one step away from
+                accessing the full platform.
+              </p>
+
+              <!-- Info Cards -->
+              <table width="100%" cellpadding="0" cellspacing="0"
+                style="background:#fdf6fa;border-radius:10px;padding:0;margin-bottom:28px;
+                       border:1px solid #f0dcea;">
+                <tr>
+                  <td style="padding:20px 24px;">
+                    <table width="100%" cellpadding="6" cellspacing="0">
+                      <tr>
+                        <td style="color:#888;font-size:13px;width:140px;">📧 Email</td>
+                        <td style="color:#333;font-size:13px;font-weight:600;">${email}</td>
+                      </tr>
+                      <tr>
+                        <td style="color:#888;font-size:13px;">🏢 Organisation</td>
+                        <td style="color:#333;font-size:13px;font-weight:600;">${organisation_name}</td>
+                      </tr>
+                      <tr>
+                        <td style="color:#888;font-size:13px;">🎯 Plan</td>
+                        <td style="color:#333;font-size:13px;font-weight:600;">
+                          <span style="background:#730042;color:white;padding:2px 10px;
+                                       border-radius:20px;font-size:11px;">
+                            30-Day Free Trial
+                          </span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="color:#888;font-size:13px;">👤 Role</td>
+                        <td style="color:#333;font-size:13px;font-weight:600;">Super Admin</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- CTA Button -->
+              <p style="margin:0 0 16px;color:#444;font-size:15px;line-height:1.6;">
+                Click the button below to verify your email and activate your account:
+              </p>
+              <div style="text-align:center;margin:28px 0;">
+                <a href="${verifyLink}"
+                  style="background:linear-gradient(135deg,#730042,#CD166E);
+                         color:#ffffff;padding:16px 40px;text-decoration:none;
+                         border-radius:10px;font-weight:700;font-size:16px;
+                         display:inline-block;letter-spacing:0.3px;
+                         box-shadow:0 4px 16px rgba(205,22,110,0.35);">
+                  ✅ Verify My Account
+                </a>
+              </div>
+
+              <!-- Fallback link -->
+              <div style="background:#f9f9f9;border-left:4px solid #CD166E;
+                          border-radius:4px;padding:14px 18px;margin-bottom:24px;">
+                <p style="margin:0 0 6px;font-size:13px;color:#666;">
+                  Button not working? Copy and paste this link into your browser:
+                </p>
+                <a href="${verifyLink}"
+                  style="font-size:12px;color:#CD166E;word-break:break-all;
+                         text-decoration:none;">
+                  ${verifyLink}
+                </a>
+              </div>
+
+              <!-- Warning -->
+              <table width="100%" cellpadding="0" cellspacing="0"
+                style="background:#fff8e1;border-radius:8px;border:1px solid #ffe082;
+                       margin-bottom:8px;">
+                <tr>
+                  <td style="padding:14px 18px;">
+                    <p style="margin:0;font-size:13px;color:#795548;">
+                      ⏱️ <strong>This link expires in 1 hour.</strong>
+                      If it expires, please register again or contact support.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:20px 0 0;font-size:13px;color:#999;">
+                If you did not create this account, you can safely ignore this email.
+                No action is required.
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background:#f4f1ee;padding:24px 40px;text-align:center;
+                        border-top:1px solid #eedde8;">
+              <p style="margin:0 0 6px;font-size:13px;color:#730042;font-weight:600;">
+                TechTorch HRMS Platform
+              </p>
+              <p style="margin:0;font-size:12px;color:#aaa;">
+                © 2026 TechTorch Solutions Private Limited. All rights reserved.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+        <!-- /Card -->
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
+      `,
+    });
+
+    res.status(201).json({
       success: true,
       message: "Account created successfully. Please verify your email.",
     });
+
+  } catch (err) {
+    next(Object.assign(err, { statusCode: err.statusCode || 400 }));
+  }
 };
 
 const verifySuperAdmin = async (req, res, next) => {
@@ -108,79 +273,94 @@ const verifySuperAdmin = async (req, res, next) => {
 };
 
 const loginSuperAdmin = async (req, res, next) => {
-  const { email, password } = req.body;
-  if (!email || !password)
-    return next(
-      Object.assign(new Error("Email and password are required"), {
-        statusCode: 400,
-      }),
+  try {
+    const { identifier, password } = req.body;
+
+    if (!identifier || !password)
+      return next(
+        Object.assign(new Error("Email and password are required"), {
+          statusCode: 400,
+        })
+      );
+
+    const superAdmin = await SuperAdminModel.findOne({
+      email: identifier.toLowerCase().trim(), 
+    });
+
+    if (!superAdmin)
+      return next(
+        Object.assign(new Error("No account found with this email"), {
+          statusCode: 404,
+        })
+      );
+
+    if (!superAdmin.isVerified)
+      return next(
+        Object.assign(new Error("Please verify your email before logging in"), {
+          statusCode: 403,
+        })
+      );
+
+    if (superAdmin.status === "suspended")
+      return next(
+        Object.assign(
+          new Error("Your account has been suspended. Contact support."),
+          { statusCode: 403 }
+        )
+      );
+
+    // if (superAdmin.status === "inactive")
+    //   return next(
+    //     Object.assign(new Error("Your account is inactive"), { statusCode: 403 })
+    //   );
+
+    const isMatch = await superAdmin.isValidPassword(password);
+    if (!isMatch)
+      return next(
+        Object.assign(new Error("Invalid credentials"), { statusCode: 401 })
+      );
+
+    const token = jwt.sign(
+      {
+        superadminid: superAdmin._id,
+        role: superAdmin.role,
+        email: superAdmin.email,
+        company_domain: superAdmin.company_domain,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "15d" }
     );
-  const superAdmin = await SuperAdminModel.findOne({
-    email: email.toLowerCase().trim(),
-  });
-  if (!superAdmin)
-    return next(
-      Object.assign(new Error("No account found with this email"), {
-        statusCode: 404,
-      }),
-    );
-  if (!superAdmin.isVerified)
-    return next(
-      Object.assign(new Error("Please verify your email before logging in"), {
-        statusCode: 403,
-      }),
-    );
-  if (superAdmin.status === "suspended")
-    return next(
-      Object.assign(
-        new Error("Your account has been suspended. Contact support."),
-        { statusCode: 403 },
-      ),
-    );
-  if (superAdmin.status === "inactive")
-    return next(
-      Object.assign(new Error("Your account is inactive"), { statusCode: 403 }),
-    );
-  const isMatch = await superAdmin.isValidPassword(password);
-  if (!isMatch)
-    return next(
-      Object.assign(new Error("Invalid credentials"), { statusCode: 401 }),
-    );
-  const token = jwt.sign(
-    {
-      superadminid: superAdmin._id,
-      role: superAdmin.role,
-      email: superAdmin.email,
-      company_domain: superAdmin.company_domain,
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: "15d" },
-  );
-  const isProduction = process.env.NODE_ENV === "production";
-  res.cookie("token", token, {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? "none" : "lax",
-    maxAge: 15 * 24 * 60 * 60 * 1000,
-  });
-  superAdmin.last_login = new Date();
-  superAdmin.status = "active";
-  await superAdmin.save();
-  res.status(200).json({
-    success: true,
-    message: "Login successful",
-    superAdmin: {
-      id: superAdmin._id,
-      f_name: superAdmin.f_name,
-      l_name: superAdmin.l_name,
-      email: superAdmin.email,
-      organisation_name: superAdmin.organisation_name,
-      company_domain: superAdmin.company_domain,
-      plan: superAdmin.plan,
-      plan_expires_at: superAdmin.plan_expires_at,
-      role: superAdmin.role,
-    },
-  });
+
+    const isProduction = process.env.NODE_ENV === "production";
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+      maxAge: 15 * 24 * 60 * 60 * 1000,
+    });
+
+    superAdmin.last_login = new Date();
+    superAdmin.status = "active";
+    await superAdmin.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Login successful",
+      superAdmin: {
+        id: superAdmin._id,
+        f_name: superAdmin.f_name,
+        l_name: superAdmin.l_name,
+        email: superAdmin.email,
+        organisation_name: superAdmin.organisation_name,
+        company_domain: superAdmin.company_domain,
+        plan: superAdmin.plan,
+        plan_expires_at: superAdmin.plan_expires_at,
+        role: superAdmin.role,
+      },
+    });
+  } catch (err) {
+    next(Object.assign(err, { statusCode: err.statusCode || 500 }));
+  }
 };
 
 const getMe = async (req, res, next) => {
@@ -791,31 +971,41 @@ const deleteemployee = async (req, res, next) => {
 };
 
 const showallleaves = async (req, res, next) => {
-  const [employeeLeaves, managerLeaves] = await Promise.all([
-    Leave.find({ status: "forwarded_admin" })
+  const adminIds = await AdminModel.find({
+    created_by: req.superAdmin._id,
+  }).distinct("_id");
+  const [employeeLeaves, adminLeaves] = await Promise.all([
+    Leave.find({
+      status: {
+        $in: [
+          "forwarded_reporting_manager",
+          "approved_reporting_manager",
+          "rejected_reporting_manager",
+        ],
+      },
+    })
       .populate("employee", "f_name l_name work_email")
       .populate("manager", "f_name l_name work_email")
       .sort({ createdAt: -1 })
       .lean(),
     ManagerLeave.find({
-      status: { $in: ["pending_admin", "approved_admin", "rejected_admin"] },
+      manager: { $in: adminIds },
+      status: "pending_reporting_manager",
     })
-      .populate("manager", "f_name l_name work_email")
+      .populate("manager", "f_name l_name work_email designation")
       .sort({ createdAt: -1 })
       .lean(),
   ]);
-  res
-    .status(200)
-    .json({
-      employeeLeaves: { count: employeeLeaves.length, leaves: employeeLeaves },
-      managerLeaves: { count: managerLeaves.length, leaves: managerLeaves },
-    });
+  res.status(200).json({
+    employeeLeaves: { count: employeeLeaves.length, leaves: employeeLeaves },
+    adminLeaves: { count: adminLeaves.length, leaves: adminLeaves },
+  });
 };
 
 const acceptleavebyadmin = async (req, res, next) => {
   const { id } = req.params;
   const { leaveFor } = req.query;
-  const LeaveModel = leaveFor === "manager" ? ManagerLeave : Leave;
+  const LeaveModel = leaveFor === "admin" ? ManagerLeave : Leave;
   const leave = await LeaveModel.findById(id);
   if (!leave)
     return next(
@@ -828,7 +1018,19 @@ const acceptleavebyadmin = async (req, res, next) => {
     return next(
       Object.assign(new Error("Leave already processed"), { statusCode: 400 }),
     );
-  if (leaveFor !== "manager") {
+  if (leaveFor === "admin") {
+    const adminIds = await AdminModel.find({
+      created_by: req.superAdmin._id,
+    }).distinct("_id");
+    if (!adminIds.some((id) => id.toString() === leave.manager.toString()))
+      return next(
+        Object.assign(
+          new Error("This leave does not belong to your organisation"),
+          { statusCode: 403 },
+        ),
+      );
+    leave.status = "approved_reporting_manager";
+  } else {
     const leaveBalance = await LeaveBalance.findOne({
       employee: leave.employee,
     });
@@ -847,8 +1049,8 @@ const acceptleavebyadmin = async (req, res, next) => {
       await leaveBalance.save();
     }
     await processLeaveDeduction(leave);
+    leave.status = "approved_reporting_manager";
   }
-  leave.status = "approved_admin";
   leave.approvedBy = req.superAdmin._id;
   await leave.save();
   res.status(200).json({ message: "Leave approved", leave });
@@ -857,7 +1059,7 @@ const acceptleavebyadmin = async (req, res, next) => {
 const rejectleavebyadmin = async (req, res, next) => {
   const { id } = req.params;
   const { leaveFor } = req.query;
-  const LeaveModel = leaveFor === "manager" ? ManagerLeave : Leave;
+  const LeaveModel = leaveFor === "admin" ? ManagerLeave : Leave;
   const leave = await LeaveModel.findById(id);
   if (!leave)
     return next(
@@ -870,7 +1072,19 @@ const rejectleavebyadmin = async (req, res, next) => {
     return next(
       Object.assign(new Error("Leave already processed"), { statusCode: 400 }),
     );
-  leave.status = "rejected_admin";
+  if (leaveFor === "admin") {
+    const adminIds = await AdminModel.find({
+      created_by: req.superAdmin._id,
+    }).distinct("_id");
+    if (!adminIds.some((id) => id.toString() === leave.manager.toString()))
+      return next(
+        Object.assign(
+          new Error("This leave does not belong to your organisation"),
+          { statusCode: 403 },
+        ),
+      );
+  }
+  leave.status = "rejected_reporting_manager";
   leave.rejectedBy = req.superAdmin._id;
   leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   await leave.save();
