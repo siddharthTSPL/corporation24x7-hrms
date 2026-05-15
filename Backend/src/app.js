@@ -51,7 +51,7 @@ const managerrouter = require('../routes/managerroutes');
 const userrouter = require('../routes/userroutes');
 const documentroute = require('../routes/documentroute');
 const attendancerouter = require('../routes/attendanceroutes');
-const superadminrouter = require('../routes/superadminroutes');
+const superadminrouter = require('../routes/superadmin.route');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 app.use('/admin', adminrouter);
