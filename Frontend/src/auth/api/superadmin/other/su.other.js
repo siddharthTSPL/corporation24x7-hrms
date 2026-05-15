@@ -45,7 +45,7 @@ export const resetSuperAdminPassword = async (data) => {
 };
 
 export const createAdmin = async (data) => {
-  const res = await api.post("superadmin/create-admin", data);
+  const res = await api.post("superadmin/admin/create", data);
   return res.data;
 };
 
