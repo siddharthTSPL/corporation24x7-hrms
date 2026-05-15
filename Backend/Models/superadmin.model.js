@@ -7,7 +7,7 @@ const extractDomain = (email) => {
 };
 
 const BLOCKED_DOMAINS = [
-  "gmail.com",
+  // "gmail.com",
   "yahoo.com",
   "hotmail.com",
   "outlook.com",
@@ -138,24 +138,20 @@ const superAdminSchema = new mongoose.Schema(
   }
 );
 
-superAdminSchema.pre("validate", function (next) {
-  if (!this.email) return next();
+superAdminSchema.pre("validate", function () {
+  if (!this.email) return;
   const domain = extractDomain(this.email);
   if (BLOCKED_DOMAINS.includes(domain)) {
-    return next(
-      new Error(
-        `Personal email domains like "${domain}" are not allowed. Please use your company work email.`
-      )
+    throw new Error(
+      `Personal email domains like "${domain}" are not allowed. Please use your company work email.`
     );
   }
   this.company_domain = domain;
-  next();
 });
 
-superAdminSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
+superAdminSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
   this.password = await bcrypt.hash(this.password, 10);
-  next();
 });
 
 superAdminSchema.methods.isValidPassword = async function (password) {
