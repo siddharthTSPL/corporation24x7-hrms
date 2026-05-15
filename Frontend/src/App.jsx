@@ -63,7 +63,7 @@ const SuperAdminOrganisations = lazy(
 );
 
 const SuperAdminAnnouncements = lazy(
-  () => import("./pages/announcement/Announce"),
+  () => import("./pages/announcement/suannounce"),
 );
 
 const SuperAdminLeaves = lazy(() => import("./pages/leave/suleave"));
