@@ -60,7 +60,7 @@ export const deleteAdmin = async (id) => {
 };
 
 export const getAllAdmins = async () => {
-  const res = await api.get("superadmin/getAllAdmins");
+  const res = await api.get("superadmin/admin/all");
   return res.data;
 };
 
