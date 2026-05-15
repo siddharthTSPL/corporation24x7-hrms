@@ -2,13 +2,23 @@ import { useQuery } from "@tanstack/react-query";
 import { getMeAdmin } from "../../api/adminapi/auth/ad.auth.api";
 import { getMeManager } from "../../api/managerapi/auth/ma.auth.api";
 import { getMeUser } from "../../api/employeeapi/auth/em.auth.api";
-
+import { getMeSuperAdmin } from "../../api/superadmin/auth/su.auth";
 
 export const useAuth = () => {
   return useQuery({
     queryKey: ["auth"],
     queryFn: async () => {
       const savedRole = localStorage.getItem("role");
+
+      if (savedRole === "superadmin") {
+        try {
+          const res = await getMeSuperAdmin();
+          return { role: "superadmin", data: res };
+        } catch {
+          localStorage.removeItem("role");
+          return null;
+        }
+      }
 
       if (savedRole === "admin") {
         try {
