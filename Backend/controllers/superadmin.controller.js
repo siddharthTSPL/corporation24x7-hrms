@@ -309,10 +309,10 @@ const loginSuperAdmin = async (req, res, next) => {
         )
       );
 
-    if (superAdmin.status === "inactive")
-      return next(
-        Object.assign(new Error("Your account is inactive"), { statusCode: 403 })
-      );
+    // if (superAdmin.status === "inactive")
+    //   return next(
+    //     Object.assign(new Error("Your account is inactive"), { statusCode: 403 })
+    //   );
 
     const isMatch = await superAdmin.isValidPassword(password);
     if (!isMatch)
