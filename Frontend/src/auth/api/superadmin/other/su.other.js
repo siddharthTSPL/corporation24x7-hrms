@@ -50,7 +50,7 @@ export const createAdmin = async (data) => {
 };
 
 export const updateAdmin = async (id, data) => {
-  const res = await api.put(`superadmin/update-admin/${id}`, data);
+  const res = await api.put(`superadmin/admin/update/${id}`, data);
   return res.data;
 };
 
