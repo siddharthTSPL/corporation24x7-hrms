@@ -33,6 +33,13 @@ const Organisationma  = lazy(() => import("./pages/organisation/organisationma")
 const Reviewad        = lazy(() => import("./pages/review/reviewad"));
 const Reviewma        = lazy(() => import("./pages/review/reviewma"));
 const Attendancepage  = lazy(() => import("./pages/attendance/attendancepage"));
+// superadmin
+const SuperAdminDashboard = lazy(() => import("./pages/dashboard/sudashboard"));
+const SuperAdminOrganisations = lazy(() => import("./pages/organisation/suorganization"));
+const SuperAdminAnnouncements = lazy(() => import("./pages/announcement/suannouncement"));
+const SuperAdminLeaves = lazy(() => import("./pages/leave/suleave"));
+const SuperAdminReviews = lazy(() => import("./pages/review/sureview"));
+const SuperAdminSettings = lazy(() => import("./pages/settings/susetting"));
 
 
 function PageSkeleton() {
