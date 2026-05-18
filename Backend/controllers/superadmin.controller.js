@@ -1432,6 +1432,158 @@ const getOrgInfo = async (req, res, next) => {
   });
 };
 
+
+const getAllPersonalDocumentsSuperAdmin = async (req, res, next) => {
+  if (!req.superAdmin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const documents = await Document.find({ fileType: "personal" })
+    .populate("employee", "f_name l_name work_email personal_contact department designation")
+    .populate("underManager", "f_name l_name work_email")
+    .sort({ uploadedAt: -1 })
+    .lean();
+
+  Document.updateMany(
+    { fileType: "personal", viewedBySuperAdmin: false },
+    { $set: { viewedBySuperAdmin: true } }
+  ).exec();
+
+  res.status(200).json({
+    message: "All personal documents fetched successfully",
+    total: documents.length,
+    documents: documents.map((doc) => ({
+      id: doc._id,
+      title: doc.title,
+      fileUrl: doc.fileUrl,
+      fileType: doc.fileType,
+      sizeKB: doc.size,
+      uploadedAt: doc.uploadedAt,
+      viewedByManager: doc.viewedByManager,
+      viewedByAdmin: doc.viewedByAdmin,
+      viewedBySuperAdmin: doc.viewedBySuperAdmin,
+      employee: doc.employee
+        ? {
+            id: doc.employee._id,
+            name: `${doc.employee.f_name} ${doc.employee.l_name}`,
+            email: doc.employee.work_email,
+            contact: doc.employee.personal_contact,
+            department: doc.employee.department,
+            designation: doc.employee.designation,
+          }
+        : null,
+      reportingManager: doc.underManager
+        ? {
+            id: doc.underManager._id,
+            name: `${doc.underManager.f_name} ${doc.underManager.l_name}`,
+            email: doc.underManager.work_email,
+          }
+        : null,
+    })),
+  });
+};
+
+const getAllExpenseDocumentsSuperAdmin = async (req, res, next) => {
+  if (!req.superAdmin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const documents = await Document.find({ fileType: "expense" })
+    .populate("employee", "f_name l_name work_email personal_contact department designation")
+    .populate("underManager", "f_name l_name work_email")
+    .sort({ uploadedAt: -1 })
+    .lean();
+
+  Document.updateMany(
+    { fileType: "expense", viewedBySuperAdmin: false },
+    { $set: { viewedBySuperAdmin: true } }
+  ).exec();
+
+  res.status(200).json({
+    message: "All expense documents fetched successfully",
+    total: documents.length,
+    documents: documents.map((doc) => ({
+      id: doc._id,
+      title: doc.title,
+      fileUrl: doc.fileUrl,
+      fileType: doc.fileType,
+      sizeKB: doc.size,
+      uploadedAt: doc.uploadedAt,
+      viewedByManager: doc.viewedByManager,
+      viewedByAdmin: doc.viewedByAdmin,
+      viewedBySuperAdmin: doc.viewedBySuperAdmin,
+      employee: doc.employee
+        ? {
+            id: doc.employee._id,
+            name: `${doc.employee.f_name} ${doc.employee.l_name}`,
+            email: doc.employee.work_email,
+            contact: doc.employee.personal_contact,
+            department: doc.employee.department,
+            designation: doc.employee.designation,
+          }
+        : null,
+      reportingManager: doc.underManager
+        ? {
+            id: doc.underManager._id,
+            name: `${doc.underManager.f_name} ${doc.underManager.l_name}`,
+            email: doc.underManager.work_email,
+          }
+        : null,
+    })),
+  });
+};
+
+const getDocumentDetailsSuperAdmin = async (req, res, next) => {
+  if (!req.superAdmin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const { documentId } = req.params;
+  if (!documentId)
+    return next(
+      Object.assign(new Error("Document ID is required"), { statusCode: 400 })
+    );
+
+  const document = await Document.findById(documentId)
+    .populate("employee", "f_name l_name work_email personal_contact department designation")
+    .populate("underManager", "f_name l_name work_email");
+
+  if (!document)
+    return next(
+      Object.assign(new Error("Document not found"), { statusCode: 404 })
+    );
+
+  document.viewedBySuperAdmin = true;
+  await document.save();
+
+  res.status(200).json({
+    message: "Document details fetched successfully",
+    document: {
+      id: document._id,
+      title: document.title,
+      fileUrl: document.fileUrl,
+      fileType: document.fileType,
+      sizeKB: document.size,
+      uploadedAt: document.uploadedAt,
+      viewedByManager: document.viewedByManager,
+      viewedByAdmin: document.viewedByAdmin,
+      viewedBySuperAdmin: document.viewedBySuperAdmin,
+      employee: document.employee
+        ? {
+            id: document.employee._id,
+            name: `${document.employee.f_name} ${document.employee.l_name}`,
+            email: document.employee.work_email,
+            department: document.employee.department,
+          }
+        : null,
+      reportingManager: document.underManager
+        ? {
+            id: document.underManager._id,
+            name: `${document.underManager.f_name} ${document.underManager.l_name}`,
+            email: document.underManager.work_email,
+          }
+        : null,
+    },
+  });
+};
+
 module.exports = {
   registerSuperAdmin,
   verifySuperAdmin,
@@ -1466,4 +1618,7 @@ module.exports = {
   reviewtoadmin,
   getTodayCheckins,
   getOrgInfo,
+  getAllPersonalDocumentsSuperAdmin,
+  getAllExpenseDocumentsSuperAdmin,
+  getDocumentDetailsSuperAdmin,
 };
