@@ -2,6 +2,7 @@
 import { useState } from "react";
 import {
   FaEdit, FaTrash, FaSearch, FaFilter, FaTimes, FaUserTie, FaUserPlus,
+  FaChevronLeft, FaChevronRight,
 } from "react-icons/fa";
 import {
   useAddManager, useAddEmployee, useFindAllManagers,
@@ -13,34 +14,189 @@ import EmployeeDetailModal from "./EmployeeDetailModal";
 
 const DEPARTMENTS = ["OPR", "BPO", "ENG", "MGMT", "HR"];
 const LOCATIONS   = ["Noida", "Bareilly", "Delhi", "Mumbai"];
+const INDIAN_STATES = [
+  "Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat",
+  "Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala","Madhya Pradesh",
+  "Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab",
+  "Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh",
+  "Uttarakhand","West Bengal","Delhi","Jammu and Kashmir","Ladakh",
+];
 
 const EMPTY_EMP = {
-  department: "", under_manager: "", f_name: "", l_name: "",
-  work_email: "", gender: "", marital_status: "single", password: "",
-  personal_contact: "", e_contact: "", role: "employee",
-  office_location: "", designation: "",
+  // Basic
+  f_name: "", l_name: "", work_email: "", password: "",
+  gender: "", marital_status: "single",
+  personal_contact: "", e_contact: "",
+  // Work
+  department: "", designation: "", role: "employee",
+  office_location: "", Under_manager: "",
+  // Address
+  address: "", city: "", state: "", pincode: "",
+  // Identity
+  aadhaar_number: "", pan_number: "",
+  // Experience
+  is_fresher: true, total_experience: "",
+  previous_company: "", previous_designation: "",
+  // Bank
+  bank_name: "", account_holder_name: "", account_number: "", ifsc_code: "",
+  // Documents (URLs)
+  resume: "", aadhaar_card: "", pan_card: "", experience_letter: "",
 };
 
 const EMPTY_MGR = {
-  department: "", f_name: "", l_name: "", work_email: "", gender: "",
-  marital_status: "single", password: "", personal_contact: "",
-  e_contact: "", role: "manager", designation: "", office_location: "",
+  // Basic
+  f_name: "", l_name: "", work_email: "", password: "",
+  gender: "", marital_status: "single",
+  personal_contact: "", e_contact: "",
+  // Work
+  department: "", designation: "", role: "manager",
+  office_location: "", reporting_manager: "",
+  // Address
+  address: "", city: "", state: "", pincode: "",
+  // Identity
+  aadhaar_number: "", pan_number: "",
+  // Experience
+  is_fresher: true, total_experience: "",
+  previous_company: "", previous_designation: "",
+  // Bank
+  bank_name: "", account_holder_name: "", account_number: "", ifsc_code: "",
+  // Documents (URLs)
+  resume: "", aadhaar_card: "", pan_card: "", experience_letter: "",
 };
+
+// Steps for multi-step modal
+const EMP_STEPS = [
+  { label: "Basic Info",    icon: "👤" },
+  { label: "Work Details",  icon: "💼" },
+  { label: "Address",       icon: "🏠" },
+  { label: "Identity",      icon: "🪪" },
+  { label: "Experience",    icon: "📋" },
+  { label: "Bank & Docs",   icon: "🏦" },
+];
 
 const inputCls =
   "w-full px-3 py-2.5 rounded-lg border border-[#F4C0D1] bg-[#F9F8F2] text-sm text-[#730042] " +
   "focus:outline-none focus:border-[#CD166E] focus:ring-2 focus:ring-[#CD166E]/20 transition-all placeholder-[#993556]/50";
 
-function Field({ label, error, children }) {
+function Field({ label, error, children, required }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs font-semibold uppercase tracking-wider text-[#993556]">{label}</label>
+      <label className="text-xs font-semibold uppercase tracking-wider text-[#993556]">
+        {label}{required && <span className="text-[#CD166E] ml-0.5">*</span>}
+      </label>
       {children}
       {error && <span className="text-xs text-[#A32D2D] flex items-center gap-1">⚠ {error}</span>}
     </div>
   );
 }
 
+// ─── Multi-Step Modal ────────────────────────────────────────────────────────
+function StepModal({ title, icon, onClose, onSubmit, steps, currentStep, setCurrentStep, children, accentColor = "#CD166E" }) {
+  const totalSteps = steps.length;
+  const isLast     = currentStep === totalSteps - 1;
+  const isFirst    = currentStep === 0;
+
+  return (
+    <div
+      className="fixed inset-0 flex items-center justify-center z-50 p-4"
+      style={{ background: "rgba(115,0,66,0.32)", backdropFilter: "blur(2px)" }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-white w-full max-w-2xl rounded-2xl flex flex-col max-h-[92vh] border border-[#F4C0D1]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 rounded-t-2xl" style={{ background: accentColor }}>
+          <div className="flex items-center gap-3">
+            <span className="text-white text-xl">{icon}</span>
+            <div>
+              <h2 className="text-lg font-bold text-white">{title}</h2>
+              <p className="text-xs" style={{ color: "rgba(255,255,255,0.65)" }}>
+                Step {currentStep + 1} of {totalSteps} — {steps[currentStep].label}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white transition-colors"
+            style={{ background: "rgba(255,255,255,0.18)" }}
+          >
+            <FaTimes size={14} />
+          </button>
+        </div>
+
+        {/* Step Progress */}
+        <div className="px-6 pt-4 pb-2 bg-white border-b border-[#F4C0D1]">
+          <div className="flex items-center gap-1 overflow-x-auto pb-1">
+            {steps.map((s, i) => (
+              <div key={i} className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => setCurrentStep(i)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                  style={
+                    i === currentStep
+                      ? { background: accentColor, color: "#fff" }
+                      : i < currentStep
+                      ? { background: "#FBEAF0", color: "#730042" }
+                      : { background: "#F9F8F2", color: "#993556" }
+                  }
+                >
+                  <span>{s.icon}</span>
+                  <span className="hidden sm:inline">{s.label}</span>
+                </button>
+                {i < totalSteps - 1 && (
+                  <div className="w-4 h-0.5 rounded-full shrink-0" style={{ background: i < currentStep ? accentColor : "#F4C0D1" }} />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Step Content */}
+        <div className="overflow-y-auto p-6 flex-1 bg-[#F9F8F2]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-[#F4C0D1] flex justify-between gap-3 bg-[#F9F8F2]">
+          <button
+            onClick={onClose}
+            className="px-5 py-2.5 rounded-xl border border-[#F4C0D1] text-[#730042] text-sm font-semibold hover:bg-[#FBEAF0] transition-colors"
+          >
+            Cancel
+          </button>
+          <div className="flex gap-2">
+            {!isFirst && (
+              <button
+                onClick={() => setCurrentStep((s) => s - 1)}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-[#F4C0D1] text-[#730042] text-sm font-semibold hover:bg-[#FBEAF0] transition-colors"
+              >
+                <FaChevronLeft size={11} /> Prev
+              </button>
+            )}
+            {!isLast ? (
+              <button
+                onClick={() => setCurrentStep((s) => s + 1)}
+                className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-all hover:opacity-90 active:scale-95"
+                style={{ background: accentColor }}
+              >
+                Next <FaChevronRight size={11} />
+              </button>
+            ) : (
+              <button
+                onClick={onSubmit}
+                className="px-6 py-2.5 rounded-xl text-white text-sm font-semibold transition-all hover:opacity-90 active:scale-95"
+                style={{ background: accentColor }}
+              >
+                Submit
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Simple (non-step) modal for Edit ────────────────────────────────────────
 function Modal({ title, icon, onClose, onSubmit, children, accentColor = "#CD166E" }) {
   return (
     <div
@@ -175,14 +331,362 @@ function DeleteConfirm({ user, onConfirm, onCancel }) {
   );
 }
 
+// ─── Step field renderers ─────────────────────────────────────────────────────
+
+function EmpStepFields({ step, form, onChange, errors, managers }) {
+  if (step === 0) return (
+    <>
+      <Field label="First Name" required error={errors.f_name}>
+        <input name="f_name" placeholder="First name" value={form.f_name} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Last Name" required error={errors.l_name}>
+        <input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Work Email" required error={errors.work_email}>
+        <input name="work_email" type="email" placeholder="name@company.com" value={form.work_email} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Password" required error={errors.password}>
+        <input name="password" type="password" placeholder="Set password" value={form.password} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Gender" required error={errors.gender}>
+        <select name="gender" value={form.gender} onChange={onChange} className={inputCls}>
+          <option value="">Select Gender</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+          <option value="other">Other</option>
+        </select>
+      </Field>
+      <Field label="Marital Status">
+        <select name="marital_status" value={form.marital_status} onChange={onChange} className={inputCls}>
+          <option value="single">Single</option>
+          <option value="married">Married</option>
+          <option value="divorced">Divorced</option>
+        </select>
+      </Field>
+      <Field label="Personal Contact" required error={errors.personal_contact}>
+        <input name="personal_contact" placeholder="+91 XXXXX XXXXX" value={form.personal_contact} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Emergency Contact" required error={errors.e_contact}>
+        <input name="e_contact" placeholder="Emergency contact number" value={form.e_contact} onChange={onChange} className={inputCls} />
+      </Field>
+    </>
+  );
+
+  if (step === 1) return (
+    <>
+      <Field label="Department" required error={errors.department}>
+        <select name="department" value={form.department} onChange={onChange} className={inputCls}>
+          <option value="">Select Department</option>
+          {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+        </select>
+      </Field>
+      <Field label="Designation" required error={errors.designation}>
+        <input name="designation" placeholder="e.g. Software Engineer" value={form.designation} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Role">
+        <select name="role" value={form.role} onChange={onChange} className={inputCls}>
+          <option value="employee">Employee</option>
+          <option value="official">Official</option>
+        </select>
+      </Field>
+      <Field label="Office Location" required error={errors.office_location}>
+        <select name="office_location" value={form.office_location} onChange={onChange} className={inputCls}>
+          <option value="">Select Location</option>
+          {LOCATIONS.map((l) => <option key={l} value={l}>{l}</option>)}
+        </select>
+      </Field>
+      <Field label="Under Manager" className="sm:col-span-2">
+        <select name="Under_manager" value={form.Under_manager} onChange={onChange} className={inputCls}>
+          <option value="">Select Manager (optional)</option>
+          {managers?.managers?.map((mgr) => (
+            <option key={mgr._id} value={mgr._id}>{mgr.f_name} {mgr.l_name} ({mgr.uid})</option>
+          ))}
+        </select>
+      </Field>
+    </>
+  );
+
+  if (step === 2) return (
+    <>
+      <Field label="Address" className="sm:col-span-2">
+        <input name="address" placeholder="Street address" value={form.address} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="City">
+        <input name="city" placeholder="City" value={form.city} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="State">
+        <select name="state" value={form.state} onChange={onChange} className={inputCls}>
+          <option value="">Select State</option>
+          {INDIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </Field>
+      <Field label="Pincode">
+        <input name="pincode" placeholder="6-digit pincode" maxLength={6} value={form.pincode} onChange={onChange} className={inputCls} />
+      </Field>
+    </>
+  );
+
+  if (step === 3) return (
+    <>
+      <Field label="Aadhaar Number">
+        <input name="aadhaar_number" placeholder="XXXX XXXX XXXX" maxLength={12} value={form.aadhaar_number} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="PAN Number">
+        <input name="pan_number" placeholder="ABCDE1234F" maxLength={10} value={form.pan_number} onChange={onChange} className={inputCls} />
+      </Field>
+    </>
+  );
+
+  if (step === 4) return (
+    <>
+      <Field label="Is Fresher?" className="sm:col-span-2">
+        <select
+          name="is_fresher"
+          value={form.is_fresher ? "true" : "false"}
+          onChange={(e) => onChange({ target: { name: "is_fresher", value: e.target.value === "true" } })}
+          className={inputCls}
+        >
+          <option value="true">Yes — Fresher</option>
+          <option value="false">No — Experienced</option>
+        </select>
+      </Field>
+      {!form.is_fresher && (
+        <>
+          <Field label="Total Experience (years)">
+            <input name="total_experience" type="number" min="0" placeholder="e.g. 3" value={form.total_experience} onChange={onChange} className={inputCls} />
+          </Field>
+          <Field label="Previous Company">
+            <input name="previous_company" placeholder="Company name" value={form.previous_company} onChange={onChange} className={inputCls} />
+          </Field>
+          <Field label="Previous Designation">
+            <input name="previous_designation" placeholder="Previous role" value={form.previous_designation} onChange={onChange} className={inputCls} />
+          </Field>
+        </>
+      )}
+    </>
+  );
+
+  if (step === 5) return (
+    <>
+      <Field label="Bank Name">
+        <input name="bank_name" placeholder="e.g. State Bank of India" value={form.bank_name} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Account Holder Name">
+        <input name="account_holder_name" placeholder="Name as per bank" value={form.account_holder_name} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Account Number">
+        <input name="account_number" placeholder="Account number" value={form.account_number} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="IFSC Code">
+        <input name="ifsc_code" placeholder="e.g. SBIN0001234" value={form.ifsc_code} onChange={onChange} className={inputCls} />
+      </Field>
+      <div className="sm:col-span-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-[#993556] mb-3">Document URLs</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Resume URL">
+            <input name="resume" placeholder="https://..." value={form.resume} onChange={onChange} className={inputCls} />
+          </Field>
+          <Field label="Aadhaar Card URL">
+            <input name="aadhaar_card" placeholder="https://..." value={form.aadhaar_card} onChange={onChange} className={inputCls} />
+          </Field>
+          <Field label="PAN Card URL">
+            <input name="pan_card" placeholder="https://..." value={form.pan_card} onChange={onChange} className={inputCls} />
+          </Field>
+          <Field label="Experience Letter URL">
+            <input name="experience_letter" placeholder="https://..." value={form.experience_letter} onChange={onChange} className={inputCls} />
+          </Field>
+        </div>
+      </div>
+    </>
+  );
+
+  return null;
+}
+
+function MgrStepFields({ step, form, onChange, errors, managers }) {
+  if (step === 0) return (
+    <>
+      <Field label="First Name" required error={errors.f_name}>
+        <input name="f_name" placeholder="First name" value={form.f_name} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Last Name" required error={errors.l_name}>
+        <input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Work Email" required error={errors.work_email}>
+        <input name="work_email" type="email" placeholder="name@company.com" value={form.work_email} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Password" required error={errors.password}>
+        <input name="password" type="password" placeholder="Set password" value={form.password} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Gender" required error={errors.gender}>
+        <select name="gender" value={form.gender} onChange={onChange} className={inputCls}>
+          <option value="">Select Gender</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+          <option value="other">Other</option>
+        </select>
+      </Field>
+      <Field label="Marital Status">
+        <select name="marital_status" value={form.marital_status} onChange={onChange} className={inputCls}>
+          <option value="single">Single</option>
+          <option value="married">Married</option>
+          <option value="divorced">Divorced</option>
+        </select>
+      </Field>
+      <Field label="Personal Contact" required error={errors.personal_contact}>
+        <input name="personal_contact" placeholder="+91 XXXXX XXXXX" value={form.personal_contact} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Emergency Contact" required error={errors.e_contact}>
+        <input name="e_contact" placeholder="Emergency contact number" value={form.e_contact} onChange={onChange} className={inputCls} />
+      </Field>
+    </>
+  );
+
+  if (step === 1) return (
+    <>
+      <Field label="Department" required error={errors.department}>
+        <select name="department" value={form.department} onChange={onChange} className={inputCls}>
+          <option value="">Select Department</option>
+          {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+        </select>
+      </Field>
+      <Field label="Designation" required error={errors.designation}>
+        <input name="designation" placeholder="e.g. Head of Engineering" value={form.designation} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Role">
+        <select name="role" value={form.role} onChange={onChange} className={inputCls}>
+          <option value="manager">Manager</option>
+          <option value="senior_manager">Senior Manager</option>
+          <option value="official">Official</option>
+        </select>
+      </Field>
+      <Field label="Office Location" required error={errors.office_location}>
+        <select name="office_location" value={form.office_location} onChange={onChange} className={inputCls}>
+          <option value="">Select Location</option>
+          {LOCATIONS.map((l) => <option key={l} value={l}>{l}</option>)}
+        </select>
+      </Field>
+      <Field label="Reporting Manager">
+        <select name="reporting_manager" value={form.reporting_manager} onChange={onChange} className={inputCls}>
+          <option value="">Select Reporting Manager (optional)</option>
+          {managers?.managers?.map((mgr) => (
+            <option key={mgr._id} value={mgr._id}>{mgr.f_name} {mgr.l_name} ({mgr.uid})</option>
+          ))}
+        </select>
+      </Field>
+    </>
+  );
+
+  if (step === 2) return (
+    <>
+      <Field label="Address" className="sm:col-span-2">
+        <input name="address" placeholder="Street address" value={form.address} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="City">
+        <input name="city" placeholder="City" value={form.city} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="State">
+        <select name="state" value={form.state} onChange={onChange} className={inputCls}>
+          <option value="">Select State</option>
+          {INDIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </Field>
+      <Field label="Pincode">
+        <input name="pincode" placeholder="6-digit pincode" maxLength={6} value={form.pincode} onChange={onChange} className={inputCls} />
+      </Field>
+    </>
+  );
+
+  if (step === 3) return (
+    <>
+      <Field label="Aadhaar Number">
+        <input name="aadhaar_number" placeholder="XXXX XXXX XXXX" maxLength={12} value={form.aadhaar_number} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="PAN Number">
+        <input name="pan_number" placeholder="ABCDE1234F" maxLength={10} value={form.pan_number} onChange={onChange} className={inputCls} />
+      </Field>
+    </>
+  );
+
+  if (step === 4) return (
+    <>
+      <Field label="Is Fresher?" className="sm:col-span-2">
+        <select
+          name="is_fresher"
+          value={form.is_fresher ? "true" : "false"}
+          onChange={(e) => onChange({ target: { name: "is_fresher", value: e.target.value === "true" } })}
+          className={inputCls}
+        >
+          <option value="true">Yes — Fresher</option>
+          <option value="false">No — Experienced</option>
+        </select>
+      </Field>
+      {!form.is_fresher && (
+        <>
+          <Field label="Total Experience (years)">
+            <input name="total_experience" type="number" min="0" placeholder="e.g. 3" value={form.total_experience} onChange={onChange} className={inputCls} />
+          </Field>
+          <Field label="Previous Company">
+            <input name="previous_company" placeholder="Company name" value={form.previous_company} onChange={onChange} className={inputCls} />
+          </Field>
+          <Field label="Previous Designation">
+            <input name="previous_designation" placeholder="Previous role" value={form.previous_designation} onChange={onChange} className={inputCls} />
+          </Field>
+        </>
+      )}
+    </>
+  );
+
+  if (step === 5) return (
+    <>
+      <Field label="Bank Name">
+        <input name="bank_name" placeholder="e.g. State Bank of India" value={form.bank_name} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Account Holder Name">
+        <input name="account_holder_name" placeholder="Name as per bank" value={form.account_holder_name} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Account Number">
+        <input name="account_number" placeholder="Account number" value={form.account_number} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="IFSC Code">
+        <input name="ifsc_code" placeholder="e.g. SBIN0001234" value={form.ifsc_code} onChange={onChange} className={inputCls} />
+      </Field>
+      <div className="sm:col-span-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-[#993556] mb-3">Document URLs</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Resume URL">
+            <input name="resume" placeholder="https://..." value={form.resume} onChange={onChange} className={inputCls} />
+          </Field>
+          <Field label="Aadhaar Card URL">
+            <input name="aadhaar_card" placeholder="https://..." value={form.aadhaar_card} onChange={onChange} className={inputCls} />
+          </Field>
+          <Field label="PAN Card URL">
+            <input name="pan_card" placeholder="https://..." value={form.pan_card} onChange={onChange} className={inputCls} />
+          </Field>
+          <Field label="Experience Letter URL">
+            <input name="experience_letter" placeholder="https://..." value={form.experience_letter} onChange={onChange} className={inputCls} />
+          </Field>
+        </div>
+      </div>
+    </>
+  );
+
+  return null;
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function EmployeeTable() {
-  const [open,               setOpen]               = useState(false);
-  const [openManager,        setOpenManager]        = useState(false);
-  const [showFilters,        setShowFilters]        = useState(false);
-  const [popup,              setPopup]              = useState({ show: false, type: "success", message: "" });
-  // ✅ CHANGE 1: added selectedEmployeeRole state
+  const [open,        setOpen]        = useState(false);
+  const [openManager, setOpenManager] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [popup,       setPopup]       = useState({ show: false, type: "success", message: "" });
+
   const [selectedEmployeeId,   setSelectedEmployeeId]   = useState(null);
   const [selectedEmployeeRole, setSelectedEmployeeRole] = useState(null);
+
+  // Multi-step state
+  const [empStep, setEmpStep] = useState(0);
+  const [mgrStep, setMgrStep] = useState(0);
 
   const [empForm,   setEmpForm]   = useState(EMPTY_EMP);
   const [mgrForm,   setMgrForm]   = useState(EMPTY_MGR);
@@ -211,6 +715,7 @@ export default function EmployeeTable() {
     setTimeout(() => setPopup({ show: false, type: "", message: "" }), 3000);
   };
 
+  // ── Edit handlers ──
   const handleOpenEdit = (user) => {
     setEditTarget(user);
     setEditForm({
@@ -269,70 +774,140 @@ export default function EmployeeTable() {
     });
   };
 
+  // ── Employee form ──
   const handleEmpChange = (e) => setEmpForm({ ...empForm, [e.target.name]: e.target.value });
 
   const validateEmp = () => {
     const err = {};
-    if (!empForm.f_name)      err.f_name      = "Required";
-    if (!empForm.l_name)      err.l_name      = "Required";
-    if (!empForm.work_email)  err.work_email  = "Required";
-    if (!empForm.department)  err.department  = "Required";
-    if (!empForm.designation) err.designation = "Required";
-    if (!empForm.password)    err.password    = "Required";
+    if (!empForm.f_name)           err.f_name           = "Required";
+    if (!empForm.l_name)           err.l_name           = "Required";
+    if (!empForm.work_email)       err.work_email       = "Required";
+    if (!empForm.password)         err.password         = "Required";
+    if (!empForm.gender)           err.gender           = "Required";
+    if (!empForm.personal_contact) err.personal_contact = "Required";
+    if (!empForm.e_contact)        err.e_contact        = "Required";
+    if (!empForm.department)       err.department       = "Required";
+    if (!empForm.designation)      err.designation      = "Required";
+    if (!empForm.office_location)  err.office_location  = "Required";
     setEmpErrors(err);
     return Object.keys(err).length === 0;
   };
 
   const handleEmpSubmit = () => {
-    if (!validateEmp()) { showPopup("error", "Please fill all required employee fields"); return; }
+    if (!validateEmp()) {
+      showPopup("error", "Please fill all required fields before submitting");
+      setEmpStep(0); // jump back to first step with errors
+      return;
+    }
     addEmployeeApi({
-      f_name: empForm.f_name, l_name: empForm.l_name, work_email: empForm.work_email,
-      password: empForm.password, gender: empForm.gender, marital_status: empForm.marital_status,
-      personal_contact: empForm.personal_contact, e_contact: empForm.e_contact,
-      role: empForm.role, office_location: empForm.office_location,
-      designation: empForm.designation, department: empForm.department,
-      Under_manager: empForm.under_manager,
+      f_name:              empForm.f_name,
+      l_name:              empForm.l_name,
+      work_email:          empForm.work_email,
+      password:            empForm.password,
+      gender:              empForm.gender,
+      marital_status:      empForm.marital_status,
+      personal_contact:    empForm.personal_contact,
+      e_contact:           empForm.e_contact,
+      role:                empForm.role,
+      office_location:     empForm.office_location,
+      designation:         empForm.designation,
+      department:          empForm.department,
+      Under_manager:       empForm.Under_manager || undefined,
+      address:             empForm.address || undefined,
+      city:                empForm.city || undefined,
+      state:               empForm.state || undefined,
+      pincode:             empForm.pincode || undefined,
+      aadhaar_number:      empForm.aadhaar_number || undefined,
+      pan_number:          empForm.pan_number || undefined,
+      is_fresher:          empForm.is_fresher,
+      total_experience:    empForm.is_fresher ? undefined : empForm.total_experience || undefined,
+      previous_company:    empForm.is_fresher ? undefined : empForm.previous_company || undefined,
+      previous_designation:empForm.is_fresher ? undefined : empForm.previous_designation || undefined,
+      bank_name:           empForm.bank_name || undefined,
+      account_holder_name: empForm.account_holder_name || undefined,
+      account_number:      empForm.account_number || undefined,
+      ifsc_code:           empForm.ifsc_code || undefined,
+      resume:              empForm.resume || undefined,
+      aadhaar_card:        empForm.aadhaar_card || undefined,
+      pan_card:            empForm.pan_card || undefined,
+      experience_letter:   empForm.experience_letter || undefined,
     }, {
       onSuccess: (res) => {
         showPopup("success", res?.message || "Employee added successfully");
-        setOpen(false); setEmpForm(EMPTY_EMP); setEmpErrors({});
+        setOpen(false); setEmpForm(EMPTY_EMP); setEmpErrors({}); setEmpStep(0);
         refetchList();
       },
       onError: (err) => showPopup("error", err?.response?.data?.message || err?.message || "Something went wrong"),
     });
   };
 
+  // ── Manager form ──
   const handleMgrChange = (e) => setMgrForm({ ...mgrForm, [e.target.name]: e.target.value });
 
   const validateMgr = () => {
     const err = {};
-    if (!mgrForm.f_name)      err.f_name      = "Required";
-    if (!mgrForm.l_name)      err.l_name      = "Required";
-    if (!mgrForm.work_email)  err.work_email  = "Required";
-    if (!mgrForm.department)  err.department  = "Required";
-    if (!mgrForm.designation) err.designation = "Required";
+    if (!mgrForm.f_name)           err.f_name           = "Required";
+    if (!mgrForm.l_name)           err.l_name           = "Required";
+    if (!mgrForm.work_email)       err.work_email       = "Required";
+    if (!mgrForm.gender)           err.gender           = "Required";
+    if (!mgrForm.personal_contact) err.personal_contact = "Required";
+    if (!mgrForm.e_contact)        err.e_contact        = "Required";
+    if (!mgrForm.department)       err.department       = "Required";
+    if (!mgrForm.designation)      err.designation      = "Required";
+    if (!mgrForm.office_location)  err.office_location  = "Required";
     setMgrErrors(err);
     return Object.keys(err).length === 0;
   };
 
   const handleMgrSubmit = () => {
-    if (!validateMgr()) { showPopup("error", "Please fill all required manager fields"); return; }
+    if (!validateMgr()) {
+      showPopup("error", "Please fill all required fields before submitting");
+      setMgrStep(0);
+      return;
+    }
     addManagerApi({
-      f_name: mgrForm.f_name, l_name: mgrForm.l_name, work_email: mgrForm.work_email,
-      password: mgrForm.password, gender: mgrForm.gender, marital_status: mgrForm.marital_status,
-      personal_contact: mgrForm.personal_contact, e_contact: mgrForm.e_contact,
-      role: mgrForm.role, office_location: mgrForm.office_location,
-      designation: mgrForm.designation, department: mgrForm.department,
+      f_name:              mgrForm.f_name,
+      l_name:              mgrForm.l_name,
+      work_email:          mgrForm.work_email,
+      password:            mgrForm.password,
+      gender:              mgrForm.gender,
+      marital_status:      mgrForm.marital_status,
+      personal_contact:    mgrForm.personal_contact,
+      e_contact:           mgrForm.e_contact,
+      role:                mgrForm.role,
+      office_location:     mgrForm.office_location,
+      designation:         mgrForm.designation,
+      department:          mgrForm.department,
+      reporting_manager:   mgrForm.reporting_manager || undefined,
+      address:             mgrForm.address || undefined,
+      city:                mgrForm.city || undefined,
+      state:               mgrForm.state || undefined,
+      pincode:             mgrForm.pincode || undefined,
+      aadhaar_number:      mgrForm.aadhaar_number || undefined,
+      pan_number:          mgrForm.pan_number || undefined,
+      is_fresher:          mgrForm.is_fresher,
+      total_experience:    mgrForm.is_fresher ? undefined : mgrForm.total_experience || undefined,
+      previous_company:    mgrForm.is_fresher ? undefined : mgrForm.previous_company || undefined,
+      previous_designation:mgrForm.is_fresher ? undefined : mgrForm.previous_designation || undefined,
+      bank_name:           mgrForm.bank_name || undefined,
+      account_holder_name: mgrForm.account_holder_name || undefined,
+      account_number:      mgrForm.account_number || undefined,
+      ifsc_code:           mgrForm.ifsc_code || undefined,
+      resume:              mgrForm.resume || undefined,
+      aadhaar_card:        mgrForm.aadhaar_card || undefined,
+      pan_card:            mgrForm.pan_card || undefined,
+      experience_letter:   mgrForm.experience_letter || undefined,
     }, {
       onSuccess: (res) => {
-        showPopup("success", res?.message || "Manager added & login link sent to email");
-        setOpenManager(false); setMgrForm(EMPTY_MGR); setMgrErrors({});
+        showPopup("success", res?.message || "Manager added & verification email sent");
+        setOpenManager(false); setMgrForm(EMPTY_MGR); setMgrErrors({}); setMgrStep(0);
         refetchList();
       },
       onError: (err) => showPopup("error", err?.response?.data?.message || err?.message || "Something went wrong"),
     });
   };
 
+  // ── Filter logic ──
   const filtered = allUsers.filter((u) => {
     const name = `${u.f_name ?? ""} ${u.l_name ?? ""}`.toLowerCase();
     const q    = filters.search.toLowerCase();
@@ -359,6 +934,7 @@ export default function EmployeeTable() {
     <div className="min-h-screen p-4 md:p-6" style={{ background: "#F9F8F2" }}>
       <div className="max-w-7xl mx-auto">
 
+        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-[#730042]">Employee Directory</h1>
@@ -366,7 +942,7 @@ export default function EmployeeTable() {
           </div>
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => setOpenManager(true)}
+              onClick={() => { setOpenManager(true); setMgrStep(0); }}
               className="flex items-center gap-2 px-4 py-2 rounded-xl border-2 text-sm font-semibold hover:text-white transition-all"
               style={{ borderColor: "#730042", color: "#730042" }}
               onMouseEnter={(e) => { e.currentTarget.style.background = "#730042"; e.currentTarget.style.color = "#fff"; }}
@@ -374,14 +950,20 @@ export default function EmployeeTable() {
             >
               <FaUserTie size={13} /><span>Add Manager</span>
             </button>
-            <button onClick={() => setOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-semibold hover:opacity-90 transition-all" style={{ background: "#CD166E" }}>
+            <button
+              onClick={() => { setOpen(true); setEmpStep(0); }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-semibold hover:opacity-90 transition-all"
+              style={{ background: "#CD166E" }}
+            >
               <FaUserPlus size={13} /><span>Add Employee</span>
             </button>
           </div>
         </div>
 
+        {/* Table card */}
         <div className="bg-white rounded-2xl border border-[#F4C0D1] overflow-hidden">
 
+          {/* Toolbar */}
           <div className="p-4 border-b border-[#F4C0D1]" style={{ background: "#F9F8F2" }}>
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
@@ -444,6 +1026,7 @@ export default function EmployeeTable() {
             )}
           </div>
 
+          {/* Table */}
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-sm">
               <thead>
@@ -465,7 +1048,6 @@ export default function EmployeeTable() {
                       className="transition-colors group cursor-pointer"
                       onMouseEnter={(e) => e.currentTarget.style.background = "#FEF4F9"}
                       onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                      // ✅ CHANGE 2: store role alongside id
                       onClick={() => { setSelectedEmployeeId(u._id); setSelectedEmployeeRole(u.role); }}
                     >
                       <td className="px-4 py-3">
@@ -515,87 +1097,39 @@ export default function EmployeeTable() {
         </div>
       </div>
 
-      {/* Add Employee modal */}
+      {/* ── Add Employee multi-step modal ── */}
       {open && (
-        <Modal title="Add Employee" icon={<FaUserPlus />} onClose={() => { setOpen(false); setEmpErrors({}); }} onSubmit={handleEmpSubmit} accentColor="#CD166E">
-          <Field label="Department" error={empErrors.department}>
-            <select name="department" value={empForm.department} onChange={handleEmpChange} className={inputCls}>
-              <option value="">Select Department</option>
-              {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </Field>
-          <Field label="Under Manager">
-            <select name="under_manager" value={empForm.under_manager} onChange={handleEmpChange} className={inputCls}>
-              <option value="">Select Manager</option>
-              {managers?.managers?.map((mgr) => (
-                <option key={mgr._id} value={mgr._id}>{mgr.f_name} {mgr.l_name} ({mgr.uid})</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="First Name" error={empErrors.f_name}><input name="f_name" placeholder="First name" value={empForm.f_name} onChange={handleEmpChange} className={inputCls} /></Field>
-          <Field label="Last Name"  error={empErrors.l_name}><input name="l_name" placeholder="Last name"  value={empForm.l_name} onChange={handleEmpChange} className={inputCls} /></Field>
-          <Field label="Work Email" error={empErrors.work_email}><input name="work_email" type="email" placeholder="name@company.com" value={empForm.work_email} onChange={handleEmpChange} className={inputCls} /></Field>
-          <Field label="Password"   error={empErrors.password}><input name="password" type="password" placeholder="Set password" value={empForm.password} onChange={handleEmpChange} className={inputCls} /></Field>
-          <Field label="Gender">
-            <select name="gender" value={empForm.gender} onChange={handleEmpChange} className={inputCls}>
-              <option value="">Select Gender</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
-            </select>
-          </Field>
-          <Field label="Marital Status">
-            <select name="marital_status" value={empForm.marital_status} onChange={handleEmpChange} className={inputCls}>
-              <option value="single">Single</option><option value="married">Married</option><option value="divorced">Divorced</option>
-            </select>
-          </Field>
-          <Field label="Phone"><input name="personal_contact" placeholder="+91 XXXXX XXXXX" value={empForm.personal_contact} onChange={handleEmpChange} className={inputCls} /></Field>
-          <Field label="Emergency Contact"><input name="e_contact" placeholder="Emergency contact" value={empForm.e_contact} onChange={handleEmpChange} className={inputCls} /></Field>
-          <Field label="Office Location">
-            <select name="office_location" value={empForm.office_location} onChange={handleEmpChange} className={inputCls}>
-              <option value="">Select Location</option>{LOCATIONS.map((l) => <option key={l} value={l}>{l}</option>)}
-            </select>
-          </Field>
-          <Field label="Designation" error={empErrors.designation}><input name="designation" placeholder="e.g. Software Engineer" value={empForm.designation} onChange={handleEmpChange} className={inputCls} /></Field>
-        </Modal>
+        <StepModal
+          title="Add Employee"
+          icon={<FaUserPlus />}
+          onClose={() => { setOpen(false); setEmpErrors({}); setEmpStep(0); }}
+          onSubmit={handleEmpSubmit}
+          steps={EMP_STEPS}
+          currentStep={empStep}
+          setCurrentStep={setEmpStep}
+          accentColor="#CD166E"
+        >
+          <EmpStepFields step={empStep} form={empForm} onChange={handleEmpChange} errors={empErrors} managers={managers} />
+        </StepModal>
       )}
 
-      {/* Add Manager modal */}
+      {/* ── Add Manager multi-step modal ── */}
       {openManager && (
-        <Modal title="Add Manager" icon={<FaUserTie />} onClose={() => { setOpenManager(false); setMgrErrors({}); }} onSubmit={handleMgrSubmit} accentColor="#730042">
-          <Field label="Department" error={mgrErrors.department}>
-            <select name="department" value={mgrForm.department} onChange={handleMgrChange} className={inputCls}>
-              <option value="">Select Department</option>{DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </Field>
-          <Field label="Role">
-            <select name="role" value={mgrForm.role} onChange={handleMgrChange} className={inputCls}>
-              <option value="manager">Manager</option><option value="senior_manager">Senior Manager</option><option value="official">Official</option>
-            </select>
-          </Field>
-          <Field label="First Name" error={mgrErrors.f_name}><input name="f_name" placeholder="First name" value={mgrForm.f_name} onChange={handleMgrChange} className={inputCls} /></Field>
-          <Field label="Last Name"  error={mgrErrors.l_name}><input name="l_name" placeholder="Last name"  value={mgrForm.l_name} onChange={handleMgrChange} className={inputCls} /></Field>
-          <Field label="Work Email" error={mgrErrors.work_email}><input name="work_email" type="email" placeholder="name@company.com" value={mgrForm.work_email} onChange={handleMgrChange} className={inputCls} /></Field>
-          <Field label="Password"><input name="password" type="password" placeholder="Set password" value={mgrForm.password} onChange={handleMgrChange} className={inputCls} /></Field>
-          <Field label="Gender">
-            <select name="gender" value={mgrForm.gender} onChange={handleMgrChange} className={inputCls}>
-              <option value="">Select Gender</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
-            </select>
-          </Field>
-          <Field label="Marital Status">
-            <select name="marital_status" value={mgrForm.marital_status} onChange={handleMgrChange} className={inputCls}>
-              <option value="single">Single</option><option value="married">Married</option><option value="divorced">Divorced</option>
-            </select>
-          </Field>
-          <Field label="Phone"><input name="personal_contact" placeholder="+91 XXXXX XXXXX" value={mgrForm.personal_contact} onChange={handleMgrChange} className={inputCls} /></Field>
-          <Field label="Emergency Contact"><input name="e_contact" placeholder="Emergency contact" value={mgrForm.e_contact} onChange={handleMgrChange} className={inputCls} /></Field>
-          <Field label="Office Location">
-            <select name="office_location" value={mgrForm.office_location} onChange={handleMgrChange} className={inputCls}>
-              <option value="">Select Location</option>{LOCATIONS.map((l) => <option key={l} value={l}>{l}</option>)}
-            </select>
-          </Field>
-          <Field label="Designation" error={mgrErrors.designation}><input name="designation" placeholder="e.g. Head of Engineering" value={mgrForm.designation} onChange={handleMgrChange} className={inputCls} /></Field>
-        </Modal>
+        <StepModal
+          title="Add Manager"
+          icon={<FaUserTie />}
+          onClose={() => { setOpenManager(false); setMgrErrors({}); setMgrStep(0); }}
+          onSubmit={handleMgrSubmit}
+          steps={EMP_STEPS}
+          currentStep={mgrStep}
+          setCurrentStep={setMgrStep}
+          accentColor="#730042"
+        >
+          <MgrStepFields step={mgrStep} form={mgrForm} onChange={handleMgrChange} errors={mgrErrors} managers={managers} />
+        </StepModal>
       )}
 
-      {/* Edit modal */}
+      {/* ── Edit modal (simple, unchanged fields) ── */}
       {openEdit && editTarget && (
         <Modal
           title={`Edit ${editTarget.role === "employee" ? "Employee" : "Manager"}`}
@@ -604,15 +1138,15 @@ export default function EmployeeTable() {
           onSubmit={handleEditSubmit}
           accentColor={editTarget.role === "employee" ? "#CD166E" : "#730042"}
         >
-          <Field label="First Name" error={editErrors.f_name}><input name="f_name" value={editForm.f_name} onChange={handleEditChange} className={inputCls} /></Field>
-          <Field label="Last Name"  error={editErrors.l_name}><input name="l_name" value={editForm.l_name} onChange={handleEditChange} className={inputCls} /></Field>
-          <Field label="Work Email" error={editErrors.work_email}><input name="work_email" type="email" value={editForm.work_email} onChange={handleEditChange} className={inputCls} /></Field>
-          <Field label="Department" error={editErrors.department}>
+          <Field label="First Name" required error={editErrors.f_name}><input name="f_name" value={editForm.f_name} onChange={handleEditChange} className={inputCls} /></Field>
+          <Field label="Last Name"  required error={editErrors.l_name}><input name="l_name" value={editForm.l_name} onChange={handleEditChange} className={inputCls} /></Field>
+          <Field label="Work Email" required error={editErrors.work_email}><input name="work_email" type="email" value={editForm.work_email} onChange={handleEditChange} className={inputCls} /></Field>
+          <Field label="Department" required error={editErrors.department}>
             <select name="department" value={editForm.department} onChange={handleEditChange} className={inputCls}>
               <option value="">Select Department</option>{DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
           </Field>
-          <Field label="Designation" error={editErrors.designation}><input name="designation" value={editForm.designation} onChange={handleEditChange} className={inputCls} /></Field>
+          <Field label="Designation" required error={editErrors.designation}><input name="designation" value={editForm.designation} onChange={handleEditChange} className={inputCls} /></Field>
           <Field label="Role">
             <select name="role" value={editForm.role} onChange={handleEditChange} className={inputCls}>
               <option value="employee">Employee</option>
@@ -655,7 +1189,6 @@ export default function EmployeeTable() {
         <DeleteConfirm user={deleteTarget} onConfirm={handleConfirmDelete} onCancel={() => setDeleteTarget(null)} />
       )}
 
-      {/* ✅ CHANGE 3: pass employeeRole to modal, clear both states on close */}
       {selectedEmployeeId && (
         <EmployeeDetailModal
           employeeId={selectedEmployeeId}
