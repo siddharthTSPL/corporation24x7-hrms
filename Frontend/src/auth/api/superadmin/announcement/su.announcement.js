@@ -18,7 +18,7 @@ export const getAllAnnouncements = async () => {
 
 export const updateAnnouncement = async (id, data) => {
   const res = await api.put(
-    `superadmin/update-announcement/${id}`,
+    `superadmin/updateannouncement/${id}`,
     data
   );
   return res.data;
@@ -26,7 +26,7 @@ export const updateAnnouncement = async (id, data) => {
 
 export const deleteAnnouncement = async (id) => {
   const res = await api.delete(
-    `superadmin/delete-announcement/${id}`
+    `superadmin/deleteannouncement/${id}`
   );
   return res.data;
 };
