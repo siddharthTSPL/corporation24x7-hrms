@@ -148,7 +148,6 @@ const addmanager = async (req, res, next) => {
       return next(Object.assign(new Error("Manager already exists"), { statusCode: 400 }));
     }
 
- 
     const token = jwt.sign(
       { managerid: existingManager._id },
       process.env.JWT_SECRET,
@@ -160,13 +159,14 @@ const addmanager = async (req, res, next) => {
       await sendEmail({
         to: work_email,
         subject: "Activate Your Manager Account",
-        html: buildManagerEmail(f_name || existingManager.f_name, designation || existingManager.designation, department || existingManager.department, office_location || existingManager.office_location, verifyLink)
+        html: buildManagerEmail(existingManager.f_name, existingManager.designation, existingManager.department, existingManager.office_location, verifyLink)
       });
       return res.status(200).json({
         success: true,
         message: "Manager already registered but unverified. Verification email resent."
       });
     } catch (emailErr) {
+       console.error("EMAIL ERROR DETAILS:", emailErr)
       return next(Object.assign(new Error("Failed to resend verification email"), { statusCode: 500 }));
     }
   }
@@ -192,15 +192,17 @@ const addmanager = async (req, res, next) => {
   const verifyLink = `${process.env.BASE_URL}/manager/verify/${token}`;
 
   try {
+    await assignDefaultLeave(newmanager);
+  } catch (leaveErr) {
+    console.error("assignDefaultLeave failed:", leaveErr.message);
+  }
 
-    await Promise.all([
-      assignDefaultLeave(newmanager),
-      sendEmail({
-        to: work_email,
-        subject: "Activate Your Manager Account",
-        html: buildManagerEmail(f_name, designation, department, office_location, verifyLink)
-      })
-    ]);
+  try {
+    await sendEmail({
+      to: work_email,
+      subject: "Activate Your Manager Account",
+      html: buildManagerEmail(f_name, designation, department, office_location, verifyLink)
+    });
   } catch (emailErr) {
     await Managermodel.findByIdAndDelete(newmanager._id);
     return next(Object.assign(new Error("Failed to send verification email. Please try again."), { statusCode: 500 }));
@@ -232,7 +234,6 @@ const addemployee = async (req, res, next) => {
     return next(Object.assign(new Error("Required fields missing"), { statusCode: 400 }));
   }
 
-
   const existingUser = await Usermodel.findOne({ work_email }).lean();
 
   if (existingUser) {
@@ -240,7 +241,6 @@ const addemployee = async (req, res, next) => {
       return next(Object.assign(new Error("User already exists"), { statusCode: 400 }));
     }
 
-  
     const token = jwt.sign(
       { userid: existingUser._id },
       process.env.JWT_SECRET,
@@ -252,7 +252,7 @@ const addemployee = async (req, res, next) => {
       await sendEmail({
         to: work_email,
         subject: "Welcome! Verify Your Employee Account",
-        html: buildEmployeeEmail(f_name || existingUser.f_name, department || existingUser.department, office_location || existingUser.office_location, verifyLink)
+        html: buildEmployeeEmail(existingUser.f_name, existingUser.department, existingUser.office_location, verifyLink)
       });
       return res.status(200).json({
         success: true,
@@ -284,17 +284,18 @@ const addemployee = async (req, res, next) => {
   const verifyLink = `${process.env.BASE_URL}/user/verify/${token}`;
 
   try {
- 
-    await Promise.all([
-      assignDefaultLeave(newuser),
-      sendEmail({
-        to: work_email,
-        subject: "Welcome! Verify Your Employee Account",
-        html: buildEmployeeEmail(f_name, department, office_location, verifyLink)
-      })
-    ]);
+    await assignDefaultLeave(newuser);
+  } catch (leaveErr) {
+    console.error("assignDefaultLeave failed:", leaveErr.message);
+  }
+
+  try {
+    await sendEmail({
+      to: work_email,
+      subject: "Welcome! Verify Your Employee Account",
+      html: buildEmployeeEmail(f_name, department, office_location, verifyLink)
+    });
   } catch (emailErr) {
-  
     await Usermodel.findByIdAndDelete(newuser._id);
     return next(Object.assign(new Error("Failed to send verification email. Please try again."), { statusCode: 500 }));
   }
@@ -304,6 +305,7 @@ const addemployee = async (req, res, next) => {
     message: "User added successfully. Verification email sent."
   });
 };
+
 
 
 const findallmanagers = async (req, res, next) => {
