@@ -24,9 +24,8 @@ const managerSchema = new mongoose.Schema(
         "OPR",
         "BPO",
         "ENG",
-        "OPR_HR",
-        "BPO_HR",
-        "ENG_HR",
+        "HR",
+        "MGMT"
       ],
       required: true,
     },
