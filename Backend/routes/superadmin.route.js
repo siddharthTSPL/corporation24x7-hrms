@@ -36,6 +36,9 @@ const {
   reviewtoadmin,
   getTodayCheckins,
   getOrgInfo,
+  getAllPersonalDocumentsSuperAdmin,
+  getAllExpenseDocumentsSuperAdmin,
+  getDocumentDetailsSuperAdmin,
 } = require("../controllers/superadmin.controller");
 
 superAdminRouter.post("/register", asyncHandler(registerSuperAdmin));
@@ -167,4 +170,19 @@ superAdminRouter.get(
   asyncHandler(getTodayCheckins),
 );
 
+superAdminRouter.get(
+  "/getallpersonaldocuments",
+  superAdminAuth,
+  asyncHandler(getAllPersonalDocumentsSuperAdmin),
+);
+superAdminRouter.get(
+  "/getallexpensedocuments",
+  superAdminAuth,
+  asyncHandler(getAllExpenseDocumentsSuperAdmin),
+);
+superAdminRouter.get(
+  "/getdocumentdetails/:id",
+  superAdminAuth,
+  asyncHandler(getDocumentDetailsSuperAdmin),
+);
 module.exports = superAdminRouter;

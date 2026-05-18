@@ -836,12 +836,7 @@ const getOrgInfo = async (req, res) => {
   });
 };
 
-// ─── DOCUMENT ACCESS (Admin = Manager-level + can see ALL org documents) ───
 
-/**
- * Admin can view ALL personal documents across the organisation.
- * Sets viewedByAdmin = true on each document fetched.
- */
 const getAllPersonalDocumentsAdmin = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
@@ -853,7 +848,6 @@ const getAllPersonalDocumentsAdmin = async (req, res, next) => {
     .populate("underManager", "f_name l_name work_email")
     .sort({ uploadedAt: -1 })
     .lean();
-  // Mark unread docs as viewed (fire-and-forget)
   Document.updateMany(
     { fileType: "personal", viewedByAdmin: false },
     { $set: { viewedByAdmin: true } },
@@ -891,9 +885,7 @@ const getAllPersonalDocumentsAdmin = async (req, res, next) => {
   });
 };
 
-/**
- * Admin can view ALL expense documents across the organisation.
- */
+
 const getAllExpenseDocumentsAdmin = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
@@ -942,9 +934,7 @@ const getAllExpenseDocumentsAdmin = async (req, res, next) => {
   });
 };
 
-/**
- * Admin: view detail of a single document (any employee).
- */
+
 const getDocumentDetailsAdmin = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
