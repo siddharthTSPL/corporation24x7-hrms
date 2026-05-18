@@ -51,7 +51,7 @@ const managerSchema = new mongoose.Schema(
     password: {
       type: String,
       required: true,
-      select: false,
+      // select: false,
     },
 
     gender: {
