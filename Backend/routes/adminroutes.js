@@ -3,21 +3,19 @@ const adminrouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const adminauthmiddleware = require("../middleware/auth/admin.middleware");
 const {
-  registerAdmin,
   verifyAdmin,
-  findallmanagers,
   adminlogin,
   adminlogout,
   addmanager,
   addemployee,
+  findallmanagers,
   getallemployee,
   editemployee,
   getperticularemployee,
   getperticularemanager,
   deleteemployee,
-  acceptleavebyadmin,
-  rejectleavebyadmin,
   showallleaves,
+  applyleave,
   noofemployee,
   createannouncement,
   getallannouncement,
@@ -27,25 +25,47 @@ const {
   forgetpasswordloginotp,
   verifyAotp,
   resetAdminPassword,
-  showUserPasswordPage,
   getme,
   editadminprofile,
   changepassword,
-  getTodayCheckins
+  getTodayCheckins,
+  getOrgInfo,
+  getAllPersonalDocumentsAdmin,
+  getAllExpenseDocumentsAdmin,
+  getDocumentDetailsAdmin,
+  adminActionOnLeave,
 } = require("../controllers/admin.controller");
 
-adminrouter.post("/register", asyncHandler(registerAdmin));
 adminrouter.get("/verify/:token", asyncHandler(verifyAdmin));
-
-adminrouter.get("/findallmanagers", adminauthmiddleware, asyncHandler(findallmanagers));
-
 adminrouter.post("/login", asyncHandler(adminlogin));
+adminrouter.post("/forgetpassword", asyncHandler(forgetpasswordloginotp));
+adminrouter.post("/verifyotp", asyncHandler(verifyAotp));
+adminrouter.post("/resetpassword", asyncHandler(resetAdminPassword));
+
 adminrouter.post("/logout", adminauthmiddleware, asyncHandler(adminlogout));
+adminrouter.get("/getme", adminauthmiddleware, asyncHandler(getme));
+adminrouter.put(
+  "/editadminprofile",
+  adminauthmiddleware,
+  asyncHandler(editadminprofile),
+);
+adminrouter.put(
+  "/changepassword",
+  adminauthmiddleware,
+  asyncHandler(changepassword),
+);
+adminrouter.get("/getorginfo", adminauthmiddleware, asyncHandler(getOrgInfo));
+
 adminrouter.post("/addmanager", adminauthmiddleware, asyncHandler(addmanager));
 adminrouter.post(
   "/addemployee",
   adminauthmiddleware,
   asyncHandler(addemployee),
+);
+adminrouter.get(
+  "/findallmanagers",
+  adminauthmiddleware,
+  asyncHandler(findallmanagers),
 );
 adminrouter.get(
   "/getallemployee",
@@ -72,22 +92,21 @@ adminrouter.delete(
   adminauthmiddleware,
   asyncHandler(deleteemployee),
 );
+
+// Leave
 adminrouter.get(
   "/showallleaves",
   adminauthmiddleware,
   asyncHandler(showallleaves),
 );
+adminrouter.post("/applyleave", adminauthmiddleware, asyncHandler(applyleave));
+// Admin can approve / reject any pending or forwarded leave (acts as reporting manager)
+adminrouter.post(
+  "/actionleave",
+  adminauthmiddleware,
+  asyncHandler(adminActionOnLeave),
+);
 
-adminrouter.put(
-  "/acceptleave/:id",
-  adminauthmiddleware,
-  asyncHandler(acceptleavebyadmin),
-);
-adminrouter.put(
-  "/rejectleave/:id",
-  adminauthmiddleware,
-  asyncHandler(rejectleavebyadmin),
-);
 adminrouter.get(
   "/noofemployee",
   adminauthmiddleware,
@@ -99,7 +118,6 @@ adminrouter.post(
   adminauthmiddleware,
   asyncHandler(createannouncement),
 );
-
 adminrouter.get(
   "/getallannouncement",
   adminauthmiddleware,
@@ -110,7 +128,6 @@ adminrouter.put(
   adminauthmiddleware,
   asyncHandler(updateAnnouncement),
 );
-
 adminrouter.delete(
   "/deleteannouncement/:id",
   adminauthmiddleware,
@@ -122,19 +139,26 @@ adminrouter.post(
   adminauthmiddleware,
   asyncHandler(reviewtomanager),
 );
-adminrouter.post(
-  "/forgetpassword",
-  asyncHandler(forgetpasswordloginotp),
+adminrouter.get(
+  "/gettodaycheckins",
+  adminauthmiddleware,
+  asyncHandler(getTodayCheckins),
 );
-adminrouter.post("/verifyotp", asyncHandler(verifyAotp));
-adminrouter.get("/change-password", asyncHandler(showUserPasswordPage));
-adminrouter.post(
-  "/resetAdminPassword",
-  asyncHandler(resetAdminPassword),
+
+adminrouter.get(
+  "/documents/personal",
+  adminauthmiddleware,
+  asyncHandler(getAllPersonalDocumentsAdmin),
 );
-adminrouter.get("/getme", adminauthmiddleware, asyncHandler(getme));
-adminrouter.put("/editadminprofile", adminauthmiddleware, asyncHandler(editadminprofile));
-adminrouter.put("/changepassword", adminauthmiddleware, asyncHandler(changepassword));
-adminrouter.get("/gettodaycheckins", adminauthmiddleware, asyncHandler(getTodayCheckins));
+adminrouter.get(
+  "/documents/expense",
+  adminauthmiddleware,
+  asyncHandler(getAllExpenseDocumentsAdmin),
+);
+adminrouter.get(
+  "/documents/:documentId",
+  adminauthmiddleware,
+  asyncHandler(getDocumentDetailsAdmin),
+);
 
 module.exports = adminrouter;
