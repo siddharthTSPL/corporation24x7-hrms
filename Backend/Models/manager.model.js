@@ -1,77 +1,210 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 
-const managerSchema = new mongoose.Schema({
-  organisation_id: {
-  type: mongoose.Schema.Types.ObjectId,
-  ref: "SuperAdmin",
-  // required: true,
-},
-  profile_image: { type: String },
-  uid: {
-    type: String,
-    required: [true, "UID is required"],
-    unique: [true, "UID already exists"],
+const managerSchema = new mongoose.Schema(
+  {
+    organisation_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SuperAdmin",
+    },
+
+    profile_image: {
+      type: String,
+    },
+
+    uid: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+
+    department: {
+      type: String,
+      enum: [
+        "OPR",
+        "BPO",
+        "ENG",
+        "OPR_HR",
+        "BPO_HR",
+        "ENG_HR",
+      ],
+      required: true,
+    },
+
+    f_name: {
+      type: String,
+      required: true,
+    },
+
+    l_name: {
+      type: String,
+      required: true,
+    },
+
+    work_email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
+
+    password: {
+      type: String,
+      required: true,
+      select: false,
+    },
+
+    gender: {
+      type: String,
+      enum: ["male", "female"],
+      required: true,
+    },
+
+    marital_status: {
+      type: String,
+      enum: ["single", "married", "divorced"],
+      default: "single",
+    },
+
+    personal_contact: {
+      type: String,
+      required: true,
+    },
+
+    e_contact: {
+      type: String,
+      required: true,
+    },
+
+    aadhaar_number: {
+      type: String,
+    },
+
+    pan_number: {
+      type: String,
+    },
+
+    address: {
+      type: String,
+    },
+
+    city: {
+      type: String,
+    },
+
+    state: {
+      type: String,
+    },
+
+    pincode: {
+      type: String,
+    },
+
+    role: {
+      type: String,
+      enum: ["manager", "senior_manager", "official"],
+      default: "manager",
+    },
+
+    designation: {
+      type: String,
+      required: true,
+    },
+
+    office_location: {
+      type: String,
+      enum: ["Noida", "Bareilly", "Delhi", "Mumbai"],
+      required: true,
+    },
+
+    reporting_manager: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Manager",
+      default: null,
+    },
+
+    is_fresher: {
+      type: Boolean,
+      default: true,
+    },
+
+    total_experience: {
+      type: Number,
+      default: 0,
+    },
+
+    previous_company: {
+      type: String,
+    },
+
+    previous_designation: {
+      type: String,
+    },
+
+    bank_name: {
+      type: String,
+    },
+
+    account_holder_name: {
+      type: String,
+    },
+
+    account_number: {
+      type: String,
+    },
+
+    ifsc_code: {
+      type: String,
+    },
+
+    resume: {
+      type: String,
+    },
+
+    aadhaar_card: {
+      type: String,
+    },
+
+    pan_card: {
+      type: String,
+    },
+
+    experience_letter: {
+      type: String,
+    },
+
+    status: {
+      type: String,
+      enum: ["active", "inactive"],
+      default: "active",
+    },
+
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    isFirstLogin: {
+      type: Boolean,
+      default: true,
+    },
   },
-  department: {
-    type: String,
-    enum: ["MGMT", "HR"],
-    required: [true, "Department is required"],
-  },
-  f_name: { type: String, required: [true, "Name is required"] },
-  l_name: { type: String, required: [true, "Name is required"] },
-  work_email: {
-    type: String,
-    required: [true, "Email is required"],
-    unique: [true, "Email already exists"],
-  },
-  gender: {
-    type: String,
-    enum: ["male", "female"],
-    required: [true, "Gender is required"],
-  },
-  marital_status: {
-    type: String,
-    enum: ["single", "married", "divorced"],
-    required: [true, "Marital status is required"],
-    default: "single",
-  },
-  password: { type: String, required: [true, "Password is required"] },
-  personal_contact: {
-    type: String,
-    required: [true, "Phone number is required"],
-  },
-  e_contact: { type: String, required: [true, "Phone number is required"] },
-  role: {
-    type: String,
-    enum: ["manager", "senior_manager", "official"],
-    default: "manager",
-  },
-  office_location: {
-    type: String,
-    enum: ["Noida", "Bareilly", "Delhi", "Mumbai"],
-    required: [true, "Office location is required"],
-  },
-  designation: { type: String, required: [true, "Designation is required"] },
-  reporting_manager: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Manager",
-    default: null,
-  },
-  status: { type: String, enum: ["active", "inactive"], default: "active" },
-  isFirstLogin: { type: Boolean, default: true },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
-  isVerified: { type: Boolean, default: false },
-});
+  {
+    timestamps: true,
+  }
+);
 
 managerSchema.index({ department: 1, status: 1 });
 managerSchema.index({ status: 1 });
 managerSchema.index({ reporting_manager: 1 });
 
-managerSchema.pre("save", async function () {
-  if (!this.isModified("password")) return;
+managerSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) return next();
+
   this.password = await bcrypt.hash(this.password, 10);
+
+  next();
 });
 
 managerSchema.methods.isValidPassword = async function (password) {
@@ -79,4 +212,5 @@ managerSchema.methods.isValidPassword = async function (password) {
 };
 
 const Managermodel = mongoose.model("Manager", managerSchema);
+
 module.exports = Managermodel;
