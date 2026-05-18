@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import logo from "../../assets/logo1.png"
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -49,7 +50,7 @@ export default function LandingPage() {
         {/* Logo */}
         <div className="flex items-center gap-2">
           <img
-            src="/src/assets/TorchX.svg"
+            src="/src/assets/logo1.png"
             alt="logo"
             className="w-50 h-15"
           />

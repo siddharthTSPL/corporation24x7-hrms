@@ -10,6 +10,7 @@ import {
   getparticularEmployeeStats,
   getParticularManager,
   getTodayCheckins,
+  getOrgInfo,
 } from "../../api/adminapi/other/ad.other.api";
 
 export const useGetAllEmployee = () => {
@@ -94,5 +95,12 @@ export const useGetTodayCheckins = () => {
     refetchInterval: 2 * 60 * 1000,
     refetchIntervalInBackground: false,
     staleTime: 60 * 1000,
+  });
+};
+
+export const useGetOrgInfo = () => {
+  return useQuery({
+    queryKey: ["orgInfo"],
+    queryFn: getOrgInfo,
   });
 };

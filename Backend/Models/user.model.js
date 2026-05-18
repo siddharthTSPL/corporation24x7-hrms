@@ -2,6 +2,11 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 
 const userSchema = new mongoose.Schema({
+  organisation_id: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "SuperAdmin",
+  // required: true,
+},
   profile_image: {
     type: String,
   },
@@ -10,76 +15,65 @@ const userSchema = new mongoose.Schema({
     required: [true, "UID is required"],
     unique: [true, "UID already exists"],
   },
-
   department: {
     type: String,
-    enum: ["OPR", "BPO",  "ENG"],
+    enum: ["OPR", "BPO", "ENG"],
     required: [true, "Department is required"],
   },
-
   Under_manager: {
-      type: mongoose.Schema.Types.ObjectId,
-  ref: "Manager",
-  default: null,
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Manager",
+    default: null,
   },
-
   f_name: {
     type: String,
     required: [true, "First name is required"],
   },
-
   l_name: {
     type: String,
     required: [true, "Last name is required"],
   },
-
   work_email: {
     type: String,
     required: [true, "Email is required"],
     unique: [true, "Email already exists"],
   },
-  gender:{
-    type:String,
-    enum:["male","female"],
-    required:[true,'Gender is required']
+  gender: {
+    type: String,
+    enum: ["male", "female"],
+    required: [true, "Gender is required"],
   },
-
   marital_status: {
     type: String,
     enum: ["single", "married", "divorced"],
     required: [true, "Marital status is required"],
     default: "single",
-    
   },
-
   password: {
     type: String,
     required: [true, "Password is required"],
   },
-
   personal_contact: {
     type: String,
     required: [true, "Phone number is required"],
   },
-
   e_contact: {
     type: String,
     required: [true, "Emergency contact is required"],
   },
-
   role: {
     type: String,
     default: "employee",
     required: [true, "Role is required"],
   },
-  designation:{
-     type:String,
-     required:[true,'Designation is required']
+  designation: {
+    type: String,
+    required: [true, "Designation is required"],
   },
-  office_location:{
-    type:String,
-    enum:["Noida", "Bareilly", "Delhi", "Mumbai"],
-    required:[true,'Office location is required']
+  office_location: {
+    type: String,
+    enum: ["Noida", "Bareilly", "Delhi", "Mumbai"],
+    required: [true, "Office location is required"],
   },
   status: {
     type: String,
@@ -108,10 +102,13 @@ const userSchema = new mongoose.Schema({
   },
 });
 
+userSchema.index({ Under_manager: 1, status: 1 });
+userSchema.index({ department: 1, status: 1 });
+userSchema.index({ status: 1 });
+
 userSchema.pre("save", async function (next) {
- if (!this.isModified("password")) return;
- 
-   this.password = await bcrypt.hash(this.password, 10);
+  if (!this.isModified("password")) return;
+  this.password = await bcrypt.hash(this.password, 10);
 });
 
 userSchema.methods.isValidPassword = async function (password) {

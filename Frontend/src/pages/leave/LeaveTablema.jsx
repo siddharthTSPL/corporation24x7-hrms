@@ -209,6 +209,23 @@ const GlobalStyles = () => (
       margin-right: 8px;
       vertical-align: middle;
     }
+
+    .lm-history-card {
+      background: #ffffff;
+      border-radius: 16px;
+      border: 1px solid rgba(200,185,220,0.28);
+      padding: 16px 18px;
+      margin-bottom: 10px;
+      box-shadow: 0 2px 10px rgba(80,40,100,0.06);
+      transition: box-shadow .22s ease, transform .22s ease;
+      animation: fadeSlideUp .3s ease both;
+      position: relative;
+      overflow: hidden;
+    }
+    .lm-history-card:hover {
+      box-shadow: 0 6px 22px rgba(80,40,100,0.11);
+      transform: translateY(-1px);
+    }
   `}</style>
 );
 
@@ -728,6 +745,207 @@ const MyBalancePanel = () => {
 };
 
 /* ─────────────────────────────────────────────
+   MY APPLIED LEAVE HISTORY  (new)
+───────────────────────────────────────────── */
+const MyAppliedLeaveHistory = () => {
+  const { data: raw = [], isLoading } = useGetMyLeavesManager();
+
+  // The API may return either:
+  //   • an array of leave-request objects  (leaveType / status / startDate …)
+  //   • or the balance object array used by MyBalancePanel
+  // We only render records that look like leave requests.
+  const leaveRequests = raw.filter(
+    (item) => item.leaveType && item.status && item.startDate
+  );
+
+  return (
+    <div style={{
+      background:"#fff",
+      borderRadius:20,
+      border:"1px solid rgba(200,185,220,0.3)",
+      overflow:"hidden",
+      boxShadow:"0 2px 12px rgba(80,40,100,0.07)",
+      marginTop:20,
+    }}>
+      {/* Header */}
+      <div style={{
+        padding:"18px 22px 14px",
+        borderBottom:"1px solid #F0EAF8",
+        display:"flex",
+        alignItems:"center",
+        justifyContent:"space-between",
+      }}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span className="lm-divider"/>
+          <span style={{fontSize:14,fontWeight:600,color:"#1C1028",fontFamily:"'DM Sans',sans-serif"}}>
+            My Applied Leaves
+          </span>
+        </div>
+        {leaveRequests.length > 0 && (
+          <span style={{
+            background:"linear-gradient(135deg,#F9EFF5,#F4E6F0)",
+            color:"#6B1A4A",
+            fontSize:11,fontWeight:700,
+            padding:"3px 10px",borderRadius:20,
+            fontFamily:"'DM Sans',sans-serif",
+          }}>
+            {leaveRequests.length} record{leaveRequests.length!==1?"s":""}
+          </span>
+        )}
+      </div>
+
+      <div style={{padding:"16px 20px"}}>
+        {isLoading ? (
+          <Spinner/>
+        ) : leaveRequests.length === 0 ? (
+          <EmptyState msg="No leave applications found"/>
+        ) : (
+          leaveRequests.map((leave, idx) => {
+            const days = leave.days || daysDiff(leave.startDate, leave.endDate);
+            const meta = LEAVE_META[leave.leaveType] || { accent:"#8B3A8A" };
+
+            return (
+              <div
+                key={leave._id || idx}
+                className="lm-history-card"
+                style={{ animationDelay:`${idx * .055}s` }}
+              >
+                {/* Left accent stripe */}
+                <div style={{
+                  position:"absolute",top:0,left:0,width:3,bottom:0,
+                  background:meta.accent,
+                  borderRadius:"16px 0 0 16px",
+                }}/>
+
+                <div style={{
+                  display:"flex",
+                  justifyContent:"space-between",
+                  alignItems:"flex-start",
+                  gap:14,
+                  paddingLeft:8,
+                }}>
+                  {/* Left info */}
+                  <div style={{flex:1,minWidth:0}}>
+                    {/* Badges row */}
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+                      <TypeBadge type={leave.leaveType}/>
+                      <StatusBadge status={leave.status}/>
+                      <span style={{
+                        display:"inline-flex",alignItems:"center",gap:4,
+                        padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:600,
+                        background:"#F4EEF9",color:"#6B1A4A",
+                        fontFamily:"'DM Sans',sans-serif",
+                      }}>
+                        {days} day{days>1?"s":""}
+                      </span>
+                      {leave.durationType && (
+                        <span style={{
+                          display:"inline-flex",alignItems:"center",gap:4,
+                          padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:600,
+                          background:"#F0F9FF",color:"#0369A1",
+                          fontFamily:"'DM Sans',sans-serif",
+                        }}>
+                          {leave.durationType === "half" ? "Half Day" : "Full Day"}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Date range */}
+                    <div style={{
+                      display:"flex",alignItems:"center",gap:6,
+                      fontSize:12,color:"#9B8BAE",
+                      fontFamily:"'DM Sans',sans-serif",
+                    }}>
+                      <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                        <rect x="1" y="2" width="11" height="10" rx="2.5" stroke="#C4AADA" strokeWidth="1"/>
+                        <path d="M1 6h11" stroke="#C4AADA" strokeWidth="1"/>
+                        <path d="M4 1v2M9 1v2" stroke="#C4AADA" strokeWidth="1" strokeLinecap="round"/>
+                      </svg>
+                      <span style={{fontWeight:500,color:"#4A3860"}}>{formatDate(leave.startDate)}</span>
+                      <span style={{color:"#D4BFEA",fontSize:10}}>→</span>
+                      <span style={{fontWeight:500,color:"#4A3860"}}>{formatDate(leave.endDate)}</span>
+                    </div>
+
+                    {/* Reason */}
+                    {leave.reason && (
+                      <div style={{
+                        background:"#FAF7FD",borderRadius:10,padding:"8px 13px",
+                        fontSize:12,color:"#4A3860",marginTop:10,
+                        borderLeft:"3px solid #D4AECB",lineHeight:1.6,
+                        fontFamily:"'DM Sans',sans-serif",
+                      }}>
+                        <span style={{color:"#6B1A4A",fontWeight:600}}>Reason — </span>
+                        {leave.reason}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right — applied-on date + status icon */}
+                  <div style={{
+                    display:"flex",flexDirection:"column",alignItems:"flex-end",
+                    gap:8,flexShrink:0,
+                  }}>
+                    {/* Status icon ring */}
+                    {(() => {
+                      const sm = STATUS_META[leave.status];
+                      if (!sm) return null;
+                      return (
+                        <div style={{
+                          width:36,height:36,borderRadius:"50%",
+                          background:sm.bg,
+                          border:`2px solid ${sm.dot}`,
+                          display:"flex",alignItems:"center",justifyContent:"center",
+                        }}>
+                          {(leave.status==="approved_manager"||leave.status==="approved_admin") && (
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                              <path d="M3 7l2.5 2.5 5.5-5" stroke={sm.dot} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                          {(leave.status==="rejected_manager"||leave.status==="rejected_admin") && (
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                              <path d="M4 4l6 6M10 4l-6 6" stroke={sm.dot} strokeWidth="2" strokeLinecap="round"/>
+                            </svg>
+                          )}
+                          {leave.status==="forwarded_admin" && (
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                              <path d="M3 7h8M8 4l3 3-3 3" stroke={sm.dot} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                          {(leave.status==="pending"||leave.status==="pending_admin") && (
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                              <circle cx="7" cy="7" r="4.5" stroke={sm.dot} strokeWidth="1.5"/>
+                              <path d="M7 5v2.5l1.5 1" stroke={sm.dot} strokeWidth="1.3" strokeLinecap="round"/>
+                            </svg>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Applied on */}
+                    {leave.createdAt && (
+                      <div style={{
+                        fontSize:10,color:"#9B8BAE",
+                        fontFamily:"'DM Sans',sans-serif",
+                        textAlign:"right",lineHeight:1.4,
+                      }}>
+                        Applied<br/>
+                        <span style={{fontWeight:600,color:"#7B6890"}}>
+                          {formatDate(leave.createdAt)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────
    APPLY LEAVE PANEL
 ───────────────────────────────────────────── */
 const ApplyLeavePanel = ({showToast}) => {
@@ -765,6 +983,7 @@ const ApplyLeavePanel = ({showToast}) => {
 
   return (
     <div>
+      {/* ── Apply Form ── */}
       <div style={{
         background:"#fff",borderRadius:20,border:"1px solid rgba(200,185,220,0.3)",
         padding:"26px 28px",
@@ -897,6 +1116,9 @@ const ApplyLeavePanel = ({showToast}) => {
           Please ensure adequate team coverage before applying.
         </span>
       </div>
+
+      {/* ── My Applied Leave History (NEW) ── */}
+      <MyAppliedLeaveHistory/>
     </div>
   );
 };
@@ -958,7 +1180,7 @@ const LeaveTablema = () => {
                 Leave Management
               </h1>
               <p style={{fontSize:12,color:"#9B8BAE",margin:"3px 0 0",fontWeight:400}}>
-                Manage employee leaves & track your balance
+                Manage employee leaves &amp; track your balance
               </p>
             </div>
           </div>

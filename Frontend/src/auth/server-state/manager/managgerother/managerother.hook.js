@@ -1,4 +1,4 @@
-import { getEmployeeDocuments, forgetPasswordManager, resetManagerPassword, verifyManagerOtpApi, getUsersUnderManager, reviewEmployee, editManagerProfile, changeManagerPassword, getAllExpenseDocuments, getDocumentDetails, getAllPersonalDocuments } from "../../../api/managerapi/other/ma.other.api";
+import { getEmployeeDocuments, forgetPasswordManager, resetManagerPassword, verifyManagerOtpApi, getUsersUnderManager, reviewEmployee, editManagerProfile, changeManagerPassword, getAllExpenseDocuments, getDocumentDetails, getAllPersonalDocuments, getattendance,  fetchOrgInfo } from "../../../api/managerapi/other/ma.other.api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export const useGetEmployeeDocuments = (uid) => {
@@ -106,4 +106,21 @@ export const useGetDocumentDetails = (documentId) => {
         queryFn: () => getDocumentDetails(documentId),
         enabled: !!documentId,
     });
+};
+
+export const useGetAttendance = () => {
+    return useQuery({
+        queryKey: ["attendance"],
+        queryFn: getattendance,
+    });
+};
+
+
+export const useGetOrgInfoManager = () => {
+  return useQuery({
+    queryKey: ["orgInfo-manager"],
+    queryFn:  fetchOrgInfo,        
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
 };

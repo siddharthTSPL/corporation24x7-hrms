@@ -3,6 +3,7 @@ const managerrouter = express.Router();
 const managercontroller = require("../controllers/manager.controller");
 const managermiddleware = require("../middleware/auth/manager.middleware");
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
+const admincontroller = require("../controllers/admin.controller");
 
 managerrouter.get(
   "/verify/:token",
@@ -51,9 +52,27 @@ managerrouter.post(
 );
 
 managerrouter.post(
-  "/forwardtoadmin",
+  "/forwardtoreportingmanager",
   managermiddleware,
-  asyncHandler(managercontroller.forwardedtoadmin),
+  asyncHandler(managercontroller.forwardedtoreportingmanager),
+);
+
+managerrouter.get(
+  "/getforwardedleaves",
+  managermiddleware,
+  asyncHandler(managercontroller.getforwardedleaves),
+);
+
+managerrouter.post(
+  "/acceptforwardedleave",
+  managermiddleware,
+  asyncHandler(managercontroller.acceptforwardedleave),
+);
+
+managerrouter.post(
+  "/rejectforwardedleave",
+  managermiddleware,
+  asyncHandler(managercontroller.rejectforwardedleave),
 );
 
 managerrouter.get(
@@ -71,7 +90,6 @@ managerrouter.get(
   managermiddleware,
   asyncHandler(managercontroller.getDocumentDetails),
 );
-
 
 managerrouter.get(
   "/showannouncements",
@@ -124,13 +142,25 @@ managerrouter.get(
 managerrouter.put(
   "/manager/edit-profile",
   managermiddleware,
-  asyncHandler(managercontroller.editprofilemanager)
+  asyncHandler(managercontroller.editprofilemanager),
 );
 
 managerrouter.put(
   "/manager/change-password",
   managermiddleware,
-  asyncHandler(managercontroller.changepassword)
+  asyncHandler(managercontroller.changepassword),
+);
+
+managerrouter.get(
+  "/getattendance",
+  managermiddleware,
+  asyncHandler(managercontroller.getattendance),
+);
+
+managerrouter.get(
+  "/getorginfo",
+  managermiddleware,
+  asyncHandler(admincontroller.getOrgInfo),
 );
 
 module.exports = managerrouter;

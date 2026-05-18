@@ -8,8 +8,6 @@ const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const { sendEmail } = require("../utils/nodemailer.utils");
 const assignDefaultLeave = require("../automatic/bydefaultleaveset");
-const { processLeaveDeduction } = require("../automatic/calculateleave");
-const LeaveBalance = require("../Models/leavebalance.model");
 const Leave = require("../Models/leave.model");
 const Review = require("../Models/review.model");
 const generateOTP = require("../automatic/otpgenerator");
@@ -17,246 +15,113 @@ const OtpModel = require("../Models/otpbasedlogin.model");
 const leavebalanceModel = require("../Models/leavebalance.model");
 const reviewModel = require("../Models/review.model");
 const Attendance = require("../Models/attendance.model");
-const  ManagerLeave = require("../Models/maleave.model");
+const ManagerLeave = require("../Models/maleave.model");
+const SuperAdminModel = require("../Models/superadmin.model");
+const Document = require("../Models/document.model");
 
-
-
-const registerAdmin = async (req, res, next) => {
-  const { organisation_name, email, password } = req.body;
-
-  if (!organisation_name || !email || !password) {
-    return next(
-      Object.assign(new Error("All fields are required"), { statusCode: 400 })
-    );
-  }
-
-  const existingAdmin = await Adminmodel.findOne();
-
-  if (existingAdmin) {
-    return next(
-      Object.assign(new Error("Only one admin allowed in system"), {
-        statusCode: 403,
-      })
-    );
-  }
-
-  const admin = await Adminmodel.create({
-    organisation_name,
-    email,
-    password,
-  });
-
-  const token = jwt.sign(
-    { adminid: admin._id },
-    process.env.JWT_SECRET,
-    { expiresIn: "1h" }
-  );
-
-  const verifyLink = `http://localhost:5000/admin/verify/${token}`;
-
-  await sendEmail({
-    to: email,
-    subject: "Verify Your Admin Account",
-    html: `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    </head>
-
-    <body style="margin:0; padding:0; background:#F9F8F2; font-family: 'Segoe UI', sans-serif;">
-
-      <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
-        <tr>
-          <td align="center">
-
-            <!-- Card -->
-            <table width="600" cellpadding="0" cellspacing="0" 
-              style="background:#ffffff; border-radius:14px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.08);">
-
-              <!-- Header -->
-              <tr>
-                <td style="background: linear-gradient(135deg, #730042, #CD166E); padding:30px; text-align:center; color:white;">
-                  <h1 style="margin:0;">🚀 Welcome</h1>
-                  <p style="margin-top:8px; font-size:14px;">Admin Account Verification</p>
-                </td>
-              </tr>
-
-              <!-- Body -->
-              <tr>
-                <td style="padding:40px; color:#333;">
-                  
-                  <h2 style="color:#730042;">Hello ${organisation_name},</h2>
-
-                  <p style="font-size:15px; line-height:1.6; color:#444;">
-                    You're just one step away from activating your admin account.
-                    Please verify your email to access your dashboard.
-                  </p>
-
-                  <!-- Button -->
-                  <div style="text-align:center; margin:30px 0;">
-                    <a href="${verifyLink}" 
-                      style="
-                        background:#CD166E;
-                        color:white;
-                        padding:14px 28px;
-                        text-decoration:none;
-                        border-radius:8px;
-                        font-weight:600;
-                        display:inline-block;
-                        box-shadow:0 6px 16px rgba(205,22,110,0.3);
-                      ">
-                      Verify Email
-                    </a>
-                  </div>
-
-                  <p style="font-size:14px; color:#666;">
-                    If the button doesn't work, use this link:
-                  </p>
-
-                  <p style="font-size:13px; word-break:break-all; color:#CD166E;">
-                    ${verifyLink}
-                  </p>
-
-                  <hr style="border:none; border-top:1px solid #eee; margin:30px 0;" />
-
-                  <p style="font-size:13px; color:#777;">
-                    ⏳ This link expires in <strong>1 hour</strong>.
-                  </p>
-
-                  <p style="font-size:13px; color:#777;">
-                    If you didn’t request this, you can ignore this email.
-                  </p>
-
-                </td>
-              </tr>
-
-              <!-- Footer -->
-              <tr>
-                <td style="background:#F9F8F2; padding:20px; text-align:center; font-size:12px; color:#888;">
-                  © 2026 Your Company • Modern SaaS Platform
-                </td>
-              </tr>
-
-            </table>
-
-          </td>
-        </tr>
-      </table>
-
-    </body>
-    </html>
-    `,
-  });
-
-  res.status(201).json({
-    message: "Admin registered. Please verify your email.",
-  });
-};
+const EXCLUDE =
+  "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
 
 const verifyAdmin = async (req, res, next) => {
   const { token } = req.params;
-
   let decoded;
   try {
     decoded = jwt.verify(token, process.env.JWT_SECRET);
   } catch (err) {
-    return next(Object.assign(new Error("Invalid or expired token"), { statusCode: 400 }));
+    return next(
+      Object.assign(new Error("Invalid or expired token"), { statusCode: 400 }),
+    );
   }
-
-  const admin = await Adminmodel.findById(decoded.adminid);
-
-  if (!admin) {
+  const admin = await Adminmodel.findByIdAndUpdate(
+    decoded.adminid,
+    { isVerified: true },
+    { new: true },
+  ).lean();
+  if (!admin)
     return next(Object.assign(new Error("Invalid token"), { statusCode: 400 }));
-  }
-
-  admin.isVerified = true;
-  await admin.save();
-
-  res.status(200).json({
-    message: "Admin verified successfully",
-  });
+  res.status(200).json({ message: "Admin verified successfully" });
 };
-
 
 const adminlogin = async (req, res, next) => {
   const { identifier, password } = req.body;
-
-  if (!identifier || !password) {
-    return next(Object.assign(new Error("All fields are required"), { statusCode: 400 }));
-  }
-
-  const admin = await Adminmodel.findOne({
-    $or: [{ email: identifier }, { username: identifier }],
-  });
-
-  if (!admin) {
-    return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
-  }
-
+  if (!identifier || !password)
+    return next(
+      Object.assign(new Error("All fields are required"), { statusCode: 400 }),
+    );
+  const admin = await Adminmodel.findOne({ work_email: identifier });
+  if (!admin)
+    return next(
+      Object.assign(new Error("Admin not found"), { statusCode: 404 }),
+    );
+  if (!admin.isVerified)
+    return next(
+      Object.assign(new Error("Please verify your email before logging in"), {
+        statusCode: 403,
+      }),
+    );
+  if (admin.status === "suspended")
+    return next(
+      Object.assign(
+        new Error("Your account has been suspended. Contact super admin."),
+        { statusCode: 403 },
+      ),
+    );
   const isMatch = await admin.isValidPassword(password);
-  if (!isMatch) {
-    return next(Object.assign(new Error("Invalid credentials"), { statusCode: 401 }));
-  }
-
+  if (!isMatch)
+    return next(
+      Object.assign(new Error("Invalid credentials"), { statusCode: 401 }),
+    );
   const token = jwt.sign(
     {
       adminid: admin._id,
       role: admin.role,
-      email: admin.email,
+      email: admin.work_email,
+      created_by: admin.created_by,
     },
     process.env.JWT_SECRET,
-    { expiresIn: "15d" }
+    { expiresIn: "15d" },
   );
-
+  const isProduction = process.env.NODE_ENV === "production";
   res.cookie("token", token, {
     httpOnly: true,
-    secure: false, 
-    sameSite: "lax", 
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+    maxAge: 15 * 24 * 60 * 60 * 1000,
   });
-
-  admin.status = "active";
-  await admin.save();
-
+  Adminmodel.findByIdAndUpdate(admin._id, {
+    status: "active",
+    last_login: new Date(),
+    isFirstLogin: false,
+  }).exec();
   res.status(200).json({
     message: "Login successful",
     admin: {
       id: admin._id,
-      username: admin.username,
-      email: admin.email,
+      f_name: admin.f_name,
+      l_name: admin.l_name,
+      work_email: admin.work_email,
+      designation: admin.designation,
+      role: admin.role,
     },
-    role: admin.role,
-    token
   });
 };
 
-
 const adminlogout = async (req, res, next) => {
-  const admin = req.admin;
-
-  if (!admin) {
-    const err = new Error("Unauthorized");
-    err.statusCode = 401;
-    return next(err);
-  }
-
-  admin.status = "inactive";
-  await admin.save();
-
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  Adminmodel.findByIdAndUpdate(req.admin._id, { status: "inactive" }).exec();
+  const isProduction = process.env.NODE_ENV === "production";
   res.clearCookie("token", {
     httpOnly: true,
-    secure: false,
-    sameSite: "strict",
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
   });
-
-  res.status(200).json({
-    message: "Admin logout successful",
-  });
+  res.status(200).json({ message: "Admin logout successful" });
 };
 
 const addmanager = async (req, res, next) => {
-  console.log("NEXT TYPE:", typeof next);
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   const {
     f_name,
     l_name,
@@ -270,21 +135,21 @@ const addmanager = async (req, res, next) => {
     office_location,
     designation,
     department,
+    reporting_manager,
   } = req.body;
-
-  if (!req.admin) {
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  }
-
-  const existingManager = await Managermodel.findOne({ work_email });
-
-  if (existingManager) {
-    return next(Object.assign(new Error("Manager already exists"), { statusCode: 400 }));
-  }
-
+  if (!f_name || !work_email || !password || !department)
+    return next(
+      Object.assign(new Error("Required fields missing"), { statusCode: 400 }),
+    );
+  const existingManager = await Managermodel.findOne({ work_email })
+    .select("_id")
+    .lean();
+  if (existingManager)
+    return next(
+      Object.assign(new Error("Manager already exists"), { statusCode: 400 }),
+    );
   const uid = await generateUID(department);
-
-  const newmanager = new Managermodel({
+  const newmanager = await Managermodel.create({
     uid,
     department,
     f_name,
@@ -298,113 +163,31 @@ const addmanager = async (req, res, next) => {
     role,
     office_location,
     designation,
+    reporting_manager: reporting_manager || null,
   });
-
-  await newmanager.save();
-
   const token = jwt.sign(
     { managerid: newmanager._id },
     process.env.JWT_SECRET,
-    { expiresIn: "1h" }
+    { expiresIn: "1h" },
   );
-
-  await assignDefaultLeave(newmanager);
-
-  const verifyLink = `http://localhost:5000/manager/verify/${token}`;
-
- await sendEmail({
-  to: work_email,
-  subject: "🚀 Activate Your Manager Account",
-  html: `
-  <!DOCTYPE html>
-  <html>
-  <body style="margin:0; padding:0; background:#F9F8F2; font-family:Segoe UI, sans-serif;">
-
-    <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
-      <tr>
-        <td align="center">
-
-          <table width="600" style="background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.08);">
-
-            <!-- Header -->
-            <tr>
-              <td style="background:linear-gradient(135deg,#730042,#CD166E); padding:30px; text-align:center; color:white;">
-                <h1 style="margin:0;">👔 Manager Onboarding</h1>
-                <p style="margin-top:6px; font-size:14px;">You're now part of the system</p>
-              </td>
-            </tr>
-
-            <!-- Body -->
-            <tr>
-              <td style="padding:40px; color:#333;">
-
-                <h2 style="color:#730042;">Hi ${f_name},</h2>
-
-                <p style="font-size:15px; line-height:1.6;">
-                  Your <strong>Manager Account</strong> has been successfully created.
-                  You can now manage your team, track performance, and streamline operations.
-                </p>
-
-                <div style="background:#F9F8F2; padding:15px; border-radius:8px; margin:20px 0;">
-                  <p style="margin:0;"><strong>Role:</strong> ${designation}</p>
-                  <p style="margin:5px 0;"><strong>Department:</strong> ${department}</p>
-                  <p style="margin:0;"><strong>Location:</strong> ${office_location}</p>
-                </div>
-
-                <!-- CTA -->
-                <div style="text-align:center; margin:30px 0;">
-                  <a href="${verifyLink}" style="
-                    background:#CD166E;
-                    color:white;
-                    padding:14px 30px;
-                    text-decoration:none;
-                    border-radius:8px;
-                    font-weight:600;
-                    display:inline-block;
-                    box-shadow:0 6px 16px rgba(205,22,110,0.3);
-                  ">
-                    Verify & Activate
-                  </a>
-                </div>
-
-                <p style="font-size:13px; color:#777;">
-                  Or copy this link:<br/>
-                  <span style="color:#CD166E;">${verifyLink}</span>
-                </p>
-
-                <hr style="margin:25px 0; border:none; border-top:1px solid #eee;" />
-
-                <p style="font-size:13px; color:#777;">
-                  ⏳ Link expires in 1 hour. Ignore if not requested.
-                </p>
-
-              </td>
-            </tr>
-
-            <!-- Footer -->
-            <tr>
-              <td style="background:#F9F8F2; padding:20px; text-align:center; font-size:12px; color:#888;">
-                © 2026 Your Company • Manager Panel
-              </td>
-            </tr>
-
-          </table>
-
-        </td>
-      </tr>
-    </table>
-
-  </body>
-  </html>
-  `,
-});
-
-  res.status(200).json({
+  const verifyLink = `${process.env.BASE_URL}/manager/verify/${token}`;
+  Promise.all([
+    assignDefaultLeave(newmanager),
+    sendEmail({
+      to: work_email,
+      subject: "Activate Your Manager Account",
+      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F9F8F2;font-family:Segoe UI,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center"><table width="600" style="background:#fff;border-radius:14px;overflow:hidden;"><tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h1 style="margin:0;">Manager Onboarding</h1></td></tr><tr><td style="padding:40px;color:#333;"><h2 style="color:#730042;">Hi ${f_name},</h2><p>Your <strong>Manager Account</strong> has been created.</p><div style="background:#F9F8F2;padding:15px;border-radius:8px;margin:20px 0;"><p><strong>Role:</strong> ${designation}</p><p><strong>Department:</strong> ${department}</p><p><strong>Location:</strong> ${office_location}</p></div><div style="text-align:center;margin:30px 0;"><a href="${verifyLink}" style="background:#CD166E;color:white;padding:14px 30px;text-decoration:none;border-radius:8px;font-weight:600;">Verify & Activate</a></div><p style="font-size:13px;color:#777;">Link expires in 1 hour.</p></td></tr><tr><td style="background:#F9F8F2;padding:20px;text-align:center;font-size:12px;color:#888;">© 2026 Your Company</td></tr></table></td></tr></table></body></html>`,
+    }),
+  ]);
+  res.status(201).json({
+    success: true,
     message: "Manager added successfully. Verification email sent.",
   });
 };
 
 const addemployee = async (req, res, next) => {
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   const {
     f_name,
     l_name,
@@ -420,23 +203,19 @@ const addemployee = async (req, res, next) => {
     department,
     Under_manager,
   } = req.body;
- 
-  if (!req.admin) {
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  }
-
-if (!f_name || !work_email || !password) {
-  return next(Object.assign(new Error("Required fields missing"), { statusCode: 400 }));
-}
-  const existingUser = await Usermodel.findOne({ work_email });
-
-  if (existingUser) {
-    return next(Object.assign(new Error("User already exists"), { statusCode: 400 }));
-  }
-
+  if (!f_name || !work_email || !password || !department)
+    return next(
+      Object.assign(new Error("Required fields missing"), { statusCode: 400 }),
+    );
+  const existingUser = await Usermodel.findOne({ work_email })
+    .select("_id")
+    .lean();
+  if (existingUser)
+    return next(
+      Object.assign(new Error("User already exists"), { statusCode: 400 }),
+    );
   const uid = await generateUID(department);
-
-  const newuser = new Usermodel({
+  const newuser = await Usermodel.create({
     uid,
     f_name,
     l_name,
@@ -452,158 +231,64 @@ if (!f_name || !work_email || !password) {
     department,
     Under_manager,
   });
-
-  await newuser.save();
-
-  const token = jwt.sign(
-    { userid: newuser._id },
-    process.env.JWT_SECRET,
-    { expiresIn: "1h" }
-  );
-
-  await assignDefaultLeave(newuser);
-
-  const verifyLink = `http://localhost:5000/user/verify/${token}`;
-
- await sendEmail({
-  to: work_email,
-  subject: "🎉 Welcome! Verify Your Employee Account",
-  html: `
-  <!DOCTYPE html>
-  <html>
-  <body style="margin:0; padding:0; background:#F9F8F2; font-family:Segoe UI, sans-serif;">
-
-    <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
-      <tr>
-        <td align="center">
-
-          <table width="600" style="background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.08);">
-
-            <!-- Header -->
-            <tr>
-              <td style="background:linear-gradient(135deg,#730042,#CD166E); padding:30px; text-align:center; color:white;">
-                <h1 style="margin:0;">🎉 Welcome Aboard</h1>
-                <p style="margin-top:6px; font-size:14px;">Your journey starts here</p>
-              </td>
-            </tr>
-
-            <!-- Body -->
-            <tr>
-              <td style="padding:40px; color:#333;">
-
-                <h2 style="color:#730042;">Hello ${f_name},</h2>
-
-                <p style="font-size:15px; line-height:1.6;">
-                  Your employee account has been successfully created.
-                  You're now part of the team — let's get started 🚀
-                </p>
-
-                <div style="background:#F9F8F2; padding:15px; border-radius:8px; margin:20px 0;">
-                  <p style="margin:0;"><strong>Department:</strong> ${department}</p>
-                  <p style="margin:5px 0;"><strong>Manager:</strong> ${Under_manager || "Assigned Soon"}</p>
-                  <p style="margin:0;"><strong>Location:</strong> ${office_location}</p>
-                </div>
-
-                <!-- CTA -->
-                <div style="text-align:center; margin:30px 0;">
-                  <a href="${verifyLink}" style="
-                    background:#730042;
-                    color:white;
-                    padding:14px 30px;
-                    text-decoration:none;
-                    border-radius:8px;
-                    font-weight:600;
-                    display:inline-block;
-                    box-shadow:0 6px 16px rgba(115,0,66,0.3);
-                  ">
-                    Verify Account
-                  </a>
-                </div>
-
-                <p style="font-size:13px; color:#777;">
-                  If button doesn't work:<br/>
-                  <span style="color:#CD166E;">${verifyLink}</span>
-                </p>
-
-                <hr style="margin:25px 0; border:none; border-top:1px solid #eee;" />
-
-                <p style="font-size:13px; color:#777;">
-                  ⏳ Link valid for 1 hour only.
-                </p>
-
-              </td>
-            </tr>
-
-            <!-- Footer -->
-            <tr>
-              <td style="background:#F9F8F2; padding:20px; text-align:center; font-size:12px; color:#888;">
-                © 2026 Your Company • Employee Portal
-              </td>
-            </tr>
-
-          </table>
-
-        </td>
-      </tr>
-    </table>
-
-  </body>
-  </html>
-  `,
-});
-
-  res.status(200).json({
+  const token = jwt.sign({ userid: newuser._id }, process.env.JWT_SECRET, {
+    expiresIn: "1h",
+  });
+  const verifyLink = `${process.env.BASE_URL}/user/verify/${token}`;
+  Promise.all([
+    assignDefaultLeave(newuser),
+    sendEmail({
+      to: work_email,
+      subject: "Welcome! Verify Your Employee Account",
+      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F9F8F2;font-family:Segoe UI,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center"><table width="600" style="background:#fff;border-radius:14px;overflow:hidden;"><tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h1 style="margin:0;">Welcome Aboard</h1></td></tr><tr><td style="padding:40px;color:#333;"><h2 style="color:#730042;">Hello ${f_name},</h2><p>Your employee account has been created.</p><div style="background:#F9F8F2;padding:15px;border-radius:8px;margin:20px 0;"><p><strong>Department:</strong> ${department}</p><p><strong>Location:</strong> ${office_location}</p></div><div style="text-align:center;margin:30px 0;"><a href="${verifyLink}" style="background:#730042;color:white;padding:14px 30px;text-decoration:none;border-radius:8px;font-weight:600;">Verify Account</a></div><p style="font-size:13px;color:#777;">Link valid for 1 hour only.</p></td></tr><tr><td style="background:#F9F8F2;padding:20px;text-align:center;font-size:12px;color:#888;">© 2026 Your Company</td></tr></table></td></tr></table></body></html>`,
+    }),
+  ]);
+  res.status(201).json({
+    success: true,
     message: "User added successfully. Verification email sent.",
   });
 };
 
 const findallmanagers = async (req, res, next) => {
-  if (!req.admin) {
+  if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  }
-
   const managers = await Managermodel.find()
-    .select(
-      "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt"
-    );
-
-  res.status(200).json({
-    managers,
-  });
+    .select(EXCLUDE)
+    .populate("reporting_manager", "f_name l_name work_email designation")
+    .lean();
+  res.status(200).json({ managers });
 };
 
 const getallemployee = async (req, res, next) => {
-  if (!req.admin) {
+  if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  }
- 
-  const users = await Usermodel.find()
-  .select('uid f_name l_name work_email role department designation office_location gender personal_contact e_contact')
-    .populate({
-      path: "Under_manager",
-      select: "uid f_name l_name work_email role ",
-    })
-    .select(
-      "-password -__v  -marital_status  -personal_contact -e_contact -gender -designation -office_location -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt"
-    );
-    
-    const managers = await Managermodel.find().select("uid f_name l_name work_email role designation office_location department gender personal_contact e_contact");
-
-    users.push(...managers);
-
+  const [users, managers] = await Promise.all([
+    Usermodel.find()
+      .select(
+        "uid f_name l_name work_email role department designation office_location Under_manager",
+      )
+      .populate({
+        path: "Under_manager",
+        select: "uid f_name l_name work_email role",
+      })
+      .lean(),
+    Managermodel.find()
+      .select(
+        "uid f_name l_name work_email role designation office_location department gender personal_contact e_contact reporting_manager",
+      )
+      .populate("reporting_manager", "f_name l_name work_email")
+      .lean(),
+  ]);
   res.status(200).json({
-    count: users.length,
-    users,
+    count: users.length + managers.length,
+    users: [...users, ...managers],
   });
 };
 
 const editemployee = async (req, res, next) => {
-  if (!req.admin) {
+  if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  }
-
   const { uid } = req.params;
-
   const updateData = {
     f_name: req.body.f_name,
     l_name: req.body.l_name,
@@ -618,28 +303,20 @@ const editemployee = async (req, res, next) => {
     department: req.body.department,
     Under_manager: req.body.Under_manager,
   };
-
- 
   const user = await Usermodel.findByIdAndUpdate(uid, updateData, {
     new: true,
     runValidators: true,
   });
-
-  if (!user) {
-    return next(Object.assign(new Error("User not found"), { statusCode: 404 }));
-  }
-
-  
-  let manager = null;
-
-  if (updateData.role === "manager") {
-    manager = await Managermodel.findOneAndUpdate(
-      { userId: uid }, 
-      updateData,
-      { new: true, upsert: true } 
+  if (!user)
+    return next(
+      Object.assign(new Error("User not found"), { statusCode: 404 }),
     );
-  }
-
+  let manager = null;
+  if (updateData.role === "manager")
+    manager = await Managermodel.findOneAndUpdate({ userId: uid }, updateData, {
+      new: true,
+      upsert: true,
+    });
   res.status(200).json({
     success: true,
     message: "Employee updated successfully",
@@ -648,296 +325,185 @@ const editemployee = async (req, res, next) => {
   });
 };
 
-
 const getperticularemployee = async (req, res, next) => {
-  try {
-    if (!req.admin) {
-      return next(
-        Object.assign(new Error("Unauthorized"), { statusCode: 401 })
-      );
-    }
-    const { uid } = req.params;
-    const user = await Usermodel.findById(uid)
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  const { uid } = req.params;
+  const [user, leaveBalance, reviews] = await Promise.all([
+    Usermodel.findById(uid)
       .populate({
         path: "Under_manager",
         select: "uid f_name l_name work_email role",
       })
-      .select(
-        "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt"
-      );
-
-    if (!user) {
-      return next(
-        Object.assign(new Error("User not found"), { statusCode: 404 })
-      );
-    }
-    const manager = await Managermodel.findOne({ userId: user._id }).select(
-      "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt"
+      .select(EXCLUDE)
+      .lean(),
+    leavebalanceModel.findOne({ employee: uid }).lean(),
+    reviewModel
+      .find({ reviewee: uid })
+      .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      .lean(),
+  ]);
+  if (!user)
+    return next(
+      Object.assign(new Error("User not found"), { statusCode: 404 }),
     );
-    
-    const leaveBalance = await leavebalanceModel.findOne({
-      employee: user._id,
-    });
-
-    if (!leaveBalance) {
-      return next(
-        Object.assign(new Error("Leave balance not found"), {
-          statusCode: 404,
-        })
-      );
-    }
-
-    const reviews = await reviewModel
-      .find({ reviewee: user._id })
-      .populate({
-        path: "reviewer",
-        select: "f_name l_name work_email role",
-      });
-
-    res.status(200).json({
-      success: true,
-      user,
-      manager: manager || null,
-      leaveBalance,
-      reviews: reviews || [],
-    });
-  } catch (error) {
-    return next(error);
-  }
+  if (!leaveBalance)
+    return next(
+      Object.assign(new Error("Leave balance not found"), { statusCode: 404 }),
+    );
+  const manager = await Managermodel.findOne({ userId: user._id })
+    .select(EXCLUDE)
+    .lean();
+  res.status(200).json({
+    success: true,
+    user,
+    manager: manager || null,
+    leaveBalance,
+    reviews: reviews || [],
+  });
 };
 
 const getperticularemanager = async (req, res, next) => {
-  try {
-    if (!req.admin) {
-      return next(
-        Object.assign(new Error("Unauthorized"), { statusCode: 401 })
-      );
-    }
-    const { uid } = req.params;
-    const manager = await Managermodel.findById(uid)
-      .select(
-        "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt"
-      );
-
-    if (!manager) {
-      return next(
-        Object.assign(new Error("Manager not found"), { statusCode: 404 })
-      );
-    }
-    const leaveBalance = await leavebalanceModel.findOne({
-      employee: manager._id,
-    });
-
-    if (!leaveBalance) {
-      return next(
-        Object.assign(new Error("Leave balance not found"), {
-          statusCode: 404,
-        })
-      );
-    }
-    const reviews = await reviewModel
-      .find({ reviewee: manager._id })
-      .populate({
-        path: "reviewer",
-        select: "f_name l_name work_email role",
-      });
-
-    res.status(200).json({
-      success: true,
-      manager,
-      leaveBalance,
-      reviews: reviews || [],
-    });
-}
-    catch (error) {
-    return next(error);
-  }
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  const { uid } = req.params;
+  const [manager, leaveBalance, reviews] = await Promise.all([
+    Managermodel.findById(uid)
+      .select(EXCLUDE)
+      .populate("reporting_manager", "f_name l_name work_email designation")
+      .lean(),
+    leavebalanceModel.findOne({ employee: uid }).lean(),
+    reviewModel
+      .find({ reviewee: uid })
+      .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      .lean(),
+  ]);
+  if (!manager)
+    return next(
+      Object.assign(new Error("Manager not found"), { statusCode: 404 }),
+    );
+  if (!leaveBalance)
+    return next(
+      Object.assign(new Error("Leave balance not found"), { statusCode: 404 }),
+    );
+  res
+    .status(200)
+    .json({ success: true, manager, leaveBalance, reviews: reviews || [] });
 };
 
 const deleteemployee = async (req, res, next) => {
-  if (!req.admin) {
+  if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  }
-
   const { uid } = req.params;
-
-  const user = await Usermodel.findByIdAndDelete(uid);
- const manager = await Managermodel.findOneAndDelete(uid);
-
-  if (!user && !manager) {
-    return next(Object.assign(new Error("User not found"), { statusCode: 404 }));
-  }
-
-  res.status(200).json({
-    message: "User deleted successfully",
-  });
+  const [user, manager] = await Promise.all([
+    Usermodel.findByIdAndDelete(uid),
+    Managermodel.findByIdAndDelete(uid),
+  ]);
+  if (!user && !manager)
+    return next(
+      Object.assign(new Error("User not found"), { statusCode: 404 }),
+    );
+  res.status(200).json({ message: "User deleted successfully" });
 };
-
 
 const showallleaves = async (req, res, next) => {
-  if (!req.admin) {
+  if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  }
-
-  const [employeeLeaves, managerLeaves] = await Promise.all([
-    Leave.find({ status: { $in: ["forwarded_admin"] } })
+  const [employeeLeaves, myLeaves] = await Promise.all([
+    Leave.find({
+      status: {
+        $in: [
+          "forwarded_reporting_manager",
+          "approved_reporting_manager",
+          "rejected_reporting_manager",
+        ],
+      },
+    })
       .populate("employee", "f_name l_name work_email")
       .populate("manager", "f_name l_name work_email")
-      .sort({ createdAt: -1 }),
-
-    ManagerLeave.find({
-      status: { $in: ["pending_admin", "approved_admin", "rejected_admin"] }, // ← fetch all statuses
-    })
-      .populate("manager", "f_name l_name work_email")
-      .sort({ createdAt: -1 }),
+      .sort({ createdAt: -1 })
+      .lean(),
+    ManagerLeave.find({ manager: req.admin._id })
+      .sort({ createdAt: -1 })
+      .lean(),
   ]);
-
-  // Debug — remove after confirming it works
-  console.log("Employee Leaves:", employeeLeaves.length);
-  console.log("Manager Leaves:", managerLeaves.length);
-
   res.status(200).json({
-    employeeLeaves: {
-      count: employeeLeaves.length,
-      leaves: employeeLeaves,
-    },
-    managerLeaves: {
-      count: managerLeaves.length,
-      leaves: managerLeaves,
-    },
+    employeeLeaves: { count: employeeLeaves.length, leaves: employeeLeaves },
+    myLeaves: { count: myLeaves.length, leaves: myLeaves },
   });
 };
 
-const acceptleavebyadmin = async (req, res, next) => {
-  if (!req.admin) {
+const applyleave = async (req, res, next) => {
+  if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  }
-
-  const { id } = req.params;
-  const { leaveFor } = req.query; 
-
- 
-  const LeaveModel = leaveFor === "manager" ? ManagerLeave : Leave;
-
-  const leave = await LeaveModel.findById(id);
-
-  if (!leave) {
-    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
-  }
-
-  if (
-    leave.status.startsWith("approved") ||
-    leave.status.startsWith("rejected")
-  ) {
-    return next(Object.assign(new Error("Leave already processed"), { statusCode: 400 }));
-  }
-
-
-  if (leaveFor !== "manager") {
-    const leaveBalance = await LeaveBalance.findOne({ employee: leave.employee });
-
-    if (!leaveBalance) {
-      return next(Object.assign(new Error("Leave balance not found"), { statusCode: 404 }));
-    }
-
-    if (leave.leaveType === "ml") {
-      const start = new Date(leave.startDate);
-      const end = new Date(start);
-      end.setDate(end.getDate() + 181);
-
-      leaveBalance.mlStartDate = start;
-      leaveBalance.mlEndDate = end;
-
-      await leaveBalance.save();
-    }
-
-    await processLeaveDeduction(leave);
-  }
-
-  leave.status = "approved_admin";
-  leave.approvedBy = req.admin._id;
-  await leave.save();
-
-  res.status(200).json({
-    message: "Leave approved by admin",
+  const { leaveType, startDate, endDate, reason } = req.body;
+  if (!leaveType || !startDate || !endDate || !reason)
+    return next(
+      Object.assign(
+        new Error("leaveType, startDate, endDate and reason are required"),
+        { statusCode: 400 },
+      ),
+    );
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (end < start)
+    return next(
+      Object.assign(new Error("End date cannot be before start date"), {
+        statusCode: 400,
+      }),
+    );
+  const days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  const overlapping = await ManagerLeave.findOne({
+    manager: req.admin._id,
+    status: { $nin: ["rejected_reporting_manager"] },
+    startDate: { $lte: end },
+    endDate: { $gte: start },
+  })
+    .select("_id")
+    .lean();
+  if (overlapping)
+    return next(
+      Object.assign(new Error("Leave already applied for these dates"), {
+        statusCode: 400,
+      }),
+    );
+  const leave = await ManagerLeave.create({
+    manager: req.admin._id,
+    leaveType,
+    startDate: start,
+    endDate: end,
+    days,
+    reason,
+    status: "pending_reporting_manager",
+  });
+  res.status(201).json({
+    success: true,
+    message: "Leave request submitted to super admin",
     leave,
   });
 };
-
-
-const rejectleavebyadmin = async (req, res, next) => {
-  if (!req.admin) {
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  }
-
-  const { id } = req.params;
-  const { leaveFor } = req.query; 
-
-  const LeaveModel = leaveFor === "manager" ? ManagerLeave : Leave;
-
-  const leave = await LeaveModel.findById(id);
-
-  if (!leave) {
-    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
-  }
-
-  if (
-    leave.status.startsWith("approved") ||
-    leave.status.startsWith("rejected")
-  ) {
-    return next(Object.assign(new Error("Leave already processed"), { statusCode: 400 }));
-  }
-
-  leave.status = "rejected_admin";
-  leave.rejectedBy = req.admin._id;
-  leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  await leave.save();
-
-  res.status(200).json({
-    message: "Leave rejected by admin successfully",
-    leave,
-  });
-};
-
 
 const noofemployee = async (req, res, next) => {
-  if (!req.admin) {
+  if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  }
-
-  const departments = await uidmodel.find(
-    {},
-    { department: 1, lastNumber: 1, _id: 0 }
-  );
-
-  let total = 0;
-
-  departments.forEach((dep) => {
-    total += dep.lastNumber;
-  });
-
-  res.status(200).json({
-    departments,
-    totalEmployees: total,
-  });
+  const departments = await uidmodel
+    .find({}, { department: 1, lastNumber: 1, _id: 0 })
+    .lean();
+  const total = departments.reduce((sum, dep) => sum + dep.lastNumber, 0);
+  res.status(200).json({ departments, totalEmployees: total });
 };
 
-
 const createannouncement = async (req, res, next) => {
-  if (!req.admin) {
-    const error = new Error("Unauthorized");
-    error.statusCode = 401;
-    throw error;
-  }
-
-  const { title, message, audience, priority, notice_image, expiresAt } = req.body;
-
-  if (!title || !message) {
-    const error = new Error("Title and message are required");
-    error.statusCode = 400;
-    throw error;
-  }
-
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  const { title, message, audience, priority, notice_image, expiresAt } =
+    req.body;
+  if (!title || !message)
+    return next(
+      Object.assign(new Error("Title and message are required"), {
+        statusCode: 400,
+      }),
+    );
   const announcement = await announcementmodel.create({
     title,
     message,
@@ -947,7 +513,6 @@ const createannouncement = async (req, res, next) => {
     expiresAt,
     createdBy: req.admin._id,
   });
-
   res.status(201).json({
     success: true,
     message: "Announcement created successfully",
@@ -956,505 +521,543 @@ const createannouncement = async (req, res, next) => {
 };
 
 const getallannouncement = async (req, res, next) => {
-  if (!req.admin) {
-    const error = new Error("Unauthorized");
-    error.statusCode = 401;
-    throw error;
-  }
-
-  const announcements = await announcementmodel.find();
-    
-
-  res.status(200).json({
-    success: true,
-    count: announcements.length,
-    announcements,
-  });
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  const announcements = await announcementmodel.find().lean();
+  res
+    .status(200)
+    .json({ success: true, count: announcements.length, announcements });
 };
 
 const updateAnnouncement = async (req, res, next) => {
-  if (!req.admin) {
-    const error = new Error("Unauthorized");
-    error.statusCode = 401;
-    throw error;
-  }
-
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   const { id } = req.params;
-
-  const announcement = await announcementmodel.findById(id);
-
-  if (!announcement) {
-    const error = new Error("Announcement not found");
-    error.statusCode = 404;
-    throw error;
-  }
-
-  if (announcement.createdBy.toString() !== req.admin._id.toString()) {
-    const error = new Error("You are not allowed to edit this announcement");
-    error.statusCode = 403;
-    throw error;
-  }
-
-  const { title, message, audience, priority, notice_image, expiresAt } = req.body;
-
-  if (title) announcement.title = title;
-  if (message) announcement.message = message;
-  if (audience) announcement.audience = audience;
-  if (priority) announcement.priority = priority;
-  if (notice_image !== undefined) announcement.notice_image = notice_image;
-  if (expiresAt) announcement.expiresAt = expiresAt;
-
-  await announcement.save();
-
+  const announcement = await announcementmodel
+    .findById(id)
+    .select("createdBy")
+    .lean();
+  if (!announcement)
+    return next(
+      Object.assign(new Error("Announcement not found"), { statusCode: 404 }),
+    );
+  if (announcement.createdBy.toString() !== req.admin._id.toString())
+    return next(
+      Object.assign(
+        new Error("You are not allowed to edit this announcement"),
+        { statusCode: 403 },
+      ),
+    );
+  const { title, message, audience, priority, notice_image, expiresAt } =
+    req.body;
+  const $set = {};
+  if (title) $set.title = title;
+  if (message) $set.message = message;
+  if (audience) $set.audience = audience;
+  if (priority) $set.priority = priority;
+  if (notice_image !== undefined) $set.notice_image = notice_image;
+  if (expiresAt) $set.expiresAt = expiresAt;
+  const updated = await announcementmodel
+    .findByIdAndUpdate(id, { $set }, { new: true })
+    .lean();
   res.status(200).json({
     success: true,
     message: "Announcement updated successfully",
-    announcement,
+    announcement: updated,
   });
 };
 
 const deleteAnnouncement = async (req, res, next) => {
-  if (!req.admin) {
-    const error = new Error("Unauthorized");
-    error.statusCode = 401;
-    throw error;
-  }
-
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   const { id } = req.params;
-
-  const announcement = await announcementmodel.findById(id);
-
-  if (!announcement) {
-    const error = new Error("Announcement not found");
-    error.statusCode = 404;
-    throw error;
-  }
-
-  if (announcement.createdBy.toString() !== req.admin._id.toString()) {
-    const error = new Error("You are not allowed to delete this announcement");
-    error.statusCode = 403;
-    throw error;
-  }
-
-  await announcement.deleteOne();
-
-  res.status(200).json({
-    success: true,
-    message: "Announcement deleted successfully",
-  });
+  const announcement = await announcementmodel
+    .findById(id)
+    .select("createdBy")
+    .lean();
+  if (!announcement)
+    return next(
+      Object.assign(new Error("Announcement not found"), { statusCode: 404 }),
+    );
+  if (announcement.createdBy.toString() !== req.admin._id.toString())
+    return next(
+      Object.assign(
+        new Error("You are not allowed to delete this announcement"),
+        { statusCode: 403 },
+      ),
+    );
+  await announcementmodel.findByIdAndDelete(id);
+  res
+    .status(200)
+    .json({ success: true, message: "Announcement deleted successfully" });
 };
 
 const reviewtomanager = async (req, res, next) => {
-  if (!req.admin) {
+  if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  }
-
   const { managerid, rating, comment } = req.body;
-
-  const adminid = req.admin._id;
-  const adminrole = req.admin.role;
-
-  if (adminrole !== "admin") {
+  if (!managerid || !rating || !comment)
     return next(
-      Object.assign(new Error("Only admin can review managers"), {
-        statusCode: 403,
-      })
-    );
-  }
-
-  if (!rating || !comment) {
-    return next(
-      Object.assign(new Error("Rating and comment are required"), {
+      Object.assign(new Error("managerid, rating and comment are required"), {
         statusCode: 400,
-      })
+      }),
     );
-  }
-
-  const manager = await Managermodel.findById(managerid);
-
-  if (!manager) {
-    return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
-  }
-
-
   const now = new Date();
   const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-
-
-  const existingreview = await Review.findOne({
-    reviewer: adminid,
-    reviewee: managerid,
-    monthYear,
-  });
-
-  if (existingreview) {
+  const [manager, existingreview] = await Promise.all([
+    Managermodel.findById(managerid).select("role").lean(),
+    Review.findOne({ reviewer: req.admin._id, reviewee: managerid, monthYear })
+      .select("_id")
+      .lean(),
+  ]);
+  if (!manager)
+    return next(
+      Object.assign(new Error("Manager not found"), { statusCode: 404 }),
+    );
+  if (existingreview)
     return next(
       Object.assign(
         new Error("You have already reviewed this manager this month."),
-        { statusCode: 400 }
-      )
+        { statusCode: 400 },
+      ),
     );
-  }
-
   const review = await Review.create({
-  reviewerRole: adminrole,                         
-  reviewer: adminid,
-  reviewerRoleModel: "Admin",                       
-  revieweeRole: manager.role,                       
-  reviewee: managerid,
-  revieweeRoleModel: "Manager",                     
-  rating,
-  comment,
-  monthYear,
-});
-
-  res.status(201).json({
-    message: "Review submitted successfully",
-    review,
+    reviewerRole: "admin",
+    reviewer: req.admin._id,
+    reviewerRoleModel: "Admin",
+    revieweeRole: manager.role,
+    reviewee: managerid,
+    revieweeRoleModel: "Manager",
+    rating,
+    comment,
+    monthYear,
   });
+  res.status(201).json({ message: "Review submitted successfully", review });
 };
 
 const forgetpasswordloginotp = async (req, res, next) => {
   const { email } = req.body;
-
-  if (!email) {
-    return next(Object.assign(new Error("Email is required"), { statusCode: 400 }));
-  }
-
-  const admin = await Adminmodel.findOne({ email });
-
-  if (!admin) {
-    return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
-  }
-
+  if (!email)
+    return next(
+      Object.assign(new Error("Email is required"), { statusCode: 400 }),
+    );
+  const admin = await Adminmodel.findOne({ work_email: email })
+    .select("_id f_name")
+    .lean();
+  if (!admin)
+    return next(
+      Object.assign(new Error("Admin not found"), { statusCode: 404 }),
+    );
   const otp = generateOTP();
-  const expiry = Date.now() + 5 * 60 * 1000;
-
-  await OtpModel.findOneAndUpdate(
-    { email },
-    { otp, expiry },
-    { upsert: true, new: true }
-  );
-
-  await sendEmail({
-    to: email,
-    subject: "Admin Password Reset OTP",
-    html: `
-      <h2>Password Reset Request</h2>
-      <p>Your OTP is:</p>
-      <h1>${otp}</h1>
-      <p>This OTP will expire in 5 minutes.</p>
-    `,
-  });
-
-  res.status(200).json({
-    success: true,
-    message: "OTP sent successfully",
-  });
+  await Promise.all([
+    OtpModel.findOneAndUpdate(
+      { email },
+      { otp, expiry: Date.now() + 5 * 60 * 1000 },
+      { upsert: true, new: true },
+    ),
+    sendEmail({
+      to: email,
+      subject: "Admin Password Reset OTP",
+      html: `<h2>Password Reset</h2><p>Your OTP is:</p><h1>${otp}</h1><p>Expires in 5 minutes.</p>`,
+    }),
+  ]);
+  res.status(200).json({ success: true, message: "OTP sent successfully" });
 };
 
 const verifyAotp = async (req, res, next) => {
   const { email, otp } = req.body;
-
   const otpRecord = await OtpModel.findOne({ email });
-
-  if (!otpRecord) {
+  if (!otpRecord)
     return next(Object.assign(new Error("OTP not found"), { statusCode: 404 }));
-  }
-
-  if (otpRecord.isExpired()) {
-    return next(Object.assign(new Error("OTP has expired"), { statusCode: 400 }));
-  }
-
-  const isMatch = otpRecord.compareOtp(otp);
-
-  if (!isMatch) {
+  if (otpRecord.isExpired())
+    return next(
+      Object.assign(new Error("OTP has expired"), { statusCode: 400 }),
+    );
+  if (!otpRecord.compareOtp(String(otp)))
     return next(Object.assign(new Error("Invalid OTP"), { statusCode: 400 }));
-  }
-
-  const admin = await Adminmodel.findOne({ email });
-
-  if (!admin) {
-    return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
-  }
-
-
-  const token = jwt.sign(
-    {
-      adminid: admin._id, 
-      role: admin.role,
-      email: admin.email,
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: "15d" }
-  );
-
-  
-  res.cookie("token", token, {
-    httpOnly: true,
-    secure: false,
-    sameSite: "lax",
-    maxAge: 15 * 24 * 60 * 60 * 1000,
-  });
-
-
+  const admin = await Adminmodel.findOne({ work_email: email })
+    .select("_id work_email")
+    .lean();
+  if (!admin)
+    return next(
+      Object.assign(new Error("Admin not found"), { statusCode: 404 }),
+    );
   const resetToken = jwt.sign(
-    { email: admin.email },
+    { email: admin.work_email },
     process.env.JWT_SECRET,
-    { expiresIn: "15m" }
+    { expiresIn: "15m" },
   );
-
-  const link = `http://localhost:5173/reset-password?token=${resetToken}`;
-
-  await sendEmail({
-    to: admin.email,
-    subject: "Optional Password Change",
-    html: `
-      <h2>Hello ${admin.organisation_name || "Admin"}</h2>
-      <p>Your OTP verification was successful.</p>
-      <a href="${link}">Change Password</a>
-    `,
-  });
-
   await OtpModel.deleteOne({ email });
-
-  res.status(200).json({
-    success: true,
-    message: "OTP verified successfully",
-    login: true,
-    user: {
-      id: admin._id,
-      email: admin.email,
-    },
-  });
+  res
+    .status(200)
+    .json({ success: true, message: "OTP verified successfully", resetToken });
 };
 
-
-const showUserPasswordPage = (req, res) => {
-  const token = req.query.token;
-
-  res.send(`
-    <h2>Set Your Password</h2>
-
-    <form action="/admin/resetAdminPassword" method="POST">
-
-      <input type="hidden" name="token" value="${token}" />
-
-      <input type="password" name="newPassword" placeholder="Enter new password" required/>
-
-      <button type="submit">Update Password</button>
-
-    </form>
-  `);
-};
 const resetAdminPassword = async (req, res, next) => {
-  const { token, newPassword } = req.body;
-
+  const { resetToken, newPassword } = req.body;
   let decode;
   try {
-    decode = jwt.verify(token, process.env.JWT_SECRET);
+    decode = jwt.verify(resetToken, process.env.JWT_SECRET);
   } catch (err) {
     return next(
-      Object.assign(new Error("Invalid or expired token"), {
-        statusCode: 400,
-      })
+      Object.assign(new Error("Invalid or expired token"), { statusCode: 400 }),
     );
   }
-
-  const admin = await Adminmodel.findOne({ email: decode.email });
-
-  if (!admin) {
+  const admin = await Adminmodel.findOne({ work_email: decode.email });
+  if (!admin)
     return next(
-      Object.assign(new Error("Admin not found"), {
-        statusCode: 404,
-      })
+      Object.assign(new Error("Admin not found"), { statusCode: 404 }),
     );
-  }
-
   admin.password = newPassword;
   await admin.save();
-
-  res.status(200).json({
-    success: true,
-    message: "Password updated successfully",
-  });
+  res
+    .status(200)
+    .json({ success: true, message: "Password updated successfully" });
 };
+
 const getme = async (req, res, next) => {
-  if (!req.admin) {
+  if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  }
-
-  const admin = req.admin;
-
-  res.status(200).json(admin);
+  res.status(200).json(req.admin);
 };
 
 const editadminprofile = async (req, res, next) => {
-  try {
-    if (!req.admin) {
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  const admin = req.admin;
+  const { phone, profile_image, f_name, l_name } = req.body;
+  if (f_name !== undefined) admin.f_name = f_name;
+  if (l_name !== undefined) admin.l_name = l_name;
+  if (phone !== undefined) {
+    if (typeof phone !== "string")
       return next(
-        Object.assign(new Error("Unauthorized"), { statusCode: 401 })
+        Object.assign(new Error("Phone must be a string"), { statusCode: 400 }),
+      );
+    admin.phone = phone;
+  }
+  if (profile_image !== undefined) {
+    if (typeof profile_image !== "string")
+      return next(
+        Object.assign(new Error("Profile image must be a string"), {
+          statusCode: 400,
+        }),
+      );
+    if (profile_image === "" || profile_image.includes("api.dicebear.com")) {
+      admin.profile_image = profile_image;
+    } else {
+      return next(
+        Object.assign(new Error("Invalid avatar format"), { statusCode: 400 }),
       );
     }
-
-    const admin = req.admin;
-    const { phone, profile_image } = req.body;
-
-    if (phone !== undefined) {
-      if (typeof phone !== "string") {
-        return next(
-          Object.assign(new Error("Phone must be a string"), {
-            statusCode: 400,
-          })
-        );
-      }
-      admin.phone = phone;
-    }
-
-    if (profile_image !== undefined) {
-      if (typeof profile_image !== "string") {
-        return next(
-          Object.assign(new Error("Profile image must be a string"), {
-            statusCode: 400,
-          })
-        );
-      }
-
-      if (
-        profile_image === "" ||
-        profile_image.includes("api.dicebear.com")
-      ) {
-        admin.profile_image = profile_image;
-      } else {
-        return next(
-          Object.assign(new Error("Invalid avatar format"), {
-            statusCode: 400,
-          })
-        );
-      }
-    }
-
-    await admin.save();
-
-    res.status(200).json({
-      success: true,
-      message: "Admin profile updated successfully",
-      admin: {
-        _id: admin._id,
-        organisation_name: admin.organisation_name,
-        email: admin.email,
-        phone: admin.phone,
-        profile_image: admin.profile_image,
-      },
-    });
-  } catch (error) {
-    console.error("Admin profile update error:", error);
-    return next(
-      Object.assign(new Error(error.message), { statusCode: 500 })
-    );
   }
+  await admin.save();
+  res.status(200).json({
+    success: true,
+    message: "Admin profile updated successfully",
+    admin: {
+      _id: admin._id,
+      f_name: admin.f_name,
+      l_name: admin.l_name,
+      work_email: admin.work_email,
+      phone: admin.phone,
+      profile_image: admin.profile_image,
+    },
+  });
 };
 
 const changepassword = async (req, res, next) => {
-  if (!req.admin) {
+  if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  }
-
-  const adminid = req.admin._id;
-  const admin = await Adminmodel.findById(adminid).select("+password");
-
   const { currentPassword, newPassword } = req.body;
-
-  console.log("Entered:", currentPassword);
-  console.log("Stored Hash:", admin.password);
-
-  if (!currentPassword || !newPassword) {
+  if (!currentPassword || !newPassword)
     return next(
-      Object.assign(new Error("Current password and new password are required"), {
-        statusCode: 400,
-      })
+      Object.assign(
+        new Error("Current password and new password are required"),
+        { statusCode: 400 },
+      ),
     );
-  }
-
+  const admin = await Adminmodel.findById(req.admin._id);
   const isvalid = await admin.isValidPassword(currentPassword);
-
-  if (!isvalid) {
-    return next(Object.assign(new Error("Current password is incorrect"), { statusCode: 400 }));
-  }
-
-  if (currentPassword === newPassword) {
+  if (!isvalid)
     return next(
-      Object.assign(new Error("New password must be different from current password"), {
+      Object.assign(new Error("Current password is incorrect"), {
         statusCode: 400,
-      })
+      }),
     );
-  }
-
+  if (currentPassword === newPassword)
+    return next(
+      Object.assign(
+        new Error("New password must be different from current password"),
+        { statusCode: 400 },
+      ),
+    );
   admin.password = newPassword;
-
   await admin.save();
+  res
+    .status(200)
+    .json({ success: true, message: "Password updated successfully" });
+};
 
+const getTodayCheckins = async (req, res) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const checkins = await Attendance.find({
+    date: today,
+    checkIn: { $exists: true },
+    latitude: { $exists: true, $ne: null },
+    longitude: { $exists: true, $ne: null },
+  })
+    .populate("employee", "f_name l_name work_email department designation")
+    .select("employee role latitude longitude checkIn checkOut")
+    .lean();
+  const payload = checkins.map((c) => ({
+    id: c._id,
+    name:
+      [c.employee?.f_name, c.employee?.l_name].filter(Boolean).join(" ") ||
+      "Unknown",
+    email: c.employee?.work_email || "",
+    dept: c.employee?.department || c.employee?.designation || "",
+    role: c.role,
+    lat: c.latitude,
+    lng: c.longitude,
+    checkIn: c.checkIn,
+    checkedOut: !!c.checkOut,
+  }));
+  res.json({ checkins: payload, total: payload.length });
+};
+
+const getOrgInfo = async (req, res) => {
+  const superAdmin = await SuperAdminModel.findById(req.admin.created_by)
+    .select("organisation_name profile_image")
+    .lean();
+  res.json({
+    organisation_name: superAdmin?.organisation_name,
+    profile_image: superAdmin?.profile_image,
+  });
+};
+
+// ─── DOCUMENT ACCESS (Admin = Manager-level + can see ALL org documents) ───
+
+/**
+ * Admin can view ALL personal documents across the organisation.
+ * Sets viewedByAdmin = true on each document fetched.
+ */
+const getAllPersonalDocumentsAdmin = async (req, res, next) => {
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  const documents = await Document.find({ fileType: "personal" })
+    .populate(
+      "employee",
+      "f_name l_name work_email personal_contact department designation",
+    )
+    .populate("underManager", "f_name l_name work_email")
+    .sort({ uploadedAt: -1 })
+    .lean();
+  // Mark unread docs as viewed (fire-and-forget)
+  Document.updateMany(
+    { fileType: "personal", viewedByAdmin: false },
+    { $set: { viewedByAdmin: true } },
+  ).exec();
   res.status(200).json({
-    success: true,
-    message: "Password updated successfully",
+    message: "All personal documents fetched successfully",
+    total: documents.length,
+    documents: documents.map((doc) => ({
+      id: doc._id,
+      title: doc.title,
+      fileUrl: doc.fileUrl,
+      fileType: doc.fileType,
+      sizeKB: doc.size,
+      uploadedAt: doc.uploadedAt,
+      viewedByManager: doc.viewedByManager,
+      viewedByAdmin: doc.viewedByAdmin,
+      employee: doc.employee
+        ? {
+            id: doc.employee._id,
+            name: `${doc.employee.f_name} ${doc.employee.l_name}`,
+            email: doc.employee.work_email,
+            contact: doc.employee.personal_contact,
+            department: doc.employee.department,
+            designation: doc.employee.designation,
+          }
+        : null,
+      reportingManager: doc.underManager
+        ? {
+            id: doc.underManager._id,
+            name: `${doc.underManager.f_name} ${doc.underManager.l_name}`,
+            email: doc.underManager.work_email,
+          }
+        : null,
+    })),
+  });
+};
+
+/**
+ * Admin can view ALL expense documents across the organisation.
+ */
+const getAllExpenseDocumentsAdmin = async (req, res, next) => {
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  const documents = await Document.find({ fileType: "expense" })
+    .populate(
+      "employee",
+      "f_name l_name work_email personal_contact department designation",
+    )
+    .populate("underManager", "f_name l_name work_email")
+    .sort({ uploadedAt: -1 })
+    .lean();
+  Document.updateMany(
+    { fileType: "expense", viewedByAdmin: false },
+    { $set: { viewedByAdmin: true } },
+  ).exec();
+  res.status(200).json({
+    message: "All expense documents fetched successfully",
+    total: documents.length,
+    documents: documents.map((doc) => ({
+      id: doc._id,
+      title: doc.title,
+      fileUrl: doc.fileUrl,
+      fileType: doc.fileType,
+      sizeKB: doc.size,
+      uploadedAt: doc.uploadedAt,
+      viewedByManager: doc.viewedByManager,
+      viewedByAdmin: doc.viewedByAdmin,
+      employee: doc.employee
+        ? {
+            id: doc.employee._id,
+            name: `${doc.employee.f_name} ${doc.employee.l_name}`,
+            email: doc.employee.work_email,
+            contact: doc.employee.personal_contact,
+            department: doc.employee.department,
+            designation: doc.employee.designation,
+          }
+        : null,
+      reportingManager: doc.underManager
+        ? {
+            id: doc.underManager._id,
+            name: `${doc.underManager.f_name} ${doc.underManager.l_name}`,
+            email: doc.underManager.work_email,
+          }
+        : null,
+    })),
+  });
+};
+
+/**
+ * Admin: view detail of a single document (any employee).
+ */
+const getDocumentDetailsAdmin = async (req, res, next) => {
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  const { documentId } = req.params;
+  if (!documentId)
+    return next(
+      Object.assign(new Error("Document ID is required"), { statusCode: 400 }),
+    );
+  const document = await Document.findById(documentId)
+    .populate(
+      "employee",
+      "f_name l_name work_email personal_contact department designation",
+    )
+    .populate("underManager", "f_name l_name work_email");
+  if (!document)
+    return next(
+      Object.assign(new Error("Document not found"), { statusCode: 404 }),
+    );
+  document.viewedByAdmin = true;
+  await document.save();
+  res.status(200).json({
+    message: "Document details fetched successfully",
+    document: {
+      id: document._id,
+      title: document.title,
+      fileUrl: document.fileUrl,
+      fileType: document.fileType,
+      sizeKB: document.size,
+      uploadedAt: document.uploadedAt,
+      viewedByManager: document.viewedByManager,
+      viewedByAdmin: document.viewedByAdmin,
+      employee: document.employee
+        ? {
+            id: document.employee._id,
+            name: `${document.employee.f_name} ${document.employee.l_name}`,
+            email: document.employee.work_email,
+            department: document.employee.department,
+          }
+        : null,
+      reportingManager: document.underManager
+        ? {
+            id: document.underManager._id,
+            name: `${document.underManager.f_name} ${document.underManager.l_name}`,
+            email: document.underManager.work_email,
+          }
+        : null,
+    },
   });
 };
 
 
-
-
-const getTodayCheckins = async (req, res) => {
-  try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const checkins = await Attendance.find({
-      date:      today,
-      checkIn:   { $exists: true },
-      latitude:  { $exists: true, $ne: null },
-      longitude: { $exists: true, $ne: null },
-    })
-      .populate(
-        "employee",
-        "f_name l_name work_email department designation" // ← exact field names from both schemas
-      )
-      .select("employee role latitude longitude checkIn checkOut");
-
-    const payload = checkins.map((c) => ({
-      id:    c._id,
-      name:  [c.employee?.f_name, c.employee?.l_name].filter(Boolean).join(" ") || "Unknown",
-      email: c.employee?.work_email || "",
-      dept:  c.employee?.department || c.employee?.designation || "",
-      role:  c.role,
-      lat:   c.latitude,
-      lng:   c.longitude,
-      checkIn:    c.checkIn,
-      checkedOut: !!c.checkOut,
-    }));
-
-    res.json({ checkins: payload, total: payload.length });
-
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+const adminActionOnLeave = async (req, res, next) => {
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  const { leaveId, action, remarks } = req.body;
+  if (!leaveId || !action)
+    return next(
+      Object.assign(new Error("leaveId and action are required"), {
+        statusCode: 400,
+      }),
+    );
+  if (!["approve", "reject"].includes(action))
+    return next(
+      Object.assign(new Error("action must be 'approve' or 'reject'"), {
+        statusCode: 400,
+      }),
+    );
+  const leave = await Leave.findById(leaveId);
+  if (!leave)
+    return next(
+      Object.assign(new Error("Leave not found"), { statusCode: 404 }),
+    );
+  if (
+    leave.status !== "forwarded_reporting_manager" &&
+    leave.status !== "pending_manager"
+  )
+    return next(
+      Object.assign(
+        new Error("Only pending or forwarded leaves can be actioned by admin"),
+        { statusCode: 400 },
+      ),
+    );
+  if (action === "approve") {
+    leave.status = "approved_reporting_manager";
+    leave.approvedBy = null; // admin approved, no manager ref
+    leave.remarks = remarks || "Approved by Admin";
+  } else {
+    leave.status = "rejected_reporting_manager";
+    leave.rejectedBy = null;
+    leave.remarks = remarks || "Rejected by Admin";
+    leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   }
+  await leave.save();
+  res.status(200).json({
+    message: `Leave ${action === "approve" ? "approved" : "rejected"} successfully by Admin`,
+    leave,
+  });
 };
 
 module.exports = {
-  registerAdmin,
   verifyAdmin,
   adminlogin,
   adminlogout,
-  findallmanagers,
   addmanager,
   addemployee,
+  findallmanagers,
   getallemployee,
   editemployee,
   getperticularemployee,
   getperticularemanager,
   deleteemployee,
   showallleaves,
-  acceptleavebyadmin,
-  rejectleavebyadmin,
+  applyleave,
   noofemployee,
   createannouncement,
   getallannouncement,
@@ -1464,9 +1067,13 @@ module.exports = {
   forgetpasswordloginotp,
   verifyAotp,
   resetAdminPassword,
-  showUserPasswordPage,
   getme,
   editadminprofile,
   changepassword,
-  getTodayCheckins
+  getTodayCheckins,
+  getOrgInfo,
+  getAllPersonalDocumentsAdmin,
+  getAllExpenseDocumentsAdmin,
+  getDocumentDetailsAdmin,
+  adminActionOnLeave,
 };
