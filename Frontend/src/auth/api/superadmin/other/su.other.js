@@ -111,5 +111,18 @@ export const getNoOfEmployees = async () => {
   return res.data;
 };
 
+export const getAllPersonalDocumentsSuperAdmin = async () => {
+  const res = await api.get("superadmin/documents/personal");
+  return res.data;
+};
 
+export const getAllExpenseDocumentsSuperAdmin = async () => {
+  const res = await api.get("superadmin/documents/expense");
+  return res.data;
+};
+
+export const getDocumentDetailsSuperAdmin = async (documentId) => {
+  const res = await api.get(`superadmin/documents/${documentId}`);
+  return res.data;
+};
 

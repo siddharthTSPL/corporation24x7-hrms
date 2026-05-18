@@ -116,7 +116,7 @@ function Sidebar({ collapsed, setCollapsed }) {
         ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
       >
         <div className="p-4 flex items-center justify-between border-b">
-          <img src={logo} alt="logo" className="w-40" />
+          <img src="/src/assets/logo1.png" alt="logo" className="w-40" />
           <button className="md:hidden" onClick={() => setMobileOpen(false)}>
             <FaTimes />
           </button>
