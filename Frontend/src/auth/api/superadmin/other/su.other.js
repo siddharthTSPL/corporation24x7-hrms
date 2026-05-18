@@ -55,7 +55,7 @@ export const updateAdmin = async (id, data) => {
 };
 
 export const deleteAdmin = async (id) => {
-  const res = await api.delete(`superadmin/delete-admin/${id}`);
+  const res = await api.delete(`superadmin/admin/delete/${id}`);
   return res.data;
 };
 
