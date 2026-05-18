@@ -199,12 +199,10 @@ managerSchema.index({ department: 1, status: 1 });
 managerSchema.index({ status: 1 });
 managerSchema.index({ reporting_manager: 1 });
 
-managerSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
+managerSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
 
   this.password = await bcrypt.hash(this.password, 10);
-
-  next();
 });
 
 managerSchema.methods.isValidPassword = async function (password) {
