@@ -7,7 +7,7 @@ const api = axios.create({
 
 
 export const createAnnouncement = async (data) => {
-  const res = await api.post("superadmin/create-announcement", data);
+  const res = await api.post("superadmin/createannouncement", data);
   return res.data;
 };
 

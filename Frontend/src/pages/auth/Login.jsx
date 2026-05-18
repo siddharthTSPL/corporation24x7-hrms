@@ -129,7 +129,7 @@ function Login() {
 
       <div className="w-full max-w-5xl bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden">
         <div className="w-full md:w-1/2 p-8">
-          <img src={logo} alt="logo" className="w-28 mb-6" />
+          <img src="src/assets/logo1.png" alt="logo" className="w-28 mb-6" />
 
           {step === "login" && (
             <>

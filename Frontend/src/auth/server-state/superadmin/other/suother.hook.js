@@ -25,6 +25,9 @@ import {
   getParticularManager,
   deleteEmployee,
   getNoOfEmployees,
+    getAllPersonalDocumentsSuperAdmin,
+  getAllExpenseDocumentsSuperAdmin,
+  getDocumentDetailsSuperAdmin,
 } from "../../../api/superadmin/other/su.other";
 
 
@@ -267,6 +270,35 @@ export const useGetNoOfEmployees = () => {
     queryKey: ["employee-count"],
     queryFn: getNoOfEmployees,
     staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+  });
+};
+
+
+
+export const useGetAllPersonalDocumentsSuperAdmin = () => {
+  return useQuery({
+    queryKey: ["superadmin-personal-documents"],
+    queryFn: getAllPersonalDocumentsSuperAdmin,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useGetAllExpenseDocumentsSuperAdmin = () => {
+  return useQuery({
+    queryKey: ["superadmin-expense-documents"],
+    queryFn: getAllExpenseDocumentsSuperAdmin,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useGetDocumentDetailsSuperAdmin = (documentId) => {
+  return useQuery({
+    queryKey: ["superadmin-document", documentId],
+    queryFn: () => getDocumentDetailsSuperAdmin(documentId),
+    enabled: !!documentId,
     refetchOnWindowFocus: false,
   });
 };
