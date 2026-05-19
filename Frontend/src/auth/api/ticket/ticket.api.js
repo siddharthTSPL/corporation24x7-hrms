@@ -7,11 +7,9 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
-
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-
   return config;
 });
 
@@ -22,7 +20,6 @@ api.interceptors.response.use(
       localStorage.removeItem("token");
       localStorage.removeItem("role");
     }
-
     return Promise.reject(err);
   }
 );
@@ -33,10 +30,7 @@ export const getTicketStats = async () => {
 };
 
 export const getAllTickets = async (params = {}) => {
-  const res = await api.get("ticket/all", {
-    params,
-  });
-
+  const res = await api.get("ticket/all", { params });
   return res.data;
 };
 
@@ -46,24 +40,16 @@ export const getTicketById = async (id) => {
 };
 
 export const updateTicketStatus = async ({ id, data }) => {
-  const res = await api.put(
-    `ticket/${id}/update`,
-    data
-  );
-
+  const res = await api.put(`ticket/${id}/update`, data);
   return res.data;
 };
 
 export const escalateTicket = async ({ id, data }) => {
-  const res = await api.put(
-    `ticket/superadmin/${id}/escalate`,
-    data
-  );
-
+  const res = await api.put(`ticket/${id}/escalate`, data);
   return res.data;
 };
 
 export const deleteTicket = async (id) => {
-  const res = await api.delete(`ticket/superadmin/${id}`);
+  const res = await api.delete(`ticket/${id}`);
   return res.data;
 };

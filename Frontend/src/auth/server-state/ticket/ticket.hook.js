@@ -35,59 +35,35 @@ export const useGetTicketById = (id) =>
 
 export const useUpdateTicketStatus = () => {
   const qc = useQueryClient();
-
   return useMutation({
     mutationFn: _updateTicketStatus,
     onSuccess: (_, vars) => {
-      qc.invalidateQueries({
-        queryKey: ["tickets"],
-      });
-
-      qc.invalidateQueries({
-        queryKey: ["ticket", vars.id],
-      });
-
-      qc.invalidateQueries({
-        queryKey: ["ticket-stats"],
-      });
+      qc.invalidateQueries({ queryKey: ["tickets"] });
+      qc.invalidateQueries({ queryKey: ["ticket", vars.id] });
+      qc.invalidateQueries({ queryKey: ["ticket-stats"] });
     },
   });
 };
 
 export const useEscalateTicket = () => {
   const qc = useQueryClient();
-
   return useMutation({
     mutationFn: _escalateTicket,
     onSuccess: (_, vars) => {
-      qc.invalidateQueries({
-        queryKey: ["tickets"],
-      });
-
-      qc.invalidateQueries({
-        queryKey: ["ticket", vars.id],
-      });
-
-      qc.invalidateQueries({
-        queryKey: ["ticket-stats"],
-      });
+      qc.invalidateQueries({ queryKey: ["tickets"] });
+      qc.invalidateQueries({ queryKey: ["ticket", vars.id] });
+      qc.invalidateQueries({ queryKey: ["ticket-stats"] });
     },
   });
 };
 
 export const useDeleteTicket = () => {
   const qc = useQueryClient();
-
   return useMutation({
     mutationFn: _deleteTicket,
     onSuccess: () => {
-      qc.invalidateQueries({
-        queryKey: ["tickets"],
-      });
-
-      qc.invalidateQueries({
-        queryKey: ["ticket-stats"],
-      });
+      qc.invalidateQueries({ queryKey: ["tickets"] });
+      qc.invalidateQueries({ queryKey: ["ticket-stats"] });
     },
   });
 };
