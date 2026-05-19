@@ -1,9 +1,6 @@
-
-
 import React, { useState } from "react";
-import { useSubmitTicket, useGetMyTickets, useRateTicket } from "../../auth/server-state/ticket/ticket.hook";
+import { useEmployeeSubmitTicket, useEmployeeGetMyTickets, useEmployeeRateTicket } from "../../auth/server-state/ticket/employeeticket.hook";
 
-/* ─── palette matches TorchX brand ──────────────────────────────── */
 const C = {
   primary:   "#730042",
   accent:    "#CD166E",
@@ -15,7 +12,6 @@ const C = {
   subtext:   "#6B5080",
 };
 
-/* ─── Global styles ──────────────────────────────────────────────── */
 const GlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
@@ -54,7 +50,6 @@ const GlobalStyles = () => (
   `}</style>
 );
 
-/* ─── Meta maps ──────────────────────────────────────────────────── */
 const TYPE_META = {
   suggestion:    { label:"Suggestion",    bg:"#DCFCE7", color:"#14803D", dot:"#22C55E", icon:"💡" },
   complaint:     { label:"Complaint",     bg:"#FEF3C7", color:"#92400E", dot:"#F59E0B", icon:"📋" },
@@ -102,7 +97,6 @@ const CAT_LABELS = {
   legal_compliance:"Legal Compliance", other:"Other",
 };
 
-/* ─── Helpers ────────────────────────────────────────────────────── */
 const fmt = (d) => d ? new Date(d).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}) : "—";
 const timeAgo = (d) => {
   if (!d) return "";
@@ -112,7 +106,6 @@ const timeAgo = (d) => {
   return `${Math.floor(diff/1440)}d ago`;
 };
 
-/* ─── Sub-components ─────────────────────────────────────────────── */
 const Spinner = () => (
   <div style={{display:"flex",alignItems:"center",justifyContent:"center",padding:"48px 0",flexDirection:"column",gap:12}}>
     <div style={{width:34,height:34,border:"3px solid #EDE6F5",borderTop:"3px solid #730042",borderRadius:"50%",animation:"spin .7s linear infinite"}}/>
@@ -136,7 +129,6 @@ const StatusChip = ({status}) => {
   return <span className="emp-chip" style={{background:m.bg,color:m.color}}><span style={{width:6,height:6,borderRadius:"50%",background:m.dot,display:"inline-block"}}/>{m.label}</span>;
 };
 
-/* ─── Submit Form ────────────────────────────────────────────────── */
 const INITIAL = {
   type:"complaint", category:"", subCategory:"", title:"", description:"",
   incidentDate:"", incidentLocation:"", witnessNames:"",
@@ -146,7 +138,7 @@ const INITIAL = {
 function SubmitForm({ onSuccess }) {
   const [form, setForm] = useState(INITIAL);
   const [toast, setToast] = useState(null);
-  const submitMut = useSubmitTicket();
+  const submitMut = useEmployeeSubmitTicket();
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v, ...(k==="type"?{category:"",subCategory:""}:{}) }));
 
@@ -185,7 +177,6 @@ function SubmitForm({ onSuccess }) {
         </div>
       </div>
 
-      {/* Type */}
       <div style={{marginBottom:16}}>
         <Label required>Ticket Type</Label>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -197,7 +188,6 @@ function SubmitForm({ onSuccess }) {
         </div>
       </div>
 
-      {/* Grid: category + severity */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:16}}>
         <div>
           <Label required>Category</Label>
@@ -214,19 +204,16 @@ function SubmitForm({ onSuccess }) {
         </div>
       </div>
 
-      {/* Title */}
       <div style={{marginBottom:16}}>
         <Label required>Title</Label>
         <input className="emp-input" value={form.title} onChange={e=>set("title",e.target.value)} placeholder="Brief, clear title for your ticket…" maxLength={120}/>
       </div>
 
-      {/* Description */}
       <div style={{marginBottom:16}}>
         <Label required>Description</Label>
         <textarea className="emp-input" rows={4} value={form.description} onChange={e=>set("description",e.target.value)} placeholder="Describe the issue in detail. Include dates, people involved, and what happened…" style={{resize:"vertical",lineHeight:1.7}}/>
       </div>
 
-      {/* Incident details */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:16}}>
         <div>
           <Label>Incident Date</Label>
@@ -238,13 +225,11 @@ function SubmitForm({ onSuccess }) {
         </div>
       </div>
 
-      {/* Witnesses */}
       <div style={{marginBottom:20}}>
         <Label>Witness Names <span style={{fontWeight:400,textTransform:"none",fontSize:10}}>(comma-separated)</span></Label>
         <input className="emp-input" value={form.witnessNames} onChange={e=>set("witnessNames",e.target.value)} placeholder="John Doe, Jane Smith"/>
       </div>
 
-      {/* Anonymous toggle */}
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:24,background:"#FAF5FF",borderRadius:12,padding:"12px 16px",border:"1px solid #DDD6FE"}}>
         <button onClick={()=>set("isAnonymous",!form.isAnonymous)} style={{width:42,height:24,borderRadius:12,border:"none",cursor:"pointer",background:form.isAnonymous?"linear-gradient(135deg,#730042,#CD166E)":"#E5E7EB",transition:"background .2s",position:"relative",flexShrink:0}}>
           <span style={{position:"absolute",top:3,left:form.isAnonymous?20:3,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left .2s",boxShadow:"0 1px 4px rgba(0,0,0,.2)"}}/>
@@ -255,7 +240,6 @@ function SubmitForm({ onSuccess }) {
         </div>
       </div>
 
-      {/* Submit */}
       <button className="emp-btn" onClick={handleSubmit} disabled={submitMut.isPending}
         style={{background:"linear-gradient(135deg,#730042,#CD166E)",color:"#fff",width:"100%",justifyContent:"center",padding:"13px",borderRadius:12,fontSize:14,boxShadow:"0 4px 16px rgba(115,0,66,.3)",opacity:submitMut.isPending?.7:1}}>
         {submitMut.isPending
@@ -264,7 +248,6 @@ function SubmitForm({ onSuccess }) {
         }
       </button>
 
-      {/* Toast */}
       {toast&&(
         <div style={{marginTop:14,padding:"10px 16px",borderRadius:10,fontSize:13,fontFamily:"'DM Sans',sans-serif",fontWeight:500,background:toast.type==="success"?"#F0FDF4":"#FEF2F2",color:toast.type==="success"?"#14803D":"#991B1B",border:`1px solid ${toast.type==="success"?"#86EFAC":"#FCA5A5"}`}}>
           {toast.type==="success"?"✅":"❌"} {toast.msg}
@@ -274,11 +257,10 @@ function SubmitForm({ onSuccess }) {
   );
 }
 
-/* ─── Rate Modal ─────────────────────────────────────────────────── */
 function RateModal({ ticket, onClose }) {
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState("");
-  const rateMut = useRateTicket();
+  const rateMut = useEmployeeRateTicket();
 
   const submit = async () => {
     if (!rating) return;
@@ -311,9 +293,8 @@ function RateModal({ ticket, onClose }) {
   );
 }
 
-/* ─── My Tickets List ────────────────────────────────────────────── */
 function MyTickets() {
-  const { data, isLoading } = useGetMyTickets();
+  const { data, isLoading } = useEmployeeGetMyTickets();
   const [rateTarget, setRateTarget] = useState(null);
   const tickets = data?.tickets || [];
 
@@ -369,17 +350,15 @@ function MyTickets() {
   );
 }
 
-/* ─── Main Export ────────────────────────────────────────────────── */
 export default function EmployeeTickets() {
   const [tab, setTab] = useState("submit");
-  const { data } = useGetMyTickets();
+  const { data } = useEmployeeGetMyTickets();
   const count = data?.count || 0;
 
   return (
     <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'DM Sans',sans-serif",padding:"32px 36px"}}>
       <GlobalStyles/>
 
-      {/* Header */}
       <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:28}}>
         <div style={{width:50,height:50,borderRadius:16,background:"linear-gradient(135deg,#730042,#CD166E)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,boxShadow:"0 6px 22px rgba(115,0,66,.35)"}}>🎫</div>
         <div>
@@ -388,7 +367,6 @@ export default function EmployeeTickets() {
         </div>
       </div>
 
-      {/* Tabs */}
       <div style={{display:"flex",gap:4,background:"rgba(235,228,245,.6)",borderRadius:12,padding:4,marginBottom:24,width:"fit-content",border:"1px solid rgba(200,185,220,.3)"}}>
         {[["submit","📝 Submit New"],["mytickets",`📋 My Tickets (${count})`]].map(([k,l])=>{
           const active=tab===k;
