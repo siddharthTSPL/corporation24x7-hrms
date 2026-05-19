@@ -1,13 +1,17 @@
-/**
- * ManagerTickets.jsx
- * Manager view: Submit a ticket + see own tickets + rate resolved ones
- * Same hooks as employee (submit/getMyTickets/rateTicket) — manager token auto-applied by axios interceptor
- */
-
 import React, { useState } from "react";
-import { useSubmitTicket, useGetMyTickets, useRateTicket } from "../../auth/server-state/ticket/ticket.hook";
+import { useManagerSubmitTicket, useManagerGetMyTickets, useManagerRateTicket } from "../../auth/server-state/manager/managerticket/managerticket";
 
-/* ─── Global styles ──────────────────────────────────────────────── */
+const C = {
+  primary:   "#730042",
+  accent:    "#CD166E",
+  bg:        "linear-gradient(160deg,#F7F3FC 0%,#F0EBF8 50%,#F4F0FA 100%)",
+  card:      "#fff",
+  border:    "rgba(180,155,210,.25)",
+  muted:     "#9B8BAE",
+  text:      "#1C1028",
+  subtext:   "#6B5080",
+};
+
 const GlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
@@ -33,7 +37,7 @@ const GlobalStyles = () => (
       width:100%; box-sizing:border-box; padding:10px 14px; border-radius:10px;
       font-size:13px; font-family:'DM Sans',sans-serif; color:#1C1028;
       background:#FDFBFF; border:1.5px solid #E2D8EE; outline:none;
-      transition:border .2s,box-shadow .2s;
+      transition:border .2s, box-shadow .2s;
     }
     .mgr-input:focus { border-color:#730042!important; box-shadow:0 0 0 3px rgba(115,0,66,.09); }
     .mgr-chip {
@@ -62,6 +66,13 @@ const STATUS_META = {
   resolved:     { label:"Resolved",      bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
   closed:       { label:"Closed",        bg:"#F3F4F6", color:"#374151", dot:"#9CA3AF" },
   rejected:     { label:"Rejected",      bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
+};
+
+const SEV_META = {
+  low:      { label:"Low",      bg:"#F0FDF4", color:"#14803D" },
+  medium:   { label:"Medium",   bg:"#FFFBEB", color:"#92400E" },
+  high:     { label:"High",     bg:"#FFF7ED", color:"#9A3412" },
+  critical: { label:"Critical", bg:"#FEF2F2", color:"#991B1B" },
 };
 
 const CATEGORIES = {
@@ -124,11 +135,10 @@ const INITIAL = {
   severity:"medium", isAnonymous:false,
 };
 
-/* ─── Submit Form ────────────────────────────────────────────────── */
 function SubmitForm({ onSuccess }) {
   const [form, setForm] = useState(INITIAL);
   const [toast, setToast] = useState(null);
-  const submitMut = useSubmitTicket();
+  const submitMut = useManagerSubmitTicket();
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v, ...(k==="type"?{category:"",subCategory:""}:{}) }));
 
@@ -142,10 +152,11 @@ function SubmitForm({ onSuccess }) {
       showToast("Please fill in all required fields.","error"); return;
     }
     try {
-      await submitMut.mutateAsync({
+      const payload = {
         ...form,
         witnessNames: form.witnessNames ? form.witnessNames.split(",").map(s=>s.trim()).filter(Boolean) : [],
-      });
+      };
+      await submitMut.mutateAsync(payload);
       showToast("Ticket submitted successfully! 🎉","success");
       setForm(INITIAL);
       onSuccess?.();
@@ -158,17 +169,14 @@ function SubmitForm({ onSuccess }) {
 
   return (
     <div style={{background:"#fff",borderRadius:20,border:"1px solid rgba(180,155,210,.25)",padding:28,boxShadow:"0 4px 20px rgba(60,20,80,.07)"}}>
-      {/* Manager badge */}
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}>
-        <div style={{width:44,height:44,borderRadius:14,background:"linear-gradient(135deg,#1D4ED8,#3B82F6)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,boxShadow:"0 4px 14px rgba(29,78,216,.3)"}}>📝</div>
+        <div style={{width:44,height:44,borderRadius:14,background:"linear-gradient(135deg,#730042,#CD166E)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,boxShadow:"0 4px 14px rgba(115,0,66,.3)"}}>📝</div>
         <div>
           <div style={{fontSize:17,fontWeight:700,color:"#1C1028",fontFamily:"'Playfair Display',serif"}}>New Ticket</div>
-          <div style={{fontSize:12,color:"#9B8BAE",fontFamily:"'DM Sans',sans-serif"}}>Manager submission — confidential</div>
+          <div style={{fontSize:12,color:"#9B8BAE",fontFamily:"'DM Sans',sans-serif"}}>Your submission is confidential</div>
         </div>
-        <span style={{marginLeft:"auto",padding:"4px 12px",borderRadius:20,background:"#EFF6FF",color:"#1D4ED8",fontSize:11,fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>Manager Portal</span>
       </div>
 
-      {/* Type selector */}
       <div style={{marginBottom:16}}>
         <Label required>Ticket Type</Label>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -191,22 +199,19 @@ function SubmitForm({ onSuccess }) {
         <div>
           <Label>Severity</Label>
           <select className="mgr-input" value={form.severity} onChange={e=>set("severity",e.target.value)}>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="critical">Critical</option>
+            {Object.entries(SEV_META).map(([k,m])=><option key={k} value={k}>{m.label}</option>)}
           </select>
         </div>
       </div>
 
       <div style={{marginBottom:16}}>
         <Label required>Title</Label>
-        <input className="mgr-input" value={form.title} onChange={e=>set("title",e.target.value)} placeholder="Brief, clear title…" maxLength={120}/>
+        <input className="mgr-input" value={form.title} onChange={e=>set("title",e.target.value)} placeholder="Brief, clear title for your ticket…" maxLength={120}/>
       </div>
 
       <div style={{marginBottom:16}}>
         <Label required>Description</Label>
-        <textarea className="mgr-input" rows={4} value={form.description} onChange={e=>set("description",e.target.value)} placeholder="Describe the situation in detail…" style={{resize:"vertical",lineHeight:1.7}}/>
+        <textarea className="mgr-input" rows={4} value={form.description} onChange={e=>set("description",e.target.value)} placeholder="Describe the issue in detail. Include dates, people involved, and what happened…" style={{resize:"vertical",lineHeight:1.7}}/>
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:16}}>
@@ -216,7 +221,7 @@ function SubmitForm({ onSuccess }) {
         </div>
         <div>
           <Label>Location</Label>
-          <input className="mgr-input" value={form.incidentLocation} onChange={e=>set("incidentLocation",e.target.value)} placeholder="Department, floor, remote…"/>
+          <input className="mgr-input" value={form.incidentLocation} onChange={e=>set("incidentLocation",e.target.value)} placeholder="Office floor, remote, etc."/>
         </div>
       </div>
 
@@ -225,14 +230,13 @@ function SubmitForm({ onSuccess }) {
         <input className="mgr-input" value={form.witnessNames} onChange={e=>set("witnessNames",e.target.value)} placeholder="John Doe, Jane Smith"/>
       </div>
 
-      {/* Anonymous */}
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:24,background:"#FAF5FF",borderRadius:12,padding:"12px 16px",border:"1px solid #DDD6FE"}}>
         <button onClick={()=>set("isAnonymous",!form.isAnonymous)} style={{width:42,height:24,borderRadius:12,border:"none",cursor:"pointer",background:form.isAnonymous?"linear-gradient(135deg,#730042,#CD166E)":"#E5E7EB",transition:"background .2s",position:"relative",flexShrink:0}}>
           <span style={{position:"absolute",top:3,left:form.isAnonymous?20:3,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left .2s",boxShadow:"0 1px 4px rgba(0,0,0,.2)"}}/>
         </button>
         <div>
           <div style={{fontSize:12,fontWeight:600,color:"#5B21B6",fontFamily:"'DM Sans',sans-serif"}}>Submit Anonymously</div>
-          <div style={{fontSize:11,color:"#8B5CF6",fontFamily:"'DM Sans',sans-serif"}}>Your identity will not be disclosed</div>
+          <div style={{fontSize:11,color:"#8B5CF6",fontFamily:"'DM Sans',sans-serif"}}>Your identity will be hidden from Super Admin</div>
         </div>
       </div>
 
@@ -253,27 +257,35 @@ function SubmitForm({ onSuccess }) {
   );
 }
 
-/* ─── Rate Modal ─────────────────────────────────────────────────── */
 function RateModal({ ticket, onClose }) {
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState("");
-  const rateMut = useRateTicket();
+  const rateMut = useManagerRateTicket();
+
+  const submit = async () => {
+    if (!rating) return;
+    await rateMut.mutateAsync({ ticketNumber: ticket.ticketNumber, rating, feedback });
+    onClose();
+  };
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(20,0,30,.5)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)"}}>
       <div style={{background:"#fff",borderRadius:20,padding:28,width:380,boxShadow:"0 20px 60px rgba(0,0,0,.2)"}}>
         <div style={{fontSize:16,fontWeight:700,color:"#1C1028",fontFamily:"'Playfair Display',serif",marginBottom:4}}>Rate Your Experience</div>
-        <div style={{fontSize:12,color:"#9B8BAE",fontFamily:"'DM Sans',sans-serif",marginBottom:20}}>{ticket.ticketNumber}</div>
+        <div style={{fontSize:12,color:"#9B8BAE",fontFamily:"'DM Sans',sans-serif",marginBottom:20}}>{ticket.ticketNumber} · {ticket.title}</div>
+
         <div style={{display:"flex",gap:6,marginBottom:16,justifyContent:"center"}}>
           {[1,2,3,4,5].map(n=>(
             <button key={n} onClick={()=>setRating(n)} style={{fontSize:30,background:"none",border:"none",cursor:"pointer",opacity:n<=rating?1:.3,transition:"opacity .15s,transform .15s",transform:n<=rating?"scale(1.1)":"scale(1)"}}>★</button>
           ))}
         </div>
+
         <textarea className="mgr-input" rows={3} value={feedback} onChange={e=>setFeedback(e.target.value)} placeholder="Optional feedback…" style={{marginBottom:16,resize:"none"}}/>
+
         <div style={{display:"flex",gap:10}}>
           <button className="mgr-btn" onClick={onClose} style={{background:"#F4EEF9",color:"#6B5080",flex:1,justifyContent:"center"}}>Cancel</button>
-          <button className="mgr-btn" onClick={async()=>{if(!rating)return;await rateMut.mutateAsync({ticketNumber:ticket.ticketNumber,rating,feedback});onClose();}} disabled={!rating||rateMut.isPending} style={{background:"linear-gradient(135deg,#730042,#CD166E)",color:"#fff",flex:1,justifyContent:"center",opacity:(!rating||rateMut.isPending)?.6:1}}>
-            {rateMut.isPending?"Submitting…":"Submit"}
+          <button className="mgr-btn" onClick={submit} disabled={!rating||rateMut.isPending} style={{background:"linear-gradient(135deg,#730042,#CD166E)",color:"#fff",flex:1,justifyContent:"center",opacity:(!rating||rateMut.isPending)?.6:1}}>
+            {rateMut.isPending?"Submitting…":"Submit Rating"}
           </button>
         </div>
       </div>
@@ -281,9 +293,8 @@ function RateModal({ ticket, onClose }) {
   );
 }
 
-/* ─── My Tickets List ────────────────────────────────────────────── */
 function MyTickets() {
-  const { data, isLoading } = useGetMyTickets();
+  const { data, isLoading } = useManagerGetMyTickets();
   const [rateTarget, setRateTarget] = useState(null);
   const tickets = data?.tickets || [];
 
@@ -291,13 +302,13 @@ function MyTickets() {
   if (!tickets.length) return (
     <div style={{textAlign:"center",padding:"48px 0",color:"#9B8BAE",fontFamily:"'DM Sans',sans-serif"}}>
       <div style={{fontSize:40,marginBottom:12}}>🎫</div>
-      <div style={{fontWeight:500}}>No tickets yet</div>
+      <div style={{fontWeight:500}}>No tickets submitted yet</div>
     </div>
   );
 
   return (
     <>
-      {tickets.map((t,i)=>{
+      {tickets.map((t,i) => {
         const tm = TYPE_META[t.type]||{};
         const canRate = ["resolved","closed"].includes(t.status) && !t.submitterRating;
         return (
@@ -320,14 +331,14 @@ function MyTickets() {
                   </div>
                 )}
               </div>
-              <div style={{flexShrink:0}}>
+              <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end",flexShrink:0}}>
                 {canRate&&(
                   <button className="mgr-btn" onClick={()=>setRateTarget(t)} style={{background:"linear-gradient(135deg,#F59E0B,#D97706)",color:"#fff",fontSize:11,padding:"6px 12px"}}>
                     ⭐ Rate
                   </button>
                 )}
                 {t.submitterRating&&(
-                  <div style={{fontSize:11,color:"#92400E",fontFamily:"'DM Sans',sans-serif"}}>{"★".repeat(t.submitterRating)}</div>
+                  <div style={{fontSize:11,color:"#92400E",fontFamily:"'DM Sans',sans-serif"}}>{"★".repeat(t.submitterRating)} {t.submitterFeedback}</div>
                 )}
               </div>
             </div>
@@ -339,21 +350,20 @@ function MyTickets() {
   );
 }
 
-/* ─── Main Export ────────────────────────────────────────────────── */
 export default function ManagerTickets() {
   const [tab, setTab] = useState("submit");
-  const { data } = useGetMyTickets();
+  const { data } = useManagerGetMyTickets();
   const count = data?.count || 0;
 
   return (
-    <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#F7F3FC 0%,#F0EBF8 50%,#F4F0FA 100%)",fontFamily:"'DM Sans',sans-serif",padding:"32px 36px"}}>
+    <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'DM Sans',sans-serif",padding:"32px 36px"}}>
       <GlobalStyles/>
 
       <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:28}}>
-        <div style={{width:50,height:50,borderRadius:16,background:"linear-gradient(135deg,#1D4ED8,#3B82F6)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,boxShadow:"0 6px 22px rgba(29,78,216,.35)"}}>🎫</div>
+        <div style={{width:50,height:50,borderRadius:16,background:"linear-gradient(135deg,#730042,#CD166E)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,boxShadow:"0 6px 22px rgba(115,0,66,.35)"}}>🎫</div>
         <div>
           <h1 style={{fontSize:22,fontWeight:700,color:"#1C1028",margin:0,fontFamily:"'Playfair Display',serif"}}>My Tickets</h1>
-          <p style={{fontSize:12,color:"#9B8BAE",margin:"3px 0 0"}}>Manager · Submit & track your tickets</p>
+          <p style={{fontSize:12,color:"#9B8BAE",margin:"3px 0 0"}}>Submit & track your grievances, complaints, and suggestions</p>
         </div>
       </div>
 
