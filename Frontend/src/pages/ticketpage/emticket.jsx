@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useEmployeeSubmitTicket, useEmployeeGetMyTickets, useEmployeeRateTicket } from "../../auth/server-state/ticket/employeeticket.hook";
+import { useEmployeeSubmitTicket, useEmployeeGetMyTickets, useEmployeeRateTicket } from "../../auth/server-state/employee/employeeticket/employeeticket.hook";
 
 const C = {
   primary:   "#730042",
