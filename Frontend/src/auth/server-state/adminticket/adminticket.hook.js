@@ -6,7 +6,7 @@ import {
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-export const useAdminSubmitTicket = () => {
+export const useSubmitTicket = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -19,13 +19,13 @@ export const useAdminSubmitTicket = () => {
   });
 };
 
-export const useAdminGetMyTickets = () =>
+export const useGetMyTickets = () =>
   useQuery({
     queryKey: ["adminTickets"],
     queryFn: adminGetMyTickets,
   });
 
-export const useAdminRateTicket = () => {
+export const useRateTicket = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
