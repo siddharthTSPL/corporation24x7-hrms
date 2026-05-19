@@ -5,13 +5,13 @@ const api = axios.create({
   withCredentials: true,
 });
 
-
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
   return config;
 });
-
 
 api.interceptors.response.use(
   (res) => res,
@@ -21,25 +21,35 @@ api.interceptors.response.use(
       localStorage.removeItem("role");
     }
     return Promise.reject(err);
-  },
+  }
 );
 
-export const submitTicket = (data) =>
-  api.post("ticket/submit", data).then((r) => r.data);
-export const getMyTickets = () =>
-  api.get("ticket/my-tickets").then((r) => r.data);
-export const rateTicket = (ticketNumber, data) =>
-  api.post(`ticket/rate/${ticketNumber}`, data).then((r) => r.data);
+export const getTicketStats = async () => {
+  const res = await api.get("ticket/stats");
+  return res.data;
+};
 
-export const getTicketStats = () =>
-  api.get("ticket/superadmin/stats").then((r) => r.data);
-export const getAllTickets = (params = {}) =>
-  api.get("ticket/superadmin/all", { params }).then((r) => r.data);
-export const getTicketById = (id) =>
-  api.get(`ticket/superadmin/${id}`).then((r) => r.data);
-export const updateTicketStatus = (id, data) =>
-  api.put(`ticket/superadmin/${id}/update`, data).then((r) => r.data);
-export const escalateTicket = (id, data) =>
-  api.put(`ticket/superadmin/${id}/escalate`, data).then((r) => r.data);
-export const deleteTicket = (id) =>
-  api.delete(`ticket/superadmin/${id}`).then((r) => r.data);
+export const getAllTickets = async (params = {}) => {
+  const res = await api.get("ticket/all", { params });
+  return res.data;
+};
+
+export const getTicketById = async (id) => {
+  const res = await api.get(`ticket/${id}`);
+  return res.data;
+};
+
+export const updateTicketStatus = async ({ id, data }) => {
+  const res = await api.put(`ticket/${id}/update`, data);
+  return res.data;
+};
+
+export const escalateTicket = async ({ id, data }) => {
+  const res = await api.put(`ticket/${id}/escalate`, data);
+  return res.data;
+};
+
+export const deleteTicket = async (id) => {
+  const res = await api.delete(`ticket/${id}`);
+  return res.data;
+};

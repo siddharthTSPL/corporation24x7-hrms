@@ -669,22 +669,41 @@ const getattendance = async (req, res, next) => {
 const employeeSubmitTicket = async (req, res, next) => {
   try {
     const {
-      type, category, subCategory, title, description,
-      incidentDate, incidentLocation, witnessNames,
-      severity, isAnonymous, againstId, againstModel, attachments,
+      type,
+      category,
+      subCategory,
+      title,
+      description,
+      incidentDate,
+      incidentLocation,
+      witnessNames,
+      severity,
+      isAnonymous,
+      againstId,
+      againstModel,
+      attachments,
     } = req.body;
 
-    if (!req.user) return res.status(401).json({ message: "Not authenticated" });
+    if (!req.employee) {
+      return res.status(401).json({
+        message: "Not authenticated",
+      });
+    }
 
     const ticket = await Ticket.create({
-      type, category, subCategory, title, description,
-      incidentDate, incidentLocation,
+      type,
+      category,
+      subCategory,
+      title,
+      description,
+      incidentDate,
+      incidentLocation,
       witnessNames: witnessNames || [],
       severity: severity || "medium",
       isAnonymous: isAnonymous || false,
-      submittedBy: isAnonymous ? null : req.user._id,
+      submittedBy: isAnonymous ? null : req.employee._id,
       submitterModel: isAnonymous ? null : "User",
-      submitterDept: req.user.department,
+      submitterDept: req.employee.department,
       submitterRole: "employee",
       against: againstId || undefined,
       againstModel: againstModel || undefined,
@@ -709,14 +728,25 @@ const employeeSubmitTicket = async (req, res, next) => {
 
 const employeeGetMyTickets = async (req, res, next) => {
   try {
-    if (!req.user) return res.status(401).json({ message: "Not authenticated" });
+    if (!req.employee) {
+      return res.status(401).json({
+        message: "Not authenticated",
+      });
+    }
 
-    const tickets = await Ticket.find({ submittedBy: req.user._id, isDeleted: false })
+    const tickets = await Ticket.find({
+      submittedBy: req.employee._id,
+      isDeleted: false,
+    })
       .select("-timeline -internalNotes -statusHistory")
       .sort({ createdAt: -1 })
       .lean();
 
-    res.json({ success: true, count: tickets.length, tickets });
+    res.json({
+      success: true,
+      count: tickets.length,
+      tickets,
+    });
   } catch (err) {
     next(err);
   }
@@ -727,18 +757,39 @@ const employeeRateTicket = async (req, res, next) => {
     const { ticketNumber } = req.params;
     const { rating, feedback } = req.body;
 
-    if (!req.user) return res.status(401).json({ message: "Not authenticated" });
+    if (!req.employee) {
+      return res.status(401).json({
+        message: "Not authenticated",
+      });
+    }
 
-    const ticket = await Ticket.findOne({ ticketNumber, submittedBy: req.user._id });
-    if (!ticket) return res.status(404).json({ message: "Ticket not found" });
-    if (!["resolved", "closed"].includes(ticket.status))
-      return res.status(400).json({ message: "Can only rate resolved or closed tickets" });
-    if (ticket.submitterRating)
-      return res.status(400).json({ message: "You have already rated this ticket" });
+    const ticket = await Ticket.findOne({
+      ticketNumber,
+      submittedBy: req.employee._id,
+    });
+
+    if (!ticket) {
+      return res.status(404).json({
+        message: "Ticket not found",
+      });
+    }
+
+    if (!["resolved", "closed"].includes(ticket.status)) {
+      return res.status(400).json({
+        message: "Can only rate resolved or closed tickets",
+      });
+    }
+
+    if (ticket.submitterRating) {
+      return res.status(400).json({
+        message: "You have already rated this ticket",
+      });
+    }
 
     ticket.submitterRating = rating;
     ticket.submitterFeedback = feedback;
     ticket.ratedAt = new Date();
+
     ticket.timeline.push({
       action: "rating_submitted",
       note: `Submitter rated resolution ${rating}/5.`,
@@ -747,7 +798,33 @@ const employeeRateTicket = async (req, res, next) => {
     });
 
     await ticket.save();
-    res.json({ success: true, message: "Rating submitted. Thank you." });
+
+    res.json({
+      success: true,
+      message: "Rating submitted. Thank you.",
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const employeeGetTicketDetail = async (req, res, next) => {
+  try {
+    const { ticketNumber } = req.params;
+    if (!req.employee) return res.status(401).json({ message: "Not authenticated" });
+
+    const ticket = await Ticket.findOne({
+      ticketNumber,
+      submittedBy: req.employee._id,
+      isDeleted: false,
+    })
+      .populate("submittedBy", "f_name l_name work_email department designation")
+      .populate("against", "f_name l_name work_email department designation")
+      .select("-internalNotes")
+      .lean();
+
+    if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+    res.json({ success: true, ticket });
   } catch (err) {
     next(err);
   }
@@ -775,5 +852,6 @@ module.exports = {
   getattendance,
   employeeSubmitTicket,
   employeeGetMyTickets,
-  employeeRateTicket
+  employeeRateTicket,
+  employeeGetTicketDetail
 };

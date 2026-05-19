@@ -8,7 +8,7 @@ const {
   escalateTicket,
   deleteTicket,
   getTicketStats,
-} = require("../controllers/superadmin.ticket.controller");
+} = require("../controllers/ticket.controller");
 
 const superAdminAuth = require("../middleware/auth/superadmin.middleware");
 

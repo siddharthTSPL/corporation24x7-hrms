@@ -1130,6 +1130,28 @@ const managerRateTicket = async (req, res, next) => {
   }
 };
 
+const managerGetTicketDetail = async (req, res, next) => {
+  try {
+    const { ticketNumber } = req.params;
+    if (!req.manager) return res.status(401).json({ message: "Not authenticated" });
+
+    const ticket = await Ticket.findOne({
+      ticketNumber,
+      submittedBy: req.manager._id,
+      isDeleted: false,
+    })
+      .populate("submittedBy", "f_name l_name work_email department designation")
+      .populate("against", "f_name l_name work_email department designation")
+      .select("-internalNotes")
+      .lean();
+
+    if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+    res.json({ success: true, ticket });
+  } catch (err) {
+    next(err);
+  }
+};
+
 
 
 module.exports = {
@@ -1165,5 +1187,6 @@ module.exports = {
   getattendance,
   managerSubmitTicket,
   managerGetMyTickets,
-  managerRateTicket
+  managerRateTicket,
+  managerGetTicketDetail
 };

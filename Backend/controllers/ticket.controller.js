@@ -82,33 +82,31 @@ const getTicketById = async (req, res, next) => {
     const { id } = req.params;
     const ticket = await Ticket.findOne({ _id: id, isDeleted: false })
       .populate("submittedBy", "f_name l_name work_email department designation")
-      .populate("against",     "f_name l_name work_email department designation")
-      .lean();
+      .populate("against",     "f_name l_name work_email department designation");
 
     if (!ticket) return res.status(404).json({ message: "Ticket not found" });
 
     if (ticket.status === "open") {
-      await Ticket.findByIdAndUpdate(id, {
-        acknowledgedAt: new Date(),
-        firstResponseHours: Math.round((Date.now() - new Date(ticket.createdAt)) / 3600000),
-        $push: {
-          timeline: {
-            action:  "acknowledgement_sent",
-            note:    "Ticket viewed and acknowledged by Super Admin.",
-            byModel: "SuperAdmin",
-            byName:  `${req.superAdmin.f_name} ${req.superAdmin.l_name}`,
-            by:      req.superAdmin._id,
-          },
-          statusHistory: {
-            status:    "acknowledged",
-            changedAt: new Date(),
-            changedBy: req.superAdmin._id,
-            note:      "Auto-acknowledged on first view",
-          },
-        },
-        $set: { status: "acknowledged" },
+      ticket.status         = "acknowledged";
+      ticket.acknowledgedAt = new Date();
+      ticket.firstResponseHours = Math.round((Date.now() - new Date(ticket.createdAt)) / 3600000);
+
+      ticket.timeline.push({
+        action:  "acknowledgement_sent",
+        note:    "Ticket viewed and acknowledged by Super Admin.",
+        byModel: "SuperAdmin",
+        byName:  `${req.superAdmin.f_name} ${req.superAdmin.l_name}`,
+        by:      req.superAdmin._id,
       });
-      ticket.status = "acknowledged";
+
+      ticket.statusHistory.push({
+        status:    "acknowledged",
+        changedAt: new Date(),
+        changedBy: req.superAdmin._id,
+        note:      "Auto-acknowledged on first view",
+      });
+
+      await ticket.save();
     }
 
     res.json({ success: true, ticket });
@@ -202,9 +200,9 @@ const escalateTicket = async (req, res, next) => {
     ticket.severity        = ticket.severity === "high" ? "critical" : ticket.severity === "medium" ? "high" : ticket.severity;
 
     ticket.timeline.push({
-      action: "escalated",
-      note:   reason || "Ticket escalated by Super Admin.",
-      by:     req.superAdmin._id,
+      action:  "escalated",
+      note:    reason || "Ticket escalated by Super Admin.",
+      by:      req.superAdmin._id,
       byModel: "SuperAdmin",
       byName:  `${req.superAdmin.f_name} ${req.superAdmin.l_name}`,
     });
@@ -219,7 +217,7 @@ const escalateTicket = async (req, res, next) => {
 const deleteTicket = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const ticket = await Ticket.findById(id);
+    const ticket = await Ticket.findOne({ _id: id, isDeleted: false });
     if (!ticket) return res.status(404).json({ message: "Ticket not found" });
 
     ticket.isDeleted = true;

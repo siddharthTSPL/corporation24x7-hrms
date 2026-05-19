@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
+import { Player } from "@lottiefiles/react-lottie-player";
 import { useAuth } from "./auth/store/getmeauth/getmeauth";
 
 const Login = lazy(() => import("./pages/auth/Login"));
@@ -73,58 +74,86 @@ const SuperAdminReviews = lazy(() => import("./pages/review/sureview"));
 const SuperAdminSettings = lazy(() => import("./pages/settings/susetting"));
 
 const SuperAdminDocuments = lazy(() => import("./pages/document/sudocument"));
+
 const SuperAdminComplaints = lazy(
   () => import("./pages/ticketpage/suticket"),
-)
+);
 const AdminComplaints = lazy(() => import("./pages/ticketpage/adticket"));
 const EmployeeComplaints = lazy(() => import("./pages/ticketpage/emticket"));
 const ManagerComplaints = lazy(() => import("./pages/ticketpage/maticket"));
+
+/* ─────────────────────────────────────────────
+   Lottie Page Skeleton — mirrors Login loader
+───────────────────────────────────────────── */
 function PageSkeleton() {
+  const [animationData, setAnimationData] = useState(null);
+
+  useEffect(() => {
+    fetch("/loader.json")
+      .then((r) => r.json())
+      .then(setAnimationData)
+      .catch(() => setAnimationData(null));
+  }, []);
+
   return (
     <div
       style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0, 0, 0, 0.50)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        minHeight: "100vh",
-        background: "#f9fafb",
+        zIndex: 9999,
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 12,
-        }}
-      >
+      {animationData ? (
+        <Player
+          autoplay
+          loop
+          src={animationData}
+          style={{ height: "140px", width: "140px" }}
+        />
+      ) : (
+        /* Fallback spinner shown while loader.json itself is fetching */
         <div
           style={{
-            width: 36,
-            height: 36,
-            border: "3px solid #e5e7eb",
-            borderTop: "3px solid #6366f1",
-            borderRadius: "50%",
-            animation: "spin 0.7s linear infinite",
-          }}
-        />
-
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-
-        <span
-          style={{
-            fontSize: 13,
-            color: "#9ca3af",
-            letterSpacing: "0.05em",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 12,
           }}
         >
-          Loading…
-        </span>
-      </div>
+          <style>{`@keyframes _spin { to { transform: rotate(360deg); } }`}</style>
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              border: "3px solid rgba(255,255,255,.2)",
+              borderTop: "3px solid #CD166E",
+              borderRadius: "50%",
+              animation: "_spin 0.7s linear infinite",
+            }}
+          />
+          <span
+            style={{
+              fontSize: 13,
+              color: "rgba(255,255,255,.7)",
+              fontFamily: "sans-serif",
+              letterSpacing: "0.05em",
+            }}
+          >
+            Loading…
+          </span>
+        </div>
+      )}
     </div>
   );
 }
 
+/* ─────────────────────────────────────────────
+   Role-based redirect
+───────────────────────────────────────────── */
 function RoleBasedRedirect() {
   const { data: auth, isLoading } = useAuth();
 
@@ -132,32 +161,23 @@ function RoleBasedRedirect() {
 
   if (!auth) return <Navigate to="/login" replace />;
 
-  if (auth.role === "superadmin") {
-    return <Navigate to="/superadmin-dashboard" replace />;
-  }
-
-  if (auth.role === "admin") {
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  if (auth.role === "manager") {
-    return <Navigate to="/manager-dashboard" replace />;
-  }
-
+  if (auth.role === "superadmin") return <Navigate to="/superadmin-dashboard" replace />;
+  if (auth.role === "admin")      return <Navigate to="/dashboard" replace />;
+  if (auth.role === "manager")    return <Navigate to="/manager-dashboard" replace />;
   return <Navigate to="/employee-dashboard" replace />;
 }
 
+/* ─────────────────────────────────────────────
+   App
+───────────────────────────────────────────── */
 function App() {
   return (
     <BrowserRouter>
       <Suspense fallback={<PageSkeleton />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
-
           <Route path="/login" element={<Login />} />
-
           <Route path="/signup" element={<Signup />} />
-
           <Route path="/redirect" element={<RoleBasedRedirect />} />
 
           <Route
@@ -168,7 +188,6 @@ function App() {
                   <h2 className="text-2xl font-bold text-gray-800 mb-2">
                     Access Denied
                   </h2>
-
                   <p className="text-gray-500">
                     You don't have permission to view this page.
                   </p>
@@ -177,6 +196,7 @@ function App() {
             }
           />
 
+          {/* ── Admin / Manager / Employee routes ── */}
           <Route
             element={
               <ProtectedRoute allowedRoles={["admin", "manager", "employee"]}>
@@ -184,57 +204,37 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route path="/dashboard" element={<Dashboard />} />
-
-            <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
-
-            <Route path="/manager-dashboard" element={<Managerdashboard />} />
-
-            <Route path="/employee" element={<EmployeeTable />} />
-
-            <Route path="/leave-manager" element={<LeaveTablema />} />
-
-            <Route path="/leave-employee" element={<LeaveTableem />} />
-
-            <Route path="/leave-admin" element={<LeaveTablead />} />
-
-            <Route path="/leave" element={<LeaveTable />} />
-
-            <Route path="/announcement" element={<Announce />} />
-
-            <Route path="/announcement-employee" element={<Announceem />} />
-
-            <Route path="/announcement-manager" element={<Announcema />} />
-
-            <Route path="/document" element={<Doc />} />
-
-            <Route path="/document-manager" element={<Docma />} />
-
-            <Route path="/file" element={<File />} />
-
-            <Route path="/file-employee" element={<Fileem />} />
-
-            <Route path="/file-manager" element={<Filema />} />
-
-            <Route path="/settings" element={<Set />} />
-
-            <Route path="/settings-employee" element={<Setem />} />
-
-            <Route path="/settings-manager" element={<Setma />} />
-
-            <Route path="/organisation" element={<Organisation />} />
-
-            <Route path="/organisation-employee" element={<Organisationem />} />
-
-            <Route path="/organisation-manager" element={<Organisationma />} />
-
-            <Route path="/review-admin" element={<Reviewad />} />
-
-            <Route path="/review-manager" element={<Reviewma />} />
-
-            <Route path="/mark-attendance" element={<Attendancepage />} />
+            <Route path="/dashboard"              element={<Dashboard />} />
+            <Route path="/employee-dashboard"     element={<EmployeeDashboard />} />
+            <Route path="/manager-dashboard"      element={<Managerdashboard />} />
+            <Route path="/employee"               element={<EmployeeTable />} />
+            <Route path="/leave-manager"          element={<LeaveTablema />} />
+            <Route path="/leave-employee"         element={<LeaveTableem />} />
+            <Route path="/leave-admin"            element={<LeaveTablead />} />
+            <Route path="/leave"                  element={<LeaveTable />} />
+            <Route path="/announcement"           element={<Announce />} />
+            <Route path="/announcement-employee"  element={<Announceem />} />
+            <Route path="/announcement-manager"   element={<Announcema />} />
+            <Route path="/document"               element={<Doc />} />
+            <Route path="/document-manager"       element={<Docma />} />
+            <Route path="/file"                   element={<File />} />
+            <Route path="/file-employee"          element={<Fileem />} />
+            <Route path="/file-manager"           element={<Filema />} />
+            <Route path="/settings"               element={<Set />} />
+            <Route path="/settings-employee"      element={<Setem />} />
+            <Route path="/settings-manager"       element={<Setma />} />
+            <Route path="/organisation"           element={<Organisation />} />
+            <Route path="/organisation-employee"  element={<Organisationem />} />
+            <Route path="/organisation-manager"   element={<Organisationma />} />
+            <Route path="/review-admin"           element={<Reviewad />} />
+            <Route path="/review-manager"         element={<Reviewma />} />
+            <Route path="/mark-attendance"        element={<Attendancepage />} />
+            <Route path="/admin-complaints"       element={<AdminComplaints />} />
+            <Route path="/manager-complaints"     element={<ManagerComplaints />} />
+            <Route path="/employee-complaints"    element={<EmployeeComplaints />} />
           </Route>
 
+          {/* ── Super Admin routes ── */}
           <Route
             element={
               <ProtectedRoute allowedRoles={["superadmin"]}>
@@ -242,45 +242,15 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route
-              path="/superadmin-dashboard"
-              element={<SuperAdminDashboard />}
-            />
-
-            <Route
-              path="/superadmin-organisations"
-              element={<SuperAdminOrganisations />}
-            />
-
-            <Route
-              path="/superadmin-announcements"
-              element={<SuperAdminAnnouncements />}
-            />
-
-            <Route path="/superadmin-leaves" element={<SuperAdminLeaves />} />
-
-            <Route path="/superadmin-reviews" element={<SuperAdminReviews />} />
-
-            <Route
-              path="/superadmin-settings"
-              element={<SuperAdminSettings />}
-            />
-
-            <Route
-              path="/superadmin-documents"
-              element={<SuperAdminDocuments />}
-            />
+            <Route path="/superadmin-dashboard"      element={<SuperAdminDashboard />} />
+            <Route path="/superadmin-organisations"  element={<SuperAdminOrganisations />} />
+            <Route path="/superadmin-announcements"  element={<SuperAdminAnnouncements />} />
+            <Route path="/superadmin-leaves"         element={<SuperAdminLeaves />} />
+            <Route path="/superadmin-reviews"        element={<SuperAdminReviews />} />
+            <Route path="/superadmin-settings"       element={<SuperAdminSettings />} />
+            <Route path="/superadmin-documents"      element={<SuperAdminDocuments />} />
+            <Route path="/superadmin-complaints"     element={<SuperAdminComplaints />} />
           </Route>
-
-          <Route path="/superadmin-complaints" element={<SuperAdminComplaints />} />
-
-          <Route path="/admin-complaints" element={<AdminComplaints />} />
-
-          <Route path="/manager-complaints" element={<ManagerComplaints />} />
-
-          <Route path="/employee-complaints" element={<EmployeeComplaints />} />
-
-          
         </Routes>
       </Suspense>
     </BrowserRouter>
