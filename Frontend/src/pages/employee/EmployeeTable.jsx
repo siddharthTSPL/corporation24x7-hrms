@@ -274,8 +274,8 @@ function EmptyState({ onAdd }) {
         <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
           <div className="text-5xl">👥</div>
           <p className="text-[#730042] font-medium">No employees found</p>
-          <p className="text-[#993556] text-sm">Add your first employee to get started</p>
-          <button onClick={onAdd} className="mt-2 px-4 py-2 rounded-xl text-white text-sm font-semibold hover:opacity-90 transition" style={{ background: "#CD166E" }}>
+          <p className="text-[#750a2d] text-sm">Add your first employee to get started</p>
+          <button onClick={onAdd} className="mt-2 px-4 py-2 rounded-xl text-white text-sm font-semibold hover:opacity-90 transition" style={{ background: "#730042" }}>
             + Add Employee
           </button>
         </div>
@@ -953,7 +953,7 @@ export default function EmployeeTable() {
             <button
               onClick={() => { setOpen(true); setEmpStep(0); }}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-semibold hover:opacity-90 transition-all"
-              style={{ background: "#CD166E" }}
+              style={{ background: "#730042" }}
             >
               <FaUserPlus size={13} /><span>Add Employee</span>
             </button>
@@ -1107,7 +1107,7 @@ export default function EmployeeTable() {
           steps={EMP_STEPS}
           currentStep={empStep}
           setCurrentStep={setEmpStep}
-          accentColor="#CD166E"
+          accentColor="#730042"
         >
           <EmpStepFields step={empStep} form={empForm} onChange={handleEmpChange} errors={empErrors} managers={managers} />
         </StepModal>
