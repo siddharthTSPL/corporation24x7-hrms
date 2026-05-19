@@ -1,4 +1,4 @@
-import { adminSubmitTicket, adminGetMyTickets, adminRateTicket } from "../../api/adminapi/ticket/adminticket.api";
+import { adminSubmitTicket, adminGetMyTickets, adminRateTicket,adminGetTicketDetail } from "../../api/adminapi/ticket/adminticket.api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const useSubmitTicket = () => {
@@ -28,3 +28,11 @@ export const useRateTicket = () => {
     },
   });
 };
+
+export const useGetTicketDetail = (ticketNumber) =>
+  useQuery({
+    queryKey: ["adminTicket", ticketNumber],
+    queryFn: () => adminGetTicketDetail(ticketNumber),
+    enabled: !!ticketNumber,
+    staleTime: 30000,
+  });
