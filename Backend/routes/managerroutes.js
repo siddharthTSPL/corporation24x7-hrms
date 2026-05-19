@@ -166,17 +166,23 @@ managerrouter.get(
 managerrouter.post(
   "/submit-ticket",
   managermiddleware,
-  asyncHandler(managerSubmitTicket),
+  asyncHandler(managercontroller.managerSubmitTicket),
 );
 managerrouter.get(
   "/my-tickets",
   managermiddleware,
-  asyncHandler(managerGetMyTickets),
+  asyncHandler(managercontroller.managerGetMyTickets),
 );
 managerrouter.post(
   "/rate-ticket/:ticketNumber",
   managermiddleware,
-  asyncHandler(managerRateTicket),
+  asyncHandler(managercontroller.managerRateTicket),
+);
+
+managerrouter.get(
+  "/getTicketDetail/:ticketNumber",
+  managermiddleware,
+  asyncHandler(managercontroller. managerGetTicketDetail),
 );
 
 module.exports = managerrouter;

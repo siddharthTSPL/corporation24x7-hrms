@@ -36,7 +36,9 @@ const {
   adminActionOnLeave,
     adminSubmitTicket,
   adminGetMyTickets,
-  adminRateTicket
+  adminRateTicket,
+   adminGetTicketDetail
+
 
 } = require("../controllers/admin.controller");
 
@@ -179,6 +181,12 @@ adminrouter.post(
   "/rateTicket",
   adminauthmiddleware,
   asyncHandler(adminRateTicket),
+);
+
+adminrouter.get(
+  "/getTicketDetail/:ticketNumber",
+  adminauthmiddleware,
+  asyncHandler(adminGetTicketDetail),
 );
 
 module.exports = adminrouter;

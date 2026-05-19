@@ -30,6 +30,7 @@ const leaveBalanceSchema = new mongoose.Schema(
     PL: Number,
     pbc: Number,
     lwp: Number,
+    wfh: Number,
     lastAccrualDate: Date,
   },
   { timestamps: true }

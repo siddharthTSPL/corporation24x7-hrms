@@ -22,7 +22,8 @@ const {
   getattendance,
   employeeSubmitTicket,
   employeeGetMyTickets,
-  employeeRateTicket
+  employeeRateTicket,
+  employeeGetTicketDetail,
 } = require("../controllers/user.controller");
 
 userrouter.get("/verify/:token", asyncHandler(verifyUserEmail));
@@ -85,6 +86,12 @@ userrouter.post(
   "/rateTicket",
   employeemiddleware,
   asyncHandler(employeeRateTicket),
+);
+
+userrouter.get(
+  "/getTicketDetail/:ticketNumber",
+  employeemiddleware,
+  asyncHandler(employeeGetTicketDetail),
 );
 
 module.exports = userrouter;
