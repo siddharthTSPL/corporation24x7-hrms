@@ -34,6 +34,10 @@ const {
   getAllExpenseDocumentsAdmin,
   getDocumentDetailsAdmin,
   adminActionOnLeave,
+    adminSubmitTicket,
+  adminGetMyTickets,
+  adminRateTicket
+
 } = require("../controllers/admin.controller");
 
 adminrouter.get("/verify/:token", asyncHandler(verifyAdmin));
@@ -159,6 +163,22 @@ adminrouter.get(
   "/documents/:documentId",
   adminauthmiddleware,
   asyncHandler(getDocumentDetailsAdmin),
+);
+
+adminrouter.post(
+  "/submitTicket",
+  adminauthmiddleware,
+  asyncHandler(adminSubmitTicket),
+);
+adminrouter.get(
+  "/getMyTickets",
+  adminauthmiddleware,
+  asyncHandler(adminGetMyTickets),
+);
+adminrouter.post(
+  "/rateTicket",
+  adminauthmiddleware,
+  asyncHandler(adminRateTicket),
 );
 
 module.exports = adminrouter;
