@@ -9,6 +9,7 @@ const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const Review = require("../Models/review.model");
 const Attendance = require("../Models/attendance.model");
+const Ticket = require("../Models/ticket.model");
 
 const verifyUserEmail = async (req, res, next) => {
   const { token } = req.params;
@@ -663,6 +664,97 @@ const getattendance = async (req, res, next) => {
   res.status(200).json({ success: true, count: attendance.length, attendance });
 };
 
+
+
+const employeeSubmitTicket = async (req, res, next) => {
+  try {
+    const {
+      type, category, subCategory, title, description,
+      incidentDate, incidentLocation, witnessNames,
+      severity, isAnonymous, againstId, againstModel, attachments,
+    } = req.body;
+
+    if (!req.user) return res.status(401).json({ message: "Not authenticated" });
+
+    const ticket = await Ticket.create({
+      type, category, subCategory, title, description,
+      incidentDate, incidentLocation,
+      witnessNames: witnessNames || [],
+      severity: severity || "medium",
+      isAnonymous: isAnonymous || false,
+      submittedBy: isAnonymous ? null : req.user._id,
+      submitterModel: isAnonymous ? null : "User",
+      submitterDept: req.user.department,
+      submitterRole: "employee",
+      against: againstId || undefined,
+      againstModel: againstModel || undefined,
+      attachments: attachments || [],
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Ticket submitted successfully.",
+      ticket: {
+        ticketNumber: ticket.ticketNumber,
+        type: ticket.type,
+        status: ticket.status,
+        slaDeadline: ticket.slaDeadline,
+        confidentialityLevel: ticket.confidentialityLevel,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const employeeGetMyTickets = async (req, res, next) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Not authenticated" });
+
+    const tickets = await Ticket.find({ submittedBy: req.user._id, isDeleted: false })
+      .select("-timeline -internalNotes -statusHistory")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({ success: true, count: tickets.length, tickets });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const employeeRateTicket = async (req, res, next) => {
+  try {
+    const { ticketNumber } = req.params;
+    const { rating, feedback } = req.body;
+
+    if (!req.user) return res.status(401).json({ message: "Not authenticated" });
+
+    const ticket = await Ticket.findOne({ ticketNumber, submittedBy: req.user._id });
+    if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+    if (!["resolved", "closed"].includes(ticket.status))
+      return res.status(400).json({ message: "Can only rate resolved or closed tickets" });
+    if (ticket.submitterRating)
+      return res.status(400).json({ message: "You have already rated this ticket" });
+
+    ticket.submitterRating = rating;
+    ticket.submitterFeedback = feedback;
+    ticket.ratedAt = new Date();
+    ticket.timeline.push({
+      action: "rating_submitted",
+      note: `Submitter rated resolution ${rating}/5.`,
+      byModel: "System",
+      byName: "Submitter",
+    });
+
+    await ticket.save();
+    res.json({ success: true, message: "Rating submitted. Thank you." });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+
 module.exports = {
   verifyUserEmail,
   userlogin,
@@ -681,4 +773,7 @@ module.exports = {
   getme,
   editprofile,
   getattendance,
+  employeeSubmitTicket,
+  employeeGetMyTickets,
+  employeeRateTicket
 };
