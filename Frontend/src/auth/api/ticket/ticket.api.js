@@ -28,12 +28,12 @@ api.interceptors.response.use(
 );
 
 export const getTicketStats = async () => {
-  const res = await api.get("ticket/superadmin/stats");
+  const res = await api.get("ticket/stats");
   return res.data;
 };
 
 export const getAllTickets = async (params = {}) => {
-  const res = await api.get("ticket/superadmin/all", {
+  const res = await api.get("ticket/all", {
     params,
   });
 
@@ -41,13 +41,13 @@ export const getAllTickets = async (params = {}) => {
 };
 
 export const getTicketById = async (id) => {
-  const res = await api.get(`ticket/superadmin/${id}`);
+  const res = await api.get(`ticket/${id}`);
   return res.data;
 };
 
 export const updateTicketStatus = async ({ id, data }) => {
   const res = await api.put(
-    `ticket/superadmin/${id}/update`,
+    `ticket/${id}/update`,
     data
   );
 
