@@ -73,7 +73,9 @@ const SuperAdminReviews = lazy(() => import("./pages/review/sureview"));
 const SuperAdminSettings = lazy(() => import("./pages/settings/susetting"));
 
 const SuperAdminDocuments = lazy(() => import("./pages/document/sudocument"));
-
+const SuperAdminComplaints = lazy(
+  () => import("./pages/ticketpage/suticket"),
+)
 function PageSkeleton() {
   return (
     <div
@@ -266,6 +268,8 @@ function App() {
               element={<SuperAdminDocuments />}
             />
           </Route>
+
+          <Route path="/superadmin-complaints" element={<SuperAdminComplaints />} />
         </Routes>
       </Suspense>
     </BrowserRouter>
