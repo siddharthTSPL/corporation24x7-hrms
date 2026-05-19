@@ -1,59 +1,46 @@
 import { useQuery } from "@tanstack/react-query";
-import { getMeAdmin } from "../../api/adminapi/auth/ad.auth.api";
-import { getMeManager } from "../../api/managerapi/auth/ma.auth.api";
-import { getMeUser } from "../../api/employeeapi/auth/em.auth.api";
+import { getMeAdmin }      from "../../api/adminapi/auth/ad.auth.api";
+import { getMeManager }    from "../../api/managerapi/auth/ma.auth.api";
+import { getMeUser }       from "../../api/employeeapi/auth/em.auth.api";
 import { getMeSuperAdmin } from "../../api/superadmin/auth/su.auth";
 
-export const useAuth = () => {
-  return useQuery({
+export const useAuth = () =>
+  useQuery({
     queryKey: ["auth"],
     queryFn: async () => {
       const savedRole = localStorage.getItem("role");
 
-      if (savedRole === "superadmin") {
+      const attempt = async (fn, role) => {
         try {
-          const res = await getMeSuperAdmin();
-          return { role: "superadmin", data: res };
+          const res = await fn();
+          return { role, data: res };
         } catch {
+          localStorage.removeItem("token");
           localStorage.removeItem("role");
           return null;
         }
-      }
+      };
 
-      if (savedRole === "admin") {
-        try {
-          const res = await getMeAdmin();
-          return { role: "admin", data: res };
-        } catch {
-          localStorage.removeItem("role");
-          return null;
-        }
-      }
-
-      if (savedRole === "manager") {
-        try {
-          const res = await getMeManager();
-          return { role: "manager", data: res };
-        } catch {
-          localStorage.removeItem("role");
-          return null;
-        }
-      }
-
-      if (savedRole === "employee") {
-        try {
-          const res = await getMeUser();
-          return { role: "employee", data: res };
-        } catch {
-          localStorage.removeItem("role");
-          return null;
-        }
-      }
+      if (savedRole === "superadmin") return attempt(getMeSuperAdmin, "superadmin");
+      if (savedRole === "admin")      return attempt(getMeAdmin,       "admin");
+      if (savedRole === "manager")    return attempt(getMeManager,     "manager");
+      if (savedRole === "employee")   return attempt(getMeUser,        "employee");
 
       return null;
     },
-    staleTime: 1000 * 60 * 5,
-    retry: false,
+    staleTime:            1000 * 60 * 5,
+    retry:                false,
     refetchOnWindowFocus: false,
   });
+
+
+export const persistAuth = (role, token) => {
+  localStorage.setItem("role",  role);
+  localStorage.setItem("token", token);
+};
+
+
+export const clearAuth = () => {
+  localStorage.removeItem("role");
+  localStorage.removeItem("token");
 };

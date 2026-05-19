@@ -3,7 +3,13 @@ const managermodel = require("../../Models/manager.model");
 
 const authmanager = async (req, res, next) => {
   try {
-    const token = req.cookies.token;
+    let token = req.cookies?.token;
+    if (!token) {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        token = authHeader.split(" ")[1];
+      }
+    }
 
     if (!token) {
       return res.status(401).json({ message: "Unauthorized" });
@@ -16,19 +22,24 @@ const authmanager = async (req, res, next) => {
       return res.status(401).json({ message: "Invalid or expired token" });
     }
 
-    const manager = await managermodel.findById(decoded.managerid).select("-password -isVerified -status");
+    if (
+      decoded.role !== "manager" &&
+      decoded.role !== "senior_manager" &&
+      decoded.role !== "official"
+    ) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const manager = await managermodel
+      .findById(decoded.managerid)
+      .select("-password -isVerified -status");
 
     if (!manager) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    if (decoded.role !== "manager" && decoded.role !== "senior_manager" && decoded.role !== "official") {
-      return res.status(403).json({ message: "Access denied" });
-    }
-
     req.manager = manager;
     next();
-
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }

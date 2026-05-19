@@ -1,12 +1,9 @@
-// employee.middleware.js
-const jwt      = require("jsonwebtoken");
+const jwt = require("jsonwebtoken");
 const usermodel = require("../../Models/user.model");
 
 const authemployee = async (req, res, next) => {
   try {
-
     let token = req.cookies?.token;
-
     if (!token) {
       const authHeader = req.headers.authorization;
       if (authHeader && authHeader.startsWith("Bearer ")) {
@@ -20,7 +17,6 @@ const authemployee = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-   
     if (decoded.role !== "employee") {
       return res.status(403).json({ message: "Access denied" });
     }
@@ -30,7 +26,7 @@ const authemployee = async (req, res, next) => {
       return res.status(401).json({ message: "Unauthorized: user not found" });
     }
 
-    req.employee = employee;
+    req.user = employee;
     next();
   } catch (error) {
     return res.status(401).json({ message: "Invalid or expired token" });
