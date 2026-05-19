@@ -197,7 +197,7 @@ ticketSchema.virtual("daysUntilDeadline").get(function () {
 });
 
 
-ticketSchema.pre("save", async function (next) {
+ticketSchema.pre("save", async function () {
 
   if (this.isNew) {
     const prefixMap = {
@@ -250,8 +250,6 @@ ticketSchema.pre("save", async function (next) {
       note:      "Ticket created",
     });
   }
-
-  next();
 });
 
 
