@@ -13,10 +13,10 @@ const {
   getTicketStats,
 } = require("../controllers/ticket.controller");
 
-const { superAdminAuth } = require("../middleware/auth/superadmin.middleware");
-const { authemployee } = require("../middleware/auth/employee.middleware");
-const { authmanager } = require("../middleware/auth/manager.middleware");
-const { adminAuth } = require("../middleware/auth/admin.middleware");
+const superAdminAuth = require("../middleware/auth/superadmin.middleware");
+const authemployee = require("../middleware/auth/employee.middleware");
+const authmanager = require("../middleware/auth/manager.middleware");
+const adminAuth = require("../middleware/auth/admin.middleware");
 
 router.post("/submit", authemployee, submitTicket);
 router.post("/submit", authmanager, submitTicket); 
