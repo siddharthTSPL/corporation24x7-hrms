@@ -54,9 +54,7 @@ ${note ? `<p style="font-size:14px;color:#444;line-height:1.7;">${note}</p>` : "
   });
 };
 
-/* ═══════════════════════════════════════════════
-   SUBMIT TICKET  —  Any logged-in user
-═══════════════════════════════════════════════ */
+
 const submitTicket = async (req, res, next) => {
   try {
     const {
