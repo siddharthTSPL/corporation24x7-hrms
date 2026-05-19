@@ -33,7 +33,7 @@ const adminMenu = [
   { name: "Review",            path: "/review-admin",    icon: <FaBullhorn /> },
   { name: "Leave",             path: "/leave-admin",     icon: <FaCalendarAlt /> },
   { name: "Organisation",      path: "/organisation",    icon: <FaBuilding /> },
-    { name:"TorchX Voice",     path: "/admin-complaints", icon: <FaShieldAlt /> },
+  { name:"TorchX Voice",     path: "/admin-complaints", icon: <FaShieldAlt /> },
   { name: "Settings",          path: "/settings",        icon: <FaCog /> },
 ];
 
