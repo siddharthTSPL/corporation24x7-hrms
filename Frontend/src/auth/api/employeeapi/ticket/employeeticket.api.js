@@ -29,6 +29,11 @@ export const employeeGetMyTickets = async () => {
   return res.data;
 };
 
+export const employeeGetTicketDetail = async (ticketNumber) => {
+  const res = await api.get(`employee/getTicketDetail/${ticketNumber}`);
+  return res.data;
+};
+
 export const employeeRateTicket = async ({
   ticketNumber,
   rating,
