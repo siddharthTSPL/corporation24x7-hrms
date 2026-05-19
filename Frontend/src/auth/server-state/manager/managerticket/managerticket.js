@@ -2,6 +2,7 @@ import {
   managerSubmitTicket,
   managerGetMyTickets,
   managerRateTicket,
+  managerGetTicketDetail,
 } from "../../../api/managerapi/ticket/managerticket.api";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -37,3 +38,11 @@ export const useManagerRateTicket = () => {
     },
   });
 };
+
+export const useGetManagerTicketDetail = (ticketNumber) =>
+  useQuery({
+    queryKey: ["managerTicket", ticketNumber],
+    queryFn: () => managerGetTicketDetail(ticketNumber),
+    enabled: !!ticketNumber,
+    staleTime: 30000,
+  });

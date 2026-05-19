@@ -2,6 +2,7 @@ import {
   employeeSubmitTicket,
   employeeGetMyTickets,
   employeeRateTicket,
+  employeeGetTicketDetail,
 } from "../../../api/employeeapi/ticket/employeeticket.api";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -37,3 +38,11 @@ export const useEmployeeRateTicket = () => {
     },
   });
 };
+
+export const useGetEmployeeTicketDetail = (ticketNumber) =>
+  useQuery({
+    queryKey: ["employeeTicket", ticketNumber],
+    queryFn: () => employeeGetTicketDetail(ticketNumber),
+    enabled: !!ticketNumber,
+    staleTime: 30000,
+  });

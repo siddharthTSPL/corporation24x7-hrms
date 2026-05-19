@@ -35,3 +35,8 @@ export const managerRateTicket = async ({ ticketNumber, rating, feedback }) => {
   });
   return res.data;
 };
+
+export const managerGetTicketDetail = async (ticketNumber) => {
+  const res = await api.get(`manager/getTicketDetail/${ticketNumber}`);
+  return res.data;
+};

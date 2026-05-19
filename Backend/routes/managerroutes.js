@@ -179,4 +179,10 @@ managerrouter.post(
   asyncHandler(managercontroller.managerRateTicket),
 );
 
+managerrouter.get(
+  "/getTicketDetail/:ticketNumber",
+  managermiddleware,
+  asyncHandler(managercontroller. managerGetTicketDetail),
+);
+
 module.exports = managerrouter;
