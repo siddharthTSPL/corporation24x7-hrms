@@ -29,7 +29,10 @@ export const adminGetMyTickets = async () => {
   const res = await api.get("admin/getMyTickets");
   return res.data;
 };
-
+export const adminGetTicketDetail = async (ticketNumber) => {
+  const res = await api.get(`admin/getTicketDetail/${ticketNumber}`);
+  return res.data;
+};
 export const adminRateTicket = async ({ ticketNumber, rating, feedback }) => {
   const res = await api.post(`admin/rateTicket/${ticketNumber}`, { rating, feedback });
   return res.data;
