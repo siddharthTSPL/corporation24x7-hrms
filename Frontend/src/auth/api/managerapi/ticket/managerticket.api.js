@@ -8,8 +8,7 @@ const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message =
-      error.response?.data?.message || "Something went wrong";
+    const message = error.response?.data?.message || "Something went wrong";
 
     if (error.response?.status === 401) {
       return Promise.reject(null);
@@ -20,29 +19,19 @@ api.interceptors.response.use(
 );
 
 export const managerSubmitTicket = async (data) => {
-  const res = await api.post("manager/submitticket", data);
+  const res = await api.post("manager/submit-ticket", data);
   return res.data;
 };
-
 
 export const managerGetMyTickets = async () => {
-  const res = await api.get("manager/getmytickets");
+  const res = await api.get("manager/my-tickets");
   return res.data;
 };
 
-
-export const managerRateTicket = async ({
-  ticketNumber,
-  rating,
-  feedback,
-}) => {
-  const res = await api.post(
-    `manager/rateticket/${ticketNumber}`,
-    {
-      rating,
-      feedback,
-    }
-  );
-
+export const managerRateTicket = async ({ ticketNumber, rating, feedback }) => {
+  const res = await api.post(`manager/rate-ticket/${ticketNumber}`, {
+    rating,
+    feedback,
+  });
   return res.data;
 };
