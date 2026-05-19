@@ -21,12 +21,12 @@ api.interceptors.response.use(
 
 
 export const employeeSubmitTicket = async (data) => {
-  const res = await api.post("employee/submitticket", data);
+  const res = await api.post("user/employeeSubmitTicket", data);
   return res.data;
 };
 
 export const employeeGetMyTickets = async () => {
-  const res = await api.get("employee/getmytickets");
+  const res = await api.get("user/employeeGetMyTickets");
   return res.data;
 };
 
@@ -37,7 +37,7 @@ export const employeeRateTicket = async ({
   feedback,
 }) => {
   const res = await api.post(
-    `employee/rateticket/${ticketNumber}`,
+    `user/employeeRateTicket/${ticketNumber}`,
     {
       rating,
       feedback,
