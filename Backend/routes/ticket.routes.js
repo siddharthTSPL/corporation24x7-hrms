@@ -1,5 +1,5 @@
 const express = require("express");
-const router  = express.Router();
+const router = express.Router();
 
 const {
   submitTicket,
@@ -14,41 +14,30 @@ const {
 } = require("../controllers/ticket.controller");
 
 const { superAdminAuth } = require("../middleware/auth/superadmin.middleware");
-const { authemployee }       = require("../middleware/auth/employee.middleware");
-const { authmanager }    = require("../middleware/auth/manager.middleware");
-const { adminAuth }      = require("../middleware/auth/admin.middleware");
+const { authemployee } = require("../middleware/auth/employee.middleware");
+const { authmanager } = require("../middleware/auth/manager.middleware");
+const { adminAuth } = require("../middleware/auth/admin.middleware");
 
+router.post("/submit", authemployee, submitTicket);
+router.post("/submit", authmanager, submitTicket); 
+router.post("/submit", adminAuth, submitTicket); 
 
-router.post("/submit",     protectUser,    submitTicket);
-router.post("/submit",     protectManager, submitTicket);   // fallback for managers
-router.post("/submit",     protectAdmin,   submitTicket);   // fallback for admins
+router.get("/my-tickets", authemployee, getMyTickets);
+router.get("/my-tickets", authmanager, getMyTickets);
+router.get("/my-tickets", adminAuth, getMyTickets);
 
+router.post("/rate/:ticketNumber", authemployee, rateTicket);
 
-router.get("/my-tickets",  protectUser,    getMyTickets);
-router.get("/my-tickets",  protectManager, getMyTickets);
-router.get("/my-tickets",  protectAdmin,   getMyTickets);
+router.get("/superadmin/stats", superAdminAuth, getTicketStats);
 
+router.get("/superadmin/all", superAdminAuth, getAllTickets);
 
-router.post("/rate/:ticketNumber", protectUser, rateTicket);
+router.get("/superadmin/:id", superAdminAuth, getTicketById);
 
+router.put("/superadmin/:id/update", superAdminAuth, updateTicketStatus);
 
+router.put("/superadmin/:id/escalate", superAdminAuth, escalateTicket);
 
-
-router.get( "/superadmin/stats",              protectSuperAdmin, getTicketStats);
-
-
-router.get( "/superadmin/all",                protectSuperAdmin, getAllTickets);
-
-
-router.get( "/superadmin/:id",                protectSuperAdmin, getTicketById);
-
-
-router.put( "/superadmin/:id/update",         protectSuperAdmin, updateTicketStatus);
-
-
-router.put( "/superadmin/:id/escalate",       protectSuperAdmin, escalateTicket);
-
-
-router.delete("/superadmin/:id",              protectSuperAdmin, deleteTicket);
+router.delete("/superadmin/:id", superAdminAuth, deleteTicket);
 
 module.exports = router;
