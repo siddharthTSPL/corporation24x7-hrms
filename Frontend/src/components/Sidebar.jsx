@@ -33,6 +33,7 @@ const adminMenu = [
   { name: "Review",            path: "/review-admin",    icon: <FaBullhorn /> },
   { name: "Leave",             path: "/leave-admin",     icon: <FaCalendarAlt /> },
   { name: "Organisation",      path: "/organisation",    icon: <FaBuilding /> },
+    { name:"complaints",     path: "/admin-complaints", icon: <FaShieldAlt /> },
   { name: "Settings",          path: "/settings",        icon: <FaCog /> },
 ];
 
@@ -44,6 +45,7 @@ const managerMenu = [
   { name: "Review",      path: "/review-manager",       icon: <FaBullhorn /> },
   { name: "Document",    path: "/document-manager",     icon: <FaFileAlt /> },
   { name: "File",        path: "/file-manager",         icon: <FaFolder /> },
+    { name:"complaints",     path: "/manager-complaints", icon: <FaShieldAlt /> },
   { name: "Settings",    path: "/settings-manager",     icon: <FaCog /> },
 ];
 
@@ -53,6 +55,7 @@ const employeeMenu = [
   { name: "Announcement",path: "/announcement-employee", icon: <FaBullhorn /> },
   { name: "Organisation",path: "/organisation-employee", icon: <FaBuilding /> },
   { name: "File",        path: "/file-employee",         icon: <FaFolder /> },
+    { name:"complaints",     path: "/employee-complaints", icon: <FaShieldAlt /> },
   { name: "Settings",    path: "/settings-employee",     icon: <FaCog /> },
 ];
 
