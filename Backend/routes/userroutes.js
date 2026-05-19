@@ -20,6 +20,9 @@ const {
   getme,
   editprofile,
   getattendance,
+  employeeSubmitTicket,
+  employeeGetMyTickets,
+  employeeRateTicket
 } = require("../controllers/user.controller");
 
 userrouter.get("/verify/:token", asyncHandler(verifyUserEmail));
@@ -66,6 +69,22 @@ userrouter.get(
   "/getattendance",
   employeemiddleware,
   asyncHandler(getattendance),
+);
+
+userrouter.post(
+  "/submitTicket",
+  employeemiddleware,
+  asyncHandler(employeeSubmitTicket),
+);
+userrouter.get(
+  "/getMyTickets",
+  employeemiddleware,
+  asyncHandler(employeeGetMyTickets),
+);
+userrouter.post(
+  "/rateTicket",
+  employeemiddleware,
+  asyncHandler(employeeRateTicket),
 );
 
 module.exports = userrouter;

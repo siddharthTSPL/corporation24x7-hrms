@@ -163,4 +163,20 @@ managerrouter.get(
   asyncHandler(admincontroller.getOrgInfo),
 );
 
+managerrouter.post(
+  "/submit-ticket",
+  managermiddleware,
+  asyncHandler(managerSubmitTicket),
+);
+managerrouter.get(
+  "/my-tickets",
+  managermiddleware,
+  asyncHandler(managerGetMyTickets),
+);
+managerrouter.post(
+  "/rate-ticket/:ticketNumber",
+  managermiddleware,
+  asyncHandler(managerRateTicket),
+);
+
 module.exports = managerrouter;
