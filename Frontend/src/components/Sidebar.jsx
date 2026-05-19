@@ -22,6 +22,7 @@ const superAdminMenu = [
   { name: "Leaves",        path: "/superadmin-leaves",    icon: <FaCalendarAlt /> },
   { name: "Reviews",       path: "/superadmin-reviews",   icon: <FaBullhorn /> },
   { name: "Documents",     path: "/superadmin-documents", icon: <FaFileAlt /> },
+  { name:"complaints",     path: "/superadmin-complaints", icon: <FaShieldAlt /> },
   { name: "Settings",      path: "/superadmin-settings", icon: <FaCog /> },
 ];
 
