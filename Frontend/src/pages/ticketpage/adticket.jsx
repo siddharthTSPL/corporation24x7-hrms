@@ -1,18 +1,15 @@
 import React, { useState, useCallback } from "react";
 import { useSubmitTicket, useGetMyTickets, useRateTicket } from "../../auth/server-state/adminticket/adminticket.hook";
 
-/* ═══════════════════════════════════════════════
-   COLOR PALETTE — matches Employee component
-═══════════════════════════════════════════════ */
 const C = {
-  primary:  "#730042",
-  accent:   "#CD166E",
-  bg:       "linear-gradient(160deg,#F7F3FC 0%,#F0EBF8 50%,#F4F0FA 100%)",
-  card:     "#fff",
-  border:   "rgba(180,155,210,.25)",
-  muted:    "#9B8BAE",
-  text:     "#1C1028",
-  subtext:  "#6B5080",
+  primary: "#730042",
+  accent:  "#CD166E",
+  bg:      "linear-gradient(160deg,#F7F3FC 0%,#F0EBF8 50%,#F4F0FA 100%)",
+  card:    "#fff",
+  border:  "rgba(180,155,210,.25)",
+  muted:   "#9B8BAE",
+  text:    "#1C1028",
+  subtext: "#6B5080",
 };
 
 const TICKET_TYPES = {
@@ -31,6 +28,7 @@ const STATUS_META = {
   resolved:     { label:"Resolved",      bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
   closed:       { label:"Closed",        bg:"#F3F4F6", color:"#374151", dot:"#9CA3AF" },
   rejected:     { label:"Rejected",      bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
+  reopened:     { label:"Reopened",      bg:"#FFF7ED", color:"#9A3412", dot:"#F97316" },
 };
 
 const SEV_META = {
@@ -62,7 +60,14 @@ const CAT_LABELS = {
   legal_compliance:"Legal Compliance", other:"Other",
 };
 
-const fmt = (d) => d ? new Date(d).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}) : "—";
+const TL_COLORS = {
+  ticket_created:"#CD166E", status_changed:"#1D4ED8", note_added:"#14803D",
+  internal_note_added:"#7C3AED", priority_changed:"#C2410C",
+  escalated:"#DC2626", acknowledgement_sent:"#1D4ED8", rating_submitted:"#92400E",
+};
+
+const fmt     = (d) => d ? new Date(d).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}) : "—";
+const fmtFull = (d) => d ? new Date(d).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) : "—";
 const timeAgo = (d) => {
   if (!d) return "";
   const diff = Math.floor((Date.now()-new Date(d))/60000);
@@ -71,21 +76,25 @@ const timeAgo = (d) => {
   return `${Math.floor(diff/1440)}d ago`;
 };
 
-/* ═══════════════════════════════════════════════
-   GLOBAL STYLES — identical to employee
-═══════════════════════════════════════════════ */
 const GlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
     @keyframes spin        { to { transform:rotate(360deg); } }
     @keyframes fadeSlideUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
     @keyframes pulse       { 0%,100%{opacity:1} 50%{opacity:.45} }
+    @keyframes slideLeft   { from{opacity:0;transform:translateX(30px)} to{opacity:1;transform:translateX(0)} }
 
     .adm-card {
       background:#fff; border-radius:16px; border:1px solid rgba(180,155,210,.25);
       padding:18px 20px; margin-bottom:10px;
       box-shadow:0 2px 10px rgba(60,20,80,.06);
       transition:all .22s ease; animation:fadeSlideUp .3s ease both;
+    }
+    .adm-card-hover:hover {
+      box-shadow:0 6px 22px rgba(115,0,66,.1);
+      border-color:rgba(115,0,66,.25);
+      transform:translateY(-1px);
+      cursor:pointer;
     }
     .adm-btn {
       display:inline-flex; align-items:center; gap:6px;
@@ -95,6 +104,7 @@ const GlobalStyles = () => (
     }
     .adm-btn:hover  { transform:translateY(-1px); filter:brightness(1.05); }
     .adm-btn:active { transform:translateY(0); }
+    .adm-btn:disabled { opacity:.5; cursor:not-allowed; transform:none!important; }
     .adm-input {
       width:100%; box-sizing:border-box; padding:10px 14px; border-radius:10px;
       font-size:13px; font-family:'DM Sans',sans-serif; color:#1C1028;
@@ -107,14 +117,12 @@ const GlobalStyles = () => (
       padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600;
       font-family:'DM Sans',sans-serif;
     }
+    .adm-detail-panel { animation:slideLeft .28s ease both; }
     ::-webkit-scrollbar { width:5px; }
     ::-webkit-scrollbar-thumb { background:#DDD6EC; border-radius:4px; }
   `}</style>
 );
 
-/* ═══════════════════════════════════════════════
-   ATOMS
-═══════════════════════════════════════════════ */
 const Spinner = () => (
   <div style={{display:"flex",alignItems:"center",justifyContent:"center",padding:"48px 0",flexDirection:"column",gap:12}}>
     <div style={{width:34,height:34,border:"3px solid #EDE6F5",borderTop:`3px solid ${C.primary}`,borderRadius:"50%",animation:"spin .7s linear infinite"}}/>
@@ -138,9 +146,18 @@ const StatusChip = ({status}) => {
   return <span className="adm-chip" style={{background:m.bg,color:m.color}}><span style={{width:6,height:6,borderRadius:"50%",background:m.dot,display:"inline-block"}}/>{m.label}</span>;
 };
 
-/* ═══════════════════════════════════════════════
-   SUBMIT FORM
-═══════════════════════════════════════════════ */
+const SevChip = ({sev}) => {
+  const m = SEV_META[sev]||{label:sev,bg:"#F3F4F6",color:"#374151"};
+  return <span className="adm-chip" style={{background:m.bg,color:m.color}}>{m.label}</span>;
+};
+
+const InfoCell = ({label,val}) => (
+  <div style={{background:"#FDFBFF",borderRadius:10,padding:"10px 14px",border:"1px solid rgba(180,155,210,.2)"}}>
+    <div style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:".5px",marginBottom:3,fontFamily:"'DM Sans',sans-serif"}}>{label}</div>
+    <div style={{fontSize:12,color:C.text,fontWeight:500,fontFamily:"'DM Sans',sans-serif"}}>{val||"—"}</div>
+  </div>
+);
+
 const INITIAL = {
   type:"complaint", category:"", subCategory:"", title:"", description:"",
   incidentDate:"", incidentLocation:"", witnessNames:"",
@@ -152,11 +169,11 @@ function SubmitTicketForm({onSuccess}) {
   const [toast, setToast] = useState(null);
   const submitMut         = useSubmitTicket();
 
-  const set = useCallback((k, v) =>
-    setForm(p => ({...p,[k]:v,...(k==="type"?{category:"",subCategory:""}:{})}))
+  const set = useCallback((k,v) =>
+    setForm(p=>({...p,[k]:v,...(k==="type"?{category:"",subCategory:""}:{})}))
   ,[]);
 
-  const showToast = useCallback((msg, type="success") => {
+  const showToast = useCallback((msg,type="success") => {
     setToast({msg,type});
     setTimeout(()=>setToast(null),3500);
   },[]);
@@ -176,7 +193,7 @@ function SubmitTicketForm({onSuccess}) {
       setForm(INITIAL);
       onSuccess?.();
     } catch(e) {
-      showToast(e?.response?.data?.message||"Submission failed.","error");
+      showToast(e?.message||"Submission failed.","error");
     }
   };
 
@@ -184,8 +201,6 @@ function SubmitTicketForm({onSuccess}) {
 
   return (
     <div style={{background:"#fff",borderRadius:20,border:"1px solid rgba(180,155,210,.25)",padding:28,boxShadow:"0 4px 20px rgba(60,20,80,.07)"}}>
-
-      {/* Header */}
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}>
         <div style={{width:44,height:44,borderRadius:14,background:`linear-gradient(135deg,${C.primary},${C.accent})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,boxShadow:`0 4px 14px rgba(115,0,66,.3)`}}>📝</div>
         <div>
@@ -195,7 +210,6 @@ function SubmitTicketForm({onSuccess}) {
         <span style={{marginLeft:"auto",padding:"4px 12px",borderRadius:20,background:"rgba(115,0,66,.08)",color:C.primary,fontSize:11,fontWeight:700,fontFamily:"'DM Sans',sans-serif",border:`1px solid rgba(115,0,66,.15)`}}>Admin</span>
       </div>
 
-      {/* Ticket Type */}
       <div style={{marginBottom:16}}>
         <Label required>Ticket Type</Label>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -208,7 +222,6 @@ function SubmitTicketForm({onSuccess}) {
         </div>
       </div>
 
-      {/* Category + Severity */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:16}}>
         <div>
           <Label required>Category</Label>
@@ -225,19 +238,16 @@ function SubmitTicketForm({onSuccess}) {
         </div>
       </div>
 
-      {/* Title */}
       <div style={{marginBottom:16}}>
         <Label required>Title</Label>
         <input className="adm-input" value={form.title} onChange={e=>set("title",e.target.value)} placeholder="Brief, clear title for your ticket…" maxLength={120}/>
       </div>
 
-      {/* Description */}
       <div style={{marginBottom:16}}>
         <Label required>Description</Label>
-        <textarea className="adm-input" rows={4} value={form.description} onChange={e=>set("description",e.target.value)} placeholder="Describe the issue in detail. Include dates, people involved, and what happened…" style={{resize:"vertical",lineHeight:1.7}}/>
+        <textarea className="adm-input" rows={4} value={form.description} onChange={e=>set("description",e.target.value)} placeholder="Describe the issue in detail…" style={{resize:"vertical",lineHeight:1.7}}/>
       </div>
 
-      {/* Date + Location */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:16}}>
         <div>
           <Label>Incident Date</Label>
@@ -249,13 +259,11 @@ function SubmitTicketForm({onSuccess}) {
         </div>
       </div>
 
-      {/* Witnesses */}
       <div style={{marginBottom:20}}>
         <Label>Witness Names <span style={{fontWeight:400,textTransform:"none",fontSize:10}}>(comma-separated)</span></Label>
         <input className="adm-input" value={form.witnessNames} onChange={e=>set("witnessNames",e.target.value)} placeholder="John Doe, Jane Smith"/>
       </div>
 
-      {/* Anonymous toggle */}
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:24,background:"#FAF5FF",borderRadius:12,padding:"12px 16px",border:"1px solid #DDD6FE"}}>
         <button onClick={()=>set("isAnonymous",!form.isAnonymous)}
           style={{width:42,height:24,borderRadius:12,border:"none",cursor:"pointer",background:form.isAnonymous?`linear-gradient(135deg,${C.primary},${C.accent})`:"#E5E7EB",transition:"background .2s",position:"relative",flexShrink:0}}>
@@ -267,16 +275,14 @@ function SubmitTicketForm({onSuccess}) {
         </div>
       </div>
 
-      {/* Submit button */}
       <button className="adm-btn" onClick={handleSubmit} disabled={submitMut.isPending}
-        style={{background:`linear-gradient(135deg,${C.primary},${C.accent})`,color:"#fff",width:"100%",justifyContent:"center",padding:"13px",borderRadius:12,fontSize:14,boxShadow:"0 4px 16px rgba(115,0,66,.3)",opacity:submitMut.isPending?.7:1}}>
+        style={{background:`linear-gradient(135deg,${C.primary},${C.accent})`,color:"#fff",width:"100%",justifyContent:"center",padding:"13px",borderRadius:12,fontSize:14,boxShadow:"0 4px 16px rgba(115,0,66,.3)"}}>
         {submitMut.isPending
           ?<><div style={{width:16,height:16,border:"2px solid rgba(255,255,255,.4)",borderTop:"2px solid #fff",borderRadius:"50%",animation:"spin .6s linear infinite"}}/>Submitting…</>
           :"Submit Ticket →"
         }
       </button>
 
-      {/* Toast */}
       {toast&&(
         <div style={{marginTop:14,padding:"10px 16px",borderRadius:10,fontSize:13,fontFamily:"'DM Sans',sans-serif",fontWeight:500,background:toast.type==="success"?"#F0FDF4":"#FEF2F2",color:toast.type==="success"?"#14803D":"#991B1B",border:`1px solid ${toast.type==="success"?"#86EFAC":"#FCA5A5"}`}}>
           {toast.type==="success"?"✅":"❌"} {toast.msg}
@@ -286,9 +292,6 @@ function SubmitTicketForm({onSuccess}) {
   );
 }
 
-/* ═══════════════════════════════════════════════
-   RATE MODAL
-═══════════════════════════════════════════════ */
 function RateModal({ticket,onClose}) {
   const [rating,   setRating]   = useState(0);
   const [feedback, setFeedback] = useState("");
@@ -296,8 +299,12 @@ function RateModal({ticket,onClose}) {
 
   const submit = async () => {
     if (!rating) return;
-    await rateMut.mutateAsync({ticketNumber:ticket.ticketNumber,rating,feedback});
-    onClose();
+    try {
+      await rateMut.mutateAsync({ticketNumber:ticket.ticketNumber,rating,feedback});
+      onClose();
+    } catch(e) {
+      console.error(e);
+    }
   };
 
   return (
@@ -305,20 +312,17 @@ function RateModal({ticket,onClose}) {
       <div style={{background:"#fff",borderRadius:20,padding:28,width:380,boxShadow:"0 20px 60px rgba(0,0,0,.2)"}}>
         <div style={{fontSize:16,fontWeight:700,color:C.text,fontFamily:"'Playfair Display',serif",marginBottom:4}}>Rate Your Experience</div>
         <div style={{fontSize:12,color:C.muted,fontFamily:"'DM Sans',sans-serif",marginBottom:20}}>{ticket.ticketNumber} · {ticket.title}</div>
-
         <div style={{display:"flex",gap:6,marginBottom:16,justifyContent:"center"}}>
           {[1,2,3,4,5].map(n=>(
             <button key={n} onClick={()=>setRating(n)}
               style={{fontSize:30,background:"none",border:"none",cursor:"pointer",opacity:n<=rating?1:.3,transition:"opacity .15s,transform .15s",transform:n<=rating?"scale(1.1)":"scale(1)"}}>★</button>
           ))}
         </div>
-
         <textarea className="adm-input" rows={3} value={feedback} onChange={e=>setFeedback(e.target.value)} placeholder="Optional feedback…" style={{marginBottom:16,resize:"none"}}/>
-
         <div style={{display:"flex",gap:10}}>
           <button className="adm-btn" onClick={onClose} style={{background:"#F4EEF9",color:C.subtext,flex:1,justifyContent:"center"}}>Cancel</button>
           <button className="adm-btn" onClick={submit} disabled={!rating||rateMut.isPending}
-            style={{background:`linear-gradient(135deg,${C.primary},${C.accent})`,color:"#fff",flex:1,justifyContent:"center",opacity:(!rating||rateMut.isPending)?.6:1}}>
+            style={{background:`linear-gradient(135deg,${C.primary},${C.accent})`,color:"#fff",flex:1,justifyContent:"center"}}>
             {rateMut.isPending?"Submitting…":"Submit Rating"}
           </button>
         </div>
@@ -327,15 +331,212 @@ function RateModal({ticket,onClose}) {
   );
 }
 
-/* ═══════════════════════════════════════════════
-   MY TICKETS LIST
-═══════════════════════════════════════════════ */
+function TicketDetail({ticket,onBack,onRate}) {
+  const [detailTab, setDetailTab] = useState("overview");
+  const tm = TICKET_TYPES[ticket.type]||{dot:C.primary};
+
+  const DTABS = [{key:"overview",label:"Overview"},{key:"timeline",label:"Timeline"},{key:"updates",label:"Updates"}];
+  const canRate = ["resolved","closed"].includes(ticket.status)&&!ticket.submitterRating;
+
+  return (
+    <div className="adm-detail-panel">
+      <button onClick={onBack}
+        style={{display:"inline-flex",alignItems:"center",gap:6,background:"none",border:"none",color:C.primary,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",marginBottom:16,padding:0}}>
+        ← Back to My Tickets
+      </button>
+
+      <div style={{background:"#fff",borderRadius:20,border:"1px solid rgba(180,155,210,.25)",overflow:"hidden",boxShadow:"0 4px 20px rgba(60,20,80,.07)"}}>
+        <div style={{background:`linear-gradient(135deg,${C.primary}15,${C.accent}10)`,padding:"20px 24px",borderBottom:"1px solid rgba(180,155,210,.2)"}}>
+          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8,alignItems:"center"}}>
+                <span style={{fontSize:10,fontWeight:700,color:C.muted,fontFamily:"'DM Sans',sans-serif"}}>{ticket.ticketNumber}</span>
+                <TypeChip type={ticket.type}/>
+                <StatusChip status={ticket.status}/>
+                <SevChip sev={ticket.severity}/>
+                {ticket.isOverdue&&<span className="adm-chip" style={{background:"#FEF2F2",color:"#991B1B",animation:"pulse 1.5s infinite"}}>⚠ Overdue</span>}
+                {ticket.isEscalated&&<span className="adm-chip" style={{background:"#FFF7ED",color:"#9A3412"}}>🔺 Escalated</span>}
+              </div>
+              <div style={{fontSize:18,fontWeight:700,color:C.text,fontFamily:"'Playfair Display',serif",lineHeight:1.35,marginBottom:4}}>{ticket.title}</div>
+              <div style={{fontSize:12,color:C.muted,fontFamily:"'DM Sans',sans-serif"}}>Submitted {timeAgo(ticket.createdAt)} · SLA: {fmt(ticket.slaDeadline)}</div>
+            </div>
+            {canRate&&(
+              <button className="adm-btn" onClick={()=>onRate(ticket)}
+                style={{background:"linear-gradient(135deg,#F59E0B,#D97706)",color:"#fff",flexShrink:0}}>
+                ⭐ Rate Resolution
+              </button>
+            )}
+          </div>
+
+          <div style={{display:"flex",gap:4,marginTop:16,background:"rgba(255,255,255,.6)",borderRadius:10,padding:3,width:"fit-content",border:"1px solid rgba(180,155,210,.2)"}}>
+            {DTABS.map(t=>(
+              <button key={t.key} onClick={()=>setDetailTab(t.key)}
+                style={{padding:"6px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:detailTab===t.key?600:400,fontFamily:"'DM Sans',sans-serif",color:detailTab===t.key?"#fff":C.muted,background:detailTab===t.key?`linear-gradient(135deg,${C.primary},${C.accent})`:"transparent",transition:"all .18s"}}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{padding:"20px 24px"}}>
+
+          {detailTab==="overview"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:14}}>
+              <div>
+                <div style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:".5px",marginBottom:8,fontFamily:"'DM Sans',sans-serif"}}>Description</div>
+                <div style={{fontSize:13,color:C.subtext,lineHeight:1.75,background:"#FDFBFF",borderRadius:12,padding:14,borderLeft:`3px solid ${tm.dot}`,border:"1px solid rgba(180,155,210,.2)",fontFamily:"'DM Sans',sans-serif"}}>{ticket.description}</div>
+              </div>
+
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <InfoCell label="Category"        val={CAT_LABELS[ticket.category]||ticket.category}/>
+                <InfoCell label="Severity"        val={<SevChip sev={ticket.severity}/>}/>
+                <InfoCell label="Created"         val={fmtFull(ticket.createdAt)}/>
+                <InfoCell label="SLA Deadline"    val={fmt(ticket.slaDeadline)}/>
+                <InfoCell label="Incident Date"   val={ticket.incidentDate?fmt(ticket.incidentDate):"Not specified"}/>
+                <InfoCell label="Location"        val={ticket.incidentLocation||"Not specified"}/>
+                <InfoCell label="Confidentiality" val={(ticket.confidentialityLevel||"").replace(/_/g," ")}/>
+                <InfoCell label="Anonymous"       val={ticket.isAnonymous?"Yes":"No"}/>
+              </div>
+
+              {ticket.witnessNames?.length>0&&(
+                <div style={{background:"#FFFBEB",borderRadius:12,padding:14,border:"1px solid rgba(245,158,11,.2)"}}>
+                  <div style={{fontSize:10,fontWeight:700,color:"#92400E",textTransform:"uppercase",letterSpacing:".5px",marginBottom:6,fontFamily:"'DM Sans',sans-serif"}}>Witnesses</div>
+                  {ticket.witnessNames.map((w,i)=><div key={i} style={{fontSize:12,color:"#78350F",fontFamily:"'DM Sans',sans-serif"}}>{w}</div>)}
+                </div>
+              )}
+
+              {ticket.resolutionSummary&&(
+                <div style={{background:"#F0FDF4",borderRadius:12,padding:14,border:"1px solid rgba(34,197,94,.2)"}}>
+                  <div style={{fontSize:10,fontWeight:700,color:"#14803D",textTransform:"uppercase",letterSpacing:".5px",marginBottom:6,fontFamily:"'DM Sans',sans-serif"}}>✓ Resolution Summary</div>
+                  <div style={{fontSize:13,color:"#166534",lineHeight:1.65,fontFamily:"'DM Sans',sans-serif"}}>{ticket.resolutionSummary}</div>
+                </div>
+              )}
+
+              {ticket.rejectionReason&&(
+                <div style={{background:"#FEF2F2",borderRadius:12,padding:14,border:"1px solid rgba(239,68,68,.2)"}}>
+                  <div style={{fontSize:10,fontWeight:700,color:"#991B1B",textTransform:"uppercase",letterSpacing:".5px",marginBottom:6,fontFamily:"'DM Sans',sans-serif"}}>✕ Rejection Reason</div>
+                  <div style={{fontSize:13,color:"#7F1D1D",lineHeight:1.65,fontFamily:"'DM Sans',sans-serif"}}>{ticket.rejectionReason}</div>
+                </div>
+              )}
+
+              {ticket.submitterRating&&(
+                <div style={{background:"#FFFBEB",borderRadius:12,padding:14,border:"1px solid rgba(245,158,11,.2)"}}>
+                  <div style={{fontSize:10,fontWeight:700,color:"#92400E",textTransform:"uppercase",letterSpacing:".5px",marginBottom:6,fontFamily:"'DM Sans',sans-serif"}}>Your Rating</div>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:18,color:"#D97706"}}>{"★".repeat(ticket.submitterRating)}{"☆".repeat(5-ticket.submitterRating)}</span>
+                    {ticket.submitterFeedback&&<span style={{fontSize:12,color:"#78350F",fontFamily:"'DM Sans',sans-serif"}}>{ticket.submitterFeedback}</span>}
+                  </div>
+                </div>
+              )}
+
+              <div style={{background:"#FDFBFF",borderRadius:12,padding:16,border:"1px solid rgba(180,155,210,.2)"}}>
+                <div style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:".5px",marginBottom:10,fontFamily:"'DM Sans',sans-serif"}}>SLA Metrics</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
+                  <div>
+                    <div style={{fontSize:10,color:C.muted,fontFamily:"'DM Sans',sans-serif",marginBottom:3}}>First Response</div>
+                    <div style={{fontSize:13,fontWeight:600,color:C.text,fontFamily:"'DM Sans',sans-serif"}}>{ticket.firstResponseHours!=null?`${ticket.firstResponseHours}h`:"Pending"}</div>
+                  </div>
+                  {ticket.resolutionTimeHours!=null&&(
+                    <div>
+                      <div style={{fontSize:10,color:C.muted,fontFamily:"'DM Sans',sans-serif",marginBottom:3}}>Resolution Time</div>
+                      <div style={{fontSize:13,fontWeight:600,color:"#14803D",fontFamily:"'DM Sans',sans-serif"}}>{ticket.resolutionTimeHours}h</div>
+                    </div>
+                  )}
+                  <div>
+                    <div style={{fontSize:10,color:C.muted,fontFamily:"'DM Sans',sans-serif",marginBottom:3}}>Reopen Count</div>
+                    <div style={{fontSize:13,fontWeight:600,color:C.text,fontFamily:"'DM Sans',sans-serif"}}>{ticket.reopenCount||0}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {detailTab==="timeline"&&(
+            <div>
+              {(!ticket.timeline||ticket.timeline.length===0)
+                ?<div style={{textAlign:"center",padding:"32px 0",color:C.muted,fontFamily:"'DM Sans',sans-serif",fontSize:13}}>No timeline entries yet</div>
+                :[...ticket.timeline].reverse().map((e,i,arr)=>{
+                  const dot = TL_COLORS[e.action]||C.primary;
+                  const isLast = i===arr.length-1;
+                  return (
+                    <div key={e._id||i} style={{display:"flex",gap:12,marginBottom:isLast?0:4}}>
+                      <div style={{display:"flex",flexDirection:"column",alignItems:"center",width:8,flexShrink:0}}>
+                        <div style={{width:8,height:8,borderRadius:"50%",background:dot,flexShrink:0,marginTop:5}}/>
+                        {!isLast&&<div style={{width:1,background:"rgba(180,155,210,.3)",flex:1,margin:"3px auto",minHeight:14}}/>}
+                      </div>
+                      <div style={{flex:1,paddingBottom:isLast?0:16}}>
+                        <div style={{fontSize:11,fontWeight:700,color:dot,textTransform:"capitalize",letterSpacing:".3px",fontFamily:"'DM Sans',sans-serif"}}>{e.action.replace(/_/g," ")}</div>
+                        {e.fromStatus&&e.toStatus&&(
+                          <div style={{display:"flex",alignItems:"center",gap:4,marginTop:4,flexWrap:"wrap"}}>
+                            <StatusChip status={e.fromStatus}/><span style={{color:C.muted,fontSize:10}}>→</span><StatusChip status={e.toStatus}/>
+                          </div>
+                        )}
+                        {e.note&&(
+                          <div style={{background:"#FDFBFF",borderRadius:8,padding:"8px 12px",marginTop:6,fontSize:12,color:C.subtext,lineHeight:1.55,borderLeft:`2px solid ${C.primary}`,border:"1px solid rgba(180,155,210,.2)",fontFamily:"'DM Sans',sans-serif"}}>
+                            {e.note}
+                          </div>
+                        )}
+                        <div style={{fontSize:10,color:C.muted,marginTop:4,fontFamily:"'DM Sans',sans-serif"}}>
+                          {fmtFull(e.timestamp)}{e.byName&&` · ${e.byName}`}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              }
+            </div>
+          )}
+
+          {detailTab==="updates"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              {ticket.superAdminNote?(
+                <div style={{background:"#F0FDF4",borderRadius:14,padding:16,border:"1px solid rgba(34,197,94,.2)"}}>
+                  <div style={{fontSize:10,fontWeight:700,color:"#14803D",textTransform:"uppercase",letterSpacing:".5px",marginBottom:6,fontFamily:"'DM Sans',sans-serif"}}>📩 Admin Reply</div>
+                  <div style={{fontSize:13,color:"#166534",lineHeight:1.7,fontFamily:"'DM Sans',sans-serif"}}>{ticket.superAdminNote}</div>
+                </div>
+              ):(
+                <div style={{textAlign:"center",padding:"20px 0",color:C.muted,fontFamily:"'DM Sans',sans-serif",fontSize:13}}>No public replies from admin yet.</div>
+              )}
+
+              {ticket.statusHistory?.length>0&&(
+                <div>
+                  <div style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:".5px",marginBottom:10,fontFamily:"'DM Sans',sans-serif"}}>Status History</div>
+                  {[...ticket.statusHistory].reverse().map((h,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"#FDFBFF",borderRadius:10,marginBottom:6,border:"1px solid rgba(180,155,210,.18)"}}>
+                      <StatusChip status={h.status}/>
+                      <div style={{flex:1,fontSize:11,color:C.muted,fontFamily:"'DM Sans',sans-serif"}}>{h.note&&<span style={{color:C.subtext}}>{h.note} · </span>}{fmtFull(h.changedAt)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MyTickets() {
   const {data,isLoading} = useGetMyTickets();
+  const [selected,   setSelected]   = useState(null);
   const [rateTarget, setRateTarget] = useState(null);
   const tickets = data?.tickets||[];
 
   if (isLoading) return <Spinner/>;
+
+  if (selected) {
+    return (
+      <>
+        <TicketDetail
+          ticket={selected}
+          onBack={()=>setSelected(null)}
+          onRate={(t)=>setRateTarget(t)}
+        />
+        {rateTarget&&<RateModal ticket={rateTarget} onClose={()=>setRateTarget(null)}/>}
+      </>
+    );
+  }
 
   if (!tickets.length) return (
     <div style={{textAlign:"center",padding:"48px 0",color:C.muted,fontFamily:"'DM Sans',sans-serif"}}>
@@ -347,10 +548,10 @@ function MyTickets() {
   return (
     <>
       {tickets.map((t,i)=>{
-        const tm     = TICKET_TYPES[t.type]||{};
+        const tm     = TICKET_TYPES[t.type]||{dot:C.primary};
         const canRate = ["resolved","closed"].includes(t.status)&&!t.submitterRating;
         return (
-          <div key={t._id} className="adm-card" style={{animationDelay:`${i*.05}s`,borderLeft:`3px solid ${tm.dot||C.primary}`}}>
+          <div key={t._id} className="adm-card adm-card-hover" style={{animationDelay:`${i*.05}s`,borderLeft:`3px solid ${tm.dot}`}} onClick={()=>setSelected(t)}>
             <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:7,alignItems:"center"}}>
@@ -358,6 +559,8 @@ function MyTickets() {
                   <TypeChip type={t.type}/>
                   <StatusChip status={t.status}/>
                   {t.isAnonymous&&<span className="adm-chip" style={{background:"#F3F4F6",color:"#6B7280"}}>Anonymous</span>}
+                  {t.isOverdue&&<span className="adm-chip" style={{background:"#FEF2F2",color:"#991B1B",animation:"pulse 1.5s infinite",fontSize:10}}>⚠ Overdue</span>}
+                  {t.isEscalated&&<span className="adm-chip" style={{background:"#FFF7ED",color:"#9A3412",fontSize:10}}>🔺 Escalated</span>}
                 </div>
                 <div style={{fontSize:13,fontWeight:600,color:C.text,fontFamily:"'DM Sans',sans-serif",marginBottom:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</div>
                 <div style={{fontSize:11,color:C.muted,fontFamily:"'DM Sans',sans-serif"}}>
@@ -368,17 +571,18 @@ function MyTickets() {
                     <strong>Admin Reply:</strong> {t.superAdminNote}
                   </div>
                 )}
+                {t.submitterRating&&(
+                  <div style={{marginTop:6,fontSize:11,color:"#92400E",fontFamily:"'DM Sans',sans-serif"}}>{"★".repeat(t.submitterRating)} You rated this</div>
+                )}
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end",flexShrink:0}}>
                 {canRate&&(
-                  <button className="adm-btn" onClick={()=>setRateTarget(t)}
+                  <button className="adm-btn" onClick={e=>{e.stopPropagation();setRateTarget(t);}}
                     style={{background:"linear-gradient(135deg,#F59E0B,#D97706)",color:"#fff",fontSize:11,padding:"6px 12px"}}>
                     ⭐ Rate
                   </button>
                 )}
-                {t.submitterRating&&(
-                  <div style={{fontSize:11,color:"#92400E",fontFamily:"'DM Sans',sans-serif"}}>{"★".repeat(t.submitterRating)} {t.submitterFeedback}</div>
-                )}
+                <span style={{fontSize:10,color:C.muted,fontFamily:"'DM Sans',sans-serif"}}>Tap to view →</span>
               </div>
             </div>
           </div>
@@ -389,9 +593,6 @@ function MyTickets() {
   );
 }
 
-/* ═══════════════════════════════════════════════
-   ROOT
-═══════════════════════════════════════════════ */
 export default function AdminTickets() {
   const [tab, setTab] = useState("submit");
   const {data}        = useGetMyTickets();
@@ -401,7 +602,6 @@ export default function AdminTickets() {
     <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'DM Sans',sans-serif",padding:"32px 36px"}}>
       <GlobalStyles/>
 
-      {/* Page header */}
       <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:28}}>
         <div style={{width:50,height:50,borderRadius:16,background:`linear-gradient(135deg,${C.primary},${C.accent})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,boxShadow:"0 6px 22px rgba(115,0,66,.35)"}}>🎫</div>
         <div>
@@ -410,7 +610,6 @@ export default function AdminTickets() {
         </div>
       </div>
 
-      {/* Tabs */}
       <div style={{display:"flex",gap:4,background:"rgba(235,228,245,.6)",borderRadius:12,padding:4,marginBottom:24,width:"fit-content",border:"1px solid rgba(200,185,220,.3)"}}>
         {[["submit","📝 Submit New"],["mytickets",`📋 My Tickets (${count})`]].map(([k,l])=>{
           const active=tab===k;
@@ -423,7 +622,6 @@ export default function AdminTickets() {
         })}
       </div>
 
-      {/* Content */}
       <div style={{maxWidth:720}}>
         {tab==="submit"    && <SubmitTicketForm onSuccess={()=>setTab("mytickets")}/>}
         {tab==="mytickets" && <MyTickets/>}
