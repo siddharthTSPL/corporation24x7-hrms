@@ -19,7 +19,7 @@ const getActorInfo = async (actorId, actorModel) => {
   return Model.findById(actorId).select("f_name l_name work_email").lean();
 };
 
-/* ── Email templates ── */
+
 const sendTicketEmail = async ({ to, ticketNumber, type, status, note }) => {
   if (!to) return;
   const typeLabel   = type.charAt(0).toUpperCase() + type.slice(1);
@@ -124,9 +124,7 @@ const submitTicket = async (req, res, next) => {
   }
 };
 
-/* ═══════════════════════════════════════════════
-   GET MY TICKETS  —  Submitter sees own tickets
-═══════════════════════════════════════════════ */
+
 const getMyTickets = async (req, res, next) => {
   try {
     const submitter = req.user || req.manager || req.admin;
@@ -146,9 +144,6 @@ const getMyTickets = async (req, res, next) => {
   }
 };
 
-/* ═══════════════════════════════════════════════
-   RATE RESOLVED TICKET  —  Submitter only
-═══════════════════════════════════════════════ */
 const rateTicket = async (req, res, next) => {
   try {
     const { ticketNumber } = req.params;
@@ -179,9 +174,7 @@ const rateTicket = async (req, res, next) => {
   }
 };
 
-/* ═══════════════════════════════════════════════
-   SUPERADMIN — GET ALL TICKETS  (with full filters)
-═══════════════════════════════════════════════ */
+
 const getAllTickets = async (req, res, next) => {
   try {
     const {
@@ -244,9 +237,6 @@ const getAllTickets = async (req, res, next) => {
   }
 };
 
-/* ═══════════════════════════════════════════════
-   SUPERADMIN — GET SINGLE TICKET  (with full detail)
-═══════════════════════════════════════════════ */
 const getTicketById = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -289,9 +279,7 @@ const getTicketById = async (req, res, next) => {
   }
 };
 
-/* ═══════════════════════════════════════════════
-   SUPERADMIN — UPDATE STATUS + ADD NOTE
-═══════════════════════════════════════════════ */
+
 const updateTicketStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -306,12 +294,12 @@ const updateTicketStatus = async (req, res, next) => {
     const prevStatus = ticket.status;
     const byName = `${req.superAdmin.f_name} ${req.superAdmin.l_name}`;
 
-    // Prevent illegal transitions
+  
     const terminalStatuses = ["resolved", "closed", "rejected"];
     if (terminalStatuses.includes(prevStatus) && status && status !== "reopened")
       return res.status(400).json({ message: `Cannot change status of a ${prevStatus} ticket. Reopen it first.` });
 
-    // Apply status change
+ 
     if (status && status !== prevStatus) {
       ticket.status = status;
       ticket.statusHistory.push({
@@ -416,9 +404,6 @@ const updateTicketStatus = async (req, res, next) => {
   }
 };
 
-/* ═══════════════════════════════════════════════
-   SUPERADMIN — ESCALATE TICKET
-═══════════════════════════════════════════════ */
 const escalateTicket = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -446,9 +431,7 @@ const escalateTicket = async (req, res, next) => {
   }
 };
 
-/* ═══════════════════════════════════════════════
-   SUPERADMIN — SOFT DELETE TICKET
-═══════════════════════════════════════════════ */
+
 const deleteTicket = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -466,9 +449,7 @@ const deleteTicket = async (req, res, next) => {
   }
 };
 
-/* ═══════════════════════════════════════════════
-   SUPERADMIN — DASHBOARD STATS ONLY
-═══════════════════════════════════════════════ */
+
 const getTicketStats = async (req, res, next) => {
   try {
     const stats = await Ticket.getDashboardStats();
@@ -478,10 +459,8 @@ const getTicketStats = async (req, res, next) => {
   }
 };
 
-/* ═══════════════════════════════════════════════
-   CRON JOB HELPER — Mark overdue tickets
-   Call this from a daily cron:  ticketCron()
-═══════════════════════════════════════════════ */
+
+
 const markOverdueTickets = async () => {
   const result = await Ticket.updateMany(
     {
