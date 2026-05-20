@@ -30,7 +30,7 @@ export const employeeGetMyTickets = async () => {
 };
 
 export const employeeGetTicketDetail = async (ticketNumber) => {
-  const res = await api.get(`employee/getTicketDetail/${ticketNumber}`);
+  const res = await api.get(`user/getTicketDetail/${ticketNumber}`);
   return res.data;
 };
 
