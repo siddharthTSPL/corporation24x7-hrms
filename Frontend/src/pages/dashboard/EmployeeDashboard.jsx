@@ -1239,7 +1239,7 @@ export default function EmployeeDashboard() {
         </div>
       </div>
 
-      {/* ── ROW 4: Leave History ── */}
+  
       <div className="ed-card" style={{ animationDelay:".45s" }}>
         <CardAccent color="#378ADD"/>
         <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
