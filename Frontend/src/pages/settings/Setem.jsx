@@ -3,7 +3,6 @@ import React from "react";
 import { useUpdateProfile, useUpdatePassword, useGetMeUser } from "../../auth/server-state/employee/employeeauth/employeeauth.hook";
 import { useQueryClient } from "@tanstack/react-query";
 
-// ─── CONSTANTS ────────────────────────────────────────────────────────────
 const AVATAR_STYLES = [
   "avataaars", "bottts", "personas", "lorelei",
   "micah", "open-peeps", "big-ears", "croodles",
@@ -11,7 +10,6 @@ const AVATAR_STYLES = [
 
 const MARITAL_OPTIONS = ["single", "married", "divorced"];
 
-// ─── BRAND COLORS (matches employee dashboard palette) ────────────────────
 const C = {
   brand:      "#730042",
   brandLight: "rgba(115,0,66,0.08)",
@@ -32,7 +30,6 @@ const C = {
   mutedMid:   "#c9bab5",
 };
 
-// ─── UTILS ────────────────────────────────────────────────────────────────
 function getInitials(fName = "", lName = "") {
   return `${(fName[0] || "").toUpperCase()}${(lName[0] || "").toUpperCase()}`;
 }
@@ -41,7 +38,6 @@ function getErrorMessage(err) {
   return err?.response?.data?.message || err?.message || "Something went wrong";
 }
 
-// ─── SMALL UI PRIMITIVES ──────────────────────────────────────────────────
 function Badge({ children, color = C.brand, bg = C.brandLight }) {
   return (
     <span style={{
@@ -197,7 +193,6 @@ function PrimaryButton({ onClick, disabled, loading, children, color = C.brand }
   );
 }
 
-// ─── NAV SIDEBAR ──────────────────────────────────────────────────────────
 function Sidebar({ tab, setTab, employee, initials }) {
   const tabs = [
     { key: "profile", label: "Profile", icon: (
@@ -205,6 +200,12 @@ function Sidebar({ tab, setTab, employee, initials }) {
     )},
     { key: "contact", label: "Contact info", icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="3" stroke="currentColor" strokeWidth="1.4"/><path d="M5 6h6M5 9h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+    )},
+    { key: "address", label: "Address", icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5C5.515 1.5 3.5 3.515 3.5 6c0 3.75 4.5 8.5 4.5 8.5S12.5 9.75 12.5 6c0-2.485-2.015-4.5-4.5-4.5z" stroke="currentColor" strokeWidth="1.4"/><circle cx="8" cy="6" r="1.5" stroke="currentColor" strokeWidth="1.2"/></svg>
+    )},
+    { key: "documents", label: "Documents", icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3" y="1" width="10" height="14" rx="2" stroke="currentColor" strokeWidth="1.4"/><path d="M5.5 5h5M5.5 8h5M5.5 11h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
     )},
     { key: "password", label: "Password", icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="4" y="7" width="8" height="6" rx="2" stroke="currentColor" strokeWidth="1.4"/><path d="M6 7V5a2 2 0 0 1 4 0v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
@@ -216,7 +217,6 @@ function Sidebar({ tab, setTab, employee, initials }) {
 
   return (
     <div style={{ width: 220, flexShrink: 0 }}>
-      {/* Profile mini card */}
       <div style={{
         background: C.surface, borderRadius: 16,
         border: `0.5px solid ${C.border}`,
@@ -247,7 +247,6 @@ function Sidebar({ tab, setTab, employee, initials }) {
         </div>
       </div>
 
-      {/* Nav */}
       <div style={{ background: C.surface, borderRadius: 16, border: `0.5px solid ${C.border}`, overflow: "hidden" }}>
         {tabs.map((t, i) => {
           const active = tab === t.key;
@@ -280,10 +279,12 @@ function Sidebar({ tab, setTab, employee, initials }) {
   );
 }
 
-// ─── PROFILE TAB ──────────────────────────────────────────────────────────
 function ProfileTab({ employee }) {
-  const joined = employee?.date_of_joining || employee?.createdAt;
+  const joined = employee?.createdAt;
   const joinedFmt = joined ? new Date(joined).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—";
+  const pwUpdated = employee?.passwordupdatedAt ? new Date(employee.passwordupdatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—";
+
+  const deptMap = { OPR: "Operations", BPO: "BPO", ENG: "Engineering" };
 
   return (
     <>
@@ -292,27 +293,50 @@ function ProfileTab({ employee }) {
           <ReadonlyField label="First name" value={employee?.f_name} />
           <ReadonlyField label="Last name" value={employee?.l_name} />
           <ReadonlyField label="Work email" value={employee?.work_email} />
-          <ReadonlyField label="Username" value={employee?.username} />
-          <ReadonlyField label="Employee ID" value={employee?.uid || employee?._id?.slice(-10)} />
-          <ReadonlyField label="Role" value={employee?.role} />
+          <ReadonlyField label="Employee ID" value={employee?.uid} />
+          <ReadonlyField label="Gender" value={employee?.gender} />
+          <ReadonlyField label="Marital status" value={employee?.marital_status} />
         </div>
       </SectionCard>
 
       <SectionCard title="Job information" subtitle="Your current role and team" accent={C.blue}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+          <ReadonlyField label="Role" value={employee?.role} />
           <ReadonlyField label="Designation" value={employee?.designation} />
-          <ReadonlyField label="Department" value={employee?.department} />
+          <ReadonlyField label="Department" value={deptMap[employee?.department] || employee?.department} />
+          <ReadonlyField label="Office location" value={employee?.office_location} />
           <ReadonlyField label="Date of joining" value={joinedFmt} />
-          <ReadonlyField label="Gender" value={employee?.gender} />
           <ReadonlyField label="Account status" value={employee?.status} />
           <ReadonlyField label="Email verified" value={employee?.isverified ? "✓ Verified" : "Not verified"} />
+          <ReadonlyField label="Password last updated" value={pwUpdated} />
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Experience" subtitle="Your work background" accent={C.amber}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+          <ReadonlyField label="Fresher" value={employee?.is_fresher ? "Yes" : "No"} />
+          <ReadonlyField label="Total experience (years)" value={employee?.total_experience !== undefined ? String(employee.total_experience) : "—"} />
+          {!employee?.is_fresher && (
+            <>
+              <ReadonlyField label="Previous company" value={employee?.previous_company} />
+              <ReadonlyField label="Previous designation" value={employee?.previous_designation} />
+            </>
+          )}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Reporting manager" subtitle="Your direct reporting line" accent={C.green}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+          <ReadonlyField label="Manager name" value={employee?.Under_manager ? `${employee.Under_manager.f_name} ${employee.Under_manager.l_name}` : "—"} />
+          <ReadonlyField label="Manager email" value={employee?.Under_manager?.work_email} />
+          <ReadonlyField label="Manager role" value={employee?.Under_manager?.role} />
+          <ReadonlyField label="Manager designation" value={employee?.Under_manager?.designation} />
         </div>
       </SectionCard>
     </>
   );
 }
 
-// ─── CONTACT TAB ──────────────────────────────────────────────────────────
 function ContactTab({ employee, onSuccess, onError }) {
   const queryClient = useQueryClient();
   const updateProfile = useUpdateProfile();
@@ -321,6 +345,7 @@ function ContactTab({ employee, onSuccess, onError }) {
     personal_contact: employee?.personal_contact || "",
     e_contact: employee?.e_contact || "",
     marital_status: employee?.marital_status || "single",
+    gender: employee?.gender || "male",
   });
 
   useEffect(() => {
@@ -329,6 +354,7 @@ function ContactTab({ employee, onSuccess, onError }) {
         personal_contact: employee.personal_contact || "",
         e_contact: employee.e_contact || "",
         marital_status: employee.marital_status || "single",
+        gender: employee.gender || "male",
       });
     }
   }, [employee]);
@@ -363,6 +389,31 @@ function ContactTab({ employee, onSuccess, onError }) {
         hint="This contact will be reached in case of emergency"
       />
       <div style={{ marginBottom: 20 }}>
+        <FieldLabel>Gender</FieldLabel>
+        <div style={{ display: "flex", gap: 10 }}>
+          {["male", "female"].map(opt => {
+            const active = form.gender === opt;
+            return (
+              <button
+                key={opt}
+                onClick={() => setForm(p => ({ ...p, gender: opt }))}
+                style={{
+                  flex: 1, padding: "10px 0",
+                  borderRadius: 10, border: `0.5px solid ${active ? C.brand : C.border}`,
+                  background: active ? C.brandLight : C.surface,
+                  color: active ? C.brand : C.muted,
+                  fontSize: 12, fontWeight: active ? 500 : 400,
+                  cursor: "pointer", fontFamily: "inherit",
+                  textTransform: "capitalize", transition: "all 0.15s",
+                }}
+              >
+                {opt}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{ marginBottom: 20 }}>
         <FieldLabel>Marital status</FieldLabel>
         <div style={{ display: "flex", gap: 10 }}>
           {MARITAL_OPTIONS.map(opt => {
@@ -394,7 +445,128 @@ function ContactTab({ employee, onSuccess, onError }) {
   );
 }
 
-// ─── PASSWORD TAB ─────────────────────────────────────────────────────────
+function AddressTab({ employee, onSuccess, onError }) {
+  const queryClient = useQueryClient();
+  const updateProfile = useUpdateProfile();
+
+  const [form, setForm] = useState({
+    address: employee?.address || "",
+    city: employee?.city || "",
+    state: employee?.state || "",
+    pincode: employee?.pincode || "",
+  });
+
+  useEffect(() => {
+    if (employee) {
+      setForm({
+        address: employee.address || "",
+        city: employee.city || "",
+        state: employee.state || "",
+        pincode: employee.pincode || "",
+      });
+    }
+  }, [employee]);
+
+  const handleSave = () => {
+    updateProfile.mutate(form, {
+      onSuccess: (data) => {
+        queryClient.setQueryData(["meUser"], old => old ? { ...old, employee: { ...old.employee, ...data.employee } } : old);
+        queryClient.invalidateQueries({ queryKey: ["meUser"] });
+        onSuccess("Address updated successfully!");
+      },
+      onError: (err) => onError(getErrorMessage(err)),
+    });
+  };
+
+  return (
+    <SectionCard title="Address information" subtitle="Your residential details" accent={C.amber}>
+      <InputField
+        label="Address"
+        value={form.address}
+        onChange={e => setForm(p => ({ ...p, address: e.target.value }))}
+        placeholder="Enter your address"
+      />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}>
+        <InputField
+          label="City"
+          value={form.city}
+          onChange={e => setForm(p => ({ ...p, city: e.target.value }))}
+          placeholder="City"
+        />
+        <InputField
+          label="State"
+          value={form.state}
+          onChange={e => setForm(p => ({ ...p, state: e.target.value }))}
+          placeholder="State"
+        />
+      </div>
+      <InputField
+        label="Pincode"
+        value={form.pincode}
+        onChange={e => setForm(p => ({ ...p, pincode: e.target.value }))}
+        placeholder="Enter pincode"
+      />
+      <PrimaryButton onClick={handleSave} loading={updateProfile.isPending}>
+        Save address
+      </PrimaryButton>
+    </SectionCard>
+  );
+}
+
+function DocumentsTab({ employee }) {
+  const docFields = [
+    { label: "Aadhaar number", value: employee?.aadhaar_number },
+    { label: "PAN number", value: employee?.pan_number },
+    { label: "Bank name", value: employee?.bank_name },
+    { label: "Account holder name", value: employee?.account_holder_name },
+    { label: "Account number", value: employee?.account_number },
+    { label: "IFSC code", value: employee?.ifsc_code },
+  ];
+
+  const fileFields = [
+    { label: "Resume", value: employee?.resume },
+    { label: "Aadhaar card", value: employee?.aadhaar_card },
+    { label: "PAN card", value: employee?.pan_card },
+    { label: "Experience letter", value: employee?.experience_letter },
+  ];
+
+  return (
+    <>
+      <SectionCard title="Identity & banking" subtitle="Your identity and bank details on record" accent={C.brand}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+          {docFields.map(f => (
+            <ReadonlyField key={f.label} label={f.label} value={f.value} />
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Uploaded documents" subtitle="Files submitted during onboarding" accent={C.blue}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+          {fileFields.map(f => (
+            <div key={f.label} style={{ marginBottom: 16 }}>
+              <FieldLabel>{f.label}</FieldLabel>
+              <div style={{
+                padding: "10px 14px", borderRadius: 10,
+                background: "#f9f4f2", border: `0.5px solid ${C.border}`,
+                fontSize: 13, color: f.value ? C.blue : C.muted, fontWeight: 500,
+                display: "flex", alignItems: "center", gap: 8,
+              }}>
+                {f.value ? (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="1" width="10" height="12" rx="2" stroke={C.blue} strokeWidth="1.3"/><path d="M4.5 4.5h5M4.5 7h5M4.5 9.5h3" stroke={C.blue} strokeWidth="1.2" strokeLinecap="round"/></svg>
+                    Uploaded
+                  </>
+                ) : "Not uploaded"}
+              </div>
+              <div style={{ fontSize: 11, color: C.mutedMid, marginTop: 4 }}>Read-only</div>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+    </>
+  );
+}
+
 function PasswordTab({ onSuccess, onError }) {
   const updatePassword = useUpdatePassword();
   const [show, setShow] = useState(false);
@@ -449,7 +621,6 @@ function PasswordTab({ onSuccess, onError }) {
           value={form.newpassword} onChange={e => setForm(p => ({ ...p, newpassword: e.target.value }))}
           placeholder="Enter new password" rightEl={eyeToggle} />
 
-        {/* Strength bar */}
         {form.newpassword && (
           <div style={{ marginTop: -8, marginBottom: 16 }}>
             <div style={{ display: "flex", gap: 4, marginBottom: 5 }}>
@@ -479,7 +650,6 @@ function PasswordTab({ onSuccess, onError }) {
   );
 }
 
-// ─── AVATAR TAB ───────────────────────────────────────────────────────────
 function AvatarTab({ employee, onSuccess, onError }) {
   const queryClient = useQueryClient();
   const updateProfile = useUpdateProfile();
@@ -512,7 +682,6 @@ function AvatarTab({ employee, onSuccess, onError }) {
 
   return (
     <SectionCard title="Profile avatar" subtitle="Choose an avatar that represents you" accent={C.blue}>
-      {/* Current preview */}
       <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 24, padding: "16px 20px", background: C.page, borderRadius: 12, border: `0.5px solid ${C.border}` }}>
         <div style={{
           width: 72, height: 72, borderRadius: "50%",
@@ -544,7 +713,6 @@ function AvatarTab({ employee, onSuccess, onError }) {
         </div>
       </div>
 
-      {/* Style grid */}
       <FieldLabel>Choose a style</FieldLabel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
         {AVATAR_STYLES.map((style) => {
@@ -583,13 +751,11 @@ function AvatarTab({ employee, onSuccess, onError }) {
   );
 }
 
-// ─── MAIN PAGE ────────────────────────────────────────────────────────────
 export default function EmployeeSettingsPage() {
   const [tab, setTab] = useState("profile");
   const [toast, setToast] = useState({ message: "", type: "" });
 
   const { data: meData, isLoading } = useGetMeUser();
-  // useGetMeUser returns { success, employee, leavebalance }
   const employee = meData?.employee ?? null;
   const initials = employee ? getInitials(employee.f_name, employee.l_name) : "—";
 
@@ -618,22 +784,21 @@ export default function EmployeeSettingsPage() {
 
       <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: "", type: "" })} />
 
-      {/* Header */}
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0, letterSpacing: "-0.3px" }}>Settings</h1>
         <p style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>Manage your profile, contact info and security</p>
       </div>
 
-      {/* Layout */}
       <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
         <Sidebar tab={tab} setTab={setTab} employee={employee} initials={initials} />
 
-        {/* Content */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          {tab === "profile"  && <ProfileTab employee={employee} />}
-          {tab === "contact"  && <ContactTab employee={employee} onSuccess={showSuccess} onError={showError} />}
-          {tab === "password" && <PasswordTab onSuccess={showSuccess} onError={showError} />}
-          {tab === "avatar"   && <AvatarTab employee={employee} onSuccess={showSuccess} onError={showError} />}
+          {tab === "profile"   && <ProfileTab employee={employee} />}
+          {tab === "contact"   && <ContactTab employee={employee} onSuccess={showSuccess} onError={showError} />}
+          {tab === "address"   && <AddressTab employee={employee} onSuccess={showSuccess} onError={showError} />}
+          {tab === "documents" && <DocumentsTab employee={employee} />}
+          {tab === "password"  && <PasswordTab onSuccess={showSuccess} onError={showError} />}
+          {tab === "avatar"    && <AvatarTab employee={employee} onSuccess={showSuccess} onError={showError} />}
 
           <div style={{ textAlign: "center", fontSize: 12, color: C.mutedMid, marginTop: 8 }}>
             Changes are saved to your account automatically

@@ -2,6 +2,7 @@ const express = require("express");
 const userrouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const employeemiddleware = require("../middleware/auth/employee.middleware");
+
 const {
   verifyUserEmail,
   userlogin,
@@ -24,6 +25,7 @@ const {
   employeeGetMyTickets,
   employeeRateTicket,
   employeeGetTicketDetail,
+  getOrgInfo,
 } = require("../controllers/user.controller");
 
 userrouter.get("/verify/:token", asyncHandler(verifyUserEmail));
@@ -93,5 +95,7 @@ userrouter.get(
   employeemiddleware,
   asyncHandler(employeeGetTicketDetail),
 );
+
+userrouter.get("/getOrgInfo", employeemiddleware, asyncHandler(getOrgInfo));
 
 module.exports = userrouter;

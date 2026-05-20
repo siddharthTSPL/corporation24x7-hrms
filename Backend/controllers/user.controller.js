@@ -10,6 +10,9 @@ require("dotenv").config();
 const Review = require("../Models/review.model");
 const Attendance = require("../Models/attendance.model");
 const Ticket = require("../Models/ticket.model");
+const Adminmodel = require("../Models/Admin.model");
+const SuperAdminModel = require("../Models/superadmin.model");
+const Managermodel = require("../Models/manager.model");
 
 const verifyUserEmail = async (req, res, next) => {
   const { token } = req.params;
@@ -143,9 +146,9 @@ const changepassword = async (req, res, next) => {
   if (!req.employee)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
-  const { currentPassword, newPassword } = req.body;
+  const { oldpassword, newpassword } = req.body;
 
-  if (!currentPassword || !newPassword)
+  if (!oldpassword || !newpassword)
     return next(
       Object.assign(
         new Error("Current password and new password are required"),
@@ -153,7 +156,7 @@ const changepassword = async (req, res, next) => {
       ),
     );
 
-  if (currentPassword === newPassword)
+  if (oldpassword === newpassword)
     return next(
       Object.assign(
         new Error("New password must be different from current password"),
@@ -162,7 +165,8 @@ const changepassword = async (req, res, next) => {
     );
 
   const user = await usermodel.findById(req.employee._id);
-  const isvalid = await user.isValidPassword(currentPassword);
+
+  const isvalid = await user.isValidPassword(oldpassword);
 
   if (!isvalid)
     return next(
@@ -171,7 +175,8 @@ const changepassword = async (req, res, next) => {
       }),
     );
 
-  user.password = newPassword;
+
+  user.password = newpassword;
   user.isFirstLogin = false;
   user.passwordupdatedAt = Date.now();
   await user.save();
@@ -830,6 +835,82 @@ const employeeGetTicketDetail = async (req, res, next) => {
   }
 };
 
+const  getOrgInfo = async (req, res, next) => {
+  try {
+    if (!req.employee)
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+
+    const employee = await usermodel
+      .findById(req.employee._id)
+      .select("organisation_id Under_manager")
+      .lean();
+
+    if (!employee)
+      return res.status(404).json({ success: false, message: "Employee not found" });
+
+    const admin = await Adminmodel.findById(employee.organisation_id)
+      .select("f_name l_name work_email designation created_by")
+      .lean();
+
+    let superAdmin = null;
+    if (admin?.created_by) {
+      superAdmin = await SuperAdminModel.findById(admin.created_by)
+        .select("f_name l_name email organisation_name profile_image")
+        .lean();
+    }
+
+  
+    const managers = await Managermodel.find()
+      .select("f_name l_name work_email designation department office_location")
+      .lean();
+
+  
+    const employees = await usermodel
+      .find({ Under_manager: { $in: managers.map(m => m._id) } })
+      .select("f_name l_name work_email designation department office_location Under_manager")
+      .lean();
+
+    const managersWithEmployees = managers.map(mgr => ({
+      id: mgr._id,
+      name: `${mgr.f_name} ${mgr.l_name}`,
+      email: mgr.work_email,
+      designation: mgr.designation,
+      department: mgr.department,
+      isCurrentUserManager: employee.Under_manager?.toString() === mgr._id.toString(),
+      employees: employees
+        .filter(e => e.Under_manager?.toString() === mgr._id.toString())
+        .map(e => ({
+          id: e._id,
+          name: `${e.f_name} ${e.l_name}`,
+          email: e.work_email,
+          designation: e.designation,
+          department: e.department,
+          isCurrentUser: e._id.toString() === req.employee._id.toString(),
+        })),
+    }));
+
+    res.status(200).json({
+      success: true,
+      organisation_name: superAdmin?.organisation_name || "",
+      organisation_logo: superAdmin?.profile_image || null,
+      super_admin: superAdmin ? {
+        id: superAdmin._id,
+        name: `${superAdmin.f_name} ${superAdmin.l_name}`,
+        email: superAdmin.email,
+      } : null,
+      admin: admin ? {
+        id: admin._id,
+        name: `${admin.f_name} ${admin.l_name}`,
+        email: admin.work_email,
+        designation: admin.designation,
+      } : null,
+      managers: managersWithEmployees,
+      currentUserId: req.employee._id,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 
 module.exports = {
@@ -853,5 +934,6 @@ module.exports = {
   employeeSubmitTicket,
   employeeGetMyTickets,
   employeeRateTicket,
-  employeeGetTicketDetail
+  employeeGetTicketDetail,
+  getOrgInfo,
 };
