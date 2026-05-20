@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useGetAnnouncements } from "../../auth/server-state/employee/employeeannounce/employeeannounce.hook";
 import { useGetMeUser } from "../../auth/server-state/employee/employeeauth/employeeauth.hook";
 import { useGetAllLeaveHistory } from "../../auth/server-state/employee/employeeleave/employeeleave.hook";
-import { useGetAttendance } from "../../auth/server-state/employee/employeeother/employeeother.hook"; 
+import { useGetAttendance } from "../../auth/server-state/employee/employeeother/employeeother.hook";
 
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -195,7 +195,6 @@ function isDateInRange(date, start, end) {
 function resolveAttendanceStatus(record) {
   if (!record) return null;
 
-  // Checked in but not yet checked out — still active
   if (record.checkIn && !record.checkOut) return "checkedin";
 
   const s = (record.status || "").toLowerCase();
@@ -204,7 +203,6 @@ function resolveAttendanceStatus(record) {
   if (s === "absent")     return "absent";
   if (s === "late")       return "late";
   if (s === "lwp")        return "absent";
-
 
   if (record.checkIn && record.checkOut) return "present";
 
@@ -360,14 +358,12 @@ function Calendar({ month, joiningDate, attendanceMap = new Map(), approvedLeave
   const daysInMo = new Date(year, month + 1, 0).getDate();
   const today    = new Date(); today.setHours(0, 0, 0, 0);
 
-  // Joining date normalised to midnight (local)
   const joiningMidnight = useMemo(() => {
     if (!joiningDate) return null;
     const d = new Date(joiningDate);
     d.setHours(0, 0, 0, 0);
     return d;
   }, [joiningDate]);
-
 
   const leaveDaySet = useMemo(() => {
     const set = new Set();
@@ -381,28 +377,25 @@ function Calendar({ month, joiningDate, attendanceMap = new Map(), approvedLeave
     return set;
   }, [approvedLeaves, month, year]);
 
-
   const cells = [];
-  for (let i = 0; i < firstDay; i++) cells.push(null); // grid padding
+  for (let i = 0; i < firstDay; i++) cells.push(null);
 
   for (let d = 1; d <= daysInMo; d++) {
     const date = new Date(year, month, d);
     date.setHours(0, 0, 0, 0);
 
-    const isToday        = date.toDateString() === today.toDateString();
-    const isFuture       = date > today;
+    const isToday         = date.toDateString() === today.toDateString();
+    const isFuture        = date > today;
     const isBeforeJoining = joiningMidnight && date < joiningMidnight;
 
     let status = "future";
 
     if (isBeforeJoining) {
-     
       status = "before_joining";
     } else if (leaveDaySet.has(d)) {
       status = "leave";
     } else if (!isFuture) {
-   
-      const key    = date.toISOString().slice(0, 10); // "YYYY-MM-DD"
+      const key    = date.toISOString().slice(0, 10);
       const record = attendanceMap.get(key);
       status = resolveAttendanceStatus(record) ?? "absent";
     }
@@ -418,7 +411,6 @@ function Calendar({ month, joiningDate, attendanceMap = new Map(), approvedLeave
     leave:          { background: "#e8eaf6",             color: "#283593", fontWeight: 600 },
     checkedin:      { background: "rgba(29,158,117,0.12)", color: "#1D9E75", fontWeight: 600 },
     future:         { color: "#d4c8c4", fontWeight: 400 },
-
     before_joining: { color: "#cfc6c1", fontWeight: 400, background: "transparent" },
   };
 
@@ -540,8 +532,12 @@ function TodayBanner({ isOnLeave, leaveType, onCheckIn }) {
   const date  = today.toLocaleDateString("en-IN", { day:"numeric", month:"long", year:"numeric" });
 
   const leaveLabel = {
-    el: "Earned Leave", sl: "Sick Leave", pl: "Privilege Leave",
-    ml: "Maternity Leave", cl: "Casual Leave",
+    el: "Earned Leave",
+    sl: "Sick Leave",
+    pl: "Paternity Leave",
+    ml: "Maternity Leave",
+    cl: "Casual Leave",
+    lwp: "Leave Without Pay",
   };
 
   return (
@@ -593,12 +589,14 @@ function TodayBanner({ isOnLeave, leaveType, onCheckIn }) {
 }
 
 
+// ── FIXED: correct leave type labels ──
 const LEAVE_TYPE_META = {
-  el: { label:"Earned",    color:"#730042", bg:"rgba(115,0,66,0.08)" },
-  sl: { label:"Sick",      color:"#1D9E75", bg:"rgba(29,158,117,0.08)" },
-  pl: { label:"Privilege", color:"#378ADD", bg:"rgba(55,138,221,0.08)" },
-  ml: { label:"Maternity", color:"#9333EA", bg:"rgba(147,51,234,0.08)" },
-  cl: { label:"Casual",    color:"#BA7517", bg:"rgba(186,117,23,0.08)" },
+  el:  { label:"Earned",    color:"#730042", bg:"rgba(115,0,66,0.08)" },
+  sl:  { label:"Sick",      color:"#1D9E75", bg:"rgba(29,158,117,0.08)" },
+  pl:  { label:"Paternity", color:"#378ADD", bg:"rgba(55,138,221,0.08)" },
+  ml:  { label:"Maternity", color:"#9333EA", bg:"rgba(147,51,234,0.08)" },
+  cl:  { label:"Casual",    color:"#BA7517", bg:"rgba(186,117,23,0.08)" },
+  lwp: { label:"LWP",       color:"#E24B4A", bg:"rgba(226,75,74,0.08)" },
 };
 
 const STATUS_COLORS = {
@@ -698,19 +696,6 @@ function ReviewCard({ reviews = [], loading }) {
             })}
           </div>
 
-          {latest?.comment && (
-            <div style={{ background:"#faf8f2", borderRadius:8, padding:"9px 12px",
-              borderLeft:"3px solid #e8b84b", fontSize:11, color:"#5a4030", lineHeight:1.6,
-              fontFamily:"'DM Sans',sans-serif" }}>
-              <span style={{ color:"#b0948a", fontSize:10, display:"block", marginBottom:4 }}>
-                {latest.reviewer
-                  ? `${latest.reviewer.f_name} ${latest.reviewer.l_name} · ${latest.monthYear}`
-                  : `Latest · ${latest.monthYear}`}
-              </span>
-              "{latest.comment}"
-            </div>
-          )}
-
           {newThisMonth > 0 && (
             <div style={{ marginTop:8, display:"flex", alignItems:"center", gap:5 }}>
               <Badge variant="green">+{newThisMonth} this month</Badge>
@@ -736,20 +721,20 @@ export default function EmployeeDashboard() {
   const { data: meData,   isLoading: meLoading,  isError: meError  } = useGetMeUser();
   const { data: annData,  isLoading: annLoading                     } = useGetAnnouncements();
   const { data: histData, isLoading: histLoading                    } = useGetAllLeaveHistory();
-  const { data: attData,  isLoading: attLoading                     } = useGetAttendance(); 
+  const { data: attData,  isLoading: attLoading                     } = useGetAttendance();
 
 
   const employee      = meData?.employee      ?? null;
-  const lb            = meData?.leavebalance?.[0] ?? null;
-  const allLeaves     = histData?.leaves      ?? [];
-  const announcements = annData?.announcements ?? [];
-  const reviews       = meData?.review        ?? [];
 
- 
+  // ── FIX: API returns leavebalance as a direct object, not an array ──
+  const lb            = meData?.leavebalance   ?? null;
+
+  const allLeaves     = histData?.leaves       ?? [];
+  const announcements = annData?.announcements ?? [];
+  const reviews       = meData?.reviews        ?? meData?.review ?? [];
+
   const joiningDate = employee?.date_of_joining ?? employee?.createdAt ?? null;
 
- 
- 
   const attendanceMap = useMemo(() => {
     const records = Array.isArray(attData)
       ? attData
@@ -757,12 +742,11 @@ export default function EmployeeDashboard() {
         ? attData.attendance
         : [];
 
-    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // +05:30
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
     const map = new Map();
 
     records.forEach(rec => {
       if (!rec.date) return;
-     
       const istKey = new Date(new Date(rec.date).getTime() + IST_OFFSET_MS)
         .toISOString()
         .slice(0, 10);
@@ -809,8 +793,8 @@ export default function EmployeeDashboard() {
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(year, selectedMonth, d);
       date.setHours(0,0,0,0);
-      if (date > today) break;                                             // future
-      if (joiningMidnight && date < joiningMidnight) continue;            // before joining
+      if (date > today) break;
+      if (joiningMidnight && date < joiningMidnight) continue;
       if (approvedLeaves.some(lv => isDateInRange(date, lv.startDate, lv.endDate))) continue;
 
       counted++;
@@ -828,11 +812,43 @@ export default function EmployeeDashboard() {
     return { presentCount: present, absentCount: absent, halfCount: half, checkedInCount: checkedIn, attendanceRate: rate };
   }, [attendanceMap, selectedMonth, approvedLeaves, joiningMidnight]);
 
+  // ── FIX: Correct leave labels — PL = Paternity, ML = Maternity, LWP = Leave Without Pay ──
   const leaveRows = [
-    { label:"Earned Leave (EL)",   availed:lb?.EL?.availed, entitled:lb?.EL?.entitled, accrued:lb?.EL?.accrued, color:"#730042" },
-    { label:"Sick Leave (SL)",     availed:lb?.SL?.availed, entitled:lb?.SL?.entitled, accrued:null,            color:"#1D9E75" },
-    { label:"Privilege Leave (PL)",availed:lb?.pbc ?? 0,    entitled:lb?.PL,           accrued:null,            color:"#378ADD" },
-    { label:"LWP / Maternity",     availed:lb?.lwp ?? 0,    entitled:(lb?.ML ?? 0) + 5,accrued:null,            color:"#BA7517" },
+    {
+      label:    "Earned Leave (EL)",
+      availed:  lb?.EL?.availed,
+      entitled: lb?.EL?.entitled,
+      accrued:  lb?.EL?.accrued,
+      color:    "#730042",
+    },
+    {
+      label:    "Sick Leave (SL)",
+      availed:  lb?.SL?.availed,
+      entitled: lb?.SL?.entitled,
+      accrued:  null,
+      color:    "#1D9E75",
+    },
+    {
+      label:    "Paternity Leave (PL)",
+      availed:  lb?.pbc ?? 0,
+      entitled: lb?.PL  ?? 0,
+      accrued:  null,
+      color:    "#378ADD",
+    },
+    {
+      label:    "Maternity Leave (ML)",
+      availed:  lb?.lwp ?? 0,
+      entitled: lb?.ML  ?? 0,
+      accrued:  null,
+      color:    "#9333EA",
+    },
+    {
+      label:    "Leave Without Pay (LWP)",
+      availed:  lb?.lwp ?? 0,
+      entitled: 5,
+      accrued:  null,
+      color:    "#E24B4A",
+    },
   ];
 
   if (meError) return (
@@ -977,7 +993,7 @@ export default function EmployeeDashboard() {
                 <SegBar segments={[
                   { pct:(lb?.EL?.entitled ?? 15)-(lb?.EL?.availed ?? 0), color:"#1D9E75", label:`EL (${(lb?.EL?.entitled ?? 15)-(lb?.EL?.availed ?? 0)} left)` },
                   { pct:(lb?.SL?.entitled ?? 12)-(lb?.SL?.availed ?? 0), color:"#378ADD", label:`SL (${(lb?.SL?.entitled ?? 12)-(lb?.SL?.availed ?? 0)} left)` },
-                  { pct:lb?.PL ?? 7, color:"#BA7517", label:`PL (${lb?.PL ?? 7})` },
+                  { pct: lb?.PL ?? 0, color:"#BA7517", label:`PL (${lb?.PL ?? 0})` },
                 ]}/>
               </>
             )}
@@ -1007,14 +1023,16 @@ export default function EmployeeDashboard() {
                   <div>
                     <div style={{ fontSize:14, fontWeight:600, color:"#f9f8f2", fontFamily:"'Lora',serif" }}>{managerName}</div>
                     <div style={{ fontSize:11, color:"rgba(249,248,242,0.6)", marginTop:2, fontFamily:"'DM Sans',sans-serif" }}>
-                      {employee?.Under_manager?.role ?? "Manager"}
+                      {employee?.Under_manager?.designation ?? employee?.Under_manager?.role ?? "Manager"}
                     </div>
                   </div>
                 </div>
                 <div style={{ height:"0.5px", background:"rgba(249,248,242,0.15)", marginBottom:10 }}/>
                 <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, fontFamily:"'DM Sans',sans-serif" }}>
-                  <span style={{ color:"rgba(249,248,242,0.5)" }}>Manager ID</span>
-                  <span style={{ fontWeight:500, color:"rgba(249,248,242,0.7)" }}>{employee?.Under_manager?.uid ?? "—"}</span>
+                  <span style={{ color:"rgba(249,248,242,0.5)" }}>Role</span>
+                  <span style={{ fontWeight:500, color:"rgba(249,248,242,0.7)", textTransform:"capitalize" }}>
+                    {employee?.Under_manager?.role ?? "—"}
+                  </span>
                 </div>
                 <div style={{ marginTop:8 }}>
                   <div style={{ fontSize:10, color:"rgba(249,248,242,0.4)", fontFamily:"'DM Sans',sans-serif", marginBottom:2 }}>Work email</div>
@@ -1031,7 +1049,7 @@ export default function EmployeeDashboard() {
       {/* ── ROW 2: Calendar + Announcements ── */}
       <div style={{ display:"grid", gridTemplateColumns:"minmax(0,2fr) minmax(0,1fr)", gap:14, marginBottom:14 }}>
 
-        {/* Calendar — real attendance, full month from day 1 */}
+        {/* Calendar */}
         <div className="ed-card" style={{ animationDelay:".2s" }}>
           <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
             borderBottom:"0.5px solid #ede5e0" }}>
@@ -1050,15 +1068,14 @@ export default function EmployeeDashboard() {
           </div>
 
           <div style={{ padding:"12px 14px 0" }}>
-            {/* Joining date hint */}
-          {joiningDate && (
-            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:6 }}>
-              <div style={{ width:7, height:7, borderRadius:2, background:"#cfc6c1" }}/>
-              <span style={{ fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>
-                Joined {fmtDate(joiningDate)} · days before this are not counted
-              </span>
-            </div>
-          )}
+            {joiningDate && (
+              <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:6 }}>
+                <div style={{ width:7, height:7, borderRadius:2, background:"#cfc6c1" }}/>
+                <span style={{ fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>
+                  Joined {fmtDate(joiningDate)} · days before this are not counted
+                </span>
+              </div>
+            )}
             <Calendar
               month={selectedMonth}
               joiningDate={joiningDate}
@@ -1067,7 +1084,7 @@ export default function EmployeeDashboard() {
             />
           </div>
 
-          {/* Stats row — 5 columns (added "Active Now") */}
+          {/* Stats row */}
           <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", borderTop:"0.5px solid #f0e8e4", marginTop:12 }}>
             {[
               [presentCount,        "#730042", "Present"],
@@ -1184,7 +1201,7 @@ export default function EmployeeDashboard() {
           </div>
           <div style={{ padding:"0 18px 4px" }}>
             {meLoading
-              ? [1,2,3,4].map(i => <div key={i} style={{ padding:"12px 0", borderBottom:"0.5px solid #ede5e0" }}><Skeleton h={40}/></div>)
+              ? [1,2,3,4,5].map(i => <div key={i} style={{ padding:"12px 0", borderBottom:"0.5px solid #ede5e0" }}><Skeleton h={40}/></div>)
               : leaveRows.map((row, i) => <LeaveRow key={i} {...row}/>)
             }
           </div>
