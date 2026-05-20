@@ -2,6 +2,7 @@ const express = require("express");
 const userrouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const employeemiddleware = require("../middleware/auth/employee.middleware");
+const {getOrgInfo} = require("../controllers/admin.controller");
 const {
   verifyUserEmail,
   userlogin,
@@ -93,5 +94,7 @@ userrouter.get(
   employeemiddleware,
   asyncHandler(employeeGetTicketDetail),
 );
+
+userrouter.get("/getorginfo", employeemiddleware, asyncHandler(getOrgInfo));
 
 module.exports = userrouter;
