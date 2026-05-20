@@ -10,6 +10,7 @@ export const useGetAnnouncements = () => {
     return useQuery({
         queryKey: ["announcements"],
         queryFn: () => getAnnouncements(),
+
         onSuccess: (data) => {
             queryClient.setQueryData(["announcements"], data.announcements);
         },
