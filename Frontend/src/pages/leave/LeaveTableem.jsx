@@ -355,7 +355,7 @@ const LeaveBalanceTab = ({ user, balance, isLoading }) => {
     { label: "Sick Leave",      value: balance.SL,  accent: "#3B82F6" },
     ...(user?.gender === "female" && user?.marital_status === "married" ? [{ label: "Maternity Leave", value: balance.ML, accent: "#A855F7" }] : []),
     ...(user?.gender === "male"   && user?.marital_status === "married" ? [{ label: "Paternity Leave", value: balance.PL, accent: "#F59E0B" }] : []),
-    { label: "Past Balance",       value: balance.pbc, accent: "#6B1A4A" },
+    { label: "Patientity Balance",       value: balance.pbc, accent: "#6B1A4A" },
     { label: "Leave Without Pay",  value: balance.lwp, accent: "#CD166E" },
   ];
   return (
