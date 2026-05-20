@@ -2,357 +2,353 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
-  Crown, Users, Building2, User, MapPin,
-  Download, Search, ChevronRight, X, Loader2, CheckCircle2,
+  Crown, Users, Building2, User,
+  Download, Search, X, Loader2, CheckCircle2,
 } from "lucide-react";
 
-// ── Only hooks that actually exist ────────────────────────────────────────────
-import { useGetMeUser }
-  from "../../auth/server-state/employee/employeeauth/employeeauth.hook";
 import { useGetOrgInfoEmployee }
   from "../../auth/server-state/employee/employeeother/employeeother.hook";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-const getInitials = (f = "", l = "") => `${f[0] || ""}${l[0] || ""}`.toUpperCase();
-const normalize   = (s = "") => s.toLowerCase().trim();
+const initials = (name = "") =>
+  name.split(" ").filter(Boolean).map(w => w[0]).join("").slice(0, 2).toUpperCase();
 
-const matchesPerson = (fname, lname, dept, desig, q) => {
-  if (!q) return false;
-  return (
-    normalize(`${fname} ${lname}`).includes(q) ||
-    normalize(dept  || "").includes(q) ||
-    normalize(desig || "").includes(q)
-  );
-};
+const norm = (s = "") => s.toLowerCase().trim();
 
-// ── Color palette ─────────────────────────────────────────────────────────────
-const DEPT_COLORS = [
-  { bar: "#6366f1", light: "#eef2ff", text: "#4338ca" },
-  { bar: "#0ea5e9", light: "#e0f2fe", text: "#0369a1" },
-  { bar: "#10b981", light: "#d1fae5", text: "#047857" },
-  { bar: "#f59e0b", light: "#fef3c7", text: "#b45309" },
-];
-
-// ── Global CSS ────────────────────────────────────────────────────────────────
 const STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
-  .org-root, .org-root * { font-family: 'DM Sans', sans-serif; box-sizing: border-box; }
+  .org-root, .org-root * { box-sizing: border-box; }
+  .org-root { font-family: 'DM Sans', sans-serif; }
 
   @keyframes fadeUp    { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
   @keyframes fadeIn    { from { opacity:0; } to { opacity:1; } }
-  @keyframes scaleIn   { from { opacity:0; transform:scale(0.95); } to { opacity:1; transform:scale(1); } }
+  @keyframes scaleIn   { from { opacity:0; transform:scale(0.94); } to { opacity:1; transform:scale(1); } }
   @keyframes shimmer   { 0% { background-position:-600px 0; } 100% { background-position:600px 0; } }
-  @keyframes drawV     { from { transform:scaleY(0); } to { transform:scaleY(1); } }
   @keyframes spin      { to { transform:rotate(360deg); } }
   @keyframes slideDown { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
-  @keyframes pulseRing {
-    0%, 100% { box-shadow: 0 0 0 0   rgba(99,102,241,0.35), 0 6px 20px rgba(99,102,241,0.18); }
-    50%       { box-shadow: 0 0 0 7px rgba(99,102,241,0.08), 0 8px 26px rgba(99,102,241,0.24); }
+  @keyframes pulseYou  {
+    0%,100% { box-shadow: 0 0 0 0 rgba(115,0,66,0.22), 0 4px 16px rgba(115,0,66,0.1); }
+    50%      { box-shadow: 0 0 0 8px rgba(115,0,66,0.05), 0 8px 28px rgba(115,0,66,0.18); }
   }
 
-  .org-card-hover { transition: transform 0.18s ease, box-shadow 0.18s ease; }
-  .org-card-hover:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,0.08) !important; }
-  .org-card-highlight { outline: 2.5px solid #6366f1 !important; outline-offset: 2px; box-shadow: 0 0 0 5px rgba(99,102,241,0.13) !important; }
-  .org-card-dim { opacity: 0.22; filter: grayscale(0.3); transition: opacity 0.2s, filter 0.2s; }
-  .org-card-me  { animation: pulseRing 2.6s ease-in-out infinite !important; }
+  .nd { transition: transform 0.16s ease, box-shadow 0.16s ease; cursor: default; }
+  .nd:hover { transform: translateY(-2px); }
+  .nd-hl  { outline: 2px solid #730042 !important; outline-offset: 2px; box-shadow: 0 0 0 5px rgba(115,0,66,0.1) !important; }
+  .nd-dim { opacity: 0.15; filter: grayscale(0.4); transition: opacity 0.2s, filter 0.2s; }
+  .nd-you { animation: pulseYou 2.8s ease-in-out infinite !important; }
 
-  .stat-card-hover { transition: transform 0.15s ease, box-shadow 0.15s ease; }
-  .stat-card-hover:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.06) !important; }
+  .stat-h { transition: transform 0.14s ease; }
+  .stat-h:hover { transform: translateY(-2px); }
 
-  .org-scroll::-webkit-scrollbar       { height: 4px; width: 4px; }
-  .org-scroll::-webkit-scrollbar-track { background: transparent; }
-  .org-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 4px; }
+  .sc::-webkit-scrollbar { height: 5px; width: 5px; }
+  .sc::-webkit-scrollbar-track { background: transparent; }
+  .sc::-webkit-scrollbar-thumb { background: #ddd0d8; border-radius: 4px; }
 
-  .hdr-btn {
-    display: flex; align-items: center; gap: 6px;
-    padding: 7px 14px; border-radius: 8px;
-    border: 1px solid #e2e8f0; background: #fff; color: #475569;
-    font-size: 13px; font-weight: 500; cursor: pointer;
-    font-family: 'DM Sans', sans-serif;
-    transition: background 0.13s, border-color 0.13s, color 0.13s;
-    white-space: nowrap;
+  .hb {
+    display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;
+    border:1px solid #e8dde5;background:#fff;color:#4a3542;
+    font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;
+    transition:background .13s,border-color .13s,color .13s;white-space:nowrap;
   }
-  .hdr-btn:hover    { background: #f8fafc; border-color: #cbd5e1; color: #1e293b; }
-  .hdr-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .hdr-btn-primary  { background: #1e293b; color: #fff; border-color: #1e293b; }
-  .hdr-btn-primary:hover { background: #0f172a; border-color: #0f172a; color: #fff; }
+  .hb:hover { background:#fdf6fa;border-color:#c9afc0;color:#730042; }
+  .hb:disabled { opacity:.45;cursor:not-allowed; }
+  .hb-p { background:#730042;color:#fff;border-color:#730042; }
+  .hb-p:hover { background:#5a0033;border-color:#5a0033;color:#fff; }
 
-  .search-wrap {
-    display: flex; align-items: center; gap: 8px;
-    border: 1px solid #6366f1; border-radius: 8px;
-    padding: 0 10px; background: #fff; height: 36px; width: 268px;
-    box-shadow: 0 0 0 3px rgba(99,102,241,0.1); transition: box-shadow 0.15s;
+  .sw {
+    display:flex;align-items:center;gap:8px;
+    border:1px solid #730042;border-radius:8px;
+    padding:0 10px;background:#fff;height:36px;width:260px;
+    box-shadow:0 0 0 3px rgba(115,0,66,0.09);transition:box-shadow .15s;
   }
-  .search-wrap:focus-within { box-shadow: 0 0 0 4px rgba(99,102,241,0.18); }
-  .search-input {
-    border: none; outline: none; background: transparent;
-    font-size: 13px; color: #1e293b; font-family: 'DM Sans', sans-serif; flex: 1; min-width: 0;
-  }
-  .search-input::placeholder { color: #94a3b8; }
-  .clear-btn { background: none; border: none; cursor: pointer; color: #94a3b8; display: flex; padding: 0; }
-  .clear-btn:hover { color: #475569; }
+  .sw:focus-within { box-shadow:0 0 0 4px rgba(115,0,66,0.15); }
+  .si { border:none;outline:none;background:transparent;font-size:13px;color:#1e293b;font-family:'DM Sans',sans-serif;flex:1;min-width:0; }
+  .si::placeholder { color:#b89aad; }
+  .cb { background:none;border:none;cursor:pointer;color:#b89aad;display:flex;padding:0; }
+  .cb:hover { color:#730042; }
 
-  .match-pill {
-    animation: slideDown 0.18s ease forwards;
-    display: flex; align-items: center; gap: 5px;
-    padding: 4px 10px; border-radius: 20px;
-    background: #eef2ff; color: #4338ca; font-size: 11px; font-weight: 600;
-  }
-
-  .export-toast {
-    position: fixed; bottom: 24px; right: 24px; z-index: 9999;
-    display: flex; align-items: center; gap: 10px;
-    padding: 12px 18px; border-radius: 10px;
-    background: #1e293b; color: #fff; font-size: 13px; font-weight: 500;
-    box-shadow: 0 8px 28px rgba(0,0,0,0.18);
-    animation: slideDown 0.22s ease forwards;
-    font-family: 'DM Sans', sans-serif; pointer-events: none;
-  }
-
-  .no-results-banner {
-    margin-bottom: 16px; padding: 12px 16px; border-radius: 10px;
-    background: #fef9c3; border: 1px solid #fde68a;
-    font-size: 13px; color: #92400e;
-    display: flex; align-items: center; gap: 8px;
-    animation: slideDown 0.2s ease forwards;
-  }
-
-  .export-mode, .export-mode * {
-    animation: none !important; opacity: 1 !important; transform: none !important;
-  }
+  .mp { animation:slideDown .18s ease forwards;display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;background:#fdf0f7;color:#730042;font-size:11px;font-weight:600; }
+  .et { position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;align-items:center;gap:10px;padding:12px 18px;border-radius:10px;background:#1e0e17;color:#fff;font-size:13px;font-weight:500;box-shadow:0 8px 28px rgba(0,0,0,0.22);animation:slideDown .22s ease forwards;font-family:'DM Sans',sans-serif;pointer-events:none; }
+  .export-mode, .export-mode * { animation:none!important;opacity:1!important;transform:none!important; }
 `;
 
-// ── Skeleton ──────────────────────────────────────────────────────────────────
-function Skeleton({ w, h, r = 8 }) {
+function Sk({ w, h, r = 8 }) {
   return (
-    <div style={{
-      width: w, height: h, borderRadius: r, flexShrink: 0,
-      background: "linear-gradient(90deg,#f1f5f9 25%,#e9eef5 50%,#f1f5f9 75%)",
-      backgroundSize: "600px 100%", animation: "shimmer 1.4s infinite linear",
-    }} />
+    <div style={{ width: w, height: h, borderRadius: r, flexShrink: 0, background: "linear-gradient(90deg,#f5edf2 25%,#ecdce6 50%,#f5edf2 75%)", backgroundSize: "600px 100%", animation: "shimmer 1.4s infinite linear" }} />
   );
 }
 
-function VLine({ h = 32, delay = 0 }) {
+function Avatar({ name, size = 40, bg, color }) {
   return (
-    <div style={{
-      width: 1, height: h, margin: "0 auto", flexShrink: 0,
-      background: "#e2e8f0", transformOrigin: "top",
-      animation: `drawV 0.25s ease ${delay}ms forwards`, transform: "scaleY(0)",
-    }} />
+    <div style={{ width: size, height: size, borderRadius: "50%", background: bg, color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0, fontFamily: "'Syne',sans-serif" }}>
+      {initials(name)}
+    </div>
   );
 }
 
-// ── Highlight text ────────────────────────────────────────────────────────────
-function Hi({ text = "", query = "", style = {} }) {
-  if (!query) return <span style={style}>{text}</span>;
-  const idx = normalize(text).indexOf(normalize(query));
+function Hi({ text = "", q = "", style = {} }) {
+  if (!q) return <span style={style}>{text}</span>;
+  const idx = norm(text).indexOf(q);
   if (idx === -1) return <span style={style}>{text}</span>;
   return (
     <span style={style}>
       {text.slice(0, idx)}
-      <mark style={{ background: "#fef08a", color: "#713f12", borderRadius: 2, padding: "0 1px" }}>
-        {text.slice(idx, idx + query.length)}
-      </mark>
-      {text.slice(idx + query.length)}
+      <mark style={{ background: "#fde68a", color: "#78350f", borderRadius: 2, padding: "0 1px" }}>{text.slice(idx, idx + q.length)}</mark>
+      {text.slice(idx + q.length)}
     </span>
   );
 }
 
-// ── Org Header Node ───────────────────────────────────────────────────────────
-function OrgHeaderNode({ orgName, orgLogo, delay = 0, dimmed, highlighted }) {
-  const initials = orgName
-    ? orgName.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()
-    : "ORG";
+const CFG = {
+  org:     { accent: "#1a0d14", avBg: "#1a0d14", avColor: "#f5edf2", badge: "Organisation",  badgeBg: "#f5edf2", badgeColor: "#4a3542", tag: "ORG" },
+  admin:   { accent: "#5a2240", avBg: "#f0e4ec", avColor: "#5a2240", badge: "Admin",          badgeBg: "#f0e4ec", badgeColor: "#5a2240", tag: "ADM" },
+  manager: { accent: "#a8005c", avBg: "#fce7f3", avColor: "#a8005c", badge: "Manager",        badgeBg: "#fce7f3", badgeColor: "#a8005c", tag: "MGR" },
+  myMgr:   { accent: "#CD166E", avBg: "#fce7f3", avColor: "#CD166E", badge: "Your Manager",   badgeBg: "#fdf2f8", badgeColor: "#CD166E", tag: "MGR" },
+  emp:     { accent: "#7c1f4a", avBg: "#fce7f3", avColor: "#7c1f4a", badge: "Employee",       badgeBg: "#fce7f3", badgeColor: "#7c1f4a", tag: "EMP" },
+};
+
+function Card({ level, name, sub, width = 172, delay = 0, dim, hl, q, you = false, empCount }) {
+  const c = CFG[level] || CFG.emp;
   return (
-    <div style={{ animation: `scaleIn 0.35s ease ${delay}ms forwards`, opacity: 0, flexShrink: 0 }}>
+    <div style={{ animation: `scaleIn 0.26s ease ${delay}ms forwards`, opacity: 0, flexShrink: 0 }}>
       <div
-        className={["org-card-hover", highlighted ? "org-card-highlight" : "", dimmed ? "org-card-dim" : ""].filter(Boolean).join(" ")}
-        style={{ width: 210, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "20px 16px 16px", boxShadow: "0 1px 4px rgba(0,0,0,0.04)", display: "flex", flexDirection: "column", alignItems: "center", position: "relative", overflow: "hidden" }}
+        className={["nd", hl ? "nd-hl" : "", dim ? "nd-dim" : "", you ? "nd-you" : ""].filter(Boolean).join(" ")}
+        style={{ width, background: "#fff", border: "1px solid #eedde8", borderRadius: 11, padding: "14px 12px 11px", boxShadow: "0 2px 8px rgba(115,0,66,0.04)", display: "flex", flexDirection: "column", alignItems: "center", position: "relative", overflow: "hidden" }}
       >
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "#1e293b", borderRadius: "14px 14px 0 0" }} />
-        <span style={{ position: "absolute", top: 11, right: 12, fontSize: 9, fontWeight: 600, letterSpacing: "0.08em", color: "#94a3b8", textTransform: "uppercase", fontFamily: "'DM Mono', monospace" }}>ORG</span>
-        {orgLogo ? (
-          <img src={orgLogo} alt={orgName} style={{ width: 54, height: 54, borderRadius: 12, objectFit: "contain", marginBottom: 12, flexShrink: 0, border: "1px solid #e2e8f0" }} />
-        ) : (
-          <div style={{ width: 54, height: 54, borderRadius: 12, background: "#1e293b", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 600, marginBottom: 12, flexShrink: 0 }}>{initials}</div>
-        )}
-        <p style={{ fontSize: 15, fontWeight: 600, color: "#0f172a", margin: 0, textAlign: "center", lineHeight: 1.3 }}>{orgName || "Organisation"}</p>
-        <div style={{ marginTop: 10 }}>
-          <span style={{ fontSize: 10, padding: "3px 8px", borderRadius: 5, background: "#f8fafc", border: "1px solid #e2e8f0", color: "#64748b", fontWeight: 500 }}>Organisation</span>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: you ? "linear-gradient(90deg,#730042,#CD166E)" : c.accent, borderRadius: "11px 11px 0 0" }} />
+        <span style={{ position: "absolute", top: 8, right: 9, fontSize: 8, fontWeight: 600, letterSpacing: "0.1em", color: "#c8a8bb", fontFamily: "'DM Mono',monospace" }}>{c.tag}</span>
+        {you && <div style={{ position: "absolute", top: -7, left: "50%", transform: "translateX(-50%)", fontSize: 7, fontWeight: 700, letterSpacing: "0.1em", padding: "2px 8px", borderRadius: 8, background: "#730042", color: "#fff", whiteSpace: "nowrap", fontFamily: "'DM Mono',monospace" }}>YOU</div>}
+
+        <Avatar name={name} size={38} bg={you ? "#fce7f3" : c.avBg} color={you ? "#730042" : c.avColor} />
+
+        <div style={{ marginTop: 8, marginBottom: 6, textAlign: "center", width: "100%" }}>
+          <Hi text={name} q={q} style={{ fontSize: 12, fontWeight: 600, color: "#1a0d14", display: "block", lineHeight: 1.3, fontFamily: "'Syne',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />
+          {sub && <Hi text={sub} q={q} style={{ fontSize: 10, color: "#8a6878", display: "block", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />}
+          {empCount !== undefined && <span style={{ fontSize: 10, color: "#c8a8bb", display: "block", marginTop: 2 }}>{empCount} report{empCount !== 1 ? "s" : ""}</span>}
         </div>
+
+        <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 20, background: you ? "#fce7f3" : c.badgeBg, color: you ? "#730042" : c.badgeColor, fontWeight: 600, letterSpacing: "0.04em", border: you ? "1px solid #f9a8d4" : "none", fontFamily: "'DM Mono',monospace" }}>
+          {you ? "You" : c.badge}
+        </span>
       </div>
     </div>
   );
 }
 
-// ── Manager Node ──────────────────────────────────────────────────────────────
-function ManagerNode({ name, subtitle, location, initials, colorCfg, delay = 0, dimmed, highlighted, q }) {
+function VLine({ h = 24 }) {
+  return <div style={{ width: 1, height: h, background: "#dcc0d0", margin: "0 auto", flexShrink: 0 }} />;
+}
+
+// Horizontal T-bar connector above a row of N cards each cardW wide with gap spacing
+function TBar({ count, cardW, gap }) {
+  if (count <= 1) return <VLine h={20} />;
+  const total = count * cardW + (count - 1) * gap;
+  const midY = 16;
   return (
-    <div style={{ animation: `fadeUp 0.35s ease ${delay}ms forwards`, opacity: 0, flexShrink: 0 }}>
-      <div
-        className={["org-card-hover", highlighted ? "org-card-highlight" : "", dimmed ? "org-card-dim" : ""].filter(Boolean).join(" ")}
-        style={{ width: 200, background: "#fff", border: `1px solid ${colorCfg.bar}40`, borderRadius: 14, padding: "20px 16px 16px", boxShadow: "0 1px 4px rgba(0,0,0,0.04)", display: "flex", flexDirection: "column", alignItems: "center", position: "relative", overflow: "hidden" }}
-      >
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: colorCfg.bar, borderRadius: "14px 14px 0 0" }} />
-        <span style={{ position: "absolute", top: 11, right: 12, fontSize: 9, fontWeight: 600, letterSpacing: "0.08em", color: "#94a3b8", textTransform: "uppercase", fontFamily: "'DM Mono', monospace" }}>MGR</span>
-        <div style={{ width: 46, height: 46, borderRadius: "50%", background: colorCfg.light, color: colorCfg.text, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 600, marginBottom: 10, flexShrink: 0 }}>{initials}</div>
-        <Hi text={name}     query={q} style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", textAlign: "center", margin: 0 }} />
-        <Hi text={subtitle} query={q} style={{ fontSize: 12, color: "#64748b", margin: "4px 0 0", textAlign: "center" }} />
-        {location && (
-          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 6, fontSize: 10, color: "#94a3b8" }}>
-            <MapPin size={10} style={{ flexShrink: 0 }} />{location}
-          </div>
-        )}
-        <div style={{ marginTop: 10 }}>
-          <span style={{ fontSize: 10, padding: "3px 8px", borderRadius: 5, background: colorCfg.light, color: colorCfg.text, fontWeight: 600, letterSpacing: "0.04em" }}>Your Manager</span>
-        </div>
-      </div>
-    </div>
+    <svg width={total} height={midY + 4} style={{ display: "block", flexShrink: 0, overflow: "visible" }}>
+      {/* vertical from above down to the T */}
+      <line x1={total / 2} y1={0} x2={total / 2} y2={midY} stroke="#dcc0d0" strokeWidth={1} />
+      {/* horizontal bar */}
+      <line x1={cardW / 2} y1={midY} x2={total - cardW / 2} y2={midY} stroke="#dcc0d0" strokeWidth={1} />
+      {/* vertical drops to each card */}
+      {Array.from({ length: count }).map((_, i) => {
+        const cx = i * (cardW + gap) + cardW / 2;
+        return <line key={i} x1={cx} y1={midY} x2={cx} y2={midY + 4} stroke="#dcc0d0" strokeWidth={1} />;
+      })}
+    </svg>
   );
 }
 
-// ── Employee (Self) Node ──────────────────────────────────────────────────────
-function EmployeeSelfNode({ name, subtitle, designation, location, initials, delay = 0, dimmed, highlighted }) {
+// Below-manager T-bar: stem comes from the center of the manager card
+function ManagerTBar({ mgrW, empCount, empW, empGap }) {
+  if (empCount === 0) return null;
+  const total = Math.max(mgrW, empCount * empW + (empCount - 1) * empGap);
+  const mgrCenter = total / 2;
+  const barY = 14;
   return (
-    <div style={{ animation: `scaleIn 0.35s ease ${delay}ms forwards`, opacity: 0, flexShrink: 0 }}>
-      <div
-        className={["org-card-hover", "org-card-me", highlighted ? "org-card-highlight" : "", dimmed ? "org-card-dim" : ""].filter(Boolean).join(" ")}
-        style={{ width: 160, background: "#f0f4ff", border: "1.5px solid #a5b4fc", borderRadius: 12, padding: "20px 12px 14px", boxShadow: "0 1px 4px rgba(99,102,241,0.12)", display: "flex", flexDirection: "column", alignItems: "center", position: "relative", overflow: "hidden" }}
-      >
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "#6366f1", borderRadius: "12px 12px 0 0" }} />
-        <div style={{ position: "absolute", top: -10, left: "50%", transform: "translateX(-50%)", fontSize: 8, fontWeight: 700, letterSpacing: "0.07em", padding: "2px 10px", borderRadius: 10, background: "#6366f1", color: "#fff", whiteSpace: "nowrap" }}>YOU</div>
-        <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#c7d2fe", color: "#4338ca", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 700, marginBottom: 10, flexShrink: 0 }}>{initials}</div>
-        <p style={{ fontSize: 14, fontWeight: 600, color: "#1e293b", margin: 0, textAlign: "center" }}>{name}</p>
-        {designation && <p style={{ fontSize: 11, color: "#6366f1", margin: "3px 0 0", textAlign: "center", fontWeight: 500 }}>{designation}</p>}
-        {subtitle && subtitle !== designation && <p style={{ fontSize: 11, color: "#64748b", margin: "2px 0 0", textAlign: "center" }}>{subtitle}</p>}
-        {location && (
-          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 6, fontSize: 10, color: "#94a3b8" }}>
-            <MapPin size={10} style={{ flexShrink: 0 }} />{location}
-          </div>
-        )}
-        <div style={{ marginTop: 10 }}>
-          <span style={{ fontSize: 10, padding: "3px 8px", borderRadius: 5, background: "#eef2ff", border: "1px solid #c7d2fe", color: "#4338ca", fontWeight: 600 }}>Employee</span>
-        </div>
-      </div>
-    </div>
+    <svg width={total} height={barY + 4} style={{ display: "block", flexShrink: 0, overflow: "visible" }}>
+      <line x1={mgrCenter} y1={0} x2={mgrCenter} y2={barY} stroke="#dcc0d0" strokeWidth={1} />
+      {empCount > 1 && (
+        <line x1={empW / 2 + (total - (empCount * empW + (empCount - 1) * empGap)) / 2} y1={barY} x2={total - empW / 2 - (total - (empCount * empW + (empCount - 1) * empGap)) / 2} y2={barY} stroke="#dcc0d0" strokeWidth={1} />
+      )}
+      {Array.from({ length: empCount }).map((_, i) => {
+        const offset = (total - (empCount * empW + (empCount - 1) * empGap)) / 2;
+        const cx = offset + i * (empW + empGap) + empW / 2;
+        return <line key={i} x1={cx} y1={barY} x2={cx} y2={barY + 4} stroke="#dcc0d0" strokeWidth={1} />;
+      })}
+    </svg>
   );
 }
 
-// ── Stat card ─────────────────────────────────────────────────────────────────
-function StatCard({ label, value, icon: Icon, accent, delay = 0, text }) {
-  const [count, setCount] = useState(0);
-  const num = parseInt(value) || 0;
-  useEffect(() => {
-    if (!num) return;
-    let cur = 0;
-    const step = Math.max(1, Math.ceil(num / 18));
-    const t = setInterval(() => { cur = Math.min(cur + step, num); setCount(cur); if (cur >= num) clearInterval(t); }, 40);
-    return () => clearInterval(t);
-  }, [num]);
-  return (
-    <div className="stat-card-hover" style={{ animation: `fadeUp 0.35s ease ${delay}ms forwards`, opacity: 0, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "18px 20px", display: "flex", alignItems: "center", gap: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.03)", position: "relative", overflow: "hidden" }}>
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: accent, borderRadius: "12px 12px 0 0" }} />
-      <div style={{ width: 42, height: 42, borderRadius: 10, flexShrink: 0, background: `${accent}18`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Icon size={18} style={{ color: accent }} />
-      </div>
-      <div style={{ minWidth: 0 }}>
-        {text
-          ? <p style={{ fontSize: 15, fontWeight: 600, color: "#0f172a", lineHeight: 1.2, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{text}</p>
-          : <p style={{ fontSize: 26, fontWeight: 600, color: "#0f172a", lineHeight: 1, margin: 0 }}>{count}</p>
-        }
-        <p style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500, margin: "5px 0 0" }}>{label}</p>
-      </div>
-    </div>
-  );
-}
-
-// ── Skeleton Tree ─────────────────────────────────────────────────────────────
 function SkeletonTree() {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-      <Skeleton w={210} h={120} r={14} />
-      <div style={{ width: 1, height: 28, background: "#e2e8f0" }} />
-      <Skeleton w={200} h={116} r={14} />
-      <div style={{ width: 1, height: 28, background: "#e2e8f0" }} />
-      <Skeleton w={160} h={104} r={12} />
+      <Sk w={172} h={104} r={11} />
+      <div style={{ width: 1, height: 24, background: "#eed8e5" }} />
+      <Sk w={172} h={96} r={11} />
+      <div style={{ width: 1, height: 20, background: "#eed8e5" }} />
+      <div style={{ display: "flex", gap: 28 }}>
+        {[1, 2].map(i => (
+          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <Sk w={172} h={96} r={11} />
+            <div style={{ width: 1, height: 16, background: "#eed8e5" }} />
+            <div style={{ display: "flex", gap: 10 }}>
+              <Sk w={152} h={92} r={11} />
+              <Sk w={152} h={92} r={11} />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-// ── Org Tree: Org → Manager → You ────────────────────────────────────────────
-function OrgTree({ orgName, orgLogo, manager, employee, loading, searchQuery }) {
+const CARD_W = 172;
+const EMP_W  = 152;
+const MGR_GAP = 28;
+const EMP_GAP = 10;
+
+function OrgTree({ data, loading, q }) {
   if (loading) return <SkeletonTree />;
+  if (!data)   return null;
 
-  const q        = normalize(searchQuery);
-  const hasQ     = q.length > 0;
-  const colorCfg = DEPT_COLORS[0];
+  const hasQ   = q.length > 0;
+  const matches = new Set();
 
-  const orgMatch  = hasQ && normalize(orgName || "").includes(q);
-  const mgrMatch  = hasQ && matchesPerson(manager?.f_name, manager?.l_name, manager?.department, manager?.designation, q);
-  const selfMatch = hasQ && matchesPerson(employee?.f_name, employee?.l_name, employee?.department, employee?.designation, q);
-  const anyMatch  = orgMatch || mgrMatch || selfMatch;
+  if (hasQ) {
+    const chk = (...ss) => ss.some(s => s && norm(s).includes(q));
+    if (chk(data.organisation_name, data.super_admin?.name)) matches.add("org");
+    if (chk(data.admin?.name, data.admin?.designation))       matches.add("admin");
+    (data.managers || []).forEach(mgr => {
+      if (chk(mgr.name, mgr.designation, mgr.department)) matches.add(`m-${mgr.id}`);
+      (mgr.employees || []).forEach(e => {
+        if (chk(e.name, e.designation, e.department)) matches.add(`e-${e.id}`);
+      });
+    });
+  }
+
+  const anyMatch = matches.size > 0;
+  const dim = (k) => hasQ && anyMatch && !matches.has(k);
+
+  const managers = data.managers || [];
+
+  // column width = wide enough for all employees below
+  const colW = (mgr) => {
+    const ec = (mgr.employees || []).length;
+    if (ec === 0) return CARD_W;
+    const empTotal = ec * EMP_W + (ec - 1) * EMP_GAP;
+    return Math.max(CARD_W, empTotal);
+  };
+
+  const totalW = managers.reduce((s, m) => s + colW(m), 0) + Math.max(0, managers.length - 1) * MGR_GAP;
+  const topBarW = Math.max(CARD_W, totalW);
+
+  let delay = 40;
+  const d = (add = 70) => { delay += add; return delay; };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 400 }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: "max-content" }}>
 
-      {/* Level 1 — Organisation */}
-      <OrgHeaderNode
-        orgName={orgName}
-        orgLogo={orgLogo}
-        delay={60}
-        highlighted={orgMatch}
-        dimmed={hasQ && !orgMatch && anyMatch}
-      />
+      {/* Org */}
+      <div style={{ animation: `scaleIn 0.26s ease 40ms forwards`, opacity: 0 }}>
+        <Card level="org" name={data.organisation_name || "Organisation"} sub={data.super_admin?.name} width={CARD_W} delay={0} dim={dim("org")} hl={matches.has("org")} q={q} />
+      </div>
+      <VLine h={22} />
 
-      <VLine h={28} delay={240} />
-
-      {/* Level 2 — Manager */}
-      {manager ? (
+      {/* Admin */}
+      {data.admin && (
         <>
-          <ManagerNode
-            name={`${manager.f_name || ""} ${manager.l_name || ""}`.trim()}
-            subtitle={manager.department || manager.designation || "Manager"}
-            location={manager.office_location}
-            initials={getInitials(manager.f_name, manager.l_name)}
-            colorCfg={colorCfg}
-            delay={320}
-            highlighted={mgrMatch}
-            dimmed={hasQ && !mgrMatch && anyMatch}
-            q={searchQuery}
-          />
-          <VLine h={28} delay={480} />
-        </>
-      ) : (
-        <>
-          <div style={{ padding: "10px 20px", borderRadius: 8, border: "1px dashed #e2e8f0", fontSize: 12, color: "#cbd5e1", background: "#fafafa" }}>
-            No manager assigned
-          </div>
-          <VLine h={20} delay={400} />
+          <Card level="admin" name={data.admin.name} sub={data.admin.designation} width={CARD_W} delay={d()} dim={dim("admin")} hl={matches.has("admin")} q={q} />
+          <VLine h={22} />
         </>
       )}
 
-      {/* Level 3 — You */}
-      <EmployeeSelfNode
-        name={`${employee?.f_name || ""} ${employee?.l_name || ""}`.trim() || "You"}
-        subtitle={employee?.department || ""}
-        designation={employee?.designation || "Employee"}
-        location={employee?.office_location}
-        initials={getInitials(employee?.f_name, employee?.l_name)}
-        delay={560}
-        highlighted={selfMatch}
-        dimmed={hasQ && !selfMatch && !mgrMatch}
-      />
+      {/* T-bar spanning managers row */}
+      {managers.length > 1 && (
+        <svg width={topBarW} height={20} style={{ display: "block", flexShrink: 0, overflow: "visible" }}>
+          <line x1={topBarW / 2} y1={0} x2={topBarW / 2} y2={10} stroke="#dcc0d0" strokeWidth={1} />
+          <line x1={colW(managers[0]) / 2} y1={10} x2={topBarW - colW(managers[managers.length - 1]) / 2} y2={10} stroke="#dcc0d0" strokeWidth={1} />
+          {managers.map((mgr, i) => {
+            let cx = 0;
+            for (let j = 0; j < i; j++) cx += colW(managers[j]) + MGR_GAP;
+            cx += colW(mgr) / 2;
+            return <line key={i} x1={cx} y1={10} x2={cx} y2={20} stroke="#dcc0d0" strokeWidth={1} />;
+          })}
+        </svg>
+      )}
+
+      {/* Managers row */}
+      <div style={{ display: "flex", gap: MGR_GAP, alignItems: "flex-start", animation: `fadeIn 0.28s ease ${delay + 50}ms forwards`, opacity: 0 }}>
+        {managers.map((mgr, mi) => {
+          const mKey   = `m-${mgr.id}`;
+          const emps   = mgr.employees || [];
+          const cw     = colW(mgr);
+          const isMyMgr = mgr.isCurrentUserManager;
+          const mDelay  = d(mi === 0 ? 60 : 25);
+
+          return (
+            <div key={mgr.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", width: cw, flexShrink: 0 }}>
+              <Card
+                level={isMyMgr ? "myMgr" : "manager"}
+                name={mgr.name}
+                sub={mgr.designation || mgr.department}
+                width={CARD_W}
+                delay={mDelay}
+                dim={dim(mKey)}
+                hl={matches.has(mKey)}
+                q={q}
+                empCount={emps.length}
+              />
+
+              {emps.length > 0 && (
+                <>
+                  <ManagerTBar mgrW={CARD_W} empCount={emps.length} empW={EMP_W} empGap={EMP_GAP} />
+                  <div style={{ display: "flex", gap: EMP_GAP, alignItems: "flex-start" }}>
+                    {emps.map((emp, ei) => {
+                      const eKey = `e-${emp.id}`;
+                      return (
+                        <Card
+                          key={emp.id}
+                          level="emp"
+                          name={emp.name}
+                          sub={emp.designation || emp.department}
+                          width={EMP_W}
+                          delay={d(ei === 0 ? 40 : 18)}
+                          dim={dim(eKey)}
+                          hl={matches.has(eKey)}
+                          q={q}
+                          you={emp.isCurrentUser}
+                        />
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
+function StatCard({ label, text, icon: Icon, accent, delay = 0 }) {
+  return (
+    <div className="stat-h" style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards`, opacity: 0, background: "#fff", border: "1px solid #eedde8", borderRadius: 11, padding: "15px 16px", display: "flex", alignItems: "center", gap: 13, boxShadow: "0 1px 4px rgba(115,0,66,0.04)", position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: accent }} />
+      <div style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0, background: `${accent}18`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Icon size={15} style={{ color: accent }} />
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <p style={{ fontSize: 13, fontWeight: 600, color: "#1a0d14", lineHeight: 1.2, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Syne',sans-serif" }}>{text || "—"}</p>
+        <p style={{ fontSize: 11, color: "#b89aad", fontWeight: 500, margin: "3px 0 0" }}>{label}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function OrganizationPageEmployee() {
-  // ── Only hooks that exist ─────────────────────────────────────────────────
-  const { data: meData,  isLoading: loadingMe  } = useGetMeUser();
-  const { data: orgData, isLoading: loadingOrg } = useGetOrgInfoEmployee();
+  const { data, isLoading: loading } = useGetOrgInfoEmployee();
 
   const [searchOpen,   setSearchOpen]   = useState(false);
   const [searchQuery,  setSearchQuery]  = useState("");
@@ -360,42 +356,49 @@ export default function OrganizationPageEmployee() {
   const inputRef = useRef(null);
   const chartRef = useRef(null);
 
-  // ── Derive everything from getme response ─────────────────────────────────
-  // Backend getme returns: { employee: { ...fields, Under_manager: { f_name, l_name, work_email } } }
-  const employee = meData?.employee || meData?.user || meData;
-  const manager  = employee?.Under_manager || null;
+  const orgName = data?.organisation_name || "My Organisation";
 
-  const orgName = orgData?.organisation_name
-    || employee?.organisation_name
-    || "My Organisation";
-  const orgLogo = orgData?.profile_image || null;
+  const myInfo = useMemo(() => {
+    if (!data) return null;
+    for (const mgr of (data.managers || [])) {
+      const emp = mgr.employees?.find(e => e.isCurrentUser);
+      if (emp) return { ...emp, managerName: mgr.name };
+    }
+    return null;
+  }, [data]);
 
-  const loading = loadingMe || loadingOrg;
-  const dept    = employee?.department || "";
-
-  // ── Search match count ────────────────────────────────────────────────────
   const matchCount = useMemo(() => {
-    if (!searchQuery) return 0;
-    const q = normalize(searchQuery);
+    if (!searchQuery || !data) return 0;
+    const q = norm(searchQuery);
     let n = 0;
-    if (normalize(orgName).includes(q)) n++;
-    if (matchesPerson(manager?.f_name, manager?.l_name, manager?.department, manager?.designation, q)) n++;
-    if (matchesPerson(employee?.f_name, employee?.l_name, employee?.department, employee?.designation, q)) n++;
+    const chk = (...ss) => ss.some(s => s && norm(s).includes(q));
+    if (chk(data.organisation_name)) n++;
+    if (chk(data.admin?.name, data.admin?.designation)) n++;
+    (data.managers || []).forEach(mgr => {
+      if (chk(mgr.name, mgr.department, mgr.designation)) n++;
+      (mgr.employees || []).forEach(e => { if (chk(e.name, e.designation)) n++; });
+    });
     return n;
-  }, [searchQuery, orgName, manager, employee]);
+  }, [searchQuery, data]);
 
-  // ── Keyboard: Escape ──────────────────────────────────────────────────────
+  const totalNodes = useMemo(() => {
+    if (!data) return 0;
+    let n = 1;
+    if (data.admin) n++;
+    (data.managers || []).forEach(mgr => { n++; n += (mgr.employees || []).length; });
+    return n;
+  }, [data]);
+
   useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); } };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const fn = (e) => { if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); } };
+    window.addEventListener("keydown", fn);
+    return () => window.removeEventListener("keydown", fn);
   }, []);
 
   useEffect(() => {
     if (searchOpen) setTimeout(() => inputRef.current?.focus(), 40);
   }, [searchOpen]);
 
-  // ── Export PNG ────────────────────────────────────────────────────────────
   const handleExport = useCallback(async () => {
     if (!chartRef.current || exportStatus === "loading") return;
     setExportStatus("loading");
@@ -411,20 +414,15 @@ export default function OrganizationPageEmployee() {
       const target = chartRef.current;
       target.classList.add("export-mode");
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-      const canvas = await window.html2canvas(target, {
-        backgroundColor: "#ffffff", scale: 2,
-        useCORS: true, allowTaint: false, logging: false,
-        scrollX: 0, scrollY: 0,
-      });
+      const canvas = await window.html2canvas(target, { backgroundColor: "#ffffff", scale: 2, useCORS: true, allowTaint: false, logging: false });
       target.classList.remove("export-mode");
-      const link    = document.createElement("a");
+      const link = document.createElement("a");
       link.download = `org-chart-${orgName.replace(/\s+/g, "-").toLowerCase()}.png`;
-      link.href     = canvas.toDataURL("image/png");
+      link.href = canvas.toDataURL("image/png");
       link.click();
       setExportStatus("done");
       setTimeout(() => setExportStatus(null), 2600);
-    } catch (err) {
-      console.error("Export failed:", err);
+    } catch {
       chartRef.current?.classList.remove("export-mode");
       setExportStatus(null);
     }
@@ -433,129 +431,102 @@ export default function OrganizationPageEmployee() {
   const closeSearch = () => { setSearchOpen(false); setSearchQuery(""); };
 
   return (
-    <div className="org-root" style={{ minHeight: "100vh", background: "#f8fafc" }}>
+    <div className="org-root" style={{ minHeight: "100vh", background: "#faf5f8" }}>
       <style>{STYLES}</style>
 
-      {/* ── Topbar ── */}
-      <div style={{ animation: "fadeIn 0.4s ease forwards", background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, gap: 16 }}>
+      {/* Topbar */}
+      <div style={{ animation: "fadeIn 0.3s ease forwards", background: "#fff", borderBottom: "1px solid #eedde8", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 54, gap: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          {orgLogo && <img src={orgLogo} alt={orgName} style={{ width: 24, height: 24, borderRadius: 5, objectFit: "contain", border: "1px solid #e2e8f0" }} />}
-          <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>{orgName}</span>
-          <ChevronRight size={13} style={{ color: "#cbd5e1" }} />
-          <span style={{ fontSize: 13, color: "#1e293b", fontWeight: 600 }}>Org Chart</span>
-          <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, background: "#f0f4ff", color: "#6366f1", fontWeight: 600, marginLeft: 4 }}>Employee View</span>
+          <span style={{ fontSize: 12, color: "#b89aad", fontWeight: 500 }}>{orgName}</span>
+          <span style={{ color: "#dcc0d0" }}>›</span>
+          <span style={{ fontSize: 13, color: "#1a0d14", fontWeight: 600, fontFamily: "'Syne',sans-serif" }}>Org Chart</span>
+          <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, background: "#fce7f3", color: "#730042", fontWeight: 600, marginLeft: 2 }}>Full View</span>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {searchOpen ? (
             <div style={{ display: "flex", alignItems: "center", gap: 8, animation: "slideDown 0.2s ease forwards" }}>
-              <div className="search-wrap">
-                <Search size={13} style={{ color: "#94a3b8", flexShrink: 0 }} />
-                <input ref={inputRef} className="search-input" placeholder="Search name, role, department…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-                {searchQuery && <button className="clear-btn" onClick={() => setSearchQuery("")} title="Clear"><X size={13} /></button>}
+              <div className="sw">
+                <Search size={13} style={{ color: "#b89aad", flexShrink: 0 }} />
+                <input ref={inputRef} className="si" placeholder="Search name, role, department…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                {searchQuery && <button className="cb" onClick={() => setSearchQuery("")}><X size={13} /></button>}
               </div>
-              {searchQuery && <div className="match-pill">{matchCount} match{matchCount !== 1 ? "es" : ""}</div>}
-              <button className="hdr-btn" onClick={closeSearch}><X size={13} /> Close</button>
+              {searchQuery && <div className="mp">{matchCount} match{matchCount !== 1 ? "es" : ""}</div>}
+              <button className="hb" onClick={closeSearch}><X size={13} /> Close</button>
             </div>
           ) : (
-            <button className="hdr-btn" onClick={() => setSearchOpen(true)}><Search size={13} /> Search</button>
+            <button className="hb" onClick={() => setSearchOpen(true)}><Search size={13} /> Search</button>
           )}
-          <button className="hdr-btn hdr-btn-primary" onClick={handleExport} disabled={loading || exportStatus === "loading"}>
+          <button className="hb hb-p" onClick={handleExport} disabled={loading || exportStatus === "loading"}>
             {exportStatus === "loading"
               ? <><Loader2 size={13} style={{ animation: "spin 0.8s linear infinite" }} /> Exporting…</>
-              : <><Download size={13} /> Export PNG</>
-            }
+              : <><Download size={13} /> Export PNG</>}
           </button>
         </div>
       </div>
 
-      <div style={{ maxWidth: 1400, margin: "0 auto", padding: "28px 28px 40px" }}>
+      <div style={{ maxWidth: 1600, margin: "0 auto", padding: "22px 24px 48px" }}>
 
-        {/* Page title */}
-        <div style={{ animation: "fadeUp 0.35s ease 60ms forwards", opacity: 0, marginBottom: 24 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", margin: 0, letterSpacing: "-0.3px" }}>My Organization</h1>
-          <p style={{ fontSize: 13, color: "#94a3b8", margin: "5px 0 0" }}>
-            {loading
-              ? "Loading…"
-              : `${orgName} · Reporting to ${manager ? `${manager.f_name} ${manager.l_name}` : "—"} · Your position is highlighted`
-            }
+        <div style={{ animation: "fadeUp 0.3s ease 50ms forwards", opacity: 0, marginBottom: 18 }}>
+          <h1 style={{ fontSize: 19, fontWeight: 700, color: "#1a0d14", margin: 0, letterSpacing: "-0.3px", fontFamily: "'Syne',sans-serif" }}>Organisation Chart</h1>
+          <p style={{ fontSize: 12, color: "#b89aad", margin: "4px 0 0" }}>
+            {loading ? "Loading…" : `${orgName} · ${totalNodes} nodes · ${(data?.managers || []).length} manager${(data?.managers || []).length !== 1 ? "s" : ""} · You are highlighted`}
           </p>
         </div>
 
-        {/* Stats */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginBottom: 28 }}>
-          <StatCard label="Your name"       text={loading ? "—" : `${employee?.f_name || ""} ${employee?.l_name || ""}`.trim() || "—"} icon={User}      accent="#6366f1" delay={100} />
-          <StatCard label="Your department"  text={loading ? "—" : dept || "—"}                                                          icon={Building2} accent="#f59e0b" delay={150} />
-          <StatCard label="Your designation" text={loading ? "—" : employee?.designation || "—"}                                         icon={Crown}     accent="#10b981" delay={200} />
-          <StatCard label="Reporting to"     text={loading ? "—" : manager ? `${manager.f_name} ${manager.l_name}` : "—"}               icon={Users}     accent="#0ea5e9" delay={250} />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 10, marginBottom: 22 }}>
+          <StatCard label="Organisation"  text={orgName}              icon={Building2} accent="#1a0d14" delay={60}  />
+          <StatCard label="Your name"     text={myInfo?.name}         icon={User}      accent="#730042" delay={95}  />
+          <StatCard label="Reporting to"  text={myInfo?.managerName}  icon={Users}     accent="#CD166E" delay={130} />
+          <StatCard label="Designation"   text={myInfo?.designation}  icon={Crown}     accent="#a8005c" delay={165} />
         </div>
 
-        {/* No-results banner */}
         {searchOpen && searchQuery && matchCount === 0 && (
-          <div className="no-results-banner">
-            <Search size={14} />
-            No results for <strong style={{ marginLeft: 3 }}>"{searchQuery}"</strong> — try a different name, role, or department.
+          <div style={{ marginBottom: 14, padding: "10px 14px", borderRadius: 8, background: "#fef9c3", border: "1px solid #fde68a", fontSize: 12, color: "#92400e", display: "flex", alignItems: "center", gap: 8, animation: "slideDown 0.2s ease forwards" }}>
+            <Search size={13} />No results for <strong style={{ marginLeft: 2 }}>"{searchQuery}"</strong>
           </div>
         )}
 
         {/* Chart panel */}
-        <div style={{ animation: "fadeIn 0.4s ease 300ms forwards", opacity: 0, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.04)", overflow: "hidden" }}>
-          <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fafafa" }}>
+        <div style={{ animation: "fadeIn 0.3s ease 240ms forwards", opacity: 0, background: "#fff", border: "1px solid #eedde8", borderRadius: 14, boxShadow: "0 2px 10px rgba(115,0,66,0.05)", overflow: "hidden" }}>
+          <div style={{ padding: "11px 16px", borderBottom: "1px solid #f5edf2", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fdf8fb", flexWrap: "wrap", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <Crown size={15} style={{ color: "#94a3b8" }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#475569" }}>Hierarchy view</span>
-              <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, background: "#f1f5f9", color: "#94a3b8", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", fontFamily: "'DM Mono', monospace" }}>
-                {loading ? "—" : "3 nodes"}
+              <Crown size={13} style={{ color: "#b89aad" }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#4a3542", fontFamily: "'Syne',sans-serif" }}>Full hierarchy</span>
+              <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 20, background: "#f5edf2", color: "#b89aad", fontWeight: 600, fontFamily: "'DM Mono',monospace" }}>
+                {loading ? "—" : `${totalNodes} nodes`}
               </span>
               {searchQuery && matchCount > 0 && (
-                <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, background: "#eef2ff", color: "#4338ca", fontWeight: 600 }}>{matchCount} highlighted</span>
+                <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 20, background: "#fce7f3", color: "#730042", fontWeight: 600 }}>{matchCount} highlighted</span>
               )}
             </div>
-            {!loading && dept && (
-              <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#64748b", padding: "3px 9px", borderRadius: 6, background: DEPT_COLORS[0].light, fontWeight: 500 }}>
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: DEPT_COLORS[0].bar, flexShrink: 0 }} />
-                {dept}
-              </span>
-            )}
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              {[
+                { dot: "#1a0d14", label: "Organisation" },
+                { dot: "#5a2240", label: "Admin" },
+                { dot: "#a8005c", label: "Manager" },
+                { dot: "#CD166E", label: "Your manager" },
+                { dot: "#730042", label: "You", ring: true },
+              ].map(({ dot, label, ring }) => (
+                <div key={label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#b89aad" }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: dot, flexShrink: 0, boxShadow: ring ? "0 0 0 2px rgba(115,0,66,0.2)" : "none" }} />
+                  {label}
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div ref={chartRef} className="org-scroll" style={{ overflowX: "auto", padding: "40px 32px 36px", background: "#fff" }}>
-            <OrgTree
-              orgName={orgName}
-              orgLogo={orgLogo}
-              manager={manager}
-              employee={employee}
-              loading={loading}
-              searchQuery={searchQuery}
-            />
+          <div ref={chartRef} className="sc" style={{ overflowX: "auto", padding: "36px 40px 36px", background: "#fff" }}>
+            <OrgTree data={data} loading={loading} q={norm(searchQuery)} />
           </div>
         </div>
-
-        {/* Footer legend */}
-        {!loading && (
-          <div style={{ display: "flex", gap: 24, marginTop: 16, justifyContent: "center", flexWrap: "wrap", animation: "fadeIn 0.4s ease 600ms forwards", opacity: 0 }}>
-            {[
-              { dot: "#1e293b", label: "Organisation" },
-              { dot: "#6366f1", label: "Your manager" },
-              { dot: "#c7d2fe", label: "You", border: "1.5px solid #a5b4fc", ring: true },
-              { dot: "#6366f1", label: "Search match", ring: true, dashed: true },
-            ].map(({ dot, label, border, ring, dashed }) => (
-              <div key={label} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "#94a3b8" }}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", background: dot, flexShrink: 0, border: border ?? (dashed ? `1.5px dashed ${dot}` : "none"), boxShadow: ring ? "0 0 0 3px rgba(99,102,241,0.2)" : "none" }} />
-                {label}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
-      {/* Export toast */}
       {exportStatus && (
-        <div className="export-toast">
+        <div className="et">
           {exportStatus === "loading"
-            ? <><Loader2 size={15} style={{ animation: "spin 0.8s linear infinite" }} /> Generating PNG…</>
-            : <><CheckCircle2 size={15} style={{ color: "#4ade80" }} /> Chart exported successfully!</>
-          }
+            ? <><Loader2 size={14} style={{ animation: "spin 0.8s linear infinite" }} /> Generating PNG…</>
+            : <><CheckCircle2 size={14} style={{ color: "#4ade80" }} /> Exported!</>}
         </div>
       )}
     </div>
