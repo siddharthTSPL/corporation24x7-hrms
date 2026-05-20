@@ -12,6 +12,7 @@ const Attendance = require("../Models/attendance.model");
 const Ticket = require("../Models/ticket.model");
 const Adminmodel = require("../Models/Admin.model");
 const SuperAdminModel = require("../Models/superadmin.model");
+const Managermodel = require("../Models/manager.model");
 
 const verifyUserEmail = async (req, res, next) => {
   const { token } = req.params;
@@ -834,22 +835,14 @@ const employeeGetTicketDetail = async (req, res, next) => {
   }
 };
 
-const getOrgInfo = async (req, res, next) => {
+const  getOrgInfo = async (req, res, next) => {
   try {
     if (!req.employee)
       return res.status(401).json({ success: false, message: "Unauthorized" });
 
     const employee = await usermodel
       .findById(req.employee._id)
-      .populate({
-        path: "Under_manager",
-        select: "f_name l_name work_email designation department office_location reporting_manager",
-        populate: {
-          path: "reporting_manager",
-          select: "f_name l_name work_email designation department office_location",
-        },
-      })
-      .select("f_name l_name work_email designation department office_location Under_manager organisation_id")
+      .select("organisation_id Under_manager")
       .lean();
 
     if (!employee)
@@ -866,42 +859,53 @@ const getOrgInfo = async (req, res, next) => {
         .lean();
     }
 
+  
+    const managers = await Managermodel.find()
+      .select("f_name l_name work_email designation department office_location")
+      .lean();
+
+  
+    const employees = await usermodel
+      .find({ Under_manager: { $in: managers.map(m => m._id) } })
+      .select("f_name l_name work_email designation department office_location Under_manager")
+      .lean();
+
+    const managersWithEmployees = managers.map(mgr => ({
+      id: mgr._id,
+      name: `${mgr.f_name} ${mgr.l_name}`,
+      email: mgr.work_email,
+      designation: mgr.designation,
+      department: mgr.department,
+      isCurrentUserManager: employee.Under_manager?.toString() === mgr._id.toString(),
+      employees: employees
+        .filter(e => e.Under_manager?.toString() === mgr._id.toString())
+        .map(e => ({
+          id: e._id,
+          name: `${e.f_name} ${e.l_name}`,
+          email: e.work_email,
+          designation: e.designation,
+          department: e.department,
+          isCurrentUser: e._id.toString() === req.employee._id.toString(),
+        })),
+    }));
+
     res.status(200).json({
       success: true,
       organisation_name: superAdmin?.organisation_name || "",
       organisation_logo: superAdmin?.profile_image || null,
-      super_admin: superAdmin
-        ? { id: superAdmin._id, name: `${superAdmin.f_name} ${superAdmin.l_name}`, email: superAdmin.email }
-        : null,
-      admin: admin
-        ? { id: admin._id, name: `${admin.f_name} ${admin.l_name}`, email: admin.work_email, designation: admin.designation }
-        : null,
-      reporting_manager: employee.Under_manager?.reporting_manager
-        ? {
-            id: employee.Under_manager.reporting_manager._id,
-            name: `${employee.Under_manager.reporting_manager.f_name} ${employee.Under_manager.reporting_manager.l_name}`,
-            email: employee.Under_manager.reporting_manager.work_email,
-            designation: employee.Under_manager.reporting_manager.designation,
-            department: employee.Under_manager.reporting_manager.department,
-          }
-        : null,
-      manager: employee.Under_manager
-        ? {
-            id: employee.Under_manager._id,
-            name: `${employee.Under_manager.f_name} ${employee.Under_manager.l_name}`,
-            email: employee.Under_manager.work_email,
-            designation: employee.Under_manager.designation,
-            department: employee.Under_manager.department,
-          }
-        : null,
-      employee: {
-        id: employee._id,
-        name: `${employee.f_name} ${employee.l_name}`,
-        email: employee.work_email,
-        designation: employee.designation,
-        department: employee.department,
-        office_location: employee.office_location,
-      },
+      super_admin: superAdmin ? {
+        id: superAdmin._id,
+        name: `${superAdmin.f_name} ${superAdmin.l_name}`,
+        email: superAdmin.email,
+      } : null,
+      admin: admin ? {
+        id: admin._id,
+        name: `${admin.f_name} ${admin.l_name}`,
+        email: admin.work_email,
+        designation: admin.designation,
+      } : null,
+      managers: managersWithEmployees,
+      currentUserId: req.employee._id,
     });
   } catch (error) {
     next(error);
