@@ -618,32 +618,39 @@ function MyTickets() {
 
 export default function EmployeeTickets() {
   const [tab,setTab] = useState("submit");
-  const {data}       = useEmployeeGetMyTickets();
-  const count        = data?.count||0;
+  const {data} = useEmployeeGetMyTickets();
+  const count = data?.count || 0;
 
   return (
     <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'Instrument Sans',sans-serif",padding:"32px 36px"}}>
       <G/>
-      <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:28}}>
-        <div style={{width:50,height:50,borderRadius:16,background:`linear-gradient(135deg,${C.primary},${C.accent})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,boxShadow:"0 6px 22px rgba(115,0,66,.32)",flexShrink:0}}>🎫</div>
-        <div>
-          <h1 style={{fontSize:22,fontWeight:800,color:C.text,margin:0,fontFamily:"'Syne',sans-serif"}}>My Tickets</h1>
-          <p style={{fontSize:12,color:C.muted,margin:"3px 0 0",fontFamily:"'Instrument Sans',sans-serif"}}>Submit &amp; track your grievances, complaints, and suggestions</p>
+
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
+        <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:28}}>
+          <div style={{width:50,height:50,borderRadius:16,background:`linear-gradient(135deg,${C.primary},${C.accent})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,boxShadow:"0 6px 22px rgba(115,0,66,.32)",flexShrink:0}}>🎫</div>
+          <div>
+            <h1 style={{fontSize:22,fontWeight:800,color:C.text,margin:0,fontFamily:"'Syne',sans-serif"}}>My Tickets</h1>
+            <p style={{fontSize:12,color:C.muted,margin:"3px 0 0",fontFamily:"'Instrument Sans',sans-serif"}}>Submit & track your grievances, complaints, and suggestions</p>
+          </div>
+        </div>
+
+        <div style={{display:"flex",gap:3,background:"rgba(230,220,245,.55)",borderRadius:12,padding:4,marginBottom:26,width:"fit-content",border:`1px solid ${C.border}`}}>
+          {[["submit","📝 Submit New"],["mytickets",`📋 My Tickets${count?` (${count})`:""}`]].map(([k,l])=>(
+            <button
+              key={k}
+              onClick={()=>setTab(k)}
+              className={tab===k?"e-tab-active":"e-tab-idle"}
+              style={{padding:"8px 20px",borderRadius:9,border:"none",cursor:"pointer",fontSize:12.5,fontWeight:tab===k?600:400,fontFamily:"'Instrument Sans',sans-serif",transition:"all .2s"}}
+            >
+              {l}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div style={{display:"flex",gap:3,background:"rgba(230,220,245,.55)",borderRadius:12,padding:4,marginBottom:26,width:"fit-content",border:`1px solid ${C.border}`}}>
-        {[["submit","📝 Submit New"],["mytickets",`📋 My Tickets${count?` (${count})`:""}`]].map(([k,l])=>(
-          <button key={k} onClick={()=>setTab(k)} className={tab===k?"e-tab-active":"e-tab-idle"}
-            style={{padding:"8px 20px",borderRadius:9,border:"none",cursor:"pointer",fontSize:12.5,fontWeight:tab===k?600:400,fontFamily:"'Instrument Sans',sans-serif",transition:"all .2s"}}>
-            {l}
-          </button>
-        ))}
-      </div>
-
       <div style={{maxWidth:720,margin:"0 auto"}}>
-        {tab==="submit"    &&<SubmitForm onSuccess={()=>setTab("mytickets")}/>}
-        {tab==="mytickets" &&<MyTickets/>}
+        {tab==="submit" && <SubmitForm onSuccess={()=>setTab("mytickets")} />}
+        {tab==="mytickets" && <MyTickets />}
       </div>
     </div>
   );
