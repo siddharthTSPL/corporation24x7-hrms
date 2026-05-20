@@ -81,4 +81,4 @@ wfhRouter.post(
   asyncHandler(superadminRejectWFH),
 );
 
-module.exports = wfhManagerRouter;
+module.exports = wfhRouter;
