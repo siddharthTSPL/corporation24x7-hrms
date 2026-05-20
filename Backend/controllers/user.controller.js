@@ -836,84 +836,72 @@ const employeeGetTicketDetail = async (req, res, next) => {
 
 const getOrgInfo = async (req, res, next) => {
   try {
-    if (!req.employee) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized",
-      });
-    }
+    if (!req.employee)
+      return res.status(401).json({ success: false, message: "Unauthorized" });
 
-    const employee = await usermodel.findById(req.employee._id)
+    const employee = await usermodel
+      .findById(req.employee._id)
       .populate({
         path: "Under_manager",
-        select: "f_name l_name work_email designation reporting_manager",
+        select: "f_name l_name work_email designation department office_location reporting_manager",
         populate: {
           path: "reporting_manager",
-          select: "f_name l_name work_email designation",
+          select: "f_name l_name work_email designation department office_location",
         },
       })
+      .select("f_name l_name work_email designation department office_location Under_manager organisation_id")
       .lean();
 
-    if (!employee) {
-      return res.status(404).json({
-        success: false,
-        message: "Employee not found",
-      });
-    }
+    if (!employee)
+      return res.status(404).json({ success: false, message: "Employee not found" });
 
     const admin = await Adminmodel.findById(employee.organisation_id)
       .select("f_name l_name work_email designation created_by")
       .lean();
 
     let superAdmin = null;
-
     if (admin?.created_by) {
       superAdmin = await SuperAdminModel.findById(admin.created_by)
-        .select("f_name l_name email organisation_name")
+        .select("f_name l_name email organisation_name profile_image")
         .lean();
     }
 
     res.status(200).json({
       success: true,
-
       organisation_name: superAdmin?.organisation_name || "",
-
+      organisation_logo: superAdmin?.profile_image || null,
+      super_admin: superAdmin
+        ? { id: superAdmin._id, name: `${superAdmin.f_name} ${superAdmin.l_name}`, email: superAdmin.email }
+        : null,
       admin: admin
+        ? { id: admin._id, name: `${admin.f_name} ${admin.l_name}`, email: admin.work_email, designation: admin.designation }
+        : null,
+      reporting_manager: employee.Under_manager?.reporting_manager
         ? {
-            id: admin._id,
-            name: `${admin.f_name} ${admin.l_name}`,
-            email: admin.work_email,
-            designation: admin.designation,
+            id: employee.Under_manager.reporting_manager._id,
+            name: `${employee.Under_manager.reporting_manager.f_name} ${employee.Under_manager.reporting_manager.l_name}`,
+            email: employee.Under_manager.reporting_manager.work_email,
+            designation: employee.Under_manager.reporting_manager.designation,
+            department: employee.Under_manager.reporting_manager.department,
           }
         : null,
-
       manager: employee.Under_manager
         ? {
             id: employee.Under_manager._id,
             name: `${employee.Under_manager.f_name} ${employee.Under_manager.l_name}`,
             email: employee.Under_manager.work_email,
             designation: employee.Under_manager.designation,
+            department: employee.Under_manager.department,
           }
         : null,
-
-      reporting_manager: employee.Under_manager?.reporting_manager
-        ? {
-            id: employee.Under_manager.reporting_manager._id,
-            name: `${employee.Under_manager.reporting_manager.f_name} ${employee.Under_manager.reporting_manager.l_name}`,
-            email:
-              employee.Under_manager.reporting_manager.work_email,
-            designation:
-              employee.Under_manager.reporting_manager.designation,
-          }
-        : null,
-
-      super_admin: superAdmin
-        ? {
-            id: superAdmin._id,
-            name: `${superAdmin.f_name} ${superAdmin.l_name}`,
-            email: superAdmin.email,
-          }
-        : null,
+      employee: {
+        id: employee._id,
+        name: `${employee.f_name} ${employee.l_name}`,
+        email: employee.work_email,
+        designation: employee.designation,
+        department: employee.department,
+        office_location: employee.office_location,
+      },
     });
   } catch (error) {
     next(error);
