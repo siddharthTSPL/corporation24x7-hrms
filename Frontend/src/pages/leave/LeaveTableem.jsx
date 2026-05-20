@@ -271,9 +271,7 @@ const stepIdx = (status) => {
 };
 
 const JourneyTracker = ({ leave }) => {
-  if (!leave) return (
-    <EmptyState msg="No leave applications yet" />
-  );
+  if (!leave) return <EmptyState msg="No leave applications yet" />;
   const idx      = stepIdx(leave.status);
   const rejected = leave.status?.includes("rejected");
   const leaveLabel = (LEAVE_TYPES.find(t => t.value === leave.leaveType) || {}).label || leave.leaveType;
@@ -355,7 +353,7 @@ const LeaveBalanceTab = ({ user, balance, isLoading }) => {
     { label: "Sick Leave",      value: balance.SL,  accent: "#3B82F6" },
     ...(user?.gender === "female" && user?.marital_status === "married" ? [{ label: "Maternity Leave", value: balance.ML, accent: "#A855F7" }] : []),
     ...(user?.gender === "male"   && user?.marital_status === "married" ? [{ label: "Paternity Leave", value: balance.PL, accent: "#F59E0B" }] : []),
-    { label: "Patientity Balance",       value: balance.pbc, accent: "#6B1A4A" },
+    { label: "Patientity Balance", value: balance.pbc, accent: "#6B1A4A" },
     { label: "Leave Without Pay",  value: balance.lwp, accent: "#CD166E" },
   ];
   return (
@@ -366,7 +364,7 @@ const LeaveBalanceTab = ({ user, balance, isLoading }) => {
 };
 
 const LeaveApplyTab = ({ user, showToast }) => {
-  const [form, setForm]   = useState(LEAVE_BLANK);
+  const [form, setForm]     = useState(LEAVE_BLANK);
   const [errors, setErrors] = useState({});
   const [editTarget, setEditTarget] = useState(null);
 
@@ -536,7 +534,7 @@ const WFHTab = ({ showToast }) => {
   const editMut   = useEditWFH();
   const deleteMut = useDeleteWFH();
 
-  const wfhList = wfhData?.wfhs || wfhData || [];
+  const wfhList = wfhData?.wfhList || [];
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
@@ -621,11 +619,11 @@ const WFHTab = ({ showToast }) => {
       </SectionBox>
 
       <SectionBox title="WFH History" rightEl={
-        Array.isArray(wfhList) && wfhList.length > 0
+        wfhList.length > 0
           ? <span style={{ background: "linear-gradient(135deg,#EFF6FF,#DBEAFE)", color: "#1D4ED8", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, fontFamily: "'DM Sans',sans-serif" }}>{wfhList.length} record{wfhList.length !== 1 ? "s" : ""}</span>
           : null
       }>
-        {isLoading ? <Spinner /> : !Array.isArray(wfhList) || wfhList.length === 0 ? <EmptyState msg="No WFH records yet" /> : (
+        {isLoading ? <Spinner /> : wfhList.length === 0 ? <EmptyState msg="No WFH records yet" /> : (
           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
             {wfhList.map((wfh, i) => {
               const canEdit = isPendingWFH(wfh.status);
@@ -714,9 +712,9 @@ const EmployeeLeaveWFH = () => {
   };
 
   const TABS = [
-    { key: "status",  label: "Leave Status"  },
-    { key: "balance", label: "Leave Balance" },
-    { key: "apply",   label: "Apply Leave"   },
+    { key: "status",  label: "Leave Status"   },
+    { key: "balance", label: "Leave Balance"  },
+    { key: "apply",   label: "Apply Leave"    },
     { key: "wfh",     label: "Work From Home" },
   ];
 
@@ -728,7 +726,6 @@ const EmployeeLeaveWFH = () => {
       <div style={{ position: "fixed", bottom: -60, left: -60, width: 280, height: 280, borderRadius: "50%", background: "radial-gradient(circle,rgba(107,26,74,0.06) 0%,transparent 70%)", pointerEvents: "none", zIndex: 0 }} />
 
       <div style={{ position: "relative", zIndex: 1, maxWidth: 1100, margin: "0 auto" }}>
-
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 30, flexWrap: "wrap", gap: 16, animation: "fadeSlideUp .3s ease both" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div style={{ width: 50, height: 50, borderRadius: 16, background: "linear-gradient(135deg,#6B1A4A,#A8295E)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 6px 20px rgba(107,26,74,0.38)" }}>
@@ -744,7 +741,6 @@ const EmployeeLeaveWFH = () => {
               <p style={{ fontSize: 12, color: "#9B8BAE", margin: "3px 0 0", fontWeight: 400 }}>Apply · Track balance · Request work from home</p>
             </div>
           </div>
-
           {user && (
             <div style={{ background: "#fff", border: "1px solid rgba(200,185,220,0.4)", borderRadius: 14, padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, boxShadow: "0 2px 12px rgba(80,40,100,0.08)" }}>
               <div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg,#6B1A4A,#A8295E)", color: "#fff", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
