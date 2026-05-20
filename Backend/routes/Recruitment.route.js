@@ -20,7 +20,7 @@ const {
   updateCandidateStage,
   scheduleInterview,
   submitInterviewFeedback,
-} = require("../controllers/recruitment.controller");
+} = require("../controllers/Recruitment.controller");
 
 recruitmentrouter.post(
   "/manager/create",
