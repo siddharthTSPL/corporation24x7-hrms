@@ -143,9 +143,9 @@ const changepassword = async (req, res, next) => {
   if (!req.employee)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
-  const { currentPassword, newPassword } = req.body;
+  const { oldpassword, newpassword } = req.body;
 
-  if (!currentPassword || !newPassword)
+  if (!oldpassword || !newpassword)
     return next(
       Object.assign(
         new Error("Current password and new password are required"),
@@ -153,7 +153,7 @@ const changepassword = async (req, res, next) => {
       ),
     );
 
-  if (currentPassword === newPassword)
+  if (oldpassword === newpassword)
     return next(
       Object.assign(
         new Error("New password must be different from current password"),
@@ -162,7 +162,8 @@ const changepassword = async (req, res, next) => {
     );
 
   const user = await usermodel.findById(req.employee._id);
-  const isvalid = await user.isValidPassword(currentPassword);
+
+  const isvalid = await user.isValidPassword(oldpassword);
 
   if (!isvalid)
     return next(
@@ -171,7 +172,8 @@ const changepassword = async (req, res, next) => {
       }),
     );
 
-  user.password = newPassword;
+
+  user.password = newpassword;
   user.isFirstLogin = false;
   user.passwordupdatedAt = Date.now();
   await user.save();
