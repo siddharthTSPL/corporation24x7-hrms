@@ -557,58 +557,62 @@ function MyTickets() {
   );
 
   if (!tickets.length) return (
-    <div style={{textAlign:"center",padding:"56px 0",color:C.muted,fontFamily:"'Instrument Sans',sans-serif"}}>
-      <div style={{fontSize:44,marginBottom:12}}>🎫</div>
-      <div style={{fontWeight:600,fontSize:14,color:C.subtext}}>No tickets submitted yet</div>
-      <div style={{fontSize:12,marginTop:4}}>Use the Submit New tab to raise a ticket</div>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"320px"}}>
+      <div style={{textAlign:"center",color:C.muted,fontFamily:"'Instrument Sans',sans-serif"}}>
+        <div style={{fontSize:44,marginBottom:12}}>🎫</div>
+        <div style={{fontWeight:600,fontSize:14,color:C.subtext}}>No tickets submitted yet</div>
+        <div style={{fontSize:12,marginTop:4}}>Use the Submit New tab to raise a ticket</div>
+      </div>
     </div>
   );
 
   return (
-    <>
-      {tickets.map((t,i)=>{
-        const tm = TYPE_META[t.type]||{dot:C.primary};
-        const canRate = ["resolved","closed"].includes(t.status)&&!t.submitterRating;
-        return (
-          <div key={t._id} className="e-card" style={{animationDelay:`${i*.05}s`,borderLeft:`3px solid ${tm.dot}`}} onClick={()=>setSelected(t.ticketNumber)}>
-            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8,alignItems:"center"}}>
-                  <span style={{fontSize:10,fontWeight:700,color:C.muted,fontFamily:"'Instrument Sans',sans-serif",letterSpacing:".4px"}}>{t.ticketNumber}</span>
-                  <TypeChip type={t.type}/>
-                  <StatusChip status={t.status}/>
-                  {t.isAnonymous&&<span className="e-chip" style={{background:"#F3F4F6",color:"#6B7280"}}>Anonymous</span>}
-                  {t.isOverdue&&<span className="e-chip" style={{background:"#FEF2F2",color:"#991B1B",animation:"pulse 1.5s infinite"}}>⚠ Overdue</span>}
-                  {t.isEscalated&&<span className="e-chip" style={{background:"#FFF7ED",color:"#9A3412"}}>🔺 Escalated</span>}
-                </div>
-                <div style={{fontSize:13.5,fontWeight:600,color:C.text,fontFamily:"'Syne',sans-serif",marginBottom:5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</div>
-                <div style={{fontSize:11,color:C.muted,fontFamily:"'Instrument Sans',sans-serif"}}>
-                  {CAT_LABELS[t.category]||t.category} · SLA: {fmt(t.slaDeadline)} · {timeAgo(t.createdAt)}
-                </div>
-                {t.superAdminNote&&(
-                  <div style={{marginTop:10,background:"#F0FDF4",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#065F46",fontFamily:"'Instrument Sans',sans-serif",borderLeft:"3px solid #22C55E"}}>
-                    <strong>Admin Reply:</strong> {t.superAdminNote}
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
+      <div style={{width:"100%",maxWidth:720}}>
+        {tickets.map((t,i)=>{
+          const tm = TYPE_META[t.type]||{dot:C.primary};
+          const canRate = ["resolved","closed"].includes(t.status)&&!t.submitterRating;
+          return (
+            <div key={t._id} className="e-card" style={{animationDelay:`${i*.05}s`,borderLeft:`3px solid ${tm.dot}`}} onClick={()=>setSelected(t.ticketNumber)}>
+              <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8,alignItems:"center"}}>
+                    <span style={{fontSize:10,fontWeight:700,color:C.muted,fontFamily:"'Instrument Sans',sans-serif",letterSpacing:".4px"}}>{t.ticketNumber}</span>
+                    <TypeChip type={t.type}/>
+                    <StatusChip status={t.status}/>
+                    {t.isAnonymous&&<span className="e-chip" style={{background:"#F3F4F6",color:"#6B7280"}}>Anonymous</span>}
+                    {t.isOverdue&&<span className="e-chip" style={{background:"#FEF2F2",color:"#991B1B",animation:"pulse 1.5s infinite"}}>⚠ Overdue</span>}
+                    {t.isEscalated&&<span className="e-chip" style={{background:"#FFF7ED",color:"#9A3412"}}>🔺 Escalated</span>}
                   </div>
-                )}
-                {t.submitterRating&&(
-                  <div style={{marginTop:6,fontSize:11,color:"#92400E",fontFamily:"'Instrument Sans',sans-serif",letterSpacing:1}}>
-                    {"★".repeat(t.submitterRating)}{"☆".repeat(5-t.submitterRating)} <span style={{letterSpacing:0}}>You rated this</span>
+                  <div style={{fontSize:13.5,fontWeight:600,color:C.text,fontFamily:"'Syne',sans-serif",marginBottom:5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</div>
+                  <div style={{fontSize:11,color:C.muted,fontFamily:"'Instrument Sans',sans-serif"}}>
+                    {CAT_LABELS[t.category]||t.category} · SLA: {fmt(t.slaDeadline)} · {timeAgo(t.createdAt)}
                   </div>
-                )}
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end",flexShrink:0}}>
-                {canRate&&(
-                  <button className="e-btn" onClick={e=>{e.stopPropagation();setRateTarget(t);}}
-                    style={{background:"linear-gradient(135deg,#D97706,#F59E0B)",color:"#fff",fontSize:11,padding:"6px 12px"}}>⭐ Rate</button>
-                )}
-                <span style={{fontSize:10,color:C.muted,fontFamily:"'Instrument Sans',sans-serif"}}>Tap to view →</span>
+                  {t.superAdminNote&&(
+                    <div style={{marginTop:10,background:"#F0FDF4",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#065F46",fontFamily:"'Instrument Sans',sans-serif",borderLeft:"3px solid #22C55E"}}>
+                      <strong>Admin Reply:</strong> {t.superAdminNote}
+                    </div>
+                  )}
+                  {t.submitterRating&&(
+                    <div style={{marginTop:6,fontSize:11,color:"#92400E",fontFamily:"'Instrument Sans',sans-serif",letterSpacing:1}}>
+                      {"★".repeat(t.submitterRating)}{"☆".repeat(5-t.submitterRating)} <span style={{letterSpacing:0}}>You rated this</span>
+                    </div>
+                  )}
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end",flexShrink:0}}>
+                  {canRate&&(
+                    <button className="e-btn" onClick={e=>{e.stopPropagation();setRateTarget(t);}}
+                      style={{background:"linear-gradient(135deg,#D97706,#F59E0B)",color:"#fff",fontSize:11,padding:"6px 12px"}}>⭐ Rate</button>
+                  )}
+                  <span style={{fontSize:10,color:C.muted,fontFamily:"'Instrument Sans',sans-serif"}}>Tap to view →</span>
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
       {rateTarget&&<RateModal ticket={rateTarget} onClose={()=>setRateTarget(null)}/>}
-    </>
+    </div>
   );
 }
 
@@ -637,7 +641,7 @@ export default function EmployeeTickets() {
         ))}
       </div>
 
-      <div style={{maxWidth:720}}>
+      <div style={{maxWidth:720,margin:"0 auto"}}>
         {tab==="submit"    &&<SubmitForm onSuccess={()=>setTab("mytickets")}/>}
         {tab==="mytickets" &&<MyTickets/>}
       </div>
