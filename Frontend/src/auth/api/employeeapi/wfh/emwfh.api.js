@@ -6,21 +6,21 @@ const api = axios.create({
 });
 
 export const applyWFH = async (data) => {
-  const res = await api.post("wfh/applyWFH", data);
+  const res = await api.post("wfh/employee/applyWFH", data);
   return res.data;
 };
 
 export const editWFH = async (id, data) => {
-  const res = await api.put(`wfh/editWFH/${id}`, data);
+  const res = await api.put(`wfh/employee/editWFH/${id}`, data);
   return res.data;
 };
 
 export const deleteWFH = async (id) => {
-  const res = await api.delete(`wfh/deleteWFH/${id}`);
+  const res = await api.delete(`wfh/employee/deleteWFH/${id}`);
   return res.data;
 };
 
 export const getMyWFH = async () => {
-  const res = await api.get("wfh/getMyWFH");
+  const res = await api.get("wfh/employee/getMyWFH");
   return res.data;
 };
