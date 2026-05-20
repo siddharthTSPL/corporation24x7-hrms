@@ -10,6 +10,8 @@ require("dotenv").config();
 const Review = require("../Models/review.model");
 const Attendance = require("../Models/attendance.model");
 const Ticket = require("../Models/ticket.model");
+const Adminmodel = require("../Models/Admin.model");
+const SuperAdminModel = require("../Models/superadmin.model");
 
 const verifyUserEmail = async (req, res, next) => {
   const { token } = req.params;
@@ -832,6 +834,91 @@ const employeeGetTicketDetail = async (req, res, next) => {
   }
 };
 
+const getOrgInfo = async (req, res, next) => {
+  try {
+    if (!req.employee) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const employee = await usermodel.findById(req.employee._id)
+      .populate({
+        path: "Under_manager",
+        select: "f_name l_name work_email designation reporting_manager",
+        populate: {
+          path: "reporting_manager",
+          select: "f_name l_name work_email designation",
+        },
+      })
+      .lean();
+
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: "Employee not found",
+      });
+    }
+
+    const admin = await Adminmodel.findById(employee.organisation_id)
+      .select("f_name l_name work_email designation created_by")
+      .lean();
+
+    let superAdmin = null;
+
+    if (admin?.created_by) {
+      superAdmin = await SuperAdminModel.findById(admin.created_by)
+        .select("f_name l_name email organisation_name")
+        .lean();
+    }
+
+    res.status(200).json({
+      success: true,
+
+      organisation_name: superAdmin?.organisation_name || "",
+
+      admin: admin
+        ? {
+            id: admin._id,
+            name: `${admin.f_name} ${admin.l_name}`,
+            email: admin.work_email,
+            designation: admin.designation,
+          }
+        : null,
+
+      manager: employee.Under_manager
+        ? {
+            id: employee.Under_manager._id,
+            name: `${employee.Under_manager.f_name} ${employee.Under_manager.l_name}`,
+            email: employee.Under_manager.work_email,
+            designation: employee.Under_manager.designation,
+          }
+        : null,
+
+      reporting_manager: employee.Under_manager?.reporting_manager
+        ? {
+            id: employee.Under_manager.reporting_manager._id,
+            name: `${employee.Under_manager.reporting_manager.f_name} ${employee.Under_manager.reporting_manager.l_name}`,
+            email:
+              employee.Under_manager.reporting_manager.work_email,
+            designation:
+              employee.Under_manager.reporting_manager.designation,
+          }
+        : null,
+
+      super_admin: superAdmin
+        ? {
+            id: superAdmin._id,
+            name: `${superAdmin.f_name} ${superAdmin.l_name}`,
+            email: superAdmin.email,
+          }
+        : null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 
 module.exports = {
@@ -855,5 +942,6 @@ module.exports = {
   employeeSubmitTicket,
   employeeGetMyTickets,
   employeeRateTicket,
-  employeeGetTicketDetail
+  employeeGetTicketDetail,
+  getOrgInfo,
 };
