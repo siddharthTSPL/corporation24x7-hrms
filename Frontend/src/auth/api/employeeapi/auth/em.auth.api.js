@@ -27,7 +27,7 @@ export const firstLoginResetPassword = async (data) => {
 };
 
 export const updatePassword = async (data) => {
-  const res = await api.post("user/changepassword", data);
+  const res = await api.put("user/changepassword", data);
   return res.data;
 };
 
