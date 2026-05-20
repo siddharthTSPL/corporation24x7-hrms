@@ -1,5 +1,5 @@
-const HiringRequisition = require("../Models/HiringRequisition.model");
-const Candidate = require("../Models/Candidate.model");
+const HiringRequisition = require("../Models/Hiringrequisition.model");
+const Candidate = require("../Models/candidate.model");
 
 const STAGE_ORDER = {
   APPLIED: ["SCREENING", "REJECTED"],
