@@ -14,7 +14,7 @@ const managerLeaveModel = require("../Models/maleave.model");
 const Attendance = require("../Models/attendance.model");
 const Ticket = require("../Models/ticket.model");
 const SuperAdminModel = require("../Models/superadmin.model");
-const Adminmodel = require("../Models/Admin.model");
+const AdminModel = require("../Models/Admin.model");
 require("dotenv").config();
 
 const verifyManagerEmail = async (req, res, next) => {
@@ -357,45 +357,47 @@ const applyleavem = async (req, res, next) => {
   if (!req.manager)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   if (!startDate || !endDate || !leaveType)
-    return next(Object.assign(new Error("Required fields missing"), { statusCode: 400 }));
-
+    return next(
+      Object.assign(new Error("Required fields missing"), { statusCode: 400 }),
+    );
   const managerId = req.manager._id;
   const start = new Date(startDate);
   const end = new Date(endDate);
-
   if (end < start)
-    return next(Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }));
-
+    return next(
+      Object.assign(new Error("End date cannot be before start date"), {
+        statusCode: 400,
+      }),
+    );
   const days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
-
   const overlapping = await managerLeaveModel
     .findOne({
       manager: managerId,
-      status: { $nin: ["rejected_admin", "rejected_reporting_manager"] },
+      status: { $nin: ["rejected_admin"] },
       startDate: { $lte: end },
       endDate: { $gte: start },
     })
     .select("_id")
     .lean();
-
   if (overlapping)
-    return next(Object.assign(new Error("Leave already applied for these dates"), { statusCode: 400 }));
-
-  // ✅ Fetch both fields
+    return next(
+      Object.assign(new Error("Leave already applied for these dates"), {
+        statusCode: 400,
+      }),
+    );
   const managerData = await managermodel
     .findById(managerId)
-    .select("reporting_manager reporting_manager_model")
+    .select("reporting_manager")
     .lean();
-
   if (!managerData.reporting_manager)
-    return next(Object.assign(new Error("You have no reporting manager assigned. Cannot apply leave."), { statusCode: 400 }));
-
-  // ✅ Set status based on who the reporting manager is
-  const leaveStatus =
-    managerData.reporting_manager_model === "Admin"
-      ? "pending_admin"
-      : "pending_reporting_manager";
-
+    return next(
+      Object.assign(
+        new Error(
+          "You have no reporting manager assigned. Cannot apply leave.",
+        ),
+        { statusCode: 400 },
+      ),
+    );
   const leave = await managerLeaveModel.create({
     manager: managerId,
     leaveType,
@@ -403,13 +405,14 @@ const applyleavem = async (req, res, next) => {
     endDate: end,
     days,
     reason,
-    status: leaveStatus,
+    status: "pending_reporting_manager",
   });
-
-  res.status(200).json({
-    message: "Leave request submitted successfully",
-    leave,
-  });
+  res
+    .status(200)
+    .json({
+      message: "Leave request submitted to your reporting manager",
+      leave,
+    });
 };
 
 const showannouncements = async (req, res, next) => {
@@ -1166,17 +1169,30 @@ const getOrgInfoForManager = async (req, res, next) => {
     if (!manager.organisation_id)
       return res.status(400).json({ success: false, message: "Manager has no organisation assigned" });
 
-    
-    const admin = await Adminmodel.findById(manager.organisation_id)
-      .select("f_name l_name work_email designation created_by")
+    // ── TEMPORARY DEBUG ── remove after fix ──────────────────────────────────
+    console.log("manager._id        :", manager._id);
+    console.log("organisation_id    :", manager.organisation_id);
+
+    const superAdminCheck = await SuperAdminModel.findById(manager.organisation_id).lean();
+    console.log("superAdmin found?  :", superAdminCheck ? "YES" : "NO");
+
+    const adminCheck = await Adminmodel.findById(manager.organisation_id).lean();
+    console.log("admin found?       :", adminCheck ? "YES — organisation_id points to Admin, not SuperAdmin" : "NO");
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const superAdmin = await SuperAdminModel.findById(manager.organisation_id)
+      .select("f_name l_name email organisation_name profile_image")
       .lean();
 
-    let superAdmin = null;
-    if (admin?.created_by) {
-      superAdmin = await SuperAdminModel.findById(admin.created_by)
-        .select("f_name l_name email organisation_name profile_image")
-        .lean();
-    }
+    if (!superAdmin)
+      return res.status(404).json({ success: false, message: "Organisation not found" });
+
+    const admin = await Adminmodel.findOne({ created_by: superAdmin._id })
+      .select("f_name l_name work_email designation")
+      .lean();
+
+    if (!admin)
+      return res.status(404).json({ success: false, message: "Admin not found for this organisation" });
 
     const allManagers = await managermodel.find({ organisation_id: manager.organisation_id })
       .select("f_name l_name work_email designation department office_location")
@@ -1207,19 +1223,19 @@ const getOrgInfoForManager = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      organisation_name: superAdmin?.organisation_name || "",
-      organisation_logo: superAdmin?.profile_image || null,
-      super_admin: superAdmin ? {
+      organisation_name: superAdmin.organisation_name || "",
+      organisation_logo: superAdmin.profile_image || null,
+      super_admin: {
         id: superAdmin._id,
         name: `${superAdmin.f_name} ${superAdmin.l_name}`,
         email: superAdmin.email,
-      } : null,
-      admin: admin ? {
+      },
+      admin: {
         id: admin._id,
         name: `${admin.f_name} ${admin.l_name}`,
         email: admin.work_email,
         designation: admin.designation,
-      } : null,
+      },
       managers: managersWithEmployees,
       currentManagerId: req.manager._id,
     });
