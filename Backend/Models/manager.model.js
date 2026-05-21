@@ -20,13 +20,7 @@ const managerSchema = new mongoose.Schema(
 
     department: {
       type: String,
-      enum: [
-        "OPR",
-        "BPO",
-        "ENG",
-        "HR",
-        "MGMT"
-      ],
+      enum: ["OPR", "BPO", "ENG", "HR", "MGMT"],
       required: true,
     },
 
@@ -51,7 +45,6 @@ const managerSchema = new mongoose.Schema(
     password: {
       type: String,
       required: true,
-      // select: false,
     },
 
     gender: {
@@ -119,7 +112,13 @@ const managerSchema = new mongoose.Schema(
 
     reporting_manager: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Manager",
+      refPath: "reporting_manager_model",
+      default: null,
+    },
+
+    reporting_manager_model: {
+      type: String,
+      enum: ["Admin", "Manager"],
       default: null,
     },
 
@@ -194,18 +193,69 @@ const managerSchema = new mongoose.Schema(
   }
 );
 
+
 managerSchema.index({ department: 1, status: 1 });
 managerSchema.index({ status: 1 });
 managerSchema.index({ reporting_manager: 1 });
+managerSchema.index({ organisation_id: 1 });
+
 
 managerSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
-
   this.password = await bcrypt.hash(this.password, 10);
 });
 
+
+managerSchema.pre("save", function (next) {
+  if (!this.reporting_manager) {
+    this.reporting_manager_model = null;
+  }
+  if (!this.reporting_manager_model) {
+    this.reporting_manager = null;
+  }
+  next();
+});
+
+
+managerSchema.pre(
+  ["findOneAndUpdate", "updateOne", "updateMany"],
+  function (next) {
+    const update = this.getUpdate();
+    const set = update?.$set || {};
+
+    // If clearing reporting_manager, also clear model
+    if ("reporting_manager" in set && !set.reporting_manager) {
+      set.reporting_manager_model = null;
+    }
+    // If clearing model, also clear reporting_manager
+    if ("reporting_manager_model" in set && !set.reporting_manager_model) {
+      set.reporting_manager = null;
+    }
+
+    if (update.$set) update.$set = set;
+    next();
+  }
+);
+
+
 managerSchema.methods.isValidPassword = async function (password) {
   return await bcrypt.compare(password, this.password);
+};
+
+
+managerSchema.methods.reportsToAdmin = function () {
+  return this.reporting_manager_model === "Admin";
+};
+
+
+managerSchema.methods.resolveLeaveStatus = function ({
+  pendingAdminStatus = "pending_admin",
+  pendingManagerStatus = "pending_reporting_manager",
+} = {}) {
+  if (!this.reporting_manager) return null; // no reporting manager assigned
+  return this.reporting_manager_model === "Admin"
+    ? pendingAdminStatus
+    : pendingManagerStatus;
 };
 
 const Managermodel = mongoose.model("Manager", managerSchema);
