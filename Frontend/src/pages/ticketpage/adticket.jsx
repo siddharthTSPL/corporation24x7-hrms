@@ -604,12 +604,12 @@ function TicketDetail({ ticketNumber, onBack, onRate }) {
 }
 
 function MyTickets() {
-  const { data, isLoading }   = useGetMyTickets();
+  const { data, isLoading } = useGetMyTickets();
   const [selected, setSelected] = useState(null);
   const [rateTarget, setRateTarget] = useState(null);
   const tickets = data?.tickets || [];
 
-  if (isLoading) return <Spinner/>;
+  if (isLoading) return <Spinner />;
 
   if (selected) {
     return (
@@ -619,101 +619,138 @@ function MyTickets() {
           onBack={() => setSelected(null)}
           onRate={t => setRateTarget(t)}
         />
-        {rateTarget && <RateModal ticket={rateTarget} onClose={() => setRateTarget(null)}/>}
+        {rateTarget && <RateModal ticket={rateTarget} onClose={() => setRateTarget(null)} />}
       </>
     );
   }
 
   if (!tickets.length) return (
-    <div style={{ textAlign:"center", padding:"56px 0", color:C.muted, fontFamily:"'Instrument Sans',sans-serif" }}>
-      <div style={{ fontSize:44, marginBottom:12 }}>🎫</div>
-      <div style={{ fontWeight:600, fontSize:14, color:C.subtext }}>No tickets submitted yet</div>
-      <div style={{ fontSize:12, marginTop:4 }}>Use the Submit New tab to raise a ticket</div>
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"320px" }}>
+      <div style={{ textAlign:"center", color:C.muted, fontFamily:"'Instrument Sans',sans-serif" }}>
+        <div style={{ fontSize:44, marginBottom:12 }}>🎫</div>
+        <div style={{ fontWeight:600, fontSize:14, color:C.subtext }}>No tickets submitted yet</div>
+        <div style={{ fontSize:12, marginTop:4 }}>Use the Submit New tab to raise a ticket</div>
+      </div>
     </div>
   );
 
   return (
-    <>
-      {tickets.map((t, i) => {
-        const tm      = TICKET_TYPES[t.type] || { dot:C.primary };
-        const canRate = ["resolved","closed"].includes(t.status) && !t.submitterRating;
-        return (
-          <div key={t._id} className="t-card" style={{ animationDelay:`${i*.05}s`, borderLeft:`3px solid ${tm.dot}` }}
-            onClick={() => setSelected(t.ticketNumber)}>
-            <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:8, flexWrap:"wrap" }}>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:8, alignItems:"center" }}>
-                  <span style={{ fontSize:10, fontWeight:700, color:C.muted, fontFamily:"'Instrument Sans',sans-serif", letterSpacing:".4px" }}>{t.ticketNumber}</span>
-                  <TypeChip type={t.type}/>
-                  <StatusChip status={t.status}/>
-                  {t.isAnonymous   && <span className="t-chip" style={{ background:"#F3F4F6", color:"#6B7280" }}>Anonymous</span>}
-                  {t.isOverdue     && <span className="t-chip" style={{ background:"#FEF2F2", color:"#991B1B", animation:"pulse 1.5s infinite" }}>⚠ Overdue</span>}
-                  {t.isEscalated   && <span className="t-chip" style={{ background:"#FFF7ED", color:"#9A3412" }}>🔺 Escalated</span>}
-                </div>
-                <div style={{ fontSize:13.5, fontWeight:600, color:C.text, fontFamily:"'Syne',sans-serif", marginBottom:5, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{t.title}</div>
-                <div style={{ fontSize:11, color:C.muted, fontFamily:"'Instrument Sans',sans-serif" }}>
-                  {CAT_LABELS[t.category] || t.category} · SLA: {fmt(t.slaDeadline)} · {timeAgo(t.createdAt)}
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"center" }}>
+      <div style={{ width:"100%", maxWidth:720 }}>
+        {tickets.map((t, i) => {
+          const tm = TICKET_TYPES[t.type] || { dot:C.primary };
+          const canRate = ["resolved","closed"].includes(t.status) && !t.submitterRating;
+
+          return (
+            <div
+              key={t._id}
+              className="t-card"
+              style={{ animationDelay:`${i*.05}s`, borderLeft:`3px solid ${tm.dot}` }}
+              onClick={() => setSelected(t.ticketNumber)}
+            >
+              <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:8, flexWrap:"wrap" }}>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:8, alignItems:"center" }}>
+                    <span style={{ fontSize:10, fontWeight:700, color:C.muted, fontFamily:"'Instrument Sans',sans-serif", letterSpacing:".4px" }}>
+                      {t.ticketNumber}
+                    </span>
+                    <TypeChip type={t.type}/>
+                    <StatusChip status={t.status}/>
+                    {t.isAnonymous && <span className="t-chip" style={{ background:"#F3F4F6", color:"#6B7280" }}>Anonymous</span>}
+                    {t.isOverdue && <span className="t-chip" style={{ background:"#FEF2F2", color:"#991B1B", animation:"pulse 1.5s infinite" }}>⚠ Overdue</span>}
+                    {t.isEscalated && <span className="t-chip" style={{ background:"#FFF7ED", color:"#9A3412" }}>🔺 Escalated</span>}
+                  </div>
+
+                  <div style={{ fontSize:13.5, fontWeight:600, color:C.text, fontFamily:"'Syne',sans-serif", marginBottom:5, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                    {t.title}
+                  </div>
+
+                  <div style={{ fontSize:11, color:C.muted, fontFamily:"'Instrument Sans',sans-serif" }}>
+                    {CAT_LABELS[t.category] || t.category} · SLA: {fmt(t.slaDeadline)} · {timeAgo(t.createdAt)}
+                  </div>
+
+                  {t.superAdminNote && (
+                    <div style={{ marginTop:10, background:"#F0FDF4", borderRadius:8, padding:"8px 12px", fontSize:12, color:"#065F46", fontFamily:"'Instrument Sans',sans-serif", borderLeft:"3px solid #22C55E" }}>
+                      <strong>Admin Reply:</strong> {t.superAdminNote}
+                    </div>
+                  )}
+
+                  {t.submitterRating && (
+                    <div style={{ marginTop:6, fontSize:11, color:"#92400E", fontFamily:"'Instrument Sans',sans-serif", letterSpacing:1 }}>
+                      {"★".repeat(t.submitterRating)}
+                      {"☆".repeat(5 - t.submitterRating)}
+                      <span style={{ letterSpacing:0 }}>You rated this</span>
+                    </div>
+                  )}
                 </div>
 
-                {t.superAdminNote && (
-                  <div style={{ marginTop:10, background:"#F0FDF4", borderRadius:8, padding:"8px 12px", fontSize:12, color:"#065F46", fontFamily:"'Instrument Sans',sans-serif", borderLeft:"3px solid #22C55E" }}>
-                    <strong>Admin Reply:</strong> {t.superAdminNote}
-                  </div>
-                )}
-                {t.submitterRating && (
-                  <div style={{ marginTop:6, fontSize:11, color:"#92400E", fontFamily:"'Instrument Sans',sans-serif", letterSpacing:1 }}>
-                    {"★".repeat(t.submitterRating)}{"☆".repeat(5-t.submitterRating)} <span style={{ letterSpacing:0 }}>You rated this</span>
-                  </div>
-                )}
-              </div>
-
-              <div style={{ display:"flex", flexDirection:"column", gap:6, alignItems:"flex-end", flexShrink:0 }}>
-                {canRate && (
-                  <button className="t-btn" onClick={e => { e.stopPropagation(); setRateTarget(t); }}
-                    style={{ background:"linear-gradient(135deg,#D97706,#F59E0B)", color:"#fff", fontSize:11, padding:"6px 12px" }}>
-                    ⭐ Rate
-                  </button>
-                )}
-                <span style={{ fontSize:10, color:C.muted, fontFamily:"'Instrument Sans',sans-serif" }}>Tap to view →</span>
+                <div style={{ display:"flex", flexDirection:"column", gap:6, alignItems:"flex-end", flexShrink:0 }}>
+                  {canRate && (
+                    <button
+                      className="t-btn"
+                      onClick={e => {
+                        e.stopPropagation();
+                        setRateTarget(t);
+                      }}
+                      style={{ background:"linear-gradient(135deg,#D97706,#F59E0B)", color:"#fff", fontSize:11, padding:"6px 12px" }}
+                    >
+                      ⭐ Rate
+                    </button>
+                  )}
+                  <span style={{ fontSize:10, color:C.muted, fontFamily:"'Instrument Sans',sans-serif" }}>Tap to view →</span>
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })}
-      {rateTarget && <RateModal ticket={rateTarget} onClose={() => setRateTarget(null)}/>}
-    </>
+          );
+        })}
+      </div>
+
+      {rateTarget && <RateModal ticket={rateTarget} onClose={() => setRateTarget(null)} />}
+    </div>
   );
 }
 
 export default function AdminTickets() {
   const [tab, setTab] = useState("submit");
-  const { data }      = useGetMyTickets();
-  const count         = data?.count || 0;
+  const { data } = useGetMyTickets();
+  const count = data?.count || 0;
 
   return (
     <div style={{ minHeight:"100vh", background:C.bg, fontFamily:"'Instrument Sans',sans-serif", padding:"32px 36px" }}>
       <G/>
 
-      <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:28 }}>
-        <div style={{ width:50, height:50, borderRadius:16, background:`linear-gradient(135deg,${C.primary},${C.accent})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, boxShadow:"0 6px 22px rgba(115,0,66,.32)", flexShrink:0 }}>🎫</div>
-        <div>
-          <h1 style={{ fontSize:22, fontWeight:800, color:C.text, margin:0, fontFamily:"'Syne',sans-serif" }}>My Tickets</h1>
-          <p style={{ fontSize:12, color:C.muted, margin:"3px 0 0", fontFamily:"'Instrument Sans',sans-serif" }}>Admin · Submit &amp; track grievances, complaints, and suggestions</p>
+      <div style={{ display:"flex", flexDirection:"column", alignItems:"center" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:28 }}>
+          <div style={{ width:50, height:50, borderRadius:16, background:`linear-gradient(135deg,${C.primary},${C.accent})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, boxShadow:"0 6px 22px rgba(115,0,66,.32)", flexShrink:0 }}>
+            🎫
+          </div>
+          <div>
+            <h1 style={{ fontSize:22, fontWeight:800, color:C.text, margin:0, fontFamily:"'Syne',sans-serif" }}>
+              My Tickets
+            </h1>
+            <p style={{ fontSize:12, color:C.muted, margin:"3px 0 0", fontFamily:"'Instrument Sans',sans-serif" }}>
+              Admin · Submit &amp; track grievances, complaints, and suggestions
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display:"flex", gap:3, background:"rgba(230,220,245,.55)", borderRadius:12, padding:4, marginBottom:26, width:"fit-content", border:`1px solid ${C.border}` }}>
+          {[["submit","📝 Submit New"], ["mytickets", `📋 My Tickets${count ? ` (${count})` : ""}`]].map(([k, l]) => (
+            <button
+              key={k}
+              onClick={() => setTab(k)}
+              className={tab===k ? "t-tab-active" : "t-tab-idle"}
+              style={{ padding:"8px 20px", borderRadius:9, border:"none", cursor:"pointer", fontSize:12.5, fontWeight:tab===k?600:400, fontFamily:"'Instrument Sans',sans-serif", transition:"all .2s" }}
+            >
+              {l}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div style={{ display:"flex", gap:3, background:"rgba(230,220,245,.55)", borderRadius:12, padding:4, marginBottom:26, width:"fit-content", border:`1px solid ${C.border}` }}>
-        {[["submit","📝 Submit New"], ["mytickets", `📋 My Tickets${count ? ` (${count})` : ""}`]].map(([k, l]) => (
-          <button key={k} onClick={() => setTab(k)} className={tab===k ? "t-tab-active" : "t-tab-idle"}
-            style={{ padding:"8px 20px", borderRadius:9, border:"none", cursor:"pointer", fontSize:12.5, fontWeight:tab===k?600:400, fontFamily:"'Instrument Sans',sans-serif", transition:"all .2s" }}>
-            {l}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ maxWidth:720 }}>
-        {tab === "submit"    && <SubmitForm onSuccess={() => setTab("mytickets")}/>}
-        {tab === "mytickets" && <MyTickets/>}
+      <div style={{ maxWidth:720, margin:"0 auto" }}>
+        {tab === "submit" && <SubmitForm onSuccess={() => setTab("mytickets")} />}
+        {tab === "mytickets" && <MyTickets />}
       </div>
     </div>
   );

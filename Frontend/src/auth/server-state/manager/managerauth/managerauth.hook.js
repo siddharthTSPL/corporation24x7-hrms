@@ -19,7 +19,6 @@ export const useVerifyManager = (token) => {
 
 export const useLoginManager = () => {
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationKey: ["loginManager"],
     mutationFn: loginManager,
@@ -31,7 +30,6 @@ export const useLoginManager = () => {
 
 export const useFirstLoginPasswordChange = () => {
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationKey: ["firstLoginPasswordChange"],
     mutationFn: firstLoginPasswordChange,
@@ -43,7 +41,6 @@ export const useFirstLoginPasswordChange = () => {
 
 export const useUpdateManagerPassword = () => {
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationKey: ["updateManagerPassword"],
     mutationFn: updateManagerPassword,
@@ -54,25 +51,26 @@ export const useUpdateManagerPassword = () => {
 };
 
 export const useGetMeManager = () => {
-  const queryClient = useQueryClient();
-
   return useQuery({
     queryKey: ["meManager"],
     queryFn: getMeManager,
-    onSuccess: (data) => {
-      queryClient.setQueryData(["manager"], data.manager || data);
-    },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    select: (data) => ({
+      manager: data.manager,
+      leavebalance: data.leavebalance,
+      review: data.review,
+    }),
   });
 };
 
 export const useLogoutManager = () => {
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: logoutManager,
     onSuccess: () => {
       localStorage.removeItem("role");
-      queryClient.removeQueries({ queryKey: ["auth"] });
+      queryClient.clear();
     },
   });
 };

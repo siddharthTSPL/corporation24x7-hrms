@@ -82,6 +82,8 @@ const AdminComplaints = lazy(() => import("./pages/ticketpage/adticket"));
 const EmployeeComplaints = lazy(() => import("./pages/ticketpage/emticket"));
 const ManagerComplaints = lazy(() => import("./pages/ticketpage/maticket"));
 
+const Managerrecruitment= lazy(() => import("./pages/recruitment/recruitmentma"));
+
 /* ─────────────────────────────────────────────
    Lottie Page Skeleton — mirrors Login loader
 ───────────────────────────────────────────── */
@@ -232,6 +234,7 @@ function App() {
             <Route path="/admin-complaints"       element={<AdminComplaints />} />
             <Route path="/manager-complaints"     element={<ManagerComplaints />} />
             <Route path="/employee-complaints"    element={<EmployeeComplaints />} />
+            <Route path="/manager/recruitment"    element={<Managerrecruitment />} />
           </Route>
 
           {/* ── Super Admin routes ── */}

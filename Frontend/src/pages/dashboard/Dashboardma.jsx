@@ -3,25 +3,18 @@ import { useNavigate } from "react-router-dom";
 import { useManagerAnnouncements } from "../../auth/server-state/manager/managerannounce/managerannounce.hook";
 import { useGetMeManager } from "../../auth/server-state/manager/managerauth/managerauth.hook";
 import { useGetAllManagerLeaves } from "../../auth/server-state/manager/managerleave/managerleave.hook";
-import { useGetAttendance } from "../../auth/server-state/manager/managgerother/managerother.hook"; // ← new
+import { useGetAttendance } from "../../auth/server-state/manager/managgerother/managerother.hook";
+import { useGetMyLeavesManager } from "../../auth/server-state/manager/managerleave/managerleave.hook";
 
-/* ─────────────────────────────────────────────
-   CONSTANTS
-───────────────────────────────────────────── */
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS   = ["S","M","T","W","T","F","S"];
 
-const APPROVED_STATUSES = ["approved_manager", "approved_admin", "pending_admin"];
+const APPROVED_STATUSES = ["approved_manager", "approved_admin", "pending_admin", "approved_reporting_manager"];
 
-/* ─────────────────────────────────────────────
-   GLOBAL STYLES
-───────────────────────────────────────────── */
 const GlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
-
     *, *::before, *::after { box-sizing: border-box; }
-
     @keyframes shimmer {
       0%   { background-position: 200% 0; }
       100% { background-position: -200% 0; }
@@ -30,18 +23,13 @@ const GlobalStyles = () => (
       from { opacity: 0; transform: translateY(10px); }
       to   { opacity: 1; transform: translateY(0); }
     }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+    @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes pulse-ring {
       0%   { box-shadow: 0 0 0 0 rgba(115,0,66,0.35); }
       70%  { box-shadow: 0 0 0 8px rgba(115,0,66,0); }
       100% { box-shadow: 0 0 0 0 rgba(115,0,66,0); }
     }
-    @keyframes progressIn {
-      from { width: 0; }
-    }
-
+    @keyframes progressIn { from { width: 0; } }
     .md-card {
       background: #fff;
       border-radius: 14px;
@@ -50,10 +38,7 @@ const GlobalStyles = () => (
       position: relative;
       animation: fadeUp .35s ease both;
     }
-    .md-card:hover {
-      box-shadow: 0 4px 20px rgba(42,26,22,0.08);
-    }
-
+    .md-card:hover { box-shadow: 0 4px 20px rgba(42,26,22,0.08); }
     .md-checkin-btn {
       font-family: 'DM Sans', sans-serif;
       font-size: 13px;
@@ -70,7 +55,24 @@ const GlobalStyles = () => (
       box-shadow: 0 4px 16px rgba(115,0,66,0.35);
     }
     .md-checkin-btn:not(:disabled):active { transform: translateY(0); }
-
+    .md-recruit-btn {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 9px 22px;
+      border-radius: 10px;
+      cursor: pointer;
+      border: none;
+      transition: all .2s ease;
+      letter-spacing: .2px;
+      background: rgba(255,255,255,0.18);
+      color: #f9f8f2;
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+    .md-recruit-btn:hover {
+      background: rgba(255,255,255,0.28);
+      transform: translateY(-1px);
+    }
     .md-cal-day {
       aspect-ratio: 1;
       display: flex;
@@ -83,13 +85,11 @@ const GlobalStyles = () => (
       cursor: default;
     }
     .md-cal-day:hover { transform: scale(1.1); }
-
     .md-progress-bar {
       height: 100%;
       border-radius: 4px;
       animation: progressIn .7s ease both;
     }
-
     .md-ann-item {
       display: flex;
       gap: 10px;
@@ -99,10 +99,8 @@ const GlobalStyles = () => (
       transition: background .15s;
     }
     .md-ann-item:last-child { border-bottom: none; }
-
     .md-leave-row { padding: 11px 0; border-bottom: 0.5px solid #ede5e0; }
     .md-leave-row:last-child { border-bottom: none; }
-
     .md-tag {
       display: inline-flex;
       align-items: center;
@@ -113,12 +111,7 @@ const GlobalStyles = () => (
       font-weight: 500;
       font-family: 'DM Sans', sans-serif;
     }
-
-    .md-info-row {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
+    .md-info-row { display: flex; flex-direction: column; gap: 3px; }
     .md-info-label {
       font-size: 10px;
       color: #b0948a;
@@ -133,7 +126,6 @@ const GlobalStyles = () => (
       font-family: 'DM Sans', sans-serif;
       word-break: break-all;
     }
-
     .md-history-row {
       display: flex;
       align-items: center;
@@ -146,9 +138,6 @@ const GlobalStyles = () => (
   `}</style>
 );
 
-/* ─────────────────────────────────────────────
-   HELPERS
-───────────────────────────────────────────── */
 function getInitials(f = "", l = "") {
   return `${f[0] || ""}${l[0] || ""}`.toUpperCase();
 }
@@ -194,33 +183,19 @@ function isDateInRange(date, start, end) {
   return d >= s && d <= e;
 }
 
-/* ─────────────────────────────────────────────
-   MAP BACKEND ATTENDANCE STATUS → CALENDAR STATUS
-   Backend status values: present | absent | half_day | late | etc.
-   We normalise them all to: present | absent | halfday | late | checkedin
-───────────────────────────────────────────── */
 function resolveAttendanceStatus(record) {
   if (!record) return null;
-
-  // Still checked-in (no checkout yet) — treat as in-progress
   if (record.checkIn && !record.checkOut) return "checkedin";
-
   const s = (record.status || "").toLowerCase();
   if (s.includes("half")) return "halfday";
   if (s === "present")    return "present";
   if (s === "absent")     return "absent";
   if (s === "late")       return "late";
   if (s === "lwp")        return "absent";
-
-  // Fallback: if there's a checkIn + checkOut and no status label, consider present
   if (record.checkIn && record.checkOut) return "present";
-
   return "absent";
 }
 
-/* ─────────────────────────────────────────────
-   AVATAR
-───────────────────────────────────────────── */
 function Avatar({ src, initials, size = 36, radius = "50%", fontSize = 13, style = {} }) {
   const [imgError, setImgError] = useState(false);
   const showImg = src && !imgError;
@@ -242,9 +217,6 @@ function Avatar({ src, initials, size = 36, radius = "50%", fontSize = 13, style
   );
 }
 
-/* ─────────────────────────────────────────────
-   STAR RATING
-───────────────────────────────────────────── */
 function StarRating({ rating = 0, max = 5, size = 14 }) {
   return (
     <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
@@ -277,9 +249,6 @@ function StarRating({ rating = 0, max = 5, size = 14 }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   BADGE
-───────────────────────────────────────────── */
 function Badge({ children, variant = "brand" }) {
   const styles = {
     brand:  { background: "rgba(115,0,66,0.08)", color: "#730042" },
@@ -295,16 +264,10 @@ function Badge({ children, variant = "brand" }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   CARD ACCENT
-───────────────────────────────────────────── */
 function CardAccent({ color }) {
   return <div style={{ position:"absolute",top:0,left:0,right:0,height:3,background:color,borderRadius:"14px 14px 0 0" }}/>;
 }
 
-/* ─────────────────────────────────────────────
-   SKELETON
-───────────────────────────────────────────── */
 function Skeleton({ w = "100%", h = 16, radius = 6 }) {
   return (
     <div style={{
@@ -316,9 +279,6 @@ function Skeleton({ w = "100%", h = 16, radius = 6 }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   INFO FIELD
-───────────────────────────────────────────── */
 function InfoField({ label, value, loading }) {
   return (
     <div className="md-info-row">
@@ -328,9 +288,6 @@ function InfoField({ label, value, loading }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   LEAVE ROW
-───────────────────────────────────────────── */
 function LeaveRow({ label, availed, entitled, accrued, color }) {
   const used      = availed  ?? 0;
   const total     = entitled ?? 0;
@@ -356,9 +313,6 @@ function LeaveRow({ label, availed, entitled, accrued, color }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   SEG BAR
-───────────────────────────────────────────── */
 function SegBar({ segments }) {
   return (
     <>
@@ -377,37 +331,29 @@ function SegBar({ segments }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   CALENDAR — real backend attendance data
-   Props:
-     month           – 0-based month index to display
-     joiningDate     – ISO string; days before this are "before_joining"
-     attendanceMap   – Map<"YYYY-MM-DD", record> from backend
-     approvedLeaves  – array of leave objects { startDate, endDate }
-───────────────────────────────────────────── */
-function Calendar({ month, joiningDate, attendanceMap = new Map(), approvedLeaves = [] }) {
+function Calendar({ month, joiningDate, attendanceMap = new Map(), myApprovedLeaves = [] }) {
   const year     = new Date().getFullYear();
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMo = new Date(year, month + 1, 0).getDate();
   const today    = new Date();
 
-  // Normalise joining date to midnight for comparison
   const joiningMidnight = joiningDate ? (() => { const d = new Date(joiningDate); d.setHours(0,0,0,0); return d; })() : null;
 
-  // Build a set of leave days for this month
   const leaveDaySet = useMemo(() => {
     const set = new Set();
-    approvedLeaves.forEach(lv => {
-      for (let d = new Date(lv.startDate); d <= new Date(lv.endDate); d.setDate(d.getDate() + 1)) {
+    myApprovedLeaves.forEach(lv => {
+      const start = lv.startDate || lv.start_date;
+      const end   = lv.endDate   || lv.end_date;
+      if (!start || !end) return;
+      for (let d = new Date(start); d <= new Date(end); d.setDate(d.getDate() + 1)) {
         if (d.getFullYear() === year && d.getMonth() === month) {
           set.add(d.getDate());
         }
       }
     });
     return set;
-  }, [approvedLeaves, month, year]);
+  }, [myApprovedLeaves, month, year]);
 
-  // Build calendar cells
   const cells = [];
   for (let i = 0; i < firstDay; i++) cells.push(null);
 
@@ -419,8 +365,7 @@ function Calendar({ month, joiningDate, attendanceMap = new Map(), approvedLeave
     const isFuture     = date > today;
     const isBeforeJoin = joiningMidnight && date < joiningMidnight;
 
-    // Format key matching how records come from backend
-    const key = date.toISOString().slice(0, 10); // "YYYY-MM-DD"
+    const key = date.toISOString().slice(0, 10);
 
     let status = "future";
 
@@ -479,9 +424,6 @@ function Calendar({ month, joiningDate, attendanceMap = new Map(), approvedLeave
   );
 }
 
-/* ─────────────────────────────────────────────
-   DOJ CARD
-───────────────────────────────────────────── */
 function DOJCard({ joiningDate }) {
   const { years, months, yearsFloat, nextMilestoneLabel, fracInYear } = computeTenure(joiningDate);
   const R = 36, circ = Math.PI * R;
@@ -528,9 +470,6 @@ function DOJCard({ joiningDate }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   ANNOUNCEMENT ITEM
-───────────────────────────────────────────── */
 function AnnouncementItem({ ann }) {
   const isHigh    = ann.priority === "high";
   const isExpired = ann.expiresAt && new Date(ann.expiresAt) < new Date();
@@ -561,17 +500,14 @@ function AnnouncementItem({ ann }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   TODAY STATUS BANNER
-───────────────────────────────────────────── */
-function TodayBanner({ isOnLeave, leaveType, onCheckIn }) {
+function TodayBanner({ isOnLeave, leaveType, onCheckIn, onRecruitment }) {
   const today = new Date();
   const day   = today.toLocaleDateString("en-IN", { weekday:"long" });
   const date  = today.toLocaleDateString("en-IN", { day:"numeric", month:"long", year:"numeric" });
 
   const leaveLabel = {
-    el: "Earned Leave", sl: "Sick Leave", pl: "Privilege Leave",
-    ml: "Maternity Leave", cl: "Casual Leave",
+    el: "Earned Leave", sl: "Sick Leave", pl: "Paternity Leave",
+    ml: "Maternity Leave", cl: "Casual Leave", lwp: "Leave Without Pay",
   };
 
   return (
@@ -604,69 +540,82 @@ function TodayBanner({ isOnLeave, leaveType, onCheckIn }) {
         )}
       </div>
 
-      <button
-        className="md-checkin-btn"
-        disabled={isOnLeave}
-        onClick={onCheckIn}
-        style={{
-          background: isOnLeave ? "rgba(255,255,255,0.3)" : "#fff",
-          color:      isOnLeave ? "rgba(40,53,147,0.5)"   : "#730042",
-          cursor:     isOnLeave ? "not-allowed"            : "pointer",
-          opacity:    isOnLeave ? .7 : 1,
-          boxShadow:  isOnLeave ? "none" : "0 2px 10px rgba(0,0,0,0.1)",
-        }}
-      >
-        {isOnLeave ? "🚫 Check-in Disabled" : " Check In"}
-      </button>
+      <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
+        <button
+          className="md-recruit-btn"
+          onClick={onRecruitment}
+        >
+          🧑‍💼 Recruitment
+        </button>
+        <button
+          className="md-checkin-btn"
+          disabled={isOnLeave}
+          onClick={onCheckIn}
+          style={{
+            background: isOnLeave ? "rgba(255,255,255,0.3)" : "#fff",
+            color:      isOnLeave ? "rgba(40,53,147,0.5)"   : "#730042",
+            cursor:     isOnLeave ? "not-allowed"            : "pointer",
+            opacity:    isOnLeave ? .7 : 1,
+            boxShadow:  isOnLeave ? "none" : "0 2px 10px rgba(0,0,0,0.1)",
+          }}
+        >
+          {isOnLeave ? "🚫 Check-in Disabled" : "Check In"}
+        </button>
+      </div>
     </div>
   );
 }
 
-/* ─────────────────────────────────────────────
-   LEAVE HISTORY MINI LIST
-───────────────────────────────────────────── */
 const LEAVE_TYPE_META = {
   el: { label:"Earned",    color:"#730042", bg:"rgba(115,0,66,0.08)" },
   sl: { label:"Sick",      color:"#1D9E75", bg:"rgba(29,158,117,0.08)" },
-  pl: { label:"Privilege", color:"#378ADD", bg:"rgba(55,138,221,0.08)" },
+  pl: { label:"Paternity", color:"#378ADD", bg:"rgba(55,138,221,0.08)" },
   ml: { label:"Maternity", color:"#9333EA", bg:"rgba(147,51,234,0.08)" },
   cl: { label:"Casual",    color:"#BA7517", bg:"rgba(186,117,23,0.08)" },
+  lwp:{ label:"LWP",       color:"#E24B4A", bg:"rgba(226,75,74,0.08)" },
 };
 
 const STATUS_COLORS = {
-  pending_admin:    { label:"Pending",    color:"#92400E", bg:"#faeeda" },
-  approved_admin:   { label:"Approved ✓", color:"#1a6b48", bg:"#e8f5e9" },
-  rejected_admin:   { label:"Rejected ✗", color:"#791F1F", bg:"#fcebeb" },
-  pending_manager:  { label:"Pending",    color:"#92400E", bg:"#faeeda" },
-  approved_manager: { label:"Approved",   color:"#1a6b48", bg:"#e8f5e9" },
-  rejected_manager: { label:"Rejected",   color:"#791F1F", bg:"#fcebeb" },
+  pending_admin:              { label:"Pending",    color:"#92400E", bg:"#faeeda" },
+  approved_admin:             { label:"Approved ✓", color:"#1a6b48", bg:"#e8f5e9" },
+  rejected_admin:             { label:"Rejected ✗", color:"#791F1F", bg:"#fcebeb" },
+  pending_manager:            { label:"Pending",    color:"#92400E", bg:"#faeeda" },
+  approved_manager:           { label:"Approved",   color:"#1a6b48", bg:"#e8f5e9" },
+  rejected_manager:           { label:"Rejected",   color:"#791F1F", bg:"#fcebeb" },
+  pending_reporting_manager:  { label:"Pending RM", color:"#92400E", bg:"#faeeda" },
+  approved_reporting_manager: { label:"Approved RM",color:"#1a6b48", bg:"#e8f5e9" },
+  rejected_reporting_manager: { label:"Rejected RM",color:"#791F1F", bg:"#fcebeb" },
 };
 
-function LeaveHistoryList({ leaves = [], loading }) {
+function LeaveHistoryList({ leaves, loading }) {
+  const safeLeaves = Array.isArray(leaves) ? leaves : [];
   if (loading) return (
     <div style={{ padding:"0 18px 14px", display:"flex", flexDirection:"column", gap:10 }}>
       {[1,2,3].map(i => <Skeleton key={i} h={44} radius={8}/>)}
     </div>
   );
-  if (!leaves.length) return (
+  if (!safeLeaves.length) return (
     <div style={{ padding:"20px 18px", textAlign:"center", fontSize:12, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>
       No leave history
     </div>
   );
   return (
     <div style={{ padding:"0 18px 14px" }}>
-      {leaves.slice(0, 6).map((lv, i) => {
-        const lm = LEAVE_TYPE_META[lv.leaveType] || { label: lv.leaveType?.toUpperCase(), color:"#730042", bg:"rgba(115,0,66,0.08)" };
-        const sm = STATUS_COLORS[lv.status] || { label: lv.status, color:"#475569", bg:"#f1f5f9" };
+      {safeLeaves.slice(0, 6).map((lv, i) => {
+        const typeKey = (lv.leaveType || "").toLowerCase();
+        const fallbackLabel = lv.leaveType ? lv.leaveType.toUpperCase() : "LV";
+        const lm = LEAVE_TYPE_META[typeKey] || { label: fallbackLabel, color:"#730042", bg:"rgba(115,0,66,0.08)" };
+        const sm = STATUS_COLORS[lv.status] || { label: lv.status || "Unknown", color:"#475569", bg:"#f1f5f9" };
         const days = lv.days || 1;
+        const labelText = lm.label || fallbackLabel;
         return (
           <div key={i} className="md-history-row">
             <div style={{ width:32, height:32, borderRadius:8, background:lm.bg, display:"flex", alignItems:"center",
               justifyContent:"center", fontSize:10, fontWeight:700, color:lm.color, flexShrink:0 }}>
-              {lm.label.slice(0, 2).toUpperCase()}
+              {labelText.slice(0, 2).toUpperCase()}
             </div>
             <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:12, fontWeight:500, color:"#2a1a16" }}>{lm.label}</div>
+              <div style={{ fontSize:12, fontWeight:500, color:"#2a1a16" }}>{labelText}</div>
               <div style={{ fontSize:10, color:"#b0948a", marginTop:1 }}>
                 {fmtDate(lv.startDate)} → {fmtDate(lv.endDate)} · {days}d
               </div>
@@ -682,9 +631,6 @@ function LeaveHistoryList({ leaves = [], loading }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   REVIEW STARS CARD
-───────────────────────────────────────────── */
 function ReviewCard({ reviews = [], loading }) {
   if (loading) return (
     <div style={{ padding:"14px 18px", display:"flex", flexDirection:"column", gap:10 }}>
@@ -759,31 +705,26 @@ function ReviewCard({ reviews = [], loading }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   MAIN DASHBOARD
-───────────────────────────────────────────── */
 export default function ManagerDashboard() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const navigate = useNavigate();
 
-  /* ── Hooks ── */
   const { data: meData,   isLoading: meLoading,  isError: meError  } = useGetMeManager();
   const { data: annData,  isLoading: annLoading                     } = useManagerAnnouncements();
   const { data: histData, isLoading: histLoading                    } = useGetAllManagerLeaves();
-  const { data: attData,  isLoading: attLoading                     } = useGetAttendance(); // ← new
+  const { data: attData,  isLoading: attLoading                     } = useGetAttendance();
+  const { data: myLeaveData                                         } = useGetMyLeavesManager();
 
-  /* ── Derived data ── */
   const manager   = meData?.manager      ?? null;
   const lb        = meData?.leavebalance?.[0] ?? null;
-  const allLeaves = histData ?? [];
   const announcements = annData?.announcements ?? (Array.isArray(annData) ? annData : []);
-
-  /* ── Reviews given by this manager ── */
   const reviews = meData?.review ?? [];
 
-  /* ── Build attendance Map: "YYYY-MM-DD" → record ──────────────────────
-     Handles both array root and nested { attendance: [...] } shapes.
-  ─────────────────────────────────────────────────────────────────────── */
+  const myOwnAppliedLeaves = useMemo(() => {
+    const raw = Array.isArray(myLeaveData) ? myLeaveData : [];
+    return raw.filter(lv => APPROVED_STATUSES.includes(lv.status));
+  }, [myLeaveData]);
+
   const attendanceMap = useMemo(() => {
     const records = Array.isArray(attData)
       ? attData
@@ -794,37 +735,28 @@ export default function ManagerDashboard() {
     const map = new Map();
     records.forEach(rec => {
       if (!rec.date) return;
-      // Normalise to "YYYY-MM-DD" regardless of whether date comes as ISO or Date
       const key = new Date(rec.date).toISOString().slice(0, 10);
       map.set(key, rec);
     });
     return map;
   }, [attData]);
 
-  /* ── Joining date ── */
   const joiningDate = manager?.date_of_joining ?? manager?.createdAt ?? null;
 
-  /* ── Approved leaves for calendar ── */
-  const approvedLeaves = useMemo(() =>
-    allLeaves.filter(lv => APPROVED_STATUSES.includes(lv.status)),
-    [allLeaves]
-  );
-
-  /* ── Is today an approved leave day? ── */
   const todayLeave = useMemo(() => {
     const today = new Date();
-    return approvedLeaves.find(lv =>
-      isDateInRange(today, lv.startDate, lv.endDate)
-    ) ?? null;
-  }, [approvedLeaves]);
+    return myOwnAppliedLeaves.find(lv => {
+      const start = lv.startDate || lv.start_date;
+      const end   = lv.endDate   || lv.end_date;
+      return start && end && isDateInRange(today, start, end);
+    }) ?? null;
+  }, [myOwnAppliedLeaves]);
 
   const isOnLeaveToday = Boolean(todayLeave);
 
-  /* ── Computed display ── */
   const mgrInitials = manager ? getInitials(manager.f_name, manager.l_name) : "—";
   const fullName    = manager ? `${manager.f_name} ${manager.l_name}` : "—";
 
-  /* ── Attendance quick counts from REAL data for the selected month ── */
   const { presentCount, absentCount, halfCount, checkedInCount, attendanceRate } = useMemo(() => {
     const year = new Date().getFullYear();
     const today = new Date(); today.setHours(0,0,0,0);
@@ -842,7 +774,13 @@ export default function ManagerDashboard() {
       date.setHours(0,0,0,0);
       if (date > today) break;
       if (joiningMidnight && date < joiningMidnight) continue;
-      if (approvedLeaves.some(lv => isDateInRange(date, lv.startDate, lv.endDate))) continue;
+
+      const isOwnLeave = myOwnAppliedLeaves.some(lv => {
+        const start = lv.startDate || lv.start_date;
+        const end   = lv.endDate   || lv.end_date;
+        return start && end && isDateInRange(date, start, end);
+      });
+      if (isOwnLeave) continue;
 
       counted++;
       const key = date.toISOString().slice(0, 10);
@@ -857,13 +795,19 @@ export default function ManagerDashboard() {
 
     const rate = counted > 0 ? Math.round(((present + checkedIn) / counted) * 100) : 0;
     return { presentCount: present, absentCount: absent, halfCount: half, checkedInCount: checkedIn, attendanceRate: rate };
-  }, [attendanceMap, selectedMonth, approvedLeaves, joiningDate]);
+  }, [attendanceMap, selectedMonth, myOwnAppliedLeaves, joiningDate]);
+
+  const allEmployeeLeaves = useMemo(() => {
+    if (Array.isArray(histData)) return histData;
+    if (Array.isArray(histData?.leaves)) return histData.leaves;
+    return [];
+  }, [histData]);
 
   const leaveRows = [
-    { label:"Earned Leave (EL)",   availed:lb?.EL?.availed, entitled:lb?.EL?.entitled, accrued:lb?.EL?.accrued != null ? Number(lb.EL.accrued).toFixed(2) : null, color:"#730042" },
-    { label:"Sick Leave (SL)",     availed:lb?.SL?.availed, entitled:lb?.SL?.entitled, accrued:null, color:"#1D9E75" },
-    { label:"Privilege Leave (PL)",availed:lb?.pbc ?? 0,    entitled:lb?.PL,           accrued:null, color:"#378ADD" },
-    { label:"Maternity Leave (ML)",availed:lb?.lwp ?? 0,    entitled:(lb?.ML ?? 0) + 5,accrued:null, color:"#BA7517" },
+    { label:"Earned Leave (EL)",    availed:lb?.EL?.availed,  entitled:lb?.EL?.entitled, accrued:lb?.EL?.accrued != null ? Number(lb.EL.accrued).toFixed(2) : null, color:"#730042" },
+    { label:"Sick Leave (SL)",      availed:lb?.SL?.availed,  entitled:lb?.SL?.entitled, accrued:null, color:"#1D9E75" },
+    { label:"Paternity Leave (PL)", availed:lb?.pbc ?? 0,     entitled:lb?.PL,           accrued:null, color:"#378ADD" },
+    { label:"Maternity Leave (ML)", availed:0, entitled:lb?.ML ?? 0, accrued:null, color:"#BA7517" },
   ];
 
   if (meError) return (
@@ -882,7 +826,6 @@ export default function ManagerDashboard() {
       minHeight:"100vh", padding:"24px 28px", color:"#2a1a16" }}>
       <GlobalStyles/>
 
-      {/* ── TOPBAR ── */}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
         <div>
           <h1 style={{ fontSize:20, fontWeight:700, margin:0, letterSpacing:"-.3px", fontFamily:"'Lora',serif" }}>
@@ -929,14 +872,13 @@ export default function ManagerDashboard() {
         </div>
       </div>
 
-      {/* ── TODAY BANNER ── */}
       <TodayBanner
         isOnLeave={isOnLeaveToday}
         leaveType={todayLeave?.leaveType}
         onCheckIn={() => navigate("/mark-attendance")}
+        onRecruitment={() => navigate("/manager/recruitment")}
       />
 
-      {/* ── ROW 1: 4 stat cards ── */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4,minmax(0,1fr))", gap:14, marginBottom:14 }}>
 
         <div className="md-card" style={{ animationDelay:".05s" }}>
@@ -1003,9 +945,9 @@ export default function ManagerDashboard() {
                   </div>
                 )}
                 <SegBar segments={[
-                  { pct:(lb?.EL?.entitled ?? 15)-(lb?.EL?.availed ?? 0), color:"#1D9E75", label:`EL (${(lb?.EL?.entitled ?? 15)-(lb?.EL?.availed ?? 0)} left)` },
+                  { pct:(lb?.EL?.entitled ?? 18)-(lb?.EL?.availed ?? 0), color:"#1D9E75", label:`EL (${(lb?.EL?.entitled ?? 18)-(lb?.EL?.availed ?? 0)} left)` },
                   { pct:(lb?.SL?.entitled ?? 12)-(lb?.SL?.availed ?? 0), color:"#378ADD", label:`SL (${(lb?.SL?.entitled ?? 12)-(lb?.SL?.availed ?? 0)} left)` },
-                  { pct:lb?.PL ?? 7, color:"#BA7517", label:`PL (${lb?.PL ?? 7})` },
+                  { pct:lb?.PL ?? 0, color:"#BA7517", label:`PL (${lb?.PL ?? 0})` },
                 ]}/>
               </>
             )}
@@ -1051,13 +993,12 @@ export default function ManagerDashboard() {
         </div>
       </div>
 
-      {/* ── ROW 2: Calendar + Announcements ── */}
       <div style={{ display:"grid", gridTemplateColumns:"minmax(0,2fr) minmax(0,1fr)", gap:14, marginBottom:14 }}>
 
         <div className="md-card" style={{ animationDelay:".2s" }}>
           <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
             borderBottom:"0.5px solid #ede5e0" }}>
-            <span style={{ fontSize:12, fontWeight:600, fontFamily:"'DM Sans',sans-serif" }}>Attendance</span>
+            <span style={{ fontSize:12, fontWeight:600, fontFamily:"'DM Sans',sans-serif" }}>My Attendance</span>
             <div style={{ display:"flex", alignItems:"center", gap:8 }}>
               {attLoading && (
                 <span style={{ fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>Loading…</span>
@@ -1071,7 +1012,6 @@ export default function ManagerDashboard() {
             </div>
           </div>
 
-          {/* Joining date label */}
           {joiningDate && (
             <div style={{ padding:"6px 14px 0", display:"flex", alignItems:"center", gap:6 }}>
               <div style={{ width:7, height:7, borderRadius:2, background:"#378ADD" }}/>
@@ -1086,11 +1026,10 @@ export default function ManagerDashboard() {
               month={selectedMonth}
               joiningDate={joiningDate}
               attendanceMap={attendanceMap}
-              approvedLeaves={approvedLeaves}
+              myApprovedLeaves={myOwnAppliedLeaves}
             />
           </div>
 
-          {/* Stats row */}
           <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", borderTop:"0.5px solid #f0e8e4", marginTop:12 }}>
             {[
               [presentCount,        "#730042", "Present"],
@@ -1106,7 +1045,6 @@ export default function ManagerDashboard() {
             ))}
           </div>
 
-          {/* Legend */}
           <div style={{ display:"flex", flexWrap:"wrap", gap:8, padding:"10px 14px 14px", borderTop:"0.5px solid #f0e8e4" }}>
             {[
               ["#730042", "Present"],
@@ -1114,7 +1052,7 @@ export default function ManagerDashboard() {
               ["#f57f17", "Half day"],
               ["#e65100", "Late"],
               ["#1D9E75", "Checked in"],
-              ["#283593", "On leave"],
+              ["#283593", "My leave"],
               ["#ede5e0", "Before joining"],
             ].map(([c, l]) => (
               <div key={l} style={{ display:"flex", alignItems:"center", gap:4, fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>
@@ -1153,7 +1091,6 @@ export default function ManagerDashboard() {
         </div>
       </div>
 
-      {/* ── ROW 3: Profile + Leave Balance + Reviews ── */}
       <div style={{ display:"grid", gridTemplateColumns:"minmax(0,1.5fr) minmax(0,1fr) minmax(0,.7fr)", gap:14, marginBottom:14 }}>
 
         <div className="md-card" style={{ animationDelay:".3s" }}>
@@ -1242,18 +1179,17 @@ export default function ManagerDashboard() {
         </div>
       </div>
 
-      {/* ── ROW 4: Leave History ── */}
       <div className="md-card" style={{ animationDelay:".45s" }}>
         <CardAccent color="#378ADD"/>
         <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
           borderBottom:"0.5px solid #ede5e0" }}>
-          <span style={{ fontSize:12, fontWeight:600, fontFamily:"'DM Sans',sans-serif" }}>Leave History</span>
+          <span style={{ fontSize:12, fontWeight:600, fontFamily:"'DM Sans',sans-serif" }}>Team Leave History</span>
           <div style={{ display:"flex", gap:6 }}>
-            <Badge variant="green">{approvedLeaves.length} approved</Badge>
-            <Badge variant="amber">{allLeaves.filter(l => l.status?.includes("pending")).length} pending</Badge>
+            <Badge variant="green">{allEmployeeLeaves.filter(l => APPROVED_STATUSES.includes(l.status)).length} approved</Badge>
+            <Badge variant="amber">{allEmployeeLeaves.filter(l => l.status?.includes("pending")).length} pending</Badge>
           </div>
         </div>
-        <LeaveHistoryList leaves={allLeaves} loading={histLoading}/>
+        <LeaveHistoryList leaves={allEmployeeLeaves} loading={histLoading}/>
       </div>
 
     </div>
