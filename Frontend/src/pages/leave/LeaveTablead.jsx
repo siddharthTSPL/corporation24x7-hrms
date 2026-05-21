@@ -116,6 +116,7 @@ const LEAVE_STATUS_META = {
   rejected_admin:              { label:"Admin Rejected", bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
   approved_reporting_manager:  { label:"RM Approved",    bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
   rejected_reporting_manager:  { label:"RM Rejected",    bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
+  pending_reporting_manager:   { label:"Pending",        bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
 };
 
 const WFH_STATUS_META = {
@@ -244,6 +245,69 @@ const FormField = ({ label, error, children }) => (
   </div>
 );
 
+const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, accentColor, personLabel }) => {
+  const person = leave.employee || leave.manager || {};
+  const days = leave.days || daysDiff(leave.startDate, leave.endDate);
+  const accent = accentColor || (LEAVE_META[leave.leaveType]||{accent:"#8B3A8A"}).accent;
+
+  return (
+    <div className="alw-card" style={{ opacity:isProcessing ? .6 : 1, pointerEvents:isProcessing ? "none" : "auto", position:"relative", overflow:"hidden" }}>
+      <div style={{ position:"absolute", top:0, left:0, width:3, bottom:0, background:accent, borderRadius:"20px 0 0 20px" }}/>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:16, paddingLeft:6 }}>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+            <div style={{ width:44, height:44, borderRadius:14, background:avatarColor(person.f_name||"A"), color:"#fff", fontSize:14, fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, fontFamily:"'DM Sans',sans-serif", boxShadow:"0 3px 10px rgba(0,0,0,0.15)" }}>
+              {initials(person.f_name, person.l_name)}
+            </div>
+            <div>
+              <div style={{ display:"flex", alignItems:"center", gap:7 }}>
+                <div style={{ fontSize:14, fontWeight:600, color:"#1C1028", fontFamily:"'DM Sans',sans-serif" }}>{person.f_name} {person.l_name}</div>
+                {personLabel && (
+                  <span style={{ fontSize:10, fontWeight:700, background:"#F3E8FF", color:"#6B21A8", padding:"2px 8px", borderRadius:10, fontFamily:"'DM Sans',sans-serif" }}>{personLabel}</span>
+                )}
+              </div>
+              <div style={{ fontSize:11, color:"#9B8BAE", marginTop:2, fontFamily:"'DM Sans',sans-serif" }}>{person.work_email}</div>
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:12 }}>
+            <TypeBadge type={leave.leaveType}/>
+            <StatusBadge status={leave.status}/>
+            <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:600, background:"#F4EEF9", color:"#6B1A4A", fontFamily:"'DM Sans',sans-serif" }}>{days} day{days>1?"s":""}</span>
+          </div>
+          <div style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, color:"#9B8BAE", marginTop:10, fontFamily:"'DM Sans',sans-serif" }}>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="2" width="11" height="10" rx="2.5" stroke="#C4AADA" strokeWidth="1"/><path d="M1 6h11" stroke="#C4AADA" strokeWidth="1"/><path d="M4 1v2M9 1v2" stroke="#C4AADA" strokeWidth="1" strokeLinecap="round"/></svg>
+            <span style={{ fontWeight:500, color:"#4A3860" }}>{fmt(leave.startDate)}</span>
+            <span style={{ color:"#D4BFEA", fontSize:10 }}>→</span>
+            <span style={{ fontWeight:500, color:"#4A3860" }}>{fmt(leave.endDate)}</span>
+          </div>
+          {leave.reason && (
+            <div style={{ background:"#FAF7FD", borderRadius:10, padding:"9px 14px", fontSize:12, color:"#4A3860", marginTop:10, borderLeft:"3px solid #D4AECB", lineHeight:1.6, fontFamily:"'DM Sans',sans-serif" }}>
+              <span style={{ color:"#6B1A4A", fontWeight:600 }}>Reason — </span>{leave.reason}
+            </div>
+          )}
+        </div>
+        {showActions && (
+          <div style={{ display:"flex", flexDirection:"column", gap:7, flexShrink:0 }}>
+            <button className="alw-action-btn" style={{ background:"#F0FDF4", color:"#14803D", boxShadow:"0 2px 8px rgba(34,197,94,0.15)" }} onClick={onApprove}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l2.5 2.5 5.5-5" stroke="#14803D" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Approve
+            </button>
+            <button className="alw-action-btn" style={{ background:"#FFF1F2", color:"#991B1B", boxShadow:"0 2px 8px rgba(239,68,68,0.12)" }} onClick={onReject}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="#991B1B" strokeWidth="1.8" strokeLinecap="round"/></svg>
+              Reject
+            </button>
+          </div>
+        )}
+      </div>
+      {isProcessing && (
+        <div style={{ position:"absolute", inset:0, borderRadius:20, background:"rgba(255,255,255,0.7)", display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(2px)" }}>
+          <div style={{ width:22, height:22, border:"2px solid #EDE6F5", borderTop:"2px solid #8B3A8A", borderRadius:"50%", animation:"spin .6s linear infinite" }}/>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const MyBalancePanel = ({ admin }) => {
   const { data: meData, isLoading } = useGetMeAdmin();
   if (isLoading) return <Spinner/>;
@@ -337,7 +401,9 @@ const AllLeavesPanel = ({ showToast }) => {
   const acceptMut = useAcceptLeave();
   const rejectMut = useRejectLeave();
 
-  const employeeLeaves = rawData?.employeeLeaves?.leaves || [];
+  const employeeLeaves = Array.isArray(rawData?.employeeLeaves?.leaves)
+    ? rawData.employeeLeaves.leaves
+    : [];
 
   const isStatus = (leave, key) => {
     if (key === "pending")   return leave.status?.includes("pending");
@@ -400,63 +466,79 @@ const AllLeavesPanel = ({ showToast }) => {
 
       {filtered.length === 0
         ? <EmptyState msg="No leave requests found"/>
-        : filtered.map((leave, idx) => {
-          const emp = leave.employee || {};
-          const actionable = isActionable(leave.status);
-          const isProcessing = processingId === leave._id;
-          const days = leave.days || daysDiff(leave.startDate, leave.endDate);
-          return (
-            <div key={leave._id} className="alw-card" style={{ opacity:isProcessing ? .6 : 1, pointerEvents:isProcessing ? "none" : "auto", animationDelay:`${idx*.06}s`, position:"relative", overflow:"hidden" }}>
-              <div style={{ position:"absolute", top:0, left:0, width:3, bottom:0, background:(LEAVE_META[leave.leaveType]||{accent:"#8B3A8A"}).accent, borderRadius:"20px 0 0 20px" }}/>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:16, paddingLeft:6 }}>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:14 }}>
-                    <div style={{ width:44, height:44, borderRadius:14, background:avatarColor(emp.f_name||"A"), color:"#fff", fontSize:14, fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, fontFamily:"'DM Sans',sans-serif", boxShadow:"0 3px 10px rgba(0,0,0,0.15)" }}>
-                      {initials(emp.f_name, emp.l_name)}
-                    </div>
-                    <div>
-                      <div style={{ fontSize:14, fontWeight:600, color:"#1C1028", fontFamily:"'DM Sans',sans-serif" }}>{emp.f_name} {emp.l_name}</div>
-                      <div style={{ fontSize:11, color:"#9B8BAE", marginTop:2, fontFamily:"'DM Sans',sans-serif" }}>{emp.work_email}</div>
-                    </div>
-                  </div>
-                  <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:12 }}>
-                    <TypeBadge type={leave.leaveType}/>
-                    <StatusBadge status={leave.status}/>
-                    <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:600, background:"#F4EEF9", color:"#6B1A4A", fontFamily:"'DM Sans',sans-serif" }}>{days} day{days>1?"s":""}</span>
-                  </div>
-                  <div style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, color:"#9B8BAE", marginTop:10, fontFamily:"'DM Sans',sans-serif" }}>
-                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="2" width="11" height="10" rx="2.5" stroke="#C4AADA" strokeWidth="1"/><path d="M1 6h11" stroke="#C4AADA" strokeWidth="1"/><path d="M4 1v2M9 1v2" stroke="#C4AADA" strokeWidth="1" strokeLinecap="round"/></svg>
-                    <span style={{ fontWeight:500, color:"#4A3860" }}>{fmt(leave.startDate)}</span>
-                    <span style={{ color:"#D4BFEA", fontSize:10 }}>→</span>
-                    <span style={{ fontWeight:500, color:"#4A3860" }}>{fmt(leave.endDate)}</span>
-                  </div>
-                  {leave.reason && (
-                    <div style={{ background:"#FAF7FD", borderRadius:10, padding:"9px 14px", fontSize:12, color:"#4A3860", marginTop:10, borderLeft:"3px solid #D4AECB", lineHeight:1.6, fontFamily:"'DM Sans',sans-serif" }}>
-                      <span style={{ color:"#6B1A4A", fontWeight:600 }}>Reason — </span>{leave.reason}
-                    </div>
-                  )}
-                </div>
-                {actionable && (
-                  <div style={{ display:"flex", flexDirection:"column", gap:7, flexShrink:0 }}>
-                    <button className="alw-action-btn" style={{ background:"#F0FDF4", color:"#14803D", boxShadow:"0 2px 8px rgba(34,197,94,0.15)" }} onClick={() => handleAction(leave, "approve")}>
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l2.5 2.5 5.5-5" stroke="#14803D" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      Approve
-                    </button>
-                    <button className="alw-action-btn" style={{ background:"#FFF1F2", color:"#991B1B", boxShadow:"0 2px 8px rgba(239,68,68,0.12)" }} onClick={() => handleAction(leave, "reject")}>
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="#991B1B" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                      Reject
-                    </button>
-                  </div>
-                )}
-              </div>
-              {isProcessing && (
-                <div style={{ position:"absolute", inset:0, borderRadius:20, background:"rgba(255,255,255,0.7)", display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(2px)" }}>
-                  <div style={{ width:22, height:22, border:"2px solid #EDE6F5", borderTop:"2px solid #8B3A8A", borderRadius:"50%", animation:"spin .6s linear infinite" }}/>
-                </div>
-              )}
-            </div>
-          );
-        })
+        : filtered.map((leave, idx) => (
+          <div key={leave._id} style={{ animationDelay:`${idx*.06}s` }}>
+            <LeaveCard
+              leave={leave}
+              isProcessing={processingId === leave._id}
+              showActions={isActionable(leave.status)}
+              onApprove={() => handleAction(leave, "approve")}
+              onReject={() => handleAction(leave, "reject")}
+            />
+          </div>
+        ))
+      }
+    </div>
+  );
+};
+
+const ManagerLeavesPanel = ({ showToast }) => {
+  const [processingId, setProcessingId] = useState(null);
+
+  const { data: rawData, isLoading, refetch } = useGetForwardedLeaves();
+  const acceptMut = useAcceptLeave();
+  const rejectMut = useRejectLeave();
+
+  const managerLeaves = Array.isArray(rawData?.managerLeaves?.leaves)
+    ? rawData.managerLeaves.leaves
+    : [];
+
+  const isActionable = (status) => status === "pending_reporting_manager";
+
+  const handleAction = async (leave, action) => {
+    setProcessingId(leave._id);
+    try {
+      if (action === "approve") { await acceptMut.mutateAsync({ leaveId: leave._id }); showToast("Leave approved", "success"); }
+      if (action === "reject")  { await rejectMut.mutateAsync({ leaveId: leave._id }); showToast("Leave rejected", "error"); }
+      refetch();
+    } catch (err) {
+      showToast(err?.message || "Something went wrong", "error");
+    } finally { setProcessingId(null); }
+  };
+
+  if (isLoading) return <Spinner/>;
+
+  return (
+    <div>
+      <div style={{ display:"flex", gap:12, marginBottom:22, flexWrap:"wrap" }}>
+        {[
+          { label:"Total",    val:managerLeaves.length,                                                            color:"#6B1A4A", bg:"linear-gradient(135deg,#F9EFF5,#F4E6F0)" },
+          { label:"Pending",  val:managerLeaves.filter(l=>l.status?.includes("pending")).length,                   color:"#92400E", bg:"linear-gradient(135deg,#FFFBEB,#FEF3C7)" },
+          { label:"Approved", val:managerLeaves.filter(l=>l.status?.includes("approved")).length,                  color:"#14803D", bg:"linear-gradient(135deg,#F0FDF4,#DCFCE7)" },
+          { label:"Rejected", val:managerLeaves.filter(l=>l.status?.includes("rejected")).length,                  color:"#991B1B", bg:"linear-gradient(135deg,#FEF2F2,#FEE2E2)" },
+        ].map((s, i) => (
+          <div key={s.label} style={{ background:s.bg, borderRadius:14, padding:"12px 20px", display:"flex", alignItems:"center", gap:12, border:"1px solid rgba(0,0,0,0.05)", boxShadow:"0 2px 8px rgba(0,0,0,0.04)", animation:`fadeSlideUp .3s ease ${i*.07}s both`, minWidth:110 }}>
+            <span style={{ fontSize:26, fontWeight:800, color:s.color, fontFamily:"'Playfair Display',serif", lineHeight:1 }}>{s.val}</span>
+            <span style={{ fontSize:11, color:s.color, fontWeight:600, fontFamily:"'DM Sans',sans-serif", opacity:.8, lineHeight:1.3 }}>{s.label}</span>
+          </div>
+        ))}
+      </div>
+
+      {managerLeaves.length === 0
+        ? <EmptyState msg="No manager leave requests"/>
+        : managerLeaves.map((leave, idx) => (
+          <div key={leave._id} style={{ animationDelay:`${idx*.06}s` }}>
+            <LeaveCard
+              leave={leave}
+              isProcessing={processingId === leave._id}
+              showActions={isActionable(leave.status)}
+              onApprove={() => handleAction(leave, "approve")}
+              onReject={() => handleAction(leave, "reject")}
+              personLabel="Manager"
+              accentColor="#A855F7"
+            />
+          </div>
+        ))
       }
     </div>
   );
@@ -686,10 +768,11 @@ const AdminLeaveWFH = () => {
   };
 
   const TABS = [
-    { key:"allLeaves",    label:"All Leaves"    },
-    { key:"myBalance",    label:"My Balance"    },
-    { key:"myWFH",        label:"My WFH"        },
-    { key:"forwardedWFH", label:"Forwarded WFH" },
+    { key:"allLeaves",     label:"Employee Leaves" },
+    { key:"managerLeaves", label:"Manager Leaves"  },
+    { key:"myBalance",     label:"My Balance"      },
+    { key:"myWFH",         label:"My WFH"          },
+    { key:"forwardedWFH",  label:"Forwarded WFH"   },
   ];
 
   return (
@@ -740,10 +823,11 @@ const AdminLeaveWFH = () => {
           })}
         </div>
 
-        {tab === "allLeaves"    && <AllLeavesPanel showToast={showToast}/>}
-        {tab === "myBalance"    && <MyBalancePanel admin={admin}/>}
-        {tab === "myWFH"        && <MyWFHPanel showToast={showToast}/>}
-        {tab === "forwardedWFH" && <ForwardedWFHPanel showToast={showToast}/>}
+        {tab === "allLeaves"     && <AllLeavesPanel showToast={showToast}/>}
+        {tab === "managerLeaves" && <ManagerLeavesPanel showToast={showToast}/>}
+        {tab === "myBalance"     && <MyBalancePanel admin={admin}/>}
+        {tab === "myWFH"         && <MyWFHPanel showToast={showToast}/>}
+        {tab === "forwardedWFH"  && <ForwardedWFHPanel showToast={showToast}/>}
       </div>
 
       <Toast toast={toast}/>
