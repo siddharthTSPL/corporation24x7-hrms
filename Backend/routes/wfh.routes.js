@@ -26,9 +26,9 @@ const {
   superadminGetPendingWFH,
   superadminApproveWFH,
   superadminRejectWFH,
-  adminGetForwardedWFH,
-  adminApproveForwardedWFH,
-  adminRejectForwardedWFH
+adminGetForwardedWFH,
+adminApproveForwardedWFH,
+adminRejectForwardedWFH
 
 } = require("../controllers/wfh.controller");
 
