@@ -242,7 +242,9 @@ function Sidebar({ tab, setTab, adminData, initials }) {
             }
           </div>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{adminData?.organisation_name || `${adminData?.f_name || ""} ${adminData?.l_name || ""}`.trim() || "Admin"}</div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>
+              {adminData?.organisation_name || `${adminData?.f_name || ""} ${adminData?.l_name || ""}`.trim() || "Admin"}
+            </div>
             <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{adminData?.work_email || adminData?.email || "—"}</div>
             <div style={{ marginTop: 8 }}>
               <Badge>{adminData?.role || "admin"}</Badge>
@@ -284,18 +286,22 @@ function Sidebar({ tab, setTab, adminData, initials }) {
 
 function ProfileTab({ adminData }) {
   const joined = adminData?.createdAt;
-  const joinedFmt = joined ? new Date(joined).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—";
-  const lastLogin = adminData?.last_login ? new Date(adminData.last_login).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—";
+  const joinedFmt = joined
+    ? new Date(joined).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })
+    : "—";
+  const lastLogin = adminData?.last_login
+    ? new Date(adminData.last_login).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })
+    : "—";
 
   return (
     <>
       <SectionCard title="Personal details" subtitle="Your core information on record" accent={C.brand}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
-          <ReadonlyField label="First name"    value={adminData?.f_name} />
-          <ReadonlyField label="Last name"     value={adminData?.l_name} />
-          <ReadonlyField label="Work email"    value={adminData?.work_email} />
-          <ReadonlyField label="Employee ID"   value={adminData?.uid} />
-          <ReadonlyField label="Gender"        value={adminData?.gender} />
+          <ReadonlyField label="First name"     value={adminData?.f_name} />
+          <ReadonlyField label="Last name"      value={adminData?.l_name} />
+          <ReadonlyField label="Work email"     value={adminData?.work_email} />
+          <ReadonlyField label="Employee ID"    value={adminData?.uid} />
+          <ReadonlyField label="Gender"         value={adminData?.gender} />
           <ReadonlyField label="Marital status" value={adminData?.marital_status} />
         </div>
       </SectionCard>
@@ -315,10 +321,10 @@ function ProfileTab({ adminData }) {
 
       <SectionCard title="Experience" subtitle="Your work background" accent={C.amber}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
-          <ReadonlyField label="Fresher"                   value={adminData?.is_fresher ? "Yes" : "No"} />
-          <ReadonlyField label="Total experience (years)"  value={adminData?.total_experience !== undefined ? String(adminData.total_experience) : "—"} />
-          <ReadonlyField label="Previous company"          value={adminData?.previous_company} />
-          <ReadonlyField label="Previous designation"      value={adminData?.previous_designation} />
+          <ReadonlyField label="Fresher"                  value={adminData?.is_fresher ? "Yes" : "No"} />
+          <ReadonlyField label="Total experience (years)" value={adminData?.total_experience !== undefined ? String(adminData.total_experience) : "—"} />
+          <ReadonlyField label="Previous company"         value={adminData?.previous_company} />
+          <ReadonlyField label="Previous designation"     value={adminData?.previous_designation} />
         </div>
       </SectionCard>
 
@@ -366,9 +372,19 @@ function ContactTab({ adminData, onSuccess, onError }) {
       { phone: form.phone, profile_image: adminData?.profile_image || "" },
       {
         onSuccess: (data) => {
-          queryClient.setQueryData(["auth"], old =>
-            old ? { ...old, data: { ...old.data, ...(data.admin || { phone: form.phone }) } } : old
-          );
+          queryClient.setQueryData(["auth"], old => {
+            if (!old) return old;
+            return {
+              ...old,
+              data: {
+                ...old.data,
+                user: {
+                  ...old.data.user,
+                  ...(data.admin || { phone: form.phone }),
+                },
+              },
+            };
+          });
           queryClient.invalidateQueries({ queryKey: ["auth"] });
           onSuccess("Contact info updated successfully!");
         },
@@ -504,9 +520,19 @@ function AddressTab({ adminData, onSuccess, onError }) {
       { ...form, phone: adminData?.phone || "", profile_image: adminData?.profile_image || "" },
       {
         onSuccess: (data) => {
-          queryClient.setQueryData(["auth"], old =>
-            old ? { ...old, data: { ...old.data, ...(data.admin || form) } } : old
-          );
+          queryClient.setQueryData(["auth"], old => {
+            if (!old) return old;
+            return {
+              ...old,
+              data: {
+                ...old.data,
+                user: {
+                  ...old.data.user,
+                  ...(data.admin || form),
+                },
+              },
+            };
+          });
           queryClient.invalidateQueries({ queryKey: ["auth"] });
           onSuccess("Address updated successfully!");
         },
@@ -610,7 +636,7 @@ function PasswordTab({ onSuccess, onError }) {
   const strength = (pw) => {
     if (!pw) return 0;
     let s = 0;
-    if (pw.length >= 6) s++;
+    if (pw.length >= 6)  s++;
     if (pw.length >= 10) s++;
     if (/[A-Z]/.test(pw)) s++;
     if (/[0-9]/.test(pw)) s++;
@@ -628,9 +654,9 @@ function PasswordTab({ onSuccess, onError }) {
 
   const handleChange = () => {
     if (!form.currentPassword || !form.newPassword) { onError("All password fields are required"); return; }
-    if (form.newPassword !== form.confirm) { onError("New passwords do not match"); return; }
-    if (form.newPassword.length < 6) { onError("Password must be at least 6 characters"); return; }
-    if (form.currentPassword === form.newPassword) { onError("New password must differ from current password"); return; }
+    if (form.newPassword !== form.confirm)           { onError("New passwords do not match"); return; }
+    if (form.newPassword.length < 6)                { onError("Password must be at least 6 characters"); return; }
+    if (form.currentPassword === form.newPassword)   { onError("New password must differ from current password"); return; }
     changePasswordMutation.mutate(
       { currentPassword: form.currentPassword, newPassword: form.newPassword },
       {
@@ -707,9 +733,19 @@ function AvatarTab({ adminData, onSuccess, onError }) {
       { phone: adminData?.phone || "", profile_image: url },
       {
         onSuccess: (data) => {
-          queryClient.setQueryData(["auth"], old =>
-            old ? { ...old, data: { ...old.data, ...(data.admin || { profile_image: url }) } } : old
-          );
+          queryClient.setQueryData(["auth"], old => {
+            if (!old) return old;
+            return {
+              ...old,
+              data: {
+                ...old.data,
+                user: {
+                  ...old.data.user,
+                  ...(data.admin || { profile_image: url }),
+                },
+              },
+            };
+          });
           queryClient.invalidateQueries({ queryKey: ["auth"] });
           onSuccess("Avatar updated!");
           setPending(null);
@@ -800,7 +836,7 @@ function SystemTab({ onSuccess }) {
   const [theme, setTheme] = useState("Light");
   const [language, setLanguage] = useState("English");
 
-  const THEME_OPTIONS = ["Light", "Dark", "Auto"];
+  const THEME_OPTIONS    = ["Light", "Dark", "Auto"];
   const LANGUAGE_OPTIONS = ["English", "Hindi"];
 
   return (
@@ -849,16 +885,19 @@ function SystemTab({ onSuccess }) {
 }
 
 export default function AdminSettingsPage() {
-  const [tab, setTab] = useState("profile");
+  const [tab, setTab]     = useState("profile");
   const [toast, setToast] = useState({ message: "", type: "" });
 
   const { data: auth } = useAuth();
-  const adminData = auth?.data;
+
+  const adminData = auth?.data?.user;
 
   const showSuccess = (msg) => setToast({ message: msg, type: "success" });
   const showError   = (msg) => setToast({ message: msg, type: "error" });
 
-  const initials = getOrgInitials(adminData?.organisation_name || `${adminData?.f_name || ""} ${adminData?.l_name || ""}`);
+  const initials = getOrgInitials(
+    adminData?.organisation_name || `${adminData?.f_name || ""} ${adminData?.l_name || ""}`
+  );
 
   if (!adminData) {
     return (
@@ -874,9 +913,9 @@ export default function AdminSettingsPage() {
   return (
     <div style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", background: C.page, minHeight: "100vh", padding: "28px 32px", color: C.text }}>
       <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes spin    { to { transform: rotate(360deg); } }
         @keyframes slideIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
-        input:focus { border-color: ${C.brand} !important; box-shadow: 0 0 0 3px ${C.brandLight}; }
+        input:focus  { border-color: ${C.brand} !important; box-shadow: 0 0 0 3px ${C.brandLight}; }
         select:focus { border-color: ${C.brand} !important; box-shadow: 0 0 0 3px ${C.brandLight}; outline: none; }
         button:not([disabled]):hover { opacity: 0.88; }
       `}</style>

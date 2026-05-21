@@ -17,7 +17,7 @@ export const rejectLeaveRequest = async (data) => {
 };
 
 export const forwardLeaveToAdmin = async (data) => {
-  const res = await api.post("manager/forwardtoadmin", data);
+  const res = await api.post("manager/forwardtoreportingmanager", data);
   return res.data;
 };
 

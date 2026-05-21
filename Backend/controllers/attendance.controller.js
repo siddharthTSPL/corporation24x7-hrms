@@ -9,6 +9,7 @@ const getUserId = (user) => user._id || user.id;
 const getOnModel = (role) => {
   if (role === "manager") return "Manager";
   if (role === "admin") return "Admin";
+  if (role === "employee") return "User";
   return "User";
 };
 
