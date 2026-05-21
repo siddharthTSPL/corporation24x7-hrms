@@ -422,8 +422,8 @@ const AllLeavesPanel = ({ showToast }) => {
   const handleAction = async (leave, action) => {
     setProcessingId(leave._id);
     try {
-      if (action === "approve") { await acceptMut.mutateAsync({ leaveId: leave._id }); showToast("Leave approved", "success"); }
-      if (action === "reject")  { await rejectMut.mutateAsync({ leaveId: leave._id }); showToast("Leave rejected", "error"); }
+      if (action === "approve") { await acceptMut.mutateAsync({ id: leave._id, leaveFor: "employee" }); showToast("Leave approved", "success"); }
+      if (action === "reject")  { await rejectMut.mutateAsync({ id: leave._id, leaveFor: "employee" }); showToast("Leave rejected", "error"); }
       refetch();
     } catch (err) {
       showToast(err?.message || "Something went wrong", "error");
@@ -498,8 +498,8 @@ const ManagerLeavesPanel = ({ showToast }) => {
   const handleAction = async (leave, action) => {
     setProcessingId(leave._id);
     try {
-      if (action === "approve") { await acceptMut.mutateAsync({ leaveId: leave._id }); showToast("Leave approved", "success"); }
-      if (action === "reject")  { await rejectMut.mutateAsync({ leaveId: leave._id }); showToast("Leave rejected", "error"); }
+      if (action === "approve") { await acceptMut.mutateAsync({ id: leave._id, leaveFor: "manager" }); showToast("Leave approved", "success"); }
+      if (action === "reject")  { await rejectMut.mutateAsync({ id: leave._id, leaveFor: "manager" }); showToast("Leave rejected", "error"); }
       refetch();
     } catch (err) {
       showToast(err?.message || "Something went wrong", "error");

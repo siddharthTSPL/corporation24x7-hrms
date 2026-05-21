@@ -812,30 +812,45 @@ const noofemployee = async (req, res, next) => {
 };
 
 const createannouncement = async (req, res, next) => {
-  if (!req.admin)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  const { title, message, audience, priority, notice_image, expiresAt } =
-    req.body;
-  if (!title || !message)
-    return next(
-      Object.assign(new Error("Title and message are required"), {
-        statusCode: 400,
-      }),
-    );
-  const announcement = await announcementmodel.create({
-    title,
-    message,
-    audience,
-    priority,
-    notice_image,
-    expiresAt,
-    createdBy: req.admin._id,
-  });
-  res.status(201).json({
-    success: true,
-    message: "Announcement created successfully",
-    announcement,
-  });
+  try {
+    const creator = req.admin || req.superadmin;
+
+    if (!creator)
+      return next(
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
+        })
+      );
+
+    const { title, message, audience, priority, notice_image, expiresAt } =
+      req.body;
+
+    if (!title || !message)
+      return next(
+        Object.assign(new Error("Title and message are required"), {
+          statusCode: 400,
+        })
+      );
+
+    const announcement = await announcementmodel.create({
+      title,
+      message,
+      audience,
+      priority,
+      notice_image,
+      expiresAt,
+      createdBy: creator._id,
+      createdByModel: req.admin ? "Admin" : "SuperAdmin",
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Announcement created successfully",
+      announcement,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const getallannouncement = async (req, res, next) => {
@@ -1176,20 +1191,19 @@ const getOrgInfo = async (req, res, next) => {
     if (!admin)
       return res.status(404).json({ success: false, message: "Admin not found" });
 
-    // Guard: organisation_id must exist
-    if (!admin.organisation_id)
+    const superAdminId = admin.organisation_id ?? admin.created_by;
+
+    if (!superAdminId)
       return res.status(404).json({ success: false, message: "Organisation not found" });
 
-    // Use organisation_id, not created_by
-    const superAdmin = await SuperAdminModel.findById(admin.organisation_id)
+    const superAdmin = await SuperAdminModel.findById(superAdminId)
       .select("f_name l_name email organisation_name profile_image")
       .lean();
 
     if (!superAdmin)
       return res.status(404).json({ success: false, message: "Organisation not found" });
 
-    const managers = await Managermodel
-      .find({ organisation_id: admin.organisation_id })
+    const managers = await Managermodel.find({ organisation_id: superAdmin._id })
       .select("f_name l_name work_email designation department office_location")
       .lean();
 
