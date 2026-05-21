@@ -333,6 +333,25 @@ function LeaveRow({ label, availed, entitled, accrued, color }) {
 }
 
 
+function LWPRow({ availed, color }) {
+  const used = availed ?? 0;
+  return (
+    <div className="ed-leave-row">
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
+        <div>
+          <div style={{ fontSize:12, fontWeight:500, color:"#2a1a16", fontFamily:"'DM Sans',sans-serif" }}>Leave Without Pay (LWP)</div>
+        </div>
+        <div style={{ textAlign:"right" }}>
+          <div style={{ fontSize:18, fontWeight:700, color, lineHeight:1, fontFamily:"'Lora',serif" }}>{used}</div>
+          <div style={{ fontSize:10, color:"#b0948a", marginTop:2 }}>used</div>
+        </div>
+      </div>
+      <div style={{ fontSize:9, color:"#b0948a", marginTop:3, fontFamily:"'DM Sans',sans-serif" }}>{used} days taken</div>
+    </div>
+  );
+}
+
+
 function SegBar({ segments }) {
   return (
     <>
@@ -589,7 +608,6 @@ function TodayBanner({ isOnLeave, leaveType, onCheckIn }) {
 }
 
 
-// ── FIXED: correct leave type labels ──
 const LEAVE_TYPE_META = {
   el:  { label:"Earned",    color:"#730042", bg:"rgba(115,0,66,0.08)" },
   sl:  { label:"Sick",      color:"#1D9E75", bg:"rgba(29,158,117,0.08)" },
@@ -717,21 +735,16 @@ export default function EmployeeDashboard() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const navigate = useNavigate();
 
-  /* ── Hooks ── */
   const { data: meData,   isLoading: meLoading,  isError: meError  } = useGetMeUser();
   const { data: annData,  isLoading: annLoading                     } = useGetAnnouncements();
   const { data: histData, isLoading: histLoading                    } = useGetAllLeaveHistory();
   const { data: attData,  isLoading: attLoading                     } = useGetAttendance();
 
-
   const employee      = meData?.employee      ?? null;
-
-  // ── FIX: API returns leavebalance as a direct object, not an array ──
-  const lb            = meData?.leavebalance   ?? null;
-
-  const allLeaves     = histData?.leaves       ?? [];
+  const lb            = meData?.leavebalance  ?? null;
+  const allLeaves     = histData?.leaves      ?? [];
   const announcements = annData?.announcements ?? [];
-  const reviews       = meData?.reviews        ?? meData?.review ?? [];
+  const reviews       = meData?.reviews       ?? meData?.review ?? [];
 
   const joiningDate = employee?.date_of_joining ?? employee?.createdAt ?? null;
 
@@ -755,12 +768,10 @@ export default function EmployeeDashboard() {
     return map;
   }, [attData]);
 
-
   const approvedLeaves = useMemo(() =>
     allLeaves.filter(lv => APPROVED_STATUSES.includes(lv.status)),
     [allLeaves]
   );
-
 
   const todayLeave = useMemo(() => {
     const today = new Date();
@@ -770,7 +781,6 @@ export default function EmployeeDashboard() {
   }, [approvedLeaves]);
 
   const isOnLeaveToday = Boolean(todayLeave);
-
 
   const empInitials = employee ? getInitials(employee.f_name, employee.l_name) : "—";
   const fullName    = employee ? `${employee.f_name} ${employee.l_name}` : "—";
@@ -812,44 +822,10 @@ export default function EmployeeDashboard() {
     return { presentCount: present, absentCount: absent, halfCount: half, checkedInCount: checkedIn, attendanceRate: rate };
   }, [attendanceMap, selectedMonth, approvedLeaves, joiningMidnight]);
 
-  // ── FIX: Correct leave labels — PL = Paternity, ML = Maternity, LWP = Leave Without Pay ──
-  const leaveRows = [
-    {
-      label:    "Earned Leave (EL)",
-      availed:  lb?.EL?.availed,
-      entitled: lb?.EL?.entitled,
-      accrued:  lb?.EL?.accrued,
-      color:    "#730042",
-    },
-    {
-      label:    "Sick Leave (SL)",
-      availed:  lb?.SL?.availed,
-      entitled: lb?.SL?.entitled,
-      accrued:  null,
-      color:    "#1D9E75",
-    },
-    {
-      label:    "Paternity Leave (PL)",
-      availed:  lb?.pbc ?? 0,
-      entitled: lb?.PL  ?? 0,
-      accrued:  null,
-      color:    "#378ADD",
-    },
-    {
-      label:    "Maternity Leave (ML)",
-      availed:  lb?.lwp ?? 0,
-      entitled: lb?.ML  ?? 0,
-      accrued:  null,
-      color:    "#9333EA",
-    },
-    {
-      label:    "Leave Without Pay (LWP)",
-      availed:  lb?.lwp ?? 0,
-      entitled: 5,
-      accrued:  null,
-      color:    "#E24B4A",
-    },
-  ];
+  const elRemaining  = (lb?.EL?.entitled ?? 0) - (lb?.EL?.availed ?? 0);
+  const slRemaining  = (lb?.SL?.entitled ?? 0) - (lb?.SL?.availed ?? 0);
+  const plEntitled   = lb?.PL ?? 0;
+  const mlEntitled   = lb?.ML ?? 0;
 
   if (meError) return (
     <div style={{ fontFamily:"'DM Sans',sans-serif", background:"#f9f8f2", minHeight:"100vh",
@@ -867,7 +843,6 @@ export default function EmployeeDashboard() {
       minHeight:"100vh", padding:"24px 28px", color:"#2a1a16" }}>
       <GlobalStyles/>
 
-      {/* ── TOPBAR ── */}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
         <div>
           <h1 style={{ fontSize:20, fontWeight:700, margin:0, letterSpacing:"-.3px", fontFamily:"'Lora',serif" }}>
@@ -914,17 +889,14 @@ export default function EmployeeDashboard() {
         </div>
       </div>
 
-      {/* ── TODAY BANNER ── */}
       <TodayBanner
         isOnLeave={isOnLeaveToday}
         leaveType={todayLeave?.leaveType}
         onCheckIn={() => navigate("/mark-attendance")}
       />
 
-      {/* ── ROW 1: 4 stat cards ── */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4,minmax(0,1fr))", gap:14, marginBottom:14 }}>
 
-        {/* Employee identity */}
         <div className="ed-card" style={{ animationDelay:".05s" }}>
           <CardAccent color="#730042"/>
           <div style={{ padding:"16px 18px 14px" }}>
@@ -961,10 +933,8 @@ export default function EmployeeDashboard() {
           </div>
         </div>
 
-        {/* DOJ */}
         <DOJCard joiningDate={joiningDate}/>
 
-        {/* Leave overview */}
         <div className="ed-card" style={{ animationDelay:".1s" }}>
           <CardAccent color="#1D9E75"/>
           <div style={{ padding:"16px 18px 14px" }}>
@@ -977,7 +947,7 @@ export default function EmployeeDashboard() {
               <>
                 <div style={{ display:"flex", alignItems:"baseline", gap:6, marginBottom:4 }}>
                   <span style={{ fontSize:28, fontWeight:700, color:"#1D9E75", lineHeight:1, fontFamily:"'Lora',serif" }}>
-                    {(lb?.EL?.entitled ?? 0) - (lb?.EL?.availed ?? 0)}
+                    {elRemaining}
                   </span>
                   <span style={{ fontSize:12, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>EL remaining</span>
                 </div>
@@ -991,16 +961,15 @@ export default function EmployeeDashboard() {
                   </div>
                 )}
                 <SegBar segments={[
-                  { pct:(lb?.EL?.entitled ?? 15)-(lb?.EL?.availed ?? 0), color:"#1D9E75", label:`EL (${(lb?.EL?.entitled ?? 15)-(lb?.EL?.availed ?? 0)} left)` },
-                  { pct:(lb?.SL?.entitled ?? 12)-(lb?.SL?.availed ?? 0), color:"#378ADD", label:`SL (${(lb?.SL?.entitled ?? 12)-(lb?.SL?.availed ?? 0)} left)` },
-                  { pct: lb?.PL ?? 0, color:"#BA7517", label:`PL (${lb?.PL ?? 0})` },
+                  { pct: elRemaining, color:"#1D9E75", label:`EL (${elRemaining} left)` },
+                  { pct: slRemaining, color:"#378ADD", label:`SL (${slRemaining} left)` },
+                  { pct: plEntitled,  color:"#BA7517", label:`PL (${plEntitled})` },
                 ]}/>
               </>
             )}
           </div>
         </div>
 
-        {/* Manager card */}
         <div className="ed-card" style={{ animationDelay:".15s", background:"#730042", border:"0.5px solid #5a0033" }}>
           <div style={{ position:"absolute", top:-20, right:-20, width:80, height:80, borderRadius:"50%", background:"rgba(255,255,255,0.06)" }}/>
           <div style={{ position:"absolute", bottom:-10, left:-10, width:60, height:60, borderRadius:"50%", background:"rgba(255,255,255,0.04)" }}/>
@@ -1046,10 +1015,8 @@ export default function EmployeeDashboard() {
         </div>
       </div>
 
-      {/* ── ROW 2: Calendar + Announcements ── */}
       <div style={{ display:"grid", gridTemplateColumns:"minmax(0,2fr) minmax(0,1fr)", gap:14, marginBottom:14 }}>
 
-        {/* Calendar */}
         <div className="ed-card" style={{ animationDelay:".2s" }}>
           <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
             borderBottom:"0.5px solid #ede5e0" }}>
@@ -1084,7 +1051,6 @@ export default function EmployeeDashboard() {
             />
           </div>
 
-          {/* Stats row */}
           <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", borderTop:"0.5px solid #f0e8e4", marginTop:12 }}>
             {[
               [presentCount,        "#730042", "Present"],
@@ -1100,7 +1066,6 @@ export default function EmployeeDashboard() {
             ))}
           </div>
 
-          {/* Legend */}
           <div style={{ display:"flex", flexWrap:"wrap", gap:8, padding:"10px 14px 14px", borderTop:"0.5px solid #f0e8e4" }}>
             {[
               ["#730042","Present"],
@@ -1117,7 +1082,6 @@ export default function EmployeeDashboard() {
           </div>
         </div>
 
-        {/* Announcements */}
         <div className="ed-card" style={{ animationDelay:".25s" }}>
           <CardAccent color="#BA7517"/>
           <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
@@ -1147,10 +1111,8 @@ export default function EmployeeDashboard() {
         </div>
       </div>
 
-      {/* ── ROW 3: Profile + Leave Balance + Reviews ── */}
       <div style={{ display:"grid", gridTemplateColumns:"minmax(0,1.5fr) minmax(0,1fr) minmax(0,.7fr)", gap:14, marginBottom:14 }}>
 
-        {/* Employee Profile */}
         <div className="ed-card" style={{ animationDelay:".3s" }}>
           <CardAccent color="#730042"/>
           <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
@@ -1191,7 +1153,6 @@ export default function EmployeeDashboard() {
           </div>
         </div>
 
-        {/* Leave Balance */}
         <div className="ed-card" style={{ animationDelay:".35s" }}>
           <CardAccent color="#1D9E75"/>
           <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
@@ -1200,10 +1161,48 @@ export default function EmployeeDashboard() {
             <span style={{ fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>FY 2025–26</span>
           </div>
           <div style={{ padding:"0 18px 4px" }}>
-            {meLoading
-              ? [1,2,3,4,5].map(i => <div key={i} style={{ padding:"12px 0", borderBottom:"0.5px solid #ede5e0" }}><Skeleton h={40}/></div>)
-              : leaveRows.map((row, i) => <LeaveRow key={i} {...row}/>)
-            }
+            {meLoading ? (
+              [1,2,3,4,5].map(i => (
+                <div key={i} style={{ padding:"12px 0", borderBottom:"0.5px solid #ede5e0" }}>
+                  <Skeleton h={40}/>
+                </div>
+              ))
+            ) : (
+              <>
+                <LeaveRow
+                  label="Earned Leave (EL)"
+                  availed={lb?.EL?.availed ?? 0}
+                  entitled={lb?.EL?.entitled ?? 0}
+                  accrued={lb?.EL?.accrued ?? null}
+                  color="#730042"
+                />
+                <LeaveRow
+                  label="Sick Leave (SL)"
+                  availed={lb?.SL?.availed ?? 0}
+                  entitled={lb?.SL?.entitled ?? 0}
+                  accrued={null}
+                  color="#1D9E75"
+                />
+                <LeaveRow
+                  label="Paternity Leave (PL)"
+                  availed={0}
+                  entitled={lb?.PL ?? 0}
+                  accrued={null}
+                  color="#378ADD"
+                />
+                <LeaveRow
+                  label="Maternity Leave (ML)"
+                  availed={0}
+                  entitled={lb?.ML ?? 0}
+                  accrued={null}
+                  color="#9333EA"
+                />
+                <LWPRow
+                  availed={lb?.lwp ?? 0}
+                  color="#E24B4A"
+                />
+              </>
+            )}
           </div>
           {!meLoading && lb && (
             <div style={{ margin:"0 18px 14px", display:"flex", gap:8, flexWrap:"wrap" }}>
@@ -1227,7 +1226,6 @@ export default function EmployeeDashboard() {
           )}
         </div>
 
-        {/* Reviews */}
         <div className="ed-card" style={{ animationDelay:".4s" }}>
           <CardAccent color="#e8b84b"/>
           <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
@@ -1239,7 +1237,6 @@ export default function EmployeeDashboard() {
         </div>
       </div>
 
-  
       <div className="ed-card" style={{ animationDelay:".45s" }}>
         <CardAccent color="#378ADD"/>
         <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
