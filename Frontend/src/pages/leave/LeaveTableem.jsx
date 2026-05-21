@@ -612,7 +612,7 @@ const WFHTab = ({ showToast }) => {
           {editTarget && (
             <button className="elw-btn-secondary" onClick={() => { setForm(WFH_BLANK); setEditTarget(null); setErrors({}); }}>Cancel Edit</button>
           )}
-          <button className="elw-btn-primary" style={{ background: "linear-gradient(135deg,#1D4ED8,#3B82F6)", boxShadow: "0 4px 16px rgba(59,130,246,0.35)" }} onClick={handleSubmit} disabled={applyMut.isPending || editMut.isPending}>
+          <button className="elw-btn-primary" style={{ background: "(135deg,#8A1C3A, #A1234B)" }} onClick={handleSubmit} disabled={applyMut.isPending || editMut.isPending}>
             {applyMut.isPending || editMut.isPending ? "Submitting…" : editTarget ? "Update Request →" : "Submit WFH Request →"}
           </button>
         </div>

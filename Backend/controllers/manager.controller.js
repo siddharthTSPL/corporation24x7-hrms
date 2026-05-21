@@ -13,6 +13,8 @@ const jwt = require("jsonwebtoken");
 const managerLeaveModel = require("../Models/maleave.model");
 const Attendance = require("../Models/attendance.model");
 const Ticket = require("../Models/ticket.model");
+const SuperAdminModel = require("../Models/superadmin.model");
+const AdminModel = require("../Models/Admin.model");
 require("dotenv").config();
 
 const verifyManagerEmail = async (req, res, next) => {
@@ -1152,7 +1154,106 @@ const managerGetTicketDetail = async (req, res, next) => {
   }
 };
 
+const getOrgInfoForManager = async (req, res, next) => {
+  try {
+    if (!req.manager)
+      return res.status(401).json({ success: false, message: "Unauthorized" });
 
+    const manager = await managermodel
+      .findById(req.manager._id)
+      .select("f_name l_name work_email designation department office_location organisation_id")
+      .lean();
+
+    if (!manager)
+      return res.status(404).json({ success: false, message: "Manager not found" });
+
+    if (!manager.organisation_id)
+      return res.status(400).json({ success: false, message: "Manager has no organisation assigned" });
+
+    const superAdmin = await SuperAdminModel.findById(manager.organisation_id)
+      .select("f_name l_name email organisation_name profile_image")
+      .lean();
+
+    // organisation_id is pointing to an Admin instead of SuperAdmin — trace back
+    if (!superAdmin) {
+      const linkedAdmin = await AdminModel.findById(manager.organisation_id)
+        .select("organisation_id")
+        .lean();
+
+      if (!linkedAdmin || !linkedAdmin.organisation_id)
+        return res.status(404).json({ success: false, message: "Organisation not found" });
+
+      // Auto-heal: fix this manager's organisation_id in the background
+      managermodel
+        .updateOne({ _id: manager._id }, { $set: { organisation_id: linkedAdmin.organisation_id } })
+        .catch((err) => console.error("Failed to auto-heal organisation_id:", err));
+
+      return res.status(400).json({
+        success: false,
+        message: "Manager organisation_id was misconfigured. It has been corrected — please retry.",
+      });
+    }
+
+    const admins = await AdminModel.find({ organisation_id: superAdmin._id })
+      .select("f_name l_name work_email designation department office_location")
+      .lean();
+
+    const allManagers = await managermodel
+      .find({ organisation_id: superAdmin._id })
+      .select("f_name l_name work_email designation department office_location")
+      .lean();
+
+    const employees = allManagers.length
+      ? await usermodel
+          .find({ Under_manager: { $in: allManagers.map((m) => m._id) } })
+          .select("f_name l_name work_email designation department office_location Under_manager")
+          .lean()
+      : [];
+
+    const managersWithEmployees = allManagers.map((mgr) => ({
+      id: mgr._id,
+      name: `${mgr.f_name} ${mgr.l_name}`,
+      email: mgr.work_email,
+      designation: mgr.designation,
+      department: mgr.department,
+      office_location: mgr.office_location,
+      isCurrentManager: mgr._id.toString() === req.manager._id.toString(),
+      employees: employees
+        .filter((e) => e.Under_manager?.toString() === mgr._id.toString())
+        .map((e) => ({
+          id: e._id,
+          name: `${e.f_name} ${e.l_name}`,
+          email: e.work_email,
+          designation: e.designation,
+          department: e.department,
+          office_location: e.office_location,
+        })),
+    }));
+
+    res.status(200).json({
+      success: true,
+      organisation_name: superAdmin.organisation_name,
+      organisation_logo: superAdmin.profile_image || null,
+      super_admin: {
+        id: superAdmin._id,
+        name: `${superAdmin.f_name} ${superAdmin.l_name}`,
+        email: superAdmin.email,
+      },
+      admins: admins.map((adm) => ({
+        id: adm._id,
+        name: `${adm.f_name} ${adm.l_name}`,
+        email: adm.work_email,
+        designation: adm.designation,
+        department: adm.department,
+        office_location: adm.office_location,
+      })),
+      managers: managersWithEmployees,
+      currentManagerId: req.manager._id,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 module.exports = {
   verifyManagerEmail,
@@ -1188,5 +1289,6 @@ module.exports = {
   managerSubmitTicket,
   managerGetMyTickets,
   managerRateTicket,
-  managerGetTicketDetail
+  managerGetTicketDetail,
+  getOrgInfoForManager
 };

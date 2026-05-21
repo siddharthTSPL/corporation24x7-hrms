@@ -26,6 +26,10 @@ const {
   superadminGetPendingWFH,
   superadminApproveWFH,
   superadminRejectWFH,
+adminGetForwardedWFH,
+adminApproveForwardedWFH,
+adminRejectForwardedWFH
+
 } = require("../controllers/wfh.controller");
 
 
@@ -49,6 +53,9 @@ wfhRouter.post("/manager/rejectForwardedWFH", managermiddleware, asyncHandler(re
 
 wfhRouter.post("/admin/applyWFH", adminauthmiddleware, asyncHandler(adminApplyWFH));
 wfhRouter.get("/admin/getMyWFH", adminauthmiddleware, asyncHandler(adminGetMyWFH));
+wfhRouter.get("/admin/getForwardedWFH", adminauthmiddleware, asyncHandler(adminGetForwardedWFH));
+wfhRouter.post("/admin/approveForwardedWFH", adminauthmiddleware, asyncHandler(adminApproveForwardedWFH));
+wfhRouter.post("/admin/rejectForwardedWFH", adminauthmiddleware, asyncHandler(adminRejectForwardedWFH));
 
 
 wfhRouter.get("/superadmin/getPendingWFH", superadminmiddleware, asyncHandler(superadminGetPendingWFH));
