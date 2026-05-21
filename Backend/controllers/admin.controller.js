@@ -867,7 +867,27 @@ const resetAdminPassword = async (req, res, next) => {
 const getme = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  res.status(200).json(req.admin);
+
+  const [admin, leaveBalance, reviews] = await Promise.all([
+    Adminmodel.findById(req.admin._id)
+      .select(EXCLUDE)
+      .lean(),
+    leavebalanceModel.findOne({ employee: req.admin._id }).lean(),
+    reviewModel
+      .find({ reviewee: req.admin._id })
+      .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      .lean(),
+  ]);
+
+  if (!admin)
+    return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
+
+  res.status(200).json({
+    success: true,
+    user: admin,
+    leaveBalance: leaveBalance || null,
+    reviews: reviews || [],
+  });
 };
 
 const editadminprofile = async (req, res, next) => {
