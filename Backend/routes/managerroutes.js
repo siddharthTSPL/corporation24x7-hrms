@@ -185,4 +185,5 @@ managerrouter.get(
   asyncHandler(managercontroller. managerGetTicketDetail),
 );
 
+managerrouter.get("/getOrgInfo", managermiddleware, asyncHandler(managercontroller.getOrgInfoForManager));
 module.exports = managerrouter;
