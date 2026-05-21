@@ -1169,14 +1169,14 @@ const getOrgInfoForManager = async (req, res, next) => {
     if (!manager.organisation_id)
       return res.status(400).json({ success: false, message: "Manager has no organisation assigned" });
 
-    // ── TEMPORARY DEBUG ── remove after fix ──────────────────────────────────
+  
     console.log("manager._id        :", manager._id);
     console.log("organisation_id    :", manager.organisation_id);
 
     const superAdminCheck = await SuperAdminModel.findById(manager.organisation_id).lean();
     console.log("superAdmin found?  :", superAdminCheck ? "YES" : "NO");
 
-    const adminCheck = await Adminmodel.findById(manager.organisation_id).lean();
+    const adminCheck = await AdminModel.findById(manager.organisation_id).lean();
     console.log("admin found?       :", adminCheck ? "YES — organisation_id points to Admin, not SuperAdmin" : "NO");
     // ─────────────────────────────────────────────────────────────────────────
 
