@@ -565,6 +565,7 @@ const showallleaves = async (req, res, next) => {
           "forwarded_reporting_manager",
           "approved_reporting_manager",
           "rejected_reporting_manager",
+          "pending_reporting_manager",
         ],
       },
     })
