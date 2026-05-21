@@ -19,51 +19,51 @@ api.interceptors.response.use(
 );
 
 export const managerApplyWFH = async (data) => {
-  const res = await api.post("wfh/applyWFH", data);
+  const res = await api.post("wfh/manager/applyWFH", data);
   return res.data;
 };
 
 export const managerGetMyWFH = async () => {
-  const res = await api.get("wfh/getMyWFH");
+  const res = await api.get("wfh/manager/getMyWFH");
   return res.data;
 };
 
 export const managerGetPendingWFH = async () => {
-  const res = await api.get("wfh/getPendingWFH");
+  const res = await api.get("wfh/manager/getPendingWFH");
   return res.data;
 };
 
 export const managerGetAllTeamWFH = async () => {
-  const res = await api.get("wfh/getAllTeamWFH");
+  const res = await api.get("wfh/manager/getAllTeamWFH");
   return res.data;
 };
 
 export const managerApproveWFH = async (data) => {
-  const res = await api.post("wfh/approveWFH", data);
+  const res = await api.post("wfh/manager/approveWFH", data);
   return res.data;
 };
 
 export const managerRejectWFH = async (data) => {
-  const res = await api.post("wfh/rejectWFH", data);
+  const res = await api.post("wfh/manager/rejectWFH", data);
   return res.data;
 };
 
 export const managerForwardWFH = async (data) => {
-  const res = await api.post("wfh/forwardWFH", data);
+  const res = await api.post("wfh/manager/forwardWFH", data);
   return res.data;
 };
 
 export const managerGetForwardedWFH = async () => {
-  const res = await api.get("wfh/getForwardedWFH");
+  const res = await api.get("wfh/manager/getForwardedWFH");
   return res.data;
 };
 
 export const managerApproveForwardedWFH = async (data) => {
-  const res = await api.post("wfh/approveForwardedWFH", data);
+  const res = await api.post("wfh/manager/approveForwardedWFH", data);
   return res.data;
 };
 
 export const managerRejectForwardedWFH = async (data) => {
-  const res = await api.post("wfh/rejectForwardedWFH", data);
+  const res = await api.post("wfh/manager/rejectForwardedWFH", data);
   return res.data;
 };
