@@ -116,6 +116,7 @@ const LEAVE_STATUS_META = {
   rejected_admin:              { label:"Admin Rejected", bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
   approved_reporting_manager:  { label:"RM Approved",    bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
   rejected_reporting_manager:  { label:"RM Rejected",    bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
+  pending_reporting_manager:   { label:"Pending",        bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
 };
 
 const WFH_STATUS_META = {
@@ -337,7 +338,9 @@ const AllLeavesPanel = ({ showToast }) => {
   const acceptMut = useAcceptLeave();
   const rejectMut = useRejectLeave();
 
-  const employeeLeaves = rawData?.employeeLeaves?.leaves || [];
+  const employeeLeaves = Array.isArray(rawData?.employeeLeaves?.leaves)
+    ? rawData.employeeLeaves.leaves
+    : [];
 
   const isStatus = (leave, key) => {
     if (key === "pending")   return leave.status?.includes("pending");
@@ -454,6 +457,63 @@ const AllLeavesPanel = ({ showToast }) => {
                   <div style={{ width:22, height:22, border:"2px solid #EDE6F5", borderTop:"2px solid #8B3A8A", borderRadius:"50%", animation:"spin .6s linear infinite" }}/>
                 </div>
               )}
+            </div>
+          );
+        })
+      }
+    </div>
+  );
+};
+
+const MyLeavesPanel = () => {
+  const { data: rawData, isLoading } = useGetForwardedLeaves();
+  const myLeaves = Array.isArray(rawData?.managerLeaves?.leaves)
+    ? rawData.managerLeaves.leaves
+    : [];
+
+  if (isLoading) return <Spinner/>;
+
+  return (
+    <div>
+      <div style={{ display:"flex", gap:12, marginBottom:22, flexWrap:"wrap" }}>
+        <div style={{ background:"linear-gradient(135deg,#F9EFF5,#F4E6F0)", borderRadius:14, padding:"12px 20px", display:"flex", alignItems:"center", gap:12, border:"1px solid rgba(0,0,0,0.05)", boxShadow:"0 2px 8px rgba(0,0,0,0.04)" }}>
+          <span style={{ fontSize:26, fontWeight:800, color:"#6B1A4A", fontFamily:"'Playfair Display',serif", lineHeight:1 }}>{myLeaves.length}</span>
+          <span style={{ fontSize:11, color:"#6B1A4A", fontWeight:600, fontFamily:"'DM Sans',sans-serif", opacity:.8 }}>My Applications</span>
+        </div>
+      </div>
+
+      {myLeaves.length === 0
+        ? <EmptyState msg="You haven't applied for any leaves"/>
+        : myLeaves.map((leave, idx) => {
+          const days = leave.days || daysDiff(leave.startDate, leave.endDate);
+          return (
+            <div key={leave._id} className="alw-history-card" style={{ animationDelay:`${idx*.06}s` }}>
+              <div style={{ position:"absolute", top:0, left:0, width:3, bottom:0, background:(LEAVE_META[leave.leaveType]||{accent:"#8B3A8A"}).accent, borderRadius:"16px 0 0 16px" }}/>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:14, paddingLeft:8 }}>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:10 }}>
+                    <TypeBadge type={leave.leaveType}/>
+                    <StatusBadge status={leave.status}/>
+                    <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:600, background:"#F4EEF9", color:"#6B1A4A", fontFamily:"'DM Sans',sans-serif" }}>{days} day{days>1?"s":""}</span>
+                  </div>
+                  <div style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, color:"#9B8BAE", fontFamily:"'DM Sans',sans-serif" }}>
+                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="2" width="11" height="10" rx="2.5" stroke="#C4AADA" strokeWidth="1"/><path d="M1 6h11" stroke="#C4AADA" strokeWidth="1"/><path d="M4 1v2M9 1v2" stroke="#C4AADA" strokeWidth="1" strokeLinecap="round"/></svg>
+                    <span style={{ fontWeight:500, color:"#4A3860" }}>{fmt(leave.startDate)}</span>
+                    <span style={{ color:"#D4BFEA", fontSize:10 }}>→</span>
+                    <span style={{ fontWeight:500, color:"#4A3860" }}>{fmt(leave.endDate)}</span>
+                  </div>
+                  {leave.reason && (
+                    <div style={{ background:"#FAF7FD", borderRadius:10, padding:"8px 13px", fontSize:12, color:"#4A3860", marginTop:10, borderLeft:"3px solid #D4AECB", lineHeight:1.6, fontFamily:"'DM Sans',sans-serif" }}>
+                      <span style={{ color:"#6B1A4A", fontWeight:600 }}>Reason — </span>{leave.reason}
+                    </div>
+                  )}
+                </div>
+                {leave.createdAt && (
+                  <div style={{ fontSize:10, color:"#9B8BAE", textAlign:"right", lineHeight:1.4, fontFamily:"'DM Sans',sans-serif", flexShrink:0 }}>
+                    Applied<br/><span style={{ fontWeight:600, color:"#7B6890" }}>{fmt(leave.createdAt)}</span>
+                  </div>
+                )}
+              </div>
             </div>
           );
         })
@@ -687,6 +747,7 @@ const AdminLeaveWFH = () => {
 
   const TABS = [
     { key:"allLeaves",    label:"All Leaves"    },
+    { key:"myLeaves",     label:"My Leaves"     },
     { key:"myBalance",    label:"My Balance"    },
     { key:"myWFH",        label:"My WFH"        },
     { key:"forwardedWFH", label:"Forwarded WFH" },
@@ -741,6 +802,7 @@ const AdminLeaveWFH = () => {
         </div>
 
         {tab === "allLeaves"    && <AllLeavesPanel showToast={showToast}/>}
+        {tab === "myLeaves"     && <MyLeavesPanel/>}
         {tab === "myBalance"    && <MyBalancePanel admin={admin}/>}
         {tab === "myWFH"        && <MyWFHPanel showToast={showToast}/>}
         {tab === "forwardedWFH" && <ForwardedWFHPanel showToast={showToast}/>}

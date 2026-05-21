@@ -556,31 +556,57 @@ const deleteemployee = async (req, res, next) => {
 };
 
 const showallleaves = async (req, res, next) => {
-  if (!req.admin)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  const [employeeLeaves, myLeaves] = await Promise.all([
-    Leave.find({
-      status: {
-        $in: [
-          "forwarded_reporting_manager",
-          "approved_reporting_manager",
-          "rejected_reporting_manager",
-          "pending_reporting_manager",
-        ],
+  try {
+    if (!req.admin)
+      return next(
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
+        })
+      );
+
+    const [employeeLeaves, managerLeaves] = await Promise.all([
+      Leave.find({
+        status: {
+          $in: [
+            "forwarded_reporting_manager",
+            "approved_reporting_manager",
+            "rejected_reporting_manager",
+          ],
+        },
+      })
+        .populate("employee", "f_name l_name work_email")
+        .populate("manager", "f_name l_name work_email")
+        .sort({ createdAt: -1 })
+        .lean(),
+
+      ManagerLeave.find({
+        status: {
+          $in: [
+            "pending_reporting_manager",
+            "approved_reporting_manager",
+            "rejected_reporting_manager",
+          ],
+        },
+      })
+        .populate("manager", "f_name l_name work_email")
+        .sort({ createdAt: -1 })
+        .lean(),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      employeeLeaves: {
+        count: employeeLeaves.length,
+        leaves: employeeLeaves,
       },
-    })
-      .populate("employee", "f_name l_name work_email")
-      .populate("manager", "f_name l_name work_email")
-      .sort({ createdAt: -1 })
-      .lean(),
-    ManagerLeave.find({ manager: req.admin._id })
-      .sort({ createdAt: -1 })
-      .lean(),
-  ]);
-  res.status(200).json({
-    employeeLeaves: { count: employeeLeaves.length, leaves: employeeLeaves },
-    myLeaves: { count: myLeaves.length, leaves: myLeaves },
-  });
+      managerLeaves: {
+        count: managerLeaves.length,
+        leaves: managerLeaves,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const applyleave = async (req, res, next) => {
