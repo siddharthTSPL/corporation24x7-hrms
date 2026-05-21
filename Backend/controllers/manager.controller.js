@@ -357,47 +357,45 @@ const applyleavem = async (req, res, next) => {
   if (!req.manager)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   if (!startDate || !endDate || !leaveType)
-    return next(
-      Object.assign(new Error("Required fields missing"), { statusCode: 400 }),
-    );
+    return next(Object.assign(new Error("Required fields missing"), { statusCode: 400 }));
+
   const managerId = req.manager._id;
   const start = new Date(startDate);
   const end = new Date(endDate);
+
   if (end < start)
-    return next(
-      Object.assign(new Error("End date cannot be before start date"), {
-        statusCode: 400,
-      }),
-    );
+    return next(Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }));
+
   const days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+
   const overlapping = await managerLeaveModel
     .findOne({
       manager: managerId,
-      status: { $nin: ["rejected_admin"] },
+      status: { $nin: ["rejected_admin", "rejected_reporting_manager"] },
       startDate: { $lte: end },
       endDate: { $gte: start },
     })
     .select("_id")
     .lean();
+
   if (overlapping)
-    return next(
-      Object.assign(new Error("Leave already applied for these dates"), {
-        statusCode: 400,
-      }),
-    );
+    return next(Object.assign(new Error("Leave already applied for these dates"), { statusCode: 400 }));
+
+  // ✅ Fetch both fields
   const managerData = await managermodel
     .findById(managerId)
-    .select("reporting_manager")
+    .select("reporting_manager reporting_manager_model")
     .lean();
+
   if (!managerData.reporting_manager)
-    return next(
-      Object.assign(
-        new Error(
-          "You have no reporting manager assigned. Cannot apply leave.",
-        ),
-        { statusCode: 400 },
-      ),
-    );
+    return next(Object.assign(new Error("You have no reporting manager assigned. Cannot apply leave."), { statusCode: 400 }));
+
+  // ✅ Set status based on who the reporting manager is
+  const leaveStatus =
+    managerData.reporting_manager_model === "Admin"
+      ? "pending_admin"
+      : "pending_reporting_manager";
+
   const leave = await managerLeaveModel.create({
     manager: managerId,
     leaveType,
@@ -405,14 +403,13 @@ const applyleavem = async (req, res, next) => {
     endDate: end,
     days,
     reason,
-    status: "pending_reporting_manager",
+    status: leaveStatus,
   });
-  res
-    .status(200)
-    .json({
-      message: "Leave request submitted to your reporting manager",
-      leave,
-    });
+
+  res.status(200).json({
+    message: "Leave request submitted successfully",
+    leave,
+  });
 };
 
 const showannouncements = async (req, res, next) => {
