@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   useCreateRequisition,
@@ -225,45 +225,25 @@ const GlobalStyles = () => (
 );
 
 const STATUS_META = {
-  PENDING:          { label: "Pending",          color: "#92400E", bg: "#faeeda" },
-  APPROVED:         { label: "Approved ✓",        color: "#1a6b48", bg: "#e8f5e9" },
-  REJECTED:         { label: "Rejected ✗",        color: "#791F1F", bg: "#fcebeb" },
-  ON_HOLD:          { label: "On Hold",           color: "#185FA5", bg: "#e6f1fb" },
-  REVISION_REQUIRED:{ label: "Revision Required", color: "#5b21b6", bg: "#f3e8ff" },
+  PENDING:           { label: "Pending",          color: "#92400E", bg: "#faeeda" },
+  APPROVED:          { label: "Approved ✓",        color: "#1a6b48", bg: "#e8f5e9" },
+  REJECTED:          { label: "Rejected ✗",        color: "#791F1F", bg: "#fcebeb" },
+  ON_HOLD:           { label: "On Hold",           color: "#185FA5", bg: "#e6f1fb" },
+  REVISION_REQUIRED: { label: "Revision Required", color: "#5b21b6", bg: "#f3e8ff" },
 };
 
 const PRIORITY_META = {
-  low:    { label: "Low",    color: "#475569", bg: "#f1f5f9" },
-  medium: { label: "Medium", color: "#92400E", bg: "#faeeda" },
-  high:   { label: "High",   color: "#791F1F", bg: "#fcebeb" },
-  urgent: { label: "Urgent", color: "#730042", bg: "rgba(115,0,66,0.1)" },
+  Low:    { label: "Low",    color: "#475569", bg: "#f1f5f9" },
+  Medium: { label: "Medium", color: "#92400E", bg: "#faeeda" },
+  High:   { label: "High",   color: "#791F1F", bg: "#fcebeb" },
+  Urgent: { label: "Urgent", color: "#730042", bg: "rgba(115,0,66,0.1)" },
 };
 
 const WORK_MODE_META = {
-  remote: { label: "Remote 🌐", color: "#185FA5", bg: "#e6f1fb" },
-  onsite: { label: "On-site 🏢", color: "#1a6b48", bg: "#e8f5e9" },
-  hybrid: { label: "Hybrid 🔀",  color: "#5b21b6", bg: "#f3e8ff" },
+  Remote: { label: "Remote 🌐", color: "#185FA5", bg: "#e6f1fb" },
+  Onsite: { label: "On-site 🏢", color: "#1a6b48", bg: "#e8f5e9" },
+  Hybrid: { label: "Hybrid 🔀",  color: "#5b21b6", bg: "#f3e8ff" },
 };
-
-function Badge({ children, variant }) {
-  const styles = {
-    brand:  { background: "rgba(115,0,66,0.08)", color: "#730042" },
-    green:  { background: "#e8f5e9", color: "#1a6b48" },
-    blue:   { background: "#e6f1fb", color: "#185FA5" },
-    amber:  { background: "#faeeda", color: "#633806" },
-    red:    { background: "#fcebeb", color: "#791F1F" },
-    purple: { background: "#f3e8ff", color: "#5b21b6" },
-    slate:  { background: "#f1f5f9", color: "#475569" },
-  };
-  const s = styles[variant] || styles.brand;
-  return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", padding: "2px 9px",
-      borderRadius: 20, fontSize: 10, fontWeight: 600,
-      fontFamily: "'DM Sans', sans-serif", ...s,
-    }}>{children}</span>
-  );
-}
 
 function Skeleton({ w = "100%", h = 16, radius = 6 }) {
   return (
@@ -288,8 +268,8 @@ function fmtDate(iso) {
 function timeAgo(iso) {
   if (!iso) return "—";
   const diff = Date.now() - new Date(iso).getTime();
-  if (diff < 3600000)  return `${Math.floor(diff/60000)}m ago`;
-  if (diff < 86400000) return `${Math.floor(diff/3600000)}h ago`;
+  if (diff < 3600000)   return `${Math.floor(diff/60000)}m ago`;
+  if (diff < 86400000)  return `${Math.floor(diff/3600000)}h ago`;
   if (diff < 604800000) return `${Math.floor(diff/86400000)}d ago`;
   return fmtDate(iso);
 }
@@ -299,6 +279,15 @@ function InfoRow({ label, value }) {
     <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
       <span style={{ fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif", textTransform:"uppercase", letterSpacing:".4px" }}>{label}</span>
       <span style={{ fontSize:13, fontWeight:500, color:"#2a1a16", fontFamily:"'DM Sans',sans-serif" }}>{value || "—"}</span>
+    </div>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+      <label className="rc-label">{label}</label>
+      {children}
     </div>
   );
 }
@@ -382,9 +371,9 @@ function RequisitionDetail({ req, onClose }) {
           <div>
             <div className="rc-section-title">Overview</div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
-              <InfoRow label="Employment Type" value={req.employment_type?.replace("_"," ")}/>
+              <InfoRow label="Employment Type" value={req.employment_type}/>
               <InfoRow label="Experience" value={req.experience_required ? `${req.experience_required} yrs` : "—"}/>
-              <InfoRow label="Salary Range" value={req.salary_range ? `₹${Number(req.salary_range.min).toLocaleString("en-IN")} – ₹${Number(req.salary_range.max).toLocaleString("en-IN")}` : "—"}/>
+              <InfoRow label="Salary Range" value={req.salary_range?.min && req.salary_range?.max ? `₹${Number(req.salary_range.min).toLocaleString("en-IN")} – ₹${Number(req.salary_range.max).toLocaleString("en-IN")}` : "—"}/>
               <InfoRow label="Expected Joining" value={fmtDate(req.expected_joining_date)}/>
               <InfoRow label="Submitted" value={timeAgo(req.createdAt)}/>
               <InfoRow label="Last Updated" value={timeAgo(req.updatedAt)}/>
@@ -429,12 +418,12 @@ const EMPTY_FORM = {
   job_title: "",
   department: "",
   openings: 1,
-  employment_type: "full_time",
+  employment_type: "Full Time",
   experience_required: "",
   skills_required: [],
   salary_range: { min: "", max: "" },
-  priority: "medium",
-  work_mode: "onsite",
+  priority: "Medium",
+  work_mode: "Onsite",
   job_description: "",
   hiring_reason: "",
   expected_joining_date: "",
@@ -452,27 +441,27 @@ function CreateForm({ onSuccess, onCancel }) {
   const addSkill = () => {
     const sk = skillInput.trim();
     if (sk && !form.skills_required.includes(sk)) {
-      set("skills_required", [...form.skills_required, sk]);
+      setForm(f => ({ ...f, skills_required: [...f.skills_required, sk] }));
     }
     setSkillInput("");
   };
 
-  const removeSkill = (sk) => set("skills_required", form.skills_required.filter(s => s !== sk));
+  const removeSkill = (sk) => setForm(f => ({ ...f, skills_required: f.skills_required.filter(s => s !== sk) }));
 
   const handleSkillKey = (e) => {
     if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addSkill(); }
   };
 
   const handleSubmit = async () => {
-    if (!form.job_title.trim())     { setError("Job title is required."); return; }
-    if (!form.department.trim())    { setError("Department is required."); return; }
-    if (!form.hiring_reason.trim()) { setError("Hiring reason is required."); return; }
+    if (!form.job_title.trim()) { setError("Job title is required."); return; }
+    if (!form.department)       { setError("Department is required."); return; }
+    if (!form.hiring_reason)    { setError("Hiring reason is required."); return; }
     setError("");
     try {
       await mutateAsync({
         ...form,
         openings: Number(form.openings),
-        experience_required: form.experience_required ? Number(form.experience_required) : undefined,
+        experience_required: form.experience_required || undefined,
         salary_range: form.salary_range.min && form.salary_range.max
           ? { min: Number(form.salary_range.min), max: Number(form.salary_range.max) }
           : undefined,
@@ -484,13 +473,6 @@ function CreateForm({ onSuccess, onCancel }) {
     }
   };
 
-  const Field = ({ label, children }) => (
-    <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
-      <label className="rc-label">{label}</label>
-      {children}
-    </div>
-  );
-
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
       <div>
@@ -498,26 +480,52 @@ function CreateForm({ onSuccess, onCancel }) {
         <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
           <div className="rc-form-grid-2">
             <Field label="Job Title *">
-              <input className="rc-input" value={form.job_title} onChange={e => set("job_title", e.target.value)} placeholder="e.g. Senior Frontend Developer"/>
+              <input
+                className="rc-input"
+                value={form.job_title}
+                onChange={e => set("job_title", e.target.value)}
+                placeholder="e.g. Senior Frontend Developer"
+              />
             </Field>
             <Field label="Department *">
-              <input className="rc-input" value={form.department} onChange={e => set("department", e.target.value)} placeholder="e.g. Engineering"/>
+              <select className="rc-input" value={form.department} onChange={e => set("department", e.target.value)}>
+                <option value="">Select department</option>
+                <option value="OPR">OPR – Operations</option>
+                <option value="BPO">BPO – Business Process</option>
+                <option value="ENG">ENG – Engineering</option>
+                <option value="HR">HR – Human Resources</option>
+                <option value="MGMT">MGMT – Management</option>
+              </select>
             </Field>
           </div>
           <div className="rc-form-grid-3">
             <Field label="Openings">
-              <input className="rc-input" type="number" min={1} value={form.openings} onChange={e => set("openings", e.target.value)} placeholder="1"/>
+              <input
+                className="rc-input"
+                type="number"
+                min={1}
+                value={form.openings}
+                onChange={e => set("openings", e.target.value)}
+                placeholder="1"
+              />
             </Field>
             <Field label="Employment Type">
               <select className="rc-input" value={form.employment_type} onChange={e => set("employment_type", e.target.value)}>
-                <option value="full_time">Full Time</option>
-                <option value="part_time">Part Time</option>
-                <option value="contract">Contract</option>
-                <option value="internship">Internship</option>
+                <option value="Full Time">Full Time</option>
+                <option value="Part Time">Part Time</option>
+                <option value="Contract">Contract</option>
+                <option value="Internship">Internship</option>
               </select>
             </Field>
             <Field label="Experience (yrs)">
-              <input className="rc-input" type="number" min={0} value={form.experience_required} onChange={e => set("experience_required", e.target.value)} placeholder="e.g. 3"/>
+              <input
+                className="rc-input"
+                type="number"
+                min={0}
+                value={form.experience_required}
+                onChange={e => set("experience_required", e.target.value)}
+                placeholder="e.g. 3"
+              />
             </Field>
           </div>
         </div>
@@ -529,29 +537,48 @@ function CreateForm({ onSuccess, onCancel }) {
           <div className="rc-form-grid-3">
             <Field label="Priority">
               <select className="rc-input" value={form.priority} onChange={e => set("priority", e.target.value)}>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+                <option value="Urgent">Urgent</option>
               </select>
             </Field>
             <Field label="Work Mode">
               <select className="rc-input" value={form.work_mode} onChange={e => set("work_mode", e.target.value)}>
-                <option value="onsite">On-site</option>
-                <option value="remote">Remote</option>
-                <option value="hybrid">Hybrid</option>
+                <option value="Onsite">On-site</option>
+                <option value="Remote">Remote</option>
+                <option value="Hybrid">Hybrid</option>
               </select>
             </Field>
             <Field label="Expected Joining">
-              <input className="rc-input" type="date" value={form.expected_joining_date} onChange={e => set("expected_joining_date", e.target.value)}/>
+              <input
+                className="rc-input"
+                type="date"
+                value={form.expected_joining_date}
+                onChange={e => set("expected_joining_date", e.target.value)}
+              />
             </Field>
           </div>
           <div className="rc-form-grid-2">
             <Field label="Salary Min (₹)">
-              <input className="rc-input" type="number" min={0} value={form.salary_range.min} onChange={e => setSalary("min", e.target.value)} placeholder="e.g. 600000"/>
+              <input
+                className="rc-input"
+                type="number"
+                min={0}
+                value={form.salary_range.min}
+                onChange={e => setSalary("min", e.target.value)}
+                placeholder="e.g. 600000"
+              />
             </Field>
             <Field label="Salary Max (₹)">
-              <input className="rc-input" type="number" min={0} value={form.salary_range.max} onChange={e => setSalary("max", e.target.value)} placeholder="e.g. 1200000"/>
+              <input
+                className="rc-input"
+                type="number"
+                min={0}
+                value={form.salary_range.max}
+                onChange={e => setSalary("max", e.target.value)}
+                placeholder="e.g. 1200000"
+              />
             </Field>
           </div>
         </div>
@@ -568,14 +595,14 @@ function CreateForm({ onSuccess, onCancel }) {
             onKeyDown={handleSkillKey}
             placeholder="Type a skill and press Enter or comma"
           />
-          <button className="rc-btn-ghost" onClick={addSkill} style={{ whiteSpace:"nowrap" }}>Add</button>
+          <button className="rc-btn-ghost" type="button" onClick={addSkill} style={{ whiteSpace:"nowrap" }}>Add</button>
         </div>
         {form.skills_required.length > 0 && (
           <div style={{ display:"flex", flexWrap:"wrap", gap:7 }}>
             {form.skills_required.map((sk, i) => (
               <span key={i} className="rc-skill-tag">
                 {sk}
-                <button onClick={() => removeSkill(sk)}>×</button>
+                <button type="button" onClick={() => removeSkill(sk)}>×</button>
               </span>
             ))}
           </div>
@@ -585,14 +612,25 @@ function CreateForm({ onSuccess, onCancel }) {
       <div>
         <div className="rc-section-title">Description & Reason</div>
         <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-          <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
-            <label className="rc-label">Job Description</label>
-            <textarea className="rc-input" rows={5} value={form.job_description} onChange={e => set("job_description", e.target.value)} placeholder="Describe the role, responsibilities, and expectations..."/>
-          </div>
-          <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
-            <label className="rc-label">Hiring Reason *</label>
-            <textarea className="rc-input" rows={3} value={form.hiring_reason} onChange={e => set("hiring_reason", e.target.value)} placeholder="Why is this position needed? Replacement, growth, new project..."/>
-          </div>
+          <Field label="Job Description">
+            <textarea
+              className="rc-input"
+              rows={5}
+              value={form.job_description}
+              onChange={e => set("job_description", e.target.value)}
+              placeholder="Describe the role, responsibilities, and expectations..."
+            />
+          </Field>
+          <Field label="Hiring Reason *">
+            <select className="rc-input" value={form.hiring_reason} onChange={e => set("hiring_reason", e.target.value)}>
+              <option value="">Select a reason</option>
+              <option value="New Position">New Position</option>
+              <option value="Replacement">Replacement</option>
+              <option value="Team Expansion">Team Expansion</option>
+              <option value="Project Requirement">Project Requirement</option>
+              <option value="Urgent Requirement">Urgent Requirement</option>
+            </select>
+          </Field>
         </div>
       </div>
 
@@ -604,8 +642,8 @@ function CreateForm({ onSuccess, onCancel }) {
       )}
 
       <div style={{ display:"flex", gap:10, justifyContent:"flex-end", paddingTop:4 }}>
-        <button className="rc-btn-ghost" onClick={onCancel}>Cancel</button>
-        <button className="rc-btn-primary" onClick={handleSubmit} disabled={isPending}>
+        <button className="rc-btn-ghost" type="button" onClick={onCancel}>Cancel</button>
+        <button className="rc-btn-primary" type="button" onClick={handleSubmit} disabled={isPending}>
           {isPending ? <span style={{ display:"flex", alignItems:"center", gap:8 }}><span className="rc-spinner"/></span> : "Submit Requisition"}
         </button>
       </div>
@@ -635,7 +673,7 @@ function RequisitionRow({ req, onClick, delay }) {
               {req.job_title}
             </div>
             <div style={{ fontSize:11, color:"#b0948a", marginTop:3, fontFamily:"'DM Sans',sans-serif" }}>
-              {req.department} · {req.openings} opening{req.openings !== 1 ? "s" : ""} · {req.employment_type?.replace("_"," ")}
+              {req.department} · {req.openings} opening{req.openings !== 1 ? "s" : ""} · {req.employment_type}
             </div>
           </div>
           <span style={{ padding:"3px 10px", borderRadius:20, fontSize:10, fontWeight:600,
