@@ -812,30 +812,45 @@ const noofemployee = async (req, res, next) => {
 };
 
 const createannouncement = async (req, res, next) => {
-  if (!req.admin)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  const { title, message, audience, priority, notice_image, expiresAt } =
-    req.body;
-  if (!title || !message)
-    return next(
-      Object.assign(new Error("Title and message are required"), {
-        statusCode: 400,
-      }),
-    );
-  const announcement = await announcementmodel.create({
-    title,
-    message,
-    audience,
-    priority,
-    notice_image,
-    expiresAt,
-    createdBy: req.admin._id,
-  });
-  res.status(201).json({
-    success: true,
-    message: "Announcement created successfully",
-    announcement,
-  });
+  try {
+    const creator = req.admin || req.superadmin;
+
+    if (!creator)
+      return next(
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
+        })
+      );
+
+    const { title, message, audience, priority, notice_image, expiresAt } =
+      req.body;
+
+    if (!title || !message)
+      return next(
+        Object.assign(new Error("Title and message are required"), {
+          statusCode: 400,
+        })
+      );
+
+    const announcement = await announcementmodel.create({
+      title,
+      message,
+      audience,
+      priority,
+      notice_image,
+      expiresAt,
+      createdBy: creator._id,
+      createdByModel: req.admin ? "Admin" : "SuperAdmin",
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Announcement created successfully",
+      announcement,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const getallannouncement = async (req, res, next) => {
