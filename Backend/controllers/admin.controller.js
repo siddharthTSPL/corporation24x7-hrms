@@ -1025,14 +1025,93 @@ const getTodayCheckins = async (req, res) => {
   res.json({ checkins: payload, total: payload.length });
 };
 
-const getOrgInfo = async (req, res) => {
-  const superAdmin = await SuperAdminModel.findById(req.admin.created_by)
-    .select("organisation_name profile_image")
-    .lean();
-  res.json({
-    organisation_name: superAdmin?.organisation_name,
-    profile_image: superAdmin?.profile_image,
-  });
+const getOrgInfo = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized" });
+
+    const admin = await Adminmodel.findById(req.admin._id)
+      .select(
+        "f_name l_name work_email designation department office_location organisation_id created_by"
+      )
+      .lean();
+
+    if (!admin)
+      return res
+        .status(404)
+        .json({ success: false, message: "Admin not found" });
+
+    const superAdmin = await SuperAdminModel.findById(admin.created_by)
+      .select("f_name l_name email organisation_name profile_image")
+      .lean();
+
+    const managers = await managermodel
+      .find({ organisation_id: admin.organisation_id })
+      .select(
+        "f_name l_name work_email designation department office_location"
+      )
+      .lean();
+
+    const employees = await usermodel
+      .find({
+        Under_manager: { $in: managers.map((m) => m._id) },
+      })
+      .select(
+        "f_name l_name work_email designation department office_location Under_manager"
+      )
+      .lean();
+
+    const managersWithEmployees = managers.map((mgr) => ({
+      id: mgr._id,
+      name: `${mgr.f_name} ${mgr.l_name}`,
+      email: mgr.work_email,
+      designation: mgr.designation,
+      department: mgr.department,
+      office_location: mgr.office_location,
+      employees: employees
+        .filter(
+          (e) => e.Under_manager?.toString() === mgr._id.toString()
+        )
+        .map((e) => ({
+          id: e._id,
+          name: `${e.f_name} ${e.l_name}`,
+          email: e.work_email,
+          designation: e.designation,
+          department: e.department,
+          office_location: e.office_location,
+        })),
+    }));
+
+    res.status(200).json({
+      success: true,
+      organisation_name: superAdmin?.organisation_name || "",
+      organisation_logo: superAdmin?.profile_image || null,
+
+      super_admin: superAdmin
+        ? {
+            id: superAdmin._id,
+            name: `${superAdmin.f_name} ${superAdmin.l_name}`,
+            email: superAdmin.email,
+          }
+        : null,
+
+      admin: {
+        id: admin._id,
+        name: `${admin.f_name} ${admin.l_name}`,
+        email: admin.work_email,
+        designation: admin.designation,
+        department: admin.department,
+        office_location: admin.office_location,
+      },
+
+      managers: managersWithEmployees,
+      currentAdminId: req.admin._id,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 
