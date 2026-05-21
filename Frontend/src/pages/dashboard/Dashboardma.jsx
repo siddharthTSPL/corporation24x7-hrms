@@ -807,11 +807,7 @@ export default function ManagerDashboard() {
     { label:"Earned Leave (EL)",    availed:lb?.EL?.availed,  entitled:lb?.EL?.entitled, accrued:lb?.EL?.accrued != null ? Number(lb.EL.accrued).toFixed(2) : null, color:"#730042" },
     { label:"Sick Leave (SL)",      availed:lb?.SL?.availed,  entitled:lb?.SL?.entitled, accrued:null, color:"#1D9E75" },
     { label:"Privilege Leave (PL)", availed:lb?.pbc ?? 0,     entitled:lb?.PL,           accrued:null, color:"#378ADD" },
-   { label:"Maternity Leave (ML)", availed:0, entitled:lb?.ML ?? 0, accrued:null, color:"#BA7517" },
-=========
-    { label:"Paternity Leave (PL)", availed:lb?.pbc ?? 0,     entitled:lb?.PL,           accrued:null, color:"#378ADD" },
-    { label:"Maternity Leave (ML)", availed:lb?.lwp ?? 0,     entitled:(lb?.ML ?? 0) + 5,accrued:null, color:"#BA7517" },
->>>>>>>>> Temporary merge branch 2
+    { label:"Maternity Leave (ML)", availed:0, entitled:lb?.ML ?? 0, accrued:null, color:"#BA7517" },
   ];
 
   if (meError) return (
