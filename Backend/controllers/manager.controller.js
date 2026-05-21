@@ -1157,26 +1157,31 @@ const getOrgInfoForManager = async (req, res, next) => {
     if (!req.manager)
       return res.status(401).json({ success: false, message: "Unauthorized" });
 
-  
     const manager = await Managermodel.findById(req.manager._id)
-      .select("f_name l_name work_email designation department office_location organisation_id created_by")
+      .select("f_name l_name work_email designation department office_location organisation_id")
       .lean();
 
     if (!manager)
       return res.status(404).json({ success: false, message: "Manager not found" });
 
    
+    if (!manager.organisation_id)
+      return res.status(400).json({ success: false, message: "Manager has no organisation assigned" });
+
     const admin = await Adminmodel.findById(manager.organisation_id)
       .select("f_name l_name work_email designation created_by")
       .lean();
 
+ 
+    if (!admin)
+      return res.status(404).json({ success: false, message: "Admin not found for this organisation" });
+
     let superAdmin = null;
-    if (admin?.created_by) {
+    if (admin.created_by) {
       superAdmin = await SuperAdminModel.findById(admin.created_by)
         .select("f_name l_name email organisation_name profile_image")
         .lean();
     }
-
 
     const allManagers = await Managermodel.find({ organisation_id: manager.organisation_id })
       .select("f_name l_name work_email designation department office_location")
@@ -1187,7 +1192,6 @@ const getOrgInfoForManager = async (req, res, next) => {
       .select("f_name l_name work_email designation department office_location Under_manager")
       .lean();
 
-   
     const managersWithEmployees = allManagers.map((mgr) => ({
       id: mgr._id,
       name: `${mgr.f_name} ${mgr.l_name}`,
@@ -1217,14 +1221,12 @@ const getOrgInfoForManager = async (req, res, next) => {
             email: superAdmin.email,
           }
         : null,
-      admin: admin
-        ? {
-            id: admin._id,
-            name: `${admin.f_name} ${admin.l_name}`,
-            email: admin.work_email,
-            designation: admin.designation,
-          }
-        : null,
+      admin: {
+        id: admin._id,
+        name: `${admin.f_name} ${admin.l_name}`,
+        email: admin.work_email,
+        designation: admin.designation,
+      },
       managers: managersWithEmployees,
       currentManagerId: req.manager._id,
     });
