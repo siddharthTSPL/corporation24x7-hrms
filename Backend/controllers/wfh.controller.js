@@ -443,6 +443,70 @@ const adminGetMyWFH = async (req, res, next) => {
   res.status(200).json({ success: true, count: wfhList.length, wfhList });
 };
 
+const adminGetForwardedWFH = async (req, res, next) => {
+  const wfhList = await WFH.find({
+    manager: req.admin._id,
+    managerModel: "Admin",
+    status: { $in: ["pending_admin", "forwarded_reporting_manager"] },
+  })
+    .populate("requester", "f_name l_name work_email department designation role")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  res.status(200).json({ success: true, count: wfhList.length, wfhList });
+};
+
+const adminApproveForwardedWFH = async (req, res, next) => {
+  const { wfhId, remarks } = req.body;
+
+  if (!wfhId)
+    return next(Object.assign(new Error("wfhId is required"), { statusCode: 400 }));
+
+  const wfh = await WFH.findById(wfhId);
+
+  if (!wfh)
+    return next(Object.assign(new Error("WFH request not found"), { statusCode: 404 }));
+
+  if (wfh.manager.toString() !== req.admin._id.toString())
+    return next(Object.assign(new Error("This WFH request is not in your queue"), { statusCode: 403 }));
+
+  if (wfh.status !== "pending_admin")
+    return next(Object.assign(new Error("WFH request is not awaiting your approval"), { statusCode: 400 }));
+
+  wfh.status = "approved_admin";
+  wfh.approvedBy = req.admin._id;
+  wfh.remarks = remarks || "";
+  await wfh.save();
+
+  res.status(200).json({ success: true, message: "WFH request approved by admin", wfh });
+};
+
+const adminRejectForwardedWFH = async (req, res, next) => {
+  const { wfhId, remarks } = req.body;
+
+  if (!wfhId)
+    return next(Object.assign(new Error("wfhId is required"), { statusCode: 400 }));
+
+  const wfh = await WFH.findById(wfhId);
+
+  if (!wfh)
+    return next(Object.assign(new Error("WFH request not found"), { statusCode: 404 }));
+
+  if (wfh.manager.toString() !== req.admin._id.toString())
+    return next(Object.assign(new Error("This WFH request is not in your queue"), { statusCode: 403 }));
+
+  if (wfh.status !== "pending_admin")
+    return next(Object.assign(new Error("WFH request is not awaiting your decision"), { statusCode: 400 }));
+
+  wfh.status = "rejected_admin";
+  wfh.rejectedBy = req.admin._id;
+  wfh.remarks = remarks || "";
+  wfh.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  await wfh.save();
+
+  res.status(200).json({ success: true, message: "WFH request rejected by admin", wfh });
+};
+
 const superadminGetPendingWFH = async (req, res, next) => {
   if (!req.superadmin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
