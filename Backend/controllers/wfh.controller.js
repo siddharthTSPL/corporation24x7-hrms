@@ -244,7 +244,7 @@ const managerApplyWFH = async (req, res, next) => {
 
   const managerId = req.manager._id;
 
-  const currentManager = await managermodel
+  const currentManager = await Manager
     .findById(managerId)
     .select("reporting_manager reporting_manager_model")
     .lean();
