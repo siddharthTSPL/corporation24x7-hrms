@@ -1,31 +1,25 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   FaUsers, FaClock, FaCalendarAlt, FaBullhorn,
   FaPlus, FaEdit, FaTrash, FaTimes, FaCheck,
   FaMapMarkerAlt, FaChevronRight, FaBan, FaStar,
-  FaUserShield, FaBuilding, FaEnvelope, FaCheckCircle,
-  FaChartBar, FaLayerGroup, FaUserTie, FaUserCog,
-  FaAngleDown, FaAngleUp, FaSearch, FaSortAmountDown,
-  FaEye, FaFilter, FaInbox,
+  FaUserShield, FaCheckCircle, FaChartBar, FaLayerGroup,
+  FaUserCog, FaAngleDown, FaSearch,
 } from "react-icons/fa";
 
-/* ─────────────────────────────────────────────
-   HOOK IMPORTS  (wire to your real hooks)
-───────────────────────────────────────────── */
-import { useGetMeSuperAdmin }        from "../../auth/server-state/superadmin/auth/suauth.hook";
-import { useGetTodayCheckins, useGetOrgInfo, useGetNoOfEmployees, useGetAllManagers, useGetAllEmployees, useGetParticularEmployee, useGetParticularManager, useDeleteEmployee, useAddEmployee, useAddManager, useEditEmployee } from "../../auth/server-state/superadmin/other/suother.hook";
+import { useGetMeSuperAdmin } from "../../auth/server-state/superadmin/auth/suauth.hook";
+import {
+  useGetTodayCheckins, useGetNoOfEmployees, useGetAllEmployees,
+  useDeleteEmployee, useAddEmployee, useAddManager, useEditEmployee,
+} from "../../auth/server-state/superadmin/other/suother.hook";
 import { useShowAllLeaves, useAcceptLeaveByAdmin, useRejectLeaveByAdmin } from "../../auth/server-state/superadmin/leave/suleave.hook";
 import { useGetAllAnnouncements, useCreateAnnouncement, useUpdateAnnouncement, useDeleteAnnouncement } from "../../auth/server-state/superadmin/announcement/suannouncement.hook";
-import { useGetAllAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin } from "../../auth/server-state/superadmin/other/suother.hook";
-import { useReviewToAdmin } from "../../auth/server-state/superadmin/other/suother.hook";
+import { useGetAllAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin, useReviewToAdmin } from "../../auth/server-state/superadmin/other/suother.hook";
 
-/* ─────────────────────────────────────────────
-   STYLE INJECTION
-───────────────────────────────────────────── */
 const useStyles = () => {
   useEffect(() => {
     const font = document.createElement("link");
-    font.rel  = "stylesheet";
+    font.rel = "stylesheet";
     font.href = "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap";
     document.head.appendChild(font);
 
@@ -33,48 +27,19 @@ const useStyles = () => {
     style.id = "sa-dash-styles";
     style.textContent = `
       :root {
-        --ink:      #0d0209;
-        --p:        #730042;
-        --p-dark:   #4a0029;
-        --p-deep:   #2a0017;
-        --p-mid:    #9e0058;
-        --p-light:  #cd166e;
-        --p-wash:   #f7ecf3;
-        --p-pale:   #fdf5f9;
-        --border:   #e8d5e2;
-        --surface:  #ffffff;
-        --muted:    #7a5568;
-        --light:    #c499b4;
-        --green:    #0d9e6e;
-        --red:      #d93025;
-        --gold:     #b8760a;
-        --amber:    #f59e0b;
-        --blue:     #2563eb;
-        --sh:       0 2px 12px rgba(115,0,66,.08);
-        --sh-lg:    0 16px 48px rgba(115,0,66,.16);
-        --r:        14px;
-        --r-sm:     8px;
+        --ink: #0d0209; --p: #730042; --p-dark: #4a0029; --p-deep: #2a0017;
+        --p-mid: #9e0058; --p-light: #cd166e; --p-wash: #f7ecf3; --p-pale: #fdf5f9;
+        --border: #e8d5e2; --surface: #ffffff; --muted: #7a5568; --light: #c499b4;
+        --green: #0d9e6e; --red: #d93025; --gold: #b8760a; --amber: #f59e0b;
+        --blue: #2563eb; --sh: 0 2px 12px rgba(115,0,66,.08);
+        --sh-lg: 0 16px 48px rgba(115,0,66,.16); --r: 14px; --r-sm: 8px;
         font-family: 'DM Sans', sans-serif;
       }
-      
       *, *::before, *::after { box-sizing: border-box; }
-
       .sa { background: var(--p-pale); min-height: 100vh; padding: 24px 28px; font-family: 'DM Sans', sans-serif; color: var(--ink); }
-
-      /* ── HERO ── */
-      .sa-hero {
-        background: linear-gradient(135deg, var(--p-deep) 0%, var(--p-dark) 35%, var(--p) 65%, var(--p-light) 100%);
-        border-radius: var(--r); padding: 32px 40px; margin-bottom: 26px;
-        position: relative; overflow: hidden; box-shadow: var(--sh-lg);
-      }
-      .sa-hero::before {
-        content:''; position:absolute; width:500px; height:500px; border-radius:50%;
-        top:-250px; right:-120px; background:rgba(255,255,255,.04); pointer-events:none;
-      }
-      .sa-hero::after {
-        content:''; position:absolute; width:320px; height:320px; border-radius:50%;
-        bottom:-180px; left:42%; background:rgba(255,255,255,.03); pointer-events:none;
-      }
+      .sa-hero { background: linear-gradient(135deg, var(--p-deep) 0%, var(--p-dark) 35%, var(--p) 65%, var(--p-light) 100%); border-radius: var(--r); padding: 32px 40px; margin-bottom: 26px; position: relative; overflow: hidden; box-shadow: var(--sh-lg); }
+      .sa-hero::before { content:''; position:absolute; width:500px; height:500px; border-radius:50%; top:-250px; right:-120px; background:rgba(255,255,255,.04); pointer-events:none; }
+      .sa-hero::after { content:''; position:absolute; width:320px; height:320px; border-radius:50%; bottom:-180px; left:42%; background:rgba(255,255,255,.03); pointer-events:none; }
       .sa-hero-badge { display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2); border-radius:99px; padding:4px 14px 4px 8px; font-size:11px; color:rgba(255,255,255,.85); letter-spacing:.5px; font-weight:600; text-transform:uppercase; margin-bottom:14px; }
       .sa-hero-badge-dot { width:6px; height:6px; border-radius:50%; background:#4ade80; box-shadow:0 0 6px #4ade80; }
       .sa-hero-title { font-family:'Playfair Display',serif; font-size:clamp(28px,3.5vw,42px); color:#fff; margin:0 0 8px; font-weight:800; line-height:1.05; letter-spacing:-.5px; }
@@ -84,14 +49,10 @@ const useStyles = () => {
       .sa-hero-actions { position:absolute; top:28px; right:36px; display:flex; gap:10px; }
       .sa-hero-action-btn { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.25); color:#fff; padding:8px 16px; border-radius:var(--r-sm); font-size:12px; font-weight:600; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all .2s; display:flex; align-items:center; gap:6px; }
       .sa-hero-action-btn:hover { background:rgba(255,255,255,.25); }
-
-      /* ── STATS ── */
       .sa-stats { display:grid; grid-template-columns:repeat(5,1fr); gap:16px; margin-bottom:26px; }
       @media(max-width:1200px){ .sa-stats { grid-template-columns:repeat(3,1fr); } }
       @media(max-width:760px) { .sa-stats { grid-template-columns:repeat(2,1fr); } }
-      @media(max-width:480px) { .sa-stats { grid-template-columns:1fr; } }
-
-      .sa-stat { background:var(--surface); border-radius:var(--r); border:1px solid var(--border); padding:20px 18px 16px; box-shadow:var(--sh); position:relative; overflow:hidden; transition:transform .2s,box-shadow .2s; cursor:default; }
+      .sa-stat { background:var(--surface); border-radius:var(--r); border:1px solid var(--border); padding:20px 18px 16px; box-shadow:var(--sh); position:relative; overflow:hidden; transition:transform .2s,box-shadow .2s; }
       .sa-stat:hover { transform:translateY(-3px); box-shadow:var(--sh-lg); }
       .sa-stat-accent { position:absolute; top:0; left:0; right:0; height:3px; }
       .sa-stat-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:16px; margin-bottom:14px; }
@@ -100,30 +61,19 @@ const useStyles = () => {
       .sa-stat-sub { font-size:11px; margin-top:7px; font-weight:500; }
       .sa-stat-bar { height:3px; background:var(--border); border-radius:99px; margin-top:10px; overflow:hidden; }
       .sa-stat-fill { height:100%; border-radius:99px; transition:width .9s cubic-bezier(.4,0,.2,1); }
-
-      /* ── PANEL ── */
       .sa-panel { background:var(--surface); border-radius:var(--r); border:1px solid var(--border); box-shadow:var(--sh); overflow:hidden; }
       .sa-panel-head { padding:16px 22px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
       .sa-panel-title { font-family:'Playfair Display',serif; font-size:17px; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:9px; }
       .sa-live-dot { width:8px; height:8px; border-radius:50%; background:var(--green); animation:lp 2s infinite; flex-shrink:0; }
       @keyframes lp { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.4)} }
-
-      /* ── MAP ── */
       .sa-map-wrap { height:300px; position:relative; }
       .sa-map-foot { padding:11px 20px; background:var(--p-wash); border-top:1px solid var(--border); display:flex; gap:20px; align-items:center; flex-wrap:wrap; }
       .sa-leg { display:flex; align-items:center; gap:7px; font-size:11px; color:var(--muted); }
       .sa-leg-dot { width:10px; height:10px; border-radius:50%; border:2px solid white; box-shadow:0 1px 4px rgba(0,0,0,.2); }
-
-      /* ── GRIDS ── */
       .sa-mid-grid { display:grid; grid-template-columns:1fr 360px; gap:20px; margin-bottom:26px; }
       @media(max-width:1050px){ .sa-mid-grid { grid-template-columns:1fr; } }
       .sa-lower-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:26px; }
       @media(max-width:900px){ .sa-lower-grid { grid-template-columns:1fr; } }
-      .sa-three-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:20px; margin-bottom:26px; }
-      @media(max-width:1100px){ .sa-three-grid { grid-template-columns:1fr 1fr; } }
-      @media(max-width:680px) { .sa-three-grid { grid-template-columns:1fr; } }
-
-      /* ── LEAVE ── */
       .sa-leave-scroll { overflow-y:auto; max-height:360px; }
       .sa-leave-scroll::-webkit-scrollbar { width:4px; }
       .sa-leave-scroll::-webkit-scrollbar-thumb { background:var(--border); border-radius:99px; }
@@ -135,38 +85,33 @@ const useStyles = () => {
       .sa-leave-name { font-size:13px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
       .sa-leave-info { font-size:11px; color:var(--muted); margin-top:2px; }
       .sa-leave-actions { display:flex; gap:6px; margin-top:8px; }
-
       .sa-btn-accept { background:#e8f7f1; color:var(--green); border:1px solid #b8e8d4; border-radius:6px; padding:4px 10px; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px; transition:all .15s; font-family:'DM Sans',sans-serif; }
       .sa-btn-accept:hover { background:var(--green); color:white; }
       .sa-btn-reject { background:#fbeaea; color:var(--red); border:1px solid #f0c5c5; border-radius:6px; padding:4px 10px; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px; transition:all .15s; font-family:'DM Sans',sans-serif; }
       .sa-btn-reject:hover { background:var(--red); color:white; }
-
-      /* ── TABS ── */
       .sa-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); }
       .sa-tab { padding:10px 18px; font-size:12px; font-weight:600; color:var(--muted); border-bottom:2px solid transparent; cursor:pointer; transition:all .15s; white-space:nowrap; background:none; border-top:none; border-left:none; border-right:none; font-family:'DM Sans',sans-serif; }
       .sa-tab.active { color:var(--p); border-bottom-color:var(--p); }
       .sa-tab:hover:not(.active) { color:var(--ink); }
-
-      /* ── STATUS BADGE ── */
       .sa-badge { display:inline-flex; align-items:center; font-size:10px; font-weight:700; letter-spacing:.4px; padding:3px 9px; border-radius:99px; }
-      .sa-badge-pending  { background:#fff8e1; color:var(--gold); }
+      .sa-badge-pending { background:#fff8e1; color:var(--gold); }
       .sa-badge-approved { background:#e8f7f1; color:var(--green); }
       .sa-badge-rejected { background:#fbeaea; color:var(--red); }
-      .sa-badge-active   { background:#e8f7f1; color:var(--green); }
+      .sa-badge-active { background:#e8f7f1; color:var(--green); }
       .sa-badge-inactive { background:#f3f4f6; color:#6b7280; }
-      .sa-badge-suspended{ background:#fbeaea; color:var(--red); }
-
-      /* ── ADMIN CARDS ── */
-      .sa-admin-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; padding:18px; }
+      .sa-badge-suspended { background:#fbeaea; color:var(--red); }
+      .sa-badge-role-admin { background:var(--p-wash); color:var(--p); }
+      .sa-badge-role-senior { background:#ede9fe; color:#7c3aed; }
+      .sa-badge-role-official { background:#e0f2fe; color:#0369a1; }
+      .sa-admin-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px; padding:18px; }
       .sa-admin-card { border:1px solid var(--border); border-radius:var(--r-sm); padding:18px 16px; transition:all .2s; position:relative; }
       .sa-admin-card:hover { box-shadow:var(--sh); transform:translateY(-2px); background:var(--p-wash); }
       .sa-admin-ava { width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:700; color:white; background:linear-gradient(135deg,var(--p-dark),var(--p-light)); margin:0 auto 12px; }
       .sa-admin-name { font-size:13px; font-weight:700; color:var(--ink); text-align:center; }
       .sa-admin-desg { font-size:11px; color:var(--muted); text-align:center; margin-top:2px; }
-      .sa-admin-email { font-size:10px; color:var(--light); text-align:center; margin-top:6px; }
+      .sa-admin-email { font-size:10px; color:var(--light); text-align:center; margin-top:4px; }
+      .sa-admin-meta { display:flex; justify-content:center; gap:5px; margin-top:8px; flex-wrap:wrap; }
       .sa-admin-actions { display:flex; justify-content:center; gap:6px; margin-top:12px; padding-top:10px; border-top:1px solid var(--border); }
-
-      /* ── EMPLOYEE GRID ── */
       .sa-emp-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; padding:18px; }
       .sa-emp-card { border:1px solid var(--border); border-radius:var(--r-sm); padding:14px 12px; display:flex; align-items:center; gap:12px; transition:all .2s; }
       .sa-emp-card:hover { box-shadow:var(--sh); background:var(--p-wash); }
@@ -174,36 +119,26 @@ const useStyles = () => {
       .sa-emp-name { font-size:13px; font-weight:600; color:var(--ink); line-height:1.2; }
       .sa-emp-role { font-size:11px; color:var(--muted); margin-top:1px; }
       .sa-emp-dept { display:inline-block; font-size:10px; font-weight:600; background:var(--p-wash); color:var(--p); padding:2px 7px; border-radius:99px; margin-top:4px; }
-
-      /* ── DEPT BARS ── */
       .sa-dept-item { padding:12px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:14px; }
       .sa-dept-item:last-child { border-bottom:none; }
       .sa-dept-name { font-size:12px; font-weight:600; color:var(--ink); width:120px; flex-shrink:0; }
       .sa-dept-bar-track { flex:1; height:7px; background:var(--border); border-radius:99px; overflow:hidden; }
       .sa-dept-bar-fill { height:100%; border-radius:99px; background:linear-gradient(90deg,var(--p-dark),var(--p-light)); transition:width 1s ease; }
       .sa-dept-count { font-size:12px; font-weight:700; color:var(--p); width:32px; text-align:right; flex-shrink:0; }
-
-      /* ── ANN ── */
-      .sa-ann-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:18px; }
-      @media(max-width:700px){ .sa-ann-grid { grid-template-columns:1fr; } }
-      .sa-ann-card { border-radius:var(--r-sm); border:1px solid var(--border); padding:16px; transition:all .2s; }
+      .sa-ann-card { border-radius:var(--r-sm); border:1px solid var(--border); padding:16px; margin:0 18px 12px; transition:all .2s; }
       .sa-ann-card:hover { box-shadow:var(--sh); transform:translateY(-2px); }
       .sa-ann-chip { display:inline-block; font-size:10px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; padding:3px 10px; border-radius:99px; margin-bottom:8px; }
       .chip-general { background:var(--p-wash); color:var(--p); }
-      .chip-urgent   { background:#fbeaea; color:var(--red); }
-      .chip-event    { background:#e8f7f1; color:var(--green); }
-      .chip-policy   { background:#fff8e1; color:var(--gold); }
+      .chip-urgent { background:#fbeaea; color:var(--red); }
+      .chip-event { background:#e8f7f1; color:var(--green); }
+      .chip-policy { background:#fff8e1; color:var(--gold); }
       .sa-ann-title { font-size:13px; font-weight:600; color:var(--ink); margin-bottom:5px; }
-      .sa-ann-body  { font-size:12px; color:var(--muted); line-height:1.55; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-      .sa-ann-foot  { display:flex; gap:6px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border); }
-
-      /* ── REVIEW ── */
+      .sa-ann-body { font-size:12px; color:var(--muted); line-height:1.55; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+      .sa-ann-foot { display:flex; gap:6px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border); }
       .sa-review-form { padding:20px; }
       .sa-stars { display:flex; gap:6px; margin-bottom:14px; }
       .sa-star { font-size:22px; cursor:pointer; color:var(--border); transition:color .15s; }
       .sa-star.active { color:var(--amber); }
-
-      /* ── BUTTONS ── */
       .sa-btn-p { background:var(--p); color:white; border:none; padding:8px 16px; border-radius:var(--r-sm); font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; font-family:'DM Sans',sans-serif; transition:all .2s; white-space:nowrap; }
       .sa-btn-p:hover { background:var(--p-dark); transform:translateY(-1px); box-shadow:0 4px 14px rgba(115,0,66,.3); }
       .sa-btn-p:disabled { opacity:.5; cursor:not-allowed; transform:none; }
@@ -212,18 +147,14 @@ const useStyles = () => {
       .sa-icon-btn { background:none; border:none; cursor:pointer; padding:5px 8px; border-radius:5px; font-size:12px; color:var(--light); transition:all .15s; display:flex; align-items:center; gap:4px; font-family:'DM Sans',sans-serif; }
       .sa-icon-btn:hover { background:var(--p-wash); color:var(--p); }
       .sa-icon-btn.del:hover { background:#fbeaea; color:var(--red); }
-
-      /* ── SEARCH ── */
       .sa-search-wrap { position:relative; }
       .sa-search-ico { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--light); font-size:12px; pointer-events:none; }
       .sa-search-inp { padding:7px 10px 7px 30px; background:var(--p-pale); border:1px solid var(--border); border-radius:var(--r-sm); font-size:12px; color:var(--ink); font-family:'DM Sans',sans-serif; outline:none; width:200px; transition:all .15s; }
       .sa-search-inp:focus { border-color:var(--p); box-shadow:0 0 0 3px var(--p-wash); width:240px; }
-
-      /* ── MODAL ── */
       .sa-overlay { position:fixed; inset:0; background:rgba(13,2,9,.65); backdrop-filter:blur(6px); z-index:1000; display:flex; align-items:center; justify-content:center; padding:20px; animation:saov .18s; }
       @keyframes saov { from{opacity:0} to{opacity:1} }
       .sa-modal { background:var(--surface); border-radius:var(--r); width:100%; max-width:520px; box-shadow:var(--sh-lg); animation:samup .22s; max-height:90vh; overflow-y:auto; }
-      .sa-modal-lg { max-width:640px; }
+      .sa-modal-lg { max-width:680px; }
       @keyframes samup { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
       .sa-modal-hd { padding:22px 26px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; background:var(--surface); z-index:1; }
       .sa-modal-title { font-family:'Playfair Display',serif; font-size:20px; font-weight:700; color:var(--ink); }
@@ -231,40 +162,29 @@ const useStyles = () => {
       .sa-modal-x:hover { background:var(--p-wash); color:var(--p); }
       .sa-modal-bd { padding:22px 26px; }
       .sa-modal-ft { padding:14px 26px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px; position:sticky; bottom:0; background:var(--surface); }
+      .sa-modal-section { font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--p); margin:18px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--p-wash); }
+      .sa-modal-section:first-child { margin-top:0; }
       .sa-fld { margin-bottom:16px; }
       .sa-flbl { display:block; font-size:11px; font-weight:600; letter-spacing:.6px; text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
       .sa-finp, .sa-fsel, .sa-ftxt { width:100%; padding:10px 12px; background:var(--p-pale); border:1px solid var(--border); border-radius:var(--r-sm); font-size:13px; color:var(--ink); font-family:'DM Sans',sans-serif; outline:none; transition:border-color .15s,box-shadow .15s; }
       .sa-finp:focus, .sa-fsel:focus, .sa-ftxt:focus { border-color:var(--p); box-shadow:0 0 0 3px var(--p-wash); }
       .sa-ftxt { resize:vertical; min-height:80px; line-height:1.6; }
       .sa-form-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-
-      /* ── EMPTY ── */
+      .sa-form-row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
       .sa-empty { text-align:center; padding:36px 20px; color:var(--light); }
       .sa-empty-ico { font-size:28px; margin-bottom:10px; }
       .sa-empty p { font-size:13px; margin:0; }
-
-      /* ── SECTION DIVIDER ── */
-      .sa-divider { display:flex; align-items:center; gap:12px; margin:0 0 20px; }
-      .sa-divider-line { flex:1; height:1px; background:var(--border); }
-      .sa-divider-txt { font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:var(--light); font-weight:600; white-space:nowrap; }
-
-      @keyframes mPulse {
-        0%,100% { transform:translate(-50%,-50%) scale(1); opacity:.5; }
-        50%      { transform:translate(-50%,-50%) scale(2.4); opacity:0; }
-      }
+      @keyframes mPulse { 0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.5} 50%{transform:translate(-50%,-50%) scale(2.4);opacity:0} }
     `;
     document.head.appendChild(style);
     return () => {
-      try { document.head.removeChild(font); } catch(_){}
+      try { document.head.removeChild(font); } catch (_) {}
       const el = document.getElementById("sa-dash-styles");
       if (el) document.head.removeChild(el);
     };
   }, []);
 };
 
-/* ─────────────────────────────────────────────
-   HELPERS
-───────────────────────────────────────────── */
 const initials = (name = "") =>
   (name || "").trim().split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
 
@@ -285,24 +205,21 @@ const ROLE_COLOR = { manager: "#730042", employee: "#a0005c" };
 const leaveTypeColor = (type = "") => {
   const t = type.toLowerCase();
   if (t.includes("sick") || t === "sl") return "#0d9e6e";
-  if (t.includes("earn") || t === "el")  return "#730042";
-  if (t.includes("priv") || t === "pl")  return "#b8760a";
-  if (t.includes("mat")  || t === "ml")  return "#7c3aed";
-  if (t.includes("cas")  || t === "cl")  return "#2563eb";
+  if (t.includes("earn") || t === "el") return "#730042";
+  if (t.includes("priv") || t === "pl") return "#b8760a";
+  if (t.includes("mat") || t === "ml") return "#7c3aed";
+  if (t.includes("cas") || t === "cl") return "#2563eb";
   return "#730042";
 };
 
-const ANN_CHIP = { general:"chip-general", urgent:"chip-urgent", event:"chip-event", policy:"chip-policy" };
+const AVATAR_COLORS = ["#730042","#9e0058","#4a0029","#2563eb","#0d9e6e","#7c3aed","#b8760a","#d93025"];
+const avaColor = (str = "") => AVATAR_COLORS[(str.charCodeAt(0) || 0) % AVATAR_COLORS.length];
 
-const AVATAR_COLORS = [
-  "#730042","#9e0058","#4a0029","#2563eb","#0d9e6e","#7c3aed","#b8760a","#d93025",
-];
-const avaColor = (str = "") =>
-  AVATAR_COLORS[(str.charCodeAt(0) || 0) % AVATAR_COLORS.length];
+const DEPT_OPTIONS = ["OPR", "BPO", "ENG", "HR", "MGMT"];
+const OFFICE_OPTIONS = ["Noida", "Bareilly", "Delhi", "Mumbai"];
+const ROLE_OPTIONS = ["admin", "senior_admin", "official"];
+const ROLE_LABEL = { admin: "Admin", senior_admin: "Senior Admin", official: "Official" };
 
-/* ─────────────────────────────────────────────
-   ATTENDANCE MAP
-───────────────────────────────────────────── */
 const AttendanceMap = ({ checkins = [], loading }) => {
   const mapRef = useRef(null);
   const instRef = useRef(null);
@@ -400,9 +317,6 @@ const AttendanceMap = ({ checkins = [], loading }) => {
   );
 };
 
-/* ─────────────────────────────────────────────
-   ANNOUNCEMENT MODAL
-───────────────────────────────────────────── */
 const AnnModal = ({ open, onClose, initial, onSave, loading }) => {
   const [form, setForm] = useState({ title: "", message: "", audience: "all", priority: "normal" });
   useEffect(() => {
@@ -457,15 +371,23 @@ const AnnModal = ({ open, onClose, initial, onSave, loading }) => {
   );
 };
 
-/* ─────────────────────────────────────────────
-   CREATE ADMIN MODAL
-───────────────────────────────────────────── */
 const AdminModal = ({ open, onClose, initial, onSave, loading }) => {
-  const blank = { f_name:"", l_name:"", work_email:"", password:"", gender:"", designation:"", phone:"" };
+  const blank = {
+    f_name: "", l_name: "", work_email: "", password: "",
+    gender: "", designation: "", phone: "",
+    department: "", role: "admin", office_location: "",
+    marital_status: "single", personal_contact: "", e_contact: "",
+    is_fresher: true, total_experience: 0,
+    previous_company: "", previous_designation: "",
+    aadhaar_number: "", pan_number: "",
+    address: "", city: "", state: "", pincode: "",
+  };
   const [form, setForm] = useState(blank);
   useEffect(() => { if (open) setForm(initial ? { ...blank, ...initial } : blank); }, [open]);
   if (!open) return null;
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const setCheck = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.checked }));
+
   return (
     <div className="sa-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="sa-modal sa-modal-lg">
@@ -474,29 +396,147 @@ const AdminModal = ({ open, onClose, initial, onSave, loading }) => {
           <button className="sa-modal-x" onClick={onClose}><FaTimes /></button>
         </div>
         <div className="sa-modal-bd">
+          <div className="sa-modal-section">Basic Information</div>
           <div className="sa-form-row">
-            <div className="sa-fld"><label className="sa-flbl">First Name</label><input className="sa-finp" placeholder="First name" value={form.f_name} onChange={set("f_name")} /></div>
-            <div className="sa-fld"><label className="sa-flbl">Last Name</label><input className="sa-finp" placeholder="Last name" value={form.l_name} onChange={set("l_name")} /></div>
-          </div>
-          <div className="sa-fld"><label className="sa-flbl">Work Email</label><input className="sa-finp" type="email" placeholder="admin@company.com" value={form.work_email} onChange={set("work_email")} disabled={!!initial} /></div>
-          {!initial && <div className="sa-fld"><label className="sa-flbl">Password</label><input className="sa-finp" type="password" placeholder="Temporary password" value={form.password} onChange={set("password")} /></div>}
-          <div className="sa-form-row">
-            <div className="sa-fld"><label className="sa-flbl">Designation</label><input className="sa-finp" placeholder="e.g. HR Manager" value={form.designation} onChange={set("designation")} /></div>
             <div className="sa-fld">
-              <label className="sa-flbl">Gender</label>
+              <label className="sa-flbl">First Name *</label>
+              <input className="sa-finp" placeholder="First name" value={form.f_name} onChange={set("f_name")} />
+            </div>
+            <div className="sa-fld">
+              <label className="sa-flbl">Last Name *</label>
+              <input className="sa-finp" placeholder="Last name" value={form.l_name} onChange={set("l_name")} />
+            </div>
+          </div>
+          <div className="sa-fld">
+            <label className="sa-flbl">Work Email *</label>
+            <input className="sa-finp" type="email" placeholder="admin@company.com" value={form.work_email} onChange={set("work_email")} disabled={!!initial} />
+          </div>
+          {!initial && (
+            <div className="sa-fld">
+              <label className="sa-flbl">Password *</label>
+              <input className="sa-finp" type="password" placeholder="Temporary password" value={form.password} onChange={set("password")} />
+            </div>
+          )}
+          <div className="sa-form-row">
+            <div className="sa-fld">
+              <label className="sa-flbl">Gender *</label>
               <select className="sa-fsel" value={form.gender} onChange={set("gender")}>
-                <option value="">Select</option>
+                <option value="">Select gender</option>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
-                <option value="other">Other</option>
+              </select>
+            </div>
+            <div className="sa-fld">
+              <label className="sa-flbl">Marital Status</label>
+              <select className="sa-fsel" value={form.marital_status} onChange={set("marital_status")}>
+                <option value="single">Single</option>
+                <option value="married">Married</option>
+                <option value="divorced">Divorced</option>
               </select>
             </div>
           </div>
-          <div className="sa-fld" style={{ marginBottom: 0 }}><label className="sa-flbl">Phone</label><input className="sa-finp" placeholder="Phone number" value={form.phone} onChange={set("phone")} /></div>
+          <div className="sa-form-row">
+            <div className="sa-fld">
+              <label className="sa-flbl">Personal Contact *</label>
+              <input className="sa-finp" placeholder="Personal phone" value={form.personal_contact} onChange={set("personal_contact")} />
+            </div>
+            <div className="sa-fld">
+              <label className="sa-flbl">Emergency Contact *</label>
+              <input className="sa-finp" placeholder="Emergency phone" value={form.e_contact} onChange={set("e_contact")} />
+            </div>
+          </div>
+
+          <div className="sa-modal-section">Work Details</div>
+          <div className="sa-form-row">
+            <div className="sa-fld">
+              <label className="sa-flbl">Designation *</label>
+              <input className="sa-finp" placeholder="e.g. HR Manager" value={form.designation} onChange={set("designation")} />
+            </div>
+            <div className="sa-fld">
+              <label className="sa-flbl">Role *</label>
+              <select className="sa-fsel" value={form.role} onChange={set("role")}>
+                {ROLE_OPTIONS.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="sa-form-row">
+            <div className="sa-fld">
+              <label className="sa-flbl">Department *</label>
+              <select className="sa-fsel" value={form.department} onChange={set("department")}>
+                <option value="">Select department</option>
+                {DEPT_OPTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div className="sa-fld">
+              <label className="sa-flbl">Office Location *</label>
+              <select className="sa-fsel" value={form.office_location} onChange={set("office_location")}>
+                <option value="">Select location</option>
+                {OFFICE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="sa-modal-section">Experience</div>
+          <div className="sa-form-row">
+            <div className="sa-fld" style={{ display:"flex", alignItems:"center", gap:10, paddingTop:22 }}>
+              <input type="checkbox" id="sa-fresher" checked={form.is_fresher} onChange={setCheck("is_fresher")} style={{ width:16, height:16, accentColor:"var(--p)" }} />
+              <label htmlFor="sa-fresher" className="sa-flbl" style={{ margin:0, cursor:"pointer" }}>Is Fresher</label>
+            </div>
+            <div className="sa-fld">
+              <label className="sa-flbl">Total Experience (yrs)</label>
+              <input className="sa-finp" type="number" min="0" placeholder="0" value={form.total_experience} onChange={set("total_experience")} disabled={form.is_fresher} />
+            </div>
+          </div>
+          {!form.is_fresher && (
+            <div className="sa-form-row">
+              <div className="sa-fld">
+                <label className="sa-flbl">Previous Company</label>
+                <input className="sa-finp" placeholder="Company name" value={form.previous_company} onChange={set("previous_company")} />
+              </div>
+              <div className="sa-fld">
+                <label className="sa-flbl">Previous Designation</label>
+                <input className="sa-finp" placeholder="Last role" value={form.previous_designation} onChange={set("previous_designation")} />
+              </div>
+            </div>
+          )}
+
+          <div className="sa-modal-section">Identity & Address</div>
+          <div className="sa-form-row">
+            <div className="sa-fld">
+              <label className="sa-flbl">Aadhaar Number</label>
+              <input className="sa-finp" placeholder="xxxx xxxx xxxx" value={form.aadhaar_number} onChange={set("aadhaar_number")} />
+            </div>
+            <div className="sa-fld">
+              <label className="sa-flbl">PAN Number</label>
+              <input className="sa-finp" placeholder="ABCDE1234F" value={form.pan_number} onChange={set("pan_number")} />
+            </div>
+          </div>
+          <div className="sa-fld">
+            <label className="sa-flbl">Address</label>
+            <input className="sa-finp" placeholder="Street address" value={form.address} onChange={set("address")} />
+          </div>
+          <div className="sa-form-row-3">
+            <div className="sa-fld">
+              <label className="sa-flbl">City</label>
+              <input className="sa-finp" placeholder="City" value={form.city} onChange={set("city")} />
+            </div>
+            <div className="sa-fld">
+              <label className="sa-flbl">State</label>
+              <input className="sa-finp" placeholder="State" value={form.state} onChange={set("state")} />
+            </div>
+            <div className="sa-fld" style={{ marginBottom:0 }}>
+              <label className="sa-flbl">Pincode</label>
+              <input className="sa-finp" placeholder="Pincode" value={form.pincode} onChange={set("pincode")} />
+            </div>
+          </div>
         </div>
         <div className="sa-modal-ft">
           <button className="sa-btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="sa-btn-p" onClick={() => onSave(form)} disabled={loading || !form.f_name || !form.work_email}>
+          <button
+            className="sa-btn-p"
+            onClick={() => onSave(form)}
+            disabled={loading || !form.f_name || !form.l_name || !form.work_email || !form.gender || !form.designation || !form.department || !form.office_location || !form.personal_contact || !form.e_contact || (!initial && !form.password)}
+          >
             <FaCheck style={{ fontSize: 10 }} /> {loading ? "Saving…" : initial ? "Update" : "Create"}
           </button>
         </div>
@@ -505,9 +545,6 @@ const AdminModal = ({ open, onClose, initial, onSave, loading }) => {
   );
 };
 
-/* ─────────────────────────────────────────────
-   REVIEW MODAL
-───────────────────────────────────────────── */
 const ReviewModal = ({ open, onClose, admins, onSave, loading }) => {
   const [form, setForm] = useState({ adminid: "", rating: 0, comment: "" });
   useEffect(() => { if (open) setForm({ adminid: "", rating: 0, comment: "" }); }, [open]);
@@ -525,7 +562,9 @@ const ReviewModal = ({ open, onClose, admins, onSave, loading }) => {
             <select className="sa-fsel" value={form.adminid} onChange={(e) => setForm((f) => ({ ...f, adminid: e.target.value }))}>
               <option value="">Choose admin…</option>
               {admins.map((a) => (
-                <option key={a._id} value={a._id}>{a.f_name} {a.l_name} – {a.designation || a.work_email}</option>
+                <option key={a._id} value={a._id}>
+                  {a.f_name} {a.l_name} – {a.designation} ({a.department})
+                </option>
               ))}
             </select>
           </div>
@@ -553,59 +592,56 @@ const ReviewModal = ({ open, onClose, admins, onSave, loading }) => {
   );
 };
 
-/* ─────────────────────────────────────────────
-   MAIN DASHBOARD
-───────────────────────────────────────────── */
+const roleBadgeClass = (role = "") => {
+  if (role === "senior_admin") return "sa-badge sa-badge-role-senior";
+  if (role === "official") return "sa-badge sa-badge-role-official";
+  return "sa-badge sa-badge-role-admin";
+};
+
 function SuperAdminDashboard() {
   useStyles();
 
   const [greeting, setGreeting] = useState("");
-  const [thought,  setThought]  = useState("");
-
-  // Modals
-  const [annModal,    setAnnModal]    = useState({ open: false, editing: null });
-  const [adminModal,  setAdminModal]  = useState({ open: false, editing: null });
+  const [thought, setThought] = useState("");
+  const [annModal, setAnnModal] = useState({ open: false, editing: null });
+  const [adminModal, setAdminModal] = useState({ open: false, editing: null });
   const [reviewModal, setReviewModal] = useState(false);
+  const [leaveTab, setLeaveTab] = useState("employee");
+  const [empExpand, setEmpExpand] = useState(false);
+  const [empSearch, setEmpSearch] = useState("");
 
-  // UI state
-  const [leaveTab,    setLeaveTab]    = useState("employee"); // "employee" | "admin"
-  const [empExpand,   setEmpExpand]   = useState(false);
-  const [empSearch,   setEmpSearch]   = useState("");
+  const { data: meData } = useGetMeSuperAdmin();
+  const { data: checkinData, isLoading: mapLoading } = useGetTodayCheckins();
+  const { data: adminsData, isLoading: adminsLoading } = useGetAllAdmins();
+  const { data: empData, isLoading: empLoading } = useGetAllEmployees();
+  const { data: deptData, isLoading: deptLoading } = useGetNoOfEmployees();
+  const { data: leavesRaw, isLoading: leaveLoading } = useShowAllLeaves();
+  const { data: annRaw, isLoading: annLoading } = useGetAllAnnouncements();
 
-  // ── Data hooks ──
-  const { data: meData }                                   = useGetMeSuperAdmin();
-  const { data: checkinData, isLoading: mapLoading }       = useGetTodayCheckins();
-  const { data: adminsData,  isLoading: adminsLoading }    = useGetAllAdmins();
-  const { data: empData,     isLoading: empLoading }       = useGetAllEmployees();
-  const { data: deptData,    isLoading: deptLoading }      = useGetNoOfEmployees();
-  const { data: leavesRaw,   isLoading: leaveLoading }     = useShowAllLeaves();
-  const { data: annRaw,      isLoading: annLoading }       = useGetAllAnnouncements();
+  const { mutate: createAnn, isPending: creatingAnn } = useCreateAnnouncement();
+  const { mutate: updateAnn, isPending: updatingAnn } = useUpdateAnnouncement();
+  const { mutate: deleteAnn } = useDeleteAnnouncement();
+  const { mutate: createAdmin, isPending: creatingAdmin } = useCreateAdmin();
+  const { mutate: updateAdmin, isPending: updatingAdmin } = useUpdateAdmin();
+  const { mutate: deleteAdmin } = useDeleteAdmin();
+  const { mutate: acceptLeave, isPending: accepting } = useAcceptLeaveByAdmin();
+  const { mutate: rejectLeave, isPending: rejecting } = useRejectLeaveByAdmin();
+  const { mutate: reviewAdmin, isPending: reviewing } = useReviewToAdmin();
 
-  // ── Mutation hooks ──
-  const { mutate: createAnn,   isPending: creatingAnn  }   = useCreateAnnouncement();
-  const { mutate: updateAnn,   isPending: updatingAnn  }   = useUpdateAnnouncement();
-  const { mutate: deleteAnn                            }   = useDeleteAnnouncement();
-  const { mutate: createAdmin, isPending: creatingAdmin }  = useCreateAdmin();
-  const { mutate: updateAdmin, isPending: updatingAdmin }  = useUpdateAdmin();
-  const { mutate: deleteAdmin                          }   = useDeleteAdmin();
-  const { mutate: acceptLeave, isPending: accepting    }   = useAcceptLeaveByAdmin();
-  const { mutate: rejectLeave, isPending: rejecting    }   = useRejectLeaveByAdmin();
-  const { mutate: reviewAdmin, isPending: reviewing    }   = useReviewToAdmin();
+  const superAdmin = meData?.superAdmin || meData || {};
+  const checkins = checkinData?.checkins ?? [];
+  const presentToday = checkinData?.total ?? checkins.length;
+  const stillOnDuty = checkins.filter((c) => !c.checkedOut).length;
+  const admins = Array.isArray(adminsData?.admins) ? adminsData.admins : Array.isArray(adminsData) ? adminsData : [];
+  const employees = Array.isArray(empData?.users) ? empData.users : Array.isArray(empData) ? empData : [];
+  const departments = Array.isArray(deptData?.departments) ? deptData.departments : [];
+  const totalEmpCount = deptData?.totalEmployees ?? employees.length;
+  const announcements = Array.isArray(annRaw?.announcements) ? annRaw.announcements : Array.isArray(annRaw) ? annRaw : [];
+  const empLeaves = Array.isArray(leavesRaw?.employeeLeaves?.leaves) ? leavesRaw.employeeLeaves.leaves : [];
+  const adminLeaves = Array.isArray(leavesRaw?.adminLeaves?.leaves) ? leavesRaw.adminLeaves.leaves : [];
+  const activeLeaves = leaveTab === "employee" ? empLeaves : adminLeaves;
 
-  // ── Normalize data ──
-  const superAdmin     = meData?.superAdmin || meData || {};
-  const checkins       = checkinData?.checkins  ?? [];
-  const presentToday   = checkinData?.total     ?? checkins.length;
-  const stillOnDuty    = checkins.filter((c) => !c.checkedOut).length;
-  const admins         = Array.isArray(adminsData?.admins)  ? adminsData.admins  : Array.isArray(adminsData) ? adminsData : [];
-  const employees      = Array.isArray(empData?.users)      ? empData.users      : Array.isArray(empData)   ? empData   : [];
-  const departments    = Array.isArray(deptData?.departments) ? deptData.departments : [];
-  const totalEmpCount  = deptData?.totalEmployees ?? employees.length;
-  const announcements  = Array.isArray(annRaw?.announcements) ? annRaw.announcements : Array.isArray(annRaw) ? annRaw : [];
-  const empLeaves      = Array.isArray(leavesRaw?.employeeLeaves?.leaves) ? leavesRaw.employeeLeaves.leaves : [];
-  const adminLeaves    = Array.isArray(leavesRaw?.adminLeaves?.leaves)    ? leavesRaw.adminLeaves.leaves    : [];
-  const activeLeaves   = leaveTab === "employee" ? empLeaves : adminLeaves;
-  const pendingLeaves  = empLeaves.filter((l) => {
+  const pendingLeaves = empLeaves.filter((l) => {
     const s = (l.status || "").toLowerCase();
     return s.includes("forwarded") || s.includes("pending");
   }).length + adminLeaves.filter((l) => (l.status || "").includes("pending")).length;
@@ -633,7 +669,6 @@ function SuperAdminDashboard() {
   const orgName = superAdmin?.organisation_name || "Your Organisation";
   const maxDept = Math.max(...departments.map((d) => d.lastNumber), 1);
 
-  // ── Filtered employees ──
   const filteredEmp = employees.filter((e) => {
     const q = empSearch.toLowerCase();
     const name = [e.f_name, e.l_name].filter(Boolean).join(" ").toLowerCase();
@@ -641,7 +676,6 @@ function SuperAdminDashboard() {
   });
   const displayEmp = empExpand ? filteredEmp : filteredEmp.slice(0, 10);
 
-  // ── Stats ──
   const stats = [
     { icon: <FaUserShield />, label: "Total Admins", value: adminsLoading ? "—" : admins.length, sub: `${admins.filter((a) => a.status === "active").length} active`, color: "#730042", bgColor: "#f7ecf3", bar: null },
     { icon: <FaUsers />, label: "Total Employees", value: deptLoading || empLoading ? "—" : totalEmpCount, sub: `${departments.length} departments`, color: "#2563eb", bgColor: "#eff6ff", bar: null },
@@ -650,7 +684,6 @@ function SuperAdminDashboard() {
     { icon: <FaBullhorn />, label: "Announcements", value: annLoading ? "—" : announcements.length, sub: "Active broadcasts", color: "#7c3aed", bgColor: "#f5f3ff", bar: null },
   ];
 
-  // ── Handlers ──
   const saveAnn = (form) => {
     if (annModal.editing) {
       updateAnn({ id: annModal.editing._id, data: form }, { onSuccess: () => setAnnModal({ open: false, editing: null }) });
@@ -668,13 +701,11 @@ function SuperAdminDashboard() {
   };
 
   const handleAcceptLeave = (leave) => {
-    const isAdminLeave = leaveTab === "admin";
-    acceptLeave({ id: leave._id, leaveFor: isAdminLeave ? "admin" : "employee" });
+    acceptLeave({ id: leave._id, leaveFor: leaveTab === "admin" ? "admin" : "employee" });
   };
 
   const handleRejectLeave = (leave) => {
-    const isAdminLeave = leaveTab === "admin";
-    rejectLeave({ id: leave._id, leaveFor: isAdminLeave ? "admin" : "employee" });
+    rejectLeave({ id: leave._id, leaveFor: leaveTab === "admin" ? "admin" : "employee" });
   };
 
   const saveReview = (form) => {
@@ -703,7 +734,6 @@ function SuperAdminDashboard() {
   return (
     <div className="sa">
 
-      {/* ━━━━━━━━ HERO ━━━━━━━━ */}
       <div className="sa-hero">
         <div className="sa-hero-badge">
           <div className="sa-hero-badge-dot" />
@@ -728,7 +758,6 @@ function SuperAdminDashboard() {
         </div>
       </div>
 
-      {/* ━━━━━━━━ STATS ━━━━━━━━ */}
       <div className="sa-stats">
         {stats.map((s, i) => (
           <div className="sa-stat" key={i}>
@@ -746,10 +775,7 @@ function SuperAdminDashboard() {
         ))}
       </div>
 
-      {/* ━━━━━━━━ MAP + LEAVE REQUESTS ━━━━━━━━ */}
       <div className="sa-mid-grid">
-
-        {/* MAP */}
         <div className="sa-panel">
           <div className="sa-panel-head">
             <div className="sa-panel-title">
@@ -772,7 +798,6 @@ function SuperAdminDashboard() {
           </div>
         </div>
 
-        {/* LEAVE PANEL */}
         <div className="sa-panel" style={{ display: "flex", flexDirection: "column" }}>
           <div className="sa-panel-head">
             <div className="sa-panel-title">
@@ -785,7 +810,6 @@ function SuperAdminDashboard() {
               </span>
             )}
           </div>
-
           <div className="sa-tabs">
             <button className={`sa-tab${leaveTab === "employee" ? " active" : ""}`} onClick={() => setLeaveTab("employee")}>
               Employees {empLeaves.length > 0 && `(${empLeaves.length})`}
@@ -794,7 +818,6 @@ function SuperAdminDashboard() {
               Admins/Managers {adminLeaves.length > 0 && `(${adminLeaves.length})`}
             </button>
           </div>
-
           <div className="sa-leave-scroll" style={{ flex: 1 }}>
             {leaveLoading ? (
               <div className="sa-empty"><div className="sa-empty-ico">⏳</div><p>Loading…</p></div>
@@ -809,7 +832,7 @@ function SuperAdminDashboard() {
                 const name = [emp.f_name, emp.l_name].filter(Boolean).join(" ") || leave.name || "Employee";
                 const type = leave.leaveType || leave.type || "Leave";
                 const from = leave.startDate || leave.from || "";
-                const to   = leave.endDate   || leave.to   || "";
+                const to = leave.endDate || leave.to || "";
                 const pending = isPendingLeave(leave);
                 return (
                   <div key={leave._id} className="sa-leave-item">
@@ -842,7 +865,6 @@ function SuperAdminDashboard() {
         </div>
       </div>
 
-      {/* ━━━━━━━━ ADMIN MANAGEMENT ━━━━━━━━ */}
       <div className="sa-panel" style={{ marginBottom: 26 }}>
         <div className="sa-panel-head">
           <div className="sa-panel-title">
@@ -858,7 +880,6 @@ function SuperAdminDashboard() {
             </button>
           </div>
         </div>
-
         {adminsLoading ? (
           <div className="sa-empty"><div className="sa-empty-ico">⏳</div><p>Loading admins…</p></div>
         ) : admins.length === 0 ? (
@@ -871,17 +892,28 @@ function SuperAdminDashboard() {
             {admins.map((admin) => {
               const name = [admin.f_name, admin.l_name].filter(Boolean).join(" ");
               const statusKey = (admin.status || "inactive").toLowerCase();
+              const roleKey = admin.role || "admin";
               return (
                 <div className="sa-admin-card" key={admin._id}>
                   <div className="sa-admin-ava" style={{ background: `linear-gradient(135deg, ${avaColor(admin.f_name || "")}, #cd166e)` }}>
                     {initials(name)}
                   </div>
                   <div className="sa-admin-name">{name}</div>
-                  <div className="sa-admin-desg">{admin.designation || "Admin"}</div>
+                  <div className="sa-admin-desg">{admin.designation}</div>
                   <div className="sa-admin-email">{admin.work_email}</div>
-                  <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>
-                    <span className={`sa-badge sa-badge-${statusKey}`}>{statusKey.charAt(0).toUpperCase() + statusKey.slice(1)}</span>
+                  <div className="sa-admin-meta">
+                    <span className={`sa-badge ${statusKey === "active" ? "sa-badge-active" : statusKey === "suspended" ? "sa-badge-suspended" : "sa-badge-inactive"}`}>
+                      {statusKey.charAt(0).toUpperCase() + statusKey.slice(1)}
+                    </span>
+                    <span className={roleBadgeClass(roleKey)}>{ROLE_LABEL[roleKey] || roleKey}</span>
                   </div>
+                  {admin.department && (
+                    <div style={{ textAlign:"center", marginTop:4 }}>
+                      <span style={{ fontSize:10, background:"#f3f4f6", color:"#6b7280", padding:"2px 8px", borderRadius:99, fontWeight:600 }}>
+                        {admin.department} · {admin.office_location}
+                      </span>
+                    </div>
+                  )}
                   <div className="sa-admin-actions">
                     <button className="sa-icon-btn" title="Edit" onClick={() => setAdminModal({ open: true, editing: admin })}><FaEdit /></button>
                     <button className="sa-icon-btn del" title="Delete" onClick={() => { if (window.confirm(`Delete ${name}?`)) deleteAdmin(admin._id); }}><FaTrash /></button>
@@ -893,10 +925,7 @@ function SuperAdminDashboard() {
         )}
       </div>
 
-      {/* ━━━━━━━━ DEPARTMENT BREAKDOWN + ANNOUNCEMENTS ━━━━━━━━ */}
       <div className="sa-lower-grid">
-
-        {/* DEPT BREAKDOWN */}
         <div className="sa-panel">
           <div className="sa-panel-head">
             <div className="sa-panel-title">
@@ -924,7 +953,6 @@ function SuperAdminDashboard() {
           )}
         </div>
 
-        {/* ANNOUNCEMENTS */}
         <div className="sa-panel">
           <div className="sa-panel-head">
             <div className="sa-panel-title">
@@ -940,39 +968,36 @@ function SuperAdminDashboard() {
           ) : announcements.length === 0 ? (
             <div className="sa-empty"><div className="sa-empty-ico">📢</div><p>No announcements. Publish one to notify your team.</p></div>
           ) : (
-            <div style={{ overflow: "hidden" }}>
-              <div className="sa-ann-grid" style={{ gridTemplateColumns: "1fr" }}>
-                {announcements.slice(0, 5).map((ann) => {
-                  const priority = (ann.priority || "normal").toLowerCase();
-                  const audience = (ann.audience || "all");
-                  const chipCls = priority === "urgent" ? "chip-urgent" : priority === "low" ? "chip-event" : "chip-general";
-                  return (
-                    <div className="sa-ann-card" key={ann._id}>
-                      <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-                        <span className={`sa-ann-chip ${chipCls}`}>{priority.charAt(0).toUpperCase() + priority.slice(1)}</span>
-                        <span style={{ fontSize: 10, background: "#f3f4f6", color: "#6b7280", padding: "3px 8px", borderRadius: 99, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".4px" }}>{audience}</span>
-                      </div>
-                      <div className="sa-ann-title">{ann.title}</div>
-                      <div className="sa-ann-body">{ann.message}</div>
-                      <div className="sa-ann-foot">
-                        <button className="sa-icon-btn" onClick={() => setAnnModal({ open: true, editing: ann })}><FaEdit /> Edit</button>
-                        <button className="sa-icon-btn del" onClick={() => { if (window.confirm("Delete announcement?")) deleteAnn(ann._id); }}><FaTrash /> Delete</button>
-                        {ann.expiresAt && (
-                          <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--light)" }}>
-                            Expires {fmtDate(ann.expiresAt)}
-                          </span>
-                        )}
-                      </div>
+            <div style={{ paddingTop: 6, paddingBottom: 6 }}>
+              {announcements.slice(0, 5).map((ann) => {
+                const priority = (ann.priority || "normal").toLowerCase();
+                const audience = ann.audience || "all";
+                const chipCls = priority === "urgent" ? "chip-urgent" : priority === "low" ? "chip-event" : "chip-general";
+                return (
+                  <div className="sa-ann-card" key={ann._id}>
+                    <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                      <span className={`sa-ann-chip ${chipCls}`}>{priority.charAt(0).toUpperCase() + priority.slice(1)}</span>
+                      <span style={{ fontSize: 10, background: "#f3f4f6", color: "#6b7280", padding: "3px 8px", borderRadius: 99, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".4px" }}>{audience}</span>
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="sa-ann-title">{ann.title}</div>
+                    <div className="sa-ann-body">{ann.message}</div>
+                    <div className="sa-ann-foot">
+                      <button className="sa-icon-btn" onClick={() => setAnnModal({ open: true, editing: ann })}><FaEdit /> Edit</button>
+                      <button className="sa-icon-btn del" onClick={() => { if (window.confirm("Delete announcement?")) deleteAnn(ann._id); }}><FaTrash /> Delete</button>
+                      {ann.expiresAt && (
+                        <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--light)" }}>
+                          Expires {fmtDate(ann.expiresAt)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
       </div>
 
-      {/* ━━━━━━━━ EMPLOYEE OVERVIEW ━━━━━━━━ */}
       <div className="sa-panel" style={{ marginBottom: 26 }}>
         <div className="sa-panel-head">
           <div className="sa-panel-title">
@@ -997,7 +1022,6 @@ function SuperAdminDashboard() {
             )}
           </div>
         </div>
-
         {empLoading ? (
           <div className="sa-empty"><div className="sa-empty-ico">⏳</div><p>Loading employees…</p></div>
         ) : filteredEmp.length === 0 ? (
@@ -1005,10 +1029,9 @@ function SuperAdminDashboard() {
         ) : (
           <div className="sa-emp-grid">
             {displayEmp.map((emp, i) => {
-              const name  = [emp.f_name, emp.l_name].filter(Boolean).join(" ") || "Employee";
-              const role  = emp.designation || emp.role || "";
-              const dept  = emp.department  || "";
-              const email = emp.work_email  || "";
+              const name = [emp.f_name, emp.l_name].filter(Boolean).join(" ") || "Employee";
+              const role = emp.designation || emp.role || "";
+              const dept = emp.department || "";
               const isManager = (emp.role || "").toLowerCase() === "manager";
               return (
                 <div className="sa-emp-card" key={emp._id || i}>
@@ -1018,15 +1041,14 @@ function SuperAdminDashboard() {
                   <div style={{ minWidth: 0 }}>
                     <div className="sa-emp-name">{name}</div>
                     {isManager && <span style={{ fontSize: 9, background: "var(--p-wash)", color: "var(--p)", padding: "1px 6px", borderRadius: 99, fontWeight: 700, display: "inline-block", marginBottom: 2 }}>MANAGER</span>}
-                    {role  && <div className="sa-emp-role">{role}</div>}
-                    {dept  && <span className="sa-emp-dept">{dept}</span>}
+                    {role && <div className="sa-emp-role">{role}</div>}
+                    {dept && <span className="sa-emp-dept">{dept}</span>}
                   </div>
                 </div>
               );
             })}
           </div>
         )}
-
         {!empExpand && filteredEmp.length > 10 && (
           <div style={{ padding: "12px 18px", borderTop: "1px solid var(--border)", textAlign: "center" }}>
             <button className="sa-btn-ghost" onClick={() => setEmpExpand(true)} style={{ fontSize: 12 }}>
@@ -1036,7 +1058,6 @@ function SuperAdminDashboard() {
         )}
       </div>
 
-      {/* ━━━━━━━━ MODALS ━━━━━━━━ */}
       <AnnModal
         open={annModal.open}
         onClose={() => setAnnModal({ open: false, editing: null })}

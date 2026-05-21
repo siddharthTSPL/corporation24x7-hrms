@@ -574,8 +574,36 @@ const resetPassword = async (req, res, next) => {
 
 const createAdmin = async (req, res, next) => {
   try {
-    const { f_name, l_name, work_email, password, gender, designation, phone } =
-      req.body;
+    const {
+      f_name,
+      l_name,
+      work_email,
+      password,
+      gender,
+      designation,
+      department,
+      office_location,
+      personal_contact,
+      e_contact,
+      role,
+      marital_status,
+      is_fresher,
+      total_experience,
+      previous_company,
+      previous_designation,
+      aadhaar_number,
+      pan_number,
+      address,
+      city,
+      state,
+      pincode,
+      reporting_manager,
+      reporting_manager_model,
+      bank_name,
+      account_holder_name,
+      account_number,
+      ifsc_code,
+    } = req.body;
 
     if (
       !f_name ||
@@ -583,12 +611,16 @@ const createAdmin = async (req, res, next) => {
       !work_email ||
       !password ||
       !gender ||
-      !designation
+      !designation ||
+      !department ||
+      !office_location ||
+      !personal_contact ||
+      !e_contact
     ) {
       return next(
         Object.assign(
           new Error(
-            "f_name, l_name, work_email, password, gender and designation are required",
+            "f_name, l_name, work_email, password, gender, designation, department, office_location, personal_contact and e_contact are required",
           ),
           { statusCode: 400 },
         ),
@@ -597,9 +629,7 @@ const createAdmin = async (req, res, next) => {
 
     const email = work_email.toLowerCase().trim();
 
-    const existing = await AdminModel.findOne({
-      work_email: email,
-    })
+    const existing = await AdminModel.findOne({ work_email: email })
       .select("_id")
       .lean();
 
@@ -611,14 +641,38 @@ const createAdmin = async (req, res, next) => {
       );
     }
 
+    const uid = await generateUID(department);
+
     const admin = await AdminModel.create({
+      uid,
       f_name,
       l_name,
       work_email: email,
       password,
       gender,
       designation,
-      phone,
+      department,
+      office_location,
+      personal_contact,
+      e_contact,
+      role: role || "admin",
+      marital_status: marital_status || "single",
+      is_fresher: is_fresher !== undefined ? is_fresher : true,
+      total_experience: total_experience || 0,
+      previous_company: previous_company || undefined,
+      previous_designation: previous_designation || undefined,
+      aadhaar_number: aadhaar_number || undefined,
+      pan_number: pan_number || undefined,
+      address: address || undefined,
+      city: city || undefined,
+      state: state || undefined,
+      pincode: pincode || undefined,
+      reporting_manager: reporting_manager || undefined,
+      reporting_manager_model: reporting_manager_model || undefined,
+      bank_name: bank_name || undefined,
+      account_holder_name: account_holder_name || undefined,
+      account_number: account_number || undefined,
+      ifsc_code: ifsc_code || undefined,
       created_by: req.superAdmin._id,
     });
 
@@ -658,104 +712,44 @@ style="background:#ffffff;border-radius:14px;overflow:hidden;
 box-shadow:0 10px 30px rgba(0,0,0,0.08);">
 
 <tr>
-<td
-style="background:linear-gradient(135deg,#730042,#CD166E);
-padding:35px;
-text-align:center;
-color:#ffffff;"
->
-<h1 style="margin:0;font-size:28px;">
-Welcome to HRMS Platform
-</h1>
-
-<p style="margin-top:10px;font-size:15px;opacity:0.9;">
-Your admin account has been successfully created
-</p>
+<td style="background:linear-gradient(135deg,#730042,#CD166E);padding:35px;text-align:center;color:#ffffff;">
+<h1 style="margin:0;font-size:28px;">Welcome to HRMS Platform</h1>
+<p style="margin-top:10px;font-size:15px;opacity:0.9;">Your admin account has been successfully created</p>
 </td>
 </tr>
 
 <tr>
 <td style="padding:40px;color:#333333;">
 
-<h2 style="margin-top:0;color:#730042;">
-Hello ${f_name} ${l_name},
-</h2>
+<h2 style="margin-top:0;color:#730042;">Hello ${f_name} ${l_name},</h2>
 
 <p style="font-size:15px;line-height:1.8;color:#555;">
-Your admin account is now ready.
-Please verify your email address to activate your account
-and access the HRMS dashboard.
+Your admin account is now ready. Please verify your email address to activate your account and access the HRMS dashboard.
 </p>
 
 <table width="100%" cellpadding="0" cellspacing="0"
 style="margin:30px 0;background:#F9F8F2;border-radius:10px;padding:20px;">
-
-<tr>
-<td style="padding:8px 0;">
-<strong>Role:</strong> Admin
-</td>
-</tr>
-
-<tr>
-<td style="padding:8px 0;">
-<strong>Designation:</strong> ${designation}
-</td>
-</tr>
-
-<tr>
-<td style="padding:8px 0;">
-<strong>Email:</strong> ${email}
-</td>
-</tr>
-
-<tr>
-<td style="padding:8px 0;">
-<strong>Default Leave Balance:</strong> Assigned Successfully
-</td>
-</tr>
-
+<tr><td style="padding:8px 0;"><strong>UID:</strong> ${uid}</td></tr>
+<tr><td style="padding:8px 0;"><strong>Role:</strong> ${role || "Admin"}</td></tr>
+<tr><td style="padding:8px 0;"><strong>Designation:</strong> ${designation}</td></tr>
+<tr><td style="padding:8px 0;"><strong>Department:</strong> ${department}</td></tr>
+<tr><td style="padding:8px 0;"><strong>Office Location:</strong> ${office_location}</td></tr>
+<tr><td style="padding:8px 0;"><strong>Email:</strong> ${email}</td></tr>
+<tr><td style="padding:8px 0;"><strong>Default Leave Balance:</strong> Assigned Successfully</td></tr>
 </table>
 
 <div style="text-align:center;margin:40px 0;">
-
-<a
-href="${verifyLink}"
-style="
-background:#CD166E;
-color:#ffffff;
-padding:15px 35px;
-text-decoration:none;
-border-radius:8px;
-font-size:16px;
-font-weight:600;
-display:inline-block;
-"
->
-Verify & Activate Account
+<a href="${verifyLink}"
+style="background:#CD166E;color:#ffffff;padding:15px 35px;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;display:inline-block;">
+Verify &amp; Activate Account
 </a>
-
 </div>
 
-<p style="font-size:14px;color:#666;line-height:1.7;">
-This verification link will expire in
-<strong>1 hour</strong>.
-</p>
+<p style="font-size:14px;color:#666;line-height:1.7;">This verification link will expire in <strong>1 hour</strong>.</p>
 
-<p style="font-size:14px;color:#666;line-height:1.7;">
-If the button above does not work,
-copy and paste the following link into your browser:
-</p>
+<p style="font-size:14px;color:#666;line-height:1.7;">If the button above does not work, copy and paste the following link into your browser:</p>
 
-<p
-style="
-word-break:break-all;
-font-size:13px;
-color:#CD166E;
-background:#F9F8F2;
-padding:12px;
-border-radius:6px;
-"
->
+<p style="word-break:break-all;font-size:13px;color:#CD166E;background:#F9F8F2;padding:12px;border-radius:6px;">
 ${verifyLink}
 </p>
 
@@ -763,21 +757,12 @@ ${verifyLink}
 </tr>
 
 <tr>
-<td
-style="
-background:#F4F6F9;
-padding:25px;
-text-align:center;
-font-size:12px;
-color:#888888;
-"
->
+<td style="background:#F4F6F9;padding:25px;text-align:center;font-size:12px;color:#888888;">
 © 2026 HRMS Platform. All rights reserved.
 </td>
 </tr>
 
 </table>
-
 </td>
 </tr>
 </table>
@@ -792,11 +777,15 @@ color:#888888;
       message: "Admin created successfully. Verification email sent.",
       admin: {
         id: admin._id,
+        uid: admin.uid,
         f_name: admin.f_name,
         l_name: admin.l_name,
         work_email: admin.work_email,
         designation: admin.designation,
+        department: admin.department,
+        office_location: admin.office_location,
         role: admin.role,
+        status: admin.status,
       },
     });
   } catch (error) {
