@@ -599,5 +599,8 @@ module.exports = {
   superadminGetPendingWFH,
   superadminApproveWFH,
   superadminRejectWFH,
+  adminGetForwardedWFH,
+  adminApproveForwardedWFH,
+  adminRejectForwardedWFH
 
 };
