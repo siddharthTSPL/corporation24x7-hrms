@@ -556,30 +556,199 @@ const deleteemployee = async (req, res, next) => {
 };
 
 const showallleaves = async (req, res, next) => {
-  if (!req.admin)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  const [employeeLeaves, myLeaves] = await Promise.all([
-    Leave.find({
-      status: {
-        $in: [
-          "forwarded_reporting_manager",
-          "approved_reporting_manager",
-          "rejected_reporting_manager",
-        ],
+  try {
+    if (!req.admin)
+      return next(
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
+        })
+      );
+
+    const [employeeLeaves, managerLeaves] = await Promise.all([
+      Leave.find({
+        status: {
+          $in: [
+            "forwarded_reporting_manager",
+            "approved_reporting_manager",
+            "rejected_reporting_manager",
+          ],
+        },
+      })
+        .populate("employee", "f_name l_name work_email")
+        .populate("manager", "f_name l_name work_email")
+        .sort({ createdAt: -1 })
+        .lean(),
+
+      ManagerLeave.find({
+        status: {
+          $in: [
+            "pending_reporting_manager",
+            "approved_reporting_manager",
+            "rejected_reporting_manager",
+          ],
+        },
+      })
+        .populate("manager", "f_name l_name work_email")
+        .sort({ createdAt: -1 })
+        .lean(),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      employeeLeaves: {
+        count: employeeLeaves.length,
+        leaves: employeeLeaves,
       },
-    })
-      .populate("employee", "f_name l_name work_email")
-      .populate("manager", "f_name l_name work_email")
-      .sort({ createdAt: -1 })
-      .lean(),
-    ManagerLeave.find({ manager: req.admin._id })
-      .sort({ createdAt: -1 })
-      .lean(),
-  ]);
-  res.status(200).json({
-    employeeLeaves: { count: employeeLeaves.length, leaves: employeeLeaves },
-    myLeaves: { count: myLeaves.length, leaves: myLeaves },
-  });
+      managerLeaves: {
+        count: managerLeaves.length,
+        leaves: managerLeaves,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const acceptLeave = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
+        })
+      );
+
+    const { id } = req.params;
+    const { leaveFor } = req.query;
+
+    if (!leaveFor)
+      return next(
+        Object.assign(new Error("leaveFor is required"), {
+          statusCode: 400,
+        })
+      );
+
+    let leave = null;
+
+    if (leaveFor === "employee") {
+      leave = await Leave.findById(id);
+
+      if (!leave)
+        return next(
+          Object.assign(new Error("Employee leave not found"), {
+            statusCode: 404,
+          })
+        );
+
+      leave.status = "approved_reporting_manager";
+      leave.approvedBy = req.admin._id;
+      leave.remarks = "Approved by Admin";
+    }
+
+    if (leaveFor === "manager") {
+      leave = await ManagerLeave.findById(id);
+
+      if (!leave)
+        return next(
+          Object.assign(new Error("Manager leave not found"), {
+            statusCode: 404,
+          })
+        );
+
+      leave.status = "approved_reporting_manager";
+      leave.approvedBy = req.admin._id;
+      leave.remarks = "Approved by Admin";
+    }
+
+    if (!leave)
+      return next(
+        Object.assign(new Error("Invalid leave type"), {
+          statusCode: 400,
+        })
+      );
+
+    await leave.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Leave approved successfully",
+      leave,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const rejectLeave = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
+        })
+      );
+
+    const { id } = req.params;
+    const { leaveFor } = req.query;
+
+    if (!leaveFor)
+      return next(
+        Object.assign(new Error("leaveFor is required"), {
+          statusCode: 400,
+        })
+      );
+
+    let leave = null;
+
+    if (leaveFor === "employee") {
+      leave = await Leave.findById(id);
+
+      if (!leave)
+        return next(
+          Object.assign(new Error("Employee leave not found"), {
+            statusCode: 404,
+          })
+        );
+
+      leave.status = "rejected_reporting_manager";
+      leave.rejectedBy = req.admin._id;
+      leave.remarks = "Rejected by Admin";
+    }
+
+    if (leaveFor === "manager") {
+      leave = await ManagerLeave.findById(id);
+
+      if (!leave)
+        return next(
+          Object.assign(new Error("Manager leave not found"), {
+            statusCode: 404,
+          })
+        );
+
+      leave.status = "rejected_reporting_manager";
+      leave.rejectedBy = req.admin._id;
+      leave.remarks = "Rejected by Admin";
+    }
+
+    if (!leave)
+      return next(
+        Object.assign(new Error("Invalid leave type"), {
+          statusCode: 400,
+        })
+      );
+
+    leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await leave.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Leave rejected successfully",
+      leave,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const applyleave = async (req, res, next) => {
@@ -1401,6 +1570,8 @@ module.exports = {
   getperticularemanager,
   deleteemployee,
   showallleaves,
+  acceptLeave,
+  rejectLeave,
   applyleave,
   noofemployee,
   createannouncement,
@@ -1423,5 +1594,6 @@ module.exports = {
   adminSubmitTicket,
   adminGetMyTickets,
   adminRateTicket,
-  adminGetTicketDetail
+  adminGetTicketDetail,
+  
 };

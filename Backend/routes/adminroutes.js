@@ -15,6 +15,8 @@ const {
   getperticularemanager,
   deleteemployee,
   showallleaves,
+  acceptLeave,
+  rejectLeave,
   applyleave,
   noofemployee,
   createannouncement,
@@ -106,7 +108,18 @@ adminrouter.get(
   asyncHandler(showallleaves),
 );
 adminrouter.post("/applyleave", adminauthmiddleware, asyncHandler(applyleave));
-// Admin can approve / reject any pending or forwarded leave (acts as reporting manager)
+adminrouter.put(
+  "/acceptleave/:id",
+  adminauthmiddleware,
+  asyncHandler(acceptLeave)
+);
+
+adminrouter.put(
+  "/rejectleave/:id",
+  adminauthmiddleware,
+  asyncHandler(rejectLeave)
+);
+
 adminrouter.post(
   "/actionleave",
   adminauthmiddleware,
