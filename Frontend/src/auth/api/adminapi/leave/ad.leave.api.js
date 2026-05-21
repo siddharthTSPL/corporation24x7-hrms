@@ -22,12 +22,22 @@ export const getAllLeaves = async () => {
 
 export const acceptLeave = async ({ id, leaveFor }) => {
   if (!id) throw new Error("Leave ID is required");
-  const res = await api.put(`admin/acceptleave/${id}?leaveFor=${leaveFor}`);
+  if (!leaveFor) throw new Error("leaveFor is required");
+
+  const res = await api.put(
+    `/admin/acceptleave/${id}?leaveFor=${leaveFor}`
+  );
+
   return res.data;
 };
 
 export const rejectLeave = async ({ id, leaveFor }) => {
   if (!id) throw new Error("Leave ID is required");
-  const res = await api.put(`admin/rejectleave/${id}?leaveFor=${leaveFor}`);
+  if (!leaveFor) throw new Error("leaveFor is required");
+
+  const res = await api.put(
+    `/admin/rejectleave/${id}?leaveFor=${leaveFor}`
+  );
+
   return res.data;
 };
