@@ -1047,14 +1047,14 @@ const getOrgInfo = async (req, res, next) => {
       .select("f_name l_name email organisation_name profile_image")
       .lean();
 
-    const managers = await managermodel
+    const managers = await Managermodel
       .find({ organisation_id: admin.organisation_id })
       .select(
         "f_name l_name work_email designation department office_location"
       )
       .lean();
 
-    const employees = await usermodel
+    const employees = await Usermodel
       .find({
         Under_manager: { $in: managers.map((m) => m._id) },
       })
