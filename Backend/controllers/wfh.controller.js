@@ -54,6 +54,9 @@ const applyWFH = async (req, res, next) => {
   res.status(201).json({ success: true, message: "WFH request submitted", wfh });
 };
 
+
+
+
 const editWFH = async (req, res, next) => {
   const wfh = await WFH.findById(req.params.id);
 
@@ -238,7 +241,10 @@ const managerApplyWFH = async (req, res, next) => {
 
   if (!startDate || !endDate || !reason)
     return next(
-      Object.assign(new Error("startDate, endDate, and reason are required"), { statusCode: 400 })
+      Object.assign(
+        new Error("startDate, endDate, and reason are required"),
+        { statusCode: 400 }
+      )
     );
 
   const managerId = req.manager._id;
@@ -247,22 +253,40 @@ const managerApplyWFH = async (req, res, next) => {
     .select("reporting_manager")
     .lean();
 
+  if (!currentManager)
+    return next(
+      Object.assign(new Error("Manager not found"), {
+        statusCode: 404,
+      })
+    );
+
   if (!currentManager.reporting_manager)
     return next(
-      Object.assign(new Error("No reporting manager assigned. Cannot apply WFH."), { statusCode: 400 })
+      Object.assign(
+        new Error("No reporting manager assigned. Cannot apply WFH."),
+        { statusCode: 400 }
+      )
     );
 
   const start = new Date(startDate);
   const end = new Date(endDate);
 
   if (end < start)
-    return next(Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }));
+    return next(
+      Object.assign(
+        new Error("End date cannot be before start date"),
+        { statusCode: 400 }
+      )
+    );
 
-  const days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  const days =
+    Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
   const overlapping = await WFH.findOne({
     requester: managerId,
-    status: { $nin: ["rejected_manager", "rejected_reporting_manager"] },
+    status: {
+      $nin: ["rejected_manager", "rejected_reporting_manager"],
+    },
     startDate: { $lte: end },
     endDate: { $gte: start },
   })
@@ -271,7 +295,10 @@ const managerApplyWFH = async (req, res, next) => {
 
   if (overlapping)
     return next(
-      Object.assign(new Error("You already have a WFH request for overlapping dates"), { statusCode: 409 })
+      Object.assign(
+        new Error("You already have a WFH request for overlapping dates"),
+        { statusCode: 409 }
+      )
     );
 
   const wfh = await WFH.create({
@@ -285,7 +312,11 @@ const managerApplyWFH = async (req, res, next) => {
     status: "pending_reporting_manager",
   });
 
-  res.status(201).json({ success: true, message: "WFH request submitted to reporting manager", wfh });
+  res.status(201).json({
+    success: true,
+    message: "WFH request submitted to reporting manager",
+    wfh,
+  });
 };
 
 const managerGetMyWFH = async (req, res, next) => {
@@ -528,4 +559,5 @@ module.exports = {
   superadminGetPendingWFH,
   superadminApproveWFH,
   superadminRejectWFH,
+
 };
