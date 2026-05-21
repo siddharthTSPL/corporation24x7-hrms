@@ -1176,7 +1176,7 @@ const getOrgInfoForManager = async (req, res, next) => {
     const superAdminCheck = await SuperAdminModel.findById(manager.organisation_id).lean();
     console.log("superAdmin found?  :", superAdminCheck ? "YES" : "NO");
 
-    const adminCheck = await Adminmodel.findById(manager.organisation_id).lean();
+    const adminCheck = await AdminModel.findById(manager.organisation_id).lean();
     console.log("admin found?       :", adminCheck ? "YES — organisation_id points to Admin, not SuperAdmin" : "NO");
     // ─────────────────────────────────────────────────────────────────────────
 
