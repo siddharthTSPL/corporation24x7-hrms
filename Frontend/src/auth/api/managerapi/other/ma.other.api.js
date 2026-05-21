@@ -69,3 +69,8 @@ export const fetchOrgInfo = async () => {
   const res = await api.get("manager/getorginfo");
   return res.data;
 };
+
+export const getOrgInfo = async () => {
+  const res = await api.get("manager/getorginfo");
+  return res.data;
+};
