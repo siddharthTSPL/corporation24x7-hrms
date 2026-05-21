@@ -1176,20 +1176,19 @@ const getOrgInfo = async (req, res, next) => {
     if (!admin)
       return res.status(404).json({ success: false, message: "Admin not found" });
 
-    // Guard: organisation_id must exist
-    if (!admin.organisation_id)
+    const superAdminId = admin.organisation_id ?? admin.created_by;
+
+    if (!superAdminId)
       return res.status(404).json({ success: false, message: "Organisation not found" });
 
-    // Use organisation_id, not created_by
-    const superAdmin = await SuperAdminModel.findById(admin.organisation_id)
+    const superAdmin = await SuperAdminModel.findById(superAdminId)
       .select("f_name l_name email organisation_name profile_image")
       .lean();
 
     if (!superAdmin)
       return res.status(404).json({ success: false, message: "Organisation not found" });
 
-    const managers = await Managermodel
-      .find({ organisation_id: admin.organisation_id })
+    const managers = await Managermodel.find({ organisation_id: superAdmin._id })
       .select("f_name l_name work_email designation department office_location")
       .lean();
 
