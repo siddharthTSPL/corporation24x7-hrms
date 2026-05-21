@@ -157,11 +157,11 @@ managerrouter.get(
   asyncHandler(managercontroller.getattendance),
 );
 
-managerrouter.get(
-  "/getorginfo",
-  managermiddleware,
-  asyncHandler(admincontroller.getOrgInfo),
-);
+// managerrouter.get(
+//   "/getorginfo",
+//   managermiddleware,
+//   asyncHandler(admincontroller.getOrgInfo),
+// );
 
 managerrouter.post(
   "/submit-ticket",
@@ -185,4 +185,5 @@ managerrouter.get(
   asyncHandler(managercontroller. managerGetTicketDetail),
 );
 
+managerrouter.get("/getOrgInfo", managermiddleware, asyncHandler(managercontroller.getOrgInfoForManager));
 module.exports = managerrouter;
