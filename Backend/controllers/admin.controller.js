@@ -375,13 +375,37 @@ const addemployee = async (req, res, next) => {
   });
 };
 const findallmanagers = async (req, res, next) => {
-  if (!req.admin)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  const managers = await Managermodel.find()
-    .select(EXCLUDE)
-    .populate("reporting_manager", "f_name l_name work_email designation")
-    .lean();
-  res.status(200).json({ managers });
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const managers = await Managermodel.find()
+      .select(EXCLUDE)
+      .populate(
+        "reporting_manager",
+        "f_name l_name work_email designation"
+      )
+      .lean();
+
+    const adminData = await Adminmodel.findById(req.admin._id)
+      .select(
+        "f_name l_name work_email designation department office_location"
+      )
+      .lean();
+
+    const allManagers = [
+      ...managers,
+      {
+        ...adminData,
+        _id: adminData._id,
+        isAdmin: true,
+      },
+    ];
+
+    res.status(200).json({ managers: allManagers });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const getallemployee = async (req, res, next) => {
