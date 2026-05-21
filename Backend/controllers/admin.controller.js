@@ -867,7 +867,27 @@ const resetAdminPassword = async (req, res, next) => {
 const getme = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  res.status(200).json(req.admin);
+
+  const [admin, leaveBalance, reviews] = await Promise.all([
+    Adminmodel.findById(req.admin._id)
+      .select(EXCLUDE)
+      .lean(),
+    leavebalanceModel.findOne({ employee: req.admin._id }).lean(),
+    reviewModel
+      .find({ reviewee: req.admin._id })
+      .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      .lean(),
+  ]);
+
+  if (!admin)
+    return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
+
+  res.status(200).json({
+    success: true,
+    user: admin,
+    leaveBalance: leaveBalance || null,
+    reviews: reviews || [],
+  });
 };
 
 const editadminprofile = async (req, res, next) => {
@@ -978,40 +998,39 @@ const getTodayCheckins = async (req, res) => {
 const getOrgInfo = async (req, res, next) => {
   try {
     if (!req.admin)
-      return res
-        .status(401)
-        .json({ success: false, message: "Unauthorized" });
+      return res.status(401).json({ success: false, message: "Unauthorized" });
 
     const admin = await Adminmodel.findById(req.admin._id)
-      .select(
-        "f_name l_name work_email designation department office_location organisation_id created_by"
-      )
+      .select("f_name l_name work_email designation department office_location organisation_id created_by")
       .lean();
 
     if (!admin)
-      return res
-        .status(404)
-        .json({ success: false, message: "Admin not found" });
+      return res.status(404).json({ success: false, message: "Admin not found" });
 
-    const superAdmin = await SuperAdminModel.findById(admin.created_by)
+    // Guard: organisation_id must exist
+    if (!admin.organisation_id)
+      return res.status(404).json({ success: false, message: "Organisation not found" });
+
+    // Use organisation_id, not created_by
+    const superAdmin = await SuperAdminModel.findById(admin.organisation_id)
       .select("f_name l_name email organisation_name profile_image")
       .lean();
 
+    if (!superAdmin)
+      return res.status(404).json({ success: false, message: "Organisation not found" });
+
     const managers = await Managermodel
       .find({ organisation_id: admin.organisation_id })
-      .select(
-        "f_name l_name work_email designation department office_location"
-      )
+      .select("f_name l_name work_email designation department office_location")
       .lean();
 
-    const employees = await Usermodel
-      .find({
-        Under_manager: { $in: managers.map((m) => m._id) },
-      })
-      .select(
-        "f_name l_name work_email designation department office_location Under_manager"
-      )
-      .lean();
+    const employees = managers.length
+      ? await Usermodel.find({
+          Under_manager: { $in: managers.map((m) => m._id) },
+        })
+          .select("f_name l_name work_email designation department office_location Under_manager")
+          .lean()
+      : [];
 
     const managersWithEmployees = managers.map((mgr) => ({
       id: mgr._id,
@@ -1021,9 +1040,7 @@ const getOrgInfo = async (req, res, next) => {
       department: mgr.department,
       office_location: mgr.office_location,
       employees: employees
-        .filter(
-          (e) => e.Under_manager?.toString() === mgr._id.toString()
-        )
+        .filter((e) => e.Under_manager?.toString() === mgr._id.toString())
         .map((e) => ({
           id: e._id,
           name: `${e.f_name} ${e.l_name}`,
@@ -1036,17 +1053,13 @@ const getOrgInfo = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      organisation_name: superAdmin?.organisation_name || "",
-      organisation_logo: superAdmin?.profile_image || null,
-
-      super_admin: superAdmin
-        ? {
-            id: superAdmin._id,
-            name: `${superAdmin.f_name} ${superAdmin.l_name}`,
-            email: superAdmin.email,
-          }
-        : null,
-
+      organisation_name: superAdmin.organisation_name,
+      organisation_logo: superAdmin.profile_image || null,
+      super_admin: {
+        id: superAdmin._id,
+        name: `${superAdmin.f_name} ${superAdmin.l_name}`,
+        email: superAdmin.email,
+      },
       admin: {
         id: admin._id,
         name: `${admin.f_name} ${admin.l_name}`,
@@ -1055,7 +1068,6 @@ const getOrgInfo = async (req, res, next) => {
         department: admin.department,
         office_location: admin.office_location,
       },
-
       managers: managersWithEmployees,
       currentAdminId: req.admin._id,
     });
