@@ -333,7 +333,7 @@ function ProfileTab({ manager }) {
         </div>
       </SectionCard>
 
-      <SectionCard title="Job & location" subtitle="Current role, office and account info" accent={C.blue}>
+      <SectionCard title="Job & location" subtitle="Current role, office and account info" accent={C.maroon}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
           <ReadonlyField label="Designation"     value={manager?.designation} />
           <ReadonlyField label="Office location" value={manager?.office_location} />
@@ -387,7 +387,7 @@ function ContactTab({ manager, onSuccess, onError }) {
   };
 
   return (
-    <SectionCard title="Contact & office information" subtitle="Fields you can update yourself" accent={C.green}>
+    <SectionCard title="Contact & office information" subtitle="Fields you can update yourself" accent={C.maroon}>
       <InputField
         label="Personal contact" type="tel"
         value={form.personal_contact}
@@ -438,7 +438,7 @@ function ContactTab({ manager, onSuccess, onError }) {
           })}
         </div>
       </div>
-      <PrimaryButton onClick={handleSave} loading={editProfile.isPending} color={C.green}>
+      <PrimaryButton onClick={handleSave} loading={editProfile.isPending} color={C.maroon}>
         Save contact info
       </PrimaryButton>
     </SectionCard>
@@ -579,7 +579,7 @@ function AvatarTab({ manager, onSuccess, onError }) {
   const removeAvatar = () => applyAvatar("");
 
   return (
-    <SectionCard title="Profile avatar" subtitle="Choose an avatar that represents you" accent={C.blue}>
+    <SectionCard title="Profile avatar" subtitle="Choose an avatar that represents you" accent={C.maroon}>
       {/* Current preview */}
       <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 24, padding: "16px 20px", background: C.page, borderRadius: 12, border: `0.5px solid ${C.border}` }}>
         <div style={{
