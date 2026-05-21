@@ -1159,7 +1159,8 @@ const getOrgInfoForManager = async (req, res, next) => {
     if (!req.manager)
       return res.status(401).json({ success: false, message: "Unauthorized" });
 
-    const manager = await managermodel.findById(req.manager._id)
+    const manager = await managermodel
+      .findById(req.manager._id)
       .select("f_name l_name work_email designation department office_location organisation_id")
       .lean();
 
@@ -1169,39 +1170,45 @@ const getOrgInfoForManager = async (req, res, next) => {
     if (!manager.organisation_id)
       return res.status(400).json({ success: false, message: "Manager has no organisation assigned" });
 
-  
-    console.log("manager._id        :", manager._id);
-    console.log("organisation_id    :", manager.organisation_id);
-
-    const superAdminCheck = await SuperAdminModel.findById(manager.organisation_id).lean();
-    console.log("superAdmin found?  :", superAdminCheck ? "YES" : "NO");
-
-    const adminCheck = await AdminModel.findById(manager.organisation_id).lean();
-    console.log("admin found?       :", adminCheck ? "YES — organisation_id points to Admin, not SuperAdmin" : "NO");
-    // ─────────────────────────────────────────────────────────────────────────
-
     const superAdmin = await SuperAdminModel.findById(manager.organisation_id)
       .select("f_name l_name email organisation_name profile_image")
       .lean();
 
-    if (!superAdmin)
-      return res.status(404).json({ success: false, message: "Organisation not found" });
+    // organisation_id is pointing to an Admin instead of SuperAdmin — trace back
+    if (!superAdmin) {
+      const linkedAdmin = await AdminModel.findById(manager.organisation_id)
+        .select("organisation_id")
+        .lean();
 
-    const admin = await Adminmodel.findOne({ created_by: superAdmin._id })
-      .select("f_name l_name work_email designation")
-      .lean();
+      if (!linkedAdmin || !linkedAdmin.organisation_id)
+        return res.status(404).json({ success: false, message: "Organisation not found" });
 
-    if (!admin)
-      return res.status(404).json({ success: false, message: "Admin not found for this organisation" });
+      // Auto-heal: fix this manager's organisation_id in the background
+      managermodel
+        .updateOne({ _id: manager._id }, { $set: { organisation_id: linkedAdmin.organisation_id } })
+        .catch((err) => console.error("Failed to auto-heal organisation_id:", err));
 
-    const allManagers = await managermodel.find({ organisation_id: manager.organisation_id })
+      return res.status(400).json({
+        success: false,
+        message: "Manager organisation_id was misconfigured. It has been corrected — please retry.",
+      });
+    }
+
+    const admins = await AdminModel.find({ organisation_id: superAdmin._id })
       .select("f_name l_name work_email designation department office_location")
       .lean();
 
-    const employees = await usermodel
-      .find({ Under_manager: { $in: allManagers.map((m) => m._id) } })
-      .select("f_name l_name work_email designation department office_location Under_manager")
+    const allManagers = await managermodel
+      .find({ organisation_id: superAdmin._id })
+      .select("f_name l_name work_email designation department office_location")
       .lean();
+
+    const employees = allManagers.length
+      ? await usermodel
+          .find({ Under_manager: { $in: allManagers.map((m) => m._id) } })
+          .select("f_name l_name work_email designation department office_location Under_manager")
+          .lean()
+      : [];
 
     const managersWithEmployees = allManagers.map((mgr) => ({
       id: mgr._id,
@@ -1209,6 +1216,7 @@ const getOrgInfoForManager = async (req, res, next) => {
       email: mgr.work_email,
       designation: mgr.designation,
       department: mgr.department,
+      office_location: mgr.office_location,
       isCurrentManager: mgr._id.toString() === req.manager._id.toString(),
       employees: employees
         .filter((e) => e.Under_manager?.toString() === mgr._id.toString())
@@ -1218,24 +1226,27 @@ const getOrgInfoForManager = async (req, res, next) => {
           email: e.work_email,
           designation: e.designation,
           department: e.department,
+          office_location: e.office_location,
         })),
     }));
 
     res.status(200).json({
       success: true,
-      organisation_name: superAdmin.organisation_name || "",
+      organisation_name: superAdmin.organisation_name,
       organisation_logo: superAdmin.profile_image || null,
       super_admin: {
         id: superAdmin._id,
         name: `${superAdmin.f_name} ${superAdmin.l_name}`,
         email: superAdmin.email,
       },
-      admin: {
-        id: admin._id,
-        name: `${admin.f_name} ${admin.l_name}`,
-        email: admin.work_email,
-        designation: admin.designation,
-      },
+      admins: admins.map((adm) => ({
+        id: adm._id,
+        name: `${adm.f_name} ${adm.l_name}`,
+        email: adm.work_email,
+        designation: adm.designation,
+        department: adm.department,
+        office_location: adm.office_location,
+      })),
       managers: managersWithEmployees,
       currentManagerId: req.manager._id,
     });
