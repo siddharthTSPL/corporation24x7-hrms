@@ -506,7 +506,7 @@ function TodayBanner({ isOnLeave, leaveType, onCheckIn, onRecruitment }) {
   const date  = today.toLocaleDateString("en-IN", { day:"numeric", month:"long", year:"numeric" });
 
   const leaveLabel = {
-    el: "Earned Leave", sl: "Sick Leave", pl: "Privilege Leave",
+    el: "Earned Leave", sl: "Sick Leave", pl: "Paternity Leave",
     ml: "Maternity Leave", cl: "Casual Leave", lwp: "Leave Without Pay",
   };
 
@@ -559,7 +559,7 @@ function TodayBanner({ isOnLeave, leaveType, onCheckIn, onRecruitment }) {
             boxShadow:  isOnLeave ? "none" : "0 2px 10px rgba(0,0,0,0.1)",
           }}
         >
-          {isOnLeave ? "🚫 Check-in Disabled" : "✅ Check In"}
+          {isOnLeave ? "🚫 Check-in Disabled" : "Check In"}
         </button>
       </div>
     </div>
@@ -569,7 +569,7 @@ function TodayBanner({ isOnLeave, leaveType, onCheckIn, onRecruitment }) {
 const LEAVE_TYPE_META = {
   el: { label:"Earned",    color:"#730042", bg:"rgba(115,0,66,0.08)" },
   sl: { label:"Sick",      color:"#1D9E75", bg:"rgba(29,158,117,0.08)" },
-  pl: { label:"Privilege", color:"#378ADD", bg:"rgba(55,138,221,0.08)" },
+  pl: { label:"Paternity", color:"#378ADD", bg:"rgba(55,138,221,0.08)" },
   ml: { label:"Maternity", color:"#9333EA", bg:"rgba(147,51,234,0.08)" },
   cl: { label:"Casual",    color:"#BA7517", bg:"rgba(186,117,23,0.08)" },
   lwp:{ label:"LWP",       color:"#E24B4A", bg:"rgba(226,75,74,0.08)" },
@@ -807,7 +807,7 @@ export default function ManagerDashboard() {
     { label:"Earned Leave (EL)",    availed:lb?.EL?.availed,  entitled:lb?.EL?.entitled, accrued:lb?.EL?.accrued != null ? Number(lb.EL.accrued).toFixed(2) : null, color:"#730042" },
     { label:"Sick Leave (SL)",      availed:lb?.SL?.availed,  entitled:lb?.SL?.entitled, accrued:null, color:"#1D9E75" },
     { label:"Privilege Leave (PL)", availed:lb?.pbc ?? 0,     entitled:lb?.PL,           accrued:null, color:"#378ADD" },
-   { label:"Maternity Leave (ML)", availed:0, entitled:lb?.ML ?? 0, accrued:null, color:"#BA7517" },
+    { label:"Maternity Leave (ML)", availed:lb?.lwp ?? 0,     entitled:(lb?.ML ?? 0) + 5,accrued:null, color:"#BA7517" },
   ];
 
   if (meError) return (
