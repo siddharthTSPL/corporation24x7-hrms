@@ -1152,6 +1152,86 @@ const managerGetTicketDetail = async (req, res, next) => {
   }
 };
 
+const getOrgInfoForManager = async (req, res, next) => {
+  try {
+    if (!req.manager)
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+
+  
+    const manager = await Managermodel.findById(req.manager._id)
+      .select("f_name l_name work_email designation department office_location organisation_id created_by")
+      .lean();
+
+    if (!manager)
+      return res.status(404).json({ success: false, message: "Manager not found" });
+
+   
+    const admin = await Adminmodel.findById(manager.organisation_id)
+      .select("f_name l_name work_email designation created_by")
+      .lean();
+
+    let superAdmin = null;
+    if (admin?.created_by) {
+      superAdmin = await SuperAdminModel.findById(admin.created_by)
+        .select("f_name l_name email organisation_name profile_image")
+        .lean();
+    }
+
+
+    const allManagers = await Managermodel.find({ organisation_id: manager.organisation_id })
+      .select("f_name l_name work_email designation department office_location")
+      .lean();
+
+    const employees = await usermodel
+      .find({ Under_manager: { $in: allManagers.map((m) => m._id) } })
+      .select("f_name l_name work_email designation department office_location Under_manager")
+      .lean();
+
+   
+    const managersWithEmployees = allManagers.map((mgr) => ({
+      id: mgr._id,
+      name: `${mgr.f_name} ${mgr.l_name}`,
+      email: mgr.work_email,
+      designation: mgr.designation,
+      department: mgr.department,
+      isCurrentManager: mgr._id.toString() === req.manager._id.toString(),
+      employees: employees
+        .filter((e) => e.Under_manager?.toString() === mgr._id.toString())
+        .map((e) => ({
+          id: e._id,
+          name: `${e.f_name} ${e.l_name}`,
+          email: e.work_email,
+          designation: e.designation,
+          department: e.department,
+        })),
+    }));
+
+    res.status(200).json({
+      success: true,
+      organisation_name: superAdmin?.organisation_name || "",
+      organisation_logo: superAdmin?.profile_image || null,
+      super_admin: superAdmin
+        ? {
+            id: superAdmin._id,
+            name: `${superAdmin.f_name} ${superAdmin.l_name}`,
+            email: superAdmin.email,
+          }
+        : null,
+      admin: admin
+        ? {
+            id: admin._id,
+            name: `${admin.f_name} ${admin.l_name}`,
+            email: admin.work_email,
+            designation: admin.designation,
+          }
+        : null,
+      managers: managersWithEmployees,
+      currentManagerId: req.manager._id,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 
 module.exports = {
@@ -1188,5 +1268,6 @@ module.exports = {
   managerSubmitTicket,
   managerGetMyTickets,
   managerRateTicket,
-  managerGetTicketDetail
+  managerGetTicketDetail,
+  getOrgInfoForManager
 };
