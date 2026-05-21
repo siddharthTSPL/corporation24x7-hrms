@@ -13,6 +13,8 @@ const jwt = require("jsonwebtoken");
 const managerLeaveModel = require("../Models/maleave.model");
 const Attendance = require("../Models/attendance.model");
 const Ticket = require("../Models/ticket.model");
+const SuperAdminModel = require("../Models/superadmin.model");
+const Adminmodel = require("../Models/Admin.model");
 require("dotenv").config();
 
 const verifyManagerEmail = async (req, res, next) => {
@@ -1157,7 +1159,7 @@ const getOrgInfoForManager = async (req, res, next) => {
     if (!req.manager)
       return res.status(401).json({ success: false, message: "Unauthorized" });
 
-    const manager = await Managermodel.findById(req.manager._id)
+    const manager = await managermodel.findById(req.manager._id)
       .select("f_name l_name work_email designation department office_location organisation_id")
       .lean();
 
@@ -1168,22 +1170,18 @@ const getOrgInfoForManager = async (req, res, next) => {
       return res.status(400).json({ success: false, message: "Manager has no organisation assigned" });
 
     
-    const superAdmin = await SuperAdminModel.findById(manager.organisation_id)
-      .select("f_name l_name email organisation_name profile_image")
+    const admin = await Adminmodel.findById(manager.organisation_id)
+      .select("f_name l_name work_email designation created_by")
       .lean();
 
-    if (!superAdmin)
-      return res.status(404).json({ success: false, message: "Organisation not found" });
+    let superAdmin = null;
+    if (admin?.created_by) {
+      superAdmin = await SuperAdminModel.findById(admin.created_by)
+        .select("f_name l_name email organisation_name profile_image")
+        .lean();
+    }
 
-
-    const admin = await Adminmodel.findOne({ created_by: superAdmin._id })
-      .select("f_name l_name work_email designation ")
-      .lean();
-
-    if (!admin)
-      return res.status(404).json({ success: false, message: "Admin not found for this organisation" });
-
-    const allManagers = await Managermodel.find({ organisation_id: manager.organisation_id })
+    const allManagers = await managermodel.find({ organisation_id: manager.organisation_id })
       .select("f_name l_name work_email designation department office_location")
       .lean();
 
@@ -1212,19 +1210,19 @@ const getOrgInfoForManager = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      organisation_name: superAdmin.organisation_name || "",
-      organisation_logo: superAdmin.profile_image || null,
-      super_admin: {
+      organisation_name: superAdmin?.organisation_name || "",
+      organisation_logo: superAdmin?.profile_image || null,
+      super_admin: superAdmin ? {
         id: superAdmin._id,
         name: `${superAdmin.f_name} ${superAdmin.l_name}`,
         email: superAdmin.email,
-      },
-      admin: {
+      } : null,
+      admin: admin ? {
         id: admin._id,
         name: `${admin.f_name} ${admin.l_name}`,
         email: admin.work_email,
         designation: admin.designation,
-      },
+      } : null,
       managers: managersWithEmployees,
       currentManagerId: req.manager._id,
     });
