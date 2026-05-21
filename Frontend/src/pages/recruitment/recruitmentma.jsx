@@ -1,6 +1,9 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { createRequisition, getMyRequisitions } from "../../auth/server-state/manager/managerrecruitment/marecruitment.hook";
+import {
+  useCreateRequisition,
+  useGetMyRequisitions,
+} from "../../auth/server-state/manager/managerrecruitment/marecruitment.hook";
 
 const GlobalStyles = () => (
   <style>{`
@@ -440,8 +443,8 @@ const EMPTY_FORM = {
 function CreateForm({ onSuccess, onCancel }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [skillInput, setSkillInput] = useState("");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { mutateAsync, isPending } = useCreateRequisition();
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
   const setSalary = (key, val) => setForm(f => ({ ...f, salary_range: { ...f.salary_range, [key]: val } }));
@@ -461,13 +464,12 @@ function CreateForm({ onSuccess, onCancel }) {
   };
 
   const handleSubmit = async () => {
-    if (!form.job_title.trim())   { setError("Job title is required."); return; }
-    if (!form.department.trim())  { setError("Department is required."); return; }
+    if (!form.job_title.trim())     { setError("Job title is required."); return; }
+    if (!form.department.trim())    { setError("Department is required."); return; }
     if (!form.hiring_reason.trim()) { setError("Hiring reason is required."); return; }
     setError("");
-    setLoading(true);
     try {
-      await createRequisition({
+      await mutateAsync({
         ...form,
         openings: Number(form.openings),
         experience_required: form.experience_required ? Number(form.experience_required) : undefined,
@@ -479,8 +481,6 @@ function CreateForm({ onSuccess, onCancel }) {
       onSuccess();
     } catch (err) {
       setError(err?.message || "Failed to submit. Please try again.");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -605,8 +605,8 @@ function CreateForm({ onSuccess, onCancel }) {
 
       <div style={{ display:"flex", gap:10, justifyContent:"flex-end", paddingTop:4 }}>
         <button className="rc-btn-ghost" onClick={onCancel}>Cancel</button>
-        <button className="rc-btn-primary" onClick={handleSubmit} disabled={loading}>
-          {loading ? <span style={{ display:"flex", alignItems:"center", gap:8 }}><span className="rc-spinner"/></span> : "Submit Requisition"}
+        <button className="rc-btn-primary" onClick={handleSubmit} disabled={isPending}>
+          {isPending ? <span style={{ display:"flex", alignItems:"center", gap:8 }}><span className="rc-spinner"/></span> : "Submit Requisition"}
         </button>
       </div>
     </div>
@@ -683,34 +683,17 @@ const FILTER_LABELS = { All:"All", PENDING:"Pending", APPROVED:"Approved", REJEC
 export default function RecruitmentMA() {
   const navigate = useNavigate();
   const [view, setView] = useState("list");
-  const [reqs, setReqs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState("");
   const [filterTab, setFilterTab] = useState("All");
   const [search, setSearch] = useState("");
   const [selectedReq, setSelectedReq] = useState(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
-  const fetchReqs = useCallback(async () => {
-    setLoading(true);
-    setFetchError("");
-    try {
-      const res = await getMyRequisitions();
-      const data = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
-      setReqs(data);
-    } catch (err) {
-      setFetchError(err?.message || "Failed to load requisitions.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchReqs(); }, [fetchReqs]);
+  const { data, isLoading, isError, error, refetch } = useGetMyRequisitions();
+  const reqs = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
 
   const handleSuccess = () => {
     setView("list");
     setSubmitSuccess(true);
-    fetchReqs();
     setTimeout(() => setSubmitSuccess(false), 4000);
   };
 
@@ -785,7 +768,7 @@ export default function RecruitmentMA() {
         </div>
       ) : (
         <>
-          {!loading && reqs.length > 0 && <StatsBar reqs={reqs}/>}
+          {!isLoading && reqs.length > 0 && <StatsBar reqs={reqs}/>}
 
           <div className="rc-card" style={{ animationDelay:".1s" }}>
             <CardAccent color="#730042"/>
@@ -816,7 +799,7 @@ export default function RecruitmentMA() {
               />
             </div>
 
-            {loading ? (
+            {isLoading ? (
               <div style={{ padding:"20px 20px", display:"flex", flexDirection:"column", gap:14 }}>
                 {[1,2,3].map(i => (
                   <div key={i} style={{ display:"flex", gap:14, alignItems:"flex-start" }}>
@@ -829,12 +812,12 @@ export default function RecruitmentMA() {
                   </div>
                 ))}
               </div>
-            ) : fetchError ? (
+            ) : isError ? (
               <div style={{ padding:"40px 20px", textAlign:"center" }}>
                 <div style={{ fontSize:24, marginBottom:8 }}>⚠️</div>
                 <div style={{ fontSize:13, fontWeight:600, color:"#791F1F", fontFamily:"'Lora',serif", marginBottom:4 }}>Failed to load</div>
-                <div style={{ fontSize:12, color:"#b0948a", fontFamily:"'DM Sans',sans-serif", marginBottom:14 }}>{fetchError}</div>
-                <button className="rc-btn-ghost" onClick={fetchReqs}>Retry</button>
+                <div style={{ fontSize:12, color:"#b0948a", fontFamily:"'DM Sans',sans-serif", marginBottom:14 }}>{error?.message}</div>
+                <button className="rc-btn-ghost" onClick={() => refetch()}>Retry</button>
               </div>
             ) : filtered.length === 0 ? (
               <div className="rc-empty-state">
