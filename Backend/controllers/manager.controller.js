@@ -1169,7 +1169,7 @@ const getOrgInfoForManager = async (req, res, next) => {
     if (!manager.organisation_id)
       return res.status(400).json({ success: false, message: "Manager has no organisation assigned" });
 
-    // ── TEMPORARY DEBUG ── remove after fix ──────────────────────────────────
+  
     console.log("manager._id        :", manager._id);
     console.log("organisation_id    :", manager.organisation_id);
 
