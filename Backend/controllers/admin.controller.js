@@ -120,82 +120,44 @@ const adminlogout = async (req, res, next) => {
   res.status(200).json({ message: "Admin logout successful" });
 };
 
+
 const addmanager = async (req, res, next) => {
-  if (!req.admin) {
-    return next(
-      Object.assign(new Error("Unauthorized"), { statusCode: 401 })
-    );
-  }
-
+  if (!req.admin) return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+ 
   const {
-    organisation_id,
-    profile_image,
-    f_name,
-    l_name,
-    work_email,
-    gender,
-    marital_status,
-    password,
-    personal_contact,
-    e_contact,
-    aadhaar_number,
-    pan_number,
-    address,
-    city,
-    state,
-    pincode,
-    role,
-    office_location,
-    designation,
-    department,
-    reporting_manager,
-    is_fresher,
-    total_experience,
-    previous_company,
-    previous_designation,
-    bank_name,
-    account_holder_name,
-    account_number,
-    ifsc_code,
-    resume,
-    aadhaar_card,
-    pan_card,
-    experience_letter
+    organisation_id, profile_image, f_name, l_name, work_email, gender,
+    marital_status, password, personal_contact, e_contact, aadhaar_number,
+    pan_number, address, city, state, pincode, role, office_location,
+    designation, department, reporting_manager, is_fresher, total_experience,
+    previous_company, previous_designation, bank_name, account_holder_name,
+    account_number, ifsc_code, resume, aadhaar_card, pan_card, experience_letter,
   } = req.body;
-
-  if (
-    !f_name ||
-    !l_name ||
-    !work_email ||
-    !password ||
-    !department ||
-    !designation ||
-    !office_location ||
-    !gender ||
-    !personal_contact ||
-    !e_contact
-  ) {
-    return next(
-      Object.assign(new Error("Required fields missing"), {
-        statusCode: 400,
-      })
-    );
-  }
-
-  const existingManager = await Managermodel.findOne({ work_email })
-    .select("_id")
-    .lean();
-
-  if (existingManager) {
-    return next(
-      Object.assign(new Error("Manager already exists"), {
-        statusCode: 400,
-      })
-    );
-  }
-
+ 
+  if (!f_name || !l_name || !work_email || !password || !department || !designation || !office_location || !gender || !personal_contact || !e_contact)
+    return next(Object.assign(new Error("Required fields missing"), { statusCode: 400 }));
+ 
+  const existingManager = await Managermodel.findOne({ work_email }).select("_id").lean();
+  if (existingManager) return next(Object.assign(new Error("Manager already exists"), { statusCode: 400 }));
+ 
   const uid = await generateUID(department);
-
+ 
+  let reportingManagerId = null;
+  let reportingManagerModel = null;
+ 
+  if (reporting_manager) {
+    const isAdmin = await Adminmodel.findById(reporting_manager).select("_id").lean();
+    if (isAdmin) {
+      reportingManagerId = reporting_manager;
+      reportingManagerModel = "Admin";
+    } else {
+      const isMgr = await Managermodel.findById(reporting_manager).select("_id").lean();
+      if (isMgr) {
+        reportingManagerId = reporting_manager;
+        reportingManagerModel = "Manager";
+      }
+    }
+  }
+ 
   const newmanager = await Managermodel.create({
     organisation_id: organisation_id || req.admin._id,
     profile_image,
@@ -218,7 +180,8 @@ const addmanager = async (req, res, next) => {
     role,
     designation,
     office_location,
-    reporting_manager: reporting_manager || null,
+    reporting_manager: reportingManagerId,
+    reporting_manager_model: reportingManagerModel,
     is_fresher,
     total_experience,
     previous_company,
@@ -230,59 +193,22 @@ const addmanager = async (req, res, next) => {
     resume,
     aadhaar_card,
     pan_card,
-    experience_letter
+    experience_letter,
   });
-
-  const token = jwt.sign(
-    { managerid: newmanager._id },
-    process.env.JWT_SECRET,
-    { expiresIn: "1h" }
-  );
-
+ 
+  const token = jwt.sign({ managerid: newmanager._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
   const verifyLink = `${process.env.BASE_URL}/manager/verify/${token}`;
-
+ 
   Promise.all([
     assignDefaultLeave(newmanager),
     sendEmail({
       to: work_email,
       subject: "Activate Your Manager Account",
-      html: `
-      <!DOCTYPE html>
-      <html>
-      <body style="margin:0;padding:0;background:#F9F8F2;font-family:Segoe UI,sans-serif;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
-      <tr>
-      <td align="center">
-      <table width="600" style="background:#fff;border-radius:14px;overflow:hidden;">
-      <tr>
-      <td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;">
-      <h1>Manager Onboarding</h1>
-      </td>
-      </tr>
-      <tr>
-      <td style="padding:40px;">
-      <h2>Hi ${f_name}</h2>
-      <p>Your manager account has been created.</p>
-      <p><strong>Role:</strong> ${designation}</p>
-      <p><strong>Department:</strong> ${department}</p>
-      <p><strong>Location:</strong> ${office_location}</p>
-      <a href="${verifyLink}" style="background:#CD166E;color:white;padding:14px 30px;text-decoration:none;border-radius:8px;">Verify Account</a>
-      </td>
-      </tr>
-      </table>
-      </td>
-      </tr>
-      </table>
-      </body>
-      </html>
-      `
-    })
+      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F9F8F2;font-family:Segoe UI,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center"><table width="600" style="background:#fff;border-radius:14px;overflow:hidden;"><tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h1>Manager Onboarding</h1></td></tr><tr><td style="padding:40px;"><h2>Hi ${f_name}</h2><p>Your manager account has been created.</p><p><strong>Role:</strong> ${designation}</p><p><strong>Department:</strong> ${department}</p><p><strong>Location:</strong> ${office_location}</p><a href="${verifyLink}" style="background:#CD166E;color:white;padding:14px 30px;text-decoration:none;border-radius:8px;">Verify Account</a></td></tr></table></td></tr></table></body></html>`,
+    }),
   ]);
-
-  res.status(201).json({
-    success: true,
-    message: "Manager added successfully. Verification email sent."
-  });
+ 
+  res.status(201).json({ success: true, message: "Manager added successfully. Verification email sent." });
 };
 
 const addemployee = async (req, res, next) => {
