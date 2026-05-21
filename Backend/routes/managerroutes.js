@@ -157,11 +157,11 @@ managerrouter.get(
   asyncHandler(managercontroller.getattendance),
 );
 
-managerrouter.get(
-  "/getorginfo",
-  managermiddleware,
-  asyncHandler(admincontroller.getOrgInfo),
-);
+// managerrouter.get(
+//   "/getorginfo",
+//   managermiddleware,
+//   asyncHandler(admincontroller.getOrgInfo),
+// );
 
 managerrouter.post(
   "/submit-ticket",

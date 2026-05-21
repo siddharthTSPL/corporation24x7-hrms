@@ -1164,24 +1164,24 @@ const getOrgInfoForManager = async (req, res, next) => {
     if (!manager)
       return res.status(404).json({ success: false, message: "Manager not found" });
 
-   
     if (!manager.organisation_id)
       return res.status(400).json({ success: false, message: "Manager has no organisation assigned" });
 
-    const admin = await Adminmodel.findById(manager.organisation_id)
-      .select("f_name l_name work_email designation created_by")
+    
+    const superAdmin = await SuperAdminModel.findById(manager.organisation_id)
+      .select("f_name l_name email organisation_name profile_image")
       .lean();
 
- 
+    if (!superAdmin)
+      return res.status(404).json({ success: false, message: "Organisation not found" });
+
+
+    const admin = await Adminmodel.findOne({ created_by: superAdmin._id })
+      .select("f_name l_name work_email designation ")
+      .lean();
+
     if (!admin)
       return res.status(404).json({ success: false, message: "Admin not found for this organisation" });
-
-    let superAdmin = null;
-    if (admin.created_by) {
-      superAdmin = await SuperAdminModel.findById(admin.created_by)
-        .select("f_name l_name email organisation_name profile_image")
-        .lean();
-    }
 
     const allManagers = await Managermodel.find({ organisation_id: manager.organisation_id })
       .select("f_name l_name work_email designation department office_location")
@@ -1212,15 +1212,13 @@ const getOrgInfoForManager = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      organisation_name: superAdmin?.organisation_name || "",
-      organisation_logo: superAdmin?.profile_image || null,
-      super_admin: superAdmin
-        ? {
-            id: superAdmin._id,
-            name: `${superAdmin.f_name} ${superAdmin.l_name}`,
-            email: superAdmin.email,
-          }
-        : null,
+      organisation_name: superAdmin.organisation_name || "",
+      organisation_logo: superAdmin.profile_image || null,
+      super_admin: {
+        id: superAdmin._id,
+        name: `${superAdmin.f_name} ${superAdmin.l_name}`,
+        email: superAdmin.email,
+      },
       admin: {
         id: admin._id,
         name: `${admin.f_name} ${admin.l_name}`,
@@ -1234,7 +1232,6 @@ const getOrgInfoForManager = async (req, res, next) => {
     next(error);
   }
 };
-
 
 module.exports = {
   verifyManagerEmail,
