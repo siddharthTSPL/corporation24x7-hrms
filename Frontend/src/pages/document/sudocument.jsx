@@ -15,6 +15,8 @@ const C = {
   blueBg:     "#E6F1FB",
   red:        "#E24B4A",
   redBg:      "#fcebeb",
+  green:      "#1D9E75",
+  greenBg:    "#e8f5e9",
   surface:    "#ffffff",
   page:       "#f9f8f2",
   border:     "#ede5e0",
@@ -171,10 +173,11 @@ function DetailDrawer({ documentId, docType, onClose }) {
               </div>
 
               {[
-                ["File size",   fmtSize(doc.sizeKB)],
-                ["Uploaded on", fmtDate(doc.uploadedAt)],
-                ["Viewed by admin",       doc.viewedByAdmin ? "Yes" : "Not yet"],
-                ["Viewed by super admin", doc.viewedBySuperAdmin ? "Yes" : "Not yet"],
+                ["File size",             fmtSize(doc.sizeKB)],
+                ["Uploaded on",           fmtDate(doc.uploadedAt)],
+                ["Viewed by manager",     doc.viewedByManager     ? "Yes" : "Not yet"],
+                ["Viewed by admin",       doc.viewedByAdmin       ? "Yes" : "Not yet"],
+                ["Viewed by super admin", doc.viewedBySuperAdmin  ? "Yes" : "Not yet"],
               ].map(([label, val]) => (
                 <div key={label} style={{
                   display: "flex", justifyContent: "space-between",
@@ -185,7 +188,7 @@ function DetailDrawer({ documentId, docType, onClose }) {
                 </div>
               ))}
 
-              {doc.employee && (
+              {doc.employee ? (
                 <div style={{
                   marginTop: 24, background: C.page,
                   borderRadius: 12, padding: "16px",
@@ -206,6 +209,15 @@ function DetailDrawer({ documentId, docType, onClose }) {
                       <div style={{ fontSize: 12, color: C.muted, marginTop: 1 }}>{doc.employee.department}</div>
                     </div>
                   </div>
+                </div>
+              ) : (
+                <div style={{
+                  marginTop: 24, background: C.page,
+                  borderRadius: 12, padding: "14px 16px",
+                  border: `0.5px solid ${C.border}`,
+                  fontSize: 13, color: C.muted,
+                }}>
+                  Employee information not available
                 </div>
               )}
 
@@ -239,65 +251,84 @@ function DetailDrawer({ documentId, docType, onClose }) {
   );
 }
 
-function DocCard({ doc, docType, onClick }) {
+function DocRow({ doc, docType, onClick }) {
   return (
     <div
       onClick={onClick}
       style={{
-        background: C.surface, borderRadius: 14,
-        border: `0.5px solid ${C.border}`,
+        display: "flex", alignItems: "center", gap: 16,
         padding: "16px 20px", cursor: "pointer",
-        transition: "border-color 0.15s, box-shadow 0.15s",
-        position: "relative", overflow: "hidden",
+        borderBottom: `0.5px solid ${C.border}`,
+        transition: "background 0.12s",
       }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = C.brand;
-        e.currentTarget.style.boxShadow = `0 0 0 3px ${C.brandLight}`;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = C.border;
-        e.currentTarget.style.boxShadow = "none";
-      }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = C.page)}
+      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
       <div style={{
-        position: "absolute", top: 0, left: 0, right: 0, height: 3,
-        background: docType === "personal" ? C.brand : C.blue,
-        borderRadius: "14px 14px 0 0",
-      }} />
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+        width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+        background: docType === "personal" ? C.brandLight : C.blueBg,
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+            stroke={docType === "personal" ? C.brand : C.blue}
+            strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          <polyline points="14 2 14 8 20 8"
+            stroke={docType === "personal" ? C.brand : C.blue}
+            strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          width: 40, height: 40, borderRadius: 10,
-          background: docType === "personal" ? C.brandLight : C.blueBg,
-          flexShrink: 0,
+          fontSize: 13, fontWeight: 500, color: C.text,
+          marginBottom: 4, overflow: "hidden",
+          textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>
+          {doc.title}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {!doc.viewedBySuperAdmin && (
+            <Badge color={C.amber} bg={C.amberBg}>New</Badge>
+          )}
+          <span style={{ fontSize: 11, color: C.mutedMid }}>
+            {fmtSize(doc.sizeKB)} · {fmtDate(doc.uploadedAt)}
+          </span>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        {doc.employee ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: "50%", background: C.brand,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 10, fontWeight: 600, color: "#fff", flexShrink: 0,
+            }}>
+              {getInitials(doc.employee.name)}
+            </div>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 500, color: C.text }}>{doc.employee.name}</div>
+              <div style={{ fontSize: 11, color: C.muted }}>{doc.employee.department || doc.employee.designation || "—"}</div>
+            </div>
+          </div>
+        ) : (
+          <span style={{ fontSize: 12, color: C.mutedMid }}>No employee info</span>
+        )}
+      </div>
+
+      <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
+        <div title="Viewed by admin" style={{
+          width: 20, height: 20, borderRadius: "50%",
+          background: doc.viewedByAdmin ? C.greenBg : C.redBg,
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
-              stroke={docType === "personal" ? C.brand : C.blue}
-              strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-            <polyline points="14 2 14 8 20 8"
-              stroke={docType === "personal" ? C.brand : C.blue}
-              strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          {doc.viewedByAdmin
+            ? <svg width="10" height="10" viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5" fill="none" stroke={C.green} strokeWidth="1.5" strokeLinecap="round"/></svg>
+            : <svg width="10" height="10" viewBox="0 0 10 10"><line x1="2" y1="2" x2="8" y2="8" stroke={C.red} strokeWidth="1.5" strokeLinecap="round"/><line x1="8" y1="2" x2="2" y2="8" stroke={C.red} strokeWidth="1.5" strokeLinecap="round"/></svg>
+          }
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontSize: 13, fontWeight: 500, color: C.text,
-            marginBottom: 4, overflow: "hidden",
-            textOverflow: "ellipsis", whiteSpace: "nowrap",
-          }}>
-            {doc.title}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            {!doc.viewedBySuperAdmin && (
-              <Badge color={C.amber} bg={C.amberBg}>New</Badge>
-            )}
-            <span style={{ fontSize: 11, color: C.mutedMid }}>
-              {fmtSize(doc.sizeKB)} · {fmtDate(doc.uploadedAt)}
-            </span>
-          </div>
-        </div>
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, marginTop: 2 }}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
           <path d="M6 4l4 4-4 4" stroke={C.mutedMid} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </div>
@@ -305,110 +336,57 @@ function DocCard({ doc, docType, onClick }) {
   );
 }
 
-function EmployeeDocsView({ employee, onBack }) {
-  const [activeTab, setActiveTab] = useState("personal");
+export default function SuperAdminDocuments() {
+  const [activeTab, setActiveTab]     = useState("personal");
+  const [search, setSearch]           = useState("");
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [selectedDocType, setSelectedDocType] = useState(null);
-  const [search, setSearch] = useState("");
 
   const { data: personalData, isLoading: loadingPersonal } = useGetAllPersonalDocumentsSuperAdmin();
   const { data: expenseData,  isLoading: loadingExpense  } = useGetAllExpenseDocumentsSuperAdmin();
 
-  const personalDocs = (personalData?.documents ?? []).filter((d) => d.employee?.id === employee.id);
-  const expenseDocs  = (expenseData?.documents  ?? []).filter((d) => d.employee?.id === employee.id);
+  const personalDocs = personalData?.documents ?? [];
+  const expenseDocs  = expenseData?.documents  ?? [];
 
   const activeDocs = activeTab === "personal" ? personalDocs : expenseDocs;
+  const loading    = activeTab === "personal" ? loadingPersonal : loadingExpense;
+
   const filtered = activeDocs.filter((d) =>
-    d.title.toLowerCase().includes(search.toLowerCase())
+    d.title.toLowerCase().includes(search.toLowerCase()) ||
+    (d.employee?.name  || "").toLowerCase().includes(search.toLowerCase()) ||
+    (d.employee?.email || "").toLowerCase().includes(search.toLowerCase())
   );
 
-  const loading = activeTab === "personal" ? loadingPersonal : loadingExpense;
+  const unviewedPersonal = personalDocs.filter((d) => !d.viewedBySuperAdmin).length;
+  const unviewedExpense  = expenseDocs.filter((d)  => !d.viewedBySuperAdmin).length;
 
   return (
     <div style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", background: C.page, minHeight: "100vh", padding: "28px 32px", color: C.text }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
-      <button
-        onClick={onBack}
-        style={{
-          display: "inline-flex", alignItems: "center", gap: 6,
-          background: "none", border: `0.5px solid ${C.border}`,
-          borderRadius: 8, padding: "7px 14px", cursor: "pointer",
-          fontSize: 13, color: C.muted, marginBottom: 20, fontFamily: "inherit",
-        }}
-      >
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M9 2L3 7l6 5" stroke={C.muted} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        Back to employees
-      </button>
-
-      <div style={{
-        background: C.surface, borderRadius: 14,
-        border: `0.5px solid ${C.border}`,
-        padding: "20px 24px", marginBottom: 24,
-        display: "flex", alignItems: "center", gap: 16,
-      }}>
-        <div style={{
-          width: 52, height: 52, borderRadius: "50%", background: C.brand,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 16, fontWeight: 500, color: "#fff", flexShrink: 0,
-        }}>
-          {getInitials(employee.name)}
-        </div>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 500, color: C.text }}>{employee.name}</div>
-          <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{employee.email}</div>
-          <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-            {employee.department && (
-              <Badge color={C.brand} bg={C.brandLight}>{employee.department}</Badge>
-            )}
-            {employee.designation && (
-              <Badge color={C.blue} bg={C.blueBg}>{employee.designation}</Badge>
-            )}
-            <Badge color="#5F5E5A" bg="#F1EFE8">{employee.role}</Badge>
-          </div>
-        </div>
-        <div style={{ marginLeft: "auto", display: "flex", gap: 20 }}>
-          {[
-            ["Personal", personalDocs.length],
-            ["Expense",  expenseDocs.length],
-          ].map(([label, count]) => (
-            <div key={label} style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 20, fontWeight: 500, color: C.text }}>{count}</div>
-              <div style={{ fontSize: 12, color: C.muted }}>{label}</div>
-            </div>
-          ))}
-        </div>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0, letterSpacing: "-0.3px" }}>Documents</h1>
+        <p style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>
+          View and manage personal and expense documents submitted by employees
+        </p>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", gap: 8 }}>
-          {["personal", "expense"].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => { setActiveTab(tab); setSearch(""); }}
-              style={{
-                padding: "8px 18px", borderRadius: 8,
-                border: `0.5px solid ${activeTab === tab ? C.brand : C.border}`,
-                background: activeTab === tab ? C.brand : C.surface,
-                color: activeTab === tab ? "#fff" : C.muted,
-                fontSize: 13, cursor: "pointer", fontFamily: "inherit",
-                fontWeight: activeTab === tab ? 500 : 400,
-              }}
-            >
-              {tab === "personal" ? "Personal" : "Expense"}
-              <span style={{
-                marginLeft: 6, fontSize: 11,
-                background: activeTab === tab ? "rgba(255,255,255,0.2)" : C.brandLight,
-                color: activeTab === tab ? "#fff" : C.brand,
-                padding: "1px 7px", borderRadius: 20,
-              }}>
-                {tab === "personal" ? personalDocs.length : expenseDocs.length}
-              </span>
-            </button>
-          ))}
-        </div>
+      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+        {[
+          ["Total personal", personalDocs.length, C.brand, C.brandLight],
+          ["Total expense",  expenseDocs.length,  C.blue,  C.blueBg],
+          ["Unviewed",       unviewedPersonal + unviewedExpense, C.amber, C.amberBg],
+        ].map(([label, val, color, bg]) => (
+          <div key={label} style={{
+            background: C.surface, borderRadius: 10,
+            border: `0.5px solid ${C.border}`,
+            padding: "10px 16px", display: "flex", alignItems: "center", gap: 10,
+          }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
+            <span style={{ fontSize: 13, color: C.muted }}>{label}</span>
+            <span style={{ fontSize: 14, fontWeight: 500, color: C.text }}>{val}</span>
+          </div>
+        ))}
 
         <div style={{ marginLeft: "auto", position: "relative" }}>
           <svg width="15" height="15" viewBox="0 0 15 15" fill="none"
@@ -418,14 +396,14 @@ function EmployeeDocsView({ employee, onBack }) {
           </svg>
           <input
             type="text"
-            placeholder="Search documents..."
+            placeholder="Search title, employee..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{
               padding: "9px 14px 9px 34px", borderRadius: 10,
               border: `0.5px solid ${C.border}`, fontSize: 13,
               color: C.text, background: C.surface,
-              outline: "none", width: 220, fontFamily: "inherit",
+              outline: "none", width: 240, fontFamily: "inherit",
             }}
             onFocus={(e) => (e.target.style.borderColor = C.brand)}
             onBlur={(e)  => (e.target.style.borderColor = C.border)}
@@ -436,6 +414,56 @@ function EmployeeDocsView({ employee, onBack }) {
       <div style={{ background: C.surface, borderRadius: 16, border: `0.5px solid ${C.border}`, overflow: "hidden" }}>
         <div style={{ height: 3, background: activeTab === "personal" ? C.brand : C.blue }} />
 
+        <div style={{
+          display: "flex", gap: 0,
+          borderBottom: `0.5px solid ${C.border}`,
+          padding: "0 20px",
+        }}>
+          {[
+            { key: "personal", label: "Personal",  count: personalDocs.length, unviewed: unviewedPersonal },
+            { key: "expense",  label: "Expense",   count: expenseDocs.length,  unviewed: unviewedExpense  },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => { setActiveTab(tab.key); setSearch(""); }}
+              style={{
+                padding: "14px 20px",
+                background: "none",
+                border: "none",
+                borderBottom: activeTab === tab.key
+                  ? `2px solid ${tab.key === "personal" ? C.brand : C.blue}`
+                  : "2px solid transparent",
+                color: activeTab === tab.key ? (tab.key === "personal" ? C.brand : C.blue) : C.muted,
+                fontSize: 13, fontWeight: activeTab === tab.key ? 500 : 400,
+                cursor: "pointer", fontFamily: "inherit",
+                display: "flex", alignItems: "center", gap: 8,
+                marginBottom: -1,
+              }}
+            >
+              {tab.label}
+              <span style={{
+                fontSize: 11, padding: "1px 7px", borderRadius: 20,
+                background: activeTab === tab.key
+                  ? (tab.key === "personal" ? C.brandLight : C.blueBg)
+                  : "#f2eeec",
+                color: activeTab === tab.key
+                  ? (tab.key === "personal" ? C.brand : C.blue)
+                  : C.muted,
+              }}>
+                {tab.count}
+              </span>
+              {tab.unviewed > 0 && (
+                <span style={{
+                  fontSize: 10, padding: "1px 6px", borderRadius: 20,
+                  background: C.amberBg, color: C.amber, fontWeight: 600,
+                }}>
+                  {tab.unviewed} new
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
         {loading && (
           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "60px 0", gap: 12 }}>
             <Spinner />
@@ -444,20 +472,36 @@ function EmployeeDocsView({ employee, onBack }) {
         )}
 
         {!loading && filtered.length === 0 && (
-          <EmptyState message={search ? "No results match your search." : `No ${activeTab} documents found for this employee.`} />
+          <EmptyState message={search ? "No results match your search." : `No ${activeTab} documents uploaded yet.`} />
         )}
 
         {!loading && filtered.length > 0 && (
-          <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: 12 }}>
-            {filtered.map((doc) => (
-              <DocCard
-                key={doc.id}
-                doc={doc}
-                docType={activeTab}
-                onClick={() => { setSelectedDoc(doc.id); setSelectedDocType(activeTab); }}
-              />
-            ))}
-          </div>
+          <>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "40px 1fr 200px 60px",
+              padding: "10px 20px",
+              borderBottom: `0.5px solid ${C.border}`,
+              gap: 16,
+            }}>
+              {["", "Document", "Employee", "Status"].map((h, i) => (
+                <div key={i} style={{ fontSize: 11, fontWeight: 500, color: C.mutedMid, textTransform: "uppercase", letterSpacing: "0.4px" }}>
+                  {h}
+                </div>
+              ))}
+            </div>
+
+            <div>
+              {filtered.map((doc) => (
+                <DocRow
+                  key={doc.id}
+                  doc={doc}
+                  docType={activeTab}
+                  onClick={() => { setSelectedDoc(doc.id); setSelectedDocType(activeTab); }}
+                />
+              ))}
+            </div>
+          </>
         )}
       </div>
 
@@ -470,252 +514,4 @@ function EmployeeDocsView({ employee, onBack }) {
       )}
     </div>
   );
-}
-
-function EmployeeListView({ onSelectEmployee }) {
-  const { data: personalData } = useGetAllPersonalDocumentsSuperAdmin();
-  const { data: expenseData  } = useGetAllExpenseDocumentsSuperAdmin();
-  const [search, setSearch]     = useState("");
-  const [deptFilter, setDept]   = useState("all");
-  const [roleFilter, setRole]   = useState("all");
-
-  const allDocs = [
-    ...(personalData?.documents ?? []),
-    ...(expenseData?.documents  ?? []),
-  ];
-
-  const employeeMap = {};
-  allDocs.forEach((doc) => {
-    if (!doc.employee) return;
-    const id = doc.employee.id;
-    if (!employeeMap[id]) {
-      employeeMap[id] = {
-        id,
-        name:        doc.employee.name,
-        email:       doc.employee.email,
-        contact:     doc.employee.contact,
-        department:  doc.employee.department,
-        designation: doc.employee.designation,
-        role:        doc.reportingManager ? "employee" : "manager",
-        personalCount: 0,
-        expenseCount:  0,
-        unviewed:      0,
-      };
-    }
-    if (doc.fileType === "personal") employeeMap[id].personalCount++;
-    else                             employeeMap[id].expenseCount++;
-    if (!doc.viewedBySuperAdmin)     employeeMap[id].unviewed++;
-  });
-
-  const employees = Object.values(employeeMap);
-
-  const departments = ["all", ...new Set(employees.map((e) => e.department).filter(Boolean))];
-  const roles       = ["all", "employee", "manager"];
-
-  const filtered = employees.filter((e) => {
-    const matchSearch = !search ||
-      e.name.toLowerCase().includes(search.toLowerCase()) ||
-      e.email.toLowerCase().includes(search.toLowerCase()) ||
-      (e.department || "").toLowerCase().includes(search.toLowerCase());
-    const matchDept = deptFilter === "all" || e.department === deptFilter;
-    const matchRole = roleFilter === "all" || e.role === roleFilter;
-    return matchSearch && matchDept && matchRole;
-  });
-
-  return (
-    <div style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", background: C.page, minHeight: "100vh", padding: "28px 32px", color: C.text }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0, letterSpacing: "-0.3px" }}>Documents</h1>
-        <p style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>
-          Select an employee or manager to view their documents
-        </p>
-      </div>
-
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-        {[
-          ["Total employees", employees.length, C.brand],
-          ["With unviewed docs", employees.filter((e) => e.unviewed > 0).length, C.amber],
-        ].map(([label, val, dotColor]) => (
-          <div key={label} style={{
-            background: C.surface, borderRadius: 10,
-            border: `0.5px solid ${C.border}`,
-            padding: "10px 16px", display: "flex", alignItems: "center", gap: 10,
-          }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: dotColor }} />
-            <span style={{ fontSize: 13, color: C.muted }}>{label}</span>
-            <span style={{ fontSize: 14, fontWeight: 500, color: C.text }}>{val}</span>
-          </div>
-        ))}
-
-        <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <select
-            value={deptFilter}
-            onChange={(e) => setDept(e.target.value)}
-            style={{
-              padding: "8px 12px", borderRadius: 8,
-              border: `0.5px solid ${C.border}`, fontSize: 13,
-              color: C.text, background: C.surface,
-              outline: "none", cursor: "pointer", fontFamily: "inherit",
-            }}
-          >
-            {departments.map((d) => (
-              <option key={d} value={d}>{d === "all" ? "All departments" : d}</option>
-            ))}
-          </select>
-
-          <select
-            value={roleFilter}
-            onChange={(e) => setRole(e.target.value)}
-            style={{
-              padding: "8px 12px", borderRadius: 8,
-              border: `0.5px solid ${C.border}`, fontSize: 13,
-              color: C.text, background: C.surface,
-              outline: "none", cursor: "pointer", fontFamily: "inherit",
-            }}
-          >
-            {roles.map((r) => (
-              <option key={r} value={r}>{r === "all" ? "All roles" : r.charAt(0).toUpperCase() + r.slice(1)}</option>
-            ))}
-          </select>
-
-          <div style={{ position: "relative" }}>
-            <svg width="15" height="15" viewBox="0 0 15 15" fill="none"
-              style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }}>
-              <circle cx="6.5" cy="6.5" r="4.5" stroke={C.muted} strokeWidth="1.3" />
-              <path d="M10 10l3 3" stroke={C.muted} strokeWidth="1.3" strokeLinecap="round" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Search name, email, department..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{
-                padding: "9px 14px 9px 34px", borderRadius: 10,
-                border: `0.5px solid ${C.border}`, fontSize: 13,
-                color: C.text, background: C.surface,
-                outline: "none", width: 250, fontFamily: "inherit",
-              }}
-              onFocus={(e) => (e.target.style.borderColor = C.brand)}
-              onBlur={(e)  => (e.target.style.borderColor = C.border)}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div style={{ background: C.surface, borderRadius: 16, border: `0.5px solid ${C.border}`, overflow: "hidden" }}>
-        <div style={{ height: 3, background: C.brand }} />
-
-        {filtered.length === 0 ? (
-          <div style={{
-            display: "flex", flexDirection: "column", alignItems: "center",
-            justifyContent: "center", padding: "60px 24px", gap: 14,
-          }}>
-            <div style={{
-              width: 56, height: 56, borderRadius: "50%", background: C.brandLight,
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <circle cx="11" cy="11" r="8" stroke={C.brand} strokeWidth="1.5" />
-                <path d="M21 21l-4.35-4.35" stroke={C.brand} strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            </div>
-            <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>No employees found</div>
-            <div style={{ fontSize: 12, color: C.muted }}>Try adjusting your filters or search term.</div>
-          </div>
-        ) : (
-          <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: 10 }}>
-            {filtered.map((emp) => (
-              <div
-                key={emp.id}
-                onClick={() => onSelectEmployee(emp)}
-                style={{
-                  background: C.surface, borderRadius: 14,
-                  border: `0.5px solid ${C.border}`,
-                  padding: "16px 20px", cursor: "pointer",
-                  transition: "border-color 0.15s, box-shadow 0.15s",
-                  display: "flex", alignItems: "center", gap: 16,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = C.brand;
-                  e.currentTarget.style.boxShadow = `0 0 0 3px ${C.brandLight}`;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = C.border;
-                  e.currentTarget.style.boxShadow = "none";
-                }}
-              >
-                <div style={{
-                  width: 44, height: 44, borderRadius: "50%", background: C.brand,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 14, fontWeight: 500, color: "#fff", flexShrink: 0,
-                }}>
-                  {getInitials(emp.name)}
-                </div>
-
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontSize: 14, fontWeight: 500, color: C.text }}>{emp.name}</span>
-                    {emp.unviewed > 0 && (
-                      <span style={{
-                        fontSize: 11, fontWeight: 500,
-                        color: C.amber, background: C.amberBg,
-                        padding: "1px 8px", borderRadius: 20,
-                      }}>
-                        {emp.unviewed} new
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>{emp.email}</div>
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {emp.department && (
-                      <Badge color={C.brand} bg={C.brandLight}>{emp.department}</Badge>
-                    )}
-                    {emp.designation && (
-                      <Badge color={C.blue} bg={C.blueBg}>{emp.designation}</Badge>
-                    )}
-                    <Badge color="#5F5E5A" bg="#F1EFE8">
-                      {emp.role === "manager" ? "Manager" : "Employee"}
-                    </Badge>
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", gap: 20, marginRight: 12 }}>
-                  {[
-                    ["Personal", emp.personalCount, C.brand],
-                    ["Expense",  emp.expenseCount,  C.blue],
-                  ].map(([label, count, color]) => (
-                    <div key={label} style={{ textAlign: "center" }}>
-                      <div style={{ fontSize: 18, fontWeight: 500, color }}>{count}</div>
-                      <div style={{ fontSize: 11, color: C.muted }}>{label}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-                  <path d="M6 4l4 4-4 4" stroke={C.mutedMid} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export default function SuperAdminDocuments() {
-  const [selectedEmployee, setSelectedEmployee] = useState(null);
-
-  if (selectedEmployee) {
-    return (
-      <EmployeeDocsView
-        employee={selectedEmployee}
-        onBack={() => setSelectedEmployee(null)}
-      />
-    );
-  }
-
-  return <EmployeeListView onSelectEmployee={setSelectedEmployee} />;
 }
