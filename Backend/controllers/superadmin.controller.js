@@ -364,31 +364,44 @@ const loginSuperAdmin = async (req, res, next) => {
 };
 
 const getMe = async (req, res, next) => {
-  const superAdmin = req.superAdmin;
-  res.status(200).json({
-    success: true,
-    superAdmin: {
-      id: superAdmin._id,
-      f_name: superAdmin.f_name,
-      l_name: superAdmin.l_name,
-      email: superAdmin.email,
-      phone: superAdmin.phone,
-      profile_image: superAdmin.profile_image,
-      organisation_name: superAdmin.organisation_name,
-      company_domain: superAdmin.company_domain,
-      company_address: superAdmin.company_address,
-      company_size: superAdmin.company_size,
-      industry: superAdmin.industry,
-      plan: superAdmin.plan,
-      plan_started_at: superAdmin.plan_started_at,
-      plan_expires_at: superAdmin.plan_expires_at,
-      role: superAdmin.role,
-      status: superAdmin.status,
-      isFirstLogin: superAdmin.isFirstLogin,
-      last_login: superAdmin.last_login,
-      createdAt: superAdmin.createdAt,
-    },
-  });
+  try {
+    const superAdmin = req.superAdmin;
+
+    res.status(200).json({
+      success: true,
+      superAdmin: {
+        _id: superAdmin._id,
+        f_name: superAdmin.f_name,
+        l_name: superAdmin.l_name,
+        email: superAdmin.email,
+        phone: superAdmin.phone,
+        profile_image: superAdmin.profile_image,
+        organisation_name: superAdmin.organisation_name,
+        company_address: superAdmin.company_address,
+        company_size: superAdmin.company_size,
+        industry: superAdmin.industry,
+        plan: superAdmin.plan,
+        role: superAdmin.role,
+        status: superAdmin.status,
+        isVerified: superAdmin.isVerified,
+        isFirstLogin: superAdmin.isFirstLogin,
+        last_login: superAdmin.last_login,
+        company_domain: superAdmin.company_domain,
+        plan_started_at: superAdmin.plan_started_at,
+        plan_expires_at: superAdmin.plan_expires_at,
+        trial_started_at: superAdmin.trial_started_at,
+        trial_expires_at: superAdmin.trial_expires_at,
+        is_trial_active: superAdmin.is_trial_active,
+        licenses: superAdmin.licenses,
+        purchased_products: superAdmin.purchased_products,
+        createdAt: superAdmin.createdAt,
+        updatedAt: superAdmin.updatedAt,
+        __v: superAdmin.__v,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const logoutSuperAdmin = async (req, res, next) => {
