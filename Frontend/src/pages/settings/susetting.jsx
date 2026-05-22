@@ -7,7 +7,6 @@ import {
 import { useChangeSuperAdminPassword } from "../../auth/server-state/superadmin/other/suother.hook";
 import { useQueryClient } from "@tanstack/react-query";
 
-// ─── CONSTANTS ────────────────────────────────────────────────────────────
 const AVATAR_STYLES = [
   "avataaars", "bottts", "personas", "lorelei",
   "micah", "open-peeps", "big-ears", "croodles",
@@ -22,7 +21,6 @@ const COMPANY_SIZE_OPTIONS = [
   "1–10", "11–50", "51–200", "201–500", "501–1000", "1000+",
 ];
 
-// ─── BRAND COLORS (matches superadmin palette) ────────────────────────────
 const C = {
   brand:      "#730042",
   brandLight: "rgba(115,0,66,0.08)",
@@ -45,7 +43,6 @@ const C = {
   mutedMid:   "#c9bab5",
 };
 
-// ─── UTILS ────────────────────────────────────────────────────────────────
 function getInitials(fName = "", lName = "") {
   return `${(fName[0] || "").toUpperCase()}${(lName[0] || "").toUpperCase()}`;
 }
@@ -67,7 +64,6 @@ function daysLeft(dateStr) {
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }
 
-// ─── SMALL UI PRIMITIVES ──────────────────────────────────────────────────
 function Badge({ children, color = C.brand, bg = C.brandLight }) {
   return (
     <span style={{
@@ -272,7 +268,6 @@ function PrimaryButton({ onClick, disabled, loading, children, color = C.brand }
   );
 }
 
-// ─── NAV SIDEBAR ──────────────────────────────────────────────────────────
 function Sidebar({ tab, setTab, superAdmin, initials }) {
   const tabs = [
     {
@@ -302,18 +297,16 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
     },
   ];
 
-  const days = daysLeft(superAdmin?.plan_expires_at);
+  const days = daysLeft(superAdmin?.plan_expires_at || superAdmin?.trial_expires_at);
 
   return (
     <div style={{ width: 220, flexShrink: 0 }}>
-      {/* Profile mini card */}
       <div style={{
         background: C.surface, borderRadius: 16,
         border: `0.5px solid ${C.border}`,
         padding: "20px 16px", marginBottom: 12,
         position: "relative", overflow: "hidden",
       }}>
-        {/* gradient top bar */}
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${C.grad1}, ${C.grad2})`, borderRadius: "16px 16px 0 0" }} />
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
           <div style={{
@@ -333,10 +326,9 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
             <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{superAdmin?.organisation_name || "—"}</div>
             <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 5, alignItems: "center" }}>
               <Badge color={C.brand} bg={C.brandLight}>{superAdmin?.role || "super_admin"}</Badge>
-              {superAdmin?.plan && <PlanBadge plan={superAdmin.plan} />}
+              {superAdmin?.is_trial_active && <PlanBadge plan="free_trial" />}
             </div>
           </div>
-          {/* Trial days pill */}
           {days !== null && days <= 30 && (
             <div style={{
               width: "100%", padding: "8px 12px", borderRadius: 10,
@@ -347,13 +339,14 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
               <div style={{ fontSize: 11, fontWeight: 600, color: days <= 5 ? C.red : C.amber }}>
                 {days === 0 ? "Expires today!" : `${days} day${days !== 1 ? "s" : ""} left`}
               </div>
-              <div style={{ fontSize: 10, color: C.muted, marginTop: 1 }}>Plan expires {formatDate(superAdmin.plan_expires_at)}</div>
+              <div style={{ fontSize: 10, color: C.muted, marginTop: 1 }}>
+                Trial expires {formatDate(superAdmin?.trial_expires_at)}
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Nav */}
       <div style={{ background: C.surface, borderRadius: 16, border: `0.5px solid ${C.border}`, overflow: "hidden" }}>
         {tabs.map((t, i) => {
           const active = tab === t.key;
@@ -385,9 +378,8 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
   );
 }
 
-// ─── OVERVIEW TAB ─────────────────────────────────────────────────────────
 function OverviewTab({ superAdmin }) {
-  const days = daysLeft(superAdmin?.plan_expires_at);
+  const days = daysLeft(superAdmin?.trial_expires_at);
 
   return (
     <>
@@ -407,19 +399,19 @@ function OverviewTab({ superAdmin }) {
           <div style={{ marginBottom: 16 }}>
             <FieldLabel>Current plan</FieldLabel>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <PlanBadge plan={superAdmin?.plan} />
+              <PlanBadge plan={superAdmin?.is_trial_active ? "free_trial" : "active"} />
             </div>
           </div>
-          <ReadonlyField label="Plan started" value={formatDate(superAdmin?.plan_started_at)} />
+          <ReadonlyField label="Trial started" value={formatDate(superAdmin?.trial_started_at)} />
           <div style={{ marginBottom: 16 }}>
-            <FieldLabel>Plan expires</FieldLabel>
+            <FieldLabel>Trial expires</FieldLabel>
             <div style={{
               padding: "10px 14px", borderRadius: 10,
               background: days !== null && days <= 5 ? C.redBg : "#f9f4f2",
               border: `0.5px solid ${days !== null && days <= 5 ? "#f5c6c6" : C.border}`,
               fontSize: 13, color: days !== null && days <= 5 ? C.red : C.text, fontWeight: 500,
             }}>
-              {formatDate(superAdmin?.plan_expires_at)}
+              {formatDate(superAdmin?.trial_expires_at)}
               {days !== null && <span style={{ fontSize: 11, marginLeft: 8, opacity: 0.7 }}>({days}d left)</span>}
             </div>
           </div>
@@ -442,7 +434,6 @@ function OverviewTab({ superAdmin }) {
   );
 }
 
-// ─── PROFILE TAB ──────────────────────────────────────────────────────────
 function ProfileTab({ superAdmin, onSuccess, onError }) {
   const queryClient = useQueryClient();
   const updateProfile = useUpdateSuperAdminProfile();
@@ -503,13 +494,10 @@ function ProfileTab({ superAdmin, onSuccess, onError }) {
         onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
         placeholder="Enter phone number"
       />
-
-      {/* Read-only info row */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
         <ReadonlyField label="Role" value={superAdmin?.role} />
         <ReadonlyField label="Company domain" value={superAdmin?.company_domain} />
       </div>
-
       <PrimaryButton onClick={handleSave} loading={updateProfile.isPending}>
         Save personal details
       </PrimaryButton>
@@ -517,7 +505,6 @@ function ProfileTab({ superAdmin, onSuccess, onError }) {
   );
 }
 
-// ─── ORGANISATION TAB ─────────────────────────────────────────────────────
 function OrganisationTab({ superAdmin, onSuccess, onError }) {
   const queryClient = useQueryClient();
   const updateProfile = useUpdateSuperAdminProfile();
@@ -587,7 +574,6 @@ function OrganisationTab({ superAdmin, onSuccess, onError }) {
   );
 }
 
-// ─── PASSWORD TAB ─────────────────────────────────────────────────────────
 function PasswordTab({ onSuccess, onError }) {
   const changePassword = useChangeSuperAdminPassword();
   const [show, setShow] = useState(false);
@@ -671,7 +657,6 @@ function PasswordTab({ onSuccess, onError }) {
   );
 }
 
-// ─── AVATAR TAB ───────────────────────────────────────────────────────────
 function AvatarTab({ superAdmin, onSuccess, onError }) {
   const queryClient = useQueryClient();
   const updateProfile = useUpdateSuperAdminProfile();
@@ -776,13 +761,11 @@ function AvatarTab({ superAdmin, onSuccess, onError }) {
   );
 }
 
-// ─── MAIN PAGE ────────────────────────────────────────────────────────────
 export default function SuperAdminSettingsPage() {
   const [tab, setTab] = useState("overview");
   const [toast, setToast] = useState({ message: "", type: "" });
 
   const { data: profileData, isLoading } = useGetMeSuperAdmin();
-  // useGetMeSuperAdmin returns { success, superAdmin }
   const superAdmin = profileData?.superAdmin ?? null;
   const initials = superAdmin ? getInitials(superAdmin.f_name, superAdmin.l_name) : "SA";
 
@@ -812,17 +795,14 @@ export default function SuperAdminSettingsPage() {
 
       <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: "", type: "" })} />
 
-      {/* Header */}
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0, letterSpacing: "-0.3px" }}>Settings</h1>
         <p style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>Manage your super admin profile, organisation and security</p>
       </div>
 
-      {/* Layout */}
       <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
         <Sidebar tab={tab} setTab={setTab} superAdmin={superAdmin} initials={initials} />
 
-        {/* Content */}
         <div style={{ flex: 1, minWidth: 0 }}>
           {tab === "overview"      && <OverviewTab superAdmin={superAdmin} />}
           {tab === "profile"       && <ProfileTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
