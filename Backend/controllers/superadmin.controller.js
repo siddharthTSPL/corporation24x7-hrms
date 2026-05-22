@@ -1552,13 +1552,13 @@ const getDocumentDetailsSuperAdmin = async (req, res, next) => {
   if (!req.superAdmin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
-  const { documentId } = req.params;
-  if (!documentId)
+  const { id } = req.params; 
+  if (!id)  
     return next(
       Object.assign(new Error("Document ID is required"), { statusCode: 400 })
     );
 
-  const document = await Document.findById(documentId)
+  const document = await Document.findById(id)  // ✅ Changed from documentId to id
     .populate("employee", "f_name l_name work_email personal_contact department designation")
     .populate("underManager", "f_name l_name work_email");
 
