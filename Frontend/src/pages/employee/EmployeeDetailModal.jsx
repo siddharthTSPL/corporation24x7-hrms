@@ -44,35 +44,21 @@ function formatRole(role) {
 
 function Avatar({ fName, lName, size = "lg" }) {
   const initials = getInitials(fName, lName);
-  const palettes = [
-    "from-blue-500 to-violet-500",
-    "from-rose-500 to-pink-500",
-    "from-amber-500 to-orange-500",
-    "from-emerald-500 to-teal-500",
-    "from-cyan-500 to-blue-500",
-  ];
-  const gradient = palettes[((fName || "?").charCodeAt(0)) % palettes.length];
   const sizeMap = {
     sm: "w-8 h-8 text-xs",
     md: "w-10 h-10 text-sm",
     lg: "w-[72px] h-[72px] text-2xl",
   };
   return (
-    <div className={`${sizeMap[size]} rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center font-medium text-white flex-shrink-0 border-2 border-white/10`}>
+    <div className={`${sizeMap[size]} rounded-full bg-white flex items-center justify-center font-medium flex-shrink-0 border-2`} style={{ color: "#88004d", borderColor: "#88004d" }}>
       {initials}
     </div>
   );
 }
 
 function HeroPill({ children, variant = "blue" }) {
-  const variants = {
-    blue:   "bg-blue-500/20 text-blue-300",
-    violet: "bg-violet-500/20 text-violet-300",
-    green:  "bg-emerald-500/20 text-emerald-300",
-    amber:  "bg-amber-500/20 text-amber-300",
-  };
   return (
-    <span className={`px-2.5 py-1 rounded-full text-[11px] font-medium tracking-wide ${variants[variant]}`}>
+    <span className="px-2.5 py-1 rounded-full text-[11px] font-medium tracking-wide text-white border border-white/40">
       {children}
     </span>
   );
@@ -547,7 +533,7 @@ export default function EmployeeDetailModal({ employeeId, employeeRole, onClose 
             )}
           </div>
 
-          <div className="px-7 py-4 border-t border-black/[0.08] dark:border-white/[0.08] flex items-center justify-between bg-white dark:bg-[#0f172a] flex-shrink-0">
+          <div className="px-7 py-4 border-t border-black/[0.08] dark:border-white/[0.08] flex items-center justify-between bg-white dark:bg-[#090e1b] flex-shrink-0">
             <p className="text-[11px] text-[var(--muted)]">
               {user?.uid && `ID: ${user.uid}`}
               {user?.department && ` · ${user.department}`}
