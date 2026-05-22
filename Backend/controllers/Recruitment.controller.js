@@ -58,6 +58,7 @@ const getMyRequisitions = async (req, res) => {
   };
 
   if (status) filter.status = status;
+  
 
   const requisitions = await HiringRequisition.find(filter)
     .populate("approved_by", "f_name l_name work_email")
@@ -70,6 +71,8 @@ const getAllRequisitions = async (req, res) => {
   const { status, department, priority } = req.query;
 
   const filter = { organisation_id: req.admin.organisation_id };
+  console.log("Admin org ID:", req.admin.organisation_id);
+  console.log("Type:", typeof req.admin.organisation_id);
 
   if (status) filter.status = status;
   if (department) filter.department = department;
