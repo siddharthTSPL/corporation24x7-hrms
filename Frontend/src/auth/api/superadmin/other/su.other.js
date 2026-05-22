@@ -122,7 +122,9 @@ export const getAllExpenseDocumentsSuperAdmin = async () => {
 };
 
 export const getDocumentDetailsSuperAdmin = async (documentId) => {
-  const res = await api.get(`superadmin/documents/${documentId}`);
+  const res = await api.get(
+    `superadmin/getdocumentdetails/${documentId}`
+  );
   return res.data;
 };
 
