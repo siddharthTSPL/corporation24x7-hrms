@@ -61,7 +61,7 @@ export default function SuperAdminRegister() {
 
           {/* Header */}
           <div className="flex justify-between items-center mb-6">
-            <img src="/src/assets/logo1.png" alt="logo" className="w-28" />
+            <img src="/src/assets/TorchX.svg" alt="logo" className="w-28" />
             
             <p
               onClick={() => navigate("/login")}
