@@ -452,7 +452,7 @@ export default function EmployeeDetailModal({ employeeId, employeeRole, onClose 
       >
         <div className="w-full max-w-2xl rounded-2xl flex flex-col max-h-[92vh] overflow-hidden shadow-2xl bg-white dark:bg-[#0f172a] border border-black/10 dark:border-white/10">
 
-          <div className="bg-[#88004d] px-7 pt-7 pb-0 flex-shrink-0">
+          <div className="bg-[#740f48] px-7 pt-7 pb-0 flex-shrink-0">
             <div className="flex items-start gap-4">
               <Avatar fName={user?.f_name} lName={user?.l_name} size="lg" />
               <div className="flex-1 min-w-0">
