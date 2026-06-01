@@ -82,11 +82,11 @@ const globalStyles = `
     cursor: default;
   }
   @media (hover:hover) and (pointer:fine) {
-    .pricing-card:hover  { transform: scale(1.045) !important; box-shadow: 0 28px 72px rgba(122,0,75,0.30) !important; z-index:10; position:relative; }
+    .pricing-card:hover  { transform: scale(1.045) !important; box-shadow: none !important; z-index:10; position:relative; }
     .testi-card:hover    { transform: translateY(-8px) !important; box-shadow: 0 20px 60px rgba(90,0,51,0.18) !important; border-color:#5a0033 !important; }
     .feat-card:hover     { transform: translateY(-8px) !important; box-shadow: 0 16px 48px rgba(122,0,75,0.18) !important; }
   }
-  .pricing-card-popular { transform: scale(1.045); box-shadow: 0 24px 64px rgba(122,0,75,0.32) !important; z-index:5; position:relative; }
+  .pricing-card-popular { transform: scale(1.045); box-shadow: none !important; z-index:5; position:relative; }
   .testi-card  { transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease !important; }
   .feat-card   { transition: transform 0.3s ease, box-shadow 0.3s ease !important; }
 
@@ -833,7 +833,7 @@ function Pricing() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 24, alignItems: 'center', marginBottom: 36, paddingTop: 20 }} className="pricing-grid">
           {plans.map(p => (
-            <div key={p.name} className={`pricing-card${p.popular ? ' pricing-card-popular' : ''}`} style={{ position: 'relative', borderRadius: 24, padding: '36px 30px', display: 'flex', flexDirection: 'column', gap: 20, background: p.dark ? P : '#fff', border: p.dark ? 'none' : `2px solid ${P}`, boxShadow: p.dark ? `0 2px 20px ${P}50` : '0 4px 16px rgba(122,0,75,.06)' }}>
+            <div key={p.name} className={`pricing-card${p.popular ? ' pricing-card-popular' : ''}`} style={{ position: 'relative', borderRadius: 24, padding: '36px 30px', display: 'flex', flexDirection: 'column', gap: 20, background: p.dark ? P : '#fff', border: p.dark ? 'none' : `2px solid ${P}`, boxShadow: 'none' }}>
               {p.popular && (
                 <div style={{ position: 'absolute', top: -16, left: '50%', transform: 'translateX(-50%)', zIndex: 2 }}>
                   <span style={{ background: P, color: '#fff', fontSize: 11, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 700, padding: '6px 20px', borderRadius: 50, whiteSpace: 'nowrap', letterSpacing: '0.5px' }}>Most Popular</span>
@@ -880,7 +880,7 @@ function Pricing() {
         </div>
         <div style={{ display: 'grid', gap: 16, marginBottom: 22 }} className="badge-grid">
           {badges.map(b => (
-            <div key={b.label} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '16px 18px', background: PL, borderRadius: 16, border: `1px solid ${PB}` }}>
+            <div key={b.label} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '16px 18px', background: PL, borderRadius: 16, border: `1.5px solid ${P}` }}>
               <div style={{ color: P, flexShrink: 0, marginTop: 2 }}>{b.icon}</div>
               <div>
                 <div style={{ fontSize: 12, fontFamily: 'Sora, sans-serif', fontWeight: 700, color: D, marginBottom: 3 }}>{b.label}</div>
@@ -889,7 +889,7 @@ function Pricing() {
             </div>
           ))}
         </div>
-        <div style={{ background: PL, borderRadius: 20, padding: '22px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, border: `1px solid ${PB}` }} className="expert-banner">
+        <div style={{ background: PL, borderRadius: 20, padding: '22px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, border: `1.5px solid ${P}` }} className="expert-banner">
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 44, height: 44, background: `${P}18`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <HiOutlineSparkles style={{ color: P, fontSize: 20 }} />
