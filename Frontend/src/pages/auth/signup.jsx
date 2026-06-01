@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from 'react-router-dom';
 import { useRegisterSuperAdmin } from "../../auth/server-state/superadmin/auth/suauth.hook";
 import logo from "../../assets/logo1.png";
 import slide1 from "../../assets/slide1.png";
