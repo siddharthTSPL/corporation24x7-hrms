@@ -624,7 +624,7 @@ function AIRecruitmentCard() {
   ]
   return (
     <motion.div variants={cardVariant} whileHover={{ y: -10, boxShadow: '0 20px 40px rgba(122,0,75,0.15)' }}
-      style={{ background: '#fff', border: `1px solid ${PB}`, borderRadius: 18, overflow: 'hidden', boxShadow: '0 8px 24px rgba(122,0,75,0.08)', display: 'flex', flexDirection: 'column', transition: 'all 0.3s ease' }}>
+      style={{ background: '#fff', border: `2px solid ${P}`, borderRadius: 18, overflow: 'hidden', boxShadow: '0 8px 24px rgba(122,0,75,0.08)', display: 'flex', flexDirection: 'column', transition: 'all 0.3s ease' }}>
       <div style={{ padding: '24px 24px 16px' }}>
         <div style={{ width: 56, height: 56, background: PL, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
           <HiOutlineSparkles style={{ color: P, fontSize: 26 }} />
@@ -634,7 +634,7 @@ function AIRecruitmentCard() {
           Find the right talent faster with AI-powered candidate screening, smart matching, and automated shortlisting.
         </p>
       </div>
-      <motion.div animate={{ y: [0, -3, 0] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+      <motion.div
         style={{ margin: '0 16px', background: PL, borderRadius: '12px 12px 0 0', overflow: 'hidden', display: 'flex', flex: 1 }}>
         <MiniSidebar />
         <div style={{ flex: 1, padding: '14px 12px 16px' }}>
@@ -671,7 +671,7 @@ function AIRecruitmentCard() {
 function PerformanceCard() {
   return (
     <motion.div variants={cardVariant} whileHover={{ y: -10, boxShadow: '0 20px 40px rgba(122,0,75,0.15)' }}
-      style={{ background: '#fff', border: `1px solid ${PB}`, borderRadius: 18, overflow: 'hidden', boxShadow: '0 8px 24px rgba(122,0,75,0.08)', display: 'flex', flexDirection: 'column', transition: 'all 0.3s ease' }}>
+      style={{ background: '#fff', border: `2px solid ${P}`, borderRadius: 18, overflow: 'hidden', boxShadow: '0 8px 24px rgba(122,0,75,0.08)', display: 'flex', flexDirection: 'column', transition: 'all 0.3s ease' }}>
       <div style={{ padding: '24px 24px 16px' }}>
         <div style={{ width: 56, height: 56, background: PL, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
           <BsGraphUp style={{ color: P, fontSize: 24 }} />
@@ -681,7 +681,7 @@ function PerformanceCard() {
           Simplify performance evaluations with customizable reviews, goal tracking, and actionable feedback.
         </p>
       </div>
-      <motion.div animate={{ y: [0, -3, 0] }} transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
+      <motion.div 
         style={{ margin: '0 16px', background: PL, borderRadius: '12px 12px 0 0', padding: '14px 14px 10px', flex: 1 }}>
         <div style={{ fontSize: 9, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 700, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 10 }}>Performance Overview</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
@@ -710,7 +710,7 @@ function PerformanceCard() {
           </div>
         </div>
       </motion.div>
-      <div style={{ padding: '14px 20px', borderTop: `1px solid ${PB}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ padding: '14px 20px', borderTop: `2px solid ${P}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: 12, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 700, color: P }}>Evaluate. Improve. Grow.</span>
         <div style={{ width: 30, height: 30, borderRadius: '50%', border: `1.5px solid ${PB}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <FiArrowRight style={{ color: P, fontSize: 13 }} />
@@ -729,7 +729,7 @@ function EmployeePortalCard() {
   ]
   return (
     <motion.div variants={cardVariant} whileHover={{ y: -10, boxShadow: '0 20px 40px rgba(122,0,75,0.15)' }}
-      style={{ background: '#fff', border: `1px solid ${PB}`, borderRadius: 18, overflow: 'hidden', boxShadow: '0 8px 24px rgba(122,0,75,0.08)', display: 'flex', flexDirection: 'column', transition: 'all 0.3s ease' }}>
+      style={{ background: '#fff', border: `2px solid ${P}`, borderRadius: 18, overflow: 'hidden', boxShadow: '0 8px 24px rgba(122,0,75,0.08)', display: 'flex', flexDirection: 'column', transition: 'all 0.3s ease' }}>
       <div style={{ padding: '24px 24px 16px' }}>
         <div style={{ width: 56, height: 56, background: PL, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
           <BsPersonBadge style={{ color: P, fontSize: 26 }} />
@@ -739,7 +739,7 @@ function EmployeePortalCard() {
           Empower employees with a self-service portal for profiles, documents, requests, and company updates.
         </p>
       </div>
-      <motion.div animate={{ y: [0, -3, 0] }} transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+      <motion.div 
         style={{ margin: '0 16px', background: PL, borderRadius: '12px 12px 0 0', overflow: 'hidden', display: 'flex', flex: 1 }}>
         <MiniSidebar />
         <div style={{ flex: 1, padding: '12px 10px 14px' }}>
@@ -833,7 +833,7 @@ function Pricing() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 24, alignItems: 'center', marginBottom: 36, paddingTop: 20 }} className="pricing-grid">
           {plans.map(p => (
-            <div key={p.name} className={`pricing-card${p.popular ? ' pricing-card-popular' : ''}`} style={{ position: 'relative', borderRadius: 24, padding: '36px 30px', display: 'flex', flexDirection: 'column', gap: 20, background: p.dark ? P : '#fff', border: p.dark ? 'none' : `1.5px solid ${PB}`, boxShadow: p.dark ? `0 24px 64px ${P}50` : '0 4px 16px rgba(122,0,75,.06)' }}>
+            <div key={p.name} className={`pricing-card${p.popular ? ' pricing-card-popular' : ''}`} style={{ position: 'relative', borderRadius: 24, padding: '36px 30px', display: 'flex', flexDirection: 'column', gap: 20, background: p.dark ? P : '#fff', border: p.dark ? 'none' : `2px solid ${P}`, boxShadow: p.dark ? `0 2px 20px ${P}50` : '0 4px 16px rgba(122,0,75,.06)' }}>
               {p.popular && (
                 <div style={{ position: 'absolute', top: -16, left: '50%', transform: 'translateX(-50%)', zIndex: 2 }}>
                   <span style={{ background: P, color: '#fff', fontSize: 11, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 700, padding: '6px 20px', borderRadius: 50, whiteSpace: 'nowrap', letterSpacing: '0.5px' }}>Most Popular</span>
@@ -860,7 +860,7 @@ function Pricing() {
             </div>
           ))}
         </div>
-        <div style={{ background: PL, borderRadius: 20, padding: '22px 28px', marginBottom: 22, border: `1px solid ${PB}` }}>
+        <div style={{ background: PL, borderRadius: 20, padding: '22px 28px', marginBottom: 22, border: `2px solid ${P}` }}>
           <div style={{ display: 'grid', gap: 16, alignItems: 'center' }} className="storage-grid">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <FiHardDrive style={{ color: P, fontSize: 22, flexShrink: 0 }} />
@@ -1039,7 +1039,103 @@ function Testimonials() {
       </motion.div>
     </section>
   )
+}  
+
+//FOOTER SECTION-----------
+
+const legalDocs = {
+  privacy: {
+    title: 'Privacy Policy',
+    effective: 'April 01, 2026',
+    sections: [
+      { heading:'Information We Collect', items:['Personal Information: Name, email address, phone number, billing information, company details, and account credentials.','Usage Information: IP address, browser type, device information, login activity, usage analytics, cookies and tracking information.','Customer Data: Any data uploaded, processed, or stored by customers while using our Services.'] },
+      { heading:'How We Use Information', items:['Provide and maintain Services, process subscriptions and payments, improve platform performance.','Offer customer support, prevent fraud and abuse, send service-related notifications, and comply with legal obligations.'] },
+      { heading:'Data Security & Sharing', items:['We implement commercially reasonable administrative, technical, and organizational safeguards to protect user data.','We do not sell personal data. We may share with payment processors, cloud hosting providers, analytics providers, and legal authorities when required by law.'] },
+      { heading:'User Rights', items:['Users may request access, correction, deletion, or export of personal data.','Send requests to: privacy@torchxsuite.com'] },
+      { heading:'Additional', items:['Data may be processed and stored outside your country subject to applicable laws.','Our Services are not intended for individuals under 18 years of age.','We reserve the right to modify this policy at any time. Contact: legal@torchxsuite.com'] },
+    ],
+  },
+  terms: {
+    title: 'Terms of Service',
+    effective: 'April 01, 2026',
+    sections: [
+      { heading:'Eligibility & Account Responsibilities', items:['You must be legally capable of entering into binding agreements to use our Services.','Users are responsible for maintaining account confidentiality and all activities under their account.','You agree not to use Services unlawfully, attempt unauthorized access, reverse engineer the platform, or upload malicious software.'] },
+      { heading:'Subscription & Billing', items:['Services are offered on subscription plans billed monthly, quarterly, or annually.','Payments are non-refundable unless stated otherwise in our Refund Policy.','Failure to pay may result in suspension or termination.'] },
+      { heading:'Intellectual Property & Customer Data', items:['All platform software, branding, designs, content, APIs, workflows, and technology remain the exclusive property of the Company.','Customers retain ownership of their uploaded data. You grant us limited rights necessary to host, process, and operate the Services.'] },
+      { heading:'Limitation of Liability & Termination', items:['We are not liable for indirect, incidental, or consequential damages. Total liability shall not exceed the amount paid during the previous 3 months.','Accounts may be suspended or terminated for violation of Terms, fraudulent activity, non-payment, or abuse of Services.'] },
+      { heading:'Governing Law', items:['These Terms shall be governed by the laws of India.','Disputes shall be subject to the jurisdiction of courts located in Bareilly, Uttar Pradesh, India.','Contact: legal@torchxsuite.com'] },
+    ],
+  },
+  cookie: {
+    title: 'Cookie Policy',
+    effective: 'April 01, 2026',
+    sections: [
+      { heading:'What Are Cookies?', items:['Cookies are small text files stored on your device to improve website functionality and user experience.'] },
+      { heading:'Types of Cookies We Use', items:['Essential Cookies: Required for authentication, security, and core functionality.','Analytics Cookies: Help us understand platform usage and improve performance.','Preference Cookies: Remember user settings and preferences.','Marketing Cookies: Used for relevant communication and advertising where permitted.'] },
+      { heading:'Managing Cookies', items:['Some third-party services integrated into our platform may place cookies subject to their own privacy policies.','Users can manage or disable cookies through browser settings. Disabling cookies may affect platform functionality.','We may update this Cookie Policy periodically.'] },
+    ],
+  },
+  refund: {
+    title: 'Refund Policy',
+    effective: 'April 01, 2026',
+    sections: [
+      { heading:'Subscription Payments', items:['All subscription payments are generally non-refundable once billed.','Where trial access is provided, users are encouraged to evaluate the Services before purchasing.'] },
+      { heading:'Exceptional Refunds', items:['Refunds may be considered for: duplicate payment, incorrect billing due to system error, or service unavailable for an extended verified duration caused solely by us.','Approved refunds are processed within 7–15 business days.'] },
+      { heading:'Non-Refundable Situations', items:['Refunds will not be issued for partial usage, change of mind, failure to cancel before renewal, account suspension due to policy violations, or third-party service interruptions.'] },
+      { heading:'Chargebacks', items:['Initiating fraudulent chargebacks without contacting support may result in immediate account suspension, permanent service restriction, and legal recovery actions where applicable.','Contact: accounts@torchxsuite.com'] },
+    ],
+  },
 }
+
+const modalStyles = `
+  .torchx-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:9999; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .torchx-modal { background:#fff; border-radius:14px; width:100%; max-width:720px; max-height:88vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 24px 64px rgba(0,0,0,0.18); }
+  .torchx-modal-header { display:flex; align-items:center; justify-content:space-between; padding:20px 24px 16px; border-bottom:1px solid #f0e6ec; }
+  .torchx-modal-title { font-family:'DM Sans',sans-serif; font-size:16px; font-weight:600; color:#730042; margin:0; }
+  .torchx-modal-close { width:32px; height:32px; border-radius:50%; border:none; background:#f5f5f5; color:#555; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:background 0.15s; }
+  .torchx-modal-close:hover { background:#ececec; }
+  .torchx-modal-body { overflow-y:auto; padding:24px; flex:1; }
+  .torchx-modal-eff { font-family:'DM Sans',sans-serif; font-size:12px; color:#aaa; margin-bottom:20px; }
+  .torchx-modal-section { margin-bottom:20px; }
+  .torchx-modal-section-head { font-family:'DM Sans',sans-serif; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.6px; color:#730042; margin-bottom:10px; }
+  .torchx-modal-item { display:flex; gap:10px; margin-bottom:8px; font-family:'DM Sans',sans-serif; font-size:13.5px; color:#444; line-height:1.6; }
+  .torchx-modal-dot { width:5px; height:5px; background:#730042; border-radius:50%; margin-top:8px; flex-shrink:0; opacity:0.5; }
+`
+
+function LegalModal({ docKey, onClose }) {
+  const doc = legalDocs[docKey]
+  useEffect(() => {
+    const handleKey = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [onClose])
+  return (
+    <div className="torchx-modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="torchx-modal">
+        <div className="torchx-modal-header">
+          <p className="torchx-modal-title">{doc.title}</p>
+          <button className="torchx-modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="torchx-modal-body">
+          <p className="torchx-modal-eff">Effective Date: {doc.effective}</p>
+          {doc.sections.map((sec,i) => (
+            <div key={i} className="torchx-modal-section">
+              <p className="torchx-modal-section-head">{sec.heading}</p>
+              {sec.items.map((item,j) => (
+                <div key={j} className="torchx-modal-item">
+                  <span className="torchx-modal-dot"/>
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
 function Footer() {
   const FOOTER_BORDER = '#E2C9D6'
   const FOOTER_MUTED = '#888888'
@@ -1072,7 +1168,12 @@ function Footer() {
     Pricing: '#pricing',
   }
 
+  const [activeDoc, setActiveDoc] = useState(null)
+
   return (
+  <>
+    <style>{modalStyles}</style>
+
     <footer
       style={{
         background: '#F6EDF2',
@@ -1257,30 +1358,37 @@ function Footer() {
             flexWrap: 'wrap',
             gap: 18
           }}
-        >
-          {[
-            'Privacy Policy',
-            'Terms of Service',
-            'Cookie Policy',
-            'Refund Policy'
-          ].map((l) => (
-            <span
-              key={l}
-              style={{
-                fontSize: 14,
-                color: FOOTER_MUTED,
-                cursor: 'default'
-              }}
-            >
-              {l}
-            </span>
-          ))}
+        >{[
+  { label: 'Privacy Policy', key: 'privacy' },
+  { label: 'Terms of Service', key: 'terms' },
+  { label: 'Cookie Policy', key: 'cookie' },
+  { label: 'Refund Policy', key: 'refund' }
+].map((item) => (
+  <span
+    key={item.key}
+    onClick={() => setActiveDoc(item.key)}
+    style={{
+      fontSize: 14,
+      color: FOOTER_MUTED,
+      cursor: 'pointer'
+    }}
+  >
+    {item.label}
+  </span>
+))}
         </div>
       </div>
+<div style={{ height: 20 }} />
+</footer>
 
-      <div style={{ height: 20 }} />
-    </footer>
-  )
+{activeDoc && (
+  <LegalModal
+    docKey={activeDoc}
+    onClose={() => setActiveDoc(null)}
+  />
+)}
+</>
+)
 }
 // ══════════════════════════════════════════════════════════════
 // DEFAULT EXPORT — single, at the bottom
