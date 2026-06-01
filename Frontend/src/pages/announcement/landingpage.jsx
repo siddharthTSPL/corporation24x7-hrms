@@ -542,13 +542,13 @@ function DashboardMockup() {
 // ══════════════════════════════════════════════════════════════
 function Hero() {
   return (
-    <section className="hero-section" style={{ padding: '72px 40px 48px', background: '#fff', overflow: 'hidden' }}>
+    <section className="hero-section" style={{ padding: '0px 40px 48px', background: '#fff', overflow: 'hidden' }}>
       <div style={{ width: '100%', maxWidth: '1600px', margin: '0 auto', display: 'grid', gap: 'clamp(24px,4vw,60px)', alignItems: 'center' }} className="hero-grid">
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
-          <h1 style={{ fontSize: 'clamp(32px,4vw,52px)', fontFamily: 'Sora, sans-serif', fontWeight: 800, color: D, lineHeight: 1.15, margin: '0 0 20px' }}>
+          <h1 style={{ fontSize: 'clamp(32px,4vw,52px)', fontFamily: 'Roboto, sans-serif', fontWeight: 500, color: D, lineHeight: 1.15, margin: '0 0 20px' }}>
             Manage Your Workforce<br />With Smart <span style={{ color: P }}>HR Solutions</span>
           </h1>
-          <p style={{ fontSize: 16, fontFamily: 'DM Sans, sans-serif', fontWeight: 400, color: G, lineHeight: 1.75, maxWidth: 440, margin: '0 0 36px' }}>
+          <p style={{ fontSize: 18, fontFamily: 'DM Sans, sans-serif', fontWeight: 400, color: G, lineHeight: 1.75, maxWidth: 440, margin: '0 0 36px' }}>
             Optimize every stage of the employee lifecycle with a robust and reliable Human Resource Management System.
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
@@ -788,7 +788,7 @@ function Features() {
     <section id="features" className="feat-section" style={{ padding: '100px 40px', background: '#F8F5F7', fontFamily: 'DM Sans, sans-serif' }}>
       <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} style={{ maxWidth: 1280, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 64 }}>
-          <h2 style={{ fontSize: 'clamp(42px,5vw,52px)', fontFamily: 'Sora, sans-serif', fontWeight: 800, color: D, lineHeight: 1.1, margin: '0 0 20px' }}>
+          <h2 style={{ fontSize: 'clamp(42px,5vw,52px)', fontFamily: 'Roboto, sans-serif', fontWeight: 500, color: D, lineHeight: 1.1, margin: '0 0 20px' }}>
             Powerful <span style={{ color: P }}>Features</span><br />Built for <span style={{ color: P }}>Modern</span> Teams
           </h2>
           <p style={{ fontSize: 20, color: '#555', lineHeight: 1.6, maxWidth: 700, margin: '0 auto', fontFamily: 'DM Sans, sans-serif' }}>
@@ -824,10 +824,10 @@ function Pricing() {
     <section id="pricing" className="section-pad" style={{ padding: '80px 40px', background: '#fff' }}>
       <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} style={{ maxWidth: 1280, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 56 }}>
-          <h2 style={{ fontSize: 'clamp(28px,3.2vw,42px)', fontFamily: 'Sora, sans-serif', fontWeight: 800, color: D, margin: '0 0 14px' }}>
+          <h2 style={{ fontSize: 'clamp(28px,3.2vw,42px)', fontFamily: 'Roboto, sans-serif', fontWeight: 500, color: D, margin: '0 0 14px' }}>
             Simple, Transparent <span style={{ color: P }}>Pricing</span><br />That Grows With You
           </h2>
-          <p style={{ fontSize: 15, fontFamily: 'DM Sans, sans-serif', color: G, maxWidth: 440, margin: '0 auto', lineHeight: 1.7 }}>
+          <p style={{ fontSize: 18, fontFamily: 'DM Sans, sans-serif', color: G, maxWidth: 440, margin: '0 auto', lineHeight: 1.7 }}>
             Choose the perfect plan for your team. Upgrade or downgrade anytime as your needs change.
           </p>
         </div>
@@ -929,10 +929,10 @@ function Testimonials() {
     <section id="testimonials" className="section-pad" style={{ padding: '80px 40px', background: '#F6EDF2', fontFamily: 'DM Sans, sans-serif' }}>
       <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} style={{ maxWidth: 1100, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 52 }}>
-          <h2 style={{ fontSize: 'clamp(26px,3.2vw,40px)', fontFamily: 'Sora, sans-serif', fontWeight: 800, color: '#111111', margin: '0 0 14px', lineHeight: 1.2 }}>
+          <h2 style={{ fontSize: 'clamp(26px,3.2vw,40px)', fontFamily: 'Roboto, sans-serif', fontWeight: 500, color: '#111111', margin: '0 0 14px', lineHeight: 1.2 }}>
             Loved by <span style={{ color: P }}>Teams</span>, Trusted by <span style={{ color: P }}>Leaders</span>
           </h2>
-          <p style={{ fontSize: 15, color: '#555555', maxWidth: 440, margin: '0 auto', lineHeight: 1.7 }}>
+          <p style={{ fontSize: 18, color: '#555555', maxWidth: 440, margin: '0 auto', lineHeight: 1.7 }}>
             See how organizations like yours are using TorchX to streamline HR and achieve more every day.
           </p>
         </div>
