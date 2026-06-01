@@ -880,7 +880,7 @@ function Pricing() {
         </div>
         <div style={{ display: 'grid', gap: 16, marginBottom: 22 }} className="badge-grid">
           {badges.map(b => (
-            <div key={b.label} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '16px 18px', background: PL, borderRadius: 16, border: `1.5px solid ${P}` }}>
+            <div key={b.label} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '16px 18px', background: PL, borderRadius: 16, border: `1px solid ${PB}` }}>
               <div style={{ color: P, flexShrink: 0, marginTop: 2 }}>{b.icon}</div>
               <div>
                 <div style={{ fontSize: 12, fontFamily: 'Sora, sans-serif', fontWeight: 700, color: D, marginBottom: 3 }}>{b.label}</div>
@@ -889,7 +889,7 @@ function Pricing() {
             </div>
           ))}
         </div>
-        <div style={{ background: PL, borderRadius: 20, padding: '22px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, border: `1.5px solid ${P}` }} className="expert-banner">
+        <div style={{ background: PL, borderRadius: 20, padding: '22px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, border: `px solid ${PB}` }} className="expert-banner">
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 44, height: 44, background: `${P}18`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <HiOutlineSparkles style={{ color: P, fontSize: 20 }} />
