@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion'
 import {
   FiMenu, FiX, FiArrowRight, FiCheck,
@@ -535,12 +536,11 @@ function DashboardMockup() {
   )
 }
 
-
-
 // ══════════════════════════════════════════════════════════════
 // HERO
 // ══════════════════════════════════════════════════════════════
 function Hero() {
+  const navigate = useNavigate();
   return (
     <section className="hero-section" style={{ padding: '0px 40px 48px', background: '#fff', overflow: 'hidden' }}>
       <div style={{ width: '100%', maxWidth: '1600px', margin: '0 auto', display: 'grid', gap: 'clamp(24px,4vw,60px)', alignItems: 'center' }} className="hero-grid">
@@ -552,11 +552,35 @@ function Hero() {
             Optimize every stage of the employee lifecycle with a robust and reliable Human Resource Management System.
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
-            <a href="#trial" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: P, color: '#fff', fontSize: 15, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 600, padding: '13px 28px', borderRadius: 50, textDecoration: 'none', boxShadow: `0 8px 24px ${P}40`, transition: 'all .2s' }}
-              onMouseEnter={e => { e.currentTarget.style.background = PH; e.currentTarget.style.transform = 'translateY(-2px)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = P; e.currentTarget.style.transform = 'none' }}>
-              Sign Up For Free Trial <FiArrowRight />
-            </a>
+            <button
+  onClick={() => navigate('/signup')}
+  style={{
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    background: P,
+    color: '#fff',
+    fontSize: 15,
+    fontFamily: 'Instrument Sans, sans-serif',
+    fontWeight: 600,
+    padding: '13px 28px',
+    borderRadius: 50,
+    border: 'none',
+    cursor: 'pointer',
+    boxShadow: `0 8px 24px ${P}40`,
+    transition: 'all .2s'
+  }}
+  onMouseEnter={e => {
+    e.currentTarget.style.background = PH;
+    e.currentTarget.style.transform = 'translateY(-2px)';
+  }}
+  onMouseLeave={e => {
+    e.currentTarget.style.background = P;
+    e.currentTarget.style.transform = 'none';
+  }}
+>
+  Sign Up For Free Trial <FiArrowRight />
+</button>
             <a href="#expert" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: `2px solid ${P}`, color: P, background: 'transparent', fontSize: 15, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 600, padding: '13px 28px', borderRadius: 50, textDecoration: 'none', transition: 'all .2s' }}
               onMouseEnter={e => { e.currentTarget.style.background = PL; e.currentTarget.style.transform = 'translateY(-2px)' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.transform = 'none' }}>
