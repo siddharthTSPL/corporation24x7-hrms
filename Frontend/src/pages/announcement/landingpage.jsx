@@ -18,6 +18,7 @@ import {
   ResponsiveContainer
 } from 'recharts'
 import logo from '../../assets/TorchX.svg'
+import PlantImage from '../../assets/plant.png';
 
 // ── Brand tokens ──────────────────────────────────────────────
 const P  = '#7A004B'
@@ -512,23 +513,8 @@ function DashboardMockup() {
             <line x1="728" y1="352" x2="936" y2="352" stroke="#f0e8f0" strokeWidth="1"/>
             <text x="832" y="450" fontFamily="Instrument Sans,sans-serif" fontSize="11" fill="#ccc" textAnchor="middle">No announcements</text>
             {/* Plant SVG at bottom of announcements */}
-            {/* Pot */}
-            <path d="M808,618 H862 L855,645 H815 Z" fill="#730042" opacity="0.9"/>
-            <rect x="802" y="613" width="62" height="10" rx="5" fill="#5A0033" opacity="0.8"/>
-            {/* Stems */}
-            <path d="M830,612 C826,592 814,575 798,561" stroke="#B66A92" strokeWidth="2.2" fill="none" opacity="0.85"/>
-            <path d="M835,612 C835,585 833,562 826,540" stroke="#B66A92" strokeWidth="2.2" fill="none" opacity="0.85"/>
-            <path d="M840,612 C847,582 862,560 878,542" stroke="#B66A92" strokeWidth="2.2" fill="none" opacity="0.85"/>
-            {/* Left large leaf */}
-            <path d="M793,557 C784,544 793,531 808,539 C817,545 813,559 798,563 C795,561 793,559 793,557 Z" fill="#5A0033" opacity="0.9"/>
-            {/* Middle leaf */}
-            <path d="M819,540 C815,527 828,523 839,533 C845,542 838,557 826,557 C819,553 819,547 819,540 Z" fill="#5A0033" opacity="0.9"/>
-            {/* Right top leaf */}
-            <path d="M852,537 C866,525 880,530 877,543 C873,554 858,558 848,549 C846,545 847,540 852,537 Z" fill="#5A0033" opacity="0.9"/>
-            {/* Right small leaf */}
-            <path d="M849,577 C860,568 869,573 867,586 C862,595 849,597 842,590 C840,586 842,580 849,577 Z" fill="#5A0033" opacity="0.85"/>
-            {/* Left small leaf */}
-            <path d="M806,578 C799,567 808,561 819,568 C825,574 821,587 810,589 C806,587 804,582 806,578 Z" fill="#5A0033" opacity="0.85"/>
+            <image href={PlantImage} x="750" y="440" width="150" height="275" preserveAspectRatio="xMidYMid meet"
+/>
           </svg>
         </div>
       </div>
@@ -545,10 +531,10 @@ function Hero() {
     <section className="hero-section" style={{ padding: '0px 40px 48px', background: '#fff', overflow: 'hidden' }}>
       <div style={{ width: '100%', maxWidth: '1600px', margin: '0 auto', display: 'grid', gap: 'clamp(24px,4vw,60px)', alignItems: 'center' }} className="hero-grid">
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
-          <h1 style={{ fontSize: 'clamp(32px,4vw,52px)', fontFamily: 'Roboto, sans-serif', fontWeight: 500, color: D, lineHeight: 1.15, margin: '0 0 20px' }}>
+          <h1 style={{ fontSize: 'clamp(32px,4vw,52px)', fontFamily: 'Roboto, sans-serif', fontWeight: 500, color: D, lineHeight: 1.08, margin: '0 0 20px' }}>
             Manage Your Workforce<br />With Smart <span style={{ color: P }}>HR Solutions</span>
           </h1>
-          <p style={{ fontSize: 18, fontFamily: 'DM Sans, sans-serif', fontWeight: 400, color: G, lineHeight: 1.75, maxWidth: 440, margin: '0 0 36px' }}>
+          <p style={{ fontSize: 18, fontFamily: 'Roboto, sans-serif', fontWeight: 400, color: G, lineHeight: 1.75, maxWidth: 440, margin: '0 0 36px' }}>
             Optimize every stage of the employee lifecycle with a robust and reliable Human Resource Management System.
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
