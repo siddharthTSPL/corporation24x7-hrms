@@ -114,6 +114,15 @@ export default defineConfig(({ mode }) => ({
       host: "localhost",
       overlay: true,
     },
+
+    // ✅ Dev proxy — forwards /api/* to your backend
+    proxy: {
+      '/api': {
+        target: 'http://146.101.46.205:5001',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+    },
   },
 
   optimizeDeps: {
