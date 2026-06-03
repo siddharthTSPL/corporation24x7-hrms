@@ -64,7 +64,7 @@ export default function SuperAdminRegister() {
             <img src="/src/assets/TorchX.svg" alt="logo" className="w-28" />
             
             <p
-              onClick={() => navigate("/login")}
+             onClick={() => window.location.href = "/talent/login"}
               className="text-sm text-gray-500 cursor-pointer hover:text-(--primary)"
             >
               Already have an account?{" "}
