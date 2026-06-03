@@ -9,7 +9,7 @@ import logo from "../../assets/logo1.png";
 import slide1 from "../../assets/slide1.png";
 import slide2 from "../../assets/slide2.png";
 import slide3 from "../../assets/slide3.png";
-import logo from "../../assets/TorchX logo.svg"
+import logo2 from "../../assets/TorchX logo.svg"
 
 function Login() {
   const navigate = useNavigate();
@@ -130,7 +130,7 @@ function Login() {
 
       <div className="w-full max-w-5xl bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden">
         <div className="w-full md:w-1/2 p-8">
-          <img src="src/assets/TorchX logo.svg" alt="logo" className="w-28 mb-6" />
+          <img src="src/assets/TorchX logo.svg" alt="logo2" className="w-28 mb-6" />
 
           {step === "login" && (
             <>
