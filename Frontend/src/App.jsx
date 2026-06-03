@@ -3,9 +3,11 @@ import { lazy, Suspense, useState, useEffect } from "react";
 import { Player } from "@lottiefiles/react-lottie-player";
 import { useAuth } from "./auth/store/getmeauth/getmeauth";
 
+
+
 const Login = lazy(() => import("./pages/auth/Login"));
 const Signup = lazy(() => import("./pages/auth/Signup"));
-const LandingPage = lazy(() => import("./pages/auth/LandingPage"));
+const LandingPage = lazy(() => import("./pages/announcement/landingpage"));
 
 const MainLayout = lazy(() => import("./layout/MainLayout"));
 const ProtectedRoute = lazy(() => import("./components/Protectedroute"));
