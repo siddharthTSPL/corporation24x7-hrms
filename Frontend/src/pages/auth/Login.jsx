@@ -130,7 +130,8 @@ function Login() {
 
       <div className="w-full max-w-5xl bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden">
         <div className="w-full md:w-1/2 p-8">
-          <img src="src/assets/TorchX logo.svg" alt="logo2" className="w-28 mb-6" />
+        <img src={logo2} alt="TorchX Logo.svg" className="w-28 mb-6"
+/>
 
           {step === "login" && (
             <>
