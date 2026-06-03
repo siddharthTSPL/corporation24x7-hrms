@@ -19,6 +19,7 @@ import {
   useUpdateAnnouncement,
 } from "../../auth/server-state/adminannounce/adminannounce.hook";
 import { useGetTodayCheckins } from "../../auth/server-state/adminother/adminother.hook";
+import talent from "../../assets/Talent.png"
 
 const useInjectStyles = () => {
   useEffect(() => {
