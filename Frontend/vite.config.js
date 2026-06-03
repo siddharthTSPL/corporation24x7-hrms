@@ -4,6 +4,8 @@ import tailwindcss from "@tailwindcss/vite";
 import { visualizer } from "rollup-plugin-visualizer";
 
 export default defineConfig(({ mode }) => ({
+  base: '/talent/',
+
   plugins: [
     react({
       babel: false,
@@ -73,7 +75,7 @@ export default defineConfig(({ mode }) => ({
             id.includes("node_modules/dayjs") ||
             id.includes("node_modules/lodash")
           ) {
-            return "utils";
+            return "vendor-misc";
           }
           if (
             id.includes("node_modules/recharts") ||
