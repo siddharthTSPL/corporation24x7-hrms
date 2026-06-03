@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from 'react-router-dom';
 import { useRegisterSuperAdmin } from "../../auth/server-state/superadmin/auth/suauth.hook";
 import logo from "../../assets/logo1.png";
 import slide1 from "../../assets/slide1.png";
@@ -61,7 +61,7 @@ export default function SuperAdminRegister() {
 
           {/* Header */}
           <div className="flex justify-between items-center mb-6">
-            <img src="/src/assets/logo1.png" alt="logo" className="w-28" />
+            <img src="/src/assets/TorchX.svg" alt="logo" className="w-28" />
             
             <p
               onClick={() => navigate("/login")}

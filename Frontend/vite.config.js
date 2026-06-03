@@ -102,7 +102,7 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: true,
     port: 5173,
-    strictPort: true,
+    strictPort: false,
     watch: {
       usePolling: false,
       ignored: ["**/node_modules/**", "**/dist/**"],
