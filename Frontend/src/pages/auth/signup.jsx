@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useRegisterSuperAdmin } from "../../auth/server-state/superadmin/auth/suauth.hook";
 import logo from "../../assets/logo1.png";
 import slide1 from "../../assets/slide1.png";
-import logo2 from "../../assets/TorchX logo.svg"
+import talent from "../../assets/Talent.png"
 
 const COMPANY_SIZES = ["1-10", "11-50", "51-200", "201-500", "500+"];
 
@@ -62,7 +62,7 @@ export default function SuperAdminRegister() {
 
           {/* Header */}
           <div className="flex justify-between items-center mb-6">
-          <img src={logo2} alt="TorchX Logo.svg" className="w-28 mb-6"
+          <img src={talent} alt="Talent.png" className="w-28 mb-6"
           />
             
             <p
