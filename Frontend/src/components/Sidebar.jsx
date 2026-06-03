@@ -2,7 +2,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import logo from "../assets/logo1.png";
 import React from "react";
-import talent from "../../assets/Talent.png"
+import talent from "../assets/Talent.png"
 import {
   FaHome,
   FaCalendarAlt,
