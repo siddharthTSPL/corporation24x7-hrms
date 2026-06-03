@@ -69,7 +69,7 @@ export default function LandingPage() {
           </span>
 
           <button
-            onClick={() => navigate("/login")}
+            onClick={() => window.location.href = "/talent/login"}
             className="bg-[var(--primary)] text-white px-4 py-2 rounded-md hover:opacity-90"
           >
             Login
