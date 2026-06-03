@@ -78,7 +78,7 @@ export default function LandingPage() {
 
         {/* Mobile Login */}
         <button
-          onClick={() => navigate("/login")}
+           onClick={() => window.location.href = "/talent/login"}
           className="md:hidden bg-[var(--primary)] text-white px-3 py-1 rounded"
         >
           Login
