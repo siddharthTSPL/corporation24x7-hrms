@@ -3,8 +3,6 @@ import { lazy, Suspense, useState, useEffect } from "react";
 import { Player } from "@lottiefiles/react-lottie-player";
 import { useAuth } from "./auth/store/getmeauth/getmeauth";
 
-
-
 const Login = lazy(() => import("./pages/auth/Login"));
 const Signup = lazy(() => import("./pages/auth/Signup"));
 const LandingPage = lazy(() => import("./pages/announcement/landingpage"));
@@ -13,9 +11,7 @@ const MainLayout = lazy(() => import("./layout/MainLayout"));
 const ProtectedRoute = lazy(() => import("./components/Protectedroute"));
 
 const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
-const EmployeeDashboard = lazy(
-  () => import("./pages/dashboard/EmployeeDashboard"),
-);
+const EmployeeDashboard = lazy(() => import("./pages/dashboard/EmployeeDashboard"));
 const Managerdashboard = lazy(() => import("./pages/dashboard/Dashboardma"));
 
 const EmployeeTable = lazy(() => import("./pages/employee/EmployeeTable"));
@@ -25,15 +21,9 @@ const LeaveTableem = lazy(() => import("./pages/leave/LeaveTableem"));
 const LeaveTablema = lazy(() => import("./pages/leave/LeaveTablema"));
 const LeaveTablead = lazy(() => import("./pages/leave/LeaveTablead"));
 
-const Announce = lazy(
-  () => import("./pages/announcement/admin/AnnouncementPage"),
-);
-const Announceem = lazy(
-  () => import("./pages/announcement/employee/Announceem"),
-);
-const Announcema = lazy(
-  () => import("./pages/announcement/manager/Announcema"),
-);
+const Announce = lazy(() => import("./pages/announcement/admin/AnnouncementPage"));
+const Announceem = lazy(() => import("./pages/announcement/employee/Announceem"));
+const Announcema = lazy(() => import("./pages/announcement/manager/Announcema"));
 
 const Doc = lazy(() => import("./pages/document/Doc"));
 const Docma = lazy(() => import("./pages/document/Docma"));
@@ -47,12 +37,8 @@ const Fileem = lazy(() => import("./pages/file/Fileem"));
 const Filema = lazy(() => import("./pages/file/Filema"));
 
 const Organisation = lazy(() => import("./pages/organisation/Organisation"));
-const Organisationem = lazy(
-  () => import("./pages/organisation/organisationem"),
-);
-const Organisationma = lazy(
-  () => import("./pages/organisation/organisationma"),
-);
+const Organisationem = lazy(() => import("./pages/organisation/organisationem"));
+const Organisationma = lazy(() => import("./pages/organisation/organisationma"));
 
 const Reviewad = lazy(() => import("./pages/review/reviewad"));
 const Reviewma = lazy(() => import("./pages/review/reviewma"));
@@ -60,41 +46,24 @@ const Reviewma = lazy(() => import("./pages/review/reviewma"));
 const Attendancepage = lazy(() => import("./pages/attendance/attendancepage"));
 
 const SuperAdminDashboard = lazy(() => import("./pages/dashboard/sudashboard"));
-
-const SuperAdminOrganisations = lazy(
-  () => import("./pages/organisation/suorganization"),
-);
-
-const SuperAdminAnnouncements = lazy(
-  () => import("./pages/announcement/suannounce"),
-);
-
+const SuperAdminOrganisations = lazy(() => import("./pages/organisation/suorganization"));
+const SuperAdminAnnouncements = lazy(() => import("./pages/announcement/suannounce"));
 const SuperAdminLeaves = lazy(() => import("./pages/leave/suleave"));
-
 const SuperAdminReviews = lazy(() => import("./pages/review/sureview"));
-
 const SuperAdminSettings = lazy(() => import("./pages/settings/susetting"));
-
 const SuperAdminDocuments = lazy(() => import("./pages/document/sudocument"));
-
-const SuperAdminComplaints = lazy(
-  () => import("./pages/ticketpage/suticket"),
-);
+const SuperAdminComplaints = lazy(() => import("./pages/ticketpage/suticket"));
 const AdminComplaints = lazy(() => import("./pages/ticketpage/adticket"));
 const EmployeeComplaints = lazy(() => import("./pages/ticketpage/emticket"));
 const ManagerComplaints = lazy(() => import("./pages/ticketpage/maticket"));
+const Managerrecruitment = lazy(() => import("./pages/recruitment/recruitmentma"));
+const Adminrecruitment = lazy(() => import("./pages/recruitment/recruitmentad"));
 
-const Managerrecruitment= lazy(() => import("./pages/recruitment/recruitmentma"));
-const Adminrecruitment= lazy(() => import("./pages/recruitment/recruitmentad"));
-
-/* ─────────────────────────────────────────────
-   Lottie Page Skeleton — mirrors Login loader
-───────────────────────────────────────────── */
 function PageSkeleton() {
   const [animationData, setAnimationData] = useState(null);
 
   useEffect(() => {
-    fetch("/loader.json")
+    fetch("/talent/loader.json")
       .then((r) => r.json())
       .then(setAnimationData)
       .catch(() => setAnimationData(null));
@@ -120,7 +89,6 @@ function PageSkeleton() {
           style={{ height: "140px", width: "140px" }}
         />
       ) : (
-        /* Fallback spinner shown while loader.json itself is fetching */
         <div
           style={{
             display: "flex",
@@ -156,28 +124,20 @@ function PageSkeleton() {
   );
 }
 
-/* ─────────────────────────────────────────────
-   Role-based redirect
-───────────────────────────────────────────── */
 function RoleBasedRedirect() {
   const { data: auth, isLoading } = useAuth();
 
   if (isLoading) return <PageSkeleton />;
-
   if (!auth) return <Navigate to="/login" replace />;
-
   if (auth.role === "superadmin") return <Navigate to="/superadmin-dashboard" replace />;
-  if (auth.role === "admin")      return <Navigate to="/dashboard" replace />;
-  if (auth.role === "manager")    return <Navigate to="/manager-dashboard" replace />;
+  if (auth.role === "admin") return <Navigate to="/dashboard" replace />;
+  if (auth.role === "manager") return <Navigate to="/manager-dashboard" replace />;
   return <Navigate to="/employee-dashboard" replace />;
 }
 
-/* ─────────────────────────────────────────────
-   App
-───────────────────────────────────────────── */
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/talent">
       <Suspense fallback={<PageSkeleton />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
@@ -190,18 +150,13 @@ function App() {
             element={
               <div className="min-h-screen flex items-center justify-center">
                 <div className="text-center">
-                  <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                    Access Denied
-                  </h2>
-                  <p className="text-gray-500">
-                    You don't have permission to view this page.
-                  </p>
+                  <h2 className="text-2xl font-bold text-gray-800 mb-2">Access Denied</h2>
+                  <p className="text-gray-500">You don't have permission to view this page.</p>
                 </div>
               </div>
             }
           />
 
-          {/* ── Admin / Manager / Employee routes ── */}
           <Route
             element={
               <ProtectedRoute allowedRoles={["admin", "manager", "employee"]}>
@@ -209,39 +164,38 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route path="/dashboard"              element={<Dashboard />} />
-            <Route path="/employee-dashboard"     element={<EmployeeDashboard />} />
-            <Route path="/manager-dashboard"      element={<Managerdashboard />} />
-            <Route path="/employee"               element={<EmployeeTable />} />
-            <Route path="/leave-manager"          element={<LeaveTablema />} />
-            <Route path="/leave-employee"         element={<LeaveTableem />} />
-            <Route path="/leave-admin"            element={<LeaveTablead />} />
-            <Route path="/leave"                  element={<LeaveTable />} />
-            <Route path="/announcement"           element={<Announce />} />
-            <Route path="/announcement-employee"  element={<Announceem />} />
-            <Route path="/announcement-manager"   element={<Announcema />} />
-            <Route path="/document"               element={<Doc />} />
-            <Route path="/document-manager"       element={<Docma />} />
-            <Route path="/file"                   element={<File />} />
-            <Route path="/file-employee"          element={<Fileem />} />
-            <Route path="/file-manager"           element={<Filema />} />
-            <Route path="/settings"               element={<Set />} />
-            <Route path="/settings-employee"      element={<Setem />} />
-            <Route path="/settings-manager"       element={<Setma />} />
-            <Route path="/organisation"           element={<Organisation />} />
-            <Route path="/organisation-employee"  element={<Organisationem />} />
-            <Route path="/organisation-manager"   element={<Organisationma />} />
-            <Route path="/review-admin"           element={<Reviewad />} />
-            <Route path="/review-manager"         element={<Reviewma />} />
-            <Route path="/mark-attendance"        element={<Attendancepage />} />
-            <Route path="/admin-complaints"       element={<AdminComplaints />} />
-            <Route path="/manager-complaints"     element={<ManagerComplaints />} />
-            <Route path="/employee-complaints"    element={<EmployeeComplaints />} />
-            <Route path="/manager/recruitment"    element={<Managerrecruitment />} />
-            <Route path="/recruitment-admin"      element={<Adminrecruitment />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
+            <Route path="/manager-dashboard" element={<Managerdashboard />} />
+            <Route path="/employee" element={<EmployeeTable />} />
+            <Route path="/leave-manager" element={<LeaveTablema />} />
+            <Route path="/leave-employee" element={<LeaveTableem />} />
+            <Route path="/leave-admin" element={<LeaveTablead />} />
+            <Route path="/leave" element={<LeaveTable />} />
+            <Route path="/announcement" element={<Announce />} />
+            <Route path="/announcement-employee" element={<Announceem />} />
+            <Route path="/announcement-manager" element={<Announcema />} />
+            <Route path="/document" element={<Doc />} />
+            <Route path="/document-manager" element={<Docma />} />
+            <Route path="/file" element={<File />} />
+            <Route path="/file-employee" element={<Fileem />} />
+            <Route path="/file-manager" element={<Filema />} />
+            <Route path="/settings" element={<Set />} />
+            <Route path="/settings-employee" element={<Setem />} />
+            <Route path="/settings-manager" element={<Setma />} />
+            <Route path="/organisation" element={<Organisation />} />
+            <Route path="/organisation-employee" element={<Organisationem />} />
+            <Route path="/organisation-manager" element={<Organisationma />} />
+            <Route path="/review-admin" element={<Reviewad />} />
+            <Route path="/review-manager" element={<Reviewma />} />
+            <Route path="/mark-attendance" element={<Attendancepage />} />
+            <Route path="/admin-complaints" element={<AdminComplaints />} />
+            <Route path="/manager-complaints" element={<ManagerComplaints />} />
+            <Route path="/employee-complaints" element={<EmployeeComplaints />} />
+            <Route path="/manager/recruitment" element={<Managerrecruitment />} />
+            <Route path="/recruitment-admin" element={<Adminrecruitment />} />
           </Route>
 
-          {/* ── Super Admin routes ── */}
           <Route
             element={
               <ProtectedRoute allowedRoles={["superadmin"]}>
@@ -249,14 +203,14 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route path="/superadmin-dashboard"      element={<SuperAdminDashboard />} />
-            <Route path="/superadmin-organisations"  element={<SuperAdminOrganisations />} />
-            <Route path="/superadmin-announcements"  element={<SuperAdminAnnouncements />} />
-            <Route path="/superadmin-leaves"         element={<SuperAdminLeaves />} />
-            <Route path="/superadmin-reviews"        element={<SuperAdminReviews />} />
-            <Route path="/superadmin-settings"       element={<SuperAdminSettings />} />
-            <Route path="/superadmin-documents"      element={<SuperAdminDocuments />} />
-            <Route path="/superadmin-complaints"     element={<SuperAdminComplaints />} />
+            <Route path="/superadmin-dashboard" element={<SuperAdminDashboard />} />
+            <Route path="/superadmin-organisations" element={<SuperAdminOrganisations />} />
+            <Route path="/superadmin-announcements" element={<SuperAdminAnnouncements />} />
+            <Route path="/superadmin-leaves" element={<SuperAdminLeaves />} />
+            <Route path="/superadmin-reviews" element={<SuperAdminReviews />} />
+            <Route path="/superadmin-settings" element={<SuperAdminSettings />} />
+            <Route path="/superadmin-documents" element={<SuperAdminDocuments />} />
+            <Route path="/superadmin-complaints" element={<SuperAdminComplaints />} />
           </Route>
         </Routes>
       </Suspense>
