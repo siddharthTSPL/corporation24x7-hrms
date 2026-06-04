@@ -72,6 +72,32 @@ const adminlogin = async (req, res, next) => {
     return next(
       Object.assign(new Error("Invalid credentials"), { statusCode: 401 }),
     );
+
+  const superAdmin = await SuperAdminModel.findOne({
+    company_domain: identifier.split("@")[1].toLowerCase().trim(),
+  });
+
+  if (superAdmin) {
+    const trialValid = superAdmin.isTrialValid();
+    const hasTalentLicense = superAdmin.licenses.some(
+      (l) =>
+        l.product === "torchx_talent" &&
+        l.isActive &&
+        new Date(l.expiresAt) > new Date()
+    );
+
+    if (!trialValid && !hasTalentLicense) {
+      return next(
+        Object.assign(
+          new Error(
+            "Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."
+          ),
+          { statusCode: 403, code: "SERVICE_STOPPED" }
+        )
+      );
+    }
+  }
+
   const token = jwt.sign(
     {
       adminid: admin._id,
