@@ -309,16 +309,31 @@ const loginSuperAdmin = async (req, res, next) => {
         ),
       );
 
-    // if (superAdmin.status === "inactive")
-    //   return next(
-    //     Object.assign(new Error("Your account is inactive"), { statusCode: 403 })
-    //   );
-
     const isMatch = await superAdmin.isValidPassword(password);
     if (!isMatch)
       return next(
         Object.assign(new Error("Invalid credentials"), { statusCode: 401 }),
       );
+
+   
+    const trialValid = superAdmin.isTrialValid();
+    const hasTalentLicense = superAdmin.licenses.some(
+      (l) =>
+        l.product === "torchx_talent" &&
+        l.isActive &&
+        new Date(l.expiresAt) > new Date()
+    );
+
+    if (!trialValid && !hasTalentLicense) {
+      return next(
+        Object.assign(
+          new Error(
+            "Your trial has expired and you have no active license for TorchX Talent. Please upgrade your plan at torchxsuite.com to continue."
+          ),
+          { statusCode: 403, code: "PLAN_EXPIRED" }
+        )
+      );
+    }
 
     const token = jwt.sign(
       {
@@ -353,9 +368,10 @@ const loginSuperAdmin = async (req, res, next) => {
         email: superAdmin.email,
         organisation_name: superAdmin.organisation_name,
         company_domain: superAdmin.company_domain,
-        plan: superAdmin.plan,
-        plan_expires_at: superAdmin.plan_expires_at,
         role: superAdmin.role,
+        is_trial_active: trialValid,
+        trial_expires_at: superAdmin.trial_expires_at,
+        has_talent_license: hasTalentLicense,
       },
     });
   } catch (err) {

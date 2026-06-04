@@ -13,6 +13,7 @@ app.enable("trust proxy");
 app.use((req, res, next) => {
   if (
     req.hostname === "localhost" ||
+    req.hostname === "146.101.46.205" || 
     req.method === "OPTIONS" ||
     req.secure
   ) {
@@ -37,7 +38,9 @@ const corsOptions = {
     "http://talent.techtorch.solutions",
     "https://talent.techtorch.solutions",
     "https://corporation24x7-hrms.onrender.com",
-    "http://talent.techtorch.solutions"
+    "http://talent.techtorch.solutions",
+    "https://torchxsuite.com/talent",
+    "http://torchxsuite.com/talent/"
   ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
