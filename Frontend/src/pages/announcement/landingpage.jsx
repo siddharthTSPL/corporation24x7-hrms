@@ -252,6 +252,12 @@ const globalStyles = `
     /* analytics floating card: hide on small screens — saves space */
     .analytics-card-wrap { display:none; }
 
+  
+  .hero-grid {
+    margin-top: 20px !important;
+  }
+
+
     /* Popular pricing card: disable scale on mobile (breaks layout) */
     .pricing-card-popular, .pricing-card:hover { transform:none !important; }
 
@@ -313,11 +319,23 @@ function Navbar() {
   }, [])
 
   return (
-    <nav style={{
-      position: 'sticky', top: 0, zIndex: 100, background: '#fff',
-      boxShadow: scrolled ? '0 2px 16px rgba(122,0,75,.08)' : '0 1px 0 #f0e0e8',
-      transition: 'box-shadow .3s'
-    }}>
+   <nav
+  style={{
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+    zIndex: 9999,
+    background: '#fff',
+
+    boxShadow: scrolled
+      ? '0 2px 16px rgba(122,0,75,.08)'
+      : '0 1px 0 #f0e0e8',
+
+    transition: 'box-shadow .3s',
+  }}
+>
       {/*
         ── Navbar inner: uses SP.maxW (1280px) and SP.gutter.css
         Previously was maxWidth:1500px with px:40px — too wide relative to
@@ -626,7 +644,7 @@ function Hero() {
       /* SP.section.lg top + SP.section.md bottom = 96px + 72px
          Hero breathes more at top (first impression) than bottom
          where Stats follows immediately */
-      paddingTop: SP.section.lg,
+      paddingTop: '80px',
       paddingBottom: SP.section.md,
     }}>
       <Wrap>
@@ -639,23 +657,33 @@ function Hero() {
           <motion.div
             variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
             style={{ maxWidth: '520px' }}
-          >
-            <h1 style={{
-              fontSize: 'clamp(32px,4vw,52px)',
-              fontFamily: 'Roboto, sans-serif', fontWeight: 500,
-              color: D, lineHeight: 1.08,
-              /* mb: SP.section.xs = 24px — clean separation before body */
-              margin: `0 0 ${SP.section.xs}`,
-            }}>
-              Manage Your Workforce<br />With Smart <span style={{ color: P }}>HR Solutions</span>
-            </h1>
+          ><h1
+  style={{
+    fontSize: 'clamp(1.8rem,5vw,4rem)',
+    lineHeight: 1.08,
+    marginBottom: '20px',
+    fontFamily: 'Roboto, sans-serif',
+    fontWeight: 500,
+    color: '#111',
+    letterSpacing: '-1px',
+  }}
+>
+  Manage Your Workforce
+  <br />
+  With Smart <span style={{ color: P }}>HR Solutions</span>
+</h1>
 
-            <p style={{
-              fontSize: 18, fontFamily: 'Roboto, sans-serif', fontWeight: 400,
-              color: G, lineHeight: 1.75, maxWidth: 440,
-              /* mb: SP.section.sm = 48px — generous before CTAs */
-              margin: `0 0 ${SP.section.sm}`,
-            }}>
+           <p
+  style={{
+    fontSize: 'clamp(0.9rem,1.8vw,1.1rem)',
+    color: '#555',
+    lineHeight: 1.75,
+    marginBottom: '34px',
+    fontFamily: 'Roboto, sans-serif',
+    fontWeight: 400,
+    maxWidth: '480px',
+  }}
+>
               Optimize every stage of the employee lifecycle with a robust and
               reliable Human Resource Management System.
             </p>
