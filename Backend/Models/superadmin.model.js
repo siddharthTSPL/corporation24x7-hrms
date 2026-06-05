@@ -64,6 +64,10 @@ const licenseSchema = new mongoose.Schema(
 
 const superAdminSchema = new mongoose.Schema(
   {
+    organisation_id: {
+      type: String,
+      unique: true,
+    },
     f_name: String,
 
     l_name: String,
