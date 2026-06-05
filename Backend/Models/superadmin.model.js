@@ -26,7 +26,6 @@ const SOFTWARE_PRODUCTS = [
 
 const generateLicenseKey = (product) => {
   const random = crypto.randomBytes(8).toString("hex").toUpperCase();
-
   return `TORCHX-${product.replace("torchx_", "").toUpperCase()}-${random}`;
 };
 
@@ -37,32 +36,27 @@ const licenseSchema = new mongoose.Schema(
       enum: SOFTWARE_PRODUCTS,
       required: true,
     },
-
     license_key: {
       type: String,
       required: true,
       unique: true,
     },
-
     activatedAt: {
       type: Date,
       default: Date.now,
     },
-
     expiresAt: {
       type: Date,
       required: true,
     },
-
     isActive: {
       type: Boolean,
       default: true,
     },
-
     plan: {
       type: String,
-      enum: ["monthly", "yearly", "lifetime"],
-      default: "monthly",
+      enum: ["startup", "business", "enterprise"],
+      default: "startup",
     },
   },
   { _id: false }
@@ -88,11 +82,27 @@ const superAdminSchema = new mongoose.Schema(
     organisation_name: {
       type: String,
       required: true,
+      unique: true,
+    },
+
+    country: {
+      type: String,
+    },
+
+    state: {
+      type: String,
+    },
+
+    city: {
+      type: String,
+    },
+
+    zip_code: {
+      type: String,
     },
 
     company_domain: {
       type: String,
-      unique: true,
     },
 
     purchased_products: [
@@ -111,8 +121,7 @@ const superAdminSchema = new mongoose.Schema(
 
     trial_expires_at: {
       type: Date,
-      default: () =>
-        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      default: () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     },
 
     is_trial_active: {
@@ -143,19 +152,15 @@ const superAdminSchema = new mongoose.Schema(
 
 superAdminSchema.pre("validate", function () {
   if (!this.email) return;
-
   const domain = extractDomain(this.email);
-
   if (BLOCKED_DOMAINS.includes(domain)) {
     throw new Error("Use company email only");
   }
-
   this.company_domain = domain;
 });
 
 superAdminSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
-
   this.password = await bcrypt.hash(this.password, 10);
 });
 
@@ -170,11 +175,9 @@ superAdminSchema.methods.isTrialValid = function () {
 superAdminSchema.methods.generateLicense = function (
   product,
   durationDays = 30,
-  plan = "monthly"
+  plan = "startup"
 ) {
-  const existing = this.licenses.find(
-    (l) => l.product === product
-  );
+  const existing = this.licenses.find((l) => l.product === product);
 
   if (existing) {
     throw new Error(`${product} already purchased`);
@@ -184,65 +187,49 @@ superAdminSchema.methods.generateLicense = function (
     product,
     license_key: generateLicenseKey(product),
     activatedAt: new Date(),
-    expiresAt: new Date(
-      Date.now() + durationDays * 24 * 60 * 60 * 1000
-    ),
+    expiresAt: new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000),
     isActive: true,
     plan,
   };
 
   this.licenses.push(license);
-
   this.purchased_products.push(product);
 
   return license;
 };
 
-superAdminSchema.methods.canAccessProduct = function (
-  product
-) {
+superAdminSchema.methods.canAccessProduct = function (product) {
   if (this.isTrialValid()) {
     return true;
   }
 
-  const license = this.licenses.find(
-    (l) => l.product === product
-  );
+  const license = this.licenses.find((l) => l.product === product);
 
   if (!license) {
     return false;
   }
 
-  return (
-    license.isActive &&
-    new Date(license.expiresAt) > new Date()
-  );
+  return license.isActive && new Date(license.expiresAt) > new Date();
 };
 
-superAdminSchema.statics.checkDomainAvailable =
-  async function (email) {
-    const domain = extractDomain(email);
+superAdminSchema.statics.checkDomainAvailable = async function (
+  email,
+  organisation_name
+) {
+  const domain = extractDomain(email);
+  if (!domain) throw new Error("Invalid email");
 
-    if (!domain) {
-      throw new Error("Invalid email");
-    }
+  const existing = await this.findOne({
+    organisation_name: {
+      $regex: new RegExp(`^${organisation_name}$`, "i"),
+    },
+  });
 
-    const existing = await this.findOne({
-      company_domain: domain,
-    });
+  if (existing) throw new Error("Organisation name already registered");
 
-    if (existing) {
-      throw new Error(
-        "Company already registered"
-      );
-    }
+  return true;
+};
 
-    return true;
-  };
-
-const SuperAdminModel = mongoose.model(
-  "SuperAdmin",
-  superAdminSchema
-);
+const SuperAdminModel = mongoose.model("SuperAdmin", superAdminSchema);
 
 module.exports = SuperAdminModel;
