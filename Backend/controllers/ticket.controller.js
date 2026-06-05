@@ -26,7 +26,7 @@ const getAllTickets = async (req, res, next) => {
       dateFrom, dateTo,
     } = req.query;
 
-    const filter = { isDeleted: false };
+    const filter = { isDeleted: false, organisation_id: req.superAdmin._id };
     if (type)     filter.type     = type;
     if (status)   filter.status   = status;
     if (severity) filter.severity = severity;
@@ -58,7 +58,7 @@ const getAllTickets = async (req, res, next) => {
         .limit(Number(limit))
         .lean(),
       Ticket.countDocuments(filter),
-      Ticket.getDashboardStats(),
+      Ticket.getDashboardStats(req.superAdmin._id),
     ]);
 
     res.json({
@@ -80,7 +80,7 @@ const getAllTickets = async (req, res, next) => {
 const getTicketById = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const ticket = await Ticket.findOne({ _id: id, isDeleted: false })
+    const ticket = await Ticket.findOne({ _id: id, isDeleted: false, organisation_id: req.superAdmin._id })
       .populate("submittedBy", "f_name l_name work_email department designation")
       .populate("against",     "f_name l_name work_email department designation");
 
@@ -120,7 +120,7 @@ const updateTicketStatus = async (req, res, next) => {
     const { id } = req.params;
     const { status, note, internalNote, resolutionSummary, rejectionReason, priority } = req.body;
 
-    const ticket = await Ticket.findOne({ _id: id, isDeleted: false });
+    const ticket = await Ticket.findOne({ _id: id, isDeleted: false, organisation_id: req.superAdmin._id });
     if (!ticket) return res.status(404).json({ message: "Ticket not found" });
 
     const prevStatus = ticket.status;
@@ -192,7 +192,7 @@ const escalateTicket = async (req, res, next) => {
     const { id } = req.params;
     const { reason } = req.body;
 
-    const ticket = await Ticket.findOne({ _id: id, isDeleted: false });
+    const ticket = await Ticket.findOne({ _id: id, isDeleted: false, organisation_id: req.superAdmin._id });
     if (!ticket) return res.status(404).json({ message: "Ticket not found" });
 
     ticket.isEscalated     = true;
@@ -217,7 +217,7 @@ const escalateTicket = async (req, res, next) => {
 const deleteTicket = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const ticket = await Ticket.findOne({ _id: id, isDeleted: false });
+    const ticket = await Ticket.findOne({ _id: id, isDeleted: false, organisation_id: req.superAdmin._id });
     if (!ticket) return res.status(404).json({ message: "Ticket not found" });
 
     ticket.isDeleted = true;
@@ -233,7 +233,7 @@ const deleteTicket = async (req, res, next) => {
 
 const getTicketStats = async (req, res, next) => {
   try {
-    const stats = await Ticket.getDashboardStats();
+    const stats = await Ticket.getDashboardStats(req.superAdmin._id);
     res.json({ success: true, stats });
   } catch (err) {
     next(err);
