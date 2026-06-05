@@ -183,6 +183,7 @@ const globalStyles = `
   ── */
   .hero-grid         { grid-template-columns: minmax(0,.95fr) minmax(0,1.05fr); gap: 60px; }
   .stats-grid        { grid-template-columns: repeat(4, minmax(0,1fr)); gap: 20px; }  /* SP.gap.stat */
+  .scroll-anchor     {  scroll-margin-top: 90px; }
   .feat-section-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 28px; } /* SP.gap.card */
   .pricing-grid      { grid-template-columns: repeat(3, minmax(0,1fr)); gap: 28px; } /* SP.gap.card */
   .badge-grid        { grid-template-columns: repeat(4, minmax(0,1fr)); gap: 16px; } /* SP.gap.inner */
@@ -738,7 +739,7 @@ function Stats() {
     <section style={{
       background: '#fff',
       /* SP.section.sm = 48px — compact bridge between Hero and Features */
-      paddingTop: SP.section.sm,
+      paddingTop: '0px',
       paddingBottom: SP.section.sm,
     }}>
       <Wrap>
@@ -960,12 +961,14 @@ function EmployeePortalCard() {
 // ─────────────────────────────────────────────────────────────────────────────
 function Features() {
   return (
-    <section id="features" style={{
+    <section id="features" 
+    className="scroll-anchor"
+    style={{
       background: '#F8F5F7',
       fontFamily: 'DM Sans, sans-serif',
       /* SP.section.lg = 96px — full section tier */
-      paddingTop: SP.section.lg,
-      paddingBottom: SP.section.lg,
+      paddingTop: '30px',
+      paddingBottom: '35px',
     }}>
       <Wrap>
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
@@ -999,15 +1002,7 @@ function Features() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ██ PRICING
-// Layout changes vs original:
-//   - padding: was '80px 40px' → SP.section.lg (96px) + Wrap gutter
-//   - heading mb: was 56px → SP.headingGap (64px) for consistency with Features
-//   - pricing-grid gap: was 24px → SP.gap.card (28px) — consistent with feat-grid
-//   - badge-grid gap: was 16px → SP.gap.inner (16px) — same, now tokenized
-//   - storage banner, badge grid, expert banner: 
-//     gap between them = SP.section.xs (24px) instead of marginBottom:22px
-//   - card padding: was '36px 30px' → SP.card.pad (32px) all around — unified
-// ─────────────────────────────────────────────────────────────────────────────
+
 function Pricing() {
   const plans = [
     { name: 'Startup',    desc: 'Perfect for small teams getting started',                       price: '₹109', features: ['Employee database','Attendance tracking','Leave management','Basic payroll','Employee self-service portal','Email support'] },
@@ -1021,10 +1016,12 @@ function Pricing() {
     { icon: <FiBookOpen size={20} />, label: 'Free Onboarding',    desc: 'We help you and your team get started.' },
   ]
   return (
-    <section id="pricing" style={{
+    <section id="pricing" 
+    className="scroll-anchor"
+    style={{
       background: '#fff',
-      paddingTop: SP.section.lg,   /* 96px */
-      paddingBottom: SP.section.lg,
+      paddingTop: '30px',  
+      paddingBottom: '35px',
     }}>
       <Wrap>
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
@@ -1134,33 +1131,49 @@ function Pricing() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ██ TESTIMONIALS
-// Layout changes vs original:
-//   - padding: was '80px 40px' → SP.section.lg (96px) + Wrap gutter
-//   - maxWidth: was 1100px → SP.maxW (1280px) via Wrap for alignment consistency
-//     (1100px caused testimonials content to be narrower than all other sections)
-//   - heading mb: was 52px → SP.headingGap (64px)
-//   - testi-grid gap: was 20px → SP.gap.card (28px) for visual consistency with feat/pricing
-//   - testimonial cards: padding 26px → SP.card.padSm (24px)
-//   - CTA banner: padding '36px 40px' → SP.section.sm (48px) SP.card.pad (32px)
-// ─────────────────────────────────────────────────────────────────────────────
+
 function Testimonials() {
-  const [active, setActive] = useState(1)
+  const [startIndex, setStartIndex] = useState(0)
   const avatarGradients = [
     'linear-gradient(135deg, #740042)',
     'linear-gradient(135deg, #740042)',
     'linear-gradient(135deg, #740022)',
+    'linear-gradient(135deg, #740022)',
+    'linear-gradient(135deg, #740032)',
   ]
   const testimonials = [
     { quote: 'TorchX has completely transformed our hiring process. The AI recruitment feature helps us find the right talent faster and with better accuracy.', name: 'Alexa', role: 'HR Manager', co: 'LOGOIPSUM', initials: 'AL', grad: avatarGradients[0] },
     { quote: 'The employee portal is a game changer! Our team loves the easy access to documents, requests, and updates all in one place.', name: 'Anaya Varma', role: 'HR Director', co: 'LOGOIPSUM', initials: 'AV', grad: avatarGradients[1] },
     { quote: 'Performance reviews are now simple, transparent, and data-driven. TorchX helps us build a culture of continuous feedback and growth.', name: 'Rohan Sharma', role: 'People Operations Lead', co: 'LOGOIPSUM', initials: 'RS', grad: avatarGradients[2] },
+  {
+  quote: 'TorchX has significantly improved our workforce management. From onboarding to performance tracking, everything is streamlined and easy to manage.',
+  name: 'Karan Malhotra',
+  role: 'Head of Human Resources',
+  co: 'LOGOIPSUM',
+  initials: 'KM',
+  grad: avatarGradients[0]
+},
+{
+  quote: 'TorchX has helped us centralize all HR operations in one platform. The automation features save countless hours every week and improve team productivity.',
+  name: 'Meera Patel',
+  role: 'Chief People Officer',
+  co: 'LOGOIPSUM',
+  initials: 'MP',
+  grad: avatarGradients[1]
+}
   ]
+  const visibleTestimonials = testimonials.slice(
+  startIndex,
+  startIndex + 3
+)
+
   return (
-    <section id="testimonials" style={{
+    <section id="testimonials" 
+    className="scroll-anchor" style={{
       background: '#F6EDF2',
       fontFamily: 'DM Sans, sans-serif',
-      paddingTop: SP.section.lg,   /* 96px */
-      paddingBottom: SP.section.lg,
+      paddingTop: '30px',  
+      paddingBottom: '40px',
     }}>
       <Wrap>
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
@@ -1180,8 +1193,9 @@ function Testimonials() {
           </div>
 
           {/* Testimonial cards: gap = SP.gap.card (28px), mb = SP.section.sm (48px) */}
+          
           <div style={{ display: 'grid', gap: SP.gap.card, marginBottom: SP.section.sm }} className="testi-grid">
-            {testimonials.map((t, i) => (
+            {visibleTestimonials.map((t, i) => (
               <motion.div key={t.name}
                 initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.45, delay: i * 0.1 }} viewport={{ once: true }}
@@ -1189,8 +1203,7 @@ function Testimonials() {
                 style={{
                   background: '#ffffff', border: '1px solid #DDB7CB', borderRadius: 14,
                   padding: SP.card.padSm, /* 24px — replaces '26px' */
-                  boxShadow: i === active ? '0 10px 24px rgba(122,0,75,0.15)' : '0 6px 18px rgba(122,0,75,0.08)',
-                  transform: i === active ? 'translateY(-4px)' : 'none',
+                  boxShadow: '0 6px 18px rgba(122,0,75,0.08)',transform: 'none',
                   display: 'flex', flexDirection: 'column'
                 }}>
                 <div style={{ fontSize: 48, fontFamily: 'Sora, sans-serif', fontWeight: 900, color: P, lineHeight: 0.7, marginBottom: 14 }}>"</div>
@@ -1211,18 +1224,73 @@ function Testimonials() {
           </div>
 
           {/* Pagination dots: mb = SP.section.sm (48px) */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: SP.section.sm }}>
-            <button onClick={() => setActive((active - 1 + testimonials.length) % testimonials.length)}
-              style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid #DDB7CB', background: 'transparent', color: P, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>←</button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {testimonials.map((_, i) => (
-                <button key={i} onClick={() => setActive(i)} style={{ width: i === active ? 26 : 8, height: 8, borderRadius: 10, border: 'none', cursor: 'pointer', background: i === active ? P : '#E7D6DF', padding: 0, transition: 'all .3s' }} />
-              ))}
-            </div>
-            <button onClick={() => setActive((active + 1) % testimonials.length)}
-              style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid #DDB7CB', background: 'transparent', color: P, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>→</button>
-          </div>
+ <div
+  style={{
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: '16px',
+    marginBottom: SP.section.sm,
+  }}
+>
+  <button
+    onClick={() =>Math.max(prev - 1, 0)}
+    style={{
+      width: 32,
+      height: 32,
+      borderRadius: '50%',
+      border: '1px solid #DDB7CB',
+      background: 'transparent',
+      color: P,
+      cursor: 'pointer',
+    }}
+  >
+    ←
+  </button>
 
+  <div
+  style={{
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  }}
+>
+  {[0,1,2].map(i => (
+    <button
+      key={i}
+      onClick={() => setStartIndex(i)}
+      style={{
+        width: startIndex === i ? '18px' : '6px',
+        height: '6px',
+        borderRadius: '20px',
+        border: 'none',
+        cursor: 'pointer',
+        background:
+          startIndex === i
+            ? '#730042'
+            : '#DDB7CB',
+        transition: 'all .3s ease',
+      }}
+    />
+  ))}
+</div>
+
+  <button
+    onClick={() => setStartIndex(prev =>
+    Math.min(prev + 1, testimonials.length - 3))}
+    style={{
+      width: 32,
+      height: 32,
+      borderRadius: '50%',
+      border: '1px solid #DDB7CB',
+      background: 'transparent',
+      color: P,
+      cursor: 'pointer',
+    }}
+  >
+    →
+  </button>
+</div>
           {/* CTA banner: padding SP.section.sm (48px) SP.card.pad (32px) */}
           <div className="testimonial-cta"
             style={{
@@ -1390,7 +1458,7 @@ function Footer() {
           Now using Wrap → all sections share the same left/right walls.
           paddingTop: SP.section.sm (48px) — footer starts after a full breath
         */}
-        <Wrap style={{ paddingTop: SP.section.sm, paddingBottom: 0 }}>
+        <Wrap style={{ paddingTop: '30px', paddingBottom: 0 }}>
           <div style={{ display: 'grid', gap: '40px' }} className="footer-grid">
 
             {/* Logo + description */}
@@ -1438,7 +1506,7 @@ function Footer() {
         </Wrap>
 
         {/* Bottom bar: inside Wrap for gutter alignment, mt = SP.section.xs (24px) */}
-        <Wrap style={{ paddingTop: SP.gap.stat, paddingBottom: SP.gap.stat }}>
+        <Wrap style={{ paddingTop: '35px', paddingBottom: SP.gap.stat }}>
           <div style={{ borderTop: `1px solid ${FOOTER_BORDER}`, paddingTop: SP.gap.stat, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
             <p style={{ fontSize: 14, color: '#555555', margin: 0 }}>
               TorchX™ — A Product of Techtorch Solutions Private Limited.
