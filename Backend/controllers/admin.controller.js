@@ -185,7 +185,7 @@ const addmanager = async (req, res, next) => {
   }
  
   const newmanager = await Managermodel.create({
-    organisation_id: organisation_id || req.admin._id,
+    organisation_id: req.admin.organisation_id,
     profile_image,
     uid,
     department,
@@ -314,7 +314,7 @@ const addemployee = async (req, res, next) => {
   const uid = await generateUID(department);
 
   const newuser = await Usermodel.create({
-    organisation_id: organisation_id || req.admin._id,
+    organisation_id: req.admin.organisation_id,
     profile_image,
     uid,
     department,
