@@ -30,7 +30,7 @@ const verifyAdmin = async (req, res, next) => {
     decoded = jwt.verify(token, process.env.JWT_SECRET);
   } catch (err) {
     return next(
-      Object.assign(new Error("Invalid or expired token"), { statusCode: 400 }),
+      Object.assign(new Error(err.message), { statusCode: 400 }),
     );
   }
   const admin = await Adminmodel.findByIdAndUpdate(
