@@ -821,7 +821,7 @@ const verifyManagerOtp = async (req, res, next) => {
     process.env.JWT_SECRET,
     { expiresIn: "15m" },
   );
-  const link = `http://localhost:5000/manager/showPasswordPageotp?token=${resetToken}`;
+  const link = `https://torchxsuite.com/api/talent/manager/showPasswordPageotp?token=${resetToken}`;
   await Promise.all([
     sendEmail({
       to: manager.work_email,
