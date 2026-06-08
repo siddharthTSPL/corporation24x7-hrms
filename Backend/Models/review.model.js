@@ -2,6 +2,12 @@ const mongoose = require("mongoose");
 
 const reviewSchema = new mongoose.Schema(
   {
+      organisation_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SuperAdmin",
+      required: true,
+      index: true,
+    },
     reviewerRole: {
       type: String,
       enum: ["super_admin", "admin", "manager"],
