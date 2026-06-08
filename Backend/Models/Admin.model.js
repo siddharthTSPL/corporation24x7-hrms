@@ -93,6 +93,9 @@ const adminSchema = new mongoose.Schema(
     pincode: {
       type: String,
     },
+    country: {
+      type: String,
+    },
 
     role: {
       type: String,
