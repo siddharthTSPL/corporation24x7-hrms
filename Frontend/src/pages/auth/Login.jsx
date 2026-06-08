@@ -211,7 +211,7 @@ function Login() {
                   </p>
                 )}
                 <p
-                  onClick={() => navigate("/signup")}
+                  onClick={() => window.location.href = "/talent/signup"}
                   className="cursor-pointer hover:text-[#730042] ml-auto"
                 >
                   Sign Up

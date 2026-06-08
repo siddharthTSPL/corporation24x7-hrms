@@ -15,7 +15,6 @@ const adminSchema = new mongoose.Schema(
     uid: {
       type: String,
       required: true,
-      unique: true,
     },
 
     department: {
@@ -206,6 +205,7 @@ const adminSchema = new mongoose.Schema(
   }
 );
 
+adminSchema.index({ uid: 1, organisation_id: 1 }, { unique: true });
 adminSchema.index({ department: 1, status: 1 });
 adminSchema.index({ status: 1 });
 adminSchema.index({ reporting_manager: 1 });

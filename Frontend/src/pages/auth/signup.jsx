@@ -67,7 +67,7 @@ export default function SuperAdminRegister() {
           />
             
             <p
-              onClick={() => navigate("/login")}
+             onClick={() => window.location.href = "/talent/login"}
               className="text-sm text-gray-500 cursor-pointer hover:text-(--primary)"
             >
               Already have an account?{" "}

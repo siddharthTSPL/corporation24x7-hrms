@@ -30,7 +30,7 @@ const verifyAdmin = async (req, res, next) => {
     decoded = jwt.verify(token, process.env.JWT_SECRET);
   } catch (err) {
     return next(
-      Object.assign(new Error("Invalid or expired token"), { statusCode: 400 }),
+      Object.assign(new Error(err.message), { statusCode: 400 }),
     );
   }
   const admin = await Adminmodel.findByIdAndUpdate(
@@ -72,6 +72,32 @@ const adminlogin = async (req, res, next) => {
     return next(
       Object.assign(new Error("Invalid credentials"), { statusCode: 401 }),
     );
+
+  const superAdmin = await SuperAdminModel.findOne({
+    company_domain: identifier.split("@")[1].toLowerCase().trim(),
+  });
+
+  if (superAdmin) {
+    const trialValid = superAdmin.isTrialValid();
+    const hasTalentLicense = superAdmin.licenses.some(
+      (l) =>
+        l.product === "torchx_talent" &&
+        l.isActive &&
+        new Date(l.expiresAt) > new Date()
+    );
+
+    if (!trialValid && !hasTalentLicense) {
+      return next(
+        Object.assign(
+          new Error(
+            "Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."
+          ),
+          { statusCode: 403, code: "SERVICE_STOPPED" }
+        )
+      );
+    }
+  }
+
   const token = jwt.sign(
     {
       adminid: admin._id,
@@ -159,7 +185,7 @@ const addmanager = async (req, res, next) => {
   }
  
   const newmanager = await Managermodel.create({
-    organisation_id: organisation_id || req.admin._id,
+    organisation_id: req.admin.organisation_id,
     profile_image,
     uid,
     department,
@@ -288,7 +314,7 @@ const addemployee = async (req, res, next) => {
   const uid = await generateUID(department);
 
   const newuser = await Usermodel.create({
-    organisation_id: organisation_id || req.admin._id,
+    organisation_id: req.admin.organisation_id,
     profile_image,
     uid,
     department,

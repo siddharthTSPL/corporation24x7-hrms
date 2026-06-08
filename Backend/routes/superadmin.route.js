@@ -49,7 +49,7 @@ superAdminRouter.post("/verifyotp", asyncHandler(verifyOtp));
 superAdminRouter.post("/resetpassword", asyncHandler(resetPassword));
 
 superAdminRouter.get("/me", superAdminAuth, asyncHandler(getMe));
-superAdminRouter.put("/update", superAdminAuth, asyncHandler(updateSuperAdmin));
+superAdminRouter.put("/update-profile", superAdminAuth, asyncHandler(updateSuperAdmin));
 superAdminRouter.put(
   "/changepassword",
   superAdminAuth,
