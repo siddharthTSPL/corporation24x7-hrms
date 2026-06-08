@@ -151,7 +151,7 @@ function Login() {
     }
   };
 
- const handleVerifyOtp = () => {
+const handleVerifyOtp = () => {
   if (!form.otp) {
     setErrors({ otp: "OTP is required" });
     return;
@@ -162,7 +162,6 @@ function Login() {
   const onSuccess = async (data) => {
     const role = data?.role ?? form.role;
 
-    // ✅ Store the token the same way normal login does
     if (data?.token) {
       try {
         await fetch("http://localhost:47821/set-token", {
@@ -175,7 +174,6 @@ function Login() {
 
     localStorage.setItem("role", role);
 
-    // ✅ Fetch full user data just like useLogin's onSuccess does
     try {
       let fullData;
       if (role === "admin") fullData = await getMeAdmin();
