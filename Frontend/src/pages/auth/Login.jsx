@@ -25,6 +25,10 @@ import slide1 from "../../assets/slide1.png";
 import slide2 from "../../assets/slide2.png";
 import slide3 from "../../assets/slide3.png";
 import talent from "../../assets/Talent.png";
+import { getMeAdmin } from "../../auth/api/adminapi/auth/ad.auth.api";
+import { getMeManager } from "../../auth/api/managerapi/auth/ma.auth.api";
+import { getMeUser } from "../../auth/api/employeeapi/auth/em.auth.api";
+import { getMeSuperAdmin } from "../../auth/api/superadmin/auth/su.auth";
 
 function Login() {
   const navigate = useNavigate();
@@ -147,28 +151,56 @@ function Login() {
     }
   };
 
-  const handleVerifyOtp = () => {
-    if (!form.otp) {
-      setErrors({ otp: "OTP is required" });
-      return;
+ const handleVerifyOtp = () => {
+  if (!form.otp) {
+    setErrors({ otp: "OTP is required" });
+    return;
+  }
+
+  const onError = (err) => setErrors({ otp: getErrorMessage(err) });
+
+  const onSuccess = async (data) => {
+    const role = data?.role ?? form.role;
+
+    // ✅ Store the token the same way normal login does
+    if (data?.token) {
+      try {
+        await fetch("http://localhost:47821/set-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: data.token }),
+        });
+      } catch (_) {}
     }
-    const onError = (err) => setErrors({ otp: getErrorMessage(err) });
-    const onSuccess = (data) => {
-      const role = data?.role ?? form.role;
-      localStorage.setItem("role", role);
-      queryClient.setQueryData(["auth"], { role, data: null });
-      navigateByRole(role);
-    };
-    if (form.role === "admin") {
-      verifyAdminOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
-    } else if (form.role === "superadmin") {
-      verifySuperAdminOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
-    } else if (form.role === "manager") {
-      verifyManagerOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
-    } else if (form.role === "employee") {
-      verifyEmployeeOtpFn({ work_email: form.email, otp: form.otp }, { onSuccess, onError });
+
+    localStorage.setItem("role", role);
+
+    // ✅ Fetch full user data just like useLogin's onSuccess does
+    try {
+      let fullData;
+      if (role === "admin") fullData = await getMeAdmin();
+      else if (role === "manager") fullData = await getMeManager();
+      else if (role === "employee") fullData = await getMeUser();
+      else if (role === "superadmin") fullData = await getMeSuperAdmin();
+
+      queryClient.setQueryData(["auth"], { role, data: fullData });
+    } catch {
+      queryClient.setQueryData(["auth"], { role, data });
     }
+
+    navigateByRole(role);
   };
+
+  if (form.role === "admin") {
+    verifyAdminOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
+  } else if (form.role === "superadmin") {
+    verifySuperAdminOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
+  } else if (form.role === "manager") {
+    verifyManagerOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
+  } else if (form.role === "employee") {
+    verifyEmployeeOtpFn({ work_email: form.email, otp: form.otp }, { onSuccess, onError });
+  }
+};
 
   return (
     <div
