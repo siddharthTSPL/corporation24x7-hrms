@@ -1,8 +1,5 @@
 const Attendance = require("../Models/attendance.model");
-const {
-  calculateStatus,
-  updateSummary,
-} = require("../automatic/monthattendanceupdate");
+const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
 
 const getUserId = (user) => user._id || user.id;
 
@@ -18,29 +15,19 @@ const checkin = async (req, res) => {
     const { latitude, longitude, selfie } = req.body;
     const user = req.user;
     const userId = getUserId(user);
+    const organisation_id = user.organisation_id;
 
-    if (!latitude || !longitude) {
+    if (!latitude || !longitude)
       return res.status(400).json({ message: "Location required" });
-    }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const attendance = await Attendance.findOne({
-      employee: userId,
-      role: user.role,
-      date: today,
-    });
+    const attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
 
     if (attendance) {
-      if (attendance.checkOut) {
-        return res
-          .status(400)
-          .json({
-            message: "You have already completed your attendance for today.",
-            alreadyDone: true,
-          });
-      }
+      if (attendance.checkOut)
+        return res.status(400).json({ message: "You have already completed your attendance for today.", alreadyDone: true });
       if (attendance.source === "agent") {
         attendance.latitude = latitude;
         attendance.longitude = longitude;
@@ -58,6 +45,7 @@ const checkin = async (req, res) => {
     }
 
     const newAttendance = await Attendance.create({
+      organisation_id,
       employee: userId,
       onModel: getOnModel(user.role),
       role: user.role,
@@ -83,22 +71,19 @@ const activity = async (req, res) => {
     const { status } = req.body;
     const user = req.user;
     const userId = getUserId(user);
+    const organisation_id = user.organisation_id;
 
-    if (!["active", "idle"].includes(status)) {
+    if (!["active", "idle"].includes(status))
       return res.status(400).json({ message: "Invalid status" });
-    }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    let attendance = await Attendance.findOne({
-      employee: userId,
-      role: user.role,
-      date: today,
-    });
+    let attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
 
     if (!attendance) {
       attendance = await Attendance.create({
+        organisation_id,
         employee: userId,
         onModel: getOnModel(user.role),
         role: user.role,
@@ -111,14 +96,12 @@ const activity = async (req, res) => {
       });
     }
 
-    if (attendance.checkOut) {
+    if (attendance.checkOut)
       return res.status(400).json({ message: "Already checked out" });
-    }
 
     const now = Date.now();
-    if (attendance.lastUpdated && now - attendance.lastUpdated < 60000) {
+    if (attendance.lastUpdated && now - attendance.lastUpdated < 60000)
       return res.status(429).json({ message: "Too many requests" });
-    }
 
     if (attendance.source === "manual") {
       if (status === "active") attendance.activeMinutes += 1;
@@ -128,11 +111,7 @@ const activity = async (req, res) => {
     attendance.lastUpdated = now;
     await attendance.save();
 
-    res.json({
-      message: "Activity updated",
-      activeMinutes: attendance.activeMinutes,
-      idleMinutes: attendance.idleMinutes,
-    });
+    res.json({ message: "Activity updated", activeMinutes: attendance.activeMinutes, idleMinutes: attendance.idleMinutes });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -142,22 +121,17 @@ const checkout = async (req, res) => {
   try {
     const user = req.user;
     const userId = getUserId(user);
+    const organisation_id = user.organisation_id;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const attendance = await Attendance.findOne({
-      employee: userId,
-      role: user.role,
-      date: today,
-    });
+    const attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
 
     if (!attendance)
       return res.status(404).json({ message: "Please check in first" });
     if (attendance.source === "agent")
-      return res
-        .status(400)
-        .json({ message: "Please check in first before checking out" });
+      return res.status(400).json({ message: "Please check in first before checking out" });
     if (attendance.checkOut)
       return res.status(400).json({ message: "Already checked out" });
 
@@ -165,15 +139,9 @@ const checkout = async (req, res) => {
     const status = calculateStatus(attendance.activeMinutes);
     attendance.status = status;
     await attendance.save();
-
     await updateSummary(attendance);
 
-    res.json({
-      message: "Checkout successful",
-      status,
-      activeMinutes: attendance.activeMinutes,
-      idleMinutes: attendance.idleMinutes,
-    });
+    res.json({ message: "Checkout successful", status, activeMinutes: attendance.activeMinutes, idleMinutes: attendance.idleMinutes });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -183,29 +151,17 @@ const getToday = async (req, res) => {
   try {
     const user = req.user;
     const userId = getUserId(user);
+    const organisation_id = user.organisation_id;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const attendance = await Attendance.findOne({
-      employee: userId,
-      role: user.role,
-      date: today,
-    }).lean();
+    const attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id }).lean();
 
-    if (!attendance) {
-      return res.json({
-        attendance: null,
-        isCheckedIn: false,
-        isCheckedOut: false,
-      });
-    }
+    if (!attendance)
+      return res.json({ attendance: null, isCheckedIn: false, isCheckedOut: false });
 
-    res.json({
-      attendance,
-      isCheckedIn: attendance.source === "manual" && !attendance.checkOut,
-      isCheckedOut: !!attendance.checkOut,
-    });
+    res.json({ attendance, isCheckedIn: attendance.source === "manual" && !attendance.checkOut, isCheckedOut: !!attendance.checkOut });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -229,21 +185,16 @@ const autoCheckoutAll = async () => {
     const ops = openSessions.map((a) => ({
       updateOne: {
         filter: { _id: a._id },
-        update: {
-          $set: { checkOut: now, status: calculateStatus(a.activeMinutes) },
-        },
+        update: { $set: { checkOut: now, status: calculateStatus(a.activeMinutes) } },
       },
     }));
 
     await Attendance.bulkWrite(ops, { ordered: false });
-
-    await Promise.all(
-      openSessions.map((a) => {
-        a.checkOut = now;
-        a.status = calculateStatus(a.activeMinutes);
-        return updateSummary(a);
-      }),
-    );
+    await Promise.all(openSessions.map((a) => {
+      a.checkOut = now;
+      a.status = calculateStatus(a.activeMinutes);
+      return updateSummary(a);
+    }));
   } catch (error) {
     console.error("[Cron] Auto checkout failed:", error.message);
   }
