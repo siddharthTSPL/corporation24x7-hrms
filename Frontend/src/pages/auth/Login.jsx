@@ -59,7 +59,7 @@ function Login() {
   const images = [slide1, slide2, slide3];
 
   const navigateByRole = (role) => {
-    if (role === "superadmin") navigate("/superadmin-dashboard", { replace: true });
+    if (role === "superadmin" || role === "super_admin") navigate("/superadmin-dashboard", { replace: true });
     else if (role === "admin") navigate("/dashboard", { replace: true });
     else if (role === "manager") navigate("/manager-dashboard", { replace: true });
     else navigate("/employee-dashboard", { replace: true });
@@ -140,66 +140,67 @@ function Login() {
     }
     const onSuccess = () => setStep("otp");
     const onError = (err) => setErrors({ email: getErrorMessage(err) });
+
     if (form.role === "admin") {
       sendAdminOtpFn(form.email, { onSuccess, onError });
     } else if (form.role === "superadmin") {
       sendSuperAdminOtpFn({ email: form.email }, { onSuccess, onError });
     } else if (form.role === "manager") {
-      sendManagerOtpFn({ email: form.email }, { onSuccess, onError });
+      sendManagerOtpFn({ work_email: form.email }, { onSuccess, onError });
     } else if (form.role === "employee") {
       sendEmployeeOtpFn({ work_email: form.email }, { onSuccess, onError });
     }
   };
 
-const handleVerifyOtp = () => {
-  if (!form.otp) {
-    setErrors({ otp: "OTP is required" });
-    return;
-  }
+  const handleVerifyOtp = () => {
+    if (!form.otp) {
+      setErrors({ otp: "OTP is required" });
+      return;
+    }
 
-  const onError = (err) => setErrors({ otp: getErrorMessage(err) });
+    const onError = (err) => setErrors({ otp: getErrorMessage(err) });
 
-  const onSuccess = async (data) => {
-    const role = data?.role ?? form.role;
+    const onSuccess = async (data) => {
+      const rawRole = data?.role ?? form.role;
+      const role = rawRole === "super_admin" ? "superadmin" : rawRole;
 
-    if (data?.token) {
+      if (data?.token) {
+        try {
+          await fetch("http://localhost:47821/set-token", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: data.token }),
+          });
+        } catch (_) {}
+      }
+
+      localStorage.setItem("role", role);
+
       try {
-        await fetch("http://localhost:47821/set-token", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: data.token }),
-        });
-      } catch (_) {}
+        let fullData;
+        if (role === "admin") fullData = await getMeAdmin();
+        else if (role === "manager") fullData = await getMeManager();
+        else if (role === "employee") fullData = await getMeUser();
+        else if (role === "superadmin") fullData = await getMeSuperAdmin();
+
+        queryClient.setQueryData(["auth"], { role, data: fullData });
+      } catch {
+        queryClient.setQueryData(["auth"], { role, data });
+      }
+
+      navigateByRole(role);
+    };
+
+    if (form.role === "admin") {
+      verifyAdminOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
+    } else if (form.role === "superadmin") {
+      verifySuperAdminOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
+    } else if (form.role === "manager") {
+      verifyManagerOtpFn({ work_email: form.email, otp: form.otp }, { onSuccess, onError });
+    } else if (form.role === "employee") {
+      verifyEmployeeOtpFn({ work_email: form.email, otp: form.otp }, { onSuccess, onError });
     }
-
-    localStorage.setItem("role", role);
-
-    try {
-      let fullData;
-      console.log(role);
-      if (role === "admin") fullData = await getMeAdmin();
-      else if (role === "manager") fullData = await getMeManager();
-      else if (role === "employee") fullData = await getMeUser();
-      else if (role === "super_admin") fullData = await getMeSuperAdmin();
-
-      queryClient.setQueryData(["auth"], { role, data: fullData });
-    } catch {
-      queryClient.setQueryData(["auth"], { role, data });
-    }
-
-    navigateByRole(role);
   };
-
-  if (form.role === "admin") {
-    verifyAdminOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
-  } else if (form.role === "super_admin") {
-    verifySuperAdminOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
-  } else if (form.role === "manager") {
-    verifyManagerOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
-  } else if (form.role === "employee") {
-    verifyEmployeeOtpFn({ work_email: form.email, otp: form.otp }, { onSuccess, onError });
-  }
-};
 
   return (
     <div
@@ -285,10 +286,7 @@ const handleVerifyOtp = () => {
               </button>
 
               <div className="flex justify-between mt-4 text-sm text-gray-500">
-                <p
-                  onClick={() => setStep("email")}
-                  className="cursor-pointer hover:text-[#730042]"
-                >
+                <p onClick={() => setStep("email")} className="cursor-pointer hover:text-[#730042]">
                   Forgot Password?
                 </p>
                 <p
