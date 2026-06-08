@@ -530,44 +530,44 @@ const forgotPassword = async (req, res, next) => {
 const verifyOtp = async (req, res, next) => {
   const { email, otp } = req.body;
   if (!email || !otp)
-    return next(
-      Object.assign(new Error("Email and OTP are required"), {
-        statusCode: 400,
-      }),
-    );
+    return next(Object.assign(new Error("Email and OTP are required"), { statusCode: 400 }));
+
   const otpRecord = await OtpModel.findOne({ email });
   if (!otpRecord)
-    return next(
-      Object.assign(new Error("OTP not found. Please request a new one"), {
-        statusCode: 404,
-      }),
-    );
+    return next(Object.assign(new Error("OTP not found. Please request a new one"), { statusCode: 404 }));
   if (otpRecord.isExpired()) {
     await OtpModel.deleteOne({ email });
-    return next(
-      Object.assign(new Error("OTP has expired. Please request a new one"), {
-        statusCode: 400,
-      }),
-    );
+    return next(Object.assign(new Error("OTP has expired. Please request a new one"), { statusCode: 400 }));
   }
   if (!otpRecord.compareOtp(String(otp)))
     return next(Object.assign(new Error("Invalid OTP"), { statusCode: 400 }));
-  const superAdmin = await SuperAdminModel.findOne({ email })
-    .select("_id email")
-    .lean();
+
+  const superAdmin = await SuperAdminModel.findOne({ email }).select("_id email role").lean();
   if (!superAdmin)
-    return next(
-      Object.assign(new Error("Account not found"), { statusCode: 404 }),
-    );
-  const resetToken = jwt.sign(
-    { superadminid: superAdmin._id, email: superAdmin.email },
-    process.env.JWT_SECRET,
-    { expiresIn: "15m" },
-  );
+    return next(Object.assign(new Error("Account not found"), { statusCode: 404 }));
+
   await OtpModel.deleteOne({ email });
-  res
-    .status(200)
-    .json({ success: true, message: "OTP verified successfully", resetToken });
+
+  const token = jwt.sign(
+    { superadminid: superAdmin._id, role: superAdmin.role, email: superAdmin.email },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" },
+  );
+
+  const isProduction = process.env.NODE_ENV === "production";
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+
+  SuperAdminModel.findByIdAndUpdate(superAdmin._id, {
+    status: "active",
+    last_login: new Date(),
+  }).exec();
+
+  res.status(200).json({ success: true, message: "OTP verified successfully", role: superAdmin.role });
 };
 
 const resetPassword = async (req, res, next) => {

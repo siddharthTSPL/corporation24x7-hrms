@@ -431,7 +431,11 @@ const verifyManagerOtp = async (req, res, next) => {
     sendEmail({ to: manager.work_email, subject: "Optional Password Change", html: `<h2>Hello ${manager.f_name}</h2><p>Your OTP verification was successful.</p><p>If you want to change your password, click the link below:</p><a href="${link}">Change Password</a>` }),
     OtpModel.deleteOne({ email: work_email }),
   ]);
-  res.status(200).json({ message: "OTP verified. Login successful.", my_details: { id: manager._id, email: manager.work_email }, passwordResetOptional: true });
+  res.status(200).json({
+  message: "OTP verified. Login successful.",
+  role: manager.role,      
+  passwordResetOptional: true,
+});
 };
 
 const showPasswordPageotp = (req, res) => {
