@@ -1,16 +1,28 @@
 const mongoose = require("mongoose");
 
+const departmentCounterSchema = new mongoose.Schema(
+  {
+    lastNumber: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
 const uidCounterSchema = new mongoose.Schema({
-     department:{
-          type:String,
-          enum:["MGMT","OPR","BPO","HR","ENG"],
-          required:true,
-          unique:true
-     },
-     lastNumber:{
-          type:Number,
-          default:0
-     }
+  organisation_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "SuperAdmin",
+    required: true,
+    unique: true,
+  },
+  departments: {
+    MGMT: { type: departmentCounterSchema, default: () => ({}) },
+    OPR:  { type: departmentCounterSchema, default: () => ({}) },
+    BPO:  { type: departmentCounterSchema, default: () => ({}) },
+    HR:   { type: departmentCounterSchema, default: () => ({}) },
+    ENG:  { type: departmentCounterSchema, default: () => ({}) },
+  },
 });
 
-module.exports = mongoose.model("UidCounter", uidCounterSchema);
+const UidCounter = mongoose.model("UidCounter", uidCounterSchema);
+
+module.exports = UidCounter;

@@ -34,13 +34,12 @@ const verifyManagerEmail = async (req, res, next) => {
     .findByIdAndUpdate(decoded.managerid, { isVerified: true }, { new: true })
     .lean();
 
-  if (!manager) {
+  if (!manager)
     return res
       .status(404)
       .send(
         `<!DOCTYPE html><html><body style="margin:0;font-family:Segoe UI;background:#F9F8F2;display:flex;align-items:center;justify-content:center;height:100vh;"><div style="background:white;padding:40px;border-radius:14px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.1);max-width:420px;"><h1 style="color:#CD166E;">⚠️ Manager Not Found</h1><p style="color:#555;">We couldn't find your account.</p></div></body></html>`,
       );
-  }
 
   res
     .status(200)
@@ -51,6 +50,7 @@ const verifyManagerEmail = async (req, res, next) => {
 
 const managerlogin = async (req, res, next) => {
   const { work_email, password } = req.body;
+
   if (!work_email || !password) {
     return next(
       Object.assign(new Error("Email and password are required"), {
@@ -58,16 +58,27 @@ const managerlogin = async (req, res, next) => {
       }),
     );
   }
+
   const manager = await managermodel.findOne({ work_email });
-  if (!manager)
+
+  if (!manager) {
     return next(
-      Object.assign(new Error("Invalid credentials"), { statusCode: 401 }),
+      Object.assign(new Error("Invalid credentials"), {
+        statusCode: 401,
+      }),
     );
+  }
+
   const isValidPassword = await manager.isValidPassword(password);
-  if (!isValidPassword)
+
+  if (!isValidPassword) {
     return next(
-      Object.assign(new Error("Invalid credentials"), { statusCode: 401 }),
+      Object.assign(new Error("Invalid credentials"), {
+        statusCode: 401,
+      }),
     );
+  }
+
   if (!manager.isVerified) {
     return next(
       Object.assign(new Error("Please verify your email before login"), {
@@ -76,43 +87,98 @@ const managerlogin = async (req, res, next) => {
     );
   }
 
-  const superAdmin = await SuperAdminModel.findOne({
-    company_domain: work_email.split("@")[1].toLowerCase().trim(),
-  });
+  // ==========================
+  // Resolve Organisation
+  // ==========================
 
-  if (superAdmin) {
-    const trialValid = superAdmin.isTrialValid();
-    const hasTalentLicense = superAdmin.licenses.some(
-      (l) =>
-        l.product === "torchx_talent" &&
-        l.isActive &&
-        new Date(l.expiresAt) > new Date()
-    );
+  let organisationId = manager.organisation_id;
 
-    if (!trialValid && !hasTalentLicense) {
-      return next(
-        Object.assign(
-          new Error(
-            "Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."
-          ),
-          { statusCode: 403, code: "SERVICE_STOPPED" }
-        )
-      );
+  let superAdmin = await SuperAdminModel.findById(organisationId);
+
+  // If organisation_id accidentally contains Admin ID
+  if (!superAdmin) {
+    const admin = await AdminModel.findById(organisationId)
+      .select("organisation_id")
+      .lean();
+
+    if (admin?.organisation_id) {
+      organisationId = admin.organisation_id;
+
+      // auto heal manager record
+      await managermodel.findByIdAndUpdate(manager._id, {
+        organisation_id: organisationId,
+      });
+
+      superAdmin = await SuperAdminModel.findById(organisationId);
     }
   }
 
+  if (!superAdmin) {
+    return next(
+      Object.assign(
+        new Error("Organisation not found. Please contact administrator."),
+        { statusCode: 404 },
+      ),
+    );
+  }
+
+  // ==========================
+  // License Validation
+  // ==========================
+
+  const trialValid = superAdmin.isTrialValid();
+
+  const hasTalentLicense =
+    superAdmin.licenses?.some(
+      (license) =>
+        license.product === "torchx_talent" &&
+        license.isActive &&
+        new Date(license.expiresAt) > new Date(),
+    ) || false;
+
+  if (!trialValid && !hasTalentLicense) {
+    return next(
+      Object.assign(
+        new Error(
+          "Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance.",
+        ),
+        {
+          statusCode: 403,
+          code: "SERVICE_STOPPED",
+        },
+      ),
+    );
+  }
+
+  // ==========================
+  // First Login Flow
+  // ==========================
+
   if (manager.isFirstLogin) {
     const resetToken = jwt.sign(
-      { work_email: manager.work_email },
+      {
+        work_email: manager.work_email,
+      },
       process.env.JWT_SECRET,
-      { expiresIn: "15m" },
+      {
+        expiresIn: "15m",
+      },
     );
+
     const link = `https://corporation24x7-hrms.onrender.com/manager/change-password?token=${resetToken}`;
+
     await sendEmail({
       to: manager.work_email,
       subject: "Set Your Password",
-      html: `<h2>Hello ${manager.f_name}</h2><p>This is your first login.</p><p>Please click the link below to set your password:</p><a href="${link}">Change Password</a><p>This link expires in 15 minutes.</p>`,
+      html: `
+        <h2>Hello ${manager.f_name}</h2>
+        <p>This is your first login.</p>
+        <p>Please click the link below to set your password:</p>
+        <a href="${link}">Change Password</a>
+        <p>This link expires in 15 minutes.</p>
+      `,
     });
+
     return next(
       Object.assign(
         new Error("First login detected. Check your email to set password."),
@@ -120,26 +186,45 @@ const managerlogin = async (req, res, next) => {
       ),
     );
   }
+
+  // ==========================
+  // Generate Token
+  // ==========================
+
   const token = jwt.sign(
     {
       managerid: manager._id,
       work_email: manager.work_email,
       role: manager.role,
+      organisation_id: organisationId,
     },
     process.env.JWT_SECRET,
-    { expiresIn: "15d" },
+    {
+      expiresIn: "15d",
+    },
   );
+
   const isProduction = process.env.NODE_ENV === "production";
+
   res.cookie("token", token, {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
     maxAge: 15 * 24 * 60 * 60 * 1000,
   });
-  await managermodel.findByIdAndUpdate(manager._id, { status: "active" });
-  res
-    .status(200)
-    .json({ message: "Manager login successful", role: manager.role, token });
+
+  await managermodel.findByIdAndUpdate(manager._id, {
+    status: "active",
+    organisation_id: organisationId,
+  });
+
+  return res.status(200).json({
+    success: true,
+    message: "Manager login successful",
+    role: manager.role,
+    organisation_id: organisationId,
+    token,
+  });
 };
 
 const managerlogout = async (req, res, next) => {
@@ -199,13 +284,12 @@ const managerUpdatePassword = async (req, res, next) => {
   if (!req.manager)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   const { oldpassword, newpassword } = req.body;
-  if (!oldpassword || !newpassword) {
+  if (!oldpassword || !newpassword)
     return next(
       Object.assign(new Error("Old password and new password are required"), {
         statusCode: 400,
       }),
     );
-  }
   const manager = req.manager;
   const isvalid = await manager.isValidPassword(oldpassword);
   if (!isvalid)
@@ -214,14 +298,13 @@ const managerUpdatePassword = async (req, res, next) => {
         statusCode: 400,
       }),
     );
-  if (oldpassword === newpassword) {
+  if (oldpassword === newpassword)
     return next(
       Object.assign(
         new Error("New password must be different from old password"),
         { statusCode: 400 },
       ),
     );
-  }
   manager.password = newpassword;
   manager.passwordUpdatedAt = Date.now();
   await manager.save();
@@ -229,29 +312,37 @@ const managerUpdatePassword = async (req, res, next) => {
 };
 
 const userunderme = async (req, res, next) => {
-  if (!req.manager)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  const users = await usermodel
-    .find({ Under_manager: req.manager._id })
-    .select(
-      "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt",
-    )
-    .lean();
-  if (!users || users.length === 0) {
-    return next(
-      Object.assign(new Error("No users found under this manager"), {
-        statusCode: 404,
-      }),
-    );
+  try {
+    if (!req.manager) {
+      return next(
+        Object.assign(new Error("Unauthorized"), { statusCode: 401 }),
+      );
+    }
+
+    const users = await usermodel
+      .find({
+        Under_manager: req.manager._id,
+        organisation_id: req.manager.organisation_id,
+      })
+      .select(
+        "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt",
+      )
+      .lean();
+
+    return res.status(200).json(users); // [] if no users found
+  } catch (error) {
+    next(error);
   }
-  res.status(200).json(users);
 };
 
 const viewallleaves = async (req, res, next) => {
   if (!req.manager)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   const leaves = await leavemodel
-    .find({ manager: req.manager._id })
+    .find({
+      manager: req.manager._id,
+      organisation_id: req.manager.organisation_id,
+    })
     .populate("employee", "f_name l_name work_email role")
     .sort({ createdAt: -1 })
     .lean();
@@ -266,7 +357,11 @@ const acceptleaverequest = async (req, res, next) => {
     return next(
       Object.assign(new Error("Leave ID is required"), { statusCode: 400 }),
     );
-  const leave = await leavemodel.findById(leaveId);
+
+  const leave = await leavemodel.findOne({
+    _id: leaveId,
+    organisation_id: req.manager.organisation_id,
+  });
   if (!leave)
     return next(
       Object.assign(new Error("Leave not found"), { statusCode: 404 }),
@@ -274,16 +369,20 @@ const acceptleaverequest = async (req, res, next) => {
   if (
     leave.status.startsWith("approved") ||
     leave.status.startsWith("rejected")
-  ) {
+  )
     return next(
       Object.assign(new Error("Leave already processed"), { statusCode: 400 }),
     );
-  }
-  const leaveBalance = await LeaveBalance.findOne({ employee: leave.employee });
+
+  const leaveBalance = await LeaveBalance.findOne({
+    employee: leave.employee,
+    organisation_id: req.manager.organisation_id,
+  });
   if (!leaveBalance)
     return next(
       Object.assign(new Error("Leave balance not found"), { statusCode: 404 }),
     );
+
   if (leave.leaveType === "ml") {
     const start = new Date(leave.startDate);
     const end = new Date(start);
@@ -292,14 +391,17 @@ const acceptleaverequest = async (req, res, next) => {
     leaveBalance.mlEndDate = end;
     await leaveBalance.save();
   }
+
   const updatedBalance = await processLeaveDeduction(leave);
   leave.status = "approved_manager";
   await leave.save();
-  res.status(200).json({
-    message: "Leave approved successfully",
-    leave,
-    leaveBalance: updatedBalance,
-  });
+  res
+    .status(200)
+    .json({
+      message: "Leave approved successfully",
+      leave,
+      leaveBalance: updatedBalance,
+    });
 };
 
 const rejectleaverequest = async (req, res, next) => {
@@ -310,7 +412,11 @@ const rejectleaverequest = async (req, res, next) => {
     return next(
       Object.assign(new Error("Leave ID is required"), { statusCode: 400 }),
     );
-  const leave = await leavemodel.findById(leaveId);
+
+  const leave = await leavemodel.findOne({
+    _id: leaveId,
+    organisation_id: req.manager.organisation_id,
+  });
   if (!leave)
     return next(
       Object.assign(new Error("Leave not found"), { statusCode: 404 }),
@@ -318,11 +424,11 @@ const rejectleaverequest = async (req, res, next) => {
   if (
     leave.status.startsWith("approved") ||
     leave.status.startsWith("rejected")
-  ) {
+  )
     return next(
       Object.assign(new Error("Leave already processed"), { statusCode: 400 }),
     );
-  }
+
   leave.status = "rejected_manager";
   leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   await leave.save();
@@ -337,7 +443,11 @@ const forwardedtoreportingmanager = async (req, res, next) => {
     return next(
       Object.assign(new Error("Leave ID is required"), { statusCode: 400 }),
     );
-  const leave = await leavemodel.findById(leaveId);
+
+  const leave = await leavemodel.findOne({
+    _id: leaveId,
+    organisation_id: req.manager.organisation_id,
+  });
   if (!leave)
     return next(
       Object.assign(new Error("Leave not found"), { statusCode: 404 }),
@@ -355,6 +465,7 @@ const forwardedtoreportingmanager = async (req, res, next) => {
         statusCode: 403,
       }),
     );
+
   const currentManager = await managermodel
     .findById(req.manager._id)
     .select("reporting_manager")
@@ -368,6 +479,7 @@ const forwardedtoreportingmanager = async (req, res, next) => {
         { statusCode: 400 },
       ),
     );
+
   leave.status = "forwarded_reporting_manager";
   await leave.save();
   res
@@ -386,31 +498,39 @@ const applyleavem = async (req, res, next) => {
     return next(
       Object.assign(new Error("Required fields missing"), { statusCode: 400 }),
     );
+
   const managerId = req.manager._id;
+  const organisation_id = req.manager.organisation_id;
   const start = new Date(startDate);
   const end = new Date(endDate);
+
   if (end < start)
     return next(
       Object.assign(new Error("End date cannot be before start date"), {
         statusCode: 400,
       }),
     );
+
   const days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+
   const overlapping = await managerLeaveModel
     .findOne({
       manager: managerId,
+      organisation_id,
       status: { $nin: ["rejected_admin"] },
       startDate: { $lte: end },
       endDate: { $gte: start },
     })
     .select("_id")
     .lean();
+
   if (overlapping)
     return next(
       Object.assign(new Error("Leave already applied for these dates"), {
         statusCode: 400,
       }),
     );
+
   const managerData = await managermodel
     .findById(managerId)
     .select("reporting_manager")
@@ -424,7 +544,9 @@ const applyleavem = async (req, res, next) => {
         { statusCode: 400 },
       ),
     );
+
   const leave = await managerLeaveModel.create({
+    organisation_id,
     manager: managerId,
     leaveType,
     startDate: start,
@@ -433,6 +555,7 @@ const applyleavem = async (req, res, next) => {
     reason,
     status: "pending_reporting_manager",
   });
+
   res
     .status(200)
     .json({
@@ -445,7 +568,10 @@ const showannouncements = async (req, res, next) => {
   if (!req.manager)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   const announcements = await announcementmodel
-    .find({ audience: { $in: ["managers", "all"] } })
+    .find({
+      organisation_id: req.manager.organisation_id,
+      audience: { $in: ["managers", "all"] },
+    })
     .lean();
   res.status(200).json(announcements);
 };
@@ -453,14 +579,18 @@ const showannouncements = async (req, res, next) => {
 const particularannouncement = async (req, res, next) => {
   if (!req.manager)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  const announcement = await announcementmodel.findById(req.params.id).lean();
+  const announcement = await announcementmodel
+    .findOne({
+      _id: req.params.id,
+      organisation_id: req.manager.organisation_id,
+    })
+    .lean();
   if (!announcement)
     return next(
       Object.assign(new Error("Announcement not found"), { statusCode: 404 }),
     );
-  if (announcement.audience !== "managers" && announcement.audience !== "all") {
+  if (announcement.audience !== "managers" && announcement.audience !== "all")
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  }
   res.status(200).json({ success: true, announcement });
 };
 
@@ -471,24 +601,29 @@ const getAllPersonalDocuments = async (req, res, next) => {
         Object.assign(new Error("Unauthorized"), { statusCode: 401 }),
       );
     const employees = await usermodel
-      .find({ Under_manager: req.manager._id })
+      .find({
+        Under_manager: req.manager._id,
+        organisation_id: req.manager.organisation_id,
+      })
       .select("_id")
       .lean();
     const employeeIds = employees.map((emp) => emp._id);
     const documents = await Document.find({
       employee: { $in: employeeIds },
+      organisation_id: req.manager.organisation_id,
       fileType: "personal",
     })
       .populate("employee", "f_name l_name work_email personal_contact")
       .sort({ createdAt: -1 })
       .lean();
-    if (documents.length === 0) {
-      return res.status(200).json({
-        message: "No personal documents found",
-        total: 0,
-        documents: [],
-      });
-    }
+    if (documents.length === 0)
+      return res
+        .status(200)
+        .json({
+          message: "No personal documents found",
+          total: 0,
+          documents: [],
+        });
     res.status(200).json({
       message: "All personal documents fetched successfully",
       total: documents.length,
@@ -520,24 +655,29 @@ const getAllExpenseDocuments = async (req, res, next) => {
         Object.assign(new Error("Unauthorized"), { statusCode: 401 }),
       );
     const employees = await usermodel
-      .find({ Under_manager: req.manager._id })
+      .find({
+        Under_manager: req.manager._id,
+        organisation_id: req.manager.organisation_id,
+      })
       .select("_id")
       .lean();
     const employeeIds = employees.map((emp) => emp._id);
     const documents = await Document.find({
       employee: { $in: employeeIds },
+      organisation_id: req.manager.organisation_id,
       fileType: "expense",
     })
       .populate("employee", "f_name l_name work_email personal_contact")
       .sort({ createdAt: -1 })
       .lean();
-    if (documents.length === 0) {
-      return res.status(200).json({
-        message: "No expense documents found",
-        total: 0,
-        documents: [],
-      });
-    }
+    if (documents.length === 0)
+      return res
+        .status(200)
+        .json({
+          message: "No expense documents found",
+          total: 0,
+          documents: [],
+        });
     res.status(200).json({
       message: "All expense documents fetched successfully",
       total: documents.length,
@@ -569,7 +709,10 @@ const getDocumentDetails = async (req, res, next) => {
       return next(
         Object.assign(new Error("Unauthorized"), { statusCode: 401 }),
       );
-    const document = await Document.findById(documentId).populate(
+    const document = await Document.findOne({
+      _id: documentId,
+      organisation_id: req.manager.organisation_id,
+    }).populate(
       "employee",
       "f_name l_name work_email personal_contact Under_manager",
     );
@@ -579,11 +722,10 @@ const getDocumentDetails = async (req, res, next) => {
       );
     if (
       document.employee.Under_manager.toString() !== req.manager._id.toString()
-    ) {
+    )
       return next(
         Object.assign(new Error("Not authorized"), { statusCode: 403 }),
       );
-    }
     document.viewedByManager = true;
     await document.save();
     res.status(200).json({
@@ -681,7 +823,7 @@ const verifyManagerOtp = async (req, res, next) => {
   ]);
   res.status(200).json({
     message: "OTP verified. Login successful.",
-    my_details: { id: manager._id, email: manager.work_email },
+    role: manager.role,
     passwordResetOptional: true,
   });
 };
@@ -722,16 +864,22 @@ const resetManagerPassword = async (req, res, next) => {
 };
 
 const getmyleaves = async (req, res, next) => {
-  if (!req.manager)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  const leaves = await LeaveBalance.find({ employee: req.manager._id }).lean();
-  if (!leaves.length)
-    return next(
-      Object.assign(new Error("No leaves found for this manager"), {
-        statusCode: 404,
-      }),
-    );
-  res.status(200).json(leaves);
+  try {
+    if (!req.manager) {
+      return next(
+        Object.assign(new Error("Unauthorized"), { statusCode: 401 }),
+      );
+    }
+
+    const leaves = await LeaveBalance.find({
+      employee: req.manager._id,
+      organisation_id: req.manager.organisation_id,
+    }).lean();
+
+    return res.status(200).json(leaves);
+  } catch (error) {
+    next(error);
+  }
 };
 
 const reviewtoemployee = async (req, res, next) => {
@@ -744,9 +892,11 @@ const reviewtoemployee = async (req, res, next) => {
         statusCode: 400,
       }),
     );
+
   const manager = req.manager;
+  const organisation_id = manager.organisation_id;
   const employee = await usermodel
-    .findOne({ _id: employeeid, Under_manager: manager._id })
+    .findOne({ _id: employeeid, Under_manager: manager._id, organisation_id })
     .select("_id")
     .lean();
   if (!employee)
@@ -755,10 +905,12 @@ const reviewtoemployee = async (req, res, next) => {
         statusCode: 404,
       }),
     );
+
   const now = new Date();
   const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   try {
     const review = await Review.create({
+      organisation_id,
       reviewerRole: manager.role,
       reviewer: manager._id,
       reviewerRoleModel: "Manager",
@@ -771,7 +923,7 @@ const reviewtoemployee = async (req, res, next) => {
     });
     res.status(201).json({ message: "Employee reviewed successfully", review });
   } catch (err) {
-    if (err.code === 11000) {
+    if (err.code === 11000)
       return next(
         Object.assign(
           new Error(
@@ -780,20 +932,35 @@ const reviewtoemployee = async (req, res, next) => {
           { statusCode: 400 },
         ),
       );
-    }
     next(err);
   }
 };
 
 const getme = async (req, res, next) => {
-  if (!req.manager)
+  if (!req.manager) {
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  }
+
   const manager = req.manager;
-  const [leavebalance, review] = await Promise.all([
-    LeaveBalance.find({ employee: manager._id }).lean(),
-    Review.find({ reviewer: manager._id }).lean(),
+  const organisation_id = manager.organisation_id;
+
+  const [leavebalance, reviews] = await Promise.all([
+    LeaveBalance.find({
+      employee: manager._id,
+      organisation_id,
+    }).lean(),
+
+    Review.find({
+      reviewee: manager._id,
+      organisation_id,
+    }).lean(),
   ]);
-  res.status(200).json({ manager, leavebalance, review });
+
+  res.status(200).json({
+    manager,
+    leavebalance,
+    reviews,
+  });
 };
 
 const editprofilemanager = async (req, res, next) => {
@@ -857,13 +1024,12 @@ const editprofilemanager = async (req, res, next) => {
         );
       if (profile_image === "" || profile_image.includes("api.dicebear.com")) {
         manager.profile_image = profile_image;
-      } else {
+      } else
         return next(
           Object.assign(new Error("Invalid avatar format"), {
             statusCode: 400,
           }),
         );
-      }
     }
     manager.updatedAt = Date.now();
     await manager.save();
@@ -877,7 +1043,7 @@ const editprofilemanager = async (req, res, next) => {
           ? 7
           : 0;
       await LeaveBalance.findOneAndUpdate(
-        { employee: manager._id },
+        { employee: manager._id, organisation_id: manager.organisation_id },
         { $set: { ML, PL } },
       );
     }
@@ -929,7 +1095,10 @@ const getattendance = async (req, res, next) => {
       return next(
         Object.assign(new Error("Unauthorized"), { statusCode: 401 }),
       );
-    const attendance = await Attendance.find({ employee: req.manager._id })
+    const attendance = await Attendance.find({
+      employee: req.manager._id,
+      organisation_id: req.manager.organisation_id,
+    })
       .sort({ createdAt: -1 })
       .lean();
     res
@@ -943,15 +1112,16 @@ const getattendance = async (req, res, next) => {
 const getforwardedleaves = async (req, res, next) => {
   if (!req.manager)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  const organisation_id = req.manager.organisation_id;
+  const subordinateManagerIds = await managermodel
+    .find({ reporting_manager: req.manager._id, organisation_id })
+    .distinct("_id");
   const [employeeLeaves, managerLeaves] = await Promise.all([
     leavemodel
       .find({
+        organisation_id,
         status: "forwarded_reporting_manager",
-        manager: {
-          $in: await managermodel
-            .find({ reporting_manager: req.manager._id })
-            .distinct("_id"),
-        },
+        manager: { $in: subordinateManagerIds },
       })
       .populate("employee", "f_name l_name work_email department")
       .populate("manager", "f_name l_name work_email")
@@ -959,12 +1129,9 @@ const getforwardedleaves = async (req, res, next) => {
       .lean(),
     managerLeaveModel
       .find({
+        organisation_id,
         status: "pending_reporting_manager",
-        manager: {
-          $in: await managermodel
-            .find({ reporting_manager: req.manager._id })
-            .distinct("_id"),
-        },
+        manager: { $in: subordinateManagerIds },
       })
       .populate("manager", "f_name l_name work_email department designation")
       .sort({ createdAt: -1 })
@@ -987,12 +1154,15 @@ const acceptforwardedleave = async (req, res, next) => {
         { statusCode: 400 },
       ),
     );
+
+  const organisation_id = req.manager.organisation_id;
   const LeaveModel = leaveFor === "manager" ? managerLeaveModel : leavemodel;
   const expectedStatus =
     leaveFor === "manager"
       ? "pending_reporting_manager"
       : "forwarded_reporting_manager";
-  const leave = await LeaveModel.findById(leaveId);
+
+  const leave = await LeaveModel.findOne({ _id: leaveId, organisation_id });
   if (!leave)
     return next(
       Object.assign(new Error("Leave not found"), { statusCode: 404 }),
@@ -1003,6 +1173,7 @@ const acceptforwardedleave = async (req, res, next) => {
         statusCode: 400,
       }),
     );
+
   const leaveManager = await managermodel
     .findById(leave.manager)
     .select("reporting_manager")
@@ -1016,6 +1187,7 @@ const acceptforwardedleave = async (req, res, next) => {
         statusCode: 403,
       }),
     );
+
   leave.status = "approved_reporting_manager";
   leave.approvedBy = req.manager._id;
   await leave.save();
@@ -1033,12 +1205,15 @@ const rejectforwardedleave = async (req, res, next) => {
         { statusCode: 400 },
       ),
     );
+
+  const organisation_id = req.manager.organisation_id;
   const LeaveModel = leaveFor === "manager" ? managerLeaveModel : leavemodel;
   const expectedStatus =
     leaveFor === "manager"
       ? "pending_reporting_manager"
       : "forwarded_reporting_manager";
-  const leave = await LeaveModel.findById(leaveId);
+
+  const leave = await LeaveModel.findOne({ _id: leaveId, organisation_id });
   if (!leave)
     return next(
       Object.assign(new Error("Leave not found"), { statusCode: 404 }),
@@ -1049,6 +1224,7 @@ const rejectforwardedleave = async (req, res, next) => {
         statusCode: 400,
       }),
     );
+
   const leaveManager = await managermodel
     .findById(leave.manager)
     .select("reporting_manager")
@@ -1062,6 +1238,7 @@ const rejectforwardedleave = async (req, res, next) => {
         statusCode: 403,
       }),
     );
+
   leave.status = "rejected_reporting_manager";
   leave.rejectedBy = req.manager._id;
   leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -1069,21 +1246,34 @@ const rejectforwardedleave = async (req, res, next) => {
   res.status(200).json({ message: "Leave rejected successfully", leave });
 };
 
-
-
 const managerSubmitTicket = async (req, res, next) => {
   try {
     const {
-      type, category, subCategory, title, description,
-      incidentDate, incidentLocation, witnessNames,
-      severity, isAnonymous, againstId, againstModel, attachments,
+      type,
+      category,
+      subCategory,
+      title,
+      description,
+      incidentDate,
+      incidentLocation,
+      witnessNames,
+      severity,
+      isAnonymous,
+      againstId,
+      againstModel,
+      attachments,
     } = req.body;
-
-    if (!req.manager) return res.status(401).json({ message: "Not authenticated" });
-
+    if (!req.manager)
+      return res.status(401).json({ message: "Not authenticated" });
     const ticket = await Ticket.create({
-      type, category, subCategory, title, description,
-      incidentDate, incidentLocation,
+      organisation_id: req.manager.organisation_id,
+      type,
+      category,
+      subCategory,
+      title,
+      description,
+      incidentDate,
+      incidentLocation,
       witnessNames: witnessNames || [],
       severity: severity || "medium",
       isAnonymous: isAnonymous || false,
@@ -1095,18 +1285,19 @@ const managerSubmitTicket = async (req, res, next) => {
       againstModel: againstModel || undefined,
       attachments: attachments || [],
     });
-
-    res.status(201).json({
-      success: true,
-      message: "Ticket submitted successfully.",
-      ticket: {
-        ticketNumber: ticket.ticketNumber,
-        type: ticket.type,
-        status: ticket.status,
-        slaDeadline: ticket.slaDeadline,
-        confidentialityLevel: ticket.confidentialityLevel,
-      },
-    });
+    res
+      .status(201)
+      .json({
+        success: true,
+        message: "Ticket submitted successfully.",
+        ticket: {
+          ticketNumber: ticket.ticketNumber,
+          type: ticket.type,
+          status: ticket.status,
+          slaDeadline: ticket.slaDeadline,
+          confidentialityLevel: ticket.confidentialityLevel,
+        },
+      });
   } catch (err) {
     next(err);
   }
@@ -1114,13 +1305,16 @@ const managerSubmitTicket = async (req, res, next) => {
 
 const managerGetMyTickets = async (req, res, next) => {
   try {
-    if (!req.manager) return res.status(401).json({ message: "Not authenticated" });
-
-    const tickets = await Ticket.find({ submittedBy: req.manager._id, isDeleted: false })
+    if (!req.manager)
+      return res.status(401).json({ message: "Not authenticated" });
+    const tickets = await Ticket.find({
+      submittedBy: req.manager._id,
+      organisation_id: req.manager.organisation_id,
+      isDeleted: false,
+    })
       .select("-timeline -internalNotes -statusHistory")
       .sort({ createdAt: -1 })
       .lean();
-
     res.json({ success: true, count: tickets.length, tickets });
   } catch (err) {
     next(err);
@@ -1131,16 +1325,22 @@ const managerRateTicket = async (req, res, next) => {
   try {
     const { ticketNumber } = req.params;
     const { rating, feedback } = req.body;
-
-    if (!req.manager) return res.status(401).json({ message: "Not authenticated" });
-
-    const ticket = await Ticket.findOne({ ticketNumber, submittedBy: req.manager._id });
+    if (!req.manager)
+      return res.status(401).json({ message: "Not authenticated" });
+    const ticket = await Ticket.findOne({
+      ticketNumber,
+      submittedBy: req.manager._id,
+      organisation_id: req.manager.organisation_id,
+    });
     if (!ticket) return res.status(404).json({ message: "Ticket not found" });
     if (!["resolved", "closed"].includes(ticket.status))
-      return res.status(400).json({ message: "Can only rate resolved or closed tickets" });
+      return res
+        .status(400)
+        .json({ message: "Can only rate resolved or closed tickets" });
     if (ticket.submitterRating)
-      return res.status(400).json({ message: "You have already rated this ticket" });
-
+      return res
+        .status(400)
+        .json({ message: "You have already rated this ticket" });
     ticket.submitterRating = rating;
     ticket.submitterFeedback = feedback;
     ticket.ratedAt = new Date();
@@ -1150,7 +1350,6 @@ const managerRateTicket = async (req, res, next) => {
       byModel: "System",
       byName: "Submitter",
     });
-
     await ticket.save();
     res.json({ success: true, message: "Rating submitted. Thank you." });
   } catch (err) {
@@ -1161,18 +1360,21 @@ const managerRateTicket = async (req, res, next) => {
 const managerGetTicketDetail = async (req, res, next) => {
   try {
     const { ticketNumber } = req.params;
-    if (!req.manager) return res.status(401).json({ message: "Not authenticated" });
-
+    if (!req.manager)
+      return res.status(401).json({ message: "Not authenticated" });
     const ticket = await Ticket.findOne({
       ticketNumber,
       submittedBy: req.manager._id,
+      organisation_id: req.manager.organisation_id,
       isDeleted: false,
     })
-      .populate("submittedBy", "f_name l_name work_email department designation")
+      .populate(
+        "submittedBy",
+        "f_name l_name work_email department designation",
+      )
       .populate("against", "f_name l_name work_email department designation")
       .select("-internalNotes")
       .lean();
-
     if (!ticket) return res.status(404).json({ message: "Ticket not found" });
     res.json({ success: true, ticket });
   } catch (err) {
@@ -1182,98 +1384,168 @@ const managerGetTicketDetail = async (req, res, next) => {
 
 const getOrgInfoForManager = async (req, res, next) => {
   try {
-    if (!req.manager)
-      return res.status(401).json({ success: false, message: "Unauthorized" });
-
-    const manager = await managermodel
-      .findById(req.manager._id)
-      .select("f_name l_name work_email designation department office_location organisation_id")
-      .lean();
-
-    if (!manager)
-      return res.status(404).json({ success: false, message: "Manager not found" });
-
-    if (!manager.organisation_id)
-      return res.status(400).json({ success: false, message: "Manager has no organisation assigned" });
-
-    const superAdmin = await SuperAdminModel.findById(manager.organisation_id)
-      .select("f_name l_name email organisation_name profile_image")
-      .lean();
-
-    // organisation_id is pointing to an Admin instead of SuperAdmin — trace back
-    if (!superAdmin) {
-      const linkedAdmin = await AdminModel.findById(manager.organisation_id)
-        .select("organisation_id")
-        .lean();
-
-      if (!linkedAdmin || !linkedAdmin.organisation_id)
-        return res.status(404).json({ success: false, message: "Organisation not found" });
-
-      // Auto-heal: fix this manager's organisation_id in the background
-      managermodel
-        .updateOne({ _id: manager._id }, { $set: { organisation_id: linkedAdmin.organisation_id } })
-        .catch((err) => console.error("Failed to auto-heal organisation_id:", err));
-
-      return res.status(400).json({
+    if (!req.manager) {
+      return res.status(401).json({
         success: false,
-        message: "Manager organisation_id was misconfigured. It has been corrected — please retry.",
+        message: "Unauthorized",
       });
     }
 
-    const admins = await AdminModel.find({ organisation_id: superAdmin._id })
-      .select("f_name l_name work_email designation department office_location")
+    const manager = await managermodel
+      .findById(req.manager._id)
+      .select(
+        "f_name l_name work_email designation department office_location organisation_id"
+      )
       .lean();
 
-    const allManagers = await managermodel
-      .find({ organisation_id: superAdmin._id })
-      .select("f_name l_name work_email designation department office_location")
+    if (!manager) {
+      return res.status(404).json({
+        success: false,
+        message: "Manager not found",
+      });
+    }
+
+    let organisation_id = manager.organisation_id;
+
+    // Try SuperAdmin directly
+    let superAdmin = await SuperAdminModel.findById(
+      organisation_id
+    )
+      .select(
+        "f_name l_name email organisation_name profile_image"
+      )
       .lean();
 
-    const employees = allManagers.length
-      ? await usermodel
-          .find({ Under_manager: { $in: allManagers.map((m) => m._id) } })
-          .select("f_name l_name work_email designation department office_location Under_manager")
-          .lean()
-      : [];
+    // If organisation_id is actually an Admin ID
+    if (!superAdmin) {
+      const admin = await AdminModel.findById(organisation_id)
+        .select("organisation_id")
+        .lean();
 
-    const managersWithEmployees = allManagers.map((mgr) => ({
+      if (admin?.organisation_id) {
+        organisation_id = admin.organisation_id;
+
+        superAdmin = await SuperAdminModel.findById(
+          organisation_id
+        )
+          .select(
+            "f_name l_name email organisation_name profile_image"
+          )
+          .lean();
+      }
+    }
+
+    // If still not found, use manager email domain
+    if (!superAdmin) {
+      const domain = manager.work_email.split("@")[1];
+
+      superAdmin = await SuperAdminModel.findOne({
+        company_domain: domain,
+      })
+        .select(
+          "f_name l_name email organisation_name profile_image"
+        )
+        .lean();
+
+      if (superAdmin) {
+        organisation_id = superAdmin._id;
+
+        await managermodel.updateOne(
+          { _id: manager._id },
+          {
+            $set: {
+              organisation_id: superAdmin._id,
+            },
+          }
+        );
+      }
+    }
+
+    if (!superAdmin) {
+      return res.status(404).json({
+        success: false,
+        message: "Organisation not found",
+      });
+    }
+
+    const admins = await AdminModel.find({
+      organisation_id,
+    })
+      .select(
+        "f_name l_name work_email designation department office_location"
+      )
+      .lean();
+
+    const managers = await managermodel.find({
+      organisation_id,
+    })
+      .select(
+        "f_name l_name work_email designation department office_location"
+      )
+      .lean();
+
+    const employees = await usermodel.find({
+      organisation_id,
+      Under_manager: {
+        $in: managers.map((m) => m._id),
+      },
+    })
+      .select(
+        "f_name l_name work_email designation department office_location Under_manager"
+      )
+      .lean();
+
+    const managersWithEmployees = managers.map((mgr) => ({
       id: mgr._id,
       name: `${mgr.f_name} ${mgr.l_name}`,
       email: mgr.work_email,
       designation: mgr.designation,
       department: mgr.department,
       office_location: mgr.office_location,
-      isCurrentManager: mgr._id.toString() === req.manager._id.toString(),
+      isCurrentManager:
+        mgr._id.toString() === req.manager._id.toString(),
+
       employees: employees
-        .filter((e) => e.Under_manager?.toString() === mgr._id.toString())
-        .map((e) => ({
-          id: e._id,
-          name: `${e.f_name} ${e.l_name}`,
-          email: e.work_email,
-          designation: e.designation,
-          department: e.department,
-          office_location: e.office_location,
+        .filter(
+          (emp) =>
+            emp.Under_manager?.toString() ===
+            mgr._id.toString()
+        )
+        .map((emp) => ({
+          id: emp._id,
+          name: `${emp.f_name} ${emp.l_name}`,
+          email: emp.work_email,
+          designation: emp.designation,
+          department: emp.department,
+          office_location: emp.office_location,
         })),
     }));
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
+      organisation_id,
       organisation_name: superAdmin.organisation_name,
       organisation_logo: superAdmin.profile_image || null,
+
       super_admin: {
         id: superAdmin._id,
         name: `${superAdmin.f_name} ${superAdmin.l_name}`,
         email: superAdmin.email,
       },
-      admins: admins.map((adm) => ({
-        id: adm._id,
-        name: `${adm.f_name} ${adm.l_name}`,
-        email: adm.work_email,
-        designation: adm.designation,
-        department: adm.department,
-        office_location: adm.office_location,
-      })),
+
+      current_manager: {
+        id: manager._id,
+        name: `${manager.f_name} ${manager.l_name}`,
+        email: manager.work_email,
+        designation: manager.designation,
+        department: manager.department,
+        office_location: manager.office_location,
+      },
+
+      admins,
+
       managers: managersWithEmployees,
+
       currentManagerId: req.manager._id,
     });
   } catch (error) {
@@ -1316,5 +1588,5 @@ module.exports = {
   managerGetMyTickets,
   managerRateTicket,
   managerGetTicketDetail,
-  getOrgInfoForManager
+  getOrgInfoForManager,
 };

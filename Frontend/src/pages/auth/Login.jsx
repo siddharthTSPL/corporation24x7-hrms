@@ -1,27 +1,56 @@
 import { useState, useEffect } from "react";
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Player } from "@lottiefiles/react-lottie-player";
 import { useLogin } from "../../auth/store/getmeauth/getuselogin";
-import { useSendForgetPasswordOtp, useVerifyAdminOtp } from "../../auth/server-state/adminauth/adminauth.hook";
+import {
+  useSendForgetPasswordOtp,
+  useVerifyAdminOtp,
+} from "../../auth/server-state/adminauth/adminauth.hook";
+import {
+  useForgotPasswordSuperAdmin,
+  useVerifySuperAdminOtp,
+} from "../../auth/server-state/superadmin/other/suother.hook";
+import {
+  useForgetPasswordManager,
+  useVerifyManagerOtpApi,
+} from "../../auth/server-state/manager/managgerother/managerother.hook";
+import {
+  useForgetPassword,
+  useVerifyOtp,
+} from "../../auth/server-state/employee/employeeauth/employeeauth.hook";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
-import logo from "../../assets/logo1.png";
 import slide1 from "../../assets/slide1.png";
 import slide2 from "../../assets/slide2.png";
 import slide3 from "../../assets/slide3.png";
-import talent from "../../assets/Talent.png"
+import talent from "../../assets/Talent.png";
+import { getMeAdmin } from "../../auth/api/adminapi/auth/ad.auth.api";
+import { getMeManager } from "../../auth/api/managerapi/auth/ma.auth.api";
+import { getMeUser } from "../../auth/api/employeeapi/auth/em.auth.api";
+import { getMeSuperAdmin } from "../../auth/api/superadmin/auth/su.auth";
 
 function Login() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: authData, isLoading: authLoading } = useAuth();
   const { mutate: loginFn, isPending: isLoggingIn } = useLogin();
-  const { mutate: sendOtpFn, isPending: sendingOtp } = useSendForgetPasswordOtp();
-  const { mutate: verifyOtpFn, isPending: verifyingOtp } = useVerifyAdminOtp();
+
+  const { mutate: sendAdminOtpFn, isPending: sendingAdminOtp } = useSendForgetPasswordOtp();
+  const { mutate: verifyAdminOtpFn, isPending: verifyingAdminOtp } = useVerifyAdminOtp();
+
+  const { mutate: sendSuperAdminOtpFn, isPending: sendingSuperAdminOtp } = useForgotPasswordSuperAdmin();
+  const { mutate: verifySuperAdminOtpFn, isPending: verifyingSuperAdminOtp } = useVerifySuperAdminOtp();
+
+  const { mutate: sendManagerOtpFn, isPending: sendingManagerOtp } = useForgetPasswordManager();
+  const { mutate: verifyManagerOtpFn, isPending: verifyingManagerOtp } = useVerifyManagerOtpApi();
+
+  const { mutate: sendEmployeeOtpFn, isPending: sendingEmployeeOtp } = useForgetPassword();
+  const { mutate: verifyEmployeeOtpFn, isPending: verifyingEmployeeOtp } = useVerifyOtp();
 
   const [form, setForm] = useState({ email: "", password: "", otp: "", role: "admin" });
   const [errors, setErrors] = useState({});
   const [step, setStep] = useState("login");
-  const [verified, setVerified] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [animationData, setAnimationData] = useState(null);
   const [showLoader, setShowLoader] = useState(false);
@@ -29,7 +58,6 @@ function Login() {
 
   const images = [slide1, slide2, slide3];
 
-  // ✅ Added superadmin route
   const navigateByRole = (role) => {
     if (role === "superadmin") navigate("/superadmin-dashboard", { replace: true });
     else if (role === "admin") navigate("/dashboard", { replace: true });
@@ -42,7 +70,9 @@ function Login() {
   }, [authData, authLoading]);
 
   useEffect(() => {
-    fetch("/loader.json").then((r) => r.json()).then(setAnimationData);
+    fetch(`${import.meta.env.BASE_URL}loader.json`)
+      .then((r) => r.json())
+      .then(setAnimationData);
   }, []);
 
   useEffect(() => {
@@ -72,7 +102,6 @@ function Login() {
     if (!validate()) return;
     setShowLoader(true);
 
-    // ✅ superadmin uses identifier like admin; manager uses work_email
     const payload =
       form.role === "manager"
         ? { role: form.role, work_email: form.email, password: form.password }
@@ -98,29 +127,84 @@ function Login() {
     });
   };
 
+  const isSendingOtp =
+    sendingAdminOtp || sendingSuperAdminOtp || sendingManagerOtp || sendingEmployeeOtp;
+
+  const isVerifyingOtp =
+    verifyingAdminOtp || verifyingSuperAdminOtp || verifyingManagerOtp || verifyingEmployeeOtp;
+
   const handleSendOtp = () => {
-    if (!form.email) { setErrors({ email: "Email is required" }); return; }
-    sendOtpFn(form.email, {
-      onSuccess: () => setStep("otp"),
-      onError: (err) => setErrors({ email: getErrorMessage(err) }),
-    });
+    if (!form.email) {
+      setErrors({ email: "Email is required" });
+      return;
+    }
+    const onSuccess = () => setStep("otp");
+    const onError = (err) => setErrors({ email: getErrorMessage(err) });
+    if (form.role === "admin") {
+      sendAdminOtpFn(form.email, { onSuccess, onError });
+    } else if (form.role === "superadmin") {
+      sendSuperAdminOtpFn({ email: form.email }, { onSuccess, onError });
+    } else if (form.role === "manager") {
+      sendManagerOtpFn({ email: form.email }, { onSuccess, onError });
+    } else if (form.role === "employee") {
+      sendEmployeeOtpFn({ work_email: form.email }, { onSuccess, onError });
+    }
   };
 
-  const handleVerifyOtp = () => {
-    if (!form.otp) { setErrors({ otp: "OTP is required" }); return; }
-    verifyOtpFn(
-      { email: form.email, otp: form.otp },
-      {
-        onSuccess: () => { setVerified(true); setStep("login"); },
-        onError: (err) => setErrors({ otp: getErrorMessage(err) }),
-      }
-    );
+const handleVerifyOtp = () => {
+  if (!form.otp) {
+    setErrors({ otp: "OTP is required" });
+    return;
+  }
+
+  const onError = (err) => setErrors({ otp: getErrorMessage(err) });
+
+  const onSuccess = async (data) => {
+    const role = data?.role ?? form.role;
+
+    if (data?.token) {
+      try {
+        await fetch("http://localhost:47821/set-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: data.token }),
+        });
+      } catch (_) {}
+    }
+
+    localStorage.setItem("role", role);
+
+    try {
+      let fullData;
+      console.log(role);
+      if (role === "admin") fullData = await getMeAdmin();
+      else if (role === "manager") fullData = await getMeManager();
+      else if (role === "employee") fullData = await getMeUser();
+      else if (role === "super_admin") fullData = await getMeSuperAdmin();
+
+      queryClient.setQueryData(["auth"], { role, data: fullData });
+    } catch {
+      queryClient.setQueryData(["auth"], { role, data });
+    }
+
+    navigateByRole(role);
   };
+
+  if (form.role === "admin") {
+    verifyAdminOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
+  } else if (form.role === "super_admin") {
+    verifySuperAdminOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
+  } else if (form.role === "manager") {
+    verifyManagerOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
+  } else if (form.role === "employee") {
+    verifyEmployeeOtpFn({ work_email: form.email, otp: form.otp }, { onSuccess, onError });
+  }
+};
 
   return (
     <div
       className="min-h-screen flex items-center justify-center bg-cover bg-center px-4 relative"
-      style={{ backgroundImage: "url('/bg.jpeg')" }}
+      style={{ backgroundImage: `url('${import.meta.env.BASE_URL}bg.jpeg')` }}
     >
       {showLoader && animationData && (
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -130,15 +214,13 @@ function Login() {
 
       <div className="w-full max-w-5xl bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden">
         <div className="w-full md:w-1/2 p-8">
-        <img src={talent} alt="Talent.png" className="w-28 mb-6"
-/>
+          <img src={talent} alt="Talent" className="w-28 mb-6" />
 
           {step === "login" && (
             <>
               <h2 className="text-2xl font-bold text-[#730042] mb-1">Sign in</h2>
               <p className="text-gray-500 text-sm mb-4">Access your Talent account</p>
 
-              {/* ✅ Added superadmin option */}
               <select
                 name="role"
                 value={form.role}
@@ -151,7 +233,6 @@ function Login() {
                 <option value="employee">Employee</option>
               </select>
 
-              {/* ✅ Super Admin badge hint */}
               {form.role === "superadmin" && (
                 <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-[#730042]/8 border border-[#730042]/20 rounded-lg">
                   <span className="text-sm">🛡️</span>
@@ -204,21 +285,19 @@ function Login() {
               </button>
 
               <div className="flex justify-between mt-4 text-sm text-gray-500">
-                {/* ✅ Forgot password only for admin (not superadmin/manager/employee) */}
-                {form.role === "admin" && (
-                  <p onClick={() => setStep("email")} className="cursor-pointer hover:text-[#730042]">
-                    Forgot Password?
-                  </p>
-                )}
                 <p
-                  onClick={() => window.location.href = "/talent/signup"}
+                  onClick={() => setStep("email")}
+                  className="cursor-pointer hover:text-[#730042]"
+                >
+                  Forgot Password?
+                </p>
+                <p
+                  onClick={() => (window.location.href = "/talent/signup")}
                   className="cursor-pointer hover:text-[#730042] ml-auto"
                 >
                   Sign Up
                 </p>
               </div>
-
-              {verified && <p className="text-green-600 text-sm mt-2">✅ Email Verified</p>}
             </>
           )}
 
@@ -236,12 +315,15 @@ function Login() {
               {errors.email && <p className="text-red-500 text-sm mb-2">{errors.email}</p>}
               <button
                 onClick={handleSendOtp}
-                disabled={sendingOtp}
+                disabled={isSendingOtp}
                 className="w-full bg-[#730042] text-white py-3 rounded-lg disabled:opacity-60"
               >
-                {sendingOtp ? "Sending..." : "Send OTP"}
+                {isSendingOtp ? "Sending..." : "Send OTP"}
               </button>
-              <p onClick={() => setStep("login")} className="text-sm text-gray-500 mt-3 cursor-pointer hover:text-[#730042]">
+              <p
+                onClick={() => setStep("login")}
+                className="text-sm text-gray-500 mt-3 cursor-pointer hover:text-[#730042]"
+              >
                 ← Back to login
               </p>
             </>
@@ -261,19 +343,21 @@ function Login() {
               {errors.otp && <p className="text-red-500 text-sm mb-2">{errors.otp}</p>}
               <button
                 onClick={handleVerifyOtp}
-                disabled={verifyingOtp}
+                disabled={isVerifyingOtp}
                 className="w-full bg-[#730042] text-white py-3 rounded-lg disabled:opacity-60"
               >
-                {verifyingOtp ? "Verifying..." : "Verify OTP"}
+                {isVerifyingOtp ? "Verifying..." : "Verify OTP"}
               </button>
-              <p onClick={() => setStep("login")} className="text-sm text-gray-500 mt-3 cursor-pointer hover:text-[#730042]">
+              <p
+                onClick={() => setStep("login")}
+                className="text-sm text-gray-500 mt-3 cursor-pointer hover:text-[#730042]"
+              >
                 ← Back to login
               </p>
             </>
           )}
         </div>
 
-        {/* Right side — unchanged */}
         <div className="hidden md:flex w-1/2 bg-gray-50 items-center justify-center p-6">
           <div className="text-center">
             <img src={images[currentSlide]} alt="slide" className="w-full max-h-65 object-contain" />
@@ -285,7 +369,9 @@ function Login() {
               {images.map((_, index) => (
                 <div
                   key={index}
-                  className={`w-2 h-2 rounded-full ${currentSlide === index ? "bg-[#730042]" : "bg-gray-300"}`}
+                  className={`w-2 h-2 rounded-full ${
+                    currentSlide === index ? "bg-[#730042]" : "bg-gray-300"
+                  }`}
                 />
               ))}
             </div>
@@ -293,9 +379,9 @@ function Login() {
         </div>
       </div>
 
-      <p className="fixed bottom-2 left-0 w-full text-center text-gray-600 text-sm font-medium">
+      <footer className="fixed bottom-0 left-0 w-full py-3 bg-transparent text-center text-gray-600 text-sm font-medium z-10">
         © 2026, TechTorch Solutions Private Limited. All Rights Reserved.
-      </p>
+      </footer>
     </div>
   );
 }

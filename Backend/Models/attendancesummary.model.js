@@ -1,6 +1,12 @@
 const mongoose = require("mongoose");
 
 const summarySchema = new mongoose.Schema({
+    organisation_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "SuperAdmin",
+    required: true,
+    index: true,
+  },
   employee: {
     type: mongoose.Schema.Types.ObjectId,
   },

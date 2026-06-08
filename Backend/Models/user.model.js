@@ -6,6 +6,7 @@ const userSchema = new mongoose.Schema(
     organisation_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SuperAdmin",
+      required: true,
     },
 
     profile_image: {
@@ -15,7 +16,6 @@ const userSchema = new mongoose.Schema(
     uid: {
       type: String,
       required: [true, "UID is required"],
-      unique: [true, "UID already exists"],
     },
 
     department: {
@@ -43,7 +43,8 @@ const userSchema = new mongoose.Schema(
     work_email: {
       type: String,
       required: [true, "Email is required"],
-      unique: [true, "Email already exists"],
+      lowercase: true,
+      trim: true,
     },
 
     gender: {
@@ -55,14 +56,12 @@ const userSchema = new mongoose.Schema(
     marital_status: {
       type: String,
       enum: ["single", "married", "divorced"],
-      required: [true, "Marital status is required"],
       default: "single",
     },
 
     password: {
       type: String,
       required: [true, "Password is required"],
-      // select: false,
     },
 
     personal_contact: {
@@ -75,34 +74,16 @@ const userSchema = new mongoose.Schema(
       required: [true, "Emergency contact is required"],
     },
 
-    aadhaar_number: {
-      type: String,
-    },
-
-    pan_number: {
-      type: String,
-    },
-
-    address: {
-      type: String,
-    },
-
-    city: {
-      type: String,
-    },
-
-    state: {
-      type: String,
-    },
-
-    pincode: {
-      type: String,
-    },
+    aadhaar_number: { type: String },
+    pan_number: { type: String },
+    address: { type: String },
+    city: { type: String },
+    state: { type: String },
+    pincode: { type: String },
 
     role: {
       type: String,
       default: "employee",
-      required: [true, "Role is required"],
     },
 
     designation: {
@@ -116,55 +97,18 @@ const userSchema = new mongoose.Schema(
       required: [true, "Office location is required"],
     },
 
-    is_fresher: {
-      type: Boolean,
-      default: true,
-    },
-
-    total_experience: {
-      type: Number,
-      default: 0,
-    },
-
-    previous_company: {
-      type: String,
-    },
-
-    previous_designation: {
-      type: String,
-    },
-
-    bank_name: {
-      type: String,
-    },
-
-    account_holder_name: {
-      type: String,
-    },
-
-    account_number: {
-      type: String,
-    },
-
-    ifsc_code: {
-      type: String,
-    },
-
-    resume: {
-      type: String,
-    },
-
-    aadhaar_card: {
-      type: String,
-    },
-
-    pan_card: {
-      type: String,
-    },
-
-    experience_letter: {
-      type: String,
-    },
+    is_fresher: { type: Boolean, default: true },
+    total_experience: { type: Number, default: 0 },
+    previous_company: { type: String },
+    previous_designation: { type: String },
+    bank_name: { type: String },
+    account_holder_name: { type: String },
+    account_number: { type: String },
+    ifsc_code: { type: String },
+    resume: { type: String },
+    aadhaar_card: { type: String },
+    pan_card: { type: String },
+    experience_letter: { type: String },
 
     status: {
       type: String,
@@ -172,33 +116,22 @@ const userSchema = new mongoose.Schema(
       default: "active",
     },
 
-    isFirstLogin: {
-      type: Boolean,
-      default: true,
-    },
-
-    passwordupdatedAt: {
-      type: Date,
-      default: Date.now,
-    },
-
-    isverified: {
-      type: Boolean,
-      default: false,
-    },
+    isFirstLogin: { type: Boolean, default: true },
+    passwordupdatedAt: { type: Date, default: Date.now },
+    isverified: { type: Boolean, default: false },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
+userSchema.index({ uid: 1, organisation_id: 1 }, { unique: true });
+userSchema.index({ work_email: 1, organisation_id: 1 }, { unique: true });
 userSchema.index({ Under_manager: 1, status: 1 });
 userSchema.index({ department: 1, status: 1 });
 userSchema.index({ status: 1 });
+userSchema.index({ organisation_id: 1 });
 
 userSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
-
   this.password = await bcrypt.hash(this.password, 10);
 });
 
