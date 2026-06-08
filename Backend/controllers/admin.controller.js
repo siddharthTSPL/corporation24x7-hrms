@@ -288,49 +288,108 @@ const addemployee = async (req, res, next) => {
 
 const findallmanagers = async (req, res, next) => {
   try {
-    if (!req.admin)
-      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+    if (!req.admin) {
+      return next(
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
+        })
+      );
+    }
 
     const organisation_id = req.admin.organisation_id;
 
-    const managers = await Managermodel.find({ organisation_id })
-      .select(EXCLUDE)
-      .populate("reporting_manager", "f_name l_name work_email designation")
-      .lean();
+    const [managers, adminData] = await Promise.all([
+      Managermodel.find({ organisation_id })
+        .select(EXCLUDE)
+        .populate(
+          "reporting_manager",
+          "f_name l_name work_email designation"
+        )
+        .lean(),
 
-    const adminData = await Adminmodel.findById(req.admin._id)
-      .select("f_name l_name work_email designation department office_location")
-      .lean();
+      Adminmodel.findById(req.admin._id)
+        .select(
+          "uid f_name l_name work_email designation department office_location role organisation_id"
+        )
+        .lean(),
+    ]);
 
-    const allManagers = [
-      ...managers,
-      { ...adminData, _id: adminData._id, isAdmin: true },
-    ];
+    const allManagers = [...managers];
 
-    res.status(200).json({ managers: allManagers });
+    if (adminData) {
+      allManagers.unshift({
+        ...adminData,
+        isAdmin: true,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      organisation_id,
+      count: allManagers.length,
+      managers: allManagers,
+    });
   } catch (error) {
     next(error);
   }
 };
 
 const getallemployee = async (req, res, next) => {
-  if (!req.admin)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  try {
+    if (!req.admin) {
+      return next(
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
+        })
+      );
+    }
 
-  const organisation_id = req.admin.organisation_id;
+    const organisation_id = req.admin.organisation_id;
 
-  const [users, managers] = await Promise.all([
-    Usermodel.find({ organisation_id })
-      .select("uid f_name l_name work_email role department designation office_location Under_manager")
-      .populate({ path: "Under_manager", select: "uid f_name l_name work_email role" })
-      .lean(),
-    Managermodel.find({ organisation_id })
-      .select("uid f_name l_name work_email role designation office_location department gender personal_contact e_contact reporting_manager")
-      .populate("reporting_manager", "f_name l_name work_email")
-      .lean(),
-  ]);
+    const [users, managers] = await Promise.all([
+      Usermodel.find({ organisation_id })
+        .select(
+          "uid f_name l_name work_email role department designation office_location Under_manager organisation_id"
+        )
+        .populate({
+          path: "Under_manager",
+          select: "uid f_name l_name work_email role",
+        })
+        .lean(),
 
-  res.status(200).json({ count: users.length + managers.length, users: [...users, ...managers] });
+      Managermodel.find({ organisation_id })
+        .select(
+          "uid f_name l_name work_email role designation office_location department gender personal_contact e_contact reporting_manager organisation_id"
+        )
+        .populate({
+          path: "reporting_manager",
+          select: "f_name l_name work_email",
+        })
+        .lean(),
+    ]);
+
+    const allEmployees = [
+      ...users.map((user) => ({
+        type: "employee",
+        ...user,
+      })),
+      ...managers.map((manager) => ({
+        type: "manager",
+        ...manager,
+      })),
+    ];
+
+    return res.status(200).json({
+      success: true,
+      organisation_id,
+      employees: users.length,
+      managers: managers.length,
+      count: allEmployees.length,
+      users: allEmployees,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const editemployee = async (req, res, next) => {
