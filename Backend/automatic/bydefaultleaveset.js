@@ -10,7 +10,7 @@ const assignDefaultLeave = async (user) => {
   }
 
   const leaveBalance = await LeaveBalance.create({
-  organisation_id: user.organisation_id, // ✅ Add this
+  organisation_id: user.organisation_id, 
   employee: user._id,
 
   EL: {
