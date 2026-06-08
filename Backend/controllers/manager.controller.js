@@ -142,14 +142,27 @@ const managerUpdatePassword = async (req, res, next) => {
 };
 
 const userunderme = async (req, res, next) => {
-  if (!req.manager) return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  const users = await usermodel
-    .find({ Under_manager: req.manager._id, organisation_id: req.manager.organisation_id })
-    .select("-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt")
-    .lean();
-  if (!users || users.length === 0)
-    return next(Object.assign(new Error("No users found under this manager"), { statusCode: 404 }));
-  res.status(200).json(users);
+  try {
+    if (!req.manager) {
+      return next(
+        Object.assign(new Error("Unauthorized"), { statusCode: 401 })
+      );
+    }
+
+    const users = await usermodel
+      .find({
+        Under_manager: req.manager._id,
+        organisation_id: req.manager.organisation_id,
+      })
+      .select(
+        "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt"
+      )
+      .lean();
+
+    return res.status(200).json(users); // [] if no users found
+  } catch (error) {
+    next(error);
+  }
 };
 
 const viewallleaves = async (req, res, next) => {
@@ -444,10 +457,22 @@ const resetManagerPassword = async (req, res, next) => {
 };
 
 const getmyleaves = async (req, res, next) => {
-  if (!req.manager) return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  const leaves = await LeaveBalance.find({ employee: req.manager._id, organisation_id: req.manager.organisation_id }).lean();
-  if (!leaves.length) return next(Object.assign(new Error("No leaves found for this manager"), { statusCode: 404 }));
-  res.status(200).json(leaves);
+  try {
+    if (!req.manager) {
+      return next(
+        Object.assign(new Error("Unauthorized"), { statusCode: 401 })
+      );
+    }
+
+    const leaves = await LeaveBalance.find({
+      employee: req.manager._id,
+      organisation_id: req.manager.organisation_id,
+    }).lean();
+
+    return res.status(200).json(leaves); 
+  } catch (error) {
+    next(error);
+  }
 };
 
 const reviewtoemployee = async (req, res, next) => {
