@@ -299,7 +299,7 @@ const addemployee = async (req, res, next) => {
   });
 
   const token = jwt.sign({ userid: newuser._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
-  const verifyLink = `${process.env.BASE_URL}/user/verify/${token}`;
+  const verifyLink = `${process.env.BASE_URL}/talent/api/user/verify/${token}`;
 
   Promise.all([
     assignDefaultLeave(newuser),
