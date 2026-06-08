@@ -58,7 +58,6 @@ const getMyRequisitions = async (req, res) => {
   };
 
   if (status) filter.status = status;
-  
 
   const requisitions = await HiringRequisition.find(filter)
     .populate("approved_by", "f_name l_name work_email")
@@ -70,9 +69,7 @@ const getMyRequisitions = async (req, res) => {
 const getAllRequisitions = async (req, res) => {
   const { status, department, priority } = req.query;
 
-  const filter = { organisation_id: req.admin.organisation_id };
-  console.log("Admin org ID:", req.admin.organisation_id);
-  console.log("Type:", typeof req.admin.organisation_id);
+  const filter = {};
 
   if (status) filter.status = status;
   if (department) filter.department = department;
@@ -87,10 +84,7 @@ const getAllRequisitions = async (req, res) => {
 };
 
 const getPendingRequisitions = async (req, res) => {
-  const requisitions = await HiringRequisition.find({
-    organisation_id: req.admin.organisation_id,
-    status: "PENDING",
-  })
+  const requisitions = await HiringRequisition.find({ status: "PENDING" })
     .populate("requested_by", "f_name l_name work_email department designation")
     .sort({ createdAt: -1 });
 
@@ -98,10 +92,7 @@ const getPendingRequisitions = async (req, res) => {
 };
 
 const getRequisitionById = async (req, res) => {
-  const requisition = await HiringRequisition.findOne({
-    _id: req.params.id,
-    organisation_id: req.admin.organisation_id,
-  })
+  const requisition = await HiringRequisition.findById(req.params.id)
     .populate("requested_by", "f_name l_name work_email department designation")
     .populate("approved_by", "f_name l_name work_email");
 
@@ -127,7 +118,6 @@ const getRequisitionById = async (req, res) => {
 const approveRequisition = async (req, res) => {
   const requisition = await HiringRequisition.findOne({
     _id: req.params.id,
-    organisation_id: req.admin.organisation_id,
     status: "PENDING",
   });
 
@@ -154,7 +144,6 @@ const rejectRequisition = async (req, res) => {
 
   const requisition = await HiringRequisition.findOne({
     _id: req.params.id,
-    organisation_id: req.admin.organisation_id,
     status: "PENDING",
   });
 
@@ -173,7 +162,7 @@ const rejectRequisition = async (req, res) => {
 
 const holdRequisition = async (req, res) => {
   const requisition = await HiringRequisition.findOneAndUpdate(
-    { _id: req.params.id, organisation_id: req.admin.organisation_id, status: "PENDING" },
+    { _id: req.params.id, status: "PENDING" },
     { status: "ON_HOLD", admin_comment: req.body.admin_comment || "" },
     { new: true }
   );
@@ -193,7 +182,7 @@ const requestRevision = async (req, res) => {
   }
 
   const requisition = await HiringRequisition.findOneAndUpdate(
-    { _id: req.params.id, organisation_id: req.admin.organisation_id, status: "PENDING" },
+    { _id: req.params.id, status: "PENDING" },
     { status: "REVISION_REQUIRED", admin_comment },
     { new: true }
   );
@@ -220,7 +209,6 @@ const addCandidate = async (req, res) => {
 
   const requisition = await HiringRequisition.findOne({
     _id: requisition_id,
-    organisation_id: req.admin.organisation_id,
     status: "APPROVED",
   });
 
@@ -234,7 +222,7 @@ const addCandidate = async (req, res) => {
   }
 
   const candidate = await Candidate.create({
-    organisation_id: req.admin.organisation_id,
+    organisation_id: requisition.organisation_id,
     requisition_id,
     full_name,
     email,
@@ -253,10 +241,7 @@ const addCandidate = async (req, res) => {
 const getCandidatesByRequisition = async (req, res) => {
   const { stage } = req.query;
 
-  const filter = {
-    requisition_id: req.params.requisition_id,
-    organisation_id: req.admin.organisation_id,
-  };
+  const filter = { requisition_id: req.params.requisition_id };
 
   if (stage) filter.current_stage = stage;
 
@@ -268,10 +253,7 @@ const getCandidatesByRequisition = async (req, res) => {
 };
 
 const getCandidateById = async (req, res) => {
-  const candidate = await Candidate.findOne({
-    _id: req.params.id,
-    organisation_id: req.admin.organisation_id,
-  })
+  const candidate = await Candidate.findById(req.params.id)
     .populate("requisition_id", "job_title department employment_type skills_required")
     .populate("added_by", "f_name l_name work_email")
     .populate("interview_rounds.conducted_by", "f_name l_name");
@@ -286,10 +268,7 @@ const getCandidateById = async (req, res) => {
 const updateCandidateStage = async (req, res) => {
   const { stage, rejection_reason, overall_feedback } = req.body;
 
-  const candidate = await Candidate.findOne({
-    _id: req.params.id,
-    organisation_id: req.admin.organisation_id,
-  });
+  const candidate = await Candidate.findById(req.params.id);
 
   if (!candidate) {
     return res.status(404).json({ success: false, message: "Candidate not found" });
@@ -316,10 +295,7 @@ const updateCandidateStage = async (req, res) => {
 const scheduleInterview = async (req, res) => {
   const { round_type, scheduled_at, conducted_by } = req.body;
 
-  const candidate = await Candidate.findOne({
-    _id: req.params.id,
-    organisation_id: req.admin.organisation_id,
-  });
+  const candidate = await Candidate.findById(req.params.id);
 
   if (!candidate) {
     return res.status(404).json({ success: false, message: "Candidate not found" });
@@ -341,10 +317,7 @@ const scheduleInterview = async (req, res) => {
 const submitInterviewFeedback = async (req, res) => {
   const { feedback, score, outcome } = req.body;
 
-  const candidate = await Candidate.findOne({
-    _id: req.params.candidateId,
-    organisation_id: req.admin.organisation_id,
-  });
+  const candidate = await Candidate.findById(req.params.candidateId);
 
   if (!candidate) {
     return res.status(404).json({ success: false, message: "Candidate not found" });

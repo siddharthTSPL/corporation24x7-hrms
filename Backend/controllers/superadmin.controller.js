@@ -309,16 +309,31 @@ const loginSuperAdmin = async (req, res, next) => {
         ),
       );
 
-    // if (superAdmin.status === "inactive")
-    //   return next(
-    //     Object.assign(new Error("Your account is inactive"), { statusCode: 403 })
-    //   );
-
     const isMatch = await superAdmin.isValidPassword(password);
     if (!isMatch)
       return next(
         Object.assign(new Error("Invalid credentials"), { statusCode: 401 }),
       );
+
+   
+    const trialValid = superAdmin.isTrialValid();
+    const hasTalentLicense = superAdmin.licenses.some(
+      (l) =>
+        l.product === "torchx_talent" &&
+        l.isActive &&
+        new Date(l.expiresAt) > new Date()
+    );
+
+    if (!trialValid && !hasTalentLicense) {
+      return next(
+        Object.assign(
+          new Error(
+            "Your trial has expired and you have no active license for TorchX Talent. Please upgrade your plan at torchxsuite.com to continue."
+          ),
+          { statusCode: 403, code: "PLAN_EXPIRED" }
+        )
+      );
+    }
 
     const token = jwt.sign(
       {
@@ -353,9 +368,10 @@ const loginSuperAdmin = async (req, res, next) => {
         email: superAdmin.email,
         organisation_name: superAdmin.organisation_name,
         company_domain: superAdmin.company_domain,
-        plan: superAdmin.plan,
-        plan_expires_at: superAdmin.plan_expires_at,
         role: superAdmin.role,
+        is_trial_active: trialValid,
+        trial_expires_at: superAdmin.trial_expires_at,
+        has_talent_license: hasTalentLicense,
       },
     });
   } catch (err) {
@@ -364,31 +380,44 @@ const loginSuperAdmin = async (req, res, next) => {
 };
 
 const getMe = async (req, res, next) => {
-  const superAdmin = req.superAdmin;
-  res.status(200).json({
-    success: true,
-    superAdmin: {
-      id: superAdmin._id,
-      f_name: superAdmin.f_name,
-      l_name: superAdmin.l_name,
-      email: superAdmin.email,
-      phone: superAdmin.phone,
-      profile_image: superAdmin.profile_image,
-      organisation_name: superAdmin.organisation_name,
-      company_domain: superAdmin.company_domain,
-      company_address: superAdmin.company_address,
-      company_size: superAdmin.company_size,
-      industry: superAdmin.industry,
-      plan: superAdmin.plan,
-      plan_started_at: superAdmin.plan_started_at,
-      plan_expires_at: superAdmin.plan_expires_at,
-      role: superAdmin.role,
-      status: superAdmin.status,
-      isFirstLogin: superAdmin.isFirstLogin,
-      last_login: superAdmin.last_login,
-      createdAt: superAdmin.createdAt,
-    },
-  });
+  try {
+    const superAdmin = req.superAdmin;
+
+    res.status(200).json({
+      success: true,
+      superAdmin: {
+        _id: superAdmin._id,
+        f_name: superAdmin.f_name,
+        l_name: superAdmin.l_name,
+        email: superAdmin.email,
+        phone: superAdmin.phone,
+        profile_image: superAdmin.profile_image,
+        organisation_name: superAdmin.organisation_name,
+        company_address: superAdmin.company_address,
+        company_size: superAdmin.company_size,
+        industry: superAdmin.industry,
+        plan: superAdmin.plan,
+        role: superAdmin.role,
+        status: superAdmin.status,
+        isVerified: superAdmin.isVerified,
+        isFirstLogin: superAdmin.isFirstLogin,
+        last_login: superAdmin.last_login,
+        company_domain: superAdmin.company_domain,
+        plan_started_at: superAdmin.plan_started_at,
+        plan_expires_at: superAdmin.plan_expires_at,
+        trial_started_at: superAdmin.trial_started_at,
+        trial_expires_at: superAdmin.trial_expires_at,
+        is_trial_active: superAdmin.is_trial_active,
+        licenses: superAdmin.licenses,
+        purchased_products: superAdmin.purchased_products,
+        createdAt: superAdmin.createdAt,
+        updatedAt: superAdmin.updatedAt,
+        __v: superAdmin.__v,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const logoutSuperAdmin = async (req, res, next) => {
@@ -641,7 +670,18 @@ const createAdmin = async (req, res, next) => {
       );
     }
 
-    const uid = await generateUID(department);
+    const organisation_id = req.superAdmin._id;
+
+    if (!organisation_id) {
+      return next(
+        Object.assign(new Error("Organisation ID not found on your account"), {
+          statusCode: 400,
+        }),
+      );
+    }
+
+    const uid = await generateUID(department, organisation_id);
+    
 
     const admin = await AdminModel.create({
       uid,
@@ -687,7 +727,7 @@ const createAdmin = async (req, res, next) => {
       { expiresIn: "1h" },
     );
 
-    const verifyLink = `${process.env.BASE_URL}/admin/verify/${verifyToken}`;
+    const verifyLink = `${process.env.BASE_URL}/talent/api/admin/verify/${verifyToken}`;
 
     await sendEmail({
       to: email,
@@ -700,33 +740,25 @@ const createAdmin = async (req, res, next) => {
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Admin Account Activation</title>
 </head>
-
 <body style="margin:0;padding:0;background:#F4F6F9;font-family:Arial,sans-serif;">
-
 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="padding:40px 0;">
 <tr>
 <td align="center">
-
 <table width="650" cellpadding="0" cellspacing="0" border="0"
 style="background:#ffffff;border-radius:14px;overflow:hidden;
 box-shadow:0 10px 30px rgba(0,0,0,0.08);">
-
 <tr>
 <td style="background:linear-gradient(135deg,#730042,#CD166E);padding:35px;text-align:center;color:#ffffff;">
 <h1 style="margin:0;font-size:28px;">Welcome to HRMS Platform</h1>
 <p style="margin-top:10px;font-size:15px;opacity:0.9;">Your admin account has been successfully created</p>
 </td>
 </tr>
-
 <tr>
 <td style="padding:40px;color:#333333;">
-
 <h2 style="margin-top:0;color:#730042;">Hello ${f_name} ${l_name},</h2>
-
 <p style="font-size:15px;line-height:1.8;color:#555;">
 Your admin account is now ready. Please verify your email address to activate your account and access the HRMS dashboard.
 </p>
-
 <table width="100%" cellpadding="0" cellspacing="0"
 style="margin:30px 0;background:#F9F8F2;border-radius:10px;padding:20px;">
 <tr><td style="padding:8px 0;"><strong>UID:</strong> ${uid}</td></tr>
@@ -737,36 +769,28 @@ style="margin:30px 0;background:#F9F8F2;border-radius:10px;padding:20px;">
 <tr><td style="padding:8px 0;"><strong>Email:</strong> ${email}</td></tr>
 <tr><td style="padding:8px 0;"><strong>Default Leave Balance:</strong> Assigned Successfully</td></tr>
 </table>
-
 <div style="text-align:center;margin:40px 0;">
 <a href="${verifyLink}"
 style="background:#CD166E;color:#ffffff;padding:15px 35px;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;display:inline-block;">
 Verify &amp; Activate Account
 </a>
 </div>
-
 <p style="font-size:14px;color:#666;line-height:1.7;">This verification link will expire in <strong>1 hour</strong>.</p>
-
 <p style="font-size:14px;color:#666;line-height:1.7;">If the button above does not work, copy and paste the following link into your browser:</p>
-
 <p style="word-break:break-all;font-size:13px;color:#CD166E;background:#F9F8F2;padding:12px;border-radius:6px;">
 ${verifyLink}
 </p>
-
 </td>
 </tr>
-
 <tr>
 <td style="background:#F4F6F9;padding:25px;text-align:center;font-size:12px;color:#888888;">
 © 2026 HRMS Platform. All rights reserved.
 </td>
 </tr>
-
 </table>
 </td>
 </tr>
 </table>
-
 </body>
 </html>
       `,
@@ -1539,13 +1563,13 @@ const getDocumentDetailsSuperAdmin = async (req, res, next) => {
   if (!req.superAdmin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
-  const { documentId } = req.params;
-  if (!documentId)
+  const { id } = req.params; 
+  if (!id)  
     return next(
       Object.assign(new Error("Document ID is required"), { statusCode: 400 })
     );
 
-  const document = await Document.findById(documentId)
+  const document = await Document.findById(id)  // ✅ Changed from documentId to id
     .populate("employee", "f_name l_name work_email personal_contact department designation")
     .populate("underManager", "f_name l_name work_email");
 
