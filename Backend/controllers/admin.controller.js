@@ -689,15 +689,36 @@ const noofemployee = async (req, res, next) => {
 
 const createannouncement = async (req, res, next) => {
   try {
-    const creator = req.admin || req.superadmin;
-    if (!creator)
-      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+    const creator = req.admin || req.superAdmin;
 
-    const { title, message, audience, priority, notice_image, expiresAt } = req.body;
-    if (!title || !message)
-      return next(Object.assign(new Error("Title and message are required"), { statusCode: 400 }));
+    if (!creator) {
+      return next(
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
+        })
+      );
+    }
 
-    const organisation_id = req.admin ? req.admin.organisation_id : req.superadmin._id;
+    const {
+      title,
+      message,
+      audience,
+      priority,
+      notice_image,
+      expiresAt,
+    } = req.body;
+
+    if (!title || !message) {
+      return next(
+        Object.assign(new Error("Title and message are required"), {
+          statusCode: 400,
+        })
+      );
+    }
+
+    const organisation_id = req.admin
+      ? req.admin.organisation_id
+      : req.superAdmin._id;
 
     const announcement = await announcementmodel.create({
       organisation_id,
@@ -711,62 +732,173 @@ const createannouncement = async (req, res, next) => {
       createdByModel: req.admin ? "Admin" : "SuperAdmin",
     });
 
-    res.status(201).json({ success: true, message: "Announcement created successfully", announcement });
+    res.status(201).json({
+      success: true,
+      message: "Announcement created successfully",
+      announcement,
+    });
   } catch (error) {
     next(error);
   }
 };
 
 const getallannouncement = async (req, res, next) => {
-  if (!req.admin)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  try {
+    const organisation_id = req.admin
+      ? req.admin.organisation_id
+      : req.superAdmin?._id;
 
-  const organisation_id = req.admin.organisation_id;
-  const announcements = await announcementmodel.find({ organisation_id }).lean();
-  res.status(200).json({ success: true, count: announcements.length, announcements });
+    if (!organisation_id) {
+      return next(
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
+        })
+      );
+    }
+
+    const announcements = await announcementmodel
+      .find({ organisation_id })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      count: announcements.length,
+      announcements,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const updateAnnouncement = async (req, res, next) => {
-  if (!req.admin)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  try {
+    const user = req.admin || req.superAdmin;
 
-  const { id } = req.params;
-  const organisation_id = req.admin.organisation_id;
+    if (!user) {
+      return next(
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
+        })
+      );
+    }
 
-  const announcement = await announcementmodel.findOne({ _id: id, organisation_id }).select("createdBy").lean();
-  if (!announcement)
-    return next(Object.assign(new Error("Announcement not found"), { statusCode: 404 }));
-  if (announcement.createdBy.toString() !== req.admin._id.toString())
-    return next(Object.assign(new Error("You are not allowed to edit this announcement"), { statusCode: 403 }));
+    const { id } = req.params;
 
-  const { title, message, audience, priority, notice_image, expiresAt } = req.body;
-  const $set = {};
-  if (title) $set.title = title;
-  if (message) $set.message = message;
-  if (audience) $set.audience = audience;
-  if (priority) $set.priority = priority;
-  if (notice_image !== undefined) $set.notice_image = notice_image;
-  if (expiresAt) $set.expiresAt = expiresAt;
+    const organisation_id = req.admin
+      ? req.admin.organisation_id
+      : req.superAdmin._id;
 
-  const updated = await announcementmodel.findByIdAndUpdate(id, { $set }, { new: true }).lean();
-  res.status(200).json({ success: true, message: "Announcement updated successfully", announcement: updated });
+    const announcement = await announcementmodel.findOne({
+      _id: id,
+      organisation_id,
+    });
+
+    if (!announcement) {
+      return next(
+        Object.assign(new Error("Announcement not found"), {
+          statusCode: 404,
+        })
+      );
+    }
+
+    const isOwner =
+      announcement.createdBy.toString() === user._id.toString();
+
+    const isSuperAdmin = !!req.superAdmin;
+
+    if (!isOwner && !isSuperAdmin) {
+      return next(
+        Object.assign(
+          new Error("You are not allowed to edit this announcement"),
+          { statusCode: 403 }
+        )
+      );
+    }
+
+    const {
+      title,
+      message,
+      audience,
+      priority,
+      notice_image,
+      expiresAt,
+    } = req.body;
+
+    if (title) announcement.title = title;
+    if (message) announcement.message = message;
+    if (audience) announcement.audience = audience;
+    if (priority) announcement.priority = priority;
+    if (notice_image !== undefined)
+      announcement.notice_image = notice_image;
+    if (expiresAt) announcement.expiresAt = expiresAt;
+
+    await announcement.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Announcement updated successfully",
+      announcement,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const deleteAnnouncement = async (req, res, next) => {
-  if (!req.admin)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  try {
+    const user = req.admin || req.superAdmin;
 
-  const { id } = req.params;
-  const organisation_id = req.admin.organisation_id;
+    if (!user) {
+      return next(
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
+        })
+      );
+    }
 
-  const announcement = await announcementmodel.findOne({ _id: id, organisation_id }).select("createdBy").lean();
-  if (!announcement)
-    return next(Object.assign(new Error("Announcement not found"), { statusCode: 404 }));
-  if (announcement.createdBy.toString() !== req.admin._id.toString())
-    return next(Object.assign(new Error("You are not allowed to delete this announcement"), { statusCode: 403 }));
+    const { id } = req.params;
 
-  await announcementmodel.findByIdAndDelete(id);
-  res.status(200).json({ success: true, message: "Announcement deleted successfully" });
+    const organisation_id = req.admin
+      ? req.admin.organisation_id
+      : req.superAdmin._id;
+
+    const announcement = await announcementmodel.findOne({
+      _id: id,
+      organisation_id,
+    });
+
+    if (!announcement) {
+      return next(
+        Object.assign(new Error("Announcement not found"), {
+          statusCode: 404,
+        })
+      );
+    }
+
+    const isOwner =
+      announcement.createdBy.toString() === user._id.toString();
+
+    const isSuperAdmin = !!req.superAdmin;
+
+    if (!isOwner && !isSuperAdmin) {
+      return next(
+        Object.assign(
+          new Error("You are not allowed to delete this announcement"),
+          { statusCode: 403 }
+        )
+      );
+    }
+
+    await announcementmodel.findByIdAndDelete(id);
+
+    res.status(200).json({
+      success: true,
+      message: "Announcement deleted successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const reviewtomanager = async (req, res, next) => {
