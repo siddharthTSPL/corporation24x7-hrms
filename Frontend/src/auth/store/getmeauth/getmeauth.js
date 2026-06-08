@@ -7,6 +7,7 @@ import { getMeSuperAdmin, loginSuperAdmin } from "../../api/superadmin/auth/su.a
 export const useAuth = () => {
   return useQuery({
     queryKey: ["auth"],
+
     queryFn: async () => {
       const savedRole = localStorage.getItem("role");
 

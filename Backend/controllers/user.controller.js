@@ -99,19 +99,85 @@ const forgetpassword = async (req, res, next) => {
 };
 
 const verifyOtp = async (req, res, next) => {
-  const { work_email, otp } = req.body;
-  if (!work_email || !otp) return next(Object.assign(new Error("Email and OTP are required"), { statusCode: 400 }));
-  const otpRecord = await OtpModel.findOne({ email: work_email });
-  if (!otpRecord) return next(Object.assign(new Error("OTP not found. Please request a new one"), { statusCode: 404 }));
-  if (otpRecord.isExpired()) { await OtpModel.deleteOne({ email: work_email }); return next(Object.assign(new Error("OTP has expired. Please request a new one"), { statusCode: 400 })); }
-  if (!otpRecord.compareOtp(String(otp))) return next(Object.assign(new Error("Invalid OTP"), { statusCode: 400 }));
-  const user = await usermodel.findOne({ work_email }).select("_id work_email").lean();
-  if (!user) return next(Object.assign(new Error("User not found"), { statusCode: 404 }));
-  const resetToken = jwt.sign({ userid: user._id, work_email: user.work_email }, process.env.JWT_SECRET, { expiresIn: "15m" });
-  await OtpModel.deleteOne({ email: work_email });
-  res.status(200).json({ success: true, message: "OTP verified successfully", resetToken });
-};
+  try {
+    const { work_email, otp } = req.body;
 
+    if (!work_email || !otp) {
+      return next(
+        Object.assign(new Error("Email and OTP are required"), {
+          statusCode: 400,
+        })
+      );
+    }
+
+    const otpRecord = await OtpModel.findOne({ email: work_email });
+
+    if (!otpRecord) {
+      return next(
+        Object.assign(
+          new Error("OTP not found. Please request a new one"),
+          { statusCode: 404 }
+        )
+      );
+    }
+
+    if (otpRecord.isExpired()) {
+      await OtpModel.deleteOne({ email: work_email });
+
+      return next(
+        Object.assign(
+          new Error("OTP has expired. Please request a new one"),
+          { statusCode: 400 }
+        )
+      );
+    }
+
+    if (!otpRecord.compareOtp(String(otp))) {
+      return next(
+        Object.assign(new Error("Invalid OTP"), {
+          statusCode: 400,
+        })
+      );
+    }
+
+    // Find user by email
+    const user = await usermodel
+      .findOne({ work_email })
+      .select("_id work_email")
+      .lean();
+
+    if (!user) {
+      return next(
+        Object.assign(new Error("User not found"), {
+          statusCode: 404,
+        })
+      );
+    }
+
+    // Delete OTP after successful verification
+    await OtpModel.deleteOne({ email: work_email });
+
+    // Generate login token
+    const token = jwt.sign(
+      {
+        userid: user._id,
+        work_email: user.work_email,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "7d",
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "OTP verified successfully",
+      token,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 const resetpassword = async (req, res, next) => {
   const { resetToken, newPassword } = req.body;
   if (!resetToken || !newPassword) return next(Object.assign(new Error("Reset token and new password are required"), { statusCode: 400 }));
