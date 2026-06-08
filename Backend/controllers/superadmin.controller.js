@@ -681,6 +681,7 @@ const createAdmin = async (req, res, next) => {
     }
 
     const uid = await generateUID(department, organisation_id);
+    
 
     const admin = await AdminModel.create({
       uid,
