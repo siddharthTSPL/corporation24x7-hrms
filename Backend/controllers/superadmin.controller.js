@@ -882,10 +882,30 @@ const deleteAdmin = async (req, res, next) => {
 };
 
 const getAllAdmins = async (req, res, next) => {
-  const admins = await AdminModel.find({ created_by: req.superAdmin._id })
-    .select("-password -__v")
-    .lean();
-  res.status(200).json({ success: true, count: admins.length, admins });
+  try {
+    if (!req.superAdmin) {
+      return next(
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
+        })
+      );
+    }
+
+    const organisation_id = req.superAdmin._id;
+
+    const admins = await AdminModel.find({ organisation_id })
+      .select("-password -__v")
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      organisation_id,
+      count: admins.length,
+      admins,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const addmanager = async (req, res, next) => {
@@ -1063,29 +1083,86 @@ const addemployee = async (req, res, next) => {
 };
 
 const findallmanagers = async (req, res, next) => {
-  const managers = await Managermodel.find().select(EXCLUDE).lean();
-  res.status(200).json({ managers });
+  try {
+    if (!req.superAdmin) {
+      return next(
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
+        })
+      );
+    }
+
+    const organisation_id = req.superAdmin._id;
+
+    const managers = await Managermodel.find({ organisation_id })
+      .select(EXCLUDE)
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      organisation_id,
+      count: managers.length,
+      managers,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const getallemployee = async (req, res, next) => {
-  const [users, managers] = await Promise.all([
-    Usermodel.find()
-      .select(
-        "uid f_name l_name work_email role department designation office_location Under_manager",
-      )
-      .populate({
-        path: "Under_manager",
-        select: "uid f_name l_name work_email role",
-      })
-      .lean(),
-    Managermodel.find()
-      .select(
-        "uid f_name l_name work_email role designation office_location department gender personal_contact e_contact",
-      )
-      .lean(),
-  ]);
-  const all = [...users, ...managers];
-  res.status(200).json({ count: all.length, users: all });
+  try {
+    if (!req.superAdmin) {
+      return next(
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
+        })
+      );
+    }
+
+    const organisation_id = req.superAdmin._id;
+
+    const [admins, managers, users] = await Promise.all([
+      AdminModel.find({ organisation_id })
+        .select(
+          "uid f_name l_name work_email role department designation office_location organisation_id"
+        )
+        .lean(),
+
+      Managermodel.find({ organisation_id })
+        .select(
+          "uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact"
+        )
+        .lean(),
+
+      Usermodel.find({ organisation_id })
+        .select(
+          "uid f_name l_name work_email role department designation office_location organisation_id Under_manager"
+        )
+        .populate({
+          path: "Under_manager",
+          select: "uid f_name l_name work_email role",
+        })
+        .lean(),
+    ]);
+
+    const all = [
+      ...admins.map((a) => ({ type: "admin", ...a })),
+      ...managers.map((m) => ({ type: "manager", ...m })),
+      ...users.map((u) => ({ type: "employee", ...u })),
+    ];
+
+    return res.status(200).json({
+      success: true,
+      organisation_id,
+      admins: admins.length,
+      managers: managers.length,
+      employees: users.length,
+      count: all.length,
+      users: all,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const editemployee = async (req, res, next) => {
@@ -1543,10 +1620,38 @@ const getTodayCheckins = async (req, res, next) => {
 };
 
 const getOrgInfo = async (req, res, next) => {
-  res.json({
-    organisation_name: req.superAdmin.organisation_name,
-    profile_image: req.superAdmin.profile_image,
-  });
+  try {
+    if (!req.superAdmin) {
+      return next(
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
+        })
+      );
+    }
+
+    const organisation = await SuperAdminModel.findById(
+      req.superAdmin._id
+    )
+      .select("organisation_name profile_image")
+      .lean();
+
+    if (!organisation) {
+      return next(
+        Object.assign(new Error("Organization not found"), {
+          statusCode: 404,
+        })
+      );
+    }
+
+    res.status(200).json({
+      success: true,
+      organisation_id: req.superAdmin._id,
+      organisation_name: organisation.organisation_name,
+      profile_image: organisation.profile_image,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 

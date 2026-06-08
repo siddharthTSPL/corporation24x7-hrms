@@ -176,10 +176,11 @@ const handleVerifyOtp = () => {
 
     try {
       let fullData;
+      console.log(role);
       if (role === "admin") fullData = await getMeAdmin();
       else if (role === "manager") fullData = await getMeManager();
       else if (role === "employee") fullData = await getMeUser();
-      else if (role === "superadmin") fullData = await getMeSuperAdmin();
+      else if (role === "super_admin") fullData = await getMeSuperAdmin();
 
       queryClient.setQueryData(["auth"], { role, data: fullData });
     } catch {
@@ -191,7 +192,7 @@ const handleVerifyOtp = () => {
 
   if (form.role === "admin") {
     verifyAdminOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
-  } else if (form.role === "superadmin") {
+  } else if (form.role === "super_admin") {
     verifySuperAdminOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
   } else if (form.role === "manager") {
     verifyManagerOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
