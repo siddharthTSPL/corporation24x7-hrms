@@ -1390,36 +1390,101 @@ const getDocumentDetailsAdmin = async (req, res, next) => {
 };
 
 const adminActionOnLeave = async (req, res, next) => {
-  if (!req.admin)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  try {
+    if (!req.admin) {
+      return next(
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
+        })
+      );
+    }
 
-  const { leaveId, action, remarks } = req.body;
-  if (!leaveId || !action)
-    return next(Object.assign(new Error("leaveId and action are required"), { statusCode: 400 }));
-  if (!["approve", "reject"].includes(action))
-    return next(Object.assign(new Error("action must be 'approve' or 'reject'"), { statusCode: 400 }));
+    const { leaveId, action, remarks } = req.body;
 
-  const organisation_id = req.admin.organisation_id;
-  const leave = await Leave.findOne({ _id: leaveId, organisation_id });
-  if (!leave)
-    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
+    if (!leaveId || !action) {
+      return next(
+        Object.assign(
+          new Error("leaveId and action are required"),
+          { statusCode: 400 }
+        )
+      );
+    }
 
-  if (leave.status !== "forwarded_reporting_manager" && leave.status !== "pending_manager")
-    return next(Object.assign(new Error("Only pending or forwarded leaves can be actioned by admin"), { statusCode: 400 }));
+    if (!["approve", "reject"].includes(action)) {
+      return next(
+        Object.assign(
+          new Error("action must be 'approve' or 'reject'"),
+          { statusCode: 400 }
+        )
+      );
+    }
 
-  if (action === "approve") {
-    leave.status = "approved_reporting_manager";
-    leave.approvedBy = null;
-    leave.remarks = remarks || "Approved by Admin";
-  } else {
-    leave.status = "rejected_reporting_manager";
-    leave.rejectedBy = null;
-    leave.remarks = remarks || "Rejected by Admin";
-    leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const organisation_id = req.admin.organisation_id;
+
+    const leave = await Leave.findOne({
+      _id: leaveId,
+      organisation_id,
+    });
+
+    if (!leave) {
+      return next(
+        Object.assign(new Error("Leave not found"), {
+          statusCode: 404,
+        })
+      );
+    }
+
+    if (
+      leave.status !== "forwarded_reporting_manager" &&
+      leave.status !== "pending_manager"
+    ) {
+      return next(
+        Object.assign(
+          new Error(
+            "Only pending or forwarded leaves can be actioned by admin"
+          ),
+          { statusCode: 400 }
+        )
+      );
+    }
+
+    if (action === "approve") {
+      leave.status = "approved_reporting_manager";
+
+      leave.approvedBy = req.admin._id;
+      leave.rejectedBy = null;
+
+      leave.remarks =
+        remarks || `Approved by Admin (${req.admin.f_name})`;
+
+      leave.deleteAt = null;
+    } else {
+      leave.status = "rejected_reporting_manager";
+
+      leave.rejectedBy = req.admin._id;
+      leave.approvedBy = null;
+
+      leave.remarks =
+        remarks || `Rejected by Admin (${req.admin.f_name})`;
+
+      leave.deleteAt = new Date(
+        Date.now() + 24 * 60 * 60 * 1000
+      );
+    }
+
+    await leave.save();
+
+    return res.status(200).json({
+      success: true,
+      organisation_id,
+      message: `Leave ${
+        action === "approve" ? "approved" : "rejected"
+      } successfully by Admin`,
+      leave,
+    });
+  } catch (error) {
+    next(error);
   }
-
-  await leave.save();
-  res.status(200).json({ message: `Leave ${action === "approve" ? "approved" : "rejected"} successfully by Admin`, leave });
 };
 
 const adminSubmitTicket = async (req, res, next) => {
@@ -1494,21 +1559,32 @@ const adminSubmitTicket = async (req, res, next) => {
 
 const adminGetMyTickets = async (req, res, next) => {
   try {
-    if (!req.admin)
-      return res.status(401).json({ message: "Not authenticated" });
+    if (!req.admin) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated",
+      });
+    }
+
+    const organisation_id = req.admin.organisation_id;
 
     const tickets = await Ticket.find({
       submittedBy: req.admin._id,
-      organisation_id: req.admin.organisation_id,
+      organisation_id,
       isDeleted: false,
     })
       .select("-timeline -internalNotes -statusHistory")
       .sort({ createdAt: -1 })
       .lean();
 
-    res.json({ success: true, count: tickets.length, tickets });
-  } catch (err) {
-    next(err);
+    return res.status(200).json({
+      success: true,
+      organisation_id,
+      count: tickets.length,
+      tickets,
+    });
+  } catch (error) {
+    next(error);
   }
 };
 
