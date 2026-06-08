@@ -1143,108 +1143,12 @@ const getOrgInfo = async (req, res, next) => {
       });
     }
 
-    const admin = await Adminmodel.findById(req.admin._id)
-      .select(
-        "f_name l_name work_email designation department office_location organisation_id"
-      )
-      .lean();
-
-    if (!admin) {
-      return res.status(404).json({
-        success: false,
-        message: "Admin not found",
-      });
-    }
-
-    const organisation_id = admin.organisation_id;
-
-    if (!organisation_id) {
-      return res.status(404).json({
-        success: false,
-        message: "Organisation ID not found",
-      });
-    }
-
-    const superAdmin = await SuperAdminModel.findById(organisation_id)
-      .select(
-        "f_name l_name email organisation_name profile_image"
-      )
-      .lean();
-
-    if (!superAdmin) {
-      return res.status(404).json({
-        success: false,
-        message: "Organisation not found",
-      });
-    }
-
-    const managers = await Managermodel.find({
-      organisation_id,
-    })
-      .select(
-        "f_name l_name work_email designation department office_location"
-      )
-      .lean();
-
-    const employees = managers.length
-      ? await Usermodel.find({
-          organisation_id,
-          Under_manager: {
-            $in: managers.map((m) => m._id),
-          },
-        })
-          .select(
-            "f_name l_name work_email designation department office_location Under_manager"
-          )
-          .lean()
-      : [];
-
-    const managersWithEmployees = managers.map((mgr) => ({
-      id: mgr._id,
-      name: `${mgr.f_name} ${mgr.l_name}`,
-      email: mgr.work_email,
-      designation: mgr.designation,
-      department: mgr.department,
-      office_location: mgr.office_location,
-      employees: employees
-        .filter(
-          (e) =>
-            e.Under_manager?.toString() ===
-            mgr._id.toString()
-        )
-        .map((e) => ({
-          id: e._id,
-          name: `${e.f_name} ${e.l_name}`,
-          email: e.work_email,
-          designation: e.designation,
-          department: e.department,
-          office_location: e.office_location,
-        })),
-    }));
+    const admin = await Adminmodel.findById(req.admin._id).lean();
 
     return res.status(200).json({
       success: true,
-      organisation_id,
-      organisation_name: superAdmin.organisation_name,
-      organisation_logo: superAdmin.profile_image || null,
-
-      super_admin: {
-        id: superAdmin._id,
-        name: `${superAdmin.f_name} ${superAdmin.l_name}`,
-        email: superAdmin.email,
-      },
-
-      admin: {
-        id: admin._id,
-        name: `${admin.f_name} ${admin.l_name}`,
-        email: admin.work_email,
-        designation: admin.designation,
-        department: admin.department,
-        office_location: admin.office_location,
-      },
-
-      managers: managersWithEmployees,
-      currentAdminId: req.admin._id,
+      organisation_id: admin.organisation_id,
+      admin,
     });
   } catch (error) {
     next(error);
