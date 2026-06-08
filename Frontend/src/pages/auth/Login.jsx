@@ -289,9 +289,9 @@ function Login() {
         </div>
       </div>
 
-      <p className="fixed bottom-2 left-0 w-full text-center text-gray-600 text-sm font-medium">
-        © 2026, TechTorch Solutions Private Limited. All Rights Reserved.
-      </p>
+     <footer className="fixed bottom-0 left-0 w-full py-3 bg-transparent text-center text-gray-600 text-sm font-medium z-10">
+  © 2026, TechTorch Solutions Private Limited. All Rights Reserved.
+</footer>
     </div>
   );
 }
