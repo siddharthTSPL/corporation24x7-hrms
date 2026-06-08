@@ -15,7 +15,7 @@ import {
 import { useShowAllLeaves, useAcceptLeaveByAdmin, useRejectLeaveByAdmin } from "../../auth/server-state/superadmin/leave/suleave.hook";
 import { useGetAllAnnouncements, useCreateAnnouncement, useUpdateAnnouncement, useDeleteAnnouncement } from "../../auth/server-state/superadmin/announcement/suannouncement.hook";
 import { useGetAllAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin, useReviewToAdmin } from "../../auth/server-state/superadmin/other/suother.hook";
-
+import { FiEye, FiEyeOff } from "react-icons/fi";
 const useStyles = () => {
   useEffect(() => {
     const font = document.createElement("link");
@@ -372,6 +372,8 @@ const AnnModal = ({ open, onClose, initial, onSave, loading }) => {
 };
 
 const AdminModal = ({ open, onClose, initial, onSave, loading }) => {
+const [showPassword, setShowPassword] = useState(false);
+const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const blank = {
     f_name: "", l_name: "", work_email: "", password: "",
     gender: "", designation: "", phone: "",
@@ -380,7 +382,7 @@ const AdminModal = ({ open, onClose, initial, onSave, loading }) => {
     is_fresher: true, total_experience: 0,
     previous_company: "", previous_designation: "",
     aadhaar_number: "", pan_number: "",
-    address: "", city: "", state: "", pincode: "",
+    residential_address: "",permanent_address: "", city: "", state: "", pincode: "",
   };
   const [form, setForm] = useState(blank);
   useEffect(() => { if (open) setForm(initial ? { ...blank, ...initial } : blank); }, [open]);
@@ -411,12 +413,101 @@ const AdminModal = ({ open, onClose, initial, onSave, loading }) => {
             <label className="sa-flbl">Work Email *</label>
             <input className="sa-finp" type="email" placeholder="admin@company.com" value={form.work_email} onChange={set("work_email")} disabled={!!initial} />
           </div>
-          {!initial && (
-            <div className="sa-fld">
-              <label className="sa-flbl">Password *</label>
-              <input className="sa-finp" type="password" placeholder="Temporary password" value={form.password} onChange={set("password")} />
-            </div>
+         {!initial && (
+  <>
+    {/* Password */}
+    <div className="sa-fld">
+      <label className="sa-flbl">Password *</label>
+
+      <div style={{ position: "relative" }}>
+        <input
+          className="sa-finp"
+          type={showPassword ? "text" : "password"}
+          placeholder="Temporary password"
+          value={form.password}
+          onChange={set("password")}
+          style={{ paddingRight: "45px" }}
+        />
+
+        <button
+          type="button"
+          onClick={() => setShowPassword(!showPassword)}
+          style={{
+            position: "absolute",
+            right: "14px",
+            top: "50%",
+            transform: "translateY(-50%)",
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            color: "#6b7280",
+          }}
+        >
+          {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+        </button>
+      </div>
+    </div>
+
+    {/* Confirm Password */}
+    <div
+      className="sa-fld"
+      style={{ marginTop: "16px" }}
+    >
+      <label className="sa-flbl">Confirm Password *</label>
+
+      <div style={{ position: "relative" }}>
+        <input
+          className="sa-finp"
+          type={showConfirmPassword ? "text" : "password"}
+          placeholder="Confirm password"
+          value={form.confirmPassword}
+          onChange={set("confirmPassword")}
+          style={{ paddingRight: "45px" }}
+        />
+
+        <button
+          type="button"
+          onClick={() =>
+            setShowConfirmPassword(!showConfirmPassword)
+          }
+          style={{
+            position: "absolute",
+            right: "14px",
+            top: "50%",
+            transform: "translateY(-50%)",
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            color: "#6b7280",
+          }}
+        >
+          {showConfirmPassword ? (
+            <FiEyeOff size={18} />
+          ) : (
+            <FiEye size={18} />
           )}
+        </button>
+      </div>
+
+      {form.confirmPassword &&
+        form.password !== form.confirmPassword && (
+          <p
+            style={{
+              color: "#ef4444",
+              fontSize: "13px",
+              marginTop: "6px",
+            }}
+          >
+            Passwords do not match
+          </p>
+        )}
+    </div>
+  </>
+  )}
           <div className="sa-form-row">
             <div className="sa-fld">
               <label className="sa-flbl">Gender *</label>
@@ -512,8 +603,24 @@ const AdminModal = ({ open, onClose, initial, onSave, loading }) => {
             </div>
           </div>
           <div className="sa-fld">
-            <label className="sa-flbl">Address</label>
-            <input className="sa-finp" placeholder="Street address" value={form.address} onChange={set("address")} />
+            <label className="sa-flbl">Residential Address</label>
+            <input className="sa-finp" placeholder="" value={form.address} onChange={set("address")} />
+            <div className="sa-fld">
+
+  <label
+    className="sa-flbl"
+    style={{ marginTop: "16px" }}
+  >
+    Permanent Address
+  </label>
+
+  <input
+    className="sa-finp"
+    value={form.permanentAddress}
+    onChange={set("permanentAddress")}
+  />
+</div>
+          
           </div>
           <div className="sa-form-row-3">
             <div className="sa-fld">
