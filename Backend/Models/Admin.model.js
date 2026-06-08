@@ -38,7 +38,6 @@ const adminSchema = new mongoose.Schema(
     work_email: {
       type: String,
       required: true,
-      unique: true,
       lowercase: true,
       trim: true,
     },
@@ -93,6 +92,7 @@ const adminSchema = new mongoose.Schema(
     pincode: {
       type: String,
     },
+
     country: {
       type: String,
     },
@@ -209,6 +209,7 @@ const adminSchema = new mongoose.Schema(
 );
 
 adminSchema.index({ uid: 1, organisation_id: 1 }, { unique: true });
+adminSchema.index({ work_email: 1, organisation_id: 1 }, { unique: true });
 adminSchema.index({ department: 1, status: 1 });
 adminSchema.index({ status: 1 });
 adminSchema.index({ reporting_manager: 1 });
@@ -241,10 +242,7 @@ adminSchema.pre(
       set.reporting_manager_model = null;
     }
 
-    if (
-      "reporting_manager_model" in set &&
-      !set.reporting_manager_model
-    ) {
+    if ("reporting_manager_model" in set && !set.reporting_manager_model) {
       set.reporting_manager = null;
     }
 
