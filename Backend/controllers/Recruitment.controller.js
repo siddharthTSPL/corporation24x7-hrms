@@ -1,3 +1,4 @@
+
 const HiringRequisition = require("../Models/Hiringrequisition.model");
 const Candidate = require("../Models/candidate.model");
 
@@ -15,35 +16,17 @@ const STAGE_ORDER = {
 
 const createRequisition = async (req, res) => {
   const {
-    job_title,
-    department,
-    openings,
-    employment_type,
-    experience_required,
-    skills_required,
-    salary_range,
-    priority,
-    work_mode,
-    job_description,
-    hiring_reason,
-    expected_joining_date,
+    job_title, department, openings, employment_type, experience_required,
+    skills_required, salary_range, priority, work_mode, job_description,
+    hiring_reason, expected_joining_date,
   } = req.body;
 
   const requisition = await HiringRequisition.create({
     organisation_id: req.manager.organisation_id,
     requested_by: req.manager._id,
-    job_title,
-    department,
-    openings,
-    employment_type,
-    experience_required,
-    skills_required,
-    salary_range,
-    priority,
-    work_mode,
-    job_description,
-    hiring_reason,
-    expected_joining_date,
+    job_title, department, openings, employment_type, experience_required,
+    skills_required, salary_range, priority, work_mode, job_description,
+    hiring_reason, expected_joining_date,
   });
 
   return res.status(201).json({ success: true, data: requisition });
@@ -69,7 +52,7 @@ const getMyRequisitions = async (req, res) => {
 const getAllRequisitions = async (req, res) => {
   const { status, department, priority } = req.query;
 
-  const filter = {};
+  const filter = { organisation_id: req.admin.organisation_id };
 
   if (status) filter.status = status;
   if (department) filter.department = department;
@@ -84,7 +67,10 @@ const getAllRequisitions = async (req, res) => {
 };
 
 const getPendingRequisitions = async (req, res) => {
-  const requisitions = await HiringRequisition.find({ status: "PENDING" })
+  const requisitions = await HiringRequisition.find({
+    organisation_id: req.admin.organisation_id,
+    status: "PENDING",
+  })
     .populate("requested_by", "f_name l_name work_email department designation")
     .sort({ createdAt: -1 });
 
@@ -92,7 +78,10 @@ const getPendingRequisitions = async (req, res) => {
 };
 
 const getRequisitionById = async (req, res) => {
-  const requisition = await HiringRequisition.findById(req.params.id)
+  const requisition = await HiringRequisition.findOne({
+    _id: req.params.id,
+    organisation_id: req.admin.organisation_id,
+  })
     .populate("requested_by", "f_name l_name work_email department designation")
     .populate("approved_by", "f_name l_name work_email");
 
@@ -100,24 +89,23 @@ const getRequisitionById = async (req, res) => {
     return res.status(404).json({ success: false, message: "Requisition not found" });
   }
 
-  const candidates = await Candidate.find({ requisition_id: req.params.id }).select(
-    "full_name email phone skills experience current_stage source current_company createdAt"
-  );
+  const candidates = await Candidate.find({
+    requisition_id: req.params.id,
+    organisation_id: req.admin.organisation_id,
+  }).select("full_name email phone skills experience current_stage source current_company createdAt");
 
   const stage_summary = await Candidate.aggregate([
-    { $match: { requisition_id: requisition._id } },
+    { $match: { requisition_id: requisition._id, organisation_id: requisition.organisation_id } },
     { $group: { _id: "$current_stage", count: { $sum: 1 } } },
   ]);
 
-  return res.status(200).json({
-    success: true,
-    data: { requisition, candidates, stage_summary },
-  });
+  return res.status(200).json({ success: true, data: { requisition, candidates, stage_summary } });
 };
 
 const approveRequisition = async (req, res) => {
   const requisition = await HiringRequisition.findOne({
     _id: req.params.id,
+    organisation_id: req.admin.organisation_id,
     status: "PENDING",
   });
 
@@ -144,6 +132,7 @@ const rejectRequisition = async (req, res) => {
 
   const requisition = await HiringRequisition.findOne({
     _id: req.params.id,
+    organisation_id: req.admin.organisation_id,
     status: "PENDING",
   });
 
@@ -162,7 +151,7 @@ const rejectRequisition = async (req, res) => {
 
 const holdRequisition = async (req, res) => {
   const requisition = await HiringRequisition.findOneAndUpdate(
-    { _id: req.params.id, status: "PENDING" },
+    { _id: req.params.id, organisation_id: req.admin.organisation_id, status: "PENDING" },
     { status: "ON_HOLD", admin_comment: req.body.admin_comment || "" },
     { new: true }
   );
@@ -182,7 +171,7 @@ const requestRevision = async (req, res) => {
   }
 
   const requisition = await HiringRequisition.findOneAndUpdate(
-    { _id: req.params.id, status: "PENDING" },
+    { _id: req.params.id, organisation_id: req.admin.organisation_id, status: "PENDING" },
     { status: "REVISION_REQUIRED", admin_comment },
     { new: true }
   );
@@ -196,19 +185,13 @@ const requestRevision = async (req, res) => {
 
 const addCandidate = async (req, res) => {
   const {
-    requisition_id,
-    full_name,
-    email,
-    phone,
-    resume_url,
-    experience,
-    current_company,
-    skills,
-    source,
+    requisition_id, full_name, email, phone, resume_url,
+    experience, current_company, skills, source,
   } = req.body;
 
   const requisition = await HiringRequisition.findOne({
     _id: requisition_id,
+    organisation_id: req.admin.organisation_id,
     status: "APPROVED",
   });
 
@@ -216,7 +199,11 @@ const addCandidate = async (req, res) => {
     return res.status(404).json({ success: false, message: "Approved requisition not found" });
   }
 
-  const existing = await Candidate.findOne({ requisition_id, email: email.toLowerCase() });
+  const existing = await Candidate.findOne({
+    requisition_id,
+    organisation_id: req.admin.organisation_id,
+    email: email.toLowerCase(),
+  });
   if (existing) {
     return res.status(409).json({ success: false, message: "Candidate with this email already exists in this pipeline" });
   }
@@ -224,14 +211,7 @@ const addCandidate = async (req, res) => {
   const candidate = await Candidate.create({
     organisation_id: requisition.organisation_id,
     requisition_id,
-    full_name,
-    email,
-    phone,
-    resume_url,
-    experience,
-    current_company,
-    skills,
-    source,
+    full_name, email, phone, resume_url, experience, current_company, skills, source,
     added_by: req.admin._id,
   });
 
@@ -241,7 +221,10 @@ const addCandidate = async (req, res) => {
 const getCandidatesByRequisition = async (req, res) => {
   const { stage } = req.query;
 
-  const filter = { requisition_id: req.params.requisition_id };
+  const filter = {
+    requisition_id: req.params.requisition_id,
+    organisation_id: req.admin.organisation_id,
+  };
 
   if (stage) filter.current_stage = stage;
 
@@ -253,7 +236,10 @@ const getCandidatesByRequisition = async (req, res) => {
 };
 
 const getCandidateById = async (req, res) => {
-  const candidate = await Candidate.findById(req.params.id)
+  const candidate = await Candidate.findOne({
+    _id: req.params.id,
+    organisation_id: req.admin.organisation_id,
+  })
     .populate("requisition_id", "job_title department employment_type skills_required")
     .populate("added_by", "f_name l_name work_email")
     .populate("interview_rounds.conducted_by", "f_name l_name");
@@ -268,7 +254,10 @@ const getCandidateById = async (req, res) => {
 const updateCandidateStage = async (req, res) => {
   const { stage, rejection_reason, overall_feedback } = req.body;
 
-  const candidate = await Candidate.findById(req.params.id);
+  const candidate = await Candidate.findOne({
+    _id: req.params.id,
+    organisation_id: req.admin.organisation_id,
+  });
 
   if (!candidate) {
     return res.status(404).json({ success: false, message: "Candidate not found" });
@@ -295,16 +284,17 @@ const updateCandidateStage = async (req, res) => {
 const scheduleInterview = async (req, res) => {
   const { round_type, scheduled_at, conducted_by } = req.body;
 
-  const candidate = await Candidate.findById(req.params.id);
+  const candidate = await Candidate.findOne({
+    _id: req.params.id,
+    organisation_id: req.admin.organisation_id,
+  });
 
   if (!candidate) {
     return res.status(404).json({ success: false, message: "Candidate not found" });
   }
 
   const round_number = candidate.interview_rounds.length + 1;
-
   candidate.interview_rounds.push({ round_number, round_type, scheduled_at, conducted_by });
-
   await candidate.save();
 
   return res.status(200).json({
@@ -317,7 +307,10 @@ const scheduleInterview = async (req, res) => {
 const submitInterviewFeedback = async (req, res) => {
   const { feedback, score, outcome } = req.body;
 
-  const candidate = await Candidate.findById(req.params.candidateId);
+  const candidate = await Candidate.findOne({
+    _id: req.params.candidateId,
+    organisation_id: req.admin.organisation_id,
+  });
 
   if (!candidate) {
     return res.status(404).json({ success: false, message: "Candidate not found" });
@@ -339,19 +332,8 @@ const submitInterviewFeedback = async (req, res) => {
 };
 
 module.exports = {
-  createRequisition,
-  getMyRequisitions,
-  getAllRequisitions,
-  getPendingRequisitions,
-  getRequisitionById,
-  approveRequisition,
-  rejectRequisition,
-  holdRequisition,
-  requestRevision,
-  addCandidate,
-  getCandidatesByRequisition,
-  getCandidateById,
-  updateCandidateStage,
-  scheduleInterview,
-  submitInterviewFeedback,
+  createRequisition, getMyRequisitions, getAllRequisitions, getPendingRequisitions,
+  getRequisitionById, approveRequisition, rejectRequisition, holdRequisition,
+  requestRevision, addCandidate, getCandidatesByRequisition, getCandidateById,
+  updateCandidateStage, scheduleInterview, submitInterviewFeedback,
 };
