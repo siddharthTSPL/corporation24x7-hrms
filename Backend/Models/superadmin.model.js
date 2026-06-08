@@ -1,6 +1,6 @@
-import mongoose from "mongoose";
-import bcrypt from "bcrypt";
-import crypto from "crypto";
+const mongoose = require("mongoose");
+const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 
 const extractDomain = (email) => {
   if (!email || !email.includes("@")) return null;
@@ -29,78 +29,6 @@ const generateLicenseKey = (product) => {
   return `TORCHX-${product.replace("torchx_", "").toUpperCase()}-${random}`;
 };
 
-const GSTIN_CHARSET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
-export const validateGSTIN = (gstin) => {
-  if (!gstin || typeof gstin !== "string") return false;
-  const g = gstin.trim().toUpperCase();
-  if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(g)) return false;
-  let sum = 0;
-  for (let i = 0; i < 14; i++) {
-    const val = GSTIN_CHARSET.indexOf(g[i]);
-    const factor = i % 2 === 0 ? 1 : 2;
-    const product = val * factor;
-    sum += Math.floor(product / 36) + (product % 36);
-  }
-  const checkDigit = (36 - (sum % 36)) % 36;
-  return GSTIN_CHARSET[checkDigit] === g[14];
-};
-
-export const validatePAN = (pan) => {
-  if (!pan || typeof pan !== "string") return false;
-  const p = pan.trim().toUpperCase();
-  if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(p)) return false;
-  const validTypes = ["P", "C", "H", "F", "A", "T", "B", "L", "J", "G"];
-  return validTypes.includes(p[3]);
-};
-
-export const validatePanOrGstin = (value) => {
-  if (!value || typeof value !== "string") {
-    return { valid: false, type: null, error: "PAN or GSTIN is required" };
-  }
-  const v = value.trim().toUpperCase();
-  if (v.length === 15) {
-    if (validateGSTIN(v)) return { valid: true, type: "GSTIN", value: v };
-    return { valid: false, type: "GSTIN", error: "Invalid GSTIN — checksum or format mismatch" };
-  }
-  if (v.length === 10) {
-    if (validatePAN(v)) return { valid: true, type: "PAN", value: v };
-    return { valid: false, type: "PAN", error: "Invalid PAN — format must be AAAAA0000A with a valid entity type" };
-  }
-  return { valid: false, type: null, error: "Must be a 10-character PAN or 15-character GSTIN" };
-};
-
-export const validateOrganisationName = (name) => {
-  if (!name || typeof name !== "string") {
-    return { valid: false, error: "Organisation name is required" };
-  }
-  const trimmed = name.trim();
-  if (trimmed.length < 3) {
-    return { valid: false, error: "Organisation name is too short" };
-  }
-  if (/^[^a-zA-Z]*$/.test(trimmed)) {
-    return { valid: false, error: "Organisation name must contain letters" };
-  }
-  if (/^[a-zA-Z]{1,2}$/.test(trimmed)) {
-    return { valid: false, error: "Organisation name must be a real company name" };
-  }
-  if (/^(.)\1+$/i.test(trimmed.replace(/\s/g, ""))) {
-    return { valid: false, error: "Organisation name does not look real" };
-  }
-  const words = trimmed.split(/\s+/).filter(Boolean);
-  const hasRealWord = words.some((w) => /[a-zA-Z]{3,}/.test(w));
-  if (!hasRealWord) {
-    return { valid: false, error: "Organisation name must contain at least one meaningful word" };
-  }
-  if (/[^a-zA-Z0-9\s\.\,\&\-\'\/]/.test(trimmed)) {
-    return { valid: false, error: "Organisation name contains invalid special characters" };
-  }
-  if (/^[\s\d\.\-\&]+$/.test(trimmed)) {
-    return { valid: false, error: "Organisation name must have real words, not just symbols or numbers" };
-  }
-  return { valid: true };
-};
-
 const licenseSchema = new mongoose.Schema(
   {
     product: {
@@ -111,6 +39,7 @@ const licenseSchema = new mongoose.Schema(
     license_key: {
       type: String,
       required: true,
+      unique: true,
     },
     activatedAt: {
       type: Date,
@@ -129,27 +58,6 @@ const licenseSchema = new mongoose.Schema(
       enum: ["startup", "business", "enterprise"],
       default: "startup",
     },
-    plan_type: {
-      type: String,
-      enum: ["monthly", "yearly"],
-      default: "monthly",
-    },
-    users: {
-      type: Number,
-      default: 0,
-    },
-  },
-  { _id: false }
-);
-
-const addressSchema = new mongoose.Schema(
-  {
-    line1:    { type: String, default: "" },
-    line2:    { type: String, default: "" },
-    city:     { type: String, default: "" },
-    state:    { type: String, default: "" },
-    zip_code: { type: String, default: "" },
-    country:  { type: String, default: "India" },
   },
   { _id: false }
 );
@@ -161,65 +69,81 @@ const superAdminSchema = new mongoose.Schema(
       unique: true,
     },
     f_name: String,
+
     l_name: String,
+
     email: {
       type: String,
       unique: true,
       required: true,
     },
+
     password: {
       type: String,
       required: true,
     },
+
     organisation_name: {
       type: String,
       required: true,
       unique: true,
     },
+
+    country: {
+      type: String,
+    },
+
+    state: {
+      type: String,
+    },
+
+    city: {
+      type: String,
+    },
+
+    zip_code: {
+      type: String,
+    },
+
     company_domain: {
       type: String,
     },
-    pan_or_gstin: {
-      type: String,
-      trim: true,
-      uppercase: true,
-    },
-    pan_gstin_type: {
-      type: String,
-      enum: ["PAN", "GSTIN"],
-    },
-    address: {
-      type: addressSchema,
-      default: () => ({}),
-    },
+
     purchased_products: [
       {
         type: String,
         enum: SOFTWARE_PRODUCTS,
       },
     ],
+
     licenses: [licenseSchema],
+
     trial_started_at: {
       type: Date,
       default: Date.now,
     },
+
     trial_expires_at: {
       type: Date,
       default: () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     },
+
     is_trial_active: {
       type: Boolean,
       default: true,
     },
+
     role: {
       type: String,
       default: "super_admin",
     },
+
     status: {
       type: String,
       enum: ["active", "inactive", "suspended"],
       default: "active",
     },
+
     isVerified: {
       type: Boolean,
       default: false,
@@ -255,20 +179,12 @@ superAdminSchema.methods.isTrialValid = function () {
 superAdminSchema.methods.generateLicense = function (
   product,
   durationDays = 30,
-  plan = "startup",
-  users = 1,
-  plan_type = "monthly"
+  plan = "startup"
 ) {
-  const existingIndex = this.licenses.findIndex((l) => l.product === product);
+  const existing = this.licenses.find((l) => l.product === product);
 
-  if (existingIndex !== -1) {
-    const existing = this.licenses[existingIndex];
-    if (existing.isActive && new Date(existing.expiresAt) > new Date()) {
-      throw new Error(`${product} already has an active license`);
-    }
-    this.licenses.splice(existingIndex, 1);
-    const productIndex = this.purchased_products.indexOf(product);
-    if (productIndex !== -1) this.purchased_products.splice(productIndex, 1);
+  if (existing) {
+    throw new Error(`${product} already purchased`);
   }
 
   const license = {
@@ -278,8 +194,6 @@ superAdminSchema.methods.generateLicense = function (
     expiresAt: new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000),
     isActive: true,
     plan,
-    plan_type,
-    users,
   };
 
   this.licenses.push(license);
@@ -294,6 +208,7 @@ superAdminSchema.methods.canAccessProduct = function (product) {
   }
 
   const license = this.licenses.find((l) => l.product === product);
+
   if (!license) {
     return false;
   }
@@ -321,4 +236,4 @@ superAdminSchema.statics.checkDomainAvailable = async function (
 
 const SuperAdminModel = mongoose.model("SuperAdmin", superAdminSchema);
 
-export default SuperAdminModel;
+module.exports = SuperAdminModel;
