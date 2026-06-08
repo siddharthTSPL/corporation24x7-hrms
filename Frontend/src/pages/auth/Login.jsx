@@ -29,7 +29,7 @@ function Login() {
 
   const images = [slide1, slide2, slide3];
 
-  // ✅ Added superadmin route
+
   const navigateByRole = (role) => {
     if (role === "superadmin") navigate("/superadmin-dashboard", { replace: true });
     else if (role === "admin") navigate("/dashboard", { replace: true });
