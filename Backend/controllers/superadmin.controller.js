@@ -632,6 +632,7 @@ const createAdmin = async (req, res, next) => {
       account_holder_name,
       account_number,
       ifsc_code,
+      country,
     } = req.body;
 
     if (
@@ -706,6 +707,7 @@ const createAdmin = async (req, res, next) => {
       address: address || undefined,
       city: city || undefined,
       state: state || undefined,
+      country: country || undefined,
       pincode: pincode || undefined,
       reporting_manager: reporting_manager || undefined,
       reporting_manager_model: reporting_manager_model || undefined,
