@@ -1269,11 +1269,39 @@ const rejectleavebyadmin = async (req, res, next) => {
 };
 
 const noofemployee = async (req, res, next) => {
-  const departments = await uidmodel
-    .find({}, { department: 1, lastNumber: 1, _id: 0 })
-    .lean();
-  const total = departments.reduce((sum, dep) => sum + dep.lastNumber, 0);
-  res.status(200).json({ departments, totalEmployees: total });
+  try {
+    if (!req.superAdmin) {
+      return next(
+        Object.assign(new Error("Unauthorized"), { statusCode: 401 })
+      );
+    }
+
+    const orgDoc = await uidmodel
+      .findOne({ organisation_id: req.superAdmin._id }, { departments: 1, _id: 0 })
+      .lean();
+
+    if (!orgDoc) {
+      return res.status(200).json({ departments: {}, totalEmployees: 0 });
+    }
+
+    const departments = orgDoc.departments;
+
+    
+    const departmentList = Object.entries(departments).map(([name, data]) => ({
+      department: name,
+      lastNumber: data.lastNumber,
+    }));
+
+    const total = departmentList.reduce((sum, dep) => sum + dep.lastNumber, 0);
+
+    res.status(200).json({
+      success: true,
+      departments: departmentList,
+      totalEmployees: total,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const createannouncement = async (req, res, next) => {
