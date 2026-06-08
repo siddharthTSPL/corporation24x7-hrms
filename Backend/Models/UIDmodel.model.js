@@ -1,26 +1,31 @@
-const mongoose = require("mongoose");
+const UidCounter = require("../Models/UIDmodel.model");
 
-const departmentCounterSchema = new mongoose.Schema(
-  {
-    lastNumber: { type: Number, default: 0 },
-  },
-  { _id: false }
-);
+const VALID_DEPARTMENTS = ["MGMT", "OPR", "BPO", "HR", "ENG"];
 
-const uidCounterSchema = new mongoose.Schema({
-  organisation_id: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "SuperAdmin",
-    required: true,
-    unique: true,           
-  },
-  departments: {
-    MGMT: { type: departmentCounterSchema, default: () => ({}) },
-    OPR:  { type: departmentCounterSchema, default: () => ({}) },
-    BPO:  { type: departmentCounterSchema, default: () => ({}) },
-    HR:   { type: departmentCounterSchema, default: () => ({}) },
-    ENG:  { type: departmentCounterSchema, default: () => ({}) },
-  },
-});
+const generateUID = async (department, organisation_id) => {
+  if (!organisation_id) throw new Error("organisation_id is required");
+  if (!VALID_DEPARTMENTS.includes(department))
+    throw new Error(`Invalid department: ${department}`);
 
-module.exports = mongoose.model("UidCounter", uidCounterSchema);
+
+  const setOnInsert = {};
+  VALID_DEPARTMENTS.forEach((dept) => {
+    if (dept !== department) {
+      setOnInsert[`departments.${dept}.lastNumber`] = 0;
+    }
+  });
+
+  const counter = await UidCounter.findOneAndUpdate(
+    { organisation_id },
+    {
+      $inc: { [`departments.${department}.lastNumber`]: 1 },
+      $setOnInsert: setOnInsert,
+    },
+    { new: true, upsert: true }
+  );
+
+  const lastNumber = counter.departments[department].lastNumber;
+  return department + String(lastNumber).padStart(2, "0");
+};
+
+module.exports = generateUID;
