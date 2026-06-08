@@ -397,6 +397,22 @@ const COUNTRIES = [
 const AdminModal = ({ open, onClose, initial, onSave, loading }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const passwordRegex =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&^#()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  if (!validatePassword(form.password)) {
+    alert(
+      "Password must contain at least 8 characters, one uppercase letter, one lowercase letter, one number and one special character."
+    );
+    return;
+  }
+
+
+};
+
+  const validatePassword = (password) => passwordRegex.test(password);
 
   // All keys match backend field names exactly as destructured in createAdmin controller
   const blank = {
@@ -506,54 +522,121 @@ const AdminModal = ({ open, onClose, initial, onSave, loading }) => {
           </div>
 
           {/* Password fields — create only */}
-          {!initial && (
-            <>
-              <div className="sa-fld">
-                <label className="sa-flbl">Password *</label>
-                <div style={{ position: "relative" }}>
-                  <input
-                    className="sa-finp"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Temporary password"
-                    value={form.password}
-                    onChange={set("password")}
-                    style={{ paddingRight: "45px" }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    style={{ position:"absolute", right:"14px", top:"50%", transform:"translateY(-50%)", background:"transparent", border:"none", cursor:"pointer", display:"flex", alignItems:"center", color:"#6b7280" }}
-                  >
-                    {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
-                  </button>
-                </div>
-              </div>
+         {/* Password fields — create only */}
+{!initial && (
+  <>
+    <div className="sa-fld">
+      <label className="sa-flbl">Password *</label>
 
-              <div className="sa-fld">
-                <label className="sa-flbl">Confirm Password *</label>
-                <div style={{ position: "relative" }}>
-                  <input
-                    className="sa-finp"
-                    type={showConfirmPassword ? "text" : "password"}
-                    placeholder="Confirm password"
-                    value={form.confirmPassword}
-                    onChange={set("confirmPassword")}
-                    style={{ paddingRight: "45px" }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword((v) => !v)}
-                    style={{ position:"absolute", right:"14px", top:"50%", transform:"translateY(-50%)", background:"transparent", border:"none", cursor:"pointer", display:"flex", alignItems:"center", color:"#6b7280" }}
-                  >
-                    {showConfirmPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
-                  </button>
-                </div>
-                {form.confirmPassword && !passwordsMatch && (
-                  <p style={{ color: "#ef4444", fontSize: "13px", marginTop: "6px" }}>Passwords do not match</p>
-                )}
-              </div>
-            </>
-          )}
+      <div style={{ position: "relative" }}>
+        <input
+          className="sa-finp"
+          type={showPassword ? "text" : "password"}
+          placeholder="Enter Password"
+          value={form.password}
+          onChange={set("password")}
+          style={{ paddingRight: "45px" }}
+        />
+
+        <button
+          type="button"
+          onClick={() => setShowPassword((v) => !v)}
+          style={{
+            position: "absolute",
+            right: "14px",
+            top: "50%",
+            transform: "translateY(-50%)",
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            color: "#6b7280",
+            zIndex: 1,
+          }}
+        >
+          {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+        </button>
+      </div>
+
+      {form.password && !validatePassword(form.password) && (
+        <p
+          style={{
+            color: "#dc2626",
+            fontSize: "12px",
+            marginTop: "6px",
+            lineHeight: "1.5",
+          }}
+        >
+          Password must contain:
+          <br />
+          • 1 uppercase letter
+          <br />
+          • 1 lowercase letter
+          <br />
+          • 1 number
+          <br />
+          • 1 special character
+          <br />
+          • Minimum 8 characters
+        </p>
+      )}
+    </div>
+
+    <div className="sa-fld">
+      <label className="sa-flbl">Confirm Password *</label>
+<div
+  style={{
+    position: "relative",
+    display: "flex",
+    alignItems: "center",
+  }}
+>
+  <input
+    className="sa-finp"
+    type={showPassword ? "text" : "password"}
+    placeholder="Confirm Password"
+    value={form.confirmPassword}
+    onChange={set("confirmPassword")}
+    style={{
+      paddingRight: "45px",
+      width: "100%",
+      boxSizing: "border-box",
+    }}
+  />
+
+  <button
+    type="button"
+    onClick={() => setShowPassword((v) => !v)}
+    style={{
+      position: "absolute",
+      right: "14px",
+      top: "50%",
+      transform: "translateY(-50%)",
+      background: "transparent",
+      border: "none",
+      cursor: "pointer",
+      padding: 0,
+      zIndex: 2,
+    }}
+  >
+    {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+  </button>
+</div>
+      {form.confirmPassword && !passwordsMatch && (
+        <p
+          style={{
+            color: "#ef4444",
+            fontSize: "13px",
+            marginTop: "6px",
+          }}
+        >
+          Passwords do not match
+        </p>
+      )}
+    </div>
+  </>
+)}
 
           <div className="sa-form-row">
             <div className="sa-fld">
