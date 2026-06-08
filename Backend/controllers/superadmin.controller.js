@@ -666,17 +666,18 @@ const createAdmin = async (req, res, next) => {
 
     const email = work_email.toLowerCase().trim();
 
-    const existing = await AdminModel.findOne({ work_email: email })
-      .select("_id")
-      .lean();
+    const existing = await AdminModel.findOne({ 
+  work_email: email,
+  organisation_id: req.superAdmin._id   
+}).select("_id").lean();
 
-    if (existing) {
-      return next(
-        Object.assign(new Error("An admin with this email already exists"), {
-          statusCode: 400,
-        }),
-      );
-    }
+if (existing) {
+  return next(
+    Object.assign(new Error("An admin with this email already exists in your organization"), {
+      statusCode: 400,
+    }),
+  );
+}
 
     const organisation_id = req.superAdmin._id;
 
