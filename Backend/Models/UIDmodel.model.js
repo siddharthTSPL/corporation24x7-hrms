@@ -12,7 +12,7 @@ const uidCounterSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "SuperAdmin",
     required: true,
-    unique: true,           
+    unique: true,
   },
   departments: {
     MGMT: { type: departmentCounterSchema, default: () => ({}) },
@@ -23,4 +23,6 @@ const uidCounterSchema = new mongoose.Schema({
   },
 });
 
-module.exports = mongoose.model("UidCounter", uidCounterSchema);
+const UidCounter = mongoose.model("UidCounter", uidCounterSchema);
+
+module.exports = UidCounter;

@@ -1,6 +1,12 @@
 const mongoose = require("mongoose");
 
 const documentSchema = new mongoose.Schema({
+   organisation_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "SuperAdmin",
+    required: true,
+    index: true,
+  },
   title: { type: String, required: true },
   employee: {
     type: mongoose.Schema.Types.ObjectId,

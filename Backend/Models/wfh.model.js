@@ -2,6 +2,12 @@ const mongoose = require("mongoose");
 
 const wfhSchema = new mongoose.Schema(
   {
+     organisation_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SuperAdmin",
+      required: true,
+      index: true,
+    },
     requester: {
       type: mongoose.Schema.Types.ObjectId,
       refPath: "requesterModel",
