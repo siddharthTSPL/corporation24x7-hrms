@@ -1,6 +1,12 @@
 const mongoose = require("mongoose");
 
 const managerLeaveSchema = new mongoose.Schema({
+   organisation_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "SuperAdmin",
+    required: true,
+    index: true,
+  },
   manager: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Manager",
