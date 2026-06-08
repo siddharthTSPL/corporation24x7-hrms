@@ -603,6 +603,13 @@ const resetPassword = async (req, res, next) => {
 
 const createAdmin = async (req, res, next) => {
   try {
+    if(!req.superAdmin){
+      return next(
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
+        }),
+      );
+    }
     const {
       f_name,
       l_name,
@@ -685,6 +692,7 @@ const createAdmin = async (req, res, next) => {
     
 
     const admin = await AdminModel.create({
+      organisation_id,
       uid,
       f_name,
       l_name,
