@@ -371,24 +371,112 @@ const AnnModal = ({ open, onClose, initial, onSave, loading }) => {
   );
 };
 
+const COUNTRIES = [
+  "Afghanistan","Albania","Algeria","Andorra","Angola","Antigua and Barbuda","Argentina","Armenia","Australia","Austria",
+  "Azerbaijan","Bahamas","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin","Bhutan",
+  "Bolivia","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria","Burkina Faso","Burundi","Cabo Verde","Cambodia",
+  "Cameroon","Canada","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo (Brazzaville)","Congo (Kinshasa)",
+  "Costa Rica","Croatia","Cuba","Cyprus","Czech Republic","Denmark","Djibouti","Dominica","Dominican Republic","Ecuador",
+  "Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia","Eswatini","Ethiopia","Fiji","Finland","France",
+  "Gabon","Gambia","Georgia","Germany","Ghana","Greece","Grenada","Guatemala","Guinea","Guinea-Bissau",
+  "Guyana","Haiti","Honduras","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland",
+  "Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati","Kuwait","Kyrgyzstan",
+  "Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein","Lithuania","Luxembourg","Madagascar",
+  "Malawi","Malaysia","Maldives","Mali","Malta","Marshall Islands","Mauritania","Mauritius","Mexico","Micronesia",
+  "Moldova","Monaco","Mongolia","Montenegro","Morocco","Mozambique","Myanmar","Namibia","Nauru","Nepal",
+  "Netherlands","New Zealand","Nicaragua","Niger","Nigeria","North Korea","North Macedonia","Norway","Oman","Pakistan",
+  "Palau","Palestine","Panama","Papua New Guinea","Paraguay","Peru","Philippines","Poland","Portugal","Qatar",
+  "Romania","Russia","Rwanda","Saint Kitts and Nevis","Saint Lucia","Saint Vincent and the Grenadines","Samoa","San Marino","Sao Tome and Principe","Saudi Arabia",
+  "Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Solomon Islands","Somalia","South Africa",
+  "South Korea","South Sudan","Spain","Sri Lanka","Sudan","Suriname","Sweden","Switzerland","Syria","Taiwan",
+  "Tajikistan","Tanzania","Thailand","Timor-Leste","Togo","Tonga","Trinidad and Tobago","Tunisia","Turkey","Turkmenistan",
+  "Tuvalu","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","Uruguay","Uzbekistan","Vanuatu","Vatican City",
+  "Venezuela","Vietnam","Yemen","Zambia","Zimbabwe",
+];
+
 const AdminModal = ({ open, onClose, initial, onSave, loading }) => {
-const [showPassword, setShowPassword] = useState(false);
-const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // All keys match backend field names exactly as destructured in createAdmin controller
   const blank = {
-    f_name: "", l_name: "", work_email: "", password: "",
-    gender: "", designation: "", phone: "",
-    department: "", role: "admin", office_location: "",
-    marital_status: "single", personal_contact: "", e_contact: "",
-    is_fresher: true, total_experience: 0,
-    previous_company: "", previous_designation: "",
-    aadhaar_number: "", pan_number: "",
-    residential_address: "",permanent_address: "", city: "", state: "", pincode: "",
+    f_name: "",
+    l_name: "",
+    work_email: "",
+    password: "",
+    confirmPassword: "",        // frontend-only validation field, stripped before submit
+    gender: "",
+    designation: "",
+    department: "",
+    office_location: "",
+    personal_contact: "",
+    e_contact: "",
+    role: "admin",
+    marital_status: "single",
+    is_fresher: true,
+    total_experience: 0,
+    previous_company: "",
+    previous_designation: "",
+    aadhaar_number: "",
+    pan_number: "",
+    // Two UI fields combined into backend `address` on save
+    residential_address: "",
+    permanent_address: "",
+    city: "",
+    state: "",
+    pincode: "",
+    country: "",
+    reporting_manager: "",
+    reporting_manager_model: "",
+    bank_name: "",
+    account_holder_name: "",
+    account_number: "",
+    ifsc_code: "",
   };
+
+  const parseAddress = (raw = "") => {
+    // Format stored: "Residential: <val> | Permanent: <val>"
+    const resMatch = raw.match(/Residential:\s*(.*?)(?:\s*\|\s*Permanent:|$)/);
+    const permMatch = raw.match(/Permanent:\s*(.*?)$/);
+    return {
+      residential_address: resMatch ? resMatch[1].trim() : raw,
+      permanent_address: permMatch ? permMatch[1].trim() : "",
+    };
+  };
+
   const [form, setForm] = useState(blank);
-  useEffect(() => { if (open) setForm(initial ? { ...blank, ...initial } : blank); }, [open]);
+  useEffect(() => {
+    if (open) {
+      if (initial) {
+        const { address, ...rest } = initial;
+        setForm({ ...blank, ...rest, ...parseAddress(address || ""), confirmPassword: "" });
+      } else {
+        setForm(blank);
+      }
+    }
+  }, [open]);
   if (!open) return null;
+
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const setCheck = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.checked }));
+
+  // Combine UI address fields → single backend `address`, strip frontend-only keys
+  const handleSave = () => {
+    const { confirmPassword, residential_address, permanent_address, ...rest } = form;
+    const address = [
+      residential_address ? `Residential: ${residential_address}` : "",
+      permanent_address   ? `Permanent: ${permanent_address}`     : "",
+    ].filter(Boolean).join(" | ");
+    onSave({ ...rest, address });
+  };
+
+  const passwordsMatch = !form.confirmPassword || form.password === form.confirmPassword;
+  const canSubmit =
+    !loading &&
+    form.f_name && form.l_name && form.work_email &&
+    form.gender && form.designation && form.department &&
+    form.office_location && form.personal_contact && form.e_contact &&
+    (initial || (form.password && passwordsMatch));
 
   return (
     <div className="sa-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -398,6 +486,8 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
           <button className="sa-modal-x" onClick={onClose}><FaTimes /></button>
         </div>
         <div className="sa-modal-bd">
+
+          {/* ── Basic Information ── */}
           <div className="sa-modal-section">Basic Information</div>
           <div className="sa-form-row">
             <div className="sa-fld">
@@ -409,105 +499,62 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
               <input className="sa-finp" placeholder="Last name" value={form.l_name} onChange={set("l_name")} />
             </div>
           </div>
+
           <div className="sa-fld">
             <label className="sa-flbl">Work Email *</label>
             <input className="sa-finp" type="email" placeholder="admin@company.com" value={form.work_email} onChange={set("work_email")} disabled={!!initial} />
           </div>
-         {!initial && (
-  <>
-    {/* Password */}
-    <div className="sa-fld">
-      <label className="sa-flbl">Password *</label>
 
-      <div style={{ position: "relative" }}>
-        <input
-          className="sa-finp"
-          type={showPassword ? "text" : "password"}
-          placeholder="Temporary password"
-          value={form.password}
-          onChange={set("password")}
-          style={{ paddingRight: "45px" }}
-        />
+          {/* Password fields — create only */}
+          {!initial && (
+            <>
+              <div className="sa-fld">
+                <label className="sa-flbl">Password *</label>
+                <div style={{ position: "relative" }}>
+                  <input
+                    className="sa-finp"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Temporary password"
+                    value={form.password}
+                    onChange={set("password")}
+                    style={{ paddingRight: "45px" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    style={{ position:"absolute", right:"14px", top:"50%", transform:"translateY(-50%)", background:"transparent", border:"none", cursor:"pointer", display:"flex", alignItems:"center", color:"#6b7280" }}
+                  >
+                    {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                  </button>
+                </div>
+              </div>
 
-        <button
-          type="button"
-          onClick={() => setShowPassword(!showPassword)}
-          style={{
-            position: "absolute",
-            right: "14px",
-            top: "50%",
-            transform: "translateY(-50%)",
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            color: "#6b7280",
-          }}
-        >
-          {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
-        </button>
-      </div>
-    </div>
-
-    {/* Confirm Password */}
-    <div
-      className="sa-fld"
-      style={{ marginTop: "16px" }}
-    >
-      <label className="sa-flbl">Confirm Password *</label>
-
-      <div style={{ position: "relative" }}>
-        <input
-          className="sa-finp"
-          type={showConfirmPassword ? "text" : "password"}
-          placeholder="Confirm password"
-          value={form.confirmPassword}
-          onChange={set("confirmPassword")}
-          style={{ paddingRight: "45px" }}
-        />
-
-        <button
-          type="button"
-          onClick={() =>
-            setShowConfirmPassword(!showConfirmPassword)
-          }
-          style={{
-            position: "absolute",
-            right: "14px",
-            top: "50%",
-            transform: "translateY(-50%)",
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            color: "#6b7280",
-          }}
-        >
-          {showConfirmPassword ? (
-            <FiEyeOff size={18} />
-          ) : (
-            <FiEye size={18} />
+              <div className="sa-fld">
+                <label className="sa-flbl">Confirm Password *</label>
+                <div style={{ position: "relative" }}>
+                  <input
+                    className="sa-finp"
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Confirm password"
+                    value={form.confirmPassword}
+                    onChange={set("confirmPassword")}
+                    style={{ paddingRight: "45px" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((v) => !v)}
+                    style={{ position:"absolute", right:"14px", top:"50%", transform:"translateY(-50%)", background:"transparent", border:"none", cursor:"pointer", display:"flex", alignItems:"center", color:"#6b7280" }}
+                  >
+                    {showConfirmPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                  </button>
+                </div>
+                {form.confirmPassword && !passwordsMatch && (
+                  <p style={{ color: "#ef4444", fontSize: "13px", marginTop: "6px" }}>Passwords do not match</p>
+                )}
+              </div>
+            </>
           )}
-        </button>
-      </div>
 
-      {form.confirmPassword &&
-        form.password !== form.confirmPassword && (
-          <p
-            style={{
-              color: "#ef4444",
-              fontSize: "13px",
-              marginTop: "6px",
-            }}
-          >
-            Passwords do not match
-          </p>
-        )}
-    </div>
-  </>
-  )}
           <div className="sa-form-row">
             <div className="sa-fld">
               <label className="sa-flbl">Gender *</label>
@@ -526,6 +573,7 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
               </select>
             </div>
           </div>
+
           <div className="sa-form-row">
             <div className="sa-fld">
               <label className="sa-flbl">Personal Contact *</label>
@@ -537,6 +585,7 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
             </div>
           </div>
 
+          {/* ── Work Details ── */}
           <div className="sa-modal-section">Work Details</div>
           <div className="sa-form-row">
             <div className="sa-fld">
@@ -550,6 +599,7 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
               </select>
             </div>
           </div>
+
           <div className="sa-form-row">
             <div className="sa-fld">
               <label className="sa-flbl">Department *</label>
@@ -567,6 +617,7 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
             </div>
           </div>
 
+          {/* ── Experience ── */}
           <div className="sa-modal-section">Experience</div>
           <div className="sa-form-row">
             <div className="sa-fld" style={{ display:"flex", alignItems:"center", gap:10, paddingTop:22 }}>
@@ -578,6 +629,7 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
               <input className="sa-finp" type="number" min="0" placeholder="0" value={form.total_experience} onChange={set("total_experience")} disabled={form.is_fresher} />
             </div>
           </div>
+
           {!form.is_fresher && (
             <div className="sa-form-row">
               <div className="sa-fld">
@@ -591,6 +643,7 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
             </div>
           )}
 
+          {/* ── Identity & Address ── */}
           <div className="sa-modal-section">Identity & Address</div>
           <div className="sa-form-row">
             <div className="sa-fld">
@@ -602,26 +655,18 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
               <input className="sa-finp" placeholder="ABCDE1234F" value={form.pan_number} onChange={set("pan_number")} />
             </div>
           </div>
+
+          {/* Residential + Permanent — combined into backend `address` on save */}
           <div className="sa-fld">
             <label className="sa-flbl">Residential Address</label>
-            <input className="sa-finp" placeholder="" value={form.address} onChange={set("address")} />
-            <div className="sa-fld">
-
-  <label
-    className="sa-flbl"
-    style={{ marginTop: "16px" }}
-  >
-    Permanent Address
-  </label>
-
-  <input
-    className="sa-finp"
-    value={form.permanentAddress}
-    onChange={set("permanentAddress")}
-  />
-</div>
-          
+            <input className="sa-finp" placeholder="Current / residential street, locality" value={form.residential_address} onChange={set("residential_address")} />
           </div>
+
+          <div className="sa-fld">
+            <label className="sa-flbl">Permanent Address</label>
+            <input className="sa-finp" placeholder="Permanent / hometown address" value={form.permanent_address} onChange={set("permanent_address")} />
+          </div>
+
           <div className="sa-form-row-3">
             <div className="sa-fld">
               <label className="sa-flbl">City</label>
@@ -636,14 +681,42 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
               <input className="sa-finp" placeholder="Pincode" value={form.pincode} onChange={set("pincode")} />
             </div>
           </div>
+
+          <div className="sa-fld" style={{ marginBottom: 0 }}>
+            <label className="sa-flbl">Country</label>
+            <select className="sa-fsel" value={form.country} onChange={set("country")}>
+              <option value="">Select country</option>
+              {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          {/* ── Banking (optional) ── */}
+          <div className="sa-modal-section">Banking Details <span style={{ fontWeight:400, textTransform:"none", letterSpacing:0, fontSize:10 }}>(optional)</span></div>
+          <div className="sa-form-row">
+            <div className="sa-fld">
+              <label className="sa-flbl">Bank Name</label>
+              <input className="sa-finp" placeholder="e.g. HDFC Bank" value={form.bank_name} onChange={set("bank_name")} />
+            </div>
+            <div className="sa-fld">
+              <label className="sa-flbl">Account Holder Name</label>
+              <input className="sa-finp" placeholder="As per passbook" value={form.account_holder_name} onChange={set("account_holder_name")} />
+            </div>
+          </div>
+          <div className="sa-form-row">
+            <div className="sa-fld">
+              <label className="sa-flbl">Account Number</label>
+              <input className="sa-finp" placeholder="Account number" value={form.account_number} onChange={set("account_number")} />
+            </div>
+            <div className="sa-fld" style={{ marginBottom:0 }}>
+              <label className="sa-flbl">IFSC Code</label>
+              <input className="sa-finp" placeholder="IFSC code" value={form.ifsc_code} onChange={set("ifsc_code")} />
+            </div>
+          </div>
+
         </div>
         <div className="sa-modal-ft">
           <button className="sa-btn-ghost" onClick={onClose}>Cancel</button>
-          <button
-            className="sa-btn-p"
-            onClick={() => onSave(form)}
-            disabled={loading || !form.f_name || !form.l_name || !form.work_email || !form.gender || !form.designation || !form.department || !form.office_location || !form.personal_contact || !form.e_contact || (!initial && !form.password)}
-          >
+          <button className="sa-btn-p" onClick={handleSave} disabled={!canSubmit}>
             <FaCheck style={{ fontSize: 10 }} /> {loading ? "Saving…" : initial ? "Update" : "Create"}
           </button>
         </div>
