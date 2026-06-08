@@ -51,10 +51,11 @@ export default function SuperAdminRegister() {
   };
 
   return (
-    <div
-      className="min-h-screen relative flex items-center justify-center bg-cover bg-center px-4 py-8"
-      style={{ backgroundImage: "url('/bg.jpeg')" }}
-    >
+   <div
+  className="min-h-screen flex flex-col bg-cover bg-center px-4 py-8"
+  style={{ backgroundImage: "url('/bg.jpeg')" }}
+>
+      <div className="flex-1 flex items-center justify-center">
       <div className="w-full max-w-5xl bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden">
 
         {/* ── LEFT SIDE ── */}
@@ -285,9 +286,10 @@ export default function SuperAdminRegister() {
         </div>
       </div>
 
-      <p className="fixed bottom-2 left-0 w-full text-center text-gray-600 text-sm font-medium">
-        © 2026, TechTorch Solutions Private Limited. All Rights Reserved.
-      </p>
+    </div>
+    <footer className="w-full py-4 text-center text-gray-600 text-sm font-medium">
+  © 2026, TechTorch Solutions Private Limited. All Rights Reserved.
+</footer>
     </div>
   );
 }
