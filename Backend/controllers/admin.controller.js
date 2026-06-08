@@ -1424,35 +1424,68 @@ const adminActionOnLeave = async (req, res, next) => {
 
 const adminSubmitTicket = async (req, res, next) => {
   try {
+    if (!req.admin) {
+      return res.status(401).json({
+        message: "Not authenticated",
+      });
+    }
+
+    const organisation_id = req.admin.organisation_id;
+
     const {
-      type, category, subCategory, title, description,
-      incidentDate, incidentLocation, witnessNames,
-      severity, isAnonymous, againstId, againstModel, attachments,
+      type,
+      category,
+      subCategory,
+      title,
+      description,
+      incidentDate,
+      incidentLocation,
+      witnessNames,
+      severity,
+      isAnonymous,
+      againstId,
+      againstModel,
+      attachments,
     } = req.body;
 
-    if (!req.admin)
-      return res.status(401).json({ message: "Not authenticated" });
-
     const ticket = await Ticket.create({
-      organisation_id: req.admin.organisation_id,
-      type, category, subCategory, title, description,
-      incidentDate, incidentLocation,
+      organisation_id, 
+
+      type,
+      category,
+      subCategory,
+      title,
+      description,
+      incidentDate,
+      incidentLocation,
+
       witnessNames: witnessNames || [],
       severity: severity || "medium",
       isAnonymous: isAnonymous || false,
+
       submittedBy: isAnonymous ? null : req.admin._id,
       submitterModel: isAnonymous ? null : "Admin",
       submitterDept: req.admin.department,
       submitterRole: "admin",
+
       against: againstId || undefined,
       againstModel: againstModel || undefined,
+
       attachments: attachments || [],
     });
 
     res.status(201).json({
       success: true,
-      message: "Ticket submitted successfully.",
-      ticket: { ticketNumber: ticket.ticketNumber, type: ticket.type, status: ticket.status, slaDeadline: ticket.slaDeadline, confidentialityLevel: ticket.confidentialityLevel },
+      message: "Ticket submitted successfully",
+      ticket: {
+        id: ticket._id,
+        ticketNumber: ticket.ticketNumber,
+        organisation_id: ticket.organisation_id,
+        type: ticket.type,
+        status: ticket.status,
+        slaDeadline: ticket.slaDeadline,
+        confidentialityLevel: ticket.confidentialityLevel,
+      },
     });
   } catch (err) {
     next(err);
