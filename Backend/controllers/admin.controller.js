@@ -1029,27 +1029,42 @@ const verifyAotp = async (req, res, next) => {
   if (!otpRecord)
     return next(Object.assign(new Error("OTP not found"), { statusCode: 404 }));
   if (otpRecord.isExpired())
-    return next(
-      Object.assign(new Error("OTP has expired"), { statusCode: 400 }),
-    );
+    return next(Object.assign(new Error("OTP has expired"), { statusCode: 400 }));
   if (!otpRecord.compareOtp(String(otp)))
     return next(Object.assign(new Error("Invalid OTP"), { statusCode: 400 }));
+
   const admin = await Adminmodel.findOne({ work_email: email })
-    .select("_id work_email")
+    .select("_id work_email role")
     .lean();
   if (!admin)
-    return next(
-      Object.assign(new Error("Admin not found"), { statusCode: 404 }),
-    );
-  const resetToken = jwt.sign(
-    { email: admin.work_email },
+    return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
+
+  const token = jwt.sign(
+    { adminid: admin._id, role: admin.role },
     process.env.JWT_SECRET,
-    { expiresIn: "15m" },
+    { expiresIn: "7d" }
   );
+
   await OtpModel.deleteOne({ email });
-  res
-    .status(200)
-    .json({ success: true, message: "OTP verified successfully", resetToken });
+
+  const isProduction = process.env.NODE_ENV === "production";
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+  Adminmodel.findByIdAndUpdate(admin._id, {
+    status: "active",
+    last_login: new Date(),
+    isFirstLogin: false,
+  }).exec();
+
+  res.status(200).json({
+    success: true,
+    message: "OTP verified successfully",
+    role: admin.role,
+  });
 };
 
 const resetAdminPassword = async (req, res, next) => {
