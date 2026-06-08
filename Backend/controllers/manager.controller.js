@@ -802,11 +802,20 @@ const verifyManagerOtp = async (req, res, next) => {
       Object.assign(new Error("Manager not found"), { statusCode: 404 }),
     );
   const token = jwt.sign(
-    { managerid: manager._id, work_email: manager.work_email },
-    process.env.JWT_SECRET,
-    { expiresIn: "1d" },
-  );
-  res.cookie("token", token, { httpOnly: true });
+  { 
+    managerid: manager._id, 
+    work_email: manager.work_email,
+    role: manager.role,
+  },
+  process.env.JWT_SECRET,
+  { expiresIn: "1d" }
+);
+  res.cookie("token", token, {
+  httpOnly: true,
+  sameSite: "lax",
+  secure: false,
+  path: "/",
+});
   const resetToken = jwt.sign(
     { work_email: manager.work_email },
     process.env.JWT_SECRET,
@@ -822,10 +831,11 @@ const verifyManagerOtp = async (req, res, next) => {
     OtpModel.deleteOne({ email: work_email }),
   ]);
   res.status(200).json({
-    message: "OTP verified. Login successful.",
-    role: manager.role,
-    passwordResetOptional: true,
-  });
+  message: "OTP verified. Login successful.",
+  role: manager.role,
+  token: token,
+  passwordResetOptional: true,
+});
 };
 
 const showPasswordPageotp = (req, res) => {
