@@ -1590,32 +1590,74 @@ const adminGetMyTickets = async (req, res, next) => {
 
 const adminRateTicket = async (req, res, next) => {
   try {
+    if (!req.admin) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated",
+      });
+    }
+
     const { ticketNumber } = req.params;
     const { rating, feedback } = req.body;
 
-    if (!req.admin)
-      return res.status(401).json({ message: "Not authenticated" });
+    const organisation_id = req.admin.organisation_id;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({
+        success: false,
+        message: "Rating must be between 1 and 5",
+      });
+    }
 
     const ticket = await Ticket.findOne({
       ticketNumber,
       submittedBy: req.admin._id,
-      organisation_id: req.admin.organisation_id,
+      organisation_id,
+      isDeleted: false,
     });
-    if (!ticket) return res.status(404).json({ message: "Ticket not found" });
-    if (!["resolved", "closed"].includes(ticket.status))
-      return res.status(400).json({ message: "Can only rate resolved or closed tickets" });
-    if (ticket.submitterRating)
-      return res.status(400).json({ message: "You have already rated this ticket" });
+
+    if (!ticket) {
+      return res.status(404).json({
+        success: false,
+        message: "Ticket not found",
+      });
+    }
+
+    if (!["resolved", "closed"].includes(ticket.status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Can only rate resolved or closed tickets",
+      });
+    }
+
+    if (ticket.submitterRating) {
+      return res.status(400).json({
+        success: false,
+        message: "You have already rated this ticket",
+      });
+    }
 
     ticket.submitterRating = rating;
-    ticket.submitterFeedback = feedback;
+    ticket.submitterFeedback = feedback || "";
     ticket.ratedAt = new Date();
-    ticket.timeline.push({ action: "rating_submitted", note: `Submitter rated resolution ${rating}/5.`, byModel: "System", byName: "Submitter" });
+
+    ticket.timeline.push({
+      action: "rating_submitted",
+      note: `Submitter rated resolution ${rating}/5`,
+      byModel: "Admin",
+      byName: `${req.admin.f_name} ${req.admin.l_name}`,
+    });
+
     await ticket.save();
 
-    res.json({ success: true, message: "Rating submitted. Thank you." });
-  } catch (err) {
-    next(err);
+    return res.status(200).json({
+      success: true,
+      organisation_id,
+      message: "Rating submitted successfully",
+      rating,
+    });
+  } catch (error) {
+    next(error);
   }
 };
 
