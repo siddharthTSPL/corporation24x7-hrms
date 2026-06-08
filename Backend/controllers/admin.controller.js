@@ -1663,25 +1663,47 @@ const adminRateTicket = async (req, res, next) => {
 
 const adminGetTicketDetail = async (req, res, next) => {
   try {
+    if (!req.admin) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated",
+      });
+    }
+
     const { ticketNumber } = req.params;
-    if (!req.admin)
-      return res.status(401).json({ message: "Not authenticated" });
+    const organisation_id = req.admin.organisation_id;
 
     const ticket = await Ticket.findOne({
       ticketNumber,
       submittedBy: req.admin._id,
-      organisation_id: req.admin.organisation_id,
+      organisation_id,
       isDeleted: false,
     })
-      .populate("submittedBy", "f_name l_name work_email department designation")
-      .populate("against", "f_name l_name work_email department designation")
+      .populate(
+        "submittedBy",
+        "f_name l_name work_email department designation"
+      )
+      .populate(
+        "against",
+        "f_name l_name work_email department designation"
+      )
       .select("-internalNotes")
       .lean();
 
-    if (!ticket) return res.status(404).json({ message: "Ticket not found" });
-    res.json({ success: true, ticket });
-  } catch (err) {
-    next(err);
+    if (!ticket) {
+      return res.status(404).json({
+        success: false,
+        message: "Ticket not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      organisation_id,
+      ticket,
+    });
+  } catch (error) {
+    next(error);
   }
 };
 
