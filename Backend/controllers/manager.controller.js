@@ -509,14 +509,32 @@ const reviewtoemployee = async (req, res, next) => {
 };
 
 const getme = async (req, res, next) => {
-  if (!req.manager) return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  if (!req.manager) {
+    return next(
+      Object.assign(new Error("Unauthorized"), { statusCode: 401 })
+    );
+  }
+
   const manager = req.manager;
   const organisation_id = manager.organisation_id;
-  const [leavebalance, review] = await Promise.all([
-    LeaveBalance.find({ employee: manager._id, organisation_id }).lean(),
-    Review.find({ reviewer: manager._id, organisation_id }).lean(),
+
+  const [leavebalance, reviews] = await Promise.all([
+    LeaveBalance.find({
+      employee: manager._id,
+      organisation_id,
+    }).lean(),
+
+    Review.find({
+      reviewee: manager._id,
+      organisation_id,
+    }).lean(),
   ]);
-  res.status(200).json({ manager, leavebalance, review });
+
+  res.status(200).json({
+    manager,
+    leavebalance,
+    reviews,
+  });
 };
 
 const editprofilemanager = async (req, res, next) => {
