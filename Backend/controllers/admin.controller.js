@@ -117,97 +117,236 @@ const adminlogout = async (req, res, next) => {
 };
 
 const addmanager = async (req, res, next) => {
-  if (!req.admin)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  try {
+    if (!req.admin) {
+      return next(
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
+        })
+      );
+    }
 
-  const {
-    profile_image, f_name, l_name, work_email, gender,
-    marital_status, password, personal_contact, e_contact, aadhaar_number,
-    pan_number, address, city, state, pincode, role, office_location,
-    designation, department, reporting_manager, is_fresher, total_experience,
-    previous_company, previous_designation, bank_name, account_holder_name,
-    account_number, ifsc_code, resume, aadhaar_card, pan_card, experience_letter,
-  } = req.body;
+    const {
+      profile_image,
+      f_name,
+      l_name,
+      work_email,
+      gender,
+      marital_status,
+      password,
+      personal_contact,
+      e_contact,
+      aadhaar_number,
+      pan_number,
+      address,
+      city,
+      state,
+      pincode,
+      role,
+      office_location,
+      designation,
+      department,
+      reporting_manager,
+      is_fresher,
+      total_experience,
+      previous_company,
+      previous_designation,
+      bank_name,
+      account_holder_name,
+      account_number,
+      ifsc_code,
+      resume,
+      aadhaar_card,
+      pan_card,
+      experience_letter,
+    } = req.body;
 
-  if (!f_name || !l_name || !work_email || !password || !department || !designation || !office_location || !gender || !personal_contact || !e_contact)
-    return next(Object.assign(new Error("Required fields missing"), { statusCode: 400 }));
+    if (
+      !f_name ||
+      !l_name ||
+      !work_email ||
+      !password ||
+      !department ||
+      !designation ||
+      !office_location ||
+      !gender ||
+      !personal_contact ||
+      !e_contact
+    ) {
+      return next(
+        Object.assign(new Error("Required fields missing"), {
+          statusCode: 400,
+        })
+      );
+    }
 
-  const organisation_id = req.admin.organisation_id;
+    const superAdmin = await SuperAdminModel.findById(
+      req.admin.organisation_id
+    ).select("_id organisation_name");
 
-  const existingManager = await Managermodel.findOne({ work_email, organisation_id }).select("_id").lean();
-  if (existingManager)
-    return next(Object.assign(new Error("Manager already exists"), { statusCode: 400 }));
+    if (!superAdmin) {
+      return next(
+        Object.assign(
+          new Error(
+            "Organisation not found. Please contact administrator."
+          ),
+          { statusCode: 404 }
+        )
+      );
+    }
 
-  const uid = await generateUID(department, organisation_id);
+    const organisation_id = superAdmin._id;
 
-  let reportingManagerId = null;
-  let reportingManagerModel = null;
+    const existingManager = await Managermodel.findOne({
+      work_email,
+      organisation_id,
+    })
+      .select("_id")
+      .lean();
 
-  if (reporting_manager) {
-    const isAdmin = await Adminmodel.findOne({ _id: reporting_manager, organisation_id }).select("_id").lean();
-    if (isAdmin) {
-      reportingManagerId = reporting_manager;
-      reportingManagerModel = "Admin";
-    } else {
-      const isMgr = await Managermodel.findOne({ _id: reporting_manager, organisation_id }).select("_id").lean();
-      if (isMgr) {
-        reportingManagerId = reporting_manager;
-        reportingManagerModel = "Manager";
+    if (existingManager) {
+      return next(
+        Object.assign(new Error("Manager already exists"), {
+          statusCode: 400,
+        })
+      );
+    }
+
+    const uid = await generateUID(
+      department,
+      organisation_id
+    );
+
+    let reportingManagerId = null;
+    let reportingManagerModel = null;
+
+    if (reporting_manager) {
+      const admin = await Adminmodel.findOne({
+        _id: reporting_manager,
+        organisation_id,
+      })
+        .select("_id")
+        .lean();
+
+      if (admin) {
+        reportingManagerId = admin._id;
+        reportingManagerModel = "Admin";
+      } else {
+        const manager = await Managermodel.findOne({
+          _id: reporting_manager,
+          organisation_id,
+        })
+          .select("_id")
+          .lean();
+
+        if (manager) {
+          reportingManagerId = manager._id;
+          reportingManagerModel = "Manager";
+        }
       }
     }
+
+    const newmanager = await Managermodel.create({
+      organisation_id,
+      profile_image,
+      uid,
+      department,
+      f_name,
+      l_name,
+      work_email,
+      password,
+      gender,
+      marital_status,
+      personal_contact,
+      e_contact,
+      aadhaar_number,
+      pan_number,
+      address,
+      city,
+      state,
+      pincode,
+      role,
+      designation,
+      office_location,
+      reporting_manager: reportingManagerId,
+      reporting_manager_model: reportingManagerModel,
+      is_fresher,
+      total_experience,
+      previous_company,
+      previous_designation,
+      bank_name,
+      account_holder_name,
+      account_number,
+      ifsc_code,
+      resume,
+      aadhaar_card,
+      pan_card,
+      experience_letter,
+    });
+
+    const token = jwt.sign(
+      {
+        managerid: newmanager._id,
+        work_email: newmanager.work_email,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    const verifyLink = `${process.env.BASE_URL}talent/api/manager/verify/${token}`;
+
+    await Promise.all([
+      assignDefaultLeave(newmanager),
+
+      sendEmail({
+        to: work_email,
+        subject: "Activate Your Manager Account",
+        html: `
+          <div style="font-family:Arial,sans-serif;padding:20px">
+            <h2>Hello ${f_name},</h2>
+
+            <p>Your manager account has been created successfully.</p>
+
+            <p><strong>UID:</strong> ${uid}</p>
+            <p><strong>Department:</strong> ${department}</p>
+            <p><strong>Designation:</strong> ${designation}</p>
+
+            <p>Please verify your account by clicking below:</p>
+
+            <a href="${verifyLink}"
+              style="
+                background:#730042;
+                color:#fff;
+                padding:12px 24px;
+                text-decoration:none;
+                border-radius:6px;
+                display:inline-block;
+              ">
+              Verify Account
+            </a>
+
+            <p>This link will expire in 1 hour.</p>
+
+            <p>Regards,<br/>HR Team</p>
+          </div>
+        `,
+      }),
+    ]);
+
+    return res.status(201).json({
+      success: true,
+      message:
+        "Manager added successfully. Verification email sent.",
+      manager: {
+        _id: newmanager._id,
+        uid: newmanager.uid,
+        work_email: newmanager.work_email,
+        organisation_id: newmanager.organisation_id,
+      },
+    });
+  } catch (error) {
+    next(error);
   }
-
-  const newmanager = await Managermodel.create({
-    organisation_id,
-    profile_image,
-    uid,
-    department,
-    f_name,
-    l_name,
-    work_email,
-    password,
-    gender,
-    marital_status,
-    personal_contact,
-    e_contact,
-    aadhaar_number,
-    pan_number,
-    address,
-    city,
-    state,
-    pincode,
-    role,
-    designation,
-    office_location,
-    reporting_manager: reportingManagerId,
-    reporting_manager_model: reportingManagerModel,
-    is_fresher,
-    total_experience,
-    previous_company,
-    previous_designation,
-    bank_name,
-    account_holder_name,
-    account_number,
-    ifsc_code,
-    resume,
-    aadhaar_card,
-    pan_card,
-    experience_letter,
-  });
-
-  const token = jwt.sign({ managerid: newmanager._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
-  const verifyLink = `${process.env.BASE_URL}talent/api/manager/verify/${token}`;
-
-  Promise.all([
-    assignDefaultLeave(newmanager),
-    sendEmail({
-      to: work_email,
-      subject: "Activate Your Manager Account",
-      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F9F8F2;font-family:Segoe UI,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center"><table width="600" style="background:#fff;border-radius:14px;overflow:hidden;"><tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h1>Manager Onboarding</h1></td></tr><tr><td style="padding:40px;"><h2>Hi ${f_name}</h2><p>Your manager account has been created.</p><p><strong>Role:</strong> ${designation}</p><p><strong>Department:</strong> ${department}</p><p><strong>Location:</strong> ${office_location}</p><a href="${verifyLink}" style="background:#CD166E;color:white;padding:14px 30px;text-decoration:none;border-radius:8px;">Verify Account</a></td></tr></table></td></tr></table></body></html>`,
-    }),
-  ]);
-
-  res.status(201).json({ success: true, message: "Manager added successfully. Verification email sent." });
 };
 
 const addemployee = async (req, res, next) => {
