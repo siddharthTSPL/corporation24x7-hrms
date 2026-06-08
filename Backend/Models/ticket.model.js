@@ -47,6 +47,14 @@ const attachmentSchema = new mongoose.Schema({
 
 const ticketSchema = new mongoose.Schema(
   {
+ 
+    organisation_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SuperAdmin",
+      required: true,
+      index: true,
+    },
+
     ticketNumber: { type: String, unique: true, index: true },
 
     type: {
@@ -214,15 +222,20 @@ ticketSchema.pre("save", async function () {
     };
     const prefix = prefixMap[this.type] || "TCKT";
     const year = new Date().getFullYear();
-    const count = await this.constructor.countDocuments({ type: this.type });
+
+  
+    const count = await this.constructor.countDocuments({
+      type: this.type,
+      organisation_id: this.organisation_id,
+    });
     this.ticketNumber = `HRMS-${prefix}-${year}-${String(count + 1).padStart(4, "0")}`;
 
     const slaDays = {
-      posh: { low: 7, medium: 7, high: 3, critical: 1 },
-      whistleblower: { low: 14, medium: 7, high: 3, critical: 1 },
-      complaint: { low: 21, medium: 14, high: 7, critical: 3 },
-      grievance: { low: 30, medium: 21, high: 14, critical: 7 },
-      suggestion: { low: 45, medium: 30, high: 30, critical: 30 },
+      posh:          { low: 7,  medium: 7,  high: 3,  critical: 1  },
+      whistleblower: { low: 14, medium: 7,  high: 3,  critical: 1  },
+      complaint:     { low: 21, medium: 14, high: 7,  critical: 3  },
+      grievance:     { low: 30, medium: 21, high: 14, critical: 7  },
+      suggestion:    { low: 45, medium: 30, high: 30, critical: 30 },
     };
     const days = slaDays[this.type]?.[this.severity] ?? 14;
     this.slaDeadline = new Date(Date.now() + days * 86400000);
@@ -252,6 +265,9 @@ ticketSchema.pre("save", async function () {
   }
 });
 
+ticketSchema.index({ organisation_id: 1, type: 1, status: 1 });
+ticketSchema.index({ organisation_id: 1, status: 1, isOverdue: 1 });
+ticketSchema.index({ organisation_id: 1, createdAt: -1 });
 ticketSchema.index({ type: 1, status: 1 });
 ticketSchema.index({ status: 1, isOverdue: 1 });
 ticketSchema.index({ createdAt: -1 });
@@ -259,7 +275,12 @@ ticketSchema.index({ slaDeadline: 1, status: 1 });
 ticketSchema.index({ submittedBy: 1 });
 ticketSchema.index({ against: 1 });
 
-ticketSchema.statics.getDashboardStats = async function () {
+
+ticketSchema.statics.getDashboardStats = async function (organisation_id) {
+  if (!organisation_id) throw new Error("organisation_id is required for getDashboardStats");
+
+  const baseMatch = { isDeleted: false, organisation_id };
+
   const [
     typeCounts,
     statusCounts,
@@ -268,23 +289,23 @@ ticketSchema.statics.getDashboardStats = async function () {
     monthlyCounts,
   ] = await Promise.all([
     this.aggregate([
-      { $match: { isDeleted: false } },
+      { $match: baseMatch },
       { $group: { _id: "$type", count: { $sum: 1 } } },
     ]),
 
     this.aggregate([
-      { $match: { isDeleted: false } },
+      { $match: baseMatch },
       { $group: { _id: "$status", count: { $sum: 1 } } },
     ]),
 
     this.countDocuments({
-      isDeleted: false,
+      ...baseMatch,
       isOverdue: true,
       status: { $nin: ["resolved", "closed", "rejected"] },
     }),
 
     this.countDocuments({
-      isDeleted: false,
+      ...baseMatch,
       $or: [{ severity: "critical" }, { type: "posh" }],
       status: { $nin: ["resolved", "closed", "rejected"] },
     }),
@@ -292,7 +313,7 @@ ticketSchema.statics.getDashboardStats = async function () {
     this.aggregate([
       {
         $match: {
-          isDeleted: false,
+          ...baseMatch,
           createdAt: { $gte: new Date(Date.now() - 180 * 86400000) },
         },
       },
@@ -311,11 +332,11 @@ ticketSchema.statics.getDashboardStats = async function () {
   ]);
 
   return {
-    byType: Object.fromEntries(typeCounts.map((t) => [t._id, t.count])),
-    byStatus: Object.fromEntries(statusCounts.map((s) => [s._id, s.count])),
-    overdue: overdueCounts,
+    byType:        Object.fromEntries(typeCounts.map((t) => [t._id, t.count])),
+    byStatus:      Object.fromEntries(statusCounts.map((s) => [s._id, s.count])),
+    overdue:       overdueCounts,
     criticalOrPosh: recentCritical,
-    monthly: monthlyCounts,
+    monthly:       monthlyCounts,
   };
 };
 

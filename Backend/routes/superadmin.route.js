@@ -44,8 +44,8 @@ const {
 superAdminRouter.post("/register", asyncHandler(registerSuperAdmin));
 superAdminRouter.get("/verify/:token", asyncHandler(verifySuperAdmin));
 superAdminRouter.post("/login", asyncHandler(loginSuperAdmin));
-superAdminRouter.post("/forgotpassword", asyncHandler(forgotPassword));
-superAdminRouter.post("/verifyotp", asyncHandler(verifyOtp));
+superAdminRouter.post("/forgot-password", asyncHandler(forgotPassword));
+superAdminRouter.post("/verify-otp", asyncHandler(verifyOtp));
 superAdminRouter.post("/resetpassword", asyncHandler(resetPassword));
 
 superAdminRouter.get("/me", superAdminAuth, asyncHandler(getMe));
