@@ -59,7 +59,7 @@ function Login() {
   const images = [slide1, slide2, slide3];
 
   const navigateByRole = (role) => {
-    if (role === "superadmin") navigate("/superadmin-dashboard", { replace: true });
+    if (role === "superadmin" || role === "super_admin") navigate("/superadmin-dashboard", { replace: true });
     else if (role === "admin") navigate("/dashboard", { replace: true });
     else if (role === "manager") navigate("/manager-dashboard", { replace: true });
     else navigate("/employee-dashboard", { replace: true });
@@ -140,70 +140,73 @@ function Login() {
     }
     const onSuccess = () => setStep("otp");
     const onError = (err) => setErrors({ email: getErrorMessage(err) });
+
     if (form.role === "admin") {
       sendAdminOtpFn(form.email, { onSuccess, onError });
     } else if (form.role === "superadmin") {
       sendSuperAdminOtpFn({ email: form.email }, { onSuccess, onError });
     } else if (form.role === "manager") {
-      sendManagerOtpFn({ email: form.email }, { onSuccess, onError });
+      sendManagerOtpFn({ work_email: form.email }, { onSuccess, onError });
     } else if (form.role === "employee") {
       sendEmployeeOtpFn({ work_email: form.email }, { onSuccess, onError });
     }
   };
 
-const handleVerifyOtp = () => {
-  if (!form.otp) {
-    setErrors({ otp: "OTP is required" });
-    return;
-  }
+  const handleVerifyOtp = () => {
+    if (!form.otp) {
+      setErrors({ otp: "OTP is required" });
+      return;
+    }
 
-  const onError = (err) => setErrors({ otp: getErrorMessage(err) });
+    const onError = (err) => setErrors({ otp: getErrorMessage(err) });
 
-  const onSuccess = async (data) => {
-    const role = data?.role ?? form.role;
+    const onSuccess = async (data) => {
+      const rawRole = data?.role ?? form.role;
+      const role = rawRole === "super_admin" ? "superadmin" : rawRole;
 
-    if (data?.token) {
+      if (data?.token) {
+        try {
+          await fetch("http://localhost:47821/set-token", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: data.token }),
+          });
+        } catch (_) {}
+      }
+
+      localStorage.setItem("role", role);
+
       try {
-        await fetch("http://localhost:47821/set-token", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: data.token }),
-        });
-      } catch (_) {}
+        let fullData;
+        if (role === "admin") fullData = await getMeAdmin();
+        else if (role === "manager") fullData = await getMeManager();
+        else if (role === "employee") fullData = await getMeUser();
+        else if (role === "superadmin") fullData = await getMeSuperAdmin();
+
+        queryClient.setQueryData(["auth"], { role, data: fullData });
+      } catch {
+        queryClient.setQueryData(["auth"], { role, data });
+      }
+
+      navigateByRole(role);
+    };
+
+    if (form.role === "admin") {
+      verifyAdminOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
+    } else if (form.role === "superadmin") {
+      verifySuperAdminOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
+    } else if (form.role === "manager") {
+      verifyManagerOtpFn({ work_email: form.email, otp: form.otp }, { onSuccess, onError });
+    } else if (form.role === "employee") {
+      verifyEmployeeOtpFn({ work_email: form.email, otp: form.otp }, { onSuccess, onError });
     }
-
-    localStorage.setItem("role", role);
-
-    try {
-      let fullData;
-      console.log(role);
-      if (role === "admin") fullData = await getMeAdmin();
-      else if (role === "manager") fullData = await getMeManager();
-      else if (role === "employee") fullData = await getMeUser();
-      else if (role === "super_admin") fullData = await getMeSuperAdmin();
-
-      queryClient.setQueryData(["auth"], { role, data: fullData });
-    } catch {
-      queryClient.setQueryData(["auth"], { role, data });
-    }
-
-    navigateByRole(role);
   };
 
-  if (form.role === "admin") {
-    verifyAdminOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
-  } else if (form.role === "super_admin") {
-    verifySuperAdminOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
-  } else if (form.role === "manager") {
-    verifyManagerOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
-  } else if (form.role === "employee") {
-    verifyEmployeeOtpFn({ work_email: form.email, otp: form.otp }, { onSuccess, onError });
-  }
-};
-
   return (
+    <div className="flex flex-col items-center px-4">
+
     <div
-      className="min-h-screen flex items-center justify-center bg-cover bg-center px-4 relative"
+      className="min-h-screen w-full flex flex-col items-center py-8 bg-cover bg-center px-4 relative"
       style={{ backgroundImage: `url('${import.meta.env.BASE_URL}bg.jpeg')` }}
     >
       {showLoader && animationData && (
@@ -212,7 +215,7 @@ const handleVerifyOtp = () => {
         </div>
       )}
 
-      <div className="w-full max-w-5xl bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden">
+      <div className="w-full max-w-5xl  bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden">
         <div className="w-full md:w-1/2 p-8">
           <img src={talent} alt="Talent" className="w-28 mb-6" />
 
@@ -234,7 +237,7 @@ const handleVerifyOtp = () => {
               </select>
 
               {form.role === "superadmin" && (
-                <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-[#730042]/8 border border-[#730042]/20 rounded-lg">
+                <div className="flex items-center gap-2 mb-3 px-3 -py-1 bg-[#730042]/8 border border-[#730042]/20 rounded-lg">
                   <span className="text-sm">🛡️</span>
                   <p className="text-xs text-[#730042] font-medium">
                     Super Admin — use your company work email
@@ -285,10 +288,7 @@ const handleVerifyOtp = () => {
               </button>
 
               <div className="flex justify-between mt-4 text-sm text-gray-500">
-                <p
-                  onClick={() => setStep("email")}
-                  className="cursor-pointer hover:text-[#730042]"
-                >
+                <p onClick={() => setStep("email")} className="cursor-pointer hover:text-[#730042]">
                   Forgot Password?
                 </p>
                 <p
@@ -379,9 +379,10 @@ const handleVerifyOtp = () => {
         </div>
       </div>
 
-      <footer className="fixed bottom-0 left-0 w-full py-3 bg-transparent text-center text-gray-600 text-sm font-medium z-10">
+      <footer className="mt-2 py-3 bg-transparent text-center text-gray-600 text-sm font-medium z-10">
         © 2026, TechTorch Solutions Private Limited. All Rights Reserved.
       </footer>
+    </div>
     </div>
   );
 }

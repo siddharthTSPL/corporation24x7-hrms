@@ -1,3 +1,4 @@
+
 const Attendance = require("../Models/attendance.model");
 const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
 
@@ -177,14 +178,14 @@ const autoCheckoutAll = async () => {
       source: "manual",
       checkIn: { $exists: true },
       checkOut: { $exists: false },
-    }).lean();
+    }).select("_id activeMinutes organisation_id").lean();
 
     if (!openSessions.length) return;
 
     const now = new Date();
     const ops = openSessions.map((a) => ({
       updateOne: {
-        filter: { _id: a._id },
+        filter: { _id: a._id, organisation_id: a.organisation_id },
         update: { $set: { checkOut: now, status: calculateStatus(a.activeMinutes) } },
       },
     }));

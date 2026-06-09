@@ -39,7 +39,8 @@ const {
     adminSubmitTicket,
   adminGetMyTickets,
   adminRateTicket,
-   adminGetTicketDetail
+   adminGetTicketDetail,
+   getmyleavehistory
 
 
 } = require("../controllers/admin.controller");
@@ -108,6 +109,11 @@ adminrouter.get(
   asyncHandler(showallleaves),
 );
 adminrouter.post("/applyleave", adminauthmiddleware, asyncHandler(applyleave));
+adminrouter.get(
+  "/getmyleavehistory",
+  adminauthmiddleware,
+  asyncHandler(getmyleavehistory)
+)
 adminrouter.put(
   "/acceptleave/:id",
   adminauthmiddleware,

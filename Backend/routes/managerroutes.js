@@ -108,7 +108,7 @@ managerrouter.post(
   asyncHandler(managercontroller.forgetpasswordloginbyotp),
 );
 managerrouter.post(
-  "/verifyMotp",
+  "/verifyotp",
   asyncHandler(managercontroller.verifyManagerOtp),
 );
 managerrouter.get(

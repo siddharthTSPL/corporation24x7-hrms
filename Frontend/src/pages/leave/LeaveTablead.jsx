@@ -2,7 +2,13 @@
 
 import React, { useState } from "react";
 import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
-import { useGetForwardedLeaves, useAcceptLeave, useRejectLeave } from "../../auth/server-state/adminleave/adminleave.hook";
+import {
+  useGetForwardedLeaves,
+  useAcceptLeave,
+  useRejectLeave,
+  useAdminApplyLeave,
+  useAdminGetMyLeaveHistory,
+} from "../../auth/server-state/adminleave/adminleave.hook";
 import {
   useAdminApplyWFH,
   useAdminGetMyWFH,
@@ -135,6 +141,13 @@ const LEAVE_FILTERS = [
   { key:"approved",  label:"Approved"  },
   { key:"rejected",  label:"Rejected"  },
   { key:"forwarded", label:"Forwarded" },
+];
+
+const BASE_LEAVE_TYPES = [
+  { value:"el",          label:"Earned Leave"  },
+  { value:"sl",          label:"Sick Leave"    },
+  { value:"half_day_el", label:"Half Day EL"   },
+  { value:"half_day_sl", label:"Half Day SL"   },
 ];
 
 const AVATAR_COLORS = [
@@ -308,13 +321,12 @@ const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, acce
   );
 };
 
-const MyBalancePanel = ({ admin }) => {
-  const { data: meData, isLoading } = useGetMeAdmin();
-  if (isLoading) return <Spinner/>;
+const MyBalancePanel = ({ admin, leaveBalance }) => {
+  if (!admin) return <Spinner/>;
 
-  const balance = meData?.leaveBalance || {};
-  const showML = admin?.gender === "female" && admin?.marital_status === "married";
-  const showPL = admin?.gender === "male"   && admin?.marital_status === "married";
+  const balance = leaveBalance || {};
+  const showML = admin.gender === "female" && admin.marital_status === "married";
+  const showPL = admin.gender === "male"   && admin.marital_status === "married";
 
   const cards = [
     { key:"el",  label:"Earned Leave",      entitled:balance.EL?.entitled||0, availed:balance.EL?.availed||0, accrued:balance.EL?.accrued||0, accent:"#22C55E", bg:"linear-gradient(135deg,#F0FDF4,#DCFCE7)" },
@@ -393,6 +405,135 @@ const MyBalancePanel = ({ admin }) => {
   );
 };
 
+const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
+  const [form, setForm] = useState({ leaveType:"el", startDate:"", endDate:"", reason:"" });
+  const [errors, setErrors] = useState({});
+
+  const { data: rawHistory, isLoading: histLoading, refetch } = useAdminGetMyLeaveHistory();
+  const applyMut = useAdminApplyLeave();
+
+  const history = Array.isArray(rawHistory) ? rawHistory : [];
+
+  const showML = admin?.gender === "female" && admin?.marital_status === "married";
+  const showPL = admin?.gender === "male"   && admin?.marital_status === "married";
+
+  const availTypes = [
+    ...BASE_LEAVE_TYPES,
+    ...(showML ? [{ value:"ml", label:"Maternity Leave" }] : []),
+    ...(showPL ? [{ value:"pl", label:"Paternity Leave" }] : []),
+  ];
+
+  const set = (k, v) => setForm(p => ({ ...p, [k]:v }));
+
+  const validate = () => {
+    const e = {};
+    if (!form.leaveType) e.leaveType = "Select a leave type";
+    if (!form.startDate) e.startDate = "Required";
+    if (!form.endDate)   e.endDate   = "Required";
+    if ((form.reason || "").trim().length < 10) e.reason = "Minimum 10 characters";
+    if (form.startDate && form.endDate && new Date(form.endDate) < new Date(form.startDate)) e.endDate = "End date cannot precede start date";
+    setErrors(e);
+    return !Object.keys(e).length;
+  };
+
+  const handleSubmit = async () => {
+    if (!validate()) return;
+    try {
+      await applyMut.mutateAsync(form);
+      showToast("Leave request submitted", "success");
+      setForm({ leaveType:"el", startDate:"", endDate:"", reason:"" });
+      setErrors({});
+      refetch();
+    } catch (err) {
+      showToast(err?.response?.data?.message || err?.message || "Something went wrong", "error");
+    }
+  };
+
+  const days = daysDiff(form.startDate, form.endDate);
+  const ib = (k) => errors[k] ? "#FCA5A5" : "#E2D8EE";
+
+  return (
+    <div>
+      <SectionBox title="New Leave Request">
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:18, marginBottom:18 }}>
+          <FormField label="Leave Type" error={errors.leaveType}>
+            <select value={form.leaveType} onChange={e => set("leaveType", e.target.value)} className="alw-input" style={{ border:`1.5px solid ${ib("leaveType")}` }}>
+              {availTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+          </FormField>
+          <FormField label="Start Date" error={errors.startDate}>
+            <input type="date" value={form.startDate} onChange={e => set("startDate", e.target.value)} min={todayStr()} className="alw-input" style={{ border:`1.5px solid ${ib("startDate")}` }}/>
+          </FormField>
+          <FormField label="End Date" error={errors.endDate}>
+            <input type="date" value={form.endDate} onChange={e => set("endDate", e.target.value)} min={form.startDate || todayStr()} className="alw-input" style={{ border:`1.5px solid ${ib("endDate")}` }}/>
+          </FormField>
+        </div>
+        {days > 0 && (
+          <div style={{ background:"linear-gradient(135deg,#F9EFF5,#F2E8F5)", border:"1px solid #DFD0EC", borderRadius:12, padding:"12px 18px", fontSize:13, color:"#6B1A4A", fontWeight:600, marginBottom:18, display:"flex", alignItems:"center", gap:8, fontFamily:"'DM Sans',sans-serif" }}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="11" rx="3" stroke="#9B2458" strokeWidth="1.3"/><path d="M1 6h12" stroke="#9B2458" strokeWidth="1.3"/><path d="M4 1v2M10 1v2" stroke="#9B2458" strokeWidth="1.3" strokeLinecap="round"/></svg>
+            <strong style={{ fontFamily:"'Playfair Display',serif", fontSize:15 }}>{days}</strong> day{days>1?"s":""} · {(LEAVE_META[form.leaveType]||{}).label||""}
+          </div>
+        )}
+        <FormField label="Reason" error={errors.reason}>
+          <textarea value={form.reason} onChange={e => set("reason", e.target.value)} placeholder="Briefly explain the reason for your leave…" className="alw-input" style={{ border:`1.5px solid ${ib("reason")}`, minHeight:88, resize:"vertical", lineHeight:1.6 }}/>
+        </FormField>
+        <p style={{ fontSize:11, color:"#9B8BAE", marginTop:4, marginBottom:18, fontFamily:"'DM Sans',sans-serif" }}>{form.reason.length}/500 chars (min 10)</p>
+        <div style={{ display:"flex", justifyContent:"flex-end", gap:10 }}>
+          <button className="alw-btn-secondary" onClick={() => { setForm({ leaveType:"el", startDate:"", endDate:"", reason:"" }); setErrors({}); }}>Clear</button>
+          <button className="alw-btn-primary" onClick={handleSubmit} disabled={applyMut.isPending}>
+            {applyMut.isPending ? "Submitting…" : "Submit Request →"}
+          </button>
+        </div>
+      </SectionBox>
+
+      <SectionBox title="My Leave History" rightEl={
+        history.length > 0
+          ? <span style={{ background:"linear-gradient(135deg,#F9EFF5,#F4E6F0)", color:"#6B1A4A", fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:20, fontFamily:"'DM Sans',sans-serif" }}>{history.length} record{history.length!==1?"s":""}</span>
+          : null
+      }>
+        {histLoading ? <Spinner/> : history.length === 0 ? <EmptyState msg="No leave records yet"/> : (
+          <div>
+            {history.map((leave, idx) => {
+              const d = leave.days || daysDiff(leave.startDate, leave.endDate);
+              const accent = (LEAVE_META[leave.leaveType]||{accent:"#8B3A8A"}).accent;
+              return (
+                <div key={leave._id || idx} className="alw-history-card" style={{ animationDelay:`${idx*.05}s` }}>
+                  <div style={{ position:"absolute", top:0, left:0, width:3, bottom:0, background:accent, borderRadius:"16px 0 0 16px" }}/>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:14, paddingLeft:8 }}>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:10 }}>
+                        <TypeBadge type={leave.leaveType}/>
+                        <StatusBadge status={leave.status}/>
+                        <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:600, background:"#F4EEF9", color:"#6B1A4A", fontFamily:"'DM Sans',sans-serif" }}>{d} day{d>1?"s":""}</span>
+                      </div>
+                      <div style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, color:"#9B8BAE", fontFamily:"'DM Sans',sans-serif" }}>
+                        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="2" width="11" height="10" rx="2.5" stroke="#C4AADA" strokeWidth="1"/><path d="M1 6h11" stroke="#C4AADA" strokeWidth="1"/><path d="M4 1v2M9 1v2" stroke="#C4AADA" strokeWidth="1" strokeLinecap="round"/></svg>
+                        <span style={{ fontWeight:500, color:"#4A3860" }}>{fmt(leave.startDate)}</span>
+                        <span style={{ color:"#D4BFEA", fontSize:10 }}>→</span>
+                        <span style={{ fontWeight:500, color:"#4A3860" }}>{fmt(leave.endDate)}</span>
+                      </div>
+                      {leave.reason && (
+                        <div style={{ background:"#FAF7FD", borderRadius:10, padding:"8px 13px", fontSize:12, color:"#4A3860", marginTop:10, borderLeft:"3px solid #D4AECB", lineHeight:1.6, fontFamily:"'DM Sans',sans-serif" }}>
+                          <span style={{ color:"#6B1A4A", fontWeight:600 }}>Reason — </span>{leave.reason}
+                        </div>
+                      )}
+                    </div>
+                    {leave.createdAt && (
+                      <div style={{ fontSize:10, color:"#9B8BAE", textAlign:"right", lineHeight:1.4, fontFamily:"'DM Sans',sans-serif", flexShrink:0 }}>
+                        Applied<br/><span style={{ fontWeight:600, color:"#7B6890" }}>{fmt(leave.createdAt)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </SectionBox>
+    </div>
+  );
+};
+
 const AllLeavesPanel = ({ showToast }) => {
   const [filter, setFilter] = useState("all");
   const [processingId, setProcessingId] = useState(null);
@@ -415,9 +556,7 @@ const AllLeavesPanel = ({ showToast }) => {
 
   const filtered = filter === "all" ? employeeLeaves : employeeLeaves.filter(l => isStatus(l, filter));
   const count = (key) => key === "all" ? employeeLeaves.length : employeeLeaves.filter(l => isStatus(l, key)).length;
-
-  const isActionable = (status) =>
-    status === "forwarded_reporting_manager" || status === "pending_manager";
+  const isActionable = (status) => status === "forwarded_reporting_manager" || status === "pending_manager";
 
   const handleAction = async (leave, action) => {
     setProcessingId(leave._id);
@@ -512,10 +651,10 @@ const ManagerLeavesPanel = ({ showToast }) => {
     <div>
       <div style={{ display:"flex", gap:12, marginBottom:22, flexWrap:"wrap" }}>
         {[
-          { label:"Total",    val:managerLeaves.length,                                                            color:"#6B1A4A", bg:"linear-gradient(135deg,#F9EFF5,#F4E6F0)" },
-          { label:"Pending",  val:managerLeaves.filter(l=>l.status?.includes("pending")).length,                   color:"#92400E", bg:"linear-gradient(135deg,#FFFBEB,#FEF3C7)" },
-          { label:"Approved", val:managerLeaves.filter(l=>l.status?.includes("approved")).length,                  color:"#14803D", bg:"linear-gradient(135deg,#F0FDF4,#DCFCE7)" },
-          { label:"Rejected", val:managerLeaves.filter(l=>l.status?.includes("rejected")).length,                  color:"#991B1B", bg:"linear-gradient(135deg,#FEF2F2,#FEE2E2)" },
+          { label:"Total",    val:managerLeaves.length,                                                 color:"#6B1A4A", bg:"linear-gradient(135deg,#F9EFF5,#F4E6F0)" },
+          { label:"Pending",  val:managerLeaves.filter(l=>l.status?.includes("pending")).length,        color:"#92400E", bg:"linear-gradient(135deg,#FFFBEB,#FEF3C7)" },
+          { label:"Approved", val:managerLeaves.filter(l=>l.status?.includes("approved")).length,       color:"#14803D", bg:"linear-gradient(135deg,#F0FDF4,#DCFCE7)" },
+          { label:"Rejected", val:managerLeaves.filter(l=>l.status?.includes("rejected")).length,       color:"#991B1B", bg:"linear-gradient(135deg,#FEF2F2,#FEE2E2)" },
         ].map((s, i) => (
           <div key={s.label} style={{ background:s.bg, borderRadius:14, padding:"12px 20px", display:"flex", alignItems:"center", gap:12, border:"1px solid rgba(0,0,0,0.05)", boxShadow:"0 2px 8px rgba(0,0,0,0.04)", animation:`fadeSlideUp .3s ease ${i*.07}s both`, minWidth:110 }}>
             <span style={{ fontSize:26, fontWeight:800, color:s.color, fontFamily:"'Playfair Display',serif", lineHeight:1 }}>{s.val}</span>
@@ -759,8 +898,9 @@ const AdminLeaveWFH = () => {
   const [tab, setTab]     = useState("allLeaves");
   const [toast, setToast] = useState({ visible:false, message:"", type:"success" });
 
-  const { data: meData } = useGetMeAdmin();
-  const admin = meData?.user || meData;
+  const { data: meData, isLoading: meLoading } = useGetMeAdmin();
+  const admin        = meData?.user  || meData;
+  const leaveBalance = meData?.leaveBalance || null;
 
   const showToast = (message, type = "success") => {
     setToast({ visible:true, message, type });
@@ -771,6 +911,7 @@ const AdminLeaveWFH = () => {
     { key:"allLeaves",     label:"Employee Leaves" },
     { key:"managerLeaves", label:"Manager Leaves"  },
     { key:"myBalance",     label:"My Balance"      },
+    { key:"applyLeave",    label:"Apply Leave"     },
     { key:"myWFH",         label:"My WFH"          },
     { key:"forwardedWFH",  label:"Forwarded WFH"   },
   ];
@@ -823,11 +964,16 @@ const AdminLeaveWFH = () => {
           })}
         </div>
 
-        {tab === "allLeaves"     && <AllLeavesPanel showToast={showToast}/>}
-        {tab === "managerLeaves" && <ManagerLeavesPanel showToast={showToast}/>}
-        {tab === "myBalance"     && <MyBalancePanel admin={admin}/>}
-        {tab === "myWFH"         && <MyWFHPanel showToast={showToast}/>}
-        {tab === "forwardedWFH"  && <ForwardedWFHPanel showToast={showToast}/>}
+        {meLoading && (tab === "myBalance" || tab === "applyLeave") ? <Spinner/> : (
+          <>
+            {tab === "allLeaves"     && <AllLeavesPanel showToast={showToast}/>}
+            {tab === "managerLeaves" && <ManagerLeavesPanel showToast={showToast}/>}
+            {tab === "myBalance"     && <MyBalancePanel admin={admin} leaveBalance={leaveBalance}/>}
+            {tab === "applyLeave"    && <ApplyLeavePanel admin={admin} leaveBalance={leaveBalance} showToast={showToast}/>}
+            {tab === "myWFH"         && <MyWFHPanel showToast={showToast}/>}
+            {tab === "forwardedWFH"  && <ForwardedWFHPanel showToast={showToast}/>}
+          </>
+        )}
       </div>
 
       <Toast toast={toast}/>

@@ -68,8 +68,7 @@ const registerSuperAdmin = async (req, res, next) => {
       process.env.JWT_SECRET,
       { expiresIn: "1h" },
     );
-    console.log(process.env.BASE_URL);
-    const verifyLink = `${process.env.BASE_URL}/superadmin/verify/${verifyToken}`;
+    const verifyLink = `${process.env.BASE_URL}talent/api/superadmin/verify/${verifyToken}`;
 
     sendEmail({
       to: email,
@@ -83,17 +82,12 @@ const registerSuperAdmin = async (req, res, next) => {
   <title>Verify Your Account</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f4f1ee;font-family:'Segoe UI',Arial,sans-serif;">
-
   <table width="100%" cellpadding="0" cellspacing="0" style="padding: 40px 16px;">
     <tr>
       <td align="center">
-
-        <!-- Card -->
         <table width="600" cellpadding="0" cellspacing="0"
           style="background:#ffffff;border-radius:16px;overflow:hidden;
                  box-shadow:0 8px 32px rgba(115,0,66,0.10);max-width:100%;">
-
-          <!-- Header Banner -->
           <tr>
             <td style="background:linear-gradient(135deg,#730042 0%,#CD166E 100%);
                         padding:40px 40px 32px 40px;text-align:center;">
@@ -110,12 +104,8 @@ const registerSuperAdmin = async (req, res, next) => {
               </p>
             </td>
           </tr>
-
-          <!-- Body -->
           <tr>
             <td style="padding:40px;">
-
-              <!-- Greeting -->
               <h2 style="margin:0 0 8px;color:#730042;font-size:20px;">
                 Hello, ${f_name} ${l_name} 👋
               </h2>
@@ -125,8 +115,6 @@ const registerSuperAdmin = async (req, res, next) => {
                 has been successfully created. You're just one step away from
                 accessing the full platform.
               </p>
-
-              <!-- Info Cards -->
               <table width="100%" cellpadding="0" cellspacing="0"
                 style="background:#fdf6fa;border-radius:10px;padding:0;margin-bottom:28px;
                        border:1px solid #f0dcea;">
@@ -158,8 +146,6 @@ const registerSuperAdmin = async (req, res, next) => {
                   </td>
                 </tr>
               </table>
-
-              <!-- CTA Button -->
               <p style="margin:0 0 16px;color:#444;font-size:15px;line-height:1.6;">
                 Click the button below to verify your email and activate your account:
               </p>
@@ -173,8 +159,6 @@ const registerSuperAdmin = async (req, res, next) => {
                   ✅ Verify My Account
                 </a>
               </div>
-
-              <!-- Fallback link -->
               <div style="background:#f9f9f9;border-left:4px solid #CD166E;
                           border-radius:4px;padding:14px 18px;margin-bottom:24px;">
                 <p style="margin:0 0 6px;font-size:13px;color:#666;">
@@ -186,8 +170,6 @@ const registerSuperAdmin = async (req, res, next) => {
                   ${verifyLink}
                 </a>
               </div>
-
-              <!-- Warning -->
               <table width="100%" cellpadding="0" cellspacing="0"
                 style="background:#fff8e1;border-radius:8px;border:1px solid #ffe082;
                        margin-bottom:8px;">
@@ -200,16 +182,12 @@ const registerSuperAdmin = async (req, res, next) => {
                   </td>
                 </tr>
               </table>
-
               <p style="margin:20px 0 0;font-size:13px;color:#999;">
                 If you did not create this account, you can safely ignore this email.
                 No action is required.
               </p>
-
             </td>
           </tr>
-
-          <!-- Footer -->
           <tr>
             <td style="background:#f4f1ee;padding:24px 40px;text-align:center;
                         border-top:1px solid #eedde8;">
@@ -221,14 +199,10 @@ const registerSuperAdmin = async (req, res, next) => {
               </p>
             </td>
           </tr>
-
         </table>
-        <!-- /Card -->
-
       </td>
     </tr>
   </table>
-
 </body>
 </html>
       `,
@@ -277,82 +251,78 @@ const loginSuperAdmin = async (req, res, next) => {
     const { identifier, password } = req.body;
 
     if (!identifier || !password)
-      return next(
-        Object.assign(new Error("Email and password are required"), {
-          statusCode: 400,
-        }),
-      );
+      return next(Object.assign(new Error("Email and password are required"), { statusCode: 400 }));
 
-    const superAdmin = await SuperAdminModel.findOne({
-      email: identifier.toLowerCase().trim(),
-    });
+    const superAdmin = await SuperAdminModel.findOne({ email: identifier.toLowerCase().trim() });
 
     if (!superAdmin)
-      return next(
-        Object.assign(new Error("No account found with this email"), {
-          statusCode: 404,
-        }),
-      );
+      return next(Object.assign(new Error("No account found with this email"), { statusCode: 404 }));
 
     if (!superAdmin.isVerified)
-      return next(
-        Object.assign(new Error("Please verify your email before logging in"), {
-          statusCode: 403,
-        }),
-      );
+      return next(Object.assign(new Error("Please verify your email before logging in"), { statusCode: 403 }));
 
     if (superAdmin.status === "suspended")
-      return next(
-        Object.assign(
-          new Error("Your account has been suspended. Contact support."),
-          { statusCode: 403 },
-        ),
-      );
+      return next(Object.assign(new Error("Your account has been suspended. Contact support."), { statusCode: 403 }));
 
     const isMatch = await superAdmin.isValidPassword(password);
     if (!isMatch)
-      return next(
-        Object.assign(new Error("Invalid credentials"), { statusCode: 401 }),
-      );
+      return next(Object.assign(new Error("Invalid credentials"), { statusCode: 401 }));
 
-   
     const trialValid = superAdmin.isTrialValid();
     const hasTalentLicense = superAdmin.licenses.some(
-      (l) =>
-        l.product === "torchx_talent" &&
-        l.isActive &&
-        new Date(l.expiresAt) > new Date()
+      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date(),
     );
 
-    if (!trialValid && !hasTalentLicense) {
+    if (!trialValid && !hasTalentLicense)
+      return next(Object.assign(
+        new Error("Your trial has expired and you have no active license for TorchX Talent. Please upgrade your plan at torchxsuite.com to continue."),
+        { statusCode: 403, code: "PLAN_EXPIRED" },
+      ));
+
+    const isProduction = process.env.NODE_ENV === "production";
+    const cookieOpts = {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+    };
+
+    if (superAdmin.isFirstLogin) {
+      const firstLoginToken = jwt.sign(
+        { superadminid: superAdmin._id, email: superAdmin.email, purpose: "first_login" },
+        process.env.JWT_SECRET,
+        { expiresIn: "15m" },
+      );
+
+      res.cookie("superResetToken", firstLoginToken, { ...cookieOpts, maxAge: 15 * 60 * 1000 });
+
+      sendEmail({
+        to: superAdmin.email,
+        subject: "Set Your Password",
+        html: `
+          <div style="font-family:Arial,sans-serif;padding:20px">
+            <h2>Hello ${superAdmin.f_name},</h2>
+            <p>This is your first login. Please set your password using the link below.</p>
+            <a href="${process.env.BASE_URL}talent/api/superadmin/reset-password"
+               style="display:inline-block;padding:12px 24px;background:#730042;color:#fff;border-radius:6px;text-decoration:none;">
+              Set Password
+            </a>
+            <p>This link expires in 15 minutes.</p>
+          </div>
+        `,
+      }).catch((err) => console.error("First login email failed:", err.message));
+
       return next(
-        Object.assign(
-          new Error(
-            "Your trial has expired and you have no active license for TorchX Talent. Please upgrade your plan at torchxsuite.com to continue."
-          ),
-          { statusCode: 403, code: "PLAN_EXPIRED" }
-        )
+        Object.assign(new Error("First login detected. Check your email to set password."), { statusCode: 403 }),
       );
     }
 
     const token = jwt.sign(
-      {
-        superadminid: superAdmin._id,
-        role: superAdmin.role,
-        email: superAdmin.email,
-        company_domain: superAdmin.company_domain,
-      },
+      { superadminid: superAdmin._id, role: superAdmin.role, email: superAdmin.email, company_domain: superAdmin.company_domain },
       process.env.JWT_SECRET,
       { expiresIn: "15d" },
     );
 
-    const isProduction = process.env.NODE_ENV === "production";
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? "none" : "lax",
-      maxAge: 15 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie("token", token, { ...cookieOpts, maxAge: 15 * 24 * 60 * 60 * 1000 });
 
     superAdmin.last_login = new Date();
     superAdmin.status = "active";
@@ -542,11 +512,18 @@ const verifyOtp = async (req, res, next) => {
   if (!otpRecord.compareOtp(String(otp)))
     return next(Object.assign(new Error("Invalid OTP"), { statusCode: 400 }));
 
-  const superAdmin = await SuperAdminModel.findOne({ email }).select("_id email role").lean();
+  const superAdmin = await SuperAdminModel.findOne({ email }).select("_id f_name email role").lean();
   if (!superAdmin)
     return next(Object.assign(new Error("Account not found"), { statusCode: 404 }));
 
   await OtpModel.deleteOne({ email });
+
+  const isProduction = process.env.NODE_ENV === "production";
+  const cookieOpts = {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+  };
 
   const token = jwt.sign(
     { superadminid: superAdmin._id, role: superAdmin.role, email: superAdmin.email },
@@ -554,62 +531,97 @@ const verifyOtp = async (req, res, next) => {
     { expiresIn: "7d" },
   );
 
-  const isProduction = process.env.NODE_ENV === "production";
-  res.cookie("token", token, {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? "none" : "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
+  const resetToken = jwt.sign(
+    { superadminid: superAdmin._id, email: superAdmin.email, purpose: "password_reset" },
+    process.env.JWT_SECRET,
+    { expiresIn: "15m" },
+  );
+
+  res.cookie("token", token, { ...cookieOpts, maxAge: 7 * 24 * 60 * 60 * 1000 });
+  res.cookie("superResetToken", resetToken, { ...cookieOpts, maxAge: 15 * 60 * 1000 });
 
   SuperAdminModel.findByIdAndUpdate(superAdmin._id, {
     status: "active",
     last_login: new Date(),
   }).exec();
 
-  res.status(200).json({ success: true, message: "OTP verified successfully", role: superAdmin.role });
+  sendEmail({
+    to: email,
+    subject: "Optional Password Reset",
+    html: `
+      <div style="font-family:Arial,sans-serif;padding:20px">
+        <h2>Hello ${superAdmin.f_name},</h2>
+        <p>Your OTP login was successful.</p>
+        <p>If you want to reset your password, click the button below. This link expires in <strong>15 minutes</strong>.</p>
+        <a href="${process.env.BASE_URL}talent/api/superadmin/reset-password"
+           style="display:inline-block;padding:12px 24px;background:#730042;color:#fff;border-radius:6px;text-decoration:none;">
+          Reset Password
+        </a>
+        <p style="color:#999;font-size:12px;">If you didn't request this, ignore this email.</p>
+      </div>
+    `,
+  }).catch((err) => console.error("Reset email failed:", err.message));
+
+  res.status(200).json({
+    success: true,
+    message: "OTP verified successfully",
+    role: superAdmin.role,
+    passwordResetOptional: true,
+  });
 };
 
 const resetPassword = async (req, res, next) => {
-  const { resetToken, newPassword } = req.body;
-  if (!resetToken || !newPassword)
-    return next(
-      Object.assign(new Error("Reset token and new password are required"), {
-        statusCode: 400,
-      }),
-    );
+  const { newPassword, confirmPassword } = req.body;
+
+  if (!newPassword || !confirmPassword)
+    return next(Object.assign(new Error("Both password fields are required"), { statusCode: 400 }));
+
+  if (newPassword !== confirmPassword)
+    return next(Object.assign(new Error("Passwords do not match"), { statusCode: 400 }));
+
+  if (newPassword.length < 8)
+    return next(Object.assign(new Error("Password must be at least 8 characters"), { statusCode: 400 }));
+
+  const resetToken = req.cookies?.superResetToken;
+  if (!resetToken)
+    return next(Object.assign(new Error("Reset session expired. Please verify OTP again."), { statusCode: 401 }));
+
   let decoded;
   try {
     decoded = jwt.verify(resetToken, process.env.JWT_SECRET);
   } catch (err) {
-    return next(
-      Object.assign(new Error("Invalid or expired reset token"), {
-        statusCode: 400,
-      }),
-    );
+    return next(Object.assign(new Error("Invalid or expired reset token"), { statusCode: 401 }));
   }
+
+  if (decoded.purpose !== "password_reset" && decoded.purpose !== "first_login")
+    return next(Object.assign(new Error("Invalid reset token"), { statusCode: 401 }));
+
   const superAdmin = await SuperAdminModel.findById(decoded.superadminid);
   if (!superAdmin)
-    return next(
-      Object.assign(new Error("Account not found"), { statusCode: 404 }),
-    );
+    return next(Object.assign(new Error("Account not found"), { statusCode: 404 }));
+
   superAdmin.password = newPassword;
+  if (decoded.purpose === "first_login") superAdmin.isFirstLogin = false;
   await superAdmin.save();
-  res.status(200).json({
-    success: true,
-    message: "Password reset successfully. You can now login.",
+
+  const isProduction = process.env.NODE_ENV === "production";
+  res.clearCookie("superResetToken", {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
   });
+
+  res.status(200).json({ success: true, message: "Password updated successfully" });
 };
 
 const createAdmin = async (req, res, next) => {
   try {
-    if(!req.superAdmin){
+    if (!req.superAdmin) {
       return next(
-        Object.assign(new Error("Unauthorized"), {
-          statusCode: 401,
-        }),
+        Object.assign(new Error("Unauthorized"), { statusCode: 401 }),
       );
     }
+
     const {
       f_name,
       l_name,
@@ -665,32 +677,27 @@ const createAdmin = async (req, res, next) => {
     }
 
     const email = work_email.toLowerCase().trim();
-
-    const existing = await AdminModel.findOne({ 
-  work_email: email,
-  organisation_id: req.superAdmin._id   
-}).select("_id").lean();
-
-if (existing) {
-  return next(
-    Object.assign(new Error("An admin with this email already exists in your organization"), {
-      statusCode: 400,
-    }),
-  );
-}
-
     const organisation_id = req.superAdmin._id;
 
-    if (!organisation_id) {
+    const existing = await AdminModel.findOne({
+      work_email: email,
+      organisation_id,
+    })
+      .select("_id")
+      .lean();
+
+    if (existing) {
       return next(
-        Object.assign(new Error("Organisation ID not found on your account"), {
-          statusCode: 400,
-        }),
+        Object.assign(
+          new Error(
+            "An admin with this email already exists in your organization",
+          ),
+          { statusCode: 400 },
+        ),
       );
     }
 
     const uid = await generateUID(department, organisation_id);
-    
 
     const admin = await AdminModel.create({
       organisation_id,
@@ -830,24 +837,18 @@ ${verifyLink}
 
 const updateAdmin = async (req, res, next) => {
   const { id } = req.params;
-  const admin = await AdminModel.findOne({
-    _id: id,
-    created_by: req.superAdmin._id,
-  });
+  const organisation_id = req.superAdmin._id;
+
+  const admin = await AdminModel.findOne({ _id: id, organisation_id });
   if (!admin)
     return next(
       Object.assign(new Error("Admin not found"), { statusCode: 404 }),
     );
-  [
-    "f_name",
-    "l_name",
-    "phone",
-    "gender",
-    "designation",
-    "profile_image",
-  ].forEach((field) => {
-    if (req.body[field] !== undefined) admin[field] = req.body[field];
-  });
+  ["f_name", "l_name", "phone", "gender", "designation", "profile_image"].forEach(
+    (field) => {
+      if (req.body[field] !== undefined) admin[field] = req.body[field];
+    },
+  );
   await admin.save();
   res.status(200).json({
     success: true,
@@ -867,10 +868,9 @@ const updateAdmin = async (req, res, next) => {
 
 const deleteAdmin = async (req, res, next) => {
   const { id } = req.params;
-  const admin = await AdminModel.findOne({
-    _id: id,
-    created_by: req.superAdmin._id,
-  });
+  const organisation_id = req.superAdmin._id;
+
+  const admin = await AdminModel.findOne({ _id: id, organisation_id });
   if (!admin)
     return next(
       Object.assign(new Error("Admin not found"), { statusCode: 404 }),
@@ -885,9 +885,7 @@ const getAllAdmins = async (req, res, next) => {
   try {
     if (!req.superAdmin) {
       return next(
-        Object.assign(new Error("Unauthorized"), {
-          statusCode: 401,
-        })
+        Object.assign(new Error("Unauthorized"), { statusCode: 401 }),
       );
     }
 
@@ -911,7 +909,9 @@ const getAllAdmins = async (req, res, next) => {
 const addmanager = async (req, res, next) => {
   try {
     if (!req.superAdmin) {
-      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+      return next(
+        Object.assign(new Error("Unauthorized"), { statusCode: 401 }),
+      );
     }
 
     const {
@@ -929,8 +929,20 @@ const addmanager = async (req, res, next) => {
       department,
     } = req.body;
 
-    if (!f_name || !work_email || !password || !department || !gender || !office_location || !designation || !personal_contact || !e_contact) {
-      return next(Object.assign(new Error("Required fields missing"), { statusCode: 400 }));
+    if (
+      !f_name ||
+      !work_email ||
+      !password ||
+      !department ||
+      !gender ||
+      !office_location ||
+      !designation ||
+      !personal_contact ||
+      !e_contact
+    ) {
+      return next(
+        Object.assign(new Error("Required fields missing"), { statusCode: 400 }),
+      );
     }
 
     const organisation_id = req.superAdmin._id;
@@ -938,10 +950,19 @@ const addmanager = async (req, res, next) => {
     const existingManager = await Managermodel.findOne({
       work_email: work_email.toLowerCase().trim(),
       organisation_id,
-    }).select("_id").lean();
+    })
+      .select("_id")
+      .lean();
 
     if (existingManager) {
-      return next(Object.assign(new Error("Manager with this email already exists in your organization"), { statusCode: 400 }));
+      return next(
+        Object.assign(
+          new Error(
+            "Manager with this email already exists in your organization",
+          ),
+          { statusCode: 400 },
+        ),
+      );
     }
 
     const uid = await generateUID(department, organisation_id);
@@ -963,7 +984,11 @@ const addmanager = async (req, res, next) => {
       designation,
     });
 
-    const token = jwt.sign({ managerid: newmanager._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    const token = jwt.sign(
+      { managerid: newmanager._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" },
+    );
     const verifyLink = `${process.env.BASE_URL}talent/api/manager/verify/${token}`;
 
     Promise.all([
@@ -997,7 +1022,9 @@ const addmanager = async (req, res, next) => {
 const addemployee = async (req, res, next) => {
   try {
     if (!req.superAdmin) {
-      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+      return next(
+        Object.assign(new Error("Unauthorized"), { statusCode: 401 }),
+      );
     }
 
     const {
@@ -1016,8 +1043,20 @@ const addemployee = async (req, res, next) => {
       Under_manager,
     } = req.body;
 
-    if (!f_name || !work_email || !password || !department || !gender || !office_location || !designation || !personal_contact || !e_contact) {
-      return next(Object.assign(new Error("Required fields missing"), { statusCode: 400 }));
+    if (
+      !f_name ||
+      !work_email ||
+      !password ||
+      !department ||
+      !gender ||
+      !office_location ||
+      !designation ||
+      !personal_contact ||
+      !e_contact
+    ) {
+      return next(
+        Object.assign(new Error("Required fields missing"), { statusCode: 400 }),
+      );
     }
 
     const organisation_id = req.superAdmin._id;
@@ -1025,10 +1064,19 @@ const addemployee = async (req, res, next) => {
     const existingUser = await Usermodel.findOne({
       work_email: work_email.toLowerCase().trim(),
       organisation_id,
-    }).select("_id").lean();
+    })
+      .select("_id")
+      .lean();
 
     if (existingUser) {
-      return next(Object.assign(new Error("Employee with this email already exists in your organization"), { statusCode: 400 }));
+      return next(
+        Object.assign(
+          new Error(
+            "Employee with this email already exists in your organization",
+          ),
+          { statusCode: 400 },
+        ),
+      );
     }
 
     const uid = await generateUID(department, organisation_id);
@@ -1051,7 +1099,11 @@ const addemployee = async (req, res, next) => {
       Under_manager: Under_manager || null,
     });
 
-    const token = jwt.sign({ userid: newuser._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    const token = jwt.sign(
+      { userid: newuser._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" },
+    );
     const verifyLink = `${process.env.BASE_URL}talent/api/user/verify/${token}`;
 
     Promise.all([
@@ -1086,9 +1138,7 @@ const findallmanagers = async (req, res, next) => {
   try {
     if (!req.superAdmin) {
       return next(
-        Object.assign(new Error("Unauthorized"), {
-          statusCode: 401,
-        })
+        Object.assign(new Error("Unauthorized"), { statusCode: 401 }),
       );
     }
 
@@ -1113,9 +1163,7 @@ const getallemployee = async (req, res, next) => {
   try {
     if (!req.superAdmin) {
       return next(
-        Object.assign(new Error("Unauthorized"), {
-          statusCode: 401,
-        })
+        Object.assign(new Error("Unauthorized"), { statusCode: 401 }),
       );
     }
 
@@ -1124,19 +1172,19 @@ const getallemployee = async (req, res, next) => {
     const [admins, managers, users] = await Promise.all([
       AdminModel.find({ organisation_id })
         .select(
-          "uid f_name l_name work_email role department designation office_location organisation_id"
+          "uid f_name l_name work_email role department designation office_location organisation_id",
         )
         .lean(),
 
       Managermodel.find({ organisation_id })
         .select(
-          "uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact"
+          "uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact",
         )
         .lean(),
 
       Usermodel.find({ organisation_id })
         .select(
-          "uid f_name l_name work_email role department designation office_location organisation_id Under_manager"
+          "uid f_name l_name work_email role department designation office_location organisation_id Under_manager",
         )
         .populate({
           path: "Under_manager",
@@ -1167,6 +1215,8 @@ const getallemployee = async (req, res, next) => {
 
 const editemployee = async (req, res, next) => {
   const { uid } = req.params;
+  const organisation_id = req.superAdmin._id;
+
   const updateData = {
     f_name: req.body.f_name,
     l_name: req.body.l_name,
@@ -1181,20 +1231,26 @@ const editemployee = async (req, res, next) => {
     department: req.body.department,
     Under_manager: req.body.Under_manager,
   };
-  const user = await Usermodel.findByIdAndUpdate(uid, updateData, {
-    new: true,
-    runValidators: true,
-  });
+
+  const user = await Usermodel.findOneAndUpdate(
+    { _id: uid, organisation_id },
+    updateData,
+    { new: true, runValidators: true },
+  );
   if (!user)
     return next(
       Object.assign(new Error("User not found"), { statusCode: 404 }),
     );
+
   let manager = null;
-  if (updateData.role === "manager")
-    manager = await Managermodel.findOneAndUpdate({ userId: uid }, updateData, {
-      new: true,
-      upsert: true,
-    });
+  if (updateData.role === "manager") {
+    manager = await Managermodel.findOneAndUpdate(
+      { _id: uid, organisation_id },
+      updateData,
+      { new: true, upsert: true },
+    );
+  }
+
   res.status(200).json({
     success: true,
     message: "Employee updated successfully",
@@ -1205,20 +1261,23 @@ const editemployee = async (req, res, next) => {
 
 const getperticularemployee = async (req, res, next) => {
   const { uid } = req.params;
+  const organisation_id = req.superAdmin._id;
+
   const [user, leaveBalance, reviews] = await Promise.all([
-    Usermodel.findById(uid)
+    Usermodel.findOne({ _id: uid, organisation_id })
       .populate({
         path: "Under_manager",
         select: "uid f_name l_name work_email role",
       })
       .select(EXCLUDE)
       .lean(),
-    leavebalanceModel.findOne({ employee: uid }).lean(),
+    leavebalanceModel.findOne({ employee: uid, organisation_id }).lean(),
     reviewModel
-      .find({ reviewee: uid })
+      .find({ reviewee: uid, organisation_id })
       .populate({ path: "reviewer", select: "f_name l_name work_email role" })
       .lean(),
   ]);
+
   if (!user)
     return next(
       Object.assign(new Error("User not found"), { statusCode: 404 }),
@@ -1227,9 +1286,14 @@ const getperticularemployee = async (req, res, next) => {
     return next(
       Object.assign(new Error("Leave balance not found"), { statusCode: 404 }),
     );
-  const manager = await Managermodel.findOne({ userId: user._id })
+
+  const manager = await Managermodel.findOne({
+    _id: user._id,
+    organisation_id,
+  })
     .select(EXCLUDE)
     .lean();
+
   res.status(200).json({
     success: true,
     user,
@@ -1241,14 +1305,17 @@ const getperticularemployee = async (req, res, next) => {
 
 const getperticularemanager = async (req, res, next) => {
   const { uid } = req.params;
+  const organisation_id = req.superAdmin._id;
+
   const [manager, leaveBalance, reviews] = await Promise.all([
-    Managermodel.findById(uid).select(EXCLUDE).lean(),
-    leavebalanceModel.findOne({ employee: uid }).lean(),
+    Managermodel.findOne({ _id: uid, organisation_id }).select(EXCLUDE).lean(),
+    leavebalanceModel.findOne({ employee: uid, organisation_id }).lean(),
     reviewModel
-      .find({ reviewee: uid })
+      .find({ reviewee: uid, organisation_id })
       .populate({ path: "reviewer", select: "f_name l_name work_email role" })
       .lean(),
   ]);
+
   if (!manager)
     return next(
       Object.assign(new Error("Manager not found"), { statusCode: 404 }),
@@ -1257,30 +1324,40 @@ const getperticularemanager = async (req, res, next) => {
     return next(
       Object.assign(new Error("Leave balance not found"), { statusCode: 404 }),
     );
-  res
-    .status(200)
-    .json({ success: true, manager, leaveBalance, reviews: reviews || [] });
+
+  res.status(200).json({
+    success: true,
+    manager,
+    leaveBalance,
+    reviews: reviews || [],
+  });
 };
 
 const deleteemployee = async (req, res, next) => {
   const { uid } = req.params;
+  const organisation_id = req.superAdmin._id;
+
   const [user, manager] = await Promise.all([
-    Usermodel.findByIdAndDelete(uid),
-    Managermodel.findByIdAndDelete(uid),
+    Usermodel.findOneAndDelete({ _id: uid, organisation_id }),
+    Managermodel.findOneAndDelete({ _id: uid, organisation_id }),
   ]);
+
   if (!user && !manager)
     return next(
       Object.assign(new Error("User not found"), { statusCode: 404 }),
     );
+
   res.status(200).json({ message: "User deleted successfully" });
 };
 
 const showallleaves = async (req, res, next) => {
-  const adminIds = await AdminModel.find({
-    created_by: req.superAdmin._id,
-  }).distinct("_id");
+  const organisation_id = req.superAdmin._id;
+
+  const adminIds = await AdminModel.find({ organisation_id }).distinct("_id");
+
   const [employeeLeaves, adminLeaves] = await Promise.all([
     Leave.find({
+      organisation_id,
       status: {
         $in: [
           "forwarded_reporting_manager",
@@ -1294,6 +1371,7 @@ const showallleaves = async (req, res, next) => {
       .sort({ createdAt: -1 })
       .lean(),
     ManagerLeave.find({
+      organisation_id,
       manager: { $in: adminIds },
       status: "pending_reporting_manager",
     })
@@ -1301,6 +1379,7 @@ const showallleaves = async (req, res, next) => {
       .sort({ createdAt: -1 })
       .lean(),
   ]);
+
   res.status(200).json({
     employeeLeaves: { count: employeeLeaves.length, leaves: employeeLeaves },
     adminLeaves: { count: adminLeaves.length, leaves: adminLeaves },
@@ -1310,41 +1389,34 @@ const showallleaves = async (req, res, next) => {
 const acceptleavebyadmin = async (req, res, next) => {
   const { id } = req.params;
   const { leaveFor } = req.query;
+  const organisation_id = req.superAdmin._id;
+
   const LeaveModel = leaveFor === "admin" ? ManagerLeave : Leave;
-  const leave = await LeaveModel.findById(id);
+  const leave = await LeaveModel.findOne({ _id: id, organisation_id });
   if (!leave)
-    return next(
-      Object.assign(new Error("Leave not found"), { statusCode: 404 }),
-    );
-  if (
-    leave.status.startsWith("approved") ||
-    leave.status.startsWith("rejected")
-  )
-    return next(
-      Object.assign(new Error("Leave already processed"), { statusCode: 400 }),
-    );
+    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
+
+  if (leave.status.startsWith("approved") || leave.status.startsWith("rejected"))
+    return next(Object.assign(new Error("Leave already processed"), { statusCode: 400 }));
+
   if (leaveFor === "admin") {
-    const adminIds = await AdminModel.find({
-      created_by: req.superAdmin._id,
-    }).distinct("_id");
-    if (!adminIds.some((id) => id.toString() === leave.manager.toString()))
+    const adminIds = await AdminModel.find({ organisation_id }).distinct("_id");
+    if (!adminIds.some((aid) => aid.toString() === leave.manager.toString()))
       return next(
-        Object.assign(
-          new Error("This leave does not belong to your organisation"),
-          { statusCode: 403 },
-        ),
+        Object.assign(new Error("This leave does not belong to your organisation"), { statusCode: 403 })
       );
-    leave.status = "approved_reporting_manager";
-  } else {
+
     const leaveBalance = await LeaveBalance.findOne({
-      employee: leave.employee,
+      employee: leave.manager,
+      organisation_id,
     });
+
+    console.log("leave.manager:", leave.manager);
+    console.log("leaveBalance found:", leaveBalance);
+
     if (!leaveBalance)
-      return next(
-        Object.assign(new Error("Leave balance not found"), {
-          statusCode: 404,
-        }),
-      );
+      return next(Object.assign(new Error("Admin leave balance not found"), { statusCode: 404 }));
+
     if (leave.leaveType === "ml") {
       const start = new Date(leave.startDate);
       const end = new Date(start);
@@ -1353,9 +1425,30 @@ const acceptleavebyadmin = async (req, res, next) => {
       leaveBalance.mlEndDate = end;
       await leaveBalance.save();
     }
+
     await processLeaveDeduction(leave);
-    leave.status = "approved_reporting_manager";
+
+  } else {
+    const leaveBalance = await LeaveBalance.findOne({
+      employee: leave.employee,
+      organisation_id,
+    });
+    if (!leaveBalance)
+      return next(Object.assign(new Error("Leave balance not found"), { statusCode: 404 }));
+
+    if (leave.leaveType === "ml") {
+      const start = new Date(leave.startDate);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 181);
+      leaveBalance.mlStartDate = start;
+      leaveBalance.mlEndDate = end;
+      await leaveBalance.save();
+    }
+
+    await processLeaveDeduction(leave);
   }
+
+  leave.status = "approved_reporting_manager";
   leave.approvedBy = req.superAdmin._id;
   await leave.save();
   res.status(200).json({ message: "Leave approved", leave });
@@ -1364,8 +1457,10 @@ const acceptleavebyadmin = async (req, res, next) => {
 const rejectleavebyadmin = async (req, res, next) => {
   const { id } = req.params;
   const { leaveFor } = req.query;
+  const organisation_id = req.superAdmin._id;
+
   const LeaveModel = leaveFor === "admin" ? ManagerLeave : Leave;
-  const leave = await LeaveModel.findById(id);
+  const leave = await LeaveModel.findOne({ _id: id, organisation_id });
   if (!leave)
     return next(
       Object.assign(new Error("Leave not found"), { statusCode: 404 }),
@@ -1377,11 +1472,10 @@ const rejectleavebyadmin = async (req, res, next) => {
     return next(
       Object.assign(new Error("Leave already processed"), { statusCode: 400 }),
     );
+
   if (leaveFor === "admin") {
-    const adminIds = await AdminModel.find({
-      created_by: req.superAdmin._id,
-    }).distinct("_id");
-    if (!adminIds.some((id) => id.toString() === leave.manager.toString()))
+    const adminIds = await AdminModel.find({ organisation_id }).distinct("_id");
+    if (!adminIds.some((aid) => aid.toString() === leave.manager.toString()))
       return next(
         Object.assign(
           new Error("This leave does not belong to your organisation"),
@@ -1389,6 +1483,7 @@ const rejectleavebyadmin = async (req, res, next) => {
         ),
       );
   }
+
   leave.status = "rejected_reporting_manager";
   leave.rejectedBy = req.superAdmin._id;
   leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -1400,25 +1495,27 @@ const noofemployee = async (req, res, next) => {
   try {
     if (!req.superAdmin) {
       return next(
-        Object.assign(new Error("Unauthorized"), { statusCode: 401 })
+        Object.assign(new Error("Unauthorized"), { statusCode: 401 }),
       );
     }
 
     const orgDoc = await uidmodel
-      .findOne({ organisation_id: req.superAdmin._id }, { departments: 1, _id: 0 })
+      .findOne(
+        { organisation_id: req.superAdmin._id },
+        { departments: 1, _id: 0 },
+      )
       .lean();
 
     if (!orgDoc) {
       return res.status(200).json({ departments: {}, totalEmployees: 0 });
     }
 
-    const departments = orgDoc.departments;
-
-    
-    const departmentList = Object.entries(departments).map(([name, data]) => ({
-      department: name,
-      lastNumber: data.lastNumber,
-    }));
+    const departmentList = Object.entries(orgDoc.departments).map(
+      ([name, data]) => ({
+        department: name,
+        lastNumber: data.lastNumber,
+      }),
+    );
 
     const total = departmentList.reduce((sum, dep) => sum + dep.lastNumber, 0);
 
@@ -1436,9 +1533,7 @@ const createannouncement = async (req, res, next) => {
   try {
     if (!req.superAdmin)
       return next(
-        Object.assign(new Error("Unauthorized"), {
-          statusCode: 401,
-        })
+        Object.assign(new Error("Unauthorized"), { statusCode: 401 }),
       );
 
     const { title, message, audience, priority, notice_image, expiresAt } =
@@ -1448,10 +1543,11 @@ const createannouncement = async (req, res, next) => {
       return next(
         Object.assign(new Error("Title and message are required"), {
           statusCode: 400,
-        })
+        }),
       );
 
     const announcement = await announcementmodel.create({
+      organisation_id: req.superAdmin._id,
       title,
       message,
       audience,
@@ -1473,7 +1569,12 @@ const createannouncement = async (req, res, next) => {
 };
 
 const getallannouncement = async (req, res, next) => {
-  const announcements = await announcementmodel.find().lean();
+  const organisation_id = req.superAdmin._id;
+
+  const announcements = await announcementmodel
+    .find({ organisation_id })
+    .lean();
+
   res
     .status(200)
     .json({ success: true, count: announcements.length, announcements });
@@ -1481,8 +1582,10 @@ const getallannouncement = async (req, res, next) => {
 
 const updateAnnouncement = async (req, res, next) => {
   const { id } = req.params;
+  const organisation_id = req.superAdmin._id;
+
   const announcement = await announcementmodel
-    .findById(id)
+    .findOne({ _id: id, organisation_id })
     .select("createdBy")
     .lean();
   if (!announcement)
@@ -1496,6 +1599,7 @@ const updateAnnouncement = async (req, res, next) => {
         { statusCode: 403 },
       ),
     );
+
   const { title, message, audience, priority, notice_image, expiresAt } =
     req.body;
   const $set = {};
@@ -1505,9 +1609,11 @@ const updateAnnouncement = async (req, res, next) => {
   if (priority) $set.priority = priority;
   if (notice_image !== undefined) $set.notice_image = notice_image;
   if (expiresAt) $set.expiresAt = expiresAt;
+
   const updated = await announcementmodel
     .findByIdAndUpdate(id, { $set }, { new: true })
     .lean();
+
   res.status(200).json({
     success: true,
     message: "Announcement updated successfully",
@@ -1517,8 +1623,10 @@ const updateAnnouncement = async (req, res, next) => {
 
 const deleteAnnouncement = async (req, res, next) => {
   const { id } = req.params;
+  const organisation_id = req.superAdmin._id;
+
   const announcement = await announcementmodel
-    .findById(id)
+    .findOne({ _id: id, organisation_id })
     .select("createdBy")
     .lean();
   if (!announcement)
@@ -1532,6 +1640,7 @@ const deleteAnnouncement = async (req, res, next) => {
         { statusCode: 403 },
       ),
     );
+
   await announcementmodel.findByIdAndDelete(id);
   res
     .status(200)
@@ -1540,15 +1649,18 @@ const deleteAnnouncement = async (req, res, next) => {
 
 const reviewtoadmin = async (req, res, next) => {
   const { adminid, rating, comment } = req.body;
+  const organisation_id = req.superAdmin._id;
+
   if (!adminid || !rating || !comment)
     return next(
       Object.assign(new Error("adminid, rating and comment are required"), {
         statusCode: 400,
       }),
     );
+
   const admin = await AdminModel.findOne({
     _id: adminid,
-    created_by: req.superAdmin._id,
+    organisation_id,
   })
     .select("role")
     .lean();
@@ -1559,9 +1671,12 @@ const reviewtoadmin = async (req, res, next) => {
         { statusCode: 404 },
       ),
     );
+
   const now = new Date();
   const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
   const existingreview = await Review.findOne({
+    organisation_id,
     reviewer: req.superAdmin._id,
     reviewee: adminid,
     monthYear,
@@ -1575,7 +1690,9 @@ const reviewtoadmin = async (req, res, next) => {
         { statusCode: 400 },
       ),
     );
+
   const review = await Review.create({
+    organisation_id,
     reviewerRole: "super_admin",
     reviewer: req.superAdmin._id,
     reviewerRoleModel: "SuperAdmin",
@@ -1586,15 +1703,22 @@ const reviewtoadmin = async (req, res, next) => {
     comment,
     monthYear,
   });
-  res
-    .status(201)
-    .json({ success: true, message: "Review submitted successfully", review });
+
+  res.status(201).json({
+    success: true,
+    message: "Review submitted successfully",
+    review,
+  });
 };
 
 const getTodayCheckins = async (req, res, next) => {
+  const organisation_id = req.superAdmin._id;
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+
   const checkins = await Attendance.find({
+    organisation_id,
     date: today,
     checkIn: { $exists: true },
     latitude: { $exists: true, $ne: null },
@@ -1603,6 +1727,7 @@ const getTodayCheckins = async (req, res, next) => {
     .populate("employee", "f_name l_name work_email department designation")
     .select("employee role latitude longitude checkIn checkOut")
     .lean();
+
   const payload = checkins.map((c) => ({
     id: c._id,
     name:
@@ -1616,6 +1741,7 @@ const getTodayCheckins = async (req, res, next) => {
     checkIn: c.checkIn,
     checkedOut: !!c.checkOut,
   }));
+
   res.json({ checkins: payload, total: payload.length });
 };
 
@@ -1623,23 +1749,17 @@ const getOrgInfo = async (req, res, next) => {
   try {
     if (!req.superAdmin) {
       return next(
-        Object.assign(new Error("Unauthorized"), {
-          statusCode: 401,
-        })
+        Object.assign(new Error("Unauthorized"), { statusCode: 401 }),
       );
     }
 
-    const organisation = await SuperAdminModel.findById(
-      req.superAdmin._id
-    )
+    const organisation = await SuperAdminModel.findById(req.superAdmin._id)
       .select("organisation_name profile_image")
       .lean();
 
     if (!organisation) {
       return next(
-        Object.assign(new Error("Organization not found"), {
-          statusCode: 404,
-        })
+        Object.assign(new Error("Organization not found"), { statusCode: 404 }),
       );
     }
 
@@ -1654,20 +1774,27 @@ const getOrgInfo = async (req, res, next) => {
   }
 };
 
-
 const getAllPersonalDocumentsSuperAdmin = async (req, res, next) => {
   if (!req.superAdmin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
-  const documents = await Document.find({ fileType: "personal" })
-    .populate("employee", "f_name l_name work_email personal_contact department designation")
+  const organisation_id = req.superAdmin._id;
+
+  const documents = await Document.find({
+    organisation_id,
+    fileType: "personal",
+  })
+    .populate(
+      "employee",
+      "f_name l_name work_email personal_contact department designation",
+    )
     .populate("underManager", "f_name l_name work_email")
     .sort({ uploadedAt: -1 })
     .lean();
 
   Document.updateMany(
-    { fileType: "personal", viewedBySuperAdmin: false },
-    { $set: { viewedBySuperAdmin: true } }
+    { organisation_id, fileType: "personal", viewedBySuperAdmin: false },
+    { $set: { viewedBySuperAdmin: true } },
   ).exec();
 
   res.status(200).json({
@@ -1708,15 +1835,23 @@ const getAllExpenseDocumentsSuperAdmin = async (req, res, next) => {
   if (!req.superAdmin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
-  const documents = await Document.find({ fileType: "expense" })
-    .populate("employee", "f_name l_name work_email personal_contact department designation")
+  const organisation_id = req.superAdmin._id;
+
+  const documents = await Document.find({
+    organisation_id,
+    fileType: "expense",
+  })
+    .populate(
+      "employee",
+      "f_name l_name work_email personal_contact department designation",
+    )
     .populate("underManager", "f_name l_name work_email")
     .sort({ uploadedAt: -1 })
     .lean();
 
   Document.updateMany(
-    { fileType: "expense", viewedBySuperAdmin: false },
-    { $set: { viewedBySuperAdmin: true } }
+    { organisation_id, fileType: "expense", viewedBySuperAdmin: false },
+    { $set: { viewedBySuperAdmin: true } },
   ).exec();
 
   res.status(200).json({
@@ -1757,19 +1892,24 @@ const getDocumentDetailsSuperAdmin = async (req, res, next) => {
   if (!req.superAdmin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
-  const { id } = req.params; 
-  if (!id)  
+  const { id } = req.params;
+  const organisation_id = req.superAdmin._id;
+
+  if (!id)
     return next(
-      Object.assign(new Error("Document ID is required"), { statusCode: 400 })
+      Object.assign(new Error("Document ID is required"), { statusCode: 400 }),
     );
 
-  const document = await Document.findById(id)  // ✅ Changed from documentId to id
-    .populate("employee", "f_name l_name work_email personal_contact department designation")
+  const document = await Document.findOne({ _id: id, organisation_id })
+    .populate(
+      "employee",
+      "f_name l_name work_email personal_contact department designation",
+    )
     .populate("underManager", "f_name l_name work_email");
 
   if (!document)
     return next(
-      Object.assign(new Error("Document not found"), { statusCode: 404 })
+      Object.assign(new Error("Document not found"), { statusCode: 404 }),
     );
 
   document.viewedBySuperAdmin = true;
@@ -1843,4 +1983,4 @@ module.exports = {
   getAllPersonalDocumentsSuperAdmin,
   getAllExpenseDocumentsSuperAdmin,
   getDocumentDetailsSuperAdmin,
-};
+}; 

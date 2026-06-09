@@ -17,12 +17,13 @@ export const verifySuperAdmin = async (token) => {
 
 export const loginSuperAdmin = async (data) => {
   const res = await api.post("superadmin/login", data);
+  if (res.data?.role === "super_admin") res.data.role = "superadmin";
   return res.data;
 };
 
-
 export const getMeSuperAdmin = async () => {
   const res = await api.get("superadmin/me");
+  if (res.data?.role === "super_admin") res.data.role = "superadmin";
   return res.data;
 };
 

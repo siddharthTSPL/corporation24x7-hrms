@@ -362,7 +362,7 @@ function Navbar() {
               onMouseEnter={e => e.currentTarget.style.color = P}
               onMouseLeave={e => e.currentTarget.style.color = G}>{l}</a>
           ))}
-          <a href="/login" style={{ background: P, color: '#fff', fontSize: 14, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 600, padding: '10px 28px', borderRadius: 50, textDecoration: 'none', boxShadow: `0 4px 18px ${P}40`, transition: 'all .2s' }}
+          <a href="https://torchxsuite.com/talent/login" style={{ background: P, color: '#fff', fontSize: 14, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 600, padding: '10px 28px', borderRadius: 50, textDecoration: 'none', boxShadow: `0 4px 18px ${P}40`, transition: 'all .2s' }}
             onMouseEnter={e => { e.currentTarget.style.background = PH; e.currentTarget.style.transform = 'translateY(-1px)' }}
             onMouseLeave={e => { e.currentTarget.style.background = P; e.currentTarget.style.transform = 'none' }}>Login</a>
         </div>

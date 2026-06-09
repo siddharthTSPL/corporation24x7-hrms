@@ -45,13 +45,17 @@ const adminlogin = async (req, res, next) => {
   const { identifier, password } = req.body;
   if (!identifier || !password)
     return next(Object.assign(new Error("All fields are required"), { statusCode: 400 }));
+
   const admin = await Adminmodel.findOne({ work_email: identifier });
   if (!admin)
     return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
+
   if (!admin.isVerified)
     return next(Object.assign(new Error("Please verify your email before logging in"), { statusCode: 403 }));
+
   if (admin.status === "suspended")
     return next(Object.assign(new Error("Your account has been suspended. Contact super admin."), { statusCode: 403 }));
+
   const isMatch = await admin.isValidPassword(password);
   if (!isMatch)
     return next(Object.assign(new Error("Invalid credentials"), { statusCode: 401 }));
@@ -65,12 +69,48 @@ const adminlogin = async (req, res, next) => {
     const hasTalentLicense = superAdmin.licenses.some(
       (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
     );
-    if (!trialValid && !hasTalentLicense) {
+    if (!trialValid && !hasTalentLicense)
       return next(Object.assign(
         new Error("Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."),
         { statusCode: 403, code: "SERVICE_STOPPED" }
       ));
-    }
+  }
+
+  const isProduction = process.env.NODE_ENV === "production";
+  const cookieOpts = {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+  };
+
+  if (admin.isFirstLogin) {
+    const firstLoginToken = jwt.sign(
+      { adminid: admin._id, work_email: admin.work_email, purpose: "first_login" },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" },
+    );
+
+    res.cookie("resetToken", firstLoginToken, { ...cookieOpts, maxAge: 15 * 60 * 1000 });
+
+    sendEmail({
+      to: admin.work_email,
+      subject: "Set Your Password",
+      html: `
+        <div style="font-family:Arial,sans-serif;padding:20px">
+          <h2>Hello ${admin.f_name},</h2>
+          <p>This is your first login. Please set your password using the link below.</p>
+          <a href="${process.env.BASE_URL}talent/api/admin/resetpassword"
+             style="display:inline-block;padding:12px 24px;background:#4F46E5;color:#fff;border-radius:6px;text-decoration:none;">
+            Set Password
+          </a>
+          <p>This link expires in 15 minutes.</p>
+        </div>
+      `,
+    }).catch((err) => console.error("First login email failed:", err.message));
+
+    return next(
+      Object.assign(new Error("First login detected. Check your email to set password."), { statusCode: 403 }),
+    );
   }
 
   const token = jwt.sign(
@@ -78,18 +118,15 @@ const adminlogin = async (req, res, next) => {
     process.env.JWT_SECRET,
     { expiresIn: "15d" },
   );
-  const isProduction = process.env.NODE_ENV === "production";
-  res.cookie("token", token, {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? "none" : "lax",
-    maxAge: 15 * 24 * 60 * 60 * 1000,
-  });
+
+  res.cookie("token", token, { ...cookieOpts, maxAge: 15 * 24 * 60 * 60 * 1000 });
+
   Adminmodel.findByIdAndUpdate(admin._id, {
     status: "active",
     last_login: new Date(),
     isFirstLogin: false,
   }).exec();
+
   res.status(200).json({
     message: "Login successful",
     admin: {
@@ -698,24 +735,64 @@ const acceptLeave = async (req, res, next) => {
       leave = await Leave.findOne({ _id: id, organisation_id });
       if (!leave)
         return next(Object.assign(new Error("Employee leave not found"), { statusCode: 404 }));
-      leave.status = "approved_reporting_manager";
-      leave.approvedBy = req.admin._id;
-      leave.remarks = "Approved by Admin";
+
+      if (leave.status.startsWith("approved") || leave.status.startsWith("rejected"))
+        return next(Object.assign(new Error("Leave already processed"), { statusCode: 400 }));
+
+      const leaveBalance = await leavebalanceModel.findOne({
+        employee: leave.employee,
+        organisation_id,
+      });
+      if (!leaveBalance)
+        return next(Object.assign(new Error("Leave balance not found"), { statusCode: 404 }));
+
+      if (leave.leaveType === "ml") {
+        const start = new Date(leave.startDate);
+        const end = new Date(start);
+        end.setDate(end.getDate() + 181);
+        leaveBalance.mlStartDate = start;
+        leaveBalance.mlEndDate = end;
+        await leaveBalance.save();
+      }
+
+      await processLeaveDeduction(leave);
     }
 
     if (leaveFor === "manager") {
       leave = await ManagerLeave.findOne({ _id: id, organisation_id });
       if (!leave)
         return next(Object.assign(new Error("Manager leave not found"), { statusCode: 404 }));
-      leave.status = "approved_reporting_manager";
-      leave.approvedBy = req.admin._id;
-      leave.remarks = "Approved by Admin";
+
+      if (leave.status.startsWith("approved") || leave.status.startsWith("rejected"))
+        return next(Object.assign(new Error("Leave already processed"), { statusCode: 400 }));
+
+      const leaveBalance = await leavebalanceModel.findOne({
+        employee: leave.manager,
+        organisation_id,
+      });
+      if (!leaveBalance)
+        return next(Object.assign(new Error("Manager leave balance not found"), { statusCode: 404 }));
+
+      if (leave.leaveType === "ml") {
+        const start = new Date(leave.startDate);
+        const end = new Date(start);
+        end.setDate(end.getDate() + 181);
+        leaveBalance.mlStartDate = start;
+        leaveBalance.mlEndDate = end;
+        await leaveBalance.save();
+      }
+
+      await processLeaveDeduction(leave);
     }
 
     if (!leave)
-      return next(Object.assign(new Error("Invalid leave type"), { statusCode: 400 }));
+      return next(Object.assign(new Error("Invalid leaveFor value"), { statusCode: 400 }));
 
+    leave.status = "approved_reporting_manager";
+    leave.approvedBy = req.admin._id;
+    leave.remarks = `Approved by Admin (${req.admin.f_name})`;
     await leave.save();
+
     res.status(200).json({ success: true, message: "Leave approved successfully", leave });
   } catch (error) {
     next(error);
@@ -804,6 +881,14 @@ const applyleave = async (req, res, next) => {
   });
 
   res.status(201).json({ success: true, message: "Leave request submitted to super admin", leave });
+};
+
+const getmyleavehistory = async (req, res, next) => {
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const leave = await ManagerLeave.find({ organisation_id: req.admin.organisation_id }).lean();
+  res.status(200).json({ leave });
 };
 
 const noofemployee = async (req, res, next) => {
@@ -1114,7 +1199,7 @@ const verifyAotp = async (req, res, next) => {
   if (!otpRecord.compareOtp(String(otp)))
     return next(Object.assign(new Error("Invalid OTP"), { statusCode: 400 }));
 
-  const admin = await Adminmodel.findOne({ work_email: email }).select("_id work_email role").lean();
+  const admin = await Adminmodel.findOne({ work_email: email }).select("_id work_email role f_name").lean();
   if (!admin)
     return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
 
@@ -1124,15 +1209,23 @@ const verifyAotp = async (req, res, next) => {
     { expiresIn: "7d" },
   );
 
+  const resetToken = jwt.sign(
+    { adminid: admin._id, work_email: admin.work_email, purpose: "password_reset" },
+    process.env.JWT_SECRET,
+    { expiresIn: "15m" },
+  );
+
   await OtpModel.deleteOne({ email });
 
   const isProduction = process.env.NODE_ENV === "production";
-  res.cookie("token", token, {
+  const cookieOpts = {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
+  };
+
+  res.cookie("token", token, { ...cookieOpts, maxAge: 7 * 24 * 60 * 60 * 1000 });
+  res.cookie("resetToken", resetToken, { ...cookieOpts, maxAge: 15 * 60 * 1000 });
 
   Adminmodel.findByIdAndUpdate(admin._id, {
     status: "active",
@@ -1140,24 +1233,72 @@ const verifyAotp = async (req, res, next) => {
     isFirstLogin: false,
   }).exec();
 
-  res.status(200).json({ success: true, message: "OTP verified successfully", role: admin.role });
+  const resetLink = `${process.env.BASE_URL}talent/api/admin/resetpassword`;
+  sendEmail({
+    to: email,
+    subject: "Optional Password Reset",
+    html: `
+      <div style="font-family:Arial,sans-serif;padding:20px">
+        <h2>Hello ${admin.f_name},</h2>
+        <p>Your OTP login was successful.</p>
+        <p>If you want to reset your password, click the button below. This link expires in <strong>15 minutes</strong>.</p>
+        <a href="${resetLink}" style="display:inline-block;padding:12px 24px;background:#4F46E5;color:#fff;border-radius:6px;text-decoration:none;">
+          Reset Password
+        </a>
+        <p style="color:#999;font-size:12px;">If you didn't request this, ignore this email.</p>
+      </div>
+    `,
+  }).catch((err) => console.error("Reset email failed:", err.message));
+
+  res.status(200).json({
+    success: true,
+    message: "OTP verified successfully",
+    role: admin.role,
+    passwordResetOptional: true,
+  });
 };
 
 const resetAdminPassword = async (req, res, next) => {
-  const { resetToken, newPassword } = req.body;
+  const { newPassword, confirmPassword } = req.body;
+
+  if (!newPassword || !confirmPassword)
+    return next(Object.assign(new Error("Both password fields are required"), { statusCode: 400 }));
+
+  if (newPassword !== confirmPassword)
+    return next(Object.assign(new Error("Passwords do not match"), { statusCode: 400 }));
+
+  if (newPassword.length < 8)
+    return next(Object.assign(new Error("Password must be at least 8 characters"), { statusCode: 400 }));
+
+  const resetToken = req.cookies?.resetToken;
+  if (!resetToken)
+    return next(Object.assign(new Error("Reset session expired. Please verify OTP again."), { statusCode: 401 }));
+
   let decode;
   try {
     decode = jwt.verify(resetToken, process.env.JWT_SECRET);
   } catch (err) {
-    return next(Object.assign(new Error("Invalid or expired token"), { statusCode: 400 }));
+    return next(Object.assign(new Error("Invalid or expired reset token"), { statusCode: 401 }));
   }
 
-  const admin = await Adminmodel.findOne({ work_email: decode.email });
+  if (decode.purpose !== "password_reset" && decode.purpose !== "first_login")
+    return next(Object.assign(new Error("Invalid reset token"), { statusCode: 401 }));
+
+  const admin = await Adminmodel.findById(decode.adminid);
   if (!admin)
     return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
 
   admin.password = newPassword;
+  if (decode.purpose === "first_login") admin.isFirstLogin = false;
   await admin.save();
+
+  const isProduction = process.env.NODE_ENV === "production";
+  res.clearCookie("resetToken", {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+  });
+
   res.status(200).json({ success: true, message: "Password updated successfully" });
 };
 
@@ -1766,6 +1907,7 @@ module.exports = {
   acceptLeave,
   rejectLeave,
   applyleave,
+  getmyleavehistory,
   noofemployee,
   createannouncement,
   getallannouncement,
