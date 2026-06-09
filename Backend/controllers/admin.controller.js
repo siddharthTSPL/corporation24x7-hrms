@@ -1233,7 +1233,7 @@ const resetAdminPassword = async (req, res, next) => {
     return next(Object.assign(new Error("Invalid or expired reset token"), { statusCode: 401 }));
   }
 
-  if (decode.purpose !== "password_reset")
+  if (decode.purpose !== "password_reset" && decode.purpose !== "first_login")
     return next(Object.assign(new Error("Invalid reset token"), { statusCode: 401 }));
 
   const admin = await Adminmodel.findById(decode.adminid);
@@ -1241,6 +1241,7 @@ const resetAdminPassword = async (req, res, next) => {
     return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
 
   admin.password = newPassword;
+  if (decode.purpose === "first_login") admin.isFirstLogin = false;
   await admin.save();
 
   const isProduction = process.env.NODE_ENV === "production";
