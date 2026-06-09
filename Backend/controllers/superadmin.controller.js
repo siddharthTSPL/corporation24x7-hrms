@@ -1410,6 +1410,10 @@ const acceptleavebyadmin = async (req, res, next) => {
       employee: leave.manager,
       organisation_id,
     });
+
+    console.log("leave.manager:", leave.manager);
+    console.log("leaveBalance found:", leaveBalance);
+
     if (!leaveBalance)
       return next(Object.assign(new Error("Admin leave balance not found"), { statusCode: 404 }));
 
