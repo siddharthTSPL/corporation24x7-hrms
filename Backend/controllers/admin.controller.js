@@ -843,6 +843,14 @@ const applyleave = async (req, res, next) => {
   res.status(201).json({ success: true, message: "Leave request submitted to super admin", leave });
 };
 
+const getmyleavehistory = async (req, res, next) => {
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const leave = await ManagerLeave.find({ organisation_id: req.admin.organisation_id }).lean();
+  res.status(200).json({ leave });
+};
+
 const noofemployee = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
@@ -1859,6 +1867,7 @@ module.exports = {
   acceptLeave,
   rejectLeave,
   applyleave,
+  getmyleavehistory,
   noofemployee,
   createannouncement,
   getallannouncement,

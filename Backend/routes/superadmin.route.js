@@ -122,12 +122,12 @@ superAdminRouter.get(
   asyncHandler(showallleaves),
 );
 superAdminRouter.put(
-  "/acceptleave/:id",
+  "/accept-leave/:id",
   superAdminAuth,
   asyncHandler(acceptleavebyadmin),
 );
 superAdminRouter.put(
-  "/rejectleave/:id",
+  "/reject-leave/:id",
   superAdminAuth,
   asyncHandler(rejectleavebyadmin),
 );
