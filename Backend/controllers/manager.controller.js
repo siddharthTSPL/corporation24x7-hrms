@@ -338,6 +338,10 @@ const userunderme = async (req, res, next) => {
 const viewallleaves = async (req, res, next) => {
   if (!req.manager)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  console.log("manager _id:", req.manager._id);
+  console.log("organisation_id:", req.manager.organisation_id);
+
   const leaves = await leavemodel
     .find({
       manager: req.manager._id,
@@ -346,6 +350,9 @@ const viewallleaves = async (req, res, next) => {
     .populate("employee", "f_name l_name work_email role")
     .sort({ createdAt: -1 })
     .lean();
+
+  console.log("leaves found:", leaves.length);
+
   res.status(200).json(leaves);
 };
 
