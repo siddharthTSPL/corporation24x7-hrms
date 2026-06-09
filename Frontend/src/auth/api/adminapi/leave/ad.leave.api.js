@@ -41,3 +41,13 @@ export const rejectLeave = async ({ id, leaveFor }) => {
 
   return res.data;
 };
+
+export const applyleave = async (data) => {
+  const res = await api.post("admin/applyleave", data);
+  return res.data;
+};
+
+export const getLeavehistory = async (id) => {
+  const res = await api.get(`admin/getmyleavehistory`);
+  return res.data;
+}
