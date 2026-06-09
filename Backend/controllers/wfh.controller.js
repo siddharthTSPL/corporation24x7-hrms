@@ -317,8 +317,12 @@ const adminRejectForwardedWFH = async (req, res, next) => {
 };
 
 const superadminGetPendingWFH = async (req, res, next) => {
-  if (!req.superadmin) return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  const wfhList = await WFH.find({ superadmin: req.superadmin._id, organisation_id: req.superadmin._id, status: "pending_superadmin" })
+  if (!req.superAdmin) return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  const wfhList = await WFH.find({
+    superadmin: req.superAdmin._id,
+    organisation_id: req.superAdmin._id,
+    status: "pending_superadmin",
+  })
     .populate("requester", "f_name l_name work_email")
     .sort({ createdAt: -1 })
     .lean();
@@ -326,28 +330,28 @@ const superadminGetPendingWFH = async (req, res, next) => {
 };
 
 const superadminApproveWFH = async (req, res, next) => {
-  if (!req.superadmin) return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  if (!req.superAdmin) return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   const { wfhId, remarks } = req.body;
   if (!wfhId) return next(Object.assign(new Error("wfhId is required"), { statusCode: 400 }));
-  const wfh = await WFH.findOne({ _id: wfhId, organisation_id: req.superadmin._id, superadmin: req.superadmin._id });
+  const wfh = await WFH.findOne({ _id: wfhId, organisation_id: req.superAdmin._id, superadmin: req.superAdmin._id });
   if (!wfh) return next(Object.assign(new Error("WFH request not found"), { statusCode: 404 }));
   if (wfh.status !== "pending_superadmin") return next(Object.assign(new Error("WFH request is already processed"), { statusCode: 400 }));
   wfh.status = "approved_superadmin";
-  wfh.approvedBy = req.superadmin._id;
+  wfh.approvedBy = req.superAdmin._id;
   wfh.remarks = remarks || "";
   await wfh.save();
   res.status(200).json({ success: true, message: "WFH request approved", wfh });
 };
 
 const superadminRejectWFH = async (req, res, next) => {
-  if (!req.superadmin) return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  if (!req.superAdmin) return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   const { wfhId, remarks } = req.body;
   if (!wfhId) return next(Object.assign(new Error("wfhId is required"), { statusCode: 400 }));
-  const wfh = await WFH.findOne({ _id: wfhId, organisation_id: req.superadmin._id, superadmin: req.superadmin._id });
+  const wfh = await WFH.findOne({ _id: wfhId, organisation_id: req.superAdmin._id, superadmin: req.superAdmin._id });
   if (!wfh) return next(Object.assign(new Error("WFH request not found"), { statusCode: 404 }));
   if (wfh.status !== "pending_superadmin") return next(Object.assign(new Error("WFH request is already processed"), { statusCode: 400 }));
   wfh.status = "rejected_superadmin";
-  wfh.rejectedBy = req.superadmin._id;
+  wfh.rejectedBy = req.superAdmin._id;
   wfh.remarks = remarks || "";
   wfh.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   await wfh.save();
