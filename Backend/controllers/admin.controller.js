@@ -99,7 +99,7 @@ const adminlogin = async (req, res, next) => {
         <div style="font-family:Arial,sans-serif;padding:20px">
           <h2>Hello ${admin.f_name},</h2>
           <p>This is your first login. Please set your password using the link below.</p>
-          <a href="${process.env.FRONTEND_URL}/admin/reset-password"
+          <a href="${process.env.BASE_URL}talent/api/admin/resetpassword"
              style="display:inline-block;padding:12px 24px;background:#4F46E5;color:#fff;border-radius:6px;text-decoration:none;">
             Set Password
           </a>
@@ -1185,7 +1185,7 @@ const verifyAotp = async (req, res, next) => {
     isFirstLogin: false,
   }).exec();
 
-  const resetLink = `${process.env.FRONTEND_URL}/admin/reset-password`;
+  const resetLink = `${process.env.BASE_URL}talent/api/admin/resetpassword`;
   sendEmail({
     to: email,
     subject: "Optional Password Reset",
