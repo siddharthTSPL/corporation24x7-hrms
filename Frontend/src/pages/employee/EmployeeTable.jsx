@@ -32,7 +32,7 @@ const EMPTY_EMP = {
 };
 
 const EMPTY_MGR = {
-  f_name: "", l_name: "", work_email: "", password: "", gender: "", marital_status: "single",
+  f_name: "", l_name: "", work_email: "", password: "", confirm_password: "", gender: "", marital_status: "single",
   personal_contact: "", e_contact: "", department: "", designation: "", role: "manager",
   office_location: "", reporting_manager: "", address: "", city: "", state: "", pincode: "",
   aadhaar_number: "", pan_number: "", is_fresher: true, total_experience: "",
@@ -461,12 +461,100 @@ function EmpStepFields({ step, form, onChange, errors, managers }) {
 }
 
 function MgrStepFields({ step, form, onChange, errors, managers }) {
-  if (step === 0) return (
-    <>
-      <Field label="First Name" required error={errors.f_name}><input name="f_name" placeholder="First name" value={form.f_name} onChange={onChange} className={inputCls} /></Field>
-      <Field label="Last Name" required error={errors.l_name}><input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls} /></Field>
-      <Field label="Work Email" required error={errors.work_email}><input name="work_email" type="email" placeholder="name@company.com" value={form.work_email} onChange={onChange} className={inputCls} /></Field>
-      <Field label="Password" required error={errors.password}><input name="password" type="password" placeholder="Set password" value={form.password} onChange={onChange} className={inputCls} /></Field>
+const [showPassword, setShowPassword] = useState(false);
+const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+const newErrors = {};
+const passwordRegex =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+
+  const passwordError =
+    form.password && !passwordRegex.test(form.password)
+      ? "Password must contain at least 8 characters, 1 uppercase letter, 1 lowercase letter, 1 number and 1 special character."
+      : "";
+
+  const confirmPasswordError =
+    form.confirm_password &&
+    form.password !== form.confirm_password
+      ? "Passwords do not match."
+      : "";
+ if (step === 0)
+    return (
+      <>
+        <Field label="First Name" required error={errors.f_name}>
+          <input
+            name="f_name"
+            placeholder="First name"
+            value={form.f_name}
+            onChange={onChange}
+            className={inputCls}
+          />
+        </Field>
+
+        <Field label="Last Name" required error={errors.l_name}>
+          <input
+            name="l_name"
+            placeholder="Last name"
+            value={form.l_name}
+            onChange={onChange}
+            className={inputCls}
+          />
+        </Field>
+
+        <Field
+          label="Password"
+          required
+          error={passwordError || errors.password}
+        >
+          <div className="relative">
+            <input
+              name="password"
+              type={showPassword ? "text" : "password"}
+              placeholder="Set password"
+              value={form.password}
+              onChange={onChange}
+              className={inputCls}
+            />
+
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm"
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </div>
+
+         
+        </Field>
+
+        <Field
+          label="Confirm Password"
+          required
+          error={confirmPasswordError || errors.confirm_password}
+        >
+          <div className="relative">
+            <input
+              name="confirm_password"
+              type={showConfirmPassword ? "text" : "password"}
+              placeholder="Confirm password"
+              value={form.confirm_password}
+              onChange={onChange}
+              className={inputCls}
+            />
+
+            <button
+              type="button"
+              onClick={() =>
+                setShowConfirmPassword(!showConfirmPassword)
+              }
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm"
+            >
+              {showConfirmPassword ? "Hide" : "Show"}
+            </button>
+          </div>
+        </Field>
+    
+  
       <Field label="Gender" required error={errors.gender}>
         <select name="gender" value={form.gender} onChange={onChange} className={inputCls}>
           <option value="">Select Gender</option>
