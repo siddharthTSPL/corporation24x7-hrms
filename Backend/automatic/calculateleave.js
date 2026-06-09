@@ -7,7 +7,7 @@ function calculateLeaveDays(startDate, endDate) {
 }
 
 async function processLeaveDeduction(leave) {
-  const empId = new mongoose.Types.ObjectId(leave.employee);
+  const empId = new mongoose.Types.ObjectId(leave.employee || leave.manager);
 
   const balance = await LeaveBalance.findOne({ employee: empId }).lean();
   if (!balance) throw new Error("Leave balance not found");

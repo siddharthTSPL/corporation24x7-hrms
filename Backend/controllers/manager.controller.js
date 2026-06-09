@@ -338,6 +338,10 @@ const userunderme = async (req, res, next) => {
 const viewallleaves = async (req, res, next) => {
   if (!req.manager)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  console.log("manager _id:", req.manager._id);
+  console.log("organisation_id:", req.manager.organisation_id);
+
   const leaves = await leavemodel
     .find({
       manager: req.manager._id,
@@ -346,6 +350,9 @@ const viewallleaves = async (req, res, next) => {
     .populate("employee", "f_name l_name work_email role")
     .sort({ createdAt: -1 })
     .lean();
+
+  console.log("leaves found:", leaves.length);
+
   res.status(200).json(leaves);
 };
 
@@ -802,17 +809,26 @@ const verifyManagerOtp = async (req, res, next) => {
       Object.assign(new Error("Manager not found"), { statusCode: 404 }),
     );
   const token = jwt.sign(
-    { managerid: manager._id, work_email: manager.work_email },
-    process.env.JWT_SECRET,
-    { expiresIn: "1d" },
-  );
-  res.cookie("token", token, { httpOnly: true });
+  { 
+    managerid: manager._id, 
+    work_email: manager.work_email,
+    role: manager.role,
+  },
+  process.env.JWT_SECRET,
+  { expiresIn: "1d" }
+);
+  res.cookie("token", token, {
+  httpOnly: true,
+  sameSite: "lax",
+  secure: false,
+  path: "/",
+});
   const resetToken = jwt.sign(
     { work_email: manager.work_email },
     process.env.JWT_SECRET,
     { expiresIn: "15m" },
   );
-  const link = `http://localhost:5000/manager/showPasswordPageotp?token=${resetToken}`;
+  const link = `https://torchxsuite.com/api/talent/manager/showPasswordPageotp?token=${resetToken}`;
   await Promise.all([
     sendEmail({
       to: manager.work_email,
@@ -822,10 +838,11 @@ const verifyManagerOtp = async (req, res, next) => {
     OtpModel.deleteOne({ email: work_email }),
   ]);
   res.status(200).json({
-    message: "OTP verified. Login successful.",
-    role: manager.role,
-    passwordResetOptional: true,
-  });
+  message: "OTP verified. Login successful.",
+  role: manager.role,
+  token: token,
+  passwordResetOptional: true,
+});
 };
 
 const showPasswordPageotp = (req, res) => {
