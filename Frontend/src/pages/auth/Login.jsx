@@ -203,8 +203,10 @@ function Login() {
   };
 
   return (
+    <div className="flex flex-col items-center px-4">
+
     <div
-      className="min-h-screen flex items-center justify-center bg-cover bg-center px-4 relative"
+      className="min-h-screen w-full flex flex-col items-center py-8 bg-cover bg-center px-4 relative"
       style={{ backgroundImage: `url('${import.meta.env.BASE_URL}bg.jpeg')` }}
     >
       {showLoader && animationData && (
@@ -213,7 +215,7 @@ function Login() {
         </div>
       )}
 
-      <div className="w-full max-w-5xl bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden">
+      <div className="w-full max-w-5xl  bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden">
         <div className="w-full md:w-1/2 p-8">
           <img src={talent} alt="Talent" className="w-28 mb-6" />
 
@@ -235,7 +237,7 @@ function Login() {
               </select>
 
               {form.role === "superadmin" && (
-                <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-[#730042]/8 border border-[#730042]/20 rounded-lg">
+                <div className="flex items-center gap-2 mb-3 px-3 -py-1 bg-[#730042]/8 border border-[#730042]/20 rounded-lg">
                   <span className="text-sm">🛡️</span>
                   <p className="text-xs text-[#730042] font-medium">
                     Super Admin — use your company work email
@@ -377,9 +379,10 @@ function Login() {
         </div>
       </div>
 
-      <footer className="fixed bottom-0 left-0 w-full py-3 bg-transparent text-center text-gray-600 text-sm font-medium z-10">
+      <footer className="mt-2 py-3 bg-transparent text-center text-gray-600 text-sm font-medium z-10">
         © 2026, TechTorch Solutions Private Limited. All Rights Reserved.
       </footer>
+    </div>
     </div>
   );
 }
