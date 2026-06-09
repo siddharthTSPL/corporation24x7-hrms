@@ -1960,4 +1960,4 @@ module.exports = {
   getAllPersonalDocumentsSuperAdmin,
   getAllExpenseDocumentsSuperAdmin,
   getDocumentDetailsSuperAdmin,
-};
+}; 
