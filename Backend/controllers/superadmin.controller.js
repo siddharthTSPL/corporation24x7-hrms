@@ -69,7 +69,7 @@ const registerSuperAdmin = async (req, res, next) => {
       { expiresIn: "1h" },
     );
     console.log(process.env.BASE_URL);
-    const verifyLink = `${process.env.BASE_URL}/superadmin/verify/${verifyToken}`;
+    const verifyLink = `${process.env.BASE_URL}talent/api/superadmin/verify/${verifyToken}`;
 
     sendEmail({
       to: email,
