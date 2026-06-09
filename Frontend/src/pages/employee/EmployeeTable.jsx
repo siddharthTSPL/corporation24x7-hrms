@@ -77,62 +77,67 @@ function StepModal({ title, icon, onClose, onSubmit, steps, currentStep, setCurr
       style={{ background: "rgba(115,0,66,0.40)", backdropFilter: "blur(3px)" }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl flex flex-col max-h-[96vh] sm:max-h-[92vh] border-t sm:border border-[#F4C0D1] shadow-2xl">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 rounded-t-2xl flex-shrink-0" style={{ background: accentColor }}>
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <span className="text-white text-lg sm:text-xl flex-shrink-0">{icon}</span>
+      <div className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl flex flex-col max-h-[96vh] sm:max-h-[85vh] border-t sm:border border-[#F4C0D1] shadow-2xl">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 rounded-t-2xl flex-shrink-0" style={{ background: accentColor }}>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-white text-base flex-shrink-0">{icon}</span>
             <div className="min-w-0">
-              <h2 className="text-base sm:text-lg font-bold text-white truncate">{title}</h2>
-              <p className="text-[11px] sm:text-xs hidden xs:block" style={{ color: "rgba(255,255,255,0.65)" }}>
+              <h2 className="text-sm font-bold text-white truncate">{title}</h2>
+              <p className="text-[11px]" style={{ color: "rgba(255,255,255,0.65)" }}>
                 Step {currentStep + 1} of {totalSteps} — {steps[currentStep].label}
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center text-white flex-shrink-0 ml-2" style={{ background: "rgba(255,255,255,0.18)" }}>
-            <FaTimes size={13} />
+          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-white flex-shrink-0 ml-2" style={{ background: "rgba(255,255,255,0.18)" }}>
+            <FaTimes size={12} />
           </button>
         </div>
 
-        <div className="px-3 sm:px-6 pt-3 pb-2 bg-white border-b border-[#F4C0D1] flex-shrink-0">
+        {/* Step Tabs */}
+        <div className="px-3 pt-2.5 pb-2 bg-white border-b border-[#F4C0D1] flex-shrink-0">
           <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-hide">
             {steps.map((s, i) => (
               <div key={i} className="flex items-center gap-1 flex-shrink-0">
                 <button
                   onClick={() => setCurrentStep(i)}
-                  className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition-all"
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold transition-all"
                   style={i === currentStep ? { background: accentColor, color: "#fff" } : i < currentStep ? { background: "#FBEAF0", color: "#730042" } : { background: "#F9F8F2", color: "#993556" }}
                 >
                   <span>{s.icon}</span>
                   <span className="hidden sm:inline">{s.label}</span>
                 </button>
                 {i < totalSteps - 1 && (
-                  <div className="w-2 sm:w-3 h-0.5 rounded-full flex-shrink-0" style={{ background: i < currentStep ? accentColor : "#F4C0D1" }} />
+                  <div className="w-2 h-0.5 rounded-full flex-shrink-0" style={{ background: i < currentStep ? accentColor : "#F4C0D1" }} />
                 )}
               </div>
             ))}
           </div>
         </div>
 
-        <div className="overflow-y-auto p-3 sm:p-6 flex-1 bg-[#F9F8F2]">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">{children}</div>
+        {/* Scrollable Form Area */}
+        <div className="overflow-y-auto p-3 sm:p-4 flex-1 bg-[#F9F8F2]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{children}</div>
         </div>
 
-        <div className="px-3 sm:px-6 py-3 sm:py-4 border-t border-[#F4C0D1] flex justify-between gap-2 bg-[#F9F8F2] flex-shrink-0">
-          <button onClick={onClose} className="px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl border border-[#F4C0D1] text-[#730042] text-xs sm:text-sm font-semibold hover:bg-[#FBEAF0] transition-colors">
+        {/* Footer */}
+        <div className="px-3 sm:px-4 py-3 border-t border-[#F4C0D1] flex justify-between gap-2 bg-[#F9F8F2] flex-shrink-0">
+          <button onClick={onClose} className="px-3 py-2 rounded-xl border border-[#F4C0D1] text-[#730042] text-xs font-semibold hover:bg-[#FBEAF0] transition-colors">
             Cancel
           </button>
           <div className="flex gap-2">
             {!isFirst && (
-              <button onClick={() => setCurrentStep((s) => s - 1)} className="flex items-center gap-1 sm:gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-[#F4C0D1] text-[#730042] text-xs sm:text-sm font-semibold hover:bg-[#FBEAF0] transition-colors">
-                <FaChevronLeft size={10} /> <span className="hidden xs:inline">Prev</span>
+              <button onClick={() => setCurrentStep((s) => s - 1)} className="flex items-center gap-1 px-3 py-2 rounded-xl border border-[#F4C0D1] text-[#730042] text-xs font-semibold hover:bg-[#FBEAF0] transition-colors">
+                <FaChevronLeft size={9} /> Prev
               </button>
             )}
             {!isLast ? (
-              <button onClick={() => setCurrentStep((s) => s + 1)} className="flex items-center gap-1 sm:gap-1.5 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-white text-xs sm:text-sm font-semibold transition-all hover:opacity-90" style={{ background: accentColor }}>
-                <span className="hidden xs:inline">Next</span> <FaChevronRight size={10} />
+              <button onClick={() => setCurrentStep((s) => s + 1)} className="flex items-center gap-1 px-4 py-2 rounded-xl text-white text-xs font-semibold transition-all hover:opacity-90" style={{ background: accentColor }}>
+                Next <FaChevronRight size={9} />
               </button>
             ) : (
-              <button onClick={onSubmit} className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-white text-xs sm:text-sm font-semibold transition-all hover:opacity-90" style={{ background: accentColor }}>
+              <button onClick={onSubmit} className="px-5 py-2 rounded-xl text-white text-xs font-semibold transition-all hover:opacity-90" style={{ background: accentColor }}>
                 Submit
               </button>
             )}
@@ -150,25 +155,31 @@ function Modal({ title, icon, onClose, onSubmit, children, accentColor = "#CD166
       style={{ background: "rgba(115,0,66,0.40)", backdropFilter: "blur(3px)" }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl flex flex-col max-h-[96vh] sm:max-h-[92vh] border-t sm:border border-[#F4C0D1] shadow-2xl">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 rounded-t-2xl flex-shrink-0" style={{ background: accentColor }}>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <span className="text-white text-lg sm:text-xl">{icon}</span>
+      <div className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl flex flex-col max-h-[96vh] sm:max-h-[85vh] border-t sm:border border-[#F4C0D1] shadow-2xl">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 rounded-t-2xl flex-shrink-0" style={{ background: accentColor }}>
+          <div className="flex items-center gap-2">
+            <span className="text-white text-base">{icon}</span>
             <div>
-              <h2 className="text-base sm:text-lg font-bold text-white">{title}</h2>
-              <p className="text-[11px] sm:text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>Fill in all required fields</p>
+              <h2 className="text-sm font-bold text-white">{title}</h2>
+              <p className="text-[11px]" style={{ color: "rgba(255,255,255,0.6)" }}>Fill in all required fields</p>
             </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center text-white" style={{ background: "rgba(255,255,255,0.18)" }}>
-            <FaTimes size={13} />
+          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-white" style={{ background: "rgba(255,255,255,0.18)" }}>
+            <FaTimes size={12} />
           </button>
         </div>
-        <div className="overflow-y-auto p-3 sm:p-6 flex-1 bg-[#F9F8F2]">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">{children}</div>
+
+        {/* Scrollable Form Area */}
+        <div className="overflow-y-auto p-3 sm:p-4 flex-1 bg-[#F9F8F2]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{children}</div>
         </div>
-        <div className="px-3 sm:px-6 py-3 sm:py-4 border-t border-[#F4C0D1] flex justify-end gap-2 sm:gap-3 bg-[#F9F8F2] flex-shrink-0">
-          <button onClick={onClose} className="px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl border border-[#F4C0D1] text-[#730042] text-xs sm:text-sm font-semibold hover:bg-[#FBEAF0] transition-colors">Cancel</button>
-          <button onClick={onSubmit} className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90" style={{ background: accentColor }}>Submit</button>
+
+        {/* Footer */}
+        <div className="px-3 sm:px-4 py-3 border-t border-[#F4C0D1] flex justify-end gap-2 bg-[#F9F8F2] flex-shrink-0">
+          <button onClick={onClose} className="px-3 py-2 rounded-xl border border-[#F4C0D1] text-[#730042] text-xs font-semibold hover:bg-[#FBEAF0] transition-colors">Cancel</button>
+          <button onClick={onSubmit} className="px-5 py-2 rounded-xl text-white text-xs font-semibold hover:opacity-90" style={{ background: accentColor }}>Submit</button>
         </div>
       </div>
     </div>
