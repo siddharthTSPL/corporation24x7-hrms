@@ -251,81 +251,78 @@ const loginSuperAdmin = async (req, res, next) => {
     const { identifier, password } = req.body;
 
     if (!identifier || !password)
-      return next(
-        Object.assign(new Error("Email and password are required"), {
-          statusCode: 400,
-        }),
-      );
+      return next(Object.assign(new Error("Email and password are required"), { statusCode: 400 }));
 
-    const superAdmin = await SuperAdminModel.findOne({
-      email: identifier.toLowerCase().trim(),
-    });
+    const superAdmin = await SuperAdminModel.findOne({ email: identifier.toLowerCase().trim() });
 
     if (!superAdmin)
-      return next(
-        Object.assign(new Error("No account found with this email"), {
-          statusCode: 404,
-        }),
-      );
+      return next(Object.assign(new Error("No account found with this email"), { statusCode: 404 }));
 
     if (!superAdmin.isVerified)
-      return next(
-        Object.assign(new Error("Please verify your email before logging in"), {
-          statusCode: 403,
-        }),
-      );
+      return next(Object.assign(new Error("Please verify your email before logging in"), { statusCode: 403 }));
 
     if (superAdmin.status === "suspended")
-      return next(
-        Object.assign(
-          new Error("Your account has been suspended. Contact support."),
-          { statusCode: 403 },
-        ),
-      );
+      return next(Object.assign(new Error("Your account has been suspended. Contact support."), { statusCode: 403 }));
 
     const isMatch = await superAdmin.isValidPassword(password);
     if (!isMatch)
-      return next(
-        Object.assign(new Error("Invalid credentials"), { statusCode: 401 }),
-      );
+      return next(Object.assign(new Error("Invalid credentials"), { statusCode: 401 }));
 
     const trialValid = superAdmin.isTrialValid();
     const hasTalentLicense = superAdmin.licenses.some(
-      (l) =>
-        l.product === "torchx_talent" &&
-        l.isActive &&
-        new Date(l.expiresAt) > new Date(),
+      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date(),
     );
 
-    if (!trialValid && !hasTalentLicense) {
+    if (!trialValid && !hasTalentLicense)
+      return next(Object.assign(
+        new Error("Your trial has expired and you have no active license for TorchX Talent. Please upgrade your plan at torchxsuite.com to continue."),
+        { statusCode: 403, code: "PLAN_EXPIRED" },
+      ));
+
+    const isProduction = process.env.NODE_ENV === "production";
+    const cookieOpts = {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+    };
+
+    if (superAdmin.isFirstLogin) {
+      const firstLoginToken = jwt.sign(
+        { superadminid: superAdmin._id, email: superAdmin.email, purpose: "first_login" },
+        process.env.JWT_SECRET,
+        { expiresIn: "15m" },
+      );
+
+      res.cookie("superResetToken", firstLoginToken, { ...cookieOpts, maxAge: 15 * 60 * 1000 });
+
+      sendEmail({
+        to: superAdmin.email,
+        subject: "Set Your Password",
+        html: `
+          <div style="font-family:Arial,sans-serif;padding:20px">
+            <h2>Hello ${superAdmin.f_name},</h2>
+            <p>This is your first login. Please set your password using the link below.</p>
+            <a href="${process.env.BASE_URL}talent/api/superadmin/reset-password"
+               style="display:inline-block;padding:12px 24px;background:#730042;color:#fff;border-radius:6px;text-decoration:none;">
+              Set Password
+            </a>
+            <p>This link expires in 15 minutes.</p>
+          </div>
+        `,
+      }).catch((err) => console.error("First login email failed:", err.message));
+
       return next(
-        Object.assign(
-          new Error(
-            "Your trial has expired and you have no active license for TorchX Talent. Please upgrade your plan at torchxsuite.com to continue.",
-          ),
-          { statusCode: 403, code: "PLAN_EXPIRED" },
-        ),
+        Object.assign(new Error("First login detected. Check your email to set password."), { statusCode: 403 }),
       );
     }
 
     const token = jwt.sign(
-      {
-        superadminid: superAdmin._id,
-        role: superAdmin.role,
-        email: superAdmin.email,
-        company_domain: superAdmin.company_domain,
-      },
+      { superadminid: superAdmin._id, role: superAdmin.role, email: superAdmin.email, company_domain: superAdmin.company_domain },
       process.env.JWT_SECRET,
       { expiresIn: "15d" },
     );
 
-    const isProduction = process.env.NODE_ENV === "production";
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? "none" : "lax",
-      maxAge: 15 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie("token", token, { ...cookieOpts, maxAge: 15 * 24 * 60 * 60 * 1000 });
 
     superAdmin.last_login = new Date();
     superAdmin.status = "active";
@@ -503,103 +500,118 @@ const forgotPassword = async (req, res, next) => {
 const verifyOtp = async (req, res, next) => {
   const { email, otp } = req.body;
   if (!email || !otp)
-    return next(
-      Object.assign(new Error("Email and OTP are required"), {
-        statusCode: 400,
-      }),
-    );
+    return next(Object.assign(new Error("Email and OTP are required"), { statusCode: 400 }));
 
   const otpRecord = await OtpModel.findOne({ email });
   if (!otpRecord)
-    return next(
-      Object.assign(
-        new Error("OTP not found. Please request a new one"),
-        { statusCode: 404 },
-      ),
-    );
+    return next(Object.assign(new Error("OTP not found. Please request a new one"), { statusCode: 404 }));
   if (otpRecord.isExpired()) {
     await OtpModel.deleteOne({ email });
-    return next(
-      Object.assign(
-        new Error("OTP has expired. Please request a new one"),
-        { statusCode: 400 },
-      ),
-    );
+    return next(Object.assign(new Error("OTP has expired. Please request a new one"), { statusCode: 400 }));
   }
   if (!otpRecord.compareOtp(String(otp)))
-    return next(
-      Object.assign(new Error("Invalid OTP"), { statusCode: 400 }),
-    );
+    return next(Object.assign(new Error("Invalid OTP"), { statusCode: 400 }));
 
-  const superAdmin = await SuperAdminModel.findOne({ email })
-    .select("_id email role")
-    .lean();
+  const superAdmin = await SuperAdminModel.findOne({ email }).select("_id f_name email role").lean();
   if (!superAdmin)
-    return next(
-      Object.assign(new Error("Account not found"), { statusCode: 404 }),
-    );
+    return next(Object.assign(new Error("Account not found"), { statusCode: 404 }));
 
   await OtpModel.deleteOne({ email });
 
+  const isProduction = process.env.NODE_ENV === "production";
+  const cookieOpts = {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+  };
+
   const token = jwt.sign(
-    {
-      superadminid: superAdmin._id,
-      role: superAdmin.role,
-      email: superAdmin.email,
-    },
+    { superadminid: superAdmin._id, role: superAdmin.role, email: superAdmin.email },
     process.env.JWT_SECRET,
     { expiresIn: "7d" },
   );
 
-  const isProduction = process.env.NODE_ENV === "production";
-  res.cookie("token", token, {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? "none" : "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
+  const resetToken = jwt.sign(
+    { superadminid: superAdmin._id, email: superAdmin.email, purpose: "password_reset" },
+    process.env.JWT_SECRET,
+    { expiresIn: "15m" },
+  );
+
+  res.cookie("token", token, { ...cookieOpts, maxAge: 7 * 24 * 60 * 60 * 1000 });
+  res.cookie("superResetToken", resetToken, { ...cookieOpts, maxAge: 15 * 60 * 1000 });
 
   SuperAdminModel.findByIdAndUpdate(superAdmin._id, {
     status: "active",
     last_login: new Date(),
   }).exec();
 
+  sendEmail({
+    to: email,
+    subject: "Optional Password Reset",
+    html: `
+      <div style="font-family:Arial,sans-serif;padding:20px">
+        <h2>Hello ${superAdmin.f_name},</h2>
+        <p>Your OTP login was successful.</p>
+        <p>If you want to reset your password, click the button below. This link expires in <strong>15 minutes</strong>.</p>
+        <a href="${process.env.BASE_URL}talent/api/superadmin/reset-password"
+           style="display:inline-block;padding:12px 24px;background:#730042;color:#fff;border-radius:6px;text-decoration:none;">
+          Reset Password
+        </a>
+        <p style="color:#999;font-size:12px;">If you didn't request this, ignore this email.</p>
+      </div>
+    `,
+  }).catch((err) => console.error("Reset email failed:", err.message));
+
   res.status(200).json({
     success: true,
     message: "OTP verified successfully",
     role: superAdmin.role,
+    passwordResetOptional: true,
   });
 };
 
 const resetPassword = async (req, res, next) => {
-  const { resetToken, newPassword } = req.body;
-  if (!resetToken || !newPassword)
-    return next(
-      Object.assign(new Error("Reset token and new password are required"), {
-        statusCode: 400,
-      }),
-    );
+  const { newPassword, confirmPassword } = req.body;
+
+  if (!newPassword || !confirmPassword)
+    return next(Object.assign(new Error("Both password fields are required"), { statusCode: 400 }));
+
+  if (newPassword !== confirmPassword)
+    return next(Object.assign(new Error("Passwords do not match"), { statusCode: 400 }));
+
+  if (newPassword.length < 8)
+    return next(Object.assign(new Error("Password must be at least 8 characters"), { statusCode: 400 }));
+
+  const resetToken = req.cookies?.superResetToken;
+  if (!resetToken)
+    return next(Object.assign(new Error("Reset session expired. Please verify OTP again."), { statusCode: 401 }));
+
   let decoded;
   try {
     decoded = jwt.verify(resetToken, process.env.JWT_SECRET);
   } catch (err) {
-    return next(
-      Object.assign(new Error("Invalid or expired reset token"), {
-        statusCode: 400,
-      }),
-    );
+    return next(Object.assign(new Error("Invalid or expired reset token"), { statusCode: 401 }));
   }
+
+  if (decoded.purpose !== "password_reset" && decoded.purpose !== "first_login")
+    return next(Object.assign(new Error("Invalid reset token"), { statusCode: 401 }));
+
   const superAdmin = await SuperAdminModel.findById(decoded.superadminid);
   if (!superAdmin)
-    return next(
-      Object.assign(new Error("Account not found"), { statusCode: 404 }),
-    );
+    return next(Object.assign(new Error("Account not found"), { statusCode: 404 }));
+
   superAdmin.password = newPassword;
+  if (decoded.purpose === "first_login") superAdmin.isFirstLogin = false;
   await superAdmin.save();
-  res.status(200).json({
-    success: true,
-    message: "Password reset successfully. You can now login.",
+
+  const isProduction = process.env.NODE_ENV === "production";
+  res.clearCookie("superResetToken", {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
   });
+
+  res.status(200).json({ success: true, message: "Password updated successfully" });
 };
 
 const createAdmin = async (req, res, next) => {
