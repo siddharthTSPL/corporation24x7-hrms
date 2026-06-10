@@ -16,6 +16,7 @@ const leavebalanceModel = require("../Models/leavebalance.model");
 const reviewModel = require("../Models/review.model");
 const Attendance = require("../Models/attendance.model");
 const ManagerLeave = require("../Models/maleave.model");
+const AdminLeave = require("../Models/adleave_model");
 const SuperAdminModel = require("../Models/superadmin.model");
 const Document = require("../Models/document.model");
 const Ticket = require("../Models/ticket.model");
@@ -154,11 +155,30 @@ const adminlogout = async (req, res, next) => {
   res.status(200).json({ message: "Admin logout successful" });
 };
 
+// ─── RESOLVE REPORTING MANAGER HELPER ──────────────────────────────────────────
+// For a manager: reporting_manager can be another Manager or an Admin.
+// For an employee: Under_manager is always a Manager.
+// Returns { reportingManagerId, reportingManagerModel } or { null, null }.
+const resolveReportingManager = async (reporting_manager_id, organisation_id) => {
+  if (!reporting_manager_id) return { reportingManagerId: null, reportingManagerModel: null };
+
+  const admin = await Adminmodel.findOne({ _id: reporting_manager_id, organisation_id })
+    .select("_id")
+    .lean();
+  if (admin) return { reportingManagerId: admin._id, reportingManagerModel: "Admin" };
+
+  const manager = await Managermodel.findOne({ _id: reporting_manager_id, organisation_id })
+    .select("_id")
+    .lean();
+  if (manager) return { reportingManagerId: manager._id, reportingManagerModel: "Manager" };
+
+  return { reportingManagerId: null, reportingManagerModel: null };
+};
+
 const addmanager = async (req, res, next) => {
   try {
-    if (!req.admin) {
+    if (!req.admin)
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-    }
 
     const {
       profile_image, f_name, l_name, work_email, gender, marital_status, password,
@@ -169,46 +189,29 @@ const addmanager = async (req, res, next) => {
       experience_letter,
     } = req.body;
 
-    if (!f_name || !l_name || !work_email || !password || !department || !designation || !office_location || !gender || !personal_contact || !e_contact) {
+    if (!f_name || !l_name || !work_email || !password || !department || !designation || !office_location || !gender || !personal_contact || !e_contact)
       return next(Object.assign(new Error("Required fields missing"), { statusCode: 400 }));
-    }
 
-    const superAdmin = await SuperAdminModel.findById(req.admin.organisation_id).select("_id organisation_name");
-    if (!superAdmin) {
+    const superAdmin = await SuperAdminModel.findById(req.admin.organisation_id).select("_id organisation_name").lean();
+    if (!superAdmin)
       return next(Object.assign(new Error("Organisation not found. Please contact administrator."), { statusCode: 404 }));
-    }
 
     const organisation_id = superAdmin._id;
 
     const existingManager = await Managermodel.findOne({ work_email, organisation_id }).select("_id").lean();
-    if (existingManager) {
+    if (existingManager)
       return next(Object.assign(new Error("Manager already exists"), { statusCode: 400 }));
-    }
 
     const uid = await generateUID(department, organisation_id);
 
-    let reportingManagerId = null;
-    let reportingManagerModel = null;
-
-    if (reporting_manager) {
-      const admin = await Adminmodel.findOne({ _id: reporting_manager, organisation_id }).select("_id").lean();
-      if (admin) {
-        reportingManagerId = admin._id;
-        reportingManagerModel = "Admin";
-      } else {
-        const manager = await Managermodel.findOne({ _id: reporting_manager, organisation_id }).select("_id").lean();
-        if (manager) {
-          reportingManagerId = manager._id;
-          reportingManagerModel = "Manager";
-        }
-      }
-    }
+    const { reportingManagerId, reportingManagerModel } = await resolveReportingManager(reporting_manager, organisation_id);
 
     const newmanager = await Managermodel.create({
       organisation_id, profile_image, uid, department, f_name, l_name, work_email, password,
       gender, marital_status, personal_contact, e_contact, aadhaar_number, pan_number,
       address, city, state, pincode, role, designation, office_location,
-      reporting_manager: reportingManagerId, reporting_manager_model: reportingManagerModel,
+      reporting_manager: reportingManagerId,
+      reporting_manager_model: reportingManagerModel,
       is_fresher, total_experience, previous_company, previous_designation, bank_name,
       account_holder_name, account_number, ifsc_code, resume, aadhaar_card, pan_card,
       experience_letter,
@@ -246,6 +249,8 @@ const addmanager = async (req, res, next) => {
         uid: newmanager.uid,
         work_email: newmanager.work_email,
         organisation_id: newmanager.organisation_id,
+        reporting_manager: reportingManagerId,
+        reporting_manager_model: reportingManagerModel,
       },
     });
   } catch (error) {
@@ -274,6 +279,12 @@ const addemployee = async (req, res, next) => {
   if (existingUser)
     return next(Object.assign(new Error("User already exists"), { statusCode: 400 }));
 
+  if (Under_manager) {
+    const managerExists = await Managermodel.findOne({ _id: Under_manager, organisation_id }).select("_id").lean();
+    if (!managerExists)
+      return next(Object.assign(new Error("Assigned manager not found in this organisation"), { statusCode: 404 }));
+  }
+
   const uid = await generateUID(department, organisation_id);
 
   const newuser = await Usermodel.create({
@@ -301,9 +312,8 @@ const addemployee = async (req, res, next) => {
 
 const findallmanagers = async (req, res, next) => {
   try {
-    if (!req.admin) {
+    if (!req.admin)
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-    }
 
     const organisation_id = req.admin.organisation_id;
 
@@ -335,9 +345,8 @@ const findallmanagers = async (req, res, next) => {
 
 const getallemployee = async (req, res, next) => {
   try {
-    if (!req.admin) {
+    if (!req.admin)
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-    }
 
     const organisation_id = req.admin.organisation_id;
 
@@ -347,8 +356,8 @@ const getallemployee = async (req, res, next) => {
         .populate({ path: "Under_manager", select: "uid f_name l_name work_email role" })
         .lean(),
       Managermodel.find({ organisation_id })
-        .select("uid f_name l_name work_email role designation office_location department gender personal_contact e_contact reporting_manager organisation_id")
-        .populate({ path: "reporting_manager", select: "f_name l_name work_email" })
+        .select("uid f_name l_name work_email role designation office_location department gender personal_contact e_contact reporting_manager reporting_manager_model organisation_id")
+        .populate({ path: "reporting_manager", select: "f_name l_name work_email role" })
         .lean(),
     ]);
 
@@ -370,61 +379,340 @@ const getallemployee = async (req, res, next) => {
   }
 };
 
+// ─── EDIT EMPLOYEE ─────────────────────────────────────────────────────────────
+// Edits a User record. Under_manager must always be a valid Manager in the org.
 const editemployee = async (req, res, next) => {
-  if (!req.admin)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
-  const { uid } = req.params;
-  const organisation_id = req.admin.organisation_id;
+    const { id } = req.params;
+    const organisation_id = req.admin.organisation_id;
 
-  const updateData = {
-    f_name: req.body.f_name,
-    l_name: req.body.l_name,
-    work_email: req.body.work_email,
-    gender: req.body.gender,
-    marital_status: req.body.marital_status,
-    personal_contact: req.body.personal_contact,
-    e_contact: req.body.e_contact,
-    role: req.body.role,
-    office_location: req.body.office_location,
-    designation: req.body.designation,
-    department: req.body.department,
-    Under_manager: req.body.Under_manager,
-  };
+    const {
+      f_name, l_name, work_email, gender, marital_status, personal_contact, e_contact,
+      role, office_location, designation, department, Under_manager,
+    } = req.body;
 
-  const user = await Usermodel.findOneAndUpdate(
-    { _id: uid, organisation_id },
-    updateData,
-    { new: true, runValidators: true },
-  );
-  if (!user)
-    return next(Object.assign(new Error("User not found"), { statusCode: 404 }));
+    if (Under_manager) {
+      const managerExists = await Managermodel.findOne({ _id: Under_manager, organisation_id }).select("_id").lean();
+      if (!managerExists)
+        return next(Object.assign(new Error("Assigned manager not found in this organisation"), { statusCode: 404 }));
+    }
 
-  let manager = null;
-  if (updateData.role === "manager")
-    manager = await Managermodel.findOneAndUpdate(
-      { userId: uid, organisation_id },
+    const updateData = {
+      ...(f_name !== undefined && { f_name }),
+      ...(l_name !== undefined && { l_name }),
+      ...(work_email !== undefined && { work_email }),
+      ...(gender !== undefined && { gender }),
+      ...(marital_status !== undefined && { marital_status }),
+      ...(personal_contact !== undefined && { personal_contact }),
+      ...(e_contact !== undefined && { e_contact }),
+      ...(role !== undefined && { role }),
+      ...(office_location !== undefined && { office_location }),
+      ...(designation !== undefined && { designation }),
+      ...(department !== undefined && { department }),
+      Under_manager: Under_manager || null,
+    };
+
+    const user = await Usermodel.findOneAndUpdate(
+      { _id: id, organisation_id },
       updateData,
-      { new: true, upsert: true },
+      { new: true, runValidators: true },
+    ).lean();
+
+    if (!user)
+      return next(Object.assign(new Error("Employee not found"), { statusCode: 404 }));
+
+    return res.status(200).json({ success: true, message: "Employee updated successfully", user });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ─── EDIT MANAGER ──────────────────────────────────────────────────────────────
+// Edits a Manager record. reporting_manager can be an Admin or another Manager.
+// Frontend must always send reporting_manager (can be null to clear).
+const editmanager = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const { id } = req.params;
+    const organisation_id = req.admin.organisation_id;
+
+    const {
+      f_name, l_name, work_email, gender, marital_status, personal_contact, e_contact,
+      role, office_location, designation, department, reporting_manager,
+    } = req.body;
+
+    const { reportingManagerId, reportingManagerModel } = await resolveReportingManager(
+      reporting_manager,
+      organisation_id,
     );
 
-  res.status(200).json({ success: true, message: "Employee updated successfully", user, manager });
+    const updateData = {
+      ...(f_name !== undefined && { f_name }),
+      ...(l_name !== undefined && { l_name }),
+      ...(work_email !== undefined && { work_email }),
+      ...(gender !== undefined && { gender }),
+      ...(marital_status !== undefined && { marital_status }),
+      ...(personal_contact !== undefined && { personal_contact }),
+      ...(e_contact !== undefined && { e_contact }),
+      ...(role !== undefined && { role }),
+      ...(office_location !== undefined && { office_location }),
+      ...(designation !== undefined && { designation }),
+      ...(department !== undefined && { department }),
+      reporting_manager: reportingManagerId,
+      reporting_manager_model: reportingManagerModel,
+    };
+
+    const manager = await Managermodel.findOneAndUpdate(
+      { _id: id, organisation_id },
+      updateData,
+      { new: true, runValidators: true },
+    )
+      .select(EXCLUDE)
+      .populate("reporting_manager", "f_name l_name work_email designation role")
+      .lean();
+
+    if (!manager)
+      return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
+
+    return res.status(200).json({ success: true, message: "Manager updated successfully", manager });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ─── PROMOTE EMPLOYEE → MANAGER ────────────────────────────────────────────────
+// Creates a Manager record from a User, then deletes the User record.
+// reporting_manager in body sets who the new manager reports to (Admin or Manager).
+const promoteToManager = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const { id } = req.params;
+    const organisation_id = req.admin.organisation_id;
+    const { reporting_manager, designation, role } = req.body;
+
+    const user = await Usermodel.findOne({ _id: id, organisation_id }).lean();
+    if (!user)
+      return next(Object.assign(new Error("Employee not found"), { statusCode: 404 }));
+
+    const existing = await Managermodel.findOne({ work_email: user.work_email, organisation_id }).select("_id").lean();
+    if (existing)
+      return next(Object.assign(new Error("A manager with this email already exists"), { statusCode: 400 }));
+
+    const { reportingManagerId, reportingManagerModel } = await resolveReportingManager(reporting_manager, organisation_id);
+
+    const newManager = await Managermodel.create({
+      organisation_id,
+      uid: user.uid,
+      profile_image: user.profile_image,
+      department: user.department,
+      f_name: user.f_name,
+      l_name: user.l_name,
+      work_email: user.work_email,
+      password: user.password,
+      gender: user.gender,
+      marital_status: user.marital_status,
+      personal_contact: user.personal_contact,
+      e_contact: user.e_contact,
+      aadhaar_number: user.aadhaar_number,
+      pan_number: user.pan_number,
+      address: user.address,
+      city: user.city,
+      state: user.state,
+      pincode: user.pincode,
+      designation: designation || user.designation,
+      role: role || "manager",
+      office_location: user.office_location,
+      reporting_manager: reportingManagerId,
+      reporting_manager_model: reportingManagerModel,
+      is_fresher: user.is_fresher,
+      total_experience: user.total_experience,
+      previous_company: user.previous_company,
+      previous_designation: user.previous_designation,
+      bank_name: user.bank_name,
+      account_holder_name: user.account_holder_name,
+      account_number: user.account_number,
+      ifsc_code: user.ifsc_code,
+      resume: user.resume,
+      aadhaar_card: user.aadhaar_card,
+      pan_card: user.pan_card,
+      experience_letter: user.experience_letter,
+      isVerified: user.isverified,
+      status: user.status,
+      isFirstLogin: false,
+    });
+
+    await Promise.all([
+      Usermodel.findByIdAndDelete(id),
+      Usermodel.updateMany({ Under_manager: id, organisation_id }, { Under_manager: newManager._id }),
+      assignDefaultLeave(newManager),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: `${user.f_name} ${user.l_name} has been promoted to manager`,
+      manager: {
+        _id: newManager._id,
+        uid: newManager.uid,
+        work_email: newManager.work_email,
+        role: newManager.role,
+        reporting_manager: reportingManagerId,
+        reporting_manager_model: reportingManagerModel,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ─── DEMOTE MANAGER → EMPLOYEE ─────────────────────────────────────────────────
+// Creates a User record from a Manager, then deletes the Manager record.
+// under_manager in body sets the new employee's reporting manager (optional).
+const demoteToEmployee = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const { id } = req.params;
+    const organisation_id = req.admin.organisation_id;
+    const { Under_manager, designation } = req.body;
+
+    const manager = await Managermodel.findOne({ _id: id, organisation_id }).lean();
+    if (!manager)
+      return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
+
+    const existing = await Usermodel.findOne({ work_email: manager.work_email, organisation_id }).select("_id").lean();
+    if (existing)
+      return next(Object.assign(new Error("An employee with this email already exists"), { statusCode: 400 }));
+
+    let resolvedUnderManager = null;
+    if (Under_manager) {
+      const mgr = await Managermodel.findOne({ _id: Under_manager, organisation_id }).select("_id").lean();
+      if (!mgr)
+        return next(Object.assign(new Error("Assigned manager not found in this organisation"), { statusCode: 404 }));
+      resolvedUnderManager = mgr._id;
+    }
+
+    const newEmployee = await Usermodel.create({
+      organisation_id,
+      uid: manager.uid,
+      profile_image: manager.profile_image,
+      department: manager.department,
+      f_name: manager.f_name,
+      l_name: manager.l_name,
+      work_email: manager.work_email,
+      password: manager.password,
+      gender: manager.gender,
+      marital_status: manager.marital_status,
+      personal_contact: manager.personal_contact,
+      e_contact: manager.e_contact,
+      aadhaar_number: manager.aadhaar_number,
+      pan_number: manager.pan_number,
+      address: manager.address,
+      city: manager.city,
+      state: manager.state,
+      pincode: manager.pincode,
+      designation: designation || manager.designation,
+      role: "employee",
+      office_location: manager.office_location,
+      Under_manager: resolvedUnderManager,
+      is_fresher: manager.is_fresher,
+      total_experience: manager.total_experience,
+      previous_company: manager.previous_company,
+      previous_designation: manager.previous_designation,
+      bank_name: manager.bank_name,
+      account_holder_name: manager.account_holder_name,
+      account_number: manager.account_number,
+      ifsc_code: manager.ifsc_code,
+      resume: manager.resume,
+      aadhaar_card: manager.aadhaar_card,
+      pan_card: manager.pan_card,
+      experience_letter: manager.experience_letter,
+      isverified: manager.isVerified,
+      status: manager.status,
+      isFirstLogin: false,
+    });
+
+    await Promise.all([
+      Managermodel.findByIdAndDelete(id),
+      Usermodel.updateMany({ Under_manager: id, organisation_id }, { Under_manager: resolvedUnderManager }),
+      Managermodel.updateMany(
+        { reporting_manager: id, reporting_manager_model: "Manager", organisation_id },
+        { reporting_manager: null, reporting_manager_model: null },
+      ),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: `${manager.f_name} ${manager.l_name} has been demoted to employee`,
+      employee: {
+        _id: newEmployee._id,
+        uid: newEmployee.uid,
+        work_email: newEmployee.work_email,
+        role: newEmployee.role,
+        Under_manager: resolvedUnderManager,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ─── CHANGE MANAGER ROLE (manager ↔ senior_manager) ───────────────────────────
+// Only changes the role field within the Manager model — no record migration needed.
+const changeManagerRole = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const { id } = req.params;
+    const { role } = req.body;
+    const organisation_id = req.admin.organisation_id;
+
+    if (!["manager", "senior_manager", "official"].includes(role))
+      return next(Object.assign(new Error("Invalid role. Must be manager, senior_manager, or official"), { statusCode: 400 }));
+
+    const manager = await Managermodel.findOneAndUpdate(
+      { _id: id, organisation_id },
+      { role },
+      { new: true, runValidators: true },
+    )
+      .select("_id uid f_name l_name work_email role department designation")
+      .lean();
+
+    if (!manager)
+      return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
+
+    return res.status(200).json({
+      success: true,
+      message: `Role updated to ${role} successfully`,
+      manager,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const getperticularemployee = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
-  const { uid } = req.params;
+  const { id } = req.params;
   const organisation_id = req.admin.organisation_id;
 
   const [user, leaveBalance, reviews] = await Promise.all([
-    Usermodel.findOne({ _id: uid, organisation_id })
+    Usermodel.findOne({ _id: id, organisation_id })
       .populate({ path: "Under_manager", select: "uid f_name l_name work_email role" })
       .select(EXCLUDE)
       .lean(),
-    leavebalanceModel.findOne({ employee: uid, organisation_id }).lean(),
-    reviewModel.find({ reviewee: uid, organisation_id })
+    leavebalanceModel.findOne({ employee: id, organisation_id }).lean(),
+    reviewModel.find({ reviewee: id, organisation_id })
       .populate({ path: "reviewer", select: "f_name l_name work_email role" })
       .lean(),
   ]);
@@ -434,25 +722,23 @@ const getperticularemployee = async (req, res, next) => {
   if (!leaveBalance)
     return next(Object.assign(new Error("Leave balance not found"), { statusCode: 404 }));
 
-  const manager = await Managermodel.findOne({ userId: user._id, organisation_id }).select(EXCLUDE).lean();
-
-  res.status(200).json({ success: true, user, manager: manager || null, leaveBalance, reviews: reviews || [] });
+  res.status(200).json({ success: true, user, leaveBalance, reviews: reviews || [] });
 };
 
 const getperticularemanager = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
-  const { uid } = req.params;
+  const { id } = req.params;
   const organisation_id = req.admin.organisation_id;
 
   const [manager, leaveBalance, reviews] = await Promise.all([
-    Managermodel.findOne({ _id: uid, organisation_id })
+    Managermodel.findOne({ _id: id, organisation_id })
       .select(EXCLUDE)
-      .populate("reporting_manager", "f_name l_name work_email designation")
+      .populate("reporting_manager", "f_name l_name work_email designation role")
       .lean(),
-    leavebalanceModel.findOne({ employee: uid, organisation_id }).lean(),
-    reviewModel.find({ reviewee: uid, organisation_id })
+    leavebalanceModel.findOne({ employee: id, organisation_id }).lean(),
+    reviewModel.find({ reviewee: id, organisation_id })
       .populate({ path: "reviewer", select: "f_name l_name work_email role" })
       .lean(),
   ]);
@@ -469,16 +755,26 @@ const deleteemployee = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
-  const { uid } = req.params;
+  const { id } = req.params;
   const organisation_id = req.admin.organisation_id;
 
   const [user, manager] = await Promise.all([
-    Usermodel.findOneAndDelete({ _id: uid, organisation_id }),
-    Managermodel.findOneAndDelete({ _id: uid, organisation_id }),
+    Usermodel.findOneAndDelete({ _id: id, organisation_id }),
+    Managermodel.findOneAndDelete({ _id: id, organisation_id }),
   ]);
 
   if (!user && !manager)
     return next(Object.assign(new Error("User not found"), { statusCode: 404 }));
+
+  if (manager) {
+    await Promise.all([
+      Usermodel.updateMany({ Under_manager: id, organisation_id }, { Under_manager: null }),
+      Managermodel.updateMany(
+        { reporting_manager: id, reporting_manager_model: "Manager", organisation_id },
+        { reporting_manager: null, reporting_manager_model: null },
+      ),
+    ]);
+  }
 
   res.status(200).json({ message: "User deleted successfully" });
 };
@@ -539,19 +835,16 @@ const acceptLeave = async (req, res, next) => {
       leave.status = "approved_reporting_manager";
       leave.approvedBy = req.admin._id;
       leave.remarks = "Approved by Admin";
-    }
-
-    if (leaveFor === "manager") {
+    } else if (leaveFor === "manager") {
       leave = await ManagerLeave.findOne({ _id: id, organisation_id });
       if (!leave)
         return next(Object.assign(new Error("Manager leave not found"), { statusCode: 404 }));
       leave.status = "approved_reporting_manager";
       leave.approvedBy = req.admin._id;
       leave.remarks = "Approved by Admin";
+    } else {
+      return next(Object.assign(new Error("Invalid leaveFor value"), { statusCode: 400 }));
     }
-
-    if (!leave)
-      return next(Object.assign(new Error("Invalid leave type"), { statusCode: 400 }));
 
     await leave.save();
 
@@ -588,19 +881,16 @@ const rejectLeave = async (req, res, next) => {
       leave.status = "rejected_reporting_manager";
       leave.rejectedBy = req.admin._id;
       leave.remarks = "Rejected by Admin";
-    }
-
-    if (leaveFor === "manager") {
+    } else if (leaveFor === "manager") {
       leave = await ManagerLeave.findOne({ _id: id, organisation_id });
       if (!leave)
         return next(Object.assign(new Error("Manager leave not found"), { statusCode: 404 }));
       leave.status = "rejected_reporting_manager";
       leave.rejectedBy = req.admin._id;
       leave.remarks = "Rejected by Admin";
+    } else {
+      return next(Object.assign(new Error("Invalid leaveFor value"), { statusCode: 400 }));
     }
-
-    if (!leave)
-      return next(Object.assign(new Error("Invalid leave type"), { statusCode: 400 }));
 
     leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await leave.save();
@@ -610,6 +900,8 @@ const rejectLeave = async (req, res, next) => {
   }
 };
 
+// ─── ADMIN APPLY LEAVE ─────────────────────────────────────────────────────────
+// Admin leave goes to SuperAdmin for approval — uses AdminLeave model.
 const applyleave = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
@@ -626,10 +918,10 @@ const applyleave = async (req, res, next) => {
   const days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
   const organisation_id = req.admin.organisation_id;
 
-  const overlapping = await ManagerLeave.findOne({
-    manager: req.admin._id,
+  const overlapping = await AdminLeave.findOne({
+    admin: req.admin._id,
     organisation_id,
-    status: { $nin: ["rejected_reporting_manager"] },
+    status: { $nin: ["rejected_superadmin"] },
     startDate: { $lte: end },
     endDate: { $gte: start },
   }).select("_id").lean();
@@ -637,26 +929,33 @@ const applyleave = async (req, res, next) => {
   if (overlapping)
     return next(Object.assign(new Error("Leave already applied for these dates"), { statusCode: 400 }));
 
-  const leave = await ManagerLeave.create({
+  const leave = await AdminLeave.create({
     organisation_id,
-    manager: req.admin._id,
+    admin: req.admin._id,
     leaveType,
     startDate: start,
     endDate: end,
     days,
     reason,
-    status: "pending_reporting_manager",
+    status: "pending_superadmin",
   });
 
   res.status(201).json({ success: true, message: "Leave request submitted to super admin", leave });
 };
 
+// ─── ADMIN GET OWN LEAVE HISTORY ───────────────────────────────────────────────
 const getmyleavehistory = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
-  const leave = await ManagerLeave.find({ organisation_id: req.admin.organisation_id }).lean();
-  res.status(200).json({ leave });
+  const leave = await AdminLeave.find({
+    admin: req.admin._id,
+    organisation_id: req.admin.organisation_id,
+  })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  res.status(200).json({ success: true, count: leave.length, leave });
 };
 
 const noofemployee = async (req, res, next) => {
@@ -682,14 +981,12 @@ const noofemployee = async (req, res, next) => {
 const createannouncement = async (req, res, next) => {
   try {
     const creator = req.admin || req.superAdmin;
-    if (!creator) {
+    if (!creator)
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-    }
 
     const { title, message, audience, priority, notice_image, expiresAt } = req.body;
-    if (!title || !message) {
+    if (!title || !message)
       return next(Object.assign(new Error("Title and message are required"), { statusCode: 400 }));
-    }
 
     const organisation_id = req.admin ? req.admin.organisation_id : req.superAdmin._id;
 
@@ -708,9 +1005,8 @@ const createannouncement = async (req, res, next) => {
 const getallannouncement = async (req, res, next) => {
   try {
     const organisation_id = req.admin ? req.admin.organisation_id : req.superAdmin?._id;
-    if (!organisation_id) {
+    if (!organisation_id)
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-    }
 
     const announcements = await announcementmodel.find({ organisation_id }).sort({ createdAt: -1 }).lean();
     res.status(200).json({ success: true, count: announcements.length, announcements });
@@ -722,23 +1018,20 @@ const getallannouncement = async (req, res, next) => {
 const updateAnnouncement = async (req, res, next) => {
   try {
     const user = req.admin || req.superAdmin;
-    if (!user) {
+    if (!user)
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-    }
 
     const { id } = req.params;
     const organisation_id = req.admin ? req.admin.organisation_id : req.superAdmin._id;
 
     const announcement = await announcementmodel.findOne({ _id: id, organisation_id });
-    if (!announcement) {
+    if (!announcement)
       return next(Object.assign(new Error("Announcement not found"), { statusCode: 404 }));
-    }
 
     const isOwner = announcement.createdBy.toString() === user._id.toString();
     const isSuperAdmin = !!req.superAdmin;
-    if (!isOwner && !isSuperAdmin) {
+    if (!isOwner && !isSuperAdmin)
       return next(Object.assign(new Error("You are not allowed to edit this announcement"), { statusCode: 403 }));
-    }
 
     const { title, message, audience, priority, notice_image, expiresAt } = req.body;
     if (title) announcement.title = title;
@@ -758,23 +1051,20 @@ const updateAnnouncement = async (req, res, next) => {
 const deleteAnnouncement = async (req, res, next) => {
   try {
     const user = req.admin || req.superAdmin;
-    if (!user) {
+    if (!user)
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-    }
 
     const { id } = req.params;
     const organisation_id = req.admin ? req.admin.organisation_id : req.superAdmin._id;
 
     const announcement = await announcementmodel.findOne({ _id: id, organisation_id });
-    if (!announcement) {
+    if (!announcement)
       return next(Object.assign(new Error("Announcement not found"), { statusCode: 404 }));
-    }
 
     const isOwner = announcement.createdBy.toString() === user._id.toString();
     const isSuperAdmin = !!req.superAdmin;
-    if (!isOwner && !isSuperAdmin) {
+    if (!isOwner && !isSuperAdmin)
       return next(Object.assign(new Error("You are not allowed to delete this announcement"), { statusCode: 403 }));
-    }
 
     await announcementmodel.findByIdAndDelete(id);
     res.status(200).json({ success: true, message: "Announcement deleted successfully" });
@@ -1070,9 +1360,8 @@ const getTodayCheckins = async (req, res) => {
 
 const getOrgInfo = async (req, res, next) => {
   try {
-    if (!req.admin) {
+    if (!req.admin)
       return res.status(401).json({ success: false, message: "Unauthorized" });
-    }
 
     const admin = await Adminmodel.findById(req.admin._id).lean();
     return res.status(200).json({ success: true, organisation_id: admin.organisation_id, admin });
@@ -1221,30 +1510,25 @@ const getDocumentDetailsAdmin = async (req, res, next) => {
 
 const adminActionOnLeave = async (req, res, next) => {
   try {
-    if (!req.admin) {
+    if (!req.admin)
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-    }
 
     const { leaveId, action, remarks } = req.body;
 
-    if (!leaveId || !action) {
+    if (!leaveId || !action)
       return next(Object.assign(new Error("leaveId and action are required"), { statusCode: 400 }));
-    }
 
-    if (!["approve", "reject"].includes(action)) {
+    if (!["approve", "reject"].includes(action))
       return next(Object.assign(new Error("action must be 'approve' or 'reject'"), { statusCode: 400 }));
-    }
 
     const organisation_id = req.admin.organisation_id;
     const leave = await Leave.findOne({ _id: leaveId, organisation_id });
 
-    if (!leave) {
+    if (!leave)
       return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
-    }
 
-    if (leave.status !== "forwarded_reporting_manager" && leave.status !== "pending_manager") {
+    if (leave.status !== "forwarded_reporting_manager" && leave.status !== "pending_manager")
       return next(Object.assign(new Error("Only pending or forwarded leaves can be actioned by admin"), { statusCode: 400 }));
-    }
 
     if (action === "approve") {
       leave.status = "approved_reporting_manager";
@@ -1283,9 +1567,8 @@ const adminActionOnLeave = async (req, res, next) => {
 
 const adminSubmitTicket = async (req, res, next) => {
   try {
-    if (!req.admin) {
+    if (!req.admin)
       return res.status(401).json({ message: "Not authenticated" });
-    }
 
     const organisation_id = req.admin.organisation_id;
     const {
@@ -1326,9 +1609,8 @@ const adminSubmitTicket = async (req, res, next) => {
 
 const adminGetMyTickets = async (req, res, next) => {
   try {
-    if (!req.admin) {
+    if (!req.admin)
       return res.status(401).json({ success: false, message: "Not authenticated" });
-    }
 
     const organisation_id = req.admin.organisation_id;
     const tickets = await Ticket.find({ submittedBy: req.admin._id, organisation_id, isDeleted: false })
@@ -1344,28 +1626,23 @@ const adminGetMyTickets = async (req, res, next) => {
 
 const adminRateTicket = async (req, res, next) => {
   try {
-    if (!req.admin) {
+    if (!req.admin)
       return res.status(401).json({ success: false, message: "Not authenticated" });
-    }
 
     const { ticketNumber } = req.params;
     const { rating, feedback } = req.body;
     const organisation_id = req.admin.organisation_id;
 
-    if (!rating || rating < 1 || rating > 5) {
+    if (!rating || rating < 1 || rating > 5)
       return res.status(400).json({ success: false, message: "Rating must be between 1 and 5" });
-    }
 
     const ticket = await Ticket.findOne({ ticketNumber, submittedBy: req.admin._id, organisation_id, isDeleted: false });
-    if (!ticket) {
+    if (!ticket)
       return res.status(404).json({ success: false, message: "Ticket not found" });
-    }
-    if (!["resolved", "closed"].includes(ticket.status)) {
+    if (!["resolved", "closed"].includes(ticket.status))
       return res.status(400).json({ success: false, message: "Can only rate resolved or closed tickets" });
-    }
-    if (ticket.submitterRating) {
+    if (ticket.submitterRating)
       return res.status(400).json({ success: false, message: "You have already rated this ticket" });
-    }
 
     ticket.submitterRating = rating;
     ticket.submitterFeedback = feedback || "";
@@ -1386,9 +1663,8 @@ const adminRateTicket = async (req, res, next) => {
 
 const adminGetTicketDetail = async (req, res, next) => {
   try {
-    if (!req.admin) {
+    if (!req.admin)
       return res.status(401).json({ success: false, message: "Not authenticated" });
-    }
 
     const { ticketNumber } = req.params;
     const organisation_id = req.admin.organisation_id;
@@ -1399,9 +1675,8 @@ const adminGetTicketDetail = async (req, res, next) => {
       .select("-internalNotes")
       .lean();
 
-    if (!ticket) {
+    if (!ticket)
       return res.status(404).json({ success: false, message: "Ticket not found" });
-    }
 
     return res.status(200).json({ success: true, organisation_id, ticket });
   } catch (error) {
@@ -1418,6 +1693,10 @@ module.exports = {
   findallmanagers,
   getallemployee,
   editemployee,
+  editmanager,
+  promoteToManager,
+  demoteToEmployee,
+  changeManagerRole,
   getperticularemployee,
   getperticularemanager,
   deleteemployee,
