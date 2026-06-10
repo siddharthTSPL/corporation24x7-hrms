@@ -1,5 +1,4 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-
 import {
   getAllEmployee,
   getParticularEmployee,
@@ -64,6 +63,7 @@ export const useDeleteUser = () => {
     mutationFn: deleteUser,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["managers"] });
     },
   });
 };
@@ -85,6 +85,7 @@ export const useEditManager = (id) => {
     mutationFn: (data) => editManager(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["managers"] });
       queryClient.invalidateQueries({ queryKey: ["manager", id] });
     },
   });
@@ -96,6 +97,7 @@ export const usePromoteEmployeeToManager = () => {
     mutationFn: ({ id, data }) => promoteEmployeeToManager(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["managers"] });
       queryClient.invalidateQueries({ queryKey: ["employeeStats"] });
     },
   });
@@ -107,6 +109,7 @@ export const usePromoteEmployeeToAdmin = () => {
     mutationFn: ({ id, data }) => promoteEmployeeToAdmin(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["managers"] });
       queryClient.invalidateQueries({ queryKey: ["employeeStats"] });
     },
   });
@@ -118,6 +121,7 @@ export const usePromoteManagerToAdmin = () => {
     mutationFn: ({ id, data }) => promoteManagerToAdmin(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["managers"] });
       queryClient.invalidateQueries({ queryKey: ["employeeStats"] });
     },
   });
@@ -129,6 +133,7 @@ export const useDemoteManagerToEmployee = () => {
     mutationFn: ({ id, data }) => demoteManagerToEmployee(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["managers"] });
       queryClient.invalidateQueries({ queryKey: ["employeeStats"] });
     },
   });
@@ -140,6 +145,7 @@ export const useDemoteAdminToManager = () => {
     mutationFn: ({ id, data }) => demoteAdminToManager(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["managers"] });
       queryClient.invalidateQueries({ queryKey: ["employeeStats"] });
     },
   });
@@ -151,6 +157,7 @@ export const useDemoteAdminToEmployee = () => {
     mutationFn: ({ id, data }) => demoteAdminToEmployee(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["managers"] });
       queryClient.invalidateQueries({ queryKey: ["employeeStats"] });
     },
   });
@@ -162,6 +169,7 @@ export const useChangeManagerRole = () => {
     mutationFn: ({ id, data }) => changeManagerRole(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["managers"] });
     },
   });
 };
