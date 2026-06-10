@@ -103,28 +103,34 @@ const LEAVE_META = {
 };
 
 const LEAVE_STATUS_META = {
-  pending_manager:             { label: "Pending Manager",            bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
-  forwarded_reporting_manager: { label: "Forwarded to Reporting Mgr", bg: "#EFF6FF", color: "#1D4ED8", dot: "#3B82F6" },
-  approved_manager:            { label: "Approved by Manager",        bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
-  approved_reporting_manager:  { label: "Approved by Reporting Mgr",  bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
-  rejected_manager:            { label: "Rejected by Manager",        bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
-  rejected_reporting_manager:  { label: "Rejected by Reporting Mgr",  bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  pending_manager:             { label: "Pending Manager",             bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
+  forwarded_reporting_manager: { label: "Forwarded to Reporting Mgr",  bg: "#EFF6FF", color: "#1D4ED8", dot: "#3B82F6" },
+  approved_manager:            { label: "Approved by Manager",         bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  approved_reporting_manager:  { label: "Approved by Reporting Mgr",   bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_manager:            { label: "Rejected by Manager",         bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  rejected_reporting_manager:  { label: "Rejected by Reporting Mgr",   bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  approved_admin:              { label: "Approved by Admin",           bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_admin:              { label: "Rejected by Admin",           bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  approved_superadmin:         { label: "Approved by Super Admin",     bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_superadmin:         { label: "Rejected by Super Admin",     bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  pending_admin:               { label: "Pending Admin",               bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
+  pending_superadmin:          { label: "Pending Super Admin",         bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
 };
 
 const WFH_STATUS_META = {
-  pending_manager:             { label: "Pending Manager",            bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
-  approved_manager:            { label: "Approved by Manager",        bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
-  rejected_manager:            { label: "Rejected by Manager",        bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
-  forwarded_reporting_manager: { label: "Forwarded to Reporting Mgr", bg: "#EFF6FF", color: "#1D4ED8", dot: "#3B82F6" },
-  pending_reporting_manager:   { label: "Pending Reporting Mgr",      bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
-  approved_reporting_manager:  { label: "Approved by Reporting Mgr",  bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
-  rejected_reporting_manager:  { label: "Rejected by Reporting Mgr",  bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
-  pending_admin:               { label: "Pending Admin",              bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
-  approved_admin:              { label: "Approved by Admin",          bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
-  rejected_admin:              { label: "Rejected by Admin",          bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
-  pending_superadmin:          { label: "Pending Super Admin",        bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
-  approved_superadmin:         { label: "Approved by Super Admin",    bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
-  rejected_superadmin:         { label: "Rejected by Super Admin",    bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  pending_manager:             { label: "Pending Manager",             bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
+  approved_manager:            { label: "Approved by Manager",         bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_manager:            { label: "Rejected by Manager",         bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  forwarded_reporting_manager: { label: "Forwarded to Reporting Mgr",  bg: "#EFF6FF", color: "#1D4ED8", dot: "#3B82F6" },
+  pending_reporting_manager:   { label: "Pending Reporting Mgr",       bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
+  approved_reporting_manager:  { label: "Approved by Reporting Mgr",   bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_reporting_manager:  { label: "Rejected by Reporting Mgr",   bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  pending_admin:               { label: "Pending Admin",               bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
+  approved_admin:              { label: "Approved by Admin",           bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_admin:              { label: "Rejected by Admin",           bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  pending_superadmin:          { label: "Pending Super Admin",         bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
+  approved_superadmin:         { label: "Approved by Super Admin",     bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_superadmin:         { label: "Rejected by Super Admin",     bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
 };
 
 const fmt = (d) =>
@@ -186,9 +192,9 @@ const Toast = ({ toast }) => {
 };
 
 const LeaveTypeBadge = ({ type }) => {
-  const m = LEAVE_META[type] || { label: (type || "").toUpperCase(), bg: "#F3F4F6", color: "#374151", dot: "#9CA3AF" };
+  const m = LEAVE_META[type] || { label: (type || "").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()), bg: "#F3F4F6", color: "#374151", dot: "#9CA3AF" };
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, background: m.bg, color: m.color, fontFamily: "'DM Sans',sans-serif" }}>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, background: m.bg, color: m.color, fontFamily: "'DM Sans',sans-serif", whiteSpace: "nowrap" }}>
       <span style={{ width: 5, height: 5, borderRadius: "50%", background: m.dot, flexShrink: 0 }} />
       {m.label}
     </span>
@@ -196,7 +202,7 @@ const LeaveTypeBadge = ({ type }) => {
 };
 
 const StatusBadge = ({ status, meta }) => {
-  const m = (meta || {})[status] || { label: (status || "").replace(/_/g, " "), bg: "#F3F4F6", color: "#374151", dot: "#9CA3AF" };
+  const m = (meta || {})[status] || { label: (status || "").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()), bg: "#F3F4F6", color: "#374151", dot: "#9CA3AF" };
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, background: m.bg, color: m.color, fontFamily: "'DM Sans',sans-serif", whiteSpace: "nowrap" }}>
       <span style={{ width: 5, height: 5, borderRadius: "50%", background: m.dot, flexShrink: 0 }} />
@@ -228,22 +234,69 @@ const SectionBox = ({ title, children, rightEl }) => (
   </div>
 );
 
-const JOURNEY_STEPS = ["Submitted", "Manager Review", "Reporting Manager", "Final Decision"];
+const getJourneyConfig = (status) => {
+  const isForwardedToReporting =
+    status === "forwarded_reporting_manager" ||
+    status === "approved_reporting_manager" ||
+    status === "rejected_reporting_manager";
 
-const getJourneyIdx = (status) => {
+  const isAdminInvolved =
+    status === "pending_admin" ||
+    status === "approved_admin" ||
+    status === "rejected_admin" ||
+    status === "approved_superadmin" ||
+    status === "rejected_superadmin" ||
+    status === "pending_superadmin";
+
+  if (isAdminInvolved || isForwardedToReporting) {
+    return [
+      { key: "submitted",          label: "Submitted"        },
+      { key: "manager_review",     label: "Manager Review"   },
+      { key: "reporting_manager",  label: "HR / Admin"       },
+      { key: "final",              label: "Final Decision"   },
+    ];
+  }
+
+  return [
+    { key: "submitted",      label: "Submitted"      },
+    { key: "manager_review", label: "Manager Review" },
+    { key: "final",          label: "Final Decision" },
+  ];
+};
+
+const getJourneyActiveIdx = (status, steps) => {
   if (!status) return 0;
-  if (status === "pending_manager") return 1;
-  if (status === "forwarded_reporting_manager") return 2;
-  if (status.startsWith("approved") || status.startsWith("rejected")) return 3;
+
+  const keyMap = {
+    "pending_manager":             { 3: 1, 4: 1 },
+    "forwarded_reporting_manager": { 4: 2 },
+    "approved_manager":            { 3: 2, 4: 3 },
+    "rejected_manager":            { 3: 2, 4: 3 },
+    "approved_reporting_manager":  { 4: 3 },
+    "rejected_reporting_manager":  { 4: 3 },
+    "pending_admin":               { 4: 2 },
+    "approved_admin":              { 4: 3 },
+    "rejected_admin":              { 4: 3 },
+    "approved_superadmin":         { 4: 3 },
+    "rejected_superadmin":         { 4: 3 },
+  };
+
+  const len = steps.length;
+  if (keyMap[status] && keyMap[status][len] !== undefined) return keyMap[status][len];
+
+  if (status.startsWith("approved") || status.startsWith("rejected")) return steps.length - 1;
   return 0;
 };
 
 const JourneyTracker = ({ leave }) => {
   if (!leave) return <EmptyState msg="No leave applications yet" />;
+
   const leaveMeta  = LEAVE_META[leave.leaveType] || {};
-  const leaveLabel = leaveMeta.label || leave.leaveType;
-  const activeIdx  = getJourneyIdx(leave.status);
-  const isRejected = leave.status?.startsWith("rejected");
+  const leaveLabel = leaveMeta.label || (leave.leaveType || "").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  const steps      = getJourneyConfig(leave.status);
+  const activeIdx  = getJourneyActiveIdx(leave.status, steps);
+  const isRejected = (leave.status || "").startsWith("rejected");
+  const isFinalDone = activeIdx === steps.length - 1;
 
   return (
     <div>
@@ -259,22 +312,34 @@ const JourneyTracker = ({ leave }) => {
       </div>
 
       <div style={{ display: "flex", alignItems: "flex-start" }}>
-        {JOURNEY_STEPS.map((step, i) => {
-          const isLast          = i === JOURNEY_STEPS.length - 1;
-          const done            = i < activeIdx;
-          const current         = i === activeIdx;
-          const isFinalStep     = isLast && current;
-          const finalBg         = isFinalStep ? (isRejected ? "#BE123C" : "#15803D") : done ? "#730042" : current ? "#CD166E" : "rgba(115,0,66,.08)";
-          const borderCol       = current ? "#730042" : done ? "transparent" : "rgba(115,0,66,.15)";
-          const labelColor      = isFinalStep ? (isRejected ? "#BE123C" : "#15803D") : done ? "#730042" : current ? "#CD166E" : "rgba(115,0,66,.4)";
-          const stepLabel       = isFinalStep ? (isRejected ? "Rejected" : "Approved") : step;
+        {steps.map((step, i) => {
+          const isLast      = i === steps.length - 1;
+          const done        = i < activeIdx;
+          const current     = i === activeIdx;
+          const isFinalStep = isLast && current;
+
+          let circleBg;
+          if (isFinalStep && isRejected) circleBg = "#BE123C";
+          else if (isFinalStep && !isRejected) circleBg = "#15803D";
+          else if (done) circleBg = "#730042";
+          else if (current) circleBg = "#CD166E";
+          else circleBg = "rgba(115,0,66,.08)";
+
+          const borderCol  = current ? "#730042" : done ? "transparent" : "rgba(115,0,66,.15)";
+          const labelColor = isFinalStep
+            ? (isRejected ? "#BE123C" : "#15803D")
+            : done ? "#730042" : current ? "#CD166E" : "rgba(115,0,66,.4)";
+
+          const displayLabel = isFinalStep
+            ? (isRejected ? "Rejected" : "Approved")
+            : step.label;
 
           return (
-            <React.Fragment key={step}>
+            <React.Fragment key={step.key}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
                 <div style={{
                   width: 38, height: 38, borderRadius: "50%",
-                  background: finalBg,
+                  background: circleBg,
                   border: `2.5px solid ${borderCol}`,
                   boxShadow: current ? "0 0 0 5px rgba(205,22,110,.15)" : "none",
                   display: "flex", alignItems: "center", justifyContent: "center", transition: "all .25s",
@@ -290,12 +355,14 @@ const JourneyTracker = ({ leave }) => {
                   )}
                 </div>
                 <span style={{ fontSize: 11, fontWeight: current ? 600 : 400, textAlign: "center", lineHeight: 1.3, paddingInline: 2, color: labelColor, fontFamily: "'DM Sans',sans-serif" }}>
-                  {stepLabel}
+                  {displayLabel}
                 </span>
               </div>
               {!isLast && (
                 <div style={{ flex: 2, height: 2.5, marginTop: 18, borderRadius: 4, background: "rgba(115,0,66,.1)", position: "relative", overflow: "hidden" }}>
-                  {i < activeIdx && !isRejected && <div style={{ position: "absolute", inset: 0, background: "#730042", borderRadius: 4 }} />}
+                  {i < activeIdx && (
+                    <div style={{ position: "absolute", inset: 0, background: isRejected && i === activeIdx - 1 ? "#BE123C" : "#730042", borderRadius: 4 }} />
+                  )}
                 </div>
               )}
             </React.Fragment>
@@ -345,8 +412,8 @@ const LeaveBalanceTab = ({ employee, balance, isLoading }) => {
 };
 
 const LeaveApplyTab = ({ employee, showToast }) => {
-  const [form, setForm]         = useState(LEAVE_BLANK);
-  const [errors, setErrors]     = useState({});
+  const [form, setForm]             = useState(LEAVE_BLANK);
+  const [errors, setErrors]         = useState({});
   const [editTarget, setEditTarget] = useState(null);
 
   const { data: historyData, isLoading: histLoading } = useGetAllLeaveHistory();
@@ -362,11 +429,15 @@ const LeaveApplyTab = ({ employee, showToast }) => {
   const availTypes = [
     { value: "el",          label: "Earned Leave"    },
     { value: "sl",          label: "Sick Leave"      },
-    ...(isFemaleMarried ? [{ value: "ml", label: "Maternity Leave" }] : []),
-    ...(isMaleMarried   ? [{ value: "pl", label: "Paternity Leave" }] : []),
+    { value: "ml",          label: "Maternity Leave" },
+    { value: "pl",          label: "Paternity Leave" },
     { value: "half_day_el", label: "Half Day EL"     },
     { value: "half_day_sl", label: "Half Day SL"     },
-  ];
+  ].filter(t => {
+    if (t.value === "ml") return isFemaleMarried;
+    if (t.value === "pl") return isMaleMarried;
+    return true;
+  });
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
@@ -618,7 +689,7 @@ const WFHTab = ({ showToast }) => {
           <div style={{ display: "flex", flexDirection: "column" }}>
             {wfhList.map((wfh, i) => {
               const canEdit = wfh.status === "pending_manager";
-              const d = wfh.days || daysBetween(wfh.startDate, wfh.endDate);
+              const d       = wfh.days || daysBetween(wfh.startDate, wfh.endDate);
               return (
                 <div key={wfh._id || i} className="elw-history-card" style={{ animationDelay: `${i * .05}s` }}>
                   <div style={{ position: "absolute", top: 0, left: 0, width: 3, bottom: 0, background: "#3B82F6", borderRadius: "16px 0 0 16px" }} />
@@ -762,6 +833,7 @@ const EmployeeLeaveWFH = () => {
         {tab === "apply"   && <LeaveApplyTab employee={employee} showToast={showToast} />}
         {tab === "wfh"     && <WFHTab showToast={showToast} />}
       </div>
+      
 
       <Toast toast={toast} />
     </div>
