@@ -23,6 +23,7 @@ const GlobalStyles = () => (
     @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes fadeSlideUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
     @keyframes progressIn { from { width:0; } }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
     .alw-card {
       background:#fff; border-radius:20px; border:1px solid rgba(200,185,220,0.3);
       padding:22px 24px; margin-bottom:14px;
@@ -100,6 +101,12 @@ const GlobalStyles = () => (
     }
     .alw-table tr:last-child td { border-bottom:none; }
     .alw-table tr:hover td { background:#FDFBFF; }
+    .alw-timeline-dot {
+      width:10px; height:10px; border-radius:50%; flex-shrink:0; margin-top:4px; position:relative; z-index:1;
+    }
+    .alw-timeline-line {
+      position:absolute; left:4px; top:14px; bottom:-14px; width:2px; background:linear-gradient(180deg,#E0D0F0,transparent);
+    }
   `}</style>
 );
 
@@ -112,27 +119,46 @@ const LEAVE_META = {
   half_day_sl: { label:"Half Day SL",     short:"½SL", bg:"#EFF6FF", color:"#1E40AF", accent:"#60A5FA", dot:"#3B82F6" },
 };
 
+const STATUS_LABEL_MAP = {
+  pending_manager:             "Pending (Manager)",
+  approved_manager:            "Approved by Manager",
+  rejected_manager:            "Rejected by Manager",
+  forwarded_admin:             "Forwarded to Admin",
+  forwarded_reporting_manager: "Forwarded to Reporting Manager",
+  approved_admin:              "Approved by Admin",
+  rejected_admin:              "Rejected by Admin",
+  approved_reporting_manager:  "Approved by RM",
+  rejected_reporting_manager:  "Rejected by RM",
+  pending_reporting_manager:   "Pending (Reporting Manager)",
+  pending_admin:               "Pending (Admin)",
+  pending_superadmin:          "Pending (Super Admin)",
+  approved_superadmin:         "Approved by Super Admin",
+  rejected_superadmin:         "Rejected by Super Admin",
+};
+
+const humanStatus = (status) => STATUS_LABEL_MAP[status] || (status || "Unknown").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+
 const LEAVE_STATUS_META = {
-  pending_manager:             { label:"Pending",        bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
-  approved_manager:            { label:"Approved",       bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
-  rejected_manager:            { label:"Rejected",       bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
-  forwarded_admin:             { label:"Fwd to Admin",   bg:"#EFF6FF", color:"#1D4ED8", dot:"#3B82F6" },
-  forwarded_reporting_manager: { label:"Forwarded",      bg:"#EFF6FF", color:"#1D4ED8", dot:"#3B82F6" },
-  approved_admin:              { label:"Admin Approved", bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
-  rejected_admin:              { label:"Admin Rejected", bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
-  approved_reporting_manager:  { label:"RM Approved",    bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
-  rejected_reporting_manager:  { label:"RM Rejected",    bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
-  pending_reporting_manager:   { label:"Pending",        bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
+  pending_manager:             { bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
+  approved_manager:            { bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
+  rejected_manager:            { bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
+  forwarded_admin:             { bg:"#EFF6FF", color:"#1D4ED8", dot:"#3B82F6" },
+  forwarded_reporting_manager: { bg:"#EFF6FF", color:"#1D4ED8", dot:"#3B82F6" },
+  approved_admin:              { bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
+  rejected_admin:              { bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
+  approved_reporting_manager:  { bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
+  rejected_reporting_manager:  { bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
+  pending_reporting_manager:   { bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
 };
 
 const WFH_STATUS_META = {
-  pending_admin:               { label:"Pending",     bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
-  approved_admin:              { label:"Approved",    bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
-  rejected_admin:              { label:"Rejected",    bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
-  pending_superadmin:          { label:"Pending SA",  bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
-  approved_superadmin:         { label:"SA Approved", bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
-  rejected_superadmin:         { label:"SA Rejected", bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
-  forwarded_reporting_manager: { label:"Forwarded",   bg:"#EFF6FF", color:"#1D4ED8", dot:"#3B82F6" },
+  pending_admin:               { bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
+  approved_admin:              { bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
+  rejected_admin:              { bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
+  pending_superadmin:          { bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
+  approved_superadmin:         { bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
+  rejected_superadmin:         { bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
+  forwarded_reporting_manager: { bg:"#EFF6FF", color:"#1D4ED8", dot:"#3B82F6" },
 };
 
 const LEAVE_FILTERS = [
@@ -160,6 +186,9 @@ const AVATAR_COLORS = [
 
 const fmt = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" }) : "—";
+
+const fmtDateTime = (d) =>
+  d ? new Date(d).toLocaleString("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" }) : "—";
 
 const daysDiff = (s, e) => {
   if (!s || !e) return 0;
@@ -216,11 +245,11 @@ const Toast = ({ toast }) => {
 };
 
 const StatusBadge = ({ status, meta = LEAVE_STATUS_META }) => {
-  const m = meta[status] || { label:status, bg:"#F3F4F6", color:"#374151", dot:"#9CA3AF" };
+  const m = meta[status] || { bg:"#F3F4F6", color:"#374151", dot:"#9CA3AF" };
   return (
     <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:600, background:m.bg, color:m.color, fontFamily:"'DM Sans',sans-serif" }}>
       <span style={{ width:5, height:5, borderRadius:"50%", background:m.dot, flexShrink:0 }}/>
-      {m.label}
+      {humanStatus(status)}
     </span>
   );
 };
@@ -258,7 +287,77 @@ const FormField = ({ label, error, children }) => (
   </div>
 );
 
-const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, accentColor, personLabel }) => {
+const buildTimeline = (leave) => {
+  const steps = [];
+  const status = leave.status || "";
+
+  steps.push({
+    label: "Applied",
+    desc: "Leave request submitted",
+    date: leave.createdAt,
+    done: true,
+    color: "#8B3A8A",
+  });
+
+  const isApprovedByManager = status === "approved_manager" || status === "forwarded_admin" || status === "forwarded_reporting_manager" || status === "approved_admin" || status === "rejected_admin" || status === "approved_reporting_manager" || status === "rejected_reporting_manager";
+  const isRejectedByManager = status === "rejected_manager";
+  const isPendingManager = status === "pending_manager";
+
+  if (isPendingManager) {
+    steps.push({ label: "Manager Review", desc: "Awaiting manager decision", date: null, done: false, pending: true, color: "#F59E0B" });
+  } else if (isRejectedByManager) {
+    steps.push({ label: "Manager Review", desc: "Rejected by manager", date: leave.updatedAt, done: true, color: "#EF4444" });
+  } else if (isApprovedByManager) {
+    steps.push({ label: "Manager Review", desc: "Approved by manager", date: leave.updatedAt, done: true, color: "#22C55E" });
+  }
+
+  const isAdminPending = status === "forwarded_admin" || status === "forwarded_reporting_manager";
+  const isAdminApproved = status === "approved_admin" || status === "approved_reporting_manager";
+  const isAdminRejected = status === "rejected_admin" || status === "rejected_reporting_manager";
+
+  if (isAdminPending) {
+    steps.push({ label: "Admin Review", desc: "Awaiting admin approval", date: null, done: false, pending: true, color: "#F59E0B" });
+  } else if (isAdminApproved) {
+    steps.push({ label: "Admin Review", desc: "Approved by admin", date: leave.updatedAt, done: true, color: "#22C55E" });
+    steps.push({ label: "Completed", desc: "Leave has been approved", date: leave.updatedAt, done: true, color: "#22C55E" });
+  } else if (isAdminRejected) {
+    steps.push({ label: "Admin Review", desc: "Rejected by admin", date: leave.updatedAt, done: true, color: "#EF4444" });
+  }
+
+  return steps;
+};
+
+const LeaveTimeline = ({ leave }) => {
+  const steps = buildTimeline(leave);
+  return (
+    <div style={{ marginTop:14, paddingTop:14, borderTop:"1px dashed #EDE6F5" }}>
+      <div style={{ fontSize:11, fontWeight:600, color:"#9B8BAE", textTransform:"uppercase", letterSpacing:".5px", marginBottom:12, fontFamily:"'DM Sans',sans-serif" }}>Application Timeline</div>
+      <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
+        {steps.map((step, i) => (
+          <div key={i} style={{ display:"flex", gap:12, position:"relative" }}>
+            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", width:18 }}>
+              <div className="alw-timeline-dot" style={{ background: step.done ? step.color : "#E0D0F0", border: step.pending ? `2px solid ${step.color}` : "none", animation: step.pending ? "pulse 1.5s ease infinite" : "none" }}/>
+              {i < steps.length - 1 && <div style={{ flex:1, width:2, background:"linear-gradient(180deg,#E0D0F0,#F0EAF8)", minHeight:24, marginTop:2 }}/>}
+            </div>
+            <div style={{ paddingBottom: i < steps.length - 1 ? 16 : 0, flex:1 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+                <span style={{ fontSize:12, fontWeight:600, color: step.done ? "#1C1028" : "#9B8BAE", fontFamily:"'DM Sans',sans-serif" }}>{step.label}</span>
+                {step.pending && (
+                  <span style={{ fontSize:10, fontWeight:700, background:"#FFFBEB", color:"#92400E", padding:"1px 7px", borderRadius:10, fontFamily:"'DM Sans',sans-serif" }}>In Progress</span>
+                )}
+              </div>
+              <div style={{ fontSize:11, color:"#9B8BAE", marginTop:1, fontFamily:"'DM Sans',sans-serif" }}>{step.desc}</div>
+              {step.date && <div style={{ fontSize:10, color:"#C4AADA", marginTop:2, fontFamily:"'DM Sans',sans-serif" }}>{fmtDateTime(step.date)}</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, accentColor, personLabel, showTimeline }) => {
+  const [expanded, setExpanded] = useState(false);
   const person = leave.employee || leave.manager || {};
   const days = leave.days || daysDiff(leave.startDate, leave.endDate);
   const accent = accentColor || (LEAVE_META[leave.leaveType]||{accent:"#8B3A8A"}).accent;
@@ -298,6 +397,13 @@ const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, acce
               <span style={{ color:"#6B1A4A", fontWeight:600 }}>Reason — </span>{leave.reason}
             </div>
           )}
+          {showTimeline && (
+            <button onClick={() => setExpanded(p => !p)} style={{ marginTop:10, background:"none", border:"none", cursor:"pointer", display:"flex", alignItems:"center", gap:5, fontSize:11, fontWeight:600, color:"#8B3A8A", fontFamily:"'DM Sans',sans-serif", padding:"4px 0" }}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: expanded ? "rotate(180deg)" : "none", transition:".2s" }}><path d="M2 4l4 4 4-4" stroke="#8B3A8A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              {expanded ? "Hide timeline" : "View timeline"}
+            </button>
+          )}
+          {showTimeline && expanded && <LeaveTimeline leave={leave}/>}
         </div>
         {showActions && (
           <div style={{ display:"flex", flexDirection:"column", gap:7, flexShrink:0 }}>
@@ -325,8 +431,9 @@ const MyBalancePanel = ({ admin, leaveBalance }) => {
   if (!admin) return <Spinner/>;
 
   const balance = leaveBalance || {};
-  const showML = admin.gender === "female" && admin.marital_status === "married";
-  const showPL = admin.gender === "male"   && admin.marital_status === "married";
+  const isMarried = admin.marital_status === "married";
+  const showML = admin.gender === "female" && isMarried;
+  const showPL = admin.gender === "male"   && isMarried;
 
   const cards = [
     { key:"el",  label:"Earned Leave",      entitled:balance.EL?.entitled||0, availed:balance.EL?.availed||0, accrued:balance.EL?.accrued||0, accent:"#22C55E", bg:"linear-gradient(135deg,#F0FDF4,#DCFCE7)" },
@@ -414,8 +521,9 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
 
   const history = Array.isArray(rawHistory) ? rawHistory : [];
 
-  const showML = admin?.gender === "female" && admin?.marital_status === "married";
-  const showPL = admin?.gender === "male"   && admin?.marital_status === "married";
+  const isMarried = admin?.marital_status === "married";
+  const showML = admin?.gender === "female" && isMarried;
+  const showPL = admin?.gender === "male"   && isMarried;
 
   const availTypes = [
     ...BASE_LEAVE_TYPES,
@@ -517,6 +625,7 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
                           <span style={{ color:"#6B1A4A", fontWeight:600 }}>Reason — </span>{leave.reason}
                         </div>
                       )}
+                      <LeaveTimeline leave={leave}/>
                     </div>
                     {leave.createdAt && (
                       <div style={{ fontSize:10, color:"#9B8BAE", textAlign:"right", lineHeight:1.4, fontFamily:"'DM Sans',sans-serif", flexShrink:0 }}>
@@ -613,6 +722,7 @@ const AllLeavesPanel = ({ showToast }) => {
               showActions={isActionable(leave.status)}
               onApprove={() => handleAction(leave, "approve")}
               onReject={() => handleAction(leave, "reject")}
+              showTimeline
             />
           </div>
         ))
@@ -675,6 +785,7 @@ const ManagerLeavesPanel = ({ showToast }) => {
               onReject={() => handleAction(leave, "reject")}
               personLabel="Manager"
               accentColor="#A855F7"
+              showTimeline
             />
           </div>
         ))
@@ -799,15 +910,26 @@ const MyWFHPanel = ({ showToast }) => {
   );
 };
 
-const ForwardedWFHPanel = ({ showToast }) => {
+const TeamWFHPanel = ({ showToast }) => {
   const [processingId, setProcessingId] = useState(null);
+  const [wfhFilter, setWfhFilter] = useState("all");
 
   const { data: fwdData, isLoading, refetch } = useAdminGetForwardedWFH();
   const approveMut = useAdminApproveForwardedWFH();
   const rejectMut  = useAdminRejectForwardedWFH();
 
   const raw = fwdData?.wfhList || fwdData || [];
-  const list = Array.isArray(raw) ? raw : [];
+  const allList = Array.isArray(raw) ? raw : [];
+
+  const isWfhStatus = (wfh, key) => {
+    if (key === "pending")  return wfh.status?.includes("pending");
+    if (key === "approved") return wfh.status?.includes("approved");
+    if (key === "rejected") return wfh.status?.includes("rejected");
+    return true;
+  };
+
+  const list = wfhFilter === "all" ? allList : allList.filter(w => isWfhStatus(w, wfhFilter));
+  const wfhCount = (key) => key === "all" ? allList.length : allList.filter(w => isWfhStatus(w, key)).length;
 
   const handleAction = async (wfhId, action) => {
     setProcessingId(wfhId);
@@ -822,21 +944,47 @@ const ForwardedWFHPanel = ({ showToast }) => {
 
   if (isLoading) return <Spinner/>;
 
+  const isActionable = (status) => status === "pending_admin" || status === "forwarded_reporting_manager";
+
   return (
     <div>
-      <div style={{ display:"flex", gap:12, marginBottom:22 }}>
-        <div style={{ background:"linear-gradient(135deg,#EFF6FF,#DBEAFE)", borderRadius:14, padding:"12px 20px", display:"flex", alignItems:"center", gap:12, border:"1px solid rgba(0,0,0,0.05)", boxShadow:"0 2px 8px rgba(0,0,0,0.04)" }}>
-          <span style={{ fontSize:26, fontWeight:800, color:"#1D4ED8", fontFamily:"'Playfair Display',serif", lineHeight:1 }}>{list.length}</span>
-          <span style={{ fontSize:11, color:"#1D4ED8", fontWeight:600, fontFamily:"'DM Sans',sans-serif", opacity:.8 }}>Pending Review</span>
-        </div>
+      <div style={{ display:"flex", gap:12, marginBottom:22, flexWrap:"wrap" }}>
+        {[
+          { label:"Total",    val:allList.length,                                          color:"#1D4ED8", bg:"linear-gradient(135deg,#EFF6FF,#DBEAFE)" },
+          { label:"Pending",  val:allList.filter(w=>isWfhStatus(w,"pending")).length,      color:"#92400E", bg:"linear-gradient(135deg,#FFFBEB,#FEF3C7)" },
+          { label:"Approved", val:allList.filter(w=>isWfhStatus(w,"approved")).length,     color:"#14803D", bg:"linear-gradient(135deg,#F0FDF4,#DCFCE7)" },
+          { label:"Rejected", val:allList.filter(w=>isWfhStatus(w,"rejected")).length,     color:"#991B1B", bg:"linear-gradient(135deg,#FEF2F2,#FEE2E2)" },
+        ].map((s, i) => (
+          <div key={s.label} style={{ background:s.bg, borderRadius:14, padding:"12px 20px", display:"flex", alignItems:"center", gap:12, border:"1px solid rgba(0,0,0,0.05)", boxShadow:"0 2px 8px rgba(0,0,0,0.04)", animation:`fadeSlideUp .3s ease ${i*.07}s both`, minWidth:110 }}>
+            <span style={{ fontSize:26, fontWeight:800, color:s.color, fontFamily:"'Playfair Display',serif", lineHeight:1 }}>{s.val}</span>
+            <span style={{ fontSize:11, color:s.color, fontWeight:600, fontFamily:"'DM Sans',sans-serif", opacity:.8, lineHeight:1.3 }}>{s.label}</span>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display:"flex", gap:8, marginBottom:22, flexWrap:"wrap" }}>
+        {[{ key:"all", label:"All" }, { key:"pending", label:"Pending" }, { key:"approved", label:"Approved" }, { key:"rejected", label:"Rejected" }].map(f => {
+          const active = wfhFilter === f.key;
+          return (
+            <button key={f.key} className="alw-chip-btn"
+              style={{ border:active?"1.5px solid #3B82F6":"1.5px solid #E5DAF0", background:active?"linear-gradient(135deg,#1D4ED8,#3B82F6)":"#fff", color:active?"#fff":"#8B7FA0", boxShadow:active?"0 2px 10px rgba(59,130,246,0.3)":"none" }}
+              onClick={() => setWfhFilter(f.key)}>
+              {f.label}
+              <span style={{ background:active?"rgba(255,255,255,0.25)":"#DBEAFE", color:active?"#fff":"#1D4ED8", borderRadius:10, padding:"1px 7px", fontSize:10, fontWeight:700 }}>
+                {wfhCount(f.key)}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {list.length === 0
-        ? <EmptyState msg="No forwarded WFH requests"/>
+        ? <EmptyState msg="No team WFH requests found"/>
         : list.map((wfh, idx) => {
           const requester = wfh.requester || {};
           const d = wfh.days || daysDiff(wfh.startDate, wfh.endDate);
           const isProcessing = processingId === wfh._id;
+          const actionable = isActionable(wfh.status);
           return (
             <div key={wfh._id || idx} className="alw-card" style={{ opacity:isProcessing ? .6 : 1, pointerEvents:isProcessing ? "none" : "auto", animationDelay:`${idx*.06}s`, position:"relative", overflow:"hidden" }}>
               <div style={{ position:"absolute", top:0, left:0, width:3, bottom:0, background:"#3B82F6", borderRadius:"20px 0 0 20px" }}/>
@@ -869,17 +1017,22 @@ const ForwardedWFHPanel = ({ showToast }) => {
                       <span style={{ color:"#1D4ED8", fontWeight:600 }}>Reason — </span>{wfh.reason}
                     </div>
                   )}
+                  {wfh.createdAt && (
+                    <div style={{ fontSize:10, color:"#C4AADA", marginTop:8, fontFamily:"'DM Sans',sans-serif" }}>Applied {fmtDateTime(wfh.createdAt)}</div>
+                  )}
                 </div>
-                <div style={{ display:"flex", flexDirection:"column", gap:7, flexShrink:0 }}>
-                  <button className="alw-action-btn" style={{ background:"#F0FDF4", color:"#14803D", boxShadow:"0 2px 8px rgba(34,197,94,0.15)" }} onClick={() => handleAction(wfh._id, "approve")}>
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l2.5 2.5 5.5-5" stroke="#14803D" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    Approve
-                  </button>
-                  <button className="alw-action-btn" style={{ background:"#FFF1F2", color:"#991B1B", boxShadow:"0 2px 8px rgba(239,68,68,0.12)" }} onClick={() => handleAction(wfh._id, "reject")}>
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="#991B1B" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                    Reject
-                  </button>
-                </div>
+                {actionable && (
+                  <div style={{ display:"flex", flexDirection:"column", gap:7, flexShrink:0 }}>
+                    <button className="alw-action-btn" style={{ background:"#F0FDF4", color:"#14803D", boxShadow:"0 2px 8px rgba(34,197,94,0.15)" }} onClick={() => handleAction(wfh._id, "approve")}>
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l2.5 2.5 5.5-5" stroke="#14803D" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      Approve
+                    </button>
+                    <button className="alw-action-btn" style={{ background:"#FFF1F2", color:"#991B1B", boxShadow:"0 2px 8px rgba(239,68,68,0.12)" }} onClick={() => handleAction(wfh._id, "reject")}>
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="#991B1B" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                      Reject
+                    </button>
+                  </div>
+                )}
               </div>
               {isProcessing && (
                 <div style={{ position:"absolute", inset:0, borderRadius:20, background:"rgba(255,255,255,0.7)", display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(2px)" }}>
@@ -913,7 +1066,7 @@ const AdminLeaveWFH = () => {
     { key:"myBalance",     label:"My Balance"      },
     { key:"applyLeave",    label:"Apply Leave"     },
     { key:"myWFH",         label:"My WFH"          },
-    { key:"forwardedWFH",  label:"Forwarded WFH"   },
+    { key:"teamWFH",       label:"Team WFH"        },
   ];
 
   return (
@@ -971,7 +1124,7 @@ const AdminLeaveWFH = () => {
             {tab === "myBalance"     && <MyBalancePanel admin={admin} leaveBalance={leaveBalance}/>}
             {tab === "applyLeave"    && <ApplyLeavePanel admin={admin} leaveBalance={leaveBalance} showToast={showToast}/>}
             {tab === "myWFH"         && <MyWFHPanel showToast={showToast}/>}
-            {tab === "forwardedWFH"  && <ForwardedWFHPanel showToast={showToast}/>}
+            {tab === "teamWFH"       && <TeamWFHPanel showToast={showToast}/>}
           </>
         )}
       </div>
