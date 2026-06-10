@@ -540,6 +540,8 @@ const promoteEmployeeToManager = async (req, res, next) => {
       { session }
     );
 
+    const newRole = role || "manager";
+
     await Promise.all([
       Usermodel.findByIdAndDelete(id, { session }),
 
@@ -567,9 +569,45 @@ const promoteEmployeeToManager = async (req, res, next) => {
         { session }
       ),
 
+      AttendanceSummary.updateMany(
+        { employee: id, organisation_id },
+        { $set: { employee: newManager._id, role: "manager" } },
+        { session }
+      ),
+
       Document.updateMany(
         { employee: id, organisation_id },
         { $set: { employee: newManager._id } },
+        { session }
+      ),
+
+      Review.updateMany(
+        { reviewee: id, organisation_id },
+        { $set: { reviewee: newManager._id, revieweeRole: newRole, revieweeRoleModel: "Manager" } },
+        { session }
+      ),
+
+      Review.updateMany(
+        { reviewer: id, organisation_id },
+        { $set: { reviewer: newManager._id, reviewerRole: newRole, reviewerRoleModel: "Manager" } },
+        { session }
+      ),
+
+      Ticket.updateMany(
+        { submittedBy: id, submitterModel: "User", organisation_id },
+        { $set: { submittedBy: newManager._id, submitterModel: "Manager", submitterRole: "manager" } },
+        { session }
+      ),
+
+      Ticket.updateMany(
+        { against: id, againstModel: "User", organisation_id },
+        { $set: { against: newManager._id, againstModel: "Manager" } },
+        { session }
+      ),
+
+      WFH.updateMany(
+        { requester: id, requesterModel: "User", organisation_id },
+        { $set: { requester: newManager._id, requesterModel: "Manager" } },
         { session }
       ),
     ]);
@@ -701,6 +739,8 @@ const promoteManagerToAdmin = async (req, res, next) => {
       { session }
     );
 
+    const newRole = role || "admin";
+
     await Promise.all([
       Managermodel.findByIdAndDelete(id, { session }),
 
@@ -740,9 +780,51 @@ const promoteManagerToAdmin = async (req, res, next) => {
         { session }
       ),
 
+      AttendanceSummary.updateMany(
+        { employee: id, organisation_id },
+        { $set: { employee: newAdmin._id, role: "admin" } },
+        { session }
+      ),
+
       Document.updateMany(
         { employee: id, organisation_id },
         { $set: { employee: newAdmin._id } },
+        { session }
+      ),
+
+      Review.updateMany(
+        { reviewee: id, organisation_id },
+        { $set: { reviewee: newAdmin._id, revieweeRole: newRole, revieweeRoleModel: "Admin" } },
+        { session }
+      ),
+
+      Review.updateMany(
+        { reviewer: id, organisation_id },
+        { $set: { reviewer: newAdmin._id, reviewerRole: newRole, reviewerRoleModel: "Admin" } },
+        { session }
+      ),
+
+      Ticket.updateMany(
+        { submittedBy: id, submitterModel: "Manager", organisation_id },
+        { $set: { submittedBy: newAdmin._id, submitterModel: "Admin", submitterRole: "admin" } },
+        { session }
+      ),
+
+      Ticket.updateMany(
+        { against: id, againstModel: "Manager", organisation_id },
+        { $set: { against: newAdmin._id, againstModel: "Admin" } },
+        { session }
+      ),
+
+      WFH.updateMany(
+        { requester: id, requesterModel: "Manager", organisation_id },
+        { $set: { requester: newAdmin._id, requesterModel: "Admin" } },
+        { session }
+      ),
+
+      WFH.updateMany(
+        { manager: id, organisation_id },
+        { $set: { manager: null } },
         { session }
       ),
     ]);
@@ -874,6 +956,8 @@ const promoteEmployeeToAdmin = async (req, res, next) => {
       { session }
     );
 
+    const newRole = role || "admin";
+
     await Promise.all([
       Usermodel.findByIdAndDelete(id, { session }),
 
@@ -901,9 +985,45 @@ const promoteEmployeeToAdmin = async (req, res, next) => {
         { session }
       ),
 
+      AttendanceSummary.updateMany(
+        { employee: id, organisation_id },
+        { $set: { employee: newAdmin._id, role: "admin" } },
+        { session }
+      ),
+
       Document.updateMany(
         { employee: id, organisation_id },
         { $set: { employee: newAdmin._id } },
+        { session }
+      ),
+
+      Review.updateMany(
+        { reviewee: id, organisation_id },
+        { $set: { reviewee: newAdmin._id, revieweeRole: newRole, revieweeRoleModel: "Admin" } },
+        { session }
+      ),
+
+      Review.updateMany(
+        { reviewer: id, organisation_id },
+        { $set: { reviewer: newAdmin._id, reviewerRole: newRole, reviewerRoleModel: "Admin" } },
+        { session }
+      ),
+
+      Ticket.updateMany(
+        { submittedBy: id, submitterModel: "User", organisation_id },
+        { $set: { submittedBy: newAdmin._id, submitterModel: "Admin", submitterRole: "admin" } },
+        { session }
+      ),
+
+      Ticket.updateMany(
+        { against: id, againstModel: "User", organisation_id },
+        { $set: { against: newAdmin._id, againstModel: "Admin" } },
+        { session }
+      ),
+
+      WFH.updateMany(
+        { requester: id, requesterModel: "User", organisation_id },
+        { $set: { requester: newAdmin._id, requesterModel: "Admin" } },
         { session }
       ),
     ]);
@@ -1058,9 +1178,57 @@ const demoteManagerToEmployee = async (req, res, next) => {
         { session }
       ),
 
+      AttendanceSummary.updateMany(
+        { employee: id, organisation_id },
+        { $set: { employee: newEmployee._id, role: "employee" } },
+        { session }
+      ),
+
       Document.updateMany(
         { employee: id, organisation_id },
         { $set: { employee: newEmployee._id } },
+        { session }
+      ),
+
+      Review.updateMany(
+        { reviewee: id, organisation_id },
+        { $set: { reviewee: newEmployee._id, revieweeRole: "employee", revieweeRoleModel: "User" } },
+        { session }
+      ),
+
+      Review.updateMany(
+        { reviewer: id, organisation_id },
+        { $set: { reviewer: newEmployee._id, reviewerRole: "employee", reviewerRoleModel: "User" } },
+        { session }
+      ),
+
+      Ticket.updateMany(
+        { submittedBy: id, submitterModel: "Manager", organisation_id },
+        { $set: { submittedBy: newEmployee._id, submitterModel: "User", submitterRole: "employee" } },
+        { session }
+      ),
+
+      Ticket.updateMany(
+        { against: id, againstModel: "Manager", organisation_id },
+        { $set: { against: newEmployee._id, againstModel: "User" } },
+        { session }
+      ),
+
+      WFH.updateMany(
+        { requester: id, requesterModel: "Manager", organisation_id },
+        { $set: { requester: newEmployee._id, requesterModel: "User" } },
+        { session }
+      ),
+
+      WFH.updateMany(
+        { manager: id, organisation_id },
+        { $set: { manager: null } },
+        { session }
+      ),
+
+      Document.updateMany(
+        { underManager: id, organisation_id },
+        { $set: { underManager: resolvedUnderManager } },
         { session }
       ),
     ]);
@@ -1174,6 +1342,8 @@ const demoteAdminToManager = async (req, res, next) => {
       { session }
     );
 
+    const newRole = role || "manager";
+
     await Promise.all([
       Adminmodel.findByIdAndDelete(id, { session }),
 
@@ -1201,9 +1371,45 @@ const demoteAdminToManager = async (req, res, next) => {
         { session }
       ),
 
+      AttendanceSummary.updateMany(
+        { employee: id, organisation_id },
+        { $set: { employee: newManager._id, role: "manager" } },
+        { session }
+      ),
+
       Document.updateMany(
         { employee: id, organisation_id },
         { $set: { employee: newManager._id } },
+        { session }
+      ),
+
+      Review.updateMany(
+        { reviewee: id, organisation_id },
+        { $set: { reviewee: newManager._id, revieweeRole: newRole, revieweeRoleModel: "Manager" } },
+        { session }
+      ),
+
+      Review.updateMany(
+        { reviewer: id, organisation_id },
+        { $set: { reviewer: newManager._id, reviewerRole: newRole, reviewerRoleModel: "Manager" } },
+        { session }
+      ),
+
+      Ticket.updateMany(
+        { submittedBy: id, submitterModel: "Admin", organisation_id },
+        { $set: { submittedBy: newManager._id, submitterModel: "Manager", submitterRole: "manager" } },
+        { session }
+      ),
+
+      Ticket.updateMany(
+        { against: id, againstModel: "Admin", organisation_id },
+        { $set: { against: newManager._id, againstModel: "Manager" } },
+        { session }
+      ),
+
+      WFH.updateMany(
+        { requester: id, requesterModel: "Admin", organisation_id },
+        { $set: { requester: newManager._id, requesterModel: "Manager" } },
         { session }
       ),
     ]);
@@ -1349,9 +1555,45 @@ const demoteAdminToEmployee = async (req, res, next) => {
         { session }
       ),
 
+      AttendanceSummary.updateMany(
+        { employee: id, organisation_id },
+        { $set: { employee: newEmployee._id, role: "employee" } },
+        { session }
+      ),
+
       Document.updateMany(
         { employee: id, organisation_id },
         { $set: { employee: newEmployee._id } },
+        { session }
+      ),
+
+      Review.updateMany(
+        { reviewee: id, organisation_id },
+        { $set: { reviewee: newEmployee._id, revieweeRole: "employee", revieweeRoleModel: "User" } },
+        { session }
+      ),
+
+      Review.updateMany(
+        { reviewer: id, organisation_id },
+        { $set: { reviewer: newEmployee._id, reviewerRole: "employee", reviewerRoleModel: "User" } },
+        { session }
+      ),
+
+      Ticket.updateMany(
+        { submittedBy: id, submitterModel: "Admin", organisation_id },
+        { $set: { submittedBy: newEmployee._id, submitterModel: "User", submitterRole: "employee" } },
+        { session }
+      ),
+
+      Ticket.updateMany(
+        { against: id, againstModel: "Admin", organisation_id },
+        { $set: { against: newEmployee._id, againstModel: "User" } },
+        { session }
+      ),
+
+      WFH.updateMany(
+        { requester: id, requesterModel: "Admin", organisation_id },
+        { $set: { requester: newEmployee._id, requesterModel: "User" } },
         { session }
       ),
     ]);
