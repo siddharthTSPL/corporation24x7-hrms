@@ -120,35 +120,35 @@ const LEAVE_META = {
 };
 
 const LEAVE_STATUS_META = {
-  pending_manager:             { label:"Pending Manager",           bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
-  forwarded_reporting_manager: { label:"Forwarded to Reporting Mgr",bg:"#EFF6FF", color:"#1D4ED8", dot:"#3B82F6" },
-  approved_manager:            { label:"Approved by Manager",       bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
-  approved_reporting_manager:  { label:"Approved by Reporting Mgr", bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
-  rejected_manager:            { label:"Rejected by Manager",       bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
-  rejected_reporting_manager:  { label:"Rejected by Reporting Mgr", bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
-  forwarded_admin:             { label:"Forwarded to Admin",        bg:"#EFF6FF", color:"#1D4ED8", dot:"#3B82F6" },
-  approved_admin:              { label:"Approved by Admin",         bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
-  rejected_admin:              { label:"Rejected by Admin",         bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
-  approved_superadmin:         { label:"Approved by Super Admin",   bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
-  rejected_superadmin:         { label:"Rejected by Super Admin",   bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
-  pending_admin:               { label:"Pending Admin",             bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
-  pending_superadmin:          { label:"Pending Super Admin",       bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
+  pending_manager:             { label:"Pending Manager",            bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
+  forwarded_reporting_manager: { label:"Forwarded to Reporting Mgr", bg:"#EFF6FF", color:"#1D4ED8", dot:"#3B82F6" },
+  approved_manager:            { label:"Approved by Manager",        bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
+  approved_reporting_manager:  { label:"Approved by Reporting Mgr",  bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
+  rejected_manager:            { label:"Rejected by Manager",        bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
+  rejected_reporting_manager:  { label:"Rejected by Reporting Mgr",  bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
+  forwarded_admin:             { label:"Forwarded to Admin",         bg:"#EFF6FF", color:"#1D4ED8", dot:"#3B82F6" },
+  approved_admin:              { label:"Approved by Admin",          bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
+  rejected_admin:              { label:"Rejected by Admin",          bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
+  approved_superadmin:         { label:"Approved by Super Admin",    bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
+  rejected_superadmin:         { label:"Rejected by Super Admin",    bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
+  pending_admin:               { label:"Pending Admin",              bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
+  pending_superadmin:          { label:"Pending Super Admin",        bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
 };
 
 const WFH_STATUS_META = {
-  pending_manager:             { label:"Pending Manager",           bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
-  approved_manager:            { label:"Approved by Manager",       bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
-  rejected_manager:            { label:"Rejected by Manager",       bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
-  forwarded_reporting_manager: { label:"Forwarded to Reporting Mgr",bg:"#EFF6FF", color:"#1D4ED8", dot:"#3B82F6" },
-  pending_reporting_manager:   { label:"Pending Reporting Mgr",     bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
-  approved_reporting_manager:  { label:"Approved by Reporting Mgr", bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
-  rejected_reporting_manager:  { label:"Rejected by Reporting Mgr", bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
-  pending_admin:               { label:"Pending Admin",             bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
-  approved_admin:              { label:"Approved by Admin",         bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
-  rejected_admin:              { label:"Rejected by Admin",         bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
-  pending_superadmin:          { label:"Pending Super Admin",       bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
-  approved_superadmin:         { label:"Approved by Super Admin",   bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
-  rejected_superadmin:         { label:"Rejected by Super Admin",   bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
+  pending_manager:             { label:"Pending Manager",            bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
+  approved_manager:            { label:"Approved by Manager",        bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
+  rejected_manager:            { label:"Rejected by Manager",        bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
+  forwarded_reporting_manager: { label:"Forwarded to Reporting Mgr", bg:"#EFF6FF", color:"#1D4ED8", dot:"#3B82F6" },
+  pending_reporting_manager:   { label:"Pending Reporting Mgr",      bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
+  approved_reporting_manager:  { label:"Approved by Reporting Mgr",  bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
+  rejected_reporting_manager:  { label:"Rejected by Reporting Mgr",  bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
+  pending_admin:               { label:"Pending Admin",              bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
+  approved_admin:              { label:"Approved by Admin",          bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
+  rejected_admin:              { label:"Rejected by Admin",          bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
+  pending_superadmin:          { label:"Pending Super Admin",        bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
+  approved_superadmin:         { label:"Approved by Super Admin",    bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
+  rejected_superadmin:         { label:"Rejected by Super Admin",    bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
 };
 
 const EMP_LEAVE_FILTERS = [
@@ -185,6 +185,31 @@ const daysDiff = (s,e) => {
 const todayStr = () => new Date().toISOString().split("T")[0];
 const avatarColor = (name="") => AVATAR_COLORS[name.charCodeAt(0)%AVATAR_COLORS.length];
 const initials = (f="",l="") => `${f[0]||""}${l[0]||""}`.toUpperCase();
+
+const normalizeLeave = (raw) => {
+  if (!raw || typeof raw !== "object") return null;
+  return {
+    _id:       raw._id       || raw.id,
+    leaveType: raw.leaveType || raw.leave_type || raw.type || "",
+    status:    raw.status    || "",
+    startDate: raw.startDate || raw.start_date || raw.from || "",
+    endDate:   raw.endDate   || raw.end_date   || raw.to   || "",
+    days:      raw.days      || raw.totalDays   || raw.total_days || 0,
+    reason:    raw.reason    || raw.description || "",
+    createdAt: raw.createdAt || raw.created_at  || raw.appliedAt || "",
+  };
+};
+
+const extractArray = (data) => {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data.leaves))  return data.leaves;
+  if (Array.isArray(data.data))    return data.data;
+  if (Array.isArray(data.records)) return data.records;
+  if (Array.isArray(data.list))    return data.list;
+  if (data.leave && Array.isArray(data.leave)) return data.leave;
+  return [];
+};
 
 const Spinner = () => (
   <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"70px 0",gap:14}}>
@@ -231,7 +256,7 @@ const Toast = ({toast}) => {
 };
 
 const TypeBadge = ({type}) => {
-  const m = LEAVE_META[type]||{label:(type||"").replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()),bg:"#F3F4F6",color:"#374151",dot:"#9CA3AF"};
+  const m = LEAVE_META[type]||{label:(type||"Leave").replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()),bg:"#F3F4F6",color:"#374151",dot:"#9CA3AF"};
   return (
     <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:600,background:m.bg,color:m.color,fontFamily:"'DM Sans',sans-serif",whiteSpace:"nowrap"}}>
       <span style={{width:5,height:5,borderRadius:"50%",background:m.dot,flexShrink:0}}/>
@@ -242,7 +267,7 @@ const TypeBadge = ({type}) => {
 
 const StatusBadge = ({status,meta}) => {
   const pool = meta||LEAVE_STATUS_META;
-  const m = pool[status]||{label:(status||"").replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()),bg:"#F3F4F6",color:"#374151",dot:"#9CA3AF"};
+  const m = pool[status]||{label:(status||"Unknown").replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()),bg:"#F3F4F6",color:"#374151",dot:"#9CA3AF"};
   return (
     <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:600,background:m.bg,color:m.color,fontFamily:"'DM Sans',sans-serif",whiteSpace:"nowrap"}}>
       <span style={{width:5,height:5,borderRadius:"50%",background:m.dot,flexShrink:0}}/>
@@ -275,7 +300,7 @@ const FormField = ({label,error,children}) => (
 );
 
 const EmployeeLeavesPanel = ({showToast}) => {
-  const [filter,setFilter]       = useState("all");
+  const [filter,setFilter]           = useState("all");
   const [processingId,setProcessingId] = useState(null);
 
   const {data:rawLeaves,isLoading,refetch} = useGetAllManagerLeaves();
@@ -283,7 +308,7 @@ const EmployeeLeavesPanel = ({showToast}) => {
   const rejectMut  = useRejectLeaveRequest();
   const forwardMut = useForwardLeaveToAdmin();
 
-  const leaves   = Array.isArray(rawLeaves) ? rawLeaves : [];
+  const leaves   = extractArray(rawLeaves);
   const filtered = filter==="all" ? leaves : leaves.filter(l=>l.status===filter);
   const count    = (key) => key==="all" ? leaves.length : leaves.filter(l=>l.status===key).length;
 
@@ -305,10 +330,10 @@ const EmployeeLeavesPanel = ({showToast}) => {
     <div>
       <div style={{display:"flex",gap:12,marginBottom:22,flexWrap:"wrap"}}>
         {[
-          {label:"Total",    val:leaves.length,                                             color:"#6B1A4A",bg:"linear-gradient(135deg,#F9EFF5,#F4E6F0)"},
-          {label:"Pending",  val:leaves.filter(l=>l.status==="pending_manager").length,     color:"#92400E",bg:"linear-gradient(135deg,#FFFBEB,#FEF3C7)"},
-          {label:"Approved", val:leaves.filter(l=>l.status.startsWith("approved")).length,  color:"#14803D",bg:"linear-gradient(135deg,#F0FDF4,#DCFCE7)"},
-          {label:"Forwarded",val:leaves.filter(l=>l.status==="forwarded_admin").length,     color:"#1D4ED8",bg:"linear-gradient(135deg,#EFF6FF,#DBEAFE)"},
+          {label:"Total",    val:leaves.length,                                              color:"#6B1A4A",bg:"linear-gradient(135deg,#F9EFF5,#F4E6F0)"},
+          {label:"Pending",  val:leaves.filter(l=>l.status==="pending_manager").length,      color:"#92400E",bg:"linear-gradient(135deg,#FFFBEB,#FEF3C7)"},
+          {label:"Approved", val:leaves.filter(l=>l.status?.startsWith("approved")).length,  color:"#14803D",bg:"linear-gradient(135deg,#F0FDF4,#DCFCE7)"},
+          {label:"Forwarded",val:leaves.filter(l=>l.status==="forwarded_admin").length,      color:"#1D4ED8",bg:"linear-gradient(135deg,#EFF6FF,#DBEAFE)"},
         ].map((s,i)=>(
           <div key={s.label} style={{background:s.bg,borderRadius:14,padding:"12px 20px",display:"flex",alignItems:"center",gap:12,border:"1px solid rgba(0,0,0,0.05)",boxShadow:"0 2px 8px rgba(0,0,0,0.04)",animation:`fadeSlideUp .3s ease ${i*.07}s both`,minWidth:110}}>
             <span style={{fontSize:26,fontWeight:800,color:s.color,fontFamily:"'Playfair Display',serif",lineHeight:1}}>{s.val}</span>
@@ -336,12 +361,12 @@ const EmployeeLeavesPanel = ({showToast}) => {
       {filtered.length===0
         ? <EmptyState msg="No leave requests found"/>
         : filtered.map((leave,idx)=>{
-            const emp         = leave.employee||{};
+            const emp          = leave.employee||{};
             const isActionable = !NON_ACTIONABLE.includes(leave.status);
             const isProcessing = processingId===leave._id;
-            const days        = leave.days||daysDiff(leave.startDate,leave.endDate);
+            const days         = leave.days||daysDiff(leave.startDate,leave.endDate);
             return (
-              <div key={leave._id} className="mlw-card" style={{opacity:isProcessing?.6:1,pointerEvents:isProcessing?"none":"auto",animationDelay:`${idx*.06}s`,position:"relative",overflow:"hidden"}}>
+              <div key={leave._id||idx} className="mlw-card" style={{opacity:isProcessing?.6:1,pointerEvents:isProcessing?"none":"auto",animationDelay:`${idx*.06}s`,position:"relative",overflow:"hidden"}}>
                 <div style={{position:"absolute",top:0,left:0,width:3,bottom:0,background:(LEAVE_META[leave.leaveType]||{accent:"#8B3A8A"}).accent,borderRadius:"20px 0 0 20px"}}/>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16,paddingLeft:6}}>
                   <div style={{flex:1,minWidth:0}}>
@@ -404,8 +429,9 @@ const EmployeeLeavesPanel = ({showToast}) => {
 const MyBalancePanel = ({manager,leavebalance}) => {
   const balance = Array.isArray(leavebalance) ? leavebalance[0] : leavebalance || {};
 
-  const showML = manager?.gender==="female" && manager?.marital_status==="married";
-  const showPL = manager?.gender==="male"   && manager?.marital_status==="married";
+  const isMarried = manager?.marital_status === "married";
+  const showML    = manager?.gender==="female" && isMarried;
+  const showPL    = manager?.gender==="male"   && isMarried;
 
   const elEntitled = balance.EL?.entitled || 0;
   const elAvailed  = balance.EL?.availed  || 0;
@@ -491,31 +517,27 @@ const MyBalancePanel = ({manager,leavebalance}) => {
 };
 
 const ApplyLeavePanel = ({manager,showToast}) => {
-  const [form,setForm]   = useState({leaveType:"el",startDate:"",endDate:"",reason:""});
+  const [form,setForm]     = useState({leaveType:"el",startDate:"",endDate:"",reason:""});
   const [errors,setErrors] = useState({});
 
-  const {data:rawHistory,isLoading:histLoading} = useGetMyLeavesManager();
+  const {data:rawHistory,isLoading:histLoading,refetch} = useGetMyLeavesManager();
   const applyMut = useApplyLeaveManager();
 
-  const history = Array.isArray(rawHistory)
-    ? rawHistory.filter(r=>r.leaveType&&r.status&&r.startDate)
-    : [];
+  const isMarried = manager?.marital_status === "married";
+  const showML    = manager?.gender==="female" && isMarried;
+  const showPL    = manager?.gender==="male"   && isMarried;
 
-  const showML = manager?.gender==="female" && manager?.marital_status==="married";
-  const showPL = manager?.gender==="male"   && manager?.marital_status==="married";
+  const rawArr = extractArray(rawHistory);
+  const history = rawArr.map(normalizeLeave).filter(Boolean);
 
   const availTypes = [
     {value:"el",          label:"Earned Leave"},
     {value:"sl",          label:"Sick Leave"},
-    {value:"ml",          label:"Maternity Leave"},
-    {value:"pl",          label:"Paternity Leave"},
     {value:"half_day_el", label:"Half Day EL"},
     {value:"half_day_sl", label:"Half Day SL"},
-  ].filter(t => {
-    if (t.value==="ml") return showML;
-    if (t.value==="pl") return showPL;
-    return true;
-  });
+    ...(showML ? [{value:"ml", label:"Maternity Leave"}] : []),
+    ...(showPL ? [{value:"pl", label:"Paternity Leave"}] : []),
+  ];
 
   const set = (k,v) => setForm(p=>({...p,[k]:v}));
 
@@ -537,6 +559,7 @@ const ApplyLeavePanel = ({manager,showToast}) => {
       showToast("Leave request submitted","success");
       setForm({leaveType:"el",startDate:"",endDate:"",reason:""});
       setErrors({});
+      refetch();
     } catch(err) {
       showToast(err?.response?.data?.message||err?.message||"Something went wrong","error");
     }
@@ -587,7 +610,7 @@ const ApplyLeavePanel = ({manager,showToast}) => {
         {histLoading ? <Spinner/> : history.length===0 ? <EmptyState msg="No leave records yet"/> : (
           <div>
             {history.map((leave,idx)=>{
-              const d      = leave.days||daysDiff(leave.startDate,leave.endDate);
+              const d      = leave.days || daysDiff(leave.startDate,leave.endDate);
               const accent = (LEAVE_META[leave.leaveType]||{accent:"#8B3A8A"}).accent;
               return (
                 <div key={leave._id||idx} className="mlw-history-card" style={{animationDelay:`${idx*.05}s`}}>
@@ -595,9 +618,9 @@ const ApplyLeavePanel = ({manager,showToast}) => {
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:14,paddingLeft:8}}>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
-                        <TypeBadge type={leave.leaveType}/>
-                        <StatusBadge status={leave.status} meta={LEAVE_STATUS_META}/>
-                        <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:600,background:"#F4EEF9",color:"#6B1A4A",fontFamily:"'DM Sans',sans-serif"}}>{d} day{d>1?"s":""}</span>
+                        {leave.leaveType && <TypeBadge type={leave.leaveType}/>}
+                        {leave.status    && <StatusBadge status={leave.status} meta={LEAVE_STATUS_META}/>}
+                        <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:600,background:"#F4EEF9",color:"#6B1A4A",fontFamily:"'DM Sans',sans-serif"}}>{d} day{d!==1?"s":""}</span>
                       </div>
                       <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#9B8BAE",fontFamily:"'DM Sans',sans-serif"}}>
                         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="2" width="11" height="10" rx="2.5" stroke="#C4AADA" strokeWidth="1"/><path d="M1 6h11" stroke="#C4AADA" strokeWidth="1"/><path d="M4 1v2M9 1v2" stroke="#C4AADA" strokeWidth="1" strokeLinecap="round"/></svg>
@@ -783,8 +806,8 @@ const TeamWFHPanel = ({showToast}) => {
   };
 
   const renderWFHCard = (wfh,idx,actions) => {
-    const requester  = wfh.requester||{};
-    const d          = wfh.days||daysDiff(wfh.startDate,wfh.endDate);
+    const requester    = wfh.requester||{};
+    const d            = wfh.days||daysDiff(wfh.startDate,wfh.endDate);
     const isProcessing = processingId===wfh._id;
     return (
       <div key={wfh._id||idx} className="mlw-card" style={{opacity:isProcessing?.6:1,pointerEvents:isProcessing?"none":"auto",animationDelay:`${idx*.06}s`,position:"relative",overflow:"hidden"}}>
@@ -869,9 +892,9 @@ const TeamWFHPanel = ({showToast}) => {
           );
         })}
       </div>
-      {activeTab==="pending"   && (pendingLoading  ? <Spinner/> : pendingList.length===0   ? <EmptyState msg="No pending WFH requests"/>   : pendingList.map((w,i)=>renderWFHCard(w,i,pendingActions)))}
-      {activeTab==="all"       && (teamLoading     ? <Spinner/> : teamList.length===0      ? <EmptyState msg="No team WFH records"/>        : teamList.map((w,i)=>renderWFHCard(w,i,null)))}
-      {activeTab==="forwarded" && (fwdLoading      ? <Spinner/> : forwardedList.length===0 ? <EmptyState msg="No forwarded WFH requests"/>  : forwardedList.map((w,i)=>renderWFHCard(w,i,fwdActions)))}
+      {activeTab==="pending"   && (pendingLoading  ? <Spinner/> : pendingList.length===0   ? <EmptyState msg="No pending WFH requests"/>  : pendingList.map((w,i)=>renderWFHCard(w,i,pendingActions)))}
+      {activeTab==="all"       && (teamLoading     ? <Spinner/> : teamList.length===0      ? <EmptyState msg="No team WFH records"/>       : teamList.map((w,i)=>renderWFHCard(w,i,null)))}
+      {activeTab==="forwarded" && (fwdLoading      ? <Spinner/> : forwardedList.length===0 ? <EmptyState msg="No forwarded WFH requests"/> : forwardedList.map((w,i)=>renderWFHCard(w,i,fwdActions)))}
     </div>
   );
 };
