@@ -7,26 +7,46 @@ import {
   getEmployeeStats,
   reviewToManager,
   editEmployee,
+  editManager,
   getparticularEmployeeStats,
   getParticularManager,
   getTodayCheckins,
   getOrgInfo,
+  changeManagerRole,
+  demoteToEmployee,
+  promoteToManager,
+  getTodayLeaves,
 } from "../../api/adminapi/other/ad.other.api";
 
 export const useGetAllEmployee = () => {
   return useQuery({
     queryKey: ["employees"],
     queryFn: getAllEmployee,
-    staleTime: 1000 * 60 * 5, 
+    staleTime: 1000 * 60 * 5,
   });
 };
 
-
-export const useGetParticularEmployee = (uid) => {
+export const useGetParticularEmployee = (id) => {
   return useQuery({
-    queryKey: ["employee", uid],
-    queryFn: () => getParticularEmployee(uid),
-    enabled: !!uid, // run only if uid exists
+    queryKey: ["employee", id],
+    queryFn: () => getParticularEmployee(id),
+    enabled: !!id,
+  });
+};
+
+export const useGetParticularManager = (id) => {
+  return useQuery({
+    queryKey: ["manager", id],
+    queryFn: () => getParticularManager(id),
+    enabled: !!id,
+  });
+};
+
+export const useGetParticularManagerStats = (id) => {
+  return useQuery({
+    queryKey: ["managerStats", id],
+    queryFn: () => getParticularManager(id),
+    enabled: !!id,
   });
 };
 
@@ -40,11 +60,54 @@ export const useDeleteUser = () => {
   });
 };
 
-
-export const useEditEmployee = (uid) => {
+export const useEditEmployee = (id) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data) => editEmployee(uid, data),
+    mutationFn: (data) => editEmployee(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employee", id] });
+    },
+  });
+};
+
+export const useEditManager = (id) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => editManager(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["manager", id] });
+    },
+  });
+};
+
+export const usePromoteToManager = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }) => promoteToManager(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employeeStats"] });
+    },
+  });
+};
+
+export const useDemoteToEmployee = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }) => demoteToEmployee(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employeeStats"] });
+    },
+  });
+};
+
+export const useChangeManagerRole = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }) => changeManagerRole(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
     },
@@ -64,26 +127,11 @@ export const useGetEmployeeStats = () => {
   });
 };
 
-export const useGetParticularEmployeeStats = (uid) => {
+export const useGetParticularEmployeeStats = (id) => {
   return useQuery({
-    queryKey: ["employeeStats", uid],
-    queryFn: () => getparticularEmployeeStats(uid),
-    enabled: !!uid, 
-  });
-};
-
-export const useGetParticularManager = (uid) => {
-  return useQuery({
-    queryKey: ["manager", uid],
-    queryFn: () => getParticularManager(uid),
-    enabled: !!uid, 
-  });
-};
-export const useGetParticularManagerStats = (uid) => {
-  return useQuery({
-    queryKey: ["manager-stats", uid],
-    queryFn: () => getParticularManager(uid),
-    enabled: !!uid,
+    queryKey: ["employeeStats", id],
+    queryFn: () => getparticularEmployeeStats(id),
+    enabled: !!id,
   });
 };
 
@@ -91,7 +139,6 @@ export const useGetTodayCheckins = () => {
   return useQuery({
     queryKey: ["todayCheckins"],
     queryFn: getTodayCheckins,
-    // Refetch every 2 minutes so the map stays live without a page reload
     refetchInterval: 2 * 60 * 1000,
     refetchIntervalInBackground: false,
     staleTime: 60 * 1000,
@@ -102,5 +149,12 @@ export const useGetOrgInfo = () => {
   return useQuery({
     queryKey: ["orgInfo"],
     queryFn: getOrgInfo,
+  });
+};
+
+export const useGetTodayLeaves = () => {
+  return useQuery({
+    queryKey: ["todayLeaves"],
+    queryFn: getTodayLeaves,
   });
 };
