@@ -4,20 +4,22 @@ import {
   FaEdit, FaTrash, FaSearch, FaFilter, FaTimes, FaUserTie, FaUserPlus,
   FaChevronLeft, FaChevronRight, FaFileExcel, FaArrowUp, FaArrowDown,
   FaExchangeAlt, FaEllipsisV, FaEnvelope, FaPhone, FaBuilding,
-  FaMapMarkerAlt, FaIdCard, FaStar, FaCalendarAlt, FaUser, FaBriefcase,
-  FaUniversity, FaFileAlt, FaShieldAlt, FaTimes as FaX,
+  FaMapMarkerAlt, FaIdCard, FaStar, FaUser, FaBriefcase,
+  FaUniversity, FaFileAlt, FaShieldAlt,
 } from "react-icons/fa";
 import {
   useAddManager, useAddEmployee, useFindAllManagers,
 } from "../../auth/server-state/adminauth/adminauth.hook";
 import {
   useGetAllEmployee, useDeleteUser, useEditEmployee, useEditManager,
-  usePromoteToManager, useDemoteToEmployee, useChangeManagerRole,
-  useGetParticularEmployee, useGetParticularManager,
+  usePromoteEmployeeToManager, usePromoteEmployeeToAdmin, usePromoteManagerToAdmin,
+  useDemoteManagerToEmployee, useDemoteAdminToManager, useDemoteAdminToEmployee,
+  useChangeManagerRole, useGetParticularEmployee, useGetParticularManager,
 } from "../../auth/server-state/adminother/adminother.hook";
+import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
 
 const DEPARTMENTS = ["OPR", "BPO", "ENG", "MGMT", "HR"];
-const LOCATIONS   = ["Noida", "Bareilly", "Delhi", "Mumbai"];
+const LOCATIONS = ["Noida", "Bareilly", "Delhi", "Mumbai"];
 const INDIAN_STATES = [
   "Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat",
   "Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala","Madhya Pradesh",
@@ -63,7 +65,7 @@ function exportToCSV(data) {
     "UID","First Name","Last Name","Work Email","Role","Department",
     "Designation","Office Location","Gender","Marital Status",
     "Personal Contact","Emergency Contact","City","State","Pincode",
-    "Under Manager / Reporting Manager","Is Fresher","Total Experience","Status",
+    "Reporting / Under Manager","Is Fresher","Total Experience","Status",
   ];
   const rows = data.map((u) => [
     u.uid??"",u.f_name??"",u.l_name??"",u.work_email??"",u.role??"",
@@ -77,7 +79,6 @@ function exportToCSV(data) {
         :"",
     u.is_fresher?"Yes":"No",u.total_experience??"",u.status??"",
   ]);
-  const esc=(v)=>{const s=String(v??"");return s.includes(",")||s.includes('"')||s.includes("\n")?`"${s.replace(/"/g,'""')}"`:"";};
   const escape=(v)=>{const s=String(v??"");return s.includes(",")||s.includes('"')||s.includes("\n")?`"${s.replace(/"/g,'""')}"`:s;};
   const csv=[headers,...rows].map((r)=>r.map(escape).join(",")).join("\n");
   const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
@@ -118,11 +119,10 @@ function Badge({label,type="dept"}){
     role:"bg-[#FEF3E8] text-[#7A3500]",
     manager:"bg-[#EEEDFE] text-[#3C3489]",
     smgr:"bg-[#E1F5EE] text-[#085041]",
+    admin:"bg-[#FEF3C7] text-[#92400E]",
     active:"bg-[#D1FAE5] text-[#065F46]",
     inactive:"bg-[#F3F4F6] text-[#6B7280]",
     suspended:"bg-[#FEE2E2] text-[#991B1B]",
-    fresher:"bg-[#E0F2FE] text-[#0369A1]",
-    experienced:"bg-[#FEF9C3] text-[#713F12]",
   };
   return(
     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${styles[type]??styles.dept}`}>
@@ -146,9 +146,36 @@ function InfoRow({icon,label,value}){
   );
 }
 
-function AccountSummaryDrawer({userId,userRole,onClose,onEdit,onDelete,onPromote,onDemote,onChangeRole,managers}){
+function ReportingManagerSelect({value,onChange,managers,allEmployees,label="Reporting Manager",name="reporting_manager"}){
+  const managers_list=managers?.managers??[];
+  const admins_list=(allEmployees??[]).filter((u)=>u.role==="admin");
+  return(
+    <Field label={label}>
+      <select name={name} value={value} onChange={onChange} className={inputCls}>
+        <option value="">Select (optional)</option>
+        {managers_list.length>0&&(
+          <optgroup label="Managers">
+            {managers_list.map((m)=>(
+              <option key={m._id} value={m._id}>{m.f_name} {m.l_name} — {m.designation||"Manager"}</option>
+            ))}
+          </optgroup>
+        )}
+        {admins_list.length>0&&(
+          <optgroup label="Admins">
+            {admins_list.map((a)=>(
+              <option key={a._id} value={a._id}>{a.f_name} {a.l_name} — {a.designation||"Admin"}</option>
+            ))}
+          </optgroup>
+        )}
+      </select>
+    </Field>
+  );
+}
+
+function AccountSummaryDrawer({userId,userRole,onClose,onEdit,onDelete,onPromoteToManager,onPromoteToAdmin,onDemoteToEmployee,onDemoteToManager,onDemoteToEmployee2,onChangeRole,managers,allEmployees,currentAdminId}){
   const isManager=userRole==="manager"||userRole==="senior_manager";
-  const empQuery=useGetParticularEmployee(!isManager?userId:null);
+  const isAdmin=userRole==="admin";
+  const empQuery=useGetParticularEmployee(!isManager&&!isAdmin?userId:null);
   const mgrQuery=useGetParticularManager(isManager?userId:null);
   const data=isManager?mgrQuery.data:empQuery.data;
   const loading=isManager?mgrQuery.isLoading:empQuery.isLoading;
@@ -157,16 +184,17 @@ function AccountSummaryDrawer({userId,userRole,onClose,onEdit,onDelete,onPromote
   const reviews=data?.reviews||[];
   const [tab,setTab]=useState("info");
 
-  const roleLabel=(r)=>{
+  const roleBadgeEl=(r)=>{
     if(r==="manager")return<Badge label="Manager" type="manager"/>;
     if(r==="senior_manager")return<Badge label="Sr. Manager" type="smgr"/>;
+    if(r==="admin")return<Badge label="Admin" type="admin"/>;
     if(r==="employee")return<Badge label="Employee" type="role"/>;
+    if(r==="official")return<Badge label="Official" type="role"/>;
     return<Badge label={r?.replace("_"," ")||"—"} type="role"/>;
   };
 
-  const avgRating=reviews.length
-    ?reviews.reduce((s,r)=>s+(r.rating||0),0)/reviews.length
-    :null;
+  const avgRating=reviews.length?reviews.reduce((s,r)=>s+(r.rating||0),0)/reviews.length:null;
+  const isSelf=currentAdminId&&userId&&currentAdminId===userId;
 
   return(
     <div className="fixed inset-0 z-50 flex" onClick={(e)=>e.target===e.currentTarget&&onClose()}>
@@ -196,14 +224,13 @@ function AccountSummaryDrawer({userId,userRole,onClose,onEdit,onDelete,onPromote
                   <p className="font-bold text-[#730042] text-base leading-tight">{person.f_name} {person.l_name}</p>
                   <p className="text-xs text-[#993556] truncate mt-0.5">{person.work_email}</p>
                   <div className="flex flex-wrap gap-1.5 mt-2">
-                    {roleLabel(person.role)}
+                    {roleBadgeEl(person.role)}
                     {person.department&&<Badge label={person.department} type="dept"/>}
                     {person.status&&<Badge label={person.status} type={person.status==="active"?"active":person.status==="suspended"?"suspended":"inactive"}/>}
                   </div>
                   {person.uid&&<p className="text-[11px] text-[#993556] mt-1.5 font-mono bg-[#F9F8F2] px-1.5 py-0.5 rounded inline-block border border-[#F4C0D1]">{person.uid}</p>}
                 </div>
               </div>
-
               {avgRating!==null&&(
                 <div className="mt-3 flex items-center gap-1.5">
                   {[1,2,3,4,5].map((s)=>(
@@ -215,27 +242,13 @@ function AccountSummaryDrawer({userId,userRole,onClose,onEdit,onDelete,onPromote
             </div>
 
             <div className="flex border-b border-[#F4C0D1] flex-shrink-0 bg-white">
-  {["info", "leave", "reviews"].map((t) => (
-    <button
-      key={t}
-      onClick={() => setTab(t)}
-      className="flex-1 py-2.5 text-xs font-semibold capitalize transition-colors"
-      style={
-        tab === t
-          ? { color: "#730042", borderBottom: "2px solid #CD166E" }
-          : { color: "#993556" }
-      }
-    >
-      {t === "info"
-        ? "Profile"
-        : t === "leave"
-        ? "Leave"
-        : t === "reviews"
-        ? "Reviews"
-        : ""}
-    </button>
-  ))}
-</div>
+              {["info","leave","reviews"].map((t)=>(
+                <button key={t} onClick={()=>setTab(t)} className="flex-1 py-2.5 text-xs font-semibold capitalize transition-colors"
+                  style={tab===t?{color:"#730042",borderBottom:"2px solid #CD166E"}:{color:"#993556"}}>
+                  {t==="info"?"Profile":t==="leave"?"Leave":"Reviews"}
+                </button>
+              ))}
+            </div>
 
             <div className="flex-1 overflow-y-auto px-4 py-3">
               {tab==="info"&&(
@@ -283,7 +296,6 @@ function AccountSummaryDrawer({userId,userRole,onClose,onEdit,onDelete,onPromote
                   )}
                 </div>
               )}
-
               {tab==="leave"&&(
                 <div>
                   {leaveBalance?(
@@ -300,7 +312,6 @@ function AccountSummaryDrawer({userId,userRole,onClose,onEdit,onDelete,onPromote
                   )}
                 </div>
               )}
-
               {tab==="reviews"&&(
                 <div className="space-y-3">
                   {reviews.length===0?(
@@ -332,19 +343,41 @@ function AccountSummaryDrawer({userId,userRole,onClose,onEdit,onDelete,onPromote
                   <FaTrash size={10}/> Delete
                 </button>
               </div>
-              {(userRole==="employee"||userRole==="official")&&(
-                <button onClick={()=>{onPromote(person);onClose();}} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90" style={{background:"#3C3489"}}>
-                  <FaArrowUp size={10}/> Promote to Manager
-                </button>
-              )}
-              {(userRole==="manager"||userRole==="senior_manager")&&(
-                <div className="flex gap-2">
-                  <button onClick={()=>{onDemote(person);onClose();}} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90" style={{background:"#7A3500"}}>
-                    <FaArrowDown size={10}/> Demote
-                  </button>
-                  <button onClick={()=>{onChangeRole(person);onClose();}} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90" style={{background:"#085041"}}>
-                    <FaExchangeAlt size={10}/> Change Role
-                  </button>
+              {!isSelf&&(
+                <div className="flex flex-col gap-2">
+                  {(userRole==="employee"||userRole==="official")&&(
+                    <>
+                      <button onClick={()=>{onPromoteToManager(person);onClose();}} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90" style={{background:"#3C3489"}}>
+                        <FaArrowUp size={10}/> Promote to Manager
+                      </button>
+                      <button onClick={()=>{onPromoteToAdmin(person);onClose();}} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90" style={{background:"#92400E"}}>
+                        <FaArrowUp size={10}/> Promote to Admin
+                      </button>
+                    </>
+                  )}
+                  {(userRole==="manager"||userRole==="senior_manager")&&(
+                    <div className="flex gap-2">
+                      <button onClick={()=>{onPromoteToAdmin(person);onClose();}} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90" style={{background:"#92400E"}}>
+                        <FaArrowUp size={10}/> To Admin
+                      </button>
+                      <button onClick={()=>{onDemoteToEmployee(person);onClose();}} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90" style={{background:"#7A3500"}}>
+                        <FaArrowDown size={10}/> To Employee
+                      </button>
+                      <button onClick={()=>{onChangeRole(person);onClose();}} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90" style={{background:"#085041"}}>
+                        <FaExchangeAlt size={10}/> Role
+                      </button>
+                    </div>
+                  )}
+                  {userRole==="admin"&&(
+                    <div className="flex gap-2">
+                      <button onClick={()=>{onDemoteToManager(person);onClose();}} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90" style={{background:"#7A3500"}}>
+                        <FaArrowDown size={10}/> To Manager
+                      </button>
+                      <button onClick={()=>{onDemoteToEmployee2(person);onClose();}} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90" style={{background:"#A32D2D"}}>
+                        <FaArrowDown size={10}/> To Employee
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -459,7 +492,7 @@ function ConfirmModal({title,message,icon,confirmLabel,confirmColor,onConfirm,on
   );
 }
 
-function ActionMenu({user,onView,onEdit,onDelete,onPromote,onDemote,onChangeRole}){
+function ActionMenu({user,onView,onEdit,onDelete,onPromoteToManager,onPromoteToAdmin,onDemoteToEmployee,onDemoteToManager,onDemoteToEmployee2,onChangeRole,currentAdminId}){
   const [open,setOpen]=useState(false);
   const ref=useRef();
   useEffect(()=>{
@@ -467,76 +500,77 @@ function ActionMenu({user,onView,onEdit,onDelete,onPromote,onDemote,onChangeRole
     document.addEventListener("mousedown",h);
     return()=>document.removeEventListener("mousedown",h);
   },[]);
-  const isEmployee=user.type==="employee"||user.role==="employee"||user.role==="official";
-  const isManager=user.type==="manager"||["manager","senior_manager"].includes(user.role);
+  const isEmployee=user.role==="employee"||user.role==="official";
+  const isManager=user.role==="manager"||user.role==="senior_manager";
+  const isAdmin=user.role==="admin";
+  const isSelf=currentAdminId&&user._id&&currentAdminId===user._id;
   return(
     <div className="relative" ref={ref} onClick={(e)=>e.stopPropagation()}>
       <button onClick={(e)=>{e.stopPropagation();setOpen((p)=>!p);}} className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center text-[#993556] border border-[#F4C0D1] hover:bg-[#FBEAF0] transition-colors" style={{background:"#F9F8F2"}}>
         <FaEllipsisV size={10}/>
       </button>
       {open&&(
-        <div className="absolute right-0 top-9 z-20 bg-white border border-[#F4C0D1] rounded-xl shadow-xl min-w-[175px] py-1 overflow-hidden">
+        <div className="absolute right-0 top-9 z-20 bg-white border border-[#F4C0D1] rounded-xl shadow-xl min-w-[185px] py-1 overflow-hidden">
           <button onClick={()=>{onView(user._id,user.role);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#730042] hover:bg-[#FBEAF0] transition-colors">
             <FaUser size={10}/> View Profile
           </button>
           <button onClick={()=>{onEdit(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#730042] hover:bg-[#FBEAF0] transition-colors">
             <FaEdit size={10}/> Edit
           </button>
-          {isEmployee&&(
-            <button onClick={()=>{onPromote(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#3C3489] hover:bg-[#EEEDFE] transition-colors">
-              <FaArrowUp size={10}/> Promote to Manager
-            </button>
-          )}
-          {isManager&&(
+          {!isSelf&&(
             <>
-              <button onClick={()=>{onDemote(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#7A3500] hover:bg-[#FEF3E8] transition-colors">
-                <FaArrowDown size={10}/> Demote to Employee
-              </button>
-              <button onClick={()=>{onChangeRole(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#085041] hover:bg-[#E1F5EE] transition-colors">
-                <FaExchangeAlt size={10}/> Change Role
+              {isEmployee&&(
+                <>
+                  <button onClick={()=>{onPromoteToManager(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#3C3489] hover:bg-[#EEEDFE] transition-colors">
+                    <FaArrowUp size={10}/> Promote to Manager
+                  </button>
+                  <button onClick={()=>{onPromoteToAdmin(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#92400E] hover:bg-[#FEF3C7] transition-colors">
+                    <FaArrowUp size={10}/> Promote to Admin
+                  </button>
+                </>
+              )}
+              {isManager&&(
+                <>
+                  <button onClick={()=>{onPromoteToAdmin(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#92400E] hover:bg-[#FEF3C7] transition-colors">
+                    <FaArrowUp size={10}/> Promote to Admin
+                  </button>
+                  <button onClick={()=>{onDemoteToEmployee(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#7A3500] hover:bg-[#FEF3E8] transition-colors">
+                    <FaArrowDown size={10}/> Demote to Employee
+                  </button>
+                  <button onClick={()=>{onChangeRole(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#085041] hover:bg-[#E1F5EE] transition-colors">
+                    <FaExchangeAlt size={10}/> Change Role
+                  </button>
+                </>
+              )}
+              {isAdmin&&(
+                <>
+                  <button onClick={()=>{onDemoteToManager(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#7A3500] hover:bg-[#FEF3E8] transition-colors">
+                    <FaArrowDown size={10}/> Demote to Manager
+                  </button>
+                  <button onClick={()=>{onDemoteToEmployee2(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#A32D2D] hover:bg-[#FCEBEB] transition-colors">
+                    <FaArrowDown size={10}/> Demote to Employee
+                  </button>
+                </>
+              )}
+              <div className="border-t border-[#F4C0D1] my-1"/>
+              <button onClick={()=>{onDelete(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#A32D2D] hover:bg-[#FCEBEB] transition-colors">
+                <FaTrash size={10}/> Delete
               </button>
             </>
           )}
-          <div className="border-t border-[#F4C0D1] my-1"/>
-          <button onClick={()=>{onDelete(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#A32D2D] hover:bg-[#FCEBEB] transition-colors">
-            <FaTrash size={10}/> Delete
-          </button>
         </div>
       )}
     </div>
   );
 }
 
-function MobileCard({u,onView,onEdit,onDelete,onPromote,onDemote,onChangeRole}){
-  const roleBadgeType=u.role==="manager"?"manager":u.role==="senior_manager"?"smgr":"role";
-  const roleLabel=u.role==="senior_manager"?"Sr. Manager":u.role==="employee"?"Employee":u.role?.replace("_"," ")||"—";
-  return(
-    <div className="bg-white border border-[#F4C0D1] rounded-xl p-4 flex gap-3 cursor-pointer active:scale-[0.99] transition-transform" onClick={()=>onView(u._id,u.role)}>
-      <Avatar name={`${u.f_name??""} ${u.l_name??""}`}/>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="font-semibold text-[#730042] text-sm truncate">{u.f_name} {u.l_name}</p>
-            <p className="text-xs text-[#993556] truncate">{u.work_email}</p>
-          </div>
-          <Badge label={roleLabel} type={roleBadgeType}/>
-        </div>
-        <div className="flex flex-wrap gap-1.5 mt-2">
-          {u.department&&<Badge label={u.department} type="dept"/>}
-          {u.office_location&&<span className="px-2 py-0.5 rounded-full text-xs bg-[#F9F8F2] text-[#993556] border border-[#F4C0D1]">📍 {u.office_location}</span>}
-          {u.designation&&<span className="px-2 py-0.5 rounded-full text-xs bg-[#F9F8F2] text-[#993556] border border-[#F4C0D1] truncate max-w-[120px]">{u.designation}</span>}
-        </div>
-        <div className="flex items-center justify-between mt-3">
-          {u.Under_manager?(
-            <p className="text-[11px] text-[#993556]">Under: <span className="font-medium text-[#730042]">{u.Under_manager.f_name} {u.Under_manager.l_name}</span></p>
-          ):<span/>}
-          <div onClick={(e)=>e.stopPropagation()}>
-            <ActionMenu user={u} onView={onView} onEdit={onEdit} onDelete={onDelete} onPromote={onPromote} onDemote={onDemote} onChangeRole={onChangeRole}/>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+function roleBadge(role){
+  if(role==="employee")return<Badge label="Employee" type="role"/>;
+  if(role==="manager")return<Badge label="Manager" type="manager"/>;
+  if(role==="senior_manager")return<Badge label="Sr. Manager" type="smgr"/>;
+  if(role==="admin")return<Badge label="Admin" type="admin"/>;
+  if(role==="official")return<Badge label="Official" type="role"/>;
+  return<Badge label={role?.replace("_"," ")||"—"} type="manager"/>;
 }
 
 function SkeletonRows(){
@@ -641,7 +675,7 @@ function EmpStepFields({step,form,onChange,errors,managers}){
       <Field label="Under Manager" span2>
         <select name="Under_manager" value={form.Under_manager} onChange={onChange} className={inputCls}>
           <option value="">Select Manager (optional)</option>
-          {managers?.managers?.map((mgr)=>(<option key={mgr._id} value={mgr._id}>{mgr.f_name} {mgr.l_name} ({mgr.uid})</option>))}
+          {managers?.managers?.map((m)=><option key={m._id} value={m._id}>{m.f_name} {m.l_name} ({m.uid})</option>)}
         </select>
       </Field>
     </>
@@ -700,7 +734,7 @@ function EmpStepFields({step,form,onChange,errors,managers}){
   return null;
 }
 
-function MgrStepFields({step,form,onChange,errors,managers}){
+function MgrStepFields({step,form,onChange,errors,managers,allEmployees}){
   const [showPwd,setShowPwd]=useState(false);
   const [showCPwd,setShowCPwd]=useState(false);
   const pwdRegex=/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
@@ -755,12 +789,16 @@ function MgrStepFields({step,form,onChange,errors,managers}){
           <option value="">Select Location</option>{LOCATIONS.map((l)=><option key={l} value={l}>{l}</option>)}
         </select>
       </Field>
-      <Field label="Reporting Manager" span2>
-        <select name="reporting_manager" value={form.reporting_manager} onChange={onChange} className={inputCls}>
-          <option value="">Select Reporting Manager (optional)</option>
-          {managers?.managers?.map((mgr)=>(<option key={mgr._id} value={mgr._id}>{mgr.f_name} {mgr.l_name} ({mgr.uid})</option>))}
-        </select>
-      </Field>
+      <div className="col-span-1 sm:col-span-2">
+        <ReportingManagerSelect
+          value={form.reporting_manager}
+          onChange={onChange}
+          managers={managers}
+          allEmployees={allEmployees}
+          label="Reporting Manager"
+          name="reporting_manager"
+        />
+      </div>
     </>
   );
   if(step===2)return(
@@ -817,6 +855,44 @@ function MgrStepFields({step,form,onChange,errors,managers}){
   return null;
 }
 
+function MobileCard({u,onView,onEdit,onDelete,onPromoteToManager,onPromoteToAdmin,onDemoteToEmployee,onDemoteToManager,onDemoteToEmployee2,onChangeRole,currentAdminId}){
+  const roleType=u.role==="manager"?"manager":u.role==="senior_manager"?"smgr":u.role==="admin"?"admin":"role";
+  const roleLabel=u.role==="senior_manager"?"Sr. Manager":u.role==="employee"?"Employee":u.role==="admin"?"Admin":u.role?.replace("_"," ")||"—";
+  return(
+    <div className="bg-white border border-[#F4C0D1] rounded-xl p-4 flex gap-3 cursor-pointer active:scale-[0.99] transition-transform" onClick={()=>onView(u._id,u.role)}>
+      <Avatar name={`${u.f_name??""} ${u.l_name??""}`}/>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-semibold text-[#730042] text-sm truncate">{u.f_name} {u.l_name}</p>
+            <p className="text-xs text-[#993556] truncate">{u.work_email}</p>
+          </div>
+          <Badge label={roleLabel} type={roleType}/>
+        </div>
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {u.department&&<Badge label={u.department} type="dept"/>}
+          {u.office_location&&<span className="px-2 py-0.5 rounded-full text-xs bg-[#F9F8F2] text-[#993556] border border-[#F4C0D1]">📍 {u.office_location}</span>}
+        </div>
+        <div className="flex items-center justify-between mt-3">
+          {u.Under_manager?(
+            <p className="text-[11px] text-[#993556]">Under: <span className="font-medium text-[#730042]">{u.Under_manager.f_name} {u.Under_manager.l_name}</span></p>
+          ):u.reporting_manager?(
+            <p className="text-[11px] text-[#993556]">Reports to: <span className="font-medium text-[#730042]">{u.reporting_manager.f_name} {u.reporting_manager.l_name}</span></p>
+          ):<span/>}
+          <div onClick={(e)=>e.stopPropagation()}>
+            <ActionMenu user={u} onView={onView} onEdit={onEdit} onDelete={onDelete}
+              onPromoteToManager={onPromoteToManager} onPromoteToAdmin={onPromoteToAdmin}
+              onDemoteToEmployee={onDemoteToEmployee} onDemoteToManager={onDemoteToManager}
+              onDemoteToEmployee2={onDemoteToEmployee2} onChangeRole={onChangeRole}
+              currentAdminId={currentAdminId}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function EmployeeTable(){
   const [open,setOpen]=useState(false);
   const [openManager,setOpenManager]=useState(false);
@@ -835,16 +911,29 @@ export default function EmployeeTable(){
   const [editErrors,setEditErrors]=useState({});
   const [openEdit,setOpenEdit]=useState(false);
   const [deleteTarget,setDeleteTarget]=useState(null);
-  const [promoteTarget,setPromoteTarget]=useState(null);
-  const [promoteForm,setPromoteForm]=useState({reporting_manager:"",designation:"",role:"manager"});
-  const [demoteTarget,setDemoteTarget]=useState(null);
-  const [demoteForm,setDemoteForm]=useState({Under_manager:"",designation:""});
+
+  const [promoteToMgrTarget,setPromoteToMgrTarget]=useState(null);
+  const [promoteToMgrForm,setPromoteToMgrForm]=useState({reporting_manager:"",designation:"",role:"manager"});
+
+  const [promoteToAdminTarget,setPromoteToAdminTarget]=useState(null);
+  const [promoteToAdminForm,setPromoteToAdminForm]=useState({reporting_manager:"",designation:"",role:"admin"});
+
+  const [demoteMgrToEmpTarget,setDemoteMgrToEmpTarget]=useState(null);
+  const [demoteMgrToEmpForm,setDemoteMgrToEmpForm]=useState({Under_manager:"",designation:""});
+
+  const [demoteAdminToMgrTarget,setDemoteAdminToMgrTarget]=useState(null);
+  const [demoteAdminToMgrForm,setDemoteAdminToMgrForm]=useState({reporting_manager:"",designation:"",role:"manager"});
+
+  const [demoteAdminToEmpTarget,setDemoteAdminToEmpTarget]=useState(null);
+  const [demoteAdminToEmpForm,setDemoteAdminToEmpForm]=useState({Under_manager:"",designation:""});
+
   const [roleChangeTarget,setRoleChangeTarget]=useState(null);
   const [roleChangeValue,setRoleChangeValue]=useState("manager");
-  const [filters,setFilters]=useState({
-    search:"",department:"",role:"",location:"",gender:"",
-    marital_status:"",is_fresher:"",type:"",status:"",designation:"",
-  });
+
+  const [filters,setFilters]=useState({search:"",department:"",role:"",location:"",gender:"",type:"",status:""});
+
+  const {data:adminData}=useGetMeAdmin();
+  const currentAdminId=adminData?.user?._id||adminData?._id;
 
   const {mutate:addEmployeeApi}=useAddEmployee();
   const {mutate:addManagerApi}=useAddManager();
@@ -855,17 +944,24 @@ export default function EmployeeTable(){
   const {mutate:editUserApi}=useEditEmployee(editTarget?._id);
   const {mutate:editManagerApi}=useEditManager(editTarget?._id);
   const {mutate:deleteUserApi}=useDeleteUser();
-  const {mutate:promoteApi}=usePromoteToManager();
-  const {mutate:demoteApi}=useDemoteToEmployee();
-  const {mutate:changeManagerRoleApi}=useChangeManagerRole();
+  const {mutate:promoteToMgrApi}=usePromoteEmployeeToManager();
+  const {mutate:promoteToAdminFromEmpApi}=usePromoteEmployeeToAdmin();
+  const {mutate:promoteToAdminFromMgrApi}=usePromoteManagerToAdmin();
+  const {mutate:demoteMgrToEmpApi}=useDemoteManagerToEmployee();
+  const {mutate:demoteAdminToMgrApi}=useDemoteAdminToManager();
+  const {mutate:demoteAdminToEmpApi}=useDemoteAdminToEmployee();
+  const {mutate:changeRoleApi}=useChangeManagerRole();
 
   const showPopup=(type,message)=>{
     setPopup({show:true,type,message});
-    setTimeout(()=>setPopup({show:false,type:"",message:""}),3000);
+    setTimeout(()=>setPopup({show:false,type:"",message:""}),3500);
   };
+
+  const handleView=(id,role)=>{setSelectedEmployeeId(id);setSelectedEmployeeRole(role);};
 
   const handleOpenEdit=(user)=>{
     setEditTarget(user);
+    const isManager=user.role==="manager"||user.role==="senior_manager";
     setEditForm({
       f_name:user.f_name??"",l_name:user.l_name??"",work_email:user.work_email??"",
       gender:user.gender??"",marital_status:user.marital_status??"single",
@@ -894,7 +990,7 @@ export default function EmployeeTable(){
 
   const handleEditSubmit=()=>{
     if(!validateEdit()){showPopup("error","Please fill all required fields");return;}
-    const isManager=editTarget?.type==="manager"||["manager","senior_manager"].includes(editTarget?.role);
+    const isManager=editTarget?.role==="manager"||editTarget?.role==="senior_manager";
     const mutate=isManager?editManagerApi:editUserApi;
     mutate(editForm,{
       onSuccess:(res)=>{showPopup("success",res?.message||"Updated successfully");setOpenEdit(false);setEditTarget(null);refetchList();},
@@ -909,24 +1005,47 @@ export default function EmployeeTable(){
     });
   };
 
-  const handleConfirmPromote=()=>{
-    promoteApi({id:promoteTarget._id,data:promoteForm},{
-      onSuccess:(res)=>{showPopup("success",res?.message||"Promoted to manager");setPromoteTarget(null);refetchList();},
-      onError:(err)=>{showPopup("error",err?.response?.data?.message||err?.message||"Promotion failed");},
+  const handlePromoteToManager=()=>{
+    promoteToMgrApi({id:promoteToMgrTarget._id,data:promoteToMgrForm},{
+      onSuccess:(res)=>{showPopup("success",res?.message||"Promoted to Manager");setPromoteToMgrTarget(null);refetchList();},
+      onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Promotion failed"),
     });
   };
 
-  const handleConfirmDemote=()=>{
-    demoteApi({id:demoteTarget._id,data:demoteForm},{
-      onSuccess:(res)=>{showPopup("success",res?.message||"Demoted to employee");setDemoteTarget(null);refetchList();},
-      onError:(err)=>{showPopup("error",err?.response?.data?.message||err?.message||"Demotion failed");},
+  const handlePromoteToAdmin=()=>{
+    const isManager=promoteToAdminTarget.role==="manager"||promoteToAdminTarget.role==="senior_manager";
+    const mutate=isManager?promoteToAdminFromMgrApi:promoteToAdminFromEmpApi;
+    mutate({id:promoteToAdminTarget._id,data:promoteToAdminForm},{
+      onSuccess:(res)=>{showPopup("success",res?.message||"Promoted to Admin");setPromoteToAdminTarget(null);refetchList();},
+      onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Promotion failed"),
     });
   };
 
-  const handleConfirmRoleChange=()=>{
-    changeManagerRoleApi({id:roleChangeTarget._id,data:{role:roleChangeValue}},{
+  const handleDemoteMgrToEmp=()=>{
+    demoteMgrToEmpApi({id:demoteMgrToEmpTarget._id,data:demoteMgrToEmpForm},{
+      onSuccess:(res)=>{showPopup("success",res?.message||"Demoted to Employee");setDemoteMgrToEmpTarget(null);refetchList();},
+      onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Demotion failed"),
+    });
+  };
+
+  const handleDemoteAdminToMgr=()=>{
+    demoteAdminToMgrApi({id:demoteAdminToMgrTarget._id,data:demoteAdminToMgrForm},{
+      onSuccess:(res)=>{showPopup("success",res?.message||"Demoted to Manager");setDemoteAdminToMgrTarget(null);refetchList();},
+      onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Demotion failed"),
+    });
+  };
+
+  const handleDemoteAdminToEmp=()=>{
+    demoteAdminToEmpApi({id:demoteAdminToEmpTarget._id,data:demoteAdminToEmpForm},{
+      onSuccess:(res)=>{showPopup("success",res?.message||"Demoted to Employee");setDemoteAdminToEmpTarget(null);refetchList();},
+      onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Demotion failed"),
+    });
+  };
+
+  const handleRoleChange=()=>{
+    changeRoleApi({id:roleChangeTarget._id,data:{role:roleChangeValue}},{
       onSuccess:(res)=>{showPopup("success",res?.message||"Role updated");setRoleChangeTarget(null);refetchList();},
-      onError:(err)=>{showPopup("error",err?.response?.data?.message||err?.message||"Role change failed");},
+      onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Role change failed"),
     });
   };
 
@@ -1024,7 +1143,9 @@ export default function EmployeeTable(){
     const name=`${u.f_name??""} ${u.l_name??""}`.toLowerCase();
     const q=filters.search.toLowerCase();
     const matchType=filters.type
-      ?filters.type==="employee"?u.type==="employee":u.type==="manager"
+      ?filters.type==="employee"?u.type==="employee"
+        :filters.type==="manager"?u.type==="manager"
+        :u.role===filters.type
       :true;
     return(
       (name.includes(q)||(u.work_email??"").toLowerCase().includes(q)||(u.uid??"").toLowerCase().includes(q)||(u.designation??"").toLowerCase().includes(q))&&
@@ -1032,27 +1153,29 @@ export default function EmployeeTable(){
       (filters.role?u.role===filters.role:true)&&
       (filters.location?u.office_location===filters.location:true)&&
       (filters.gender?u.gender===filters.gender:true)&&
-      (filters.marital_status?u.marital_status===filters.marital_status:true)&&
-      (filters.is_fresher!==""?String(u.is_fresher)===filters.is_fresher:true)&&
-      (filters.designation?u.designation===filters.designation:true)&&
       (filters.status?u.status===filters.status:true)&&
       matchType
     );
   });
 
-  const clearFilters=()=>setFilters({search:"",department:"",role:"",location:"",gender:"",marital_status:"",is_fresher:"",type:"",status:"",designation:""});
-  const activeFilterCount=[filters.department,filters.role,filters.location,filters.gender,filters.marital_status,filters.is_fresher,filters.type,filters.status,filters.designation].filter(Boolean).length;
+  const clearFilters=()=>setFilters({search:"",department:"",role:"",location:"",gender:"",type:"",status:""});
+  const activeFilterCount=[filters.department,filters.role,filters.location,filters.gender,filters.type,filters.status].filter(Boolean).length;
 
-  function roleBadge(role){
-    if(role==="employee")return<Badge label="Employee" type="role"/>;
-    if(role==="manager")return<Badge label="Manager" type="manager"/>;
-    if(role==="senior_manager")return<Badge label="Sr. Manager" type="smgr"/>;
-    return<Badge label={role?.replace("_"," ")||"—"} type="manager"/>;
-  }
+  const openPromoteToManager=(user)=>{setPromoteToMgrTarget(user);setPromoteToMgrForm({reporting_manager:"",designation:user.designation||"",role:"manager"});};
+  const openPromoteToAdmin=(user)=>{setPromoteToAdminTarget(user);setPromoteToAdminForm({reporting_manager:"",designation:user.designation||"",role:"admin"});};
+  const openDemoteMgrToEmp=(user)=>{setDemoteMgrToEmpTarget(user);setDemoteMgrToEmpForm({Under_manager:"",designation:user.designation||""});};
+  const openDemoteAdminToMgr=(user)=>{setDemoteAdminToMgrTarget(user);setDemoteAdminToMgrForm({reporting_manager:"",designation:user.designation||"",role:"manager"});};
+  const openDemoteAdminToEmp=(user)=>{setDemoteAdminToEmpTarget(user);setDemoteAdminToEmpForm({Under_manager:"",designation:user.designation||""});};
+  const openChangeRole=(user)=>{setRoleChangeTarget(user);setRoleChangeValue(user.role||"manager");};
 
-  const handleView=(id,role)=>{
-    setSelectedEmployeeId(id);
-    setSelectedEmployeeRole(role);
+  const actionMenuProps={
+    onPromoteToManager:openPromoteToManager,
+    onPromoteToAdmin:openPromoteToAdmin,
+    onDemoteToEmployee:openDemoteMgrToEmp,
+    onDemoteToManager:openDemoteAdminToMgr,
+    onDemoteToEmployee2:openDemoteAdminToEmp,
+    onChangeRole:openChangeRole,
+    currentAdminId,
   };
 
   return(
@@ -1064,125 +1187,82 @@ export default function EmployeeTable(){
       `}</style>
 
       <div className="max-w-7xl mx-auto">
-
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-[#730042] tracking-tight">Employee Directory</h1>
             <p className="text-xs sm:text-sm text-[#993556] mt-0.5">{allUsers.length} total · {filtered.length} shown</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={()=>exportToCSV(filtered)}
-              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all hover:text-white"
+            <button onClick={()=>exportToCSV(filtered)}
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all"
               style={{borderColor:"#085041",color:"#085041"}}
               onMouseEnter={(e)=>{e.currentTarget.style.background="#085041";e.currentTarget.style.color="#fff";}}
-              onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#085041";}}
-            >
-              <FaFileExcel size={12}/>
-              <span>Export{activeFilterCount>0?" Filtered":""} CSV</span>
+              onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#085041";}}>
+              <FaFileExcel size={12}/><span>Export CSV</span>
             </button>
-            <button
-              onClick={()=>{setOpenManager(true);setMgrStep(0);}}
-              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all hover:text-white"
+            <button onClick={()=>{setOpenManager(true);setMgrStep(0);}}
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all"
               style={{borderColor:"#730042",color:"#730042"}}
               onMouseEnter={(e)=>{e.currentTarget.style.background="#730042";e.currentTarget.style.color="#fff";}}
-              onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#730042";}}
-            >
+              onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#730042";}}>
               <FaUserTie size={12}/><span>Add Manager</span>
             </button>
-            <button
-              onClick={()=>{setOpen(true);setEmpStep(0);}}
+            <button onClick={()=>{setOpen(true);setEmpStep(0);}}
               className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90 transition-all"
-              style={{background:"#730042"}}
-            >
+              style={{background:"#730042"}}>
               <FaUserPlus size={12}/><span>Add Employee</span>
             </button>
           </div>
         </div>
 
         <div className="bg-white rounded-2xl border border-[#F4C0D1] overflow-hidden">
-
           <div className="p-3 sm:p-4 border-b border-[#F4C0D1]" style={{background:"#F9F8F2"}}>
-            <div className="flex flex-col gap-2 sm:gap-3">
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[#993556]" size={12}/>
-                  <input
-                    placeholder="Search name, email, UID, or designation…"
-                    className={`${inputCls} pl-8 sm:pl-9`}
-                    value={filters.search}
-                    onChange={(e)=>setFilters({...filters,search:e.target.value})}
-                  />
-                </div>
-                <button
-                  onClick={()=>setShowFilters(!showFilters)}
-                  className="relative flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs sm:text-sm font-medium transition-colors flex-shrink-0"
-                  style={showFilters?{background:"#CD166E",color:"#fff",borderColor:"#CD166E"}:{background:"transparent",color:"#730042",borderColor:"#F4C0D1"}}
-                >
-                  <FaFilter size={11}/>
-                  <span className="hidden sm:inline">Filters</span>
-                  {activeFilterCount>0&&(
-                    <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full text-white text-[10px] font-bold flex items-center justify-center" style={{background:"#730042"}}>
-                      {activeFilterCount}
-                    </span>
-                  )}
-                </button>
+            <div className="flex gap-2 mb-2">
+              <div className="relative flex-1">
+                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[#993556]" size={12}/>
+                <input placeholder="Search name, email, UID or designation…"
+                  className={`${inputCls} pl-8 sm:pl-9`}
+                  value={filters.search}
+                  onChange={(e)=>setFilters({...filters,search:e.target.value})}/>
               </div>
-
-              <div className="hidden sm:flex gap-2">
-                <select className={`${inputCls} flex-1`} value={filters.type} onChange={(e)=>setFilters({...filters,type:e.target.value})}>
-                  <option value="">All Types</option><option value="employee">Employees</option><option value="manager">Managers</option>
-                </select>
-                <select className={`${inputCls} flex-1`} value={filters.department} onChange={(e)=>setFilters({...filters,department:e.target.value})}>
-                  <option value="">All Departments</option>{DEPARTMENTS.map((d)=><option key={d} value={d}>{d}</option>)}
-                </select>
-                <select className={`${inputCls} flex-1`} value={filters.role} onChange={(e)=>setFilters({...filters,role:e.target.value})}>
-                  <option value="">All Roles</option>
-                  <option value="employee">Employee</option><option value="manager">Manager</option>
-                  <option value="senior_manager">Senior Manager</option><option value="official">Official</option>
-                </select>
-                <select className={`${inputCls} flex-1`} value={filters.location} onChange={(e)=>setFilters({...filters,location:e.target.value})}>
-                  <option value="">All Locations</option>{LOCATIONS.map((l)=><option key={l} value={l}>{l}</option>)}
-                </select>
-              </div>
+              <button onClick={()=>setShowFilters(!showFilters)}
+                className="relative flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs sm:text-sm font-medium transition-colors flex-shrink-0"
+                style={showFilters?{background:"#CD166E",color:"#fff",borderColor:"#CD166E"}:{background:"transparent",color:"#730042",borderColor:"#F4C0D1"}}>
+                <FaFilter size={11}/>
+                <span className="hidden sm:inline">Filters</span>
+                {activeFilterCount>0&&(
+                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full text-white text-[10px] font-bold flex items-center justify-center" style={{background:"#730042"}}>
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
             </div>
-
+            <div className="hidden sm:flex gap-2">
+              <select className={`${inputCls} flex-1`} value={filters.type} onChange={(e)=>setFilters({...filters,type:e.target.value})}>
+                <option value="">All Types</option><option value="employee">Employees</option><option value="manager">Managers</option>
+              </select>
+              <select className={`${inputCls} flex-1`} value={filters.department} onChange={(e)=>setFilters({...filters,department:e.target.value})}>
+                <option value="">All Departments</option>{DEPARTMENTS.map((d)=><option key={d} value={d}>{d}</option>)}
+              </select>
+              <select className={`${inputCls} flex-1`} value={filters.role} onChange={(e)=>setFilters({...filters,role:e.target.value})}>
+                <option value="">All Roles</option>
+                <option value="employee">Employee</option><option value="manager">Manager</option>
+                <option value="senior_manager">Senior Manager</option><option value="official">Official</option>
+              </select>
+              <select className={`${inputCls} flex-1`} value={filters.location} onChange={(e)=>setFilters({...filters,location:e.target.value})}>
+                <option value="">All Locations</option>{LOCATIONS.map((l)=><option key={l} value={l}>{l}</option>)}
+              </select>
+            </div>
             {showFilters&&(
-              <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-[#F4C0D1]">
-                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
-                  <select className={inputCls} value={filters.type} onChange={(e)=>setFilters({...filters,type:e.target.value})}>
-                    <option value="">All Types</option><option value="employee">Employees</option><option value="manager">Managers</option>
-                  </select>
-                  <select className={inputCls} value={filters.department} onChange={(e)=>setFilters({...filters,department:e.target.value})}>
-                    <option value="">All Depts</option>{DEPARTMENTS.map((d)=><option key={d} value={d}>{d}</option>)}
-                  </select>
-                  <select className={inputCls} value={filters.role} onChange={(e)=>setFilters({...filters,role:e.target.value})}>
-                    <option value="">All Roles</option>
-                    <option value="employee">Employee</option><option value="manager">Manager</option>
-                    <option value="senior_manager">Sr. Manager</option><option value="official">Official</option>
-                  </select>
-                  <select className={inputCls} value={filters.location} onChange={(e)=>setFilters({...filters,location:e.target.value})}>
-                    <option value="">All Locations</option>{LOCATIONS.map((l)=><option key={l} value={l}>{l}</option>)}
-                  </select>
+              <div className="mt-2 pt-2 border-t border-[#F4C0D1]">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <select className={inputCls} value={filters.gender} onChange={(e)=>setFilters({...filters,gender:e.target.value})}>
                     <option value="">All Genders</option>
                     <option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
                   </select>
-                  <select className={inputCls} value={filters.marital_status} onChange={(e)=>setFilters({...filters,marital_status:e.target.value})}>
-                    <option value="">All Marital Status</option>
-                    <option value="single">Single</option><option value="married">Married</option><option value="divorced">Divorced</option>
-                  </select>
-                  <select className={inputCls} value={filters.is_fresher} onChange={(e)=>setFilters({...filters,is_fresher:e.target.value})}>
-                    <option value="">Fresher / Experienced</option>
-                    <option value="true">Fresher</option><option value="false">Experienced</option>
-                  </select>
                   <select className={inputCls} value={filters.status} onChange={(e)=>setFilters({...filters,status:e.target.value})}>
                     <option value="">All Status</option>
                     <option value="active">Active</option><option value="inactive">Inactive</option><option value="suspended">Suspended</option>
-                  </select>
-                  <select className={inputCls} value={filters.designation} onChange={(e)=>setFilters({...filters,designation:e.target.value})}>
-                    <option value="">All Designations</option>
-                    {allDesignations.map((d)=><option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
                 {activeFilterCount>0&&(
@@ -1192,10 +1272,7 @@ export default function EmployeeTable(){
                     {filters.role&&<FilterChip label={`Role: ${filters.role}`} onRemove={()=>setFilters({...filters,role:""})}/>}
                     {filters.location&&<FilterChip label={`Loc: ${filters.location}`} onRemove={()=>setFilters({...filters,location:""})}/>}
                     {filters.gender&&<FilterChip label={`Gender: ${filters.gender}`} onRemove={()=>setFilters({...filters,gender:""})}/>}
-                    {filters.marital_status&&<FilterChip label={`Marital: ${filters.marital_status}`} onRemove={()=>setFilters({...filters,marital_status:""})}/>}
-                    {filters.is_fresher!==""&&<FilterChip label={filters.is_fresher==="true"?"Fresher":"Experienced"} onRemove={()=>setFilters({...filters,is_fresher:""})}/>}
                     {filters.status&&<FilterChip label={`Status: ${filters.status}`} onRemove={()=>setFilters({...filters,status:""})}/>}
-                    {filters.designation&&<FilterChip label={`Desg: ${filters.designation}`} onRemove={()=>setFilters({...filters,designation:""})}/>}
                     <button onClick={clearFilters} className="text-xs text-[#A32D2D] font-semibold hover:underline ml-1">Clear All</button>
                   </div>
                 )}
@@ -1208,19 +1285,11 @@ export default function EmployeeTable(){
               <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
                 <div className="text-4xl">👥</div>
                 <p className="text-[#730042] font-medium text-sm">No employees found</p>
-                <p className="text-[#993556] text-xs">Add your first employee to get started</p>
                 <button onClick={()=>setOpen(true)} className="mt-1 px-4 py-2 rounded-xl text-white text-sm font-semibold hover:opacity-90 transition" style={{background:"#730042"}}>+ Add Employee</button>
               </div>
             ):filtered.map((u)=>(
-              <MobileCard
-                key={u._id} u={u}
-                onView={handleView}
-                onEdit={handleOpenEdit}
-                onDelete={setDeleteTarget}
-                onPromote={(user)=>{setPromoteTarget(user);setPromoteForm({reporting_manager:"",designation:user.designation||"",role:"manager"});}}
-                onDemote={(user)=>{setDemoteTarget(user);setDemoteForm({Under_manager:"",designation:user.designation||""});}}
-                onChangeRole={(user)=>{setRoleChangeTarget(user);setRoleChangeValue(user.role||"manager");}}
-              />
+              <MobileCard key={u._id} u={u} onView={handleView} onEdit={handleOpenEdit} onDelete={setDeleteTarget}
+                {...actionMenuProps}/>
             ))}
           </div>
 
@@ -1228,20 +1297,17 @@ export default function EmployeeTable(){
             <table className="w-full min-w-[700px] lg:min-w-[900px] text-sm">
               <thead>
                 <tr className="border-b border-[#F4C0D1]" style={{background:"#F9F8F2"}}>
-                  {["Employee","Department","Designation","Location","Manager","Role","Actions"].map((h)=>(
+                  {["Employee","Department","Designation","Location","Manager / Reports To","Role","Actions"].map((h)=>(
                     <th key={h} className="px-3 lg:px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-[#993556] whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#FBEAF0]">
                 {listLoading?<SkeletonRows/>:filtered.length===0?<EmptyState onAdd={()=>setOpen(true)}/>:filtered.map((u)=>(
-                  <tr
-                    key={u._id}
-                    className="transition-colors group cursor-pointer"
+                  <tr key={u._id} className="transition-colors group cursor-pointer"
                     onMouseEnter={(e)=>e.currentTarget.style.background="#FEF4F9"}
                     onMouseLeave={(e)=>e.currentTarget.style.background="transparent"}
-                    onClick={()=>handleView(u._id,u.role)}
-                  >
+                    onClick={()=>handleView(u._id,u.role)}>
                     <td className="px-3 lg:px-4 py-3">
                       <div className="flex items-center gap-2 lg:gap-3">
                         <Avatar name={`${u.f_name??""} ${u.l_name??""}`}/>
@@ -1259,26 +1325,20 @@ export default function EmployeeTable(){
                       {u.Under_manager?(
                         <div className="text-xs">
                           <p className="font-medium text-[#730042] truncate max-w-[80px] lg:max-w-none">{u.Under_manager.f_name} {u.Under_manager.l_name}</p>
-                          <p className="text-[#993556] hidden lg:block">{u.Under_manager.uid}</p>
+                          <p className="text-[#993556] text-[10px] hidden lg:block">{u.Under_manager.uid}</p>
                         </div>
                       ):u.reporting_manager?(
                         <div className="text-xs">
                           <p className="font-medium text-[#730042] truncate max-w-[80px] lg:max-w-none">{u.reporting_manager.f_name} {u.reporting_manager.l_name}</p>
+                          <p className="text-[#993556] text-[10px] hidden lg:block">{u.reporting_manager.work_email}</p>
                         </div>
                       ):<span className="text-[#F4C0D1] text-xs">—</span>}
                     </td>
                     <td className="px-3 lg:px-4 py-3">{roleBadge(u.role)}</td>
                     <td className="px-3 lg:px-4 py-3">
                       <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e)=>e.stopPropagation()}>
-                        <ActionMenu
-                          user={u}
-                          onView={handleView}
-                          onEdit={handleOpenEdit}
-                          onDelete={setDeleteTarget}
-                          onPromote={(user)=>{setPromoteTarget(user);setPromoteForm({reporting_manager:"",designation:user.designation||"",role:"manager"});}}
-                          onDemote={(user)=>{setDemoteTarget(user);setDemoteForm({Under_manager:"",designation:user.designation||""});}}
-                          onChangeRole={(user)=>{setRoleChangeTarget(user);setRoleChangeValue(user.role||"manager");}}
-                        />
+                        <ActionMenu user={u} onView={handleView} onEdit={handleOpenEdit} onDelete={setDeleteTarget}
+                          {...actionMenuProps}/>
                       </div>
                     </td>
                   </tr>
@@ -1289,7 +1349,7 @@ export default function EmployeeTable(){
 
           {!listLoading&&filtered.length>0&&(
             <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-t border-[#F4C0D1] text-[11px] sm:text-xs text-[#993556] flex items-center justify-between" style={{background:"#F9F8F2"}}>
-              <span>Showing {filtered.length} of {allUsers.length} employees · {employeeData?.employees??0} employees · {employeeData?.managers??0} managers</span>
+              <span>Showing {filtered.length} of {allUsers.length} · {employeeData?.employees??0} employees · {employeeData?.managers??0} managers</span>
               {activeFilterCount>0&&<button onClick={clearFilters} className="text-[#A32D2D] font-medium hover:underline">Clear filters</button>}
             </div>
           )}
@@ -1301,12 +1361,17 @@ export default function EmployeeTable(){
           userId={selectedEmployeeId}
           userRole={selectedEmployeeRole}
           onClose={()=>{setSelectedEmployeeId(null);setSelectedEmployeeRole(null);}}
-          onEdit={(person)=>{handleOpenEdit({...person,type:selectedEmployeeRole==="manager"||selectedEmployeeRole==="senior_manager"?"manager":"employee"});}}
+          onEdit={(person)=>handleOpenEdit(person)}
           onDelete={(person)=>setDeleteTarget(person)}
-          onPromote={(person)=>{setPromoteTarget(person);setPromoteForm({reporting_manager:"",designation:person.designation||"",role:"manager"});}}
-          onDemote={(person)=>{setDemoteTarget(person);setDemoteForm({Under_manager:"",designation:person.designation||""});}}
-          onChangeRole={(person)=>{setRoleChangeTarget(person);setRoleChangeValue(person.role||"manager");}}
+          onPromoteToManager={openPromoteToManager}
+          onPromoteToAdmin={openPromoteToAdmin}
+          onDemoteToEmployee={openDemoteMgrToEmp}
+          onDemoteToManager={openDemoteAdminToMgr}
+          onDemoteToEmployee2={openDemoteAdminToEmp}
+          onChangeRole={openChangeRole}
           managers={managers}
+          allEmployees={allUsers}
+          currentAdminId={currentAdminId}
         />
       )}
 
@@ -1318,18 +1383,17 @@ export default function EmployeeTable(){
 
       {openManager&&(
         <StepModal title="Add Manager" icon={<FaUserTie/>} onClose={()=>{setOpenManager(false);setMgrErrors({});setMgrStep(0);}} onSubmit={handleMgrSubmit} steps={EMP_STEPS} currentStep={mgrStep} setCurrentStep={setMgrStep} accentColor="#730042">
-          <MgrStepFields step={mgrStep} form={mgrForm} onChange={handleMgrChange} errors={mgrErrors} managers={managers}/>
+          <MgrStepFields step={mgrStep} form={mgrForm} onChange={handleMgrChange} errors={mgrErrors} managers={managers} allEmployees={allUsers}/>
         </StepModal>
       )}
 
       {openEdit&&editTarget&&(
         <Modal
-          title={`Edit ${editTarget.type==="manager"||["manager","senior_manager"].includes(editTarget.role)?"Manager":"Employee"}`}
-          icon={editTarget.type==="manager"?<FaUserTie/>:<FaUserPlus/>}
+          title={`Edit ${editTarget.role==="manager"||editTarget.role==="senior_manager"?"Manager":"Employee"}`}
+          icon={editTarget.role==="manager"||editTarget.role==="senior_manager"?<FaUserTie/>:<FaUserPlus/>}
           onClose={()=>{setOpenEdit(false);setEditTarget(null);setEditErrors({});}}
           onSubmit={handleEditSubmit}
-          accentColor={editTarget.type==="manager"||["manager","senior_manager"].includes(editTarget.role)?"#730042":"#CD166E"}
-        >
+          accentColor={editTarget.role==="manager"||editTarget.role==="senior_manager"?"#730042":"#CD166E"}>
           <Field label="First Name" required error={editErrors.f_name}><input name="f_name" value={editForm.f_name} onChange={handleEditChange} className={inputCls}/></Field>
           <Field label="Last Name" required error={editErrors.l_name}><input name="l_name" value={editForm.l_name} onChange={handleEditChange} className={inputCls}/></Field>
           <Field label="Work Email" required error={editErrors.work_email}><input name="work_email" type="email" value={editForm.work_email} onChange={handleEditChange} className={inputCls}/></Field>
@@ -1345,21 +1409,23 @@ export default function EmployeeTable(){
               <option value="senior_manager">Senior Manager</option><option value="official">Official</option>
             </select>
           </Field>
-          {(editTarget.type==="employee"||editForm.role==="employee"||editForm.role==="official")&&(
+          {(editTarget.role==="employee"||editTarget.role==="official"||editForm.role==="employee"||editForm.role==="official")&&(
             <Field label="Under Manager">
               <select name="Under_manager" value={editForm.Under_manager} onChange={handleEditChange} className={inputCls}>
                 <option value="">Select Manager</option>
-                {managers?.managers?.map((mgr)=>(<option key={mgr._id} value={mgr._id}>{mgr.f_name} {mgr.l_name} ({mgr.uid})</option>))}
+                {managers?.managers?.map((m)=><option key={m._id} value={m._id}>{m.f_name} {m.l_name} ({m.uid})</option>)}
               </select>
             </Field>
           )}
-          {(editTarget.type==="manager"||["manager","senior_manager"].includes(editTarget.role))&&(
-            <Field label="Reporting Manager">
-              <select name="reporting_manager" value={editForm.reporting_manager} onChange={handleEditChange} className={inputCls}>
-                <option value="">Select Reporting Manager</option>
-                {managers?.managers?.map((mgr)=>(<option key={mgr._id} value={mgr._id}>{mgr.f_name} {mgr.l_name} ({mgr.uid})</option>))}
-              </select>
-            </Field>
+          {(editTarget.role==="manager"||editTarget.role==="senior_manager")&&(
+            <ReportingManagerSelect
+              value={editForm.reporting_manager}
+              onChange={handleEditChange}
+              managers={managers}
+              allEmployees={allUsers}
+              label="Reporting Manager"
+              name="reporting_manager"
+            />
           )}
           <Field label="Gender">
             <select name="gender" value={editForm.gender} onChange={handleEditChange} className={inputCls}>
@@ -1382,36 +1448,107 @@ export default function EmployeeTable(){
       )}
 
       {deleteTarget&&(
-        <ConfirmModal title="Delete User?" icon="🗑️" message={`Are you sure you want to delete ${deleteTarget.f_name} ${deleteTarget.l_name}? This cannot be undone.`} confirmLabel="Delete" confirmColor="#A32D2D" onConfirm={handleConfirmDelete} onCancel={()=>setDeleteTarget(null)}/>
+        <ConfirmModal title="Delete User?" icon="🗑️"
+          message={`Are you sure you want to delete ${deleteTarget.f_name} ${deleteTarget.l_name}? This cannot be undone.`}
+          confirmLabel="Delete" confirmColor="#A32D2D"
+          onConfirm={handleConfirmDelete} onCancel={()=>setDeleteTarget(null)}/>
       )}
 
-      {promoteTarget&&(
-        <ConfirmModal title="Promote to Manager?" icon="⬆️" message={`Promote ${promoteTarget.f_name} ${promoteTarget.l_name} to manager. Set a new designation and reporting manager.`} confirmLabel="Promote" confirmColor="#3C3489" onConfirm={handleConfirmPromote} onCancel={()=>setPromoteTarget(null)}>
+      {promoteToMgrTarget&&(
+        <ConfirmModal title="Promote to Manager?" icon="⬆️"
+          message={`Promote ${promoteToMgrTarget.f_name} ${promoteToMgrTarget.l_name} from Employee to Manager.`}
+          confirmLabel="Promote" confirmColor="#3C3489"
+          onConfirm={handlePromoteToManager} onCancel={()=>setPromoteToMgrTarget(null)}>
           <div className="flex flex-col gap-2 -mt-1">
-            <Field label="New Designation"><input className={inputCls} placeholder="e.g. Team Lead" value={promoteForm.designation} onChange={(e)=>setPromoteForm({...promoteForm,designation:e.target.value})}/></Field>
+            <Field label="New Designation"><input className={inputCls} placeholder="e.g. Team Lead" value={promoteToMgrForm.designation} onChange={(e)=>setPromoteToMgrForm({...promoteToMgrForm,designation:e.target.value})}/></Field>
             <Field label="Manager Role">
-              <select className={inputCls} value={promoteForm.role} onChange={(e)=>setPromoteForm({...promoteForm,role:e.target.value})}>
+              <select className={inputCls} value={promoteToMgrForm.role} onChange={(e)=>setPromoteToMgrForm({...promoteToMgrForm,role:e.target.value})}>
                 <option value="manager">Manager</option><option value="senior_manager">Senior Manager</option><option value="official">Official</option>
               </select>
             </Field>
-            <Field label="Reporting Manager">
-              <select className={inputCls} value={promoteForm.reporting_manager} onChange={(e)=>setPromoteForm({...promoteForm,reporting_manager:e.target.value})}>
-                <option value="">Select (optional)</option>
-                {managers?.managers?.map((mgr)=>(<option key={mgr._id} value={mgr._id}>{mgr.f_name} {mgr.l_name}</option>))}
+            <ReportingManagerSelect
+              value={promoteToMgrForm.reporting_manager}
+              onChange={(e)=>setPromoteToMgrForm({...promoteToMgrForm,reporting_manager:e.target.value})}
+              managers={managers}
+              allEmployees={allUsers}
+              label="Reporting Manager"
+              name="reporting_manager"
+            />
+          </div>
+        </ConfirmModal>
+      )}
+
+      {promoteToAdminTarget&&(
+        <ConfirmModal title="Promote to Admin?" icon="🔝"
+          message={`Promote ${promoteToAdminTarget.f_name} ${promoteToAdminTarget.l_name} to Admin.`}
+          confirmLabel="Promote" confirmColor="#92400E"
+          onConfirm={handlePromoteToAdmin} onCancel={()=>setPromoteToAdminTarget(null)}>
+          <div className="flex flex-col gap-2 -mt-1">
+            <Field label="New Designation"><input className={inputCls} placeholder="e.g. HR Manager" value={promoteToAdminForm.designation} onChange={(e)=>setPromoteToAdminForm({...promoteToAdminForm,designation:e.target.value})}/></Field>
+            <ReportingManagerSelect
+              value={promoteToAdminForm.reporting_manager}
+              onChange={(e)=>setPromoteToAdminForm({...promoteToAdminForm,reporting_manager:e.target.value})}
+              managers={managers}
+              allEmployees={allUsers}
+              label="Reporting Manager (optional)"
+              name="reporting_manager"
+            />
+          </div>
+        </ConfirmModal>
+      )}
+
+      {demoteMgrToEmpTarget&&(
+        <ConfirmModal title="Demote to Employee?" icon="⬇️"
+          message={`Demote ${demoteMgrToEmpTarget.f_name} ${demoteMgrToEmpTarget.l_name} from Manager to Employee. Their direct reports will be reassigned.`}
+          confirmLabel="Demote" confirmColor="#7A3500"
+          onConfirm={handleDemoteMgrToEmp} onCancel={()=>setDemoteMgrToEmpTarget(null)}>
+          <div className="flex flex-col gap-2 -mt-1">
+            <Field label="New Designation"><input className={inputCls} placeholder="e.g. Senior Associate" value={demoteMgrToEmpForm.designation} onChange={(e)=>setDemoteMgrToEmpForm({...demoteMgrToEmpForm,designation:e.target.value})}/></Field>
+            <Field label="Assign Under Manager">
+              <select className={inputCls} value={demoteMgrToEmpForm.Under_manager} onChange={(e)=>setDemoteMgrToEmpForm({...demoteMgrToEmpForm,Under_manager:e.target.value})}>
+                <option value="">Select Manager (optional)</option>
+                {managers?.managers?.filter((m)=>m._id!==demoteMgrToEmpTarget._id).map((m)=><option key={m._id} value={m._id}>{m.f_name} {m.l_name}</option>)}
               </select>
             </Field>
           </div>
         </ConfirmModal>
       )}
 
-      {demoteTarget&&(
-        <ConfirmModal title="Demote to Employee?" icon="⬇️" message={`Demote ${demoteTarget.f_name} ${demoteTarget.l_name} to employee. Their direct reports will be reassigned.`} confirmLabel="Demote" confirmColor="#7A3500" onConfirm={handleConfirmDemote} onCancel={()=>setDemoteTarget(null)}>
+      {demoteAdminToMgrTarget&&(
+        <ConfirmModal title="Demote Admin to Manager?" icon="⬇️"
+          message={`Demote ${demoteAdminToMgrTarget.f_name} ${demoteAdminToMgrTarget.l_name} from Admin to Manager.`}
+          confirmLabel="Demote" confirmColor="#7A3500"
+          onConfirm={handleDemoteAdminToMgr} onCancel={()=>setDemoteAdminToMgrTarget(null)}>
           <div className="flex flex-col gap-2 -mt-1">
-            <Field label="New Designation"><input className={inputCls} placeholder="e.g. Senior Associate" value={demoteForm.designation} onChange={(e)=>setDemoteForm({...demoteForm,designation:e.target.value})}/></Field>
+            <Field label="New Designation"><input className={inputCls} placeholder="e.g. Team Lead" value={demoteAdminToMgrForm.designation} onChange={(e)=>setDemoteAdminToMgrForm({...demoteAdminToMgrForm,designation:e.target.value})}/></Field>
+            <Field label="Manager Role">
+              <select className={inputCls} value={demoteAdminToMgrForm.role} onChange={(e)=>setDemoteAdminToMgrForm({...demoteAdminToMgrForm,role:e.target.value})}>
+                <option value="manager">Manager</option><option value="senior_manager">Senior Manager</option>
+              </select>
+            </Field>
+            <ReportingManagerSelect
+              value={demoteAdminToMgrForm.reporting_manager}
+              onChange={(e)=>setDemoteAdminToMgrForm({...demoteAdminToMgrForm,reporting_manager:e.target.value})}
+              managers={managers}
+              allEmployees={allUsers}
+              label="Reporting Manager (optional)"
+              name="reporting_manager"
+            />
+          </div>
+        </ConfirmModal>
+      )}
+
+      {demoteAdminToEmpTarget&&(
+        <ConfirmModal title="Demote Admin to Employee?" icon="⬇️"
+          message={`Demote ${demoteAdminToEmpTarget.f_name} ${demoteAdminToEmpTarget.l_name} from Admin directly to Employee.`}
+          confirmLabel="Demote" confirmColor="#A32D2D"
+          onConfirm={handleDemoteAdminToEmp} onCancel={()=>setDemoteAdminToEmpTarget(null)}>
+          <div className="flex flex-col gap-2 -mt-1">
+            <Field label="New Designation"><input className={inputCls} placeholder="e.g. Associate" value={demoteAdminToEmpForm.designation} onChange={(e)=>setDemoteAdminToEmpForm({...demoteAdminToEmpForm,designation:e.target.value})}/></Field>
             <Field label="Assign Under Manager">
-              <select className={inputCls} value={demoteForm.Under_manager} onChange={(e)=>setDemoteForm({...demoteForm,Under_manager:e.target.value})}>
+              <select className={inputCls} value={demoteAdminToEmpForm.Under_manager} onChange={(e)=>setDemoteAdminToEmpForm({...demoteAdminToEmpForm,Under_manager:e.target.value})}>
                 <option value="">Select Manager (optional)</option>
-                {managers?.managers?.filter((m)=>m._id!==demoteTarget._id).map((mgr)=>(<option key={mgr._id} value={mgr._id}>{mgr.f_name} {mgr.l_name}</option>))}
+                {managers?.managers?.map((m)=><option key={m._id} value={m._id}>{m.f_name} {m.l_name}</option>)}
               </select>
             </Field>
           </div>
@@ -1419,7 +1556,10 @@ export default function EmployeeTable(){
       )}
 
       {roleChangeTarget&&(
-        <ConfirmModal title="Change Manager Role" icon="🔄" message={`Change the role of ${roleChangeTarget.f_name} ${roleChangeTarget.l_name}.`} confirmLabel="Update Role" confirmColor="#085041" onConfirm={handleConfirmRoleChange} onCancel={()=>setRoleChangeTarget(null)}>
+        <ConfirmModal title="Change Manager Role" icon="🔄"
+          message={`Change the role of ${roleChangeTarget.f_name} ${roleChangeTarget.l_name}.`}
+          confirmLabel="Update Role" confirmColor="#085041"
+          onConfirm={handleRoleChange} onCancel={()=>setRoleChangeTarget(null)}>
           <div className="-mt-1">
             <Field label="New Role">
               <select className={inputCls} value={roleChangeValue} onChange={(e)=>setRoleChangeValue(e.target.value)}>
