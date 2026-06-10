@@ -148,15 +148,15 @@ const adminlogout = async (req, res, next) => {
 const resolveReportingManager = async (reporting_manager_id, organisation_id) => {
   if (!reporting_manager_id) return { reportingManagerId: null, reportingManagerModel: null };
 
-  const admin = await Adminmodel.findOne({ _id: reporting_manager_id, organisation_id })
-    .select("_id")
-    .lean();
-  if (admin) return { reportingManagerId: admin._id, reportingManagerModel: "Admin" };
-
   const manager = await Managermodel.findOne({ _id: reporting_manager_id, organisation_id })
     .select("_id")
     .lean();
   if (manager) return { reportingManagerId: manager._id, reportingManagerModel: "Manager" };
+
+  const admin = await Adminmodel.findOne({ _id: reporting_manager_id, organisation_id })
+    .select("_id")
+    .lean();
+  if (admin) return { reportingManagerId: admin._id, reportingManagerModel: "Admin" };
 
   return { reportingManagerId: null, reportingManagerModel: null };
 };
@@ -303,26 +303,16 @@ const findallmanagers = async (req, res, next) => {
 
     const organisation_id = req.admin.organisation_id;
 
-    const [managers, adminData] = await Promise.all([
-      Managermodel.find({ organisation_id })
-        .select(EXCLUDE)
-        .populate("reporting_manager", "f_name l_name work_email designation")
-        .lean(),
-      Adminmodel.findById(req.admin._id)
-        .select("uid f_name l_name work_email designation department office_location role organisation_id")
-        .lean(),
-    ]);
-
-    const allManagers = [...managers];
-    if (adminData) {
-      allManagers.unshift({ ...adminData, isAdmin: true });
-    }
+    const managers = await Managermodel.find({ organisation_id })
+      .select(EXCLUDE)
+      .populate("reporting_manager", "f_name l_name work_email designation")
+      .lean();
 
     return res.status(200).json({
       success: true,
       organisation_id,
-      count: allManagers.length,
-      managers: allManagers,
+      count: managers.length,
+      managers,
     });
   } catch (error) {
     next(error);

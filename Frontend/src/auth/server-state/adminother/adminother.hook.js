@@ -13,9 +13,17 @@ import {
   getTodayCheckins,
   getOrgInfo,
   changeManagerRole,
-  demoteToEmployee,
-  promoteToManager,
+  demoteManagerToEmployee,
+  demoteAdminToManager,
+  demoteAdminToEmployee,
+  promoteEmployeeToManager,
+  promoteEmployeeToAdmin,
+  promoteManagerToAdmin,
   getTodayLeaves,
+  getAllPersonalDocuments,
+  getAllExpenseDocuments,
+  getDocumentDetails,
+  adminActionOnLeave,
 } from "../../api/adminapi/other/ad.other.api";
 
 export const useGetAllEmployee = () => {
@@ -82,10 +90,10 @@ export const useEditManager = (id) => {
   });
 };
 
-export const usePromoteToManager = () => {
+export const usePromoteEmployeeToManager = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }) => promoteToManager(id, data),
+    mutationFn: ({ id, data }) => promoteEmployeeToManager(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["employeeStats"] });
@@ -93,10 +101,54 @@ export const usePromoteToManager = () => {
   });
 };
 
-export const useDemoteToEmployee = () => {
+export const usePromoteEmployeeToAdmin = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }) => demoteToEmployee(id, data),
+    mutationFn: ({ id, data }) => promoteEmployeeToAdmin(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employeeStats"] });
+    },
+  });
+};
+
+export const usePromoteManagerToAdmin = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }) => promoteManagerToAdmin(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employeeStats"] });
+    },
+  });
+};
+
+export const useDemoteManagerToEmployee = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }) => demoteManagerToEmployee(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employeeStats"] });
+    },
+  });
+};
+
+export const useDemoteAdminToManager = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }) => demoteAdminToManager(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employeeStats"] });
+    },
+  });
+};
+
+export const useDemoteAdminToEmployee = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }) => demoteAdminToEmployee(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["employeeStats"] });
@@ -156,5 +208,37 @@ export const useGetTodayLeaves = () => {
   return useQuery({
     queryKey: ["todayLeaves"],
     queryFn: getTodayLeaves,
+  });
+};
+
+export const useGetAllPersonalDocuments = () => {
+  return useQuery({
+    queryKey: ["personalDocuments"],
+    queryFn: getAllPersonalDocuments,
+  });
+};
+
+export const useGetAllExpenseDocuments = () => {
+  return useQuery({
+    queryKey: ["expenseDocuments"],
+    queryFn: getAllExpenseDocuments,
+  });
+};
+
+export const useGetDocumentDetails = (documentId) => {
+  return useQuery({
+    queryKey: ["document", documentId],
+    queryFn: () => getDocumentDetails(documentId),
+    enabled: !!documentId,
+  });
+};
+
+export const useAdminActionOnLeave = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: adminActionOnLeave,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["todayLeaves"] });
+    },
   });
 };
