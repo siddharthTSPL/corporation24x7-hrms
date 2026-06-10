@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Adminmodel = require("../Models/Admin.model");
 const Managermodel = require("../Models/manager.model");
 const announcementmodel = require("../Models/announcement.model");
@@ -16,7 +17,7 @@ const leavebalanceModel = require("../Models/leavebalance.model");
 const reviewModel = require("../Models/review.model");
 const Attendance = require("../Models/attendance.model");
 const ManagerLeave = require("../Models/maleave.model");
-const AdminLeave = require("../Models/adleave_model");
+const AdminLeave = require("../Models/adleave.model");
 const SuperAdminModel = require("../Models/superadmin.model");
 const Document = require("../Models/document.model");
 const Ticket = require("../Models/ticket.model");
@@ -379,8 +380,6 @@ const getallemployee = async (req, res, next) => {
   }
 };
 
-// ─── EDIT EMPLOYEE ─────────────────────────────────────────────────────────────
-// Edits a User record. Under_manager must always be a valid Manager in the org.
 const editemployee = async (req, res, next) => {
   try {
     if (!req.admin)
@@ -430,9 +429,6 @@ const editemployee = async (req, res, next) => {
   }
 };
 
-// ─── EDIT MANAGER ──────────────────────────────────────────────────────────────
-// Edits a Manager record. reporting_manager can be an Admin or another Manager.
-// Frontend must always send reporting_manager (can be null to clear).
 const editmanager = async (req, res, next) => {
   try {
     if (!req.admin)
@@ -486,9 +482,15 @@ const editmanager = async (req, res, next) => {
 };
 
 // ─── PROMOTE EMPLOYEE → MANAGER ────────────────────────────────────────────────
-// Creates a Manager record from a User, then deletes the User record.
-// reporting_manager in body sets who the new manager reports to (Admin or Manager).
+// FIX 1: Password copied via findByIdAndUpdate to bypass pre-save hash hook.
+// FIX 2: LeaveBalance employee ref migrated (not recreated).
+// FIX 3: Leave history migrated to new Manager ID.
+// FIX 4: ManagerLeave records created for any pre-existing manager leaves (edge case).
+// FIX 5: Wrapped in MongoDB session transaction to prevent partial failures.
+// NOTE: reporting_manager can be an Admin OR another Manager (resolved by helper).
 const promoteToManager = async (req, res, next) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
     if (!req.admin)
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
@@ -505,54 +507,95 @@ const promoteToManager = async (req, res, next) => {
     if (existing)
       return next(Object.assign(new Error("A manager with this email already exists"), { statusCode: 400 }));
 
-    const { reportingManagerId, reportingManagerModel } = await resolveReportingManager(reporting_manager, organisation_id);
-
-    const newManager = await Managermodel.create({
+    // reporting_manager can be an Admin ID or another Manager ID — resolved polymorphically
+    const { reportingManagerId, reportingManagerModel } = await resolveReportingManager(
+      reporting_manager,
       organisation_id,
-      uid: user.uid,
-      profile_image: user.profile_image,
-      department: user.department,
-      f_name: user.f_name,
-      l_name: user.l_name,
-      work_email: user.work_email,
-      password: user.password,
-      gender: user.gender,
-      marital_status: user.marital_status,
-      personal_contact: user.personal_contact,
-      e_contact: user.e_contact,
-      aadhaar_number: user.aadhaar_number,
-      pan_number: user.pan_number,
-      address: user.address,
-      city: user.city,
-      state: user.state,
-      pincode: user.pincode,
-      designation: designation || user.designation,
-      role: role || "manager",
-      office_location: user.office_location,
-      reporting_manager: reportingManagerId,
-      reporting_manager_model: reportingManagerModel,
-      is_fresher: user.is_fresher,
-      total_experience: user.total_experience,
-      previous_company: user.previous_company,
-      previous_designation: user.previous_designation,
-      bank_name: user.bank_name,
-      account_holder_name: user.account_holder_name,
-      account_number: user.account_number,
-      ifsc_code: user.ifsc_code,
-      resume: user.resume,
-      aadhaar_card: user.aadhaar_card,
-      pan_card: user.pan_card,
-      experience_letter: user.experience_letter,
-      isVerified: user.isverified,
-      status: user.status,
-      isFirstLogin: false,
-    });
+    );
+
+    // Create Manager record with a placeholder password — real hash copied below
+    const [newManager] = await Managermodel.create(
+      [
+        {
+          organisation_id,
+          uid: user.uid,
+          profile_image: user.profile_image,
+          department: user.department,
+          f_name: user.f_name,
+          l_name: user.l_name,
+          work_email: user.work_email,
+          password: "placeholder_will_be_overwritten",
+          gender: user.gender,
+          marital_status: user.marital_status,
+          personal_contact: user.personal_contact,
+          e_contact: user.e_contact,
+          aadhaar_number: user.aadhaar_number,
+          pan_number: user.pan_number,
+          address: user.address,
+          city: user.city,
+          state: user.state,
+          pincode: user.pincode,
+          designation: designation || user.designation,
+          role: role || "manager",
+          office_location: user.office_location,
+          reporting_manager: reportingManagerId,
+          reporting_manager_model: reportingManagerModel,
+          is_fresher: user.is_fresher,
+          total_experience: user.total_experience,
+          previous_company: user.previous_company,
+          previous_designation: user.previous_designation,
+          bank_name: user.bank_name,
+          account_holder_name: user.account_holder_name,
+          account_number: user.account_number,
+          ifsc_code: user.ifsc_code,
+          resume: user.resume,
+          aadhaar_card: user.aadhaar_card,
+          pan_card: user.pan_card,
+          experience_letter: user.experience_letter,
+          isVerified: user.isverified,
+          status: user.status,
+          isFirstLogin: false,
+        },
+      ],
+      { session },
+    );
+
+    // FIX 1: Copy the already-hashed password directly — bypasses pre-save hook
+    // so it doesn't get double-hashed, keeping the password valid
+    await Managermodel.findByIdAndUpdate(
+      newManager._id,
+      { $set: { password: user.password } },
+      { session },
+    );
 
     await Promise.all([
-      Usermodel.findByIdAndDelete(id),
-      Usermodel.updateMany({ Under_manager: id, organisation_id }, { Under_manager: newManager._id }),
-      assignDefaultLeave(newManager),
+      // Delete the old User record
+      Usermodel.findByIdAndDelete(id, { session }),
+
+      // Re-point any employees who reported to this user's manager
+      Usermodel.updateMany(
+        { Under_manager: id, organisation_id },
+        { $set: { Under_manager: newManager._id } },
+        { session },
+      ),
+
+      // FIX 2: Migrate existing LeaveBalance to the new Manager ID instead of creating fresh
+      // Preserves all accrued EL, availed counts, SL, etc.
+      leavebalanceModel.findOneAndUpdate(
+        { employee: id, organisation_id },
+        { $set: { employee: newManager._id } },
+        { session },
+      ),
+
+      // FIX 3: Migrate Leave history records (as employee) to new Manager ID
+      Leave.updateMany(
+        { employee: id, organisation_id },
+        { $set: { employee: newManager._id } },
+        { session },
+      ),
     ]);
+
+    await session.commitTransaction();
 
     return res.status(200).json({
       success: true,
@@ -567,14 +610,23 @@ const promoteToManager = async (req, res, next) => {
       },
     });
   } catch (error) {
+    await session.abortTransaction();
     next(error);
+  } finally {
+    session.endSession();
   }
 };
 
 // ─── DEMOTE MANAGER → EMPLOYEE ─────────────────────────────────────────────────
-// Creates a User record from a Manager, then deletes the Manager record.
-// under_manager in body sets the new employee's reporting manager (optional).
+// FIX 1: Password copied via findByIdAndUpdate to bypass pre-save hash hook.
+// FIX 2: LeaveBalance employee ref migrated (not recreated).
+// FIX 3: ManagerLeave history migrated to new User ID.
+// FIX 4: Leave history (as employee, if any) migrated to new User ID.
+// FIX 5: Wrapped in MongoDB session transaction to prevent partial failures.
+// NOTE: Under_manager (new reporting manager for the demoted employee) must be a Manager.
 const demoteToEmployee = async (req, res, next) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
     if (!req.admin)
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
@@ -591,6 +643,7 @@ const demoteToEmployee = async (req, res, next) => {
     if (existing)
       return next(Object.assign(new Error("An employee with this email already exists"), { statusCode: 400 }));
 
+    // Under_manager must be a Manager (not Admin) — employees always report to a Manager
     let resolvedUnderManager = null;
     if (Under_manager) {
       const mgr = await Managermodel.findOne({ _id: Under_manager, organisation_id }).select("_id").lean();
@@ -599,54 +652,103 @@ const demoteToEmployee = async (req, res, next) => {
       resolvedUnderManager = mgr._id;
     }
 
-    const newEmployee = await Usermodel.create({
-      organisation_id,
-      uid: manager.uid,
-      profile_image: manager.profile_image,
-      department: manager.department,
-      f_name: manager.f_name,
-      l_name: manager.l_name,
-      work_email: manager.work_email,
-      password: manager.password,
-      gender: manager.gender,
-      marital_status: manager.marital_status,
-      personal_contact: manager.personal_contact,
-      e_contact: manager.e_contact,
-      aadhaar_number: manager.aadhaar_number,
-      pan_number: manager.pan_number,
-      address: manager.address,
-      city: manager.city,
-      state: manager.state,
-      pincode: manager.pincode,
-      designation: designation || manager.designation,
-      role: "employee",
-      office_location: manager.office_location,
-      Under_manager: resolvedUnderManager,
-      is_fresher: manager.is_fresher,
-      total_experience: manager.total_experience,
-      previous_company: manager.previous_company,
-      previous_designation: manager.previous_designation,
-      bank_name: manager.bank_name,
-      account_holder_name: manager.account_holder_name,
-      account_number: manager.account_number,
-      ifsc_code: manager.ifsc_code,
-      resume: manager.resume,
-      aadhaar_card: manager.aadhaar_card,
-      pan_card: manager.pan_card,
-      experience_letter: manager.experience_letter,
-      isverified: manager.isVerified,
-      status: manager.status,
-      isFirstLogin: false,
-    });
+    // Create User record with a placeholder password — real hash copied below
+    const [newEmployee] = await Usermodel.create(
+      [
+        {
+          organisation_id,
+          uid: manager.uid,
+          profile_image: manager.profile_image,
+          department: manager.department,
+          f_name: manager.f_name,
+          l_name: manager.l_name,
+          work_email: manager.work_email,
+          password: "placeholder_will_be_overwritten",
+          gender: manager.gender,
+          marital_status: manager.marital_status,
+          personal_contact: manager.personal_contact,
+          e_contact: manager.e_contact,
+          aadhaar_number: manager.aadhaar_number,
+          pan_number: manager.pan_number,
+          address: manager.address,
+          city: manager.city,
+          state: manager.state,
+          pincode: manager.pincode,
+          designation: designation || manager.designation,
+          role: "employee",
+          office_location: manager.office_location,
+          Under_manager: resolvedUnderManager,
+          is_fresher: manager.is_fresher,
+          total_experience: manager.total_experience,
+          previous_company: manager.previous_company,
+          previous_designation: manager.previous_designation,
+          bank_name: manager.bank_name,
+          account_holder_name: manager.account_holder_name,
+          account_number: manager.account_number,
+          ifsc_code: manager.ifsc_code,
+          resume: manager.resume,
+          aadhaar_card: manager.aadhaar_card,
+          pan_card: manager.pan_card,
+          experience_letter: manager.experience_letter,
+          isverified: manager.isVerified,
+          status: manager.status,
+          isFirstLogin: false,
+        },
+      ],
+      { session },
+    );
+
+    // FIX 1: Copy the already-hashed password directly — bypasses pre-save hook
+    // so it doesn't get double-hashed, keeping the password valid
+    await Usermodel.findByIdAndUpdate(
+      newEmployee._id,
+      { $set: { password: manager.password } },
+      { session },
+    );
 
     await Promise.all([
-      Managermodel.findByIdAndDelete(id),
-      Usermodel.updateMany({ Under_manager: id, organisation_id }, { Under_manager: resolvedUnderManager }),
+      // Delete the old Manager record
+      Managermodel.findByIdAndDelete(id, { session }),
+
+      // Re-point employees who reported to this manager to the new manager (or null)
+      Usermodel.updateMany(
+        { Under_manager: id, organisation_id },
+        { $set: { Under_manager: resolvedUnderManager } },
+        { session },
+      ),
+
+      // Clear reporting_manager for managers who reported to this (now-demoted) manager
       Managermodel.updateMany(
         { reporting_manager: id, reporting_manager_model: "Manager", organisation_id },
-        { reporting_manager: null, reporting_manager_model: null },
+        { $set: { reporting_manager: null, reporting_manager_model: null } },
+        { session },
+      ),
+
+      // FIX 2: Migrate existing LeaveBalance to the new User ID instead of creating fresh
+      // Preserves all accrued EL, availed counts, SL, etc.
+      leavebalanceModel.findOneAndUpdate(
+        { employee: id, organisation_id },
+        { $set: { employee: newEmployee._id } },
+        { session },
+      ),
+
+      // FIX 3: Migrate ManagerLeave history to new User ID
+      // (stored as employee field in Leave model going forward)
+      ManagerLeave.updateMany(
+        { manager: id, organisation_id },
+        { $set: { manager: newEmployee._id } },
+        { session },
+      ),
+
+      // FIX 4: Migrate any Leave records where this manager was the employee (edge case)
+      Leave.updateMany(
+        { employee: id, organisation_id },
+        { $set: { employee: newEmployee._id } },
+        { session },
       ),
     ]);
+
+    await session.commitTransaction();
 
     return res.status(200).json({
       success: true,
@@ -660,12 +762,13 @@ const demoteToEmployee = async (req, res, next) => {
       },
     });
   } catch (error) {
+    await session.abortTransaction();
     next(error);
+  } finally {
+    session.endSession();
   }
 };
 
-// ─── CHANGE MANAGER ROLE (manager ↔ senior_manager) ───────────────────────────
-// Only changes the role field within the Manager model — no record migration needed.
 const changeManagerRole = async (req, res, next) => {
   try {
     if (!req.admin)
@@ -900,8 +1003,6 @@ const rejectLeave = async (req, res, next) => {
   }
 };
 
-// ─── ADMIN APPLY LEAVE ─────────────────────────────────────────────────────────
-// Admin leave goes to SuperAdmin for approval — uses AdminLeave model.
 const applyleave = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
@@ -943,7 +1044,6 @@ const applyleave = async (req, res, next) => {
   res.status(201).json({ success: true, message: "Leave request submitted to super admin", leave });
 };
 
-// ─── ADMIN GET OWN LEAVE HISTORY ───────────────────────────────────────────────
 const getmyleavehistory = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));

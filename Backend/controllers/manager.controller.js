@@ -636,7 +636,7 @@ const verifyManagerOtp = async (req, res, next) => {
   );
   res.cookie("token", token, { httpOnly: true, sameSite: "lax", secure: false, path: "/" });
   const resetToken = jwt.sign({ work_email: manager.work_email }, process.env.JWT_SECRET, { expiresIn: "15m" });
-  const link = `https://torchxsuite.com/api/talent/manager/showPasswordPageotp?token=${resetToken}`;
+  const link = `https://corporation24x7-hrms.onrender.com/manager/change-password?token=${resetToken}`;
   await Promise.all([
     sendEmail({
       to: manager.work_email,
