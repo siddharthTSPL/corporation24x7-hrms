@@ -735,64 +735,24 @@ const acceptLeave = async (req, res, next) => {
       leave = await Leave.findOne({ _id: id, organisation_id });
       if (!leave)
         return next(Object.assign(new Error("Employee leave not found"), { statusCode: 404 }));
-
-      if (leave.status.startsWith("approved") || leave.status.startsWith("rejected"))
-        return next(Object.assign(new Error("Leave already processed"), { statusCode: 400 }));
-
-      const leaveBalance = await leavebalanceModel.findOne({
-        employee: leave.employee,
-        organisation_id,
-      });
-      if (!leaveBalance)
-        return next(Object.assign(new Error("Leave balance not found"), { statusCode: 404 }));
-
-      if (leave.leaveType === "ml") {
-        const start = new Date(leave.startDate);
-        const end = new Date(start);
-        end.setDate(end.getDate() + 181);
-        leaveBalance.mlStartDate = start;
-        leaveBalance.mlEndDate = end;
-        await leaveBalance.save();
-      }
-
-      await processLeaveDeduction(leave);
+      leave.status = "approved_reporting_manager";
+      leave.approvedBy = req.admin._id;
+      leave.remarks = "Approved by Admin";
     }
 
     if (leaveFor === "manager") {
       leave = await ManagerLeave.findOne({ _id: id, organisation_id });
       if (!leave)
         return next(Object.assign(new Error("Manager leave not found"), { statusCode: 404 }));
-
-      if (leave.status.startsWith("approved") || leave.status.startsWith("rejected"))
-        return next(Object.assign(new Error("Leave already processed"), { statusCode: 400 }));
-
-      const leaveBalance = await leavebalanceModel.findOne({
-        employee: leave.manager,
-        organisation_id,
-      });
-      if (!leaveBalance)
-        return next(Object.assign(new Error("Manager leave balance not found"), { statusCode: 404 }));
-
-      if (leave.leaveType === "ml") {
-        const start = new Date(leave.startDate);
-        const end = new Date(start);
-        end.setDate(end.getDate() + 181);
-        leaveBalance.mlStartDate = start;
-        leaveBalance.mlEndDate = end;
-        await leaveBalance.save();
-      }
-
-      await processLeaveDeduction(leave);
+      leave.status = "approved_reporting_manager";
+      leave.approvedBy = req.admin._id;
+      leave.remarks = "Approved by Admin";
     }
 
     if (!leave)
-      return next(Object.assign(new Error("Invalid leaveFor value"), { statusCode: 400 }));
+      return next(Object.assign(new Error("Invalid leave type"), { statusCode: 400 }));
 
-    leave.status = "approved_reporting_manager";
-    leave.approvedBy = req.admin._id;
-    leave.remarks = `Approved by Admin (${req.admin.f_name})`;
     await leave.save();
-
     res.status(200).json({ success: true, message: "Leave approved successfully", leave });
   } catch (error) {
     next(error);
