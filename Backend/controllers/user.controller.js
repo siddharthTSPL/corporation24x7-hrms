@@ -76,14 +76,14 @@ const userlogin = async (req, res, next) => {
     );
   }
 
-  if (!user.isverified) {
-    return next(
-      Object.assign(
-        new Error("Please verify your email before logging in"),
-        { statusCode: 403 }
-      )
-    );
-  }
+  // if (!user.isverified) {
+  //   return next(
+  //     Object.assign(
+  //       new Error("Please verify your email before logging in"),
+  //       { statusCode: 403 }
+  //     )
+  //   );
+  // }
 
   const isvalidpassword = await user.isValidPassword(password);
 

@@ -88,22 +88,22 @@ const adminlogin = async (req, res, next) => {
     sameSite: isProduction ? "none" : "lax",
   };
 
-  if (admin.isFirstLogin) {
-    const firstLoginToken = jwt.sign(
-      { adminid: admin._id, work_email: admin.work_email, purpose: "first_login" },
-      process.env.JWT_SECRET,
-      { expiresIn: "15m" }
-    );
-    res.cookie("resetToken", firstLoginToken, { ...cookieOpts, maxAge: 15 * 60 * 1000 });
-    sendEmail({
-      to: admin.work_email,
-      subject: "Set Your Password",
-      html: `<div style="font-family:Arial,sans-serif;padding:20px"><h2>Hello ${admin.f_name},</h2><p>This is your first login. Please set your password using the link below.</p><a href="${process.env.BASE_URL}talent/api/admin/resetpassword" style="display:inline-block;padding:12px 24px;background:#4F46E5;color:#fff;border-radius:6px;text-decoration:none;">Set Password</a><p>This link expires in 15 minutes.</p></div>`,
-    }).catch((err) => console.error("First login email failed:", err.message));
-    return next(
-      Object.assign(new Error("First login detected. Check your email to set password."), { statusCode: 403 })
-    );
-  }
+  // if (admin.isFirstLogin) {
+  //   const firstLoginToken = jwt.sign(
+  //     { adminid: admin._id, work_email: admin.work_email, purpose: "first_login" },
+  //     process.env.JWT_SECRET,
+  //     { expiresIn: "15m" }
+  //   );
+  //   res.cookie("resetToken", firstLoginToken, { ...cookieOpts, maxAge: 15 * 60 * 1000 });
+  //   sendEmail({
+  //     to: admin.work_email,
+  //     subject: "Set Your Password",
+  //     html: `<div style="font-family:Arial,sans-serif;padding:20px"><h2>Hello ${admin.f_name},</h2><p>This is your first login. Please set your password using the link below.</p><a href="${process.env.BASE_URL}talent/api/admin/resetpassword" style="display:inline-block;padding:12px 24px;background:#4F46E5;color:#fff;border-radius:6px;text-decoration:none;">Set Password</a><p>This link expires in 15 minutes.</p></div>`,
+  //   }).catch((err) => console.error("First login email failed:", err.message));
+  //   return next(
+  //     Object.assign(new Error("First login detected. Check your email to set password."), { statusCode: 403 })
+  //   );
+  // }
 
   const token = jwt.sign(
     { adminid: admin._id, role: admin.role, email: admin.work_email, created_by: admin.created_by },
