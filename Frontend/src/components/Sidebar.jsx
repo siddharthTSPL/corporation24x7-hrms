@@ -51,7 +51,7 @@ const superAdminMenu = [
 
 const adminMenu = [
   { name: "Dashboard", path: "/dashboard", icon: <FaHome /> },
-  { name: "Employee Register", path: "/employee", icon: <FaUsers /> },
+  { name: "Onboarding", path: "/employee", icon: <FaUsers /> },
   { name: "Announcement", path: "/announcement", icon: <FaBullhorn /> },
   { name: "Review", path: "/review-admin", icon: <FaBullhorn /> },
   { name: "Leave", path: "/leave-admin", icon: <FaCalendarAlt /> },

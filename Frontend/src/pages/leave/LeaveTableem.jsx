@@ -22,19 +22,7 @@ const GlobalStyles = () => (
       from { opacity: 0; transform: translateY(16px); }
       to   { opacity: 1; transform: translateY(0); }
     }
-    @keyframes shimmer {
-      0%   { background-position: -400px 0; }
-      100% { background-position:  400px 0; }
-    }
     @keyframes progressIn { from { width: 0; } }
-    .elw-card {
-      background: #ffffff; border-radius: 20px;
-      border: 1px solid rgba(200,185,220,0.3); padding: 22px 24px; margin-bottom: 14px;
-      box-shadow: 0 2px 12px rgba(80,40,100,0.07), 0 1px 3px rgba(0,0,0,0.04);
-      transition: box-shadow .25s ease, transform .25s ease;
-      animation: fadeSlideUp .35s ease both;
-    }
-    .elw-card:hover { box-shadow: 0 8px 28px rgba(80,40,100,0.13), 0 2px 6px rgba(0,0,0,0.06); transform: translateY(-1px); }
     .elw-action-btn {
       display: inline-flex; align-items: center; gap: 5px; padding: 6px 13px;
       border-radius: 9px; font-size: 12px; font-weight: 600; cursor: pointer; border: none;
@@ -47,11 +35,6 @@ const GlobalStyles = () => (
       padding: 9px 22px; border-radius: 10px; font-size: 13px; font-weight: 500;
       font-family: 'DM Sans', sans-serif; border: none; cursor: pointer;
       transition: all .2s ease; white-space: nowrap;
-    }
-    .elw-chip-btn {
-      border-radius: 22px; font-size: 12px; font-weight: 500; cursor: pointer;
-      font-family: 'DM Sans', sans-serif; transition: all .18s ease;
-      display: inline-flex; align-items: center; gap: 5px; padding: 5px 14px;
     }
     .elw-input {
       padding: 11px 15px; border-radius: 12px; font-size: 13px;
@@ -81,7 +64,6 @@ const GlobalStyles = () => (
       animation: fadeSlideUp .4s ease both;
     }
     .elw-stat-card:hover { box-shadow: 0 8px 28px rgba(80,40,100,0.12); transform: translateY(-2px); }
-    .elw-progress-fill { height: 100%; border-radius: 8px; animation: progressIn .8s ease both; }
     .elw-toast {
       position: fixed; bottom: 30px; right: 30px; padding: 14px 22px; border-radius: 14px;
       font-size: 13px; font-weight: 500; font-family: 'DM Sans', sans-serif;
@@ -111,49 +93,44 @@ const GlobalStyles = () => (
   `}</style>
 );
 
-const LEAVE_TYPES = [
-  { value: "el",          label: "Earned Leave",    short: "EL"    },
-  { value: "sl",          label: "Sick Leave",      short: "SL"    },
-  { value: "ml",          label: "Maternity Leave", short: "ML",   restricted: "ml" },
-  { value: "pl",          label: "Paternity Leave", short: "PL",   restricted: "pl" },
-  { value: "half_day_el", label: "Half Day EL",     short: "½ EL" },
-  { value: "half_day_sl", label: "Half Day SL",     short: "½ SL" },
-];
-
 const LEAVE_META = {
-  el:          { label: "Earned Leave",    short: "EL",   bg: "#DCFCE7", color: "#14803D", accent: "#22C55E", dot: "#16A34A" },
-  sl:          { label: "Sick Leave",      short: "SL",   bg: "#DBEAFE", color: "#1D4ED8", accent: "#3B82F6", dot: "#2563EB" },
-  ml:          { label: "Maternity Leave", short: "ML",   bg: "#F3E8FF", color: "#6B21A8", accent: "#A855F7", dot: "#7C3AED" },
-  pl:          { label: "Paternity Leave", short: "PL",   bg: "#FEF3C7", color: "#92400E", accent: "#F59E0B", dot: "#D97706" },
-  half_day_el: { label: "Half Day EL",     short: "½EL",  bg: "#ECFDF5", color: "#065F46", accent: "#10B981", dot: "#059669" },
-  half_day_sl: { label: "Half Day SL",     short: "½SL",  bg: "#EFF6FF", color: "#1E40AF", accent: "#60A5FA", dot: "#3B82F6" },
-};
-
-const WFH_STATUS_META = {
-  pending_manager:              { label: "Pending",          bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
-  approved_manager:             { label: "Approved",         bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
-  rejected_manager:             { label: "Rejected",         bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
-  forwarded_reporting_manager:  { label: "Forwarded",        bg: "#EFF6FF", color: "#1D4ED8", dot: "#3B82F6" },
-  pending_reporting_manager:    { label: "Pending RM",       bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
-  approved_reporting_manager:   { label: "RM Approved",      bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
-  rejected_reporting_manager:   { label: "RM Rejected",      bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
-  pending_superadmin:           { label: "Pending Admin",    bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
-  approved_superadmin:          { label: "Admin Approved",   bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
-  rejected_superadmin:          { label: "Admin Rejected",   bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  el:          { label: "Earned Leave",    bg: "#DCFCE7", color: "#14803D", dot: "#16A34A" },
+  sl:          { label: "Sick Leave",      bg: "#DBEAFE", color: "#1D4ED8", dot: "#2563EB" },
+  ml:          { label: "Maternity Leave", bg: "#F3E8FF", color: "#6B21A8", dot: "#7C3AED" },
+  pl:          { label: "Paternity Leave", bg: "#FEF3C7", color: "#92400E", dot: "#D97706" },
+  half_day_el: { label: "Half Day EL",     bg: "#ECFDF5", color: "#065F46", dot: "#059669" },
+  half_day_sl: { label: "Half Day SL",     bg: "#EFF6FF", color: "#1E40AF", dot: "#3B82F6" },
 };
 
 const LEAVE_STATUS_META = {
-  pending_manager:              { label: "Pending",          bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
-  "pending_r-manager":          { label: "Pending",          bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
-  forwarded_admin:              { label: "Forwarded HR",     bg: "#EFF6FF", color: "#1D4ED8", dot: "#3B82F6" },
-  forwarded_toHr:               { label: "Forwarded HR",     bg: "#EFF6FF", color: "#1D4ED8", dot: "#3B82F6" },
-  approved_manager:             { label: "Approved",         bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
-  "approved_r-manager":         { label: "Approved",         bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
-  approved_by_hr:               { label: "Approved by HR",   bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
-  approved_admin:               { label: "Approved",         bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
-  rejected_manager:             { label: "Rejected",         bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
-  rejected_by_hr:               { label: "Rejected by HR",   bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
-  rejected_admin:               { label: "Rejected",         bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  pending_manager:             { label: "Pending Manager",             bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
+  forwarded_reporting_manager: { label: "Forwarded to Reporting Mgr",  bg: "#EFF6FF", color: "#1D4ED8", dot: "#3B82F6" },
+  approved_manager:            { label: "Approved by Manager",         bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  approved_reporting_manager:  { label: "Approved by Reporting Mgr",   bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_manager:            { label: "Rejected by Manager",         bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  rejected_reporting_manager:  { label: "Rejected by Reporting Mgr",   bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  approved_admin:              { label: "Approved by Admin",           bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_admin:              { label: "Rejected by Admin",           bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  approved_superadmin:         { label: "Approved by Super Admin",     bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_superadmin:         { label: "Rejected by Super Admin",     bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  pending_admin:               { label: "Pending Admin",               bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
+  pending_superadmin:          { label: "Pending Super Admin",         bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
+};
+
+const WFH_STATUS_META = {
+  pending_manager:             { label: "Pending Manager",             bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
+  approved_manager:            { label: "Approved by Manager",         bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_manager:            { label: "Rejected by Manager",         bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  forwarded_reporting_manager: { label: "Forwarded to Reporting Mgr",  bg: "#EFF6FF", color: "#1D4ED8", dot: "#3B82F6" },
+  pending_reporting_manager:   { label: "Pending Reporting Mgr",       bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
+  approved_reporting_manager:  { label: "Approved by Reporting Mgr",   bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_reporting_manager:  { label: "Rejected by Reporting Mgr",   bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  pending_admin:               { label: "Pending Admin",               bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
+  approved_admin:              { label: "Approved by Admin",           bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_admin:              { label: "Rejected by Admin",           bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  pending_superadmin:          { label: "Pending Super Admin",         bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
+  approved_superadmin:         { label: "Approved by Super Admin",     bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_superadmin:         { label: "Rejected by Super Admin",     bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
 };
 
 const fmt = (d) =>
@@ -165,10 +142,7 @@ const daysBetween = (s, e) => {
   return n > 0 ? n : 0;
 };
 
-const isPendingLeave = (s) => s === "pending_manager" || s === "pending_r-manager";
-const isPendingWFH   = (s) => s === "pending_manager";
 const todayStr = () => new Date().toISOString().split("T")[0];
-
 const LEAVE_BLANK = { leaveType: "", startDate: "", endDate: "", reason: "" };
 const WFH_BLANK   = { startDate: "", endDate: "", reason: "" };
 
@@ -218,9 +192,9 @@ const Toast = ({ toast }) => {
 };
 
 const LeaveTypeBadge = ({ type }) => {
-  const m = LEAVE_META[type] || { label: (type || "").toUpperCase(), bg: "#F3F4F6", color: "#374151", dot: "#9CA3AF" };
+  const m = LEAVE_META[type] || { label: (type || "").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()), bg: "#F3F4F6", color: "#374151", dot: "#9CA3AF" };
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, background: m.bg, color: m.color, fontFamily: "'DM Sans',sans-serif" }}>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, background: m.bg, color: m.color, fontFamily: "'DM Sans',sans-serif", whiteSpace: "nowrap" }}>
       <span style={{ width: 5, height: 5, borderRadius: "50%", background: m.dot, flexShrink: 0 }} />
       {m.label}
     </span>
@@ -228,9 +202,9 @@ const LeaveTypeBadge = ({ type }) => {
 };
 
 const StatusBadge = ({ status, meta }) => {
-  const m = meta[status] || { label: status, bg: "#F3F4F6", color: "#374151", dot: "#9CA3AF" };
+  const m = (meta || {})[status] || { label: (status || "").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()), bg: "#F3F4F6", color: "#374151", dot: "#9CA3AF" };
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, background: m.bg, color: m.color, fontFamily: "'DM Sans',sans-serif" }}>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, background: m.bg, color: m.color, fontFamily: "'DM Sans',sans-serif", whiteSpace: "nowrap" }}>
       <span style={{ width: 5, height: 5, borderRadius: "50%", background: m.dot, flexShrink: 0 }} />
       {m.label}
     </span>
@@ -260,50 +234,119 @@ const SectionBox = ({ title, children, rightEl }) => (
   </div>
 );
 
-const JOURNEY = ["Submitted", "Manager Review", "HR / Admin", "Approved"];
+const getJourneyConfig = (status) => {
+  const isForwardedToReporting =
+    status === "forwarded_reporting_manager" ||
+    status === "approved_reporting_manager" ||
+    status === "rejected_reporting_manager";
 
-const stepIdx = (status) => {
-  if (!status || status === "submitted") return 0;
-  if (isPendingLeave(status)) return 1;
-  if (status.includes("forwarded")) return 2;
-  if (status.includes("approved")) return 3;
-  return -1;
+  const isAdminInvolved =
+    status === "pending_admin" ||
+    status === "approved_admin" ||
+    status === "rejected_admin" ||
+    status === "approved_superadmin" ||
+    status === "rejected_superadmin" ||
+    status === "pending_superadmin";
+
+  if (isAdminInvolved || isForwardedToReporting) {
+    return [
+      { key: "submitted",          label: "Submitted"        },
+      { key: "manager_review",     label: "Manager Review"   },
+      { key: "reporting_manager",  label: "HR / Admin"       },
+      { key: "final",              label: "Final Decision"   },
+    ];
+  }
+
+  return [
+    { key: "submitted",      label: "Submitted"      },
+    { key: "manager_review", label: "Manager Review" },
+    { key: "final",          label: "Final Decision" },
+  ];
+};
+
+const getJourneyActiveIdx = (status, steps) => {
+  if (!status) return 0;
+
+  const keyMap = {
+    "pending_manager":             { 3: 1, 4: 1 },
+    "forwarded_reporting_manager": { 4: 2 },
+    "approved_manager":            { 3: 2, 4: 3 },
+    "rejected_manager":            { 3: 2, 4: 3 },
+    "approved_reporting_manager":  { 4: 3 },
+    "rejected_reporting_manager":  { 4: 3 },
+    "pending_admin":               { 4: 2 },
+    "approved_admin":              { 4: 3 },
+    "rejected_admin":              { 4: 3 },
+    "approved_superadmin":         { 4: 3 },
+    "rejected_superadmin":         { 4: 3 },
+  };
+
+  const len = steps.length;
+  if (keyMap[status] && keyMap[status][len] !== undefined) return keyMap[status][len];
+
+  if (status.startsWith("approved") || status.startsWith("rejected")) return steps.length - 1;
+  return 0;
 };
 
 const JourneyTracker = ({ leave }) => {
   if (!leave) return <EmptyState msg="No leave applications yet" />;
-  const idx      = stepIdx(leave.status);
-  const rejected = leave.status?.includes("rejected");
-  const leaveLabel = (LEAVE_TYPES.find(t => t.value === leave.leaveType) || {}).label || leave.leaveType;
+
+  const leaveMeta  = LEAVE_META[leave.leaveType] || {};
+  const leaveLabel = leaveMeta.label || (leave.leaveType || "").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  const steps      = getJourneyConfig(leave.status);
+  const activeIdx  = getJourneyActiveIdx(leave.status, steps);
+  const isRejected = (leave.status || "").startsWith("rejected");
+  const isFinalDone = activeIdx === steps.length - 1;
+
   return (
     <div>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 28 }}>
         <div>
           <p style={{ fontSize: 10.5, fontWeight: 500, letterSpacing: ".12em", textTransform: "uppercase", color: "#9B8BAE", marginBottom: 4, fontFamily: "'DM Sans',sans-serif" }}>Latest Application</p>
           <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, color: "#1C1028", margin: "0 0 3px" }}>{leaveLabel}</h3>
-          <p style={{ fontSize: 12, color: "#9B8BAE", margin: 0, fontFamily: "'DM Sans',sans-serif" }}>{fmt(leave.startDate)} → {fmt(leave.endDate)} · {leave.days} day{leave.days !== 1 ? "s" : ""}</p>
+          <p style={{ fontSize: 12, color: "#9B8BAE", margin: 0, fontFamily: "'DM Sans',sans-serif" }}>
+            {fmt(leave.startDate)} → {fmt(leave.endDate)} · {leave.days} day{leave.days !== 1 ? "s" : ""}
+          </p>
         </div>
         <StatusBadge status={leave.status} meta={LEAVE_STATUS_META} />
       </div>
+
       <div style={{ display: "flex", alignItems: "flex-start" }}>
-        {JOURNEY.map((step, i) => {
-          const done        = !rejected && i < idx;
-          const current     = !rejected && i === idx;
-          const isLast      = i === JOURNEY.length - 1;
-          const showRejected = rejected && i === JOURNEY.length - 1;
+        {steps.map((step, i) => {
+          const isLast      = i === steps.length - 1;
+          const done        = i < activeIdx;
+          const current     = i === activeIdx;
+          const isFinalStep = isLast && current;
+
+          let circleBg;
+          if (isFinalStep && isRejected) circleBg = "#BE123C";
+          else if (isFinalStep && !isRejected) circleBg = "#15803D";
+          else if (done) circleBg = "#730042";
+          else if (current) circleBg = "#CD166E";
+          else circleBg = "rgba(115,0,66,.08)";
+
+          const borderCol  = current ? "#730042" : done ? "transparent" : "rgba(115,0,66,.15)";
+          const labelColor = isFinalStep
+            ? (isRejected ? "#BE123C" : "#15803D")
+            : done ? "#730042" : current ? "#CD166E" : "rgba(115,0,66,.4)";
+
+          const displayLabel = isFinalStep
+            ? (isRejected ? "Rejected" : "Approved")
+            : step.label;
+
           return (
-            <React.Fragment key={step}>
+            <React.Fragment key={step.key}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
                 <div style={{
                   width: 38, height: 38, borderRadius: "50%",
-                  background: showRejected ? "#730042" : (done || current) ? (current ? "#CD166E" : "#730042") : "rgba(115,0,66,.08)",
-                  border: `2.5px solid ${current ? "#730042" : (done || showRejected) ? "transparent" : "rgba(115,0,66,.15)"}`,
+                  background: circleBg,
+                  border: `2.5px solid ${borderCol}`,
                   boxShadow: current ? "0 0 0 5px rgba(205,22,110,.15)" : "none",
                   display: "flex", alignItems: "center", justifyContent: "center", transition: "all .25s",
                 }}>
-                  {(done || current || showRejected) ? (
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F9F8F2" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      {showRejected
+                  {(done || current) ? (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      {isFinalStep && isRejected
                         ? <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>
                         : <polyline points="20 6 9 17 4 12"/>}
                     </svg>
@@ -311,19 +354,22 @@ const JourneyTracker = ({ leave }) => {
                     <div style={{ width: 8, height: 8, borderRadius: "50%", background: "rgba(115,0,66,.25)" }} />
                   )}
                 </div>
-                <span style={{ fontSize: 11, fontWeight: current ? 500 : 400, textAlign: "center", lineHeight: 1.3, paddingInline: 2, color: showRejected ? "#730042" : (done || current) ? (current ? "#CD166E" : "#730042") : "rgba(115,0,66,.45)", fontFamily: "'DM Sans',sans-serif" }}>
-                  {showRejected ? "Rejected" : step}
+                <span style={{ fontSize: 11, fontWeight: current ? 600 : 400, textAlign: "center", lineHeight: 1.3, paddingInline: 2, color: labelColor, fontFamily: "'DM Sans',sans-serif" }}>
+                  {displayLabel}
                 </span>
               </div>
               {!isLast && (
                 <div style={{ flex: 2, height: 2.5, marginTop: 18, borderRadius: 4, background: "rgba(115,0,66,.1)", position: "relative", overflow: "hidden" }}>
-                  {!rejected && i < idx && <div style={{ position: "absolute", inset: 0, background: "#730042", borderRadius: 4 }} />}
+                  {i < activeIdx && (
+                    <div style={{ position: "absolute", inset: 0, background: isRejected && i === activeIdx - 1 ? "#BE123C" : "#730042", borderRadius: 4 }} />
+                  )}
                 </div>
               )}
             </React.Fragment>
           );
         })}
       </div>
+
       {leave.reason && (
         <div style={{ marginTop: 20, padding: "12px 16px", background: "rgba(249,248,242,.9)", borderLeft: "2px solid #CD166E", borderRadius: "0 10px 10px 0", fontSize: 13, color: "rgba(115,0,66,.55)", lineHeight: 1.65, fontFamily: "'DM Sans',sans-serif" }}>
           <span style={{ fontWeight: 500, color: "#730042", marginRight: 4 }}>Reason:</span>
@@ -337,25 +383,27 @@ const JourneyTracker = ({ leave }) => {
 const BalCard = ({ label, value, accent }) => (
   <div className="elw-stat-card">
     <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: accent, borderRadius: "20px 20px 0 0" }} />
-    <div style={{ position: "absolute", right: -6, top: 10, fontSize: 44, fontWeight: 800, color: accent, opacity: .06, fontFamily: "'Playfair Display',serif", lineHeight: 1, userSelect: "none" }}>
-      {label.split(" ")[0][0]}{label.split(" ").length > 1 ? label.split(" ")[1][0] : ""}
-    </div>
     <p style={{ fontSize: 11, color: "#9B8BAE", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 6, fontFamily: "'DM Sans',sans-serif" }}>{label}</p>
     <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 40, fontWeight: 700, color: "#1C1028", lineHeight: 1, margin: 0, letterSpacing: "-0.5px" }}>{value ?? 0}</p>
     <p style={{ fontSize: 11, color: "#9B8BAE", marginTop: 4, fontFamily: "'DM Sans',sans-serif" }}>days available</p>
   </div>
 );
 
-const LeaveBalanceTab = ({ user, balance, isLoading }) => {
+const LeaveBalanceTab = ({ employee, balance, isLoading }) => {
   if (isLoading) return <Spinner />;
+
+  const isFemaleMarried = employee?.gender === "female" && employee?.marital_status === "married";
+  const isMaleMarried   = employee?.gender === "male"   && employee?.marital_status === "married";
+
   const cards = [
-    { label: "Earned Leave",    value: balance.EL,  accent: "#22C55E" },
-    { label: "Sick Leave",      value: balance.SL,  accent: "#3B82F6" },
-    ...(user?.gender === "female" && user?.marital_status === "married" ? [{ label: "Maternity Leave", value: balance.ML, accent: "#A855F7" }] : []),
-    ...(user?.gender === "male"   && user?.marital_status === "married" ? [{ label: "Paternity Leave", value: balance.PL, accent: "#F59E0B" }] : []),
-    { label: "Paid Balance", value: balance.pbc, accent: "#6B1A4A" },
-    { label: "Leave Without Pay",  value: balance.lwp, accent: "#CD166E" },
+    { label: "Earned Leave",      value: balance.EL,  accent: "#22C55E" },
+    { label: "Sick Leave",        value: balance.SL,  accent: "#3B82F6" },
+    ...(isFemaleMarried ? [{ label: "Maternity Leave", value: balance.ML, accent: "#A855F7" }] : []),
+    ...(isMaleMarried   ? [{ label: "Paternity Leave", value: balance.PL, accent: "#F59E0B" }] : []),
+    { label: "Paid Balance",      value: balance.pbc, accent: "#6B1A4A" },
+    { label: "Leave Without Pay", value: balance.lwp, accent: "#CD166E" },
   ];
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(155px, 1fr))", gap: 14 }}>
       {cards.map(c => <BalCard key={c.label} {...c} />)}
@@ -363,9 +411,9 @@ const LeaveBalanceTab = ({ user, balance, isLoading }) => {
   );
 };
 
-const LeaveApplyTab = ({ user, showToast }) => {
-  const [form, setForm]     = useState(LEAVE_BLANK);
-  const [errors, setErrors] = useState({});
+const LeaveApplyTab = ({ employee, showToast }) => {
+  const [form, setForm]             = useState(LEAVE_BLANK);
+  const [errors, setErrors]         = useState({});
   const [editTarget, setEditTarget] = useState(null);
 
   const { data: historyData, isLoading: histLoading } = useGetAllLeaveHistory();
@@ -375,9 +423,19 @@ const LeaveApplyTab = ({ user, showToast }) => {
 
   const history = historyData?.leaves || [];
 
-  const availTypes = LEAVE_TYPES.filter(t => {
-    if (t.restricted === "ml") return user?.gender === "female" && user?.marital_status === "married";
-    if (t.restricted === "pl") return user?.gender === "male"   && user?.marital_status === "married";
+  const isFemaleMarried = employee?.gender === "female" && employee?.marital_status === "married";
+  const isMaleMarried   = employee?.gender === "male"   && employee?.marital_status === "married";
+
+  const availTypes = [
+    { value: "el",          label: "Earned Leave"    },
+    { value: "sl",          label: "Sick Leave"      },
+    { value: "ml",          label: "Maternity Leave" },
+    { value: "pl",          label: "Paternity Leave" },
+    { value: "half_day_el", label: "Half Day EL"     },
+    { value: "half_day_sl", label: "Half Day SL"     },
+  ].filter(t => {
+    if (t.value === "ml") return isFemaleMarried;
+    if (t.value === "pl") return isMaleMarried;
     return true;
   });
 
@@ -452,16 +510,19 @@ const LeaveApplyTab = ({ user, showToast }) => {
             <input type="date" value={form.endDate} onChange={e => set("endDate", e.target.value)} min={form.startDate || todayStr()} className="elw-input" style={{ border: `1.5px solid ${ib("endDate")}` }} />
           </FormField>
         </div>
+
         {days > 0 && (
           <div style={{ background: "linear-gradient(135deg,#F9EFF5,#F2E8F5)", border: "1px solid #DFD0EC", borderRadius: 12, padding: "12px 18px", fontSize: 13, color: "#6B1A4A", fontWeight: 600, marginBottom: 18, display: "flex", alignItems: "center", gap: 8, fontFamily: "'DM Sans',sans-serif" }}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="11" rx="3" stroke="#9B2458" strokeWidth="1.3"/><path d="M1 6h12" stroke="#9B2458" strokeWidth="1.3"/><path d="M4 1v2M10 1v2" stroke="#9B2458" strokeWidth="1.3" strokeLinecap="round"/></svg>
-            <strong style={{ fontFamily: "'Playfair Display',serif", fontSize: 15 }}>{days}</strong> day{days > 1 ? "s" : ""} · {(LEAVE_META[form.leaveType] || {}).label || ""}
+            <strong style={{ fontFamily: "'Playfair Display',serif", fontSize: 15 }}>{days}</strong>&nbsp;day{days > 1 ? "s" : ""}&nbsp;·&nbsp;{(LEAVE_META[form.leaveType] || {}).label || ""}
           </div>
         )}
+
         <FormField label="Reason" error={errors.reason}>
           <textarea value={form.reason} onChange={e => set("reason", e.target.value)} placeholder="Briefly explain the reason for your leave…" className="elw-input" style={{ border: `1.5px solid ${ib("reason")}`, minHeight: 88, resize: "vertical", lineHeight: 1.6 }} />
         </FormField>
-        <p style={{ fontSize: 11, color: "#9B8BAE", marginTop: 4, marginBottom: 18, fontFamily: "'DM Sans',sans-serif" }}>{form.reason.length} / 500 chars (min 10)</p>
+        <p style={{ fontSize: 11, color: "#9B8BAE", marginTop: 4, marginBottom: 18, fontFamily: "'DM Sans',sans-serif" }}>{(form.reason || "").length} / 500 chars (min 10)</p>
+
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
           {editTarget && (
             <button className="elw-btn-secondary" onClick={() => { setForm(LEAVE_BLANK); setEditTarget(null); setErrors({}); }}>Cancel Edit</button>
@@ -481,9 +542,7 @@ const LeaveApplyTab = ({ user, showToast }) => {
           <div style={{ overflowX: "auto" }}>
             <table className="elw-table" style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
-                <tr>
-                  {["Type", "Duration", "Days", "Reason", "Status", "Applied", "Actions"].map(h => <th key={h}>{h}</th>)}
-                </tr>
+                <tr>{["Type", "Duration", "Days", "Reason", "Status", "Applied", "Actions"].map(h => <th key={h}>{h}</th>)}</tr>
               </thead>
               <tbody>
                 {history.map((leave, i) => (
@@ -500,7 +559,7 @@ const LeaveApplyTab = ({ user, showToast }) => {
                     <td><StatusBadge status={leave.status} meta={LEAVE_STATUS_META} /></td>
                     <td style={{ fontSize: 12, color: "#9B8BAE", whiteSpace: "nowrap", fontFamily: "'DM Sans',sans-serif" }}>{fmt(leave.createdAt)}</td>
                     <td>
-                      {isPendingLeave(leave.status) && (
+                      {leave.status === "pending_manager" && (
                         <div style={{ display: "flex", gap: 6 }}>
                           <button className="elw-action-btn" style={{ background: "#F0F9FF", color: "#0369A1" }} onClick={() => openEdit(leave)}>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -525,8 +584,8 @@ const LeaveApplyTab = ({ user, showToast }) => {
 };
 
 const WFHTab = ({ showToast }) => {
-  const [form, setForm]       = useState(WFH_BLANK);
-  const [errors, setErrors]   = useState({});
+  const [form, setForm]             = useState(WFH_BLANK);
+  const [errors, setErrors]         = useState({});
   const [editTarget, setEditTarget] = useState(null);
 
   const { data: wfhData, isLoading } = useGetMyWFH();
@@ -599,20 +658,23 @@ const WFHTab = ({ showToast }) => {
             <input type="date" value={form.endDate} onChange={e => set("endDate", e.target.value)} min={form.startDate || todayStr()} className="elw-input" style={{ border: `1.5px solid ${ib("endDate")}` }} />
           </FormField>
         </div>
+
         {days > 0 && (
           <div style={{ background: "linear-gradient(135deg,#EFF6FF,#DBEAFE)", border: "1px solid #BFDBFE", borderRadius: 12, padding: "12px 18px", fontSize: 13, color: "#1D4ED8", fontWeight: 600, marginBottom: 18, display: "flex", alignItems: "center", gap: 8, fontFamily: "'DM Sans',sans-serif" }}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="12" height="12" rx="3" stroke="#3B82F6" strokeWidth="1.3"/><path d="M4 7h2v4M8 4v7" stroke="#3B82F6" strokeWidth="1.2" strokeLinecap="round"/></svg>
-            <strong style={{ fontFamily: "'Playfair Display',serif", fontSize: 15 }}>{days}</strong> day{days > 1 ? "s" : ""} · Work From Home
+            <strong style={{ fontFamily: "'Playfair Display',serif", fontSize: 15 }}>{days}</strong>&nbsp;day{days > 1 ? "s" : ""}&nbsp;·&nbsp;Work From Home
           </div>
         )}
+
         <FormField label="Reason" error={errors.reason}>
           <textarea value={form.reason} onChange={e => set("reason", e.target.value)} placeholder="Briefly explain why you need to work from home…" className="elw-input" style={{ border: `1.5px solid ${ib("reason")}`, minHeight: 88, resize: "vertical", lineHeight: 1.6 }} />
         </FormField>
+
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
           {editTarget && (
             <button className="elw-btn-secondary" onClick={() => { setForm(WFH_BLANK); setEditTarget(null); setErrors({}); }}>Cancel Edit</button>
           )}
-          <button className="elw-btn-primary" style={{ background: "(135deg,#8A1C3A, #A1234B)" }} onClick={handleSubmit} disabled={applyMut.isPending || editMut.isPending}>
+          <button className="elw-btn-primary" onClick={handleSubmit} disabled={applyMut.isPending || editMut.isPending}>
             {applyMut.isPending || editMut.isPending ? "Submitting…" : editTarget ? "Update Request →" : "Submit WFH Request →"}
           </button>
         </div>
@@ -624,10 +686,10 @@ const WFHTab = ({ showToast }) => {
           : null
       }>
         {isLoading ? <Spinner /> : wfhList.length === 0 ? <EmptyState msg="No WFH records yet" /> : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+          <div style={{ display: "flex", flexDirection: "column" }}>
             {wfhList.map((wfh, i) => {
-              const canEdit = isPendingWFH(wfh.status);
-              const d = wfh.days || daysBetween(wfh.startDate, wfh.endDate);
+              const canEdit = wfh.status === "pending_manager";
+              const d       = wfh.days || daysBetween(wfh.startDate, wfh.endDate);
               return (
                 <div key={wfh._id || i} className="elw-history-card" style={{ animationDelay: `${i * .05}s` }}>
                   <div style={{ position: "absolute", top: 0, left: 0, width: 3, bottom: 0, background: "#3B82F6", borderRadius: "16px 0 0 16px" }} />
@@ -686,10 +748,9 @@ const WFHTab = ({ showToast }) => {
 
 const LeaveStatusTab = ({ histLoading, history }) => {
   if (histLoading) return <Spinner />;
-  const latest = history[0] || null;
   return (
     <SectionBox title="Latest Leave Status">
-      <JourneyTracker leave={latest} />
+      <JourneyTracker leave={history[0] || null} />
     </SectionBox>
   );
 };
@@ -698,13 +759,13 @@ const EmployeeLeaveWFH = () => {
   const [tab, setTab]     = useState("status");
   const [toast, setToast] = useState({ visible: false, message: "", type: "success" });
 
-  const { data: userData }                            = useGetMeUser();
+  const { data: meData }                              = useGetMeUser();
   const { data: balanceData, isLoading: balLoading }  = useGetAllLeaves();
   const { data: historyData, isLoading: histLoading } = useGetAllLeaveHistory();
 
-  const user    = userData?.user;
-  const balance = balanceData || {};
-  const history = historyData?.leaves || [];
+  const employee = meData?.employee ?? null;
+  const balance  = balanceData || {};
+  const history  = historyData?.leaves || [];
 
   const showToast = (message, type = "success") => {
     setToast({ visible: true, message, type });
@@ -741,14 +802,14 @@ const EmployeeLeaveWFH = () => {
               <p style={{ fontSize: 12, color: "#9B8BAE", margin: "3px 0 0", fontWeight: 400 }}>Apply · Track balance · Request work from home</p>
             </div>
           </div>
-          {user && (
+          {employee && (
             <div style={{ background: "#fff", border: "1px solid rgba(200,185,220,0.4)", borderRadius: 14, padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, boxShadow: "0 2px 12px rgba(80,40,100,0.08)" }}>
               <div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg,#6B1A4A,#A8295E)", color: "#fff", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {(user.f_name?.[0] || "")}{(user.l_name?.[0] || "")}
+                {(employee.f_name?.[0] || "")}{(employee.l_name?.[0] || "")}
               </div>
               <div>
-                <div style={{ fontWeight: 600, fontSize: 12, color: "#1C1028" }}>{user.f_name} {user.l_name}</div>
-                <div style={{ fontSize: 10, color: "#9B8BAE", marginTop: 1 }}>{user.designation || user.role}</div>
+                <div style={{ fontWeight: 600, fontSize: 12, color: "#1C1028" }}>{employee.f_name} {employee.l_name}</div>
+                <div style={{ fontSize: 10, color: "#9B8BAE", marginTop: 1 }}>{employee.designation || employee.role}</div>
               </div>
             </div>
           )}
@@ -768,10 +829,11 @@ const EmployeeLeaveWFH = () => {
         </div>
 
         {tab === "status"  && <LeaveStatusTab histLoading={histLoading} history={history} />}
-        {tab === "balance" && <LeaveBalanceTab user={user} balance={balance} isLoading={balLoading} />}
-        {tab === "apply"   && <LeaveApplyTab user={user} showToast={showToast} />}
+        {tab === "balance" && <LeaveBalanceTab employee={employee} balance={balance} isLoading={balLoading} />}
+        {tab === "apply"   && <LeaveApplyTab employee={employee} showToast={showToast} />}
         {tab === "wfh"     && <WFHTab showToast={showToast} />}
       </div>
+      
 
       <Toast toast={toast} />
     </div>

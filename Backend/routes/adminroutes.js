@@ -11,6 +11,10 @@ const {
   findallmanagers,
   getallemployee,
   editemployee,
+  editmanager,
+  promoteToManager,
+  demoteToEmployee,
+  changeManagerRole,
   getperticularemployee,
   getperticularemanager,
   deleteemployee,
@@ -18,6 +22,7 @@ const {
   acceptLeave,
   rejectLeave,
   applyleave,
+  getmyleavehistory,
   noofemployee,
   createannouncement,
   getallannouncement,
@@ -36,13 +41,10 @@ const {
   getAllExpenseDocumentsAdmin,
   getDocumentDetailsAdmin,
   adminActionOnLeave,
-    adminSubmitTicket,
+  adminSubmitTicket,
   adminGetMyTickets,
   adminRateTicket,
-   adminGetTicketDetail,
-   getmyleavehistory
-
-
+  adminGetTicketDetail,
 } = require("../controllers/admin.controller");
 
 adminrouter.get("/verify/:token", asyncHandler(verifyAdmin));
@@ -53,159 +55,50 @@ adminrouter.post("/resetpassword", asyncHandler(resetAdminPassword));
 
 adminrouter.post("/logout", adminauthmiddleware, asyncHandler(adminlogout));
 adminrouter.get("/getme", adminauthmiddleware, asyncHandler(getme));
-adminrouter.put(
-  "/editadminprofile",
-  adminauthmiddleware,
-  asyncHandler(editadminprofile),
-);
-adminrouter.put(
-  "/changepassword",
-  adminauthmiddleware,
-  asyncHandler(changepassword),
-);
+adminrouter.put("/editadminprofile", adminauthmiddleware, asyncHandler(editadminprofile));
+adminrouter.put("/changepassword", adminauthmiddleware, asyncHandler(changepassword));
 adminrouter.get("/getorginfo", adminauthmiddleware, asyncHandler(getOrgInfo));
 
 adminrouter.post("/addmanager", adminauthmiddleware, asyncHandler(addmanager));
-adminrouter.post(
-  "/addemployee",
-  adminauthmiddleware,
-  asyncHandler(addemployee),
-);
-adminrouter.get(
-  "/findallmanagers",
-  adminauthmiddleware,
-  asyncHandler(findallmanagers),
-);
-adminrouter.get(
-  "/getallemployee",
-  adminauthmiddleware,
-  asyncHandler(getallemployee),
-);
-adminrouter.put(
-  "/editemployee/:uid",
-  adminauthmiddleware,
-  asyncHandler(editemployee),
-);
-adminrouter.get(
-  "/getperticularemployee/:uid",
-  adminauthmiddleware,
-  asyncHandler(getperticularemployee),
-);
-adminrouter.get(
-  "/getperticularemanager/:uid",
-  adminauthmiddleware,
-  asyncHandler(getperticularemanager),
-);
-adminrouter.delete(
-  "/deleteuser/:uid",
-  adminauthmiddleware,
-  asyncHandler(deleteemployee),
-);
+adminrouter.post("/addemployee", adminauthmiddleware, asyncHandler(addemployee));
+adminrouter.get("/findallmanagers", adminauthmiddleware, asyncHandler(findallmanagers));
+adminrouter.get("/getallemployee", adminauthmiddleware, asyncHandler(getallemployee));
 
-// Leave
-adminrouter.get(
-  "/showallleaves",
-  adminauthmiddleware,
-  asyncHandler(showallleaves),
-);
+adminrouter.put("/editemployee/:id", adminauthmiddleware, asyncHandler(editemployee));
+adminrouter.put("/editmanager/:id", adminauthmiddleware, asyncHandler(editmanager));
+
+adminrouter.post("/employee/:id/promote", adminauthmiddleware, asyncHandler(promoteToManager));
+adminrouter.post("/manager/:id/demote", adminauthmiddleware, asyncHandler(demoteToEmployee));
+adminrouter.put("/manager/:id/role", adminauthmiddleware, asyncHandler(changeManagerRole));
+
+adminrouter.get("/getperticularemployee/:id", adminauthmiddleware, asyncHandler(getperticularemployee));
+adminrouter.get("/getperticularemanager/:id", adminauthmiddleware, asyncHandler(getperticularemanager));
+adminrouter.delete("/deleteuser/:id", adminauthmiddleware, asyncHandler(deleteemployee));
+
+adminrouter.get("/showallleaves", adminauthmiddleware, asyncHandler(showallleaves));
 adminrouter.post("/applyleave", adminauthmiddleware, asyncHandler(applyleave));
-adminrouter.get(
-  "/getmyleavehistory",
-  adminauthmiddleware,
-  asyncHandler(getmyleavehistory)
-)
-adminrouter.put(
-  "/acceptleave/:id",
-  adminauthmiddleware,
-  asyncHandler(acceptLeave)
-);
+adminrouter.get("/getmyleavehistory", adminauthmiddleware, asyncHandler(getmyleavehistory));
+adminrouter.put("/acceptleave/:id", adminauthmiddleware, asyncHandler(acceptLeave));
+adminrouter.put("/rejectleave/:id", adminauthmiddleware, asyncHandler(rejectLeave));
+adminrouter.post("/actionleave", adminauthmiddleware, asyncHandler(adminActionOnLeave));
 
-adminrouter.put(
-  "/rejectleave/:id",
-  adminauthmiddleware,
-  asyncHandler(rejectLeave)
-);
+adminrouter.get("/noofemployee", adminauthmiddleware, asyncHandler(noofemployee));
 
-adminrouter.post(
-  "/actionleave",
-  adminauthmiddleware,
-  asyncHandler(adminActionOnLeave),
-);
+adminrouter.post("/createannouncement", adminauthmiddleware, asyncHandler(createannouncement));
+adminrouter.get("/getallannouncement", adminauthmiddleware, asyncHandler(getallannouncement));
+adminrouter.put("/updateannouncement/:id", adminauthmiddleware, asyncHandler(updateAnnouncement));
+adminrouter.delete("/deleteannouncement/:id", adminauthmiddleware, asyncHandler(deleteAnnouncement));
 
-adminrouter.get(
-  "/noofemployee",
-  adminauthmiddleware,
-  asyncHandler(noofemployee),
-);
+adminrouter.post("/reviewtomanager", adminauthmiddleware, asyncHandler(reviewtomanager));
+adminrouter.get("/gettodaycheckins", adminauthmiddleware, asyncHandler(getTodayCheckins));
 
-adminrouter.post(
-  "/createannouncement",
-  adminauthmiddleware,
-  asyncHandler(createannouncement),
-);
-adminrouter.get(
-  "/getallannouncement",
-  adminauthmiddleware,
-  asyncHandler(getallannouncement),
-);
-adminrouter.put(
-  "/updateannouncement/:id",
-  adminauthmiddleware,
-  asyncHandler(updateAnnouncement),
-);
-adminrouter.delete(
-  "/deleteannouncement/:id",
-  adminauthmiddleware,
-  asyncHandler(deleteAnnouncement),
-);
+adminrouter.get("/documents/personal", adminauthmiddleware, asyncHandler(getAllPersonalDocumentsAdmin));
+adminrouter.get("/documents/expense", adminauthmiddleware, asyncHandler(getAllExpenseDocumentsAdmin));
+adminrouter.get("/documents/:documentId", adminauthmiddleware, asyncHandler(getDocumentDetailsAdmin));
 
-adminrouter.post(
-  "/reviewtomanager",
-  adminauthmiddleware,
-  asyncHandler(reviewtomanager),
-);
-adminrouter.get(
-  "/gettodaycheckins",
-  adminauthmiddleware,
-  asyncHandler(getTodayCheckins),
-);
-
-adminrouter.get(
-  "/documents/personal",
-  adminauthmiddleware,
-  asyncHandler(getAllPersonalDocumentsAdmin),
-);
-adminrouter.get(
-  "/documents/expense",
-  adminauthmiddleware,
-  asyncHandler(getAllExpenseDocumentsAdmin),
-);
-adminrouter.get(
-  "/documents/:documentId",
-  adminauthmiddleware,
-  asyncHandler(getDocumentDetailsAdmin),
-);
-
-adminrouter.post(
-  "/submitTicket",
-  adminauthmiddleware,
-  asyncHandler(adminSubmitTicket),
-);
-adminrouter.get(
-  "/getMyTickets",
-  adminauthmiddleware,
-  asyncHandler(adminGetMyTickets),
-);
-adminrouter.post(
-  "/rateTicket",
-  adminauthmiddleware,
-  asyncHandler(adminRateTicket),
-);
-
-adminrouter.get(
-  "/getTicketDetail/:ticketNumber",
-  adminauthmiddleware,
-  asyncHandler(adminGetTicketDetail),
-);
+adminrouter.post("/submitTicket", adminauthmiddleware, asyncHandler(adminSubmitTicket));
+adminrouter.get("/getMyTickets", adminauthmiddleware, asyncHandler(adminGetMyTickets));
+adminrouter.post("/rateTicket/:ticketNumber", adminauthmiddleware, asyncHandler(adminRateTicket));
+adminrouter.get("/getTicketDetail/:ticketNumber", adminauthmiddleware, asyncHandler(adminGetTicketDetail));
 
 module.exports = adminrouter;
