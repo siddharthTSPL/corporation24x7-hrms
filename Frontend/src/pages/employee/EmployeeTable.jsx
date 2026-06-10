@@ -2,13 +2,15 @@
 import { useState } from "react";
 import {
   FaEdit, FaTrash, FaSearch, FaFilter, FaTimes, FaUserTie, FaUserPlus,
-  FaChevronLeft, FaChevronRight, FaBars, FaEye,
+  FaChevronLeft, FaChevronRight, FaEye, FaFileExcel, FaArrowUp, FaArrowDown,
+  FaExchangeAlt, FaEllipsisV,
 } from "react-icons/fa";
 import {
   useAddManager, useAddEmployee, useFindAllManagers,
 } from "../../auth/server-state/adminauth/adminauth.hook";
 import {
-  useGetAllEmployee, useDeleteUser, useEditEmployee,
+  useGetAllEmployee, useDeleteUser, useEditEmployee, useEditManager,
+  usePromoteToManager, useDemoteToEmployee, useChangeManagerRole,
 } from "../../auth/server-state/adminother/adminother.hook";
 import EmployeeDetailModal from "./EmployeeDetailModal";
 
@@ -32,7 +34,7 @@ const EMPTY_EMP = {
 };
 
 const EMPTY_MGR = {
-  f_name: "", l_name: "", work_email: "", password: "", gender: "", marital_status: "single",
+  f_name: "", l_name: "", work_email: "", password: "", confirm_password: "", gender: "", marital_status: "single",
   personal_contact: "", e_contact: "", department: "", designation: "", role: "manager",
   office_location: "", reporting_manager: "", address: "", city: "", state: "", pincode: "",
   aadhaar_number: "", pan_number: "", is_fresher: true, total_experience: "",
@@ -53,6 +55,56 @@ const inputCls =
   "w-full px-3 py-2.5 rounded-lg border border-[#F4C0D1] bg-[#F9F8F2] text-sm text-[#730042] " +
   "focus:outline-none focus:border-[#CD166E] focus:ring-2 focus:ring-[#CD166E]/20 transition-all placeholder-[#993556]/50 " +
   "font-['DM_Sans',system-ui,sans-serif]";
+
+function exportToExcel(data) {
+  const headers = [
+    "UID", "First Name", "Last Name", "Work Email", "Role", "Department",
+    "Designation", "Office Location", "Gender", "Marital Status",
+    "Personal Contact", "Emergency Contact", "City", "State", "Pincode",
+    "Under Manager / Reporting Manager", "Status",
+  ];
+
+  const rows = data.map((u) => [
+    u.uid ?? "",
+    u.f_name ?? "",
+    u.l_name ?? "",
+    u.work_email ?? "",
+    u.role ?? "",
+    u.department ?? "",
+    u.designation ?? "",
+    u.office_location ?? "",
+    u.gender ?? "",
+    u.marital_status ?? "",
+    u.personal_contact ?? "",
+    u.e_contact ?? "",
+    u.city ?? "",
+    u.state ?? "",
+    u.pincode ?? "",
+    u.Under_manager
+      ? `${u.Under_manager.f_name ?? ""} ${u.Under_manager.l_name ?? ""}`.trim()
+      : u.reporting_manager
+        ? `${u.reporting_manager.f_name ?? ""} ${u.reporting_manager.l_name ?? ""}`.trim()
+        : "",
+    u.status ?? "",
+  ]);
+
+  const escape = (v) => {
+    const s = String(v ?? "");
+    return s.includes(",") || s.includes('"') || s.includes("\n")
+      ? `"${s.replace(/"/g, '""')}"`
+      : s;
+  };
+
+  const csv = [headers, ...rows].map((r) => r.map(escape).join(",")).join("\n");
+  const bom = "\uFEFF";
+  const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `employee_directory_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 function Field({ label, error, children, required, span2 }) {
   return (
@@ -175,6 +227,25 @@ function Modal({ title, icon, onClose, onSubmit, children, accentColor = "#CD166
   );
 }
 
+function ConfirmModal({ title, message, icon, confirmLabel, confirmColor, onConfirm, onCancel, children }) {
+  return (
+    <div className="fixed inset-0 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4" style={{ background: "rgba(115,0,66,0.40)", backdropFilter: "blur(3px)" }}>
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm p-5 sm:p-6 flex flex-col gap-4 border-t sm:border border-[#F4C0D1] shadow-2xl">
+        <div className="text-center">
+          <div className="text-3xl sm:text-4xl mb-2">{icon}</div>
+          <h3 className="text-base sm:text-lg font-bold text-[#730042]">{title}</h3>
+          <p className="text-xs sm:text-sm text-[#993556] mt-1">{message}</p>
+        </div>
+        {children}
+        <div className="flex gap-3 justify-center">
+          <button onClick={onCancel} className="px-4 sm:px-5 py-2 rounded-xl border border-[#F4C0D1] text-xs sm:text-sm font-semibold text-[#730042] hover:bg-[#FBEAF0] transition-colors">Cancel</button>
+          <button onClick={onConfirm} className="px-4 sm:px-5 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90 transition-colors" style={{ background: confirmColor || "#A32D2D" }}>{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Avatar({ name }) {
   const safe = name || "??";
   const initials = safe.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
@@ -201,7 +272,57 @@ function Badge({ label, type = "dept" }) {
   );
 }
 
-function MobileCard({ u, onView, onEdit, onDelete }) {
+function ActionMenu({ user, onView, onEdit, onDelete, onPromote, onDemote, onChangeRole }) {
+  const [open, setOpen] = useState(false);
+  const isEmployee = user.type === "employee" || user.role === "employee" || user.role === "official";
+  const isManager  = user.type === "manager"  || ["manager", "senior_manager"].includes(user.role);
+
+  return (
+    <div className="relative" onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen((p) => !p)}
+        className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center text-[#993556] border border-[#F4C0D1] hover:bg-[#FBEAF0] transition-colors"
+        style={{ background: "#F9F8F2" }}
+      >
+        <FaEllipsisV size={10} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-9 z-20 bg-white border border-[#F4C0D1] rounded-xl shadow-xl min-w-[170px] py-1 overflow-hidden">
+            <button onClick={() => { onView(user._id, user.role); setOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#730042] hover:bg-[#FBEAF0] transition-colors">
+              <FaEye size={11} /> View Details
+            </button>
+            <button onClick={() => { onEdit(user); setOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#730042] hover:bg-[#FBEAF0] transition-colors">
+              <FaEdit size={11} /> Edit
+            </button>
+            {isEmployee && (
+              <button onClick={() => { onPromote(user); setOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#3C3489] hover:bg-[#EEEDFE] transition-colors">
+                <FaArrowUp size={11} /> Promote to Manager
+              </button>
+            )}
+            {isManager && (
+              <>
+                <button onClick={() => { onDemote(user); setOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#7A3500] hover:bg-[#FEF3E8] transition-colors">
+                  <FaArrowDown size={11} /> Demote to Employee
+                </button>
+                <button onClick={() => { onChangeRole(user); setOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#085041] hover:bg-[#E1F5EE] transition-colors">
+                  <FaExchangeAlt size={11} /> Change Role
+                </button>
+              </>
+            )}
+            <div className="border-t border-[#F4C0D1] my-1" />
+            <button onClick={() => { onDelete(user); setOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#A32D2D] hover:bg-[#FCEBEB] transition-colors">
+              <FaTrash size={10} /> Delete
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function MobileCard({ u, onView, onEdit, onDelete, onPromote, onDemote, onChangeRole }) {
   const roleBadgeType = u.role === "manager" ? "manager" : u.role === "senior_manager" ? "smgr" : "role";
   const roleLabel = u.role === "senior_manager" ? "Sr. Manager" : u.role === "employee" ? "Employee" : u.role?.replace("_", " ") || "—";
   return (
@@ -237,16 +358,16 @@ function MobileCard({ u, onView, onEdit, onDelete }) {
               Under: <span className="font-medium text-[#730042]">{u.Under_manager.f_name} {u.Under_manager.l_name}</span>
             </p>
           ) : <span />}
-          <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => onView(u._id, u.role)} className="w-7 h-7 rounded-lg flex items-center justify-center text-[#993556] border border-[#F4C0D1] bg-[#F9F8F2]">
-              <FaEye size={11} />
-            </button>
-            <button onClick={() => onEdit(u)} className="w-7 h-7 rounded-lg flex items-center justify-center text-[#993556] border border-[#F4C0D1] bg-[#F9F8F2]">
-              <FaEdit size={11} />
-            </button>
-            <button onClick={() => onDelete(u)} className="w-7 h-7 rounded-lg flex items-center justify-center text-[#993556] border border-[#F4C0D1] bg-[#F9F8F2]">
-              <FaTrash size={10} />
-            </button>
+          <div onClick={(e) => e.stopPropagation()}>
+            <ActionMenu
+              user={u}
+              onView={onView}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onPromote={onPromote}
+              onDemote={onDemote}
+              onChangeRole={onChangeRole}
+            />
           </div>
         </div>
       </div>
@@ -320,27 +441,6 @@ function FilterChip({ label, onRemove }) {
   );
 }
 
-function DeleteConfirm({ user, onConfirm, onCancel }) {
-  return (
-    <div className="fixed inset-0 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4" style={{ background: "rgba(115,0,66,0.40)", backdropFilter: "blur(3px)" }}>
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm p-5 sm:p-6 flex flex-col gap-4 border-t sm:border border-[#F4C0D1] shadow-2xl">
-        <div className="text-center">
-          <div className="text-3xl sm:text-4xl mb-2">🗑️</div>
-          <h3 className="text-base sm:text-lg font-bold text-[#730042]">Delete User?</h3>
-          <p className="text-xs sm:text-sm text-[#993556] mt-1">
-            Are you sure you want to delete{" "}
-            <span className="font-semibold text-[#730042]">{user.f_name} {user.l_name}</span>? This cannot be undone.
-          </p>
-        </div>
-        <div className="flex gap-3 justify-center">
-          <button onClick={onCancel} className="px-4 sm:px-5 py-2 rounded-xl border border-[#F4C0D1] text-xs sm:text-sm font-semibold text-[#730042] hover:bg-[#FBEAF0] transition-colors">Cancel</button>
-          <button onClick={onConfirm} className="px-4 sm:px-5 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90 transition-colors" style={{ background: "#A32D2D" }}>Delete</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function EmpStepFields({ step, form, onChange, errors, managers }) {
   if (step === 0) return (
     <>
@@ -367,7 +467,6 @@ function EmpStepFields({ step, form, onChange, errors, managers }) {
       <Field label="Emergency Contact" required error={errors.e_contact}><input name="e_contact" placeholder="Emergency contact" value={form.e_contact} onChange={onChange} className={inputCls} /></Field>
     </>
   );
-
   if (step === 1) return (
     <>
       <Field label="Department" required error={errors.department}>
@@ -399,7 +498,6 @@ function EmpStepFields({ step, form, onChange, errors, managers }) {
       </Field>
     </>
   );
-
   if (step === 2) return (
     <>
       <Field label="Address" span2><input name="address" placeholder="Street address" value={form.address} onChange={onChange} className={inputCls} /></Field>
@@ -413,14 +511,12 @@ function EmpStepFields({ step, form, onChange, errors, managers }) {
       <Field label="Pincode"><input name="pincode" placeholder="6-digit pincode" maxLength={6} value={form.pincode} onChange={onChange} className={inputCls} /></Field>
     </>
   );
-
   if (step === 3) return (
     <>
       <Field label="Aadhaar Number"><input name="aadhaar_number" placeholder="XXXX XXXX XXXX" maxLength={12} value={form.aadhaar_number} onChange={onChange} className={inputCls} /></Field>
       <Field label="PAN Number"><input name="pan_number" placeholder="ABCDE1234F" maxLength={10} value={form.pan_number} onChange={onChange} className={inputCls} /></Field>
     </>
   );
-
   if (step === 4) return (
     <>
       <Field label="Is Fresher?" span2>
@@ -438,7 +534,6 @@ function EmpStepFields({ step, form, onChange, errors, managers }) {
       )}
     </>
   );
-
   if (step === 5) return (
     <>
       <Field label="Bank Name"><input name="bank_name" placeholder="e.g. State Bank of India" value={form.bank_name} onChange={onChange} className={inputCls} /></Field>
@@ -456,17 +551,42 @@ function EmpStepFields({ step, form, onChange, errors, managers }) {
       </div>
     </>
   );
-
   return null;
 }
 
 function MgrStepFields({ step, form, onChange, errors, managers }) {
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  const passwordError = form.password && !passwordRegex.test(form.password)
+    ? "Min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special character."
+    : "";
+  const confirmPasswordError = form.confirm_password && form.password !== form.confirm_password
+    ? "Passwords do not match."
+    : "";
+
   if (step === 0) return (
     <>
       <Field label="First Name" required error={errors.f_name}><input name="f_name" placeholder="First name" value={form.f_name} onChange={onChange} className={inputCls} /></Field>
       <Field label="Last Name" required error={errors.l_name}><input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls} /></Field>
       <Field label="Work Email" required error={errors.work_email}><input name="work_email" type="email" placeholder="name@company.com" value={form.work_email} onChange={onChange} className={inputCls} /></Field>
-      <Field label="Password" required error={errors.password}><input name="password" type="password" placeholder="Set password" value={form.password} onChange={onChange} className={inputCls} /></Field>
+      <Field label="Password" required error={passwordError || errors.password}>
+        <div className="relative">
+          <input name="password" type={showPassword ? "text" : "password"} placeholder="Set password" value={form.password} onChange={onChange} className={inputCls} />
+          <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#993556] text-xs font-medium">
+            {showPassword ? "Hide" : "Show"}
+          </button>
+        </div>
+      </Field>
+      <Field label="Confirm Password" required error={confirmPasswordError || errors.confirm_password}>
+        <div className="relative">
+          <input name="confirm_password" type={showConfirmPassword ? "text" : "password"} placeholder="Confirm password" value={form.confirm_password} onChange={onChange} className={inputCls} />
+          <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#993556] text-xs font-medium">
+            {showConfirmPassword ? "Hide" : "Show"}
+          </button>
+        </div>
+      </Field>
       <Field label="Gender" required error={errors.gender}>
         <select name="gender" value={form.gender} onChange={onChange} className={inputCls}>
           <option value="">Select Gender</option>
@@ -486,7 +606,6 @@ function MgrStepFields({ step, form, onChange, errors, managers }) {
       <Field label="Emergency Contact" required error={errors.e_contact}><input name="e_contact" placeholder="Emergency contact" value={form.e_contact} onChange={onChange} className={inputCls} /></Field>
     </>
   );
-
   if (step === 1) return (
     <>
       <Field label="Department" required error={errors.department}>
@@ -519,7 +638,6 @@ function MgrStepFields({ step, form, onChange, errors, managers }) {
       </Field>
     </>
   );
-
   if (step === 2) return (
     <>
       <Field label="Address" span2><input name="address" placeholder="Street address" value={form.address} onChange={onChange} className={inputCls} /></Field>
@@ -533,14 +651,12 @@ function MgrStepFields({ step, form, onChange, errors, managers }) {
       <Field label="Pincode"><input name="pincode" placeholder="6-digit pincode" maxLength={6} value={form.pincode} onChange={onChange} className={inputCls} /></Field>
     </>
   );
-
   if (step === 3) return (
     <>
       <Field label="Aadhaar Number"><input name="aadhaar_number" placeholder="XXXX XXXX XXXX" maxLength={12} value={form.aadhaar_number} onChange={onChange} className={inputCls} /></Field>
       <Field label="PAN Number"><input name="pan_number" placeholder="ABCDE1234F" maxLength={10} value={form.pan_number} onChange={onChange} className={inputCls} /></Field>
     </>
   );
-
   if (step === 4) return (
     <>
       <Field label="Is Fresher?" span2>
@@ -558,7 +674,6 @@ function MgrStepFields({ step, form, onChange, errors, managers }) {
       )}
     </>
   );
-
   if (step === 5) return (
     <>
       <Field label="Bank Name"><input name="bank_name" placeholder="e.g. State Bank of India" value={form.bank_name} onChange={onChange} className={inputCls} /></Field>
@@ -576,7 +691,6 @@ function MgrStepFields({ step, form, onChange, errors, managers }) {
       </div>
     </>
   );
-
   return null;
 }
 
@@ -585,7 +699,6 @@ export default function EmployeeTable() {
   const [openManager, setOpenManager] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [popup,       setPopup]       = useState({ show: false, type: "success", message: "" });
-  const [viewMode,    setViewMode]    = useState("table");
 
   const [selectedEmployeeId,   setSelectedEmployeeId]   = useState(null);
   const [selectedEmployeeRole, setSelectedEmployeeRole] = useState(null);
@@ -604,7 +717,18 @@ export default function EmployeeTable() {
   const [openEdit,   setOpenEdit]   = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [filters, setFilters] = useState({ search: "", department: "", role: "", location: "", gender: "" });
+
+  const [promoteTarget,    setPromoteTarget]    = useState(null);
+  const [promoteForm,      setPromoteForm]      = useState({ reporting_manager: "", designation: "", role: "manager" });
+  const [demoteTarget,     setDemoteTarget]     = useState(null);
+  const [demoteForm,       setDemoteForm]       = useState({ Under_manager: "", designation: "" });
+  const [roleChangeTarget, setRoleChangeTarget] = useState(null);
+  const [roleChangeValue,  setRoleChangeValue]  = useState("manager");
+
+  const [filters, setFilters] = useState({
+    search: "", department: "", role: "", location: "", gender: "",
+    marital_status: "", is_fresher: "", type: "",
+  });
 
   const { mutate: addEmployeeApi } = useAddEmployee();
   const { mutate: addManagerApi  } = useAddManager();
@@ -612,8 +736,12 @@ export default function EmployeeTable() {
   const { data: employeeData, isLoading: listLoading, refetch: refetchList } = useGetAllEmployee();
   const allUsers = employeeData?.users ?? [];
 
-  const { mutate: editUserApi   } = useEditEmployee(editTarget?._id);
-  const { mutate: deleteUserApi } = useDeleteUser();
+  const { mutate: editUserApi        } = useEditEmployee(editTarget?._id);
+  const { mutate: editManagerApi     } = useEditManager(editTarget?._id);
+  const { mutate: deleteUserApi      } = useDeleteUser();
+  const { mutate: promoteApi         } = usePromoteToManager();
+  const { mutate: demoteApi          } = useDemoteToEmployee();
+  const { mutate: changeManagerRoleApi } = useChangeManagerRole();
 
   const showPopup = (type, message) => {
     setPopup({ show: true, type, message });
@@ -629,6 +757,7 @@ export default function EmployeeTable() {
       role: user.role ?? "employee", office_location: user.office_location ?? "",
       designation: user.designation ?? "", department: user.department ?? "",
       Under_manager: user.Under_manager?._id ?? "",
+      reporting_manager: user.reporting_manager?._id ?? "",
     });
     setEditErrors({});
     setOpenEdit(true);
@@ -649,7 +778,9 @@ export default function EmployeeTable() {
 
   const handleEditSubmit = () => {
     if (!validateEdit()) { showPopup("error", "Please fill all required fields"); return; }
-    editUserApi(editForm, {
+    const isManager = editTarget?.type === "manager" || ["manager", "senior_manager"].includes(editTarget?.role);
+    const mutate    = isManager ? editManagerApi : editUserApi;
+    mutate(editForm, {
       onSuccess: (res) => { showPopup("success", res?.message || "Updated successfully"); setOpenEdit(false); setEditTarget(null); refetchList(); },
       onError: (err) => showPopup("error", err?.response?.data?.message || err?.message || "Update failed"),
     });
@@ -659,6 +790,27 @@ export default function EmployeeTable() {
     deleteUserApi(deleteTarget._id, {
       onSuccess: () => { showPopup("success", "User deleted successfully"); setDeleteTarget(null); refetchList(); },
       onError: (err) => { showPopup("error", err?.response?.data?.message || err?.message || "Delete failed"); setDeleteTarget(null); },
+    });
+  };
+
+  const handleConfirmPromote = () => {
+    promoteApi({ id: promoteTarget._id, data: promoteForm }, {
+      onSuccess: (res) => { showPopup("success", res?.message || "Promoted to manager"); setPromoteTarget(null); refetchList(); },
+      onError: (err) => { showPopup("error", err?.response?.data?.message || err?.message || "Promotion failed"); },
+    });
+  };
+
+  const handleConfirmDemote = () => {
+    demoteApi({ id: demoteTarget._id, data: demoteForm }, {
+      onSuccess: (res) => { showPopup("success", res?.message || "Demoted to employee"); setDemoteTarget(null); refetchList(); },
+      onError: (err) => { showPopup("error", err?.response?.data?.message || err?.message || "Demotion failed"); },
+    });
+  };
+
+  const handleConfirmRoleChange = () => {
+    changeManagerRoleApi({ id: roleChangeTarget._id, data: { role: roleChangeValue } }, {
+      onSuccess: (res) => { showPopup("success", res?.message || "Role updated"); setRoleChangeTarget(null); refetchList(); },
+      onError: (err) => { showPopup("error", err?.response?.data?.message || err?.message || "Role change failed"); },
     });
   };
 
@@ -753,22 +905,32 @@ export default function EmployeeTable() {
   const filtered = allUsers.filter((u) => {
     const name = `${u.f_name ?? ""} ${u.l_name ?? ""}`.toLowerCase();
     const q = filters.search.toLowerCase();
+    const matchType = filters.type
+      ? filters.type === "employee"
+        ? u.type === "employee"
+        : u.type === "manager"
+      : true;
     return (
-      (name.includes(q) || (u.work_email ?? "").toLowerCase().includes(q)) &&
-      (filters.department ? u.department      === filters.department : true) &&
-      (filters.role       ? u.role            === filters.role       : true) &&
-      (filters.location   ? u.office_location === filters.location   : true) &&
-      (filters.gender     ? u.gender          === filters.gender     : true)
+      (name.includes(q) || (u.work_email ?? "").toLowerCase().includes(q) || (u.uid ?? "").toLowerCase().includes(q)) &&
+      (filters.department    ? u.department      === filters.department    : true) &&
+      (filters.role          ? u.role            === filters.role          : true) &&
+      (filters.location      ? u.office_location === filters.location      : true) &&
+      (filters.gender        ? u.gender          === filters.gender        : true) &&
+      (filters.marital_status? u.marital_status  === filters.marital_status: true) &&
+      (filters.is_fresher !== ""
+        ? String(u.is_fresher) === filters.is_fresher
+        : true) &&
+      matchType
     );
   });
 
-  const clearFilters = () => setFilters({ search: "", department: "", role: "", location: "", gender: "" });
-  const activeFilterCount = [filters.department, filters.role, filters.location, filters.gender].filter(Boolean).length;
+  const clearFilters = () => setFilters({ search: "", department: "", role: "", location: "", gender: "", marital_status: "", is_fresher: "", type: "" });
+  const activeFilterCount = [filters.department, filters.role, filters.location, filters.gender, filters.marital_status, filters.is_fresher, filters.type].filter(Boolean).length;
 
   function roleBadge(role) {
-    if (role === "employee")       return <Badge label="Employee"       type="role" />;
-    if (role === "manager")        return <Badge label="Manager"        type="manager" />;
-    if (role === "senior_manager") return <Badge label="Sr. Manager"    type="smgr" />;
+    if (role === "employee")       return <Badge label="Employee"    type="role" />;
+    if (role === "manager")        return <Badge label="Manager"     type="manager" />;
+    if (role === "senior_manager") return <Badge label="Sr. Manager" type="smgr" />;
     return <Badge label={role?.replace("_", " ") || "—"} type="manager" />;
   }
 
@@ -788,6 +950,15 @@ export default function EmployeeTable() {
             <p className="text-xs sm:text-sm text-[#993556] mt-0.5">{allUsers.length} total · {filtered.length} shown</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => exportToExcel(filtered)}
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold hover:text-white transition-all"
+              style={{ borderColor: "#085041", color: "#085041" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#085041"; e.currentTarget.style.color = "#fff"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#085041"; }}
+            >
+              <FaFileExcel size={12} /><span>Export CSV</span>
+            </button>
             <button
               onClick={() => { setOpenManager(true); setMgrStep(0); }}
               className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold hover:text-white transition-all"
@@ -815,7 +986,7 @@ export default function EmployeeTable() {
                 <div className="relative flex-1">
                   <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[#993556]" size={12} />
                   <input
-                    placeholder="Search name or email…"
+                    placeholder="Search name, email, or UID…"
                     className={`${inputCls} pl-8 sm:pl-9`}
                     value={filters.search}
                     onChange={(e) => setFilters({ ...filters, search: e.target.value })}
@@ -837,6 +1008,11 @@ export default function EmployeeTable() {
               </div>
 
               <div className="hidden sm:flex gap-2">
+                <select className={`${inputCls} flex-1`} value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value })}>
+                  <option value="">All Types</option>
+                  <option value="employee">Employees</option>
+                  <option value="manager">Managers</option>
+                </select>
                 <select className={`${inputCls} flex-1`} value={filters.department} onChange={(e) => setFilters({ ...filters, department: e.target.value })}>
                   <option value="">All Departments</option>
                   {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
@@ -854,6 +1030,11 @@ export default function EmployeeTable() {
             {showFilters && (
               <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-[#F4C0D1]">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                  <select className={inputCls} value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value })}>
+                    <option value="">All Types</option>
+                    <option value="employee">Employees</option>
+                    <option value="manager">Managers</option>
+                  </select>
                   <select className={inputCls} value={filters.department} onChange={(e) => setFilters({ ...filters, department: e.target.value })}>
                     <option value="">All Depts</option>
                     {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
@@ -875,13 +1056,27 @@ export default function EmployeeTable() {
                     <option value="female">Female</option>
                     <option value="other">Other</option>
                   </select>
+                  <select className={inputCls} value={filters.marital_status} onChange={(e) => setFilters({ ...filters, marital_status: e.target.value })}>
+                    <option value="">All Marital Status</option>
+                    <option value="single">Single</option>
+                    <option value="married">Married</option>
+                    <option value="divorced">Divorced</option>
+                  </select>
+                  <select className={inputCls} value={filters.is_fresher} onChange={(e) => setFilters({ ...filters, is_fresher: e.target.value })}>
+                    <option value="">Fresher / Experienced</option>
+                    <option value="true">Fresher</option>
+                    <option value="false">Experienced</option>
+                  </select>
                 </div>
                 {activeFilterCount > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-2 items-center">
-                    {filters.department && <FilterChip label={`Dept: ${filters.department}`} onRemove={() => setFilters({ ...filters, department: "" })} />}
-                    {filters.role       && <FilterChip label={`Role: ${filters.role}`}       onRemove={() => setFilters({ ...filters, role: "" })} />}
-                    {filters.location   && <FilterChip label={`Loc: ${filters.location}`}    onRemove={() => setFilters({ ...filters, location: "" })} />}
-                    {filters.gender     && <FilterChip label={`Gender: ${filters.gender}`}   onRemove={() => setFilters({ ...filters, gender: "" })} />}
+                    {filters.type           && <FilterChip label={`Type: ${filters.type}`}                    onRemove={() => setFilters({ ...filters, type: "" })} />}
+                    {filters.department     && <FilterChip label={`Dept: ${filters.department}`}              onRemove={() => setFilters({ ...filters, department: "" })} />}
+                    {filters.role           && <FilterChip label={`Role: ${filters.role}`}                    onRemove={() => setFilters({ ...filters, role: "" })} />}
+                    {filters.location       && <FilterChip label={`Loc: ${filters.location}`}                 onRemove={() => setFilters({ ...filters, location: "" })} />}
+                    {filters.gender         && <FilterChip label={`Gender: ${filters.gender}`}                onRemove={() => setFilters({ ...filters, gender: "" })} />}
+                    {filters.marital_status && <FilterChip label={`Status: ${filters.marital_status}`}        onRemove={() => setFilters({ ...filters, marital_status: "" })} />}
+                    {filters.is_fresher !== "" && <FilterChip label={filters.is_fresher === "true" ? "Fresher" : "Experienced"} onRemove={() => setFilters({ ...filters, is_fresher: "" })} />}
                     <button onClick={clearFilters} className="text-xs text-[#A32D2D] font-semibold hover:underline ml-1">Clear All</button>
                   </div>
                 )}
@@ -909,6 +1104,9 @@ export default function EmployeeTable() {
                   onView={(id, role) => { setSelectedEmployeeId(id); setSelectedEmployeeRole(role); }}
                   onEdit={handleOpenEdit}
                   onDelete={setDeleteTarget}
+                  onPromote={(user) => { setPromoteTarget(user); setPromoteForm({ reporting_manager: "", designation: user.designation || "", role: "manager" }); }}
+                  onDemote={(user) => { setDemoteTarget(user); setDemoteForm({ Under_manager: "", designation: user.designation || "" }); }}
+                  onChangeRole={(user) => { setRoleChangeTarget(user); setRoleChangeValue(user.role || "manager"); }}
                 />
               ))
             )}
@@ -955,17 +1153,24 @@ export default function EmployeeTable() {
                             <p className="font-medium text-[#730042] truncate max-w-[80px] lg:max-w-none">{u.Under_manager.f_name} {u.Under_manager.l_name}</p>
                             <p className="text-[#993556] hidden lg:block">{u.Under_manager.uid}</p>
                           </div>
+                        ) : u.reporting_manager ? (
+                          <div className="text-xs">
+                            <p className="font-medium text-[#730042] truncate max-w-[80px] lg:max-w-none">{u.reporting_manager.f_name} {u.reporting_manager.l_name}</p>
+                          </div>
                         ) : <span className="text-[#F4C0D1] text-xs">—</span>}
                       </td>
                       <td className="px-3 lg:px-4 py-3">{roleBadge(u.role)}</td>
                       <td className="px-3 lg:px-4 py-3">
-                        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                          <button onClick={() => handleOpenEdit(u)} className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center text-[#993556] border border-[#F4C0D1] hover:text-[#CD166E] hover:bg-[#FBEAF0] transition-colors" style={{ background: "#F9F8F2" }}>
-                            <FaEdit size={11} />
-                          </button>
-                          <button onClick={() => setDeleteTarget(u)} className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center text-[#993556] border border-[#F4C0D1] hover:text-[#A32D2D] hover:bg-[#FCEBEB] transition-colors" style={{ background: "#F9F8F2" }}>
-                            <FaTrash size={10} />
-                          </button>
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                          <ActionMenu
+                            user={u}
+                            onView={(id, role) => { setSelectedEmployeeId(id); setSelectedEmployeeRole(role); }}
+                            onEdit={handleOpenEdit}
+                            onDelete={setDeleteTarget}
+                            onPromote={(user) => { setPromoteTarget(user); setPromoteForm({ reporting_manager: "", designation: user.designation || "", role: "manager" }); }}
+                            onDemote={(user) => { setDemoteTarget(user); setDemoteForm({ Under_manager: "", designation: user.designation || "" }); }}
+                            onChangeRole={(user) => { setRoleChangeTarget(user); setRoleChangeValue(user.role || "manager"); }}
+                          />
                         </div>
                       </td>
                     </tr>
@@ -1016,11 +1221,11 @@ export default function EmployeeTable() {
 
       {openEdit && editTarget && (
         <Modal
-          title={`Edit ${editTarget.role === "employee" ? "Employee" : "Manager"}`}
-          icon={editTarget.role === "employee" ? <FaUserPlus /> : <FaUserTie />}
+          title={`Edit ${editTarget.type === "manager" || ["manager","senior_manager"].includes(editTarget.role) ? "Manager" : "Employee"}`}
+          icon={editTarget.type === "manager" ? <FaUserTie /> : <FaUserPlus />}
           onClose={() => { setOpenEdit(false); setEditTarget(null); setEditErrors({}); }}
           onSubmit={handleEditSubmit}
-          accentColor={editTarget.role === "employee" ? "#CD166E" : "#730042"}
+          accentColor={editTarget.type === "manager" || ["manager","senior_manager"].includes(editTarget.role) ? "#730042" : "#CD166E"}
         >
           <Field label="First Name" required error={editErrors.f_name}><input name="f_name" value={editForm.f_name} onChange={handleEditChange} className={inputCls} /></Field>
           <Field label="Last Name" required error={editErrors.l_name}><input name="l_name" value={editForm.l_name} onChange={handleEditChange} className={inputCls} /></Field>
@@ -1039,10 +1244,20 @@ export default function EmployeeTable() {
               <option value="official">Official</option>
             </select>
           </Field>
-          {editForm.role === "employee" && (
+          {(editTarget.type === "employee" || editForm.role === "employee") && (
             <Field label="Under Manager">
               <select name="Under_manager" value={editForm.Under_manager} onChange={handleEditChange} className={inputCls}>
                 <option value="">Select Manager</option>
+                {managers?.managers?.map((mgr) => (
+                  <option key={mgr._id} value={mgr._id}>{mgr.f_name} {mgr.l_name} ({mgr.uid})</option>
+                ))}
+              </select>
+            </Field>
+          )}
+          {(editTarget.type === "manager" || ["manager","senior_manager"].includes(editTarget.role)) && (
+            <Field label="Reporting Manager">
+              <select name="reporting_manager" value={editForm.reporting_manager} onChange={handleEditChange} className={inputCls}>
+                <option value="">Select Reporting Manager</option>
                 {managers?.managers?.map((mgr) => (
                   <option key={mgr._id} value={mgr._id}>{mgr.f_name} {mgr.l_name} ({mgr.uid})</option>
                 ))}
@@ -1070,7 +1285,96 @@ export default function EmployeeTable() {
       )}
 
       {deleteTarget && (
-        <DeleteConfirm user={deleteTarget} onConfirm={handleConfirmDelete} onCancel={() => setDeleteTarget(null)} />
+        <ConfirmModal
+          title="Delete User?"
+          icon="🗑️"
+          message={`Are you sure you want to delete ${deleteTarget.f_name} ${deleteTarget.l_name}? This cannot be undone.`}
+          confirmLabel="Delete"
+          confirmColor="#A32D2D"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {promoteTarget && (
+        <ConfirmModal
+          title="Promote to Manager?"
+          icon="⬆️"
+          message={`Promote ${promoteTarget.f_name} ${promoteTarget.l_name} to manager. You can set a designation and reporting manager.`}
+          confirmLabel="Promote"
+          confirmColor="#3C3489"
+          onConfirm={handleConfirmPromote}
+          onCancel={() => setPromoteTarget(null)}
+        >
+          <div className="flex flex-col gap-2 -mt-1">
+            <Field label="New Designation">
+              <input className={inputCls} placeholder="e.g. Team Lead" value={promoteForm.designation} onChange={(e) => setPromoteForm({ ...promoteForm, designation: e.target.value })} />
+            </Field>
+            <Field label="Manager Role">
+              <select className={inputCls} value={promoteForm.role} onChange={(e) => setPromoteForm({ ...promoteForm, role: e.target.value })}>
+                <option value="manager">Manager</option>
+                <option value="senior_manager">Senior Manager</option>
+                <option value="official">Official</option>
+              </select>
+            </Field>
+            <Field label="Reporting Manager">
+              <select className={inputCls} value={promoteForm.reporting_manager} onChange={(e) => setPromoteForm({ ...promoteForm, reporting_manager: e.target.value })}>
+                <option value="">Select (optional)</option>
+                {managers?.managers?.map((mgr) => (
+                  <option key={mgr._id} value={mgr._id}>{mgr.f_name} {mgr.l_name}</option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        </ConfirmModal>
+      )}
+
+      {demoteTarget && (
+        <ConfirmModal
+          title="Demote to Employee?"
+          icon="⬇️"
+          message={`Demote ${demoteTarget.f_name} ${demoteTarget.l_name} to employee. Their direct reports will be reassigned.`}
+          confirmLabel="Demote"
+          confirmColor="#7A3500"
+          onConfirm={handleConfirmDemote}
+          onCancel={() => setDemoteTarget(null)}
+        >
+          <div className="flex flex-col gap-2 -mt-1">
+            <Field label="New Designation">
+              <input className={inputCls} placeholder="e.g. Senior Associate" value={demoteForm.designation} onChange={(e) => setDemoteForm({ ...demoteForm, designation: e.target.value })} />
+            </Field>
+            <Field label="Assign Under Manager">
+              <select className={inputCls} value={demoteForm.Under_manager} onChange={(e) => setDemoteForm({ ...demoteForm, Under_manager: e.target.value })}>
+                <option value="">Select Manager (optional)</option>
+                {managers?.managers?.filter((m) => m._id !== demoteTarget._id).map((mgr) => (
+                  <option key={mgr._id} value={mgr._id}>{mgr.f_name} {mgr.l_name}</option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        </ConfirmModal>
+      )}
+
+      {roleChangeTarget && (
+        <ConfirmModal
+          title="Change Manager Role"
+          icon="🔄"
+          message={`Change the role of ${roleChangeTarget.f_name} ${roleChangeTarget.l_name}.`}
+          confirmLabel="Update Role"
+          confirmColor="#085041"
+          onConfirm={handleConfirmRoleChange}
+          onCancel={() => setRoleChangeTarget(null)}
+        >
+          <div className="-mt-1">
+            <Field label="New Role">
+              <select className={inputCls} value={roleChangeValue} onChange={(e) => setRoleChangeValue(e.target.value)}>
+                <option value="manager">Manager</option>
+                <option value="senior_manager">Senior Manager</option>
+                <option value="official">Official</option>
+              </select>
+            </Field>
+          </div>
+        </ConfirmModal>
       )}
 
       {selectedEmployeeId && (

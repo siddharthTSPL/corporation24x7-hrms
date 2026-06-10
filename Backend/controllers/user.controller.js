@@ -23,7 +23,7 @@ const verifyUserEmail = async (req, res, next) => {
     return res
       .status(400)
       .send(
-        `<!DOCTYPE html><html><body style="margin:0;font-family:Segoe UI;background:#F9F8F2;display:flex;align-items:center;justify-content:center;height:100vh;"><div style="background:white;padding:40px;border-radius:12px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.1);max-width:400px;"><h1 style="color:#CD166E;">Link Invalid</h1><p style="color:#555;">This verification link is expired or invalid.</p><a href="${process.env.FRONTEND_URL}/login" style="margin-top:20px;display:inline-block;padding:12px 25px;background:#730042;color:white;text-decoration:none;border-radius:8px;">Go to Login</a></div></body></html>`,
+        `<!DOCTYPE html><html><body style="margin:0;font-family:Segoe UI;background:#F9F8F2;display:flex;align-items:center;justify-content:center;height:100vh;"><div style="background:white;padding:40px;border-radius:12px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.1);max-width:400px;"><h1 style="color:#CD166E;">Link Invalid</h1><p style="color:#555;">This verification link is expired or invalid.</p><a href="${process.env.torchxsuite.com/talent}/login" style="margin-top:20px;display:inline-block;padding:12px 25px;background:#730042;color:white;text-decoration:none;border-radius:8px;">Go to Login</a></div></body></html>`,
       );
   }
 
@@ -53,51 +53,96 @@ const verifyUserEmail = async (req, res, next) => {
 
 const userlogin = async (req, res, next) => {
   const { identifier, password } = req.body;
-  if (!identifier || !password)
-    return next(
-      Object.assign(new Error("Email and password are required"), {
-        statusCode: 400,
-      }),
-    );
 
-  const user = await usermodel.findOne({ work_email: identifier });
-  if (!user)
+  if (!identifier || !password) {
     return next(
-      Object.assign(new Error("User not found"), { statusCode: 404 }),
+      Object.assign(
+        new Error("Email and password are required"),
+        { statusCode: 400 }
+      )
     );
-  if (!user.isverified)
+  }
+
+  const user = await usermodel.findOne({
+    work_email: identifier.toLowerCase().trim(),
+  });
+
+  if (!user) {
     return next(
-      Object.assign(new Error("Please verify your email before logging in"), {
-        statusCode: 403,
-      }),
+      Object.assign(
+        new Error("User not found"),
+        { statusCode: 404 }
+      )
     );
+  }
+
+  if (!user.isverified) {
+    return next(
+      Object.assign(
+        new Error("Please verify your email before logging in"),
+        { statusCode: 403 }
+      )
+    );
+  }
 
   const isvalidpassword = await user.isValidPassword(password);
-  if (!isvalidpassword)
+
+  if (!isvalidpassword) {
     return next(
-      Object.assign(new Error("Invalid credentials"), { statusCode: 401 }),
+      Object.assign(
+        new Error("Invalid credentials"),
+        { statusCode: 401 }
+      )
     );
+  }
+
+  /*
+   * Optional password setup link
+   */
+  let passwordSetupLink = null;
+
+  if (user.isFirstLogin) {
+    const resetToken = jwt.sign(
+      {
+        work_email: user.work_email,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "15m",
+      }
+    );
+
+    passwordSetupLink =
+      `https://corporation24x7-hrms.onrender.com/user/change-password?token=${resetToken}`;
+  }
 
   const superAdmin = await SuperAdminModel.findOne({
     company_domain: user.work_email.split("@")[1].toLowerCase().trim(),
   });
+
   if (superAdmin) {
     const trialValid = superAdmin.isTrialValid();
+
     const hasTalentLicense = superAdmin.licenses.some(
       (l) =>
         l.product === "torchx_talent" &&
         l.isActive &&
-        new Date(l.expiresAt) > new Date(),
+        new Date(l.expiresAt) > new Date()
     );
-    if (!trialValid && !hasTalentLicense)
+
+    if (!trialValid && !hasTalentLicense) {
       return next(
         Object.assign(
           new Error(
-            "Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance.",
+            "Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."
           ),
-          { statusCode: 403, code: "SERVICE_STOPPED" },
-        ),
+          {
+            statusCode: 403,
+            code: "SERVICE_STOPPED",
+          }
+        )
       );
+    }
   }
 
   const token = jwt.sign(
@@ -108,24 +153,38 @@ const userlogin = async (req, res, next) => {
       organisation_id: user.organisation_id,
     },
     process.env.JWT_SECRET,
-    { expiresIn: "15d" },
+    {
+      expiresIn: "15d",
+    }
   );
-  const isProduction = process.env.NODE_ENV === "production";
+
+  const isProduction =
+    process.env.NODE_ENV === "production";
+
   res.cookie("token", token, {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
     maxAge: 15 * 24 * 60 * 60 * 1000,
   });
-  usermodel.findByIdAndUpdate(user._id, { status: "active" }).exec();
-  res
-    .status(200)
-    .json({
-      success: true,
-      message: "Login successful",
-      role: user.role,
-      isFirstLogin: user.isFirstLogin,
-    });
+
+  usermodel.findByIdAndUpdate(
+    user._id,
+    {
+      status: "active",
+      last_login: new Date(),
+    }
+  ).exec();
+
+  return res.status(200).json({
+    success: true,
+    message: "Login successful",
+    role: user.role,
+    isFirstLogin: user.isFirstLogin,
+
+    canSetupPassword: user.isFirstLogin,
+    passwordSetupLink,
+  });
 };
 
 const userlogout = async (req, res, next) => {
@@ -217,41 +276,87 @@ const forgetpassword = async (req, res, next) => {
 const verifyOtp = async (req, res, next) => {
   try {
     const { work_email, otp } = req.body;
-    if (!work_email || !otp)
-      return next(
-        Object.assign(new Error("Email and OTP are required"), {
-          statusCode: 400,
-        }),
-      );
 
-    const otpRecord = await OtpModel.findOne({ email: work_email });
-    if (!otpRecord)
+    if (!work_email || !otp) {
       return next(
-        Object.assign(new Error("OTP not found. Please request a new one"), {
-          statusCode: 404,
-        }),
-      );
-    if (otpRecord.isExpired()) {
-      await OtpModel.deleteOne({ email: work_email });
-      return next(
-        Object.assign(new Error("OTP has expired. Please request a new one"), {
-          statusCode: 400,
-        }),
+        Object.assign(
+          new Error("Email and OTP are required"),
+          { statusCode: 400 }
+        )
       );
     }
-    if (!otpRecord.compareOtp(String(otp)))
-      return next(Object.assign(new Error("Invalid OTP"), { statusCode: 400 }));
 
-    const user = await usermodel
-      .findOne({ work_email })
-      .select("_id work_email role organisation_id")
-      .lean();
-    if (!user)
+    const otpRecord = await OtpModel.findOne({
+      email: work_email,
+    });
+
+    if (!otpRecord) {
       return next(
-        Object.assign(new Error("User not found"), { statusCode: 404 }),
+        Object.assign(
+          new Error("OTP not found. Please request a new one"),
+          { statusCode: 404 }
+        )
+      );
+    }
+
+    if (otpRecord.isExpired()) {
+      await OtpModel.deleteOne({
+        email: work_email,
+      });
+
+      return next(
+        Object.assign(
+          new Error("OTP has expired. Please request a new one"),
+          { statusCode: 400 }
+        )
+      );
+    }
+
+    if (!otpRecord.compareOtp(String(otp))) {
+      return next(
+        Object.assign(
+          new Error("Invalid OTP"),
+          { statusCode: 400 }
+        )
+      );
+    }
+
+    const user = await usermodel.findOne({
+      work_email,
+    });
+
+    if (!user) {
+      return next(
+        Object.assign(
+          new Error("User not found"),
+          { statusCode: 404 }
+        )
+      );
+    }
+
+    await OtpModel.deleteOne({
+      email: work_email,
+    });
+
+    /*
+     * Optional password setup link
+     */
+    let passwordSetupLink = null;
+
+    if (user.isFirstLogin) {
+      const resetToken = jwt.sign(
+        {
+          work_email: user.work_email,
+        },
+        process.env.JWT_SECRET,
+        {
+          expiresIn: "15m",
+        }
       );
 
-    await OtpModel.deleteOne({ email: work_email });
+      passwordSetupLink =
+        `https://corporation24x7-hrms.onrender.com/user/change-password?token=${resetToken}`;
+    }
 
     const token = jwt.sign(
       {
@@ -261,10 +366,14 @@ const verifyOtp = async (req, res, next) => {
         organisation_id: user.organisation_id,
       },
       process.env.JWT_SECRET,
-      { expiresIn: "7d" },
+      {
+        expiresIn: "7d",
+      }
     );
 
-    const isProduction = process.env.NODE_ENV === "production";
+    const isProduction =
+      process.env.NODE_ENV === "production";
+
     res.cookie("token", token, {
       httpOnly: true,
       secure: isProduction,
@@ -272,17 +381,23 @@ const verifyOtp = async (req, res, next) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    usermodel
-      .findByIdAndUpdate(user._id, { status: "active", last_login: new Date() })
-      .exec();
+    usermodel.findByIdAndUpdate(
+      user._id,
+      {
+        status: "active",
+        last_login: new Date(),
+      }
+    ).exec();
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "OTP verified successfully",
-        role: user.role,
-      });
+    return res.status(200).json({
+      success: true,
+      message: "OTP verified successfully",
+      role: user.role,
+      isFirstLogin: user.isFirstLogin,
+
+      canSetupPassword: user.isFirstLogin,
+      passwordSetupLink,
+    });
   } catch (error) {
     next(error);
   }
@@ -942,6 +1057,170 @@ const getOrgInfo = async (req, res, next) => {
   }
 };
 
+
+const showPasswordPage = (req, res) => {
+  const { token } = req.query;
+
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+      <body>
+        <h2>Set Password</h2>
+
+        <form
+          action="/talent/api/user/firstloginpasswordchange"
+          method="POST"
+        >
+          <input
+            type="hidden"
+            name="token"
+            value="${token}"
+          />
+
+          <input
+            type="password"
+            name="newPassword"
+            placeholder="Enter New Password"
+            required
+          />
+
+          <button type="submit">
+            Update Password
+          </button>
+        </form>
+      </body>
+    </html>
+  `);
+};
+
+const firstLoginPasswordChange = async (req, res, next) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return next(
+        Object.assign(
+          new Error("Token and password are required"),
+          {
+            statusCode: 400,
+          }
+        )
+      );
+    }
+
+    let decoded;
+
+    try {
+      decoded = jwt.verify(
+        token,
+        process.env.JWT_SECRET
+      );
+    } catch (err) {
+      return next(
+        Object.assign(
+          new Error("Invalid or expired link"),
+          {
+            statusCode: 400,
+          }
+        )
+      );
+    }
+
+    const user = await usermodel.findOne({
+      work_email: decoded.work_email,
+    });
+
+    if (!user) {
+      return next(
+        Object.assign(
+          new Error("User not found"),
+          {
+            statusCode: 404,
+          }
+        )
+      );
+    }
+
+    user.password = newPassword;
+    user.isFirstLogin = false;
+    user.passwordupdatedAt = new Date();
+
+    await user.save();
+
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+        <body>
+          <h2>Password Updated Successfully</h2>
+
+          <p>
+            You can now continue using your account.
+          </p>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const sendPasswordSetupLink = async (req, res, next) => {
+  try {
+    const user = await usermodel.findById(req.user.userId);
+
+    if (!user) {
+      return next(
+        Object.assign(new Error("User not found"), {
+          statusCode: 404,
+        })
+      );
+    }
+
+    const resetToken = jwt.sign(
+      {
+        work_email: user.work_email,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "15m",
+      }
+    );
+
+    const passwordLink =
+      `${process.env.BASE_URL}talent/api/user/change-password?token=${resetToken}`;
+
+    await sendEmail({
+      to: user.work_email,
+      subject: "Set Your Password",
+      html: `
+        <h2>Hello ${user.f_name},</h2>
+
+        <p>Please click the button below to set your password.</p>
+
+        <a href="${passwordLink}"
+           style="
+             display:inline-block;
+             padding:12px 24px;
+             background:#730042;
+             color:#ffffff;
+             text-decoration:none;
+             border-radius:8px;
+           ">
+          Set Password
+        </a>
+
+        <p>This link expires in 15 minutes.</p>
+      `,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Password setup link sent successfully.",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 module.exports = {
   verifyUserEmail,
   userlogin,
@@ -965,4 +1244,7 @@ module.exports = {
   employeeRateTicket,
   employeeGetTicketDetail,
   getOrgInfo,
+  firstLoginPasswordChange,
+  showPasswordPage,
+  sendPasswordSetupLink,
 };

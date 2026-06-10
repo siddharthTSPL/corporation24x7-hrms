@@ -26,6 +26,9 @@ const {
   employeeRateTicket,
   employeeGetTicketDetail,
   getOrgInfo,
+  firstLoginPasswordChange,
+  showPasswordPage,
+  sendPasswordSetupLink
 } = require("../controllers/user.controller");
 
 userrouter.get("/verify/:token", asyncHandler(verifyUserEmail));
@@ -94,6 +97,22 @@ userrouter.get(
   "/getTicketDetail/:ticketNumber",
   employeemiddleware,
   asyncHandler(employeeGetTicketDetail),
+);
+
+userrouter.get(
+  "/change-password",
+  showPasswordPage
+);
+
+userrouter.post(
+  "/firstloginpasswordchange",
+  asyncHandler(firstLoginPasswordChange)
+);
+
+userrouter.post(
+  "/sendPasswordSetupLink",
+  employeemiddleware,   // <-- add middleware here
+  asyncHandler(sendPasswordSetupLink)
 );
 
 userrouter.get("/getOrgInfo", employeemiddleware, asyncHandler(getOrgInfo));
