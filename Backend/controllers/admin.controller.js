@@ -1795,6 +1795,43 @@ const showallleaves = async (req, res, next) => {
   }
 };
 
+const showallleaves = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const organisation_id = req.admin.organisation_id;
+
+    const [employeeLeaves, managerLeaves] = await Promise.all([
+      Leave.find({
+        organisation_id,
+        status: { $in: ["forwarded_reporting_manager", "approved_reporting_manager", "rejected_reporting_manager"] },
+      })
+        .populate("employee", "f_name l_name work_email")
+        .populate("manager", "f_name l_name work_email")
+        .sort({ createdAt: -1 })
+        .lean(),
+      ManagerLeave.find({
+        organisation_id,
+        status: "pending_reporting_manager",
+        directed_to: req.admin._id,
+        directed_to_model: "Admin",
+      })
+        .populate("manager", "f_name l_name work_email department designation")
+        .sort({ createdAt: -1 })
+        .lean(),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      employeeLeaves: { count: employeeLeaves.length, leaves: employeeLeaves },
+      managerLeaves: { count: managerLeaves.length, leaves: managerLeaves },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const acceptLeave = async (req, res, next) => {
   try {
     if (!req.admin)
@@ -1807,35 +1844,51 @@ const acceptLeave = async (req, res, next) => {
     if (!leaveFor)
       return next(Object.assign(new Error("leaveFor is required"), { statusCode: 400 }));
 
-    let leave = null;
-
     if (leaveFor === "employee") {
-      leave = await Leave.findOne({ _id: id, organisation_id });
+      const leave = await Leave.findOne({ _id: id, organisation_id });
       if (!leave)
         return next(Object.assign(new Error("Employee leave not found"), { statusCode: 404 }));
+
       leave.status = "approved_reporting_manager";
       leave.approvedBy = req.admin._id;
-      leave.remarks = "Approved by Admin";
-    } else if (leaveFor === "manager") {
-      leave = await ManagerLeave.findOne({ _id: id, organisation_id });
+      leave.remarks = `Approved by Admin (${req.admin.f_name})`;
+      await leave.save();
+
+      try {
+        await processLeaveDeduction(leave);
+      } catch (deductionError) {
+        console.error("Leave approved but balance deduction failed:", deductionError.message);
+      }
+
+      return res.status(200).json({ success: true, message: "Employee leave approved successfully", leave });
+    }
+
+    if (leaveFor === "manager") {
+      const leave = await ManagerLeave.findOne({ _id: id, organisation_id });
       if (!leave)
         return next(Object.assign(new Error("Manager leave not found"), { statusCode: 404 }));
+      if (
+        leave.directed_to?.toString() !== req.admin._id.toString() ||
+        leave.directed_to_model !== "Admin"
+      )
+        return next(Object.assign(new Error("This leave is not directed to you"), { statusCode: 403 }));
+
       leave.status = "approved_reporting_manager";
       leave.approvedBy = req.admin._id;
-      leave.remarks = "Approved by Admin";
-    } else {
-      return next(Object.assign(new Error("Invalid leaveFor value"), { statusCode: 400 }));
+      leave.approvedByModel = "Admin";
+      leave.remarks = `Approved by Admin (${req.admin.f_name})`;
+      await leave.save();
+
+      try {
+        await processLeaveDeduction(leave);
+      } catch (deductionError) {
+        console.error("Leave approved but balance deduction failed:", deductionError.message);
+      }
+
+      return res.status(200).json({ success: true, message: "Manager leave approved successfully", leave });
     }
 
-    await leave.save();
-
-    try {
-      await processLeaveDeduction(leave);
-    } catch (deductionError) {
-      console.error("Leave approved but balance deduction failed:", deductionError.message);
-    }
-
-    res.status(200).json({ success: true, message: "Leave approved successfully", leave });
+    return next(Object.assign(new Error("Invalid leaveFor value"), { statusCode: 400 }));
   } catch (error) {
     next(error);
   }
@@ -1853,75 +1906,44 @@ const rejectLeave = async (req, res, next) => {
     if (!leaveFor)
       return next(Object.assign(new Error("leaveFor is required"), { statusCode: 400 }));
 
-    let leave = null;
-
     if (leaveFor === "employee") {
-      leave = await Leave.findOne({ _id: id, organisation_id });
+      const leave = await Leave.findOne({ _id: id, organisation_id });
       if (!leave)
         return next(Object.assign(new Error("Employee leave not found"), { statusCode: 404 }));
+
       leave.status = "rejected_reporting_manager";
       leave.rejectedBy = req.admin._id;
-      leave.remarks = "Rejected by Admin";
-    } else if (leaveFor === "manager") {
-      leave = await ManagerLeave.findOne({ _id: id, organisation_id });
-      if (!leave)
-        return next(Object.assign(new Error("Manager leave not found"), { statusCode: 404 }));
-      leave.status = "rejected_reporting_manager";
-      leave.rejectedBy = req.admin._id;
-      leave.remarks = "Rejected by Admin";
-    } else {
-      return next(Object.assign(new Error("Invalid leaveFor value"), { statusCode: 400 }));
+      leave.remarks = `Rejected by Admin (${req.admin.f_name})`;
+      leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await leave.save();
+
+      return res.status(200).json({ success: true, message: "Employee leave rejected successfully", leave });
     }
 
-    leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    await leave.save();
-    res.status(200).json({ success: true, message: "Leave rejected successfully", leave });
+    if (leaveFor === "manager") {
+      const leave = await ManagerLeave.findOne({ _id: id, organisation_id });
+      if (!leave)
+        return next(Object.assign(new Error("Manager leave not found"), { statusCode: 404 }));
+      if (
+        leave.directed_to?.toString() !== req.admin._id.toString() ||
+        leave.directed_to_model !== "Admin"
+      )
+        return next(Object.assign(new Error("This leave is not directed to you"), { statusCode: 403 }));
+
+      leave.status = "rejected_reporting_manager";
+      leave.rejectedBy = req.admin._id;
+      leave.rejectedByModel = "Admin";
+      leave.remarks = `Rejected by Admin (${req.admin.f_name})`;
+      leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await leave.save();
+
+      return res.status(200).json({ success: true, message: "Manager leave rejected successfully", leave });
+    }
+
+    return next(Object.assign(new Error("Invalid leaveFor value"), { statusCode: 400 }));
   } catch (error) {
     next(error);
   }
-};
-
-const applyleave = async (req, res, next) => {
-  if (!req.admin)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-
-  const { leaveType, startDate, endDate, reason } = req.body;
-  if (!leaveType || !startDate || !endDate || !reason)
-    return next(Object.assign(new Error("leaveType, startDate, endDate and reason are required"), { statusCode: 400 }));
-
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  if (end < start)
-    return next(Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }));
-
-  const days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
-  const organisation_id = req.admin.organisation_id;
-
-  const overlapping = await AdminLeave.findOne({
-    admin: req.admin._id,
-    organisation_id,
-    status: { $nin: ["rejected_superadmin"] },
-    startDate: { $lte: end },
-    endDate: { $gte: start },
-  })
-    .select("_id")
-    .lean();
-
-  if (overlapping)
-    return next(Object.assign(new Error("Leave already applied for these dates"), { statusCode: 400 }));
-
-  const leave = await AdminLeave.create({
-    organisation_id,
-    admin: req.admin._id,
-    leaveType,
-    startDate: start,
-    endDate: end,
-    days,
-    reason,
-    status: "pending_superadmin",
-  });
-
-  res.status(201).json({ success: true, message: "Leave request submitted to super admin", leave });
 };
 
 const getmyleavehistory = async (req, res, next) => {
