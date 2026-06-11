@@ -58,6 +58,7 @@ const superadminrouter = require('../routes/superadmin.route');
 const ticketroute = require('../routes/ticket.routes');
 const recruitmentroute = require('../routes/Recruitment.route');
 const wfhroute = require('../routes/wfh.routes');
+const permissionroute = require('../routes/permission.route');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 app.use('/admin', adminrouter);
@@ -69,6 +70,7 @@ app.use('/superadmin', superadminrouter);
 app.use('/ticket', ticketroute);
 app.use('/recruitment', recruitmentroute);
 app.use('/wfh', wfhroute);
+app.use('/permission', permissionroute);
 
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
