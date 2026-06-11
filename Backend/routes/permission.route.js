@@ -8,20 +8,60 @@ const {
   deletePermission,
 } = require("../controllers/permission.controller");
 
-const { verifySuperAdmin } = require("../middleware/auth/superadmin.middleware");
-const { verifyAdmin } = require("../middleware/auth/admin.middleware");
-const { verifyManager } = require("../middleware/auth/manager.middleware");
+const superAdminAuth = require("../middleware/auth/superadmin.middleware");
+const adminauthmiddleware = require("../middleware/auth/admin.middleware");
+const managermiddleware = require("../middleware/auth/manager.middleware");
 
-router.post("/assign/superadmin", verifySuperAdmin, createOrUpdatePermission);
-router.post("/assign/admin", verifyAdmin, createOrUpdatePermission);
+// Assign Permissions
+router.post(
+  "/assign/superadmin",
+  superAdminAuth,
+  createOrUpdatePermission
+);
 
-router.get("/:user_model/:user_id", verifySuperAdmin, getPermissions);
-router.get("/admin/:user_model/:user_id", verifyAdmin, getPermissions);
+router.post(
+  "/assign/admin",
+  adminauthmiddleware,
+  createOrUpdatePermission
+);
 
-router.get("/me/admin", verifyAdmin, getMyPermissions);
-router.get("/me/manager", verifyManager, getMyPermissions);
+// Get Permissions
+router.get(
+  "/:user_model/:user_id",
+  superAdminAuth,
+  getPermissions
+);
 
-router.delete("/superadmin/:user_model/:user_id", verifySuperAdmin, deletePermission);
-router.delete("/admin/:user_model/:user_id", verifyAdmin, deletePermission);
+router.get(
+  "/admin/:user_model/:user_id",
+  adminauthmiddleware,
+  getPermissions
+);
+
+// Get Logged-in User Permissions
+router.get(
+  "/me/admin",
+  adminauthmiddleware,
+  getMyPermissions
+);
+
+router.get(
+  "/me/manager",
+  managermiddleware,
+  getMyPermissions
+);
+
+// Delete Permissions
+router.delete(
+  "/superadmin/:user_model/:user_id",
+  superAdminAuth,
+  deletePermission
+);
+
+router.delete(
+  "/admin/:user_model/:user_id",
+  adminauthmiddleware,
+  deletePermission
+);
 
 module.exports = router;
