@@ -1778,41 +1778,6 @@ const showallleaves = async (req, res, next) => {
         .lean(),
       ManagerLeave.find({
         organisation_id,
-        status: { $in: ["pending_reporting_manager", "approved_reporting_manager", "rejected_reporting_manager"] },
-      })
-        .populate("manager", "f_name l_name work_email")
-        .sort({ createdAt: -1 })
-        .lean(),
-    ]);
-
-    res.status(200).json({
-      success: true,
-      employeeLeaves: { count: employeeLeaves.length, leaves: employeeLeaves },
-      managerLeaves: { count: managerLeaves.length, leaves: managerLeaves },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-const showallleaves = async (req, res, next) => {
-  try {
-    if (!req.admin)
-      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-
-    const organisation_id = req.admin.organisation_id;
-
-    const [employeeLeaves, managerLeaves] = await Promise.all([
-      Leave.find({
-        organisation_id,
-        status: { $in: ["forwarded_reporting_manager", "approved_reporting_manager", "rejected_reporting_manager"] },
-      })
-        .populate("employee", "f_name l_name work_email")
-        .populate("manager", "f_name l_name work_email")
-        .sort({ createdAt: -1 })
-        .lean(),
-      ManagerLeave.find({
-        organisation_id,
         status: "pending_reporting_manager",
         directed_to: req.admin._id,
         directed_to_model: "Admin",
@@ -1944,6 +1909,49 @@ const rejectLeave = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+const applyleave = async (req, res, next) => {
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const { leaveType, startDate, endDate, reason } = req.body;
+  if (!leaveType || !startDate || !endDate || !reason)
+    return next(Object.assign(new Error("leaveType, startDate, endDate and reason are required"), { statusCode: 400 }));
+
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (end < start)
+    return next(Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }));
+
+  const days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  const organisation_id = req.admin.organisation_id;
+
+  const overlapping = await AdminLeave.findOne({
+    admin: req.admin._id,
+    organisation_id,
+    status: { $nin: ["rejected_superadmin"] },
+    startDate: { $lte: end },
+    endDate: { $gte: start },
+  })
+    .select("_id")
+    .lean();
+
+  if (overlapping)
+    return next(Object.assign(new Error("Leave already applied for these dates"), { statusCode: 400 }));
+
+  const leave = await AdminLeave.create({
+    organisation_id,
+    admin: req.admin._id,
+    leaveType,
+    startDate: start,
+    endDate: end,
+    days,
+    reason,
+    status: "pending_superadmin",
+  });
+
+  res.status(201).json({ success: true, message: "Leave request submitted to super admin", leave });
 };
 
 const getmyleavehistory = async (req, res, next) => {
