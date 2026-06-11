@@ -11,7 +11,7 @@ import {
   addEmployee,
   findAllManagers,
   editAdminProfile,
-  changeAdminPassword
+  changeAdminPassword,
 } from "../../api/adminapi/auth/ad.auth.api";
 
 export const useRegisterAdmin = () => {
@@ -22,7 +22,6 @@ export const useRegisterAdmin = () => {
 
 export const useAdminLogin = () => {
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: loginAdmin,
     onSuccess: (data) => {
@@ -35,7 +34,7 @@ export const useGetMeAdmin = () => {
   return useQuery({
     queryKey: ["admin"],
     queryFn: getMeAdmin,
-    staleTime: 0, 
+    staleTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
@@ -52,18 +51,14 @@ export const useAdminLogout = () => {
   });
 };
 
-
-
 export const useSendForgetPasswordOtp = () => {
   return useMutation({
     mutationFn: sendForgetPasswordOtp,
   });
 };
 
-
 export const useVerifyAdminOtp = () => {
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: verifyAdminOtp,
     onSuccess: (data) => {
@@ -74,21 +69,23 @@ export const useVerifyAdminOtp = () => {
   });
 };
 
-
 export const useResetAdminPassword = () => {
   return useMutation({
     mutationFn: resetAdminPassword,
   });
 };
+
 export const useAddManager = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: addManager,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["managers"] });
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
     },
   });
 };
+
 export const useAddEmployee = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -105,7 +102,6 @@ export const useFindAllManagers = () => {
     queryFn: findAllManagers,
   });
 };
-
 
 export const useEditAdminProfile = () => {
   const queryClient = useQueryClient();
