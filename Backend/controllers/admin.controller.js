@@ -9,6 +9,7 @@ const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const { sendEmail } = require("../utils/nodemailer.utils");
 const assignDefaultLeave = require("../automatic/bydefaultleaveset");
+const PermissionModel = require("../Models/permission.model");
 const Leave = require("../Models/leave.model");
 const Review = require("../Models/review.model");
 const generateOTP = require("../automatic/otpgenerator");
@@ -469,7 +470,7 @@ const promoteEmployeeToManager = async (req, res, next) => {
 
     const { id } = req.params;
     const organisation_id = req.admin.organisation_id;
-    const { reporting_manager, designation, role } = req.body;
+    const { reporting_manager, designation, role, reason } = req.body;
 
     const user = await Usermodel.findOne({ _id: id, organisation_id }).lean();
     if (!user)
@@ -489,6 +490,21 @@ const promoteEmployeeToManager = async (req, res, next) => {
     const yearsAtCompany = parseFloat(
       ((Date.now() - new Date(user.createdAt).getTime()) / (1000 * 60 * 60 * 24 * 365)).toFixed(1)
     );
+
+    const newRole = role || "manager";
+
+    const roleHistoryEntry = {
+      from_role: user.role || "employee",
+      to_role: newRole,
+      from_model: "User",
+      to_model: "Manager",
+      changed_by: req.admin._id,
+      changed_by_model: "Admin",
+      reason: reason || null,
+      changed_at: new Date(),
+    };
+
+    const inheritedHistory = Array.isArray(user.role_history) ? user.role_history : [];
 
     const [newManager] = await Managermodel.create(
       [
@@ -512,7 +528,7 @@ const promoteEmployeeToManager = async (req, res, next) => {
           state: user.state || null,
           pincode: user.pincode || null,
           designation: designation || user.designation,
-          role: role || "manager",
+          role: newRole,
           office_location: user.office_location,
           reporting_manager: reportingManagerId,
           reporting_manager_model: reportingManagerModel,
@@ -531,6 +547,7 @@ const promoteEmployeeToManager = async (req, res, next) => {
           isVerified: user.isverified,
           status: user.status,
           isFirstLogin: false,
+          role_history: [...inheritedHistory, roleHistoryEntry],
         },
       ],
       { session }
@@ -542,20 +559,24 @@ const promoteEmployeeToManager = async (req, res, next) => {
       { session }
     );
 
-    const newRole = role || "manager";
+    const newLeaveBalance = await assignDefaultLeave({ ...newManager.toObject(), _id: newManager._id });
 
     await Promise.all([
       Usermodel.findByIdAndDelete(id, { session }),
 
-      Usermodel.updateMany(
-        { Under_manager: id, organisation_id },
-        { $set: { Under_manager: newManager._id } },
+      leavebalanceModel.deleteOne({ employee: id }, { session }),
+
+      leavebalanceModel.findByIdAndUpdate(
+        newLeaveBalance._id,
+        { $set: { employee: newManager._id } },
         { session }
       ),
 
-      leavebalanceModel.findOneAndUpdate(
-        { employee: id, organisation_id },
-        { $set: { employee: newManager._id } },
+      PermissionModel.deleteOne({ user_id: id, user_model: "User", organisation_id }, { session }),
+
+      Usermodel.updateMany(
+        { Under_manager: id, organisation_id },
+        { $set: { Under_manager: newManager._id } },
         { session }
       ),
 
