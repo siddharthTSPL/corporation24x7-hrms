@@ -22,6 +22,8 @@ const SuperAdminModel = require("../Models/superadmin.model");
 const Document = require("../Models/document.model");
 const Ticket = require("../Models/ticket.model");
 const { processLeaveDeduction } = require("../automatic/calculateleave");
+const AttendanceSummary = require("../Models/attendancesummary.model");
+const WFH = require("../Models/wfh.model");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
