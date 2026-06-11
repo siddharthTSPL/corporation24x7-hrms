@@ -46,13 +46,33 @@ export const editManager = async (id, data) => {
   return res.data;
 };
 
-export const promoteToManager = async (id, data) => {
-  const res = await api.post(`/admin/employee/${id}/promote`, data);
+export const promoteEmployeeToManager = async (id, data) => {
+  const res = await api.post(`/admin/employee/${id}/promote/manager`, data);
   return res.data;
 };
 
-export const demoteToEmployee = async (id, data) => {
-  const res = await api.post(`/admin/manager/${id}/demote`, data);
+export const promoteEmployeeToAdmin = async (id, data) => {
+  const res = await api.post(`/admin/employee/${id}/promote/admin`, data);
+  return res.data;
+};
+
+export const promoteManagerToAdmin = async (id, data) => {
+  const res = await api.post(`/admin/manager/${id}/promote/admin`, data);
+  return res.data;
+};
+
+export const demoteManagerToEmployee = async (id, data) => {
+  const res = await api.post(`/admin/manager/${id}/demote/employee`, data);
+  return res.data;
+};
+
+export const demoteAdminToManager = async (id, data) => {
+  const res = await api.post(`/admin/admin/${id}/demote/manager`, data);
+  return res.data;
+};
+
+export const demoteAdminToEmployee = async (id, data) => {
+  const res = await api.post(`/admin/admin/${id}/demote/employee`, data);
   return res.data;
 };
 
@@ -88,5 +108,25 @@ export const getOrgInfo = async () => {
 
 export const getTodayLeaves = async () => {
   const res = await api.get("/admin/showallleaves");
+  return res.data;
+};
+
+export const getAllPersonalDocuments = async () => {
+  const res = await api.get("/admin/documents/personal");
+  return res.data;
+};
+
+export const getAllExpenseDocuments = async () => {
+  const res = await api.get("/admin/documents/expense");
+  return res.data;
+};
+
+export const getDocumentDetails = async (documentId) => {
+  const res = await api.get(`/admin/documents/${documentId}`);
+  return res.data;
+};
+
+export const adminActionOnLeave = async (data) => {
+  const res = await api.post("/admin/actionleave", data);
   return res.data;
 };
