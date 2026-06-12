@@ -1,14 +1,14 @@
 import {
   acceptLeaveRequest,
   rejectLeaveRequest,
-  forwardLeaveToAdmin,
+  forwardLeaveToReportingManager,
   applyLeaveManager,
   getMyLeavesManager,
   getAllManagerLeaves,
   getForwardedLeavesManager,
   acceptForwardedLeave,
   rejectForwardedLeave,
-  forwardForwardedLeaveToAdmin,
+  forwardLeaveUpChain,
 } from "../../../api/managerapi/leave/ma.leave.api";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -37,10 +37,10 @@ export const useRejectLeaveRequest = () => {
   });
 };
 
-export const useForwardLeaveToAdmin = () => {
+export const useForwardLeaveToReportingManager = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: forwardLeaveToAdmin,
+    mutationFn: forwardLeaveToReportingManager,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["allManagerLeaves"] }),
   });
 };
@@ -59,7 +59,6 @@ export const useGetAllManagerLeaves = () => {
   });
 };
 
-
 export const useGetForwardedLeavesManager = () => {
   return useQuery({
     queryKey: ["forwardedLeavesManager"],
@@ -71,7 +70,10 @@ export const useAcceptForwardedLeave = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: acceptForwardedLeave,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["forwardedLeavesManager"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["forwardedLeavesManager"] });
+      queryClient.invalidateQueries({ queryKey: ["allManagerLeaves"] });
+    },
   });
 };
 
@@ -79,19 +81,20 @@ export const useRejectForwardedLeave = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: rejectForwardedLeave,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["forwardedLeavesManager"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["forwardedLeavesManager"] });
+      queryClient.invalidateQueries({ queryKey: ["allManagerLeaves"] });
+    },
   });
 };
 
-export const useForwardForwardedLeaveToAdmin = () => {
+export const useForwardLeaveUpChain = () => {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: forwardForwardedLeaveToAdmin,
+    mutationFn: forwardLeaveUpChain,
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["forwardedLeavesManager"],
-      });
+      queryClient.invalidateQueries({ queryKey: ["forwardedLeavesManager"] });
+      queryClient.invalidateQueries({ queryKey: ["allManagerLeaves"] });
     },
   });
 };
