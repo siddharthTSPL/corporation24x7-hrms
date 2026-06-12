@@ -7,15 +7,24 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
   return config;
 });
 
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message = error.response?.data?.message || "Something went wrong";
-    if (error.response?.status === 401) return Promise.reject(null);
+    const message =
+      error.response?.data?.message || "Something went wrong";
+
+    if (error.response?.status === 401) {
+      return Promise.reject(null);
+    }
+
     return Promise.reject(new Error(message));
   }
 );
@@ -30,17 +39,17 @@ export const adminGetMyWFH = async () => {
   return res.data;
 };
 
-export const adminGetForwardedWFH = async () => {
-  const res = await api.get("wfh/admin/getForwardedWFH");
+export const adminGetPendingWFH = async () => {
+  const res = await api.get("wfh/admin/getPendingWFH");
   return res.data;
 };
 
-export const adminApproveForwardedWFH = async (data) => {
-  const res = await api.post("wfh/admin/approveForwardedWFH", data);
+export const adminApproveWFH = async (data) => {
+  const res = await api.post("wfh/admin/approveWFH", data);
   return res.data;
 };
 
-export const adminRejectForwardedWFH = async (data) => {
-  const res = await api.post("wfh/admin/rejectForwardedWFH", data);
+export const adminRejectWFH = async (data) => {
+  const res = await api.post("wfh/admin/rejectWFH", data);
   return res.data;
 };

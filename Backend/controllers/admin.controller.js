@@ -299,28 +299,41 @@ const addemployee = async (req, res, next) => {
   res.status(201).json({ success: true, message: "User added successfully. Verification email sent." });
 };
 
+
 const findallmanagers = async (req, res, next) => {
   try {
-    if (!req.admin)
+    if (!req.admin) {
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+    }
 
     const organisation_id = req.admin.organisation_id;
 
-    const managers = await Managermodel.find({ organisation_id })
-      .select(EXCLUDE)
-      .populate("reporting_manager", "f_name l_name work_email designation")
-      .lean();
+    const [managers, adminData] = await Promise.all([
+      Managermodel.find({ organisation_id })
+        .select(EXCLUDE)
+        .populate("reporting_manager", "f_name l_name work_email designation")
+        .lean(),
+      Adminmodel.findById(req.admin._id)
+        .select("uid f_name l_name work_email designation department office_location role organisation_id")
+        .lean(),
+    ]);
+
+    const allManagers = [...managers];
+    if (adminData) {
+      allManagers.unshift({ ...adminData, isAdmin: true });
+    }
 
     return res.status(200).json({
       success: true,
       organisation_id,
-      count: managers.length,
-      managers,
+      count: allManagers.length,
+      managers: allManagers,
     });
   } catch (error) {
     next(error);
   }
 };
+
 
 const getallemployee = async (req, res, next) => {
   try {
@@ -1778,42 +1791,7 @@ const showallleaves = async (req, res, next) => {
         .lean(),
       ManagerLeave.find({
         organisation_id,
-        status: { $in: ["pending_reporting_manager", "approved_reporting_manager", "rejected_reporting_manager"] },
-      })
-        .populate("manager", "f_name l_name work_email")
-        .sort({ createdAt: -1 })
-        .lean(),
-    ]);
-
-    res.status(200).json({
-      success: true,
-      employeeLeaves: { count: employeeLeaves.length, leaves: employeeLeaves },
-      managerLeaves: { count: managerLeaves.length, leaves: managerLeaves },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-const showallleaves = async (req, res, next) => {
-  try {
-    if (!req.admin)
-      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-
-    const organisation_id = req.admin.organisation_id;
-
-    const [employeeLeaves, managerLeaves] = await Promise.all([
-      Leave.find({
-        organisation_id,
-        status: { $in: ["forwarded_reporting_manager", "approved_reporting_manager", "rejected_reporting_manager"] },
-      })
-        .populate("employee", "f_name l_name work_email")
-        .populate("manager", "f_name l_name work_email")
-        .sort({ createdAt: -1 })
-        .lean(),
-      ManagerLeave.find({
-        organisation_id,
-        status: "pending_reporting_manager",
+        status: { $in: ["pending_admin", "pending_reporting_manager"] },
         directed_to: req.admin._id,
         directed_to_model: "Admin",
       })
@@ -1872,8 +1850,10 @@ const acceptLeave = async (req, res, next) => {
         leave.directed_to_model !== "Admin"
       )
         return next(Object.assign(new Error("This leave is not directed to you"), { statusCode: 403 }));
+      if (!["pending_admin", "pending_reporting_manager"].includes(leave.status))
+        return next(Object.assign(new Error("Leave is not pending for admin action"), { statusCode: 400 }));
 
-      leave.status = "approved_reporting_manager";
+      leave.status = "approved_admin";
       leave.approvedBy = req.admin._id;
       leave.approvedByModel = "Admin";
       leave.remarks = `Approved by Admin (${req.admin.f_name})`;
@@ -1929,8 +1909,10 @@ const rejectLeave = async (req, res, next) => {
         leave.directed_to_model !== "Admin"
       )
         return next(Object.assign(new Error("This leave is not directed to you"), { statusCode: 403 }));
+      if (!["pending_admin", "pending_reporting_manager"].includes(leave.status))
+        return next(Object.assign(new Error("Leave is not pending for admin action"), { statusCode: 400 }));
 
-      leave.status = "rejected_reporting_manager";
+      leave.status = "rejected_admin";
       leave.rejectedBy = req.admin._id;
       leave.rejectedByModel = "Admin";
       leave.remarks = `Rejected by Admin (${req.admin.f_name})`;
@@ -1944,6 +1926,49 @@ const rejectLeave = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+const applyleave = async (req, res, next) => {
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const { leaveType, startDate, endDate, reason } = req.body;
+  if (!leaveType || !startDate || !endDate || !reason)
+    return next(Object.assign(new Error("leaveType, startDate, endDate and reason are required"), { statusCode: 400 }));
+
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (end < start)
+    return next(Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }));
+
+  const days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  const organisation_id = req.admin.organisation_id;
+
+  const overlapping = await AdminLeave.findOne({
+    admin: req.admin._id,
+    organisation_id,
+    status: { $nin: ["rejected_superadmin"] },
+    startDate: { $lte: end },
+    endDate: { $gte: start },
+  })
+    .select("_id")
+    .lean();
+
+  if (overlapping)
+    return next(Object.assign(new Error("Leave already applied for these dates"), { statusCode: 400 }));
+
+  const leave = await AdminLeave.create({
+    organisation_id,
+    admin: req.admin._id,
+    leaveType,
+    startDate: start,
+    endDate: end,
+    days,
+    reason,
+    status: "pending_superadmin",
+  });
+
+  res.status(201).json({ success: true, message: "Leave request submitted to super admin", leave });
 };
 
 const getmyleavehistory = async (req, res, next) => {
@@ -2370,12 +2395,173 @@ const getOrgInfo = async (req, res, next) => {
   try {
     if (!req.admin)
       return res.status(401).json({ success: false, message: "Unauthorized" });
-
-    const admin = await Adminmodel.findById(req.admin._id).lean();
-    return res.status(200).json({ success: true, organisation_id: admin.organisation_id, admin });
+ 
+    const admin = await Adminmodel.findById(req.admin._id)
+      .select(
+        "f_name l_name work_email designation department office_location organisation_id"
+      )
+      .lean();
+ 
+    if (!admin)
+      return res.status(404).json({ success: false, message: "Admin not found" });
+ 
+    const organisation_id = admin.organisation_id;
+ 
+    const superAdmin = await SuperAdminModel.findById(organisation_id)
+      .select("f_name l_name email organisation_name profile_image")
+      .lean();
+ 
+    const managers = await Managermodel.find({ organisation_id })
+      .select(
+        "f_name l_name work_email designation department office_location reporting_manager reporting_manager_model"
+      )
+      .lean();
+ 
+    const employees = await Usermodel
+      .find({
+        organisation_id,
+        Under_manager: { $in: managers.map((m) => m._id) },
+      })
+      .select(
+        "f_name l_name work_email designation department office_location Under_manager"
+      )
+      .lean();
+ 
+    const topLevelManagers = managers
+      .filter(
+        (mgr) =>
+          !mgr.reporting_manager ||
+          mgr.reporting_manager_model === "Admin"
+      )
+      .map((mgr) => ({
+        id: mgr._id,
+        name: `${mgr.f_name} ${mgr.l_name}`,
+        email: mgr.work_email,
+        designation: mgr.designation,
+        department: mgr.department,
+        office_location: mgr.office_location,
+        employees: employees
+          .filter((emp) => emp.Under_manager?.toString() === mgr._id.toString())
+          .map((emp) => ({
+            id: emp._id,
+            name: `${emp.f_name} ${emp.l_name}`,
+            email: emp.work_email,
+            designation: emp.designation,
+            department: emp.department,
+          })),
+        subManagers: buildManagerTree(managers, mgr._id, "Manager", employees),
+      }));
+ 
+    return res.status(200).json({
+      success: true,
+      organisation_id,
+      organisation_name: superAdmin?.organisation_name || "",
+      organisation_logo: superAdmin?.profile_image || null,
+      super_admin: superAdmin
+        ? {
+            id: superAdmin._id,
+            name: `${superAdmin.f_name} ${superAdmin.l_name}`,
+            email: superAdmin.email,
+          }
+        : null,
+      admin: {
+        id: admin._id,
+        name: `${admin.f_name} ${admin.l_name}`,
+        email: admin.work_email,
+        designation: admin.designation,
+        department: admin.department,
+        office_location: admin.office_location,
+      },
+      managers: topLevelManagers,
+    });
   } catch (error) {
     next(error);
   }
+};
+
+const buildManagerTree = (managers, parentId, parentModel, employees) => {
+  return managers
+    .filter((mgr) => {
+      if (!mgr.reporting_manager) return false;
+      return mgr.reporting_manager.toString() === parentId.toString() &&
+        mgr.reporting_manager_model === parentModel;
+    })
+    .map((mgr) => ({
+      id: mgr._id,
+      name: `${mgr.f_name} ${mgr.l_name}`,
+      email: mgr.work_email,
+      designation: mgr.designation,
+      department: mgr.department,
+      office_location: mgr.office_location,
+      _raw: mgr,
+      employees: employees
+        .filter((emp) => emp.Under_manager?.toString() === mgr._id.toString())
+        .map((emp) => ({
+          id: emp._id,
+          name: `${emp.f_name} ${emp.l_name}`,
+          email: emp.work_email,
+          designation: emp.designation,
+          department: emp.department,
+          isCurrentUser: false,
+        })),
+      subManagers: buildManagerTree(managers, mgr._id, "Manager", employees),
+    }));
+};
+ 
+const buildManagerTreeWithCurrentFlags = (
+  managers,
+  parentId,
+  parentModel,
+  employees,
+  currentManagerId,
+  currentEmployeeId
+) => {
+  return managers
+    .filter((mgr) => {
+      if (!mgr.reporting_manager) return false;
+      return (
+        mgr.reporting_manager.toString() === parentId.toString() &&
+        mgr.reporting_manager_model === parentModel
+      );
+    })
+    .map((mgr) => ({
+      id: mgr._id,
+      name: `${mgr.f_name} ${mgr.l_name}`,
+      email: mgr.work_email,
+      designation: mgr.designation,
+      department: mgr.department,
+      office_location: mgr.office_location,
+      isCurrentManager: currentManagerId
+        ? mgr._id.toString() === currentManagerId.toString()
+        : false,
+      isCurrentUserManager: currentEmployeeId
+        ? employees.some(
+            (e) =>
+              e.Under_manager?.toString() === mgr._id.toString() &&
+              e._id.toString() === currentEmployeeId.toString()
+          )
+        : false,
+      employees: employees
+        .filter((emp) => emp.Under_manager?.toString() === mgr._id.toString())
+        .map((emp) => ({
+          id: emp._id,
+          name: `${emp.f_name} ${emp.l_name}`,
+          email: emp.work_email,
+          designation: emp.designation,
+          department: emp.department,
+          isCurrentUser: currentEmployeeId
+            ? emp._id.toString() === currentEmployeeId.toString()
+            : false,
+        })),
+      subManagers: buildManagerTreeWithCurrentFlags(
+        managers,
+        mgr._id,
+        "Manager",
+        employees,
+        currentManagerId,
+        currentEmployeeId
+      ),
+    }));
 };
 
 const getAllPersonalDocumentsAdmin = async (req, res, next) => {

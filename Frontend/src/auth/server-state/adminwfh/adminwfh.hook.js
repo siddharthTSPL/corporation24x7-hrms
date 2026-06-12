@@ -1,18 +1,26 @@
 import {
   adminApplyWFH,
   adminGetMyWFH,
-  adminGetForwardedWFH,
-  adminApproveForwardedWFH,
-  adminRejectForwardedWFH,
+  adminGetPendingWFH,
+  adminApproveWFH,
+  adminRejectWFH,
 } from "../../api/adminapi/WFH/adminwfh.api";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 export const useAdminApplyWFH = () => {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: adminApplyWFH,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["adminMyWFH"] });
+      queryClient.invalidateQueries({
+        queryKey: ["adminMyWFH"],
+      });
     },
   });
 };
@@ -25,30 +33,36 @@ export const useAdminGetMyWFH = () =>
     staleTime: 30000,
   });
 
-export const useAdminGetForwardedWFH = () =>
+export const useAdminGetPendingWFH = () =>
   useQuery({
-    queryKey: ["adminForwardedWFH"],
-    queryFn: adminGetForwardedWFH,
+    queryKey: ["adminPendingWFH"],
+    queryFn: adminGetPendingWFH,
     refetchOnWindowFocus: true,
     staleTime: 30000,
   });
 
-export const useAdminApproveForwardedWFH = () => {
+export const useAdminApproveWFH = () => {
   const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: adminApproveForwardedWFH,
+    mutationFn: adminApproveWFH,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["adminForwardedWFH"] });
+      queryClient.invalidateQueries({
+        queryKey: ["adminPendingWFH"],
+      });
     },
   });
 };
 
-export const useAdminRejectForwardedWFH = () => {
+export const useAdminRejectWFH = () => {
   const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: adminRejectForwardedWFH,
+    mutationFn: adminRejectWFH,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["adminForwardedWFH"] });
+      queryClient.invalidateQueries({
+        queryKey: ["adminPendingWFH"],
+      });
     },
   });
 };

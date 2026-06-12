@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const leaveSchema = new mongoose.Schema({
-    organisation_id: {
+  organisation_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "SuperAdmin",
     required: true,
@@ -33,13 +33,27 @@ const leaveSchema = new mongoose.Schema({
       "approved_manager",
       "rejected_manager",
       "forwarded_reporting_manager",
+      "pending_reporting_manager",
       "approved_reporting_manager",
       "rejected_reporting_manager",
+      "pending_admin",
+      "approved_admin",
+      "rejected_admin",
     ],
     default: "pending_manager",
   },
-  approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Manager" },
-  rejectedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Manager" },
+  directed_to: {
+    type: mongoose.Schema.Types.ObjectId,
+    refPath: "directed_to_model",
+  },
+  directed_to_model: {
+    type: String,
+    enum: ["Manager", "Admin"],
+  },
+  approvedBy: { type: mongoose.Schema.Types.ObjectId },
+  approvedByModel: { type: String, enum: ["Manager", "Admin"] },
+  rejectedBy: { type: mongoose.Schema.Types.ObjectId },
+  rejectedByModel: { type: String, enum: ["Manager", "Admin"] },
   remarks: { type: String },
   createdAt: { type: Date, default: Date.now },
   deleteAt: { type: Date, default: null, index: { expires: 0 } },
