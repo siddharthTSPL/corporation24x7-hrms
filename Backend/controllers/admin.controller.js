@@ -2395,12 +2395,173 @@ const getOrgInfo = async (req, res, next) => {
   try {
     if (!req.admin)
       return res.status(401).json({ success: false, message: "Unauthorized" });
-
-    const admin = await Adminmodel.findById(req.admin._id).lean();
-    return res.status(200).json({ success: true, organisation_id: admin.organisation_id, admin });
+ 
+    const admin = await Adminmodel.findById(req.admin._id)
+      .select(
+        "f_name l_name work_email designation department office_location organisation_id"
+      )
+      .lean();
+ 
+    if (!admin)
+      return res.status(404).json({ success: false, message: "Admin not found" });
+ 
+    const organisation_id = admin.organisation_id;
+ 
+    const superAdmin = await SuperAdminModel.findById(organisation_id)
+      .select("f_name l_name email organisation_name profile_image")
+      .lean();
+ 
+    const managers = await Managermodel.find({ organisation_id })
+      .select(
+        "f_name l_name work_email designation department office_location reporting_manager reporting_manager_model"
+      )
+      .lean();
+ 
+    const employees = await Usermodel
+      .find({
+        organisation_id,
+        Under_manager: { $in: managers.map((m) => m._id) },
+      })
+      .select(
+        "f_name l_name work_email designation department office_location Under_manager"
+      )
+      .lean();
+ 
+    const topLevelManagers = managers
+      .filter(
+        (mgr) =>
+          !mgr.reporting_manager ||
+          mgr.reporting_manager_model === "Admin"
+      )
+      .map((mgr) => ({
+        id: mgr._id,
+        name: `${mgr.f_name} ${mgr.l_name}`,
+        email: mgr.work_email,
+        designation: mgr.designation,
+        department: mgr.department,
+        office_location: mgr.office_location,
+        employees: employees
+          .filter((emp) => emp.Under_manager?.toString() === mgr._id.toString())
+          .map((emp) => ({
+            id: emp._id,
+            name: `${emp.f_name} ${emp.l_name}`,
+            email: emp.work_email,
+            designation: emp.designation,
+            department: emp.department,
+          })),
+        subManagers: buildManagerTree(managers, mgr._id, "Manager", employees),
+      }));
+ 
+    return res.status(200).json({
+      success: true,
+      organisation_id,
+      organisation_name: superAdmin?.organisation_name || "",
+      organisation_logo: superAdmin?.profile_image || null,
+      super_admin: superAdmin
+        ? {
+            id: superAdmin._id,
+            name: `${superAdmin.f_name} ${superAdmin.l_name}`,
+            email: superAdmin.email,
+          }
+        : null,
+      admin: {
+        id: admin._id,
+        name: `${admin.f_name} ${admin.l_name}`,
+        email: admin.work_email,
+        designation: admin.designation,
+        department: admin.department,
+        office_location: admin.office_location,
+      },
+      managers: topLevelManagers,
+    });
   } catch (error) {
     next(error);
   }
+};
+
+const buildManagerTree = (managers, parentId, parentModel, employees) => {
+  return managers
+    .filter((mgr) => {
+      if (!mgr.reporting_manager) return false;
+      return mgr.reporting_manager.toString() === parentId.toString() &&
+        mgr.reporting_manager_model === parentModel;
+    })
+    .map((mgr) => ({
+      id: mgr._id,
+      name: `${mgr.f_name} ${mgr.l_name}`,
+      email: mgr.work_email,
+      designation: mgr.designation,
+      department: mgr.department,
+      office_location: mgr.office_location,
+      _raw: mgr,
+      employees: employees
+        .filter((emp) => emp.Under_manager?.toString() === mgr._id.toString())
+        .map((emp) => ({
+          id: emp._id,
+          name: `${emp.f_name} ${emp.l_name}`,
+          email: emp.work_email,
+          designation: emp.designation,
+          department: emp.department,
+          isCurrentUser: false,
+        })),
+      subManagers: buildManagerTree(managers, mgr._id, "Manager", employees),
+    }));
+};
+ 
+const buildManagerTreeWithCurrentFlags = (
+  managers,
+  parentId,
+  parentModel,
+  employees,
+  currentManagerId,
+  currentEmployeeId
+) => {
+  return managers
+    .filter((mgr) => {
+      if (!mgr.reporting_manager) return false;
+      return (
+        mgr.reporting_manager.toString() === parentId.toString() &&
+        mgr.reporting_manager_model === parentModel
+      );
+    })
+    .map((mgr) => ({
+      id: mgr._id,
+      name: `${mgr.f_name} ${mgr.l_name}`,
+      email: mgr.work_email,
+      designation: mgr.designation,
+      department: mgr.department,
+      office_location: mgr.office_location,
+      isCurrentManager: currentManagerId
+        ? mgr._id.toString() === currentManagerId.toString()
+        : false,
+      isCurrentUserManager: currentEmployeeId
+        ? employees.some(
+            (e) =>
+              e.Under_manager?.toString() === mgr._id.toString() &&
+              e._id.toString() === currentEmployeeId.toString()
+          )
+        : false,
+      employees: employees
+        .filter((emp) => emp.Under_manager?.toString() === mgr._id.toString())
+        .map((emp) => ({
+          id: emp._id,
+          name: `${emp.f_name} ${emp.l_name}`,
+          email: emp.work_email,
+          designation: emp.designation,
+          department: emp.department,
+          isCurrentUser: currentEmployeeId
+            ? emp._id.toString() === currentEmployeeId.toString()
+            : false,
+        })),
+      subManagers: buildManagerTreeWithCurrentFlags(
+        managers,
+        mgr._id,
+        "Manager",
+        employees,
+        currentManagerId,
+        currentEmployeeId
+      ),
+    }));
 };
 
 const getAllPersonalDocumentsAdmin = async (req, res, next) => {
