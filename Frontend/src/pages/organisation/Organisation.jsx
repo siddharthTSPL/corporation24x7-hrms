@@ -97,7 +97,8 @@ const CFG = {
   org:     { accent: "#0f172a", avBg: "#0f172a", avColor: "#f8fafc", badge: "Organisation", badgeBg: "#f1f5f9", badgeColor: "#475569", tag: "ORG" },
   admin:   { accent: "#334155", avBg: "#e2e8f0", avColor: "#334155", badge: "Admin",         badgeBg: "#e2e8f0", badgeColor: "#334155", tag: "ADM" },
   manager: { accent: "#475569", avBg: "#f1f5f9", avColor: "#475569", badge: "Manager",       badgeBg: "#f1f5f9", badgeColor: "#475569", tag: "MGR" },
-  emp:     { accent: "#64748b", avBg: "#f8fafc", avColor: "#64748b", badge: "Employee",      badgeBg: "#f8fafc", badgeColor: "#64748b", tag: "EMP" },
+  subMgr:  { accent: "#64748b", avBg: "#f8fafc", avColor: "#64748b", badge: "Reporting Mgr", badgeBg: "#f8fafc", badgeColor: "#64748b", tag: "MGR" },
+  emp:     { accent: "#94a3b8", avBg: "#f8fafc", avColor: "#64748b", badge: "Employee",      badgeBg: "#f8fafc", badgeColor: "#64748b", tag: "EMP" },
 };
 
 function Card({ level, name, sub, width = 172, delay = 0, dim, hl, q, empCount }) {
@@ -110,15 +111,12 @@ function Card({ level, name, sub, width = 172, delay = 0, dim, hl, q, empCount }
       >
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: c.accent, borderRadius: "11px 11px 0 0" }} />
         <span style={{ position: "absolute", top: 8, right: 9, fontSize: 8, fontWeight: 600, letterSpacing: "0.1em", color: "#94a3b8", fontFamily: "'DM Mono',monospace" }}>{c.tag}</span>
-
         <Avatar name={name} size={38} bg={c.avBg} color={c.avColor} />
-
         <div style={{ marginTop: 8, marginBottom: 6, textAlign: "center", width: "100%" }}>
           <Hi text={name} q={q} style={{ fontSize: 12, fontWeight: 600, color: "#0f172a", display: "block", lineHeight: 1.3, fontFamily: "'Syne',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />
           {sub && <Hi text={sub} q={q} style={{ fontSize: 10, color: "#64748b", display: "block", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />}
           {empCount !== undefined && <span style={{ fontSize: 10, color: "#94a3b8", display: "block", marginTop: 2 }}>{empCount} report{empCount !== 1 ? "s" : ""}</span>}
         </div>
-
         <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 20, background: c.badgeBg, color: c.badgeColor, fontWeight: 600, letterSpacing: "0.04em", fontFamily: "'DM Mono',monospace" }}>
           {c.badge}
         </span>
@@ -150,6 +148,123 @@ function ManagerTBar({ mgrW, empCount, empW, empGap }) {
   );
 }
 
+const CARD_W = 172;
+const EMP_W  = 152;
+const MGR_GAP = 28;
+const EMP_GAP = 10;
+const SUB_MGR_GAP = 20;
+
+function collectMatchKeys(nodes, q, matches, prefix = "m") {
+  if (!q) return;
+  nodes.forEach((mgr) => {
+    const key = `${prefix}-${mgr.id}`;
+    if ([mgr.name, mgr.designation, mgr.department].some(s => s && norm(s).includes(q)))
+      matches.add(key);
+    (mgr.employees || []).forEach(e => {
+      if ([e.name, e.designation, e.department].some(s => s && norm(s).includes(q)))
+        matches.add(`e-${e.id}`);
+    });
+    if (mgr.subManagers?.length) collectMatchKeys(mgr.subManagers, q, matches, `m`);
+  });
+}
+
+function colWOf(mgr) {
+  const empCount = (mgr.employees || []).length;
+  const empW = Math.max(CARD_W, empCount > 0 ? empCount * EMP_W + (empCount - 1) * EMP_GAP : 0);
+  const subMgrs = mgr.subManagers || [];
+  const subW = subMgrs.length > 0
+    ? subMgrs.reduce((s, sm) => s + colWOf(sm), 0) + (subMgrs.length - 1) * SUB_MGR_GAP
+    : 0;
+  return Math.max(CARD_W, empW, subW);
+}
+
+function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
+  const key = `m-${mgr.id}`;
+  const emps = mgr.employees || [];
+  const subMgrs = mgr.subManagers || [];
+  const totalChildren = emps.length + subMgrs.length;
+  const level = isSubMgr ? "subMgr" : "manager";
+
+  const cw = colWOf(mgr);
+
+  const mDelay = delayRef.current;
+  delayRef.current += 55;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: cw, flexShrink: 0 }}>
+      <Card
+        level={level}
+        name={mgr.name}
+        sub={mgr.designation || mgr.department}
+        width={CARD_W}
+        delay={mDelay}
+        dim={dim(key)}
+        hl={matches.has(key)}
+        q={q}
+        empCount={totalChildren > 0 ? totalChildren : undefined}
+      />
+
+      {subMgrs.length > 0 && (
+        <>
+          <VLine h={18} />
+          {subMgrs.length > 1 && (() => {
+            const totalSubW = subMgrs.reduce((s, sm) => s + colWOf(sm), 0) + (subMgrs.length - 1) * SUB_MGR_GAP;
+            return (
+              <svg width={totalSubW} height={20} style={{ display: "block", flexShrink: 0, overflow: "visible" }}>
+                <line x1={totalSubW / 2} y1={0} x2={totalSubW / 2} y2={10} stroke="#e2e8f0" strokeWidth={1} />
+                <line x1={colWOf(subMgrs[0]) / 2} y1={10} x2={totalSubW - colWOf(subMgrs[subMgrs.length - 1]) / 2} y2={10} stroke="#e2e8f0" strokeWidth={1} />
+                {subMgrs.map((sm, i) => {
+                  let cx = 0;
+                  for (let j = 0; j < i; j++) cx += colWOf(subMgrs[j]) + SUB_MGR_GAP;
+                  cx += colWOf(sm) / 2;
+                  return <line key={i} x1={cx} y1={10} x2={cx} y2={20} stroke="#e2e8f0" strokeWidth={1} />;
+                })}
+              </svg>
+            );
+          })()}
+          <div style={{ display: "flex", gap: SUB_MGR_GAP, alignItems: "flex-start" }}>
+            {subMgrs.map(sm => (
+              <ManagerColumn key={sm.id} mgr={sm} q={q} matches={matches} dim={dim} delayRef={delayRef} isSubMgr />
+            ))}
+          </div>
+        </>
+      )}
+
+      {emps.length > 0 && (
+        <>
+          <ManagerTBar mgrW={CARD_W} empCount={emps.length} empW={EMP_W} empGap={EMP_GAP} />
+          <div style={{ display: "flex", gap: EMP_GAP, alignItems: "flex-start" }}>
+            {emps.map(emp => {
+              const eKey = `e-${emp.id}`;
+              const eDelay = delayRef.current;
+              delayRef.current += 18;
+              return (
+                <Card
+                  key={emp.id}
+                  level="emp"
+                  name={emp.name}
+                  sub={emp.designation || emp.department}
+                  width={EMP_W}
+                  delay={eDelay}
+                  dim={dim(eKey)}
+                  hl={matches.has(eKey)}
+                  q={q}
+                />
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {emps.length === 0 && subMgrs.length === 0 && (
+        <div style={{ marginTop: 10, padding: "6px 14px", borderRadius: 8, border: "1px dashed #e2e8f0", fontSize: 11, color: "#cbd5e1", background: "#fafafa" }}>
+          No reports
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SkeletonTree() {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -173,50 +288,31 @@ function SkeletonTree() {
   );
 }
 
-const CARD_W = 172;
-const EMP_W  = 152;
-const MGR_GAP = 28;
-const EMP_GAP = 10;
-
 function OrgTree({ data, loading, q }) {
   if (loading) return <SkeletonTree />;
-  if (!data)   return null;
+  if (!data) return null;
 
-  const hasQ   = q.length > 0;
+  const hasQ = q.length > 0;
   const matches = new Set();
 
   if (hasQ) {
     const chk = (...ss) => ss.some(s => s && norm(s).includes(q));
     if (chk(data.organisation_name, data.super_admin?.name)) matches.add("org");
     if (chk(data.admin?.name, data.admin?.designation, data.admin?.department)) matches.add("admin");
-    (data.managers || []).forEach(mgr => {
-      if (chk(mgr.name, mgr.designation, mgr.department)) matches.add(`m-${mgr.id}`);
-      (mgr.employees || []).forEach(e => {
-        if (chk(e.name, e.designation, e.department)) matches.add(`e-${e.id}`);
-      });
-    });
+    collectMatchKeys(data.managers || [], q, matches);
   }
 
   const anyMatch = matches.size > 0;
   const dim = (k) => hasQ && anyMatch && !matches.has(k);
 
   const managers = data.managers || [];
-
-  const colW = (mgr) => {
-    const ec = (mgr.employees || []).length;
-    if (ec === 0) return CARD_W;
-    return Math.max(CARD_W, ec * EMP_W + (ec - 1) * EMP_GAP);
-  };
-
-  const totalW = managers.reduce((s, m) => s + colW(m), 0) + Math.max(0, managers.length - 1) * MGR_GAP;
+  const totalW = managers.reduce((s, m) => s + colWOf(m), 0) + Math.max(0, managers.length - 1) * MGR_GAP;
   const topBarW = Math.max(CARD_W, totalW);
 
-  let delay = 40;
-  const d = (add = 70) => { delay += add; return delay; };
+  const delayRef = { current: 160 };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: "max-content" }}>
-
       <div style={{ animation: `scaleIn 0.26s ease 40ms forwards`, opacity: 0 }}>
         <Card level="org" name={data.organisation_name || "Organisation"} sub={data.super_admin?.name} width={CARD_W} delay={0} dim={dim("org")} hl={matches.has("org")} q={q} />
       </div>
@@ -224,7 +320,7 @@ function OrgTree({ data, loading, q }) {
 
       {data.admin && (
         <>
-          <Card level="admin" name={data.admin.name} sub={data.admin.designation || data.admin.department} width={CARD_W} delay={d()} dim={dim("admin")} hl={matches.has("admin")} q={q} />
+          <Card level="admin" name={data.admin.name} sub={data.admin.designation || data.admin.department} width={CARD_W} delay={80} dim={dim("admin")} hl={matches.has("admin")} q={q} />
           <VLine h={22} />
         </>
       )}
@@ -232,70 +328,20 @@ function OrgTree({ data, loading, q }) {
       {managers.length > 1 && (
         <svg width={topBarW} height={20} style={{ display: "block", flexShrink: 0, overflow: "visible" }}>
           <line x1={topBarW / 2} y1={0} x2={topBarW / 2} y2={10} stroke="#e2e8f0" strokeWidth={1} />
-          <line x1={colW(managers[0]) / 2} y1={10} x2={topBarW - colW(managers[managers.length - 1]) / 2} y2={10} stroke="#e2e8f0" strokeWidth={1} />
+          <line x1={colWOf(managers[0]) / 2} y1={10} x2={topBarW - colWOf(managers[managers.length - 1]) / 2} y2={10} stroke="#e2e8f0" strokeWidth={1} />
           {managers.map((mgr, i) => {
             let cx = 0;
-            for (let j = 0; j < i; j++) cx += colW(managers[j]) + MGR_GAP;
-            cx += colW(mgr) / 2;
+            for (let j = 0; j < i; j++) cx += colWOf(managers[j]) + MGR_GAP;
+            cx += colWOf(mgr) / 2;
             return <line key={i} x1={cx} y1={10} x2={cx} y2={20} stroke="#e2e8f0" strokeWidth={1} />;
           })}
         </svg>
       )}
 
-      <div style={{ display: "flex", gap: MGR_GAP, alignItems: "flex-start", animation: `fadeIn 0.28s ease ${delay + 50}ms forwards`, opacity: 0 }}>
-        {managers.map((mgr, mi) => {
-          const mKey  = `m-${mgr.id}`;
-          const emps  = mgr.employees || [];
-          const cw    = colW(mgr);
-          const mDelay = d(mi === 0 ? 60 : 25);
-
-          return (
-            <div key={mgr.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", width: cw, flexShrink: 0 }}>
-              <Card
-                level="manager"
-                name={mgr.name}
-                sub={mgr.designation || mgr.department}
-                width={CARD_W}
-                delay={mDelay}
-                dim={dim(mKey)}
-                hl={matches.has(mKey)}
-                q={q}
-                empCount={emps.length}
-              />
-
-              {emps.length > 0 && (
-                <>
-                  <ManagerTBar mgrW={CARD_W} empCount={emps.length} empW={EMP_W} empGap={EMP_GAP} />
-                  <div style={{ display: "flex", gap: EMP_GAP, alignItems: "flex-start" }}>
-                    {emps.map((emp, ei) => {
-                      const eKey = `e-${emp.id}`;
-                      return (
-                        <Card
-                          key={emp.id}
-                          level="emp"
-                          name={emp.name}
-                          sub={emp.designation || emp.department}
-                          width={EMP_W}
-                          delay={d(ei === 0 ? 40 : 18)}
-                          dim={dim(eKey)}
-                          hl={matches.has(eKey)}
-                          q={q}
-                        />
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-
-              {emps.length === 0 && (
-                <div style={{ marginTop: 10, padding: "6px 14px", borderRadius: 8, border: "1px dashed #e2e8f0", fontSize: 11, color: "#cbd5e1", background: "#fafafa" }}>
-                  No employees
-                </div>
-              )}
-            </div>
-          );
-        })}
-
+      <div style={{ display: "flex", gap: MGR_GAP, alignItems: "flex-start" }}>
+        {managers.map(mgr => (
+          <ManagerColumn key={mgr.id} mgr={mgr} q={q} matches={matches} dim={dim} delayRef={delayRef} />
+        ))}
         {managers.length === 0 && (
           <div style={{ padding: "14px 28px", borderRadius: 10, border: "1px dashed #e2e8f0", fontSize: 13, color: "#cbd5e1", background: "#fafafa" }}>
             No managers added yet
@@ -321,11 +367,20 @@ function StatCard({ label, text, icon: Icon, accent, delay = 0 }) {
   );
 }
 
+function countNodes(managers) {
+  let n = 0;
+  for (const mgr of managers) {
+    n += 1 + (mgr.employees?.length || 0);
+    if (mgr.subManagers?.length) n += countNodes(mgr.subManagers);
+  }
+  return n;
+}
+
 export default function OrganizationPageAdmin() {
   const { data, isLoading: loading } = useGetOrgInfo();
 
-  const [searchOpen,   setSearchOpen]   = useState(false);
-  const [searchQuery,  setSearchQuery]  = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [exportStatus, setExportStatus] = useState(null);
   const inputRef = useRef(null);
   const chartRef = useRef(null);
@@ -339,10 +394,12 @@ export default function OrganizationPageAdmin() {
     const chk = (...ss) => ss.some(s => s && norm(s).includes(q));
     if (chk(data.organisation_name)) n++;
     if (chk(data.admin?.name, data.admin?.designation, data.admin?.department)) n++;
-    (data.managers || []).forEach(mgr => {
+    const walk = (nodes) => nodes.forEach(mgr => {
       if (chk(mgr.name, mgr.department, mgr.designation)) n++;
       (mgr.employees || []).forEach(e => { if (chk(e.name, e.designation, e.department)) n++; });
+      if (mgr.subManagers?.length) walk(mgr.subManagers);
     });
+    walk(data.managers || []);
     return n;
   }, [searchQuery, data]);
 
@@ -350,7 +407,7 @@ export default function OrganizationPageAdmin() {
     if (!data) return 0;
     let n = 1;
     if (data.admin) n++;
-    (data.managers || []).forEach(mgr => { n++; n += (mgr.employees || []).length; });
+    n += countNodes(data.managers || []);
     return n;
   }, [data]);
 
@@ -432,11 +489,10 @@ export default function OrganizationPageAdmin() {
       </div>
 
       <div style={{ maxWidth: 1600, margin: "0 auto", padding: "22px 24px 48px" }}>
-
         <div style={{ animation: "fadeUp 0.3s ease 50ms forwards", opacity: 0, marginBottom: 18 }}>
           <h1 style={{ fontSize: 19, fontWeight: 700, color: "#0f172a", margin: 0, letterSpacing: "-0.3px", fontFamily: "'Syne',sans-serif" }}>Organisation Chart</h1>
           <p style={{ fontSize: 12, color: "#94a3b8", margin: "4px 0 0" }}>
-            {loading ? "Loading…" : `${orgName} · ${totalNodes} nodes · ${(data?.managers || []).length} manager${(data?.managers || []).length !== 1 ? "s" : ""}`}
+            {loading ? "Loading…" : `${orgName} · ${totalNodes} nodes · ${(data?.managers || []).length} top-level manager${(data?.managers || []).length !== 1 ? "s" : ""}`}
           </p>
         </div>
 
@@ -470,7 +526,8 @@ export default function OrganizationPageAdmin() {
                 { dot: "#0f172a", label: "Organisation" },
                 { dot: "#334155", label: "Admin" },
                 { dot: "#475569", label: "Manager" },
-                { dot: "#64748b", label: "Employee" },
+                { dot: "#64748b", label: "Reporting Mgr" },
+                { dot: "#94a3b8", label: "Employee" },
               ].map(({ dot, label }) => (
                 <div key={label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#94a3b8" }}>
                   <span style={{ width: 8, height: 8, borderRadius: "50%", background: dot, flexShrink: 0 }} />
