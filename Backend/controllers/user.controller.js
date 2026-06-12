@@ -981,25 +981,28 @@ const employeeGetTicketDetail = async (req, res, next) => {
   }
 };
 
+
 const getOrgInfo = async (req, res, next) => {
   try {
     if (!req.employee)
       return res.status(401).json({ success: false, message: "Unauthorized" });
-
+ 
     const organisation_id = req.employee.organisation_id;
-
+ 
     const superAdmin = await SuperAdminModel.findById(organisation_id)
       .select("f_name l_name email organisation_name profile_image")
       .lean();
-
+ 
     const admins = await Adminmodel.find({ organisation_id })
       .select("f_name l_name work_email designation")
       .lean();
-
+ 
     const managers = await Managermodel.find({ organisation_id })
-      .select("f_name l_name work_email designation department office_location")
+      .select(
+        "f_name l_name work_email designation department office_location reporting_manager reporting_manager_model"
+      )
       .lean();
-
+ 
     const employees = managers.length
       ? await usermodel
           .find({
@@ -1007,32 +1010,47 @@ const getOrgInfo = async (req, res, next) => {
             organisation_id,
           })
           .select(
-            "f_name l_name work_email designation department office_location Under_manager",
+            "f_name l_name work_email designation department office_location Under_manager"
           )
           .lean()
       : [];
-
-    const managersWithEmployees = managers.map((mgr) => ({
-      id: mgr._id,
-      name: `${mgr.f_name} ${mgr.l_name}`,
-      email: mgr.work_email,
-      designation: mgr.designation,
-      department: mgr.department,
-      isCurrentUserManager:
-        req.employee.Under_manager?.toString() === mgr._id.toString(),
-      employees: employees
-        .filter((e) => e.Under_manager?.toString() === mgr._id.toString())
-        .map((e) => ({
-          id: e._id,
-          name: `${e.f_name} ${e.l_name}`,
-          email: e.work_email,
-          designation: e.designation,
-          department: e.department,
-          isCurrentUser: e._id.toString() === req.employee._id.toString(),
-        })),
-    }));
-
-    res.status(200).json({
+ 
+    const topLevelManagers = managers
+      .filter(
+        (mgr) =>
+          !mgr.reporting_manager ||
+          mgr.reporting_manager_model === "Admin"
+      )
+      .map((mgr) => ({
+        id: mgr._id,
+        name: `${mgr.f_name} ${mgr.l_name}`,
+        email: mgr.work_email,
+        designation: mgr.designation,
+        department: mgr.department,
+        isCurrentUserManager:
+          req.employee.Under_manager?.toString() === mgr._id.toString(),
+        employees: employees
+          .filter((emp) => emp.Under_manager?.toString() === mgr._id.toString())
+          .map((emp) => ({
+            id: emp._id,
+            name: `${emp.f_name} ${emp.l_name}`,
+            email: emp.work_email,
+            designation: emp.designation,
+            department: emp.department,
+            isCurrentUser:
+              emp._id.toString() === req.employee._id.toString(),
+          })),
+        subManagers: buildManagerTreeWithCurrentFlags(
+          managers,
+          mgr._id,
+          "Manager",
+          employees,
+          null,
+          req.employee._id
+        ),
+      }));
+ 
+    return res.status(200).json({
       success: true,
       organisation_name: superAdmin?.organisation_name || "",
       organisation_logo: superAdmin?.profile_image || null,
@@ -1043,13 +1061,15 @@ const getOrgInfo = async (req, res, next) => {
             email: superAdmin.email,
           }
         : null,
-      admins: admins.map((a) => ({
-        id: a._id,
-        name: `${a.f_name} ${a.l_name}`,
-        email: a.work_email,
-        designation: a.designation,
-      })),
-      managers: managersWithEmployees,
+      admin: admins[0]
+        ? {
+            id: admins[0]._id,
+            name: `${admins[0].f_name} ${admins[0].l_name}`,
+            email: admins[0].work_email,
+            designation: admins[0].designation,
+          }
+        : null,
+      managers: topLevelManagers,
       currentUserId: req.employee._id,
     });
   } catch (error) {
@@ -1057,6 +1077,90 @@ const getOrgInfo = async (req, res, next) => {
   }
 };
 
+const buildManagerTree = (managers, parentId, parentModel, employees) => {
+  return managers
+    .filter((mgr) => {
+      if (!mgr.reporting_manager) return false;
+      return mgr.reporting_manager.toString() === parentId.toString() &&
+        mgr.reporting_manager_model === parentModel;
+    })
+    .map((mgr) => ({
+      id: mgr._id,
+      name: `${mgr.f_name} ${mgr.l_name}`,
+      email: mgr.work_email,
+      designation: mgr.designation,
+      department: mgr.department,
+      office_location: mgr.office_location,
+      _raw: mgr,
+      employees: employees
+        .filter((emp) => emp.Under_manager?.toString() === mgr._id.toString())
+        .map((emp) => ({
+          id: emp._id,
+          name: `${emp.f_name} ${emp.l_name}`,
+          email: emp.work_email,
+          designation: emp.designation,
+          department: emp.department,
+          isCurrentUser: false,
+        })),
+      subManagers: buildManagerTree(managers, mgr._id, "Manager", employees),
+    }));
+};
+ 
+const buildManagerTreeWithCurrentFlags = (
+  managers,
+  parentId,
+  parentModel,
+  employees,
+  currentManagerId,
+  currentEmployeeId
+) => {
+  return managers
+    .filter((mgr) => {
+      if (!mgr.reporting_manager) return false;
+      return (
+        mgr.reporting_manager.toString() === parentId.toString() &&
+        mgr.reporting_manager_model === parentModel
+      );
+    })
+    .map((mgr) => ({
+      id: mgr._id,
+      name: `${mgr.f_name} ${mgr.l_name}`,
+      email: mgr.work_email,
+      designation: mgr.designation,
+      department: mgr.department,
+      office_location: mgr.office_location,
+      isCurrentManager: currentManagerId
+        ? mgr._id.toString() === currentManagerId.toString()
+        : false,
+      isCurrentUserManager: currentEmployeeId
+        ? employees.some(
+            (e) =>
+              e.Under_manager?.toString() === mgr._id.toString() &&
+              e._id.toString() === currentEmployeeId.toString()
+          )
+        : false,
+      employees: employees
+        .filter((emp) => emp.Under_manager?.toString() === mgr._id.toString())
+        .map((emp) => ({
+          id: emp._id,
+          name: `${emp.f_name} ${emp.l_name}`,
+          email: emp.work_email,
+          designation: emp.designation,
+          department: emp.department,
+          isCurrentUser: currentEmployeeId
+            ? emp._id.toString() === currentEmployeeId.toString()
+            : false,
+        })),
+      subManagers: buildManagerTreeWithCurrentFlags(
+        managers,
+        mgr._id,
+        "Manager",
+        employees,
+        currentManagerId,
+        currentEmployeeId
+      ),
+    }));
+};
 
 const showPasswordPage = (req, res) => {
   const { token } = req.query;
