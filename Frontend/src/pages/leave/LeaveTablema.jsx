@@ -8,6 +8,9 @@ import {
   useForwardLeaveToAdmin,
   useGetMyLeavesManager,
   useApplyLeaveManager,
+  useGetForwardedLeavesManager,
+  useAcceptForwardedLeave,
+  useRejectForwardedLeave,
 } from "../../auth/server-state/manager/managerleave/managerleave.hook";
 import {
   useManagerApplyWFH,
@@ -121,6 +124,7 @@ const LEAVE_META = {
 
 const LEAVE_STATUS_META = {
   pending_manager:             { label:"Pending Manager",            bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
+  pending_reporting_manager:   { label:"Pending Reporting Mgr",      bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
   forwarded_reporting_manager: { label:"Forwarded to Reporting Mgr", bg:"#EFF6FF", color:"#1D4ED8", dot:"#3B82F6" },
   approved_manager:            { label:"Approved by Manager",        bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
   approved_reporting_manager:  { label:"Approved by Reporting Mgr",  bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
@@ -317,7 +321,7 @@ const EmployeeLeavesPanel = ({showToast}) => {
     try {
       if (action==="accept")  { await acceptMut.mutateAsync({leaveId});  showToast("Leave approved","success"); }
       if (action==="reject")  { await rejectMut.mutateAsync({leaveId});  showToast("Leave rejected","error"); }
-      if (action==="forward") { await forwardMut.mutateAsync({leaveId}); showToast("Forwarded to admin","info"); }
+      if (action==="forward") { await forwardMut.mutateAsync({leaveId}); showToast("Forwarded to reporting manager","info"); }
       refetch();
     } catch(err) {
       showToast(err?.response?.data?.message||err?.message||"Something went wrong","error");
@@ -333,7 +337,7 @@ const EmployeeLeavesPanel = ({showToast}) => {
           {label:"Total",    val:leaves.length,                                              color:"#6B1A4A",bg:"linear-gradient(135deg,#F9EFF5,#F4E6F0)"},
           {label:"Pending",  val:leaves.filter(l=>l.status==="pending_manager").length,      color:"#92400E",bg:"linear-gradient(135deg,#FFFBEB,#FEF3C7)"},
           {label:"Approved", val:leaves.filter(l=>l.status?.startsWith("approved")).length,  color:"#14803D",bg:"linear-gradient(135deg,#F0FDF4,#DCFCE7)"},
-          {label:"Forwarded",val:leaves.filter(l=>l.status==="forwarded_admin").length,      color:"#1D4ED8",bg:"linear-gradient(135deg,#EFF6FF,#DBEAFE)"},
+          {label:"Forwarded",val:leaves.filter(l=>l.status==="forwarded_reporting_manager"||l.status==="forwarded_admin").length, color:"#1D4ED8",bg:"linear-gradient(135deg,#EFF6FF,#DBEAFE)"},
         ].map((s,i)=>(
           <div key={s.label} style={{background:s.bg,borderRadius:14,padding:"12px 20px",display:"flex",alignItems:"center",gap:12,border:"1px solid rgba(0,0,0,0.05)",boxShadow:"0 2px 8px rgba(0,0,0,0.04)",animation:`fadeSlideUp .3s ease ${i*.07}s both`,minWidth:110}}>
             <span style={{fontSize:26,fontWeight:800,color:s.color,fontFamily:"'Playfair Display',serif",lineHeight:1}}>{s.val}</span>
@@ -422,6 +426,110 @@ const EmployeeLeavesPanel = ({showToast}) => {
             );
           })
       }
+    </div>
+  );
+};
+
+const ForwardedLeavesPanel = ({showToast}) => {
+  const [activeTab,setActiveTab]       = useState("employee");
+  const [processingId,setProcessingId] = useState(null);
+
+  const {data:rawData,isLoading,refetch} = useGetForwardedLeavesManager();
+  const acceptFwdMut = useAcceptForwardedLeave();
+  const rejectFwdMut = useRejectForwardedLeave();
+
+  const employeeLeaves = rawData?.employeeLeaves?.leaves || [];
+  const managerLeaves  = rawData?.managerLeaves?.leaves  || [];
+
+  const handleAction = async (leaveId,leaveFor,action) => {
+    setProcessingId(leaveId);
+    try {
+      if (action==="accept") { await acceptFwdMut.mutateAsync({leaveId,leaveFor}); showToast("Leave approved","success"); }
+      if (action==="reject") { await rejectFwdMut.mutateAsync({leaveId,leaveFor}); showToast("Leave rejected","error"); }
+      refetch();
+    } catch(err) {
+      showToast(err?.response?.data?.message||err?.message||"Something went wrong","error");
+    } finally { setProcessingId(null); }
+  };
+
+  const renderCard = (leave,idx,leaveFor) => {
+    const person       = leaveFor==="employee" ? (leave.employee||{}) : (leave.manager||{});
+    const isProcessing = processingId===leave._id;
+    const days         = leave.days||daysDiff(leave.startDate,leave.endDate);
+    return (
+      <div key={leave._id||idx} className="mlw-card" style={{opacity:isProcessing?.6:1,pointerEvents:isProcessing?"none":"auto",animationDelay:`${idx*.06}s`,position:"relative",overflow:"hidden"}}>
+        <div style={{position:"absolute",top:0,left:0,width:3,bottom:0,background:(LEAVE_META[leave.leaveType]||{accent:"#8B3A8A"}).accent,borderRadius:"20px 0 0 20px"}}/>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16,paddingLeft:6}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:14}}>
+              <div style={{width:44,height:44,borderRadius:14,background:avatarColor(person.f_name||"A"),color:"#fff",fontSize:14,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"'DM Sans',sans-serif",boxShadow:"0 3px 10px rgba(0,0,0,0.15)"}}>
+                {initials(person.f_name,person.l_name)}
+              </div>
+              <div>
+                <div style={{fontSize:14,fontWeight:600,color:"#1C1028",fontFamily:"'DM Sans',sans-serif"}}>{person.f_name} {person.l_name}</div>
+                <div style={{fontSize:11,color:"#9B8BAE",marginTop:2,fontFamily:"'DM Sans',sans-serif"}}>{person.designation||person.work_email}{leaveFor==="manager"&&person.department?` · ${person.department}`:""}</div>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:12}}>
+              <TypeBadge type={leave.leaveType}/>
+              <StatusBadge status={leave.status} meta={LEAVE_STATUS_META}/>
+              <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:600,background:"#F4EEF9",color:"#6B1A4A",fontFamily:"'DM Sans',sans-serif"}}>{days} day{days>1?"s":""}</span>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#9B8BAE",marginTop:10,fontFamily:"'DM Sans',sans-serif"}}>
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="2" width="11" height="10" rx="2.5" stroke="#C4AADA" strokeWidth="1"/><path d="M1 6h11" stroke="#C4AADA" strokeWidth="1"/><path d="M4 1v2M9 1v2" stroke="#C4AADA" strokeWidth="1" strokeLinecap="round"/></svg>
+              <span style={{fontWeight:500,color:"#4A3860"}}>{fmt(leave.startDate)}</span>
+              <span style={{color:"#D4BFEA",fontSize:10}}>→</span>
+              <span style={{fontWeight:500,color:"#4A3860"}}>{fmt(leave.endDate)}</span>
+            </div>
+            {leave.reason&&(
+              <div style={{background:"#FAF7FD",borderRadius:10,padding:"9px 14px",fontSize:12,color:"#4A3860",marginTop:10,borderLeft:"3px solid #D4AECB",lineHeight:1.6,fontFamily:"'DM Sans',sans-serif"}}>
+                <span style={{color:"#6B1A4A",fontWeight:600}}>Reason — </span>{leave.reason}
+              </div>
+            )}
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:7,flexShrink:0}}>
+            <button className="mlw-action-btn" style={{background:"#F0FDF4",color:"#14803D",boxShadow:"0 2px 8px rgba(34,197,94,0.15)"}} onClick={()=>handleAction(leave._id,leaveFor,"accept")}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l2.5 2.5 5.5-5" stroke="#14803D" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Approve
+            </button>
+            <button className="mlw-action-btn" style={{background:"#FFF1F2",color:"#991B1B",boxShadow:"0 2px 8px rgba(239,68,68,0.12)"}} onClick={()=>handleAction(leave._id,leaveFor,"reject")}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="#991B1B" strokeWidth="1.8" strokeLinecap="round"/></svg>
+              Reject
+            </button>
+          </div>
+        </div>
+        {isProcessing&&(
+          <div style={{position:"absolute",inset:0,borderRadius:20,background:"rgba(255,255,255,0.7)",display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(2px)"}}>
+            <div style={{width:22,height:22,border:"2px solid #EDE6F5",borderTop:"2px solid #8B3A8A",borderRadius:"50%",animation:"spin .6s linear infinite"}}/>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  if (isLoading) return <Spinner/>;
+
+  const innerTabs = [
+    {key:"employee", label:`Employee Leaves (${employeeLeaves.length})`},
+    {key:"manager",  label:`Manager Leaves (${managerLeaves.length})`},
+  ];
+
+  return (
+    <div>
+      <div style={{display:"flex",gap:8,marginBottom:22,flexWrap:"wrap"}}>
+        {innerTabs.map(t=>{
+          const active = activeTab===t.key;
+          return (
+            <button key={t.key} className="mlw-chip-btn"
+              style={{border:active?"1.5px solid #3B82F6":"1.5px solid #E5DAF0",background:active?"linear-gradient(135deg,#1D4ED8,#3B82F6)":"#fff",color:active?"#fff":"#8B7FA0",boxShadow:active?"0 2px 10px rgba(59,130,246,0.3)":"none"}}
+              onClick={()=>setActiveTab(t.key)}>
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+      {activeTab==="employee" && (employeeLeaves.length===0 ? <EmptyState msg="No forwarded employee leaves"/> : employeeLeaves.map((l,i)=>renderCard(l,i,"employee")))}
+      {activeTab==="manager"  && (managerLeaves.length===0  ? <EmptyState msg="No forwarded manager leaves"/>  : managerLeaves.map((l,i)=>renderCard(l,i,"manager")))}
     </div>
   );
 };
@@ -556,7 +664,7 @@ const ApplyLeavePanel = ({manager,showToast}) => {
     if (!validate()) return;
     try {
       await applyMut.mutateAsync(form);
-      showToast("Leave request submitted","success");
+      showToast("Leave request submitted to your reporting manager","success");
       setForm({leaveType:"el",startDate:"",endDate:"",reason:""});
       setErrors({});
       refetch();
@@ -913,11 +1021,12 @@ const ManagerLeaveWFH = () => {
   };
 
   const TABS = [
-    {key:"employeeLeaves", label:"Employee Leaves"},
-    {key:"myBalance",      label:"My Balance"},
-    {key:"applyLeave",     label:"Apply Leave"},
-    {key:"myWFH",          label:"My WFH"},
-    {key:"teamWFH",        label:"Team WFH"},
+    {key:"employeeLeaves",  label:"Employee Leaves"},
+    {key:"forwardedLeaves", label:"Forwarded Leaves"},
+    {key:"myBalance",       label:"My Balance"},
+    {key:"applyLeave",      label:"Apply Leave"},
+    {key:"myWFH",           label:"My WFH"},
+    {key:"teamWFH",         label:"Team WFH"},
   ];
 
   return (
@@ -968,11 +1077,12 @@ const ManagerLeaveWFH = () => {
           })}
         </div>
 
-        {tab==="employeeLeaves" && <EmployeeLeavesPanel showToast={showToast}/>}
-        {tab==="myBalance"      && <MyBalancePanel manager={manager} leavebalance={leavebalance}/>}
-        {tab==="applyLeave"     && <ApplyLeavePanel manager={manager} showToast={showToast}/>}
-        {tab==="myWFH"          && <MyWFHPanel showToast={showToast}/>}
-        {tab==="teamWFH"        && <TeamWFHPanel showToast={showToast}/>}
+        {tab==="employeeLeaves"  && <EmployeeLeavesPanel showToast={showToast}/>}
+        {tab==="forwardedLeaves" && <ForwardedLeavesPanel showToast={showToast}/>}
+        {tab==="myBalance"       && <MyBalancePanel manager={manager} leavebalance={leavebalance}/>}
+        {tab==="applyLeave"      && <ApplyLeavePanel manager={manager} showToast={showToast}/>}
+        {tab==="myWFH"           && <MyWFHPanel showToast={showToast}/>}
+        {tab==="teamWFH"         && <TeamWFHPanel showToast={showToast}/>}
       </div>
 
       <Toast toast={toast}/>

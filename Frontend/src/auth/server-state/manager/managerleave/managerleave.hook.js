@@ -5,6 +5,9 @@ import {
   applyLeaveManager,
   getMyLeavesManager,
   getAllManagerLeaves,
+  getForwardedLeavesManager,
+  acceptForwardedLeave,
+  rejectForwardedLeave,
 } from "../../../api/managerapi/leave/ma.leave.api";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -52,5 +55,29 @@ export const useGetAllManagerLeaves = () => {
   return useQuery({
     queryKey: ["allManagerLeaves"],
     queryFn: getAllManagerLeaves,
+  });
+};
+
+
+export const useGetForwardedLeavesManager = () => {
+  return useQuery({
+    queryKey: ["forwardedLeavesManager"],
+    queryFn: getForwardedLeavesManager,
+  });
+};
+
+export const useAcceptForwardedLeave = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: acceptForwardedLeave,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["forwardedLeavesManager"] }),
+  });
+};
+
+export const useRejectForwardedLeave = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: rejectForwardedLeave,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["forwardedLeavesManager"] }),
   });
 };

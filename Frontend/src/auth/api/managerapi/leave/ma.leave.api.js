@@ -34,3 +34,18 @@ export const getAllManagerLeaves = async () => {
   const res = await api.get("manager/viewallleaves");
   return res.data;
 };
+
+export const getForwardedLeavesManager = async () => {
+  const res = await api.get("manager/getforwardedleaves");
+  return res.data;
+};
+
+export const acceptForwardedLeave = async (data) => {
+  const res = await api.post("manager/acceptforwardedleave", data);
+  return res.data;
+};
+
+export const rejectForwardedLeave = async (data) => {
+  const res = await api.post("manager/rejectforwardedleave", data);
+  return res.data;
+};
