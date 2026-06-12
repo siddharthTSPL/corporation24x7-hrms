@@ -1850,8 +1850,10 @@ const acceptLeave = async (req, res, next) => {
         leave.directed_to_model !== "Admin"
       )
         return next(Object.assign(new Error("This leave is not directed to you"), { statusCode: 403 }));
+      if (!["pending_admin", "pending_reporting_manager"].includes(leave.status))
+        return next(Object.assign(new Error("Leave is not pending for admin action"), { statusCode: 400 }));
 
-      leave.status = "approved_reporting_manager";
+      leave.status = "approved_admin";
       leave.approvedBy = req.admin._id;
       leave.approvedByModel = "Admin";
       leave.remarks = `Approved by Admin (${req.admin.f_name})`;
