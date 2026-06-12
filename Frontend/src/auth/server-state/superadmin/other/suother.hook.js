@@ -57,6 +57,7 @@ export const useGetOrgInfo = () => {
     queryFn: getOrgInfo,
     staleTime: 1000 * 60 * 10,
     refetchOnWindowFocus: false,
+    refetchInterval: 1000 * 60 * 1, 
   });
 };
 
