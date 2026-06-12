@@ -376,9 +376,17 @@ const getforwardedleaves = async (req, res, next) => {
 
   const organisation_id = req.manager.organisation_id;
 
+  const subordinateManagerIds = await managermodel
+    .find({ reporting_manager: req.manager._id, organisation_id })
+    .distinct("_id");
+
   const [employeeLeaves, managerLeaves] = await Promise.all([
     leavemodel
-      .find({ organisation_id, status: "forwarded_reporting_manager", manager: { $in: await managermodel.find({ reporting_manager: req.manager._id, organisation_id }).distinct("_id") } })
+      .find({
+        organisation_id,
+        status: "forwarded_reporting_manager",
+        manager: { $in: subordinateManagerIds },
+      })
       .populate("employee", "f_name l_name work_email department")
       .populate("manager", "f_name l_name work_email")
       .sort({ createdAt: -1 })
