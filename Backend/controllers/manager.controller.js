@@ -1215,5 +1215,5 @@ module.exports = {
   managerGetTicketDetail,
   getOrgInfoForManager,
   getforwardedleaves, 
-  forwardforwardedleavetoadmin
+  forwardLeaveUpChain
 };
