@@ -339,7 +339,7 @@ const applyleavem = async (req, res, next) => {
     .findOne({
       manager: managerId,
       organisation_id,
-      status: { $nin: ["rejected_reporting_manager"] },
+      status: { $nin: ["rejected_reporting_manager", "rejected_admin"] },
       startDate: { $lte: end },
       endDate: { $gte: start },
     })
@@ -349,6 +349,10 @@ const applyleavem = async (req, res, next) => {
   if (overlapping)
     return next(Object.assign(new Error("Leave already applied for these dates"), { statusCode: 400 }));
 
+  const initialStatus = managerData.reporting_manager_model === "Admin"
+    ? "pending_admin"
+    : "pending_reporting_manager";
+
   const leave = await managerLeaveModel.create({
     organisation_id,
     manager: managerId,
@@ -357,7 +361,7 @@ const applyleavem = async (req, res, next) => {
     endDate: end,
     days,
     reason,
-    status: "pending_reporting_manager",
+    status: initialStatus,
     directed_to: managerData.reporting_manager,
     directed_to_model: managerData.reporting_manager_model,
   });
