@@ -21,15 +21,18 @@ const managerLeaveSchema = new mongoose.Schema({
   endDate: { type: Date, required: true },
   days: { type: Number, required: true },
   reason: { type: String, required: true },
-  status: {
-    type: String,
-    enum: [
-      "pending_reporting_manager",
-      "approved_reporting_manager",
-      "rejected_reporting_manager",
-    ],
-    default: "pending_reporting_manager",
-  },
+ status: {
+  type: String,
+  enum: [
+    "pending_reporting_manager",
+    "pending_admin",
+    "approved_reporting_manager",
+    "approved_admin",
+    "rejected_reporting_manager",
+    "rejected_admin",
+  ],
+  default: "pending_reporting_manager",
+},
   directed_to: {
     type: mongoose.Schema.Types.ObjectId,
     refPath: "directed_to_model",
