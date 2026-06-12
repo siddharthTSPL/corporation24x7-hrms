@@ -299,28 +299,41 @@ const addemployee = async (req, res, next) => {
   res.status(201).json({ success: true, message: "User added successfully. Verification email sent." });
 };
 
+
 const findallmanagers = async (req, res, next) => {
   try {
-    if (!req.admin)
+    if (!req.admin) {
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+    }
 
     const organisation_id = req.admin.organisation_id;
 
-    const managers = await Managermodel.find({ organisation_id })
-      .select(EXCLUDE)
-      .populate("reporting_manager", "f_name l_name work_email designation")
-      .lean();
+    const [managers, adminData] = await Promise.all([
+      Managermodel.find({ organisation_id })
+        .select(EXCLUDE)
+        .populate("reporting_manager", "f_name l_name work_email designation")
+        .lean(),
+      Adminmodel.findById(req.admin._id)
+        .select("uid f_name l_name work_email designation department office_location role organisation_id")
+        .lean(),
+    ]);
+
+    const allManagers = [...managers];
+    if (adminData) {
+      allManagers.unshift({ ...adminData, isAdmin: true });
+    }
 
     return res.status(200).json({
       success: true,
       organisation_id,
-      count: managers.length,
-      managers,
+      count: allManagers.length,
+      managers: allManagers,
     });
   } catch (error) {
     next(error);
   }
 };
+
 
 const getallemployee = async (req, res, next) => {
   try {
@@ -1778,7 +1791,7 @@ const showallleaves = async (req, res, next) => {
         .lean(),
       ManagerLeave.find({
         organisation_id,
-        status: "pending_reporting_manager",
+        status: { $in: ["pending_admin", "pending_reporting_manager"] },
         directed_to: req.admin._id,
         directed_to_model: "Admin",
       })
@@ -1837,8 +1850,10 @@ const acceptLeave = async (req, res, next) => {
         leave.directed_to_model !== "Admin"
       )
         return next(Object.assign(new Error("This leave is not directed to you"), { statusCode: 403 }));
+      if (!["pending_admin", "pending_reporting_manager"].includes(leave.status))
+        return next(Object.assign(new Error("Leave is not pending for admin action"), { statusCode: 400 }));
 
-      leave.status = "approved_reporting_manager";
+      leave.status = "approved_admin";
       leave.approvedBy = req.admin._id;
       leave.approvedByModel = "Admin";
       leave.remarks = `Approved by Admin (${req.admin.f_name})`;
@@ -1894,8 +1909,10 @@ const rejectLeave = async (req, res, next) => {
         leave.directed_to_model !== "Admin"
       )
         return next(Object.assign(new Error("This leave is not directed to you"), { statusCode: 403 }));
+      if (!["pending_admin", "pending_reporting_manager"].includes(leave.status))
+        return next(Object.assign(new Error("Leave is not pending for admin action"), { statusCode: 400 }));
 
-      leave.status = "rejected_reporting_manager";
+      leave.status = "rejected_admin";
       leave.rejectedBy = req.admin._id;
       leave.rejectedByModel = "Admin";
       leave.remarks = `Rejected by Admin (${req.admin.f_name})`;

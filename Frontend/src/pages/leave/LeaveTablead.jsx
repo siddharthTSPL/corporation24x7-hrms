@@ -149,6 +149,7 @@ const LEAVE_STATUS_META = {
   approved_reporting_manager:  { bg:"#F0FDF4", color:"#14803D", dot:"#22C55E" },
   rejected_reporting_manager:  { bg:"#FEF2F2", color:"#991B1B", dot:"#EF4444" },
   pending_reporting_manager:   { bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
+  pending_admin:               { bg:"#FFFBEB", color:"#92400E", dot:"#F59E0B" },
 };
 
 const WFH_STATUS_META = {
@@ -291,37 +292,31 @@ const buildTimeline = (leave) => {
   const steps = [];
   const status = leave.status || "";
 
-  steps.push({
-    label: "Applied",
-    desc: "Leave request submitted",
-    date: leave.createdAt,
-    done: true,
-    color: "#8B3A8A",
-  });
+  steps.push({ label:"Applied", desc:"Leave request submitted", date:leave.createdAt, done:true, color:"#8B3A8A" });
 
-  const isApprovedByManager = status === "approved_manager" || status === "forwarded_admin" || status === "forwarded_reporting_manager" || status === "approved_admin" || status === "rejected_admin" || status === "approved_reporting_manager" || status === "rejected_reporting_manager";
+  const isApprovedByManager = ["approved_manager","forwarded_admin","forwarded_reporting_manager","approved_admin","rejected_admin","approved_reporting_manager","rejected_reporting_manager"].includes(status);
   const isRejectedByManager = status === "rejected_manager";
-  const isPendingManager = status === "pending_manager";
+  const isPendingManager    = status === "pending_manager";
 
   if (isPendingManager) {
-    steps.push({ label: "Manager Review", desc: "Awaiting manager decision", date: null, done: false, pending: true, color: "#F59E0B" });
+    steps.push({ label:"Manager Review", desc:"Awaiting manager decision", date:null, done:false, pending:true, color:"#F59E0B" });
   } else if (isRejectedByManager) {
-    steps.push({ label: "Manager Review", desc: "Rejected by manager", date: leave.updatedAt, done: true, color: "#EF4444" });
+    steps.push({ label:"Manager Review", desc:"Rejected by manager", date:leave.updatedAt, done:true, color:"#EF4444" });
   } else if (isApprovedByManager) {
-    steps.push({ label: "Manager Review", desc: "Approved by manager", date: leave.updatedAt, done: true, color: "#22C55E" });
+    steps.push({ label:"Manager Review", desc:"Approved by manager", date:leave.updatedAt, done:true, color:"#22C55E" });
   }
 
-  const isAdminPending = status === "forwarded_admin" || status === "forwarded_reporting_manager";
-  const isAdminApproved = status === "approved_admin" || status === "approved_reporting_manager";
-  const isAdminRejected = status === "rejected_admin" || status === "rejected_reporting_manager";
+  const isAdminPending  = ["forwarded_admin","forwarded_reporting_manager","pending_admin","pending_reporting_manager"].includes(status);
+  const isAdminApproved = ["approved_admin","approved_reporting_manager"].includes(status);
+  const isAdminRejected = ["rejected_admin","rejected_reporting_manager"].includes(status);
 
   if (isAdminPending) {
-    steps.push({ label: "Admin Review", desc: "Awaiting admin approval", date: null, done: false, pending: true, color: "#F59E0B" });
+    steps.push({ label:"Admin Review", desc:"Awaiting admin approval", date:null, done:false, pending:true, color:"#F59E0B" });
   } else if (isAdminApproved) {
-    steps.push({ label: "Admin Review", desc: "Approved by admin", date: leave.updatedAt, done: true, color: "#22C55E" });
-    steps.push({ label: "Completed", desc: "Leave has been approved", date: leave.updatedAt, done: true, color: "#22C55E" });
+    steps.push({ label:"Admin Review", desc:"Approved by admin", date:leave.updatedAt, done:true, color:"#22C55E" });
+    steps.push({ label:"Completed", desc:"Leave has been approved", date:leave.updatedAt, done:true, color:"#22C55E" });
   } else if (isAdminRejected) {
-    steps.push({ label: "Admin Review", desc: "Rejected by admin", date: leave.updatedAt, done: true, color: "#EF4444" });
+    steps.push({ label:"Admin Review", desc:"Rejected by admin", date:leave.updatedAt, done:true, color:"#EF4444" });
   }
 
   return steps;
@@ -336,12 +331,12 @@ const LeaveTimeline = ({ leave }) => {
         {steps.map((step, i) => (
           <div key={i} style={{ display:"flex", gap:12, position:"relative" }}>
             <div style={{ display:"flex", flexDirection:"column", alignItems:"center", width:18 }}>
-              <div className="alw-timeline-dot" style={{ background: step.done ? step.color : "#E0D0F0", border: step.pending ? `2px solid ${step.color}` : "none", animation: step.pending ? "pulse 1.5s ease infinite" : "none" }}/>
+              <div className="alw-timeline-dot" style={{ background:step.done ? step.color : "#E0D0F0", border:step.pending ? `2px solid ${step.color}` : "none", animation:step.pending ? "pulse 1.5s ease infinite" : "none" }}/>
               {i < steps.length - 1 && <div style={{ flex:1, width:2, background:"linear-gradient(180deg,#E0D0F0,#F0EAF8)", minHeight:24, marginTop:2 }}/>}
             </div>
-            <div style={{ paddingBottom: i < steps.length - 1 ? 16 : 0, flex:1 }}>
+            <div style={{ paddingBottom:i < steps.length - 1 ? 16 : 0, flex:1 }}>
               <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
-                <span style={{ fontSize:12, fontWeight:600, color: step.done ? "#1C1028" : "#9B8BAE", fontFamily:"'DM Sans',sans-serif" }}>{step.label}</span>
+                <span style={{ fontSize:12, fontWeight:600, color:step.done ? "#1C1028" : "#9B8BAE", fontFamily:"'DM Sans',sans-serif" }}>{step.label}</span>
                 {step.pending && (
                   <span style={{ fontSize:10, fontWeight:700, background:"#FFFBEB", color:"#92400E", padding:"1px 7px", borderRadius:10, fontFamily:"'DM Sans',sans-serif" }}>In Progress</span>
                 )}
@@ -359,7 +354,7 @@ const LeaveTimeline = ({ leave }) => {
 const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, accentColor, personLabel, showTimeline }) => {
   const [expanded, setExpanded] = useState(false);
   const person = leave.employee || leave.manager || {};
-  const days = leave.days || daysDiff(leave.startDate, leave.endDate);
+  const days   = leave.days || daysDiff(leave.startDate, leave.endDate);
   const accent = accentColor || (LEAVE_META[leave.leaveType]||{accent:"#8B3A8A"}).accent;
 
   return (
@@ -399,7 +394,7 @@ const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, acce
           )}
           {showTimeline && (
             <button onClick={() => setExpanded(p => !p)} style={{ marginTop:10, background:"none", border:"none", cursor:"pointer", display:"flex", alignItems:"center", gap:5, fontSize:11, fontWeight:600, color:"#8B3A8A", fontFamily:"'DM Sans',sans-serif", padding:"4px 0" }}>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: expanded ? "rotate(180deg)" : "none", transition:".2s" }}><path d="M2 4l4 4 4-4" stroke="#8B3A8A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform:expanded ? "rotate(180deg)" : "none", transition:".2s" }}><path d="M2 4l4 4 4-4" stroke="#8B3A8A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               {expanded ? "Hide timeline" : "View timeline"}
             </button>
           )}
@@ -430,10 +425,10 @@ const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, acce
 const MyBalancePanel = ({ admin, leaveBalance }) => {
   if (!admin) return <Spinner/>;
 
-  const balance = leaveBalance || {};
+  const balance   = leaveBalance || {};
   const isMarried = admin.marital_status === "married";
-  const showML = admin.gender === "female" && isMarried;
-  const showPL = admin.gender === "male"   && isMarried;
+  const showML    = admin.gender === "female" && isMarried;
+  const showPL    = admin.gender === "male"   && isMarried;
 
   const cards = [
     { key:"el",  label:"Earned Leave",      entitled:balance.EL?.entitled||0, availed:balance.EL?.availed||0, accrued:balance.EL?.accrued||0, accent:"#22C55E", bg:"linear-gradient(135deg,#F0FDF4,#DCFCE7)" },
@@ -481,7 +476,7 @@ const MyBalancePanel = ({ admin, leaveBalance }) => {
               {cards.map(s => {
                 const rem = s.entitled - s.availed;
                 const pct = s.entitled > 0 ? Math.round((rem / s.entitled) * 100) : 0;
-                const m = LEAVE_META[s.key] || { label:s.label, bg:"#F3F4F6", color:"#374151", dot:"#9CA3AF" };
+                const m   = LEAVE_META[s.key] || { label:s.label, bg:"#F3F4F6", color:"#374151", dot:"#9CA3AF" };
                 return (
                   <tr key={s.key}>
                     <td>
@@ -513,17 +508,17 @@ const MyBalancePanel = ({ admin, leaveBalance }) => {
 };
 
 const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
-  const [form, setForm] = useState({ leaveType:"el", startDate:"", endDate:"", reason:"" });
+  const [form, setForm]     = useState({ leaveType:"el", startDate:"", endDate:"", reason:"" });
   const [errors, setErrors] = useState({});
 
-  const { data: rawHistory, isLoading: histLoading, refetch } = useAdminGetMyLeaveHistory();
+  const { data:rawHistory, isLoading:histLoading, refetch } = useAdminGetMyLeaveHistory();
   const applyMut = useAdminApplyLeave();
 
   const history = Array.isArray(rawHistory) ? rawHistory : [];
 
   const isMarried = admin?.marital_status === "married";
-  const showML = admin?.gender === "female" && isMarried;
-  const showPL = admin?.gender === "male"   && isMarried;
+  const showML    = admin?.gender === "female" && isMarried;
+  const showPL    = admin?.gender === "male"   && isMarried;
 
   const availTypes = [
     ...BASE_LEAVE_TYPES,
@@ -558,7 +553,7 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
   };
 
   const days = daysDiff(form.startDate, form.endDate);
-  const ib = (k) => errors[k] ? "#FCA5A5" : "#E2D8EE";
+  const ib   = (k) => errors[k] ? "#FCA5A5" : "#E2D8EE";
 
   return (
     <div>
@@ -602,7 +597,7 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
         {histLoading ? <Spinner/> : history.length === 0 ? <EmptyState msg="No leave records yet"/> : (
           <div>
             {history.map((leave, idx) => {
-              const d = leave.days || daysDiff(leave.startDate, leave.endDate);
+              const d      = leave.days || daysDiff(leave.startDate, leave.endDate);
               const accent = (LEAVE_META[leave.leaveType]||{accent:"#8B3A8A"}).accent;
               return (
                 <div key={leave._id || idx} className="alw-history-card" style={{ animationDelay:`${idx*.05}s` }}>
@@ -644,10 +639,10 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
 };
 
 const AllLeavesPanel = ({ showToast }) => {
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter]         = useState("all");
   const [processingId, setProcessingId] = useState(null);
 
-  const { data: rawData, isLoading, refetch } = useGetForwardedLeaves();
+  const { data:rawData, isLoading, refetch } = useGetForwardedLeaves();
   const acceptMut = useAcceptLeave();
   const rejectMut = useRejectLeave();
 
@@ -663,18 +658,24 @@ const AllLeavesPanel = ({ showToast }) => {
     return true;
   };
 
-  const filtered = filter === "all" ? employeeLeaves : employeeLeaves.filter(l => isStatus(l, filter));
-  const count = (key) => key === "all" ? employeeLeaves.length : employeeLeaves.filter(l => isStatus(l, key)).length;
+  const filtered   = filter === "all" ? employeeLeaves : employeeLeaves.filter(l => isStatus(l, filter));
+  const count      = (key) => key === "all" ? employeeLeaves.length : employeeLeaves.filter(l => isStatus(l, key)).length;
   const isActionable = (status) => status === "forwarded_reporting_manager" || status === "pending_manager";
 
   const handleAction = async (leave, action) => {
     setProcessingId(leave._id);
     try {
-      if (action === "approve") { await acceptMut.mutateAsync({ id: leave._id, leaveFor: "employee" }); showToast("Leave approved", "success"); }
-      if (action === "reject")  { await rejectMut.mutateAsync({ id: leave._id, leaveFor: "employee" }); showToast("Leave rejected", "error"); }
+      if (action === "approve") {
+        await acceptMut.mutateAsync({ id:leave._id, leaveFor:"employee" });
+        showToast("Leave approved", "success");
+      }
+      if (action === "reject") {
+        await rejectMut.mutateAsync({ id:leave._id, leaveFor:"employee" });
+        showToast("Leave rejected", "error");
+      }
       refetch();
     } catch (err) {
-      showToast(err?.message || "Something went wrong", "error");
+      showToast(err?.response?.data?.message || err?.message || "Something went wrong", "error");
     } finally { setProcessingId(null); }
   };
 
@@ -684,7 +685,7 @@ const AllLeavesPanel = ({ showToast }) => {
     <div>
       <div style={{ display:"flex", gap:12, marginBottom:22, flexWrap:"wrap" }}>
         {[
-          { label:"Total",    val:employeeLeaves.length,                                  color:"#6B1A4A", bg:"linear-gradient(135deg,#F9EFF5,#F4E6F0)" },
+          { label:"Total",    val:employeeLeaves.length,                                   color:"#6B1A4A", bg:"linear-gradient(135deg,#F9EFF5,#F4E6F0)" },
           { label:"Pending",  val:employeeLeaves.filter(l=>isStatus(l,"pending")).length,  color:"#92400E", bg:"linear-gradient(135deg,#FFFBEB,#FEF3C7)" },
           { label:"Approved", val:employeeLeaves.filter(l=>isStatus(l,"approved")).length, color:"#14803D", bg:"linear-gradient(135deg,#F0FDF4,#DCFCE7)" },
           { label:"Forwarded",val:employeeLeaves.filter(l=>isStatus(l,"forwarded")).length,color:"#1D4ED8", bg:"linear-gradient(135deg,#EFF6FF,#DBEAFE)" },
@@ -734,7 +735,7 @@ const AllLeavesPanel = ({ showToast }) => {
 const ManagerLeavesPanel = ({ showToast }) => {
   const [processingId, setProcessingId] = useState(null);
 
-  const { data: rawData, isLoading, refetch } = useGetForwardedLeaves();
+  const { data:rawData, isLoading, refetch } = useGetForwardedLeaves();
   const acceptMut = useAcceptLeave();
   const rejectMut = useRejectLeave();
 
@@ -742,16 +743,23 @@ const ManagerLeavesPanel = ({ showToast }) => {
     ? rawData.managerLeaves.leaves
     : [];
 
-  const isActionable = (status) => status === "pending_reporting_manager";
+  const isActionable = (status) =>
+    status === "pending_reporting_manager" || status === "pending_admin";
 
   const handleAction = async (leave, action) => {
     setProcessingId(leave._id);
     try {
-      if (action === "approve") { await acceptMut.mutateAsync({ id: leave._id, leaveFor: "manager" }); showToast("Leave approved", "success"); }
-      if (action === "reject")  { await rejectMut.mutateAsync({ id: leave._id, leaveFor: "manager" }); showToast("Leave rejected", "error"); }
+      if (action === "approve") {
+        await acceptMut.mutateAsync({ id:leave._id, leaveFor:"manager" });
+        showToast("Leave approved", "success");
+      }
+      if (action === "reject") {
+        await rejectMut.mutateAsync({ id:leave._id, leaveFor:"manager" });
+        showToast("Leave rejected", "error");
+      }
       refetch();
     } catch (err) {
-      showToast(err?.message || "Something went wrong", "error");
+      showToast(err?.response?.data?.message || err?.message || "Something went wrong", "error");
     } finally { setProcessingId(null); }
   };
 
@@ -761,10 +769,10 @@ const ManagerLeavesPanel = ({ showToast }) => {
     <div>
       <div style={{ display:"flex", gap:12, marginBottom:22, flexWrap:"wrap" }}>
         {[
-          { label:"Total",    val:managerLeaves.length,                                                 color:"#6B1A4A", bg:"linear-gradient(135deg,#F9EFF5,#F4E6F0)" },
-          { label:"Pending",  val:managerLeaves.filter(l=>l.status?.includes("pending")).length,        color:"#92400E", bg:"linear-gradient(135deg,#FFFBEB,#FEF3C7)" },
-          { label:"Approved", val:managerLeaves.filter(l=>l.status?.includes("approved")).length,       color:"#14803D", bg:"linear-gradient(135deg,#F0FDF4,#DCFCE7)" },
-          { label:"Rejected", val:managerLeaves.filter(l=>l.status?.includes("rejected")).length,       color:"#991B1B", bg:"linear-gradient(135deg,#FEF2F2,#FEE2E2)" },
+          { label:"Total",    val:managerLeaves.length,                                           color:"#6B1A4A", bg:"linear-gradient(135deg,#F9EFF5,#F4E6F0)" },
+          { label:"Pending",  val:managerLeaves.filter(l=>l.status?.includes("pending")).length,  color:"#92400E", bg:"linear-gradient(135deg,#FFFBEB,#FEF3C7)" },
+          { label:"Approved", val:managerLeaves.filter(l=>l.status?.includes("approved")).length, color:"#14803D", bg:"linear-gradient(135deg,#F0FDF4,#DCFCE7)" },
+          { label:"Rejected", val:managerLeaves.filter(l=>l.status?.includes("rejected")).length, color:"#991B1B", bg:"linear-gradient(135deg,#FEF2F2,#FEE2E2)" },
         ].map((s, i) => (
           <div key={s.label} style={{ background:s.bg, borderRadius:14, padding:"12px 20px", display:"flex", alignItems:"center", gap:12, border:"1px solid rgba(0,0,0,0.05)", boxShadow:"0 2px 8px rgba(0,0,0,0.04)", animation:`fadeSlideUp .3s ease ${i*.07}s both`, minWidth:110 }}>
             <span style={{ fontSize:26, fontWeight:800, color:s.color, fontFamily:"'Playfair Display',serif", lineHeight:1 }}>{s.val}</span>
@@ -797,13 +805,13 @@ const ManagerLeavesPanel = ({ showToast }) => {
 const WFH_BLANK = { startDate:"", endDate:"", reason:"" };
 
 const MyWFHPanel = ({ showToast }) => {
-  const [form, setForm] = useState(WFH_BLANK);
+  const [form, setForm]     = useState(WFH_BLANK);
   const [errors, setErrors] = useState({});
 
-  const { data: wfhData, isLoading } = useAdminGetMyWFH();
+  const { data:wfhData, isLoading } = useAdminGetMyWFH();
   const applyMut = useAdminApplyWFH();
 
-  const raw = wfhData?.wfhList || wfhData || [];
+  const raw     = wfhData?.wfhList || wfhData || [];
   const wfhList = Array.isArray(raw) ? raw : [];
 
   const set = (k, v) => setForm(p => ({ ...p, [k]:v }));
@@ -831,7 +839,7 @@ const MyWFHPanel = ({ showToast }) => {
   };
 
   const days = daysDiff(form.startDate, form.endDate);
-  const ib = (k) => errors[k] ? "#FCA5A5" : "#E2D8EE";
+  const ib   = (k) => errors[k] ? "#FCA5A5" : "#E2D8EE";
 
   return (
     <div>
@@ -912,13 +920,13 @@ const MyWFHPanel = ({ showToast }) => {
 
 const TeamWFHPanel = ({ showToast }) => {
   const [processingId, setProcessingId] = useState(null);
-  const [wfhFilter, setWfhFilter] = useState("all");
+  const [wfhFilter, setWfhFilter]       = useState("all");
 
-  const { data: fwdData, isLoading, refetch } = useAdminGetForwardedWFH();
+  const { data:fwdData, isLoading, refetch } = useAdminGetForwardedWFH();
   const approveMut = useAdminApproveForwardedWFH();
   const rejectMut  = useAdminRejectForwardedWFH();
 
-  const raw = fwdData?.wfhList || fwdData || [];
+  const raw     = fwdData?.wfhList || fwdData || [];
   const allList = Array.isArray(raw) ? raw : [];
 
   const isWfhStatus = (wfh, key) => {
@@ -928,7 +936,7 @@ const TeamWFHPanel = ({ showToast }) => {
     return true;
   };
 
-  const list = wfhFilter === "all" ? allList : allList.filter(w => isWfhStatus(w, wfhFilter));
+  const list     = wfhFilter === "all" ? allList : allList.filter(w => isWfhStatus(w, wfhFilter));
   const wfhCount = (key) => key === "all" ? allList.length : allList.filter(w => isWfhStatus(w, key)).length;
 
   const handleAction = async (wfhId, action) => {
@@ -950,10 +958,10 @@ const TeamWFHPanel = ({ showToast }) => {
     <div>
       <div style={{ display:"flex", gap:12, marginBottom:22, flexWrap:"wrap" }}>
         {[
-          { label:"Total",    val:allList.length,                                          color:"#1D4ED8", bg:"linear-gradient(135deg,#EFF6FF,#DBEAFE)" },
-          { label:"Pending",  val:allList.filter(w=>isWfhStatus(w,"pending")).length,      color:"#92400E", bg:"linear-gradient(135deg,#FFFBEB,#FEF3C7)" },
-          { label:"Approved", val:allList.filter(w=>isWfhStatus(w,"approved")).length,     color:"#14803D", bg:"linear-gradient(135deg,#F0FDF4,#DCFCE7)" },
-          { label:"Rejected", val:allList.filter(w=>isWfhStatus(w,"rejected")).length,     color:"#991B1B", bg:"linear-gradient(135deg,#FEF2F2,#FEE2E2)" },
+          { label:"Total",    val:allList.length,                                       color:"#1D4ED8", bg:"linear-gradient(135deg,#EFF6FF,#DBEAFE)" },
+          { label:"Pending",  val:allList.filter(w=>isWfhStatus(w,"pending")).length,  color:"#92400E", bg:"linear-gradient(135deg,#FFFBEB,#FEF3C7)" },
+          { label:"Approved", val:allList.filter(w=>isWfhStatus(w,"approved")).length, color:"#14803D", bg:"linear-gradient(135deg,#F0FDF4,#DCFCE7)" },
+          { label:"Rejected", val:allList.filter(w=>isWfhStatus(w,"rejected")).length, color:"#991B1B", bg:"linear-gradient(135deg,#FEF2F2,#FEE2E2)" },
         ].map((s, i) => (
           <div key={s.label} style={{ background:s.bg, borderRadius:14, padding:"12px 20px", display:"flex", alignItems:"center", gap:12, border:"1px solid rgba(0,0,0,0.05)", boxShadow:"0 2px 8px rgba(0,0,0,0.04)", animation:`fadeSlideUp .3s ease ${i*.07}s both`, minWidth:110 }}>
             <span style={{ fontSize:26, fontWeight:800, color:s.color, fontFamily:"'Playfair Display',serif", lineHeight:1 }}>{s.val}</span>
@@ -981,10 +989,10 @@ const TeamWFHPanel = ({ showToast }) => {
       {list.length === 0
         ? <EmptyState msg="No team WFH requests found"/>
         : list.map((wfh, idx) => {
-          const requester = wfh.requester || {};
-          const d = wfh.days || daysDiff(wfh.startDate, wfh.endDate);
+          const requester    = wfh.requester || {};
+          const d            = wfh.days || daysDiff(wfh.startDate, wfh.endDate);
           const isProcessing = processingId === wfh._id;
-          const actionable = isActionable(wfh.status);
+          const actionable   = isActionable(wfh.status);
           return (
             <div key={wfh._id || idx} className="alw-card" style={{ opacity:isProcessing ? .6 : 1, pointerEvents:isProcessing ? "none" : "auto", animationDelay:`${idx*.06}s`, position:"relative", overflow:"hidden" }}>
               <div style={{ position:"absolute", top:0, left:0, width:3, bottom:0, background:"#3B82F6", borderRadius:"20px 0 0 20px" }}/>
@@ -1051,7 +1059,7 @@ const AdminLeaveWFH = () => {
   const [tab, setTab]     = useState("allLeaves");
   const [toast, setToast] = useState({ visible:false, message:"", type:"success" });
 
-  const { data: meData, isLoading: meLoading } = useGetMeAdmin();
+  const { data:meData, isLoading:meLoading } = useGetMeAdmin();
   const admin        = meData?.user  || meData;
   const leaveBalance = meData?.leaveBalance || null;
 
