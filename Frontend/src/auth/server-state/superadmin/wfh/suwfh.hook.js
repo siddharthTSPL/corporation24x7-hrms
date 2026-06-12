@@ -1,5 +1,3 @@
-
-
 import {
   useQuery,
   useMutation,
@@ -26,7 +24,6 @@ export const useApproveWFHSuperAdmin = () => {
 
   return useMutation({
     mutationFn: approveWFHSuperAdmin,
-
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["superadmin-pending-wfh"],
@@ -40,7 +37,6 @@ export const useRejectWFHSuperAdmin = () => {
 
   return useMutation({
     mutationFn: rejectWFHSuperAdmin,
-
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["superadmin-pending-wfh"],
