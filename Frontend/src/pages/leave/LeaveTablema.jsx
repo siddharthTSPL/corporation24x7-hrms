@@ -11,6 +11,7 @@ import {
   useGetForwardedLeavesManager,
   useAcceptForwardedLeave,
   useRejectForwardedLeave,
+  useForwardForwardedLeaveToAdmin,
 } from "../../auth/server-state/manager/managerleave/managerleave.hook";
 import {
   useManagerApplyWFH,
@@ -303,8 +304,29 @@ const FormField = ({label,error,children}) => (
   </div>
 );
 
+const IconCheck = () => (
+  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+    <path d="M2 6l2.5 2.5 5.5-5" stroke="#14803D" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+const IconX = () => (
+  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+    <path d="M3 3l6 6M9 3l-6 6" stroke="#991B1B" strokeWidth="1.8" strokeLinecap="round"/>
+  </svg>
+);
+const IconForward = () => (
+  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+    <path d="M2 6h8M7 3l3 3-3 3" stroke="#1D4ED8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+const IconForwardAdmin = () => (
+  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+    <path d="M2 6h8M7 3l3 3-3 3" stroke="#6B21A8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 const EmployeeLeavesPanel = ({showToast}) => {
-  const [filter,setFilter]           = useState("all");
+  const [filter,setFilter] = useState("all");
   const [processingId,setProcessingId] = useState(null);
 
   const {data:rawLeaves,isLoading,refetch} = useGetAllManagerLeaves();
@@ -403,16 +425,13 @@ const EmployeeLeavesPanel = ({showToast}) => {
                   {isActionable&&(
                     <div style={{display:"flex",flexDirection:"column",gap:7,flexShrink:0}}>
                       <button className="mlw-action-btn" style={{background:"#F0FDF4",color:"#14803D",boxShadow:"0 2px 8px rgba(34,197,94,0.15)"}} onClick={()=>handleAction(leave._id,"accept")}>
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l2.5 2.5 5.5-5" stroke="#14803D" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                        Approve
+                        <IconCheck/>Approve
                       </button>
                       <button className="mlw-action-btn" style={{background:"#FFF1F2",color:"#991B1B",boxShadow:"0 2px 8px rgba(239,68,68,0.12)"}} onClick={()=>handleAction(leave._id,"reject")}>
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="#991B1B" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                        Reject
+                        <IconX/>Reject
                       </button>
                       <button className="mlw-action-btn" style={{background:"#EFF6FF",color:"#1D4ED8",boxShadow:"0 2px 8px rgba(59,130,246,0.12)"}} onClick={()=>handleAction(leave._id,"forward")}>
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M7 3l3 3-3 3" stroke="#1D4ED8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                        Forward
+                        <IconForward/>Forward
                       </button>
                     </div>
                   )}
@@ -435,8 +454,9 @@ const ForwardedLeavesPanel = ({showToast}) => {
   const [processingId,setProcessingId] = useState(null);
 
   const {data:rawData,isLoading,refetch} = useGetForwardedLeavesManager();
-  const acceptFwdMut = useAcceptForwardedLeave();
-  const rejectFwdMut = useRejectForwardedLeave();
+  const acceptFwdMut   = useAcceptForwardedLeave();
+  const rejectFwdMut   = useRejectForwardedLeave();
+  const forwardAdminMut = useForwardForwardedLeaveToAdmin();
 
   const employeeLeaves = rawData?.employeeLeaves?.leaves || [];
   const managerLeaves  = rawData?.managerLeaves?.leaves  || [];
@@ -444,8 +464,9 @@ const ForwardedLeavesPanel = ({showToast}) => {
   const handleAction = async (leaveId,leaveFor,action) => {
     setProcessingId(leaveId);
     try {
-      if (action==="accept") { await acceptFwdMut.mutateAsync({leaveId,leaveFor}); showToast("Leave approved","success"); }
-      if (action==="reject") { await rejectFwdMut.mutateAsync({leaveId,leaveFor}); showToast("Leave rejected","error"); }
+      if (action==="accept")        { await acceptFwdMut.mutateAsync({leaveId,leaveFor});   showToast("Leave approved","success"); }
+      if (action==="reject")        { await rejectFwdMut.mutateAsync({leaveId,leaveFor});   showToast("Leave rejected","error"); }
+      if (action==="forwardAdmin")  { await forwardAdminMut.mutateAsync({leaveId});          showToast("Forwarded to admin","info"); }
       refetch();
     } catch(err) {
       showToast(err?.response?.data?.message||err?.message||"Something went wrong","error");
@@ -456,6 +477,8 @@ const ForwardedLeavesPanel = ({showToast}) => {
     const person       = leaveFor==="employee" ? (leave.employee||{}) : (leave.manager||{});
     const isProcessing = processingId===leave._id;
     const days         = leave.days||daysDiff(leave.startDate,leave.endDate);
+    const isManagerLeave = leaveFor==="manager";
+
     return (
       <div key={leave._id||idx} className="mlw-card" style={{opacity:isProcessing?.6:1,pointerEvents:isProcessing?"none":"auto",animationDelay:`${idx*.06}s`,position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",top:0,left:0,width:3,bottom:0,background:(LEAVE_META[leave.leaveType]||{accent:"#8B3A8A"}).accent,borderRadius:"20px 0 0 20px"}}/>
@@ -467,10 +490,24 @@ const ForwardedLeavesPanel = ({showToast}) => {
               </div>
               <div>
                 <div style={{fontSize:14,fontWeight:600,color:"#1C1028",fontFamily:"'DM Sans',sans-serif"}}>{person.f_name} {person.l_name}</div>
-                <div style={{fontSize:11,color:"#9B8BAE",marginTop:2,fontFamily:"'DM Sans',sans-serif"}}>{person.designation||person.work_email}{leaveFor==="manager"&&person.department?` · ${person.department}`:""}</div>
+                <div style={{fontSize:11,color:"#9B8BAE",marginTop:2,fontFamily:"'DM Sans',sans-serif"}}>
+                  {person.designation||person.work_email}
+                  {isManagerLeave&&person.department?` · ${person.department}`:""}
+                </div>
               </div>
             </div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:12}}>
+
+            {isManagerLeave&&(
+              <div style={{display:"inline-flex",alignItems:"center",gap:5,marginTop:10,padding:"4px 10px",background:"linear-gradient(135deg,#F5F3FF,#EDE9FE)",borderRadius:8,border:"1px solid #DDD6FE"}}>
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <circle cx="5" cy="3.5" r="2" stroke="#6B21A8" strokeWidth="1.2"/>
+                  <path d="M1 9c0-2 1.8-3 4-3s4 1 4 3" stroke="#6B21A8" strokeWidth="1.2" strokeLinecap="round"/>
+                </svg>
+                <span style={{fontSize:10,fontWeight:600,color:"#6B21A8",fontFamily:"'DM Sans',sans-serif"}}>Manager Leave Request</span>
+              </div>
+            )}
+
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:10}}>
               <TypeBadge type={leave.leaveType}/>
               <StatusBadge status={leave.status} meta={LEAVE_STATUS_META}/>
               <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:600,background:"#F4EEF9",color:"#6B1A4A",fontFamily:"'DM Sans',sans-serif"}}>{days} day{days>1?"s":""}</span>
@@ -487,15 +524,19 @@ const ForwardedLeavesPanel = ({showToast}) => {
               </div>
             )}
           </div>
+
           <div style={{display:"flex",flexDirection:"column",gap:7,flexShrink:0}}>
             <button className="mlw-action-btn" style={{background:"#F0FDF4",color:"#14803D",boxShadow:"0 2px 8px rgba(34,197,94,0.15)"}} onClick={()=>handleAction(leave._id,leaveFor,"accept")}>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l2.5 2.5 5.5-5" stroke="#14803D" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              Approve
+              <IconCheck/>Approve
             </button>
             <button className="mlw-action-btn" style={{background:"#FFF1F2",color:"#991B1B",boxShadow:"0 2px 8px rgba(239,68,68,0.12)"}} onClick={()=>handleAction(leave._id,leaveFor,"reject")}>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="#991B1B" strokeWidth="1.8" strokeLinecap="round"/></svg>
-              Reject
+              <IconX/>Reject
             </button>
+            {isManagerLeave&&(
+              <button className="mlw-action-btn" style={{background:"#F5F3FF",color:"#6B21A8",boxShadow:"0 2px 8px rgba(107,33,168,0.12)"}} onClick={()=>handleAction(leave._id,leaveFor,"forwardAdmin")}>
+                <IconForwardAdmin/>To Admin
+              </button>
+            )}
           </div>
         </div>
         {isProcessing&&(
@@ -516,6 +557,16 @@ const ForwardedLeavesPanel = ({showToast}) => {
 
   return (
     <div>
+      <div style={{background:"linear-gradient(135deg,#EFF6FF,#DBEAFE)",border:"1px solid #BFDBFE",borderRadius:14,padding:"12px 18px",marginBottom:20,display:"flex",alignItems:"flex-start",gap:10}}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{flexShrink:0,marginTop:1}}>
+          <circle cx="8" cy="8" r="6.5" stroke="#3B82F6" strokeWidth="1.2"/>
+          <path d="M8 7v5M8 5.5v.5" stroke="#3B82F6" strokeWidth="1.4" strokeLinecap="round"/>
+        </svg>
+        <div style={{fontSize:12,color:"#1D4ED8",fontFamily:"'DM Sans',sans-serif",lineHeight:1.6}}>
+          <strong>Manager leaves</strong> forwarded to you can be approved, rejected, or escalated further to Admin. Employee leaves can only be approved or rejected here.
+        </div>
+      </div>
+
       <div style={{display:"flex",gap:8,marginBottom:22,flexWrap:"wrap"}}>
         {innerTabs.map(t=>{
           const active = activeTab===t.key;
@@ -970,14 +1021,14 @@ const TeamWFHPanel = ({showToast}) => {
   };
 
   const pendingActions = [
-    {label:"Approve",action:"approve",bg:"#F0FDF4",color:"#14803D",shadow:"0 2px 8px rgba(34,197,94,0.15)",  handler:handleTeamAction,icon:<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l2.5 2.5 5.5-5" stroke="#14803D" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>},
-    {label:"Reject", action:"reject", bg:"#FFF1F2",color:"#991B1B",shadow:"0 2px 8px rgba(239,68,68,0.12)",  handler:handleTeamAction,icon:<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="#991B1B" strokeWidth="1.8" strokeLinecap="round"/></svg>},
-    {label:"Forward",action:"forward",bg:"#EFF6FF",color:"#1D4ED8",shadow:"0 2px 8px rgba(59,130,246,0.12)", handler:handleTeamAction,icon:<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M7 3l3 3-3 3" stroke="#1D4ED8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>},
+    {label:"Approve",action:"approve",bg:"#F0FDF4",color:"#14803D",shadow:"0 2px 8px rgba(34,197,94,0.15)",  handler:handleTeamAction,icon:<IconCheck/>},
+    {label:"Reject", action:"reject", bg:"#FFF1F2",color:"#991B1B",shadow:"0 2px 8px rgba(239,68,68,0.12)",  handler:handleTeamAction,icon:<IconX/>},
+    {label:"Forward",action:"forward",bg:"#EFF6FF",color:"#1D4ED8",shadow:"0 2px 8px rgba(59,130,246,0.12)", handler:handleTeamAction,icon:<IconForward/>},
   ];
 
   const fwdActions = [
-    {label:"Approve",action:"approve",bg:"#F0FDF4",color:"#14803D",shadow:"0 2px 8px rgba(34,197,94,0.15)",handler:handleFwdAction,icon:<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l2.5 2.5 5.5-5" stroke="#14803D" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>},
-    {label:"Reject", action:"reject", bg:"#FFF1F2",color:"#991B1B",shadow:"0 2px 8px rgba(239,68,68,0.12)",handler:handleFwdAction,icon:<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="#991B1B" strokeWidth="1.8" strokeLinecap="round"/></svg>},
+    {label:"Approve",action:"approve",bg:"#F0FDF4",color:"#14803D",shadow:"0 2px 8px rgba(34,197,94,0.15)",handler:handleFwdAction,icon:<IconCheck/>},
+    {label:"Reject", action:"reject", bg:"#FFF1F2",color:"#991B1B",shadow:"0 2px 8px rgba(239,68,68,0.12)",handler:handleFwdAction,icon:<IconX/>},
   ];
 
   const innerTabs = [
