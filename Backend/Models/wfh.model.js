@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const wfhSchema = new mongoose.Schema(
   {
-     organisation_id: {
+    organisation_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SuperAdmin",
       required: true,
@@ -18,11 +18,21 @@ const wfhSchema = new mongoose.Schema(
       required: true,
       enum: ["User", "Manager", "Admin"],
     },
-    manager: {
+    currentHandler: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Manager",
+      refPath: "currentHandlerModel",
       default: null,
     },
+    currentHandlerModel: {
+      type: String,
+      enum: ["Manager", "Admin", "SuperAdmin"],
+      default: null,
+    },
+    handlerChain: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+      },
+    ],
     superadmin: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SuperAdmin",
@@ -36,24 +46,21 @@ const wfhSchema = new mongoose.Schema(
       type: String,
       enum: [
         "pending_manager",
-        "approved_manager",
-        "rejected_manager",
-        "forwarded_reporting_manager",
         "pending_reporting_manager",
-        "approved_reporting_manager",
-        "rejected_reporting_manager",
         "pending_admin",
+        "approved_manager",
         "approved_admin",
-        "rejected_admin",
-        "pending_superadmin",
         "approved_superadmin",
+        "rejected_reporting_manager",
+        "rejected_admin",
         "rejected_superadmin",
+        "pending_superadmin",
       ],
       default: "pending_manager",
     },
     approvedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
     rejectedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
-    forwardedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Manager", default: null },
+    forwardedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
     remarks: { type: String, trim: true, maxlength: 500, default: "" },
     deleteAt: { type: Date, default: null, index: { expires: 0 } },
   },
@@ -62,8 +69,9 @@ const wfhSchema = new mongoose.Schema(
 
 wfhSchema.index({ requester: 1, status: 1 });
 wfhSchema.index({ requester: 1, startDate: 1, endDate: 1 });
-wfhSchema.index({ manager: 1, status: 1 });
+wfhSchema.index({ currentHandler: 1, status: 1 });
 wfhSchema.index({ superadmin: 1, status: 1 });
+wfhSchema.index({ handlerChain: 1 });
 wfhSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model("WFH", wfhSchema);

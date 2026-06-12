@@ -104,6 +104,7 @@ const CFG = {
   admin:   { accent: "#5a2240", avBg: "#f0e4ec", avColor: "#5a2240", badge: "Admin",          badgeBg: "#f0e4ec", badgeColor: "#5a2240", tag: "ADM" },
   manager: { accent: "#a8005c", avBg: "#fce7f3", avColor: "#a8005c", badge: "Manager",        badgeBg: "#fce7f3", badgeColor: "#a8005c", tag: "MGR" },
   myMgr:   { accent: "#CD166E", avBg: "#fce7f3", avColor: "#CD166E", badge: "Your Manager",   badgeBg: "#fdf2f8", badgeColor: "#CD166E", tag: "MGR" },
+  subMgr:  { accent: "#be185d", avBg: "#fce7f3", avColor: "#be185d", badge: "Reporting Mgr",  badgeBg: "#fce7f3", badgeColor: "#be185d", tag: "MGR" },
   emp:     { accent: "#7c1f4a", avBg: "#fce7f3", avColor: "#7c1f4a", badge: "Employee",       badgeBg: "#fce7f3", badgeColor: "#7c1f4a", tag: "EMP" },
 };
 
@@ -118,15 +119,12 @@ function Card({ level, name, sub, width = 172, delay = 0, dim, hl, q, you = fals
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: you ? "linear-gradient(90deg,#730042,#CD166E)" : c.accent, borderRadius: "11px 11px 0 0" }} />
         <span style={{ position: "absolute", top: 8, right: 9, fontSize: 8, fontWeight: 600, letterSpacing: "0.1em", color: "#c8a8bb", fontFamily: "'DM Mono',monospace" }}>{c.tag}</span>
         {you && <div style={{ position: "absolute", top: -7, left: "50%", transform: "translateX(-50%)", fontSize: 7, fontWeight: 700, letterSpacing: "0.1em", padding: "2px 8px", borderRadius: 8, background: "#730042", color: "#fff", whiteSpace: "nowrap", fontFamily: "'DM Mono',monospace" }}>YOU</div>}
-
         <Avatar name={name} size={38} bg={you ? "#fce7f3" : c.avBg} color={you ? "#730042" : c.avColor} />
-
         <div style={{ marginTop: 8, marginBottom: 6, textAlign: "center", width: "100%" }}>
           <Hi text={name} q={q} style={{ fontSize: 12, fontWeight: 600, color: "#1a0d14", display: "block", lineHeight: 1.3, fontFamily: "'Syne',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />
           {sub && <Hi text={sub} q={q} style={{ fontSize: 10, color: "#8a6878", display: "block", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />}
           {empCount !== undefined && <span style={{ fontSize: 10, color: "#c8a8bb", display: "block", marginTop: 2 }}>{empCount} report{empCount !== 1 ? "s" : ""}</span>}
         </div>
-
         <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 20, background: you ? "#fce7f3" : c.badgeBg, color: you ? "#730042" : c.badgeColor, fontWeight: 600, letterSpacing: "0.04em", border: you ? "1px solid #f9a8d4" : "none", fontFamily: "'DM Mono',monospace" }}>
           {you ? "You" : c.badge}
         </span>
@@ -139,44 +137,135 @@ function VLine({ h = 24 }) {
   return <div style={{ width: 1, height: h, background: "#dcc0d0", margin: "0 auto", flexShrink: 0 }} />;
 }
 
-// Horizontal T-bar connector above a row of N cards each cardW wide with gap spacing
-function TBar({ count, cardW, gap }) {
-  if (count <= 1) return <VLine h={20} />;
-  const total = count * cardW + (count - 1) * gap;
-  const midY = 16;
+function ManagerTBar({ mgrW, empCount, empW, empGap }) {
+  if (empCount === 0) return null;
+  const total = Math.max(mgrW, empCount * empW + (empCount - 1) * empGap);
+  const barY = 14;
+  const offset = (total - (empCount * empW + (empCount - 1) * empGap)) / 2;
   return (
-    <svg width={total} height={midY + 4} style={{ display: "block", flexShrink: 0, overflow: "visible" }}>
-      {/* vertical from above down to the T */}
-      <line x1={total / 2} y1={0} x2={total / 2} y2={midY} stroke="#dcc0d0" strokeWidth={1} />
-      {/* horizontal bar */}
-      <line x1={cardW / 2} y1={midY} x2={total - cardW / 2} y2={midY} stroke="#dcc0d0" strokeWidth={1} />
-      {/* vertical drops to each card */}
-      {Array.from({ length: count }).map((_, i) => {
-        const cx = i * (cardW + gap) + cardW / 2;
-        return <line key={i} x1={cx} y1={midY} x2={cx} y2={midY + 4} stroke="#dcc0d0" strokeWidth={1} />;
+    <svg width={total} height={barY + 4} style={{ display: "block", flexShrink: 0, overflow: "visible" }}>
+      <line x1={total / 2} y1={0} x2={total / 2} y2={barY} stroke="#dcc0d0" strokeWidth={1} />
+      {empCount > 1 && (
+        <line x1={offset + empW / 2} y1={barY} x2={total - offset - empW / 2} y2={barY} stroke="#dcc0d0" strokeWidth={1} />
+      )}
+      {Array.from({ length: empCount }).map((_, i) => {
+        const cx = offset + i * (empW + empGap) + empW / 2;
+        return <line key={i} x1={cx} y1={barY} x2={cx} y2={barY + 4} stroke="#dcc0d0" strokeWidth={1} />;
       })}
     </svg>
   );
 }
 
-// Below-manager T-bar: stem comes from the center of the manager card
-function ManagerTBar({ mgrW, empCount, empW, empGap }) {
-  if (empCount === 0) return null;
-  const total = Math.max(mgrW, empCount * empW + (empCount - 1) * empGap);
-  const mgrCenter = total / 2;
-  const barY = 14;
+const CARD_W = 172;
+const EMP_W  = 152;
+const MGR_GAP = 28;
+const EMP_GAP = 10;
+const SUB_MGR_GAP = 20;
+
+function colWOf(mgr) {
+  const empCount = (mgr.employees || []).length;
+  const empW = Math.max(CARD_W, empCount > 0 ? empCount * EMP_W + (empCount - 1) * EMP_GAP : 0);
+  const subMgrs = mgr.subManagers || [];
+  const subW = subMgrs.length > 0
+    ? subMgrs.reduce((s, sm) => s + colWOf(sm), 0) + (subMgrs.length - 1) * SUB_MGR_GAP
+    : 0;
+  return Math.max(CARD_W, empW, subW);
+}
+
+function collectMatchKeys(nodes, q, matches) {
+  if (!q) return;
+  nodes.forEach(mgr => {
+    const key = `m-${mgr.id}`;
+    if ([mgr.name, mgr.designation, mgr.department].some(s => s && norm(s).includes(q)))
+      matches.add(key);
+    (mgr.employees || []).forEach(e => {
+      if ([e.name, e.designation, e.department].some(s => s && norm(s).includes(q)))
+        matches.add(`e-${e.id}`);
+    });
+    if (mgr.subManagers?.length) collectMatchKeys(mgr.subManagers, q, matches);
+  });
+}
+
+function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
+  const key = `m-${mgr.id}`;
+  const emps = mgr.employees || [];
+  const subMgrs = mgr.subManagers || [];
+
+  let level = "manager";
+  if (isSubMgr) level = mgr.isCurrentUserManager ? "myMgr" : "subMgr";
+  else level = mgr.isCurrentUserManager ? "myMgr" : "manager";
+
+  const cw = colWOf(mgr);
+  const mDelay = delayRef.current;
+  delayRef.current += 55;
+
   return (
-    <svg width={total} height={barY + 4} style={{ display: "block", flexShrink: 0, overflow: "visible" }}>
-      <line x1={mgrCenter} y1={0} x2={mgrCenter} y2={barY} stroke="#dcc0d0" strokeWidth={1} />
-      {empCount > 1 && (
-        <line x1={empW / 2 + (total - (empCount * empW + (empCount - 1) * empGap)) / 2} y1={barY} x2={total - empW / 2 - (total - (empCount * empW + (empCount - 1) * empGap)) / 2} y2={barY} stroke="#dcc0d0" strokeWidth={1} />
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: cw, flexShrink: 0 }}>
+      <Card
+        level={level}
+        name={mgr.name}
+        sub={mgr.designation || mgr.department}
+        width={CARD_W}
+        delay={mDelay}
+        dim={dim(key)}
+        hl={matches.has(key)}
+        q={q}
+        empCount={(emps.length + subMgrs.length) > 0 ? emps.length + subMgrs.length : undefined}
+      />
+
+      {subMgrs.length > 0 && (
+        <>
+          <VLine h={18} />
+          {subMgrs.length > 1 && (() => {
+            const totalSubW = subMgrs.reduce((s, sm) => s + colWOf(sm), 0) + (subMgrs.length - 1) * SUB_MGR_GAP;
+            return (
+              <svg width={totalSubW} height={20} style={{ display: "block", flexShrink: 0, overflow: "visible" }}>
+                <line x1={totalSubW / 2} y1={0} x2={totalSubW / 2} y2={10} stroke="#dcc0d0" strokeWidth={1} />
+                <line x1={colWOf(subMgrs[0]) / 2} y1={10} x2={totalSubW - colWOf(subMgrs[subMgrs.length - 1]) / 2} y2={10} stroke="#dcc0d0" strokeWidth={1} />
+                {subMgrs.map((sm, i) => {
+                  let cx = 0;
+                  for (let j = 0; j < i; j++) cx += colWOf(subMgrs[j]) + SUB_MGR_GAP;
+                  cx += colWOf(sm) / 2;
+                  return <line key={i} x1={cx} y1={10} x2={cx} y2={20} stroke="#dcc0d0" strokeWidth={1} />;
+                })}
+              </svg>
+            );
+          })()}
+          <div style={{ display: "flex", gap: SUB_MGR_GAP, alignItems: "flex-start" }}>
+            {subMgrs.map(sm => (
+              <ManagerColumn key={sm.id} mgr={sm} q={q} matches={matches} dim={dim} delayRef={delayRef} isSubMgr />
+            ))}
+          </div>
+        </>
       )}
-      {Array.from({ length: empCount }).map((_, i) => {
-        const offset = (total - (empCount * empW + (empCount - 1) * empGap)) / 2;
-        const cx = offset + i * (empW + empGap) + empW / 2;
-        return <line key={i} x1={cx} y1={barY} x2={cx} y2={barY + 4} stroke="#dcc0d0" strokeWidth={1} />;
-      })}
-    </svg>
+
+      {emps.length > 0 && (
+        <>
+          <ManagerTBar mgrW={CARD_W} empCount={emps.length} empW={EMP_W} empGap={EMP_GAP} />
+          <div style={{ display: "flex", gap: EMP_GAP, alignItems: "flex-start" }}>
+            {emps.map(emp => {
+              const eKey = `e-${emp.id}`;
+              const eDelay = delayRef.current;
+              delayRef.current += 18;
+              return (
+                <Card
+                  key={emp.id}
+                  level="emp"
+                  name={emp.name}
+                  sub={emp.designation || emp.department}
+                  width={EMP_W}
+                  delay={eDelay}
+                  dim={dim(eKey)}
+                  hl={matches.has(eKey)}
+                  q={q}
+                  you={emp.isCurrentUser}
+                />
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -203,130 +292,69 @@ function SkeletonTree() {
   );
 }
 
-const CARD_W = 172;
-const EMP_W  = 152;
-const MGR_GAP = 28;
-const EMP_GAP = 10;
+function countNodes(managers) {
+  let n = 0;
+  for (const mgr of managers) {
+    n += 1 + (mgr.employees?.length || 0);
+    if (mgr.subManagers?.length) n += countNodes(mgr.subManagers);
+  }
+  return n;
+}
 
 function OrgTree({ data, loading, q }) {
   if (loading) return <SkeletonTree />;
-  if (!data)   return null;
+  if (!data) return null;
 
-  const hasQ   = q.length > 0;
+  const hasQ = q.length > 0;
   const matches = new Set();
 
   if (hasQ) {
     const chk = (...ss) => ss.some(s => s && norm(s).includes(q));
     if (chk(data.organisation_name, data.super_admin?.name)) matches.add("org");
-    if (chk(data.admin?.name, data.admin?.designation))       matches.add("admin");
-    (data.managers || []).forEach(mgr => {
-      if (chk(mgr.name, mgr.designation, mgr.department)) matches.add(`m-${mgr.id}`);
-      (mgr.employees || []).forEach(e => {
-        if (chk(e.name, e.designation, e.department)) matches.add(`e-${e.id}`);
-      });
-    });
+    if (chk(data.admin?.name, data.admin?.designation)) matches.add("admin");
+    collectMatchKeys(data.managers || [], q, matches);
   }
 
   const anyMatch = matches.size > 0;
   const dim = (k) => hasQ && anyMatch && !matches.has(k);
 
   const managers = data.managers || [];
-
-  // column width = wide enough for all employees below
-  const colW = (mgr) => {
-    const ec = (mgr.employees || []).length;
-    if (ec === 0) return CARD_W;
-    const empTotal = ec * EMP_W + (ec - 1) * EMP_GAP;
-    return Math.max(CARD_W, empTotal);
-  };
-
-  const totalW = managers.reduce((s, m) => s + colW(m), 0) + Math.max(0, managers.length - 1) * MGR_GAP;
+  const totalW = managers.reduce((s, m) => s + colWOf(m), 0) + Math.max(0, managers.length - 1) * MGR_GAP;
   const topBarW = Math.max(CARD_W, totalW);
 
-  let delay = 40;
-  const d = (add = 70) => { delay += add; return delay; };
+  const delayRef = { current: 160 };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: "max-content" }}>
-
-      {/* Org */}
       <div style={{ animation: `scaleIn 0.26s ease 40ms forwards`, opacity: 0 }}>
         <Card level="org" name={data.organisation_name || "Organisation"} sub={data.super_admin?.name} width={CARD_W} delay={0} dim={dim("org")} hl={matches.has("org")} q={q} />
       </div>
       <VLine h={22} />
 
-      {/* Admin */}
       {data.admin && (
         <>
-          <Card level="admin" name={data.admin.name} sub={data.admin.designation} width={CARD_W} delay={d()} dim={dim("admin")} hl={matches.has("admin")} q={q} />
+          <Card level="admin" name={data.admin.name} sub={data.admin.designation} width={CARD_W} delay={80} dim={dim("admin")} hl={matches.has("admin")} q={q} />
           <VLine h={22} />
         </>
       )}
 
-      {/* T-bar spanning managers row */}
       {managers.length > 1 && (
         <svg width={topBarW} height={20} style={{ display: "block", flexShrink: 0, overflow: "visible" }}>
           <line x1={topBarW / 2} y1={0} x2={topBarW / 2} y2={10} stroke="#dcc0d0" strokeWidth={1} />
-          <line x1={colW(managers[0]) / 2} y1={10} x2={topBarW - colW(managers[managers.length - 1]) / 2} y2={10} stroke="#dcc0d0" strokeWidth={1} />
+          <line x1={colWOf(managers[0]) / 2} y1={10} x2={topBarW - colWOf(managers[managers.length - 1]) / 2} y2={10} stroke="#dcc0d0" strokeWidth={1} />
           {managers.map((mgr, i) => {
             let cx = 0;
-            for (let j = 0; j < i; j++) cx += colW(managers[j]) + MGR_GAP;
-            cx += colW(mgr) / 2;
+            for (let j = 0; j < i; j++) cx += colWOf(managers[j]) + MGR_GAP;
+            cx += colWOf(mgr) / 2;
             return <line key={i} x1={cx} y1={10} x2={cx} y2={20} stroke="#dcc0d0" strokeWidth={1} />;
           })}
         </svg>
       )}
 
-      {/* Managers row */}
-      <div style={{ display: "flex", gap: MGR_GAP, alignItems: "flex-start", animation: `fadeIn 0.28s ease ${delay + 50}ms forwards`, opacity: 0 }}>
-        {managers.map((mgr, mi) => {
-          const mKey   = `m-${mgr.id}`;
-          const emps   = mgr.employees || [];
-          const cw     = colW(mgr);
-          const isMyMgr = mgr.isCurrentUserManager;
-          const mDelay  = d(mi === 0 ? 60 : 25);
-
-          return (
-            <div key={mgr.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", width: cw, flexShrink: 0 }}>
-              <Card
-                level={isMyMgr ? "myMgr" : "manager"}
-                name={mgr.name}
-                sub={mgr.designation || mgr.department}
-                width={CARD_W}
-                delay={mDelay}
-                dim={dim(mKey)}
-                hl={matches.has(mKey)}
-                q={q}
-                empCount={emps.length}
-              />
-
-              {emps.length > 0 && (
-                <>
-                  <ManagerTBar mgrW={CARD_W} empCount={emps.length} empW={EMP_W} empGap={EMP_GAP} />
-                  <div style={{ display: "flex", gap: EMP_GAP, alignItems: "flex-start" }}>
-                    {emps.map((emp, ei) => {
-                      const eKey = `e-${emp.id}`;
-                      return (
-                        <Card
-                          key={emp.id}
-                          level="emp"
-                          name={emp.name}
-                          sub={emp.designation || emp.department}
-                          width={EMP_W}
-                          delay={d(ei === 0 ? 40 : 18)}
-                          dim={dim(eKey)}
-                          hl={matches.has(eKey)}
-                          q={q}
-                          you={emp.isCurrentUser}
-                        />
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
-          );
-        })}
+      <div style={{ display: "flex", gap: MGR_GAP, alignItems: "flex-start" }}>
+        {managers.map(mgr => (
+          <ManagerColumn key={mgr.id} mgr={mgr} q={q} matches={matches} dim={dim} delayRef={delayRef} />
+        ))}
       </div>
     </div>
   );
@@ -350,8 +378,8 @@ function StatCard({ label, text, icon: Icon, accent, delay = 0 }) {
 export default function OrganizationPageEmployee() {
   const { data, isLoading: loading } = useGetOrgInfoEmployee();
 
-  const [searchOpen,   setSearchOpen]   = useState(false);
-  const [searchQuery,  setSearchQuery]  = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [exportStatus, setExportStatus] = useState(null);
   const inputRef = useRef(null);
   const chartRef = useRef(null);
@@ -360,11 +388,18 @@ export default function OrganizationPageEmployee() {
 
   const myInfo = useMemo(() => {
     if (!data) return null;
-    for (const mgr of (data.managers || [])) {
-      const emp = mgr.employees?.find(e => e.isCurrentUser);
-      if (emp) return { ...emp, managerName: mgr.name };
-    }
-    return null;
+    const walk = (nodes, mgrName = null) => {
+      for (const mgr of nodes) {
+        const emp = mgr.employees?.find(e => e.isCurrentUser);
+        if (emp) return { ...emp, managerName: mgr.name };
+        if (mgr.subManagers?.length) {
+          const found = walk(mgr.subManagers, mgr.name);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    return walk(data.managers || []);
   }, [data]);
 
   const matchCount = useMemo(() => {
@@ -374,10 +409,12 @@ export default function OrganizationPageEmployee() {
     const chk = (...ss) => ss.some(s => s && norm(s).includes(q));
     if (chk(data.organisation_name)) n++;
     if (chk(data.admin?.name, data.admin?.designation)) n++;
-    (data.managers || []).forEach(mgr => {
+    const walk = (nodes) => nodes.forEach(mgr => {
       if (chk(mgr.name, mgr.department, mgr.designation)) n++;
       (mgr.employees || []).forEach(e => { if (chk(e.name, e.designation)) n++; });
+      if (mgr.subManagers?.length) walk(mgr.subManagers);
     });
+    walk(data.managers || []);
     return n;
   }, [searchQuery, data]);
 
@@ -385,7 +422,7 @@ export default function OrganizationPageEmployee() {
     if (!data) return 0;
     let n = 1;
     if (data.admin) n++;
-    (data.managers || []).forEach(mgr => { n++; n += (mgr.employees || []).length; });
+    n += countNodes(data.managers || []);
     return n;
   }, [data]);
 
@@ -434,7 +471,6 @@ export default function OrganizationPageEmployee() {
     <div className="org-root" style={{ minHeight: "100vh", background: "#faf5f8" }}>
       <style>{STYLES}</style>
 
-      {/* Topbar */}
       <div style={{ animation: "fadeIn 0.3s ease forwards", background: "#fff", borderBottom: "1px solid #eedde8", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 54, gap: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           <span style={{ fontSize: 12, color: "#b89aad", fontWeight: 500 }}>{orgName}</span>
@@ -466,11 +502,10 @@ export default function OrganizationPageEmployee() {
       </div>
 
       <div style={{ maxWidth: 1600, margin: "0 auto", padding: "22px 24px 48px" }}>
-
         <div style={{ animation: "fadeUp 0.3s ease 50ms forwards", opacity: 0, marginBottom: 18 }}>
           <h1 style={{ fontSize: 19, fontWeight: 700, color: "#1a0d14", margin: 0, letterSpacing: "-0.3px", fontFamily: "'Syne',sans-serif" }}>Organisation Chart</h1>
           <p style={{ fontSize: 12, color: "#b89aad", margin: "4px 0 0" }}>
-            {loading ? "Loading…" : `${orgName} · ${totalNodes} nodes · ${(data?.managers || []).length} manager${(data?.managers || []).length !== 1 ? "s" : ""} · You are highlighted`}
+            {loading ? "Loading…" : `${orgName} · ${totalNodes} nodes · You are highlighted`}
           </p>
         </div>
 
@@ -487,7 +522,6 @@ export default function OrganizationPageEmployee() {
           </div>
         )}
 
-        {/* Chart panel */}
         <div style={{ animation: "fadeIn 0.3s ease 240ms forwards", opacity: 0, background: "#fff", border: "1px solid #eedde8", borderRadius: 14, boxShadow: "0 2px 10px rgba(115,0,66,0.05)", overflow: "hidden" }}>
           <div style={{ padding: "11px 16px", borderBottom: "1px solid #f5edf2", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fdf8fb", flexWrap: "wrap", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -506,6 +540,7 @@ export default function OrganizationPageEmployee() {
                 { dot: "#5a2240", label: "Admin" },
                 { dot: "#a8005c", label: "Manager" },
                 { dot: "#CD166E", label: "Your manager" },
+                { dot: "#be185d", label: "Reporting Mgr" },
                 { dot: "#730042", label: "You", ring: true },
               ].map(({ dot, label, ring }) => (
                 <div key={label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#b89aad" }}>
