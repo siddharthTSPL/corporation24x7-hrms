@@ -5,13 +5,13 @@ import {
   useGetAllManagerLeaves,
   useAcceptLeaveRequest,
   useRejectLeaveRequest,
-  useForwardLeaveToAdmin,
+  useForwardLeaveToReportingManager,
   useGetMyLeavesManager,
   useApplyLeaveManager,
   useGetForwardedLeavesManager,
   useAcceptForwardedLeave,
   useRejectForwardedLeave,
-  useForwardForwardedLeaveToAdmin,
+  useForwardLeaveUpChain,
 } from "../../auth/server-state/manager/managerleave/managerleave.hook";
 import {
   useManagerApplyWFH,
@@ -199,7 +199,7 @@ const normalizeLeave = (raw) => {
     status:    raw.status    || "",
     startDate: raw.startDate || raw.start_date || raw.from || "",
     endDate:   raw.endDate   || raw.end_date   || raw.to   || "",
-    days:      raw.days      || raw.totalDays   || raw.total_days || 0,
+    days:      raw.days      || raw.totalDays  || raw.total_days || 0,
     reason:    raw.reason    || raw.description || "",
     createdAt: raw.createdAt || raw.created_at  || raw.appliedAt || "",
   };
@@ -319,7 +319,7 @@ const IconForward = () => (
     <path d="M2 6h8M7 3l3 3-3 3" stroke="#1D4ED8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
-const IconForwardAdmin = () => (
+const IconForwardChain = () => (
   <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
     <path d="M2 6h8M7 3l3 3-3 3" stroke="#6B21A8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
@@ -332,7 +332,7 @@ const EmployeeLeavesPanel = ({showToast}) => {
   const {data:rawLeaves,isLoading,refetch} = useGetAllManagerLeaves();
   const acceptMut  = useAcceptLeaveRequest();
   const rejectMut  = useRejectLeaveRequest();
-  const forwardMut = useForwardLeaveToAdmin();
+  const forwardMut = useForwardLeaveToReportingManager();
 
   const leaves   = extractArray(rawLeaves);
   const filtered = filter==="all" ? leaves : leaves.filter(l=>l.status===filter);
@@ -359,7 +359,7 @@ const EmployeeLeavesPanel = ({showToast}) => {
           {label:"Total",    val:leaves.length,                                              color:"#6B1A4A",bg:"linear-gradient(135deg,#F9EFF5,#F4E6F0)"},
           {label:"Pending",  val:leaves.filter(l=>l.status==="pending_manager").length,      color:"#92400E",bg:"linear-gradient(135deg,#FFFBEB,#FEF3C7)"},
           {label:"Approved", val:leaves.filter(l=>l.status?.startsWith("approved")).length,  color:"#14803D",bg:"linear-gradient(135deg,#F0FDF4,#DCFCE7)"},
-          {label:"Forwarded",val:leaves.filter(l=>l.status==="forwarded_reporting_manager"||l.status==="forwarded_admin").length, color:"#1D4ED8",bg:"linear-gradient(135deg,#EFF6FF,#DBEAFE)"},
+          {label:"Forwarded",val:leaves.filter(l=>l.status==="forwarded_reporting_manager"||l.status==="forwarded_admin").length,color:"#1D4ED8",bg:"linear-gradient(135deg,#EFF6FF,#DBEAFE)"},
         ].map((s,i)=>(
           <div key={s.label} style={{background:s.bg,borderRadius:14,padding:"12px 20px",display:"flex",alignItems:"center",gap:12,border:"1px solid rgba(0,0,0,0.05)",boxShadow:"0 2px 8px rgba(0,0,0,0.04)",animation:`fadeSlideUp .3s ease ${i*.07}s both`,minWidth:110}}>
             <span style={{fontSize:26,fontWeight:800,color:s.color,fontFamily:"'Playfair Display',serif",lineHeight:1}}>{s.val}</span>
@@ -454,9 +454,9 @@ const ForwardedLeavesPanel = ({showToast}) => {
   const [processingId,setProcessingId] = useState(null);
 
   const {data:rawData,isLoading,refetch} = useGetForwardedLeavesManager();
-  const acceptFwdMut   = useAcceptForwardedLeave();
-  const rejectFwdMut   = useRejectForwardedLeave();
-  const forwardAdminMut = useForwardForwardedLeaveToAdmin();
+  const acceptFwdMut    = useAcceptForwardedLeave();
+  const rejectFwdMut    = useRejectForwardedLeave();
+  const forwardChainMut = useForwardLeaveUpChain();
 
   const employeeLeaves = rawData?.employeeLeaves?.leaves || [];
   const managerLeaves  = rawData?.managerLeaves?.leaves  || [];
@@ -464,9 +464,9 @@ const ForwardedLeavesPanel = ({showToast}) => {
   const handleAction = async (leaveId,leaveFor,action) => {
     setProcessingId(leaveId);
     try {
-      if (action==="accept")        { await acceptFwdMut.mutateAsync({leaveId,leaveFor});   showToast("Leave approved","success"); }
-      if (action==="reject")        { await rejectFwdMut.mutateAsync({leaveId,leaveFor});   showToast("Leave rejected","error"); }
-      if (action==="forwardAdmin")  { await forwardAdminMut.mutateAsync({leaveId});          showToast("Forwarded to admin","info"); }
+      if (action==="accept")        { await acceptFwdMut.mutateAsync({leaveId,leaveFor});  showToast("Leave approved","success"); }
+      if (action==="reject")        { await rejectFwdMut.mutateAsync({leaveId,leaveFor});  showToast("Leave rejected","error"); }
+      if (action==="forwardChain")  { await forwardChainMut.mutateAsync({leaveId});         showToast("Leave forwarded up the chain","info"); }
       refetch();
     } catch(err) {
       showToast(err?.response?.data?.message||err?.message||"Something went wrong","error");
@@ -474,9 +474,9 @@ const ForwardedLeavesPanel = ({showToast}) => {
   };
 
   const renderCard = (leave,idx,leaveFor) => {
-    const person       = leaveFor==="employee" ? (leave.employee||{}) : (leave.manager||{});
-    const isProcessing = processingId===leave._id;
-    const days         = leave.days||daysDiff(leave.startDate,leave.endDate);
+    const person         = leaveFor==="employee" ? (leave.employee||{}) : (leave.manager||{});
+    const isProcessing   = processingId===leave._id;
+    const days           = leave.days||daysDiff(leave.startDate,leave.endDate);
     const isManagerLeave = leaveFor==="manager";
 
     return (
@@ -533,8 +533,8 @@ const ForwardedLeavesPanel = ({showToast}) => {
               <IconX/>Reject
             </button>
             {isManagerLeave&&(
-              <button className="mlw-action-btn" style={{background:"#F5F3FF",color:"#6B21A8",boxShadow:"0 2px 8px rgba(107,33,168,0.12)"}} onClick={()=>handleAction(leave._id,leaveFor,"forwardAdmin")}>
-                <IconForwardAdmin/>To Admin
+              <button className="mlw-action-btn" style={{background:"#F5F3FF",color:"#6B21A8",boxShadow:"0 2px 8px rgba(107,33,168,0.12)"}} onClick={()=>handleAction(leave._id,leaveFor,"forwardChain")}>
+                <IconForwardChain/>Forward Up
               </button>
             )}
           </div>
@@ -563,7 +563,7 @@ const ForwardedLeavesPanel = ({showToast}) => {
           <path d="M8 7v5M8 5.5v.5" stroke="#3B82F6" strokeWidth="1.4" strokeLinecap="round"/>
         </svg>
         <div style={{fontSize:12,color:"#1D4ED8",fontFamily:"'DM Sans',sans-serif",lineHeight:1.6}}>
-          <strong>Manager leaves</strong> forwarded to you can be approved, rejected, or escalated further to Admin. Employee leaves can only be approved or rejected here.
+          <strong>Manager leaves</strong> forwarded to you can be approved, rejected, or escalated further up the chain. Employee leaves can only be approved or rejected here.
         </div>
       </div>
 
@@ -686,7 +686,7 @@ const ApplyLeavePanel = ({manager,showToast}) => {
   const showML    = manager?.gender==="female" && isMarried;
   const showPL    = manager?.gender==="male"   && isMarried;
 
-  const rawArr = extractArray(rawHistory);
+  const rawArr  = extractArray(rawHistory);
   const history = rawArr.map(normalizeLeave).filter(Boolean);
 
   const availTypes = [
