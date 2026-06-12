@@ -1,10 +1,9 @@
 import axios from 'axios';
 
-const api= axios.create({
+const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/',
   withCredentials: true,
 });
-
 
 export const acceptLeaveRequest = async (data) => {
   const res = await api.post("manager/acceptleaverequest", data);
@@ -16,7 +15,7 @@ export const rejectLeaveRequest = async (data) => {
   return res.data;
 };
 
-export const forwardLeaveToAdmin = async (data) => {
+export const forwardLeaveToReportingManager = async (data) => {
   const res = await api.post("manager/forwardtoreportingmanager", data);
   return res.data;
 };
@@ -30,6 +29,7 @@ export const getMyLeavesManager = async () => {
   const res = await api.get("manager/getmyleaves");
   return res.data;
 };
+
 export const getAllManagerLeaves = async () => {
   const res = await api.get("manager/viewallleaves");
   return res.data;
@@ -49,10 +49,8 @@ export const rejectForwardedLeave = async (data) => {
   const res = await api.post("manager/rejectforwardedleave", data);
   return res.data;
 };
-export const forwardForwardedLeaveToAdmin = async (data) => {
-  const res = await api.post(
-    "manager/forwardforwardedleavetoadmin",
-    data
-  );
+
+export const forwardLeaveUpChain = async (data) => {
+  const res = await api.post("manager/forwardleaveupchain", data);
   return res.data;
 };
