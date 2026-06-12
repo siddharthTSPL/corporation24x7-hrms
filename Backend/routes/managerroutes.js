@@ -190,6 +190,6 @@ managerrouter.get("/getOrgInfo", managermiddleware, asyncHandler(managercontroll
 managerrouter.post(
   "/forwardforwardedleavetoadmin",
   managermiddleware,
-  asyncHandler(managercontroller.forwardforwardedleavetoadmin),
+  asyncHandler(managercontroller.forwardLeaveUpChain),
 );
 module.exports = managerrouter;
