@@ -299,28 +299,41 @@ const addemployee = async (req, res, next) => {
   res.status(201).json({ success: true, message: "User added successfully. Verification email sent." });
 };
 
+
 const findallmanagers = async (req, res, next) => {
   try {
-    if (!req.admin)
+    if (!req.admin) {
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+    }
 
     const organisation_id = req.admin.organisation_id;
 
-    const managers = await Managermodel.find({ organisation_id })
-      .select(EXCLUDE)
-      .populate("reporting_manager", "f_name l_name work_email designation")
-      .lean();
+    const [managers, adminData] = await Promise.all([
+      Managermodel.find({ organisation_id })
+        .select(EXCLUDE)
+        .populate("reporting_manager", "f_name l_name work_email designation")
+        .lean(),
+      Adminmodel.findById(req.admin._id)
+        .select("uid f_name l_name work_email designation department office_location role organisation_id")
+        .lean(),
+    ]);
+
+    const allManagers = [...managers];
+    if (adminData) {
+      allManagers.unshift({ ...adminData, isAdmin: true });
+    }
 
     return res.status(200).json({
       success: true,
       organisation_id,
-      count: managers.length,
-      managers,
+      count: allManagers.length,
+      managers: allManagers,
     });
   } catch (error) {
     next(error);
   }
 };
+
 
 const getallemployee = async (req, res, next) => {
   try {
