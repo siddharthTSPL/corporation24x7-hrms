@@ -49,3 +49,10 @@ export const rejectForwardedLeave = async (data) => {
   const res = await api.post("manager/rejectforwardedleave", data);
   return res.data;
 };
+export const forwardForwardedLeaveToAdmin = async (data) => {
+  const res = await api.post(
+    "manager/forwardforwardedleavetoadmin",
+    data
+  );
+  return res.data;
+};
