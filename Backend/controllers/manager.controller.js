@@ -639,6 +639,12 @@ const acceptforwardedleave = async (req, res, next) => {
     leave.remarks = `Approved by Manager (${req.manager.f_name})`;
     await leave.save();
 
+    try {
+      await processLeaveDeduction(leave);
+    } catch (deductionError) {
+      console.error("Leave approved but balance deduction failed:", deductionError.message);
+    }
+
     return res.status(200).json({ message: "Manager leave approved successfully", leave });
   }
 
