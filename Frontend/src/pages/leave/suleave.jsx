@@ -110,17 +110,17 @@ const LEAVE_META = {
 };
 
 const STATUS_META = {
-  pending:                        { label: "Pending",            bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
-  forwarded_reporting_manager:    { label: "Fwd by Manager",     bg: "#EFF6FF", color: "#1D4ED8", dot: "#3B82F6" },
-  approved_reporting_manager:     { label: "Approved",           bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
-  rejected_reporting_manager:     { label: "Rejected",           bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
-  pending_reporting_manager:      { label: "Pending Review",     bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
-  approved_manager:               { label: "Mgr Approved",       bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
-  rejected_manager:               { label: "Mgr Rejected",       bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
-  pending_manager:                { label: "Pending Manager",    bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
-  pending_superadmin:             { label: "Awaiting Approval",  bg: "#FFF7ED", color: "#9A3412", dot: "#F97316" },
-  approved_superadmin:            { label: "Approved",           bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
-  rejected_superadmin:            { label: "Rejected",           bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  pending:                        { label: "Pending",           bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
+  forwarded_reporting_manager:    { label: "Fwd by Manager",    bg: "#EFF6FF", color: "#1D4ED8", dot: "#3B82F6" },
+  approved_reporting_manager:     { label: "Approved",          bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_reporting_manager:     { label: "Rejected",          bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  pending_reporting_manager:      { label: "Pending Review",    bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
+  approved_manager:               { label: "Mgr Approved",      bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_manager:               { label: "Mgr Rejected",      bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  pending_manager:                { label: "Pending Manager",   bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
+  pending_superadmin:             { label: "Awaiting Approval", bg: "#FFF7ED", color: "#9A3412", dot: "#F97316" },
+  approved_superadmin:            { label: "Approved",          bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_superadmin:            { label: "Rejected",          bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
 };
 
 const AVATAR_COLORS = [
@@ -233,7 +233,7 @@ const SummaryStrip = ({ stats }) => (
   </div>
 );
 
-const PersonCard = ({ person, roleLabel, accentBadge }) => (
+const PersonCard = ({ person, accentBadge }) => (
   <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 12 }}>
     <div style={{
       width: 44, height: 44, borderRadius: 14,
@@ -266,21 +266,21 @@ const PersonCard = ({ person, roleLabel, accentBadge }) => (
   </div>
 );
 
-const ActionButtons = ({ onApprove, onReject, approveLabel = "Approve", rejectLabel = "Reject" }) => (
+const ActionButtons = ({ onApprove, onReject }) => (
   <div style={{ display: "flex", flexDirection: "column", gap: 7, flexShrink: 0 }}>
     <button className="sa-action-btn"
       style={{ background: "#F0FDF4", color: "#14803D", boxShadow: "0 2px 8px rgba(34,197,94,0.15)" }}
       onClick={onApprove}
     >
       <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l2.5 2.5 5.5-5" stroke="#14803D" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
-      {approveLabel}
+      Approve
     </button>
     <button className="sa-action-btn"
       style={{ background: "#FFF1F2", color: "#991B1B", boxShadow: "0 2px 8px rgba(239,68,68,0.12)" }}
       onClick={onReject}
     >
       <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="#991B1B" strokeWidth="1.8" strokeLinecap="round" /></svg>
-      {rejectLabel}
+      Reject
     </button>
   </div>
 );
@@ -305,11 +305,17 @@ const ProcessingOverlay = () => (
 );
 
 const LeaveCard = ({ leave, leaveFor, processingId, onAction, idx }) => {
-  const person = leave.employee || leave.manager || {};
+  const person = leaveFor === "admin"
+    ? (leave.manager || {})
+    : (leave.employee || {});
+
   const isProcessing = processingId === leave._id;
   const days = leave.days || daysDiff(leave.startDate, leave.endDate);
   const accent = (LEAVE_META[leave.leaveType] || { accent: "#730042" }).accent;
-  const terminal = ["approved_reporting_manager", "rejected_reporting_manager"].includes(leave.status);
+
+  const isTerminal =
+    leave.status === "approved_reporting_manager" ||
+    leave.status === "rejected_reporting_manager";
 
   return (
     <div className="sa-card" style={{ opacity: isProcessing ? 0.6 : 1, pointerEvents: isProcessing ? "none" : "auto", animationDelay: `${idx * 0.06}s` }}>
@@ -336,7 +342,7 @@ const LeaveCard = ({ leave, leaveFor, processingId, onAction, idx }) => {
             </div>
           )}
         </div>
-        {!terminal ? (
+        {!isTerminal ? (
           <ActionButtons
             onApprove={() => onAction(leave._id, leaveFor, "accept")}
             onReject={() => onAction(leave._id, leaveFor, "reject")}
@@ -354,7 +360,10 @@ const WFHCard = ({ wfh, processingId, onAction, idx }) => {
   const person = wfh.requester || {};
   const isProcessing = processingId === wfh._id;
   const days = wfh.days || daysDiff(wfh.startDate, wfh.endDate);
-  const terminal = ["approved_superadmin", "rejected_superadmin"].includes(wfh.status);
+
+  const isTerminal =
+    wfh.status === "approved_superadmin" ||
+    wfh.status === "rejected_superadmin";
 
   const requesterModel = wfh.requesterModel || "User";
   const modelColors = {
@@ -397,7 +406,7 @@ const WFHCard = ({ wfh, processingId, onAction, idx }) => {
             </div>
           )}
         </div>
-        {!terminal ? (
+        {!isTerminal ? (
           <ActionButtons
             onApprove={() => onAction(wfh._id, "approve")}
             onReject={() => onAction(wfh._id, "reject")}
@@ -415,10 +424,10 @@ const EmployeeLeavesTab = ({ leaves, isLoading, processingId, onAction }) => {
   const [filter, setFilter] = useState("all");
 
   const FILTERS = [
-    { key: "all",                        label: "All" },
-    { key: "forwarded_reporting_manager", label: "Forwarded" },
-    { key: "approved_reporting_manager",  label: "Approved" },
-    { key: "rejected_reporting_manager",  label: "Rejected" },
+    { key: "all",                         label: "All" },
+    { key: "forwarded_reporting_manager",  label: "Forwarded" },
+    { key: "approved_reporting_manager",   label: "Approved" },
+    { key: "rejected_reporting_manager",   label: "Rejected" },
   ];
 
   const count    = (key) => key === "all" ? leaves.length : leaves.filter(l => l.status === key).length;
@@ -483,7 +492,7 @@ const AdminLeavesTab = ({ leaves, isLoading, processingId, onAction }) => {
         <div style={{ width: 22, height: 22, borderRadius: 7, background: "linear-gradient(135deg,#730042,#CD166E)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 3v3.5M6 8v.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" /></svg>
         </div>
-        <span><strong>Admin Leave Requests</strong> — Leave applications submitted by admins. As Super Admin, you have final approval authority.</span>
+        <span><strong>Admin Leave Requests</strong> — Leave applications submitted by admins awaiting your final approval.</span>
       </div>
 
       {leaves.length === 0
@@ -500,10 +509,10 @@ const WFHTab = ({ wfhList, isLoading, processingId, onAction }) => {
   const [filter, setFilter] = useState("all");
 
   const FILTERS = [
-    { key: "all",               label: "All" },
-    { key: "pending_superadmin", label: "Pending" },
-    { key: "approved_superadmin",label: "Approved" },
-    { key: "rejected_superadmin",label: "Rejected" },
+    { key: "all",                label: "All" },
+    { key: "pending_superadmin",  label: "Pending" },
+    { key: "approved_superadmin", label: "Approved" },
+    { key: "rejected_superadmin", label: "Rejected" },
   ];
 
   const count    = (key) => key === "all" ? wfhList.length : wfhList.filter(w => w.status === key).length;
@@ -524,7 +533,7 @@ const WFHTab = ({ wfhList, isLoading, processingId, onAction }) => {
         <div style={{ width: 22, height: 22, borderRadius: 7, background: "linear-gradient(135deg,#1D4ED8,#3B82F6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 10l5-8 5 8H2z" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>
         </div>
-        <span><strong>WFH Requests</strong> — Work-from-home requests submitted by admins that require your final approval.</span>
+        <span><strong>WFH Requests</strong> — Work-from-home requests from admins, managers and employees requiring your final approval.</span>
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 22, flexWrap: "wrap" }}>
@@ -567,10 +576,10 @@ const SuperAdminLeaveWFH = () => {
   const { data: leaveData, isLoading: leaveLoading, refetch: refetchLeaves } = useShowAllLeaves();
   const { data: wfhData,   isLoading: wfhLoading,   refetch: refetchWFH   } = useGetPendingWFHSuperAdmin();
 
-  const acceptLeaveMutation  = useAcceptLeaveByAdmin();
-  const rejectLeaveMutation  = useRejectLeaveByAdmin();
-  const approveWFHMutation   = useApproveWFHSuperAdmin();
-  const rejectWFHMutation    = useRejectWFHSuperAdmin();
+  const acceptLeaveMutation = useAcceptLeaveByAdmin();
+  const rejectLeaveMutation = useRejectLeaveByAdmin();
+  const approveWFHMutation  = useApproveWFHSuperAdmin();
+  const rejectWFHMutation   = useRejectWFHSuperAdmin();
 
   const employeeLeaves = leaveData?.employeeLeaves?.leaves || [];
   const adminLeaves    = leaveData?.adminLeaves?.leaves    || [];
@@ -689,7 +698,7 @@ const SuperAdminLeaveWFH = () => {
             return (
               <button key={t.key} className="sa-tab-btn"
                 style={{
-                  color:      active ? "#fff"    : "#9B8BAE",
+                  color:      active ? "#fff" : "#9B8BAE",
                   background: active
                     ? isWFH
                       ? "linear-gradient(135deg,#1D4ED8,#3B82F6)"
