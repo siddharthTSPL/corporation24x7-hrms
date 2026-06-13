@@ -9,6 +9,7 @@ import {
   acceptForwardedLeave,
   rejectForwardedLeave,
   forwardLeaveUpChain,
+  getLeavehistory,
 } from "../../../api/managerapi/leave/ma.leave.api";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -96,5 +97,13 @@ export const useForwardLeaveUpChain = () => {
       queryClient.invalidateQueries({ queryKey: ["forwardedLeavesManager"] });
       queryClient.invalidateQueries({ queryKey: ["allManagerLeaves"] });
     },
+  });
+};
+
+
+export const useGetLeaveHistory = () => {
+  return useQuery({
+    queryKey: ["leaveHistory"],
+    queryFn: getLeavehistory,
   });
 };
