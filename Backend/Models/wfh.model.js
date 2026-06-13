@@ -42,22 +42,23 @@ const wfhSchema = new mongoose.Schema(
     endDate: { type: Date, required: true },
     days: { type: Number, required: true, min: 0.5 },
     reason: { type: String, required: true, trim: true, maxlength: 500 },
-    status: {
-      type: String,
-      enum: [
-        "pending_manager",
-        "pending_reporting_manager",
-        "pending_admin",
-        "approved_manager",
-        "approved_admin",
-        "approved_superadmin",
-        "rejected_reporting_manager",
-        "rejected_admin",
-        "rejected_superadmin",
-        "pending_superadmin",
-      ],
-      default: "pending_manager",
-    },
+   status: {
+  type: String,
+  enum: [
+    "pending_manager",
+    "pending_reporting_manager",
+    "pending_admin",
+    "pending_superadmin",
+    "approved_manager",
+    "approved_reporting_manager",
+    "approved_admin",
+    "approved_superadmin",
+    "rejected_reporting_manager",
+    "rejected_admin",
+    "rejected_superadmin",
+  ],
+  default: "pending_manager",
+},
     approvedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
     rejectedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
     forwardedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
@@ -74,4 +75,4 @@ wfhSchema.index({ superadmin: 1, status: 1 });
 wfhSchema.index({ handlerChain: 1 });
 wfhSchema.index({ createdAt: -1 });
 
-module.exports = mongoose.model("WFH", wfhSchema);
+module.exports = mongoose.models.WFH || mongoose.model("WFH", wfhSchema);
