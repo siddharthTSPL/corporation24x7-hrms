@@ -192,4 +192,9 @@ managerrouter.post(
   managermiddleware,
   asyncHandler(managercontroller.forwardLeaveUpChain),
 );
+
+managerrouter.get(
+  "/myleavehistory",
+  managermiddleware,
+  asyncHandler(managercontroller.getmyleavehistory),)
 module.exports = managerrouter;
