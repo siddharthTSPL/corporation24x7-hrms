@@ -64,4 +64,4 @@ leaveSchema.index({ manager: 1, status: 1 });
 leaveSchema.index({ directed_to: 1, status: 1 });
 leaveSchema.index({ createdAt: -1 });
 
-module.exports = mongoose.model("Leave", leaveSchema);
+module.exports = mongoose.models.Leave || mongoose.model("Leave", leaveSchema);
