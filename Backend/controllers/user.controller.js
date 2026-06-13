@@ -500,7 +500,13 @@ const applyleave = async (req, res, next) => {
   const overlapping = await Leave.findOne({
     employee: req.employee._id,
     organisation_id,
-    status: { $nin: ["rejected_manager", "rejected_reporting_manager"] },
+    status: {
+      $nin: [
+        "rejected_manager",
+        "rejected_reporting_manager",
+        "rejected_admin",
+      ],
+    },
     startDate: { $lte: end },
     endDate: { $gte: start },
   })
@@ -608,6 +614,21 @@ const deleteleave = async (req, res, next) => {
     .json({ success: true, message: "Leave deleted successfully" });
 };
 
+const getallleavehistory = async (req, res, next) => {
+  if (!req.employee)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const organisation_id = req.employee.organisation_id;
+
+  const leaves = await Leave.find({
+    employee: req.employee._id,
+    organisation_id,
+  })
+    .sort({ createdAt: -1 })
+    .lean();
+  res.status(200).json({ success: true, count: leaves.length, leaves });
+};
+
 const getallleave = async (req, res, next) => {
   if (!req.employee)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
@@ -633,21 +654,6 @@ const getallleave = async (req, res, next) => {
       pbc: leaveBalance.pbc || 0,
       lwp: leaveBalance.lwp || 0,
     });
-};
-
-const getallleavehistory = async (req, res, next) => {
-  if (!req.employee)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-
-  const organisation_id = req.employee.organisation_id;
-
-  const leaves = await Leave.find({
-    employee: req.employee._id,
-    organisation_id,
-  })
-    .sort({ createdAt: -1 })
-    .lean();
-  res.status(200).json({ success: true, count: leaves.length, leaves });
 };
 
 const showannouncements = async (req, res, next) => {

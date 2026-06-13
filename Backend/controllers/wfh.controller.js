@@ -1,6 +1,6 @@
 const WFH = require("../Models/wfh.model");
 const Manager = require("../Models/manager.model");
-const Admin = require("../Models/admin.model");
+const Admin = require("../Models/Admin.model");
 
 const applyWFH = async (req, res, next) => {
   const { startDate, endDate, reason } = req.body;
