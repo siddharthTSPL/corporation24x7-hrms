@@ -6,12 +6,13 @@ import {
   managerApproveWFH,
   managerRejectWFH,
   managerForwardWFH,
-  managerGetForwardedWFH,
-  managerApproveForwardedWFH,
-  managerRejectForwardedWFH,
 } from "../../../api/managerapi/WFH/mawfh.api";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 export const useManagerApplyWFH = () => {
   const queryClient = useQueryClient();
@@ -89,39 +90,7 @@ export const useManagerForwardWFH = () => {
       });
 
       queryClient.invalidateQueries({
-        queryKey: ["forwardedWFH"],
-      });
-    },
-  });
-};
-
-export const useManagerGetForwardedWFH = () =>
-  useQuery({
-    queryKey: ["forwardedWFH"],
-    queryFn: managerGetForwardedWFH,
-  });
-
-export const useManagerApproveForwardedWFH = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: managerApproveForwardedWFH,
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["forwardedWFH"],
-      });
-    },
-  });
-};
-
-export const useManagerRejectForwardedWFH = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: managerRejectForwardedWFH,
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["forwardedWFH"],
+        queryKey: ["teamWFH"],
       });
     },
   });
