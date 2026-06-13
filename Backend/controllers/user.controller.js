@@ -457,9 +457,7 @@ const applyleave = async (req, res, next) => {
     .select("gender marital_status Under_manager")
     .lean();
   if (!user)
-    return next(
-      Object.assign(new Error("User not found"), { statusCode: 404 }),
-    );
+    return next(Object.assign(new Error("User not found"), { statusCode: 404 }));
   if (!user.Under_manager)
     return next(
       Object.assign(
@@ -472,9 +470,7 @@ const applyleave = async (req, res, next) => {
   const end = new Date(endDate);
   if (end < start)
     return next(
-      Object.assign(new Error("End date cannot be before start date"), {
-        statusCode: 400,
-      }),
+      Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }),
     );
   const days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
@@ -483,29 +479,21 @@ const applyleave = async (req, res, next) => {
     (user.gender !== "female" || user.marital_status !== "married")
   )
     return next(
-      Object.assign(new Error("Not eligible for maternity leave"), {
-        statusCode: 400,
-      }),
+      Object.assign(new Error("Not eligible for maternity leave"), { statusCode: 400 }),
     );
   if (
     leaveType === "pl" &&
     (user.gender !== "male" || user.marital_status !== "married")
   )
     return next(
-      Object.assign(new Error("Not eligible for paternity leave"), {
-        statusCode: 400,
-      }),
+      Object.assign(new Error("Not eligible for paternity leave"), { statusCode: 400 }),
     );
 
   const overlapping = await Leave.findOne({
     employee: req.employee._id,
     organisation_id,
     status: {
-      $nin: [
-        "rejected_manager",
-        "rejected_reporting_manager",
-        "rejected_admin",
-      ],
+      $nin: ["rejected_manager", "rejected_reporting_manager", "rejected_admin"],
     },
     startDate: { $lte: end },
     endDate: { $gte: start },
@@ -514,9 +502,7 @@ const applyleave = async (req, res, next) => {
     .lean();
   if (overlapping)
     return next(
-      Object.assign(new Error("Leave already applied for these dates"), {
-        statusCode: 400,
-      }),
+      Object.assign(new Error("Leave already applied for these dates"), { statusCode: 400 }),
     );
 
   const leave = await Leave.create({
@@ -531,13 +517,11 @@ const applyleave = async (req, res, next) => {
     status: "pending_manager",
   });
 
-  res
-    .status(201)
-    .json({
-      success: true,
-      message: "Leave request submitted to your manager",
-      leave,
-    });
+  res.status(201).json({
+    success: true,
+    message: "Leave request submitted to your manager",
+    leave,
+  });
 };
 
 const editleave = async (req, res, next) => {
@@ -552,9 +536,7 @@ const editleave = async (req, res, next) => {
     employee: req.employee._id,
   });
   if (!leave)
-    return next(
-      Object.assign(new Error("Leave not found"), { statusCode: 404 }),
-    );
+    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
   if (leave.status !== "pending_manager")
     return next(
       Object.assign(
@@ -569,9 +551,7 @@ const editleave = async (req, res, next) => {
     const end = new Date(endDate);
     if (end < start)
       return next(
-        Object.assign(new Error("End date cannot be before start date"), {
-          statusCode: 400,
-        }),
+        Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }),
       );
     leave.startDate = start;
     leave.endDate = end;
@@ -580,9 +560,7 @@ const editleave = async (req, res, next) => {
   if (leaveType) leave.leaveType = leaveType;
   if (reason) leave.reason = reason;
   await leave.save();
-  res
-    .status(200)
-    .json({ success: true, message: "Leave updated successfully", leave });
+  res.status(200).json({ success: true, message: "Leave updated successfully", leave });
 };
 
 const deleteleave = async (req, res, next) => {
@@ -597,9 +575,7 @@ const deleteleave = async (req, res, next) => {
     employee: req.employee._id,
   });
   if (!leave)
-    return next(
-      Object.assign(new Error("Leave not found"), { statusCode: 404 }),
-    );
+    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
   if (leave.status !== "pending_manager")
     return next(
       Object.assign(
@@ -609,9 +585,30 @@ const deleteleave = async (req, res, next) => {
     );
 
   await Leave.findByIdAndDelete(req.params.id);
-  res
-    .status(200)
-    .json({ success: true, message: "Leave deleted successfully" });
+  res.status(200).json({ success: true, message: "Leave deleted successfully" });
+};
+
+const getallleave = async (req, res, next) => {
+  if (!req.employee)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const organisation_id = req.employee.organisation_id;
+
+  const leaveBalance = await LeaveBalance.findOne({
+    employee: req.employee._id,
+    organisation_id,
+  }).lean();
+  if (!leaveBalance)
+    return next(Object.assign(new Error("Leave balance not found"), { statusCode: 404 }));
+  res.status(200).json({
+    success: true,
+    EL: leaveBalance.EL?.entitled || 0,
+    SL: leaveBalance.SL?.entitled || 0,
+    ML: leaveBalance.ML || 0,
+    PL: leaveBalance.PL || 0,
+    pbc: leaveBalance.pbc || 0,
+    lwp: leaveBalance.lwp || 0,
+  });
 };
 
 const getallleavehistory = async (req, res, next) => {
@@ -629,32 +626,7 @@ const getallleavehistory = async (req, res, next) => {
   res.status(200).json({ success: true, count: leaves.length, leaves });
 };
 
-const getallleave = async (req, res, next) => {
-  if (!req.employee)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
-  const organisation_id = req.employee.organisation_id;
-
-  const leaveBalance = await LeaveBalance.findOne({
-    employee: req.employee._id,
-    organisation_id,
-  }).lean();
-  if (!leaveBalance)
-    return next(
-      Object.assign(new Error("Leave balance not found"), { statusCode: 404 }),
-    );
-  res
-    .status(200)
-    .json({
-      success: true,
-      EL: leaveBalance.EL?.entitled || 0,
-      SL: leaveBalance.SL?.entitled || 0,
-      ML: leaveBalance.ML || 0,
-      PL: leaveBalance.PL || 0,
-      pbc: leaveBalance.pbc || 0,
-      lwp: leaveBalance.lwp || 0,
-    });
-};
 
 const showannouncements = async (req, res, next) => {
   if (!req.employee)
