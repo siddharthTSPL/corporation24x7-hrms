@@ -450,7 +450,6 @@ const forwardLeaveUpChain = async (req, res, next) => {
 };
 
 
-
 const acceptforwardedleave = async (req, res, next) => {
   if (!req.manager)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));

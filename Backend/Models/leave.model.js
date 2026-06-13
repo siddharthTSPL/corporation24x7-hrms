@@ -33,7 +33,6 @@ const leaveSchema = new mongoose.Schema({
       "approved_manager",
       "rejected_manager",
       "forwarded_reporting_manager",
-      "pending_reporting_manager",
       "approved_reporting_manager",
       "rejected_reporting_manager",
       "pending_admin",
@@ -62,6 +61,7 @@ const leaveSchema = new mongoose.Schema({
 leaveSchema.index({ employee: 1, status: 1 });
 leaveSchema.index({ employee: 1, startDate: 1, endDate: 1 });
 leaveSchema.index({ manager: 1, status: 1 });
+leaveSchema.index({ directed_to: 1, status: 1 });
 leaveSchema.index({ createdAt: -1 });
 
-module.exports = mongoose.model("Leave", leaveSchema);
+module.exports = mongoose.models.Leave || mongoose.model("Leave", leaveSchema);
