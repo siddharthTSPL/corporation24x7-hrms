@@ -54,3 +54,9 @@ export const forwardLeaveUpChain = async (data) => {
   const res = await api.post("manager/forwardleaveupchain", data);
   return res.data;
 };
+
+
+export const getLeavehistory = async () => {
+  const res = await api.get("manager/getmyleavehistory");
+  return res.data;
+}
