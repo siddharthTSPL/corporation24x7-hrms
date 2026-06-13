@@ -2603,8 +2603,7 @@ const getAllPersonalDocumentsAdmin = async (req, res, next) => {
   const organisation_id = req.admin.organisation_id;
 
   const documents = await Document.find({ fileType: "personal", organisation_id })
-    .populate("employee", "f_name l_name work_email personal_contact department designation")
-    .populate("underManager", "f_name l_name work_email")
+    .populate("uploader", "f_name l_name work_email personal_contact department designation")
     .sort({ uploadedAt: -1 })
     .lean();
 
@@ -2623,23 +2622,16 @@ const getAllPersonalDocumentsAdmin = async (req, res, next) => {
       fileType: doc.fileType,
       sizeKB: doc.size,
       uploadedAt: doc.uploadedAt,
-      viewedByManager: doc.viewedByManager,
       viewedByAdmin: doc.viewedByAdmin,
-      employee: doc.employee
+      uploaderModel: doc.uploaderModel,
+      uploader: doc.uploader
         ? {
-            id: doc.employee._id,
-            name: `${doc.employee.f_name} ${doc.employee.l_name}`,
-            email: doc.employee.work_email,
-            contact: doc.employee.personal_contact,
-            department: doc.employee.department,
-            designation: doc.employee.designation,
-          }
-        : null,
-      reportingManager: doc.underManager
-        ? {
-            id: doc.underManager._id,
-            name: `${doc.underManager.f_name} ${doc.underManager.l_name}`,
-            email: doc.underManager.work_email,
+            id: doc.uploader._id,
+            name: `${doc.uploader.f_name} ${doc.uploader.l_name}`,
+            email: doc.uploader.work_email,
+            contact: doc.uploader.personal_contact,
+            department: doc.uploader.department,
+            designation: doc.uploader.designation,
           }
         : null,
     })),
@@ -2653,8 +2645,7 @@ const getAllExpenseDocumentsAdmin = async (req, res, next) => {
   const organisation_id = req.admin.organisation_id;
 
   const documents = await Document.find({ fileType: "expense", organisation_id })
-    .populate("employee", "f_name l_name work_email personal_contact department designation")
-    .populate("underManager", "f_name l_name work_email")
+    .populate("uploader", "f_name l_name work_email personal_contact department designation")
     .sort({ uploadedAt: -1 })
     .lean();
 
@@ -2673,23 +2664,16 @@ const getAllExpenseDocumentsAdmin = async (req, res, next) => {
       fileType: doc.fileType,
       sizeKB: doc.size,
       uploadedAt: doc.uploadedAt,
-      viewedByManager: doc.viewedByManager,
       viewedByAdmin: doc.viewedByAdmin,
-      employee: doc.employee
+      uploaderModel: doc.uploaderModel,
+      uploader: doc.uploader
         ? {
-            id: doc.employee._id,
-            name: `${doc.employee.f_name} ${doc.employee.l_name}`,
-            email: doc.employee.work_email,
-            contact: doc.employee.personal_contact,
-            department: doc.employee.department,
-            designation: doc.employee.designation,
-          }
-        : null,
-      reportingManager: doc.underManager
-        ? {
-            id: doc.underManager._id,
-            name: `${doc.underManager.f_name} ${doc.underManager.l_name}`,
-            email: doc.underManager.work_email,
+            id: doc.uploader._id,
+            name: `${doc.uploader.f_name} ${doc.uploader.l_name}`,
+            email: doc.uploader.work_email,
+            contact: doc.uploader.personal_contact,
+            department: doc.uploader.department,
+            designation: doc.uploader.designation,
           }
         : null,
     })),
@@ -2707,8 +2691,7 @@ const getDocumentDetailsAdmin = async (req, res, next) => {
   const organisation_id = req.admin.organisation_id;
 
   const document = await Document.findOne({ _id: documentId, organisation_id })
-    .populate("employee", "f_name l_name work_email personal_contact department designation")
-    .populate("underManager", "f_name l_name work_email");
+    .populate("uploader", "f_name l_name work_email personal_contact department designation");
 
   if (!document)
     return next(Object.assign(new Error("Document not found"), { statusCode: 404 }));
@@ -2725,21 +2708,15 @@ const getDocumentDetailsAdmin = async (req, res, next) => {
       fileType: document.fileType,
       sizeKB: document.size,
       uploadedAt: document.uploadedAt,
-      viewedByManager: document.viewedByManager,
       viewedByAdmin: document.viewedByAdmin,
-      employee: document.employee
+      uploaderModel: document.uploaderModel,
+      uploader: document.uploader
         ? {
-            id: document.employee._id,
-            name: `${document.employee.f_name} ${document.employee.l_name}`,
-            email: document.employee.work_email,
-            department: document.employee.department,
-          }
-        : null,
-      reportingManager: document.underManager
-        ? {
-            id: document.underManager._id,
-            name: `${document.underManager.f_name} ${document.underManager.l_name}`,
-            email: document.underManager.work_email,
+            id: document.uploader._id,
+            name: `${document.uploader.f_name} ${document.uploader.l_name}`,
+            email: document.uploader.work_email,
+            department: document.uploader.department,
+            designation: document.uploader.designation,
           }
         : null,
     },
