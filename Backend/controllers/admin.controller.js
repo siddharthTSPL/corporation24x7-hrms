@@ -1783,7 +1783,9 @@ const showallleaves = async (req, res, next) => {
     const [employeeLeaves, managerLeaves] = await Promise.all([
       Leave.find({
         organisation_id,
-        status: { $in: ["forwarded_reporting_manager", "approved_reporting_manager", "rejected_reporting_manager"] },
+        status: "pending_admin",
+        directed_to: req.admin._id,
+        directed_to_model: "Admin",
       })
         .populate("employee", "f_name l_name work_email")
         .populate("manager", "f_name l_name work_email")
@@ -1826,9 +1828,29 @@ const acceptLeave = async (req, res, next) => {
       const leave = await Leave.findOne({ _id: id, organisation_id });
       if (!leave)
         return next(Object.assign(new Error("Employee leave not found"), { statusCode: 404 }));
+      if (
+        leave.directed_to?.toString() !== req.admin._id.toString() ||
+        leave.directed_to_model !== "Admin"
+      )
+        return next(Object.assign(new Error("This leave is not directed to you"), { statusCode: 403 }));
+      if (leave.status !== "pending_admin")
+        return next(Object.assign(new Error("Leave is not pending for admin action"), { statusCode: 400 }));
 
-      leave.status = "approved_reporting_manager";
+      if (leave.leaveType === "ml") {
+        const leaveBalance = await leavebalanceModel.findOne({ employee: leave.employee, organisation_id });
+        if (leaveBalance) {
+          const start = new Date(leave.startDate);
+          const end = new Date(start);
+          end.setDate(end.getDate() + 181);
+          leaveBalance.mlStartDate = start;
+          leaveBalance.mlEndDate = end;
+          await leaveBalance.save();
+        }
+      }
+
+      leave.status = "approved_admin";
       leave.approvedBy = req.admin._id;
+      leave.approvedByModel = "Admin";
       leave.remarks = `Approved by Admin (${req.admin.f_name})`;
       await leave.save();
 
@@ -1890,9 +1912,17 @@ const rejectLeave = async (req, res, next) => {
       const leave = await Leave.findOne({ _id: id, organisation_id });
       if (!leave)
         return next(Object.assign(new Error("Employee leave not found"), { statusCode: 404 }));
+      if (
+        leave.directed_to?.toString() !== req.admin._id.toString() ||
+        leave.directed_to_model !== "Admin"
+      )
+        return next(Object.assign(new Error("This leave is not directed to you"), { statusCode: 403 }));
+      if (leave.status !== "pending_admin")
+        return next(Object.assign(new Error("Leave is not pending for admin action"), { statusCode: 400 }));
 
-      leave.status = "rejected_reporting_manager";
+      leave.status = "rejected_admin";
       leave.rejectedBy = req.admin._id;
+      leave.rejectedByModel = "Admin";
       leave.remarks = `Rejected by Admin (${req.admin.f_name})`;
       leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await leave.save();
@@ -1984,6 +2014,8 @@ const getmyleavehistory = async (req, res, next) => {
 
   res.status(200).json({ success: true, count: leave.length, leave });
 };
+
+
 
 const noofemployee = async (req, res, next) => {
   if (!req.admin)
