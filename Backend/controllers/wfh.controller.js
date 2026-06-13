@@ -1,6 +1,6 @@
 const WFH = require("../Models/wfh.model");
 const Manager = require("../Models/manager.model");
-const Admin = require("../Models/admin.model");
+const Admin = require("../Models/Admin.model");
 
 const applyWFH = async (req, res, next) => {
   const { startDate, endDate, reason } = req.body;
@@ -127,15 +127,7 @@ const approveWFH = async (req, res, next) => {
   if (!["pending_manager", "pending_reporting_manager"].includes(wfh.status))
     return next(Object.assign(new Error("WFH request is not awaiting your approval"), { statusCode: 400 }));
 
-  const currentManager = await Manager.findOne({ _id: req.manager._id, organisation_id: req.manager.organisation_id })
-    .select("reporting_manager reporting_manager_model")
-    .lean();
-
-  if (!currentManager.reporting_manager) {
-    return next(Object.assign(new Error("You have no reporting manager. Use forward to send to admin if needed."), { statusCode: 400 }));
-  }
-
-  wfh.status = "approved_manager";
+  wfh.status = wfh.status === "pending_manager" ? "approved_manager" : "approved_reporting_manager";
   wfh.approvedBy = req.manager._id;
   wfh.remarks = remarks || "";
   await wfh.save();
