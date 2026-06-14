@@ -1,28 +1,23 @@
-
-import axios from "axios";
+import axios from 'axios';
 
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/",
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/',
   withCredentials: true,
 });
 
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message =
-      error.response?.data?.message || "Something went wrong";
+    const message = error.response?.data?.message || 'Something went wrong';
     if (error.response?.status === 401) {
-      return Promise.reject(null); 
+      return Promise.reject(null);
     }
-
     return Promise.reject(new Error(message));
   }
 );
 
-
-
 export const registerAdmin = async (data) => {
-  const res = await api.post("admin/register", data);
+  const res = await api.post('admin/register', data);
   return res.data;
 };
 
@@ -32,55 +27,56 @@ export const verifyAdmin = async (token) => {
 };
 
 export const loginAdmin = async (data) => {
-  const res = await api.post("admin/login", data);
+  const res = await api.post('admin/login', data);
   return res.data;
 };
 
 export const logoutAdmin = async () => {
-  const res = await api.post("admin/logout");
+  const res = await api.post('admin/logout');
   return res.data;
 };
 
 export const getMeAdmin = async () => {
-  const res = await api.get("admin/getme");
+  const res = await api.get('admin/getme');
   return res.data;
 };
 
 export const sendForgetPasswordOtp = async (email) => {
-  const res = await api.post("admin/forgetpassword", { email });
+  const res = await api.post('admin/forgetpassword', { email });
   return res.data;
 };
 
 export const verifyAdminOtp = async (data) => {
-  const res = await api.post("admin/verifyotp", data); 
+  const res = await api.post('admin/verifyotp', data);
   return res.data;
 };
 
 export const resetAdminPassword = async (data) => {
-  const res = await api.post("admin/resetAdminPassword", data);
+  const res = await api.post('admin/resetpassword', data);
   return res.data;
 };
+
 export const addManager = async (data) => {
-  const res = await api.post("admin/addmanager", data);
+  const res = await api.post('admin/addmanager', data);
   return res.data;
 };
 
 export const addEmployee = async (data) => {
-  const res = await api.post("admin/addemployee", data);
+  const res = await api.post('admin/addemployee', data);
   return res.data;
 };
 
 export const findAllManagers = async () => {
-  const res = await api.get("admin/findallmanagers");
+  const res = await api.get('admin/findallmanagers');
   return res.data;
 };
 
 export const editAdminProfile = async (data) => {
-  const res = await api.put("admin/editadminprofile", data);
+  const res = await api.put('admin/editadminprofile', data);
   return res.data;
 };
 
 export const changeAdminPassword = async (data) => {
-  const res = await api.put("admin/changepassword", data);
+  const res = await api.put('admin/changepassword', data);
   return res.data;
 };
