@@ -52,6 +52,7 @@ const wfhSchema = new mongoose.Schema(
         "approved_manager",
         "approved_reporting_manager",
         "approved_admin",
+        "rejected_manager",
         "approved_superadmin",
         "rejected_manager",
         "rejected_reporting_manager",

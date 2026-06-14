@@ -26,28 +26,28 @@ import { useLogoutSuperAdmin } from "../auth/server-state/superadmin/auth/suauth
 import { usePermissionStore } from "../auth/store/permission/permissionStore";
 
 const superAdminMenu = [
-  { name: "Dashboard",     path: "/superadmin-dashboard",     icon: <FaHome /> },
-  { name: "Organisations", path: "/superadmin-organisations", icon: <FaBuilding /> },
-  { name: "Announcements", path: "/superadmin-announcements", icon: <FaBullhorn /> },
-  { name: "Leaves",        path: "/superadmin-leaves",        icon: <FaCalendarAlt /> },
-  { name: "Reviews",       path: "/superadmin-reviews",       icon: <FaBullhorn /> },
-  { name: "Team Documents",     path: "/superadmin-documents",     icon: <FaFileAlt /> },
-  { name: "TorchX Voice",  path: "/superadmin-complaints",    icon: <FaShieldAlt /> },
-  { name: "Settings",      path: "/superadmin-settings",      icon: <FaCog /> },
+  { name: "Dashboard",      path: "/superadmin-dashboard",     icon: <FaHome /> },
+  { name: "Organisations",  path: "/superadmin-organisations", icon: <FaBuilding /> },
+  { name: "Announcements",  path: "/superadmin-announcements", icon: <FaBullhorn /> },
+  { name: "Leaves",         path: "/superadmin-leaves",        icon: <FaCalendarAlt /> },
+  { name: "Reviews",        path: "/superadmin-reviews",       icon: <FaBullhorn /> },
+  { name: "Team Documents", path: "/superadmin-documents",     icon: <FaFileAlt /> },
+  { name: "TorchX Voice",   path: "/superadmin-complaints",    icon: <FaShieldAlt /> },
+  { name: "Settings",       path: "/superadmin-settings",      icon: <FaCog /> },
 ];
 
 const adminMenu = [
-  { name: "Dashboard",     path: "/dashboard",         icon: <FaHome /> },
-  { name: "Onboarding",    path: "/employee",          icon: <FaUsers /> },
-  { name: "Announcement",  path: "/announcement",      icon: <FaBullhorn />,  permission: "announcements.can_view_announcements" },
-  { name: "Review",        path: "/review-admin",      icon: <FaBullhorn /> },
-  { name: "Leave",         path: "/leave-admin",       icon: <FaCalendarAlt /> },
-  { name: "Organisation",  path: "/organisation",      icon: <FaBuilding /> },
-  { name: "Recruitment",   path: "/recruitment-admin", icon: <FaUsersCog />,  permission: "recruitment.can_view_hiring_requisitions" },
-  { name: "TorchX Voice",  path: "/admin-complaints",  icon: <FaShieldAlt />, permission: "tickets.can_view_all_tickets" },
-  { name: "Document",      path: "/document-admin",    icon: <FaFileAlt />,   permission: "documents.can_view_all_documents" },
-  { name: "Team Document", path: "/document-admin-team", icon: <FaFileAlt />, permission: "documents.can_view_all_documents" },
-  { name: "Settings",      path: "/settings",          icon: <FaCog /> },
+  { name: "Dashboard",     path: "/dashboard",           icon: <FaHome /> },
+  { name: "Onboarding",    path: "/employee",            icon: <FaUsers /> },
+  { name: "Announcement",  path: "/announcement",        icon: <FaBullhorn />,  permission: "announcements.can_view_announcements" },
+  { name: "Review",        path: "/review-admin",        icon: <FaBullhorn /> },
+  { name: "Leave",         path: "/leave-admin",         icon: <FaCalendarAlt /> },
+  { name: "Organisation",  path: "/organisation",        icon: <FaBuilding /> },
+  { name: "Recruitment",   path: "/recruitment-admin",   icon: <FaUsersCog />,  permission: "recruitment.can_view_hiring_requisitions" },
+  { name: "TorchX Voice",  path: "/admin-complaints",    icon: <FaShieldAlt />, permission: "tickets.can_raise_ticket" },
+  { name: "Document",      path: "/document-admin",      icon: <FaFileAlt />,   permission: "documents.can_view_all_documents" },
+  { name: "Team Document", path: "/document-admin-team", icon: <FaFileAlt />,   permission: "documents.can_view_all_documents" },
+  { name: "Settings",      path: "/settings",            icon: <FaCog /> },
 ];
 
 const managerMenu = [
@@ -57,7 +57,7 @@ const managerMenu = [
   { name: "Organisation", path: "/organisation-manager", icon: <FaBuilding /> },
   { name: "Review",       path: "/review-manager",       icon: <FaBullhorn /> },
   { name: "Document",     path: "/document-manager",     icon: <FaFileAlt />,   permission: "documents.can_view_all_documents" },
-  { name: "File",         path: "/file-manager",         icon: <FaFolder /> },
+  { name: "File",         path: "/file-manager",         icon: <FaFolder />,    permission: "documents.can_upload_documents" },
   { name: "Recruitment",  path: "/recruitment-manager",  icon: <FaUsersCog />,  permission: "recruitment.can_view_hiring_requisitions" },
   { name: "TorchX Voice", path: "/manager-complaints",   icon: <FaShieldAlt />, permission: "tickets.can_raise_ticket" },
   { name: "Settings",     path: "/settings-manager",     icon: <FaCog /> },
@@ -68,7 +68,7 @@ const employeeMenu = [
   { name: "Leave",        path: "/leave-employee",        icon: <FaCalendarAlt /> },
   { name: "Announcement", path: "/announcement-employee", icon: <FaBullhorn />,  permission: "announcements.can_view_announcements" },
   { name: "Organisation", path: "/organisation-employee", icon: <FaBuilding /> },
-  { name: "File",         path: "/file-employee",         icon: <FaFolder /> },
+  { name: "File",         path: "/file-employee",         icon: <FaFolder />,    permission: "documents.can_upload_documents" },
   { name: "TorchX Voice", path: "/employee-complaints",   icon: <FaShieldAlt />, permission: "tickets.can_raise_ticket" },
   { name: "Settings",     path: "/settings-employee",     icon: <FaCog /> },
 ];
@@ -112,10 +112,10 @@ function Sidebar({ collapsed, setCollapsed }) {
       navigate("/login");
     };
 
-    if (role === "superadmin") logoutSuperAdmin(undefined, { onSuccess });
-    else if (role === "admin") logoutAdmin(undefined, { onSuccess });
-    else if (role === "manager") logoutManager(undefined, { onSuccess });
-    else logoutEmployee(undefined, { onSuccess });
+    if (role === "superadmin")    logoutSuperAdmin(undefined, { onSuccess });
+    else if (role === "admin")    logoutAdmin(undefined, { onSuccess });
+    else if (role === "manager")  logoutManager(undefined, { onSuccess });
+    else                          logoutEmployee(undefined, { onSuccess });
   };
 
   return (
