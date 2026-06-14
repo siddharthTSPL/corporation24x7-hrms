@@ -58,6 +58,7 @@ const {
 
 const {
   uploadDocument,
+  getDocuments,
   editDocument,
   deleteDocument,
 } = require("../controllers/uploaddocument.controller");
@@ -119,5 +120,11 @@ adminrouter.post("/submitTicket", adminauthmiddleware, checkPermission("tickets.
 adminrouter.get("/getMyTickets", adminauthmiddleware, checkPermission("tickets.can_raise_ticket"), asyncHandler(adminGetMyTickets));
 adminrouter.post("/rateTicket/:ticketNumber", adminauthmiddleware, checkPermission("tickets.can_rate_ticket"), asyncHandler(adminRateTicket));
 adminrouter.get("/getTicketDetail/:ticketNumber", adminauthmiddleware, checkPermission("tickets.can_raise_ticket"), asyncHandler(adminGetTicketDetail));
+adminrouter.get(
+  "/documents",
+  adminauthmiddleware,
+  checkPermission("documents.can_view_all_documents"),
+  asyncHandler(getDocuments)
+);
 
 module.exports = adminrouter;
