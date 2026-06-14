@@ -61,5 +61,10 @@ managerrouter.post("/submit-ticket", managermiddleware, checkPermission("tickets
 managerrouter.get("/my-tickets", managermiddleware, checkPermission("tickets.can_raise_ticket"), asyncHandler(managercontroller.managerGetMyTickets));
 managerrouter.post("/rate-ticket/:ticketNumber", managermiddleware, checkPermission("tickets.can_rate_ticket"), asyncHandler(managercontroller.managerRateTicket));
 managerrouter.get("/getTicketDetail/:ticketNumber", managermiddleware, checkPermission("tickets.can_raise_ticket"), asyncHandler(managercontroller.managerGetTicketDetail));
+managerrouter.get(
+  "/viewallleaves",
+  managermiddleware,
+  asyncHandler(managercontroller.getmyleaves)
+);
 
 module.exports = managerrouter;
