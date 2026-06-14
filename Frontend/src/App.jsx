@@ -58,6 +58,9 @@ const EmployeeComplaints = lazy(() => import("./pages/ticketpage/emticket"));
 const ManagerComplaints = lazy(() => import("./pages/ticketpage/maticket"));
 const Managerrecruitment = lazy(() => import("./pages/recruitment/recruitmentma"));
 const Adminrecruitment = lazy(() => import("./pages/recruitment/recruitmentad"));
+const Managerdocument = lazy(() => import("./pages/document/managerdocument"));
+const Admindocument = lazy(() => import("./pages/document/admindocument"));
+const Adminteamdocument = lazy(() => import("./pages/document/adminteamdocument"));
 
 function PageSkeleton() {
   const [animationData, setAnimationData] = useState(null);
@@ -176,7 +179,9 @@ function App() {
             <Route path="/announcement-employee" element={<Announceem />} />
             <Route path="/announcement-manager" element={<Announcema />} />
             <Route path="/document" element={<Doc />} />
-            <Route path="/document-manager" element={<Docma />} />
+            <Route path="/document-manager" element={<Managerdocument />} />
+            <Route path="/document-admin" element={<Admindocument />} />
+            <Route path="/document-admin-team" element={<Adminteamdocument />} />
             <Route path="/file" element={<File />} />
             <Route path="/file-employee" element={<Fileem />} />
             <Route path="/file-manager" element={<Filema />} />
@@ -194,6 +199,7 @@ function App() {
             <Route path="/employee-complaints" element={<EmployeeComplaints />} />
             <Route path="/manager/recruitment" element={<Managerrecruitment />} />
             <Route path="/recruitment-admin" element={<Adminrecruitment />} />
+            <Route path="/recruitment-manager" element={<Managerrecruitment />} />
           </Route>
 
           <Route
