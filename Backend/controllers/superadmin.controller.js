@@ -26,6 +26,10 @@ const AdminLeave = require("../Models/adleave.model");
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
 
+// ─── Role-based default permissions ───────────────────────────────────────────
+// admin   : announcements + documents + tickets + recruitment  (all features)
+// manager : announcements + documents + tickets + recruitment  (all features)
+// employee: announcements + documents + tickets only           (NO recruitment)
 const DEFAULT_PERMISSIONS = {
   admin: {
     announcements: {
@@ -78,25 +82,26 @@ const DEFAULT_PERMISSIONS = {
   employee: {
     announcements: {
       can_view_announcements: true,
-      can_create_announcement: true,
-      can_edit_announcement: true,
-      can_delete_announcement: true,
+      can_create_announcement: false,
+      can_edit_announcement: false,
+      can_delete_announcement: false,
     },
     documents: {
       can_upload_documents: true,
-      can_view_all_documents: true,
+      can_view_all_documents: false,
     },
     tickets: {
       can_raise_ticket: true,
-      can_view_all_tickets: true,
-      can_resolve_ticket: true,
+      can_view_all_tickets: false,
+      can_resolve_ticket: false,
       can_rate_ticket: true,
     },
+    // Employees have NO recruitment access
     recruitment: {
-      can_view_hiring_requisitions: true,
-      can_create_hiring_requisition: true,
-      can_view_candidates: true,
-      can_add_candidate: true,
+      can_view_hiring_requisitions: false,
+      can_create_hiring_requisition: false,
+      can_view_candidates: false,
+      can_add_candidate: false,
     },
   },
 };
@@ -1144,7 +1149,7 @@ const addmanager = async (req, res, next) => {
     );
     const verifyLink = `${process.env.BASE_URL}talent/api/manager/verify/${token}`;
 
-    Promise.all([
+    await Promise.all([
       assignDefaultLeave(newmanager),
       assignPermissions(
         newmanager._id,
@@ -1268,7 +1273,7 @@ const addemployee = async (req, res, next) => {
     );
     const verifyLink = `${process.env.BASE_URL}talent/api/user/verify/${token}`;
 
-    Promise.all([
+    await Promise.all([
       assignDefaultLeave(newuser),
       assignPermissions(
         newuser._id,
@@ -1855,6 +1860,37 @@ const getTodayCheckins = async (req, res, next) => {
   }));
 
   res.json({ checkins: payload, total: payload.length });
+};
+
+// ─── Helper: recursively build manager hierarchy ──────────────────────────────
+const buildManagerTree = (managers, parentId, parentModel, employees) => {
+  return managers
+    .filter((mgr) => {
+      if (!mgr.reporting_manager) return false;
+      return (
+        mgr.reporting_manager.toString() === parentId.toString() &&
+        mgr.reporting_manager_model === parentModel
+      );
+    })
+    .map((mgr) => ({
+      id: mgr._id,
+      name: `${mgr.f_name} ${mgr.l_name}`,
+      email: mgr.work_email,
+      designation: mgr.designation,
+      department: mgr.department,
+      office_location: mgr.office_location,
+      employees: employees
+        .filter((emp) => emp.Under_manager?.toString() === mgr._id.toString())
+        .map((emp) => ({
+          id: emp._id,
+          name: `${emp.f_name} ${emp.l_name}`,
+          email: emp.work_email,
+          designation: emp.designation,
+          department: emp.department,
+          office_location: emp.office_location,
+        })),
+      subManagers: buildManagerTree(managers, mgr._id, "Manager", employees),
+    }));
 };
 
 const getOrgInfo = async (req, res, next) => {
