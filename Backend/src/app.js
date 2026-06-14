@@ -13,13 +13,12 @@ app.enable("trust proxy");
 app.use((req, res, next) => {
   if (
     req.hostname === "localhost" ||
-    req.hostname === "146.101.46.205" || 
+    req.hostname === "146.101.46.205" ||
     req.method === "OPTIONS" ||
     req.secure
   ) {
     return next();
   }
-
   res.redirect(`https://${req.headers.host}${req.url}`);
 });
 
@@ -38,9 +37,8 @@ const corsOptions = {
     "http://talent.techtorch.solutions",
     "https://talent.techtorch.solutions",
     "https://corporation24x7-hrms.onrender.com",
-    "http://talent.techtorch.solutions",
     "https://torchxsuite.com/talent",
-    "http://torchxsuite.com/talent/"
+    "http://torchxsuite.com/talent/",
   ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -52,7 +50,6 @@ app.use(cors(corsOptions));
 const adminrouter = require('../routes/adminroutes');
 const managerrouter = require('../routes/managerroutes');
 const userrouter = require('../routes/userroutes');
-const documentroute = require('../routes/documentroute');
 const attendancerouter = require('../routes/attendanceroutes');
 const superadminrouter = require('../routes/superadmin.route');
 const ticketroute = require('../routes/ticket.routes');
@@ -64,14 +61,12 @@ const errorhandler = require('../middleware/errorhandling/errorhandling.middlewa
 app.use('/admin', adminrouter);
 app.use('/manager', managerrouter);
 app.use('/user', userrouter);
-app.use('/document', documentroute);
 app.use('/attendance', attendancerouter);
 app.use('/superadmin', superadminrouter);
 app.use('/ticket', ticketroute);
 app.use('/recruitment', recruitmentroute);
 app.use('/wfh', wfhroute);
 app.use('/permission', permissionroute);
-
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 
