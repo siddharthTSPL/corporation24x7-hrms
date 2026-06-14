@@ -22,39 +22,30 @@ export const useGetMyWFH = () => {
 
 export const useApplyWFH = () => {
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: applyWFH,
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["employee-wfh"],
-      });
+      queryClient.invalidateQueries({ queryKey: ["employee-wfh"] });
     },
   });
 };
 
 export const useEditWFH = () => {
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: ({ id, data }) => editWFH(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["employee-wfh"],
-      });
+      queryClient.invalidateQueries({ queryKey: ["employee-wfh"] });
     },
   });
 };
 
 export const useDeleteWFH = () => {
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: deleteWFH,
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["employee-wfh"],
-      });
+      queryClient.invalidateQueries({ queryKey: ["employee-wfh"] });
     },
   });
 };
