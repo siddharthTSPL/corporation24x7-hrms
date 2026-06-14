@@ -18,12 +18,153 @@ const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const { sendEmail } = require("../utils/nodemailer.utils");
 const generateOTP = require("../automatic/otpgenerator");
+const PermissionModel = require("../Models/permission.model");
 const Document = require("../Models/document.model");
 const OtpModel = require("../Models/otpbasedlogin.model");
 const AdminLeave = require("../Models/adleave.model");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
+
+const DEFAULT_PERMISSIONS = {
+  admin: {
+    announcements: {
+      can_view_announcements: true,
+      can_create_announcement: true,
+      can_edit_announcement: true,
+      can_delete_announcement: true,
+    },
+    documents: {
+      can_upload_documents: true,
+      can_view_all_documents: true,
+    },
+    tickets: {
+      can_raise_ticket: true,
+      can_view_all_tickets: true,
+      can_resolve_ticket: true,
+      can_rate_ticket: true,
+    },
+    recruitment: {
+      can_view_hiring_requisitions: true,
+      can_create_hiring_requisition: true,
+      can_view_candidates: true,
+      can_add_candidate: true,
+    },
+  },
+  manager: {
+    announcements: {
+      can_view_announcements: true,
+      can_create_announcement: true,
+      can_edit_announcement: true,
+      can_delete_announcement: true,
+    },
+    documents: {
+      can_upload_documents: true,
+      can_view_all_documents: true,
+    },
+    tickets: {
+      can_raise_ticket: true,
+      can_view_all_tickets: true,
+      can_resolve_ticket: true,
+      can_rate_ticket: true,
+    },
+    recruitment: {
+      can_view_hiring_requisitions: true,
+      can_create_hiring_requisition: true,
+      can_view_candidates: true,
+      can_add_candidate: true,
+    },
+  },
+  employee: {
+    announcements: {
+      can_view_announcements: true,
+      can_create_announcement: true,
+      can_edit_announcement: true,
+      can_delete_announcement: true,
+    },
+    documents: {
+      can_upload_documents: true,
+      can_view_all_documents: true,
+    },
+    tickets: {
+      can_raise_ticket: true,
+      can_view_all_tickets: true,
+      can_resolve_ticket: true,
+      can_rate_ticket: true,
+    },
+    recruitment: {
+      can_view_hiring_requisitions: true,
+      can_create_hiring_requisition: true,
+      can_view_candidates: true,
+      can_add_candidate: true,
+    },
+  },
+};
+
+const USER_MODEL_MAP = {
+  admin: "Admin",
+  senior_admin: "Admin",
+  official: "Admin",
+  manager: "Manager",
+  senior_manager: "Manager",
+  employee: "User",
+};
+
+const mergePermissions = (role, overrides) => {
+  const permissionRole = ["admin", "senior_admin", "official"].includes(role)
+    ? "admin"
+    : ["manager", "senior_manager"].includes(role)
+    ? "manager"
+    : "employee";
+
+  const defaults = DEFAULT_PERMISSIONS[permissionRole];
+  if (!overrides) return defaults;
+
+  return {
+    announcements: {
+      can_view_announcements: overrides.announcements?.can_view_announcements ?? defaults.announcements.can_view_announcements,
+      can_create_announcement: overrides.announcements?.can_create_announcement ?? defaults.announcements.can_create_announcement,
+      can_edit_announcement: overrides.announcements?.can_edit_announcement ?? defaults.announcements.can_edit_announcement,
+      can_delete_announcement: overrides.announcements?.can_delete_announcement ?? defaults.announcements.can_delete_announcement,
+    },
+    documents: {
+      can_upload_documents: overrides.documents?.can_upload_documents ?? defaults.documents.can_upload_documents,
+      can_view_all_documents: overrides.documents?.can_view_all_documents ?? defaults.documents.can_view_all_documents,
+    },
+    tickets: {
+      can_raise_ticket: overrides.tickets?.can_raise_ticket ?? defaults.tickets.can_raise_ticket,
+      can_view_all_tickets: overrides.tickets?.can_view_all_tickets ?? defaults.tickets.can_view_all_tickets,
+      can_resolve_ticket: overrides.tickets?.can_resolve_ticket ?? defaults.tickets.can_resolve_ticket,
+      can_rate_ticket: overrides.tickets?.can_rate_ticket ?? defaults.tickets.can_rate_ticket,
+    },
+    recruitment: {
+      can_view_hiring_requisitions: overrides.recruitment?.can_view_hiring_requisitions ?? defaults.recruitment.can_view_hiring_requisitions,
+      can_create_hiring_requisition: overrides.recruitment?.can_create_hiring_requisition ?? defaults.recruitment.can_create_hiring_requisition,
+      can_view_candidates: overrides.recruitment?.can_view_candidates ?? defaults.recruitment.can_view_candidates,
+      can_add_candidate: overrides.recruitment?.can_add_candidate ?? defaults.recruitment.can_add_candidate,
+    },
+  };
+};
+
+const assignPermissions = async (user_id, role, organisation_id, granted_by, granted_by_model, overrides) => {
+  const user_model = USER_MODEL_MAP[role] || "User";
+  const perms = mergePermissions(role, overrides);
+
+  await PermissionModel.findOneAndUpdate(
+    { user_id, user_model, organisation_id },
+    {
+      $set: {
+        user_id,
+        user_model,
+        organisation_id,
+        granted_by,
+        granted_by_model,
+        ...perms,
+      },
+    },
+    { upsert: true, new: true, runValidators: true }
+  );
+};
 
 const registerSuperAdmin = async (req, res, next) => {
   try {
@@ -653,6 +794,7 @@ const createAdmin = async (req, res, next) => {
       account_number,
       ifsc_code,
       country,
+      permissions,
     } = req.body;
 
     if (
@@ -815,6 +957,15 @@ ${verifyLink}
       `,
     });
 
+    await assignPermissions(
+      admin._id,
+      admin.role || "admin",
+      organisation_id,
+      req.superAdmin._id,
+      "SuperAdmin",
+      permissions
+    );
+
     res.status(201).json({
       success: true,
       message: "Admin created successfully. Verification email sent.",
@@ -928,6 +1079,7 @@ const addmanager = async (req, res, next) => {
       office_location,
       designation,
       department,
+      permissions,
     } = req.body;
 
     if (
@@ -994,6 +1146,14 @@ const addmanager = async (req, res, next) => {
 
     Promise.all([
       assignDefaultLeave(newmanager),
+      assignPermissions(
+        newmanager._id,
+        newmanager.role || "manager",
+        organisation_id,
+        req.superAdmin._id,
+        "SuperAdmin",
+        permissions
+      ),
       sendEmail({
         to: work_email,
         subject: "Activate Your Manager Account",
@@ -1042,6 +1202,7 @@ const addemployee = async (req, res, next) => {
       designation,
       department,
       Under_manager,
+      permissions,
     } = req.body;
 
     if (
@@ -1109,6 +1270,14 @@ const addemployee = async (req, res, next) => {
 
     Promise.all([
       assignDefaultLeave(newuser),
+      assignPermissions(
+        newuser._id,
+        newuser.role || "employee",
+        organisation_id,
+        req.superAdmin._id,
+        "SuperAdmin",
+        permissions
+      ),
       sendEmail({
         to: work_email,
         subject: "Welcome! Verify Your Employee Account",
@@ -1969,4 +2138,4 @@ module.exports = {
   getAllPersonalDocumentsSuperAdmin,
   getAllExpenseDocumentsSuperAdmin,
   getDocumentDetailsSuperAdmin,
-}; 
+};
