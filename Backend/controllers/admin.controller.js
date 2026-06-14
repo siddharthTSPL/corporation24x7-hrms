@@ -108,11 +108,11 @@ const adminlogin = async (req, res, next) => {
   //   );
   // }
 
-  const token = jwt.sign(
-    { adminid: admin._id, role: admin.role, email: admin.work_email, created_by: admin.created_by },
-    process.env.JWT_SECRET,
-    { expiresIn: "15d" }
-  );
+ const token = jwt.sign(
+  { adminid: admin._id, role: admin.role, email: admin.work_email, created_by: admin.created_by, organisation_id: admin.organisation_id },
+  process.env.JWT_SECRET,
+  { expiresIn: "15d" }
+);
 
   res.cookie("token", token, { ...cookieOpts, maxAge: 15 * 24 * 60 * 60 * 1000 });
 
