@@ -164,6 +164,154 @@ const resolveReportingManager = async (reporting_manager_id, organisation_id) =>
   return { reportingManagerId: null, reportingManagerModel: null };
 };
 
+const DEFAULT_PERMISSIONS = {
+  admin: {
+    announcements: {
+      can_view_announcements: true,
+      can_create_announcement: true,
+      can_edit_announcement: true,
+      can_delete_announcement: true,
+    },
+    documents: {
+      can_upload_documents: true,
+      can_view_all_documents: true,
+    },
+    tickets: {
+      can_raise_ticket: true,
+      can_view_all_tickets: true,
+      can_resolve_ticket: true,
+      can_rate_ticket: true,
+    },
+    recruitment: {
+      can_view_hiring_requisitions: true,
+      can_create_hiring_requisition: true,
+      can_view_candidates: true,
+      can_add_candidate: true,
+    },
+  },
+  manager: {
+    announcements: {
+      can_view_announcements: true,
+      can_create_announcement: true,
+      can_edit_announcement: true,
+      can_delete_announcement: true,
+    },
+    documents: {
+      can_upload_documents: true,
+      can_view_all_documents: true,
+    },
+    tickets: {
+      can_raise_ticket: true,
+      can_view_all_tickets: true,
+      can_resolve_ticket: true,
+      can_rate_ticket: true,
+    },
+    recruitment: {
+      can_view_hiring_requisitions: true,
+      can_create_hiring_requisition: true,
+      can_view_candidates: true,
+      can_add_candidate: true,
+    },
+  },
+  employee: {
+    announcements: {
+      can_view_announcements: true,
+      can_create_announcement: true,
+      can_edit_announcement: true,
+      can_delete_announcement: true,
+    },
+    documents: {
+      can_upload_documents: true,
+      can_view_all_documents: true,
+    },
+    tickets: {
+      can_raise_ticket: true,
+      can_view_all_tickets: true,
+      can_resolve_ticket: true,
+      can_rate_ticket: true,
+    },
+    recruitment: {
+      can_view_hiring_requisitions: true,
+      can_create_hiring_requisition: true,
+      can_view_candidates: true,
+      can_add_candidate: true,
+    },
+  },
+};
+
+const USER_MODEL_MAP = {
+  admin: "Admin",
+  senior_admin: "Admin",
+  official: "Admin",
+  manager: "Manager",
+  senior_manager: "Manager",
+  employee: "User",
+};
+
+const mergePermissions = (role, overrides) => {
+  const permissionRole = ["admin", "senior_admin", "official"].includes(role)
+    ? "admin"
+    : ["manager", "senior_manager"].includes(role)
+    ? "manager"
+    : "employee";
+
+  const defaults = DEFAULT_PERMISSIONS[permissionRole];
+  if (!overrides) return defaults;
+
+  return {
+    announcements: {
+      can_view_announcements: overrides.announcements?.can_view_announcements ?? defaults.announcements.can_view_announcements,
+      can_create_announcement: overrides.announcements?.can_create_announcement ?? defaults.announcements.can_create_announcement,
+      can_edit_announcement: overrides.announcements?.can_edit_announcement ?? defaults.announcements.can_edit_announcement,
+      can_delete_announcement: overrides.announcements?.can_delete_announcement ?? defaults.announcements.can_delete_announcement,
+    },
+    documents: {
+      can_upload_documents: overrides.documents?.can_upload_documents ?? defaults.documents.can_upload_documents,
+      can_view_all_documents: overrides.documents?.can_view_all_documents ?? defaults.documents.can_view_all_documents,
+    },
+    tickets: {
+      can_raise_ticket: overrides.tickets?.can_raise_ticket ?? defaults.tickets.can_raise_ticket,
+      can_view_all_tickets: overrides.tickets?.can_view_all_tickets ?? defaults.tickets.can_view_all_tickets,
+      can_resolve_ticket: overrides.tickets?.can_resolve_ticket ?? defaults.tickets.can_resolve_ticket,
+      can_rate_ticket: overrides.tickets?.can_rate_ticket ?? defaults.tickets.can_rate_ticket,
+    },
+    recruitment: {
+      can_view_hiring_requisitions: overrides.recruitment?.can_view_hiring_requisitions ?? defaults.recruitment.can_view_hiring_requisitions,
+      can_create_hiring_requisition: overrides.recruitment?.can_create_hiring_requisition ?? defaults.recruitment.can_create_hiring_requisition,
+      can_view_candidates: overrides.recruitment?.can_view_candidates ?? defaults.recruitment.can_view_candidates,
+      can_add_candidate: overrides.recruitment?.can_add_candidate ?? defaults.recruitment.can_add_candidate,
+    },
+  };
+};
+
+const assignDefaultPermissions = async (
+  user_id,
+  role,
+  organisation_id,
+  granted_by,
+  granted_by_model,
+  session,
+  overrides
+) => {
+  const user_model = USER_MODEL_MAP[role] || "User";
+  const perms = mergePermissions(role, overrides);
+
+  await PermissionModel.findOneAndUpdate(
+    { user_id, user_model, organisation_id },
+    {
+      $set: {
+        user_id,
+        user_model,
+        organisation_id,
+        granted_by,
+        granted_by_model,
+        ...perms,
+      },
+    },
+    { upsert: true, new: true, runValidators: true, session: session || undefined }
+  );
+};
+
 const addmanager = async (req, res, next) => {
   try {
     if (!req.admin)
@@ -175,7 +323,7 @@ const addmanager = async (req, res, next) => {
       pincode, role, office_location, designation, department, reporting_manager,
       is_fresher, total_experience, previous_company, previous_designation, bank_name,
       account_holder_name, account_number, ifsc_code, resume, aadhaar_card, pan_card,
-      experience_letter,
+      experience_letter, permissions,
     } = req.body;
 
     if (!f_name || !l_name || !work_email || !password || !department || !designation || !office_location || !gender || !personal_contact || !e_contact)
@@ -221,6 +369,15 @@ const addmanager = async (req, res, next) => {
 
     await Promise.all([
       assignDefaultLeave(newmanager),
+      assignDefaultPermissions(
+        newmanager._id,
+        newmanager.role || "manager",
+        organisation_id,
+        req.admin._id,
+        "Admin",
+        null,
+        permissions
+      ),
       sendEmail({
         to: work_email,
         subject: "Activate Your Manager Account",
@@ -254,7 +411,7 @@ const addemployee = async (req, res, next) => {
     personal_contact, e_contact, aadhaar_number, pan_number, address, city, state,
     pincode, role, office_location, designation, department, Under_manager, is_fresher,
     total_experience, previous_company, previous_designation, bank_name, account_holder_name,
-    account_number, ifsc_code, resume, aadhaar_card, pan_card, experience_letter,
+    account_number, ifsc_code, resume, aadhaar_card, pan_card, experience_letter, permissions,
   } = req.body;
 
   if (!f_name || !l_name || !work_email || !password || !department || !designation || !office_location || !gender || !personal_contact || !e_contact)
@@ -289,6 +446,15 @@ const addemployee = async (req, res, next) => {
 
   Promise.all([
     assignDefaultLeave(newuser),
+    assignDefaultPermissions(
+      newuser._id,
+      newuser.role || "employee",
+      organisation_id,
+      req.admin._id,
+      "Admin",
+      null,
+      permissions
+    ),
     sendEmail({
       to: work_email,
       subject: "Welcome! Verify Your Employee Account",
@@ -557,6 +723,17 @@ const promoteEmployeeToManager = async (req, res, next) => {
     await Promise.all([
       Usermodel.findByIdAndDelete(id, { session }),
 
+      PermissionModel.findOneAndDelete({ user_id: id, user_model: "User", organisation_id }, { session }),
+
+      assignDefaultPermissions(
+        newManager._id,
+        newManager.role || "manager",
+        organisation_id,
+        req.admin._id,
+        "Admin",
+        session
+      ),
+
       Document.updateMany(
         { employee: id, organisation_id },
         { $set: { employee: newManager._id } },
@@ -701,6 +878,17 @@ const promoteManagerToAdmin = async (req, res, next) => {
 
     await Promise.all([
       Managermodel.findByIdAndDelete(id, { session }),
+
+      PermissionModel.findOneAndDelete({ user_id: id, user_model: "Manager", organisation_id }, { session }),
+
+      assignDefaultPermissions(
+        newAdmin._id,
+        newAdmin.role || "admin",
+        organisation_id,
+        req.admin._id,
+        "Admin",
+        session
+      ),
 
       Usermodel.updateMany(
         { Under_manager: id, organisation_id },
@@ -858,6 +1046,17 @@ const promoteEmployeeToAdmin = async (req, res, next) => {
     await Promise.all([
       Usermodel.findByIdAndDelete(id, { session }),
 
+      PermissionModel.findOneAndDelete({ user_id: id, user_model: "User", organisation_id }, { session }),
+
+      assignDefaultPermissions(
+        newAdmin._id,
+        newAdmin.role || "admin",
+        organisation_id,
+        req.admin._id,
+        "Admin",
+        session
+      ),
+
       Document.updateMany(
         { employee: id, organisation_id },
         { $set: { employee: newAdmin._id } },
@@ -986,6 +1185,17 @@ const demoteManagerToEmployee = async (req, res, next) => {
 
     await Promise.all([
       Managermodel.findByIdAndDelete(id, { session }),
+
+      PermissionModel.findOneAndDelete({ user_id: id, user_model: "Manager", organisation_id }, { session }),
+
+      assignDefaultPermissions(
+        newEmployee._id,
+        "employee",
+        organisation_id,
+        req.admin._id,
+        "Admin",
+        session
+      ),
 
       Usermodel.updateMany(
         { Under_manager: id, organisation_id },
@@ -1127,6 +1337,17 @@ const demoteAdminToManager = async (req, res, next) => {
     await Promise.all([
       Adminmodel.findByIdAndDelete(id, { session }),
 
+      PermissionModel.findOneAndDelete({ user_id: id, user_model: "Admin", organisation_id }, { session }),
+
+      assignDefaultPermissions(
+        newManager._id,
+        newManager.role || "manager",
+        organisation_id,
+        req.admin._id,
+        "Admin",
+        session
+      ),
+
       Document.updateMany(
         { employee: id, organisation_id },
         { $set: { employee: newManager._id } },
@@ -1258,6 +1479,17 @@ const demoteAdminToEmployee = async (req, res, next) => {
 
     await Promise.all([
       Adminmodel.findByIdAndDelete(id, { session }),
+
+      PermissionModel.findOneAndDelete({ user_id: id, user_model: "Admin", organisation_id }, { session }),
+
+      assignDefaultPermissions(
+        newEmployee._id,
+        "employee",
+        organisation_id,
+        req.admin._id,
+        "Admin",
+        session
+      ),
 
       Document.updateMany(
         { employee: id, organisation_id },
