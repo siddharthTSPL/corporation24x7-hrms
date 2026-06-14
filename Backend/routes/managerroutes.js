@@ -3,198 +3,63 @@ const managerrouter = express.Router();
 const managercontroller = require("../controllers/manager.controller");
 const managermiddleware = require("../middleware/auth/manager.middleware");
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
-const admincontroller = require("../controllers/admin.controller");
+const checkPermission = require("../middleware/auth/Checkpermission.middleware");
+const multer = require("multer");
 
-managerrouter.get(
-  "/verify/:token",
-  asyncHandler(managercontroller.verifyManagerEmail),
-);
+const upload = multer({ storage: multer.memoryStorage() });
+
+const {
+  uploadDocument,
+  editDocument,
+  deleteDocument,
+} = require("../controllers/uploaddocument.controller");
+
+managerrouter.get("/verify/:token", asyncHandler(managercontroller.verifyManagerEmail));
 managerrouter.post("/login", asyncHandler(managercontroller.managerlogin));
-
-managerrouter.post(
-  "/logout",
-  managermiddleware,
-  asyncHandler(managercontroller.managerlogout),
-);
-
 managerrouter.get("/change-password", managercontroller.showPasswordPage);
-managerrouter.post(
-  "/firstloginpasswordchange",
-  asyncHandler(managercontroller.managerFirstLoginPasswordChange),
-);
+managerrouter.post("/firstloginpasswordchange", asyncHandler(managercontroller.managerFirstLoginPasswordChange));
+managerrouter.post("/forgetpassword", asyncHandler(managercontroller.forgetpasswordloginbyotp));
+managerrouter.post("/verifyotp", asyncHandler(managercontroller.verifyManagerOtp));
+managerrouter.get("/showPasswordPageotp", managercontroller.showPasswordPageotp);
+managerrouter.post("/resetManagerPassword", asyncHandler(managercontroller.resetManagerPassword));
 
-managerrouter.put(
-  "/updatepassword",
-  managermiddleware,
-  asyncHandler(managercontroller.managerUpdatePassword),
-);
-
-managerrouter.get(
-  "/userunderme",
-  managermiddleware,
-  asyncHandler(managercontroller.userunderme),
-);
-managerrouter.get(
-  "/viewallleaves",
-  managermiddleware,
-  asyncHandler(managercontroller.viewallleaves),
-);
-
-managerrouter.post(
-  "/acceptleaverequest",
-  managermiddleware,
-  asyncHandler(managercontroller.acceptleaverequest),
-);
-managerrouter.post(
-  "/rejectleaverequest",
-  managermiddleware,
-  asyncHandler(managercontroller.rejectleaverequest),
-);
-
-managerrouter.post(
-  "/forwardtoreportingmanager",
-  managermiddleware,
-  asyncHandler(managercontroller.forwardedtoreportingmanager),
-);
-
-managerrouter.get(
-  "/getforwardedleaves",
-  managermiddleware,
-  asyncHandler(managercontroller.getforwardedleaves),
-);
-
-managerrouter.post(
-  "/acceptforwardedleave",
-  managermiddleware,
-  asyncHandler(managercontroller.acceptforwardedleave),
-);
-
-managerrouter.post(
-  "/rejectforwardedleave",
-  managermiddleware,
-  asyncHandler(managercontroller.rejectforwardedleave),
-);
-
-managerrouter.get(
-  "/getAllExpenseDocuments",
-  managermiddleware,
-  asyncHandler(managercontroller.getAllExpenseDocuments),
-);
-managerrouter.get(
-  "/getAllPersonalDocuments",
-  managermiddleware,
-  asyncHandler(managercontroller.getAllPersonalDocuments),
-);
-managerrouter.get(
-  "/getDocumentDetails/:documentId",
-  managermiddleware,
-  asyncHandler(managercontroller.getDocumentDetails),
-);
-
-managerrouter.get(
-  "/showannouncements",
-  managermiddleware,
-  asyncHandler(managercontroller.showannouncements),
-);
-
-managerrouter.get(
-  "/showannouncement/:id",
-  managermiddleware,
-  asyncHandler(managercontroller.particularannouncement),
-);
-
-managerrouter.post(
-  "/forgetpassword",
-  asyncHandler(managercontroller.forgetpasswordloginbyotp),
-);
-managerrouter.post(
-  "/verifyotp",
-  asyncHandler(managercontroller.verifyManagerOtp),
-);
-managerrouter.get(
-  "/showPasswordPageotp",
-  managercontroller.showPasswordPageotp,
-);
-managerrouter.post(
-  "/resetManagerPassword",
-  asyncHandler(managercontroller.resetManagerPassword),
-);
-managerrouter.get(
-  "/getmyleaves",
-  managermiddleware,
-  asyncHandler(managercontroller.getmyleaves),
-);
-managerrouter.post(
-  "/applyleavem",
-  managermiddleware,
-  asyncHandler(managercontroller.applyleavem),
-);
-managerrouter.post(
-  "/reviewtoemployee",
-  managermiddleware,
-  asyncHandler(managercontroller.reviewtoemployee),
-);
-managerrouter.get(
-  "/getme",
-  managermiddleware,
-  asyncHandler(managercontroller.getme),
-);
-managerrouter.put(
-  "/manager/edit-profile",
-  managermiddleware,
-  asyncHandler(managercontroller.editprofilemanager),
-);
-
-managerrouter.put(
-  "/manager/change-password",
-  managermiddleware,
-  asyncHandler(managercontroller.changepassword),
-);
-
-managerrouter.get(
-  "/getattendance",
-  managermiddleware,
-  asyncHandler(managercontroller.getattendance),
-);
-
-// managerrouter.get(
-//   "/getorginfo",
-//   managermiddleware,
-//   asyncHandler(admincontroller.getOrgInfo),
-// );
-
-managerrouter.post(
-  "/submit-ticket",
-  managermiddleware,
-  asyncHandler(managercontroller.managerSubmitTicket),
-);
-managerrouter.get(
-  "/my-tickets",
-  managermiddleware,
-  asyncHandler(managercontroller.managerGetMyTickets),
-);
-managerrouter.post(
-  "/rate-ticket/:ticketNumber",
-  managermiddleware,
-  asyncHandler(managercontroller.managerRateTicket),
-);
-
-managerrouter.get(
-  "/getTicketDetail/:ticketNumber",
-  managermiddleware,
-  asyncHandler(managercontroller. managerGetTicketDetail),
-);
-
+managerrouter.post("/logout", managermiddleware, asyncHandler(managercontroller.managerlogout));
+managerrouter.get("/getme", managermiddleware, asyncHandler(managercontroller.getme));
+managerrouter.put("/manager/edit-profile", managermiddleware, asyncHandler(managercontroller.editprofilemanager));
+managerrouter.put("/manager/change-password", managermiddleware, asyncHandler(managercontroller.changepassword));
+managerrouter.put("/updatepassword", managermiddleware, asyncHandler(managercontroller.managerUpdatePassword));
 managerrouter.get("/getOrgInfo", managermiddleware, asyncHandler(managercontroller.getOrgInfoForManager));
+managerrouter.get("/getattendance", managermiddleware, asyncHandler(managercontroller.getattendance));
 
-managerrouter.post(
-  "/forwardforwardedleavetoadmin",
-  managermiddleware,
-  asyncHandler(managercontroller.forwardLeaveUpChain),
-);
+managerrouter.get("/userunderme", managermiddleware, asyncHandler(managercontroller.userunderme));
 
-managerrouter.get(
-  "/myleavehistory",
-  managermiddleware,
-  asyncHandler(managercontroller.getmyleavehistory),)
+managerrouter.post("/applyleavem", managermiddleware, asyncHandler(managercontroller.applyleavem));
+managerrouter.get("/getmyleaves", managermiddleware, asyncHandler(managercontroller.getmyleaves));
+managerrouter.get("/myleavehistory", managermiddleware, asyncHandler(managercontroller.getmyleavehistory));
+managerrouter.post("/acceptleaverequest", managermiddleware, asyncHandler(managercontroller.acceptleaverequest));
+managerrouter.post("/rejectleaverequest", managermiddleware, asyncHandler(managercontroller.rejectleaverequest));
+managerrouter.post("/forwardtoreportingmanager", managermiddleware, asyncHandler(managercontroller.forwardedtoreportingmanager));
+managerrouter.get("/getforwardedleaves", managermiddleware, asyncHandler(managercontroller.getforwardedleaves));
+managerrouter.post("/acceptforwardedleave", managermiddleware, asyncHandler(managercontroller.acceptforwardedleave));
+managerrouter.post("/rejectforwardedleave", managermiddleware, asyncHandler(managercontroller.rejectforwardedleave));
+managerrouter.post("/forwardforwardedleavetoadmin", managermiddleware, asyncHandler(managercontroller.forwardLeaveUpChain));
+
+managerrouter.post("/reviewtoemployee", managermiddleware, asyncHandler(managercontroller.reviewtoemployee));
+
+managerrouter.get("/showannouncements", managermiddleware, checkPermission("announcements.can_view_announcements"), asyncHandler(managercontroller.showannouncements));
+managerrouter.get("/showannouncement/:id", managermiddleware, checkPermission("announcements.can_view_announcements"), asyncHandler(managercontroller.particularannouncement));
+
+managerrouter.post("/upload", managermiddleware, checkPermission("documents.can_upload_documents"), upload.single("file"), uploadDocument);
+managerrouter.get("/documents", managermiddleware, checkPermission("documents.can_upload_documents"), managercontroller.getAllPersonalDocuments);
+managerrouter.put("/documents/:id", managermiddleware, checkPermission("documents.can_upload_documents"), upload.single("file"), editDocument);
+managerrouter.delete("/documents/:id", managermiddleware, checkPermission("documents.can_upload_documents"), deleteDocument);
+managerrouter.get("/getAllExpenseDocuments", managermiddleware, checkPermission("documents.can_view_all_documents"), asyncHandler(managercontroller.getAllExpenseDocuments));
+managerrouter.get("/getAllPersonalDocuments", managermiddleware, checkPermission("documents.can_view_all_documents"), asyncHandler(managercontroller.getAllPersonalDocuments));
+managerrouter.get("/getDocumentDetails/:documentId", managermiddleware, checkPermission("documents.can_view_all_documents"), asyncHandler(managercontroller.getDocumentDetails));
+
+managerrouter.post("/submit-ticket", managermiddleware, checkPermission("tickets.can_raise_ticket"), asyncHandler(managercontroller.managerSubmitTicket));
+managerrouter.get("/my-tickets", managermiddleware, checkPermission("tickets.can_raise_ticket"), asyncHandler(managercontroller.managerGetMyTickets));
+managerrouter.post("/rate-ticket/:ticketNumber", managermiddleware, checkPermission("tickets.can_rate_ticket"), asyncHandler(managercontroller.managerRateTicket));
+managerrouter.get("/getTicketDetail/:ticketNumber", managermiddleware, checkPermission("tickets.can_raise_ticket"), asyncHandler(managercontroller.managerGetTicketDetail));
+
 module.exports = managerrouter;
