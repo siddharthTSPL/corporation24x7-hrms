@@ -1475,7 +1475,7 @@ function Footer() {
     { title: 'Resources', links: ['Documentation', 'Api Reference', 'Guides', 'Blog', 'Community'] },
   ]
   const socials = [
-    { icon: <FiLinkedin />, href: '#', label: 'LinkedIn' },
+    { icon: <FiLinkedin />, href: "https://www.linkedin.com/company/103362190/admin/dashboard/", label: 'LinkedIn' },
     { icon: <FiInstagram />, href: '#', label: 'Instagram' },
     { icon: <FiTwitter />, href: '#', label: 'Twitter' },
     { icon: <FiMail />, href: '#', label: 'Email' },
@@ -1488,13 +1488,7 @@ function Footer() {
       <style>{modalStyles}</style>
       <footer style={{ background: '#F6EDF2', borderTop: `1px solid ${FOOTER_BORDER}`, fontFamily: 'DM Sans, sans-serif' }}>
 
-        {/*
-          ── Footer main: Wrap (1280px + clamp gutter)
-          CRITICAL FIX: was maxWidth:1100px which caused footer content to be
-          visually indented vs every other section's 1280px container.
-          Now using Wrap → all sections share the same left/right walls.
-          paddingTop: SP.section.sm (48px) — footer starts after a full breath
-        */}
+      
         <Wrap style={{ paddingTop: '30px', paddingBottom: 0 }}>
           <div style={{ display: 'grid', gap: '40px' }} className="footer-grid">
 
