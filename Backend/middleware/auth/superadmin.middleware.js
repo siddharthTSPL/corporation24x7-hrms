@@ -30,6 +30,7 @@ const superAdminAuth = async (req, res, next) => {
     }
 
     req.superAdmin = superAdmin;
+    req.user = superAdmin;
     next();
   } catch (error) {
     return res.status(401).json({ message: "Invalid token" });

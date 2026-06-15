@@ -2,6 +2,11 @@ const express = require("express");
 const adminrouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const adminauthmiddleware = require("../middleware/auth/admin.middleware");
+const checkPermission = require("../middleware/auth/Checkpermission.middleware");
+const multer = require("multer");
+
+const upload = multer({ storage: multer.memoryStorage() });
+
 const {
   verifyAdmin,
   adminlogin,
@@ -51,6 +56,13 @@ const {
   adminGetTicketDetail,
 } = require("../controllers/admin.controller");
 
+const {
+  uploadDocument,
+  getDocuments,
+  editDocument,
+  deleteDocument,
+} = require("../controllers/uploaddocument.controller");
+
 adminrouter.get("/verify/:token", asyncHandler(verifyAdmin));
 adminrouter.post("/login", asyncHandler(adminlogin));
 adminrouter.post("/forgetpassword", asyncHandler(forgetpasswordloginotp));
@@ -62,6 +74,8 @@ adminrouter.get("/getme", adminauthmiddleware, asyncHandler(getme));
 adminrouter.put("/editadminprofile", adminauthmiddleware, asyncHandler(editadminprofile));
 adminrouter.put("/changepassword", adminauthmiddleware, asyncHandler(changepassword));
 adminrouter.get("/getorginfo", adminauthmiddleware, asyncHandler(getOrgInfo));
+adminrouter.get("/noofemployee", adminauthmiddleware, asyncHandler(noofemployee));
+adminrouter.get("/gettodaycheckins", adminauthmiddleware, asyncHandler(getTodayCheckins));
 
 adminrouter.post("/addmanager", adminauthmiddleware, asyncHandler(addmanager));
 adminrouter.post("/addemployee", adminauthmiddleware, asyncHandler(addemployee));
@@ -76,11 +90,9 @@ adminrouter.delete("/deleteuser/:id", adminauthmiddleware, asyncHandler(deleteem
 adminrouter.post("/employee/:id/promote/manager", adminauthmiddleware, asyncHandler(promoteEmployeeToManager));
 adminrouter.post("/employee/:id/promote/admin", adminauthmiddleware, asyncHandler(promoteEmployeeToAdmin));
 adminrouter.post("/manager/:id/promote/admin", adminauthmiddleware, asyncHandler(promoteManagerToAdmin));
-
 adminrouter.post("/manager/:id/demote/employee", adminauthmiddleware, asyncHandler(demoteManagerToEmployee));
 adminrouter.post("/admin/:id/demote/manager", adminauthmiddleware, asyncHandler(demoteAdminToManager));
 adminrouter.post("/admin/:id/demote/employee", adminauthmiddleware, asyncHandler(demoteAdminToEmployee));
-
 adminrouter.put("/manager/:id/role", adminauthmiddleware, asyncHandler(changeManagerRole));
 
 adminrouter.get("/showallleaves", adminauthmiddleware, asyncHandler(showallleaves));
@@ -90,23 +102,29 @@ adminrouter.put("/acceptleave/:id", adminauthmiddleware, asyncHandler(acceptLeav
 adminrouter.put("/rejectleave/:id", adminauthmiddleware, asyncHandler(rejectLeave));
 adminrouter.post("/actionleave", adminauthmiddleware, asyncHandler(adminActionOnLeave));
 
-adminrouter.get("/noofemployee", adminauthmiddleware, asyncHandler(noofemployee));
-adminrouter.get("/gettodaycheckins", adminauthmiddleware, asyncHandler(getTodayCheckins));
-
-adminrouter.post("/createannouncement", adminauthmiddleware, asyncHandler(createannouncement));
-adminrouter.get("/getallannouncement", adminauthmiddleware, asyncHandler(getallannouncement));
-adminrouter.put("/updateannouncement/:id", adminauthmiddleware, asyncHandler(updateAnnouncement));
-adminrouter.delete("/deleteannouncement/:id", adminauthmiddleware, asyncHandler(deleteAnnouncement));
-
 adminrouter.post("/reviewtomanager", adminauthmiddleware, asyncHandler(reviewtomanager));
 
-adminrouter.get("/documents/personal", adminauthmiddleware, asyncHandler(getAllPersonalDocumentsAdmin));
-adminrouter.get("/documents/expense", adminauthmiddleware, asyncHandler(getAllExpenseDocumentsAdmin));
-adminrouter.get("/documents/:documentId", adminauthmiddleware, asyncHandler(getDocumentDetailsAdmin));
+adminrouter.get("/getallannouncement", adminauthmiddleware, checkPermission("announcements.can_view_announcements"), asyncHandler(getallannouncement));
+adminrouter.post("/createannouncement", adminauthmiddleware, checkPermission("announcements.can_create_announcement"), asyncHandler(createannouncement));
+adminrouter.put("/updateannouncement/:id", adminauthmiddleware, checkPermission("announcements.can_edit_announcement"), asyncHandler(updateAnnouncement));
+adminrouter.delete("/deleteannouncement/:id", adminauthmiddleware, checkPermission("announcements.can_delete_announcement"), asyncHandler(deleteAnnouncement));
 
-adminrouter.post("/submitTicket", adminauthmiddleware, asyncHandler(adminSubmitTicket));
-adminrouter.get("/getMyTickets", adminauthmiddleware, asyncHandler(adminGetMyTickets));
-adminrouter.post("/rateTicket/:ticketNumber", adminauthmiddleware, asyncHandler(adminRateTicket));
-adminrouter.get("/getTicketDetail/:ticketNumber", adminauthmiddleware, asyncHandler(adminGetTicketDetail));
+adminrouter.post("/upload", adminauthmiddleware, checkPermission("documents.can_upload_documents"), upload.single("file"), uploadDocument);
+adminrouter.put("/documents/:id", adminauthmiddleware, checkPermission("documents.can_upload_documents"), upload.single("file"), editDocument);
+adminrouter.delete("/documents/:id", adminauthmiddleware, checkPermission("documents.can_upload_documents"), deleteDocument);
+adminrouter.get("/documents/personal", adminauthmiddleware, checkPermission("documents.can_view_all_documents"), asyncHandler(getAllPersonalDocumentsAdmin));
+adminrouter.get("/documents/expense", adminauthmiddleware, checkPermission("documents.can_view_all_documents"), asyncHandler(getAllExpenseDocumentsAdmin));
+adminrouter.get("/documents/:documentId", adminauthmiddleware, checkPermission("documents.can_view_all_documents"), asyncHandler(getDocumentDetailsAdmin));
+
+adminrouter.post("/submitTicket", adminauthmiddleware, checkPermission("tickets.can_raise_ticket"), asyncHandler(adminSubmitTicket));
+adminrouter.get("/getMyTickets", adminauthmiddleware, checkPermission("tickets.can_raise_ticket"), asyncHandler(adminGetMyTickets));
+adminrouter.post("/rateTicket/:ticketNumber", adminauthmiddleware, checkPermission("tickets.can_rate_ticket"), asyncHandler(adminRateTicket));
+adminrouter.get("/getTicketDetail/:ticketNumber", adminauthmiddleware, checkPermission("tickets.can_raise_ticket"), asyncHandler(adminGetTicketDetail));
+adminrouter.get(
+  "/documents",
+  adminauthmiddleware,
+  checkPermission("documents.can_view_all_documents"),
+  asyncHandler(getDocuments)
+);
 
 module.exports = adminrouter;

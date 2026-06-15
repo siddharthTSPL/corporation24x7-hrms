@@ -1,10 +1,9 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useAttendanceTracker } from "./useattendanctracker";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import { useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
 import SelfieCapture from "./selfietracker";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const formatTime = (date) =>
   date ? new Date(date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--:--";
 
@@ -16,9 +15,9 @@ const getGreeting = () => {
 const extractUser = (auth) => {
   if (!auth) return null;
   const r = auth.role;
-  if (r === "manager")  return auth.data?.manager  ?? null;
+  if (r === "manager") return auth.data?.manager ?? null;
   if (r === "employee") return auth.data?.employee ?? null;
-  if (r === "admin")    return auth.data?.admin    ?? null;
+  if (r === "admin") return auth.data?.admin ?? null;
   return null;
 };
 
@@ -28,69 +27,44 @@ const extractName = (user) => {
   return full || user.name || user.username || user.work_email || user.email || "User";
 };
 
-const cap = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : "—";
+const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : "—");
 
 const ROLE_META = {
-  admin:    { color: "#7B1C3E", label: "Admin",    bg: "#FDF2F8" },
-  manager:  { color: "#1D4ED8", label: "Manager",  bg: "#EFF6FF" },
-  employee: { color: "#065F46", label: "Employee", bg: "#F0FDF4" },
+  admin:    { color: "text-[#7B1C3E]", bg: "bg-[#FDF2F8]", border: "border-[#7B1C3E]/20", label: "Admin",    dot: "#7B1C3E" },
+  manager:  { color: "text-blue-700",   bg: "bg-blue-50",   border: "border-blue-200",       label: "Manager",  dot: "#1D4ED8" },
+  employee: { color: "text-emerald-700",bg: "bg-emerald-50",border: "border-emerald-200",    label: "Employee", dot: "#065F46" },
 };
 
-// ─── Avatar ───────────────────────────────────────────────────────────────────
-function Avatar({ name, color, src, size = 48, onClick }) {
+function Avatar({ name, src, dotColor, size = "w-12 h-12", onClick }) {
+  const initials = name.split(" ").slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
   if (src) {
     return (
       <img src={src} alt={name} onClick={onClick}
-        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", border: `2px solid ${color}55`, cursor: onClick ? "pointer" : "default", flexShrink: 0 }}
-      />
+        className={`${size} rounded-full object-cover border-2 flex-shrink-0 ${onClick ? "cursor-pointer" : ""}`}
+        style={{ borderColor: dotColor + "55" }} />
     );
   }
-  const initials = name.split(" ").slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
   return (
-    <div onClick={onClick} style={{ width: size, height: size, borderRadius: "50%", background: color + "18", color, border: `2px solid ${color}55`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: size * 0.35, flexShrink: 0, cursor: onClick ? "pointer" : "default" }}>
+    <div onClick={onClick}
+      className={`${size} rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 border-2 ${onClick ? "cursor-pointer" : ""}`}
+      style={{ background: dotColor + "18", color: dotColor, borderColor: dotColor + "55" }}>
       {initials || "U"}
     </div>
   );
 }
 
-// ─── Arc Gauge ────────────────────────────────────────────────────────────────
-function ArcGauge({ percent, size = 200, strokeWidth = 14, color }) {
-  const r = (size - strokeWidth) / 2, circ = 2 * Math.PI * r, cx = size / 2;
+function ArcGauge({ percent, color }) {
+  const size = 200, sw = 14, r = (size - sw) / 2, circ = 2 * Math.PI * r, cx = size / 2;
   return (
-    <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
-      <circle cx={cx} cy={cx} r={r} fill="none" stroke="#F3F4F6" strokeWidth={strokeWidth} />
-      <circle cx={cx} cy={cx} r={r} fill="none" stroke={color} strokeWidth={strokeWidth}
+    <svg width={size} height={size} className="-rotate-90">
+      <circle cx={cx} cy={cx} r={r} fill="none" stroke="#F3F4F6" strokeWidth={sw} />
+      <circle cx={cx} cy={cx} r={r} fill="none" stroke={color} strokeWidth={sw}
         strokeDasharray={circ} strokeDashoffset={circ - (circ * percent) / 100}
         strokeLinecap="round" style={{ transition: "stroke-dashoffset 0.6s ease" }} />
     </svg>
   );
 }
 
-// ─── Stat Card ────────────────────────────────────────────────────────────────
-function StatCard({ icon, label, value, sub, accent }) {
-  return (
-    <div style={{ ...css.statCard, borderColor: accent + "40" }}>
-      <div style={{ ...css.statIcon, background: accent + "15", color: accent }}>{icon}</div>
-      <div>
-        <p style={css.statValue}>{value}</p>
-        <p style={css.statLabel}>{label}</p>
-        {sub && <p style={css.statSub}>{sub}</p>}
-      </div>
-    </div>
-  );
-}
-
-// ─── Session Info Item ────────────────────────────────────────────────────────
-function SessionItem({ label, value, accent }) {
-  return (
-    <div style={{ ...css.sessionItem, borderColor: accent ? accent + "30" : "#F3F4F6" }}>
-      <p style={css.sessionKey}>{label}</p>
-      <p style={{ ...css.sessionVal, color: accent ?? "#111827" }}>{value || "—"}</p>
-    </div>
-  );
-}
-
-// ─── Live Clock ───────────────────────────────────────────────────────────────
 function LiveClock() {
   const [time, setTime] = useState(new Date());
   useEffect(() => {
@@ -98,82 +72,76 @@ function LiveClock() {
     return () => clearInterval(t);
   }, []);
   return (
-    <div style={css.clockFace}>
-      <p style={css.clockTime}>{time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</p>
-      <p style={css.clockLabel}>{time.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short" })}</p>
+    <div className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-8 py-5 text-center">
+      <p className="m-0 text-4xl sm:text-5xl font-bold tracking-tight text-gray-900" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+        {time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+      </p>
+      <p className="mt-1 text-[11px] uppercase tracking-widest text-gray-400">
+        {time.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short" })}
+      </p>
     </div>
   );
 }
 
-// ─── Brand Strip ─────────────────────────────────────────────────────────────
 function BrandStrip() {
   return (
-    <div style={css.brandStrip}>
-      <div style={css.brandLogo}>
-        <span style={css.brandTorch}>Torch</span>
-        <span style={css.brandX}>X</span> 
-        <br />
-        <span style={css.brandSub}>TALENT</span>  
-
-    </div>
-      <span style={css.brandTagline}>Workforce Intelligence</span>
+    <div className="flex justify-between items-center pb-1">
+      <div className="flex items-baseline gap-0" style={{ fontFamily: "'Sora', sans-serif" }}>
+        <span className="text-[22px] font-bold text-gray-900 tracking-tight">Torch</span>
+        <span className="text-[22px] font-extrabold text-[#7B1C3E] tracking-tight">X</span>
+        <span className="text-[9px] font-semibold text-gray-400 tracking-[3px] ml-1.5 self-end pb-0.5">TALENT</span>
+      </div>
+      <span className="text-[11px] text-gray-400 font-medium tracking-wide">Workforce Intelligence</span>
     </div>
   );
 }
 
-// ─── Profile Panel ────────────────────────────────────────────────────────────
 function ProfilePanel({ user, userName, userRole, roleMeta }) {
   if (!user) return null;
-
   const joined = user.createdAt
     ? new Date(user.createdAt).toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" })
     : "—";
-
   const rows = [
-    { icon: "🪪", label: "Employee ID",  value: user.uid },
-    { icon: "🏢", label: "Department",   value: user.department },
-    { icon: "💼", label: "Designation",  value: user.designation ?? user.position },
-    { icon: "📧", label: "Work Email",   value: user.work_email ?? user.email },
-    { icon: "📱", label: "Contact",      value: user.personal_contact },
-    { icon: "📍", label: "Location",     value: user.office_location },
-    { icon: "⚤",  label: "Gender",       value: cap(user.gender) },
-    { icon: "💍", label: "Marital",      value: cap(user.marital_status) },
-    { icon: "📅", label: "Joined",       value: joined },
-    { icon: "🔵", label: "Status",       value: cap(user.status) },
+    { icon: "🪪", label: "Employee ID", value: user.uid },
+    { icon: "🏢", label: "Department",  value: user.department },
+    { icon: "💼", label: "Designation", value: user.designation ?? user.position },
+    { icon: "📧", label: "Work Email",  value: user.work_email ?? user.email },
+    { icon: "📱", label: "Contact",     value: user.personal_contact },
+    { icon: "📍", label: "Location",    value: user.office_location },
+    { icon: "⚤",  label: "Gender",      value: cap(user.gender) },
+    { icon: "💍", label: "Marital",     value: cap(user.marital_status) },
+    { icon: "📅", label: "Joined",      value: joined },
+    { icon: "🔵", label: "Status",      value: cap(user.status) },
   ].filter((r) => r.value && r.value !== "—");
 
   return (
-    <div style={css.profilePanel}>
-      {/* Profile header */}
-      <div style={css.profilePanelHeader}>
-        <Avatar name={userName} color={roleMeta.color} src={user.profile_image} size={56} />
-        <div style={{ flex: 1 }}>
-          <p style={css.profilePanelName}>{userName}</p>
-          <p style={css.profilePanelDesig}>{user.designation ?? user.position ?? userRole}</p>
-          <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-            <span style={{ ...css.chipBase, background: roleMeta.color + "15", color: roleMeta.color, border: `1px solid ${roleMeta.color}25` }}>
+    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex flex-col gap-4 animate-[slideIn_0.25s_ease]">
+      <div className="flex items-start gap-3">
+        <Avatar name={userName} src={user.profile_image} dotColor={roleMeta.dot} size="w-14 h-14" />
+        <div className="flex-1 min-w-0">
+          <p className="m-0 text-[17px] font-bold text-gray-900 truncate">{userName}</p>
+          <p className="mt-0.5 text-[12px] text-gray-500 truncate">{user.designation ?? user.position ?? userRole}</p>
+          <div className="mt-2 flex gap-1.5 flex-wrap">
+            <span className={`text-[11px] font-semibold rounded-full px-2.5 py-0.5 border ${roleMeta.bg} ${roleMeta.color} ${roleMeta.border}`}>
               {roleMeta.label}
             </span>
-            <span style={{ ...css.chipBase, background: user.status === "active" ? "#DCFCE7" : "#FEF2F2", color: user.status === "active" ? "#16A34A" : "#DC2626", border: `1px solid ${user.status === "active" ? "#86EFAC" : "#FECACA"}` }}>
+            <span className={`text-[11px] font-semibold rounded-full px-2.5 py-0.5 border ${user.status === "active" ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200"}`}>
               {user.status === "active" ? "● Active" : "○ Inactive"}
             </span>
             {user.isverified && (
-              <span style={{ ...css.chipBase, background: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE" }}>✓ Verified</span>
+              <span className="text-[11px] font-semibold rounded-full px-2.5 py-0.5 border bg-blue-50 text-blue-700 border-blue-200">✓ Verified</span>
             )}
           </div>
         </div>
       </div>
-
-      <div style={css.panelDivider} />
-
-      {/* Info grid */}
-      <div style={css.profileGrid}>
+      <div className="h-px bg-gray-200" />
+      <div className="grid grid-cols-2 gap-2.5">
         {rows.map((r, i) => (
-          <div key={i} style={css.profileRow}>
-            <span style={css.profileRowIcon}>{r.icon}</span>
-            <div>
-              <p style={css.profileRowLabel}>{r.label}</p>
-              <p style={css.profileRowValue}>{r.value}</p>
+          <div key={i} className="flex items-start gap-2">
+            <span className="text-sm mt-0.5 flex-shrink-0">{r.icon}</span>
+            <div className="min-w-0">
+              <p className="m-0 text-[10px] text-gray-400 uppercase tracking-wide font-semibold">{r.label}</p>
+              <p className="mt-0.5 text-[12px] text-gray-900 font-semibold truncate">{r.value}</p>
             </div>
           </div>
         ))}
@@ -182,7 +150,6 @@ function ProfilePanel({ user, userName, userRole, roleMeta }) {
   );
 }
 
-// ─── Quick Chips ──────────────────────────────────────────────────────────────
 function QuickChips({ user }) {
   const items = [
     { icon: "🪪", v: user?.uid },
@@ -192,92 +159,108 @@ function QuickChips({ user }) {
   ].filter((c) => c.v);
   if (!items.length) return null;
   return (
-    <div style={css.quickChips}>
+    <div className="flex flex-wrap gap-1.5">
       {items.map((c, i) => (
-        <div key={i} style={css.quickChip}>
-          <span style={{ fontSize: 11 }}>{c.icon}</span>
-          <span style={css.quickChipVal}>{c.v}</span>
+        <div key={i} className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1 text-[11px]">
+          <span>{c.icon}</span>
+          <span className="text-gray-700 font-semibold">{c.v}</span>
         </div>
       ))}
     </div>
   );
 }
 
-// ─── Already Done Screen ──────────────────────────────────────────────────────
+function StatCard({ icon, label, value, sub, accentClass, accentColor }) {
+  return (
+    <div className="bg-white border rounded-2xl p-3 flex flex-col gap-2" style={{ borderColor: accentColor + "40" }}>
+      <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm" style={{ background: accentColor + "15", color: accentColor }}>
+        {icon}
+      </div>
+      <div>
+        <p className={`m-0 font-bold text-sm text-gray-900`} style={{ fontFamily: "'JetBrains Mono', monospace" }}>{value}</p>
+        <p className="mt-0.5 text-[10px] text-gray-500 uppercase tracking-wide">{label}</p>
+        {sub && <p className="mt-0.5 text-[10px] text-gray-400">{sub}</p>}
+      </div>
+    </div>
+  );
+}
+
+function SessionItem({ label, value, accentColor }) {
+  return (
+    <div className="bg-gray-50 rounded-xl p-2.5 border border-gray-100">
+      <p className="m-0 text-[10px] text-gray-400 uppercase tracking-wide">{label}</p>
+      <p className="mt-1 text-[12px] font-semibold truncate" style={{ color: accentColor ?? "#111827", fontFamily: "'JetBrains Mono', monospace" }}>
+        {value || "—"}
+      </p>
+    </div>
+  );
+}
+
 function AlreadyDoneScreen({ attendance }) {
   const statusColor =
     attendance?.status === "present"  ? "#16A34A" :
     attendance?.status === "half_day" ? "#D97706" : "#DC2626";
   const statusLabel =
     attendance?.status === "present"  ? "Present ✓" :
-    attendance?.status === "half_day" ? "Half Day"   : "Absent";
+    attendance?.status === "half_day" ? "Half Day" : "Absent";
 
-  const active   = attendance?.activeMinutes ?? 0;
-  const idle     = attendance?.idleMinutes   ?? 0;
-  const total    = active + idle;
-  const pct      = total > 0 ? Math.round((active / total) * 100) : 0;
-  const activeH  = Math.floor(active / 60);
-  const activeM  = active % 60;
+  const active  = attendance?.activeMinutes ?? 0;
+  const idle    = attendance?.idleMinutes   ?? 0;
+  const total   = active + idle;
+  const pct     = total > 0 ? Math.round((active / total) * 100) : 0;
+  const activeH = Math.floor(active / 60);
+  const activeM = active % 60;
   const activeStr = activeH > 0 ? `${activeH}h ${activeM}m` : `${activeM}m`;
 
   return (
-    <div style={{ ...css.card, textAlign: "center", gap: 18, zIndex: 1 }}>
-      <div style={{ fontSize: 52 }}>✅</div>
+    <div className="bg-white border border-gray-200 rounded-2xl p-5 flex flex-col items-center gap-4 shadow-sm text-center">
+      <div className="text-5xl">✅</div>
       <div>
-        <h2 style={{ ...css.heading, margin: 0 }}>Attendance Complete</h2>
-        <p style={{ ...css.sub, marginTop: 6 }}>Your attendance has been recorded for today.</p>
+        <h2 className="m-0 text-xl font-bold text-gray-900">Attendance Complete</h2>
+        <p className="mt-1.5 text-[13px] text-gray-500">Your attendance has been recorded for today.</p>
       </div>
-
       {attendance?.status && (
-        <div style={{ ...css.bigBadge, background: statusColor + "18", color: statusColor, border: `1px solid ${statusColor}30` }}>
+        <span className="text-sm font-bold rounded-full px-6 py-2 border" style={{ background: statusColor + "18", color: statusColor, borderColor: statusColor + "30" }}>
           {statusLabel}
-        </div>
+        </span>
       )}
-
       {attendance && (
         <>
-          {/* Time row */}
-          <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-            <div style={css.timeChip}>
+          <div className="flex gap-2.5 justify-center flex-wrap w-full">
+            <div className="flex items-center gap-2.5 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5">
               <span>🟢</span>
-              <div>
-                <p style={css.timeChipVal}>{formatTime(attendance.checkIn)}</p>
-                <p style={css.timeChipKey}>Check-in</p>
+              <div className="text-left">
+                <p className="m-0 text-sm font-bold text-gray-900" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{formatTime(attendance.checkIn)}</p>
+                <p className="mt-0.5 text-[10px] text-gray-400">Check-in</p>
               </div>
             </div>
-            <div style={{ ...css.timeChip, background: "#FEF2F2", border: "1px solid #FECACA" }}>
+            <div className="flex items-center gap-2.5 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5">
               <span>🔴</span>
-              <div>
-                <p style={css.timeChipVal}>{formatTime(attendance.checkOut)}</p>
-                <p style={css.timeChipKey}>Check-out</p>
+              <div className="text-left">
+                <p className="m-0 text-sm font-bold text-gray-900" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{formatTime(attendance.checkOut)}</p>
+                <p className="mt-0.5 text-[10px] text-gray-400">Check-out</p>
               </div>
             </div>
           </div>
-
-          {/* Stats */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
-            <div style={css.resultTile}>
-              <p style={{ ...css.resultVal, color: "#16A34A" }}>{activeStr}</p>
-              <p style={css.resultKey}>Active</p>
-            </div>
-            <div style={css.resultTile}>
-              <p style={{ ...css.resultVal, color: "#9CA3AF" }}>{idle}m</p>
-              <p style={css.resultKey}>Idle</p>
-            </div>
-            <div style={css.resultTile}>
-              <p style={{ ...css.resultVal, color: statusColor }}>{pct}%</p>
-              <p style={css.resultKey}>Score</p>
-            </div>
+          <div className="grid grid-cols-3 gap-2.5 w-full">
+            {[
+              { label: "Active", value: activeStr, color: "#16A34A" },
+              { label: "Idle",   value: `${idle}m`, color: "#9CA3AF" },
+              { label: "Score",  value: `${pct}%`,  color: statusColor },
+            ].map((s) => (
+              <div key={s.label} className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-center">
+                <p className="m-0 text-lg font-bold" style={{ color: s.color, fontFamily: "'JetBrains Mono', monospace" }}>{s.value}</p>
+                <p className="mt-1 text-[11px] text-gray-400">{s.label}</p>
+              </div>
+            ))}
           </div>
-
-          <p style={{ margin: 0, fontSize: 12, color: "#9CA3AF" }}>See you tomorrow! 👋</p>
+          <p className="m-0 text-[12px] text-gray-400">See you tomorrow! 👋</p>
         </>
       )}
     </div>
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function AttendancePage() {
   const { data: auth,      isLoading: authLoading  } = useAuth();
   const { data: todayData, isLoading: todayLoading } = useTodayAttendance();
@@ -337,326 +320,236 @@ export default function AttendancePage() {
   }, [handleCheckout]);
 
   const today = new Date().toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-
   const prodColor = productivityStatus === "High" ? "#16A34A" : productivityStatus === "Medium" ? "#D97706" : "#DC2626";
   const actColor  = activityStatus === "active" ? "#16A34A" : "#9CA3AF";
 
-  // ── Loading ─────────────────────────────────────────────────────────────────
   if (authLoading || todayLoading) {
     return (
-      <div style={{ ...css.page, alignItems: "center", justifyContent: "center" }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={css.authSpinner} />
-          <p style={{ color: "#9CA3AF", marginTop: 16, fontSize: 14 }}>Verifying session…</p>
+      <div className="min-h-screen bg-white flex items-center justify-center p-6">
+        <div className="text-center">
+          <div className="w-10 h-10 mx-auto border-[3px] border-gray-200 border-t-[#7B1C3E] rounded-full animate-spin" />
+          <p className="mt-4 text-sm text-gray-400">Verifying session…</p>
         </div>
-        <style>{keyframes}</style>
+        <style>{fonts}</style>
       </div>
     );
   }
 
-  // ── Not logged in ───────────────────────────────────────────────────────────
   if (!auth) {
     return (
-      <div style={{ ...css.page, alignItems: "center", justifyContent: "center" }}>
-        <div style={{ ...css.card, alignItems: "center", textAlign: "center", gap: 16 }}>
-          <span style={{ fontSize: 44 }}>🔒</span>
-          <p style={{ color: "#1F2937", fontWeight: 700, fontSize: 18, margin: 0 }}>Not logged in</p>
-          <p style={{ color: "#6B7280", fontSize: 13, margin: 0 }}>Please log in to access attendance.</p>
+      <div className="min-h-screen bg-white flex items-center justify-center p-6">
+        <div className="bg-white border border-gray-200 rounded-2xl p-8 flex flex-col items-center gap-4 text-center shadow-sm max-w-xs w-full">
+          <span className="text-5xl">🔒</span>
+          <p className="m-0 text-lg font-bold text-gray-900">Not logged in</p>
+          <p className="m-0 text-sm text-gray-500">Please log in to access attendance.</p>
         </div>
-        <style>{keyframes}</style>
+        <style>{fonts}</style>
       </div>
     );
   }
 
-  // ── Post-checkout result (current session) ──────────────────────────────────
   if (checkoutResult) {
     const sc = checkoutResult.status === "present" ? "#16A34A" : checkoutResult.status === "half_day" ? "#D97706" : "#DC2626";
     const sl = checkoutResult.status === "present" ? "Present ✓" : checkoutResult.status === "half_day" ? "Half Day" : "Absent";
+    const am = checkoutResult.activeMinutes ?? 0;
+    const im = checkoutResult.idleMinutes ?? 0;
+    const score = am + im > 0 ? Math.round((am / (am + im)) * 100) : 0;
     return (
-      <div style={css.page}>
-        <BrandStrip />
-        <div style={{ ...css.card, textAlign: "center", gap: 18, zIndex: 1 }}>
-          <div style={{ fontSize: 52 }}>🏁</div>
-          <h2 style={{ ...css.heading, margin: 0 }}>Session Complete</h2>
-          <p style={css.sub}>{today}</p>
-          <div style={{ ...css.bigBadge, background: sc + "18", color: sc, border: `1px solid ${sc}30` }}>{sl}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
-            <div style={css.resultTile}>
-              <p style={{ ...css.resultVal, color: "#16A34A" }}>{checkoutResult.activeMinutes ?? 0}m</p>
-              <p style={css.resultKey}>Active</p>
-            </div>
-            <div style={css.resultTile}>
-              <p style={{ ...css.resultVal, color: "#9CA3AF" }}>{checkoutResult.idleMinutes ?? 0}m</p>
-              <p style={css.resultKey}>Idle</p>
-            </div>
-            <div style={css.resultTile}>
-              <p style={{ ...css.resultVal, color: sc }}>
-                {(checkoutResult.activeMinutes ?? 0) + (checkoutResult.idleMinutes ?? 0) > 0
-                  ? Math.round(((checkoutResult.activeMinutes ?? 0) / ((checkoutResult.activeMinutes ?? 0) + (checkoutResult.idleMinutes ?? 0))) * 100)
-                  : 0}%
-              </p>
-              <p style={css.resultKey}>Score</p>
+      <div className="min-h-screen bg-white" style={{ fontFamily: "'Sora', sans-serif" }}>
+        <div className="max-w-lg mx-auto px-4 py-6 flex flex-col gap-4">
+          <BrandStrip />
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 flex flex-col items-center gap-4 shadow-sm text-center">
+            <div className="text-5xl">🏁</div>
+            <h2 className="m-0 text-xl font-bold text-gray-900">Session Complete</h2>
+            <p className="m-0 text-sm text-gray-500">{today}</p>
+            <span className="text-sm font-bold rounded-full px-6 py-2 border" style={{ background: sc + "18", color: sc, borderColor: sc + "30" }}>{sl}</span>
+            <div className="grid grid-cols-3 gap-2.5 w-full">
+              {[
+                { label: "Active", value: `${am}m`, color: "#16A34A" },
+                { label: "Idle",   value: `${im}m`, color: "#9CA3AF" },
+                { label: "Score",  value: `${score}%`, color: sc },
+              ].map((s) => (
+                <div key={s.label} className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-center">
+                  <p className="m-0 text-lg font-bold" style={{ color: s.color, fontFamily: "'JetBrains Mono', monospace" }}>{s.value}</p>
+                  <p className="mt-1 text-[11px] text-gray-400">{s.label}</p>
+                </div>
+              ))}
             </div>
           </div>
         </div>
-        <style>{keyframes}</style>
+        <style>{fonts}</style>
       </div>
     );
   }
 
-  // ── Already checked out today ───────────────────────────────────────────────
   if (todayData?.isCheckedOut && !isCheckedIn) {
     return (
-      <div style={css.page}>
-        <BrandStrip />
-        <div style={css.header}>
-          <div style={css.userInfo}>
-            <Avatar name={userName} color={roleMeta.color} src={user?.profile_image}
-              onClick={() => setShowProfile(!showProfile)} />
-            <div>
-              <p style={css.greeting}>{getGreeting()}, {userName.split(" ")[0]} 👋</p>
-              <p style={css.date}>{today}</p>
+      <div className="min-h-screen bg-white" style={{ fontFamily: "'Sora', sans-serif" }}>
+        <div className="max-w-lg mx-auto px-4 py-6 flex flex-col gap-4">
+          <BrandStrip />
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <Avatar name={userName} src={user?.profile_image} dotColor={roleMeta.dot} size="w-11 h-11" onClick={() => setShowProfile(!showProfile)} />
+              <div>
+                <p className="m-0 text-base font-bold text-gray-900">{getGreeting()}, {userName.split(" ")[0]} 👋</p>
+                <p className="mt-0.5 text-[11px] text-gray-400">{today}</p>
+              </div>
+            </div>
+            <div className="flex flex-col items-end gap-1.5">
+              <span className={`text-[11px] font-bold rounded-full px-2.5 py-0.5 border uppercase tracking-wide ${roleMeta.bg} ${roleMeta.color} ${roleMeta.border}`}>{roleMeta.label}</span>
+              <span className="text-[12px] font-semibold rounded-full px-3 py-0.5 border bg-green-50 text-green-700 border-green-200">✓ Done</span>
             </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-            <div style={{ ...css.roleBadge, background: roleMeta.color + "15", color: roleMeta.color, border: `1px solid ${roleMeta.color}30` }}>{roleMeta.label}</div>
-            <div style={{ ...css.statusBadge, background: "#DCFCE7", color: "#16A34A", border: "1px solid #86EFAC" }}>✓ Done</div>
-          </div>
+          {showProfile && <ProfilePanel user={user} userName={userName} userRole={userRole} roleMeta={roleMeta} />}
+          <AlreadyDoneScreen attendance={todayData?.attendance} />
         </div>
-        {showProfile && <ProfilePanel user={user} userName={userName} userRole={userRole} roleMeta={roleMeta} />}
-        <AlreadyDoneScreen attendance={todayData?.attendance} />
-        <style>{keyframes}</style>
+        <style>{fonts}</style>
       </div>
     );
   }
 
-  // ── Main view ───────────────────────────────────────────────────────────────
   return (
-    <div style={css.page}>
-      <BrandStrip />
+    <div className="min-h-screen bg-white" style={{ fontFamily: "'Sora', sans-serif" }}>
+      <div className="max-w-lg mx-auto px-4 py-6 flex flex-col gap-4">
 
-      {/* Header */}
-      <div style={css.header}>
-        <div style={css.userInfo}>
-          <Avatar name={userName} color={roleMeta.color} src={user?.profile_image}
-            onClick={() => setShowProfile(!showProfile)} />
-          <div>
-            <p style={css.greeting}>{getGreeting()}, {userName.split(" ")[0]} 👋</p>
-            <p style={css.date}>{today}</p>
+        <BrandStrip />
+
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <Avatar name={userName} src={user?.profile_image} dotColor={roleMeta.dot} size="w-11 h-11" onClick={() => setShowProfile(!showProfile)} />
+            <div>
+              <p className="m-0 text-base font-bold text-gray-900">{getGreeting()}, {userName.split(" ")[0]} 👋</p>
+              <p className="mt-0.5 text-[11px] text-gray-400">{today}</p>
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-1.5">
+            <span className={`text-[11px] font-bold rounded-full px-2.5 py-0.5 border uppercase tracking-wide ${roleMeta.bg} ${roleMeta.color} ${roleMeta.border}`}>{roleMeta.label}</span>
+            <span className={`text-[12px] font-semibold rounded-full px-3 py-0.5 border ${isCheckedIn ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-100 text-gray-400 border-gray-200"}`}>
+              {isCheckedIn ? "● In" : "○ Out"}
+            </span>
           </div>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-          <div style={{ ...css.roleBadge, background: roleMeta.color + "15", color: roleMeta.color, border: `1px solid ${roleMeta.color}30` }}>{roleMeta.label}</div>
-          <div style={{ ...css.statusBadge, ...(isCheckedIn ? css.badgeIn : css.badgeOut) }}>
-            {isCheckedIn ? "● In" : "○ Out"}
+
+        {showProfile && <ProfilePanel user={user} userName={userName} userRole={userRole} roleMeta={roleMeta} />}
+
+        <QuickChips user={user} />
+
+        {(error || locationError) && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-red-600 text-[13px] flex justify-between items-center">
+            <span>⚠ {error || locationError}</span>
+            <button className="bg-transparent border-none text-red-600 cursor-pointer text-base p-0 ml-2" onClick={() => { clearError(); setLocationError(""); }}>✕</button>
           </div>
-        </div>
+        )}
+
+        {showStillWorking && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-amber-800 text-[13px] flex justify-between items-center gap-3">
+            <span>💤 You've been idle for a while. Still working?</span>
+            <button className="bg-[#7B1C3E] text-white border-none rounded-lg px-3 py-1.5 font-bold text-[12px] cursor-pointer whitespace-nowrap" onClick={confirmStillWorking}>
+              Yes, I'm Here
+            </button>
+          </div>
+        )}
+
+        {!isCheckedIn && (
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 flex flex-col gap-4 shadow-sm">
+            <LiveClock />
+            <div className="flex gap-2 justify-center flex-wrap">
+              {["📍 Location", "📸 Selfie", "⏱ Activity tracking"].map((item) => (
+                <span key={item} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-[11px] text-gray-500">{item}</span>
+              ))}
+            </div>
+            <p className="m-0 text-[12px] text-gray-400 text-center leading-relaxed">
+              Attendance is tracked via browser activity, tab focus, and mouse/keyboard events. Activity syncs every 60 seconds automatically.
+            </p>
+            <button
+              onClick={startCheckin}
+              disabled={isLoading}
+              className="w-full text-white border-none rounded-2xl py-4 font-bold text-base cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:-translate-y-0.5 active:translate-y-0"
+              style={{ background: "linear-gradient(135deg, #7B1C3E 0%, #9B2554 100%)", boxShadow: "0 4px 18px rgba(123,28,62,0.28)" }}>
+              {isLoading ? "Checking in…" : "🟢 Check In"}
+            </button>
+          </div>
+        )}
+
+        {isCheckedIn && (
+          <>
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 flex flex-col items-center gap-3 shadow-sm">
+              <div className="relative w-[200px] h-[200px] flex items-center justify-center">
+                <ArcGauge percent={activePercent} color={prodColor} />
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                  <p className="m-0 text-2xl font-bold text-gray-900" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{elapsedTime}</p>
+                  <p className="mt-1 text-[10px] uppercase tracking-widest text-gray-400">Session Time</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-semibold border"
+                style={{ background: actColor + "15", color: actColor, borderColor: actColor + "30" }}>
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse flex-shrink-0" style={{ background: actColor }} />
+                {activityStatus === "active" ? "Active" : "Idle"}
+                {lastPingResult && (
+                  <span className="text-gray-400 font-normal text-[11px]">· last sync {formatTime(lastPingResult.time)}</span>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2.5">
+              <StatCard icon="⚡" label="Active"       value={`${activeMinutes}m`} sub={`${activePercent}%`}       accentColor="#16A34A" />
+              <StatCard icon="💤" label="Idle"         value={`${idleMinutes}m`}   sub={`${100-activePercent}%`}   accentColor="#9CA3AF" />
+              <StatCard icon="🏆" label="Productivity" value={productivityStatus}  sub={`${totalMinutes}m total`}  accentColor={prodColor} />
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col gap-3 shadow-sm">
+              <p className="m-0 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Session Details</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <SessionItem label="Checked in"  value={formatTime(checkInTime)}  accentColor="#16A34A" />
+                <SessionItem label="Active time" value={`${activeMinutes} min`}   accentColor="#16A34A" />
+                <SessionItem label="Idle time"   value={`${idleMinutes} min`}     accentColor="#9CA3AF" />
+                <SessionItem label="Department"  value={user?.department} />
+                <SessionItem label="Location"    value={user?.office_location} />
+                <SessionItem label="Designation" value={user?.designation} />
+              </div>
+              <div className="h-px bg-gray-100" />
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0 animate-pulse" />
+                <span className="text-[11px] text-gray-400 leading-relaxed">Browser activity tracking · Tab focus monitored · Syncing every 60s</span>
+              </div>
+            </div>
+
+            {!checkoutConfirm ? (
+              <button
+                onClick={() => setCheckoutConfirm(true)}
+                disabled={isLoading}
+                className="w-full bg-white text-red-600 border border-red-200 rounded-2xl py-4 font-bold text-base cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:bg-red-50 transition-colors">
+                🔴 Check Out
+              </button>
+            ) : (
+              <div className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col gap-3 shadow-sm">
+                <p className="m-0 text-[15px] font-semibold text-gray-700 text-center">Confirm check out?</p>
+                <p className="m-0 text-[12px] text-red-600 text-center font-medium">⚠ You cannot check in again today after this.</p>
+                <div className="flex gap-2.5">
+                  <button onClick={() => setCheckoutConfirm(false)}
+                    className="flex-1 bg-gray-50 text-gray-500 border border-gray-200 rounded-2xl py-3 font-semibold text-sm cursor-pointer hover:bg-gray-100 transition-colors">
+                    Cancel
+                  </button>
+                  <button onClick={doCheckout} disabled={isLoading}
+                    className="flex-1 bg-white text-red-600 border border-red-200 rounded-2xl py-3 font-bold text-sm cursor-pointer disabled:opacity-50 hover:bg-red-50 transition-colors">
+                    {isLoading ? "Checking out…" : "Yes, Check Out"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {showSelfie && <SelfieCapture onCapture={onSelfieCapture} onCancel={onSelfieCancel} />}
+
       </div>
 
-      {/* Collapsible profile */}
-      {showProfile && <ProfilePanel user={user} userName={userName} userRole={userRole} roleMeta={roleMeta} />}
-
-      {/* Quick chips */}
-      <QuickChips user={user} />
-
-      {/* Error banner */}
-      {(error || locationError) && (
-        <div style={css.errorBanner}>
-          ⚠ {error || locationError}
-          <button style={css.errorClose} onClick={() => { clearError(); setLocationError(""); }}>✕</button>
-        </div>
-      )}
-
-      {/* Still working */}
-      {showStillWorking && (
-        <div style={css.stillWorkingBanner}>
-          <span>💤 You've been idle for a while. Still working?</span>
-          <button style={css.confirmBtn} onClick={confirmStillWorking}>Yes, I'm Here</button>
-        </div>
-      )}
-
-      {/* ── NOT CHECKED IN ── */}
-      {!isCheckedIn && (
-        <div style={{ ...css.card, alignItems: "center", gap: 20, zIndex: 1 }}>
-          <LiveClock />
-          <div style={css.infoRow}>
-            <div style={css.infoItem}>📍 Location</div>
-            <div style={css.infoItem}>📸 Selfie</div>
-            <div style={css.infoItem}>⏱ Activity tracking</div>
-          </div>
-          <p style={css.hint}>
-            Attendance is tracked via browser activity, tab focus, and mouse/keyboard events.
-            Activity syncs every 60 seconds automatically.
-          </p>
-          <button style={{ ...css.primaryBtn, ...(isLoading ? css.btnDisabled : {}) }}
-            onClick={startCheckin} disabled={isLoading}>
-            {isLoading ? "Checking in…" : "🟢 Check In"}
-          </button>
-        </div>
-      )}
-
-      {/* ── CHECKED IN ── */}
-      {isCheckedIn && (
-        <>
-          {/* Gauge card */}
-          <div style={{ ...css.card, alignItems: "center", gap: 12, zIndex: 1 }}>
-            <div style={css.gaugeWrapper}>
-              <ArcGauge percent={activePercent} size={200} strokeWidth={14} color={prodColor} />
-              <div style={css.gaugeCenter}>
-                <p style={css.elapsedTime}>{elapsedTime}</p>
-                <p style={css.elapsedLabel}>Session Time</p>
-              </div>
-            </div>
-            <div style={{ ...css.activityPill, background: actColor + "15", color: actColor, border: `1px solid ${actColor}30` }}>
-              <span style={{ ...css.pulseDot, background: actColor }} />
-              {activityStatus === "active" ? "Active" : "Idle"}
-              {lastPingResult && <span style={css.lastPing}>· last sync {formatTime(lastPingResult.time)}</span>}
-            </div>
-          </div>
-
-          {/* Stats row */}
-          <div style={css.statsRow}>
-            <StatCard icon="⚡" label="Active"       value={`${activeMinutes}m`} sub={`${activePercent}%`}          accent="#16A34A" />
-            <StatCard icon="💤" label="Idle"         value={`${idleMinutes}m`}   sub={`${100 - activePercent}%`}    accent="#9CA3AF" />
-            <StatCard icon="🏆" label="Productivity" value={productivityStatus}  sub={`${totalMinutes}m total`}     accent={prodColor} />
-          </div>
-
-          {/* Session details */}
-          <div style={{ ...css.card, gap: 14, zIndex: 1 }}>
-            <p style={css.sectionLabel}>Session Details</p>
-            <div style={css.sessionGrid}>
-              <SessionItem label="Checked in"  value={formatTime(checkInTime)}       accent="#16A34A" />
-              <SessionItem label="Active time" value={`${activeMinutes} min`}        accent="#16A34A" />
-              <SessionItem label="Idle time"   value={`${idleMinutes} min`}          accent="#9CA3AF" />
-              <SessionItem label="Department"  value={user?.department}              />
-              <SessionItem label="Location"    value={user?.office_location}         />
-              <SessionItem label="Designation" value={user?.designation}             />
-            </div>
-            <div style={css.divider} />
-            <div style={css.trackingNote}>
-              <span style={css.trackingDot} />
-              <span style={css.trackingText}>Browser activity tracking · Tab focus monitored · Syncing every 60s</span>
-            </div>
-          </div>
-
-          {/* Checkout */}
-          {!checkoutConfirm ? (
-            <button style={{ ...css.dangerBtn, ...(isLoading ? css.btnDisabled : {}), zIndex: 1 }}
-              onClick={() => setCheckoutConfirm(true)} disabled={isLoading}>
-              🔴 Check Out
-            </button>
-          ) : (
-            <div style={{ ...css.confirmBox, zIndex: 1 }}>
-              <p style={css.confirmText}>Confirm check out?</p>
-              <p style={{ margin: 0, fontSize: 12, color: "#DC2626", textAlign: "center", fontWeight: 500 }}>
-                ⚠ You cannot check in again today after this.
-              </p>
-              <div style={css.confirmActions}>
-                <button style={css.secondaryBtn} onClick={() => setCheckoutConfirm(false)}>Cancel</button>
-                <button style={{ ...css.dangerBtn, ...(isLoading ? css.btnDisabled : {}) }}
-                  onClick={doCheckout} disabled={isLoading}>
-                  {isLoading ? "Checking out…" : "Yes, Check Out"}
-                </button>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      {showSelfie && <SelfieCapture onCapture={onSelfieCapture} onCancel={onSelfieCancel} />}
-
-      <style>{keyframes}</style>
+      <style>{fonts}</style>
     </div>
   );
 }
 
-// ─── Keyframes ────────────────────────────────────────────────────────────────
-const keyframes = `
+const fonts = `
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Sora:wght@400;500;600;700&display=swap');
-  @keyframes spin    { to { transform: rotate(360deg); } }
-  @keyframes pulse   { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
   @keyframes slideIn { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
 `;
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-const css = {
-  page:         { minHeight: "95vh", background: "#FFFFFF", color: "#1F2937", fontFamily: "'Sora', sans-serif", display: "flex", flexDirection: "column", gap: 14, padding: "24px 20px 48px", maxWidth: 560, margin: "0 auto", position: "relative", border: "2px solid #7B1C3E", borderRadius: 24 },
-  brandStrip:   { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", zIndex: 1 },
-  brandLogo:    { display: "flex", alignItems: "baseline", fontFamily: "'Sora', sans-serif" },
-  brandTorch:   { fontSize: 22, fontWeight: 700, color: "#1F2937", letterSpacing: -0.5 },
-  brandX:       { fontSize: 22, fontWeight: 800, color: "#7B1C3E", letterSpacing: -0.5 },
-  brandSub:     { fontSize: 9, fontWeight: 600, color: "#9CA3AF", letterSpacing: 3, marginLeft: 6, alignSelf: "flex-end", paddingBottom: 2 },
-  brandTagline: { fontSize: 11, color: "#9CA3AF", fontWeight: 500, letterSpacing: 0.3 },
-  header:       { display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 1 },
-  userInfo:     { display: "flex", alignItems: "center", gap: 12 },
-  greeting:     { margin: 0, fontSize: 16, fontWeight: 700, color: "#111827" },
-  date:         { margin: "3px 0 0", fontSize: 11, color: "#6B7280" },
-  roleBadge:    { fontSize: 11, fontWeight: 700, borderRadius: 999, padding: "3px 10px", textTransform: "uppercase", letterSpacing: 1 },
-  statusBadge:  { fontSize: 12, fontWeight: 600, borderRadius: 999, padding: "4px 12px", whiteSpace: "nowrap" },
-  badgeIn:      { background: "#DCFCE7", color: "#16A34A", border: "1px solid #86EFAC" },
-  badgeOut:     { background: "#F3F4F6", color: "#9CA3AF", border: "1px solid #E5E7EB" },
-  chipBase:     { fontSize: 11, fontWeight: 600, borderRadius: 999, padding: "2px 8px", display: "inline-block" },
-  quickChips:   { display: "flex", flexWrap: "wrap", gap: 7, zIndex: 1 },
-  quickChip:    { display: "flex", alignItems: "center", gap: 5, background: "#F9FAFB", border: "1px solid #E5E7EB", borderRadius: 8, padding: "4px 10px", fontSize: 11 },
-  quickChipVal: { color: "#374151", fontWeight: 600 },
-  profilePanel: { background: "#FAFAFA", border: "1px solid #E5E7EB", borderRadius: 18, padding: "18px", display: "flex", flexDirection: "column", gap: 14, zIndex: 1, animation: "slideIn 0.25s ease" },
-  profilePanelHeader: { display: "flex", alignItems: "flex-start", gap: 14 },
-  profilePanelName:   { margin: 0, fontSize: 17, fontWeight: 700, color: "#111827" },
-  profilePanelDesig:  { margin: "3px 0 0", fontSize: 12, color: "#6B7280" },
-  panelDivider: { height: 1, background: "#E5E7EB" },
-  profileGrid:  { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
-  profileRow:   { display: "flex", alignItems: "flex-start", gap: 8 },
-  profileRowIcon:  { fontSize: 14, marginTop: 2, flexShrink: 0 },
-  profileRowLabel: { margin: 0, fontSize: 10, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600 },
-  profileRowValue: { margin: "2px 0 0", fontSize: 12, color: "#111827", fontWeight: 600 },
-  authSpinner:  { width: 40, height: 40, margin: "0 auto", border: "3px solid #E5E7EB", borderTopColor: "#7B1C3E", borderRadius: "50%", animation: "spin 0.8s linear infinite" },
-  errorBanner:  { background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: "12px 16px", color: "#DC2626", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center", animation: "slideIn 0.3s ease", zIndex: 1 },
-  errorClose:   { background: "none", border: "none", color: "#DC2626", cursor: "pointer", fontSize: 16, padding: 0 },
-  stillWorkingBanner: { background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12, padding: "14px 16px", color: "#92400E", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, animation: "slideIn 0.3s ease", zIndex: 1 },
-  confirmBtn:   { background: "#7B1C3E", color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" },
-  card:         { background: "#FFFFFF", border: "1px solid #E5E7EB", borderRadius: 20, padding: "20px", display: "flex", flexDirection: "column", gap: 14, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", zIndex: 1 },
-  clockFace:    { textAlign: "center", background: "#F9FAFB", borderRadius: 16, padding: "20px 32px", border: "1px solid #E5E7EB", width: "100%" },
-  clockTime:    { margin: 0, fontSize: 42, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", letterSpacing: -1, color: "#111827" },
-  clockLabel:   { margin: "4px 0 0", fontSize: 11, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 1.5 },
-  infoRow:      { display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" },
-  infoItem:     { background: "#F9FAFB", border: "1px solid #E5E7EB", borderRadius: 8, padding: "5px 12px", fontSize: 11, color: "#6B7280" },
-  hint:         { margin: 0, fontSize: 12, color: "#9CA3AF", textAlign: "center", lineHeight: 1.65 },
-  gaugeWrapper: { position: "relative", width: 200, height: 200, display: "flex", alignItems: "center", justifyContent: "center" },
-  gaugeCenter:  { position: "absolute", textAlign: "center" },
-  elapsedTime:  { margin: 0, fontSize: 24, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: "#111827" },
-  elapsedLabel: { margin: "4px 0 0", fontSize: 10, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 1.5 },
-  activityPill: { display: "flex", alignItems: "center", gap: 8, borderRadius: 999, padding: "8px 18px", fontSize: 13, fontWeight: 600, alignSelf: "center" },
-  pulseDot:     { width: 7, height: 7, borderRadius: "50%", animation: "pulse 1.5s ease-in-out infinite", flexShrink: 0 },
-  lastPing:     { color: "#9CA3AF", fontWeight: 400, fontSize: 11 },
-  statsRow:     { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, zIndex: 1 },
-  statCard:     { background: "#FFFFFF", border: "1px solid", borderRadius: 14, padding: "12px 10px", display: "flex", flexDirection: "column", gap: 8, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" },
-  statIcon:     { width: 32, height: 32, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 },
-  statValue:    { margin: 0, fontWeight: 700, fontSize: 14, fontFamily: "'JetBrains Mono', monospace", color: "#111827" },
-  statLabel:    { margin: "2px 0 0", fontSize: 10, color: "#6B7280", textTransform: "uppercase", letterSpacing: 0.5 },
-  statSub:      { margin: "2px 0 0", fontSize: 10, color: "#9CA3AF" },
-  sectionLabel: { margin: 0, fontSize: 11, fontWeight: 600, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 1 },
-  sessionGrid:  { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 },
-  sessionItem:  { background: "#F9FAFB", borderRadius: 10, padding: "10px 10px", border: "1px solid" },
-  sessionKey:   { margin: 0, fontSize: 10, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 0.5 },
-  sessionVal:   { margin: "4px 0 0", fontSize: 12, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace" },
-  divider:      { height: 1, background: "#F3F4F6" },
-  trackingNote: { display: "flex", alignItems: "center", gap: 8 },
-  trackingDot:  { width: 6, height: 6, borderRadius: "50%", background: "#16A34A", flexShrink: 0, animation: "pulse 2s ease-in-out infinite" },
-  trackingText: { fontSize: 11, color: "#9CA3AF", lineHeight: 1.5 },
-  primaryBtn:   { width: "100%", background: "linear-gradient(135deg, #7B1C3E 0%, #9B2554 100%)", color: "#fff", border: "none", borderRadius: 14, padding: "15px", fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: "'Sora', sans-serif", boxShadow: "0 4px 18px rgba(123,28,62,0.28)", zIndex: 1 },
-  dangerBtn:    { width: "100%", background: "#FFFFFF", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 14, padding: "15px", fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: "'Sora', sans-serif", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" },
-  secondaryBtn: { flex: 1, background: "#F9FAFB", color: "#6B7280", border: "1px solid #E5E7EB", borderRadius: 14, padding: "13px", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "'Sora', sans-serif" },
-  btnDisabled:  { opacity: 0.5, cursor: "not-allowed" },
-  confirmBox:   { background: "#FFFFFF", border: "1px solid #E5E7EB", borderRadius: 16, padding: "18px", display: "flex", flexDirection: "column", gap: 12, animation: "slideIn 0.2s ease", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" },
-  confirmText:  { margin: 0, fontSize: 15, color: "#374151", textAlign: "center", fontWeight: 600 },
-  confirmActions: { display: "flex", gap: 10 },
-  bigBadge:     { fontSize: 16, fontWeight: 700, borderRadius: 999, padding: "10px 28px", alignSelf: "center" },
-  resultTile:   { background: "#F9FAFB", border: "1px solid #E5E7EB", borderRadius: 12, padding: "12px", textAlign: "center" },
-  resultVal:    { margin: 0, fontWeight: 700, fontSize: 18, fontFamily: "'JetBrains Mono', monospace" },
-  resultKey:    { margin: "4px 0 0", fontSize: 11, color: "#9CA3AF" },
-  timeChip:     { display: "flex", alignItems: "center", gap: 10, background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 12, padding: "10px 16px" },
-  timeChipVal:  { margin: 0, fontSize: 15, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: "#111827" },
-  timeChipKey:  { margin: "2px 0 0", fontSize: 11, color: "#9CA3AF" },
-  heading:      { color: "#111827", fontSize: 22, fontWeight: 700 },
-  sub:          { margin: 0, color: "#6B7280", fontSize: 13 },
-};
