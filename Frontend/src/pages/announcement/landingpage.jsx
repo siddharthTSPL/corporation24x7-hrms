@@ -1224,29 +1224,49 @@ function Testimonials() {
           </div>
 
           {/* Pagination dots: mb = SP.section.sm (48px) */}
- <div
+<div
   style={{
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: '16px',
+    gap: '10px',
     marginBottom: SP.section.sm,
   }}
 >
   <button
-    onClick={() =>Math.max(prev - 1, 0)}
-    style={{
-      width: 32,
-      height: 32,
-      borderRadius: '50%',
-      border: '1px solid #DDB7CB',
-      background: 'transparent',
-      color: P,
-      cursor: 'pointer',
-    }}
-  >
-    ←
-  </button>
+  onClick={() =>
+    setStartIndex(prev => Math.max(prev - 1, 0))
+  }
+  style={{
+    width: '42px',
+    height: '42px',
+    minWidth: '42px',
+    borderRadius: '50%',
+    border: '1.5px solid #DDB7CB',
+    background: '#fff',
+    color: '#730042',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '18px',
+    fontWeight: '400',
+    transition: 'all .3s ease',
+    boxShadow: '0 4px 12px rgba(115,0,66,0.08)'
+  }}
+  onMouseEnter={e => {
+    e.currentTarget.style.background = '#730042';
+    e.currentTarget.style.color = '#fff';
+    e.currentTarget.style.transform = 'translateY(-2px)';
+  }}
+  onMouseLeave={e => {
+    e.currentTarget.style.background = '#fff';
+    e.currentTarget.style.color = '#730042';
+    e.currentTarget.style.transform = 'translateY(0)';
+  }}
+>
+  ←
+</button>
 
   <div
   style={{
@@ -1274,22 +1294,42 @@ function Testimonials() {
     />
   ))}
 </div>
-
-  <button
-    onClick={() => setStartIndex(prev =>
-    Math.min(prev + 1, testimonials.length - 3))}
-    style={{
-      width: 32,
-      height: 32,
-      borderRadius: '50%',
-      border: '1px solid #DDB7CB',
-      background: 'transparent',
-      color: P,
-      cursor: 'pointer',
-    }}
-  >
-    →
-  </button>
+<button
+  onClick={() =>
+    setStartIndex(prev =>
+      Math.min(prev + 1, testimonials.length - 3)
+    )
+  }
+  style={{
+    width: '42px',
+    height: '42px',
+    minWidth: '42px',
+    borderRadius: '50%',
+    border: '1.5px solid #DDB7CB',
+    background: '#fff',
+    color: '#730042',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '18px',
+    fontWeight: '400',
+    transition: 'all .3s ease',
+    boxShadow: '0 4px 12px rgba(115,0,66,0.08)'
+  }}
+  onMouseEnter={e => {
+    e.currentTarget.style.background = '#730042';
+    e.currentTarget.style.color = '#fff';
+    e.currentTarget.style.transform = 'translateY(-2px)';
+  }}
+  onMouseLeave={e => {
+    e.currentTarget.style.background = '#fff';
+    e.currentTarget.style.color = '#730042';
+    e.currentTarget.style.transform = 'translateY(0)';
+  }}
+>
+  →
+</button>
 </div>
           {/* CTA banner: padding SP.section.sm (48px) SP.card.pad (32px) */}
           <div className="testimonial-cta"
