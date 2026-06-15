@@ -11,9 +11,10 @@ const adminAuth = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    if (!decoded.role || decoded.role !== "admin") {
-      return res.status(403).json({ message: "Access denied" });
-    }
+   const adminRoles = ["admin", "senior_admin", "official"];
+if (!decoded.role || !adminRoles.includes(decoded.role)) {
+  return res.status(403).json({ message: "Access denied" });
+}
 
     const admin = await AdminModel.findById(decoded.adminid).select("-password");
 
@@ -34,6 +35,7 @@ const adminAuth = async (req, res, next) => {
     }
 
     req.admin = admin;
+    req.user = admin;
     next();
   } catch (error) {
     return res.status(401).json({ message: "Invalid token" });
