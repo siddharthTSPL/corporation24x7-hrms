@@ -27,6 +27,7 @@ const authmanager = async (req, res, next) => {
     }
 
     req.manager = manager;
+    req.user = manager;
     next();
 
   } catch (error) {
