@@ -8,51 +8,37 @@ const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message =
-      error.response?.data?.message || "Something went wrong";
-
+    const message = error.response?.data?.message || "Something went wrong";
     if (error.response?.status === 401) {
       return Promise.reject(null);
     }
-
     return Promise.reject(new Error(message));
   }
 );
 
-// Upload Document
 export const uploadDocument = async (data) => {
   const res = await api.post("user/upload", data, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
+    headers: { "Content-Type": "multipart/form-data" },
   });
-
   return res.data;
 };
 
-// Get My Documents
 export const getDocuments = async () => {
   const res = await api.get("user/documents");
   return res.data;
 };
 
-// Edit Document
 export const editDocument = async ({ id, data }) => {
   const res = await api.put(`user/documents/${id}`, data, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
+    headers: { "Content-Type": "multipart/form-data" },
   });
-
   return res.data;
 };
-
 
 export const deleteDocument = async (id) => {
   const res = await api.delete(`user/documents/${id}`);
   return res.data;
 };
-
 
 export const fetchOrgInfo = async () => {
   const res = await api.get("user/getOrgInfo");

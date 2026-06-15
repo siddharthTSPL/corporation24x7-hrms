@@ -9,9 +9,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const message = error.response?.data?.message || 'Something went wrong';
-    if (error.response?.status === 401) {
-      return Promise.reject(null);
-    }
+    if (error.response?.status === 401) return Promise.reject(null);
     return Promise.reject(new Error(message));
   }
 );
@@ -28,6 +26,10 @@ const roleToEndpoint = {
 export const fetchMyPermissions = async (role) => {
   const endpoint = roleToEndpoint[role];
   if (!endpoint) return null;
-  const res = await api.get(`permissions/me/${endpoint}`);
-  return res.data.data;
+  try {
+    const res = await api.get(`permission/me/${endpoint}`);
+    return res.data.data;
+  } catch {
+    return null;
+  }
 };
