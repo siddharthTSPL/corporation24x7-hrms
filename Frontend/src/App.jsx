@@ -58,6 +58,9 @@ const EmployeeComplaints = lazy(() => import("./pages/ticketpage/emticket"));
 const ManagerComplaints = lazy(() => import("./pages/ticketpage/maticket"));
 const Managerrecruitment = lazy(() => import("./pages/recruitment/recruitmentma"));
 const Adminrecruitment = lazy(() => import("./pages/recruitment/recruitmentad"));
+const Managerdocument = lazy(() => import("./pages/document/managerdocument"));
+const Admindocument = lazy(() => import("./pages/document/admindocument"));
+const Adminteamdocument = lazy(() => import("./pages/document/adminteamdocument"));
 
 function PageSkeleton() {
   const [animationData, setAnimationData] = useState(null);
@@ -89,14 +92,7 @@ function PageSkeleton() {
           style={{ height: "140px", width: "140px" }}
         />
       ) : (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 12,
-          }}
-        >
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
           <style>{`@keyframes _spin { to { transform: rotate(360deg); } }`}</style>
           <div
             style={{
@@ -108,14 +104,7 @@ function PageSkeleton() {
               animation: "_spin 0.7s linear infinite",
             }}
           />
-          <span
-            style={{
-              fontSize: 13,
-              color: "rgba(255,255,255,.7)",
-              fontFamily: "sans-serif",
-              letterSpacing: "0.05em",
-            }}
-          >
+          <span style={{ fontSize: 13, color: "rgba(255,255,255,.7)", fontFamily: "sans-serif", letterSpacing: "0.05em" }}>
             Loading…
           </span>
         </div>
@@ -157,6 +146,7 @@ function App() {
             }
           />
 
+          {/* ── Admin / Manager / Employee routes ── */}
           <Route
             element={
               <ProtectedRoute allowedRoles={["admin", "manager", "employee"]}>
@@ -164,38 +154,142 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route path="/dashboard" element={<Dashboard />} />
+            {/* No permission required */}
+            <Route path="/dashboard"          element={<Dashboard />} />
             <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
-            <Route path="/manager-dashboard" element={<Managerdashboard />} />
-            <Route path="/employee" element={<EmployeeTable />} />
-            <Route path="/leave-manager" element={<LeaveTablema />} />
-            <Route path="/leave-employee" element={<LeaveTableem />} />
-            <Route path="/leave-admin" element={<LeaveTablead />} />
-            <Route path="/leave" element={<LeaveTable />} />
-            <Route path="/announcement" element={<Announce />} />
-            <Route path="/announcement-employee" element={<Announceem />} />
-            <Route path="/announcement-manager" element={<Announcema />} />
-            <Route path="/document" element={<Doc />} />
-            <Route path="/document-manager" element={<Docma />} />
-            <Route path="/file" element={<File />} />
-            <Route path="/file-employee" element={<Fileem />} />
-            <Route path="/file-manager" element={<Filema />} />
-            <Route path="/settings" element={<Set />} />
-            <Route path="/settings-employee" element={<Setem />} />
-            <Route path="/settings-manager" element={<Setma />} />
-            <Route path="/organisation" element={<Organisation />} />
+            <Route path="/manager-dashboard"  element={<Managerdashboard />} />
+            <Route path="/employee"           element={<EmployeeTable />} />
+            <Route path="/leave-manager"      element={<LeaveTablema />} />
+            <Route path="/leave-employee"     element={<LeaveTableem />} />
+            <Route path="/leave-admin"        element={<LeaveTablead />} />
+            <Route path="/leave"              element={<LeaveTable />} />
+            <Route path="/file"               element={<File />} />
+            <Route path="/file-employee"      element={<Fileem />} />
+            <Route path="/file-manager"       element={<Filema />} />
+            <Route path="/settings"           element={<Set />} />
+            <Route path="/settings-employee"  element={<Setem />} />
+            <Route path="/settings-manager"   element={<Setma />} />
+            <Route path="/organisation"         element={<Organisation />} />
             <Route path="/organisation-employee" element={<Organisationem />} />
-            <Route path="/organisation-manager" element={<Organisationma />} />
-            <Route path="/review-admin" element={<Reviewad />} />
-            <Route path="/review-manager" element={<Reviewma />} />
-            <Route path="/mark-attendance" element={<Attendancepage />} />
-            <Route path="/admin-complaints" element={<AdminComplaints />} />
-            <Route path="/manager-complaints" element={<ManagerComplaints />} />
-            <Route path="/employee-complaints" element={<EmployeeComplaints />} />
-            <Route path="/manager/recruitment" element={<Managerrecruitment />} />
-            <Route path="/recruitment-admin" element={<Adminrecruitment />} />
+            <Route path="/organisation-manager"  element={<Organisationma />} />
+            <Route path="/review-admin"       element={<Reviewad />} />
+            <Route path="/review-manager"     element={<Reviewma />} />
+            <Route path="/mark-attendance"    element={<Attendancepage />} />
+
+            {/* ── Announcements — requires can_view_announcements ── */}
+            <Route
+              path="/announcement"
+              element={
+                <ProtectedRoute permission="announcements.can_view_announcements">
+                  <Announce />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/announcement-employee"
+              element={
+                <ProtectedRoute permission="announcements.can_view_announcements">
+                  <Announceem />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/announcement-manager"
+              element={
+                <ProtectedRoute permission="announcements.can_view_announcements">
+                  <Announcema />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ── Documents — requires can_view_all_documents ── */}
+            <Route
+              path="/document"
+              element={
+                <ProtectedRoute permission="documents.can_view_all_documents">
+                  <Doc />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/document-manager"
+              element={
+                <ProtectedRoute permission="documents.can_view_all_documents">
+                  <Managerdocument />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/document-admin"
+              element={
+                <ProtectedRoute permission="documents.can_view_all_documents">
+                  <Admindocument />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/document-admin-team"
+              element={
+                <ProtectedRoute permission="documents.can_view_all_documents">
+                  <Adminteamdocument />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ── Tickets — requires can_raise_ticket ── */}
+            <Route
+              path="/admin-complaints"
+              element={
+                <ProtectedRoute permission="tickets.can_raise_ticket">
+                  <AdminComplaints />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/manager-complaints"
+              element={
+                <ProtectedRoute permission="tickets.can_raise_ticket">
+                  <ManagerComplaints />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/employee-complaints"
+              element={
+                <ProtectedRoute permission="tickets.can_raise_ticket">
+                  <EmployeeComplaints />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ── Recruitment — requires can_view_hiring_requisitions ── */}
+            <Route
+              path="/recruitment-admin"
+              element={
+                <ProtectedRoute permission="recruitment.can_view_hiring_requisitions">
+                  <Adminrecruitment />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/recruitment-manager"
+              element={
+                <ProtectedRoute permission="recruitment.can_view_hiring_requisitions">
+                  <Managerrecruitment />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/manager/recruitment"
+              element={
+                <ProtectedRoute permission="recruitment.can_view_hiring_requisitions">
+                  <Managerrecruitment />
+                </ProtectedRoute>
+              }
+            />
           </Route>
 
+          {/* ── SuperAdmin routes ── */}
           <Route
             element={
               <ProtectedRoute allowedRoles={["superadmin"]}>
@@ -203,14 +297,14 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route path="/superadmin-dashboard" element={<SuperAdminDashboard />} />
-            <Route path="/superadmin-organisations" element={<SuperAdminOrganisations />} />
-            <Route path="/superadmin-announcements" element={<SuperAdminAnnouncements />} />
-            <Route path="/superadmin-leaves" element={<SuperAdminLeaves />} />
-            <Route path="/superadmin-reviews" element={<SuperAdminReviews />} />
-            <Route path="/superadmin-settings" element={<SuperAdminSettings />} />
-            <Route path="/superadmin-documents" element={<SuperAdminDocuments />} />
-            <Route path="/superadmin-complaints" element={<SuperAdminComplaints />} />
+            <Route path="/superadmin-dashboard"      element={<SuperAdminDashboard />} />
+            <Route path="/superadmin-organisations"  element={<SuperAdminOrganisations />} />
+            <Route path="/superadmin-announcements"  element={<SuperAdminAnnouncements />} />
+            <Route path="/superadmin-leaves"         element={<SuperAdminLeaves />} />
+            <Route path="/superadmin-reviews"        element={<SuperAdminReviews />} />
+            <Route path="/superadmin-settings"       element={<SuperAdminSettings />} />
+            <Route path="/superadmin-documents"      element={<SuperAdminDocuments />} />
+            <Route path="/superadmin-complaints"     element={<SuperAdminComplaints />} />
           </Route>
         </Routes>
       </Suspense>

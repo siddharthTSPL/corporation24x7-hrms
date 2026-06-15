@@ -25,6 +25,7 @@ const authMiddleware = (req, res, next) => {
       decoded.id        ||
       decoded.userId    ||
       decoded.managerid ||
+      decoded.adminid   ||
       decoded.user?._id ||
       null;
 
@@ -43,4 +44,4 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
-module.exports = authMiddleware; 
+module.exports = authMiddleware;
