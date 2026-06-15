@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useGetAnnouncements } from "../../auth/server-state/employee/employeeannounce/employeeannounce.hook";
 import { useGetMeUser } from "../../auth/server-state/employee/employeeauth/employeeauth.hook";
 import { useGetAllLeaveHistory } from "../../auth/server-state/employee/employeeleave/employeeleave.hook";
-import { useGetAttendance } from "../../auth/server-state/employee/employeeother/employeeother.hook";
+import { useGetAttendance } from "../../auth/server-state/attendance/attendance.hook";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS = ["S","M","T","W","T","F","S"];
