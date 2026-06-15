@@ -712,7 +712,7 @@ export default function EmployeeDashboard() {
         </div>
 
         {/* Attendance — full width */}
-        <div className="mb-3.5 max-w-5xl mx-auto">
+        <div className="mb-3.5">
           <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative animate-fadein hover:shadow-lg transition-shadow" style={{ animationDelay:".2s" }}>
             <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between border-b border-[#ede5e0] flex-wrap gap-2">
               <span className="text-[12px] font-semibold font-sans">Attendance</span>
