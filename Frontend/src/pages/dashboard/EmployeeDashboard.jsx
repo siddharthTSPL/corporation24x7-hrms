@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useGetAnnouncements } from "../../auth/server-state/employee/employeeannounce/employeeannounce.hook";
 import { useGetMeUser } from "../../auth/server-state/employee/employeeauth/employeeauth.hook";
 import { useGetAllLeaveHistory } from "../../auth/server-state/employee/employeeleave/employeeleave.hook";
 import { useGetAttendance } from "../../auth/server-state/employee/employeeother/employeeother.hook";
@@ -36,10 +35,6 @@ function timeAgo(iso) {
   if (diff<86400000) return "Today";
   if (diff<172800000) return "Yesterday";
   return `${Math.floor(diff/86400000)}d ago`;
-}
-
-function stripMarkdown(text="") {
-  return text.replace(/\*\*(.*?)\*\*/g,"$1").replace(/^[\*\-]\s+/gm,"").replace(/\n+/g," ").trim().slice(0,90)+(text.length>90?"…":"");
 }
 
 function fmtDate(iso) {
@@ -299,34 +294,6 @@ function DOJCard({ joiningDate }) {
   );
 }
 
-function AnnouncementItem({ ann }) {
-  const isHigh=ann.priority==="high";
-  const isExpired=ann.expiresAt && new Date(ann.expiresAt)<new Date();
-  const dotColor=isHigh?"#E24B4A":ann.priority==="medium"?"#BA7517":"#730042";
-  return (
-    <div className={`flex gap-2.5 py-3 border-b border-[#f0e8e4] last:border-0 items-start ${isExpired?"opacity-45":""}`}>
-      <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-[5px]" style={{ background:dotColor,
-        boxShadow:isHigh?"0 0 0 3px rgba(226,75,74,0.15)":"none" }} />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-          <span className="text-[12px] font-medium text-[#2a1a16] font-sans">{ann.title}</span>
-          <Badge variant={isHigh?"red":ann.priority==="medium"?"amber":"green"}>{ann.priority}</Badge>
-        </div>
-        <div className="text-[11px] text-[#b0948a] leading-relaxed mb-1 font-sans">{stripMarkdown(ann.message)}</div>
-        <div className="flex gap-2 items-center flex-wrap">
-          <span className="text-[10px] text-[#c9bab5] font-sans">{timeAgo(ann.createdAt)}</span>
-          {ann.expiresAt && (
-            <span className={`text-[10px] font-sans ${isExpired?"text-[#E24B4A]":"text-[#b0948a]"}`}>
-              {isExpired?"Expired":`Expires ${new Date(ann.expiresAt).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}`}
-            </span>
-          )}
-          {ann.audience && <Badge variant={ann.audience==="all"?"blue":"brand"}>{ann.audience}</Badge>}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function TodayBanner({ isOnLeave, leaveType, onCheckIn }) {
   const today=new Date();
   const day=today.toLocaleDateString("en-IN",{weekday:"long"});
@@ -508,14 +475,12 @@ export default function EmployeeDashboard() {
   const navigate=useNavigate();
 
   const { data:meData, isLoading:meLoading, isError:meError }=useGetMeUser();
-  const { data:annData, isLoading:annLoading }=useGetAnnouncements();
   const { data:histData, isLoading:histLoading }=useGetAllLeaveHistory();
   const { data:attData, isLoading:attLoading }=useGetAttendance();
 
   const employee=meData?.employee??null;
   const lb=meData?.leavebalance??null;
   const allLeaves=histData?.leaves??[];
-  const announcements=annData?.announcements??[];
   const reviews=meData?.reviews??meData?.review??[];
 
   const joiningDate=employee?.date_of_joining??employee?.createdAt??null;
@@ -616,9 +581,6 @@ export default function EmployeeDashboard() {
               <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
                 <path d="M7.5 1.5a4 4 0 0 0-4 4V7L2 8.5V9.5h11V8.5L11.5 7V5.5a4 4 0 0 0-4-4zM7.5 13.5a1.5 1.5 0 0 1-1.5-1.5h3a1.5 1.5 0 0 1-1.5 1.5z" fill="#730042"/>
               </svg>
-              {announcements.filter(a=>a.priority==="high").length>0 && (
-                <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 border-2 border-[#f9f8f2]" />
-              )}
             </div>
             <div className="relative">
               <Avatar
@@ -749,11 +711,9 @@ export default function EmployeeDashboard() {
           </div>
         </div>
 
-        {/* Attendance + Announcements */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 mb-3.5">
-
-          {/* Attendance */}
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative animate-fadein hover:shadow-lg transition-shadow" style={{ animationDelay:".2s" }}>
+        {/* Attendance — full width */}
+        <div className="mb-3.5 max-w-5xl mx-auto">
+          <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative animate-fadein hover:shadow-lg transition-shadow" style={{ animationDelay:".2s" }}>
             <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between border-b border-[#ede5e0] flex-wrap gap-2">
               <span className="text-[12px] font-semibold font-sans">Attendance</span>
               <div className="flex items-center gap-2 flex-wrap">
@@ -772,7 +732,10 @@ export default function EmployeeDashboard() {
                   <span className="text-[10px] text-[#b0948a] font-sans">Joined {fmtDate(joiningDate)} · days before this are not counted</span>
                 </div>
               )}
-              <Calendar month={selectedMonth} joiningDate={joiningDate} attendanceMap={attendanceMap} approvedLeaves={approvedLeaves} />
+              {/* Calendar: constrained width on large screens so it doesn't stretch too wide */}
+              <div className="max-w-2xl mx-auto">
+                <Calendar month={selectedMonth} joiningDate={joiningDate} attendanceMap={attendanceMap} approvedLeaves={approvedLeaves} />
+              </div>
             </div>
             <div className="grid grid-cols-5 border-t border-[#f0e8e4] mt-3">
               {[[presentCount,"#730042","Present"],[absentCount,"#E24B4A","Absent"],[halfCount,"#BA7517","Half/Late"],[checkedInCount,"#1D9E75","Active Now"],[`${attendanceRate}%`,"#378ADD","Rate"]].map(([v,c,l]) => (
@@ -788,32 +751,6 @@ export default function EmployeeDashboard() {
                   <div className="w-2 h-2 rounded-sm" style={{ background:c }} />{l}
                 </div>
               ))}
-            </div>
-          </div>
-
-          {/* Announcements */}
-          <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative animate-fadein hover:shadow-lg transition-shadow" style={{ animationDelay:".25s" }}>
-            <CardAccent color="#BA7517" />
-            <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between border-b border-[#ede5e0]">
-              <span className="text-[12px] font-semibold font-sans">Announcements</span>
-              <div className="flex items-center gap-1.5">
-                {announcements.filter(a=>a.priority==="high").length>0 && (
-                  <Badge variant="red">{announcements.filter(a=>a.priority==="high").length} urgent</Badge>
-                )}
-                <span className="text-[11px] text-[#b0948a] font-sans">{announcements.length}</span>
-              </div>
-            </div>
-            <div className="px-4 sm:px-5 overflow-y-auto" style={{ maxHeight:340 }}>
-              {annLoading
-                ? [1,2,3].map(i => (
-                    <div key={i} className="py-3 border-b border-[#f0e8e4] flex flex-col gap-1.5">
-                      <Skeleton className="h-3 w-3/5" /><Skeleton className="h-2.5 w-4/5" /><Skeleton className="h-2.5 w-2/5" />
-                    </div>
-                  ))
-                : announcements.length>0
-                  ? [...announcements].sort((a,b)=>({high:0,medium:1,low:2}[a.priority]??3)-({high:0,medium:1,low:2}[b.priority]??3)).map(a=><AnnouncementItem key={a._id} ann={a} />)
-                  : <div className="py-10 text-center text-[12px] text-[#b0948a] font-sans">No announcements</div>
-              }
             </div>
           </div>
         </div>
