@@ -3,9 +3,9 @@ import { useState, useRef, useEffect } from "react";
 import {
   FaEdit, FaTrash, FaSearch, FaFilter, FaTimes, FaUserTie, FaUserPlus,
   FaChevronLeft, FaChevronRight, FaFileExcel, FaArrowUp, FaArrowDown,
-  FaExchangeAlt, FaEllipsisV, FaEnvelope, FaPhone, FaBuilding,
-  FaMapMarkerAlt, FaIdCard, FaStar, FaUser, FaBriefcase,
-  FaUniversity, FaFileAlt, FaShieldAlt,
+  FaEllipsisV, FaEnvelope, FaPhone, FaBuilding, FaMapMarkerAlt, FaIdCard,
+  FaStar, FaUser, FaBriefcase, FaUniversity, FaFileAlt, FaShieldAlt,
+  FaLock, FaToggleOn, FaToggleOff, FaKey,
 } from "react-icons/fa";
 import {
   useAddManager, useAddEmployee, useFindAllManagers,
@@ -14,9 +14,15 @@ import {
   useGetAllEmployee, useDeleteUser, useEditEmployee, useEditManager,
   usePromoteEmployeeToManager, usePromoteEmployeeToAdmin, usePromoteManagerToAdmin,
   useDemoteManagerToEmployee, useDemoteAdminToManager, useDemoteAdminToEmployee,
-  useChangeManagerRole, useGetParticularEmployee, useGetParticularManager,
+  useGetParticularEmployee, useGetParticularManager,
 } from "../../auth/server-state/adminother/adminother.hook";
 import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
+import axios from "axios";
+
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/",
+  withCredentials: true,
+});
 
 const DEPARTMENTS = ["OPR", "BPO", "ENG", "MGMT", "HR"];
 const LOCATIONS = ["Noida", "Bareilly", "Delhi", "Mumbai"];
@@ -46,6 +52,20 @@ const EMPTY_MGR = {
   account_number:"",ifsc_code:"",resume:"",aadhaar_card:"",pan_card:"",experience_letter:"",
 };
 
+const DEFAULT_PERMISSIONS = {
+  announcements:{can_view_announcements:true,can_create_announcement:false,can_edit_announcement:false,can_delete_announcement:false},
+  documents:{can_upload_documents:true,can_view_all_documents:false},
+  tickets:{can_raise_ticket:true,can_view_all_tickets:false,can_resolve_ticket:false,can_rate_ticket:true},
+  recruitment:{can_view_hiring_requisitions:false,can_create_hiring_requisition:false,can_view_candidates:false,can_add_candidate:false},
+};
+
+const ADMIN_PERMISSIONS = {
+  announcements:{can_view_announcements:true,can_create_announcement:true,can_edit_announcement:true,can_delete_announcement:true},
+  documents:{can_upload_documents:true,can_view_all_documents:true},
+  tickets:{can_raise_ticket:true,can_view_all_tickets:true,can_resolve_ticket:true,can_rate_ticket:true},
+  recruitment:{can_view_hiring_requisitions:true,can_create_hiring_requisition:true,can_view_candidates:true,can_add_candidate:true},
+};
+
 const EMP_STEPS = [
   {label:"Basic Info",icon:"👤"},
   {label:"Work",icon:"💼"},
@@ -53,12 +73,23 @@ const EMP_STEPS = [
   {label:"Identity",icon:"🪪"},
   {label:"Experience",icon:"📋"},
   {label:"Bank & Docs",icon:"🏦"},
+  {label:"Permissions",icon:"🔐"},
 ];
 
 const inputCls =
   "w-full px-3 py-2.5 rounded-lg border border-[#F4C0D1] bg-[#F9F8F2] text-sm text-[#730042] " +
   "focus:outline-none focus:border-[#CD166E] focus:ring-2 focus:ring-[#CD166E]/20 transition-all placeholder-[#993556]/50 " +
   "font-['DM_Sans',system-ui,sans-serif]";
+
+const PWD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^[6-9]\d{9}$/;
+const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+const AADHAAR_REGEX = /^\d{12}$/;
+const PINCODE_REGEX = /^\d{6}$/;
+const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+const ACCOUNT_REGEX = /^\d{9,18}$/;
+const URL_REGEX = /^https?:\/\/.+/;
 
 function exportToCSV(data) {
   const headers = [
@@ -146,9 +177,71 @@ function InfoRow({icon,label,value}){
   );
 }
 
+function PermissionToggle({label,value,onChange}){
+  return(
+    <div className="flex items-center justify-between py-1.5">
+      <span className="text-xs text-[#730042] font-medium">{label}</span>
+      <button type="button" onClick={()=>onChange(!value)} className="transition-colors">
+        {value
+          ?<FaToggleOn size={22} className="text-[#CD166E]"/>
+          :<FaToggleOff size={22} className="text-[#F4C0D1]"/>
+        }
+      </button>
+    </div>
+  );
+}
+
+function PermissionsPanel({perms,onChange}){
+  const sections=[
+    {key:"announcements",label:"Announcements",fields:[
+      {k:"can_view_announcements",label:"View"},
+      {k:"can_create_announcement",label:"Create"},
+      {k:"can_edit_announcement",label:"Edit"},
+      {k:"can_delete_announcement",label:"Delete"},
+    ]},
+    {key:"documents",label:"Documents",fields:[
+      {k:"can_upload_documents",label:"Upload"},
+      {k:"can_view_all_documents",label:"View All"},
+    ]},
+    {key:"tickets",label:"Tickets",fields:[
+      {k:"can_raise_ticket",label:"Raise"},
+      {k:"can_view_all_tickets",label:"View All"},
+      {k:"can_resolve_ticket",label:"Resolve"},
+      {k:"can_rate_ticket",label:"Rate"},
+    ]},
+    {key:"recruitment",label:"Recruitment",fields:[
+      {k:"can_view_hiring_requisitions",label:"View Requisitions"},
+      {k:"can_create_hiring_requisition",label:"Create Requisition"},
+      {k:"can_view_candidates",label:"View Candidates"},
+      {k:"can_add_candidate",label:"Add Candidate"},
+    ]},
+  ];
+  return(
+    <div className="col-span-2 space-y-3">
+      {sections.map((sec)=>(
+        <div key={sec.key} className="rounded-xl border border-[#F4C0D1] overflow-hidden">
+          <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[#993556]" style={{background:"#FBEAF0"}}>
+            {sec.label}
+          </div>
+          <div className="px-3 divide-y divide-[#F4C0D1]/50">
+            {sec.fields.map((f)=>(
+              <PermissionToggle
+                key={f.k}
+                label={f.label}
+                value={perms?.[sec.key]?.[f.k]??false}
+                onChange={(v)=>onChange(sec.key,f.k,v)}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ReportingManagerSelect({value,onChange,managers,allEmployees,label="Reporting Manager",name="reporting_manager"}){
   const managers_list=managers?.managers??[];
-  const admins_list=(allEmployees??[]).filter((u)=>u.role==="admin");
+  const admins_list=(allEmployees??[]).filter((u)=>["admin","senior_admin"].includes(u.role));
   return(
     <Field label={label}>
       <select name={name} value={value} onChange={onChange} className={inputCls}>
@@ -172,9 +265,73 @@ function ReportingManagerSelect({value,onChange,managers,allEmployees,label="Rep
   );
 }
 
-function AccountSummaryDrawer({userId,userRole,onClose,onEdit,onDelete,onPromoteToManager,onPromoteToAdmin,onDemoteToEmployee,onDemoteToManager,onDemoteToEmployee2,onChangeRole,managers,allEmployees,currentAdminId}){
+function PermissionsDrawer({userId,userModel,onClose}){
+  const [perms,setPerms]=useState(null);
+  const [loading,setLoading]=useState(true);
+  const [saving,setSaving]=useState(false);
+  const [msg,setMsg]=useState("");
+  useEffect(()=>{
+    api.get(`permission/admin/${userModel}/${userId}`)
+      .then((r)=>setPerms(r.data.data))
+      .catch(()=>setPerms({...DEFAULT_PERMISSIONS}))
+      .finally(()=>setLoading(false));
+  },[userId,userModel]);
+  const handleToggle=(section,key,val)=>{
+    setPerms((p)=>({...p,[section]:{...p[section],[key]:val}}));
+  };
+  const handleSave=async()=>{
+    setSaving(true);
+    try{
+      await api.post("permission/assign/admin",{user_id:userId,user_model:userModel,permissions:perms});
+      setMsg("Permissions saved successfully");
+      setTimeout(()=>setMsg(""),2500);
+    }catch(e){
+      setMsg(e?.response?.data?.message||"Failed to save permissions");
+      setTimeout(()=>setMsg(""),2500);
+    }finally{setSaving(false);}
+  };
+  return(
+    <div className="fixed inset-0 z-[60] flex" onClick={(e)=>e.target===e.currentTarget&&onClose()}>
+      <div className="flex-1" onClick={onClose}/>
+      <div className="w-full max-w-xs bg-white shadow-2xl flex flex-col border-l border-[#F4C0D1] h-full overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#F4C0D1] flex-shrink-0" style={{background:"#F9F8F2"}}>
+          <div className="flex items-center gap-2">
+            <FaKey size={12} className="text-[#CD166E]"/>
+            <p className="text-sm font-bold text-[#730042]">Manage Permissions</p>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-[#993556] hover:bg-[#FBEAF0]">
+            <FaTimes size={12}/>
+          </button>
+        </div>
+        {loading?(
+          <div className="flex-1 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full border-2 border-[#CD166E] border-t-transparent animate-spin"/>
+          </div>
+        ):(
+          <>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              <div className="flex gap-2 mb-3">
+                <button onClick={()=>setPerms({...ADMIN_PERMISSIONS})} className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-[#F4C0D1] text-[#730042] hover:bg-[#FBEAF0]">Set All On</button>
+                <button onClick={()=>setPerms({...DEFAULT_PERMISSIONS})} className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-[#F4C0D1] text-[#730042] hover:bg-[#FBEAF0]">Reset Default</button>
+              </div>
+              {perms&&<PermissionsPanel perms={perms} onChange={handleToggle}/>}
+            </div>
+            <div className="px-4 py-3 border-t border-[#F4C0D1] flex-shrink-0 bg-[#F9F8F2]">
+              {msg&&<p className={`text-xs mb-2 text-center font-medium ${msg.includes("success")?"text-[#065F46]":"text-[#A32D2D]"}`}>{msg}</p>}
+              <button onClick={handleSave} disabled={saving} className="w-full py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-60 transition-all hover:opacity-90" style={{background:"#730042"}}>
+                {saving?"Saving…":"Save Permissions"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AccountSummaryDrawer({userId,userRole,onClose,onEdit,onDelete,onPromoteToManager,onPromoteToAdmin,onDemoteToEmployee,onDemoteToManager,onDemoteToEmployee2,managers,allEmployees,currentAdminId}){
   const isManager=userRole==="manager"||userRole==="senior_manager";
-  const isAdmin=userRole==="admin";
+  const isAdmin=userRole==="admin"||userRole==="senior_admin"||userRole==="official";
   const empQuery=useGetParticularEmployee(!isManager&&!isAdmin?userId:null);
   const mgrQuery=useGetParticularManager(isManager?userId:null);
   const data=isManager?mgrQuery.data:empQuery.data;
@@ -183,210 +340,215 @@ function AccountSummaryDrawer({userId,userRole,onClose,onEdit,onDelete,onPromote
   const leaveBalance=data?.leaveBalance;
   const reviews=data?.reviews||[];
   const [tab,setTab]=useState("info");
-
+  const [showPermissions,setShowPermissions]=useState(false);
+  const avgRating=reviews.length?reviews.reduce((s,r)=>s+(r.rating||0),0)/reviews.length:null;
+  const isSelf=currentAdminId&&userId&&currentAdminId===userId;
+  const userModel=isAdmin?"Admin":isManager?"Manager":"User";
   const roleBadgeEl=(r)=>{
     if(r==="manager")return<Badge label="Manager" type="manager"/>;
     if(r==="senior_manager")return<Badge label="Sr. Manager" type="smgr"/>;
-    if(r==="admin")return<Badge label="Admin" type="admin"/>;
+    if(r==="admin"||r==="senior_admin")return<Badge label="Admin" type="admin"/>;
     if(r==="employee")return<Badge label="Employee" type="role"/>;
     if(r==="official")return<Badge label="Official" type="role"/>;
     return<Badge label={r?.replace("_"," ")||"—"} type="role"/>;
   };
-
-  const avgRating=reviews.length?reviews.reduce((s,r)=>s+(r.rating||0),0)/reviews.length:null;
-  const isSelf=currentAdminId&&userId&&currentAdminId===userId;
-
   return(
-    <div className="fixed inset-0 z-50 flex" onClick={(e)=>e.target===e.currentTarget&&onClose()}>
-      <div className="flex-1" onClick={onClose}/>
-      <div className="w-full max-w-sm bg-white shadow-2xl flex flex-col border-l border-[#F4C0D1] h-full overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#F4C0D1] flex-shrink-0" style={{background:"#F9F8F2"}}>
-          <p className="text-sm font-bold text-[#730042]">Account Summary</p>
-          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-[#993556] hover:bg-[#FBEAF0] transition-colors">
-            <FaTimes size={12}/>
-          </button>
-        </div>
-
-        {loading?(
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center space-y-2">
-              <div className="w-12 h-12 rounded-full bg-[#FBEAF0] animate-pulse mx-auto"/>
-              <div className="h-3 bg-[#FBEAF0] rounded w-24 mx-auto animate-pulse"/>
-              <div className="h-2 bg-[#FBEAF0] rounded w-32 mx-auto animate-pulse"/>
+    <>
+      <div className="fixed inset-0 z-50 flex" onClick={(e)=>e.target===e.currentTarget&&onClose()}>
+        <div className="flex-1" onClick={onClose}/>
+        <div className="w-full max-w-sm bg-white shadow-2xl flex flex-col border-l border-[#F4C0D1] h-full overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[#F4C0D1] flex-shrink-0" style={{background:"#F9F8F2"}}>
+            <p className="text-sm font-bold text-[#730042]">Account Summary</p>
+            <div className="flex items-center gap-2">
+              <button onClick={()=>setShowPermissions(true)} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[#730042] border border-[#F4C0D1] hover:bg-[#FBEAF0]">
+                <FaKey size={10}/> Permissions
+              </button>
+              <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-[#993556] hover:bg-[#FBEAF0]">
+                <FaTimes size={12}/>
+              </button>
             </div>
           </div>
-        ):person?(
-          <>
-            <div className="px-4 pt-4 pb-3 border-b border-[#F4C0D1] flex-shrink-0">
-              <div className="flex items-start gap-3">
-                <Avatar name={`${person.f_name??""} ${person.l_name??""}`} size="lg"/>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-[#730042] text-base leading-tight">{person.f_name} {person.l_name}</p>
-                  <p className="text-xs text-[#993556] truncate mt-0.5">{person.work_email}</p>
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {roleBadgeEl(person.role)}
-                    {person.department&&<Badge label={person.department} type="dept"/>}
-                    {person.status&&<Badge label={person.status} type={person.status==="active"?"active":person.status==="suspended"?"suspended":"inactive"}/>}
+          {loading?(
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center space-y-2">
+                <div className="w-12 h-12 rounded-full bg-[#FBEAF0] animate-pulse mx-auto"/>
+                <div className="h-3 bg-[#FBEAF0] rounded w-24 mx-auto animate-pulse"/>
+              </div>
+            </div>
+          ):person?(
+            <>
+              <div className="px-4 pt-4 pb-3 border-b border-[#F4C0D1] flex-shrink-0">
+                <div className="flex items-start gap-3">
+                  <Avatar name={`${person.f_name??""} ${person.l_name??""}`} size="lg"/>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-[#730042] text-base leading-tight">{person.f_name} {person.l_name}</p>
+                    <p className="text-xs text-[#993556] truncate mt-0.5">{person.work_email}</p>
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {roleBadgeEl(person.role)}
+                      {person.department&&<Badge label={person.department} type="dept"/>}
+                      {person.status&&<Badge label={person.status} type={person.status==="active"?"active":person.status==="suspended"?"suspended":"inactive"}/>}
+                    </div>
+                    {person.uid&&<p className="text-[11px] text-[#993556] mt-1.5 font-mono bg-[#F9F8F2] px-1.5 py-0.5 rounded inline-block border border-[#F4C0D1]">{person.uid}</p>}
                   </div>
-                  {person.uid&&<p className="text-[11px] text-[#993556] mt-1.5 font-mono bg-[#F9F8F2] px-1.5 py-0.5 rounded inline-block border border-[#F4C0D1]">{person.uid}</p>}
                 </div>
+                {avgRating!==null&&(
+                  <div className="mt-3 flex items-center gap-1.5">
+                    {[1,2,3,4,5].map((s)=>(
+                      <FaStar key={s} size={12} className={s<=Math.round(avgRating)?"text-yellow-400":"text-[#F4C0D1]"}/>
+                    ))}
+                    <span className="text-xs text-[#993556] font-medium">{avgRating.toFixed(1)} ({reviews.length} review{reviews.length!==1?"s":""})</span>
+                  </div>
+                )}
               </div>
-              {avgRating!==null&&(
-                <div className="mt-3 flex items-center gap-1.5">
-                  {[1,2,3,4,5].map((s)=>(
-                    <FaStar key={s} size={12} className={s<=Math.round(avgRating)?"text-yellow-400":"text-[#F4C0D1]"}/>
-                  ))}
-                  <span className="text-xs text-[#993556] font-medium">{avgRating.toFixed(1)} ({reviews.length} review{reviews.length!==1?"s":""})</span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex border-b border-[#F4C0D1] flex-shrink-0 bg-white">
-              {["info","leave","reviews"].map((t)=>(
-                <button key={t} onClick={()=>setTab(t)} className="flex-1 py-2.5 text-xs font-semibold capitalize transition-colors"
-                  style={tab===t?{color:"#730042",borderBottom:"2px solid #CD166E"}:{color:"#993556"}}>
-                  {t==="info"?"Profile":t==="leave"?"Leave":"Reviews"}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-4 py-3">
-              {tab==="info"&&(
-                <div className="space-y-0.5">
-                  <InfoRow icon={<FaEnvelope size={10}/>} label="Work Email" value={person.work_email}/>
-                  <InfoRow icon={<FaPhone size={10}/>} label="Personal Contact" value={person.personal_contact}/>
-                  <InfoRow icon={<FaPhone size={10}/>} label="Emergency Contact" value={person.e_contact}/>
-                  <InfoRow icon={<FaBriefcase size={10}/>} label="Designation" value={person.designation}/>
-                  <InfoRow icon={<FaBuilding size={10}/>} label="Department" value={person.department}/>
-                  <InfoRow icon={<FaMapMarkerAlt size={10}/>} label="Office Location" value={person.office_location}/>
-                  <InfoRow icon={<FaUser size={10}/>} label="Gender" value={person.gender?person.gender.charAt(0).toUpperCase()+person.gender.slice(1):null}/>
-                  <InfoRow icon={<FaUser size={10}/>} label="Marital Status" value={person.marital_status?person.marital_status.charAt(0).toUpperCase()+person.marital_status.slice(1):null}/>
-                  {person.address&&<InfoRow icon={<FaMapMarkerAlt size={10}/>} label="Address" value={[person.address,person.city,person.state,person.pincode].filter(Boolean).join(", ")}/>}
-                  {person.aadhaar_number&&<InfoRow icon={<FaIdCard size={10}/>} label="Aadhaar" value={person.aadhaar_number}/>}
-                  {person.pan_number&&<InfoRow icon={<FaShieldAlt size={10}/>} label="PAN" value={person.pan_number}/>}
-                  {person.bank_name&&(
-                    <div className="mt-3 pt-3 border-t border-[#F4C0D1]/50">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#993556] mb-2">Bank Details</p>
-                      <InfoRow icon={<FaUniversity size={10}/>} label="Bank" value={person.bank_name}/>
-                      <InfoRow icon={<FaUniversity size={10}/>} label="Account Holder" value={person.account_holder_name}/>
-                      <InfoRow icon={<FaUniversity size={10}/>} label="Account No." value={person.account_number}/>
-                      <InfoRow icon={<FaUniversity size={10}/>} label="IFSC" value={person.ifsc_code}/>
-                    </div>
-                  )}
-                  {(person.resume||person.aadhaar_card||person.pan_card||person.experience_letter)&&(
-                    <div className="mt-3 pt-3 border-t border-[#F4C0D1]/50">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#993556] mb-2">Documents</p>
-                      {person.resume&&<a href={person.resume} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 py-1.5 text-xs text-[#730042] hover:text-[#CD166E] transition-colors"><FaFileAlt size={10}/> Resume</a>}
-                      {person.aadhaar_card&&<a href={person.aadhaar_card} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 py-1.5 text-xs text-[#730042] hover:text-[#CD166E] transition-colors"><FaFileAlt size={10}/> Aadhaar Card</a>}
-                      {person.pan_card&&<a href={person.pan_card} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 py-1.5 text-xs text-[#730042] hover:text-[#CD166E] transition-colors"><FaFileAlt size={10}/> PAN Card</a>}
-                      {person.experience_letter&&<a href={person.experience_letter} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 py-1.5 text-xs text-[#730042] hover:text-[#CD166E] transition-colors"><FaFileAlt size={10}/> Experience Letter</a>}
-                    </div>
-                  )}
-                  {(person.Under_manager||person.reporting_manager)&&(
-                    <div className="mt-3 pt-3 border-t border-[#F4C0D1]/50">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#993556] mb-2">Reporting To</p>
-                      <div className="flex items-center gap-2 p-2 rounded-lg bg-[#FBEAF0] border border-[#F4C0D1]">
-                        <Avatar name={`${(person.Under_manager||person.reporting_manager)?.f_name??""} ${(person.Under_manager||person.reporting_manager)?.l_name??""}`} size="sm"/>
-                        <div>
-                          <p className="text-xs font-semibold text-[#730042]">{(person.Under_manager||person.reporting_manager)?.f_name} {(person.Under_manager||person.reporting_manager)?.l_name}</p>
-                          <p className="text-[10px] text-[#993556]">{(person.Under_manager||person.reporting_manager)?.work_email}</p>
+              <div className="flex border-b border-[#F4C0D1] flex-shrink-0 bg-white">
+                {["info","leave","reviews"].map((t)=>(
+                  <button key={t} onClick={()=>setTab(t)} className="flex-1 py-2.5 text-xs font-semibold capitalize transition-colors"
+                    style={tab===t?{color:"#730042",borderBottom:"2px solid #CD166E"}:{color:"#993556"}}>
+                    {t==="info"?"Profile":t==="leave"?"Leave":"Reviews"}
+                  </button>
+                ))}
+              </div>
+              <div className="flex-1 overflow-y-auto px-4 py-3">
+                {tab==="info"&&(
+                  <div className="space-y-0.5">
+                    <InfoRow icon={<FaEnvelope size={10}/>} label="Work Email" value={person.work_email}/>
+                    <InfoRow icon={<FaPhone size={10}/>} label="Personal Contact" value={person.personal_contact}/>
+                    <InfoRow icon={<FaPhone size={10}/>} label="Emergency Contact" value={person.e_contact}/>
+                    <InfoRow icon={<FaBriefcase size={10}/>} label="Designation" value={person.designation}/>
+                    <InfoRow icon={<FaBuilding size={10}/>} label="Department" value={person.department}/>
+                    <InfoRow icon={<FaMapMarkerAlt size={10}/>} label="Office Location" value={person.office_location}/>
+                    <InfoRow icon={<FaUser size={10}/>} label="Gender" value={person.gender?person.gender.charAt(0).toUpperCase()+person.gender.slice(1):null}/>
+                    <InfoRow icon={<FaUser size={10}/>} label="Marital Status" value={person.marital_status?person.marital_status.charAt(0).toUpperCase()+person.marital_status.slice(1):null}/>
+                    {person.address&&<InfoRow icon={<FaMapMarkerAlt size={10}/>} label="Address" value={[person.address,person.city,person.state,person.pincode].filter(Boolean).join(", ")}/>}
+                    {person.aadhaar_number&&<InfoRow icon={<FaIdCard size={10}/>} label="Aadhaar" value={person.aadhaar_number}/>}
+                    {person.pan_number&&<InfoRow icon={<FaShieldAlt size={10}/>} label="PAN" value={person.pan_number}/>}
+                    {person.bank_name&&(
+                      <div className="mt-3 pt-3 border-t border-[#F4C0D1]/50">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#993556] mb-2">Bank Details</p>
+                        <InfoRow icon={<FaUniversity size={10}/>} label="Bank" value={person.bank_name}/>
+                        <InfoRow icon={<FaUniversity size={10}/>} label="Account Holder" value={person.account_holder_name}/>
+                        <InfoRow icon={<FaUniversity size={10}/>} label="Account No." value={person.account_number}/>
+                        <InfoRow icon={<FaUniversity size={10}/>} label="IFSC" value={person.ifsc_code}/>
+                      </div>
+                    )}
+                    {(person.resume||person.aadhaar_card||person.pan_card||person.experience_letter)&&(
+                      <div className="mt-3 pt-3 border-t border-[#F4C0D1]/50">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#993556] mb-2">Documents</p>
+                        {person.resume&&<a href={person.resume} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 py-1.5 text-xs text-[#730042] hover:text-[#CD166E]"><FaFileAlt size={10}/> Resume</a>}
+                        {person.aadhaar_card&&<a href={person.aadhaar_card} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 py-1.5 text-xs text-[#730042] hover:text-[#CD166E]"><FaFileAlt size={10}/> Aadhaar Card</a>}
+                        {person.pan_card&&<a href={person.pan_card} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 py-1.5 text-xs text-[#730042] hover:text-[#CD166E]"><FaFileAlt size={10}/> PAN Card</a>}
+                        {person.experience_letter&&<a href={person.experience_letter} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 py-1.5 text-xs text-[#730042] hover:text-[#CD166E]"><FaFileAlt size={10}/> Experience Letter</a>}
+                      </div>
+                    )}
+                    {(person.Under_manager||person.reporting_manager)&&(
+                      <div className="mt-3 pt-3 border-t border-[#F4C0D1]/50">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#993556] mb-2">Reporting To</p>
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-[#FBEAF0] border border-[#F4C0D1]">
+                          <Avatar name={`${(person.Under_manager||person.reporting_manager)?.f_name??""} ${(person.Under_manager||person.reporting_manager)?.l_name??""}`} size="sm"/>
+                          <div>
+                            <p className="text-xs font-semibold text-[#730042]">{(person.Under_manager||person.reporting_manager)?.f_name} {(person.Under_manager||person.reporting_manager)?.l_name}</p>
+                            <p className="text-[10px] text-[#993556]">{(person.Under_manager||person.reporting_manager)?.work_email}</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              {tab==="leave"&&(
-                <div>
-                  {leaveBalance?(
-                    <div className="grid grid-cols-2 gap-2">
-                      {Object.entries(leaveBalance).filter(([k])=>!["_id","employee","organisation_id","__v","createdAt","updatedAt"].includes(k)).map(([k,v])=>(
-                        <div key={k} className="p-3 rounded-xl border border-[#F4C0D1] bg-[#FBEAF0]">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-[#993556]">{k.replace(/_/g," ")}</p>
-                          <p className="text-xl font-bold text-[#730042] mt-0.5">{String(v)}</p>
-                        </div>
-                      ))}
-                    </div>
-                  ):(
-                    <div className="text-center py-8 text-[#993556] text-sm">No leave balance data</div>
-                  )}
-                </div>
-              )}
-              {tab==="reviews"&&(
-                <div className="space-y-3">
-                  {reviews.length===0?(
-                    <div className="text-center py-8 text-[#993556] text-sm">No reviews yet</div>
-                  ):reviews.map((r,i)=>(
-                    <div key={i} className="p-3 rounded-xl border border-[#F4C0D1] bg-[#FBEAF0]">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <p className="text-xs font-semibold text-[#730042]">{r.reviewer?.f_name} {r.reviewer?.l_name}</p>
-                        <div className="flex gap-0.5">
-                          {[1,2,3,4,5].map((s)=>(
-                            <FaStar key={s} size={10} className={s<=r.rating?"text-yellow-400":"text-[#F4C0D1]"}/>
-                          ))}
-                        </div>
+                    )}
+                  </div>
+                )}
+                {tab==="leave"&&(
+                  <div>
+                    {leaveBalance?(
+                      <div className="grid grid-cols-2 gap-2">
+                        {Object.entries(leaveBalance).filter(([k])=>!["_id","employee","organisation_id","__v","createdAt","updatedAt","mlStartDate","mlEndDate"].includes(k)).map(([k,v])=>(
+                          <div key={k} className="p-3 rounded-xl border border-[#F4C0D1] bg-[#FBEAF0]">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-[#993556]">{k.replace(/_/g," ")}</p>
+                            <p className="text-xl font-bold text-[#730042] mt-0.5">{String(v)}</p>
+                          </div>
+                        ))}
                       </div>
-                      <p className="text-xs text-[#993556]">{r.comment}</p>
-                      <p className="text-[10px] text-[#993556]/60 mt-1">{r.monthYear}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="px-4 py-3 border-t border-[#F4C0D1] flex-shrink-0 bg-[#F9F8F2]">
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <button onClick={()=>{onEdit(person);onClose();}} className="flex items-center justify-center gap-1.5 py-2 rounded-lg border border-[#F4C0D1] text-xs font-semibold text-[#730042] hover:bg-[#FBEAF0] transition-colors">
-                  <FaEdit size={10}/> Edit
-                </button>
-                <button onClick={()=>{onDelete(person);onClose();}} className="flex items-center justify-center gap-1.5 py-2 rounded-lg border border-[#FEE2E2] text-xs font-semibold text-[#A32D2D] hover:bg-[#FEE2E2] transition-colors">
-                  <FaTrash size={10}/> Delete
-                </button>
+                    ):(
+                      <div className="text-center py-8 text-[#993556] text-sm">No leave balance data</div>
+                    )}
+                  </div>
+                )}
+                {tab==="reviews"&&(
+                  <div className="space-y-3">
+                    {reviews.length===0?(
+                      <div className="text-center py-8 text-[#993556] text-sm">No reviews yet</div>
+                    ):reviews.map((r,i)=>(
+                      <div key={i} className="p-3 rounded-xl border border-[#F4C0D1] bg-[#FBEAF0]">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <p className="text-xs font-semibold text-[#730042]">{r.reviewer?.f_name} {r.reviewer?.l_name}</p>
+                          <div className="flex gap-0.5">
+                            {[1,2,3,4,5].map((s)=>(
+                              <FaStar key={s} size={10} className={s<=r.rating?"text-yellow-400":"text-[#F4C0D1]"}/>
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-xs text-[#993556]">{r.comment}</p>
+                        <p className="text-[10px] text-[#993556]/60 mt-1">{r.monthYear}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              {!isSelf&&(
-                <div className="flex flex-col gap-2">
-                  {(userRole==="employee"||userRole==="official")&&(
-                    <>
-                      <button onClick={()=>{onPromoteToManager(person);onClose();}} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90" style={{background:"#3C3489"}}>
-                        <FaArrowUp size={10}/> Promote to Manager
-                      </button>
-                      <button onClick={()=>{onPromoteToAdmin(person);onClose();}} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90" style={{background:"#92400E"}}>
-                        <FaArrowUp size={10}/> Promote to Admin
-                      </button>
-                    </>
-                  )}
-                  {(userRole==="manager"||userRole==="senior_manager")&&(
-                    <div className="flex gap-2">
-                      <button onClick={()=>{onPromoteToAdmin(person);onClose();}} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90" style={{background:"#92400E"}}>
-                        <FaArrowUp size={10}/> To Admin
-                      </button>
-                      <button onClick={()=>{onDemoteToEmployee(person);onClose();}} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90" style={{background:"#7A3500"}}>
-                        <FaArrowDown size={10}/> To Employee
-                      </button>
-                      <button onClick={()=>{onChangeRole(person);onClose();}} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90" style={{background:"#085041"}}>
-                        <FaExchangeAlt size={10}/> Role
-                      </button>
-                    </div>
-                  )}
-                  {userRole==="admin"&&(
-                    <div className="flex gap-2">
-                      <button onClick={()=>{onDemoteToManager(person);onClose();}} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90" style={{background:"#7A3500"}}>
-                        <FaArrowDown size={10}/> To Manager
-                      </button>
-                      <button onClick={()=>{onDemoteToEmployee2(person);onClose();}} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90" style={{background:"#A32D2D"}}>
-                        <FaArrowDown size={10}/> To Employee
-                      </button>
-                    </div>
-                  )}
+              <div className="px-4 py-3 border-t border-[#F4C0D1] flex-shrink-0 bg-[#F9F8F2]">
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <button onClick={()=>{onEdit(person);onClose();}} className="flex items-center justify-center gap-1.5 py-2 rounded-lg border border-[#F4C0D1] text-xs font-semibold text-[#730042] hover:bg-[#FBEAF0]">
+                    <FaEdit size={10}/> Edit
+                  </button>
+                  <button onClick={()=>{onDelete(person);onClose();}} className="flex items-center justify-center gap-1.5 py-2 rounded-lg border border-[#FEE2E2] text-xs font-semibold text-[#A32D2D] hover:bg-[#FEE2E2]">
+                    <FaTrash size={10}/> Delete
+                  </button>
                 </div>
-              )}
-            </div>
-          </>
-        ):(
-          <div className="flex-1 flex items-center justify-center text-[#993556] text-sm">Failed to load profile</div>
-        )}
+                {!isSelf&&(
+                  <div className="flex flex-col gap-2">
+                    {(userRole==="employee"||userRole==="official")&&(
+                      <>
+                        <button onClick={()=>{onPromoteToManager(person);onClose();}} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white hover:opacity-90" style={{background:"#3C3489"}}>
+                          <FaArrowUp size={10}/> Promote to Manager
+                        </button>
+                        <button onClick={()=>{onPromoteToAdmin(person);onClose();}} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white hover:opacity-90" style={{background:"#92400E"}}>
+                          <FaArrowUp size={10}/> Promote to Admin
+                        </button>
+                      </>
+                    )}
+                    {(userRole==="manager"||userRole==="senior_manager")&&(
+                      <div className="flex gap-2">
+                        <button onClick={()=>{onPromoteToAdmin(person);onClose();}} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white hover:opacity-90" style={{background:"#92400E"}}>
+                          <FaArrowUp size={10}/> To Admin
+                        </button>
+                        <button onClick={()=>{onDemoteToEmployee(person);onClose();}} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white hover:opacity-90" style={{background:"#7A3500"}}>
+                          <FaArrowDown size={10}/> To Employee
+                        </button>
+                      </div>
+                    )}
+                    {(userRole==="admin"||userRole==="senior_admin")&&(
+                      <div className="flex gap-2">
+                        <button onClick={()=>{onDemoteToManager(person);onClose();}} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white hover:opacity-90" style={{background:"#7A3500"}}>
+                          <FaArrowDown size={10}/> To Manager
+                        </button>
+                        <button onClick={()=>{onDemoteToEmployee2(person);onClose();}} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white hover:opacity-90" style={{background:"#A32D2D"}}>
+                          <FaArrowDown size={10}/> To Employee
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          ):(
+            <div className="flex-1 flex items-center justify-center text-[#993556] text-sm">Failed to load profile</div>
+          )}
+        </div>
       </div>
-    </div>
+      {showPermissions&&person&&(
+        <PermissionsDrawer
+          userId={person._id}
+          userModel={userModel}
+          onClose={()=>setShowPermissions(false)}
+        />
+      )}
+    </>
   );
 }
 
@@ -428,15 +590,15 @@ function StepModal({title,icon,onClose,onSubmit,steps,currentStep,setCurrentStep
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">{children}</div>
         </div>
         <div className="px-3 sm:px-6 py-3 sm:py-4 border-t border-[#F4C0D1] flex justify-between gap-2 bg-[#F9F8F2] flex-shrink-0">
-          <button onClick={onClose} className="px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl border border-[#F4C0D1] text-[#730042] text-xs sm:text-sm font-semibold hover:bg-[#FBEAF0] transition-colors">Cancel</button>
+          <button onClick={onClose} className="px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl border border-[#F4C0D1] text-[#730042] text-xs sm:text-sm font-semibold hover:bg-[#FBEAF0]">Cancel</button>
           <div className="flex gap-2">
-            {!isFirst&&<button onClick={()=>setCurrentStep((s)=>s-1)} className="flex items-center gap-1 sm:gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-[#F4C0D1] text-[#730042] text-xs sm:text-sm font-semibold hover:bg-[#FBEAF0] transition-colors"><FaChevronLeft size={10}/><span className="hidden xs:inline">Prev</span></button>}
+            {!isFirst&&<button onClick={()=>setCurrentStep((s)=>s-1)} className="flex items-center gap-1 sm:gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-[#F4C0D1] text-[#730042] text-xs sm:text-sm font-semibold hover:bg-[#FBEAF0]"><FaChevronLeft size={10}/><span className="hidden xs:inline">Prev</span></button>}
             {!isLast?(
-              <button onClick={()=>setCurrentStep((s)=>s+1)} className="flex items-center gap-1 sm:gap-1.5 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-white text-xs sm:text-sm font-semibold transition-all hover:opacity-90" style={{background:accentColor}}>
+              <button onClick={()=>setCurrentStep((s)=>s+1)} className="flex items-center gap-1 sm:gap-1.5 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90" style={{background:accentColor}}>
                 <span className="hidden xs:inline">Next</span><FaChevronRight size={10}/>
               </button>
             ):(
-              <button onClick={onSubmit} className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-white text-xs sm:text-sm font-semibold transition-all hover:opacity-90" style={{background:accentColor}}>Submit</button>
+              <button onClick={onSubmit} className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90" style={{background:accentColor}}>Submit</button>
             )}
           </div>
         </div>
@@ -465,7 +627,7 @@ function Modal({title,icon,onClose,onSubmit,children,accentColor="#CD166E"}){
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">{children}</div>
         </div>
         <div className="px-3 sm:px-6 py-3 sm:py-4 border-t border-[#F4C0D1] flex justify-end gap-2 sm:gap-3 bg-[#F9F8F2] flex-shrink-0">
-          <button onClick={onClose} className="px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl border border-[#F4C0D1] text-[#730042] text-xs sm:text-sm font-semibold hover:bg-[#FBEAF0] transition-colors">Cancel</button>
+          <button onClick={onClose} className="px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl border border-[#F4C0D1] text-[#730042] text-xs sm:text-sm font-semibold hover:bg-[#FBEAF0]">Cancel</button>
           <button onClick={onSubmit} className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90" style={{background:accentColor}}>Submit</button>
         </div>
       </div>
@@ -484,15 +646,15 @@ function ConfirmModal({title,message,icon,confirmLabel,confirmColor,onConfirm,on
         </div>
         {children}
         <div className="flex gap-3 justify-center">
-          <button onClick={onCancel} className="px-4 sm:px-5 py-2 rounded-xl border border-[#F4C0D1] text-xs sm:text-sm font-semibold text-[#730042] hover:bg-[#FBEAF0] transition-colors">Cancel</button>
-          <button onClick={onConfirm} className="px-4 sm:px-5 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90 transition-colors" style={{background:confirmColor||"#A32D2D"}}>{confirmLabel}</button>
+          <button onClick={onCancel} className="px-4 sm:px-5 py-2 rounded-xl border border-[#F4C0D1] text-xs sm:text-sm font-semibold text-[#730042] hover:bg-[#FBEAF0]">Cancel</button>
+          <button onClick={onConfirm} className="px-4 sm:px-5 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90" style={{background:confirmColor||"#A32D2D"}}>{confirmLabel}</button>
         </div>
       </div>
     </div>
   );
 }
 
-function ActionMenu({user,onView,onEdit,onDelete,onPromoteToManager,onPromoteToAdmin,onDemoteToEmployee,onDemoteToManager,onDemoteToEmployee2,onChangeRole,currentAdminId}){
+function ActionMenu({user,onView,onEdit,onDelete,onPromoteToManager,onPromoteToAdmin,onDemoteToEmployee,onDemoteToManager,onDemoteToEmployee2,currentAdminId}){
   const [open,setOpen]=useState(false);
   const ref=useRef();
   useEffect(()=>{
@@ -502,58 +664,55 @@ function ActionMenu({user,onView,onEdit,onDelete,onPromoteToManager,onPromoteToA
   },[]);
   const isEmployee=user.role==="employee"||user.role==="official";
   const isManager=user.role==="manager"||user.role==="senior_manager";
-  const isAdmin=user.role==="admin";
+  const isAdmin=user.role==="admin"||user.role==="senior_admin";
   const isSelf=currentAdminId&&user._id&&currentAdminId===user._id;
   return(
     <div className="relative" ref={ref} onClick={(e)=>e.stopPropagation()}>
-      <button onClick={(e)=>{e.stopPropagation();setOpen((p)=>!p);}} className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center text-[#993556] border border-[#F4C0D1] hover:bg-[#FBEAF0] transition-colors" style={{background:"#F9F8F2"}}>
+      <button onClick={(e)=>{e.stopPropagation();setOpen((p)=>!p);}} className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center text-[#993556] border border-[#F4C0D1] hover:bg-[#FBEAF0]" style={{background:"#F9F8F2"}}>
         <FaEllipsisV size={10}/>
       </button>
       {open&&(
         <div className="absolute right-0 top-9 z-20 bg-white border border-[#F4C0D1] rounded-xl shadow-xl min-w-[185px] py-1 overflow-hidden">
-          <button onClick={()=>{onView(user._id,user.role);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#730042] hover:bg-[#FBEAF0] transition-colors">
+          <button onClick={()=>{onView(user._id,user.role);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#730042] hover:bg-[#FBEAF0]">
             <FaUser size={10}/> View Profile
           </button>
-          <button onClick={()=>{onEdit(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#730042] hover:bg-[#FBEAF0] transition-colors">
+          <button onClick={()=>{onEdit(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#730042] hover:bg-[#FBEAF0]">
             <FaEdit size={10}/> Edit
           </button>
           {!isSelf&&(
             <>
               {isEmployee&&(
                 <>
-                  <button onClick={()=>{onPromoteToManager(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#3C3489] hover:bg-[#EEEDFE] transition-colors">
+                  <button onClick={()=>{onPromoteToManager(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#3C3489] hover:bg-[#EEEDFE]">
                     <FaArrowUp size={10}/> Promote to Manager
                   </button>
-                  <button onClick={()=>{onPromoteToAdmin(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#92400E] hover:bg-[#FEF3C7] transition-colors">
+                  <button onClick={()=>{onPromoteToAdmin(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#92400E] hover:bg-[#FEF3C7]">
                     <FaArrowUp size={10}/> Promote to Admin
                   </button>
                 </>
               )}
               {isManager&&(
                 <>
-                  <button onClick={()=>{onPromoteToAdmin(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#92400E] hover:bg-[#FEF3C7] transition-colors">
+                  <button onClick={()=>{onPromoteToAdmin(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#92400E] hover:bg-[#FEF3C7]">
                     <FaArrowUp size={10}/> Promote to Admin
                   </button>
-                  <button onClick={()=>{onDemoteToEmployee(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#7A3500] hover:bg-[#FEF3E8] transition-colors">
+                  <button onClick={()=>{onDemoteToEmployee(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#7A3500] hover:bg-[#FEF3E8]">
                     <FaArrowDown size={10}/> Demote to Employee
-                  </button>
-                  <button onClick={()=>{onChangeRole(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#085041] hover:bg-[#E1F5EE] transition-colors">
-                    <FaExchangeAlt size={10}/> Change Role
                   </button>
                 </>
               )}
               {isAdmin&&(
                 <>
-                  <button onClick={()=>{onDemoteToManager(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#7A3500] hover:bg-[#FEF3E8] transition-colors">
+                  <button onClick={()=>{onDemoteToManager(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#7A3500] hover:bg-[#FEF3E8]">
                     <FaArrowDown size={10}/> Demote to Manager
                   </button>
-                  <button onClick={()=>{onDemoteToEmployee2(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#A32D2D] hover:bg-[#FCEBEB] transition-colors">
+                  <button onClick={()=>{onDemoteToEmployee2(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#A32D2D] hover:bg-[#FCEBEB]">
                     <FaArrowDown size={10}/> Demote to Employee
                   </button>
                 </>
               )}
               <div className="border-t border-[#F4C0D1] my-1"/>
-              <button onClick={()=>{onDelete(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#A32D2D] hover:bg-[#FCEBEB] transition-colors">
+              <button onClick={()=>{onDelete(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#A32D2D] hover:bg-[#FCEBEB]">
                 <FaTrash size={10}/> Delete
               </button>
             </>
@@ -568,7 +727,7 @@ function roleBadge(role){
   if(role==="employee")return<Badge label="Employee" type="role"/>;
   if(role==="manager")return<Badge label="Manager" type="manager"/>;
   if(role==="senior_manager")return<Badge label="Sr. Manager" type="smgr"/>;
-  if(role==="admin")return<Badge label="Admin" type="admin"/>;
+  if(role==="admin"||role==="senior_admin")return<Badge label="Admin" type="admin"/>;
   if(role==="official")return<Badge label="Official" type="role"/>;
   return<Badge label={role?.replace("_"," ")||"—"} type="manager"/>;
 }
@@ -628,18 +787,54 @@ function FilterChip({label,onRemove}){
   return(
     <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#FBEAF0] text-[#730042] text-xs font-medium border border-[#F4C0D1]">
       {label}
-      <button onClick={onRemove} className="hover:text-[#CD166E] transition-colors"><FaTimes size={9}/></button>
+      <button onClick={onRemove} className="hover:text-[#CD166E]"><FaTimes size={9}/></button>
     </span>
   );
 }
 
-function EmpStepFields({step,form,onChange,errors,managers}){
+function MobileCard({u,onView,onEdit,onDelete,onPromoteToManager,onPromoteToAdmin,onDemoteToEmployee,onDemoteToManager,onDemoteToEmployee2,currentAdminId}){
+  const roleType=u.role==="manager"?"manager":u.role==="senior_manager"?"smgr":u.role==="admin"||u.role==="senior_admin"?"admin":"role";
+  const roleLabel=u.role==="senior_manager"?"Sr. Manager":u.role==="employee"?"Employee":u.role==="admin"||u.role==="senior_admin"?"Admin":u.role?.replace("_"," ")||"—";
+  return(
+    <div className="bg-white border border-[#F4C0D1] rounded-xl p-4 flex gap-3 cursor-pointer active:scale-[0.99] transition-transform" onClick={()=>onView(u._id,u.role)}>
+      <Avatar name={`${u.f_name??""} ${u.l_name??""}`}/>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-semibold text-[#730042] text-sm truncate">{u.f_name} {u.l_name}</p>
+            <p className="text-xs text-[#993556] truncate">{u.work_email}</p>
+          </div>
+          <Badge label={roleLabel} type={roleType}/>
+        </div>
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {u.department&&<Badge label={u.department} type="dept"/>}
+          {u.office_location&&<span className="px-2 py-0.5 rounded-full text-xs bg-[#F9F8F2] text-[#993556] border border-[#F4C0D1]">📍 {u.office_location}</span>}
+        </div>
+        <div className="flex items-center justify-between mt-3">
+          {u.Under_manager?(
+            <p className="text-[11px] text-[#993556]">Under: <span className="font-medium text-[#730042]">{u.Under_manager.f_name} {u.Under_manager.l_name}</span></p>
+          ):u.reporting_manager?(
+            <p className="text-[11px] text-[#993556]">Reports to: <span className="font-medium text-[#730042]">{u.reporting_manager.f_name} {u.reporting_manager.l_name}</span></p>
+          ):<span/>}
+          <div onClick={(e)=>e.stopPropagation()}>
+            <ActionMenu user={u} onView={onView} onEdit={onEdit} onDelete={onDelete}
+              onPromoteToManager={onPromoteToManager} onPromoteToAdmin={onPromoteToAdmin}
+              onDemoteToEmployee={onDemoteToEmployee} onDemoteToManager={onDemoteToManager}
+              onDemoteToEmployee2={onDemoteToEmployee2} currentAdminId={currentAdminId}/>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EmpStepFields({step,form,onChange,errors,managers,perms,onPermChange}){
   if(step===0)return(
     <>
       <Field label="First Name" required error={errors.f_name}><input name="f_name" placeholder="First name" value={form.f_name} onChange={onChange} className={inputCls}/></Field>
       <Field label="Last Name" required error={errors.l_name}><input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls}/></Field>
       <Field label="Work Email" required error={errors.work_email}><input name="work_email" type="email" placeholder="name@company.com" value={form.work_email} onChange={onChange} className={inputCls}/></Field>
-      <Field label="Password" required error={errors.password}><input name="password" type="password" placeholder="Set password" value={form.password} onChange={onChange} className={inputCls}/></Field>
+      <Field label="Password" required error={errors.password}><input name="password" type="password" placeholder="Min 8 chars, uppercase, number, special" value={form.password} onChange={onChange} className={inputCls}/></Field>
       <Field label="Gender" required error={errors.gender}>
         <select name="gender" value={form.gender} onChange={onChange} className={inputCls}>
           <option value="">Select Gender</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
@@ -650,8 +845,8 @@ function EmpStepFields({step,form,onChange,errors,managers}){
           <option value="single">Single</option><option value="married">Married</option><option value="divorced">Divorced</option>
         </select>
       </Field>
-      <Field label="Personal Contact" required error={errors.personal_contact}><input name="personal_contact" placeholder="+91 XXXXX XXXXX" value={form.personal_contact} onChange={onChange} className={inputCls}/></Field>
-      <Field label="Emergency Contact" required error={errors.e_contact}><input name="e_contact" placeholder="Emergency contact" value={form.e_contact} onChange={onChange} className={inputCls}/></Field>
+      <Field label="Personal Contact" required error={errors.personal_contact}><input name="personal_contact" placeholder="10-digit mobile number" maxLength={10} value={form.personal_contact} onChange={onChange} className={inputCls}/></Field>
+      <Field label="Emergency Contact" required error={errors.e_contact}><input name="e_contact" placeholder="10-digit mobile number" maxLength={10} value={form.e_contact} onChange={onChange} className={inputCls}/></Field>
     </>
   );
   if(step===1)return(
@@ -689,13 +884,13 @@ function EmpStepFields({step,form,onChange,errors,managers}){
           <option value="">Select State</option>{INDIAN_STATES.map((s)=><option key={s} value={s}>{s}</option>)}
         </select>
       </Field>
-      <Field label="Pincode"><input name="pincode" placeholder="6-digit pincode" maxLength={6} value={form.pincode} onChange={onChange} className={inputCls}/></Field>
+      <Field label="Pincode" error={errors.pincode}><input name="pincode" placeholder="6-digit pincode" maxLength={6} value={form.pincode} onChange={onChange} className={inputCls}/></Field>
     </>
   );
   if(step===3)return(
     <>
-      <Field label="Aadhaar Number"><input name="aadhaar_number" placeholder="XXXX XXXX XXXX" maxLength={12} value={form.aadhaar_number} onChange={onChange} className={inputCls}/></Field>
-      <Field label="PAN Number"><input name="pan_number" placeholder="ABCDE1234F" maxLength={10} value={form.pan_number} onChange={onChange} className={inputCls}/></Field>
+      <Field label="Aadhaar Number" error={errors.aadhaar_number}><input name="aadhaar_number" placeholder="12-digit Aadhaar number" maxLength={12} value={form.aadhaar_number} onChange={onChange} className={inputCls}/></Field>
+      <Field label="PAN Number" error={errors.pan_number}><input name="pan_number" placeholder="ABCDE1234F" maxLength={10} value={form.pan_number} onChange={(e)=>onChange({target:{name:"pan_number",value:e.target.value.toUpperCase()}})} className={inputCls}/></Field>
     </>
   );
   if(step===4)return(
@@ -707,7 +902,7 @@ function EmpStepFields({step,form,onChange,errors,managers}){
       </Field>
       {!form.is_fresher&&(
         <>
-          <Field label="Total Experience (years)"><input name="total_experience" type="number" min="0" placeholder="e.g. 3" value={form.total_experience} onChange={onChange} className={inputCls}/></Field>
+          <Field label="Total Experience (years)" error={errors.total_experience}><input name="total_experience" type="number" min="0" max="50" placeholder="e.g. 3" value={form.total_experience} onChange={onChange} className={inputCls}/></Field>
           <Field label="Previous Company"><input name="previous_company" placeholder="Company name" value={form.previous_company} onChange={onChange} className={inputCls}/></Field>
           <Field label="Previous Designation"><input name="previous_designation" placeholder="Previous role" value={form.previous_designation} onChange={onChange} className={inputCls}/></Field>
         </>
@@ -716,29 +911,34 @@ function EmpStepFields({step,form,onChange,errors,managers}){
   );
   if(step===5)return(
     <>
-      <Field label="Bank Name"><input name="bank_name" placeholder="e.g. State Bank of India" value={form.bank_name} onChange={onChange} className={inputCls}/></Field>
+      <Field label="Bank Name" error={errors.bank_group}><input name="bank_name" placeholder="e.g. State Bank of India" value={form.bank_name} onChange={onChange} className={inputCls}/></Field>
       <Field label="Account Holder Name"><input name="account_holder_name" placeholder="Name as per bank" value={form.account_holder_name} onChange={onChange} className={inputCls}/></Field>
-      <Field label="Account Number"><input name="account_number" placeholder="Account number" value={form.account_number} onChange={onChange} className={inputCls}/></Field>
-      <Field label="IFSC Code"><input name="ifsc_code" placeholder="e.g. SBIN0001234" value={form.ifsc_code} onChange={onChange} className={inputCls}/></Field>
+      <Field label="Account Number" error={errors.account_number}><input name="account_number" placeholder="9-18 digit account number" maxLength={18} value={form.account_number} onChange={onChange} className={inputCls}/></Field>
+      <Field label="IFSC Code" error={errors.ifsc_code}><input name="ifsc_code" placeholder="e.g. SBIN0001234" maxLength={11} value={form.ifsc_code} onChange={(e)=>onChange({target:{name:"ifsc_code",value:e.target.value.toUpperCase()}})} className={inputCls}/></Field>
       <div className="col-span-1 sm:col-span-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-3">Document URLs</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-3">Document URLs (optional)</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <Field label="Resume URL"><input name="resume" placeholder="https://..." value={form.resume} onChange={onChange} className={inputCls}/></Field>
-          <Field label="Aadhaar Card URL"><input name="aadhaar_card" placeholder="https://..." value={form.aadhaar_card} onChange={onChange} className={inputCls}/></Field>
-          <Field label="PAN Card URL"><input name="pan_card" placeholder="https://..." value={form.pan_card} onChange={onChange} className={inputCls}/></Field>
-          <Field label="Experience Letter URL"><input name="experience_letter" placeholder="https://..." value={form.experience_letter} onChange={onChange} className={inputCls}/></Field>
+          <Field label="Resume URL" error={errors.resume}><input name="resume" placeholder="https://..." value={form.resume} onChange={onChange} className={inputCls}/></Field>
+          <Field label="Aadhaar Card URL" error={errors.aadhaar_card}><input name="aadhaar_card" placeholder="https://..." value={form.aadhaar_card} onChange={onChange} className={inputCls}/></Field>
+          <Field label="PAN Card URL" error={errors.pan_card}><input name="pan_card" placeholder="https://..." value={form.pan_card} onChange={onChange} className={inputCls}/></Field>
+          <Field label="Experience Letter URL" error={errors.experience_letter}><input name="experience_letter" placeholder="https://..." value={form.experience_letter} onChange={onChange} className={inputCls}/></Field>
         </div>
       </div>
     </>
   );
+  if(step===6)return(
+    <div className="col-span-2">
+      <p className="text-xs text-[#993556] mb-3">Set initial permissions for this employee. These can be changed anytime from their profile.</p>
+      <PermissionsPanel perms={perms} onChange={onPermChange}/>
+    </div>
+  );
   return null;
 }
 
-function MgrStepFields({step,form,onChange,errors,managers,allEmployees}){
+function MgrStepFields({step,form,onChange,errors,managers,allEmployees,perms,onPermChange}){
   const [showPwd,setShowPwd]=useState(false);
   const [showCPwd,setShowCPwd]=useState(false);
-  const pwdRegex=/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-  const pwdErr=form.password&&!pwdRegex.test(form.password)?"Min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special character.":"";
+  const pwdErr=form.password&&!PWD_REGEX.test(form.password)?"Min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special character.":"";
   const cpwdErr=form.confirm_password&&form.password!==form.confirm_password?"Passwords do not match.":"";
   if(step===0)return(
     <>
@@ -747,7 +947,7 @@ function MgrStepFields({step,form,onChange,errors,managers,allEmployees}){
       <Field label="Work Email" required error={errors.work_email}><input name="work_email" type="email" placeholder="name@company.com" value={form.work_email} onChange={onChange} className={inputCls}/></Field>
       <Field label="Password" required error={pwdErr||errors.password}>
         <div className="relative">
-          <input name="password" type={showPwd?"text":"password"} placeholder="Set password" value={form.password} onChange={onChange} className={inputCls}/>
+          <input name="password" type={showPwd?"text":"password"} placeholder="Min 8 chars, uppercase, number, special" value={form.password} onChange={onChange} className={inputCls}/>
           <button type="button" onClick={()=>setShowPwd(!showPwd)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#993556] text-xs font-medium">{showPwd?"Hide":"Show"}</button>
         </div>
       </Field>
@@ -767,8 +967,8 @@ function MgrStepFields({step,form,onChange,errors,managers,allEmployees}){
           <option value="single">Single</option><option value="married">Married</option><option value="divorced">Divorced</option>
         </select>
       </Field>
-      <Field label="Personal Contact" required error={errors.personal_contact}><input name="personal_contact" placeholder="+91 XXXXX XXXXX" value={form.personal_contact} onChange={onChange} className={inputCls}/></Field>
-      <Field label="Emergency Contact" required error={errors.e_contact}><input name="e_contact" placeholder="Emergency contact" value={form.e_contact} onChange={onChange} className={inputCls}/></Field>
+      <Field label="Personal Contact" required error={errors.personal_contact}><input name="personal_contact" placeholder="10-digit mobile number" maxLength={10} value={form.personal_contact} onChange={onChange} className={inputCls}/></Field>
+      <Field label="Emergency Contact" required error={errors.e_contact}><input name="e_contact" placeholder="10-digit mobile number" maxLength={10} value={form.e_contact} onChange={onChange} className={inputCls}/></Field>
     </>
   );
   if(step===1)return(
@@ -790,14 +990,7 @@ function MgrStepFields({step,form,onChange,errors,managers,allEmployees}){
         </select>
       </Field>
       <div className="col-span-1 sm:col-span-2">
-        <ReportingManagerSelect
-          value={form.reporting_manager}
-          onChange={onChange}
-          managers={managers}
-          allEmployees={allEmployees}
-          label="Reporting Manager"
-          name="reporting_manager"
-        />
+        <ReportingManagerSelect value={form.reporting_manager} onChange={onChange} managers={managers} allEmployees={allEmployees} label="Reporting Manager" name="reporting_manager"/>
       </div>
     </>
   );
@@ -810,13 +1003,13 @@ function MgrStepFields({step,form,onChange,errors,managers,allEmployees}){
           <option value="">Select State</option>{INDIAN_STATES.map((s)=><option key={s} value={s}>{s}</option>)}
         </select>
       </Field>
-      <Field label="Pincode"><input name="pincode" placeholder="6-digit pincode" maxLength={6} value={form.pincode} onChange={onChange} className={inputCls}/></Field>
+      <Field label="Pincode" error={errors.pincode}><input name="pincode" placeholder="6-digit pincode" maxLength={6} value={form.pincode} onChange={onChange} className={inputCls}/></Field>
     </>
   );
   if(step===3)return(
     <>
-      <Field label="Aadhaar Number"><input name="aadhaar_number" placeholder="XXXX XXXX XXXX" maxLength={12} value={form.aadhaar_number} onChange={onChange} className={inputCls}/></Field>
-      <Field label="PAN Number"><input name="pan_number" placeholder="ABCDE1234F" maxLength={10} value={form.pan_number} onChange={onChange} className={inputCls}/></Field>
+      <Field label="Aadhaar Number" error={errors.aadhaar_number}><input name="aadhaar_number" placeholder="12-digit Aadhaar number" maxLength={12} value={form.aadhaar_number} onChange={onChange} className={inputCls}/></Field>
+      <Field label="PAN Number" error={errors.pan_number}><input name="pan_number" placeholder="ABCDE1234F" maxLength={10} value={form.pan_number} onChange={(e)=>onChange({target:{name:"pan_number",value:e.target.value.toUpperCase()}})} className={inputCls}/></Field>
     </>
   );
   if(step===4)return(
@@ -828,7 +1021,7 @@ function MgrStepFields({step,form,onChange,errors,managers,allEmployees}){
       </Field>
       {!form.is_fresher&&(
         <>
-          <Field label="Total Experience (years)"><input name="total_experience" type="number" min="0" placeholder="e.g. 3" value={form.total_experience} onChange={onChange} className={inputCls}/></Field>
+          <Field label="Total Experience (years)" error={errors.total_experience}><input name="total_experience" type="number" min="0" max="50" placeholder="e.g. 3" value={form.total_experience} onChange={onChange} className={inputCls}/></Field>
           <Field label="Previous Company"><input name="previous_company" placeholder="Company name" value={form.previous_company} onChange={onChange} className={inputCls}/></Field>
           <Field label="Previous Designation"><input name="previous_designation" placeholder="Previous role" value={form.previous_designation} onChange={onChange} className={inputCls}/></Field>
         </>
@@ -837,60 +1030,64 @@ function MgrStepFields({step,form,onChange,errors,managers,allEmployees}){
   );
   if(step===5)return(
     <>
-      <Field label="Bank Name"><input name="bank_name" placeholder="e.g. State Bank of India" value={form.bank_name} onChange={onChange} className={inputCls}/></Field>
+      <Field label="Bank Name" error={errors.bank_group}><input name="bank_name" placeholder="e.g. State Bank of India" value={form.bank_name} onChange={onChange} className={inputCls}/></Field>
       <Field label="Account Holder Name"><input name="account_holder_name" placeholder="Name as per bank" value={form.account_holder_name} onChange={onChange} className={inputCls}/></Field>
-      <Field label="Account Number"><input name="account_number" placeholder="Account number" value={form.account_number} onChange={onChange} className={inputCls}/></Field>
-      <Field label="IFSC Code"><input name="ifsc_code" placeholder="e.g. SBIN0001234" value={form.ifsc_code} onChange={onChange} className={inputCls}/></Field>
+      <Field label="Account Number" error={errors.account_number}><input name="account_number" placeholder="9-18 digit account number" maxLength={18} value={form.account_number} onChange={onChange} className={inputCls}/></Field>
+      <Field label="IFSC Code" error={errors.ifsc_code}><input name="ifsc_code" placeholder="e.g. SBIN0001234" maxLength={11} value={form.ifsc_code} onChange={(e)=>onChange({target:{name:"ifsc_code",value:e.target.value.toUpperCase()}})} className={inputCls}/></Field>
       <div className="col-span-1 sm:col-span-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-3">Document URLs</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-3">Document URLs (optional)</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <Field label="Resume URL"><input name="resume" placeholder="https://..." value={form.resume} onChange={onChange} className={inputCls}/></Field>
-          <Field label="Aadhaar Card URL"><input name="aadhaar_card" placeholder="https://..." value={form.aadhaar_card} onChange={onChange} className={inputCls}/></Field>
-          <Field label="PAN Card URL"><input name="pan_card" placeholder="https://..." value={form.pan_card} onChange={onChange} className={inputCls}/></Field>
-          <Field label="Experience Letter URL"><input name="experience_letter" placeholder="https://..." value={form.experience_letter} onChange={onChange} className={inputCls}/></Field>
+          <Field label="Resume URL" error={errors.resume}><input name="resume" placeholder="https://..." value={form.resume} onChange={onChange} className={inputCls}/></Field>
+          <Field label="Aadhaar Card URL" error={errors.aadhaar_card}><input name="aadhaar_card" placeholder="https://..." value={form.aadhaar_card} onChange={onChange} className={inputCls}/></Field>
+          <Field label="PAN Card URL" error={errors.pan_card}><input name="pan_card" placeholder="https://..." value={form.pan_card} onChange={onChange} className={inputCls}/></Field>
+          <Field label="Experience Letter URL" error={errors.experience_letter}><input name="experience_letter" placeholder="https://..." value={form.experience_letter} onChange={onChange} className={inputCls}/></Field>
         </div>
       </div>
     </>
   );
+  if(step===6)return(
+    <div className="col-span-2">
+      <p className="text-xs text-[#993556] mb-3">Set initial permissions for this manager. These can be changed anytime from their profile.</p>
+      <PermissionsPanel perms={perms} onChange={onPermChange}/>
+    </div>
+  );
   return null;
 }
 
-function MobileCard({u,onView,onEdit,onDelete,onPromoteToManager,onPromoteToAdmin,onDemoteToEmployee,onDemoteToManager,onDemoteToEmployee2,onChangeRole,currentAdminId}){
-  const roleType=u.role==="manager"?"manager":u.role==="senior_manager"?"smgr":u.role==="admin"?"admin":"role";
-  const roleLabel=u.role==="senior_manager"?"Sr. Manager":u.role==="employee"?"Employee":u.role==="admin"?"Admin":u.role?.replace("_"," ")||"—";
-  return(
-    <div className="bg-white border border-[#F4C0D1] rounded-xl p-4 flex gap-3 cursor-pointer active:scale-[0.99] transition-transform" onClick={()=>onView(u._id,u.role)}>
-      <Avatar name={`${u.f_name??""} ${u.l_name??""}`}/>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="font-semibold text-[#730042] text-sm truncate">{u.f_name} {u.l_name}</p>
-            <p className="text-xs text-[#993556] truncate">{u.work_email}</p>
-          </div>
-          <Badge label={roleLabel} type={roleType}/>
-        </div>
-        <div className="flex flex-wrap gap-1.5 mt-2">
-          {u.department&&<Badge label={u.department} type="dept"/>}
-          {u.office_location&&<span className="px-2 py-0.5 rounded-full text-xs bg-[#F9F8F2] text-[#993556] border border-[#F4C0D1]">📍 {u.office_location}</span>}
-        </div>
-        <div className="flex items-center justify-between mt-3">
-          {u.Under_manager?(
-            <p className="text-[11px] text-[#993556]">Under: <span className="font-medium text-[#730042]">{u.Under_manager.f_name} {u.Under_manager.l_name}</span></p>
-          ):u.reporting_manager?(
-            <p className="text-[11px] text-[#993556]">Reports to: <span className="font-medium text-[#730042]">{u.reporting_manager.f_name} {u.reporting_manager.l_name}</span></p>
-          ):<span/>}
-          <div onClick={(e)=>e.stopPropagation()}>
-            <ActionMenu user={u} onView={onView} onEdit={onEdit} onDelete={onDelete}
-              onPromoteToManager={onPromoteToManager} onPromoteToAdmin={onPromoteToAdmin}
-              onDemoteToEmployee={onDemoteToEmployee} onDemoteToManager={onDemoteToManager}
-              onDemoteToEmployee2={onDemoteToEmployee2} onChangeRole={onChangeRole}
-              currentAdminId={currentAdminId}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+function validateFormFields(form,isManager=false){
+  const err={};
+  if(!form.f_name?.trim())err.f_name="Required";
+  if(!form.l_name?.trim())err.l_name="Required";
+  if(!form.work_email?.trim())err.work_email="Required";
+  else if(!EMAIL_REGEX.test(form.work_email))err.work_email="Invalid email address";
+  if(!form.password)err.password="Required";
+  else if(!PWD_REGEX.test(form.password))err.password="Min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special character";
+  if(isManager&&form.confirm_password!==form.password)err.confirm_password="Passwords do not match";
+  if(!form.gender)err.gender="Required";
+  if(!form.personal_contact?.trim())err.personal_contact="Required";
+  else if(!PHONE_REGEX.test(form.personal_contact))err.personal_contact="Must be a valid 10-digit Indian mobile number";
+  if(!form.e_contact?.trim())err.e_contact="Required";
+  else if(!PHONE_REGEX.test(form.e_contact))err.e_contact="Must be a valid 10-digit Indian mobile number";
+  if(!form.department)err.department="Required";
+  if(!form.designation?.trim())err.designation="Required";
+  if(!form.office_location)err.office_location="Required";
+  if(form.pincode&&!PINCODE_REGEX.test(form.pincode))err.pincode="Must be a valid 6-digit pincode";
+  if(form.aadhaar_number&&!AADHAAR_REGEX.test(form.aadhaar_number))err.aadhaar_number="Must be exactly 12 digits";
+  if(form.pan_number&&!PAN_REGEX.test(form.pan_number))err.pan_number="Invalid PAN format (e.g. ABCDE1234F)";
+  if(!form.is_fresher&&form.total_experience){
+    const exp=parseFloat(form.total_experience);
+    if(isNaN(exp)||exp<0||exp>50)err.total_experience="Enter a valid experience (0-50 years)";
+  }
+  const hasBankPartial=[form.bank_name,form.account_holder_name,form.account_number,form.ifsc_code].some(Boolean);
+  const hasBankFull=[form.bank_name,form.account_holder_name,form.account_number,form.ifsc_code].every(Boolean);
+  if(hasBankPartial&&!hasBankFull)err.bank_group="Fill all bank details together or leave all blank";
+  if(form.account_number&&!ACCOUNT_REGEX.test(form.account_number))err.account_number="Account number must be 9-18 digits";
+  if(form.ifsc_code&&!IFSC_REGEX.test(form.ifsc_code))err.ifsc_code="Invalid IFSC code format (e.g. SBIN0001234)";
+  if(form.resume&&!URL_REGEX.test(form.resume))err.resume="Must be a valid URL starting with https://";
+  if(form.aadhaar_card&&!URL_REGEX.test(form.aadhaar_card))err.aadhaar_card="Must be a valid URL starting with https://";
+  if(form.pan_card&&!URL_REGEX.test(form.pan_card))err.pan_card="Must be a valid URL starting with https://";
+  if(form.experience_letter&&!URL_REGEX.test(form.experience_letter))err.experience_letter="Must be a valid URL starting with https://";
+  return err;
 }
 
 export default function EmployeeTable(){
@@ -906,30 +1103,23 @@ export default function EmployeeTable(){
   const [mgrForm,setMgrForm]=useState(EMPTY_MGR);
   const [empErrors,setEmpErrors]=useState({});
   const [mgrErrors,setMgrErrors]=useState({});
+  const [empPerms,setEmpPerms]=useState({...DEFAULT_PERMISSIONS});
+  const [mgrPerms,setMgrPerms]=useState({...ADMIN_PERMISSIONS});
   const [editTarget,setEditTarget]=useState(null);
   const [editForm,setEditForm]=useState({});
   const [editErrors,setEditErrors]=useState({});
   const [openEdit,setOpenEdit]=useState(false);
   const [deleteTarget,setDeleteTarget]=useState(null);
-
   const [promoteToMgrTarget,setPromoteToMgrTarget]=useState(null);
   const [promoteToMgrForm,setPromoteToMgrForm]=useState({reporting_manager:"",designation:"",role:"manager"});
-
   const [promoteToAdminTarget,setPromoteToAdminTarget]=useState(null);
   const [promoteToAdminForm,setPromoteToAdminForm]=useState({reporting_manager:"",designation:"",role:"admin"});
-
   const [demoteMgrToEmpTarget,setDemoteMgrToEmpTarget]=useState(null);
   const [demoteMgrToEmpForm,setDemoteMgrToEmpForm]=useState({Under_manager:"",designation:""});
-
   const [demoteAdminToMgrTarget,setDemoteAdminToMgrTarget]=useState(null);
   const [demoteAdminToMgrForm,setDemoteAdminToMgrForm]=useState({reporting_manager:"",designation:"",role:"manager"});
-
   const [demoteAdminToEmpTarget,setDemoteAdminToEmpTarget]=useState(null);
   const [demoteAdminToEmpForm,setDemoteAdminToEmpForm]=useState({Under_manager:"",designation:""});
-
-  const [roleChangeTarget,setRoleChangeTarget]=useState(null);
-  const [roleChangeValue,setRoleChangeValue]=useState("manager");
-
   const [filters,setFilters]=useState({search:"",department:"",role:"",location:"",gender:"",type:"",status:""});
 
   const {data:adminData}=useGetMeAdmin();
@@ -940,7 +1130,6 @@ export default function EmployeeTable(){
   const {data:managers}=useFindAllManagers();
   const {data:employeeData,isLoading:listLoading,refetch:refetchList}=useGetAllEmployee();
   const allUsers=employeeData?.users??[];
-
   const {mutate:editUserApi}=useEditEmployee(editTarget?._id);
   const {mutate:editManagerApi}=useEditManager(editTarget?._id);
   const {mutate:deleteUserApi}=useDeleteUser();
@@ -950,7 +1139,6 @@ export default function EmployeeTable(){
   const {mutate:demoteMgrToEmpApi}=useDemoteManagerToEmployee();
   const {mutate:demoteAdminToMgrApi}=useDemoteAdminToManager();
   const {mutate:demoteAdminToEmpApi}=useDemoteAdminToEmployee();
-  const {mutate:changeRoleApi}=useChangeManagerRole();
 
   const showPopup=(type,message)=>{
     setPopup({show:true,type,message});
@@ -961,7 +1149,6 @@ export default function EmployeeTable(){
 
   const handleOpenEdit=(user)=>{
     setEditTarget(user);
-    const isManager=user.role==="manager"||user.role==="senior_manager";
     setEditForm({
       f_name:user.f_name??"",l_name:user.l_name??"",work_email:user.work_email??"",
       gender:user.gender??"",marital_status:user.marital_status??"single",
@@ -979,17 +1166,20 @@ export default function EmployeeTable(){
 
   const validateEdit=()=>{
     const err={};
-    if(!editForm.f_name)err.f_name="Required";
-    if(!editForm.l_name)err.l_name="Required";
-    if(!editForm.work_email)err.work_email="Required";
+    if(!editForm.f_name?.trim())err.f_name="Required";
+    if(!editForm.l_name?.trim())err.l_name="Required";
+    if(!editForm.work_email?.trim())err.work_email="Required";
+    else if(!EMAIL_REGEX.test(editForm.work_email))err.work_email="Invalid email address";
     if(!editForm.department)err.department="Required";
-    if(!editForm.designation)err.designation="Required";
+    if(!editForm.designation?.trim())err.designation="Required";
+    if(editForm.personal_contact&&!PHONE_REGEX.test(editForm.personal_contact))err.personal_contact="Must be a valid 10-digit Indian mobile number";
+    if(editForm.e_contact&&!PHONE_REGEX.test(editForm.e_contact))err.e_contact="Must be a valid 10-digit Indian mobile number";
     setEditErrors(err);
     return Object.keys(err).length===0;
   };
 
   const handleEditSubmit=()=>{
-    if(!validateEdit()){showPopup("error","Please fill all required fields");return;}
+    if(!validateEdit()){showPopup("error","Please fix the errors in the form");return;}
     const isManager=editTarget?.role==="manager"||editTarget?.role==="senior_manager";
     const mutate=isManager?editManagerApi:editUserApi;
     mutate(editForm,{
@@ -1042,33 +1232,15 @@ export default function EmployeeTable(){
     });
   };
 
-  const handleRoleChange=()=>{
-    changeRoleApi({id:roleChangeTarget._id,data:{role:roleChangeValue}},{
-      onSuccess:(res)=>{showPopup("success",res?.message||"Role updated");setRoleChangeTarget(null);refetchList();},
-      onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Role change failed"),
-    });
-  };
-
   const handleEmpChange=(e)=>setEmpForm({...empForm,[e.target.name]:e.target.value});
+  const handleMgrChange=(e)=>setMgrForm({...mgrForm,[e.target.name]:e.target.value});
 
-  const validateEmp=()=>{
-    const err={};
-    if(!empForm.f_name)err.f_name="Required";
-    if(!empForm.l_name)err.l_name="Required";
-    if(!empForm.work_email)err.work_email="Required";
-    if(!empForm.password)err.password="Required";
-    if(!empForm.gender)err.gender="Required";
-    if(!empForm.personal_contact)err.personal_contact="Required";
-    if(!empForm.e_contact)err.e_contact="Required";
-    if(!empForm.department)err.department="Required";
-    if(!empForm.designation)err.designation="Required";
-    if(!empForm.office_location)err.office_location="Required";
-    setEmpErrors(err);
-    return Object.keys(err).length===0;
-  };
+  const handleEmpPermChange=(section,key,val)=>setEmpPerms((p)=>({...p,[section]:{...p[section],[key]:val}}));
+  const handleMgrPermChange=(section,key,val)=>setMgrPerms((p)=>({...p,[section]:{...p[section],[key]:val}}));
 
   const handleEmpSubmit=()=>{
-    if(!validateEmp()){showPopup("error","Please fill all required fields before submitting");setEmpStep(0);return;}
+    const errs=validateFormFields(empForm,false);
+    if(Object.keys(errs).length>0){setEmpErrors(errs);showPopup("error","Please fix the errors in the form");setEmpStep(0);return;}
     addEmployeeApi({
       f_name:empForm.f_name,l_name:empForm.l_name,work_email:empForm.work_email,
       password:empForm.password,gender:empForm.gender,marital_status:empForm.marital_status,
@@ -1087,32 +1259,16 @@ export default function EmployeeTable(){
       account_number:empForm.account_number||undefined,ifsc_code:empForm.ifsc_code||undefined,
       resume:empForm.resume||undefined,aadhaar_card:empForm.aadhaar_card||undefined,
       pan_card:empForm.pan_card||undefined,experience_letter:empForm.experience_letter||undefined,
+      permissions:empPerms,
     },{
-      onSuccess:(res)=>{showPopup("success",res?.message||"Employee added successfully");setOpen(false);setEmpForm(EMPTY_EMP);setEmpErrors({});setEmpStep(0);refetchList();},
+      onSuccess:(res)=>{showPopup("success",res?.message||"Employee added successfully");setOpen(false);setEmpForm(EMPTY_EMP);setEmpErrors({});setEmpStep(0);setEmpPerms({...DEFAULT_PERMISSIONS});refetchList();},
       onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Something went wrong"),
     });
   };
 
-  const handleMgrChange=(e)=>setMgrForm({...mgrForm,[e.target.name]:e.target.value});
-
-  const validateMgr=()=>{
-    const err={};
-    if(!mgrForm.f_name)err.f_name="Required";
-    if(!mgrForm.l_name)err.l_name="Required";
-    if(!mgrForm.work_email)err.work_email="Required";
-    if(!mgrForm.password)err.password="Required";
-    if(!mgrForm.gender)err.gender="Required";
-    if(!mgrForm.personal_contact)err.personal_contact="Required";
-    if(!mgrForm.e_contact)err.e_contact="Required";
-    if(!mgrForm.department)err.department="Required";
-    if(!mgrForm.designation)err.designation="Required";
-    if(!mgrForm.office_location)err.office_location="Required";
-    setMgrErrors(err);
-    return Object.keys(err).length===0;
-  };
-
   const handleMgrSubmit=()=>{
-    if(!validateMgr()){showPopup("error","Please fill all required fields before submitting");setMgrStep(0);return;}
+    const errs=validateFormFields(mgrForm,true);
+    if(Object.keys(errs).length>0){setMgrErrors(errs);showPopup("error","Please fix the errors in the form");setMgrStep(0);return;}
     addManagerApi({
       f_name:mgrForm.f_name,l_name:mgrForm.l_name,work_email:mgrForm.work_email,
       password:mgrForm.password,gender:mgrForm.gender,marital_status:mgrForm.marital_status,
@@ -1131,30 +1287,24 @@ export default function EmployeeTable(){
       account_number:mgrForm.account_number||undefined,ifsc_code:mgrForm.ifsc_code||undefined,
       resume:mgrForm.resume||undefined,aadhaar_card:mgrForm.aadhaar_card||undefined,
       pan_card:mgrForm.pan_card||undefined,experience_letter:mgrForm.experience_letter||undefined,
+      permissions:mgrPerms,
     },{
-      onSuccess:(res)=>{showPopup("success",res?.message||"Manager added & verification email sent");setOpenManager(false);setMgrForm(EMPTY_MGR);setMgrErrors({});setMgrStep(0);refetchList();},
+      onSuccess:(res)=>{showPopup("success",res?.message||"Manager added & verification email sent");setOpenManager(false);setMgrForm(EMPTY_MGR);setMgrErrors({});setMgrStep(0);setMgrPerms({...ADMIN_PERMISSIONS});refetchList();},
       onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Something went wrong"),
     });
   };
 
-  const allDesignations=[...new Set(allUsers.map((u)=>u.designation).filter(Boolean))].sort();
-
   const filtered=allUsers.filter((u)=>{
     const name=`${u.f_name??""} ${u.l_name??""}`.toLowerCase();
     const q=filters.search.toLowerCase();
-    const matchType=filters.type
-      ?filters.type==="employee"?u.type==="employee"
-        :filters.type==="manager"?u.type==="manager"
-        :u.role===filters.type
-      :true;
+    const matchType=filters.type?filters.type==="employee"?u.type==="employee":filters.type==="manager"?u.type==="manager":u.role===filters.type:true;
     return(
       (name.includes(q)||(u.work_email??"").toLowerCase().includes(q)||(u.uid??"").toLowerCase().includes(q)||(u.designation??"").toLowerCase().includes(q))&&
       (filters.department?u.department===filters.department:true)&&
       (filters.role?u.role===filters.role:true)&&
       (filters.location?u.office_location===filters.location:true)&&
       (filters.gender?u.gender===filters.gender:true)&&
-      (filters.status?u.status===filters.status:true)&&
-      matchType
+      (filters.status?u.status===filters.status:true)&&matchType
     );
   });
 
@@ -1166,16 +1316,11 @@ export default function EmployeeTable(){
   const openDemoteMgrToEmp=(user)=>{setDemoteMgrToEmpTarget(user);setDemoteMgrToEmpForm({Under_manager:"",designation:user.designation||""});};
   const openDemoteAdminToMgr=(user)=>{setDemoteAdminToMgrTarget(user);setDemoteAdminToMgrForm({reporting_manager:"",designation:user.designation||"",role:"manager"});};
   const openDemoteAdminToEmp=(user)=>{setDemoteAdminToEmpTarget(user);setDemoteAdminToEmpForm({Under_manager:"",designation:user.designation||""});};
-  const openChangeRole=(user)=>{setRoleChangeTarget(user);setRoleChangeValue(user.role||"manager");};
 
   const actionMenuProps={
-    onPromoteToManager:openPromoteToManager,
-    onPromoteToAdmin:openPromoteToAdmin,
-    onDemoteToEmployee:openDemoteMgrToEmp,
-    onDemoteToManager:openDemoteAdminToMgr,
-    onDemoteToEmployee2:openDemoteAdminToEmp,
-    onChangeRole:openChangeRole,
-    currentAdminId,
+    onPromoteToManager:openPromoteToManager,onPromoteToAdmin:openPromoteToAdmin,
+    onDemoteToEmployee:openDemoteMgrToEmp,onDemoteToManager:openDemoteAdminToMgr,
+    onDemoteToEmployee2:openDemoteAdminToEmp,currentAdminId,
   };
 
   return(
@@ -1190,7 +1335,7 @@ export default function EmployeeTable(){
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-[#730042] tracking-tight">Employee Directory</h1>
-            <p className="text-xs sm:text-sm text-[#993556] mt-0.5">{allUsers.length} total · {filtered.length} shown</p>
+            <p className="text-xs sm:text-sm text-[#993556] mt-0.5">{allUsers.length} total · {filtered.length} shown · {employeeData?.employees??0} employees · {employeeData?.managers??0} managers</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button onClick={()=>exportToCSV(filtered)}
@@ -1208,7 +1353,7 @@ export default function EmployeeTable(){
               <FaUserTie size={12}/><span>Add Manager</span>
             </button>
             <button onClick={()=>{setOpen(true);setEmpStep(0);}}
-              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90 transition-all"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90"
               style={{background:"#730042"}}>
               <FaUserPlus size={12}/><span>Add Employee</span>
             </button>
@@ -1248,6 +1393,7 @@ export default function EmployeeTable(){
                 <option value="">All Roles</option>
                 <option value="employee">Employee</option><option value="manager">Manager</option>
                 <option value="senior_manager">Senior Manager</option><option value="official">Official</option>
+                <option value="admin">Admin</option>
               </select>
               <select className={`${inputCls} flex-1`} value={filters.location} onChange={(e)=>setFilters({...filters,location:e.target.value})}>
                 <option value="">All Locations</option>{LOCATIONS.map((l)=><option key={l} value={l}>{l}</option>)}
@@ -1285,11 +1431,10 @@ export default function EmployeeTable(){
               <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
                 <div className="text-4xl">👥</div>
                 <p className="text-[#730042] font-medium text-sm">No employees found</p>
-                <button onClick={()=>setOpen(true)} className="mt-1 px-4 py-2 rounded-xl text-white text-sm font-semibold hover:opacity-90 transition" style={{background:"#730042"}}>+ Add Employee</button>
+                <button onClick={()=>setOpen(true)} className="mt-1 px-4 py-2 rounded-xl text-white text-sm font-semibold hover:opacity-90" style={{background:"#730042"}}>+ Add Employee</button>
               </div>
             ):filtered.map((u)=>(
-              <MobileCard key={u._id} u={u} onView={handleView} onEdit={handleOpenEdit} onDelete={setDeleteTarget}
-                {...actionMenuProps}/>
+              <MobileCard key={u._id} u={u} onView={handleView} onEdit={handleOpenEdit} onDelete={setDeleteTarget} {...actionMenuProps}/>
             ))}
           </div>
 
@@ -1337,8 +1482,7 @@ export default function EmployeeTable(){
                     <td className="px-3 lg:px-4 py-3">{roleBadge(u.role)}</td>
                     <td className="px-3 lg:px-4 py-3">
                       <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e)=>e.stopPropagation()}>
-                        <ActionMenu user={u} onView={handleView} onEdit={handleOpenEdit} onDelete={setDeleteTarget}
-                          {...actionMenuProps}/>
+                        <ActionMenu user={u} onView={handleView} onEdit={handleOpenEdit} onDelete={setDeleteTarget} {...actionMenuProps}/>
                       </div>
                     </td>
                   </tr>
@@ -1349,7 +1493,7 @@ export default function EmployeeTable(){
 
           {!listLoading&&filtered.length>0&&(
             <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-t border-[#F4C0D1] text-[11px] sm:text-xs text-[#993556] flex items-center justify-between" style={{background:"#F9F8F2"}}>
-              <span>Showing {filtered.length} of {allUsers.length} · {employeeData?.employees??0} employees · {employeeData?.managers??0} managers</span>
+              <span>Showing {filtered.length} of {allUsers.length}</span>
               {activeFilterCount>0&&<button onClick={clearFilters} className="text-[#A32D2D] font-medium hover:underline">Clear filters</button>}
             </div>
           )}
@@ -1368,7 +1512,6 @@ export default function EmployeeTable(){
           onDemoteToEmployee={openDemoteMgrToEmp}
           onDemoteToManager={openDemoteAdminToMgr}
           onDemoteToEmployee2={openDemoteAdminToEmp}
-          onChangeRole={openChangeRole}
           managers={managers}
           allEmployees={allUsers}
           currentAdminId={currentAdminId}
@@ -1376,14 +1519,14 @@ export default function EmployeeTable(){
       )}
 
       {open&&(
-        <StepModal title="Add Employee" icon={<FaUserPlus/>} onClose={()=>{setOpen(false);setEmpErrors({});setEmpStep(0);}} onSubmit={handleEmpSubmit} steps={EMP_STEPS} currentStep={empStep} setCurrentStep={setEmpStep} accentColor="#730042">
-          <EmpStepFields step={empStep} form={empForm} onChange={handleEmpChange} errors={empErrors} managers={managers}/>
+        <StepModal title="Add Employee" icon={<FaUserPlus/>} onClose={()=>{setOpen(false);setEmpErrors({});setEmpStep(0);setEmpForm(EMPTY_EMP);}} onSubmit={handleEmpSubmit} steps={EMP_STEPS} currentStep={empStep} setCurrentStep={setEmpStep} accentColor="#730042">
+          <EmpStepFields step={empStep} form={empForm} onChange={handleEmpChange} errors={empErrors} managers={managers} perms={empPerms} onPermChange={handleEmpPermChange}/>
         </StepModal>
       )}
 
       {openManager&&(
-        <StepModal title="Add Manager" icon={<FaUserTie/>} onClose={()=>{setOpenManager(false);setMgrErrors({});setMgrStep(0);}} onSubmit={handleMgrSubmit} steps={EMP_STEPS} currentStep={mgrStep} setCurrentStep={setMgrStep} accentColor="#730042">
-          <MgrStepFields step={mgrStep} form={mgrForm} onChange={handleMgrChange} errors={mgrErrors} managers={managers} allEmployees={allUsers}/>
+        <StepModal title="Add Manager" icon={<FaUserTie/>} onClose={()=>{setOpenManager(false);setMgrErrors({});setMgrStep(0);setMgrForm(EMPTY_MGR);}} onSubmit={handleMgrSubmit} steps={EMP_STEPS} currentStep={mgrStep} setCurrentStep={setMgrStep} accentColor="#730042">
+          <MgrStepFields step={mgrStep} form={mgrForm} onChange={handleMgrChange} errors={mgrErrors} managers={managers} allEmployees={allUsers} perms={mgrPerms} onPermChange={handleMgrPermChange}/>
         </StepModal>
       )}
 
@@ -1418,14 +1561,7 @@ export default function EmployeeTable(){
             </Field>
           )}
           {(editTarget.role==="manager"||editTarget.role==="senior_manager")&&(
-            <ReportingManagerSelect
-              value={editForm.reporting_manager}
-              onChange={handleEditChange}
-              managers={managers}
-              allEmployees={allUsers}
-              label="Reporting Manager"
-              name="reporting_manager"
-            />
+            <ReportingManagerSelect value={editForm.reporting_manager} onChange={handleEditChange} managers={managers} allEmployees={allUsers} label="Reporting Manager" name="reporting_manager"/>
           )}
           <Field label="Gender">
             <select name="gender" value={editForm.gender} onChange={handleEditChange} className={inputCls}>
@@ -1437,8 +1573,8 @@ export default function EmployeeTable(){
               <option value="single">Single</option><option value="married">Married</option><option value="divorced">Divorced</option>
             </select>
           </Field>
-          <Field label="Phone"><input name="personal_contact" value={editForm.personal_contact} onChange={handleEditChange} className={inputCls}/></Field>
-          <Field label="Emergency Contact"><input name="e_contact" value={editForm.e_contact} onChange={handleEditChange} className={inputCls}/></Field>
+          <Field label="Phone" error={editErrors.personal_contact}><input name="personal_contact" value={editForm.personal_contact} onChange={handleEditChange} className={inputCls}/></Field>
+          <Field label="Emergency Contact" error={editErrors.e_contact}><input name="e_contact" value={editForm.e_contact} onChange={handleEditChange} className={inputCls}/></Field>
           <Field label="Office Location">
             <select name="office_location" value={editForm.office_location} onChange={handleEditChange} className={inputCls}>
               <option value="">Select Location</option>{LOCATIONS.map((l)=><option key={l} value={l}>{l}</option>)}
@@ -1466,14 +1602,7 @@ export default function EmployeeTable(){
                 <option value="manager">Manager</option><option value="senior_manager">Senior Manager</option><option value="official">Official</option>
               </select>
             </Field>
-            <ReportingManagerSelect
-              value={promoteToMgrForm.reporting_manager}
-              onChange={(e)=>setPromoteToMgrForm({...promoteToMgrForm,reporting_manager:e.target.value})}
-              managers={managers}
-              allEmployees={allUsers}
-              label="Reporting Manager"
-              name="reporting_manager"
-            />
+            <ReportingManagerSelect value={promoteToMgrForm.reporting_manager} onChange={(e)=>setPromoteToMgrForm({...promoteToMgrForm,reporting_manager:e.target.value})} managers={managers} allEmployees={allUsers} label="Reporting Manager" name="reporting_manager"/>
           </div>
         </ConfirmModal>
       )}
@@ -1485,14 +1614,7 @@ export default function EmployeeTable(){
           onConfirm={handlePromoteToAdmin} onCancel={()=>setPromoteToAdminTarget(null)}>
           <div className="flex flex-col gap-2 -mt-1">
             <Field label="New Designation"><input className={inputCls} placeholder="e.g. HR Manager" value={promoteToAdminForm.designation} onChange={(e)=>setPromoteToAdminForm({...promoteToAdminForm,designation:e.target.value})}/></Field>
-            <ReportingManagerSelect
-              value={promoteToAdminForm.reporting_manager}
-              onChange={(e)=>setPromoteToAdminForm({...promoteToAdminForm,reporting_manager:e.target.value})}
-              managers={managers}
-              allEmployees={allUsers}
-              label="Reporting Manager (optional)"
-              name="reporting_manager"
-            />
+            <ReportingManagerSelect value={promoteToAdminForm.reporting_manager} onChange={(e)=>setPromoteToAdminForm({...promoteToAdminForm,reporting_manager:e.target.value})} managers={managers} allEmployees={allUsers} label="Reporting Manager (optional)" name="reporting_manager"/>
           </div>
         </ConfirmModal>
       )}
@@ -1526,14 +1648,7 @@ export default function EmployeeTable(){
                 <option value="manager">Manager</option><option value="senior_manager">Senior Manager</option>
               </select>
             </Field>
-            <ReportingManagerSelect
-              value={demoteAdminToMgrForm.reporting_manager}
-              onChange={(e)=>setDemoteAdminToMgrForm({...demoteAdminToMgrForm,reporting_manager:e.target.value})}
-              managers={managers}
-              allEmployees={allUsers}
-              label="Reporting Manager (optional)"
-              name="reporting_manager"
-            />
+            <ReportingManagerSelect value={demoteAdminToMgrForm.reporting_manager} onChange={(e)=>setDemoteAdminToMgrForm({...demoteAdminToMgrForm,reporting_manager:e.target.value})} managers={managers} allEmployees={allUsers} label="Reporting Manager (optional)" name="reporting_manager"/>
           </div>
         </ConfirmModal>
       )}
@@ -1549,21 +1664,6 @@ export default function EmployeeTable(){
               <select className={inputCls} value={demoteAdminToEmpForm.Under_manager} onChange={(e)=>setDemoteAdminToEmpForm({...demoteAdminToEmpForm,Under_manager:e.target.value})}>
                 <option value="">Select Manager (optional)</option>
                 {managers?.managers?.map((m)=><option key={m._id} value={m._id}>{m.f_name} {m.l_name}</option>)}
-              </select>
-            </Field>
-          </div>
-        </ConfirmModal>
-      )}
-
-      {roleChangeTarget&&(
-        <ConfirmModal title="Change Manager Role" icon="🔄"
-          message={`Change the role of ${roleChangeTarget.f_name} ${roleChangeTarget.l_name}.`}
-          confirmLabel="Update Role" confirmColor="#085041"
-          onConfirm={handleRoleChange} onCancel={()=>setRoleChangeTarget(null)}>
-          <div className="-mt-1">
-            <Field label="New Role">
-              <select className={inputCls} value={roleChangeValue} onChange={(e)=>setRoleChangeValue(e.target.value)}>
-                <option value="manager">Manager</option><option value="senior_manager">Senior Manager</option><option value="official">Official</option>
               </select>
             </Field>
           </div>
