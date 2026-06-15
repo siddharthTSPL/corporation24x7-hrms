@@ -25,11 +25,11 @@ const roleToEndpoint = {
 
 export const fetchMyPermissions = async (role) => {
   const endpoint = roleToEndpoint[role];
-  if (!endpoint) return null;
+  if (!endpoint) return {};
   try {
     const res = await api.get(`permission/me/${endpoint}`);
-    return res.data.data;
+    return res.data.data ?? {};
   } catch {
-    return null;
+    return {};
   }
 };

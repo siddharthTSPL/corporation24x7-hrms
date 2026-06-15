@@ -6,12 +6,12 @@ const resolvePath = (obj, path) => {
 };
 
 export const usePermissionStore = create((set, get) => ({
-  permissions: null,
+  permissions: {},
   role: null,
 
-  setPermissions: (role, permissions) => set({ role, permissions }),
+  setPermissions: (role, permissions) => set({ role, permissions: permissions ?? {} }),
 
-  clearPermissions: () => set({ role: null, permissions: null }),
+  clearPermissions: () => set({ role: null, permissions: {} }),
 
   can: (permissionPath) => {
     const { role, permissions } = get();
