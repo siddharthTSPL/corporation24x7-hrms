@@ -1,60 +1,86 @@
-import { applyLeave,getAllLeaves,getLeaveResult ,deleteLeave,editLeave,getallleavehistory} from "../../../api/employeeapi/leave/em.leave.api";
+import {
+  applyLeave,
+  getAllLeaves,
+  deleteLeave,
+  editLeave,
+  getAllLeaveHistory,
+} from "../../../api/employeeapi/leave/em.leave.api";
 
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-
+// Apply Leave
 export const useApplyLeave = () => {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationKey: ["applyLeave"],
     mutationFn: applyLeave,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leaves"] });
+      queryClient.invalidateQueries({
+        queryKey: ["leaves"],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["leaveHistory"],
+      });
     },
   });
 };
 
-
+// Get Current Leaves
 export const useGetAllLeaves = () => {
-     return useQuery({
-          queryKey: ["leaves"],
-          queryFn: () => getAllLeaves(),
-     });
+  return useQuery({
+    queryKey: ["leaves"],
+    queryFn: getAllLeaves,
+  });
 };
 
-export const useGetLeaveResult = (id) => {
-     return useQuery({
-          queryKey: ["leaveResult", id],
-          queryFn: () => getLeaveResult(id),
-     });
-};
-
+// Delete Leave
 export const useDeleteLeave = () => {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationKey: ["deleteLeave"],
     mutationFn: deleteLeave,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leaves"] });
+      queryClient.invalidateQueries({
+        queryKey: ["leaves"],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["leaveHistory"],
+      });
     },
   });
 };
 
-
+// Edit Leave
 export const useEditLeave = () => {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationKey: ["editLeave"],
     mutationFn: editLeave,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leaves"] });
+      queryClient.invalidateQueries({
+        queryKey: ["leaves"],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["leaveHistory"],
+      });
     },
   });
 };
 
+// Leave History
 export const useGetAllLeaveHistory = () => {
-     return useQuery({
-          queryKey: ["leaveHistory"],
-          queryFn: () => getallleavehistory(),
-     });
+  return useQuery({
+    queryKey: ["leaveHistory"],
+    queryFn: getAllLeaveHistory,
+  });
 };

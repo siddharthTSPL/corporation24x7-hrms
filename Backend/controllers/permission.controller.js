@@ -112,6 +112,10 @@ const getMyPermissions = async (req, res, next) => {
     const { _id, role, organisation_id } = req.user;
     const user_model = resolveModel(role);
 
+    if (!user_model) {
+      return res.status(400).json({ success: false, message: "Cannot resolve model for this role." });
+    }
+
     const permDoc = await PermissionModel.findOne({ user_id: _id, user_model, organisation_id });
 
     return res.status(200).json({ success: true, data: permDoc || null });
