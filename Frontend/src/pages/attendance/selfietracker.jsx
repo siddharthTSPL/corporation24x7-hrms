@@ -8,9 +8,8 @@ export default function SelfieCapture({ onCapture, onCancel }) {
   const [phase,    setPhase]    = useState("loading");
   const [snapshot, setSnapshot] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
-  const [timer,    setTimer]    = useState(null); // countdown
+  const [timer,    setTimer]    = useState(null);
 
-  // ── Start webcam ──────────────────────────────────────────────────────────────
   useEffect(() => {
     let active = true;
     (async () => {
@@ -44,7 +43,30 @@ export default function SelfieCapture({ onCapture, onCancel }) {
     };
   }, []);
 
-  // ── Countdown then auto-capture ───────────────────────────────────────────────
+  const doCapture = useCallback(() => {
+    const video  = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+    const size = 400;
+    canvas.width  = size;
+    canvas.height = size;
+    const ctx  = canvas.getContext("2d");
+    const vw   = video.videoWidth;
+    const vh   = video.videoHeight;
+    const side = Math.min(vw, vh);
+    const sx   = (vw - side) / 2;
+    const sy   = (vh - side) / 2;
+    ctx.save();
+    ctx.translate(size, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, sx, sy, side, side, 0, 0, size, size);
+    ctx.restore();
+    const base64 = canvas.toDataURL("image/jpeg", 0.85);
+    setSnapshot(base64);
+    setPhase("captured");
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+  }, []);
+
   const startCountdown = useCallback(() => {
     let count = 3;
     setTimer(count);
@@ -58,36 +80,8 @@ export default function SelfieCapture({ onCapture, onCancel }) {
         setTimer(count);
       }
     }, 1000);
-  }, []); // eslint-disable-line
+  }, [doCapture]);
 
-  const doCapture = useCallback(() => {
-    const video  = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas) return;
-
-    const size = 400;
-    canvas.width  = size;
-    canvas.height = size;
-    const ctx  = canvas.getContext("2d");
-    const vw   = video.videoWidth;
-    const vh   = video.videoHeight;
-    const side = Math.min(vw, vh);
-    const sx   = (vw - side) / 2;
-    const sy   = (vh - side) / 2;
-
-    ctx.save();
-    ctx.translate(size, 0);
-    ctx.scale(-1, 1);
-    ctx.drawImage(video, sx, sy, side, side, 0, 0, size, size);
-    ctx.restore();
-
-    const base64 = canvas.toDataURL("image/jpeg", 0.85);
-    setSnapshot(base64);
-    setPhase("captured");
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-  }, []);
-
-  // ── Retake ────────────────────────────────────────────────────────────────────
   const retake = useCallback(async () => {
     setSnapshot(null);
     setTimer(null);
@@ -115,207 +109,149 @@ export default function SelfieCapture({ onCapture, onCancel }) {
     if (snapshot) onCapture(snapshot);
   }, [snapshot, onCapture]);
 
-  return (
-    <div style={s.overlay}>
-      <div style={s.modal}>
+  const statusConfig = {
+    preview:  { bg: "bg-green-50",  text: "text-green-700",  border: "border-green-200",  dot: "bg-green-500",  label: "Camera live" },
+    captured: { bg: "bg-blue-50",   text: "text-blue-700",   border: "border-blue-200",   dot: "bg-blue-500",   label: "Photo captured" },
+    loading:  { bg: "bg-gray-100",  text: "text-gray-500",   border: "border-gray-200",   dot: "bg-gray-400",   label: "Starting camera…" },
+    error:    { bg: "bg-red-50",    text: "text-red-700",    border: "border-red-200",    dot: "bg-red-500",    label: "Camera unavailable" },
+  };
+  const sc = statusConfig[phase] ?? statusConfig.loading;
 
-        {/* Header */}
-        <div style={s.header}>
-          <div style={s.headerLeft}>
-            <span style={s.headerIcon}>📸</span>
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[1000] p-4">
+      <div className="bg-white border border-gray-200 rounded-3xl p-6 w-full max-w-sm flex flex-col gap-4 shadow-2xl animate-[fadeIn_0.25s_ease]">
+
+        <div className="flex justify-between items-start">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">📸</span>
             <div>
-              <p style={s.title}>Identity Verification</p>
-              <p style={s.subtitle}>Take a clear selfie to check in</p>
+              <p className="m-0 text-[17px] font-bold text-gray-900">Identity Verification</p>
+              <p className="mt-0.5 text-[12px] text-gray-400">Take a clear selfie to check in</p>
             </div>
           </div>
-          <button style={s.closeBtn} onClick={onCancel} title="Cancel">✕</button>
+          <button onClick={onCancel}
+            className="w-8 h-8 bg-gray-50 border border-gray-200 text-gray-500 rounded-lg flex items-center justify-center cursor-pointer text-sm hover:bg-gray-100 transition-colors flex-shrink-0">
+            ✕
+          </button>
         </div>
 
-        {/* Viewfinder */}
-        <div style={s.viewfinderWrap}>
-          <div style={s.viewfinder}>
+        <div className="flex flex-col items-center gap-3">
+          <div className="relative w-[260px] h-[260px] rounded-full overflow-hidden bg-gray-100 border-[3px] border-gray-200 flex-shrink-0">
             <video
               ref={videoRef}
-              style={{ ...s.media, display: phase === "preview" ? "block" : "none", transform: "scaleX(-1)" }}
-              playsInline muted
-            />
+              className={`w-full h-full object-cover rounded-full ${phase === "preview" ? "block" : "hidden"}`}
+              style={{ transform: "scaleX(-1)" }}
+              playsInline muted />
+
             {snapshot && (
-              <img src={snapshot} alt="selfie" style={{ ...s.media, display: phase === "captured" ? "block" : "none" }} />
+              <img src={snapshot} alt="selfie"
+                className={`w-full h-full object-cover rounded-full ${phase === "captured" ? "block" : "hidden"}`} />
             )}
+
             {phase === "loading" && (
-              <div style={s.placeholder}>
-                <div style={s.spinner} />
-                <p style={s.placeholderText}>Starting camera…</p>
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                <div className="w-8 h-8 border-[3px] border-gray-200 border-t-[#7B1C3E] rounded-full animate-spin" />
+                <p className="text-[12px] text-gray-400 text-center m-0 px-4">Starting camera…</p>
               </div>
             )}
+
             {phase === "error" && (
-              <div style={s.placeholder}>
-                <span style={{ fontSize: 40 }}>🚫</span>
-                <p style={s.placeholderText}>{errorMsg}</p>
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4">
+                <span className="text-4xl">🚫</span>
+                <p className="text-[12px] text-gray-400 text-center m-0">{errorMsg}</p>
               </div>
             )}
 
-            {/* Countdown overlay */}
             {timer !== null && (
-              <div style={s.countdownOverlay}>
-                <span style={s.countdownNum}>{timer}</span>
+              <div className="absolute inset-0 bg-black/45 rounded-full flex items-center justify-center">
+                <span className="text-8xl font-extrabold text-white leading-none animate-[countPop_1s_ease-in-out_infinite]">{timer}</span>
               </div>
             )}
 
-            {/* Corner guides */}
             {phase === "preview" && (
               <>
-                <div style={{ ...s.corner, top: 12, left: 12, borderTop: "3px solid #7B1C3E", borderLeft: "3px solid #7B1C3E" }} />
-                <div style={{ ...s.corner, top: 12, right: 12, borderTop: "3px solid #7B1C3E", borderRight: "3px solid #7B1C3E" }} />
-                <div style={{ ...s.corner, bottom: 12, left: 12, borderBottom: "3px solid #7B1C3E", borderLeft: "3px solid #7B1C3E" }} />
-                <div style={{ ...s.corner, bottom: 12, right: 12, borderBottom: "3px solid #7B1C3E", borderRight: "3px solid #7B1C3E" }} />
+                <div className="absolute top-3 left-3 w-5 h-5 border-t-[3px] border-l-[3px] border-[#7B1C3E] rounded-sm" />
+                <div className="absolute top-3 right-3 w-5 h-5 border-t-[3px] border-r-[3px] border-[#7B1C3E] rounded-sm" />
+                <div className="absolute bottom-3 left-3 w-5 h-5 border-b-[3px] border-l-[3px] border-[#7B1C3E] rounded-sm" />
+                <div className="absolute bottom-3 right-3 w-5 h-5 border-b-[3px] border-r-[3px] border-[#7B1C3E] rounded-sm" />
               </>
             )}
 
-            {/* Captured checkmark */}
             {phase === "captured" && (
-              <div style={s.capturedBadge}>✓</div>
+              <div className="absolute bottom-3.5 right-3.5 w-7 h-7 rounded-full bg-green-500 text-white flex items-center justify-center text-sm font-bold">✓</div>
             )}
           </div>
 
-          {/* Status pill */}
-          <div style={{
-            ...s.statusPill,
-            background: phase === "preview"  ? "#DCFCE7" :
-                        phase === "captured" ? "#EFF6FF" :
-                        phase === "error"    ? "#FEF2F2" : "#F3F4F6",
-            color:      phase === "preview"  ? "#16A34A" :
-                        phase === "captured" ? "#1D4ED8" :
-                        phase === "error"    ? "#DC2626" : "#6B7280",
-            border: `1px solid ${
-                        phase === "preview"  ? "#86EFAC" :
-                        phase === "captured" ? "#BFDBFE" :
-                        phase === "error"    ? "#FECACA" : "#E5E7EB"}`,
-          }}>
-            <span style={{ ...s.statusDot, background:
-                        phase === "preview"  ? "#16A34A" :
-                        phase === "captured" ? "#1D4ED8" :
-                        phase === "error"    ? "#DC2626" : "#9CA3AF" }} />
-            {phase === "preview"  && "Camera live"}
-            {phase === "captured" && "Photo captured"}
-            {phase === "loading"  && "Starting camera…"}
-            {phase === "error"    && "Camera unavailable"}
+          <div className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-semibold border ${sc.bg} ${sc.text} ${sc.border}`}>
+            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${sc.dot}`} />
+            {sc.label}
           </div>
         </div>
 
-        <canvas ref={canvasRef} style={{ display: "none" }} />
+        <canvas ref={canvasRef} className="hidden" />
 
-        {/* Hint */}
-        <p style={s.hint}>
+        <p className="m-0 text-[12px] text-gray-500 text-center leading-relaxed">
           {phase === "preview"  && "Align your face within the frame, then tap Take Photo."}
           {phase === "captured" && "Happy with the photo? Confirm to check in."}
           {phase === "loading"  && "Requesting camera access…"}
           {phase === "error"    && "You can skip selfie verification and check in without a photo."}
         </p>
 
-        {/* Tips (preview only) */}
         {phase === "preview" && (
-          <div style={s.tips}>
-            <span style={s.tip}>💡 Face forward</span>
-            <span style={s.tip}>☀️ Good lighting</span>
-            <span style={s.tip}>🚫 No sunglasses</span>
+          <div className="flex gap-2 justify-center flex-wrap">
+            {["💡 Face forward", "☀️ Good lighting", "🚫 No sunglasses"].map((tip) => (
+              <span key={tip} className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1 text-[11px] text-gray-500">{tip}</span>
+            ))}
           </div>
         )}
 
-        {/* Actions */}
-        <div style={s.actions}>
+        <div className="flex gap-2.5">
           {phase === "preview" && (
             <>
-              <button style={s.ghostBtn} onClick={onCancel}>Skip</button>
-              <button style={s.primaryBtn} onClick={startCountdown} disabled={timer !== null}>
+              <button onClick={onCancel}
+                className="flex-1 bg-gray-50 text-gray-500 border border-gray-200 rounded-xl py-3 font-semibold text-sm cursor-pointer hover:bg-gray-100 transition-colors">
+                Skip
+              </button>
+              <button onClick={startCountdown} disabled={timer !== null}
+                className="flex-1 text-white border-none rounded-xl py-3 font-bold text-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{ background: "linear-gradient(135deg, #7B1C3E 0%, #9B2554 100%)", boxShadow: "0 4px 14px rgba(123,28,62,0.25)" }}>
                 {timer !== null ? `📷 Taking in ${timer}…` : "📷 Take Photo"}
               </button>
             </>
           )}
           {phase === "captured" && (
             <>
-              <button style={s.ghostBtn} onClick={retake}>↩ Retake</button>
-              <button style={s.primaryBtn} onClick={confirm}>✓ Use Photo</button>
+              <button onClick={retake}
+                className="flex-1 bg-gray-50 text-gray-500 border border-gray-200 rounded-xl py-3 font-semibold text-sm cursor-pointer hover:bg-gray-100 transition-colors">
+                ↩ Retake
+              </button>
+              <button onClick={confirm}
+                className="flex-1 text-white border-none rounded-xl py-3 font-bold text-sm cursor-pointer"
+                style={{ background: "linear-gradient(135deg, #7B1C3E 0%, #9B2554 100%)", boxShadow: "0 4px 14px rgba(123,28,62,0.25)" }}>
+                ✓ Use Photo
+              </button>
             </>
           )}
           {phase === "error" && (
             <>
-              <button style={s.ghostBtn} onClick={onCancel}>Cancel</button>
-              <button style={s.primaryBtn} onClick={onCancel}>Skip Selfie →</button>
+              <button onClick={onCancel}
+                className="flex-1 bg-gray-50 text-gray-500 border border-gray-200 rounded-xl py-3 font-semibold text-sm cursor-pointer hover:bg-gray-100 transition-colors">
+                Cancel
+              </button>
+              <button onClick={onCancel}
+                className="flex-1 text-white border-none rounded-xl py-3 font-bold text-sm cursor-pointer"
+                style={{ background: "linear-gradient(135deg, #7B1C3E 0%, #9B2554 100%)", boxShadow: "0 4px 14px rgba(123,28,62,0.25)" }}>
+                Skip Selfie →
+              </button>
             </>
           )}
         </div>
       </div>
 
       <style>{`
-        @keyframes spin     { to { transform: rotate(360deg); } }
         @keyframes fadeIn   { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
         @keyframes countPop { 0%,100% { transform: scale(1); } 50% { transform: scale(1.3); } }
       `}</style>
     </div>
   );
 }
-
-const s = {
-  overlay: {
-    position: "fixed", inset: 0,
-    background: "rgba(0,0,0,0.72)", backdropFilter: "blur(8px)",
-    display: "flex", alignItems: "center", justifyContent: "center",
-    zIndex: 1000, padding: 16,
-  },
-  modal: {
-    background: "#FFFFFF",
-    border: "1px solid #E5E7EB",
-    borderRadius: 24,
-    padding: "24px 22px",
-    width: "100%",
-    maxWidth: 380,
-    display: "flex", flexDirection: "column", gap: 16,
-    boxShadow: "0 32px 80px rgba(0,0,0,0.22)",
-    animation: "fadeIn 0.25s ease",
-  },
-
-  // Header
-  header:     { display: "flex", justifyContent: "space-between", alignItems: "flex-start" },
-  headerLeft: { display: "flex", alignItems: "center", gap: 12 },
-  headerIcon: { fontSize: 28 },
-  title:      { margin: 0, fontSize: 17, fontWeight: 700, color: "#111827" },
-  subtitle:   { margin: "2px 0 0", fontSize: 12, color: "#9CA3AF" },
-  closeBtn:   { background: "#F9FAFB", border: "1px solid #E5E7EB", color: "#6B7280", cursor: "pointer", fontSize: 14, borderRadius: 8, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
-
-  // Viewfinder
-  viewfinderWrap: { display: "flex", flexDirection: "column", alignItems: "center", gap: 12 },
-  viewfinder: {
-    position: "relative",
-    width: 260, height: 260,
-    borderRadius: "50%",
-    overflow: "hidden",
-    background: "#F3F4F6",
-    border: "3px solid #E5E7EB",
-    flexShrink: 0,
-  },
-  media:   { width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" },
-  corner:  { position: "absolute", width: 20, height: 20, borderRadius: 2 },
-  placeholder: { width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 },
-  placeholderText: { color: "#9CA3AF", fontSize: 12, textAlign: "center", margin: 0, padding: "0 16px" },
-  spinner: { width: 32, height: 32, border: "3px solid #E5E7EB", borderTopColor: "#7B1C3E", borderRadius: "50%", animation: "spin 0.8s linear infinite" },
-
-  countdownOverlay: { position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%" },
-  countdownNum:     { fontSize: 80, fontWeight: 800, color: "#FFFFFF", animation: "countPop 1s ease-in-out infinite", lineHeight: 1 },
-
-  capturedBadge: { position: "absolute", bottom: 14, right: 14, background: "#16A34A", color: "#fff", width: 28, height: 28, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700 },
-
-  statusPill: { display: "flex", alignItems: "center", gap: 6, borderRadius: 999, padding: "5px 14px", fontSize: 12, fontWeight: 600 },
-  statusDot:  { width: 6, height: 6, borderRadius: "50%", flexShrink: 0 },
-
-  // Tips
-  tips: { display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" },
-  tip:  { background: "#F9FAFB", border: "1px solid #E5E7EB", borderRadius: 8, padding: "4px 10px", fontSize: 11, color: "#6B7280" },
-
-  hint: { margin: 0, fontSize: 12, color: "#6B7280", textAlign: "center", lineHeight: 1.6 },
-
-  // Actions
-  actions:    { display: "flex", gap: 10 },
-  primaryBtn: { flex: 1, background: "linear-gradient(135deg, #7B1C3E 0%, #9B2554 100%)", color: "#fff", border: "none", borderRadius: 12, padding: "13px 0", fontWeight: 700, fontSize: 14, cursor: "pointer", boxShadow: "0 4px 14px rgba(123,28,62,0.25)" },
-  ghostBtn:   { flex: 1, background: "#F9FAFB", color: "#6B7280", border: "1px solid #E5E7EB", borderRadius: 12, padding: "13px 0", fontWeight: 600, fontSize: 14, cursor: "pointer" },
-};
