@@ -1,8 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
-import logo from "../assets/logo1.png";
 import React from "react";
-import talent from "../assets/Talent.png"
+import talent from "../assets/Talent.png";
 import {
   FaHome,
   FaCalendarAlt,
@@ -18,121 +17,105 @@ import {
   FaTimes,
   FaShieldAlt,
   FaUsersCog,
-  FaChartBar,
 } from "react-icons/fa";
 import { useAuth } from "../auth/store/getmeauth/getmeauth";
 import { useAdminLogout } from "../auth/server-state/adminauth/adminauth.hook";
 import { useLogoutManager } from "../auth/server-state/manager/managerauth/managerauth.hook";
 import { useLogoutUser } from "../auth/server-state/employee/employeeauth/employeeauth.hook";
 import { useLogoutSuperAdmin } from "../auth/server-state/superadmin/auth/suauth.hook";
+import { usePermissionStore } from "../auth/store/permission/permissionStore";
 
 const superAdminMenu = [
-  { name: "Dashboard", path: "/superadmin-dashboard", icon: <FaHome /> },
-  {
-    name: "Organisations",
-    path: "/superadmin-organisations",
-    icon: <FaBuilding />,
-  },
-  {
-    name: "Announcements",
-    path: "/superadmin-announcements",
-    icon: <FaBullhorn />,
-  },
-  { name: "Leaves", path: "/superadmin-leaves", icon: <FaCalendarAlt /> },
-  { name: "Reviews", path: "/superadmin-reviews", icon: <FaBullhorn /> },
-  { name: "Documents", path: "/superadmin-documents", icon: <FaFileAlt /> },
-  {
-    name: "TorchX Voice",
-    path: "/superadmin-complaints",
-    icon: <FaShieldAlt />,
-  },
-  { name: "Settings", path: "/superadmin-settings", icon: <FaCog /> },
+  { name: "Dashboard",      path: "/superadmin-dashboard",     icon: <FaHome /> },
+  { name: "Organisations",  path: "/superadmin-organisations", icon: <FaBuilding /> },
+  { name: "Announcements",  path: "/superadmin-announcements", icon: <FaBullhorn /> },
+  { name: "Leaves",         path: "/superadmin-leaves",        icon: <FaCalendarAlt /> },
+  { name: "Reviews",        path: "/superadmin-reviews",       icon: <FaBullhorn /> },
+  { name: "Team Documents", path: "/superadmin-documents",     icon: <FaFileAlt /> },
+  { name: "TorchX Voice",   path: "/superadmin-complaints",    icon: <FaShieldAlt /> },
+  { name: "Settings",       path: "/superadmin-settings",      icon: <FaCog /> },
 ];
 
 const adminMenu = [
-  { name: "Dashboard", path: "/dashboard", icon: <FaHome /> },
-  { name: "Onboarding", path: "/employee", icon: <FaUsers /> },
-  { name: "Announcement", path: "/announcement", icon: <FaBullhorn /> },
-  { name: "Review", path: "/review-admin", icon: <FaBullhorn /> },
-  { name: "Leave", path: "/leave-admin", icon: <FaCalendarAlt /> },
-  { name: "Organisation", path: "/organisation", icon: <FaBuilding /> },
-  { name: "Recruitment", path: "/recruitment-admin", icon: <FaUsersCog /> },
-  { name: "TorchX Voice", path: "/admin-complaints", icon: <FaShieldAlt /> },
-  { name: "Settings", path: "/settings", icon: <FaCog /> },
+  { name: "Dashboard",     path: "/dashboard",           icon: <FaHome /> },
+  { name: "Onboarding",    path: "/employee",            icon: <FaUsers /> },
+  { name: "Announcement",  path: "/announcement",        icon: <FaBullhorn />,  permission: "announcements.can_view_announcements" },
+  { name: "Review",        path: "/review-admin",        icon: <FaBullhorn /> },
+  { name: "Leave",         path: "/leave-admin",         icon: <FaCalendarAlt /> },
+  { name: "Organisation",  path: "/organisation",        icon: <FaBuilding /> },
+  { name: "Recruitment",   path: "/recruitment-admin",   icon: <FaUsersCog />,  permission: "recruitment.can_view_hiring_requisitions" },
+  { name: "TorchX Voice",  path: "/admin-complaints",    icon: <FaShieldAlt />, permission: "tickets.can_raise_ticket" },
+  { name: "Document",      path: "/document-admin",      icon: <FaFileAlt />,   permission: "documents.can_view_all_documents" },
+  { name: "Team Document", path: "/document-admin-team", icon: <FaFileAlt />,   permission: "documents.can_view_all_documents" },
+  { name: "Settings",      path: "/settings",            icon: <FaCog /> },
 ];
 
 const managerMenu = [
-  { name: "Dashboard", path: "/manager-dashboard", icon: <FaHome /> },
-  { name: "Leave", path: "/leave-manager", icon: <FaCalendarAlt /> },
-  { name: "Announcement", path: "/announcement-manager", icon: <FaBullhorn /> },
+  { name: "Dashboard",    path: "/manager-dashboard",    icon: <FaHome /> },
+  { name: "Leave",        path: "/leave-manager",        icon: <FaCalendarAlt /> },
+  { name: "Announcement", path: "/announcement-manager", icon: <FaBullhorn />,  permission: "announcements.can_view_announcements" },
   { name: "Organisation", path: "/organisation-manager", icon: <FaBuilding /> },
-  { name: "Review", path: "/review-manager", icon: <FaBullhorn /> },
-  { name: "Document", path: "/document-manager", icon: <FaFileAlt /> },
-  { name: "File", path: "/file-manager", icon: <FaFolder /> },
-  { name: "TorchX Voice", path: "/manager-complaints", icon: <FaShieldAlt /> },
-  { name: "Settings", path: "/settings-manager", icon: <FaCog /> },
+  { name: "Review",       path: "/review-manager",       icon: <FaBullhorn /> },
+  { name: "Document",     path: "/document-manager",     icon: <FaFileAlt />,   permission: "documents.can_view_all_documents" },
+  { name: "File",         path: "/file-manager",         icon: <FaFolder />,    permission: "documents.can_upload_documents" },
+  { name: "Recruitment",  path: "/recruitment-manager",  icon: <FaUsersCog />,  permission: "recruitment.can_view_hiring_requisitions" },
+  { name: "TorchX Voice", path: "/manager-complaints",   icon: <FaShieldAlt />, permission: "tickets.can_raise_ticket" },
+  { name: "Settings",     path: "/settings-manager",     icon: <FaCog /> },
 ];
 
 const employeeMenu = [
-  { name: "Dashboard", path: "/employee-dashboard", icon: <FaHome /> },
-  { name: "Leave", path: "/leave-employee", icon: <FaCalendarAlt /> },
-  {
-    name: "Announcement",
-    path: "/announcement-employee",
-    icon: <FaBullhorn />,
-  },
-  {
-    name: "Organisation",
-    path: "/organisation-employee",
-    icon: <FaBuilding />,
-  },
-  { name: "File", path: "/file-employee", icon: <FaFolder /> },
-  { name: "TorchX Voice", path: "/employee-complaints", icon: <FaShieldAlt /> },
-  { name: "Settings", path: "/settings-employee", icon: <FaCog /> },
+  { name: "Dashboard",    path: "/employee-dashboard",    icon: <FaHome /> },
+  { name: "Leave",        path: "/leave-employee",        icon: <FaCalendarAlt /> },
+  { name: "Announcement", path: "/announcement-employee", icon: <FaBullhorn />,  permission: "announcements.can_view_announcements" },
+  { name: "Organisation", path: "/organisation-employee", icon: <FaBuilding /> },
+  { name: "File",         path: "/file-employee",         icon: <FaFolder />,    permission: "documents.can_upload_documents" },
+  { name: "TorchX Voice", path: "/employee-complaints",   icon: <FaShieldAlt />, permission: "tickets.can_raise_ticket" },
+  { name: "Settings",     path: "/settings-employee",     icon: <FaCog /> },
 ];
 
-// ── Role → menu map ──────────────────────────────────────────────
 const menuByRole = {
   superadmin: superAdminMenu,
-  admin: adminMenu,
-  manager: managerMenu,
-  employee: employeeMenu,
+  admin:      adminMenu,
+  manager:    managerMenu,
+  employee:   employeeMenu,
 };
 
 function Sidebar({ collapsed, setCollapsed }) {
-  const location = useLocation();
-  const navigate = useNavigate();
+  const location  = useLocation();
+  const navigate  = useNavigate();
   const { data: auth } = useAuth();
   const role = auth?.role;
 
-  const { mutate: logoutSuperAdmin, isPending: pendingSuperAdmin } =
-    useLogoutSuperAdmin();
-  const { mutate: logoutAdmin, isPending: pendingAdmin } = useAdminLogout();
-  const { mutate: logoutManager, isPending: pendingManager } =
-    useLogoutManager();
-  const { mutate: logoutEmployee, isPending: pendingEmployee } =
-    useLogoutUser();
+  const can = usePermissionStore((state) => state.can);
+  const clearPermissions = usePermissionStore((state) => state.clearPermissions);
 
-  const [open, setOpen] = useState(true);
+  const { mutate: logoutSuperAdmin, isPending: pendingSuperAdmin } = useLogoutSuperAdmin();
+  const { mutate: logoutAdmin,      isPending: pendingAdmin }      = useAdminLogout();
+  const { mutate: logoutManager,    isPending: pendingManager }    = useLogoutManager();
+  const { mutate: logoutEmployee,   isPending: pendingEmployee }   = useLogoutUser();
+
+  const [open,       setOpen]       = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const menu = menuByRole[role] ?? employeeMenu;
-  const isPending =
-    pendingSuperAdmin || pendingAdmin || pendingManager || pendingEmployee;
+  const rawMenu = menuByRole[role] ?? employeeMenu;
+  const menu    = rawMenu.filter((item) => !item.permission || can(item.permission));
+
+  const isPending = pendingSuperAdmin || pendingAdmin || pendingManager || pendingEmployee;
 
   const handleLogout = () => {
     const onSuccess = async () => {
       localStorage.removeItem("role");
+      clearPermissions();
       try {
         await fetch("http://localhost:47821/clear-token");
       } catch (_) {}
       navigate("/login");
     };
 
-    if (role === "superadmin") logoutSuperAdmin(undefined, { onSuccess });
-    else if (role === "admin") logoutAdmin(undefined, { onSuccess });
-    else if (role === "manager") logoutManager(undefined, { onSuccess });
-    else logoutEmployee(undefined, { onSuccess });
+    if (role === "superadmin")    logoutSuperAdmin(undefined, { onSuccess });
+    else if (role === "admin")    logoutAdmin(undefined, { onSuccess });
+    else if (role === "manager")  logoutManager(undefined, { onSuccess });
+    else                          logoutEmployee(undefined, { onSuccess });
   };
 
   return (
@@ -156,19 +139,16 @@ function Sidebar({ collapsed, setCollapsed }) {
         ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
       >
         <div className="p-4 flex items-center justify-between border-b">
-          <img src={talent} alt="Talent.png" className="w-40" />
+          <img src={talent} alt="Talent" className="w-40" />
           <button className="md:hidden" onClick={() => setMobileOpen(false)}>
             <FaTimes />
           </button>
         </div>
 
-        {/* Role badge for superadmin */}
         {role === "superadmin" && !collapsed && (
           <div className="mx-3 mt-2 mb-1 flex items-center gap-2 rounded-md bg-[#730042]/10 px-3 py-1.5">
             <FaShieldAlt className="text-[#730042] text-xs" />
-            <span className="text-xs font-semibold text-[#730042]">
-              Super Admin
-            </span>
+            <span className="text-xs font-semibold text-[#730042]">Super Admin</span>
           </div>
         )}
 

@@ -204,15 +204,16 @@ function Login() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center bg-cover bg-center px-4 relative"
-      style={{ backgroundImage: `url('${import.meta.env.BASE_URL}bg.jpeg')` }}
-    >
+  className="min-h-screen flex flex-col bg-cover bg-center px-4 py-8"
+  style={{ backgroundImage: `url('${import.meta.env.BASE_URL}bg.jpeg')` }}
+>
       {showLoader && animationData && (
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
           <Player autoplay loop src={animationData} style={{ height: "140px", width: "140px" }} />
         </div>
       )}
 
+      <div className="flex-1 flex items-center justify-center">
       <div className="w-full max-w-5xl bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden">
         <div className="w-full md:w-1/2 p-8">
           <img src={talent} alt="Talent" className="w-28 mb-6" />
@@ -376,10 +377,11 @@ function Login() {
           </div>
         </div>
       </div>
+      </div>
 
-      <footer className="fixed bottom-0 left-0 w-full py-3 bg-transparent text-center text-gray-600 text-sm font-medium z-10">
-        © 2026, TechTorch Solutions Private Limited. All Rights Reserved.
-      </footer>
+     <footer className="w-full py-4 text-center text-gray-600 text-sm font-medium">
+  © 2026, TechTorch Solutions Private Limited. All Rights Reserved.
+</footer>
     </div>
   );
 }

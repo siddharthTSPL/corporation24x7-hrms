@@ -889,6 +889,20 @@ const getmyleaves = async (req, res, next) => {
   }
 };
 
+const getmyleavehistory = async (req, res, next) => {
+  if (!req.manager)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const leave = await managerLeaveModel.find({
+    manager: req.manager._id,
+    organisation_id: req.manager.organisation_id,
+  })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  res.status(200).json({ success: true, count: leave.length, leave });
+};
+
 const reviewtoemployee = async (req, res, next) => {
   if (!req.manager)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
@@ -1435,5 +1449,6 @@ module.exports = {
   managerGetTicketDetail,
   getOrgInfoForManager,
   getforwardedleaves, 
-  forwardLeaveUpChain
+  forwardLeaveUpChain,
+  getmyleavehistory
 };
