@@ -1,6 +1,8 @@
 const AttendanceSummary = require("../Models/attendancesummary.model");
 const LeaveBalance = require("../Models/leavebalance.model");
 const Leave = require("../Models/leave.model");
+const ManagerLeave = require("../Models/maleave.model");
+const AdminLeave = require("../Models/adleave.model");
 const mongoose = require("mongoose");
 
 const calculateStatus = (activeMinutes) => {
@@ -10,10 +12,33 @@ const calculateStatus = (activeMinutes) => {
   return "absent";
 };
 
-const hasApprovedLeave = async (employeeId, date) => {
+const hasApprovedLeave = async (employeeId, date, role) => {
   const checkDate = new Date(date);
+  const id = new mongoose.Types.ObjectId(employeeId);
+
+  if (role === "manager") {
+    const leave = await ManagerLeave.findOne({
+      manager: id,
+      status: { $in: ["approved_reporting_manager", "approved_admin"] },
+      startDate: { $lte: checkDate },
+      endDate:   { $gte: checkDate },
+    }).select("_id").lean();
+    return !!leave;
+  }
+
+  if (role === "admin") {
+    const leave = await AdminLeave.findOne({
+      admin: id,
+      status: "approved_superadmin",
+      startDate: { $lte: checkDate },
+      endDate:   { $gte: checkDate },
+    }).select("_id").lean();
+    return !!leave;
+  }
+
+  // employee
   const leave = await Leave.findOne({
-    employee: new mongoose.Types.ObjectId(employeeId),
+    employee: id,
     status: { $in: ["approved_manager", "approved_admin"] },
     startDate: { $lte: checkDate },
     endDate:   { $gte: checkDate },
@@ -47,7 +72,7 @@ const updateSummary = async (attendance) => {
 
     const [, onLeave] = await Promise.all([
       summaryWrite,
-      hasApprovedLeave(attendance.employee, attendance.date),
+      hasApprovedLeave(attendance.employee, attendance.date, attendance.role),
     ]);
 
     if (!onLeave) {

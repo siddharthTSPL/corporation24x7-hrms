@@ -234,7 +234,7 @@ const SectionBox = ({ title, children, rightEl }) => (
   </div>
 );
 
-const getJourneyConfig = (status) => {
+const getLeaveJourneyConfig = (status) => {
   const isForwardedToReporting =
     status === "forwarded_reporting_manager" ||
     status === "approved_reporting_manager" ||
@@ -250,10 +250,41 @@ const getJourneyConfig = (status) => {
 
   if (isAdminInvolved || isForwardedToReporting) {
     return [
-      { key: "submitted",          label: "Submitted"        },
-      { key: "manager_review",     label: "Manager Review"   },
-      { key: "reporting_manager",  label: "HR / Admin"       },
-      { key: "final",              label: "Final Decision"   },
+      { key: "submitted",         label: "Submitted"      },
+      { key: "manager_review",    label: "Manager Review" },
+      { key: "reporting_manager", label: "HR / Admin"     },
+      { key: "final",             label: "Final Decision" },
+    ];
+  }
+
+  return [
+    { key: "submitted",      label: "Submitted"      },
+    { key: "manager_review", label: "Manager Review" },
+    { key: "final",          label: "Final Decision" },
+  ];
+};
+
+const getWFHJourneyConfig = (status) => {
+  const isForwardedToReporting =
+    status === "forwarded_reporting_manager" ||
+    status === "pending_reporting_manager" ||
+    status === "approved_reporting_manager" ||
+    status === "rejected_reporting_manager";
+
+  const isAdminInvolved =
+    status === "pending_admin" ||
+    status === "approved_admin" ||
+    status === "rejected_admin" ||
+    status === "approved_superadmin" ||
+    status === "rejected_superadmin" ||
+    status === "pending_superadmin";
+
+  if (isAdminInvolved || isForwardedToReporting) {
+    return [
+      { key: "submitted",         label: "Submitted"      },
+      { key: "manager_review",    label: "Manager Review" },
+      { key: "reporting_manager", label: "HR / Admin"     },
+      { key: "final",             label: "Final Decision" },
     ];
   }
 
@@ -270,6 +301,7 @@ const getJourneyActiveIdx = (status, steps) => {
   const keyMap = {
     "pending_manager":             { 3: 1, 4: 1 },
     "forwarded_reporting_manager": { 4: 2 },
+    "pending_reporting_manager":   { 4: 2 },
     "approved_manager":            { 3: 2, 4: 3 },
     "rejected_manager":            { 3: 2, 4: 3 },
     "approved_reporting_manager":  { 4: 3 },
@@ -277,38 +309,40 @@ const getJourneyActiveIdx = (status, steps) => {
     "pending_admin":               { 4: 2 },
     "approved_admin":              { 4: 3 },
     "rejected_admin":              { 4: 3 },
+    "pending_superadmin":          { 4: 2 },
     "approved_superadmin":         { 4: 3 },
     "rejected_superadmin":         { 4: 3 },
   };
 
   const len = steps.length;
   if (keyMap[status] && keyMap[status][len] !== undefined) return keyMap[status][len];
-
   if (status.startsWith("approved") || status.startsWith("rejected")) return steps.length - 1;
   return 0;
 };
 
-const JourneyTracker = ({ leave }) => {
-  if (!leave) return <EmptyState msg="No leave applications yet" />;
+const JourneyTracker = ({ item, statusMeta, getJourneyConfig, titleLabel, isWFH = false }) => {
+  if (!item) return <EmptyState msg={isWFH ? "No WFH applications yet" : "No leave applications yet"} />;
 
-  const leaveMeta  = LEAVE_META[leave.leaveType] || {};
-  const leaveLabel = leaveMeta.label || (leave.leaveType || "").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-  const steps      = getJourneyConfig(leave.status);
-  const activeIdx  = getJourneyActiveIdx(leave.status, steps);
-  const isRejected = (leave.status || "").startsWith("rejected");
-  const isFinalDone = activeIdx === steps.length - 1;
+  const leaveMeta  = !isWFH ? (LEAVE_META[item.leaveType] || {}) : {};
+  const itemLabel  = isWFH
+    ? "Work From Home"
+    : (leaveMeta.label || (item.leaveType || "").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()));
+
+  const steps      = getJourneyConfig(item.status);
+  const activeIdx  = getJourneyActiveIdx(item.status, steps);
+  const isRejected = (item.status || "").startsWith("rejected");
 
   return (
     <div>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 28 }}>
         <div>
           <p style={{ fontSize: 10.5, fontWeight: 500, letterSpacing: ".12em", textTransform: "uppercase", color: "#9B8BAE", marginBottom: 4, fontFamily: "'DM Sans',sans-serif" }}>Latest Application</p>
-          <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, color: "#1C1028", margin: "0 0 3px" }}>{leaveLabel}</h3>
+          <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, color: "#1C1028", margin: "0 0 3px" }}>{itemLabel}</h3>
           <p style={{ fontSize: 12, color: "#9B8BAE", margin: 0, fontFamily: "'DM Sans',sans-serif" }}>
-            {fmt(leave.startDate)} → {fmt(leave.endDate)} · {leave.days} day{leave.days !== 1 ? "s" : ""}
+            {fmt(item.startDate)} → {fmt(item.endDate)} · {item.days} day{item.days !== 1 ? "s" : ""}
           </p>
         </div>
-        <StatusBadge status={leave.status} meta={LEAVE_STATUS_META} />
+        <StatusBadge status={item.status} meta={statusMeta} />
       </div>
 
       <div style={{ display: "flex", alignItems: "flex-start" }}>
@@ -370,10 +404,10 @@ const JourneyTracker = ({ leave }) => {
         })}
       </div>
 
-      {leave.reason && (
+      {item.reason && (
         <div style={{ marginTop: 20, padding: "12px 16px", background: "rgba(249,248,242,.9)", borderLeft: "2px solid #CD166E", borderRadius: "0 10px 10px 0", fontSize: 13, color: "rgba(115,0,66,.55)", lineHeight: 1.65, fontFamily: "'DM Sans',sans-serif" }}>
           <span style={{ fontWeight: 500, color: "#730042", marginRight: 4 }}>Reason:</span>
-          {leave.reason}
+          {item.reason}
         </div>
       )}
     </div>
@@ -466,7 +500,7 @@ const LeaveApplyTab = ({ employee, showToast }) => {
       setEditTarget(null);
       setErrors({});
     } catch (err) {
-      showToast(err?.response?.data?.message || "Something went wrong", "error");
+      showToast(err?.response?.data?.message || err?.message || "Something went wrong", "error");
     }
   };
 
@@ -484,9 +518,9 @@ const LeaveApplyTab = ({ employee, showToast }) => {
     if (!window.confirm("Delete this leave application?")) return;
     try {
       await deleteMut.mutateAsync(id);
-      showToast("Leave deleted", "error");
+      showToast("Leave deleted", "info");
     } catch (err) {
-      showToast(err?.response?.data?.message || "Delete failed", "error");
+      showToast(err?.response?.data?.message || err?.message || "Delete failed", "error");
     }
   };
 
@@ -621,7 +655,7 @@ const WFHTab = ({ showToast }) => {
       setEditTarget(null);
       setErrors({});
     } catch (err) {
-      showToast(err?.response?.data?.message || "Something went wrong", "error");
+      showToast(err?.response?.data?.message || err?.message || "Something went wrong", "error");
     }
   };
 
@@ -638,9 +672,9 @@ const WFHTab = ({ showToast }) => {
     if (!window.confirm("Delete this WFH request?")) return;
     try {
       await deleteMut.mutateAsync(id);
-      showToast("WFH request deleted", "error");
+      showToast("WFH request deleted", "info");
     } catch (err) {
-      showToast(err?.response?.data?.message || "Delete failed", "error");
+      showToast(err?.response?.data?.message || err?.message || "Delete failed", "error");
     }
   };
 
@@ -746,12 +780,48 @@ const WFHTab = ({ showToast }) => {
   );
 };
 
-const LeaveStatusTab = ({ histLoading, history }) => {
-  if (histLoading) return <Spinner />;
+const LeaveStatusTab = ({ histLoading, history, wfhLoading, wfhList }) => {
+  const [activeTracker, setActiveTracker] = useState("leave");
+
+  if (histLoading || wfhLoading) return <Spinner />;
+
   return (
-    <SectionBox title="Latest Leave Status">
-      <JourneyTracker leave={history[0] || null} />
-    </SectionBox>
+    <div>
+      <div style={{ display: "flex", gap: 4, background: "rgba(235,228,245,0.5)", borderRadius: 12, padding: 4, marginBottom: 20, width: "fit-content", border: "1px solid rgba(200,185,220,0.25)" }}>
+        {[{ key: "leave", label: "Leave Status" }, { key: "wfh", label: "WFH Status" }].map(t => {
+          const active = activeTracker === t.key;
+          return (
+            <button key={t.key}
+              style={{ padding: "7px 18px", borderRadius: 9, fontSize: 12, fontWeight: active ? 600 : 400, fontFamily: "'DM Sans',sans-serif", border: "none", cursor: "pointer", color: active ? "#fff" : "#9B8BAE", background: active ? "linear-gradient(135deg,#6B1A4A,#9B2458)" : "transparent", boxShadow: active ? "0 3px 12px rgba(107,26,74,0.32)" : "none", transition: "all .2s ease" }}
+              onClick={() => setActiveTracker(t.key)}>
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {activeTracker === "leave" && (
+        <SectionBox title="Latest Leave Status">
+          <JourneyTracker
+            item={history[0] || null}
+            statusMeta={LEAVE_STATUS_META}
+            getJourneyConfig={getLeaveJourneyConfig}
+            isWFH={false}
+          />
+        </SectionBox>
+      )}
+
+      {activeTracker === "wfh" && (
+        <SectionBox title="Latest WFH Status">
+          <JourneyTracker
+            item={wfhList[0] || null}
+            statusMeta={WFH_STATUS_META}
+            getJourneyConfig={getWFHJourneyConfig}
+            isWFH={true}
+          />
+        </SectionBox>
+      )}
+    </div>
   );
 };
 
@@ -762,10 +832,12 @@ const EmployeeLeaveWFH = () => {
   const { data: meData }                              = useGetMeUser();
   const { data: balanceData, isLoading: balLoading }  = useGetAllLeaves();
   const { data: historyData, isLoading: histLoading } = useGetAllLeaveHistory();
+  const { data: wfhData,     isLoading: wfhLoading }  = useGetMyWFH();
 
   const employee = meData?.employee ?? null;
   const balance  = balanceData || {};
   const history  = historyData?.leaves || [];
+  const wfhList  = wfhData?.wfhList || [];
 
   const showToast = (message, type = "success") => {
     setToast({ visible: true, message, type });
@@ -828,12 +900,11 @@ const EmployeeLeaveWFH = () => {
           })}
         </div>
 
-        {tab === "status"  && <LeaveStatusTab histLoading={histLoading} history={history} />}
+        {tab === "status"  && <LeaveStatusTab histLoading={histLoading} history={history} wfhLoading={wfhLoading} wfhList={wfhList} />}
         {tab === "balance" && <LeaveBalanceTab employee={employee} balance={balance} isLoading={balLoading} />}
         {tab === "apply"   && <LeaveApplyTab employee={employee} showToast={showToast} />}
         {tab === "wfh"     && <WFHTab showToast={showToast} />}
       </div>
-      
 
       <Toast toast={toast} />
     </div>

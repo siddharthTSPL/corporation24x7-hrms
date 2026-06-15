@@ -1,5 +1,5 @@
-
 const Attendance = require("../Models/attendance.model");
+const AdminModel = require("../Models/Admin.model");
 const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
 
 const getUserId = (user) => user._id || user.id;
@@ -11,12 +11,21 @@ const getOnModel = (role) => {
   return "User";
 };
 
+const resolveOrganisationId = async (user) => {
+  if (user.organisation_id) return user.organisation_id;
+  if (user.role === "admin") {
+    const admin = await AdminModel.findById(getUserId(user)).select("organisation_id").lean();
+    return admin?.organisation_id || null;
+  }
+  return null;
+};
+
 const checkin = async (req, res) => {
   try {
     const { latitude, longitude, selfie } = req.body;
     const user = req.user;
     const userId = getUserId(user);
-    const organisation_id = user.organisation_id;
+    const organisation_id = await resolveOrganisationId(user);
 
     if (!latitude || !longitude)
       return res.status(400).json({ message: "Location required" });
@@ -72,7 +81,7 @@ const activity = async (req, res) => {
     const { status } = req.body;
     const user = req.user;
     const userId = getUserId(user);
-    const organisation_id = user.organisation_id;
+    const organisation_id = await resolveOrganisationId(user);
 
     if (!["active", "idle"].includes(status))
       return res.status(400).json({ message: "Invalid status" });
@@ -122,7 +131,7 @@ const checkout = async (req, res) => {
   try {
     const user = req.user;
     const userId = getUserId(user);
-    const organisation_id = user.organisation_id;
+    const organisation_id = await resolveOrganisationId(user);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -152,7 +161,7 @@ const getToday = async (req, res) => {
   try {
     const user = req.user;
     const userId = getUserId(user);
-    const organisation_id = user.organisation_id;
+    const organisation_id = await resolveOrganisationId(user);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);

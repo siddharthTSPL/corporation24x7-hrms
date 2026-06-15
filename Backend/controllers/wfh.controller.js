@@ -127,15 +127,7 @@ const approveWFH = async (req, res, next) => {
   if (!["pending_manager", "pending_reporting_manager"].includes(wfh.status))
     return next(Object.assign(new Error("WFH request is not awaiting your approval"), { statusCode: 400 }));
 
-  const currentManager = await Manager.findOne({ _id: req.manager._id, organisation_id: req.manager.organisation_id })
-    .select("reporting_manager reporting_manager_model")
-    .lean();
-
-  if (!currentManager.reporting_manager) {
-    return next(Object.assign(new Error("You have no reporting manager. Use forward to send to admin if needed."), { statusCode: 400 }));
-  }
-
-  wfh.status = "approved_manager";
+  wfh.status = wfh.status === "pending_manager" ? "approved_manager" : "approved_reporting_manager";
   wfh.approvedBy = req.manager._id;
   wfh.remarks = remarks || "";
   await wfh.save();
@@ -155,7 +147,7 @@ const rejectWFH = async (req, res, next) => {
   if (!["pending_manager", "pending_reporting_manager"].includes(wfh.status))
     return next(Object.assign(new Error("WFH request is not awaiting your decision"), { statusCode: 400 }));
 
-  wfh.status = "rejected_reporting_manager";
+  wfh.status = wfh.status === "pending_manager" ? "rejected_manager" : "rejected_reporting_manager";
   wfh.rejectedBy = req.manager._id;
   wfh.remarks = remarks || "";
   wfh.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -189,12 +181,7 @@ const forwardWFH = async (req, res, next) => {
   wfh.currentHandlerModel = currentManager.reporting_manager_model;
   wfh.forwardedBy = req.manager._id;
   wfh.remarks = remarks || "";
-
-  if (currentManager.reporting_manager_model === "Admin") {
-    wfh.status = "pending_admin";
-  } else {
-    wfh.status = "pending_reporting_manager";
-  }
+  wfh.status = currentManager.reporting_manager_model === "Admin" ? "pending_admin" : "pending_reporting_manager";
 
   await wfh.save();
   res.status(200).json({ success: true, message: "WFH request forwarded", wfh });
@@ -227,7 +214,7 @@ const managerApplyWFH = async (req, res, next) => {
     requester: managerId,
     requesterModel: "Manager",
     organisation_id,
-    status: { $nin: ["rejected_reporting_manager", "rejected_admin"] },
+    status: { $nin: ["rejected_manager", "rejected_reporting_manager", "rejected_admin"] },
     startDate: { $lte: end },
     endDate: { $gte: start },
   }).select("_id").lean();

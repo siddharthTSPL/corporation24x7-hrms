@@ -220,6 +220,7 @@ const viewallleaves = async (req, res, next) => {
   res.status(200).json(leaves);
 };
 
+
 const acceptleaverequest = async (req, res, next) => {
   const { leaveId } = req.body;
   if (!req.manager)
@@ -230,8 +231,10 @@ const acceptleaverequest = async (req, res, next) => {
   const leave = await leavemodel.findOne({ _id: leaveId, organisation_id: req.manager.organisation_id });
   if (!leave)
     return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
-  if (leave.status.startsWith("approved") || leave.status.startsWith("rejected"))
-    return next(Object.assign(new Error("Leave already processed"), { statusCode: 400 }));
+  if (leave.status !== "pending_manager")
+    return next(Object.assign(new Error("Leave already processed or forwarded"), { statusCode: 400 }));
+  if (leave.manager.toString() !== req.manager._id.toString())
+    return next(Object.assign(new Error("This leave does not belong to your team"), { statusCode: 403 }));
 
   const leaveBalance = await LeaveBalance.findOne({ employee: leave.employee, organisation_id: req.manager.organisation_id });
   if (!leaveBalance)
@@ -246,8 +249,11 @@ const acceptleaverequest = async (req, res, next) => {
     await leaveBalance.save();
   }
 
-  leave.status = "approved_manager";
-  await leave.save();
+ leave.status = "approved_manager";
+leave.approvedBy = req.manager._id;
+leave.approvedByModel = "Manager";
+leave.remarks = `Approved by Manager (${req.manager.f_name})`;
+await leave.save();
 
   try {
     await processLeaveDeduction(leave);
@@ -268,12 +274,18 @@ const rejectleaverequest = async (req, res, next) => {
   const leave = await leavemodel.findOne({ _id: leaveId, organisation_id: req.manager.organisation_id });
   if (!leave)
     return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
-  if (leave.status.startsWith("approved") || leave.status.startsWith("rejected"))
-    return next(Object.assign(new Error("Leave already processed"), { statusCode: 400 }));
+  if (leave.status !== "pending_manager")
+    return next(Object.assign(new Error("Leave already processed or forwarded"), { statusCode: 400 }));
+  if (leave.manager.toString() !== req.manager._id.toString())
+    return next(Object.assign(new Error("This leave does not belong to your team"), { statusCode: 403 }));
 
-  leave.status = "rejected_manager";
-  leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  await leave.save();
+ leave.status = "rejected_manager";
+leave.rejectedBy = req.manager._id;
+leave.rejectedByModel = "Manager";
+leave.remarks = `Rejected by Manager (${req.manager.f_name})`;
+leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+await leave.save();
   res.status(200).json({ message: "Leave rejected successfully", leave });
 };
 
@@ -289,18 +301,24 @@ const forwardedtoreportingmanager = async (req, res, next) => {
     const leave = await leavemodel.findOne({ _id: leaveId, organisation_id: req.manager.organisation_id });
     if (!leave)
       return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
-    if (leave.status.startsWith("approved") || leave.status.startsWith("rejected"))
-      return next(Object.assign(new Error("Leave already processed"), { statusCode: 400 }));
-    if (leave.status === "forwarded_reporting_manager")
-      return next(Object.assign(new Error("Leave already forwarded"), { statusCode: 400 }));
+    if (leave.status !== "pending_manager")
+      return next(Object.assign(new Error("Leave already processed or forwarded"), { statusCode: 400 }));
     if (leave.manager.toString() !== req.manager._id.toString())
       return next(Object.assign(new Error("This leave does not belong to your team"), { statusCode: 403 }));
 
-    const currentManager = await managermodel.findById(req.manager._id).select("reporting_manager").lean();
+    const currentManager = await managermodel.findById(req.manager._id)
+      .select("reporting_manager reporting_manager_model")
+      .lean();
+
     if (!currentManager.reporting_manager)
       return next(Object.assign(new Error("You have no reporting manager assigned. Cannot forward leave."), { statusCode: 400 }));
 
-    leave.status = "forwarded_reporting_manager";
+    leave.directed_to = currentManager.reporting_manager;
+    leave.directed_to_model = currentManager.reporting_manager_model;
+    leave.status = currentManager.reporting_manager_model === "Admin"
+      ? "pending_admin"
+      : "forwarded_reporting_manager";
+
     await leave.save();
 
     res.status(200).json({ message: "Leave forwarded to reporting manager successfully", leave });
@@ -308,6 +326,50 @@ const forwardedtoreportingmanager = async (req, res, next) => {
     next(error);
   }
 };
+
+
+const forwardEmployeeLeaveUpChain = async (req, res, next) => {
+  if (!req.manager)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const { leaveId } = req.body;
+  if (!leaveId)
+    return next(Object.assign(new Error("Leave ID is required"), { statusCode: 400 }));
+
+  const organisation_id = req.manager.organisation_id;
+
+  const leave = await leavemodel.findOne({ _id: leaveId, organisation_id });
+  if (!leave)
+    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
+
+  if (leave.status !== "forwarded_reporting_manager")
+    return next(Object.assign(new Error("Leave is not pending for your action"), { statusCode: 400 }));
+
+  if (
+    leave.directed_to?.toString() !== req.manager._id.toString() ||
+    leave.directed_to_model !== "Manager"
+  )
+    return next(Object.assign(new Error("This leave is not directed to you"), { statusCode: 403 }));
+
+  const currentManager = await managermodel
+    .findById(req.manager._id)
+    .select("reporting_manager reporting_manager_model")
+    .lean();
+
+  if (!currentManager.reporting_manager)
+    return next(Object.assign(new Error("You have no reporting manager assigned. Cannot forward leave."), { statusCode: 400 }));
+
+  leave.directed_to = currentManager.reporting_manager;
+  leave.directed_to_model = currentManager.reporting_manager_model;
+  leave.status = currentManager.reporting_manager_model === "Admin"
+    ? "pending_admin"
+    : "forwarded_reporting_manager";
+
+  await leave.save();
+
+  return res.status(200).json({ success: true, message: "Leave forwarded successfully", leave });
+};
+
 
 const applyleavem = async (req, res, next) => {
   const { leaveType, startDate, endDate, reason } = req.body;
@@ -376,16 +438,13 @@ const getforwardedleaves = async (req, res, next) => {
 
   const organisation_id = req.manager.organisation_id;
 
-  const subordinateManagerIds = await managermodel
-    .find({ reporting_manager: req.manager._id, organisation_id })
-    .distinct("_id");
-
   const [employeeLeaves, managerLeaves] = await Promise.all([
     leavemodel
       .find({
         organisation_id,
         status: "forwarded_reporting_manager",
-        manager: { $in: subordinateManagerIds },
+        directed_to: req.manager._id,
+        directed_to_model: "Manager",
       })
       .populate("employee", "f_name l_name work_email department")
       .populate("manager", "f_name l_name work_email")
@@ -472,11 +531,11 @@ const acceptforwardedleave = async (req, res, next) => {
     )
       return next(Object.assign(new Error("This leave is not directed to you"), { statusCode: 403 }));
 
-    leave.status = "approved_reporting_manager";
-    leave.approvedBy = req.manager._id;
-    leave.approvedByModel = "Manager";
-    leave.remarks = `Approved by Manager (${req.manager.f_name})`;
-    await leave.save();
+   leave.status = "approved_reporting_manager";
+leave.approvedBy = req.manager._id;
+leave.approvedByModel = "Manager";
+leave.remarks = `Approved by Manager (${req.manager.f_name})`;
+await leave.save();
 
     try {
       await processLeaveDeduction(leave);
@@ -488,16 +547,15 @@ const acceptforwardedleave = async (req, res, next) => {
   }
 
   if (leaveFor === "employee") {
-    const subordinateManagerIds = await managermodel
-      .find({ reporting_manager: req.manager._id, organisation_id })
-      .distinct("_id");
-
     const leave = await leavemodel.findOne({ _id: leaveId, organisation_id });
     if (!leave)
       return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
     if (leave.status !== "forwarded_reporting_manager")
       return next(Object.assign(new Error("Leave is not pending for your action"), { statusCode: 400 }));
-    if (!subordinateManagerIds.map(String).includes(leave.manager?.toString()))
+    if (
+      leave.directed_to?.toString() !== req.manager._id.toString() ||
+      leave.directed_to_model !== "Manager"
+    )
       return next(Object.assign(new Error("This leave is not forwarded to you"), { statusCode: 403 }));
 
     if (leave.leaveType === "ml") {
@@ -512,9 +570,11 @@ const acceptforwardedleave = async (req, res, next) => {
       }
     }
 
-    leave.status = "approved_reporting_manager";
-    leave.approvedBy = req.manager._id;
-    await leave.save();
+ leave.status = "approved_reporting_manager";
+leave.approvedBy = req.manager._id;
+leave.approvedByModel = "Manager";
+leave.remarks = `Approved by Manager (${req.manager.f_name})`;
+await leave.save();
 
     try {
       await processLeaveDeduction(leave);
@@ -550,39 +610,44 @@ const rejectforwardedleave = async (req, res, next) => {
     )
       return next(Object.assign(new Error("This leave is not directed to you"), { statusCode: 403 }));
 
-    leave.status = "rejected_reporting_manager";
-    leave.rejectedBy = req.manager._id;
-    leave.rejectedByModel = "Manager";
-    leave.remarks = `Rejected by Manager (${req.manager.f_name})`;
-    leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    await leave.save();
+ leave.status = "rejected_reporting_manager";
+leave.rejectedBy = req.manager._id;
+leave.rejectedByModel = "Manager";
+leave.remarks = `Rejected by Manager (${req.manager.f_name})`;
+leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+await leave.save();
 
     return res.status(200).json({ message: "Manager leave rejected successfully", leave });
   }
 
   if (leaveFor === "employee") {
-    const subordinateManagerIds = await managermodel
-      .find({ reporting_manager: req.manager._id, organisation_id })
-      .distinct("_id");
-
     const leave = await leavemodel.findOne({ _id: leaveId, organisation_id });
     if (!leave)
       return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
     if (leave.status !== "forwarded_reporting_manager")
       return next(Object.assign(new Error("Leave is not pending for your action"), { statusCode: 400 }));
-    if (!subordinateManagerIds.map(String).includes(leave.manager?.toString()))
+    if (
+      leave.directed_to?.toString() !== req.manager._id.toString() ||
+      leave.directed_to_model !== "Manager"
+    )
       return next(Object.assign(new Error("This leave is not forwarded to you"), { statusCode: 403 }));
 
-    leave.status = "rejected_reporting_manager";
-    leave.rejectedBy = req.manager._id;
-    leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    await leave.save();
+  leave.status = "rejected_reporting_manager";
+leave.rejectedBy = req.manager._id;
+leave.rejectedByModel = "Manager";
+leave.remarks = `Rejected by Manager (${req.manager.f_name})`;
+leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+await leave.save();
 
     return res.status(200).json({ message: "Employee leave rejected successfully", leave });
   }
 
   return next(Object.assign(new Error("Invalid leaveFor value. Use 'employee' or 'manager'"), { statusCode: 400 }));
 };
+
+
 
 const showannouncements = async (req, res, next) => {
   if (!req.manager)
@@ -822,6 +887,20 @@ const getmyleaves = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+const getmyleavehistory = async (req, res, next) => {
+  if (!req.manager)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const leave = await managerLeaveModel.find({
+    manager: req.manager._id,
+    organisation_id: req.manager.organisation_id,
+  })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  res.status(200).json({ success: true, count: leave.length, leave });
 };
 
 const reviewtoemployee = async (req, res, next) => {
@@ -1370,5 +1449,6 @@ module.exports = {
   managerGetTicketDetail,
   getOrgInfoForManager,
   getforwardedleaves, 
-  forwardLeaveUpChain
+  forwardLeaveUpChain,
+  getmyleavehistory
 };

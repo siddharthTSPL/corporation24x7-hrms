@@ -18,12 +18,158 @@ const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const { sendEmail } = require("../utils/nodemailer.utils");
 const generateOTP = require("../automatic/otpgenerator");
+const PermissionModel = require("../Models/permission.model");
 const Document = require("../Models/document.model");
 const OtpModel = require("../Models/otpbasedlogin.model");
 const AdminLeave = require("../Models/adleave.model");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
+
+// ─── Role-based default permissions ───────────────────────────────────────────
+// admin   : announcements + documents + tickets + recruitment  (all features)
+// manager : announcements + documents + tickets + recruitment  (all features)
+// employee: announcements + documents + tickets only           (NO recruitment)
+const DEFAULT_PERMISSIONS = {
+  admin: {
+    announcements: {
+      can_view_announcements: true,
+      can_create_announcement: true,
+      can_edit_announcement: true,
+      can_delete_announcement: true,
+    },
+    documents: {
+      can_upload_documents: true,
+      can_view_all_documents: true,
+    },
+    tickets: {
+      can_raise_ticket: true,
+      can_view_all_tickets: true,
+      can_resolve_ticket: true,
+      can_rate_ticket: true,
+    },
+    recruitment: {
+      can_view_hiring_requisitions: true,
+      can_create_hiring_requisition: true,
+      can_view_candidates: true,
+      can_add_candidate: true,
+    },
+  },
+  manager: {
+    announcements: {
+      can_view_announcements: true,
+      can_create_announcement: true,
+      can_edit_announcement: true,
+      can_delete_announcement: true,
+    },
+    documents: {
+      can_upload_documents: true,
+      can_view_all_documents: true,
+    },
+    tickets: {
+      can_raise_ticket: true,
+      can_view_all_tickets: true,
+      can_resolve_ticket: true,
+      can_rate_ticket: true,
+    },
+    recruitment: {
+      can_view_hiring_requisitions: true,
+      can_create_hiring_requisition: true,
+      can_view_candidates: true,
+      can_add_candidate: true,
+    },
+  },
+  employee: {
+    announcements: {
+      can_view_announcements: true,
+      can_create_announcement: false,
+      can_edit_announcement: false,
+      can_delete_announcement: false,
+    },
+    documents: {
+      can_upload_documents: true,
+      can_view_all_documents: false,
+    },
+    tickets: {
+      can_raise_ticket: true,
+      can_view_all_tickets: false,
+      can_resolve_ticket: false,
+      can_rate_ticket: true,
+    },
+    // Employees have NO recruitment access
+    recruitment: {
+      can_view_hiring_requisitions: false,
+      can_create_hiring_requisition: false,
+      can_view_candidates: false,
+      can_add_candidate: false,
+    },
+  },
+};
+
+const USER_MODEL_MAP = {
+  admin: "Admin",
+  senior_admin: "Admin",
+  official: "Admin",
+  manager: "Manager",
+  senior_manager: "Manager",
+  employee: "User",
+};
+
+const mergePermissions = (role, overrides) => {
+  const permissionRole = ["admin", "senior_admin", "official"].includes(role)
+    ? "admin"
+    : ["manager", "senior_manager"].includes(role)
+    ? "manager"
+    : "employee";
+
+  const defaults = DEFAULT_PERMISSIONS[permissionRole];
+  if (!overrides) return defaults;
+
+  return {
+    announcements: {
+      can_view_announcements: overrides.announcements?.can_view_announcements ?? defaults.announcements.can_view_announcements,
+      can_create_announcement: overrides.announcements?.can_create_announcement ?? defaults.announcements.can_create_announcement,
+      can_edit_announcement: overrides.announcements?.can_edit_announcement ?? defaults.announcements.can_edit_announcement,
+      can_delete_announcement: overrides.announcements?.can_delete_announcement ?? defaults.announcements.can_delete_announcement,
+    },
+    documents: {
+      can_upload_documents: overrides.documents?.can_upload_documents ?? defaults.documents.can_upload_documents,
+      can_view_all_documents: overrides.documents?.can_view_all_documents ?? defaults.documents.can_view_all_documents,
+    },
+    tickets: {
+      can_raise_ticket: overrides.tickets?.can_raise_ticket ?? defaults.tickets.can_raise_ticket,
+      can_view_all_tickets: overrides.tickets?.can_view_all_tickets ?? defaults.tickets.can_view_all_tickets,
+      can_resolve_ticket: overrides.tickets?.can_resolve_ticket ?? defaults.tickets.can_resolve_ticket,
+      can_rate_ticket: overrides.tickets?.can_rate_ticket ?? defaults.tickets.can_rate_ticket,
+    },
+    recruitment: {
+      can_view_hiring_requisitions: overrides.recruitment?.can_view_hiring_requisitions ?? defaults.recruitment.can_view_hiring_requisitions,
+      can_create_hiring_requisition: overrides.recruitment?.can_create_hiring_requisition ?? defaults.recruitment.can_create_hiring_requisition,
+      can_view_candidates: overrides.recruitment?.can_view_candidates ?? defaults.recruitment.can_view_candidates,
+      can_add_candidate: overrides.recruitment?.can_add_candidate ?? defaults.recruitment.can_add_candidate,
+    },
+  };
+};
+
+const assignPermissions = async (user_id, role, organisation_id, granted_by, granted_by_model, overrides) => {
+  const user_model = USER_MODEL_MAP[role] || "User";
+  const perms = mergePermissions(role, overrides);
+
+  await PermissionModel.findOneAndUpdate(
+    { user_id, user_model, organisation_id },
+    {
+      $set: {
+        user_id,
+        user_model,
+        organisation_id,
+        granted_by,
+        granted_by_model,
+        ...perms,
+      },
+    },
+    { upsert: true, new: true, runValidators: true }
+  );
+};
 
 const registerSuperAdmin = async (req, res, next) => {
   try {
@@ -653,6 +799,7 @@ const createAdmin = async (req, res, next) => {
       account_number,
       ifsc_code,
       country,
+      permissions,
     } = req.body;
 
     if (
@@ -815,6 +962,15 @@ ${verifyLink}
       `,
     });
 
+    await assignPermissions(
+      admin._id,
+      admin.role || "admin",
+      organisation_id,
+      req.superAdmin._id,
+      "SuperAdmin",
+      permissions
+    );
+
     res.status(201).json({
       success: true,
       message: "Admin created successfully. Verification email sent.",
@@ -928,6 +1084,7 @@ const addmanager = async (req, res, next) => {
       office_location,
       designation,
       department,
+      permissions,
     } = req.body;
 
     if (
@@ -992,8 +1149,16 @@ const addmanager = async (req, res, next) => {
     );
     const verifyLink = `${process.env.BASE_URL}talent/api/manager/verify/${token}`;
 
-    Promise.all([
+    await Promise.all([
       assignDefaultLeave(newmanager),
+      assignPermissions(
+        newmanager._id,
+        newmanager.role || "manager",
+        organisation_id,
+        req.superAdmin._id,
+        "SuperAdmin",
+        permissions
+      ),
       sendEmail({
         to: work_email,
         subject: "Activate Your Manager Account",
@@ -1042,6 +1207,7 @@ const addemployee = async (req, res, next) => {
       designation,
       department,
       Under_manager,
+      permissions,
     } = req.body;
 
     if (
@@ -1107,8 +1273,16 @@ const addemployee = async (req, res, next) => {
     );
     const verifyLink = `${process.env.BASE_URL}talent/api/user/verify/${token}`;
 
-    Promise.all([
+    await Promise.all([
       assignDefaultLeave(newuser),
+      assignPermissions(
+        newuser._id,
+        newuser.role || "employee",
+        organisation_id,
+        req.superAdmin._id,
+        "SuperAdmin",
+        permissions
+      ),
       sendEmail({
         to: work_email,
         subject: "Welcome! Verify Your Employee Account",
@@ -1688,6 +1862,37 @@ const getTodayCheckins = async (req, res, next) => {
   res.json({ checkins: payload, total: payload.length });
 };
 
+// ─── Helper: recursively build manager hierarchy ──────────────────────────────
+const buildManagerTree = (managers, parentId, parentModel, employees) => {
+  return managers
+    .filter((mgr) => {
+      if (!mgr.reporting_manager) return false;
+      return (
+        mgr.reporting_manager.toString() === parentId.toString() &&
+        mgr.reporting_manager_model === parentModel
+      );
+    })
+    .map((mgr) => ({
+      id: mgr._id,
+      name: `${mgr.f_name} ${mgr.l_name}`,
+      email: mgr.work_email,
+      designation: mgr.designation,
+      department: mgr.department,
+      office_location: mgr.office_location,
+      employees: employees
+        .filter((emp) => emp.Under_manager?.toString() === mgr._id.toString())
+        .map((emp) => ({
+          id: emp._id,
+          name: `${emp.f_name} ${emp.l_name}`,
+          email: emp.work_email,
+          designation: emp.designation,
+          department: emp.department,
+          office_location: emp.office_location,
+        })),
+      subManagers: buildManagerTree(managers, mgr._id, "Manager", employees),
+    }));
+};
+
 const getOrgInfo = async (req, res, next) => {
   try {
     if (!req.superAdmin) {
@@ -1808,15 +2013,8 @@ const getAllPersonalDocumentsSuperAdmin = async (req, res, next) => {
 
   const organisation_id = req.superAdmin._id;
 
-  const documents = await Document.find({
-    organisation_id,
-    fileType: "personal",
-  })
-    .populate(
-      "employee",
-      "f_name l_name work_email personal_contact department designation",
-    )
-    .populate("underManager", "f_name l_name work_email")
+  const documents = await Document.find({ organisation_id, fileType: "personal" })
+    .populate("uploader", "f_name l_name work_email personal_contact department designation")
     .sort({ uploadedAt: -1 })
     .lean();
 
@@ -1835,24 +2033,17 @@ const getAllPersonalDocumentsSuperAdmin = async (req, res, next) => {
       fileType: doc.fileType,
       sizeKB: doc.size,
       uploadedAt: doc.uploadedAt,
-      viewedByManager: doc.viewedByManager,
       viewedByAdmin: doc.viewedByAdmin,
       viewedBySuperAdmin: doc.viewedBySuperAdmin,
-      employee: doc.employee
+      uploaderModel: doc.uploaderModel,
+      uploader: doc.uploader
         ? {
-            id: doc.employee._id,
-            name: `${doc.employee.f_name} ${doc.employee.l_name}`,
-            email: doc.employee.work_email,
-            contact: doc.employee.personal_contact,
-            department: doc.employee.department,
-            designation: doc.employee.designation,
-          }
-        : null,
-      reportingManager: doc.underManager
-        ? {
-            id: doc.underManager._id,
-            name: `${doc.underManager.f_name} ${doc.underManager.l_name}`,
-            email: doc.underManager.work_email,
+            id: doc.uploader._id,
+            name: `${doc.uploader.f_name} ${doc.uploader.l_name}`,
+            email: doc.uploader.work_email,
+            contact: doc.uploader.personal_contact,
+            department: doc.uploader.department,
+            designation: doc.uploader.designation,
           }
         : null,
     })),
@@ -1865,15 +2056,8 @@ const getAllExpenseDocumentsSuperAdmin = async (req, res, next) => {
 
   const organisation_id = req.superAdmin._id;
 
-  const documents = await Document.find({
-    organisation_id,
-    fileType: "expense",
-  })
-    .populate(
-      "employee",
-      "f_name l_name work_email personal_contact department designation",
-    )
-    .populate("underManager", "f_name l_name work_email")
+  const documents = await Document.find({ organisation_id, fileType: "expense" })
+    .populate("uploader", "f_name l_name work_email personal_contact department designation")
     .sort({ uploadedAt: -1 })
     .lean();
 
@@ -1892,24 +2076,17 @@ const getAllExpenseDocumentsSuperAdmin = async (req, res, next) => {
       fileType: doc.fileType,
       sizeKB: doc.size,
       uploadedAt: doc.uploadedAt,
-      viewedByManager: doc.viewedByManager,
       viewedByAdmin: doc.viewedByAdmin,
       viewedBySuperAdmin: doc.viewedBySuperAdmin,
-      employee: doc.employee
+      uploaderModel: doc.uploaderModel,
+      uploader: doc.uploader
         ? {
-            id: doc.employee._id,
-            name: `${doc.employee.f_name} ${doc.employee.l_name}`,
-            email: doc.employee.work_email,
-            contact: doc.employee.personal_contact,
-            department: doc.employee.department,
-            designation: doc.employee.designation,
-          }
-        : null,
-      reportingManager: doc.underManager
-        ? {
-            id: doc.underManager._id,
-            name: `${doc.underManager.f_name} ${doc.underManager.l_name}`,
-            email: doc.underManager.work_email,
+            id: doc.uploader._id,
+            name: `${doc.uploader.f_name} ${doc.uploader.l_name}`,
+            email: doc.uploader.work_email,
+            contact: doc.uploader.personal_contact,
+            department: doc.uploader.department,
+            designation: doc.uploader.designation,
           }
         : null,
     })),
@@ -1924,21 +2101,13 @@ const getDocumentDetailsSuperAdmin = async (req, res, next) => {
   const organisation_id = req.superAdmin._id;
 
   if (!id)
-    return next(
-      Object.assign(new Error("Document ID is required"), { statusCode: 400 }),
-    );
+    return next(Object.assign(new Error("Document ID is required"), { statusCode: 400 }));
 
   const document = await Document.findOne({ _id: id, organisation_id })
-    .populate(
-      "employee",
-      "f_name l_name work_email personal_contact department designation",
-    )
-    .populate("underManager", "f_name l_name work_email");
+    .populate("uploader", "f_name l_name work_email personal_contact department designation");
 
   if (!document)
-    return next(
-      Object.assign(new Error("Document not found"), { statusCode: 404 }),
-    );
+    return next(Object.assign(new Error("Document not found"), { statusCode: 404 }));
 
   document.viewedBySuperAdmin = true;
   await document.save();
@@ -1952,22 +2121,16 @@ const getDocumentDetailsSuperAdmin = async (req, res, next) => {
       fileType: document.fileType,
       sizeKB: document.size,
       uploadedAt: document.uploadedAt,
-      viewedByManager: document.viewedByManager,
       viewedByAdmin: document.viewedByAdmin,
       viewedBySuperAdmin: document.viewedBySuperAdmin,
-      employee: document.employee
+      uploaderModel: document.uploaderModel,
+      uploader: document.uploader
         ? {
-            id: document.employee._id,
-            name: `${document.employee.f_name} ${document.employee.l_name}`,
-            email: document.employee.work_email,
-            department: document.employee.department,
-          }
-        : null,
-      reportingManager: document.underManager
-        ? {
-            id: document.underManager._id,
-            name: `${document.underManager.f_name} ${document.underManager.l_name}`,
-            email: document.underManager.work_email,
+            id: document.uploader._id,
+            name: `${document.uploader.f_name} ${document.uploader.l_name}`,
+            email: document.uploader.work_email,
+            department: document.uploader.department,
+            designation: document.uploader.designation,
           }
         : null,
     },
@@ -2011,4 +2174,4 @@ module.exports = {
   getAllPersonalDocumentsSuperAdmin,
   getAllExpenseDocumentsSuperAdmin,
   getDocumentDetailsSuperAdmin,
-}; 
+};

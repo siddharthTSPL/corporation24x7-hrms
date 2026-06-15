@@ -21,7 +21,7 @@ api.interceptors.response.use(
 
 // Upload Document
 export const uploadDocument = async (data) => {
-  const res = await api.post("user/upload", data, {
+  const res = await api.post("admin/upload", data, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
@@ -32,13 +32,13 @@ export const uploadDocument = async (data) => {
 
 // Get My Documents
 export const getDocuments = async () => {
-  const res = await api.get("user/documents");
+  const res = await api.get("admin/documents");
   return res.data;
 };
 
-// Edit Document
-export const editDocument = async ({ id, data }) => {
-  const res = await api.put(`user/documents/${id}`, data, {
+// Update Document
+export const updateDocument = async ({ id, data }) => {
+  const res = await api.put(`admin/documents/${id}`, data, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
@@ -47,14 +47,26 @@ export const editDocument = async ({ id, data }) => {
   return res.data;
 };
 
-
+// Delete Document
 export const deleteDocument = async (id) => {
-  const res = await api.delete(`user/documents/${id}`);
+  const res = await api.delete(`admin/documents/${id}`);
   return res.data;
 };
 
+// Get All Personal Documents (Admin)
+export const getAllPersonalDocuments = async () => {
+  const res = await api.get("admin/documents/personal");
+  return res.data;
+};
 
-export const fetchOrgInfo = async () => {
-  const res = await api.get("user/getOrgInfo");
+// Get All Expense Documents (Admin)
+export const getAllExpenseDocuments = async () => {
+  const res = await api.get("admin/documents/expense");
+  return res.data;
+};
+
+// Get Document Details
+export const getDocumentDetails = async (documentId) => {
+  const res = await api.get(`admin/documents/${documentId}`);
   return res.data;
 };

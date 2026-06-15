@@ -48,13 +48,16 @@ const wfhSchema = new mongoose.Schema(
         "pending_manager",
         "pending_reporting_manager",
         "pending_admin",
+        "pending_superadmin",
         "approved_manager",
+        "approved_reporting_manager",
         "approved_admin",
+        "rejected_manager",
         "approved_superadmin",
+        "rejected_manager",
         "rejected_reporting_manager",
         "rejected_admin",
         "rejected_superadmin",
-        "pending_superadmin",
       ],
       default: "pending_manager",
     },
@@ -74,4 +77,4 @@ wfhSchema.index({ superadmin: 1, status: 1 });
 wfhSchema.index({ handlerChain: 1 });
 wfhSchema.index({ createdAt: -1 });
 
-module.exports = mongoose.model("WFH", wfhSchema);
+module.exports = mongoose.models.WFH || mongoose.model("WFH", wfhSchema);
