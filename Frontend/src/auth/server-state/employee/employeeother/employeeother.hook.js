@@ -1,6 +1,6 @@
-import { uploadDocument, getDocuments, editDocument, deleteDocument,fetchOrgInfo } from "../../../api/employeeapi/other/em.other.api";
+import { uploadDocument, getDocuments, editDocument, deleteDocument, fetchOrgInfo } from "../../../api/employeeapi/other/em.other.api";
+import { getAttendance } from "../../../api/employeeapi/leave/em.leave.api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getattendance } from "../../../api/employeeapi/leave/em.leave.api";
 
 export const useUploadDocument = () => {
   const queryClient = useQueryClient();
@@ -38,19 +38,18 @@ export const useDeleteDocument = () => {
   });
 };
 
-export const useGetAttendance = () => {
-    return useQuery({
-        queryKey: ["attendance"],
-        queryFn: getattendance,
-    });
-};
+export const useGetAttendance = () =>
+  useQuery({
+    queryKey: ["attendance", "all"],
+    queryFn: getAttendance,
+    retry: false,
+    staleTime: 2 * 60 * 1000,
+  });
 
-
-export const useGetOrgInfoEmployee = () => {
-  return useQuery({
+export const useGetOrgInfoEmployee = () =>
+  useQuery({
     queryKey: ["orgInfo-manager"],
-    queryFn:  fetchOrgInfo,        
+    queryFn: fetchOrgInfo,
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
-};
