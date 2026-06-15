@@ -108,11 +108,11 @@ const adminlogin = async (req, res, next) => {
   //   );
   // }
 
-  const token = jwt.sign(
-    { adminid: admin._id, role: admin.role, email: admin.work_email, created_by: admin.created_by },
-    process.env.JWT_SECRET,
-    { expiresIn: "15d" }
-  );
+ const token = jwt.sign(
+  { adminid: admin._id, role: admin.role, email: admin.work_email, created_by: admin.created_by, organisation_id: admin.organisation_id },
+  process.env.JWT_SECRET,
+  { expiresIn: "15d" }
+);
 
   res.cookie("token", token, { ...cookieOpts, maxAge: 15 * 24 * 60 * 60 * 1000 });
 
@@ -164,6 +164,159 @@ const resolveReportingManager = async (reporting_manager_id, organisation_id) =>
   return { reportingManagerId: null, reportingManagerModel: null };
 };
 
+// ─── Role-based default permissions ───────────────────────────────────────────
+// admin   : announcements + documents + tickets + recruitment  (all features)
+// manager : announcements + documents + tickets + recruitment  (all features)
+// employee: announcements + documents + tickets only           (NO recruitment)
+const DEFAULT_PERMISSIONS = {
+  admin: {
+    announcements: {
+      can_view_announcements: true,
+      can_create_announcement: true,
+      can_edit_announcement: true,
+      can_delete_announcement: true,
+    },
+    documents: {
+      can_upload_documents: true,
+      can_view_all_documents: true,
+    },
+    tickets: {
+      can_raise_ticket: true,
+      can_view_all_tickets: true,
+      can_resolve_ticket: true,
+      can_rate_ticket: true,
+    },
+    recruitment: {
+      can_view_hiring_requisitions: true,
+      can_create_hiring_requisition: true,
+      can_view_candidates: true,
+      can_add_candidate: true,
+    },
+  },
+  manager: {
+    announcements: {
+      can_view_announcements: true,
+      can_create_announcement: true,
+      can_edit_announcement: true,
+      can_delete_announcement: true,
+    },
+    documents: {
+      can_upload_documents: true,
+      can_view_all_documents: true,
+    },
+    tickets: {
+      can_raise_ticket: true,
+      can_view_all_tickets: true,
+      can_resolve_ticket: true,
+      can_rate_ticket: true,
+    },
+    recruitment: {
+      can_view_hiring_requisitions: true,
+      can_create_hiring_requisition: true,
+      can_view_candidates: true,
+      can_add_candidate: true,
+    },
+  },
+  employee: {
+    announcements: {
+      can_view_announcements: true,
+      can_create_announcement: false,
+      can_edit_announcement: false,
+      can_delete_announcement: false,
+    },
+    documents: {
+      can_upload_documents: true,
+      can_view_all_documents: false,
+    },
+    tickets: {
+      can_raise_ticket: true,
+      can_view_all_tickets: false,
+      can_resolve_ticket: false,
+      can_rate_ticket: true,
+    },
+    // Employees have NO recruitment access
+    recruitment: {
+      can_view_hiring_requisitions: false,
+      can_create_hiring_requisition: false,
+      can_view_candidates: false,
+      can_add_candidate: false,
+    },
+  },
+};
+
+const USER_MODEL_MAP = {
+  admin: "Admin",
+  senior_admin: "Admin",
+  official: "Admin",
+  manager: "Manager",
+  senior_manager: "Manager",
+  employee: "User",
+};
+
+const mergePermissions = (role, overrides) => {
+  const permissionRole = ["admin", "senior_admin", "official"].includes(role)
+    ? "admin"
+    : ["manager", "senior_manager"].includes(role)
+    ? "manager"
+    : "employee";
+
+  const defaults = DEFAULT_PERMISSIONS[permissionRole];
+  if (!overrides) return defaults;
+
+  return {
+    announcements: {
+      can_view_announcements: overrides.announcements?.can_view_announcements ?? defaults.announcements.can_view_announcements,
+      can_create_announcement: overrides.announcements?.can_create_announcement ?? defaults.announcements.can_create_announcement,
+      can_edit_announcement: overrides.announcements?.can_edit_announcement ?? defaults.announcements.can_edit_announcement,
+      can_delete_announcement: overrides.announcements?.can_delete_announcement ?? defaults.announcements.can_delete_announcement,
+    },
+    documents: {
+      can_upload_documents: overrides.documents?.can_upload_documents ?? defaults.documents.can_upload_documents,
+      can_view_all_documents: overrides.documents?.can_view_all_documents ?? defaults.documents.can_view_all_documents,
+    },
+    tickets: {
+      can_raise_ticket: overrides.tickets?.can_raise_ticket ?? defaults.tickets.can_raise_ticket,
+      can_view_all_tickets: overrides.tickets?.can_view_all_tickets ?? defaults.tickets.can_view_all_tickets,
+      can_resolve_ticket: overrides.tickets?.can_resolve_ticket ?? defaults.tickets.can_resolve_ticket,
+      can_rate_ticket: overrides.tickets?.can_rate_ticket ?? defaults.tickets.can_rate_ticket,
+    },
+    recruitment: {
+      can_view_hiring_requisitions: overrides.recruitment?.can_view_hiring_requisitions ?? defaults.recruitment.can_view_hiring_requisitions,
+      can_create_hiring_requisition: overrides.recruitment?.can_create_hiring_requisition ?? defaults.recruitment.can_create_hiring_requisition,
+      can_view_candidates: overrides.recruitment?.can_view_candidates ?? defaults.recruitment.can_view_candidates,
+      can_add_candidate: overrides.recruitment?.can_add_candidate ?? defaults.recruitment.can_add_candidate,
+    },
+  };
+};
+
+const assignDefaultPermissions = async (
+  user_id,
+  role,
+  organisation_id,
+  granted_by,
+  granted_by_model,
+  session,
+  overrides
+) => {
+  const user_model = USER_MODEL_MAP[role] || "User";
+  const perms = mergePermissions(role, overrides);
+
+  await PermissionModel.findOneAndUpdate(
+    { user_id, user_model, organisation_id },
+    {
+      $set: {
+        user_id,
+        user_model,
+        organisation_id,
+        granted_by,
+        granted_by_model,
+        ...perms,
+      },
+    },
+    { upsert: true, new: true, runValidators: true, session: session || undefined }
+  );
+};
+
 const addmanager = async (req, res, next) => {
   try {
     if (!req.admin)
@@ -175,7 +328,7 @@ const addmanager = async (req, res, next) => {
       pincode, role, office_location, designation, department, reporting_manager,
       is_fresher, total_experience, previous_company, previous_designation, bank_name,
       account_holder_name, account_number, ifsc_code, resume, aadhaar_card, pan_card,
-      experience_letter,
+      experience_letter, permissions,
     } = req.body;
 
     if (!f_name || !l_name || !work_email || !password || !department || !designation || !office_location || !gender || !personal_contact || !e_contact)
@@ -221,6 +374,15 @@ const addmanager = async (req, res, next) => {
 
     await Promise.all([
       assignDefaultLeave(newmanager),
+      assignDefaultPermissions(
+        newmanager._id,
+        newmanager.role || "manager",
+        organisation_id,
+        req.admin._id,
+        "Admin",
+        null,
+        permissions
+      ),
       sendEmail({
         to: work_email,
         subject: "Activate Your Manager Account",
@@ -246,6 +408,7 @@ const addmanager = async (req, res, next) => {
 };
 
 const addemployee = async (req, res, next) => {
+  try {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
@@ -254,7 +417,7 @@ const addemployee = async (req, res, next) => {
     personal_contact, e_contact, aadhaar_number, pan_number, address, city, state,
     pincode, role, office_location, designation, department, Under_manager, is_fresher,
     total_experience, previous_company, previous_designation, bank_name, account_holder_name,
-    account_number, ifsc_code, resume, aadhaar_card, pan_card, experience_letter,
+    account_number, ifsc_code, resume, aadhaar_card, pan_card, experience_letter, permissions,
   } = req.body;
 
   if (!f_name || !l_name || !work_email || !password || !department || !designation || !office_location || !gender || !personal_contact || !e_contact)
@@ -287,8 +450,17 @@ const addemployee = async (req, res, next) => {
   const token = jwt.sign({ userid: newuser._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
   const verifyLink = `${process.env.BASE_URL}talent/api/user/verify/${token}`;
 
-  Promise.all([
+  await Promise.all([
     assignDefaultLeave(newuser),
+    assignDefaultPermissions(
+      newuser._id,
+      newuser.role || "employee",
+      organisation_id,
+      req.admin._id,
+      "Admin",
+      null,
+      permissions
+    ),
     sendEmail({
       to: work_email,
       subject: "Welcome! Verify Your Employee Account",
@@ -296,7 +468,10 @@ const addemployee = async (req, res, next) => {
     }),
   ]);
 
-  res.status(201).json({ success: true, message: "User added successfully. Verification email sent." });
+  return res.status(201).json({ success: true, message: "User added successfully. Verification email sent." });
+  } catch (error) {
+    next(error);
+  }
 };
 
 
@@ -490,14 +665,12 @@ const promoteEmployeeToManager = async (req, res, next) => {
       return next(Object.assign(new Error("Employee not found"), { statusCode: 404 }));
 
     const existing = await Managermodel.findOne({ work_email: user.work_email, organisation_id })
-      .select("_id")
-      .lean();
+      .select("_id").lean();
     if (existing)
       return next(Object.assign(new Error("A manager with this email already exists"), { statusCode: 400 }));
 
     const { reportingManagerId, reportingManagerModel } = await resolveReportingManager(
-      reporting_manager,
-      organisation_id
+      reporting_manager, organisation_id
     );
 
     const yearsAtCompany = parseFloat(
@@ -505,66 +678,48 @@ const promoteEmployeeToManager = async (req, res, next) => {
     );
 
     const newRole = role || "manager";
+    const newUid = await generateUID(user.department, organisation_id);
 
-    const roleHistoryEntry = {
-      from_role: user.role || "employee",
-      to_role: newRole,
-      from_model: "User",
-      to_model: "Manager",
-      changed_by: req.admin._id,
-      changed_by_model: "Admin",
-      reason: reason || null,
-      changed_at: new Date(),
-    };
-
-    const inheritedHistory = Array.isArray(user.role_history) ? user.role_history : [];
-
-    const [newManager] = await Managermodel.create(
-      [
-        {
-          organisation_id,
-          uid: user.uid,
-          profile_image: user.profile_image || null,
-          department: user.department,
-          f_name: user.f_name,
-          l_name: user.l_name,
-          work_email: user.work_email,
-          password: "placeholder_will_be_overwritten",
-          gender: user.gender,
-          marital_status: user.marital_status || "single",
-          personal_contact: user.personal_contact,
-          e_contact: user.e_contact,
-          aadhaar_number: user.aadhaar_number || null,
-          pan_number: user.pan_number || null,
-          address: user.address || null,
-          city: user.city || null,
-          state: user.state || null,
-          pincode: user.pincode || null,
-          designation: designation || user.designation,
-          role: newRole,
-          office_location: user.office_location,
-          reporting_manager: reportingManagerId,
-          reporting_manager_model: reportingManagerModel,
-          is_fresher: false,
-          total_experience: (user.total_experience || 0) + yearsAtCompany,
-          previous_company: user.previous_company || null,
-          previous_designation: user.designation,
-          bank_name: user.bank_name || null,
-          account_holder_name: user.account_holder_name || null,
-          account_number: user.account_number || null,
-          ifsc_code: user.ifsc_code || null,
-          resume: user.resume || null,
-          aadhaar_card: user.aadhaar_card || null,
-          pan_card: user.pan_card || null,
-          experience_letter: user.experience_letter || null,
-          isVerified: user.isverified,
-          status: user.status,
-          isFirstLogin: false,
-          role_history: [...inheritedHistory, roleHistoryEntry],
-        },
-      ],
-      { session }
-    );
+    const [newManager] = await Managermodel.create([{
+      organisation_id,
+      uid: newUid,
+      profile_image: user.profile_image || null,
+      department: user.department,
+      f_name: user.f_name,
+      l_name: user.l_name,
+      work_email: user.work_email,
+      password: "placeholder_will_be_overwritten",
+      gender: user.gender,
+      marital_status: user.marital_status || "single",
+      personal_contact: user.personal_contact,
+      e_contact: user.e_contact,
+      aadhaar_number: user.aadhaar_number || null,
+      pan_number: user.pan_number || null,
+      address: user.address || null,
+      city: user.city || null,
+      state: user.state || null,
+      pincode: user.pincode || null,
+      designation: designation || user.designation,
+      role: newRole,
+      office_location: user.office_location,
+      reporting_manager: reportingManagerId,
+      reporting_manager_model: reportingManagerModel,
+      is_fresher: false,
+      total_experience: (user.total_experience || 0) + yearsAtCompany,
+      previous_company: user.previous_company || null,
+      previous_designation: user.designation,
+      bank_name: user.bank_name || null,
+      account_holder_name: user.account_holder_name || null,
+      account_number: user.account_number || null,
+      ifsc_code: user.ifsc_code || null,
+      resume: user.resume || null,
+      aadhaar_card: user.aadhaar_card || null,
+      pan_card: user.pan_card || null,
+      experience_letter: user.experience_letter || null,
+      isVerified: user.isverified,
+      status: user.status,
+      isFirstLogin: false,
+    }], { session });
 
     await Managermodel.findByIdAndUpdate(
       newManager._id,
@@ -572,60 +727,25 @@ const promoteEmployeeToManager = async (req, res, next) => {
       { session }
     );
 
-    const newLeaveBalance = await assignDefaultLeave({ ...newManager.toObject(), _id: newManager._id });
+    await assignDefaultLeave({ ...newManager.toObject(), _id: newManager._id });
 
     await Promise.all([
       Usermodel.findByIdAndDelete(id, { session }),
 
-      leavebalanceModel.deleteOne({ employee: id }, { session }),
+      PermissionModel.findOneAndDelete({ user_id: id, user_model: "User", organisation_id }, { session }),
 
-      leavebalanceModel.findByIdAndUpdate(
-        newLeaveBalance._id,
-        { $set: { employee: newManager._id } },
-        { session }
-      ),
-
-      PermissionModel.deleteOne({ user_id: id, user_model: "User", organisation_id }, { session }),
-
-      Usermodel.updateMany(
-        { Under_manager: id, organisation_id },
-        { $set: { Under_manager: newManager._id } },
-        { session }
-      ),
-
-      Leave.updateMany(
-        { employee: id, organisation_id },
-        { $set: { employee: newManager._id } },
-        { session }
-      ),
-
-      Attendance.updateMany(
-        { employee: id, organisation_id },
-        { $set: { employee: newManager._id, onModel: "Manager", role: "manager" } },
-        { session }
-      ),
-
-      AttendanceSummary.updateMany(
-        { employee: id, organisation_id },
-        { $set: { employee: newManager._id, role: "manager" } },
-        { session }
+      assignDefaultPermissions(
+        newManager._id,
+        newManager.role || "manager",
+        organisation_id,
+        req.admin._id,
+        "Admin",
+        session
       ),
 
       Document.updateMany(
         { employee: id, organisation_id },
         { $set: { employee: newManager._id } },
-        { session }
-      ),
-
-      Review.updateMany(
-        { reviewee: id, organisation_id },
-        { $set: { reviewee: newManager._id, revieweeRole: newRole, revieweeRoleModel: "Manager" } },
-        { session }
-      ),
-
-      Review.updateMany(
-        { reviewer: id, organisation_id },
-        { $set: { reviewer: newManager._id, reviewerRole: newRole, reviewerRoleModel: "Manager" } },
         { session }
       ),
 
@@ -638,12 +758,6 @@ const promoteEmployeeToManager = async (req, res, next) => {
       Ticket.updateMany(
         { against: id, againstModel: "User", organisation_id },
         { $set: { against: newManager._id, againstModel: "Manager" } },
-        { session }
-      ),
-
-      WFH.updateMany(
-        { requester: id, requesterModel: "User", organisation_id },
-        { $set: { requester: newManager._id, requesterModel: "Manager" } },
         { session }
       ),
     ]);
@@ -673,6 +787,7 @@ const promoteEmployeeToManager = async (req, res, next) => {
   }
 };
 
+
 const promoteManagerToAdmin = async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -689,8 +804,7 @@ const promoteManagerToAdmin = async (req, res, next) => {
       return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
 
     const existing = await Adminmodel.findOne({ work_email: manager.work_email, organisation_id })
-      .select("_id")
-      .lean();
+      .select("_id").lean();
     if (existing)
       return next(Object.assign(new Error("An admin with this email already exists"), { statusCode: 400 }));
 
@@ -700,16 +814,13 @@ const promoteManagerToAdmin = async (req, res, next) => {
 
     let resolvedReportingManagerId = null;
     let resolvedReportingManagerModel = null;
-
     if (reporting_manager) {
       const superAdminDoc = await SuperAdminModel.findById(reporting_manager).select("_id").lean();
       if (superAdminDoc) {
         resolvedReportingManagerId = superAdminDoc._id;
         resolvedReportingManagerModel = "SuperAdmin";
       } else {
-        const mgr = await Managermodel.findOne({ _id: reporting_manager, organisation_id })
-          .select("_id")
-          .lean();
+        const mgr = await Managermodel.findOne({ _id: reporting_manager, organisation_id }).select("_id").lean();
         if (mgr) {
           resolvedReportingManagerId = mgr._id;
           resolvedReportingManagerModel = "Manager";
@@ -721,53 +832,50 @@ const promoteManagerToAdmin = async (req, res, next) => {
       ((Date.now() - new Date(manager.createdAt).getTime()) / (1000 * 60 * 60 * 24 * 365)).toFixed(1)
     );
 
-    const [newAdmin] = await Adminmodel.create(
-      [
-        {
-          organisation_id,
-          uid: manager.uid,
-          profile_image: manager.profile_image || null,
-          department: manager.department,
-          f_name: manager.f_name,
-          l_name: manager.l_name,
-          work_email: manager.work_email,
-          password: "placeholder_will_be_overwritten",
-          gender: manager.gender,
-          marital_status: manager.marital_status || "single",
-          personal_contact: manager.personal_contact,
-          e_contact: manager.e_contact,
-          aadhaar_number: manager.aadhaar_number || null,
-          pan_number: manager.pan_number || null,
-          address: manager.address || null,
-          city: manager.city || null,
-          state: manager.state || null,
-          pincode: manager.pincode || null,
-          designation: designation || manager.designation,
-          role: role || "admin",
-          office_location: manager.office_location,
-          reporting_manager: resolvedReportingManagerId,
-          reporting_manager_model: resolvedReportingManagerModel,
-          is_fresher: false,
-          total_experience: (manager.total_experience || 0) + yearsAtCompany,
-          previous_company: manager.previous_company || null,
-          previous_designation: manager.designation,
-          bank_name: manager.bank_name || null,
-          account_holder_name: manager.account_holder_name || null,
-          account_number: manager.account_number || null,
-          ifsc_code: manager.ifsc_code || null,
-          resume: manager.resume || null,
-          aadhaar_card: manager.aadhaar_card || null,
-          pan_card: manager.pan_card || null,
-          experience_letter: manager.experience_letter || null,
-          created_by: req.admin.created_by || req.admin._id,
-          isVerified: manager.isVerified,
-          status: manager.status,
-          isFirstLogin: false,
-          last_login: null,
-        },
-      ],
-      { session }
-    );
+    const newUid = await generateUID(manager.department, organisation_id);
+
+    const [newAdmin] = await Adminmodel.create([{
+      organisation_id,
+      uid: newUid,
+      profile_image: manager.profile_image || null,
+      department: manager.department,
+      f_name: manager.f_name,
+      l_name: manager.l_name,
+      work_email: manager.work_email,
+      password: "placeholder_will_be_overwritten",
+      gender: manager.gender,
+      marital_status: manager.marital_status || "single",
+      personal_contact: manager.personal_contact,
+      e_contact: manager.e_contact,
+      aadhaar_number: manager.aadhaar_number || null,
+      pan_number: manager.pan_number || null,
+      address: manager.address || null,
+      city: manager.city || null,
+      state: manager.state || null,
+      pincode: manager.pincode || null,
+      designation: designation || manager.designation,
+      role: role || "admin",
+      office_location: manager.office_location,
+      reporting_manager: resolvedReportingManagerId,
+      reporting_manager_model: resolvedReportingManagerModel,
+      is_fresher: false,
+      total_experience: (manager.total_experience || 0) + yearsAtCompany,
+      previous_company: manager.previous_company || null,
+      previous_designation: manager.designation,
+      bank_name: manager.bank_name || null,
+      account_holder_name: manager.account_holder_name || null,
+      account_number: manager.account_number || null,
+      ifsc_code: manager.ifsc_code || null,
+      resume: manager.resume || null,
+      aadhaar_card: manager.aadhaar_card || null,
+      pan_card: manager.pan_card || null,
+      experience_letter: manager.experience_letter || null,
+      created_by: req.admin.created_by || req.admin._id,
+      isVerified: manager.isVerified,
+      status: manager.status,
+      isFirstLogin: false,
+      last_login: null,
+    }], { session });
 
     await Adminmodel.findByIdAndUpdate(
       newAdmin._id,
@@ -775,10 +883,21 @@ const promoteManagerToAdmin = async (req, res, next) => {
       { session }
     );
 
-    const newRole = role || "admin";
+    await assignDefaultLeave({ ...newAdmin.toObject(), _id: newAdmin._id });
 
     await Promise.all([
       Managermodel.findByIdAndDelete(id, { session }),
+
+      PermissionModel.findOneAndDelete({ user_id: id, user_model: "Manager", organisation_id }, { session }),
+
+      assignDefaultPermissions(
+        newAdmin._id,
+        newAdmin.role || "admin",
+        organisation_id,
+        req.admin._id,
+        "Admin",
+        session
+      ),
 
       Usermodel.updateMany(
         { Under_manager: id, organisation_id },
@@ -792,51 +911,9 @@ const promoteManagerToAdmin = async (req, res, next) => {
         { session }
       ),
 
-      leavebalanceModel.findOneAndUpdate(
-        { employee: id, organisation_id },
-        { $set: { employee: newAdmin._id } },
-        { session }
-      ),
-
-      ManagerLeave.updateMany(
-        { manager: id, organisation_id },
-        { $set: { manager: newAdmin._id } },
-        { session }
-      ),
-
-      Leave.updateMany(
-        { employee: id, organisation_id },
-        { $set: { employee: newAdmin._id } },
-        { session }
-      ),
-
-      Attendance.updateMany(
-        { employee: id, organisation_id },
-        { $set: { employee: newAdmin._id, onModel: "Admin", role: "admin" } },
-        { session }
-      ),
-
-      AttendanceSummary.updateMany(
-        { employee: id, organisation_id },
-        { $set: { employee: newAdmin._id, role: "admin" } },
-        { session }
-      ),
-
       Document.updateMany(
         { employee: id, organisation_id },
         { $set: { employee: newAdmin._id } },
-        { session }
-      ),
-
-      Review.updateMany(
-        { reviewee: id, organisation_id },
-        { $set: { reviewee: newAdmin._id, revieweeRole: newRole, revieweeRoleModel: "Admin" } },
-        { session }
-      ),
-
-      Review.updateMany(
-        { reviewer: id, organisation_id },
-        { $set: { reviewer: newAdmin._id, reviewerRole: newRole, reviewerRoleModel: "Admin" } },
         { session }
       ),
 
@@ -849,18 +926,6 @@ const promoteManagerToAdmin = async (req, res, next) => {
       Ticket.updateMany(
         { against: id, againstModel: "Manager", organisation_id },
         { $set: { against: newAdmin._id, againstModel: "Admin" } },
-        { session }
-      ),
-
-      WFH.updateMany(
-        { requester: id, requesterModel: "Manager", organisation_id },
-        { $set: { requester: newAdmin._id, requesterModel: "Admin" } },
-        { session }
-      ),
-
-      WFH.updateMany(
-        { manager: id, organisation_id },
-        { $set: { manager: null } },
         { session }
       ),
     ]);
@@ -906,8 +971,7 @@ const promoteEmployeeToAdmin = async (req, res, next) => {
       return next(Object.assign(new Error("Employee not found"), { statusCode: 404 }));
 
     const existing = await Adminmodel.findOne({ work_email: user.work_email, organisation_id })
-      .select("_id")
-      .lean();
+      .select("_id").lean();
     if (existing)
       return next(Object.assign(new Error("An admin with this email already exists"), { statusCode: 400 }));
 
@@ -917,16 +981,13 @@ const promoteEmployeeToAdmin = async (req, res, next) => {
 
     let resolvedReportingManagerId = null;
     let resolvedReportingManagerModel = null;
-
     if (reporting_manager) {
       const superAdminDoc = await SuperAdminModel.findById(reporting_manager).select("_id").lean();
       if (superAdminDoc) {
         resolvedReportingManagerId = superAdminDoc._id;
         resolvedReportingManagerModel = "SuperAdmin";
       } else {
-        const mgr = await Managermodel.findOne({ _id: reporting_manager, organisation_id })
-          .select("_id")
-          .lean();
+        const mgr = await Managermodel.findOne({ _id: reporting_manager, organisation_id }).select("_id").lean();
         if (mgr) {
           resolvedReportingManagerId = mgr._id;
           resolvedReportingManagerModel = "Manager";
@@ -938,53 +999,50 @@ const promoteEmployeeToAdmin = async (req, res, next) => {
       ((Date.now() - new Date(user.createdAt).getTime()) / (1000 * 60 * 60 * 24 * 365)).toFixed(1)
     );
 
-    const [newAdmin] = await Adminmodel.create(
-      [
-        {
-          organisation_id,
-          uid: user.uid,
-          profile_image: user.profile_image || null,
-          department: user.department,
-          f_name: user.f_name,
-          l_name: user.l_name,
-          work_email: user.work_email,
-          password: "placeholder_will_be_overwritten",
-          gender: user.gender,
-          marital_status: user.marital_status || "single",
-          personal_contact: user.personal_contact,
-          e_contact: user.e_contact,
-          aadhaar_number: user.aadhaar_number || null,
-          pan_number: user.pan_number || null,
-          address: user.address || null,
-          city: user.city || null,
-          state: user.state || null,
-          pincode: user.pincode || null,
-          designation: designation || user.designation,
-          role: role || "admin",
-          office_location: user.office_location,
-          reporting_manager: resolvedReportingManagerId,
-          reporting_manager_model: resolvedReportingManagerModel,
-          is_fresher: false,
-          total_experience: (user.total_experience || 0) + yearsAtCompany,
-          previous_company: user.previous_company || null,
-          previous_designation: user.designation,
-          bank_name: user.bank_name || null,
-          account_holder_name: user.account_holder_name || null,
-          account_number: user.account_number || null,
-          ifsc_code: user.ifsc_code || null,
-          resume: user.resume || null,
-          aadhaar_card: user.aadhaar_card || null,
-          pan_card: user.pan_card || null,
-          experience_letter: user.experience_letter || null,
-          created_by: req.admin.created_by || req.admin._id,
-          isVerified: user.isverified,
-          status: user.status,
-          isFirstLogin: false,
-          last_login: null,
-        },
-      ],
-      { session }
-    );
+    const newUid = await generateUID(user.department, organisation_id);
+
+    const [newAdmin] = await Adminmodel.create([{
+      organisation_id,
+      uid: newUid,
+      profile_image: user.profile_image || null,
+      department: user.department,
+      f_name: user.f_name,
+      l_name: user.l_name,
+      work_email: user.work_email,
+      password: "placeholder_will_be_overwritten",
+      gender: user.gender,
+      marital_status: user.marital_status || "single",
+      personal_contact: user.personal_contact,
+      e_contact: user.e_contact,
+      aadhaar_number: user.aadhaar_number || null,
+      pan_number: user.pan_number || null,
+      address: user.address || null,
+      city: user.city || null,
+      state: user.state || null,
+      pincode: user.pincode || null,
+      designation: designation || user.designation,
+      role: role || "admin",
+      office_location: user.office_location,
+      reporting_manager: resolvedReportingManagerId,
+      reporting_manager_model: resolvedReportingManagerModel,
+      is_fresher: false,
+      total_experience: (user.total_experience || 0) + yearsAtCompany,
+      previous_company: user.previous_company || null,
+      previous_designation: user.designation,
+      bank_name: user.bank_name || null,
+      account_holder_name: user.account_holder_name || null,
+      account_number: user.account_number || null,
+      ifsc_code: user.ifsc_code || null,
+      resume: user.resume || null,
+      aadhaar_card: user.aadhaar_card || null,
+      pan_card: user.pan_card || null,
+      experience_letter: user.experience_letter || null,
+      created_by: req.admin.created_by || req.admin._id,
+      isVerified: user.isverified,
+      status: user.status,
+      isFirstLogin: false,
+      last_login: null,
+    }], { session });
 
     await Adminmodel.findByIdAndUpdate(
       newAdmin._id,
@@ -992,56 +1050,25 @@ const promoteEmployeeToAdmin = async (req, res, next) => {
       { session }
     );
 
-    const newRole = role || "admin";
+    await assignDefaultLeave({ ...newAdmin.toObject(), _id: newAdmin._id });
 
     await Promise.all([
       Usermodel.findByIdAndDelete(id, { session }),
 
-      Usermodel.updateMany(
-        { Under_manager: id, organisation_id },
-        { $set: { Under_manager: null } },
-        { session }
-      ),
+      PermissionModel.findOneAndDelete({ user_id: id, user_model: "User", organisation_id }, { session }),
 
-      leavebalanceModel.findOneAndUpdate(
-        { employee: id, organisation_id },
-        { $set: { employee: newAdmin._id } },
-        { session }
-      ),
-
-      Leave.updateMany(
-        { employee: id, organisation_id },
-        { $set: { employee: newAdmin._id } },
-        { session }
-      ),
-
-      Attendance.updateMany(
-        { employee: id, organisation_id },
-        { $set: { employee: newAdmin._id, onModel: "Admin", role: "admin" } },
-        { session }
-      ),
-
-      AttendanceSummary.updateMany(
-        { employee: id, organisation_id },
-        { $set: { employee: newAdmin._id, role: "admin" } },
-        { session }
+      assignDefaultPermissions(
+        newAdmin._id,
+        newAdmin.role || "admin",
+        organisation_id,
+        req.admin._id,
+        "Admin",
+        session
       ),
 
       Document.updateMany(
         { employee: id, organisation_id },
         { $set: { employee: newAdmin._id } },
-        { session }
-      ),
-
-      Review.updateMany(
-        { reviewee: id, organisation_id },
-        { $set: { reviewee: newAdmin._id, revieweeRole: newRole, revieweeRoleModel: "Admin" } },
-        { session }
-      ),
-
-      Review.updateMany(
-        { reviewer: id, organisation_id },
-        { $set: { reviewer: newAdmin._id, reviewerRole: newRole, reviewerRoleModel: "Admin" } },
         { session }
       ),
 
@@ -1054,12 +1081,6 @@ const promoteEmployeeToAdmin = async (req, res, next) => {
       Ticket.updateMany(
         { against: id, againstModel: "User", organisation_id },
         { $set: { against: newAdmin._id, againstModel: "Admin" } },
-        { session }
-      ),
-
-      WFH.updateMany(
-        { requester: id, requesterModel: "User", organisation_id },
-        { $set: { requester: newAdmin._id, requesterModel: "Admin" } },
         { session }
       ),
     ]);
@@ -1105,16 +1126,13 @@ const demoteManagerToEmployee = async (req, res, next) => {
       return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
 
     const existing = await Usermodel.findOne({ work_email: manager.work_email, organisation_id })
-      .select("_id")
-      .lean();
+      .select("_id").lean();
     if (existing)
       return next(Object.assign(new Error("An employee with this email already exists"), { statusCode: 400 }));
 
     let resolvedUnderManager = null;
     if (Under_manager) {
-      const mgr = await Managermodel.findOne({ _id: Under_manager, organisation_id })
-        .select("_id")
-        .lean();
+      const mgr = await Managermodel.findOne({ _id: Under_manager, organisation_id }).select("_id").lean();
       if (!mgr)
         return next(Object.assign(new Error("Assigned manager not found in this organisation"), { statusCode: 404 }));
       resolvedUnderManager = mgr._id;
@@ -1124,50 +1142,47 @@ const demoteManagerToEmployee = async (req, res, next) => {
       ((Date.now() - new Date(manager.createdAt).getTime()) / (1000 * 60 * 60 * 24 * 365)).toFixed(1)
     );
 
-    const [newEmployee] = await Usermodel.create(
-      [
-        {
-          organisation_id,
-          uid: manager.uid,
-          profile_image: manager.profile_image || null,
-          department: manager.department,
-          f_name: manager.f_name,
-          l_name: manager.l_name,
-          work_email: manager.work_email,
-          password: "placeholder_will_be_overwritten",
-          gender: manager.gender,
-          marital_status: manager.marital_status || "single",
-          personal_contact: manager.personal_contact,
-          e_contact: manager.e_contact,
-          aadhaar_number: manager.aadhaar_number || null,
-          pan_number: manager.pan_number || null,
-          address: manager.address || null,
-          city: manager.city || null,
-          state: manager.state || null,
-          pincode: manager.pincode || null,
-          designation: designation || manager.designation,
-          role: "employee",
-          office_location: manager.office_location,
-          Under_manager: resolvedUnderManager,
-          is_fresher: false,
-          total_experience: (manager.total_experience || 0) + yearsAsManager,
-          previous_company: manager.previous_company || null,
-          previous_designation: manager.designation,
-          bank_name: manager.bank_name || null,
-          account_holder_name: manager.account_holder_name || null,
-          account_number: manager.account_number || null,
-          ifsc_code: manager.ifsc_code || null,
-          resume: manager.resume || null,
-          aadhaar_card: manager.aadhaar_card || null,
-          pan_card: manager.pan_card || null,
-          experience_letter: manager.experience_letter || null,
-          isverified: manager.isVerified,
-          status: manager.status,
-          isFirstLogin: false,
-        },
-      ],
-      { session }
-    );
+    const newUid = await generateUID(manager.department, organisation_id);
+
+    const [newEmployee] = await Usermodel.create([{
+      organisation_id,
+      uid: newUid,
+      profile_image: manager.profile_image || null,
+      department: manager.department,
+      f_name: manager.f_name,
+      l_name: manager.l_name,
+      work_email: manager.work_email,
+      password: "placeholder_will_be_overwritten",
+      gender: manager.gender,
+      marital_status: manager.marital_status || "single",
+      personal_contact: manager.personal_contact,
+      e_contact: manager.e_contact,
+      aadhaar_number: manager.aadhaar_number || null,
+      pan_number: manager.pan_number || null,
+      address: manager.address || null,
+      city: manager.city || null,
+      state: manager.state || null,
+      pincode: manager.pincode || null,
+      designation: designation || manager.designation,
+      role: "employee",
+      office_location: manager.office_location,
+      Under_manager: resolvedUnderManager,
+      is_fresher: false,
+      total_experience: (manager.total_experience || 0) + yearsAsManager,
+      previous_company: manager.previous_company || null,
+      previous_designation: manager.designation,
+      bank_name: manager.bank_name || null,
+      account_holder_name: manager.account_holder_name || null,
+      account_number: manager.account_number || null,
+      ifsc_code: manager.ifsc_code || null,
+      resume: manager.resume || null,
+      aadhaar_card: manager.aadhaar_card || null,
+      pan_card: manager.pan_card || null,
+      experience_letter: manager.experience_letter || null,
+      isverified: manager.isVerified,
+      status: manager.status,
+      isFirstLogin: false,
+    }], { session });
 
     await Usermodel.findByIdAndUpdate(
       newEmployee._id,
@@ -1175,8 +1190,21 @@ const demoteManagerToEmployee = async (req, res, next) => {
       { session }
     );
 
+    await assignDefaultLeave({ ...newEmployee.toObject(), _id: newEmployee._id });
+
     await Promise.all([
       Managermodel.findByIdAndDelete(id, { session }),
+
+      PermissionModel.findOneAndDelete({ user_id: id, user_model: "Manager", organisation_id }, { session }),
+
+      assignDefaultPermissions(
+        newEmployee._id,
+        "employee",
+        organisation_id,
+        req.admin._id,
+        "Admin",
+        session
+      ),
 
       Usermodel.updateMany(
         { Under_manager: id, organisation_id },
@@ -1190,51 +1218,9 @@ const demoteManagerToEmployee = async (req, res, next) => {
         { session }
       ),
 
-      leavebalanceModel.findOneAndUpdate(
-        { employee: id, organisation_id },
-        { $set: { employee: newEmployee._id } },
-        { session }
-      ),
-
-      ManagerLeave.updateMany(
-        { manager: id, organisation_id },
-        { $set: { manager: newEmployee._id } },
-        { session }
-      ),
-
-      Leave.updateMany(
-        { employee: id, organisation_id },
-        { $set: { employee: newEmployee._id } },
-        { session }
-      ),
-
-      Attendance.updateMany(
-        { employee: id, organisation_id },
-        { $set: { employee: newEmployee._id, onModel: "User", role: "employee" } },
-        { session }
-      ),
-
-      AttendanceSummary.updateMany(
-        { employee: id, organisation_id },
-        { $set: { employee: newEmployee._id, role: "employee" } },
-        { session }
-      ),
-
       Document.updateMany(
         { employee: id, organisation_id },
         { $set: { employee: newEmployee._id } },
-        { session }
-      ),
-
-      Review.updateMany(
-        { reviewee: id, organisation_id },
-        { $set: { reviewee: newEmployee._id, revieweeRole: "employee", revieweeRoleModel: "User" } },
-        { session }
-      ),
-
-      Review.updateMany(
-        { reviewer: id, organisation_id },
-        { $set: { reviewer: newEmployee._id, reviewerRole: "employee", reviewerRoleModel: "User" } },
         { session }
       ),
 
@@ -1247,24 +1233,6 @@ const demoteManagerToEmployee = async (req, res, next) => {
       Ticket.updateMany(
         { against: id, againstModel: "Manager", organisation_id },
         { $set: { against: newEmployee._id, againstModel: "User" } },
-        { session }
-      ),
-
-      WFH.updateMany(
-        { requester: id, requesterModel: "Manager", organisation_id },
-        { $set: { requester: newEmployee._id, requesterModel: "User" } },
-        { session }
-      ),
-
-      WFH.updateMany(
-        { manager: id, organisation_id },
-        { $set: { manager: null } },
-        { session }
-      ),
-
-      Document.updateMany(
-        { underManager: id, organisation_id },
-        { $set: { underManager: resolvedUnderManager } },
         { session }
       ),
     ]);
@@ -1312,65 +1280,60 @@ const demoteAdminToManager = async (req, res, next) => {
       return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
 
     const existing = await Managermodel.findOne({ work_email: adminToDemote.work_email, organisation_id })
-      .select("_id")
-      .lean();
+      .select("_id").lean();
     if (existing)
       return next(Object.assign(new Error("A manager with this email already exists"), { statusCode: 400 }));
 
     const { reportingManagerId, reportingManagerModel } = await resolveReportingManager(
-      reporting_manager,
-      organisation_id
+      reporting_manager, organisation_id
     );
 
     const yearsAsAdmin = parseFloat(
       ((Date.now() - new Date(adminToDemote.createdAt).getTime()) / (1000 * 60 * 60 * 24 * 365)).toFixed(1)
     );
 
-    const [newManager] = await Managermodel.create(
-      [
-        {
-          organisation_id,
-          uid: adminToDemote.uid,
-          profile_image: adminToDemote.profile_image || null,
-          department: adminToDemote.department,
-          f_name: adminToDemote.f_name,
-          l_name: adminToDemote.l_name,
-          work_email: adminToDemote.work_email,
-          password: "placeholder_will_be_overwritten",
-          gender: adminToDemote.gender,
-          marital_status: adminToDemote.marital_status || "single",
-          personal_contact: adminToDemote.personal_contact,
-          e_contact: adminToDemote.e_contact,
-          aadhaar_number: adminToDemote.aadhaar_number || null,
-          pan_number: adminToDemote.pan_number || null,
-          address: adminToDemote.address || null,
-          city: adminToDemote.city || null,
-          state: adminToDemote.state || null,
-          pincode: adminToDemote.pincode || null,
-          designation: designation || adminToDemote.designation,
-          role: role || "manager",
-          office_location: adminToDemote.office_location,
-          reporting_manager: reportingManagerId,
-          reporting_manager_model: reportingManagerModel,
-          is_fresher: false,
-          total_experience: (adminToDemote.total_experience || 0) + yearsAsAdmin,
-          previous_company: adminToDemote.previous_company || null,
-          previous_designation: adminToDemote.designation,
-          bank_name: adminToDemote.bank_name || null,
-          account_holder_name: adminToDemote.account_holder_name || null,
-          account_number: adminToDemote.account_number || null,
-          ifsc_code: adminToDemote.ifsc_code || null,
-          resume: adminToDemote.resume || null,
-          aadhaar_card: adminToDemote.aadhaar_card || null,
-          pan_card: adminToDemote.pan_card || null,
-          experience_letter: adminToDemote.experience_letter || null,
-          isVerified: adminToDemote.isVerified,
-          status: adminToDemote.status === "suspended" ? "inactive" : adminToDemote.status,
-          isFirstLogin: false,
-        },
-      ],
-      { session }
-    );
+    const newUid = await generateUID(adminToDemote.department, organisation_id);
+
+    const [newManager] = await Managermodel.create([{
+      organisation_id,
+      uid: newUid,
+      profile_image: adminToDemote.profile_image || null,
+      department: adminToDemote.department,
+      f_name: adminToDemote.f_name,
+      l_name: adminToDemote.l_name,
+      work_email: adminToDemote.work_email,
+      password: "placeholder_will_be_overwritten",
+      gender: adminToDemote.gender,
+      marital_status: adminToDemote.marital_status || "single",
+      personal_contact: adminToDemote.personal_contact,
+      e_contact: adminToDemote.e_contact,
+      aadhaar_number: adminToDemote.aadhaar_number || null,
+      pan_number: adminToDemote.pan_number || null,
+      address: adminToDemote.address || null,
+      city: adminToDemote.city || null,
+      state: adminToDemote.state || null,
+      pincode: adminToDemote.pincode || null,
+      designation: designation || adminToDemote.designation,
+      role: role || "manager",
+      office_location: adminToDemote.office_location,
+      reporting_manager: reportingManagerId,
+      reporting_manager_model: reportingManagerModel,
+      is_fresher: false,
+      total_experience: (adminToDemote.total_experience || 0) + yearsAsAdmin,
+      previous_company: adminToDemote.previous_company || null,
+      previous_designation: adminToDemote.designation,
+      bank_name: adminToDemote.bank_name || null,
+      account_holder_name: adminToDemote.account_holder_name || null,
+      account_number: adminToDemote.account_number || null,
+      ifsc_code: adminToDemote.ifsc_code || null,
+      resume: adminToDemote.resume || null,
+      aadhaar_card: adminToDemote.aadhaar_card || null,
+      pan_card: adminToDemote.pan_card || null,
+      experience_letter: adminToDemote.experience_letter || null,
+      isVerified: adminToDemote.isVerified,
+      status: adminToDemote.status === "suspended" ? "inactive" : adminToDemote.status,
+      isFirstLogin: false,
+    }], { session });
 
     await Managermodel.findByIdAndUpdate(
       newManager._id,
@@ -1378,56 +1341,25 @@ const demoteAdminToManager = async (req, res, next) => {
       { session }
     );
 
-    const newRole = role || "manager";
+    await assignDefaultLeave({ ...newManager.toObject(), _id: newManager._id });
 
     await Promise.all([
       Adminmodel.findByIdAndDelete(id, { session }),
 
-      leavebalanceModel.findOneAndUpdate(
-        { employee: id, organisation_id },
-        { $set: { employee: newManager._id } },
-        { session }
-      ),
+      PermissionModel.findOneAndDelete({ user_id: id, user_model: "Admin", organisation_id }, { session }),
 
-      AdminLeave.updateMany(
-        { admin: id, organisation_id },
-        { $set: { admin: newManager._id } },
-        { session }
-      ),
-
-      Leave.updateMany(
-        { employee: id, organisation_id },
-        { $set: { employee: newManager._id } },
-        { session }
-      ),
-
-      Attendance.updateMany(
-        { employee: id, organisation_id },
-        { $set: { employee: newManager._id, onModel: "Manager", role: "manager" } },
-        { session }
-      ),
-
-      AttendanceSummary.updateMany(
-        { employee: id, organisation_id },
-        { $set: { employee: newManager._id, role: "manager" } },
-        { session }
+      assignDefaultPermissions(
+        newManager._id,
+        newManager.role || "manager",
+        organisation_id,
+        req.admin._id,
+        "Admin",
+        session
       ),
 
       Document.updateMany(
         { employee: id, organisation_id },
         { $set: { employee: newManager._id } },
-        { session }
-      ),
-
-      Review.updateMany(
-        { reviewee: id, organisation_id },
-        { $set: { reviewee: newManager._id, revieweeRole: newRole, revieweeRoleModel: "Manager" } },
-        { session }
-      ),
-
-      Review.updateMany(
-        { reviewer: id, organisation_id },
-        { $set: { reviewer: newManager._id, reviewerRole: newRole, reviewerRoleModel: "Manager" } },
         { session }
       ),
 
@@ -1440,12 +1372,6 @@ const demoteAdminToManager = async (req, res, next) => {
       Ticket.updateMany(
         { against: id, againstModel: "Admin", organisation_id },
         { $set: { against: newManager._id, againstModel: "Manager" } },
-        { session }
-      ),
-
-      WFH.updateMany(
-        { requester: id, requesterModel: "Admin", organisation_id },
-        { $set: { requester: newManager._id, requesterModel: "Manager" } },
         { session }
       ),
     ]);
@@ -1494,16 +1420,13 @@ const demoteAdminToEmployee = async (req, res, next) => {
       return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
 
     const existing = await Usermodel.findOne({ work_email: adminToDemote.work_email, organisation_id })
-      .select("_id")
-      .lean();
+      .select("_id").lean();
     if (existing)
       return next(Object.assign(new Error("An employee with this email already exists"), { statusCode: 400 }));
 
     let resolvedUnderManager = null;
     if (Under_manager) {
-      const mgr = await Managermodel.findOne({ _id: Under_manager, organisation_id })
-        .select("_id")
-        .lean();
+      const mgr = await Managermodel.findOne({ _id: Under_manager, organisation_id }).select("_id").lean();
       if (!mgr)
         return next(Object.assign(new Error("Assigned manager not found in this organisation"), { statusCode: 404 }));
       resolvedUnderManager = mgr._id;
@@ -1513,50 +1436,47 @@ const demoteAdminToEmployee = async (req, res, next) => {
       ((Date.now() - new Date(adminToDemote.createdAt).getTime()) / (1000 * 60 * 60 * 24 * 365)).toFixed(1)
     );
 
-    const [newEmployee] = await Usermodel.create(
-      [
-        {
-          organisation_id,
-          uid: adminToDemote.uid,
-          profile_image: adminToDemote.profile_image || null,
-          department: adminToDemote.department,
-          f_name: adminToDemote.f_name,
-          l_name: adminToDemote.l_name,
-          work_email: adminToDemote.work_email,
-          password: "placeholder_will_be_overwritten",
-          gender: adminToDemote.gender,
-          marital_status: adminToDemote.marital_status || "single",
-          personal_contact: adminToDemote.personal_contact,
-          e_contact: adminToDemote.e_contact,
-          aadhaar_number: adminToDemote.aadhaar_number || null,
-          pan_number: adminToDemote.pan_number || null,
-          address: adminToDemote.address || null,
-          city: adminToDemote.city || null,
-          state: adminToDemote.state || null,
-          pincode: adminToDemote.pincode || null,
-          designation: designation || adminToDemote.designation,
-          role: "employee",
-          office_location: adminToDemote.office_location,
-          Under_manager: resolvedUnderManager,
-          is_fresher: false,
-          total_experience: (adminToDemote.total_experience || 0) + yearsAsAdmin,
-          previous_company: adminToDemote.previous_company || null,
-          previous_designation: adminToDemote.designation,
-          bank_name: adminToDemote.bank_name || null,
-          account_holder_name: adminToDemote.account_holder_name || null,
-          account_number: adminToDemote.account_number || null,
-          ifsc_code: adminToDemote.ifsc_code || null,
-          resume: adminToDemote.resume || null,
-          aadhaar_card: adminToDemote.aadhaar_card || null,
-          pan_card: adminToDemote.pan_card || null,
-          experience_letter: adminToDemote.experience_letter || null,
-          isverified: adminToDemote.isVerified,
-          status: adminToDemote.status === "suspended" ? "inactive" : adminToDemote.status,
-          isFirstLogin: false,
-        },
-      ],
-      { session }
-    );
+    const newUid = await generateUID(adminToDemote.department, organisation_id);
+
+    const [newEmployee] = await Usermodel.create([{
+      organisation_id,
+      uid: newUid,
+      profile_image: adminToDemote.profile_image || null,
+      department: adminToDemote.department,
+      f_name: adminToDemote.f_name,
+      l_name: adminToDemote.l_name,
+      work_email: adminToDemote.work_email,
+      password: "placeholder_will_be_overwritten",
+      gender: adminToDemote.gender,
+      marital_status: adminToDemote.marital_status || "single",
+      personal_contact: adminToDemote.personal_contact,
+      e_contact: adminToDemote.e_contact,
+      aadhaar_number: adminToDemote.aadhaar_number || null,
+      pan_number: adminToDemote.pan_number || null,
+      address: adminToDemote.address || null,
+      city: adminToDemote.city || null,
+      state: adminToDemote.state || null,
+      pincode: adminToDemote.pincode || null,
+      designation: designation || adminToDemote.designation,
+      role: "employee",
+      office_location: adminToDemote.office_location,
+      Under_manager: resolvedUnderManager,
+      is_fresher: false,
+      total_experience: (adminToDemote.total_experience || 0) + yearsAsAdmin,
+      previous_company: adminToDemote.previous_company || null,
+      previous_designation: adminToDemote.designation,
+      bank_name: adminToDemote.bank_name || null,
+      account_holder_name: adminToDemote.account_holder_name || null,
+      account_number: adminToDemote.account_number || null,
+      ifsc_code: adminToDemote.ifsc_code || null,
+      resume: adminToDemote.resume || null,
+      aadhaar_card: adminToDemote.aadhaar_card || null,
+      pan_card: adminToDemote.pan_card || null,
+      experience_letter: adminToDemote.experience_letter || null,
+      isverified: adminToDemote.isVerified,
+      status: adminToDemote.status === "suspended" ? "inactive" : adminToDemote.status,
+      isFirstLogin: false,
+    }], { session });
 
     await Usermodel.findByIdAndUpdate(
       newEmployee._id,
@@ -1564,54 +1484,25 @@ const demoteAdminToEmployee = async (req, res, next) => {
       { session }
     );
 
+    await assignDefaultLeave({ ...newEmployee.toObject(), _id: newEmployee._id });
+
     await Promise.all([
       Adminmodel.findByIdAndDelete(id, { session }),
 
-      leavebalanceModel.findOneAndUpdate(
-        { employee: id, organisation_id },
-        { $set: { employee: newEmployee._id } },
-        { session }
-      ),
+      PermissionModel.findOneAndDelete({ user_id: id, user_model: "Admin", organisation_id }, { session }),
 
-      AdminLeave.updateMany(
-        { admin: id, organisation_id },
-        { $set: { admin: newEmployee._id } },
-        { session }
-      ),
-
-      Leave.updateMany(
-        { employee: id, organisation_id },
-        { $set: { employee: newEmployee._id } },
-        { session }
-      ),
-
-      Attendance.updateMany(
-        { employee: id, organisation_id },
-        { $set: { employee: newEmployee._id, onModel: "User", role: "employee" } },
-        { session }
-      ),
-
-      AttendanceSummary.updateMany(
-        { employee: id, organisation_id },
-        { $set: { employee: newEmployee._id, role: "employee" } },
-        { session }
+      assignDefaultPermissions(
+        newEmployee._id,
+        "employee",
+        organisation_id,
+        req.admin._id,
+        "Admin",
+        session
       ),
 
       Document.updateMany(
         { employee: id, organisation_id },
         { $set: { employee: newEmployee._id } },
-        { session }
-      ),
-
-      Review.updateMany(
-        { reviewee: id, organisation_id },
-        { $set: { reviewee: newEmployee._id, revieweeRole: "employee", revieweeRoleModel: "User" } },
-        { session }
-      ),
-
-      Review.updateMany(
-        { reviewer: id, organisation_id },
-        { $set: { reviewer: newEmployee._id, reviewerRole: "employee", reviewerRoleModel: "User" } },
         { session }
       ),
 
@@ -1624,12 +1515,6 @@ const demoteAdminToEmployee = async (req, res, next) => {
       Ticket.updateMany(
         { against: id, againstModel: "Admin", organisation_id },
         { $set: { against: newEmployee._id, againstModel: "User" } },
-        { session }
-      ),
-
-      WFH.updateMany(
-        { requester: id, requesterModel: "Admin", organisation_id },
-        { $set: { requester: newEmployee._id, requesterModel: "User" } },
         { session }
       ),
     ]);
@@ -2603,8 +2488,7 @@ const getAllPersonalDocumentsAdmin = async (req, res, next) => {
   const organisation_id = req.admin.organisation_id;
 
   const documents = await Document.find({ fileType: "personal", organisation_id })
-    .populate("employee", "f_name l_name work_email personal_contact department designation")
-    .populate("underManager", "f_name l_name work_email")
+    .populate("uploader", "f_name l_name work_email personal_contact department designation")
     .sort({ uploadedAt: -1 })
     .lean();
 
@@ -2623,23 +2507,16 @@ const getAllPersonalDocumentsAdmin = async (req, res, next) => {
       fileType: doc.fileType,
       sizeKB: doc.size,
       uploadedAt: doc.uploadedAt,
-      viewedByManager: doc.viewedByManager,
       viewedByAdmin: doc.viewedByAdmin,
-      employee: doc.employee
+      uploaderModel: doc.uploaderModel,
+      uploader: doc.uploader
         ? {
-            id: doc.employee._id,
-            name: `${doc.employee.f_name} ${doc.employee.l_name}`,
-            email: doc.employee.work_email,
-            contact: doc.employee.personal_contact,
-            department: doc.employee.department,
-            designation: doc.employee.designation,
-          }
-        : null,
-      reportingManager: doc.underManager
-        ? {
-            id: doc.underManager._id,
-            name: `${doc.underManager.f_name} ${doc.underManager.l_name}`,
-            email: doc.underManager.work_email,
+            id: doc.uploader._id,
+            name: `${doc.uploader.f_name} ${doc.uploader.l_name}`,
+            email: doc.uploader.work_email,
+            contact: doc.uploader.personal_contact,
+            department: doc.uploader.department,
+            designation: doc.uploader.designation,
           }
         : null,
     })),
@@ -2653,8 +2530,7 @@ const getAllExpenseDocumentsAdmin = async (req, res, next) => {
   const organisation_id = req.admin.organisation_id;
 
   const documents = await Document.find({ fileType: "expense", organisation_id })
-    .populate("employee", "f_name l_name work_email personal_contact department designation")
-    .populate("underManager", "f_name l_name work_email")
+    .populate("uploader", "f_name l_name work_email personal_contact department designation")
     .sort({ uploadedAt: -1 })
     .lean();
 
@@ -2673,23 +2549,16 @@ const getAllExpenseDocumentsAdmin = async (req, res, next) => {
       fileType: doc.fileType,
       sizeKB: doc.size,
       uploadedAt: doc.uploadedAt,
-      viewedByManager: doc.viewedByManager,
       viewedByAdmin: doc.viewedByAdmin,
-      employee: doc.employee
+      uploaderModel: doc.uploaderModel,
+      uploader: doc.uploader
         ? {
-            id: doc.employee._id,
-            name: `${doc.employee.f_name} ${doc.employee.l_name}`,
-            email: doc.employee.work_email,
-            contact: doc.employee.personal_contact,
-            department: doc.employee.department,
-            designation: doc.employee.designation,
-          }
-        : null,
-      reportingManager: doc.underManager
-        ? {
-            id: doc.underManager._id,
-            name: `${doc.underManager.f_name} ${doc.underManager.l_name}`,
-            email: doc.underManager.work_email,
+            id: doc.uploader._id,
+            name: `${doc.uploader.f_name} ${doc.uploader.l_name}`,
+            email: doc.uploader.work_email,
+            contact: doc.uploader.personal_contact,
+            department: doc.uploader.department,
+            designation: doc.uploader.designation,
           }
         : null,
     })),
@@ -2707,8 +2576,7 @@ const getDocumentDetailsAdmin = async (req, res, next) => {
   const organisation_id = req.admin.organisation_id;
 
   const document = await Document.findOne({ _id: documentId, organisation_id })
-    .populate("employee", "f_name l_name work_email personal_contact department designation")
-    .populate("underManager", "f_name l_name work_email");
+    .populate("uploader", "f_name l_name work_email personal_contact department designation");
 
   if (!document)
     return next(Object.assign(new Error("Document not found"), { statusCode: 404 }));
@@ -2725,21 +2593,15 @@ const getDocumentDetailsAdmin = async (req, res, next) => {
       fileType: document.fileType,
       sizeKB: document.size,
       uploadedAt: document.uploadedAt,
-      viewedByManager: document.viewedByManager,
       viewedByAdmin: document.viewedByAdmin,
-      employee: document.employee
+      uploaderModel: document.uploaderModel,
+      uploader: document.uploader
         ? {
-            id: document.employee._id,
-            name: `${document.employee.f_name} ${document.employee.l_name}`,
-            email: document.employee.work_email,
-            department: document.employee.department,
-          }
-        : null,
-      reportingManager: document.underManager
-        ? {
-            id: document.underManager._id,
-            name: `${document.underManager.f_name} ${document.underManager.l_name}`,
-            email: document.underManager.work_email,
+            id: document.uploader._id,
+            name: `${document.uploader.f_name} ${document.uploader.l_name}`,
+            email: document.uploader.work_email,
+            department: document.uploader.department,
+            designation: document.uploader.designation,
           }
         : null,
     },
