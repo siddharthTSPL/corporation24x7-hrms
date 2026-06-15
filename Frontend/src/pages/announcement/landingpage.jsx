@@ -1229,7 +1229,7 @@ function Testimonials() {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: '10px',
+    gap: '20px',
     marginBottom: SP.section.sm,
   }}
 >
@@ -1274,25 +1274,22 @@ function Testimonials() {
     alignItems: 'center',
     gap: '6px',
   }}
->
-  {[0,1,2].map(i => (
-    <button
-      key={i}
-      onClick={() => setStartIndex(i)}
-      style={{
-        width: startIndex === i ? '18px' : '6px',
-        height: '6px',
-        borderRadius: '20px',
-        border: 'none',
-        cursor: 'pointer',
-        background:
-          startIndex === i
-            ? '#730042'
-            : '#DDB7CB',
-        transition: 'all .3s ease',
-      }}
-    />
-  ))}
+>{[0,1,2].map(i => (
+  <button
+    key={i}
+    onClick={() => setStartIndex(i)}
+    style={{
+      width: startIndex === i ? '40px' : '25px',
+      height: startIndex === i ? '15px' : '8px',
+      borderRadius: '50%',
+      border: 'none',
+      cursor: 'pointer',
+      background: startIndex === i ? '#730042' : '#DDB7CB',
+      transition: 'all 0.3s ease',
+      padding: 0,
+    }}
+  />
+))}
 </div>
 <button
   onClick={() =>
