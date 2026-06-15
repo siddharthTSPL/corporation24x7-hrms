@@ -7,78 +7,196 @@ import {
 } from "../../auth/server-state/employee/employeeticket/employeeticket.hook";
 import { usePermissionStore } from "../../auth/store/permission/permissionStore";
 
-const C = {
-  primary: "#730042",
-  accent: "#CD166E",
-  bg: "#F9F8F2",
-  card: "#ffffff",
-  border: "rgba(115,0,66,0.1)",
-  muted: "#9B7A8E",
-  text: "#1A0A12",
-  sub: "#5C3A50",
-  surface: "#FBF8FE",
-};
-
 const TYPE_META = {
-  suggestion:    { label: "Suggestion",    bg: "#ECFDF5", color: "#065F46", dot: "#10B981", icon: "💡" },
-  complaint:     { label: "Complaint",     bg: "#FFFBEB", color: "#78350F", dot: "#F59E0B", icon: "📋" },
-  posh:          { label: "POSH",          bg: "#FEF2F2", color: "#7F1D1D", dot: "#EF4444", icon: "🔴" },
-  grievance:     { label: "Grievance",     bg: "#EDE9FE", color: "#4C1D95", dot: "#7C3AED", icon: "⚖️" },
-  whistleblower: { label: "Whistleblower", bg: "#EFF6FF", color: "#1E3A5F", dot: "#3B82F6", icon: "🔒" },
+  suggestion: {
+    label: "Suggestion",
+    bg: "bg-emerald-50",
+    text: "text-emerald-800",
+    dot: "bg-emerald-400",
+    icon: "💡",
+  },
+  complaint: {
+    label: "Complaint",
+    bg: "bg-amber-50",
+    text: "text-amber-800",
+    dot: "bg-amber-400",
+    icon: "📋",
+  },
+  posh: {
+    label: "POSH",
+    bg: "bg-red-50",
+    text: "text-red-800",
+    dot: "bg-red-400",
+    icon: "🔴",
+  },
+  grievance: {
+    label: "Grievance",
+    bg: "bg-violet-50",
+    text: "text-violet-800",
+    dot: "bg-violet-500",
+    icon: "⚖️",
+  },
+  whistleblower: {
+    label: "Whistleblower",
+    bg: "bg-blue-50",
+    text: "text-blue-900",
+    dot: "bg-blue-500",
+    icon: "🔒",
+  },
 };
 
 const STATUS_META = {
-  open:         { label: "Open",          bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
-  acknowledged: { label: "Acknowledged",  bg: "#EFF6FF", color: "#1D4ED8", dot: "#3B82F6" },
-  under_review: { label: "Under Review",  bg: "#F5F3FF", color: "#5B21B6", dot: "#8B5CF6" },
-  action_taken: { label: "Action Taken",  bg: "#ECFDF5", color: "#065F46", dot: "#10B981" },
-  resolved:     { label: "Resolved",      bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
-  closed:       { label: "Closed",        bg: "#F3F4F6", color: "#374151", dot: "#9CA3AF" },
-  rejected:     { label: "Rejected",      bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
-  reopened:     { label: "Reopened",      bg: "#FFF7ED", color: "#9A3412", dot: "#F97316" },
+  open: {
+    label: "Open",
+    bg: "bg-amber-50",
+    text: "text-amber-800",
+    dot: "bg-amber-400",
+  },
+  acknowledged: {
+    label: "Acknowledged",
+    bg: "bg-blue-50",
+    text: "text-blue-700",
+    dot: "bg-blue-400",
+  },
+  under_review: {
+    label: "Under Review",
+    bg: "bg-violet-50",
+    text: "text-violet-700",
+    dot: "bg-violet-500",
+  },
+  action_taken: {
+    label: "Action Taken",
+    bg: "bg-emerald-50",
+    text: "text-emerald-700",
+    dot: "bg-emerald-400",
+  },
+  resolved: {
+    label: "Resolved",
+    bg: "bg-green-50",
+    text: "text-green-700",
+    dot: "bg-green-500",
+  },
+  closed: {
+    label: "Closed",
+    bg: "bg-gray-100",
+    text: "text-gray-600",
+    dot: "bg-gray-400",
+  },
+  rejected: {
+    label: "Rejected",
+    bg: "bg-red-50",
+    text: "text-red-700",
+    dot: "bg-red-400",
+  },
+  reopened: {
+    label: "Reopened",
+    bg: "bg-orange-50",
+    text: "text-orange-700",
+    dot: "bg-orange-400",
+  },
 };
 
 const SEV_META = {
-  low:      { label: "Low",      bg: "#F0FDF4", color: "#065F46" },
-  medium:   { label: "Medium",   bg: "#FFFBEB", color: "#78350F" },
-  high:     { label: "High",     bg: "#FFF7ED", color: "#9A3412" },
-  critical: { label: "Critical", bg: "#FEF2F2", color: "#7F1D1D" },
-};
-
-const CATEGORIES = {
-  complaint:     ["manager_behavior","colleague_behavior","discrimination","workplace_violence","hostile_work_environment","inappropriate_behavior","other"],
-  posh:          ["sexual_harassment","inappropriate_behavior","hostile_work_environment","other"],
-  grievance:     ["compensation_issue","workload_stress","unfair_treatment","policy_violation","other"],
-  suggestion:    ["process_improvement","technology_tools","policy_feedback","culture_diversity","benefits_perks","training_development","other"],
-  whistleblower: ["financial_fraud","data_breach","safety_violation","legal_compliance","other"],
-};
-
-const CAT_LABELS = {
-  sexual_harassment: "Sexual Harassment", hostile_work_environment: "Hostile Work Env.",
-  inappropriate_behavior: "Inappropriate Behavior", manager_behavior: "Manager Behavior",
-  colleague_behavior: "Colleague Behavior", discrimination: "Discrimination",
-  workplace_violence: "Workplace Violence", policy_violation: "Policy Violation",
-  compensation_issue: "Compensation Issue", workload_stress: "Workload / Stress",
-  unfair_treatment: "Unfair Treatment", process_improvement: "Process Improvement",
-  technology_tools: "Technology & Tools", policy_feedback: "Policy Feedback",
-  culture_diversity: "Culture & Diversity", benefits_perks: "Benefits & Perks",
-  training_development: "Training & Dev.", financial_fraud: "Financial Fraud",
-  data_breach: "Data Breach", safety_violation: "Safety Violation",
-  legal_compliance: "Legal Compliance", other: "Other",
+  low: { label: "Low", bg: "bg-green-50", text: "text-green-700" },
+  medium: { label: "Medium", bg: "bg-amber-50", text: "text-amber-800" },
+  high: { label: "High", bg: "bg-orange-50", text: "text-orange-800" },
+  critical: { label: "Critical", bg: "bg-red-50", text: "text-red-800" },
 };
 
 const TL_COLORS = {
-  ticket_created: "#CD166E", status_changed: "#3B82F6", note_added: "#10B981",
-  internal_note_added: "#7C3AED", priority_changed: "#F97316",
-  escalated: "#EF4444", acknowledgement_sent: "#3B82F6", rating_submitted: "#F59E0B",
+  ticket_created: "#CD166E",
+  status_changed: "#3B82F6",
+  note_added: "#10B981",
+  internal_note_added: "#7C3AED",
+  priority_changed: "#F97316",
+  escalated: "#EF4444",
+  acknowledgement_sent: "#3B82F6",
+  rating_submitted: "#F59E0B",
+};
+
+const CATEGORIES = {
+  complaint: [
+    "manager_behavior",
+    "colleague_behavior",
+    "discrimination",
+    "workplace_violence",
+    "hostile_work_environment",
+    "inappropriate_behavior",
+    "other",
+  ],
+  posh: [
+    "sexual_harassment",
+    "inappropriate_behavior",
+    "hostile_work_environment",
+    "other",
+  ],
+  grievance: [
+    "compensation_issue",
+    "workload_stress",
+    "unfair_treatment",
+    "policy_violation",
+    "other",
+  ],
+  suggestion: [
+    "process_improvement",
+    "technology_tools",
+    "policy_feedback",
+    "culture_diversity",
+    "benefits_perks",
+    "training_development",
+    "other",
+  ],
+  whistleblower: [
+    "financial_fraud",
+    "data_breach",
+    "safety_violation",
+    "legal_compliance",
+    "other",
+  ],
+};
+
+const CAT_LABELS = {
+  sexual_harassment: "Sexual Harassment",
+  hostile_work_environment: "Hostile Work Env.",
+  inappropriate_behavior: "Inappropriate Behavior",
+  manager_behavior: "Manager Behavior",
+  colleague_behavior: "Colleague Behavior",
+  discrimination: "Discrimination",
+  workplace_violence: "Workplace Violence",
+  policy_violation: "Policy Violation",
+  compensation_issue: "Compensation Issue",
+  workload_stress: "Workload / Stress",
+  unfair_treatment: "Unfair Treatment",
+  process_improvement: "Process Improvement",
+  technology_tools: "Technology & Tools",
+  policy_feedback: "Policy Feedback",
+  culture_diversity: "Culture & Diversity",
+  benefits_perks: "Benefits & Perks",
+  training_development: "Training & Dev.",
+  financial_fraud: "Financial Fraud",
+  data_breach: "Data Breach",
+  safety_violation: "Safety Violation",
+  legal_compliance: "Legal Compliance",
+  other: "Other",
 };
 
 const fmt = (d) =>
-  d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
-
+  d
+    ? new Date(d).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "—";
 const fmtFull = (d) =>
-  d ? new Date(d).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
-
+  d
+    ? new Date(d).toLocaleString("en-IN", {
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "—";
 const timeAgo = (d) => {
   if (!d) return "";
   const diff = Math.floor((Date.now() - new Date(d)) / 60000);
@@ -87,55 +205,93 @@ const timeAgo = (d) => {
   return `${Math.floor(diff / 1440)}d ago`;
 };
 
-const Chip = ({ bg, color, dot, children }) => (
-  <span style={{
-    display: "inline-flex", alignItems: "center", gap: 4,
-    padding: "3px 9px", borderRadius: 20,
-    fontSize: 11, fontWeight: 600, background: bg, color,
-    flexShrink: 0,
-  }}>
-    {dot && <span style={{ width: 5, height: 5, borderRadius: "50%", background: dot, display: "inline-block", flexShrink: 0 }} />}
-    {children}
-  </span>
-);
+function Chip({ bg, text, dot, children }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${bg} ${text}`}
+    >
+      {dot && (
+        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dot}`} />
+      )}
+      {children}
+    </span>
+  );
+}
 
-const TypeChip = ({ type }) => {
-  const m = TYPE_META[type] || { label: type, bg: "#F3F4F6", color: "#374151", icon: "📌" };
-  return <Chip bg={m.bg} color={m.color}>{m.icon} {m.label}</Chip>;
-};
+function TypeChip({ type }) {
+  const m = TYPE_META[type] || {
+    label: type,
+    bg: "bg-gray-100",
+    text: "text-gray-700",
+    icon: "📌",
+  };
+  return (
+    <Chip bg={m.bg} text={m.text}>
+      {m.icon} {m.label}
+    </Chip>
+  );
+}
 
-const StatusChip = ({ status }) => {
-  const m = STATUS_META[status] || { label: status, bg: "#F3F4F6", color: "#374151", dot: "#9CA3AF" };
-  return <Chip bg={m.bg} color={m.color} dot={m.dot}>{m.label}</Chip>;
-};
+function StatusChip({ status }) {
+  const m = STATUS_META[status] || {
+    label: status,
+    bg: "bg-gray-100",
+    text: "text-gray-600",
+    dot: "bg-gray-400",
+  };
+  return (
+    <Chip bg={m.bg} text={m.text} dot={m.dot}>
+      {m.label}
+    </Chip>
+  );
+}
 
-const SevChip = ({ sev }) => {
-  const m = SEV_META[sev] || { label: sev, bg: "#F3F4F6", color: "#374151" };
-  return <Chip bg={m.bg} color={m.color}>{m.label}</Chip>;
-};
+function SevChip({ sev }) {
+  const m = SEV_META[sev] || {
+    label: sev,
+    bg: "bg-gray-100",
+    text: "text-gray-600",
+  };
+  return (
+    <Chip bg={m.bg} text={m.text}>
+      {m.label}
+    </Chip>
+  );
+}
 
-const InfoRow = ({ label, val }) => (
-  <div style={{
-    display: "flex", flexDirection: "column", gap: 3,
-    padding: "10px 14px", borderRadius: 10,
-    background: C.surface, border: `1px solid ${C.border}`,
-  }}>
-    <span style={{ fontSize: 10, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: ".5px" }}>{label}</span>
-    <span style={{ fontSize: 12.5, color: C.text, fontWeight: 500 }}>{val || "—"}</span>
-  </div>
-);
+function Spinner() {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 gap-3">
+      <div className="w-7 h-7 rounded-full border-[3px] border-[rgba(115,0,66,0.15)] border-t-[#730042] animate-spin" />
+      <p className="text-xs text-[#9B7A8E]">Loading…</p>
+    </div>
+  );
+}
 
-const Spinner = () => (
-  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "48px 0", flexDirection: "column", gap: 10 }}>
-    <div style={{ width: 28, height: 28, border: `2.5px solid rgba(115,0,66,0.15)`, borderTop: `2.5px solid ${C.primary}`, borderRadius: "50%", animation: "spin .7s linear infinite" }} />
-    <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>Loading…</p>
-    <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-  </div>
-);
+function InfoRow({ label, val }) {
+  return (
+    <div className="flex flex-col gap-1 p-3 rounded-xl bg-[#FBF8FE] border border-[rgba(115,0,66,0.1)]">
+      <span className="text-[10px] font-semibold text-[#9B7A8E] uppercase tracking-wide">
+        {label}
+      </span>
+      <span className="text-[12.5px] font-medium text-[#1A0A12]">
+        {val || "—"}
+      </span>
+    </div>
+  );
+}
 
 const BLANK = {
-  type: "complaint", category: "", subCategory: "", title: "", description: "",
-  incidentDate: "", incidentLocation: "", witnessNames: "", severity: "medium", isAnonymous: false,
+  type: "complaint",
+  category: "",
+  subCategory: "",
+  title: "",
+  description: "",
+  incidentDate: "",
+  incidentLocation: "",
+  witnessNames: "",
+  severity: "medium",
+  isAnonymous: false,
 };
 
 function SubmitForm({ onSuccess }) {
@@ -144,8 +300,13 @@ function SubmitForm({ onSuccess }) {
   const mut = useEmployeeSubmitTicket();
 
   const set = useCallback(
-    (k, v) => setForm((p) => ({ ...p, [k]: v, ...(k === "type" ? { category: "", subCategory: "" } : {}) })),
-    []
+    (k, v) =>
+      setForm((p) => ({
+        ...p,
+        [k]: v,
+        ...(k === "type" ? { category: "", subCategory: "" } : {}),
+      })),
+    [],
   );
 
   const showToast = useCallback((msg, kind = "ok") => {
@@ -162,7 +323,10 @@ function SubmitForm({ onSuccess }) {
       await mut.mutateAsync({
         ...form,
         witnessNames: form.witnessNames
-          ? form.witnessNames.split(",").map((s) => s.trim()).filter(Boolean)
+          ? form.witnessNames
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean)
           : [],
       });
       showToast("Ticket submitted successfully!");
@@ -174,41 +338,37 @@ function SubmitForm({ onSuccess }) {
   };
 
   const cats = CATEGORIES[form.type] || [];
-  const inp = {
-    width: "100%", padding: "10px 14px", borderRadius: 10,
-    fontSize: 13, color: C.text, background: "#FDFBFF",
-    border: `1.5px solid ${C.border}`, outline: "none",
-    boxSizing: "border-box", fontFamily: "inherit",
-  };
+  const inputCls =
+    "w-full px-3.5 py-2.5 rounded-xl text-[13px] text-[#1A0A12] bg-[#FDFBFF] border border-[rgba(115,0,66,0.12)] outline-none focus:border-[#730042] transition-colors font-[inherit]";
 
   return (
-    <div style={{ background: "#fff", borderRadius: 18, border: `1px solid ${C.border}`, padding: "1.5rem", boxShadow: "0 4px 24px rgba(80,20,90,0.06)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
-        <div style={{ width: 42, height: 42, borderRadius: 12, background: `linear-gradient(135deg,${C.primary},${C.accent})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>📝</div>
+    <div className="bg-white rounded-2xl border border-[rgba(115,0,66,0.1)] p-5 sm:p-6 shadow-[0_4px_24px_rgba(80,20,90,0.06)]">
+      <div className="flex items-center gap-3 mb-5">
+        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#730042] to-[#CD166E] flex items-center justify-center text-lg flex-shrink-0">
+          📝
+        </div>
         <div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>New Ticket</div>
-          <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Your submission is handled confidentially</div>
+          <div className="text-[15px] font-bold text-[#1A0A12]">New Ticket</div>
+          <div className="text-[11px] text-[#9B7A8E] mt-0.5">
+            Your submission is handled confidentially
+          </div>
         </div>
       </div>
 
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: ".6px", marginBottom: 8 }}>
-          Ticket Type <span style={{ color: C.accent }}>*</span>
+      <div className="mb-4">
+        <div className="text-[11px] font-semibold text-[#9B7A8E] uppercase tracking-wider mb-2">
+          Ticket Type <span className="text-[#CD166E]">*</span>
         </div>
-        <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+        <div className="flex flex-wrap gap-2">
           {Object.entries(TYPE_META).map(([k, m]) => (
             <button
               key={k}
               onClick={() => set("type", k)}
-              style={{
-                padding: "7px 12px", borderRadius: 10,
-                border: `1.5px solid ${form.type === k ? C.primary : C.border}`,
-                background: form.type === k ? C.primary : C.surface,
-                color: form.type === k ? "#fff" : C.sub,
-                fontSize: 12, fontWeight: 600, cursor: "pointer",
-                display: "flex", alignItems: "center", gap: 5,
-                fontFamily: "inherit", transition: "all .18s",
-              }}
+              className={`px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition-all flex items-center gap-1.5 ${
+                form.type === k
+                  ? "bg-[#730042] text-white border-[#730042]"
+                  : "bg-[#FBF8FE] text-[#5C3A50] border-[rgba(115,0,66,0.12)] hover:bg-[rgba(115,0,66,0.06)]"
+              }`}
             >
               {m.icon} {m.label}
             </button>
@@ -216,80 +376,152 @@ function SubmitForm({ onSuccess }) {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 14 }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3.5">
         <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: ".6px", marginBottom: 6 }}>
-            Category <span style={{ color: C.accent }}>*</span>
+          <div className="text-[11px] font-semibold text-[#9B7A8E] uppercase tracking-wider mb-1.5">
+            Category <span className="text-[#CD166E]">*</span>
           </div>
-          <select style={inp} value={form.category} onChange={(e) => set("category", e.target.value)}>
+          <select
+            className={inputCls}
+            value={form.category}
+            onChange={(e) => set("category", e.target.value)}
+          >
             <option value="">Select…</option>
-            {cats.map((c) => <option key={c} value={c}>{CAT_LABELS[c] || c}</option>)}
+            {cats.map((c) => (
+              <option key={c} value={c}>
+                {CAT_LABELS[c] || c}
+              </option>
+            ))}
           </select>
         </div>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: ".6px", marginBottom: 6 }}>Severity</div>
-          <select style={inp} value={form.severity} onChange={(e) => set("severity", e.target.value)}>
-            {Object.entries(SEV_META).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
+          <div className="text-[11px] font-semibold text-[#9B7A8E] uppercase tracking-wider mb-1.5">
+            Severity
+          </div>
+          <select
+            className={inputCls}
+            value={form.severity}
+            onChange={(e) => set("severity", e.target.value)}
+          >
+            {Object.entries(SEV_META).map(([k, m]) => (
+              <option key={k} value={k}>
+                {m.label}
+              </option>
+            ))}
           </select>
         </div>
       </div>
 
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: ".6px", marginBottom: 6 }}>
-          Title <span style={{ color: C.accent }}>*</span>
+      <div className="mb-3.5">
+        <div className="text-[11px] font-semibold text-[#9B7A8E] uppercase tracking-wider mb-1.5">
+          Title <span className="text-[#CD166E]">*</span>
         </div>
-        <input style={inp} value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="Brief, clear title…" maxLength={120} />
+        <input
+          className={inputCls}
+          value={form.title}
+          onChange={(e) => set("title", e.target.value)}
+          placeholder="Brief, clear title…"
+          maxLength={120}
+        />
       </div>
 
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: ".6px", marginBottom: 6 }}>
-          Description <span style={{ color: C.accent }}>*</span>
+      <div className="mb-3.5">
+        <div className="text-[11px] font-semibold text-[#9B7A8E] uppercase tracking-wider mb-1.5">
+          Description <span className="text-[#CD166E]">*</span>
         </div>
-        <textarea style={{ ...inp, resize: "vertical", lineHeight: 1.7 }} rows={4} value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Describe the issue with dates, people involved, and what happened…" />
+        <textarea
+          className={`${inputCls} resize-y leading-relaxed`}
+          rows={4}
+          value={form.description}
+          onChange={(e) => set("description", e.target.value)}
+          placeholder="Describe the issue with dates, people involved, and what happened…"
+        />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 14 }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3.5">
         <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: ".6px", marginBottom: 6 }}>Incident Date</div>
-          <input style={inp} type="date" value={form.incidentDate} onChange={(e) => set("incidentDate", e.target.value)} />
+          <div className="text-[11px] font-semibold text-[#9B7A8E] uppercase tracking-wider mb-1.5">
+            Incident Date
+          </div>
+          <input
+            className={inputCls}
+            type="date"
+            value={form.incidentDate}
+            onChange={(e) => set("incidentDate", e.target.value)}
+          />
         </div>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: ".6px", marginBottom: 6 }}>Location</div>
-          <input style={inp} value={form.incidentLocation} onChange={(e) => set("incidentLocation", e.target.value)} placeholder="Office floor, remote…" />
+          <div className="text-[11px] font-semibold text-[#9B7A8E] uppercase tracking-wider mb-1.5">
+            Location
+          </div>
+          <input
+            className={inputCls}
+            value={form.incidentLocation}
+            onChange={(e) => set("incidentLocation", e.target.value)}
+            placeholder="Office floor, remote…"
+          />
         </div>
       </div>
 
-      <div style={{ marginBottom: 18 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: ".6px", marginBottom: 6 }}>Witness Names <span style={{ fontWeight: 400, textTransform: "none", fontSize: 10 }}>(comma-separated)</span></div>
-        <input style={inp} value={form.witnessNames} onChange={(e) => set("witnessNames", e.target.value)} placeholder="John Doe, Jane Smith" />
+      <div className="mb-5">
+        <div className="text-[11px] font-semibold text-[#9B7A8E] uppercase tracking-wider mb-1.5">
+          Witness Names{" "}
+          <span className="text-[10px] normal-case font-normal">
+            (comma-separated)
+          </span>
+        </div>
+        <input
+          className={inputCls}
+          value={form.witnessNames}
+          onChange={(e) => set("witnessNames", e.target.value)}
+          placeholder="John Doe, Jane Smith"
+        />
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22, background: "#F5F0FE", borderRadius: 12, padding: "12px 16px", border: "1px solid rgba(124,58,237,0.12)" }}>
+      <div className="flex items-center gap-3 mb-5 bg-violet-50 rounded-xl p-3.5 border border-violet-100">
         <button
           onClick={() => set("isAnonymous", !form.isAnonymous)}
-          style={{ width: 42, height: 24, borderRadius: 12, border: "none", cursor: "pointer", background: form.isAnonymous ? C.primary : "#DDD6F0", transition: "background .2s", position: "relative", flexShrink: 0 }}
+          className={`relative w-11 h-6 rounded-full border-none transition-colors flex-shrink-0 ${form.isAnonymous ? "bg-[#730042]" : "bg-gray-300"}`}
         >
-          <span style={{ position: "absolute", top: 3, left: form.isAnonymous ? 20 : 3, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 4px rgba(0,0,0,0.18)" }} />
+          <span
+            className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${form.isAnonymous ? "left-6" : "left-1"}`}
+          />
         </button>
         <div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#5B21B6" }}>Submit Anonymously</div>
-          <div style={{ fontSize: 11, color: "#8B5CF6", marginTop: 1 }}>Your identity will be hidden from Super Admin</div>
+          <div className="text-[12px] font-semibold text-violet-700">
+            Submit Anonymously
+          </div>
+          <div className="text-[11px] text-violet-500 mt-0.5">
+            Your identity will be hidden from Super Admin
+          </div>
         </div>
       </div>
 
       <button
         onClick={submit}
         disabled={mut.isPending}
-        style={{ background: `linear-gradient(135deg,${C.primary},${C.accent})`, color: "#fff", width: "100%", border: "none", borderRadius: 12, padding: "13px", fontSize: 14, fontWeight: 600, cursor: mut.isPending ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontFamily: "inherit", opacity: mut.isPending ? 0.7 : 1 }}
+        className="w-full bg-gradient-to-r from-[#730042] to-[#CD166E] text-white rounded-xl py-3.5 text-[14px] font-semibold flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
       >
-        {mut.isPending
-          ? <><div style={{ width: 14, height: 14, border: "2px solid rgba(255,255,255,0.35)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin .6s linear infinite" }} />Submitting…</>
-          : "Submit Ticket →"}
+        {mut.isPending ? (
+          <>
+            <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+            Submitting…
+          </>
+        ) : (
+          "Submit Ticket →"
+        )}
       </button>
 
       {toast && (
-        <div style={{ marginTop: 12, padding: "10px 16px", borderRadius: 10, fontSize: 13, fontWeight: 500, background: toast.kind === "ok" ? "#F0FDF4" : "#FEF2F2", color: toast.kind === "ok" ? "#065F46" : "#991B1B", border: `1px solid ${toast.kind === "ok" ? "#86EFAC" : "#FCA5A5"}` }}>
-          {toast.kind === "ok" ? "✓ " : "✕ "}{toast.msg}
+        <div
+          className={`mt-3 px-4 py-2.5 rounded-xl text-[13px] font-medium border ${
+            toast.kind === "ok"
+              ? "bg-green-50 text-green-800 border-green-200"
+              : "bg-red-50 text-red-800 border-red-200"
+          }`}
+        >
+          {toast.kind === "ok" ? "✓ " : "✕ "}
+          {toast.msg}
         </div>
       )}
     </div>
@@ -304,21 +536,35 @@ function RateModal({ ticket, onClose }) {
   const submit = async () => {
     if (!rating) return;
     try {
-      await mut.mutateAsync({ ticketNumber: ticket.ticketNumber, rating, feedback });
+      await mut.mutateAsync({
+        ticketNumber: ticket.ticketNumber,
+        rating,
+        feedback,
+      });
       onClose();
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(16,4,28,0.55)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem", backdropFilter: "blur(4px)" }}>
-      <div style={{ background: "#fff", borderRadius: 20, padding: "1.75rem", width: "min(380px,100%)", boxShadow: "0 24px 64px rgba(0,0,0,0.22)", animation: "fadeUp .24s ease both" }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 3 }}>Rate Your Experience</div>
-        <div style={{ fontSize: 12, color: C.muted, marginBottom: 20 }}>{ticket.ticketNumber} · {ticket.title}</div>
-        <div style={{ display: "flex", gap: 4, marginBottom: 18, justifyContent: "center" }}>
+    <div className="fixed inset-0 bg-black/50 z-[300] flex items-center justify-center p-4 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-[fadeUp_.24s_ease_both]">
+        <div className="text-[16px] font-bold text-[#1A0A12] mb-1">
+          Rate Your Experience
+        </div>
+        <div className="text-[12px] text-[#9B7A8E] mb-5">
+          {ticket.ticketNumber} · {ticket.title}
+        </div>
+        <div className="flex gap-1 justify-center mb-5">
           {[1, 2, 3, 4, 5].map((n) => (
-            <button key={n} onClick={() => setRating(n)}
-              style={{ fontSize: 32, background: "none", border: "none", cursor: "pointer", opacity: n <= rating ? 1 : 0.25, color: "#F59E0B", transition: "all .15s", transform: n <= rating ? "scale(1.12)" : "scale(1)", padding: "0 2px" }}
-            >★</button>
+            <button
+              key={n}
+              onClick={() => setRating(n)}
+              className={`text-3xl transition-all border-none bg-transparent cursor-pointer ${n <= rating ? "scale-110 opacity-100" : "opacity-25"} text-amber-400`}
+            >
+              ★
+            </button>
           ))}
         </div>
         <textarea
@@ -326,12 +572,19 @@ function RateModal({ ticket, onClose }) {
           value={feedback}
           onChange={(e) => setFeedback(e.target.value)}
           placeholder="Optional feedback…"
-          style={{ width: "100%", padding: "10px 14px", borderRadius: 10, fontSize: 13, border: `1.5px solid ${C.border}`, outline: "none", resize: "none", marginBottom: 18, fontFamily: "inherit", boxSizing: "border-box" }}
+          className="w-full px-3.5 py-2.5 rounded-xl text-[13px] border border-[rgba(115,0,66,0.12)] outline-none resize-none mb-5 font-[inherit]"
         />
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: "10px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.surface, color: C.sub, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-          <button onClick={submit} disabled={!rating || mut.isPending}
-            style={{ flex: 1, padding: "10px", borderRadius: 10, border: "none", background: `linear-gradient(135deg,${C.primary},${C.accent})`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: !rating || mut.isPending ? "not-allowed" : "pointer", opacity: !rating ? 0.5 : 1, fontFamily: "inherit" }}
+        <div className="flex gap-2.5">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-[rgba(115,0,66,0.12)] bg-[#FBF8FE] text-[#5C3A50] text-[13px] font-semibold cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={!rating || mut.isPending}
+            className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-[#730042] to-[#CD166E] text-white text-[13px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             {mut.isPending ? "Submitting…" : "Submit Rating"}
           </button>
@@ -345,31 +598,45 @@ function TicketDetail({ ticketNumber, onBack, onRate }) {
   const { data, isLoading } = useGetEmployeeTicketDetail(ticketNumber);
   const [tab, setTab] = useState("overview");
   const ticket = data?.ticket;
-  const canRate = ticket && ["resolved", "closed"].includes(ticket.status) && !ticket.submitterRating;
+  const canRate =
+    ticket &&
+    ["resolved", "closed"].includes(ticket.status) &&
+    !ticket.submitterRating;
 
   const backBtn = (
-    <button onClick={onBack} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", color: C.primary, fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 14, padding: 0, fontFamily: "inherit" }}>
+    <button
+      onClick={onBack}
+      className="inline-flex items-center gap-1.5 bg-transparent border-none text-[#730042] text-[13px] font-semibold cursor-pointer mb-3.5 p-0"
+    >
       ← Back to My Tickets
     </button>
   );
 
-  if (isLoading) return (
-    <div>
-      {backBtn}
-      <div style={{ background: "#fff", borderRadius: 18, border: `1px solid ${C.border}`, padding: 24 }}>
-        {[200, 120, 80, 160, 100].map((w, i) => (
-          <div key={i} style={{ height: 14, width: w, maxWidth: "100%", borderRadius: 8, background: "linear-gradient(90deg,#f0e8ed 25%,#f8f3f6 50%,#f0e8ed 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite", marginBottom: 12 }} />
-        ))}
+  if (isLoading)
+    return (
+      <div>
+        {backBtn}
+        <div className="bg-white rounded-2xl border border-[rgba(115,0,66,0.1)] p-6 flex flex-col gap-3">
+          {[200, 120, 80, 160, 100].map((w, i) => (
+            <div
+              key={i}
+              className="h-3.5 rounded-lg bg-gradient-to-r from-[#f0e8ed] via-[#f8f3f6] to-[#f0e8ed] animate-pulse"
+              style={{ width: w, maxWidth: "100%" }}
+            />
+          ))}
+        </div>
       </div>
-    </div>
-  );
+    );
 
-  if (!ticket) return (
-    <div>
-      {backBtn}
-      <div style={{ textAlign: "center", padding: "40px 0", color: C.muted }}>Ticket not found.</div>
-    </div>
-  );
+  if (!ticket)
+    return (
+      <div>
+        {backBtn}
+        <div className="text-center py-10 text-[#9B7A8E]">
+          Ticket not found.
+        </div>
+      </div>
+    );
 
   const TABS = [
     { key: "overview", label: "Overview" },
@@ -381,33 +648,55 @@ function TicketDetail({ ticketNumber, onBack, onRate }) {
     <div>
       <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}`}</style>
       {backBtn}
-
-      <div style={{ background: "#fff", borderRadius: 18, border: `1px solid ${C.border}`, overflow: "hidden", boxShadow: "0 4px 24px rgba(80,20,90,0.06)" }}>
-        <div style={{ background: `rgba(115,0,66,0.04)`, padding: "20px 22px", borderBottom: `1px solid ${C.border}` }}>
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 10, alignItems: "center" }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: C.muted, letterSpacing: ".5px" }}>{ticket.ticketNumber}</span>
+      <div className="bg-white rounded-2xl border border-[rgba(115,0,66,0.1)] overflow-hidden shadow-[0_4px_24px_rgba(80,20,90,0.06)]">
+        <div className="bg-[rgba(115,0,66,0.03)] p-4 sm:p-5 border-b border-[rgba(115,0,66,0.1)]">
+          <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex gap-1.5 flex-wrap mb-2.5 items-center">
+                <span className="text-[10px] font-bold text-[#9B7A8E] tracking-wide">
+                  {ticket.ticketNumber}
+                </span>
                 <TypeChip type={ticket.type} />
                 <StatusChip status={ticket.status} />
                 <SevChip sev={ticket.severity} />
-                {ticket.isOverdue && <Chip bg="#FEF2F2" color="#991B1B">⚠ Overdue</Chip>}
-                {ticket.isEscalated && <Chip bg="#FFF7ED" color="#9A3412">🔺 Escalated</Chip>}
+                {ticket.isOverdue && (
+                  <Chip bg="bg-red-50" text="text-red-700">
+                    ⚠ Overdue
+                  </Chip>
+                )}
+                {ticket.isEscalated && (
+                  <Chip bg="bg-orange-50" text="text-orange-700">
+                    🔺 Escalated
+                  </Chip>
+                )}
               </div>
-              <div style={{ fontSize: 17, fontWeight: 700, color: C.text, lineHeight: 1.3, marginBottom: 4 }}>{ticket.title}</div>
-              <div style={{ fontSize: 11, color: C.muted }}>Submitted {timeAgo(ticket.createdAt)} · SLA: {fmt(ticket.slaDeadline)}</div>
+              <div className="text-[16px] sm:text-[17px] font-bold text-[#1A0A12] leading-snug mb-1">
+                {ticket.title}
+              </div>
+              <div className="text-[11px] text-[#9B7A8E]">
+                Submitted {timeAgo(ticket.createdAt)} · SLA:{" "}
+                {fmt(ticket.slaDeadline)}
+              </div>
             </div>
             {canRate && (
-              <button onClick={() => onRate(ticket)}
-                style={{ background: "linear-gradient(135deg,#D97706,#F59E0B)", color: "#fff", border: "none", borderRadius: 10, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0, fontFamily: "inherit" }}
-              >⭐ Rate Resolution</button>
+              <button
+                onClick={() => onRate(ticket)}
+                className="bg-gradient-to-r from-amber-600 to-amber-400 text-white border-none rounded-xl px-3.5 py-2 text-[12px] font-semibold cursor-pointer flex-shrink-0"
+              >
+                ⭐ Rate Resolution
+              </button>
             )}
           </div>
-
-          <div style={{ display: "flex", gap: 3, marginTop: 16, background: "rgba(255,255,255,0.7)", borderRadius: 10, padding: 3, width: "fit-content", border: `1px solid ${C.border}`, flexWrap: "wrap" }}>
+          <div className="flex gap-1 bg-white/70 rounded-xl p-1 w-fit border border-[rgba(115,0,66,0.1)] flex-wrap">
             {TABS.map((t) => (
-              <button key={t.key} onClick={() => setTab(t.key)}
-                style={{ padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: tab === t.key ? 600 : 400, fontFamily: "inherit", background: tab === t.key ? C.primary : "transparent", color: tab === t.key ? "#fff" : C.muted, transition: "all .18s" }}
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`px-3.5 py-1.5 rounded-lg border-none cursor-pointer text-[12px] transition-all font-[inherit] ${
+                  tab === t.key
+                    ? "bg-[#730042] text-white font-semibold"
+                    : "bg-transparent text-[#9B7A8E] font-normal"
+                }`}
               >
                 {t.label}
               </button>
@@ -415,78 +704,133 @@ function TicketDetail({ ticketNumber, onBack, onRate }) {
           </div>
         </div>
 
-        <div style={{ padding: "20px 22px" }}>
+        <div className="p-4 sm:p-5">
           {tab === "overview" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div className="flex flex-col gap-4">
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 8 }}>Description</div>
-                <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.8, background: C.surface, borderRadius: 12, padding: 16, borderLeft: `3px solid ${TYPE_META[ticket.type]?.dot || C.primary}`, border: `1px solid ${C.border}` }}>
+                <div className="text-[10px] font-bold text-[#9B7A8E] uppercase tracking-wide mb-2">
+                  Description
+                </div>
+                <div className="text-[13px] text-[#5C3A50] leading-relaxed bg-[#FBF8FE] rounded-xl p-4 border border-[rgba(115,0,66,0.1)] border-l-4 border-l-[#730042]">
                   {ticket.description}
                 </div>
               </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 8 }}>
-                <InfoRow label="Category" val={CAT_LABELS[ticket.category] || ticket.category} />
-                <InfoRow label="Severity" val={<SevChip sev={ticket.severity} />} />
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                <InfoRow
+                  label="Category"
+                  val={CAT_LABELS[ticket.category] || ticket.category}
+                />
+                <InfoRow
+                  label="Severity"
+                  val={<SevChip sev={ticket.severity} />}
+                />
                 <InfoRow label="Created" val={fmtFull(ticket.createdAt)} />
                 <InfoRow label="SLA Deadline" val={fmt(ticket.slaDeadline)} />
-                <InfoRow label="Incident Date" val={ticket.incidentDate ? fmt(ticket.incidentDate) : "Not specified"} />
-                <InfoRow label="Location" val={ticket.incidentLocation || "Not specified"} />
-                <InfoRow label="Confidentiality" val={(ticket.confidentialityLevel || "").replace(/_/g, " ")} />
-                <InfoRow label="Anonymous" val={ticket.isAnonymous ? "Yes" : "No"} />
+                <InfoRow
+                  label="Incident Date"
+                  val={
+                    ticket.incidentDate
+                      ? fmt(ticket.incidentDate)
+                      : "Not specified"
+                  }
+                />
+                <InfoRow
+                  label="Location"
+                  val={ticket.incidentLocation || "Not specified"}
+                />
+                <InfoRow
+                  label="Confidentiality"
+                  val={(ticket.confidentialityLevel || "").replace(/_/g, " ")}
+                />
+                <InfoRow
+                  label="Anonymous"
+                  val={ticket.isAnonymous ? "Yes" : "No"}
+                />
               </div>
-
               {ticket.witnessNames?.length > 0 && (
-                <div style={{ background: "#FFFBEB", borderRadius: 12, padding: 14, border: "1px solid rgba(245,158,11,0.18)" }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#78350F", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 8 }}>Witnesses</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                <div className="bg-amber-50 rounded-xl p-3.5 border border-amber-100">
+                  <div className="text-[10px] font-bold text-amber-800 uppercase tracking-wide mb-2">
+                    Witnesses
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
                     {ticket.witnessNames.map((w, i) => (
-                      <Chip key={i} bg="#FEF3C7" color="#78350F">👤 {w}</Chip>
+                      <Chip key={i} bg="bg-amber-100" text="text-amber-800">
+                        👤 {w}
+                      </Chip>
                     ))}
                   </div>
                 </div>
               )}
-
               {ticket.resolutionSummary && (
-                <div style={{ background: "#F0FDF4", borderRadius: 12, padding: 16, border: "1px solid rgba(34,197,94,0.18)" }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#065F46", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 6 }}>✓ Resolution Summary</div>
-                  <div style={{ fontSize: 13, color: "#166534", lineHeight: 1.7 }}>{ticket.resolutionSummary}</div>
-                </div>
-              )}
-
-              {ticket.rejectionReason && (
-                <div style={{ background: "#FEF2F2", borderRadius: 12, padding: 16, border: "1px solid rgba(239,68,68,0.18)" }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#7F1D1D", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 6 }}>✕ Rejection Reason</div>
-                  <div style={{ fontSize: 13, color: "#7F1D1D", lineHeight: 1.7 }}>{ticket.rejectionReason}</div>
-                </div>
-              )}
-
-              {ticket.submitterRating && (
-                <div style={{ background: "#FFFBEB", borderRadius: 12, padding: 14, border: "1px solid rgba(245,158,11,0.18)" }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#78350F", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 6 }}>Your Rating</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 18, color: "#D97706", letterSpacing: 2 }}>{"★".repeat(ticket.submitterRating)}{"☆".repeat(5 - ticket.submitterRating)}</span>
-                    {ticket.submitterFeedback && <span style={{ fontSize: 12, color: "#78350F" }}>{ticket.submitterFeedback}</span>}
+                <div className="bg-green-50 rounded-xl p-4 border border-green-100">
+                  <div className="text-[10px] font-bold text-green-800 uppercase tracking-wide mb-1.5">
+                    ✓ Resolution Summary
+                  </div>
+                  <div className="text-[13px] text-green-700 leading-relaxed">
+                    {ticket.resolutionSummary}
                   </div>
                 </div>
               )}
-
-              <div style={{ background: C.surface, borderRadius: 12, padding: 16, border: `1px solid ${C.border}` }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 12 }}>SLA Metrics</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(100px,1fr))", gap: 12 }}>
+              {ticket.rejectionReason && (
+                <div className="bg-red-50 rounded-xl p-4 border border-red-100">
+                  <div className="text-[10px] font-bold text-red-800 uppercase tracking-wide mb-1.5">
+                    ✕ Rejection Reason
+                  </div>
+                  <div className="text-[13px] text-red-700 leading-relaxed">
+                    {ticket.rejectionReason}
+                  </div>
+                </div>
+              )}
+              {ticket.submitterRating && (
+                <div className="bg-amber-50 rounded-xl p-3.5 border border-amber-100">
+                  <div className="text-[10px] font-bold text-amber-800 uppercase tracking-wide mb-1.5">
+                    Your Rating
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-amber-600 text-lg tracking-widest">
+                      {"★".repeat(ticket.submitterRating)}
+                      {"☆".repeat(5 - ticket.submitterRating)}
+                    </span>
+                    {ticket.submitterFeedback && (
+                      <span className="text-[12px] text-amber-800">
+                        {ticket.submitterFeedback}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+              <div className="bg-[#FBF8FE] rounded-xl p-4 border border-[rgba(115,0,66,0.1)]">
+                <div className="text-[10px] font-bold text-[#9B7A8E] uppercase tracking-wide mb-3">
+                  SLA Metrics
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <div>
-                    <div style={{ fontSize: 10, color: C.muted, marginBottom: 4 }}>First Response</div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{ticket.firstResponseHours != null ? `${ticket.firstResponseHours}h` : "Pending"}</div>
+                    <div className="text-[10px] text-[#9B7A8E] mb-1">
+                      First Response
+                    </div>
+                    <div className="text-[16px] font-bold text-[#1A0A12]">
+                      {ticket.firstResponseHours != null
+                        ? `${ticket.firstResponseHours}h`
+                        : "Pending"}
+                    </div>
                   </div>
                   {ticket.resolutionTimeHours != null && (
                     <div>
-                      <div style={{ fontSize: 10, color: C.muted, marginBottom: 4 }}>Resolution</div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: "#065F46" }}>{ticket.resolutionTimeHours}h</div>
+                      <div className="text-[10px] text-[#9B7A8E] mb-1">
+                        Resolution
+                      </div>
+                      <div className="text-[16px] font-bold text-green-700">
+                        {ticket.resolutionTimeHours}h
+                      </div>
                     </div>
                   )}
                   <div>
-                    <div style={{ fontSize: 10, color: C.muted, marginBottom: 4 }}>Reopened</div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{ticket.reopenCount || 0}×</div>
+                    <div className="text-[10px] text-[#9B7A8E] mb-1">
+                      Reopened
+                    </div>
+                    <div className="text-[16px] font-bold text-[#1A0A12]">
+                      {ticket.reopenCount || 0}×
+                    </div>
                   </div>
                 </div>
               </div>
@@ -496,29 +840,57 @@ function TicketDetail({ ticketNumber, onBack, onRate }) {
           {tab === "timeline" && (
             <div>
               {!ticket.timeline?.length ? (
-                <div style={{ textAlign: "center", padding: "36px 0", color: C.muted, fontSize: 13 }}>No timeline entries yet</div>
+                <div className="text-center py-9 text-[13px] text-[#9B7A8E]">
+                  No timeline entries yet
+                </div>
               ) : (
                 [...ticket.timeline].reverse().map((e, i, arr) => {
-                  const dot = TL_COLORS[e.action] || C.primary;
+                  const dot = TL_COLORS[e.action] || "#730042";
                   const isLast = i === arr.length - 1;
                   return (
-                    <div key={e._id || i} style={{ display: "flex", gap: 12, marginBottom: isLast ? 0 : 4 }}>
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 10, flexShrink: 0 }}>
-                        <div style={{ width: 10, height: 10, borderRadius: "50%", background: dot, flexShrink: 0, marginTop: 4, boxShadow: `0 0 0 3px ${dot}22` }} />
-                        {!isLast && <div style={{ width: 1.5, background: `${dot}30`, flex: 1, margin: "4px auto", minHeight: 14 }} />}
+                    <div key={e._id || i} className="flex gap-3">
+                      <div className="flex flex-col items-center w-3 flex-shrink-0">
+                        <div
+                          className="w-2.5 h-2.5 rounded-full mt-1 flex-shrink-0"
+                          style={{
+                            background: dot,
+                            boxShadow: `0 0 0 3px ${dot}22`,
+                          }}
+                        />
+                        {!isLast && (
+                          <div
+                            className="w-px flex-1 mt-1 mb-0 min-h-[14px]"
+                            style={{ background: `${dot}30` }}
+                          />
+                        )}
                       </div>
-                      <div style={{ flex: 1, paddingBottom: isLast ? 0 : 18 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: dot, textTransform: "capitalize", letterSpacing: ".3px" }}>{e.action.replace(/_/g, " ")}</div>
+                      <div className={`flex-1 ${isLast ? "" : "pb-5"}`}>
+                        <div
+                          className="text-[11px] font-bold capitalize tracking-wide"
+                          style={{ color: dot }}
+                        >
+                          {e.action.replace(/_/g, " ")}
+                        </div>
                         {e.fromStatus && e.toStatus && (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5, flexWrap: "wrap" }}>
-                            <StatusChip status={e.fromStatus} /><span style={{ color: C.muted, fontSize: 11 }}>→</span><StatusChip status={e.toStatus} />
+                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                            <StatusChip status={e.fromStatus} />
+                            <span className="text-[#9B7A8E] text-[11px]">
+                              →
+                            </span>
+                            <StatusChip status={e.toStatus} />
                           </div>
                         )}
                         {e.note && (
-                          <div style={{ background: C.surface, borderRadius: 8, padding: "8px 12px", marginTop: 6, fontSize: 12, color: C.sub, lineHeight: 1.6, borderLeft: `2px solid ${dot}`, border: `1px solid ${C.border}` }}>{e.note}</div>
+                          <div
+                            className="bg-[#FBF8FE] rounded-lg px-3 py-2 mt-1.5 text-[12px] text-[#5C3A50] leading-relaxed border border-[rgba(115,0,66,0.1)]"
+                            style={{ borderLeft: `2px solid ${dot}` }}
+                          >
+                            {e.note}
+                          </div>
                         )}
-                        <div style={{ fontSize: 10, color: C.muted, marginTop: 5 }}>
-                          {fmtFull(e.timestamp)}{e.byName && ` · ${e.byName}`}
+                        <div className="text-[10px] text-[#9B7A8E] mt-1.5">
+                          {fmtFull(e.timestamp)}
+                          {e.byName && ` · ${e.byName}`}
                         </div>
                       </div>
                     </div>
@@ -529,30 +901,41 @@ function TicketDetail({ ticketNumber, onBack, onRate }) {
           )}
 
           {tab === "updates" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div className="flex flex-col gap-4">
               {ticket.superAdminNote ? (
-                <div style={{ background: "#F0FDF4", borderRadius: 14, padding: 18, border: "1px solid rgba(34,197,94,0.2)" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                    <span style={{ fontSize: 16 }}>📩</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: "#065F46", textTransform: "uppercase", letterSpacing: ".5px" }}>Admin Reply</span>
+                <div className="bg-green-50 rounded-xl p-4 sm:p-5 border border-green-100">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-base">📩</span>
+                    <span className="text-[11px] font-bold text-green-800 uppercase tracking-wide">
+                      Admin Reply
+                    </span>
                   </div>
-                  <div style={{ fontSize: 13, color: "#166534", lineHeight: 1.75 }}>{ticket.superAdminNote}</div>
+                  <div className="text-[13px] text-green-700 leading-relaxed">
+                    {ticket.superAdminNote}
+                  </div>
                 </div>
               ) : (
-                <div style={{ textAlign: "center", padding: "24px 0", color: C.muted, fontSize: 13 }}>
-                  <div style={{ fontSize: 28, marginBottom: 8 }}>📭</div>
+                <div className="text-center py-6 text-[#9B7A8E] text-[13px]">
+                  <div className="text-3xl mb-2">📭</div>
                   No public replies from admin yet.
                 </div>
               )}
-
               {ticket.statusHistory?.length > 0 && (
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 10 }}>Status History</div>
+                  <div className="text-[10px] font-bold text-[#9B7A8E] uppercase tracking-wide mb-2.5">
+                    Status History
+                  </div>
                   {[...ticket.statusHistory].reverse().map((h, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: C.surface, borderRadius: 10, marginBottom: 6, border: `1px solid ${C.border}`, flexWrap: "wrap" }}>
+                    <div
+                      key={i}
+                      className="flex items-center gap-2.5 p-3 bg-[#FBF8FE] rounded-xl mb-1.5 border border-[rgba(115,0,66,0.1)] flex-wrap"
+                    >
                       <StatusChip status={h.status} />
-                      <div style={{ flex: 1, fontSize: 11, color: C.muted, minWidth: 100 }}>
-                        {h.note && <span style={{ color: C.sub }}>{h.note} · </span>}{fmtFull(h.changedAt)}
+                      <div className="flex-1 text-[11px] text-[#9B7A8E] min-w-[100px]">
+                        {h.note && (
+                          <span className="text-[#5C3A50]">{h.note} · </span>
+                        )}
+                        {fmtFull(h.changedAt)}
                       </div>
                     </div>
                   ))}
@@ -574,81 +957,118 @@ function MyTickets({ canRaise }) {
 
   if (isLoading) return <Spinner />;
 
-  if (selected) return (
-    <>
-      <TicketDetail ticketNumber={selected} onBack={() => setSelected(null)} onRate={(t) => setRateTarget(t)} />
-      {rateTarget && <RateModal ticket={rateTarget} onClose={() => setRateTarget(null)} />}
-    </>
-  );
+  if (selected)
+    return (
+      <>
+        <TicketDetail
+          ticketNumber={selected}
+          onBack={() => setSelected(null)}
+          onRate={(t) => setRateTarget(t)}
+        />
+        {rateTarget && (
+          <RateModal ticket={rateTarget} onClose={() => setRateTarget(null)} />
+        )}
+      </>
+    );
 
-  if (!tickets.length) return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 280 }}>
-      <div style={{ textAlign: "center", color: C.muted }}>
-        <div style={{ fontSize: 40, marginBottom: 10 }}>🎫</div>
-        <div style={{ fontWeight: 600, fontSize: 14, color: C.sub }}>No tickets submitted yet</div>
-        <div style={{ fontSize: 12, marginTop: 4 }}>{canRaise ? "Use the Submit New tab to raise a ticket" : "You don't have permission to submit tickets"}</div>
+  if (!tickets.length)
+    return (
+      <div className="flex items-center justify-center min-h-[280px]">
+        <div className="text-center text-[#9B7A8E]">
+          <div className="text-4xl mb-2.5">🎫</div>
+          <div className="font-semibold text-[14px] text-[#5C3A50]">
+            No tickets submitted yet
+          </div>
+          <div className="text-[12px] mt-1">
+            {canRaise
+              ? "Use the Submit New tab to raise a ticket"
+              : "You don't have permission to submit tickets"}
+          </div>
+        </div>
       </div>
-    </div>
-  );
+    );
 
   return (
-    <div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {tickets.map((t, i) => {
-          const tm = TYPE_META[t.type] || { dot: C.primary };
-          const canRate = ["resolved", "closed"].includes(t.status) && !t.submitterRating;
-          return (
-            <div
-              key={t._id}
-              onClick={() => setSelected(t.ticketNumber)}
-              style={{
-                background: "#fff", borderRadius: 14, border: `1px solid ${C.border}`,
-                borderLeft: `3px solid ${tm.dot}`, padding: "14px 16px",
-                cursor: "pointer", transition: "box-shadow 0.18s, transform 0.18s",
-                boxShadow: "0 1px 6px rgba(80,20,90,0.05)",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 6px 20px rgba(115,0,66,0.1)"; e.currentTarget.style.transform = "translateY(-1px)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "0 1px 6px rgba(80,20,90,0.05)"; e.currentTarget.style.transform = "translateY(0)"; }}
-            >
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: C.muted, letterSpacing: ".4px" }}>{t.ticketNumber}</span>
-                    <TypeChip type={t.type} />
-                    <StatusChip status={t.status} />
-                    {t.isAnonymous && <Chip bg="#F3F4F6" color="#6B7280">Anonymous</Chip>}
-                    {t.isOverdue && <Chip bg="#FEF2F2" color="#991B1B">⚠ Overdue</Chip>}
-                  </div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</div>
-                  <div style={{ fontSize: 11, color: C.muted }}>
-                    {CAT_LABELS[t.category] || t.category} · SLA: {fmt(t.slaDeadline)} · {timeAgo(t.createdAt)}
-                  </div>
-                  {t.superAdminNote && (
-                    <div style={{ marginTop: 10, background: "#F0FDF4", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#065F46", borderLeft: "3px solid #22C55E" }}>
-                      <strong>Admin Reply:</strong> {t.superAdminNote}
-                    </div>
+    <div className="flex flex-col gap-2">
+      {tickets.map((t) => {
+        const tm = TYPE_META[t.type] || { dot: "bg-[#730042]" };
+        const canRate =
+          ["resolved", "closed"].includes(t.status) && !t.submitterRating;
+        return (
+          <div
+            key={t._id}
+            onClick={() => setSelected(t.ticketNumber)}
+            className="bg-white rounded-xl border border-[rgba(115,0,66,0.1)] border-l-4 border-l-[#730042] p-3.5 sm:p-4 cursor-pointer transition-all hover:shadow-[0_6px_20px_rgba(115,0,66,0.1)] hover:-translate-y-px"
+            style={{
+              borderLeftColor:
+                TYPE_META[t.type]?.dot
+                  ?.replace("bg-", "")
+                  .replace("[", "")
+                  .replace("]", "") || "#730042",
+            }}
+          >
+            <div className="flex items-start justify-between gap-2 flex-wrap">
+              <div className="flex-1 min-w-0">
+                <div className="flex gap-1.5 flex-wrap mb-2 items-center">
+                  <span className="text-[10px] font-bold text-[#9B7A8E] tracking-wide">
+                    {t.ticketNumber}
+                  </span>
+                  <TypeChip type={t.type} />
+                  <StatusChip status={t.status} />
+                  {t.isAnonymous && (
+                    <Chip bg="bg-gray-100" text="text-gray-500">
+                      Anonymous
+                    </Chip>
                   )}
-                  {t.submitterRating && (
-                    <div style={{ marginTop: 6, fontSize: 11, color: "#92400E", letterSpacing: 1 }}>
-                      {"★".repeat(t.submitterRating)}{"☆".repeat(5 - t.submitterRating)} <span style={{ letterSpacing: 0 }}>You rated this</span>
-                    </div>
+                  {t.isOverdue && (
+                    <Chip bg="bg-red-50" text="text-red-700">
+                      ⚠ Overdue
+                    </Chip>
                   )}
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end", flexShrink: 0 }}>
-                  {canRate && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setRateTarget(t); }}
-                      style={{ background: "linear-gradient(135deg,#D97706,#F59E0B)", color: "#fff", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
-                    >⭐ Rate</button>
-                  )}
-                  <span style={{ fontSize: 10, color: C.muted }}>Tap to view →</span>
+                <div className="text-[13px] font-bold text-[#1A0A12] mb-1.5 truncate">
+                  {t.title}
                 </div>
+                <div className="text-[11px] text-[#9B7A8E]">
+                  {CAT_LABELS[t.category] || t.category} · SLA:{" "}
+                  {fmt(t.slaDeadline)} · {timeAgo(t.createdAt)}
+                </div>
+                {t.superAdminNote && (
+                  <div className="mt-2.5 bg-green-50 rounded-lg p-2.5 text-[12px] text-green-700 border-l-[3px] border-green-400">
+                    <strong>Admin Reply:</strong> {t.superAdminNote}
+                  </div>
+                )}
+                {t.submitterRating && (
+                  <div className="mt-1.5 text-[11px] text-amber-700 tracking-widest">
+                    {"★".repeat(t.submitterRating)}
+                    {"☆".repeat(5 - t.submitterRating)}{" "}
+                    <span className="tracking-normal">You rated this</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-1.5 items-end flex-shrink-0">
+                {canRate && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRateTarget(t);
+                    }}
+                    className="bg-gradient-to-r from-amber-600 to-amber-400 text-white border-none rounded-lg px-3 py-1.5 text-[11px] font-semibold cursor-pointer"
+                  >
+                    ⭐ Rate
+                  </button>
+                )}
+                <span className="text-[10px] text-[#9B7A8E]">
+                  Tap to view →
+                </span>
               </div>
             </div>
-          );
-        })}
-      </div>
-      {rateTarget && <RateModal ticket={rateTarget} onClose={() => setRateTarget(null)} />}
+          </div>
+        );
+      })}
+      {rateTarget && (
+        <RateModal ticket={rateTarget} onClose={() => setRateTarget(null)} />
+      )}
     </div>
   );
 }
@@ -664,41 +1084,62 @@ export default function EmployeeTickets() {
   const count = data?.count || 0;
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "inherit", padding: "clamp(16px,4vw,32px)" }}>
+    <div className="min-h-screen bg-[#F9F8F2] p-4 sm:p-6 lg:p-8">
       <style>{`
-        @keyframes spin{to{transform:rotate(360deg)}}
         @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes shimmer{from{background-position:-200% 0}to{background-position:200% 0}}
       `}</style>
-
-      <div style={{ maxWidth: 740, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22, flexWrap: "wrap" }}>
-          <div style={{ width: 46, height: 46, borderRadius: 14, background: `linear-gradient(135deg,${C.primary},${C.accent})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>🎫</div>
+      <div className="max-w-2xl mx-auto">
+        <div className="flex items-center gap-3 mb-5 flex-wrap">
+          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-[#730042] to-[#CD166E] flex items-center justify-center text-xl flex-shrink-0">
+            🎫
+          </div>
           <div>
-            <h1 style={{ fontSize: "clamp(16px,4vw,20px)", fontWeight: 800, color: C.text, margin: 0 }}>TorchX Voice</h1>
-            <p style={{ fontSize: 12, color: C.muted, margin: "3px 0 0" }}>Submit & track your grievances, complaints, and suggestions</p>
+            <h1 className="text-[18px] sm:text-[20px] font-extrabold text-[#1A0A12] m-0">
+              TorchX Voice
+            </h1>
+            <p className="text-[12px] text-[#9B7A8E] mt-0.5 m-0">
+              Submit & track your grievances, complaints, and suggestions
+            </p>
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 3, background: "rgba(230,220,245,0.5)", borderRadius: 12, padding: 4, marginBottom: 22, width: "fit-content", border: `1px solid ${C.border}`, flexWrap: "wrap" }}>
+        <div className="flex gap-1 bg-violet-50/50 rounded-xl p-1 mb-5 w-fit border border-[rgba(115,0,66,0.1)] flex-wrap">
           {canRaise && (
-            <button onClick={() => setTab("submit")}
-              style={{ padding: "8px 18px", borderRadius: 9, border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: tab === "submit" ? 600 : 400, fontFamily: "inherit", background: tab === "submit" ? C.primary : "transparent", color: tab === "submit" ? "#fff" : C.muted, transition: "all .2s" }}
-            >📝 Submit New</button>
+            <button
+              onClick={() => setTab("submit")}
+              className={`px-4 sm:px-5 py-2 rounded-lg border-none cursor-pointer text-[12.5px] transition-all font-[inherit] ${
+                tab === "submit"
+                  ? "bg-[#730042] text-white font-semibold"
+                  : "bg-transparent text-[#9B7A8E]"
+              }`}
+            >
+              📝 Submit New
+            </button>
           )}
-          <button onClick={() => setTab("mytickets")}
-            style={{ padding: "8px 18px", borderRadius: 9, border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: tab === "mytickets" ? 600 : 400, fontFamily: "inherit", background: tab === "mytickets" ? C.primary : "transparent", color: tab === "mytickets" ? "#fff" : C.muted, transition: "all .2s" }}
-          >📋 My Tickets{count ? ` (${count})` : ""}</button>
+          <button
+            onClick={() => setTab("mytickets")}
+            className={`px-4 sm:px-5 py-2 rounded-lg border-none cursor-pointer text-[12.5px] transition-all font-[inherit] ${
+              tab === "mytickets"
+                ? "bg-[#730042] text-white font-semibold"
+                : "bg-transparent text-[#9B7A8E]"
+            }`}
+          >
+            📋 My Tickets{count ? ` (${count})` : ""}
+          </button>
         </div>
 
         {!canRaise && tab === "submit" && (
-          <div style={{ background: "#FEF2F2", borderRadius: 12, padding: "16px 20px", border: "1px solid rgba(239,68,68,0.2)", marginBottom: 16, fontSize: 13, color: "#991B1B" }}>
+          <div className="bg-red-50 rounded-xl px-4 py-3.5 border border-red-200 mb-4 text-[13px] text-red-800">
             You don't have permission to submit tickets. Contact your admin.
           </div>
         )}
 
-        {tab === "submit" && canRaise && <SubmitForm onSuccess={() => setTab("mytickets")} />}
-        {tab === "mytickets" && <MyTickets canRaise={canRaise} canRate={canRate} />}
+        {tab === "submit" && canRaise && (
+          <SubmitForm onSuccess={() => setTab("mytickets")} />
+        )}
+        {tab === "mytickets" && (
+          <MyTickets canRaise={canRaise} canRate={canRate} />
+        )}
       </div>
     </div>
   );
