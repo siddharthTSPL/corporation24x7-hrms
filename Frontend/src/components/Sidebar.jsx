@@ -17,6 +17,7 @@ import {
   FaTimes,
   FaShieldAlt,
   FaUsersCog,
+  FaLock,
 } from "react-icons/fa";
 import { useAuth } from "../auth/store/getmeauth/getmeauth";
 import { useAdminLogout } from "../auth/server-state/adminauth/adminauth.hook";
@@ -97,8 +98,8 @@ function Sidebar({ collapsed, setCollapsed }) {
   const [open,       setOpen]       = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const rawMenu = menuByRole[role] ?? employeeMenu;
-  const menu    = rawMenu.filter((item) => !item.permission || can(item.permission));
+  // No filtering — show all items regardless of permission
+  const menu = menuByRole[role] ?? employeeMenu;
 
   const isPending = pendingSuperAdmin || pendingAdmin || pendingManager || pendingEmployee;
 
@@ -168,17 +169,36 @@ function Sidebar({ collapsed, setCollapsed }) {
           {open && (
             <nav className="px-2 flex flex-col gap-1">
               {menu.map((item, index) => {
-                const active = location.pathname === item.path;
+                const active   = location.pathname === item.path;
+                const allowed  = !item.permission || can(item.permission);
+
                 return (
                   <Link
                     key={index}
-                    to={item.path}
-                    className={`flex items-center gap-3 p-3 rounded-lg ${
-                      active ? "bg-[#730042] text-white" : "hover:bg-gray-100"
-                    }`}
+                    to={allowed ? item.path : location.pathname}
+                    onClick={(e) => {
+                      if (!allowed) e.preventDefault();
+                    }}
+                    title={!allowed && collapsed ? `${item.name} — No permission` : undefined}
+                    className={`flex items-center gap-3 p-3 rounded-lg transition-colors
+                      ${active && allowed ? "bg-[#730042] text-white" : ""}
+                      ${active && !allowed ? "bg-gray-100 text-gray-400" : ""}
+                      ${!active && allowed ? "hover:bg-gray-100 text-gray-700" : ""}
+                      ${!active && !allowed ? "text-gray-400 cursor-not-allowed" : ""}
+                    `}
                   >
-                    {item.icon}
-                    {!collapsed && item.name}
+                    <span className={`text-sm flex-shrink-0 ${!allowed ? "opacity-50" : ""}`}>
+                      {item.icon}
+                    </span>
+
+                    {!collapsed && (
+                      <span className="flex-1 flex items-center justify-between text-sm">
+                        <span className={!allowed ? "opacity-50" : ""}>{item.name}</span>
+                        {!allowed && (
+                          <FaLock size={9} className="text-gray-400 flex-shrink-0" />
+                        )}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
@@ -186,7 +206,7 @@ function Sidebar({ collapsed, setCollapsed }) {
               <button
                 onClick={handleLogout}
                 disabled={isPending}
-                className="flex items-center gap-3 p-3 rounded-lg hover:bg-red-100 text-gray-800"
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-red-100 text-gray-800 transition-colors"
               >
                 <FaSignOutAlt />
                 {!collapsed && (isPending ? "Logging out..." : "Logout")}
