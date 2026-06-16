@@ -4,7 +4,9 @@ import {
   FaPlus, FaEdit, FaTrash, FaTimes, FaCheck,
   FaMapMarkerAlt, FaChevronRight, FaBan, FaStar,
   FaUserShield, FaCheckCircle, FaChartBar, FaLayerGroup,
-  FaUserCog, FaAngleDown, FaSearch,
+  FaUserCog, FaAngleDown, FaSearch, FaEye, FaEyeSlash,
+  FaShieldAlt, FaBuilding, FaPhone, FaEnvelope,
+  FaIdCard, FaUniversity, FaGlobe, FaBriefcase,
 } from "react-icons/fa";
 
 import { useGetMeSuperAdmin } from "../../auth/server-state/superadmin/auth/suauth.hook";
@@ -15,174 +17,158 @@ import {
 import { useShowAllLeaves, useAcceptLeaveByAdmin, useRejectLeaveByAdmin } from "../../auth/server-state/superadmin/leave/suleave.hook";
 import { useGetAllAnnouncements, useCreateAnnouncement, useUpdateAnnouncement, useDeleteAnnouncement } from "../../auth/server-state/superadmin/announcement/suannouncement.hook";
 import { useGetAllAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin, useReviewToAdmin } from "../../auth/server-state/superadmin/other/suother.hook";
-import { FiEye, FiEyeOff } from "react-icons/fi";
-const useStyles = () => {
-  useEffect(() => {
-    const font = document.createElement("link");
-    font.rel = "stylesheet";
-    font.href = "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap";
-    document.head.appendChild(font);
 
-    const style = document.createElement("style");
-    style.id = "sa-dash-styles";
-    style.textContent = `
-      :root {
-        --ink: #0d0209; --p: #730042; --p-dark: #4a0029; --p-deep: #2a0017;
-        --p-mid: #9e0058; --p-light: #cd166e; --p-wash: #f7ecf3; --p-pale: #fdf5f9;
-        --border: #e8d5e2; --surface: #ffffff; --muted: #7a5568; --light: #c499b4;
-        --green: #0d9e6e; --red: #d93025; --gold: #b8760a; --amber: #f59e0b;
-        --blue: #2563eb; --sh: 0 2px 12px rgba(115,0,66,.08);
-        --sh-lg: 0 16px 48px rgba(115,0,66,.16); --r: 14px; --r-sm: 8px;
-        font-family: 'DM Sans', sans-serif;
-      }
-      *, *::before, *::after { box-sizing: border-box; }
-      .sa { background: var(--p-pale); min-height: 100vh; padding: 24px 28px; font-family: 'DM Sans', sans-serif; color: var(--ink); }
-      .sa-hero { background: linear-gradient(135deg, var(--p-deep) 0%, var(--p-dark) 35%, var(--p) 65%, var(--p-light) 100%); border-radius: var(--r); padding: 32px 40px; margin-bottom: 26px; position: relative; overflow: hidden; box-shadow: var(--sh-lg); }
-      .sa-hero::before { content:''; position:absolute; width:500px; height:500px; border-radius:50%; top:-250px; right:-120px; background:rgba(255,255,255,.04); pointer-events:none; }
-      .sa-hero::after { content:''; position:absolute; width:320px; height:320px; border-radius:50%; bottom:-180px; left:42%; background:rgba(255,255,255,.03); pointer-events:none; }
-      .sa-hero-badge { display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2); border-radius:99px; padding:4px 14px 4px 8px; font-size:11px; color:rgba(255,255,255,.85); letter-spacing:.5px; font-weight:600; text-transform:uppercase; margin-bottom:14px; }
-      .sa-hero-badge-dot { width:6px; height:6px; border-radius:50%; background:#4ade80; box-shadow:0 0 6px #4ade80; }
-      .sa-hero-title { font-family:'Playfair Display',serif; font-size:clamp(28px,3.5vw,42px); color:#fff; margin:0 0 8px; font-weight:800; line-height:1.05; letter-spacing:-.5px; }
-      .sa-hero-sub { font-size:13px; color:rgba(255,255,255,.6); font-weight:300; max-width:560px; line-height:1.65; }
-      .sa-hero-chips { display:flex; gap:10px; margin-top:22px; flex-wrap:wrap; }
-      .sa-chip { background:rgba(255,255,255,.13); border:1px solid rgba(255,255,255,.2); border-radius:99px; padding:6px 16px; font-size:12px; color:rgba(255,255,255,.9); font-weight:500; backdrop-filter:blur(4px); }
-      .sa-hero-actions { position:absolute; top:28px; right:36px; display:flex; gap:10px; }
-      .sa-hero-action-btn { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.25); color:#fff; padding:8px 16px; border-radius:var(--r-sm); font-size:12px; font-weight:600; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all .2s; display:flex; align-items:center; gap:6px; }
-      .sa-hero-action-btn:hover { background:rgba(255,255,255,.25); }
-      .sa-stats { display:grid; grid-template-columns:repeat(5,1fr); gap:16px; margin-bottom:26px; }
-      @media(max-width:1200px){ .sa-stats { grid-template-columns:repeat(3,1fr); } }
-      @media(max-width:760px) { .sa-stats { grid-template-columns:repeat(2,1fr); } }
-      .sa-stat { background:var(--surface); border-radius:var(--r); border:1px solid var(--border); padding:20px 18px 16px; box-shadow:var(--sh); position:relative; overflow:hidden; transition:transform .2s,box-shadow .2s; }
-      .sa-stat:hover { transform:translateY(-3px); box-shadow:var(--sh-lg); }
-      .sa-stat-accent { position:absolute; top:0; left:0; right:0; height:3px; }
-      .sa-stat-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:16px; margin-bottom:14px; }
-      .sa-stat-lbl { font-size:11px; font-weight:600; letter-spacing:.7px; text-transform:uppercase; color:var(--muted); margin-bottom:4px; }
-      .sa-stat-val { font-family:'Playfair Display',serif; font-size:34px; line-height:1; color:var(--ink); font-weight:700; }
-      .sa-stat-sub { font-size:11px; margin-top:7px; font-weight:500; }
-      .sa-stat-bar { height:3px; background:var(--border); border-radius:99px; margin-top:10px; overflow:hidden; }
-      .sa-stat-fill { height:100%; border-radius:99px; transition:width .9s cubic-bezier(.4,0,.2,1); }
-      .sa-panel { background:var(--surface); border-radius:var(--r); border:1px solid var(--border); box-shadow:var(--sh); overflow:hidden; }
-      .sa-panel-head { padding:16px 22px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-      .sa-panel-title { font-family:'Playfair Display',serif; font-size:17px; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:9px; }
-      .sa-live-dot { width:8px; height:8px; border-radius:50%; background:var(--green); animation:lp 2s infinite; flex-shrink:0; }
-      @keyframes lp { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.4)} }
-      .sa-map-wrap { height:300px; position:relative; }
-      .sa-map-foot { padding:11px 20px; background:var(--p-wash); border-top:1px solid var(--border); display:flex; gap:20px; align-items:center; flex-wrap:wrap; }
-      .sa-leg { display:flex; align-items:center; gap:7px; font-size:11px; color:var(--muted); }
-      .sa-leg-dot { width:10px; height:10px; border-radius:50%; border:2px solid white; box-shadow:0 1px 4px rgba(0,0,0,.2); }
-      .sa-mid-grid { display:grid; grid-template-columns:1fr 360px; gap:20px; margin-bottom:26px; }
-      @media(max-width:1050px){ .sa-mid-grid { grid-template-columns:1fr; } }
-      .sa-lower-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:26px; }
-      @media(max-width:900px){ .sa-lower-grid { grid-template-columns:1fr; } }
-      .sa-leave-scroll { overflow-y:auto; max-height:360px; }
-      .sa-leave-scroll::-webkit-scrollbar { width:4px; }
-      .sa-leave-scroll::-webkit-scrollbar-thumb { background:var(--border); border-radius:99px; }
-      .sa-leave-item { padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:flex-start; gap:12px; transition:background .15s; }
-      .sa-leave-item:hover { background:var(--p-pale); }
-      .sa-leave-item:last-child { border-bottom:none; }
-      .sa-avatar { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:white; flex-shrink:0; }
-      .sa-leave-meta { flex:1; min-width:0; }
-      .sa-leave-name { font-size:13px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .sa-leave-info { font-size:11px; color:var(--muted); margin-top:2px; }
-      .sa-leave-actions { display:flex; gap:6px; margin-top:8px; }
-      .sa-btn-accept { background:#e8f7f1; color:var(--green); border:1px solid #b8e8d4; border-radius:6px; padding:4px 10px; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px; transition:all .15s; font-family:'DM Sans',sans-serif; }
-      .sa-btn-accept:hover { background:var(--green); color:white; }
-      .sa-btn-reject { background:#fbeaea; color:var(--red); border:1px solid #f0c5c5; border-radius:6px; padding:4px 10px; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px; transition:all .15s; font-family:'DM Sans',sans-serif; }
-      .sa-btn-reject:hover { background:var(--red); color:white; }
-      .sa-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); }
-      .sa-tab { padding:10px 18px; font-size:12px; font-weight:600; color:var(--muted); border-bottom:2px solid transparent; cursor:pointer; transition:all .15s; white-space:nowrap; background:none; border-top:none; border-left:none; border-right:none; font-family:'DM Sans',sans-serif; }
-      .sa-tab.active { color:var(--p); border-bottom-color:var(--p); }
-      .sa-tab:hover:not(.active) { color:var(--ink); }
-      .sa-badge { display:inline-flex; align-items:center; font-size:10px; font-weight:700; letter-spacing:.4px; padding:3px 9px; border-radius:99px; }
-      .sa-badge-pending { background:#fff8e1; color:var(--gold); }
-      .sa-badge-approved { background:#e8f7f1; color:var(--green); }
-      .sa-badge-rejected { background:#fbeaea; color:var(--red); }
-      .sa-badge-active { background:#e8f7f1; color:var(--green); }
-      .sa-badge-inactive { background:#f3f4f6; color:#6b7280; }
-      .sa-badge-suspended { background:#fbeaea; color:var(--red); }
-      .sa-badge-role-admin { background:var(--p-wash); color:var(--p); }
-      .sa-badge-role-senior { background:#ede9fe; color:#7c3aed; }
-      .sa-badge-role-official { background:#e0f2fe; color:#0369a1; }
-      .sa-admin-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px; padding:18px; }
-      .sa-admin-card { border:1px solid var(--border); border-radius:var(--r-sm); padding:18px 16px; transition:all .2s; position:relative; }
-      .sa-admin-card:hover { box-shadow:var(--sh); transform:translateY(-2px); background:var(--p-wash); }
-      .sa-admin-ava { width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:700; color:white; background:linear-gradient(135deg,var(--p-dark),var(--p-light)); margin:0 auto 12px; }
-      .sa-admin-name { font-size:13px; font-weight:700; color:var(--ink); text-align:center; }
-      .sa-admin-desg { font-size:11px; color:var(--muted); text-align:center; margin-top:2px; }
-      .sa-admin-email { font-size:10px; color:var(--light); text-align:center; margin-top:4px; }
-      .sa-admin-meta { display:flex; justify-content:center; gap:5px; margin-top:8px; flex-wrap:wrap; }
-      .sa-admin-actions { display:flex; justify-content:center; gap:6px; margin-top:12px; padding-top:10px; border-top:1px solid var(--border); }
-      .sa-emp-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; padding:18px; }
-      .sa-emp-card { border:1px solid var(--border); border-radius:var(--r-sm); padding:14px 12px; display:flex; align-items:center; gap:12px; transition:all .2s; }
-      .sa-emp-card:hover { box-shadow:var(--sh); background:var(--p-wash); }
-      .sa-emp-ava { width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:white; flex-shrink:0; }
-      .sa-emp-name { font-size:13px; font-weight:600; color:var(--ink); line-height:1.2; }
-      .sa-emp-role { font-size:11px; color:var(--muted); margin-top:1px; }
-      .sa-emp-dept { display:inline-block; font-size:10px; font-weight:600; background:var(--p-wash); color:var(--p); padding:2px 7px; border-radius:99px; margin-top:4px; }
-      .sa-dept-item { padding:12px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:14px; }
-      .sa-dept-item:last-child { border-bottom:none; }
-      .sa-dept-name { font-size:12px; font-weight:600; color:var(--ink); width:120px; flex-shrink:0; }
-      .sa-dept-bar-track { flex:1; height:7px; background:var(--border); border-radius:99px; overflow:hidden; }
-      .sa-dept-bar-fill { height:100%; border-radius:99px; background:linear-gradient(90deg,var(--p-dark),var(--p-light)); transition:width 1s ease; }
-      .sa-dept-count { font-size:12px; font-weight:700; color:var(--p); width:32px; text-align:right; flex-shrink:0; }
-      .sa-ann-card { border-radius:var(--r-sm); border:1px solid var(--border); padding:16px; margin:0 18px 12px; transition:all .2s; }
-      .sa-ann-card:hover { box-shadow:var(--sh); transform:translateY(-2px); }
-      .sa-ann-chip { display:inline-block; font-size:10px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; padding:3px 10px; border-radius:99px; margin-bottom:8px; }
-      .chip-general { background:var(--p-wash); color:var(--p); }
-      .chip-urgent { background:#fbeaea; color:var(--red); }
-      .chip-event { background:#e8f7f1; color:var(--green); }
-      .chip-policy { background:#fff8e1; color:var(--gold); }
-      .sa-ann-title { font-size:13px; font-weight:600; color:var(--ink); margin-bottom:5px; }
-      .sa-ann-body { font-size:12px; color:var(--muted); line-height:1.55; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-      .sa-ann-foot { display:flex; gap:6px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border); }
-      .sa-review-form { padding:20px; }
-      .sa-stars { display:flex; gap:6px; margin-bottom:14px; }
-      .sa-star { font-size:22px; cursor:pointer; color:var(--border); transition:color .15s; }
-      .sa-star.active { color:var(--amber); }
-      .sa-btn-p { background:var(--p); color:white; border:none; padding:8px 16px; border-radius:var(--r-sm); font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; font-family:'DM Sans',sans-serif; transition:all .2s; white-space:nowrap; }
-      .sa-btn-p:hover { background:var(--p-dark); transform:translateY(-1px); box-shadow:0 4px 14px rgba(115,0,66,.3); }
-      .sa-btn-p:disabled { opacity:.5; cursor:not-allowed; transform:none; }
-      .sa-btn-ghost { background:none; color:var(--muted); border:1px solid var(--border); padding:8px 16px; border-radius:var(--r-sm); font-size:12px; font-weight:500; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all .2s; white-space:nowrap; }
-      .sa-btn-ghost:hover { border-color:var(--p); color:var(--p); }
-      .sa-icon-btn { background:none; border:none; cursor:pointer; padding:5px 8px; border-radius:5px; font-size:12px; color:var(--light); transition:all .15s; display:flex; align-items:center; gap:4px; font-family:'DM Sans',sans-serif; }
-      .sa-icon-btn:hover { background:var(--p-wash); color:var(--p); }
-      .sa-icon-btn.del:hover { background:#fbeaea; color:var(--red); }
-      .sa-search-wrap { position:relative; }
-      .sa-search-ico { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--light); font-size:12px; pointer-events:none; }
-      .sa-search-inp { padding:7px 10px 7px 30px; background:var(--p-pale); border:1px solid var(--border); border-radius:var(--r-sm); font-size:12px; color:var(--ink); font-family:'DM Sans',sans-serif; outline:none; width:200px; transition:all .15s; }
-      .sa-search-inp:focus { border-color:var(--p); box-shadow:0 0 0 3px var(--p-wash); width:240px; }
-      .sa-overlay { position:fixed; inset:0; background:rgba(13,2,9,.65); backdrop-filter:blur(6px); z-index:1000; display:flex; align-items:center; justify-content:center; padding:20px; animation:saov .18s; }
-      @keyframes saov { from{opacity:0} to{opacity:1} }
-      .sa-modal { background:var(--surface); border-radius:var(--r); width:100%; max-width:520px; box-shadow:var(--sh-lg); animation:samup .22s; max-height:90vh; overflow-y:auto; }
-      .sa-modal-lg { max-width:680px; }
-      @keyframes samup { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
-      .sa-modal-hd { padding:22px 26px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; background:var(--surface); z-index:1; }
-      .sa-modal-title { font-family:'Playfair Display',serif; font-size:20px; font-weight:700; color:var(--ink); }
-      .sa-modal-x { background:none; border:none; cursor:pointer; color:var(--muted); font-size:15px; padding:5px; border-radius:6px; transition:all .15s; }
-      .sa-modal-x:hover { background:var(--p-wash); color:var(--p); }
-      .sa-modal-bd { padding:22px 26px; }
-      .sa-modal-ft { padding:14px 26px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px; position:sticky; bottom:0; background:var(--surface); }
-      .sa-modal-section { font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--p); margin:18px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--p-wash); }
-      .sa-modal-section:first-child { margin-top:0; }
-      .sa-fld { margin-bottom:16px; }
-      .sa-flbl { display:block; font-size:11px; font-weight:600; letter-spacing:.6px; text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
-      .sa-finp, .sa-fsel, .sa-ftxt { width:100%; padding:10px 12px; background:var(--p-pale); border:1px solid var(--border); border-radius:var(--r-sm); font-size:13px; color:var(--ink); font-family:'DM Sans',sans-serif; outline:none; transition:border-color .15s,box-shadow .15s; }
-      .sa-finp:focus, .sa-fsel:focus, .sa-ftxt:focus { border-color:var(--p); box-shadow:0 0 0 3px var(--p-wash); }
-      .sa-ftxt { resize:vertical; min-height:80px; line-height:1.6; }
-      .sa-form-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-      .sa-form-row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
-      .sa-empty { text-align:center; padding:36px 20px; color:var(--light); }
-      .sa-empty-ico { font-size:28px; margin-bottom:10px; }
-      .sa-empty p { font-size:13px; margin:0; }
-      @keyframes mPulse { 0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.5} 50%{transform:translate(-50%,-50%) scale(2.4);opacity:0} }
-    `;
-    document.head.appendChild(style);
-    return () => {
-      try { document.head.removeChild(font); } catch (_) {}
-      const el = document.getElementById("sa-dash-styles");
-      if (el) document.head.removeChild(el);
-    };
-  }, []);
+const COUNTRIES = [
+  "Afghanistan","Albania","Algeria","Andorra","Angola","Argentina","Armenia","Australia","Austria",
+  "Azerbaijan","Bahamas","Bahrain","Bangladesh","Belarus","Belgium","Belize","Bhutan","Bolivia",
+  "Brazil","Brunei","Bulgaria","Cambodia","Cameroon","Canada","Chile","China","Colombia","Croatia",
+  "Cuba","Cyprus","Czech Republic","Denmark","Ecuador","Egypt","Estonia","Ethiopia","Finland","France",
+  "Georgia","Germany","Ghana","Greece","Guatemala","Hungary","Iceland","India","Indonesia","Iran",
+  "Iraq","Ireland","Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kuwait",
+  "Kyrgyzstan","Laos","Latvia","Lebanon","Libya","Lithuania","Luxembourg","Malaysia","Maldives",
+  "Mali","Malta","Mexico","Moldova","Mongolia","Morocco","Myanmar","Nepal","Netherlands","New Zealand",
+  "Nicaragua","Nigeria","North Korea","North Macedonia","Norway","Oman","Pakistan","Palestine",
+  "Panama","Paraguay","Peru","Philippines","Poland","Portugal","Qatar","Romania","Russia","Rwanda",
+  "Saudi Arabia","Senegal","Serbia","Singapore","Slovakia","Slovenia","Somalia","South Africa",
+  "South Korea","South Sudan","Spain","Sri Lanka","Sudan","Sweden","Switzerland","Syria","Taiwan",
+  "Tanzania","Thailand","Tunisia","Turkey","Uganda","Ukraine","United Arab Emirates","United Kingdom",
+  "United States","Uruguay","Uzbekistan","Venezuela","Vietnam","Yemen","Zambia","Zimbabwe",
+];
+
+const DEPT_OPTIONS = ["OPR", "BPO", "ENG", "HR", "MGMT"];
+const OFFICE_OPTIONS = ["Noida", "Bareilly", "Delhi", "Mumbai"];
+const ROLE_OPTIONS = [
+  { value: "admin", label: "Admin" },
+  { value: "senior_admin", label: "Senior Admin" },
+  { value: "official", label: "Official" },
+];
+const ROLE_LABEL = { admin: "Admin", senior_admin: "Senior Admin", official: "Official" };
+
+const DEFAULT_PERMISSIONS = {
+  announcements: {
+    can_view_announcements: true,
+    can_create_announcement: true,
+    can_edit_announcement: true,
+    can_delete_announcement: true,
+  },
+  documents: {
+    can_upload_documents: true,
+    can_view_all_documents: true,
+  },
+  tickets: {
+    can_raise_ticket: true,
+    can_view_all_tickets: true,
+    can_resolve_ticket: true,
+    can_rate_ticket: true,
+  },
+  recruitment: {
+    can_view_hiring_requisitions: true,
+    can_create_hiring_requisition: true,
+    can_view_candidates: true,
+    can_add_candidate: true,
+  },
+};
+
+const PERMISSION_META = {
+  announcements: {
+    label: "Announcements",
+    icon: <FaBullhorn size={13} />,
+    color: "#7c3aed",
+    bg: "#f5f3ff",
+    keys: {
+      can_view_announcements: "View Announcements",
+      can_create_announcement: "Create Announcement",
+      can_edit_announcement: "Edit Announcement",
+      can_delete_announcement: "Delete Announcement",
+    },
+  },
+  documents: {
+    label: "Documents",
+    icon: <FaIdCard size={13} />,
+    color: "#0369a1",
+    bg: "#e0f2fe",
+    keys: {
+      can_upload_documents: "Upload Documents",
+      can_view_all_documents: "View All Documents",
+    },
+  },
+  tickets: {
+    label: "Tickets",
+    icon: <FaCheckCircle size={13} />,
+    color: "#0d9e6e",
+    bg: "#e8f7f1",
+    keys: {
+      can_raise_ticket: "Raise Ticket",
+      can_view_all_tickets: "View All Tickets",
+      can_resolve_ticket: "Resolve Ticket",
+      can_rate_ticket: "Rate Ticket",
+    },
+  },
+  recruitment: {
+    label: "Recruitment",
+    icon: <FaBriefcase size={13} />,
+    color: "#b8760a",
+    bg: "#fff8e1",
+    keys: {
+      can_view_hiring_requisitions: "View Hiring Requisitions",
+      can_create_hiring_requisition: "Create Hiring Requisition",
+      can_view_candidates: "View Candidates",
+      can_add_candidate: "Add Candidate",
+    },
+  },
+};
+
+const BLANK_FORM = {
+  f_name: "", l_name: "", work_email: "", password: "", confirmPassword: "",
+  gender: "", marital_status: "single", personal_contact: "", e_contact: "",
+  designation: "", role: "admin", department: "", office_location: "",
+  is_fresher: true, total_experience: 0, previous_company: "", previous_designation: "",
+  aadhaar_number: "", pan_number: "", residential_address: "", permanent_address: "",
+  city: "", state: "", pincode: "", country: "",
+  bank_name: "", account_holder_name: "", account_number: "", ifsc_code: "",
+};
+
+const validateForm = (form, isEdit) => {
+  const e = {};
+  if (!form.f_name.trim()) e.f_name = "First name is required";
+  if (!form.l_name.trim()) e.l_name = "Last name is required";
+  if (!form.work_email.trim()) e.work_email = "Work email is required";
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.work_email)) e.work_email = "Enter a valid email address";
+  if (!isEdit) {
+    if (!form.password) e.password = "Password is required";
+    else if (form.password.length < 8) e.password = "Minimum 8 characters required";
+    if (!form.confirmPassword) e.confirmPassword = "Please confirm your password";
+    else if (form.password !== form.confirmPassword) e.confirmPassword = "Passwords do not match";
+  }
+  if (!form.gender) e.gender = "Gender is required";
+  if (!form.personal_contact.trim()) e.personal_contact = "Personal contact is required";
+  else if (!/^[6-9]\d{9}$/.test(form.personal_contact)) e.personal_contact = "Enter valid 10-digit mobile number";
+  if (!form.e_contact.trim()) e.e_contact = "Emergency contact is required";
+  else if (!/^[6-9]\d{9}$/.test(form.e_contact)) e.e_contact = "Enter valid 10-digit mobile number";
+  if (!form.designation.trim()) e.designation = "Designation is required";
+  if (!form.department) e.department = "Department is required";
+  if (!form.office_location) e.office_location = "Office location is required";
+  if (!form.is_fresher && (!form.total_experience || Number(form.total_experience) <= 0))
+    e.total_experience = "Enter total experience in years";
+  if (form.aadhaar_number && !/^\d{12}$/.test(form.aadhaar_number.replace(/\s/g, "")))
+    e.aadhaar_number = "Aadhaar must be exactly 12 digits";
+  if (form.pan_number && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(form.pan_number))
+    e.pan_number = "Format: ABCDE1234F";
+  if (form.pincode && !/^\d{6}$/.test(form.pincode)) e.pincode = "Pincode must be 6 digits";
+  if (form.ifsc_code && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(form.ifsc_code))
+    e.ifsc_code = "Invalid IFSC format (e.g. HDFC0001234)";
+  return e;
+};
+
+const hasErrors = (e) => Object.keys(e).length > 0;
+
+const parseAddress = (raw = "") => {
+  const resMatch = raw.match(/Residential:\s*(.*?)(?:\s*\|\s*Permanent:|$)/);
+  const permMatch = raw.match(/Permanent:\s*(.*?)$/);
+  return {
+    residential_address: resMatch ? resMatch[1].trim() : raw,
+    permanent_address: permMatch ? permMatch[1].trim() : "",
+  };
 };
 
 const initials = (name = "") =>
@@ -190,17 +176,16 @@ const initials = (name = "") =>
 
 const fmtDate = (d) => {
   if (!d) return "";
-  try { return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }); }
-  catch { return d; }
+  try { return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }); } catch { return d; }
 };
 
 const fmtTime = (iso) => {
   if (!iso) return "—";
-  try { return new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }); }
-  catch { return "—"; }
+  try { return new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }); } catch { return "—"; }
 };
 
-const ROLE_COLOR = { manager: "#730042", employee: "#a0005c" };
+const AVATAR_COLORS = ["#730042","#9e0058","#4a0029","#2563eb","#0d9e6e","#7c3aed","#b8760a","#d93025"];
+const avaColor = (str = "") => AVATAR_COLORS[(str.charCodeAt(0) || 0) % AVATAR_COLORS.length];
 
 const leaveTypeColor = (type = "") => {
   const t = type.toLowerCase();
@@ -212,13 +197,550 @@ const leaveTypeColor = (type = "") => {
   return "#730042";
 };
 
-const AVATAR_COLORS = ["#730042","#9e0058","#4a0029","#2563eb","#0d9e6e","#7c3aed","#b8760a","#d93025"];
-const avaColor = (str = "") => AVATAR_COLORS[(str.charCodeAt(0) || 0) % AVATAR_COLORS.length];
+const ROLE_COLOR = { manager: "#730042", employee: "#a0005c" };
 
-const DEPT_OPTIONS = ["OPR", "BPO", "ENG", "HR", "MGMT"];
-const OFFICE_OPTIONS = ["Noida", "Bareilly", "Delhi", "Mumbai"];
-const ROLE_OPTIONS = ["admin", "senior_admin", "official"];
-const ROLE_LABEL = { admin: "Admin", senior_admin: "Senior Admin", official: "Official" };
+function Toggle({ checked, onChange }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#730042] focus:ring-offset-1 cursor-pointer ${checked ? "bg-[#730042]" : "bg-gray-200"}`}
+    >
+      <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform duration-200 ${checked ? "translate-x-4" : "translate-x-0"}`} />
+    </button>
+  );
+}
+
+function FieldErr({ msg }) {
+  if (!msg) return null;
+  return <p className="mt-1 text-[11px] text-red-500 font-medium">{msg}</p>;
+}
+
+function FLabel({ children, required }) {
+  return (
+    <label className="block text-[10px] font-bold tracking-widest uppercase text-[#7a5568] mb-1.5">
+      {children}{required && <span className="text-red-500 ml-0.5">*</span>}
+    </label>
+  );
+}
+
+function FInput({ err, className = "", ...props }) {
+  return (
+    <input
+      className={`w-full px-3 py-2.5 bg-[#fdf5f9] border rounded-lg text-[13px] text-[#0d0209] outline-none transition placeholder:text-[#c499b4] ${err ? "border-red-400 focus:border-red-400 focus:ring-2 focus:ring-red-50" : "border-[#e8d5e2] focus:border-[#730042] focus:ring-2 focus:ring-[#f7ecf3]"} ${className}`}
+      {...props}
+    />
+  );
+}
+
+function FSel({ err, className = "", children, ...props }) {
+  return (
+    <select
+      className={`w-full px-3 py-2.5 bg-[#fdf5f9] border rounded-lg text-[13px] text-[#0d0209] outline-none transition ${err ? "border-red-400 focus:border-red-400 focus:ring-2 focus:ring-red-50" : "border-[#e8d5e2] focus:border-[#730042] focus:ring-2 focus:ring-[#f7ecf3]"} ${className}`}
+      {...props}
+    >
+      {children}
+    </select>
+  );
+}
+
+function SecHead({ icon, children }) {
+  return (
+    <div className="flex items-center gap-2 text-[10px] font-bold tracking-[1.2px] uppercase text-[#730042] mt-7 mb-4 pb-2.5 border-b border-[#f0dcea] first:mt-0">
+      {icon && <span className="opacity-70">{icon}</span>}
+      {children}
+    </div>
+  );
+}
+
+function AdminModal({ open, onClose, initial, onSave, loading }) {
+  const [form, setForm] = useState(BLANK_FORM);
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+  const [showPass, setShowPass] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [permissions, setPermissions] = useState(DEFAULT_PERMISSIONS);
+
+  const isEdit = !!initial;
+
+  useEffect(() => {
+    if (open) {
+      if (initial) {
+        const { address, ...rest } = initial;
+        setForm({ ...BLANK_FORM, ...rest, ...parseAddress(address || ""), confirmPassword: "" });
+      } else {
+        setForm(BLANK_FORM);
+      }
+      setErrors({});
+      setTouched({});
+      setSubmitted(false);
+      setShowPass(false);
+      setShowConfirm(false);
+      setPermissions(DEFAULT_PERMISSIONS);
+    }
+  }, [open]);
+
+  if (!open) return null;
+
+  const set = (k) => (e) => {
+    const val = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+    const next = { ...form, [k]: val };
+    setForm(next);
+    if (submitted || touched[k]) setErrors(validateForm(next, isEdit));
+  };
+
+  const setUpper = (k) => (e) => {
+    const next = { ...form, [k]: e.target.value.toUpperCase() };
+    setForm(next);
+    if (submitted || touched[k]) setErrors(validateForm(next, isEdit));
+  };
+
+  const blur = (k) => () => {
+    setTouched((t) => ({ ...t, [k]: true }));
+    setErrors(validateForm(form, isEdit));
+  };
+
+  const showErr = (k) => (submitted || touched[k]) ? errors[k] : "";
+
+  const togglePerm = (module, key) => {
+    setPermissions((prev) => ({ ...prev, [module]: { ...prev[module], [key]: !prev[module][key] } }));
+  };
+
+  const toggleModule = (module) => {
+    const allOn = Object.values(permissions[module]).every(Boolean);
+    const next = Object.fromEntries(Object.keys(permissions[module]).map((k) => [k, !allOn]));
+    setPermissions((prev) => ({ ...prev, [module]: next }));
+  };
+
+  const handleSave = () => {
+    setSubmitted(true);
+    const e = validateForm(form, isEdit);
+    setErrors(e);
+    if (hasErrors(e)) return;
+    const { confirmPassword, residential_address, permanent_address, ...rest } = form;
+    const address = [
+      residential_address ? `Residential: ${residential_address}` : "",
+      permanent_address ? `Permanent: ${permanent_address}` : "",
+    ].filter(Boolean).join(" | ");
+    onSave({ ...rest, address, permissions });
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[1000] flex items-center justify-center p-3 sm:p-5 bg-[rgba(13,2,9,0.7)] backdrop-blur-md"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[94vh] animate-[modalUp_0.22s_ease-out]">
+        <div className="sticky top-0 z-10 bg-white px-5 sm:px-7 pt-5 pb-4 border-b border-[#e8d5e2] flex items-center justify-between rounded-t-2xl">
+          <div>
+            <h2 className="text-lg sm:text-xl font-bold text-[#0d0209] tracking-tight">
+              {isEdit ? "Edit Admin" : "Create Admin"}
+            </h2>
+            <p className="text-[11px] text-[#c499b4] mt-0.5">{isEdit ? "Update admin details and permissions" : "Fill in details and assign permissions"}</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl text-[#7a5568] hover:bg-[#f7ecf3] hover:text-[#730042] transition-colors">
+            <FaTimes size={14} />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 px-5 sm:px-7 py-5">
+          <SecHead icon={<FaUsers size={11} />}>Basic Information</SecHead>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <FLabel required>First Name</FLabel>
+              <FInput placeholder="First name" value={form.f_name} onChange={set("f_name")} onBlur={blur("f_name")} err={showErr("f_name")} />
+              <FieldErr msg={showErr("f_name")} />
+            </div>
+            <div>
+              <FLabel required>Last Name</FLabel>
+              <FInput placeholder="Last name" value={form.l_name} onChange={set("l_name")} onBlur={blur("l_name")} err={showErr("l_name")} />
+              <FieldErr msg={showErr("l_name")} />
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <FLabel required>Work Email</FLabel>
+            <FInput type="email" placeholder="admin@company.com" value={form.work_email} onChange={set("work_email")} onBlur={blur("work_email")} err={showErr("work_email")} disabled={isEdit} className={isEdit ? "opacity-60 cursor-not-allowed" : ""} />
+            <FieldErr msg={showErr("work_email")} />
+          </div>
+
+          {!isEdit && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+              <div>
+                <FLabel required>Password</FLabel>
+                <div className="relative">
+                  <FInput type={showPass ? "text" : "password"} placeholder="Min 8 characters" value={form.password} onChange={set("password")} onBlur={blur("password")} err={showErr("password")} className="pr-11" />
+                  <button type="button" onClick={() => setShowPass((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#c499b4] hover:text-[#730042] transition-colors">
+                    {showPass ? <FaEyeSlash size={15} /> : <FaEye size={15} />}
+                  </button>
+                </div>
+                <FieldErr msg={showErr("password")} />
+              </div>
+              <div>
+                <FLabel required>Confirm Password</FLabel>
+                <div className="relative">
+                  <FInput type={showConfirm ? "text" : "password"} placeholder="Re-enter password" value={form.confirmPassword} onChange={set("confirmPassword")} onBlur={blur("confirmPassword")} err={showErr("confirmPassword")} className="pr-11" />
+                  <button type="button" onClick={() => setShowConfirm((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#c499b4] hover:text-[#730042] transition-colors">
+                    {showConfirm ? <FaEyeSlash size={15} /> : <FaEye size={15} />}
+                  </button>
+                </div>
+                <FieldErr msg={showErr("confirmPassword")} />
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+            <div>
+              <FLabel required>Gender</FLabel>
+              <FSel value={form.gender} onChange={set("gender")} onBlur={blur("gender")} err={showErr("gender")}>
+                <option value="">Select gender</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </FSel>
+              <FieldErr msg={showErr("gender")} />
+            </div>
+            <div>
+              <FLabel>Marital Status</FLabel>
+              <FSel value={form.marital_status} onChange={set("marital_status")}>
+                <option value="single">Single</option>
+                <option value="married">Married</option>
+                <option value="divorced">Divorced</option>
+              </FSel>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+            <div>
+              <FLabel required>Personal Contact</FLabel>
+              <FInput placeholder="10-digit mobile" value={form.personal_contact} onChange={set("personal_contact")} onBlur={blur("personal_contact")} err={showErr("personal_contact")} maxLength={10} />
+              <FieldErr msg={showErr("personal_contact")} />
+            </div>
+            <div>
+              <FLabel required>Emergency Contact</FLabel>
+              <FInput placeholder="10-digit mobile" value={form.e_contact} onChange={set("e_contact")} onBlur={blur("e_contact")} err={showErr("e_contact")} maxLength={10} />
+              <FieldErr msg={showErr("e_contact")} />
+            </div>
+          </div>
+
+          <SecHead icon={<FaBriefcase size={11} />}>Work Details</SecHead>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <FLabel required>Designation</FLabel>
+              <FInput placeholder="e.g. HR Manager" value={form.designation} onChange={set("designation")} onBlur={blur("designation")} err={showErr("designation")} />
+              <FieldErr msg={showErr("designation")} />
+            </div>
+            <div>
+              <FLabel required>Role</FLabel>
+              <FSel value={form.role} onChange={set("role")}>
+                {ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+              </FSel>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+            <div>
+              <FLabel required>Department</FLabel>
+              <FSel value={form.department} onChange={set("department")} onBlur={blur("department")} err={showErr("department")}>
+                <option value="">Select department</option>
+                {DEPT_OPTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
+              </FSel>
+              <FieldErr msg={showErr("department")} />
+            </div>
+            <div>
+              <FLabel required>Office Location</FLabel>
+              <FSel value={form.office_location} onChange={set("office_location")} onBlur={blur("office_location")} err={showErr("office_location")}>
+                <option value="">Select location</option>
+                {OFFICE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+              </FSel>
+              <FieldErr msg={showErr("office_location")} />
+            </div>
+          </div>
+
+          <SecHead icon={<FaUserShield size={11} />}>Experience</SecHead>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex items-center gap-3 pt-5">
+              <input type="checkbox" id="is_fresher" checked={form.is_fresher} onChange={set("is_fresher")} className="w-4 h-4 accent-[#730042] cursor-pointer rounded" />
+              <label htmlFor="is_fresher" className="text-[11px] font-bold tracking-widest uppercase text-[#7a5568] cursor-pointer select-none">Is Fresher</label>
+            </div>
+            <div>
+              <FLabel>Total Experience (years)</FLabel>
+              <FInput type="number" min="0" placeholder="0" value={form.total_experience} onChange={set("total_experience")} onBlur={blur("total_experience")} err={showErr("total_experience")} disabled={form.is_fresher} className={form.is_fresher ? "opacity-40 cursor-not-allowed" : ""} />
+              <FieldErr msg={showErr("total_experience")} />
+            </div>
+          </div>
+
+          {!form.is_fresher && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+              <div>
+                <FLabel>Previous Company</FLabel>
+                <FInput placeholder="Company name" value={form.previous_company} onChange={set("previous_company")} />
+              </div>
+              <div>
+                <FLabel>Previous Designation</FLabel>
+                <FInput placeholder="Last role" value={form.previous_designation} onChange={set("previous_designation")} />
+              </div>
+            </div>
+          )}
+
+          <SecHead icon={<FaIdCard size={11} />}>Identity & Address</SecHead>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <FLabel>Aadhaar Number</FLabel>
+              <FInput placeholder="12 digits" value={form.aadhaar_number} onChange={set("aadhaar_number")} onBlur={blur("aadhaar_number")} err={showErr("aadhaar_number")} maxLength={12} />
+              <FieldErr msg={showErr("aadhaar_number")} />
+            </div>
+            <div>
+              <FLabel>PAN Number</FLabel>
+              <FInput placeholder="ABCDE1234F" value={form.pan_number} onChange={setUpper("pan_number")} onBlur={blur("pan_number")} err={showErr("pan_number")} maxLength={10} />
+              <FieldErr msg={showErr("pan_number")} />
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <FLabel>Residential Address</FLabel>
+            <FInput placeholder="Current / residential street, locality" value={form.residential_address} onChange={set("residential_address")} />
+          </div>
+
+          <div className="mt-4">
+            <FLabel>Permanent Address</FLabel>
+            <FInput placeholder="Permanent / hometown address" value={form.permanent_address} onChange={set("permanent_address")} />
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4">
+            <div>
+              <FLabel>City</FLabel>
+              <FInput placeholder="City" value={form.city} onChange={set("city")} />
+            </div>
+            <div>
+              <FLabel>State</FLabel>
+              <FInput placeholder="State" value={form.state} onChange={set("state")} />
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <FLabel>Pincode</FLabel>
+              <FInput placeholder="6 digits" value={form.pincode} onChange={set("pincode")} onBlur={blur("pincode")} err={showErr("pincode")} maxLength={6} />
+              <FieldErr msg={showErr("pincode")} />
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <FLabel>Country</FLabel>
+            <FSel value={form.country} onChange={set("country")}>
+              <option value="">Select country</option>
+              {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </FSel>
+          </div>
+
+          <SecHead icon={<FaUniversity size={11} />}>
+            Banking Details <span className="normal-case tracking-normal font-normal text-[#c499b4] ml-1">(optional)</span>
+          </SecHead>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <FLabel>Bank Name</FLabel>
+              <FInput placeholder="e.g. HDFC Bank" value={form.bank_name} onChange={set("bank_name")} />
+            </div>
+            <div>
+              <FLabel>Account Holder Name</FLabel>
+              <FInput placeholder="As per passbook" value={form.account_holder_name} onChange={set("account_holder_name")} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+            <div>
+              <FLabel>Account Number</FLabel>
+              <FInput placeholder="Account number" value={form.account_number} onChange={set("account_number")} />
+            </div>
+            <div>
+              <FLabel>IFSC Code</FLabel>
+              <FInput placeholder="e.g. HDFC0001234" value={form.ifsc_code} onChange={setUpper("ifsc_code")} onBlur={blur("ifsc_code")} err={showErr("ifsc_code")} maxLength={11} />
+              <FieldErr msg={showErr("ifsc_code")} />
+            </div>
+          </div>
+
+          <SecHead icon={<FaShieldAlt size={11} />}>Permission Setup</SecHead>
+          <p className="text-[12px] text-[#7a5568] mb-5 leading-relaxed -mt-2">
+            Control which modules and actions this admin can access. Toggle individual permissions or use the module switch to grant all at once.
+          </p>
+
+          <div className="space-y-3">
+            {Object.entries(PERMISSION_META).map(([module, meta]) => {
+              const allOn = Object.values(permissions[module]).every(Boolean);
+              const someOn = Object.values(permissions[module]).some(Boolean);
+              const onCount = Object.values(permissions[module]).filter(Boolean).length;
+              const total = Object.keys(permissions[module]).length;
+              return (
+                <div key={module} className="border border-[#e8d5e2] rounded-xl overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 cursor-pointer select-none hover:bg-[#fdf5f9] transition-colors" onClick={() => toggleModule(module)}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: meta.bg, color: meta.color }}>
+                        {meta.icon}
+                      </div>
+                      <div>
+                        <p className="text-[13px] font-semibold text-[#0d0209]">{meta.label}</p>
+                        <p className="text-[10px] text-[#c499b4] mt-0.5">{onCount}/{total} permissions enabled</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {someOn && !allOn && (
+                        <span className="text-[10px] bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">Partial</span>
+                      )}
+                      {allOn && (
+                        <span className="text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold">All On</span>
+                      )}
+                      <Toggle checked={allOn} onChange={() => toggleModule(module)} />
+                    </div>
+                  </div>
+                  <div className="border-t border-[#f0dcea] divide-y divide-[#f7ecf3]">
+                    {Object.entries(meta.keys).map(([key, label]) => (
+                      <div key={key} className="flex items-center justify-between px-5 py-2.5 hover:bg-[#fdf5f9] transition-colors">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors ${permissions[module][key] ? "bg-[#730042]" : "bg-gray-200"}`} />
+                          <span className="text-[12px] text-[#4a3040]">{label}</span>
+                        </div>
+                        <Toggle checked={permissions[module][key]} onChange={() => togglePerm(module, key)} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="sticky bottom-0 bg-white border-t border-[#e8d5e2] px-5 sm:px-7 py-4 flex items-center gap-3 rounded-b-2xl">
+          {submitted && hasErrors(errors) && (
+            <p className="text-[11px] text-red-500 font-medium flex-1">Please fix the errors above before saving.</p>
+          )}
+          <div className="flex gap-3 ml-auto flex-shrink-0">
+            <button onClick={onClose} className="px-4 py-2 rounded-xl border border-[#e8d5e2] text-[13px] font-medium text-[#7a5568] hover:border-[#730042] hover:text-[#730042] transition-colors whitespace-nowrap">
+              Cancel
+            </button>
+            <button onClick={handleSave} disabled={loading} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-[#730042] text-white text-[13px] font-semibold hover:bg-[#4a0029] active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+              <FaCheck size={10} />
+              {loading ? "Saving…" : isEdit ? "Update Admin" : "Create Admin"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AnnModal({ open, onClose, initial, onSave, loading }) {
+  const [form, setForm] = useState({ title: "", message: "", audience: "all", priority: "normal" });
+  useEffect(() => {
+    if (open) setForm({ title: "", message: "", audience: "all", priority: "normal", ...(initial || {}) });
+  }, [open]);
+  if (!open) return null;
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  return (
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-[rgba(13,2,9,0.7)] backdrop-blur-md" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-[modalUp_0.22s_ease-out]">
+        <div className="px-6 pt-5 pb-4 border-b border-[#e8d5e2] flex items-center justify-between">
+          <h2 className="text-lg font-bold text-[#0d0209]">{initial ? "Edit Announcement" : "New Announcement"}</h2>
+          <button onClick={onClose} className="p-2 rounded-xl text-[#7a5568] hover:bg-[#f7ecf3] hover:text-[#730042] transition-colors"><FaTimes size={13} /></button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <div>
+            <FLabel required>Title</FLabel>
+            <FInput placeholder="Announcement title…" value={form.title} onChange={set("title")} />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <FLabel>Audience</FLabel>
+              <FSel value={form.audience} onChange={set("audience")}>
+                <option value="all">All</option>
+                <option value="admin">Admins</option>
+                <option value="manager">Managers</option>
+                <option value="employee">Employees</option>
+              </FSel>
+            </div>
+            <div>
+              <FLabel>Priority</FLabel>
+              <FSel value={form.priority} onChange={set("priority")}>
+                <option value="normal">Normal</option>
+                <option value="urgent">Urgent</option>
+                <option value="low">Low</option>
+              </FSel>
+            </div>
+          </div>
+          <div>
+            <FLabel required>Message</FLabel>
+            <textarea
+              className="w-full px-3 py-2.5 bg-[#fdf5f9] border border-[#e8d5e2] rounded-lg text-[13px] text-[#0d0209] outline-none transition focus:border-[#730042] focus:ring-2 focus:ring-[#f7ecf3] placeholder:text-[#c499b4] resize-none min-h-[90px] leading-relaxed"
+              placeholder="Write your announcement…"
+              value={form.message}
+              onChange={set("message")}
+            />
+          </div>
+        </div>
+        <div className="px-6 pb-5 flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 rounded-xl border border-[#e8d5e2] text-[13px] font-medium text-[#7a5568] hover:border-[#730042] hover:text-[#730042] transition-colors">Cancel</button>
+          <button onClick={() => onSave(form)} disabled={loading || !form.title || !form.message} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-[#730042] text-white text-[13px] font-semibold hover:bg-[#4a0029] transition disabled:opacity-50 disabled:cursor-not-allowed">
+            <FaCheck size={10} />
+            {loading ? "Saving…" : initial ? "Update" : "Publish"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReviewModal({ open, onClose, admins, onSave, loading }) {
+  const [form, setForm] = useState({ adminid: "", rating: 0, comment: "" });
+  useEffect(() => { if (open) setForm({ adminid: "", rating: 0, comment: "" }); }, [open]);
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-[rgba(13,2,9,0.7)] backdrop-blur-md" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl animate-[modalUp_0.22s_ease-out]">
+        <div className="px-6 pt-5 pb-4 border-b border-[#e8d5e2] flex items-center justify-between">
+          <h2 className="text-lg font-bold text-[#0d0209]">Review Admin</h2>
+          <button onClick={onClose} className="p-2 rounded-xl text-[#7a5568] hover:bg-[#f7ecf3] hover:text-[#730042] transition-colors"><FaTimes size={13} /></button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <div>
+            <FLabel>Select Admin</FLabel>
+            <FSel value={form.adminid} onChange={(e) => setForm((f) => ({ ...f, adminid: e.target.value }))}>
+              <option value="">Choose admin…</option>
+              {admins.map((a) => (
+                <option key={a._id} value={a._id}>{a.f_name} {a.l_name} – {a.designation} ({a.department})</option>
+              ))}
+            </FSel>
+          </div>
+          <div>
+            <FLabel>Rating</FLabel>
+            <div className="flex gap-2 mt-1">
+              {[1,2,3,4,5].map((n) => (
+                <button key={n} type="button" onClick={() => setForm((f) => ({ ...f, rating: n }))} className={`text-2xl transition-transform hover:scale-110 ${form.rating >= n ? "text-amber-400" : "text-gray-200"}`}>★</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <FLabel>Comment</FLabel>
+            <textarea
+              className="w-full px-3 py-2.5 bg-[#fdf5f9] border border-[#e8d5e2] rounded-lg text-[13px] text-[#0d0209] outline-none transition focus:border-[#730042] focus:ring-2 focus:ring-[#f7ecf3] placeholder:text-[#c499b4] resize-none min-h-[80px] leading-relaxed"
+              placeholder="Write your review…"
+              value={form.comment}
+              onChange={(e) => setForm((f) => ({ ...f, comment: e.target.value }))}
+            />
+          </div>
+        </div>
+        <div className="px-6 pb-5 flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 rounded-xl border border-[#e8d5e2] text-[13px] font-medium text-[#7a5568] hover:border-[#730042] hover:text-[#730042] transition-colors">Cancel</button>
+          <button onClick={() => onSave(form)} disabled={loading || !form.adminid || !form.rating || !form.comment} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-[#730042] text-white text-[13px] font-semibold hover:bg-[#4a0029] transition disabled:opacity-50 disabled:cursor-not-allowed">
+            <FaStar size={10} />
+            {loading ? "Submitting…" : "Submit Review"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const AttendanceMap = ({ checkins = [], loading }) => {
   const mapRef = useRef(null);
@@ -264,30 +786,22 @@ const AttendanceMap = ({ checkins = [], loading }) => {
       const color = ROLE_COLOR[role?.toLowerCase()] ?? ROLE_COLOR.employee;
       const sz = role?.toLowerCase() === "manager" ? 16 : 12;
       const pulse = sz + 16;
-      const inits = initials(name || "?");
-      const icon = L.divIcon({
+      const icon = window.L.divIcon({
         className: "",
         html: `<div style="position:relative;width:${pulse}px;height:${pulse}px;">
-          <div style="position:absolute;top:50%;left:50%;width:${pulse}px;height:${pulse}px;border-radius:50%;background:${color}33;animation:mPulse 2.2s infinite;"></div>
+          <div style="position:absolute;top:50%;left:50%;width:${pulse}px;height:${pulse}px;border-radius:50%;background:${color}33;animation:mPulse 2.2s infinite;transform:translate(-50%,-50%);"></div>
           <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${sz}px;height:${sz}px;border-radius:50%;background:${color};border:2.5px solid white;box-shadow:0 2px 10px ${color}66;${checkedOut ? "opacity:.45;" : ""}"></div>
         </div>`,
         iconSize: [pulse, pulse], iconAnchor: [pulse / 2, pulse / 2],
       });
-      const marker = L.marker([lat, lng], { icon })
-        .bindPopup(`<div style="font-family:'DM Sans',sans-serif;padding:6px 4px;min-width:180px;">
-          <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px;">
-            <div style="width:32px;height:32px;border-radius:50%;background:${color};color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">${inits}</div>
-            <div>
-              <div style="font-weight:700;font-size:13px;color:${color};">${name || "Unknown"}</div>
-              <div style="font-size:11px;color:#8a6070;text-transform:capitalize;">${role ?? ""}${dept ? " · " + dept : ""}</div>
-            </div>
-          </div>
-          ${email ? `<div style="font-size:11px;color:#8a6070;margin-bottom:6px;">✉ ${email}</div>` : ""}
-          <div style="font-size:11px;color:#333;">✅ <strong>Check-in:</strong> ${fmtTime(checkIn)}</div>
-          ${checkedOut
-            ? `<div style="font-size:11px;color:#0d9e6e;margin-top:3px;">🏁 Checked out</div>`
-            : `<div style="font-size:11px;color:#b8760a;margin-top:3px;">🟡 On duty</div>`}
-        </div>`, { closeButton: false, maxWidth: 230 })
+      const marker = window.L.marker([lat, lng], { icon })
+        .bindPopup(`<div style="font-family:system-ui,sans-serif;padding:4px;min-width:170px;">
+          <div style="font-weight:700;font-size:13px;color:${color};margin-bottom:4px;">${name || "Unknown"}</div>
+          <div style="font-size:11px;color:#8a6070;margin-bottom:6px;text-transform:capitalize;">${role ?? ""}${dept ? " · " + dept : ""}</div>
+          ${email ? `<div style="font-size:11px;color:#8a6070;margin-bottom:4px;">✉ ${email}</div>` : ""}
+          <div style="font-size:11px;">✅ Check-in: <strong>${fmtTime(checkIn)}</strong></div>
+          ${checkedOut ? `<div style="font-size:11px;color:#0d9e6e;margin-top:2px;">🏁 Checked out</div>` : `<div style="font-size:11px;color:#b8760a;margin-top:2px;">🟡 On duty</div>`}
+        </div>`, { closeButton: false, maxWidth: 220 })
         .addTo(map);
       markRef.current.push(marker);
       bounds.push([lat, lng]);
@@ -300,487 +814,44 @@ const AttendanceMap = ({ checkins = [], loading }) => {
   useEffect(() => () => { if (instRef.current) { instRef.current.remove(); instRef.current = null; } }, []);
 
   return (
-    <div style={{ height: "100%", width: "100%", position: "relative" }}>
-      <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
+    <div className="h-full w-full relative">
+      <div ref={mapRef} className="h-full w-full" />
       {loading && (
-        <div style={{ position:"absolute", inset:0, background:"rgba(253,245,249,.8)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, color:"#8a6070", gap:8, zIndex:500 }}>
-          <span style={{ fontSize: 18 }}>⏳</span> Fetching check-ins…
+        <div className="absolute inset-0 bg-[rgba(253,245,249,0.85)] flex items-center justify-center gap-2 text-[13px] text-[#8a6070] z-50">
+          <span className="text-lg">⏳</span> Fetching check-ins…
         </div>
       )}
       {!loading && checkins.length === 0 && (
-        <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:8, zIndex:500, pointerEvents:"none" }}>
-          <span style={{ fontSize: 32 }}>📍</span>
-          <p style={{ fontSize: 13, color: "#8a6070", margin: 0 }}>No check-ins today</p>
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-50 pointer-events-none">
+          <span className="text-3xl">📍</span>
+          <p className="text-[13px] text-[#8a6070]">No check-ins today</p>
+        </div>
+      )}
+      <style>{`@keyframes mPulse{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.5}50%{transform:translate(-50%,-50%) scale(2.4);opacity:0}}`}</style>
+    </div>
+  );
+};
+
+function StatCard({ icon, label, value, sub, color, bgColor, bar }) {
+  return (
+    <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm hover:-translate-y-1 hover:shadow-md transition-all duration-200 overflow-hidden relative p-5">
+      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${color}cc, ${color}44)` }} />
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4 text-base" style={{ background: bgColor, color }}>
+        {icon}
+      </div>
+      <p className="text-[10px] font-bold tracking-[0.8px] uppercase text-[#7a5568] mb-1">{label}</p>
+      <p className="text-3xl font-bold text-[#0d0209] leading-none mb-1">{value}</p>
+      <p className="text-[11px] font-medium mt-1.5" style={{ color }}>{sub}</p>
+      {bar !== null && bar !== undefined && (
+        <div className="h-[3px] bg-[#e8d5e2] rounded-full mt-3 overflow-hidden">
+          <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${bar}%`, background: `linear-gradient(90deg, ${color}cc, ${color})` }} />
         </div>
       )}
     </div>
   );
-};
-
-const AnnModal = ({ open, onClose, initial, onSave, loading }) => {
-  const [form, setForm] = useState({ title: "", message: "", audience: "all", priority: "normal" });
-  useEffect(() => {
-    if (open) setForm({ title:"", message:"", audience:"all", priority:"normal", ...(initial || {}) });
-  }, [open]);
-  if (!open) return null;
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
-  return (
-    <div className="sa-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="sa-modal">
-        <div className="sa-modal-hd">
-          <h2 className="sa-modal-title">{initial ? "Edit Announcement" : "New Announcement"}</h2>
-          <button className="sa-modal-x" onClick={onClose}><FaTimes /></button>
-        </div>
-        <div className="sa-modal-bd">
-          <div className="sa-fld">
-            <label className="sa-flbl">Title</label>
-            <input className="sa-finp" placeholder="Announcement title…" value={form.title} onChange={set("title")} />
-          </div>
-          <div className="sa-form-row">
-            <div className="sa-fld">
-              <label className="sa-flbl">Audience</label>
-              <select className="sa-fsel" value={form.audience} onChange={set("audience")}>
-                <option value="all">All</option>
-                <option value="admin">Admins</option>
-                <option value="manager">Managers</option>
-                <option value="employee">Employees</option>
-              </select>
-            </div>
-            <div className="sa-fld">
-              <label className="sa-flbl">Priority</label>
-              <select className="sa-fsel" value={form.priority} onChange={set("priority")}>
-                <option value="normal">Normal</option>
-                <option value="urgent">Urgent</option>
-                <option value="low">Low</option>
-              </select>
-            </div>
-          </div>
-          <div className="sa-fld" style={{ marginBottom: 0 }}>
-            <label className="sa-flbl">Message</label>
-            <textarea className="sa-ftxt" placeholder="Write your announcement…" value={form.message} onChange={set("message")} />
-          </div>
-        </div>
-        <div className="sa-modal-ft">
-          <button className="sa-btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="sa-btn-p" onClick={() => onSave(form)} disabled={loading || !form.title}>
-            <FaCheck style={{ fontSize: 10 }} /> {loading ? "Saving…" : initial ? "Update" : "Publish"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const COUNTRIES = [
-  "Afghanistan","Albania","Algeria","Andorra","Angola","Antigua and Barbuda","Argentina","Armenia","Australia","Austria",
-  "Azerbaijan","Bahamas","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin","Bhutan",
-  "Bolivia","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria","Burkina Faso","Burundi","Cabo Verde","Cambodia",
-  "Cameroon","Canada","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo (Brazzaville)","Congo (Kinshasa)",
-  "Costa Rica","Croatia","Cuba","Cyprus","Czech Republic","Denmark","Djibouti","Dominica","Dominican Republic","Ecuador",
-  "Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia","Eswatini","Ethiopia","Fiji","Finland","France",
-  "Gabon","Gambia","Georgia","Germany","Ghana","Greece","Grenada","Guatemala","Guinea","Guinea-Bissau",
-  "Guyana","Haiti","Honduras","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland",
-  "Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati","Kuwait","Kyrgyzstan",
-  "Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein","Lithuania","Luxembourg","Madagascar",
-  "Malawi","Malaysia","Maldives","Mali","Malta","Marshall Islands","Mauritania","Mauritius","Mexico","Micronesia",
-  "Moldova","Monaco","Mongolia","Montenegro","Morocco","Mozambique","Myanmar","Namibia","Nauru","Nepal",
-  "Netherlands","New Zealand","Nicaragua","Niger","Nigeria","North Korea","North Macedonia","Norway","Oman","Pakistan",
-  "Palau","Palestine","Panama","Papua New Guinea","Paraguay","Peru","Philippines","Poland","Portugal","Qatar",
-  "Romania","Russia","Rwanda","Saint Kitts and Nevis","Saint Lucia","Saint Vincent and the Grenadines","Samoa","San Marino","Sao Tome and Principe","Saudi Arabia",
-  "Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Solomon Islands","Somalia","South Africa",
-  "South Korea","South Sudan","Spain","Sri Lanka","Sudan","Suriname","Sweden","Switzerland","Syria","Taiwan",
-  "Tajikistan","Tanzania","Thailand","Timor-Leste","Togo","Tonga","Trinidad and Tobago","Tunisia","Turkey","Turkmenistan",
-  "Tuvalu","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","Uruguay","Uzbekistan","Vanuatu","Vatican City",
-  "Venezuela","Vietnam","Yemen","Zambia","Zimbabwe",
-];
-
-const AdminModal = ({ open, onClose, initial, onSave, loading }) => {
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  // All keys match backend field names exactly as destructured in createAdmin controller
-  const blank = {
-    f_name: "",
-    l_name: "",
-    work_email: "",
-    password: "",
-    confirmPassword: "",        // frontend-only validation field, stripped before submit
-    gender: "",
-    designation: "",
-    department: "",
-    office_location: "",
-    personal_contact: "",
-    e_contact: "",
-    role: "admin",
-    marital_status: "single",
-    is_fresher: true,
-    total_experience: 0,
-    previous_company: "",
-    previous_designation: "",
-    aadhaar_number: "",
-    pan_number: "",
-    // Two UI fields combined into backend `address` on save
-    residential_address: "",
-    permanent_address: "",
-    city: "",
-    state: "",
-    pincode: "",
-    country: "",
-    reporting_manager: "",
-    reporting_manager_model: "",
-    bank_name: "",
-    account_holder_name: "",
-    account_number: "",
-    ifsc_code: "",
-  };
-
-  const parseAddress = (raw = "") => {
-    // Format stored: "Residential: <val> | Permanent: <val>"
-    const resMatch = raw.match(/Residential:\s*(.*?)(?:\s*\|\s*Permanent:|$)/);
-    const permMatch = raw.match(/Permanent:\s*(.*?)$/);
-    return {
-      residential_address: resMatch ? resMatch[1].trim() : raw,
-      permanent_address: permMatch ? permMatch[1].trim() : "",
-    };
-  };
-
-  const [form, setForm] = useState(blank);
-  useEffect(() => {
-    if (open) {
-      if (initial) {
-        const { address, ...rest } = initial;
-        setForm({ ...blank, ...rest, ...parseAddress(address || ""), confirmPassword: "" });
-      } else {
-        setForm(blank);
-      }
-    }
-  }, [open]);
-  if (!open) return null;
-
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
-  const setCheck = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.checked }));
-
-  // Combine UI address fields → single backend `address`, strip frontend-only keys
-  const handleSave = () => {
-    const { confirmPassword, residential_address, permanent_address, ...rest } = form;
-    const address = [
-      residential_address ? `Residential: ${residential_address}` : "",
-      permanent_address   ? `Permanent: ${permanent_address}`     : "",
-    ].filter(Boolean).join(" | ");
-    onSave({ ...rest, address });
-  };
-
-  const passwordsMatch = !form.confirmPassword || form.password === form.confirmPassword;
-  const canSubmit =
-    !loading &&
-    form.f_name && form.l_name && form.work_email &&
-    form.gender && form.designation && form.department &&
-    form.office_location && form.personal_contact && form.e_contact &&
-    (initial || (form.password && passwordsMatch));
-
-  return (
-    <div className="sa-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="sa-modal sa-modal-lg">
-        <div className="sa-modal-hd">
-          <h2 className="sa-modal-title">{initial ? "Edit Admin" : "Create Admin"}</h2>
-          <button className="sa-modal-x" onClick={onClose}><FaTimes /></button>
-        </div>
-        <div className="sa-modal-bd">
-
-          {/* ── Basic Information ── */}
-          <div className="sa-modal-section">Basic Information</div>
-          <div className="sa-form-row">
-            <div className="sa-fld">
-              <label className="sa-flbl">First Name *</label>
-              <input className="sa-finp" placeholder="First name" value={form.f_name} onChange={set("f_name")} />
-            </div>
-            <div className="sa-fld">
-              <label className="sa-flbl">Last Name *</label>
-              <input className="sa-finp" placeholder="Last name" value={form.l_name} onChange={set("l_name")} />
-            </div>
-          </div>
-
-          <div className="sa-fld">
-            <label className="sa-flbl">Work Email *</label>
-            <input className="sa-finp" type="email" placeholder="admin@company.com" value={form.work_email} onChange={set("work_email")} disabled={!!initial} />
-          </div>
-
-          {/* Password fields — create only */}
-          {!initial && (
-            <>
-              <div className="sa-fld">
-                <label className="sa-flbl">Password *</label>
-                <div style={{ position: "relative" }}>
-                  <input
-                    className="sa-finp"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Temporary password"
-                    value={form.password}
-                    onChange={set("password")}
-                    style={{ paddingRight: "45px" }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    style={{ position:"absolute", right:"14px", top:"50%", transform:"translateY(-50%)", background:"transparent", border:"none", cursor:"pointer", display:"flex", alignItems:"center", color:"#6b7280" }}
-                  >
-                    {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="sa-fld">
-                <label className="sa-flbl">Confirm Password *</label>
-                <div style={{ position: "relative" }}>
-                  <input
-                    className="sa-finp"
-                    type={showConfirmPassword ? "text" : "password"}
-                    placeholder="Confirm password"
-                    value={form.confirmPassword}
-                    onChange={set("confirmPassword")}
-                    style={{ paddingRight: "45px" }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword((v) => !v)}
-                    style={{ position:"absolute", right:"14px", top:"50%", transform:"translateY(-50%)", background:"transparent", border:"none", cursor:"pointer", display:"flex", alignItems:"center", color:"#6b7280" }}
-                  >
-                    {showConfirmPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
-                  </button>
-                </div>
-                {form.confirmPassword && !passwordsMatch && (
-                  <p style={{ color: "#ef4444", fontSize: "13px", marginTop: "6px" }}>Passwords do not match</p>
-                )}
-              </div>
-            </>
-          )}
-
-          <div className="sa-form-row">
-            <div className="sa-fld">
-              <label className="sa-flbl">Gender *</label>
-              <select className="sa-fsel" value={form.gender} onChange={set("gender")}>
-                <option value="">Select gender</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-              </select>
-            </div>
-            <div className="sa-fld">
-              <label className="sa-flbl">Marital Status</label>
-              <select className="sa-fsel" value={form.marital_status} onChange={set("marital_status")}>
-                <option value="single">Single</option>
-                <option value="married">Married</option>
-                <option value="divorced">Divorced</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="sa-form-row">
-            <div className="sa-fld">
-              <label className="sa-flbl">Personal Contact *</label>
-              <input className="sa-finp" placeholder="Personal phone" value={form.personal_contact} onChange={set("personal_contact")} />
-            </div>
-            <div className="sa-fld">
-              <label className="sa-flbl">Emergency Contact *</label>
-              <input className="sa-finp" placeholder="Emergency phone" value={form.e_contact} onChange={set("e_contact")} />
-            </div>
-          </div>
-
-          {/* ── Work Details ── */}
-          <div className="sa-modal-section">Work Details</div>
-          <div className="sa-form-row">
-            <div className="sa-fld">
-              <label className="sa-flbl">Designation *</label>
-              <input className="sa-finp" placeholder="e.g. HR Manager" value={form.designation} onChange={set("designation")} />
-            </div>
-            <div className="sa-fld">
-              <label className="sa-flbl">Role *</label>
-              <select className="sa-fsel" value={form.role} onChange={set("role")}>
-                {ROLE_OPTIONS.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div className="sa-form-row">
-            <div className="sa-fld">
-              <label className="sa-flbl">Department *</label>
-              <select className="sa-fsel" value={form.department} onChange={set("department")}>
-                <option value="">Select department</option>
-                {DEPT_OPTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-            <div className="sa-fld">
-              <label className="sa-flbl">Office Location *</label>
-              <select className="sa-fsel" value={form.office_location} onChange={set("office_location")}>
-                <option value="">Select location</option>
-                {OFFICE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
-          </div>
-
-          {/* ── Experience ── */}
-          <div className="sa-modal-section">Experience</div>
-          <div className="sa-form-row">
-            <div className="sa-fld" style={{ display:"flex", alignItems:"center", gap:10, paddingTop:22 }}>
-              <input type="checkbox" id="sa-fresher" checked={form.is_fresher} onChange={setCheck("is_fresher")} style={{ width:16, height:16, accentColor:"var(--p)" }} />
-              <label htmlFor="sa-fresher" className="sa-flbl" style={{ margin:0, cursor:"pointer" }}>Is Fresher</label>
-            </div>
-            <div className="sa-fld">
-              <label className="sa-flbl">Total Experience (yrs)</label>
-              <input className="sa-finp" type="number" min="0" placeholder="0" value={form.total_experience} onChange={set("total_experience")} disabled={form.is_fresher} />
-            </div>
-          </div>
-
-          {!form.is_fresher && (
-            <div className="sa-form-row">
-              <div className="sa-fld">
-                <label className="sa-flbl">Previous Company</label>
-                <input className="sa-finp" placeholder="Company name" value={form.previous_company} onChange={set("previous_company")} />
-              </div>
-              <div className="sa-fld">
-                <label className="sa-flbl">Previous Designation</label>
-                <input className="sa-finp" placeholder="Last role" value={form.previous_designation} onChange={set("previous_designation")} />
-              </div>
-            </div>
-          )}
-
-          {/* ── Identity & Address ── */}
-          <div className="sa-modal-section">Identity & Address</div>
-          <div className="sa-form-row">
-            <div className="sa-fld">
-              <label className="sa-flbl">Aadhaar Number</label>
-              <input className="sa-finp" placeholder="xxxx xxxx xxxx" value={form.aadhaar_number} onChange={set("aadhaar_number")} />
-            </div>
-            <div className="sa-fld">
-              <label className="sa-flbl">PAN Number</label>
-              <input className="sa-finp" placeholder="ABCDE1234F" value={form.pan_number} onChange={set("pan_number")} />
-            </div>
-          </div>
-
-          {/* Residential + Permanent — combined into backend `address` on save */}
-          <div className="sa-fld">
-            <label className="sa-flbl">Residential Address</label>
-            <input className="sa-finp" placeholder="Current / residential street, locality" value={form.residential_address} onChange={set("residential_address")} />
-          </div>
-
-          <div className="sa-fld">
-            <label className="sa-flbl">Permanent Address</label>
-            <input className="sa-finp" placeholder="Permanent / hometown address" value={form.permanent_address} onChange={set("permanent_address")} />
-          </div>
-
-          <div className="sa-form-row-3">
-            <div className="sa-fld">
-              <label className="sa-flbl">City</label>
-              <input className="sa-finp" placeholder="City" value={form.city} onChange={set("city")} />
-            </div>
-            <div className="sa-fld">
-              <label className="sa-flbl">State</label>
-              <input className="sa-finp" placeholder="State" value={form.state} onChange={set("state")} />
-            </div>
-            <div className="sa-fld" style={{ marginBottom:0 }}>
-              <label className="sa-flbl">Pincode</label>
-              <input className="sa-finp" placeholder="Pincode" value={form.pincode} onChange={set("pincode")} />
-            </div>
-          </div>
-
-          <div className="sa-fld" style={{ marginBottom: 0 }}>
-            <label className="sa-flbl">Country</label>
-            <select className="sa-fsel" value={form.country} onChange={set("country")}>
-              <option value="">Select country</option>
-              {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-
-          {/* ── Banking (optional) ── */}
-          <div className="sa-modal-section">Banking Details <span style={{ fontWeight:400, textTransform:"none", letterSpacing:0, fontSize:10 }}>(optional)</span></div>
-          <div className="sa-form-row">
-            <div className="sa-fld">
-              <label className="sa-flbl">Bank Name</label>
-              <input className="sa-finp" placeholder="e.g. HDFC Bank" value={form.bank_name} onChange={set("bank_name")} />
-            </div>
-            <div className="sa-fld">
-              <label className="sa-flbl">Account Holder Name</label>
-              <input className="sa-finp" placeholder="As per passbook" value={form.account_holder_name} onChange={set("account_holder_name")} />
-            </div>
-          </div>
-          <div className="sa-form-row">
-            <div className="sa-fld">
-              <label className="sa-flbl">Account Number</label>
-              <input className="sa-finp" placeholder="Account number" value={form.account_number} onChange={set("account_number")} />
-            </div>
-            <div className="sa-fld" style={{ marginBottom:0 }}>
-              <label className="sa-flbl">IFSC Code</label>
-              <input className="sa-finp" placeholder="IFSC code" value={form.ifsc_code} onChange={set("ifsc_code")} />
-            </div>
-          </div>
-
-        </div>
-        <div className="sa-modal-ft">
-          <button className="sa-btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="sa-btn-p" onClick={handleSave} disabled={!canSubmit}>
-            <FaCheck style={{ fontSize: 10 }} /> {loading ? "Saving…" : initial ? "Update" : "Create"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const ReviewModal = ({ open, onClose, admins, onSave, loading }) => {
-  const [form, setForm] = useState({ adminid: "", rating: 0, comment: "" });
-  useEffect(() => { if (open) setForm({ adminid: "", rating: 0, comment: "" }); }, [open]);
-  if (!open) return null;
-  return (
-    <div className="sa-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="sa-modal">
-        <div className="sa-modal-hd">
-          <h2 className="sa-modal-title">Review Admin</h2>
-          <button className="sa-modal-x" onClick={onClose}><FaTimes /></button>
-        </div>
-        <div className="sa-modal-bd">
-          <div className="sa-fld">
-            <label className="sa-flbl">Select Admin</label>
-            <select className="sa-fsel" value={form.adminid} onChange={(e) => setForm((f) => ({ ...f, adminid: e.target.value }))}>
-              <option value="">Choose admin…</option>
-              {admins.map((a) => (
-                <option key={a._id} value={a._id}>
-                  {a.f_name} {a.l_name} – {a.designation} ({a.department})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="sa-fld">
-            <label className="sa-flbl">Rating</label>
-            <div className="sa-stars">
-              {[1,2,3,4,5].map((n) => (
-                <span key={n} className={`sa-star${form.rating >= n ? " active" : ""}`} onClick={() => setForm((f) => ({ ...f, rating: n }))}>★</span>
-              ))}
-            </div>
-          </div>
-          <div className="sa-fld" style={{ marginBottom: 0 }}>
-            <label className="sa-flbl">Comment</label>
-            <textarea className="sa-ftxt" placeholder="Write your review…" value={form.comment} onChange={(e) => setForm((f) => ({ ...f, comment: e.target.value }))} />
-          </div>
-        </div>
-        <div className="sa-modal-ft">
-          <button className="sa-btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="sa-btn-p" onClick={() => onSave(form)} disabled={loading || !form.adminid || !form.rating || !form.comment}>
-            <FaStar style={{ fontSize: 10 }} /> {loading ? "Submitting…" : "Submit Review"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const roleBadgeClass = (role = "") => {
-  if (role === "senior_admin") return "sa-badge sa-badge-role-senior";
-  if (role === "official") return "sa-badge sa-badge-role-official";
-  return "sa-badge sa-badge-role-admin";
-};
+}
 
 function SuperAdminDashboard() {
-  useStyles();
-
   const [greeting, setGreeting] = useState("");
   const [thought, setThought] = useState("");
   const [annModal, setAnnModal] = useState({ open: false, editing: null });
@@ -842,10 +913,7 @@ function SuperAdminDashboard() {
     setThought(THOUGHTS[Math.floor(Math.random() * THOUGHTS.length)]);
   }, []);
 
-  const today = new Date().toLocaleDateString("en-IN", {
-    weekday: "long", year: "numeric", month: "long", day: "numeric",
-  });
-
+  const today = new Date().toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   const orgName = superAdmin?.organisation_name || "Your Organisation";
   const maxDept = Math.max(...departments.map((d) => d.lastNumber), 1);
 
@@ -880,23 +948,20 @@ function SuperAdminDashboard() {
     }
   };
 
-  const handleAcceptLeave = (leave) => {
-    acceptLeave({ id: leave._id, leaveFor: leaveTab === "admin" ? "admin" : "employee" });
-  };
+  const handleAcceptLeave = (leave) => acceptLeave({ id: leave._id, leaveFor: leaveTab === "admin" ? "admin" : "employee" });
+  const handleRejectLeave = (leave) => rejectLeave({ id: leave._id, leaveFor: leaveTab === "admin" ? "admin" : "employee" });
+  const saveReview = (form) => reviewAdmin(form, { onSuccess: () => setReviewModal(false) });
 
-  const handleRejectLeave = (leave) => {
-    rejectLeave({ id: leave._id, leaveFor: leaveTab === "admin" ? "admin" : "employee" });
-  };
-
-  const saveReview = (form) => {
-    reviewAdmin(form, { onSuccess: () => setReviewModal(false) });
+  const isPendingLeave = (leave) => {
+    const s = (leave.status || "").toLowerCase();
+    return s.includes("forwarded") || s.includes("pending");
   };
 
   const leaveStatusClass = (status = "") => {
     const s = status.toLowerCase();
-    if (s.includes("approved")) return "sa-badge sa-badge-approved";
-    if (s.includes("rejected")) return "sa-badge sa-badge-rejected";
-    return "sa-badge sa-badge-pending";
+    if (s.includes("approved")) return "bg-emerald-50 text-emerald-700 border border-emerald-200";
+    if (s.includes("rejected")) return "bg-red-50 text-red-700 border border-red-200";
+    return "bg-amber-50 text-amber-700 border border-amber-200";
   };
 
   const leaveStatusLabel = (status = "") => {
@@ -906,135 +971,150 @@ function SuperAdminDashboard() {
     return status;
   };
 
-  const isPendingLeave = (leave) => {
-    const s = (leave.status || "").toLowerCase();
-    return s.includes("forwarded") || s.includes("pending");
+  const roleBadgeCls = (role = "") => {
+    if (role === "senior_admin") return "bg-violet-50 text-violet-700 border border-violet-200";
+    if (role === "official") return "bg-sky-50 text-sky-700 border border-sky-200";
+    return "bg-[#f7ecf3] text-[#730042] border border-[#e8d5e2]";
+  };
+
+  const priorityChipCls = (priority = "") => {
+    if (priority === "urgent") return "bg-red-50 text-red-700 border border-red-200";
+    if (priority === "low") return "bg-emerald-50 text-emerald-700 border border-emerald-200";
+    return "bg-[#f7ecf3] text-[#730042] border border-[#e8d5e2]";
   };
 
   return (
-    <div className="sa">
+    <div className="min-h-screen bg-[#fdf5f9] p-4 sm:p-5 lg:p-7 font-[system-ui,sans-serif] text-[#0d0209]">
+      <style>{`
+        @keyframes modalUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes fadeIn  { from { opacity:0; } to { opacity:1; } }
+        .animate-\\[modalUp_0\\.22s_ease-out\\] { animation: modalUp 0.22s ease-out; }
+      `}</style>
 
-      <div className="sa-hero">
-        <div className="sa-hero-badge">
-          <div className="sa-hero-badge-dot" />
-          Super Administrator
-        </div>
-        <h1 className="sa-hero-title">{greeting}, {orgName}!</h1>
-        <p className="sa-hero-sub">"{thought}"</p>
-        <div className="sa-hero-chips">
-          <span className="sa-chip">🏢 {orgName}</span>
-          <span className="sa-chip">👥 {totalEmpCount} Employees</span>
-          {presentToday > 0 && <span className="sa-chip">✅ {presentToday} Present</span>}
-          {pendingLeaves > 0 && <span className="sa-chip">📋 {pendingLeaves} Leave{pendingLeaves !== 1 ? "s" : ""} Pending</span>}
-          <span className="sa-chip">📆 {today}</span>
-        </div>
-        <div className="sa-hero-actions">
-          <button className="sa-hero-action-btn" onClick={() => setAdminModal({ open: true, editing: null })}>
-            <FaPlus style={{ fontSize: 10 }} /> Add Admin
-          </button>
-          <button className="sa-hero-action-btn" onClick={() => setReviewModal(true)}>
-            <FaStar style={{ fontSize: 10 }} /> Review Admin
-          </button>
-        </div>
-      </div>
-
-      <div className="sa-stats">
-        {stats.map((s, i) => (
-          <div className="sa-stat" key={i}>
-            <div className="sa-stat-accent" style={{ background: `linear-gradient(90deg, ${s.color}cc, ${s.color}55)` }} />
-            <div className="sa-stat-icon" style={{ background: s.bgColor, color: s.color }}>{s.icon}</div>
-            <div className="sa-stat-lbl">{s.label}</div>
-            <div className="sa-stat-val">{s.value}</div>
-            <p className="sa-stat-sub" style={{ color: s.color }}>{s.sub}</p>
-            {s.bar !== null && (
-              <div className="sa-stat-bar">
-                <div className="sa-stat-fill" style={{ width: `${s.bar}%`, background: `linear-gradient(90deg, ${s.color}cc, ${s.color})` }} />
-              </div>
-            )}
+      <div className="relative bg-gradient-to-br from-[#2a0017] via-[#730042] to-[#cd166e] rounded-2xl p-6 sm:p-8 lg:p-10 mb-6 overflow-hidden shadow-xl">
+        <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-white/5 -translate-y-1/3 translate-x-1/4 pointer-events-none" />
+        <div className="absolute bottom-0 left-1/3 w-48 h-48 rounded-full bg-white/3 translate-y-1/2 pointer-events-none" />
+        <div className="relative z-10">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#4ade80]" />
+            <span className="text-[10px] font-bold tracking-[1.5px] uppercase text-white/70">Super Administrator</span>
           </div>
-        ))}
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2 leading-tight tracking-tight">
+            {greeting}, {orgName}!
+          </h1>
+          <p className="text-sm text-white/60 max-w-lg leading-relaxed mb-5">"{thought}"</p>
+          <div className="flex flex-wrap gap-2">
+            <span className="bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-3 py-1.5 text-[11px] text-white/90 font-medium">🏢 {orgName}</span>
+            <span className="bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-3 py-1.5 text-[11px] text-white/90 font-medium">👥 {totalEmpCount} Employees</span>
+            {presentToday > 0 && <span className="bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-3 py-1.5 text-[11px] text-white/90 font-medium">✅ {presentToday} Present</span>}
+            {pendingLeaves > 0 && <span className="bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-3 py-1.5 text-[11px] text-white/90 font-medium">📋 {pendingLeaves} Leaves Pending</span>}
+            <span className="bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-3 py-1.5 text-[11px] text-white/90 font-medium">📆 {today}</span>
+          </div>
+        </div>
+        <div className="absolute top-5 right-5 sm:top-7 sm:right-7 flex gap-2">
+          <button onClick={() => setAdminModal({ open: true, editing: null })} className="flex items-center gap-1.5 bg-white/15 border border-white/25 text-white px-3 py-2 rounded-xl text-[12px] font-semibold hover:bg-white/25 transition-colors backdrop-blur-sm">
+            <FaPlus size={9} /> Add Admin
+          </button>
+          <button onClick={() => setReviewModal(true)} className="flex items-center gap-1.5 bg-white/15 border border-white/25 text-white px-3 py-2 rounded-xl text-[12px] font-semibold hover:bg-white/25 transition-colors backdrop-blur-sm">
+            <FaStar size={9} /> Review
+          </button>
+        </div>
       </div>
 
-      <div className="sa-mid-grid">
-        <div className="sa-panel">
-          <div className="sa-panel-head">
-            <div className="sa-panel-title">
-              <div className="sa-live-dot" />
-              Live Attendance Map
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
+        {stats.map((s, i) => <StatCard key={i} {...s} />)}
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-5 mb-5">
+        <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#e8d5e2] flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="font-bold text-[15px] text-[#0d0209]">Live Attendance Map</span>
             </div>
-            <span style={{ fontSize: 11, color: "var(--light)", fontWeight: 500 }}>
-              <FaMapMarkerAlt style={{ marginRight: 4 }} />
+            <span className="text-[11px] text-[#c499b4] font-medium flex items-center gap-1.5">
+              <FaMapMarkerAlt size={10} />
               {mapLoading ? "Loading…" : `${checkins.length} check-in${checkins.length !== 1 ? "s" : ""} today`}
             </span>
           </div>
-          <div className="sa-map-wrap">
+          <div className="h-[300px]">
             <AttendanceMap checkins={checkins} loading={mapLoading} />
           </div>
-          <div className="sa-map-foot">
-            <div className="sa-leg"><div className="sa-leg-dot" style={{ background: "#730042" }} />Manager</div>
-            <div className="sa-leg"><div className="sa-leg-dot" style={{ background: "#a0005c" }} />Employee</div>
-            <div className="sa-leg"><div className="sa-leg-dot" style={{ background: "#aaa", opacity: .5 }} />Checked out</div>
-            <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--light)" }}>Click pin for details</span>
+          <div className="px-5 py-3 bg-[#f7ecf3] border-t border-[#e8d5e2] flex flex-wrap gap-4 items-center">
+            <div className="flex items-center gap-2 text-[11px] text-[#7a5568]">
+              <div className="w-2.5 h-2.5 rounded-full bg-[#730042] border-2 border-white shadow-sm" />Manager
+            </div>
+            <div className="flex items-center gap-2 text-[11px] text-[#7a5568]">
+              <div className="w-2.5 h-2.5 rounded-full bg-[#a0005c] border-2 border-white shadow-sm" />Employee
+            </div>
+            <div className="flex items-center gap-2 text-[11px] text-[#7a5568]">
+              <div className="w-2.5 h-2.5 rounded-full bg-gray-300 border-2 border-white shadow-sm opacity-60" />Checked out
+            </div>
+            <span className="ml-auto text-[11px] text-[#c499b4]">Click pin for details</span>
           </div>
         </div>
 
-        <div className="sa-panel" style={{ display: "flex", flexDirection: "column" }}>
-          <div className="sa-panel-head">
-            <div className="sa-panel-title">
-              <FaCalendarAlt style={{ color: "var(--p)", fontSize: 14 }} />
-              Leave Requests
+        <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden flex flex-col">
+          <div className="px-5 py-4 border-b border-[#e8d5e2] flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <FaCalendarAlt size={13} className="text-[#730042]" />
+              <span className="font-bold text-[15px] text-[#0d0209]">Leave Requests</span>
             </div>
             {pendingLeaves > 0 && (
-              <span style={{ background: "#fff8e1", color: "var(--gold)", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99, border: "1px solid #f0d870" }}>
-                {pendingLeaves} pending
-              </span>
+              <span className="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-full">{pendingLeaves} pending</span>
             )}
           </div>
-          <div className="sa-tabs">
-            <button className={`sa-tab${leaveTab === "employee" ? " active" : ""}`} onClick={() => setLeaveTab("employee")}>
-              Employees {empLeaves.length > 0 && `(${empLeaves.length})`}
-            </button>
-            <button className={`sa-tab${leaveTab === "admin" ? " active" : ""}`} onClick={() => setLeaveTab("admin")}>
-              Admins/Managers {adminLeaves.length > 0 && `(${adminLeaves.length})`}
-            </button>
+          <div className="flex border-b border-[#e8d5e2]">
+            {[["employee", "Employees", empLeaves.length], ["admin", "Admins", adminLeaves.length]].map(([val, lbl, cnt]) => (
+              <button key={val} onClick={() => setLeaveTab(val)} className={`flex-1 py-2.5 text-[12px] font-semibold border-b-2 transition-colors ${leaveTab === val ? "border-[#730042] text-[#730042]" : "border-transparent text-[#7a5568] hover:text-[#0d0209]"}`}>
+                {lbl} {cnt > 0 && `(${cnt})`}
+              </button>
+            ))}
           </div>
-          <div className="sa-leave-scroll" style={{ flex: 1 }}>
+          <div className="overflow-y-auto flex-1 max-h-[360px]">
             {leaveLoading ? (
-              <div className="sa-empty"><div className="sa-empty-ico">⏳</div><p>Loading…</p></div>
+              <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4]">
+                <span className="text-2xl">⏳</span>
+                <p className="text-[12px]">Loading…</p>
+              </div>
             ) : activeLeaves.length === 0 ? (
-              <div className="sa-empty">
-                <div className="sa-empty-ico"><FaCheckCircle style={{ color: "var(--green)" }} /></div>
-                <p>No leave requests in this category.</p>
+              <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4]">
+                <FaCheckCircle size={24} className="text-emerald-400" />
+                <p className="text-[12px]">No leave requests in this category.</p>
               </div>
             ) : (
               activeLeaves.map((leave) => {
                 const emp = leave.employee || leave.manager || {};
-                const name = [emp.f_name, emp.l_name].filter(Boolean).join(" ") || leave.name || "Employee";
+                const name = [emp.f_name, emp.l_name].filter(Boolean).join(" ") || "Employee";
                 const type = leave.leaveType || leave.type || "Leave";
                 const from = leave.startDate || leave.from || "";
                 const to = leave.endDate || leave.to || "";
                 const pending = isPendingLeave(leave);
                 return (
-                  <div key={leave._id} className="sa-leave-item">
-                    <div className="sa-avatar" style={{ background: leaveTypeColor(type) }}>{initials(name)}</div>
-                    <div className="sa-leave-meta">
-                      <div className="sa-leave-name">{name}</div>
-                      <div className="sa-leave-info">
+                  <div key={leave._id} className="px-5 py-3.5 border-b border-[#f7ecf3] last:border-0 hover:bg-[#fdf5f9] transition-colors flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0" style={{ background: leaveTypeColor(type) }}>
+                      {initials(name)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-[#0d0209] truncate">{name}</p>
+                      <p className="text-[11px] text-[#7a5568] mt-0.5">
                         {type.toUpperCase()} · {fmtDate(from)}{to && to !== from ? ` → ${fmtDate(to)}` : ""}
                         {emp.designation ? ` · ${emp.designation}` : ""}
-                      </div>
-                      {leave.reason && (
-                        <div className="sa-leave-info" style={{ marginTop: 2, fontStyle: "italic" }}>"{leave.reason}"</div>
-                      )}
+                      </p>
+                      {leave.reason && <p className="text-[11px] text-[#c499b4] mt-1 italic line-clamp-1">"{leave.reason}"</p>}
                       {pending ? (
-                        <div className="sa-leave-actions">
-                          <button className="sa-btn-accept" onClick={() => handleAcceptLeave(leave)} disabled={accepting}><FaCheck /> Approve</button>
-                          <button className="sa-btn-reject" onClick={() => handleRejectLeave(leave)} disabled={rejecting}><FaBan /> Reject</button>
+                        <div className="flex gap-2 mt-2">
+                          <button onClick={() => handleAcceptLeave(leave)} disabled={accepting} className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg px-2.5 py-1 text-[11px] font-semibold hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-colors disabled:opacity-50">
+                            <FaCheck size={8} /> Approve
+                          </button>
+                          <button onClick={() => handleRejectLeave(leave)} disabled={rejecting} className="flex items-center gap-1.5 bg-red-50 text-red-700 border border-red-200 rounded-lg px-2.5 py-1 text-[11px] font-semibold hover:bg-red-600 hover:text-white hover:border-red-600 transition-colors disabled:opacity-50">
+                            <FaBan size={8} /> Reject
+                          </button>
                         </div>
                       ) : (
-                        <div style={{ marginTop: 6 }}>
-                          <span className={leaveStatusClass(leave.status)}>{leaveStatusLabel(leave.status)}</span>
-                        </div>
+                        <span className={`inline-flex items-center mt-2 text-[10px] font-bold px-2.5 py-0.5 rounded-full ${leaveStatusClass(leave.status)}`}>
+                          {leaveStatusLabel(leave.status)}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -1045,58 +1125,67 @@ function SuperAdminDashboard() {
         </div>
       </div>
 
-      <div className="sa-panel" style={{ marginBottom: 26 }}>
-        <div className="sa-panel-head">
-          <div className="sa-panel-title">
-            <FaUserCog style={{ color: "var(--p)", fontSize: 15 }} />
-            Admin Management
+      <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden mb-5">
+        <div className="px-5 py-4 border-b border-[#e8d5e2] flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-2.5">
+            <FaUserCog size={14} className="text-[#730042]" />
+            <span className="font-bold text-[15px] text-[#0d0209]">Admin Management</span>
           </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <button className="sa-btn-ghost" style={{ fontSize: 11, padding: "6px 12px" }} onClick={() => setReviewModal(true)}>
-              <FaStar style={{ fontSize: 10, marginRight: 4 }} /> Review Admin
+          <div className="flex items-center gap-2">
+            <button onClick={() => setReviewModal(true)} className="flex items-center gap-1.5 border border-[#e8d5e2] text-[#7a5568] px-3 py-1.5 rounded-xl text-[12px] font-semibold hover:border-[#730042] hover:text-[#730042] transition-colors">
+              <FaStar size={10} /> Review Admin
             </button>
-            <button className="sa-btn-p" onClick={() => setAdminModal({ open: true, editing: null })}>
-              <FaPlus style={{ fontSize: 10 }} /> Add Admin
+            <button onClick={() => setAdminModal({ open: true, editing: null })} className="flex items-center gap-1.5 bg-[#730042] text-white px-3 py-1.5 rounded-xl text-[12px] font-semibold hover:bg-[#4a0029] transition-colors">
+              <FaPlus size={10} /> Add Admin
             </button>
           </div>
         </div>
         {adminsLoading ? (
-          <div className="sa-empty"><div className="sa-empty-ico">⏳</div><p>Loading admins…</p></div>
+          <div className="flex flex-col items-center justify-center py-12 gap-2 text-[#c499b4]">
+            <span className="text-2xl">⏳</span>
+            <p className="text-[12px]">Loading admins…</p>
+          </div>
         ) : admins.length === 0 ? (
-          <div className="sa-empty">
-            <div className="sa-empty-ico"><FaUserShield /></div>
-            <p>No admins yet. Create one to delegate management.</p>
+          <div className="flex flex-col items-center justify-center py-12 gap-2 text-[#c499b4]">
+            <FaUserShield size={28} />
+            <p className="text-[13px]">No admins yet. Create one to delegate management.</p>
           </div>
         ) : (
-          <div className="sa-admin-grid">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 p-5">
             {admins.map((admin) => {
               const name = [admin.f_name, admin.l_name].filter(Boolean).join(" ");
               const statusKey = (admin.status || "inactive").toLowerCase();
               const roleKey = admin.role || "admin";
               return (
-                <div className="sa-admin-card" key={admin._id}>
-                  <div className="sa-admin-ava" style={{ background: `linear-gradient(135deg, ${avaColor(admin.f_name || "")}, #cd166e)` }}>
+                <div key={admin._id} className="border border-[#e8d5e2] rounded-xl p-4 hover:shadow-md hover:-translate-y-1 hover:bg-[#fdf5f9] transition-all duration-200 relative">
+                  <div className="w-11 h-11 rounded-full flex items-center justify-center text-[14px] font-bold text-white mx-auto mb-3" style={{ background: `linear-gradient(135deg, ${avaColor(admin.f_name || "")}, #cd166e)` }}>
                     {initials(name)}
                   </div>
-                  <div className="sa-admin-name">{name}</div>
-                  <div className="sa-admin-desg">{admin.designation}</div>
-                  <div className="sa-admin-email">{admin.work_email}</div>
-                  <div className="sa-admin-meta">
-                    <span className={`sa-badge ${statusKey === "active" ? "sa-badge-active" : statusKey === "suspended" ? "sa-badge-suspended" : "sa-badge-inactive"}`}>
+                  <p className="text-[13px] font-bold text-[#0d0209] text-center truncate">{name}</p>
+                  <p className="text-[11px] text-[#7a5568] text-center mt-0.5 truncate">{admin.designation}</p>
+                  <p className="text-[10px] text-[#c499b4] text-center mt-0.5 truncate">{admin.work_email}</p>
+                  <div className="flex flex-wrap justify-center gap-1 mt-2.5">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusKey === "active" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : statusKey === "suspended" ? "bg-red-50 text-red-700 border border-red-200" : "bg-gray-50 text-gray-600 border border-gray-200"}`}>
                       {statusKey.charAt(0).toUpperCase() + statusKey.slice(1)}
                     </span>
-                    <span className={roleBadgeClass(roleKey)}>{ROLE_LABEL[roleKey] || roleKey}</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${roleBadgeCls(roleKey)}`}>
+                      {ROLE_LABEL[roleKey] || roleKey}
+                    </span>
                   </div>
                   {admin.department && (
-                    <div style={{ textAlign:"center", marginTop:4 }}>
-                      <span style={{ fontSize:10, background:"#f3f4f6", color:"#6b7280", padding:"2px 8px", borderRadius:99, fontWeight:600 }}>
+                    <p className="text-center mt-1.5">
+                      <span className="text-[10px] bg-gray-50 text-gray-500 border border-gray-200 px-2 py-0.5 rounded-full font-semibold">
                         {admin.department} · {admin.office_location}
                       </span>
-                    </div>
+                    </p>
                   )}
-                  <div className="sa-admin-actions">
-                    <button className="sa-icon-btn" title="Edit" onClick={() => setAdminModal({ open: true, editing: admin })}><FaEdit /></button>
-                    <button className="sa-icon-btn del" title="Delete" onClick={() => { if (window.confirm(`Delete ${name}?`)) deleteAdmin(admin._id); }}><FaTrash /></button>
+                  <div className="flex justify-center gap-1 mt-3 pt-3 border-t border-[#f0dcea]">
+                    <button onClick={() => setAdminModal({ open: true, editing: admin })} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] text-[#c499b4] hover:bg-[#f7ecf3] hover:text-[#730042] transition-colors">
+                      <FaEdit size={10} /> Edit
+                    </button>
+                    <button onClick={() => { if (window.confirm(`Delete ${name}?`)) deleteAdmin(admin._id); }} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] text-[#c499b4] hover:bg-red-50 hover:text-red-600 transition-colors">
+                      <FaTrash size={10} /> Delete
+                    </button>
                   </div>
                 </div>
               );
@@ -1105,69 +1194,80 @@ function SuperAdminDashboard() {
         )}
       </div>
 
-      <div className="sa-lower-grid">
-        <div className="sa-panel">
-          <div className="sa-panel-head">
-            <div className="sa-panel-title">
-              <FaLayerGroup style={{ color: "var(--p)", fontSize: 14 }} />
-              Department Breakdown
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+        <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#e8d5e2] flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <FaLayerGroup size={13} className="text-[#730042]" />
+              <span className="font-bold text-[15px] text-[#0d0209]">Department Breakdown</span>
             </div>
-            <span style={{ fontSize: 11, color: "var(--light)", fontWeight: 600 }}>
-              {deptLoading ? "…" : `${totalEmpCount} total`}
-            </span>
+            <span className="text-[11px] text-[#c499b4] font-semibold">{deptLoading ? "…" : `${totalEmpCount} total`}</span>
           </div>
           {deptLoading ? (
-            <div className="sa-empty"><div className="sa-empty-ico">⏳</div><p>Loading…</p></div>
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4]">
+              <span className="text-2xl">⏳</span><p className="text-[12px]">Loading…</p>
+            </div>
           ) : departments.length === 0 ? (
-            <div className="sa-empty"><div className="sa-empty-ico"><FaChartBar /></div><p>No departments yet.</p></div>
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4]">
+              <FaChartBar size={24} /><p className="text-[12px]">No departments yet.</p>
+            </div>
           ) : (
-            departments.map((dep) => (
-              <div className="sa-dept-item" key={dep.department}>
-                <div className="sa-dept-name">{dep.department}</div>
-                <div className="sa-dept-bar-track">
-                  <div className="sa-dept-bar-fill" style={{ width: `${Math.round((dep.lastNumber / maxDept) * 100)}%` }} />
+            <div>
+              {departments.map((dep) => (
+                <div key={dep.department} className="px-5 py-3 border-b border-[#f7ecf3] last:border-0 flex items-center gap-4">
+                  <p className="text-[12px] font-semibold text-[#0d0209] w-16 flex-shrink-0">{dep.department}</p>
+                  <div className="flex-1 h-2 bg-[#e8d5e2] rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-[#4a0029] to-[#cd166e] transition-all duration-1000" style={{ width: `${Math.round((dep.lastNumber / maxDept) * 100)}%` }} />
+                  </div>
+                  <p className="text-[13px] font-bold text-[#730042] w-6 text-right flex-shrink-0">{dep.lastNumber}</p>
                 </div>
-                <div className="sa-dept-count">{dep.lastNumber}</div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
 
-        <div className="sa-panel">
-          <div className="sa-panel-head">
-            <div className="sa-panel-title">
-              <FaBullhorn style={{ color: "var(--p)", fontSize: 14 }} />
-              Announcements
+        <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#e8d5e2] flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <FaBullhorn size={13} className="text-[#730042]" />
+              <span className="font-bold text-[15px] text-[#0d0209]">Announcements</span>
             </div>
-            <button className="sa-btn-p" onClick={() => setAnnModal({ open: true, editing: null })}>
-              <FaPlus style={{ fontSize: 10 }} /> New
+            <button onClick={() => setAnnModal({ open: true, editing: null })} className="flex items-center gap-1.5 bg-[#730042] text-white px-3 py-1.5 rounded-xl text-[12px] font-semibold hover:bg-[#4a0029] transition-colors">
+              <FaPlus size={9} /> New
             </button>
           </div>
           {annLoading ? (
-            <div className="sa-empty"><div className="sa-empty-ico">⏳</div><p>Loading…</p></div>
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4]">
+              <span className="text-2xl">⏳</span><p className="text-[12px]">Loading…</p>
+            </div>
           ) : announcements.length === 0 ? (
-            <div className="sa-empty"><div className="sa-empty-ico">📢</div><p>No announcements. Publish one to notify your team.</p></div>
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4]">
+              <FaBullhorn size={24} /><p className="text-[12px]">No announcements yet. Publish one to notify your team.</p>
+            </div>
           ) : (
-            <div style={{ paddingTop: 6, paddingBottom: 6 }}>
+            <div className="divide-y divide-[#f7ecf3]">
               {announcements.slice(0, 5).map((ann) => {
                 const priority = (ann.priority || "normal").toLowerCase();
                 const audience = ann.audience || "all";
-                const chipCls = priority === "urgent" ? "chip-urgent" : priority === "low" ? "chip-event" : "chip-general";
                 return (
-                  <div className="sa-ann-card" key={ann._id}>
-                    <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-                      <span className={`sa-ann-chip ${chipCls}`}>{priority.charAt(0).toUpperCase() + priority.slice(1)}</span>
-                      <span style={{ fontSize: 10, background: "#f3f4f6", color: "#6b7280", padding: "3px 8px", borderRadius: 99, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".4px" }}>{audience}</span>
+                  <div key={ann._id} className="px-5 py-4 hover:bg-[#fdf5f9] transition-colors">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`text-[10px] font-bold tracking-wide uppercase px-2.5 py-0.5 rounded-full ${priorityChipCls(priority)}`}>
+                        {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                      </span>
+                      <span className="text-[10px] font-semibold bg-gray-50 text-gray-500 border border-gray-200 px-2.5 py-0.5 rounded-full uppercase">{audience}</span>
                     </div>
-                    <div className="sa-ann-title">{ann.title}</div>
-                    <div className="sa-ann-body">{ann.message}</div>
-                    <div className="sa-ann-foot">
-                      <button className="sa-icon-btn" onClick={() => setAnnModal({ open: true, editing: ann })}><FaEdit /> Edit</button>
-                      <button className="sa-icon-btn del" onClick={() => { if (window.confirm("Delete announcement?")) deleteAnn(ann._id); }}><FaTrash /> Delete</button>
+                    <p className="text-[13px] font-semibold text-[#0d0209] mb-1">{ann.title}</p>
+                    <p className="text-[12px] text-[#7a5568] leading-relaxed line-clamp-2">{ann.message}</p>
+                    <div className="flex gap-2 mt-3 pt-2.5 border-t border-[#f7ecf3]">
+                      <button onClick={() => setAnnModal({ open: true, editing: ann })} className="flex items-center gap-1.5 text-[11px] text-[#c499b4] hover:text-[#730042] hover:bg-[#f7ecf3] px-2 py-1 rounded-lg transition-colors font-medium">
+                        <FaEdit size={9} /> Edit
+                      </button>
+                      <button onClick={() => { if (window.confirm("Delete this announcement?")) deleteAnn(ann._id); }} className="flex items-center gap-1.5 text-[11px] text-[#c499b4] hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded-lg transition-colors font-medium">
+                        <FaTrash size={9} /> Delete
+                      </button>
                       {ann.expiresAt && (
-                        <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--light)" }}>
-                          Expires {fmtDate(ann.expiresAt)}
-                        </span>
+                        <span className="ml-auto text-[10px] text-[#c499b4] self-center">Expires {fmtDate(ann.expiresAt)}</span>
                       )}
                     </div>
                   </div>
@@ -1178,51 +1278,56 @@ function SuperAdminDashboard() {
         </div>
       </div>
 
-      <div className="sa-panel" style={{ marginBottom: 26 }}>
-        <div className="sa-panel-head">
-          <div className="sa-panel-title">
-            <FaUsers style={{ color: "var(--p)", fontSize: 14 }} />
-            Employee Overview
+      <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden mb-5">
+        <div className="px-5 py-4 border-b border-[#e8d5e2] flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-2.5">
+            <FaUsers size={13} className="text-[#730042]" />
+            <span className="font-bold text-[15px] text-[#0d0209]">Employee Overview</span>
           </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <div className="sa-search-wrap">
-              <FaSearch className="sa-search-ico" />
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[#c499b4]" size={11} />
               <input
-                className="sa-search-inp"
+                className="pl-8 pr-3 py-2 bg-[#fdf5f9] border border-[#e8d5e2] rounded-xl text-[12px] text-[#0d0209] outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#f7ecf3] w-40 sm:w-52 transition-all placeholder:text-[#c499b4]"
                 placeholder="Search employees…"
                 value={empSearch}
                 onChange={(e) => setEmpSearch(e.target.value)}
               />
             </div>
             {filteredEmp.length > 10 && (
-              <button className="sa-btn-ghost" style={{ fontSize: 11, padding: "6px 12px" }} onClick={() => setEmpExpand((v) => !v)}>
+              <button onClick={() => setEmpExpand((v) => !v)} className="flex items-center gap-1.5 border border-[#e8d5e2] text-[#7a5568] px-3 py-2 rounded-xl text-[12px] font-semibold hover:border-[#730042] hover:text-[#730042] transition-colors whitespace-nowrap">
                 {empExpand ? "Show Less" : `View All (${filteredEmp.length})`}
-                <FaChevronRight style={{ fontSize: 9, marginLeft: 4, transform: empExpand ? "rotate(90deg)" : "none", transition: ".2s" }} />
+                <FaChevronRight size={9} className={`transition-transform ${empExpand ? "rotate-90" : ""}`} />
               </button>
             )}
           </div>
         </div>
         {empLoading ? (
-          <div className="sa-empty"><div className="sa-empty-ico">⏳</div><p>Loading employees…</p></div>
+          <div className="flex flex-col items-center justify-center py-12 gap-2 text-[#c499b4]">
+            <span className="text-2xl">⏳</span><p className="text-[12px]">Loading employees…</p>
+          </div>
         ) : filteredEmp.length === 0 ? (
-          <div className="sa-empty"><div className="sa-empty-ico"><FaUsers /></div><p>{empSearch ? "No matching employees." : "No employees found."}</p></div>
+          <div className="flex flex-col items-center justify-center py-12 gap-2 text-[#c499b4]">
+            <FaUsers size={28} />
+            <p className="text-[13px]">{empSearch ? "No matching employees." : "No employees found."}</p>
+          </div>
         ) : (
-          <div className="sa-emp-grid">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 p-5">
             {displayEmp.map((emp, i) => {
               const name = [emp.f_name, emp.l_name].filter(Boolean).join(" ") || "Employee";
               const role = emp.designation || emp.role || "";
               const dept = emp.department || "";
               const isManager = (emp.role || "").toLowerCase() === "manager";
               return (
-                <div className="sa-emp-card" key={emp._id || i}>
-                  <div className="sa-emp-ava" style={{ background: isManager ? "linear-gradient(135deg,#730042,#cd166e)" : `linear-gradient(135deg,${avaColor(emp.f_name || "")},${avaColor((emp.l_name || "A"))})` }}>
+                <div key={emp._id || i} className="border border-[#e8d5e2] rounded-xl p-3 flex items-center gap-3 hover:shadow-sm hover:bg-[#fdf5f9] transition-all duration-150">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-bold text-white flex-shrink-0" style={{ background: isManager ? "linear-gradient(135deg,#730042,#cd166e)" : `linear-gradient(135deg,${avaColor(emp.f_name || "")},${avaColor((emp.l_name || "A"))})` }}>
                     {initials(name)}
                   </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div className="sa-emp-name">{name}</div>
-                    {isManager && <span style={{ fontSize: 9, background: "var(--p-wash)", color: "var(--p)", padding: "1px 6px", borderRadius: 99, fontWeight: 700, display: "inline-block", marginBottom: 2 }}>MANAGER</span>}
-                    {role && <div className="sa-emp-role">{role}</div>}
-                    {dept && <span className="sa-emp-dept">{dept}</span>}
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-semibold text-[#0d0209] truncate leading-tight">{name}</p>
+                    {isManager && <span className="text-[9px] bg-[#f7ecf3] text-[#730042] px-1.5 py-0.5 rounded-full font-bold uppercase">MGR</span>}
+                    {role && <p className="text-[11px] text-[#7a5568] truncate mt-0.5">{role}</p>}
+                    {dept && <span className="text-[10px] bg-[#f7ecf3] text-[#730042] px-1.5 py-0.5 rounded-full font-semibold inline-block mt-1">{dept}</span>}
                   </div>
                 </div>
               );
@@ -1230,9 +1335,9 @@ function SuperAdminDashboard() {
           </div>
         )}
         {!empExpand && filteredEmp.length > 10 && (
-          <div style={{ padding: "12px 18px", borderTop: "1px solid var(--border)", textAlign: "center" }}>
-            <button className="sa-btn-ghost" onClick={() => setEmpExpand(true)} style={{ fontSize: 12 }}>
-              Show all {filteredEmp.length} employees <FaAngleDown style={{ marginLeft: 4 }} />
+          <div className="px-5 py-3 border-t border-[#f0dcea] text-center">
+            <button onClick={() => setEmpExpand(true)} className="text-[12px] font-semibold text-[#730042] hover:text-[#4a0029] transition-colors flex items-center gap-1.5 mx-auto">
+              Show all {filteredEmp.length} employees <FaAngleDown size={12} />
             </button>
           </div>
         )}
