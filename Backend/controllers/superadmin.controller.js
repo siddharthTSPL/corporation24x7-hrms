@@ -2206,6 +2206,28 @@ const updatePermissions = async (req, res, next) => {
   }
 };
 
+const getPermissions = async (req, res, next) => {
+  try {
+    if (!req.superAdmin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const { id: user_id } = req.params;
+    const { user_model } = req.query;
+    const organisation_id = req.superAdmin._id;
+
+    if (!user_model || !["Admin", "Manager", "User"].includes(user_model))
+      return next(Object.assign(new Error("user_model query param must be Admin, Manager, or User"), { statusCode: 400 }));
+
+    const permissions = await PermissionModel.findOne({ user_id, user_model, organisation_id }).lean();
+    if (!permissions)
+      return next(Object.assign(new Error("Permission record not found for this user"), { statusCode: 404 }));
+
+    return res.status(200).json({ success: true, permissions });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   registerSuperAdmin,
   verifySuperAdmin,
@@ -2244,4 +2266,5 @@ module.exports = {
   getAllExpenseDocumentsSuperAdmin,
   getDocumentDetailsSuperAdmin,
    updatePermissions,
+  getPermissions
 };
