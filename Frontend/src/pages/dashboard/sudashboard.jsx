@@ -16,7 +16,6 @@ import { useShowAllLeaves, useAcceptLeaveByAdmin, useRejectLeaveByAdmin } from "
 import { useGetAllAnnouncements, useCreateAnnouncement, useUpdateAnnouncement, useDeleteAnnouncement } from "../../auth/server-state/superadmin/announcement/suannouncement.hook";
 import { useGetAllAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin, useReviewToAdmin } from "../../auth/server-state/superadmin/other/suother.hook";
 import { FiEye, FiEyeOff } from "react-icons/fi";
-
 const useStyles = () => {
   useEffect(() => {
     const font = document.createElement("link");
@@ -27,388 +26,155 @@ const useStyles = () => {
     const style = document.createElement("style");
     style.id = "sa-dash-styles";
     style.textContent = `
-  /* ─── CSS Variables & Reset ─────────────────────────────────────── */
-:root {
-  --ink: #0d0209; --p: #730042; --p-dark: #4a0029; --p-deep: #2a0017;
-  --p-mid: #9e0058; --p-light: #cd166e; --p-wash: #f7ecf3; --p-pale: #fdf5f9;
-  --border: #e8d5e2; --surface: #ffffff; --muted: #7a5568; --light: #c499b4;
-  --green: #0d9e6e; --red: #d93025; --gold: #b8760a; --amber: #f59e0b;
-  --blue: #2563eb; --sh: 0 4px 16px rgba(115,0,66,.06);
-  --sh-lg: 0 16px 48px rgba(115,0,66,.12); --r: 16px; --r-sm: 10px;
-
-  /* Responsive Spacing */
-  --pad-x: 16px;
-  --pad-y: 16px;
-  --gap: 16px;
-}
-
-/* Tablet */
-@media(min-width:768px) {
-  :root { --pad-x: 28px; --pad-y: 24px; --gap: 20px; }
-}
-/* Laptop/Desktop */
-@media(min-width:1280px) {
-  :root { --pad-x: 40px; --pad-y: 32px; --gap: 24px; }
-}
-
-*, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-
-/* ─── Root Shell (Full Page App Layout) ─────────────────────────── */
-.sa {
-  background: var(--p-pale);
-  height: 100vh; /* Fixed viewport height */
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden; /* Prevent body scroll */
-  font-family: 'DM Sans', sans-serif;
-  color: var(--ink);
-}
-
-/* The main scrollable area */
-.sa-body {
-  flex: 1;
-  overflow-y: auto; /* Internal scrolling only */
-  overflow-x: hidden;
-  padding: var(--pad-y) var(--pad-x);
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap);
-  
-  /* Smooth scrolling */
-  scroll-behavior: smooth;
-}
-
-/* ─── Hero Banner ───────────────────────────────────────────────── */
-.sa-hero {
-  background: linear-gradient(135deg, var(--p-deep) 0%, var(--p-dark) 35%, var(--p) 65%, var(--p-light) 100%);
-  border-radius: 0 0 var(--r) var(--r); /* Rounded only bottom */
-  padding: clamp(24px, 5vw, 48px) clamp(16px, 4vw, 48px);
-  position: relative;
-  overflow: hidden;
-  box-shadow: var(--sh-lg);
-  flex-shrink: 0; /* Never shrink */
-  margin-bottom: 0; /* Gap handled by flex container */
-  z-index: 10;
-}
-
-/* Background blobs */
-.sa-hero::before {
-  content:''; position:absolute; width:clamp(300px, 50vw, 600px); height:clamp(300px, 50vw, 600px);
-  border-radius:50%; top:-40%; right:-10%;
-  background:rgba(255,255,255,.06); pointer-events:none;
-}
-.sa-hero::after {
-  content:''; position:absolute; width:clamp(200px, 30vw, 400px); height:clamp(200px, 30vw, 400px);
-  border-radius:50%; bottom:-30%; left:40%;
-  background:rgba(255,255,255,.04); pointer-events:none;
-}
-
-.sa-hero-content {
-  position: relative; z-index: 2;
-  display: flex; flex-direction: column; gap: 16px;
-}
-
-.sa-hero-badge {
-  display:inline-flex; align-items:center; gap:8px;
-  background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3);
-  border-radius:99px; padding:6px 16px;
-  font-size:11px; color:rgba(255,255,255,.95);
-  letter-spacing:1px; font-weight:700; text-transform:uppercase; width: fit-content;
-}
-.sa-hero-badge-dot {
-  width:8px; height:8px; border-radius:50%;
-  background:#4ade80; box-shadow:0 0 8px #4ade80; animation: lp 2s infinite;
-}
-@keyframes lp { 0%,100%{opacity:1} 50%{opacity:.5} }
-
-.sa-hero-title {
-  font-family:'Playfair Display',serif;
-  font-size:clamp(24px, 5vw, 44px);
-  color:#fff; margin:0; font-weight:800;
-  line-height:1.1; letter-spacing:-1px;
-  max-width: 800px;
-}
-.sa-hero-sub {
-  font-size:clamp(13px, 1.8vw, 15px);
-  color:rgba(255,255,255,.85); font-weight:400;
-  max-width: 600px; line-height: 1.6;
-}
-
-.sa-hero-chips {
-  display:flex; gap:10px; flex-wrap:wrap;
-}
-.sa-chip {
-  background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.3);
-  border-radius:99px; padding:6px 14px;
-  font-size:clamp(11px, 1.2vw, 13px); color:rgba(255,255,255,.95);
-  font-weight:600; backdrop-filter:blur(4px);
-}
-
-.sa-hero-actions {
-  display:flex; gap:12px; flex-wrap:wrap; margin-top: 8px;
-}
-
-/* ─── Stats Grid (Strict Breakpoints) ──────────────────────────── */
-.sa-stats {
-  display: grid;
-  gap: var(--gap);
-  /* Default Mobile: 1 col */
-  grid-template-columns: 1fr;
-}
-
-/* Small Mobile > 380px */
-@media(min-width: 381px) { .sa-stats { grid-template-columns: repeat(2, 1fr); } }
-
-/* Tablet > 768px */
-@media(min-width: 769px) { .sa-stats { grid-template-columns: repeat(3, 1fr); } }
-
-/* Laptop > 1024px */
-@media(min-width: 1025px) { .sa-stats { grid-template-columns: repeat(5, 1fr); } }
-
-.sa-stat {
-  background:var(--surface); border-radius:var(--r);
-  border:1px solid var(--border); padding:20px; box-shadow:var(--sh);
-  display: flex; flex-direction: column; justify-content: space-between;
-  transition: transform .2s;
-}
-.sa-stat:hover { transform: translateY(-4px); box-shadow: var(--sh-lg); }
-
-.sa-stat-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
-.sa-stat-icon {
-  width:42px; height:42px; border-radius:12px;
-  display:flex; align-items:center; justify-content:center;
-  font-size:16px; background: var(--p-wash); color: var(--p);
-}
-.sa-stat-lbl {
-  font-size:11px; font-weight:700; letter-spacing:.8px;
-  text-transform:uppercase; color:var(--muted);
-}
-.sa-stat-val {
-  font-family:'Playfair Display',serif;
-  font-size:clamp(28px, 5vw, 38px);
-  line-height:1; color:var(--ink); font-weight:800; margin: 4px 0;
-}
-.sa-stat-sub { font-size:12px; color:var(--muted); font-weight: 500; display: flex; align-items: center; gap: 6px; }
-.sa-stat-bar {
-  height:4px; background:var(--border); border-radius:99px;
-  margin-top:12px; overflow:hidden;
-}
-.sa-stat-fill { height:100%; border-radius:99px; background: var(--p); }
-
-/* ─── Generic Panel (Unified Structure) ───────────────────────────── */
-.sa-panel {
-  background:var(--surface); border-radius:var(--r);
-  border:1px solid var(--border); box-shadow:var(--sh);
-  display: flex; flex-direction: column;
-  overflow: hidden; 
-  /* Ensure panels fill grid height for "Full Page" look */
-  min-height: 300px; 
-}
-
-.sa-panel-head {
-  padding:16px 20px; border-bottom:1px solid var(--border);
-  display:flex; align-items:center; justify-content:space-between;
-  gap:12px; flex-wrap:wrap; background: #fff; flex-shrink: 0;
-}
-.sa-panel-title {
-  font-family:'Playfair Display',serif;
-  font-size:clamp(16px, 2vw, 18px);
-  font-weight:700; color:var(--ink);
-  display:flex; align-items:center; gap:8px;
-}
-
-/* Scrollable Content within Panel */
-.sa-panel-body {
-  flex: 1; /* Fills remaining height */
-  overflow-y: auto;
-  position: relative;
-  min-height: 0; /* Crucial for Flexbox scrolling */
-}
-.sa-panel-body::-webkit-scrollbar { width: 6px; }
-.sa-panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
-
-/* ─── Mid Grid (Map & Dept) ─────────────────────────────────────── */
-.sa-mid-grid {
-  display: grid;
-  gap: var(--gap);
-  grid-template-columns: 1fr;
-  min-height: 400px; /* Minimum height for structure */
-}
-
-/* Tablet and up: Map on left, Dept on right */
-@media(min-width: 1025px) {
-  .sa-mid-grid {
-    grid-template-columns: 2fr 1fr; /* 2/3 and 1/3 split */
-    align-items: stretch; /* Force equal height */
-  }
-}
-
-/* ─── Lower Grid (Leaves & Ann) ─────────────────────────────────── */
-.sa-lower-grid {
-  display: grid;
-  gap: var(--gap);
-  grid-template-columns: 1fr;
-  min-height: 350px;
-}
-@media(min-width: 1025px) {
-  .sa-lower-grid {
-    grid-template-columns: 1fr 1fr;
-    align-items: stretch;
-  }
-}
-
-/* ─── Attendance Map ─────────────────────────────────────────────── */
-.sa-map-wrap { 
-  flex: 1; 
-  min-height: 300px; 
-  background: #e5e5e5;
-  position: relative;
-}
-.sa-map-foot {
-  padding:12px 20px; background:var(--p-wash);
-  border-top:1px solid var(--border);
-  display:flex; gap:16px; align-items:center; flex-wrap:wrap; flex-shrink: 0;
-}
-
-/* ─── Lists & Cards (Responsive Items) ───────────────────────────── */
-.sa-list-item {
-  padding:14px 20px; border-bottom:1px solid var(--border);
-  display:flex; align-items:center; gap:12px; transition:background .15s;
-  min-width: 0;
-}
-.sa-list-item:hover { background:var(--p-pale); }
-.sa-list-item:last-child { border-bottom:none; }
-
-.sa-avatar {
-  width:40px; height:40px; border-radius:50%;
-  display:flex; align-items:center; justify-content:center;
-  font-size:12px; font-weight:700; color:white; flex-shrink: 0;
-}
-.sa-meta { flex:1; min-width:0; }
-.sa-name { font-size:14px; font-weight:700; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.sa-sub { font-size:12px; color:var(--muted); margin-top:2px; }
-
-/* ─── Buttons (Touch Friendly 44px+) ─────────────────────────────── */
-.sa-btn-p {
-  background:var(--p); color:white; border:none;
-  padding:0 20px; border-radius:var(--r-sm);
-  font-size:13px; font-weight:600; cursor:pointer;
-  display:inline-flex; align-items:center; justify-content:center; gap:8px;
-  font-family:'DM Sans',sans-serif; transition:all .2s;
-  min-height: 44px; /* Touch target */
-  white-space:nowrap;
-}
-.sa-btn-p:hover { background:var(--p-dark); transform:translateY(-1px); box-shadow:0 4px 12px rgba(115,0,66,.3); }
-
-.sa-btn-ghost {
-  background:transparent; color:var(--muted); border:1px solid var(--border);
-  padding:0 16px; border-radius:var(--r-sm); font-size:13px;
-  font-weight:600; cursor:pointer; font-family:'DM Sans',sans-serif;
-  transition:all .2s; min-height: 44px; display: inline-flex; align-items:center; justify-content:center;
-}
-.sa-btn-ghost:hover { border-color:var(--p); color:var(--p); background: var(--p-pale); }
-
-.sa-btn-sm {
-  padding: 0 12px; min-height: 32px; font-size: 12px; border-radius: 6px;
-}
-
-/* ─── Inputs & Forms ────────────────────────────────────────────── */
-.sa-search-wrap { width: 100%; max-width: 300px; }
-.sa-search-inp {
-  width:100%; padding:0 12px 0 36px;
-  height: 44px; /* Touch friendly */
-  background:var(--p-pale); border:1px solid var(--border);
-  border-radius:var(--r-sm); font-size:14px; outline:none;
-  transition: border-color .2s;
-}
-.sa-search-inp:focus { border-color:var(--p); box-shadow:0 0 0 3px var(--p-wash); }
-.sa-search-ico { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--light); }
-
-/* ─── Badges ────────────────────────────────────────────────────── */
-.sa-badge {
-  padding:4px 10px; border-radius:6px; font-size:10px; font-weight:700;
-  text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap;
-}
-.badge-urgent { background:#fee2e2; color:#ef4444; }
-.badge-info { background:#e0f2fe; color:#0284c7; }
-.badge-success { background:#dcfce7; color:#166534; }
-
-/* ─── MODAL SYSTEM (Bottom Sheet on Mobile) ─────────────────────── */
-.sa-overlay {
-  position:fixed; inset:0; background:rgba(13,2,9,.7); backdrop-filter:blur(4px);
-  z-index:2000; display:flex; align-items:center; justify-content:center;
-  padding:20px; opacity:0; animation: fadeIn .2s forwards;
-}
-@keyframes fadeIn { to { opacity:1; } }
-
-.sa-modal {
-  background:var(--surface); border-radius:var(--r);
-  width:100%; max-width:500px;
-  max-height: 90vh;
-  box-shadow:var(--sh-lg);
-  display:flex; flex-direction:column;
-  transform: scale(.95); animation: scaleUp .2s forwards;
-}
-@keyframes scaleUp { to { transform: scale(1); } }
-
-.sa-modal-lg { max-width:600px; }
-
-.sa-modal-header {
-  padding:16px 20px; border-bottom:1px solid var(--border);
-  display:flex; justify-content:space-between; align-items:center; flex-shrink:0;
-}
-.sa-modal-title { font-family:'Playfair Display',serif; font-size:18px; font-weight:700; color:var(--ink); }
-
-.sa-modal-body { padding:20px; overflow-y:auto; flex:1; }
-.sa-modal-footer {
-  padding:16px 20px; border-top:1px solid var(--border);
-  display:flex; justify-content:flex-end; gap:10px; flex-shrink:0;
-}
-
-/* Mobile Bottom Sheet Behavior */
-@media(max-width: 767px) {
-  .sa-overlay {
-    padding:0; align-items:flex-end; background:rgba(0,0,0,.5);
-  }
-  .sa-modal {
-    border-radius:20px 20px 0 0; max-height:85vh;
-    transform: translateY(100%); animation: slideUp .3s forwards;
-  }
-  @keyframes slideUp { to { transform: translateY(0); } }
-  
-  /* Full width inputs on mobile */
-  .sa-fld { width: 100%; }
-  .sa-form-row, .sa-form-row-3 { grid-template-columns: 1fr; gap: 12px; }
-  
-  /* Hero adjustments */
-  .sa-hero-actions { width: 100%; }
-  .sa-hero-actions button { flex: 1; justify-content: center; }
-}
-
-/* ─── Form Elements ─────────────────────────────────────────────── */
-.sa-fld { margin-bottom: 14px; }
-.sa-flbl { display:block; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
-.sa-input, .sa-select, .sa-textarea {
-  width:100%; padding:10px 12px; background:var(--p-pale);
-  border:1px solid var(--border); border-radius:8px;
-  font-family:'DM Sans',sans-serif; font-size:14px; color:var(--ink);
-  transition: all .2s; min-height: 44px; /* Touch friendly */
-}
-.sa-input:focus, .sa-select:focus, .sa-textarea:focus {
-  border-color:var(--p); outline:none; box-shadow:0 0 0 3px var(--p-wash);
-}
-.sa-textarea { min-height: 100px; resize: vertical; }
-
-/* ─── Utilities ─────────────────────────────────────────────────── */
-.text-truncate { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.flex-between { display:flex; justify-content:space-between; align-items:center; }
-.gap-2 { gap: 8px; }
-.mt-2 { margin-top: 8px; }
-
-/* Scrollbar hiding for clean look (optional) */
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      :root {
+        --ink: #0d0209; --p: #730042; --p-dark: #4a0029; --p-deep: #2a0017;
+        --p-mid: #9e0058; --p-light: #cd166e; --p-wash: #f7ecf3; --p-pale: #fdf5f9;
+        --border: #e8d5e2; --surface: #ffffff; --muted: #7a5568; --light: #c499b4;
+        --green: #0d9e6e; --red: #d93025; --gold: #b8760a; --amber: #f59e0b;
+        --blue: #2563eb; --sh: 0 2px 12px rgba(115,0,66,.08);
+        --sh-lg: 0 16px 48px rgba(115,0,66,.16); --r: 14px; --r-sm: 8px;
+        font-family: 'DM Sans', sans-serif;
+      }
+      *, *::before, *::after { box-sizing: border-box; }
+      .sa { background: var(--p-pale); min-height: 100vh; padding: 24px 28px; font-family: 'DM Sans', sans-serif; color: var(--ink); }
+      .sa-hero { background: linear-gradient(135deg, var(--p-deep) 0%, var(--p-dark) 35%, var(--p) 65%, var(--p-light) 100%); border-radius: var(--r); padding: 32px 40px; margin-bottom: 26px; position: relative; overflow: hidden; box-shadow: var(--sh-lg); }
+      .sa-hero::before { content:''; position:absolute; width:500px; height:500px; border-radius:50%; top:-250px; right:-120px; background:rgba(255,255,255,.04); pointer-events:none; }
+      .sa-hero::after { content:''; position:absolute; width:320px; height:320px; border-radius:50%; bottom:-180px; left:42%; background:rgba(255,255,255,.03); pointer-events:none; }
+      .sa-hero-badge { display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2); border-radius:99px; padding:4px 14px 4px 8px; font-size:11px; color:rgba(255,255,255,.85); letter-spacing:.5px; font-weight:600; text-transform:uppercase; margin-bottom:14px; }
+      .sa-hero-badge-dot { width:6px; height:6px; border-radius:50%; background:#4ade80; box-shadow:0 0 6px #4ade80; }
+      .sa-hero-title { font-family:'Playfair Display',serif; font-size:clamp(28px,3.5vw,42px); color:#fff; margin:0 0 8px; font-weight:800; line-height:1.05; letter-spacing:-.5px; }
+      .sa-hero-sub { font-size:13px; color:rgba(255,255,255,.6); font-weight:300; max-width:560px; line-height:1.65; }
+      .sa-hero-chips { display:flex; gap:10px; margin-top:22px; flex-wrap:wrap; }
+      .sa-chip { background:rgba(255,255,255,.13); border:1px solid rgba(255,255,255,.2); border-radius:99px; padding:6px 16px; font-size:12px; color:rgba(255,255,255,.9); font-weight:500; backdrop-filter:blur(4px); }
+      .sa-hero-actions { position:absolute; top:28px; right:36px; display:flex; gap:10px; }
+      .sa-hero-action-btn { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.25); color:#fff; padding:8px 16px; border-radius:var(--r-sm); font-size:12px; font-weight:600; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all .2s; display:flex; align-items:center; gap:6px; }
+      .sa-hero-action-btn:hover { background:rgba(255,255,255,.25); }
+      .sa-stats { display:grid; grid-template-columns:repeat(5,1fr); gap:16px; margin-bottom:26px; }
+      @media(max-width:1200px){ .sa-stats { grid-template-columns:repeat(3,1fr); } }
+      @media(max-width:760px) { .sa-stats { grid-template-columns:repeat(2,1fr); } }
+      .sa-stat { background:var(--surface); border-radius:var(--r); border:1px solid var(--border); padding:20px 18px 16px; box-shadow:var(--sh); position:relative; overflow:hidden; transition:transform .2s,box-shadow .2s; }
+      .sa-stat:hover { transform:translateY(-3px); box-shadow:var(--sh-lg); }
+      .sa-stat-accent { position:absolute; top:0; left:0; right:0; height:3px; }
+      .sa-stat-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:16px; margin-bottom:14px; }
+      .sa-stat-lbl { font-size:11px; font-weight:600; letter-spacing:.7px; text-transform:uppercase; color:var(--muted); margin-bottom:4px; }
+      .sa-stat-val { font-family:'Playfair Display',serif; font-size:34px; line-height:1; color:var(--ink); font-weight:700; }
+      .sa-stat-sub { font-size:11px; margin-top:7px; font-weight:500; }
+      .sa-stat-bar { height:3px; background:var(--border); border-radius:99px; margin-top:10px; overflow:hidden; }
+      .sa-stat-fill { height:100%; border-radius:99px; transition:width .9s cubic-bezier(.4,0,.2,1); }
+      .sa-panel { background:var(--surface); border-radius:var(--r); border:1px solid var(--border); box-shadow:var(--sh); overflow:hidden; }
+      .sa-panel-head { padding:16px 22px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+      .sa-panel-title { font-family:'Playfair Display',serif; font-size:17px; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:9px; }
+      .sa-live-dot { width:8px; height:8px; border-radius:50%; background:var(--green); animation:lp 2s infinite; flex-shrink:0; }
+      @keyframes lp { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.4)} }
+      .sa-map-wrap { height:300px; position:relative; }
+      .sa-map-foot { padding:11px 20px; background:var(--p-wash); border-top:1px solid var(--border); display:flex; gap:20px; align-items:center; flex-wrap:wrap; }
+      .sa-leg { display:flex; align-items:center; gap:7px; font-size:11px; color:var(--muted); }
+      .sa-leg-dot { width:10px; height:10px; border-radius:50%; border:2px solid white; box-shadow:0 1px 4px rgba(0,0,0,.2); }
+      .sa-mid-grid { display:grid; grid-template-columns:1fr 360px; gap:20px; margin-bottom:26px; }
+      @media(max-width:1050px){ .sa-mid-grid { grid-template-columns:1fr; } }
+      .sa-lower-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:26px; }
+      @media(max-width:900px){ .sa-lower-grid { grid-template-columns:1fr; } }
+      .sa-leave-scroll { overflow-y:auto; max-height:360px; }
+      .sa-leave-scroll::-webkit-scrollbar { width:4px; }
+      .sa-leave-scroll::-webkit-scrollbar-thumb { background:var(--border); border-radius:99px; }
+      .sa-leave-item { padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:flex-start; gap:12px; transition:background .15s; }
+      .sa-leave-item:hover { background:var(--p-pale); }
+      .sa-leave-item:last-child { border-bottom:none; }
+      .sa-avatar { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:white; flex-shrink:0; }
+      .sa-leave-meta { flex:1; min-width:0; }
+      .sa-leave-name { font-size:13px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .sa-leave-info { font-size:11px; color:var(--muted); margin-top:2px; }
+      .sa-leave-actions { display:flex; gap:6px; margin-top:8px; }
+      .sa-btn-accept { background:#e8f7f1; color:var(--green); border:1px solid #b8e8d4; border-radius:6px; padding:4px 10px; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px; transition:all .15s; font-family:'DM Sans',sans-serif; }
+      .sa-btn-accept:hover { background:var(--green); color:white; }
+      .sa-btn-reject { background:#fbeaea; color:var(--red); border:1px solid #f0c5c5; border-radius:6px; padding:4px 10px; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px; transition:all .15s; font-family:'DM Sans',sans-serif; }
+      .sa-btn-reject:hover { background:var(--red); color:white; }
+      .sa-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); }
+      .sa-tab { padding:10px 18px; font-size:12px; font-weight:600; color:var(--muted); border-bottom:2px solid transparent; cursor:pointer; transition:all .15s; white-space:nowrap; background:none; border-top:none; border-left:none; border-right:none; font-family:'DM Sans',sans-serif; }
+      .sa-tab.active { color:var(--p); border-bottom-color:var(--p); }
+      .sa-tab:hover:not(.active) { color:var(--ink); }
+      .sa-badge { display:inline-flex; align-items:center; font-size:10px; font-weight:700; letter-spacing:.4px; padding:3px 9px; border-radius:99px; }
+      .sa-badge-pending { background:#fff8e1; color:var(--gold); }
+      .sa-badge-approved { background:#e8f7f1; color:var(--green); }
+      .sa-badge-rejected { background:#fbeaea; color:var(--red); }
+      .sa-badge-active { background:#e8f7f1; color:var(--green); }
+      .sa-badge-inactive { background:#f3f4f6; color:#6b7280; }
+      .sa-badge-suspended { background:#fbeaea; color:var(--red); }
+      .sa-badge-role-admin { background:var(--p-wash); color:var(--p); }
+      .sa-badge-role-senior { background:#ede9fe; color:#7c3aed; }
+      .sa-badge-role-official { background:#e0f2fe; color:#0369a1; }
+      .sa-admin-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px; padding:18px; }
+      .sa-admin-card { border:1px solid var(--border); border-radius:var(--r-sm); padding:18px 16px; transition:all .2s; position:relative; }
+      .sa-admin-card:hover { box-shadow:var(--sh); transform:translateY(-2px); background:var(--p-wash); }
+      .sa-admin-ava { width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:700; color:white; background:linear-gradient(135deg,var(--p-dark),var(--p-light)); margin:0 auto 12px; }
+      .sa-admin-name { font-size:13px; font-weight:700; color:var(--ink); text-align:center; }
+      .sa-admin-desg { font-size:11px; color:var(--muted); text-align:center; margin-top:2px; }
+      .sa-admin-email { font-size:10px; color:var(--light); text-align:center; margin-top:4px; }
+      .sa-admin-meta { display:flex; justify-content:center; gap:5px; margin-top:8px; flex-wrap:wrap; }
+      .sa-admin-actions { display:flex; justify-content:center; gap:6px; margin-top:12px; padding-top:10px; border-top:1px solid var(--border); }
+      .sa-emp-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; padding:18px; }
+      .sa-emp-card { border:1px solid var(--border); border-radius:var(--r-sm); padding:14px 12px; display:flex; align-items:center; gap:12px; transition:all .2s; }
+      .sa-emp-card:hover { box-shadow:var(--sh); background:var(--p-wash); }
+      .sa-emp-ava { width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:white; flex-shrink:0; }
+      .sa-emp-name { font-size:13px; font-weight:600; color:var(--ink); line-height:1.2; }
+      .sa-emp-role { font-size:11px; color:var(--muted); margin-top:1px; }
+      .sa-emp-dept { display:inline-block; font-size:10px; font-weight:600; background:var(--p-wash); color:var(--p); padding:2px 7px; border-radius:99px; margin-top:4px; }
+      .sa-dept-item { padding:12px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:14px; }
+      .sa-dept-item:last-child { border-bottom:none; }
+      .sa-dept-name { font-size:12px; font-weight:600; color:var(--ink); width:120px; flex-shrink:0; }
+      .sa-dept-bar-track { flex:1; height:7px; background:var(--border); border-radius:99px; overflow:hidden; }
+      .sa-dept-bar-fill { height:100%; border-radius:99px; background:linear-gradient(90deg,var(--p-dark),var(--p-light)); transition:width 1s ease; }
+      .sa-dept-count { font-size:12px; font-weight:700; color:var(--p); width:32px; text-align:right; flex-shrink:0; }
+      .sa-ann-card { border-radius:var(--r-sm); border:1px solid var(--border); padding:16px; margin:0 18px 12px; transition:all .2s; }
+      .sa-ann-card:hover { box-shadow:var(--sh); transform:translateY(-2px); }
+      .sa-ann-chip { display:inline-block; font-size:10px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; padding:3px 10px; border-radius:99px; margin-bottom:8px; }
+      .chip-general { background:var(--p-wash); color:var(--p); }
+      .chip-urgent { background:#fbeaea; color:var(--red); }
+      .chip-event { background:#e8f7f1; color:var(--green); }
+      .chip-policy { background:#fff8e1; color:var(--gold); }
+      .sa-ann-title { font-size:13px; font-weight:600; color:var(--ink); margin-bottom:5px; }
+      .sa-ann-body { font-size:12px; color:var(--muted); line-height:1.55; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+      .sa-ann-foot { display:flex; gap:6px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border); }
+      .sa-review-form { padding:20px; }
+      .sa-stars { display:flex; gap:6px; margin-bottom:14px; }
+      .sa-star { font-size:22px; cursor:pointer; color:var(--border); transition:color .15s; }
+      .sa-star.active { color:var(--amber); }
+      .sa-btn-p { background:var(--p); color:white; border:none; padding:8px 16px; border-radius:var(--r-sm); font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; font-family:'DM Sans',sans-serif; transition:all .2s; white-space:nowrap; }
+      .sa-btn-p:hover { background:var(--p-dark); transform:translateY(-1px); box-shadow:0 4px 14px rgba(115,0,66,.3); }
+      .sa-btn-p:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+      .sa-btn-ghost { background:none; color:var(--muted); border:1px solid var(--border); padding:8px 16px; border-radius:var(--r-sm); font-size:12px; font-weight:500; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all .2s; white-space:nowrap; }
+      .sa-btn-ghost:hover { border-color:var(--p); color:var(--p); }
+      .sa-icon-btn { background:none; border:none; cursor:pointer; padding:5px 8px; border-radius:5px; font-size:12px; color:var(--light); transition:all .15s; display:flex; align-items:center; gap:4px; font-family:'DM Sans',sans-serif; }
+      .sa-icon-btn:hover { background:var(--p-wash); color:var(--p); }
+      .sa-icon-btn.del:hover { background:#fbeaea; color:var(--red); }
+      .sa-search-wrap { position:relative; }
+      .sa-search-ico { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--light); font-size:12px; pointer-events:none; }
+      .sa-search-inp { padding:7px 10px 7px 30px; background:var(--p-pale); border:1px solid var(--border); border-radius:var(--r-sm); font-size:12px; color:var(--ink); font-family:'DM Sans',sans-serif; outline:none; width:200px; transition:all .15s; }
+      .sa-search-inp:focus { border-color:var(--p); box-shadow:0 0 0 3px var(--p-wash); width:240px; }
+      .sa-overlay { position:fixed; inset:0; background:rgba(13,2,9,.65); backdrop-filter:blur(6px); z-index:1000; display:flex; align-items:center; justify-content:center; padding:20px; animation:saov .18s; }
+      @keyframes saov { from{opacity:0} to{opacity:1} }
+      .sa-modal { background:var(--surface); border-radius:var(--r); width:100%; max-width:520px; box-shadow:var(--sh-lg); animation:samup .22s; max-height:90vh; overflow-y:auto; }
+      .sa-modal-lg { max-width:680px; }
+      @keyframes samup { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+      .sa-modal-hd { padding:22px 26px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; background:var(--surface); z-index:1; }
+      .sa-modal-title { font-family:'Playfair Display',serif; font-size:20px; font-weight:700; color:var(--ink); }
+      .sa-modal-x { background:none; border:none; cursor:pointer; color:var(--muted); font-size:15px; padding:5px; border-radius:6px; transition:all .15s; }
+      .sa-modal-x:hover { background:var(--p-wash); color:var(--p); }
+      .sa-modal-bd { padding:22px 26px; }
+      .sa-modal-ft { padding:14px 26px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px; position:sticky; bottom:0; background:var(--surface); }
+      .sa-modal-section { font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--p); margin:18px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--p-wash); }
+      .sa-modal-section:first-child { margin-top:0; }
+      .sa-fld { margin-bottom:16px; }
+      .sa-flbl { display:block; font-size:11px; font-weight:600; letter-spacing:.6px; text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
+      .sa-finp, .sa-fsel, .sa-ftxt { width:100%; padding:10px 12px; background:var(--p-pale); border:1px solid var(--border); border-radius:var(--r-sm); font-size:13px; color:var(--ink); font-family:'DM Sans',sans-serif; outline:none; transition:border-color .15s,box-shadow .15s; }
+      .sa-finp:focus, .sa-fsel:focus, .sa-ftxt:focus { border-color:var(--p); box-shadow:0 0 0 3px var(--p-wash); }
+      .sa-ftxt { resize:vertical; min-height:80px; line-height:1.6; }
+      .sa-form-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+      .sa-form-row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
+      .sa-empty { text-align:center; padding:36px 20px; color:var(--light); }
+      .sa-empty-ico { font-size:28px; margin-bottom:10px; }
+      .sa-empty p { font-size:13px; margin:0; }
+      @keyframes mPulse { 0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.5} 50%{transform:translate(-50%,-50%) scale(2.4);opacity:0} }
     `;
     document.head.appendChild(style);
     return () => {
@@ -419,7 +185,6 @@ const useStyles = () => {
   }, []);
 };
 
-/* ─── Helpers (unchanged) ──────────────────────────────────────── */
 const initials = (name = "") =>
   (name || "").trim().split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
 
@@ -450,14 +215,13 @@ const leaveTypeColor = (type = "") => {
 const AVATAR_COLORS = ["#730042","#9e0058","#4a0029","#2563eb","#0d9e6e","#7c3aed","#b8760a","#d93025"];
 const avaColor = (str = "") => AVATAR_COLORS[(str.charCodeAt(0) || 0) % AVATAR_COLORS.length];
 
-const DEPT_OPTIONS    = ["OPR", "BPO", "ENG", "HR", "MGMT"];
-const OFFICE_OPTIONS  = ["Noida", "Bareilly", "Delhi", "Mumbai"];
-const ROLE_OPTIONS    = ["admin", "senior_admin", "official"];
-const ROLE_LABEL      = { admin: "Admin", senior_admin: "Senior Admin", official: "Official" };
+const DEPT_OPTIONS = ["OPR", "BPO", "ENG", "HR", "MGMT"];
+const OFFICE_OPTIONS = ["Noida", "Bareilly", "Delhi", "Mumbai"];
+const ROLE_OPTIONS = ["admin", "senior_admin", "official"];
+const ROLE_LABEL = { admin: "Admin", senior_admin: "Senior Admin", official: "Official" };
 
-/* ─── Attendance Map (unchanged logic, responsive container) ───── */
 const AttendanceMap = ({ checkins = [], loading }) => {
-  const mapRef  = useRef(null);
+  const mapRef = useRef(null);
   const instRef = useRef(null);
   const markRef = useRef([]);
 
@@ -553,7 +317,6 @@ const AttendanceMap = ({ checkins = [], loading }) => {
   );
 };
 
-/* ─── Announcement Modal (unchanged logic) ──────────────────────── */
 const AnnModal = ({ open, onClose, initial, onSave, loading }) => {
   const [form, setForm] = useState({ title: "", message: "", audience: "all", priority: "normal" });
   useEffect(() => {
@@ -608,7 +371,6 @@ const AnnModal = ({ open, onClose, initial, onSave, loading }) => {
   );
 };
 
-/* ─── Countries list (unchanged) ───────────────────────────────── */
 const COUNTRIES = [
   "Afghanistan","Albania","Algeria","Andorra","Angola","Antigua and Barbuda","Argentina","Armenia","Australia","Austria",
   "Azerbaijan","Bahamas","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin","Bhutan",
@@ -632,26 +394,9 @@ const COUNTRIES = [
   "Venezuela","Vietnam","Yemen","Zambia","Zimbabwe",
 ];
 
-/* ─── Admin Modal (exact original) ─────────────────────────────── */
 const AdminModal = ({ open, onClose, initial, onSave, loading }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const passwordRegex =
-  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&^#()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
-  const handleSubmit = async (e) => {
-  e.preventDefault();
-
-  if (!validatePassword(form.password)) {
-    alert(
-      "Password must contain at least 8 characters, one uppercase letter, one lowercase letter, one number and one special character."
-    );
-    return;
-  }
-
-
-};
-
-  const validatePassword = (password) => passwordRegex.test(password);
 
   // All keys match backend field names exactly as destructured in createAdmin controller
   const blank = {
@@ -761,121 +506,54 @@ const AdminModal = ({ open, onClose, initial, onSave, loading }) => {
           </div>
 
           {/* Password fields — create only */}
-         {/* Password fields — create only */}
-{!initial && (
-  <>
-    <div className="sa-fld">
-      <label className="sa-flbl">Password *</label>
+          {!initial && (
+            <>
+              <div className="sa-fld">
+                <label className="sa-flbl">Password *</label>
+                <div style={{ position: "relative" }}>
+                  <input
+                    className="sa-finp"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Temporary password"
+                    value={form.password}
+                    onChange={set("password")}
+                    style={{ paddingRight: "45px" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    style={{ position:"absolute", right:"14px", top:"50%", transform:"translateY(-50%)", background:"transparent", border:"none", cursor:"pointer", display:"flex", alignItems:"center", color:"#6b7280" }}
+                  >
+                    {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                  </button>
+                </div>
+              </div>
 
-      <div style={{ position: "relative" }}>
-        <input
-          className="sa-finp"
-          type={showPassword ? "text" : "password"}
-          placeholder="Enter Password"
-          value={form.password}
-          onChange={set("password")}
-          style={{ paddingRight: "45px" }}
-        />
-
-        <button
-          type="button"
-          onClick={() => setShowPassword((v) => !v)}
-          style={{
-            position: "absolute",
-            right: "14px",
-            top: "50%",
-            transform: "translateY(-50%)",
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            color: "#6b7280",
-            zIndex: 1,
-          }}
-        >
-          {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
-        </button>
-      </div>
-
-      {form.password && !validatePassword(form.password) && (
-        <p
-          style={{
-            color: "#dc2626",
-            fontSize: "12px",
-            marginTop: "6px",
-            lineHeight: "1.5",
-          }}
-        >
-          Password must contain:
-          <br />
-          • 1 uppercase letter
-          <br />
-          • 1 lowercase letter
-          <br />
-          • 1 number
-          <br />
-          • 1 special character
-          <br />
-          • Minimum 8 characters
-        </p>
-      )}
-    </div>
-
-    <div className="sa-fld">
-      <label className="sa-flbl">Confirm Password *</label>
-<div
-  style={{
-    position: "relative",
-    display: "flex",
-    alignItems: "center",
-  }}
->
-  <input
-    className="sa-finp"
-    type={showPassword ? "text" : "password"}
-    placeholder="Confirm Password"
-    value={form.confirmPassword}
-    onChange={set("confirmPassword")}
-    style={{
-      paddingRight: "45px",
-      width: "100%",
-      boxSizing: "border-box",
-    }}
-  />
-
-  <button
-    type="button"
-    onClick={() => setShowPassword((v) => !v)}
-    style={{
-      position: "absolute",
-      right: "14px",
-      top: "50%",
-      transform: "translateY(-50%)",
-      background: "transparent",
-      border: "none",
-      cursor: "pointer",
-      padding: 0,
-      zIndex: 2,
-    }}
-  >
-    {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
-  </button>
-</div>
-      {form.confirmPassword && !passwordsMatch && (
-        <p
-          style={{
-            color: "#ef4444",
-            fontSize: "13px",
-            marginTop: "6px",
-          }}
-        >
-          Passwords do not match
-        </p>
-      )}
-    </div>
-  </>
-)}
+              <div className="sa-fld">
+                <label className="sa-flbl">Confirm Password *</label>
+                <div style={{ position: "relative" }}>
+                  <input
+                    className="sa-finp"
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Confirm password"
+                    value={form.confirmPassword}
+                    onChange={set("confirmPassword")}
+                    style={{ paddingRight: "45px" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((v) => !v)}
+                    style={{ position:"absolute", right:"14px", top:"50%", transform:"translateY(-50%)", background:"transparent", border:"none", cursor:"pointer", display:"flex", alignItems:"center", color:"#6b7280" }}
+                  >
+                    {showConfirmPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                  </button>
+                </div>
+                {form.confirmPassword && !passwordsMatch && (
+                  <p style={{ color: "#ef4444", fontSize: "13px", marginTop: "6px" }}>Passwords do not match</p>
+                )}
+              </div>
+            </>
+          )}
 
           <div className="sa-form-row">
             <div className="sa-fld">
@@ -907,6 +585,7 @@ const AdminModal = ({ open, onClose, initial, onSave, loading }) => {
             </div>
           </div>
 
+          {/* ── Work Details ── */}
           <div className="sa-modal-section">Work Details</div>
           <div className="sa-form-row">
             <div className="sa-fld">
@@ -938,6 +617,7 @@ const AdminModal = ({ open, onClose, initial, onSave, loading }) => {
             </div>
           </div>
 
+          {/* ── Experience ── */}
           <div className="sa-modal-section">Experience</div>
           <div className="sa-form-row">
             <div className="sa-fld" style={{ display:"flex", alignItems:"center", gap:10, paddingTop:22 }}>
@@ -963,6 +643,7 @@ const AdminModal = ({ open, onClose, initial, onSave, loading }) => {
             </div>
           )}
 
+          {/* ── Identity & Address ── */}
           <div className="sa-modal-section">Identity & Address</div>
           <div className="sa-form-row">
             <div className="sa-fld">
@@ -975,6 +656,7 @@ const AdminModal = ({ open, onClose, initial, onSave, loading }) => {
             </div>
           </div>
 
+          {/* Residential + Permanent — combined into backend `address` on save */}
           <div className="sa-fld">
             <label className="sa-flbl">Residential Address</label>
             <input className="sa-finp" placeholder="Current / residential street, locality" value={form.residential_address} onChange={set("residential_address")} />
@@ -1008,6 +690,7 @@ const AdminModal = ({ open, onClose, initial, onSave, loading }) => {
             </select>
           </div>
 
+          {/* ── Banking (optional) ── */}
           <div className="sa-modal-section">Banking Details <span style={{ fontWeight:400, textTransform:"none", letterSpacing:0, fontSize:10 }}>(optional)</span></div>
           <div className="sa-form-row">
             <div className="sa-fld">
@@ -1091,57 +774,57 @@ const ReviewModal = ({ open, onClose, admins, onSave, loading }) => {
 
 const roleBadgeClass = (role = "") => {
   if (role === "senior_admin") return "sa-badge sa-badge-role-senior";
-  if (role === "official")     return "sa-badge sa-badge-role-official";
+  if (role === "official") return "sa-badge sa-badge-role-official";
   return "sa-badge sa-badge-role-admin";
 };
 
-/* ─── Main Dashboard ────────────────────────────────────────────── */
 function SuperAdminDashboard() {
   useStyles();
 
-  const [greeting, setGreeting]   = useState("");
-  const [thought,  setThought]    = useState("");
-  const [annModal,   setAnnModal]   = useState({ open: false, editing: null });
+  const [greeting, setGreeting] = useState("");
+  const [thought, setThought] = useState("");
+  const [annModal, setAnnModal] = useState({ open: false, editing: null });
   const [adminModal, setAdminModal] = useState({ open: false, editing: null });
   const [reviewModal, setReviewModal] = useState(false);
-  const [leaveTab,  setLeaveTab]  = useState("employee");
+  const [leaveTab, setLeaveTab] = useState("employee");
   const [empExpand, setEmpExpand] = useState(false);
   const [empSearch, setEmpSearch] = useState("");
 
-  const { data: meData }                             = useGetMeSuperAdmin();
+  const { data: meData } = useGetMeSuperAdmin();
   const { data: checkinData, isLoading: mapLoading } = useGetTodayCheckins();
-  const { data: adminsData,  isLoading: adminsLoading } = useGetAllAdmins();
-  const { data: empData,     isLoading: empLoading }    = useGetAllEmployees();
-  const { data: deptData,    isLoading: deptLoading }   = useGetNoOfEmployees();
-  const { data: leavesRaw,   isLoading: leaveLoading }  = useShowAllLeaves();
-  const { data: annRaw,      isLoading: annLoading }    = useGetAllAnnouncements();
+  const { data: adminsData, isLoading: adminsLoading } = useGetAllAdmins();
+  const { data: empData, isLoading: empLoading } = useGetAllEmployees();
+  const { data: deptData, isLoading: deptLoading } = useGetNoOfEmployees();
+  const { data: leavesRaw, isLoading: leaveLoading } = useShowAllLeaves();
+  const { data: annRaw, isLoading: annLoading } = useGetAllAnnouncements();
 
-  const { mutate: createAnn,   isPending: creatingAnn }  = useCreateAnnouncement();
-  const { mutate: updateAnn,   isPending: updatingAnn }  = useUpdateAnnouncement();
-  const { mutate: deleteAnn }                            = useDeleteAnnouncement();
+  const { mutate: createAnn, isPending: creatingAnn } = useCreateAnnouncement();
+  const { mutate: updateAnn, isPending: updatingAnn } = useUpdateAnnouncement();
+  const { mutate: deleteAnn } = useDeleteAnnouncement();
   const { mutate: createAdmin, isPending: creatingAdmin } = useCreateAdmin();
   const { mutate: updateAdmin, isPending: updatingAdmin } = useUpdateAdmin();
-  const { mutate: deleteAdmin }                           = useDeleteAdmin();
-  const { mutate: acceptLeave, isPending: accepting }    = useAcceptLeaveByAdmin();
-  const { mutate: rejectLeave, isPending: rejecting }    = useRejectLeaveByAdmin();
-  const { mutate: reviewAdmin, isPending: reviewing }    = useReviewToAdmin();
+  const { mutate: deleteAdmin } = useDeleteAdmin();
+  const { mutate: acceptLeave, isPending: accepting } = useAcceptLeaveByAdmin();
+  const { mutate: rejectLeave, isPending: rejecting } = useRejectLeaveByAdmin();
+  const { mutate: reviewAdmin, isPending: reviewing } = useReviewToAdmin();
 
-  const superAdmin    = meData?.superAdmin || meData || {};
-  const checkins      = checkinData?.checkins ?? [];
-  const presentToday  = checkinData?.total ?? checkins.length;
-  const stillOnDuty   = checkins.filter((c) => !c.checkedOut).length;
-  const admins        = Array.isArray(adminsData?.admins) ? adminsData.admins : Array.isArray(adminsData) ? adminsData : [];
-  const employees     = Array.isArray(empData?.users) ? empData.users : Array.isArray(empData) ? empData : [];
-  const departments   = Array.isArray(deptData?.departments) ? deptData.departments : [];
+  const superAdmin = meData?.superAdmin || meData || {};
+  const checkins = checkinData?.checkins ?? [];
+  const presentToday = checkinData?.total ?? checkins.length;
+  const stillOnDuty = checkins.filter((c) => !c.checkedOut).length;
+  const admins = Array.isArray(adminsData?.admins) ? adminsData.admins : Array.isArray(adminsData) ? adminsData : [];
+  const employees = Array.isArray(empData?.users) ? empData.users : Array.isArray(empData) ? empData : [];
+  const departments = Array.isArray(deptData?.departments) ? deptData.departments : [];
   const totalEmpCount = deptData?.totalEmployees ?? employees.length;
   const announcements = Array.isArray(annRaw?.announcements) ? annRaw.announcements : Array.isArray(annRaw) ? annRaw : [];
-  const empLeaves     = Array.isArray(leavesRaw?.employeeLeaves?.leaves) ? leavesRaw.employeeLeaves.leaves : [];
-  const adminLeaves   = Array.isArray(leavesRaw?.adminLeaves?.leaves)    ? leavesRaw.adminLeaves.leaves    : [];
-  const activeLeaves  = leaveTab === "employee" ? empLeaves : adminLeaves;
+  const empLeaves = Array.isArray(leavesRaw?.employeeLeaves?.leaves) ? leavesRaw.employeeLeaves.leaves : [];
+  const adminLeaves = Array.isArray(leavesRaw?.adminLeaves?.leaves) ? leavesRaw.adminLeaves.leaves : [];
+  const activeLeaves = leaveTab === "employee" ? empLeaves : adminLeaves;
 
-  const pendingLeaves =
-    empLeaves.filter((l) => { const s = (l.status||"").toLowerCase(); return s.includes("forwarded")||s.includes("pending"); }).length +
-    adminLeaves.filter((l) => (l.status||"").includes("pending")).length;
+  const pendingLeaves = empLeaves.filter((l) => {
+    const s = (l.status || "").toLowerCase();
+    return s.includes("forwarded") || s.includes("pending");
+  }).length + adminLeaves.filter((l) => (l.status || "").includes("pending")).length;
 
   const attendanceRate = totalEmpCount > 0 ? Math.round((presentToday / totalEmpCount) * 100) : 0;
 
@@ -1167,61 +850,70 @@ function SuperAdminDashboard() {
   const maxDept = Math.max(...departments.map((d) => d.lastNumber), 1);
 
   const filteredEmp = employees.filter((e) => {
-    const q    = empSearch.toLowerCase();
+    const q = empSearch.toLowerCase();
     const name = [e.f_name, e.l_name].filter(Boolean).join(" ").toLowerCase();
-    return !q || name.includes(q) || (e.department||"").toLowerCase().includes(q) || (e.work_email||"").toLowerCase().includes(q);
+    return !q || name.includes(q) || (e.department || "").toLowerCase().includes(q) || (e.work_email || "").toLowerCase().includes(q);
   });
   const displayEmp = empExpand ? filteredEmp : filteredEmp.slice(0, 10);
 
   const stats = [
-    { icon:<FaUserShield />, label:"Total Admins",    value:adminsLoading?"—":admins.length,       sub:`${admins.filter((a)=>a.status==="active").length} active`, color:"#730042", bgColor:"#f7ecf3", bar:null },
-    { icon:<FaUsers />,      label:"Total Employees", value:deptLoading||empLoading?"—":totalEmpCount, sub:`${departments.length} departments`, color:"#2563eb", bgColor:"#eff6ff", bar:null },
-    { icon:<FaClock />,      label:"Present Today",   value:mapLoading?"—":presentToday,           sub:`${attendanceRate}% · ${stillOnDuty} on duty`, color:"#0d9e6e", bgColor:"#e8f7f1", bar:mapLoading?null:attendanceRate },
-    { icon:<FaCalendarAlt />,label:"Pending Leaves",  value:leaveLoading?"—":pendingLeaves,         sub:pendingLeaves>0?"Needs attention":"All clear ✓", color:pendingLeaves>0?"#b8760a":"#0d9e6e", bgColor:pendingLeaves>0?"#fff8e1":"#e8f7f1", bar:null },
-    { icon:<FaBullhorn />,   label:"Announcements",   value:annLoading?"—":announcements.length,   sub:"Active broadcasts", color:"#7c3aed", bgColor:"#f5f3ff", bar:null },
+    { icon: <FaUserShield />, label: "Total Admins", value: adminsLoading ? "—" : admins.length, sub: `${admins.filter((a) => a.status === "active").length} active`, color: "#730042", bgColor: "#f7ecf3", bar: null },
+    { icon: <FaUsers />, label: "Total Employees", value: deptLoading || empLoading ? "—" : totalEmpCount, sub: `${departments.length} departments`, color: "#2563eb", bgColor: "#eff6ff", bar: null },
+    { icon: <FaClock />, label: "Present Today", value: mapLoading ? "—" : presentToday, sub: `${attendanceRate}% · ${stillOnDuty} on duty`, color: "#0d9e6e", bgColor: "#e8f7f1", bar: mapLoading ? null : attendanceRate },
+    { icon: <FaCalendarAlt />, label: "Pending Leaves", value: leaveLoading ? "—" : pendingLeaves, sub: pendingLeaves > 0 ? "Needs attention" : "All clear ✓", color: pendingLeaves > 0 ? "#b8760a" : "#0d9e6e", bgColor: pendingLeaves > 0 ? "#fff8e1" : "#e8f7f1", bar: null },
+    { icon: <FaBullhorn />, label: "Announcements", value: annLoading ? "—" : announcements.length, sub: "Active broadcasts", color: "#7c3aed", bgColor: "#f5f3ff", bar: null },
   ];
 
   const saveAnn = (form) => {
     if (annModal.editing) {
-      updateAnn({ id:annModal.editing._id, data:form }, { onSuccess:()=>setAnnModal({open:false,editing:null}) });
+      updateAnn({ id: annModal.editing._id, data: form }, { onSuccess: () => setAnnModal({ open: false, editing: null }) });
     } else {
-      createAnn(form, { onSuccess:()=>setAnnModal({open:false,editing:null}) });
+      createAnn(form, { onSuccess: () => setAnnModal({ open: false, editing: null }) });
     }
   };
 
   const saveAdmin = (form) => {
     if (adminModal.editing) {
-      updateAdmin({ id:adminModal.editing._id, data:form }, { onSuccess:()=>setAdminModal({open:false,editing:null}) });
+      updateAdmin({ id: adminModal.editing._id, data: form }, { onSuccess: () => setAdminModal({ open: false, editing: null }) });
     } else {
-      createAdmin(form, { onSuccess:()=>setAdminModal({open:false,editing:null}) });
+      createAdmin(form, { onSuccess: () => setAdminModal({ open: false, editing: null }) });
     }
   };
 
-  const handleAcceptLeave = (leave) => acceptLeave({ id:leave._id, leaveFor:leaveTab==="admin"?"admin":"employee" });
-  const handleRejectLeave = (leave) => rejectLeave({ id:leave._id, leaveFor:leaveTab==="admin"?"admin":"employee" });
-  const saveReview = (form) => reviewAdmin(form, { onSuccess:()=>setReviewModal(false) });
+  const handleAcceptLeave = (leave) => {
+    acceptLeave({ id: leave._id, leaveFor: leaveTab === "admin" ? "admin" : "employee" });
+  };
 
-  const leaveStatusClass = (status="") => {
+  const handleRejectLeave = (leave) => {
+    rejectLeave({ id: leave._id, leaveFor: leaveTab === "admin" ? "admin" : "employee" });
+  };
+
+  const saveReview = (form) => {
+    reviewAdmin(form, { onSuccess: () => setReviewModal(false) });
+  };
+
+  const leaveStatusClass = (status = "") => {
     const s = status.toLowerCase();
     if (s.includes("approved")) return "sa-badge sa-badge-approved";
     if (s.includes("rejected")) return "sa-badge sa-badge-rejected";
     return "sa-badge sa-badge-pending";
   };
-  const leaveStatusLabel = (status="") => {
+
+  const leaveStatusLabel = (status = "") => {
     if (status.includes("approved")) return "Approved";
     if (status.includes("rejected")) return "Rejected";
-    if (status.includes("forwarded")||status.includes("pending")) return "Pending";
+    if (status.includes("forwarded") || status.includes("pending")) return "Pending";
     return status;
   };
+
   const isPendingLeave = (leave) => {
-    const s = (leave.status||"").toLowerCase();
-    return s.includes("forwarded")||s.includes("pending");
+    const s = (leave.status || "").toLowerCase();
+    return s.includes("forwarded") || s.includes("pending");
   };
 
   return (
     <div className="sa">
 
-      {/* ── Hero ─────────────────────────────────────────────── */}
       <div className="sa-hero">
         <div className="sa-hero-badge">
           <div className="sa-hero-badge-dot" />
@@ -1236,36 +928,33 @@ function SuperAdminDashboard() {
           {pendingLeaves > 0 && <span className="sa-chip">📋 {pendingLeaves} Leave{pendingLeaves !== 1 ? "s" : ""} Pending</span>}
           <span className="sa-chip">📆 {today}</span>
         </div>
-        {/* On phones this becomes static (flex) via CSS breakpoint */}
         <div className="sa-hero-actions">
-          <button className="sa-hero-action-btn" onClick={() => setAdminModal({ open:true, editing:null })}>
-            <FaPlus style={{ fontSize:10 }} /> Add Admin
+          <button className="sa-hero-action-btn" onClick={() => setAdminModal({ open: true, editing: null })}>
+            <FaPlus style={{ fontSize: 10 }} /> Add Admin
           </button>
           <button className="sa-hero-action-btn" onClick={() => setReviewModal(true)}>
-            <FaStar style={{ fontSize:10 }} /> Review Admin
+            <FaStar style={{ fontSize: 10 }} /> Review Admin
           </button>
         </div>
       </div>
 
-      {/* ── Stats ────────────────────────────────────────────── */}
       <div className="sa-stats">
         {stats.map((s, i) => (
           <div className="sa-stat" key={i}>
-            <div className="sa-stat-accent" style={{ background:`linear-gradient(90deg, ${s.color}cc, ${s.color}55)` }} />
-            <div className="sa-stat-icon" style={{ background:s.bgColor, color:s.color }}>{s.icon}</div>
+            <div className="sa-stat-accent" style={{ background: `linear-gradient(90deg, ${s.color}cc, ${s.color}55)` }} />
+            <div className="sa-stat-icon" style={{ background: s.bgColor, color: s.color }}>{s.icon}</div>
             <div className="sa-stat-lbl">{s.label}</div>
             <div className="sa-stat-val">{s.value}</div>
-            <p className="sa-stat-sub" style={{ color:s.color }}>{s.sub}</p>
+            <p className="sa-stat-sub" style={{ color: s.color }}>{s.sub}</p>
             {s.bar !== null && (
               <div className="sa-stat-bar">
-                <div className="sa-stat-fill" style={{ width:`${s.bar}%`, background:`linear-gradient(90deg, ${s.color}cc, ${s.color})` }} />
+                <div className="sa-stat-fill" style={{ width: `${s.bar}%`, background: `linear-gradient(90deg, ${s.color}cc, ${s.color})` }} />
               </div>
             )}
           </div>
         ))}
       </div>
 
-      {/* ── Map + Leaves ─────────────────────────────────────── */}
       <div className="sa-mid-grid">
         <div className="sa-panel">
           <div className="sa-panel-head">
@@ -1273,77 +962,77 @@ function SuperAdminDashboard() {
               <div className="sa-live-dot" />
               Live Attendance Map
             </div>
-            <span style={{ fontSize:11, color:"var(--light)", fontWeight:500 }}>
-              <FaMapMarkerAlt style={{ marginRight:4 }} />
-              {mapLoading ? "Loading…" : `${checkins.length} check-in${checkins.length!==1?"s":""} today`}
+            <span style={{ fontSize: 11, color: "var(--light)", fontWeight: 500 }}>
+              <FaMapMarkerAlt style={{ marginRight: 4 }} />
+              {mapLoading ? "Loading…" : `${checkins.length} check-in${checkins.length !== 1 ? "s" : ""} today`}
             </span>
           </div>
           <div className="sa-map-wrap">
             <AttendanceMap checkins={checkins} loading={mapLoading} />
           </div>
           <div className="sa-map-foot">
-            <div className="sa-leg"><div className="sa-leg-dot" style={{ background:"#730042" }} />Manager</div>
-            <div className="sa-leg"><div className="sa-leg-dot" style={{ background:"#a0005c" }} />Employee</div>
-            <div className="sa-leg"><div className="sa-leg-dot" style={{ background:"#aaa", opacity:.5 }} />Checked out</div>
-            <span style={{ marginLeft:"auto", fontSize:11, color:"var(--light)" }}>Click pin for details</span>
+            <div className="sa-leg"><div className="sa-leg-dot" style={{ background: "#730042" }} />Manager</div>
+            <div className="sa-leg"><div className="sa-leg-dot" style={{ background: "#a0005c" }} />Employee</div>
+            <div className="sa-leg"><div className="sa-leg-dot" style={{ background: "#aaa", opacity: .5 }} />Checked out</div>
+            <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--light)" }}>Click pin for details</span>
           </div>
         </div>
 
-        <div className="sa-panel" style={{ display:"flex", flexDirection:"column" }}>
+        <div className="sa-panel" style={{ display: "flex", flexDirection: "column" }}>
           <div className="sa-panel-head">
             <div className="sa-panel-title">
-              <FaCalendarAlt style={{ color:"var(--p)", fontSize:14 }} />
+              <FaCalendarAlt style={{ color: "var(--p)", fontSize: 14 }} />
               Leave Requests
             </div>
             {pendingLeaves > 0 && (
-              <span style={{ background:"#fff8e1", color:"var(--gold)", fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:99, border:"1px solid #f0d870", whiteSpace:"nowrap" }}>
+              <span style={{ background: "#fff8e1", color: "var(--gold)", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99, border: "1px solid #f0d870" }}>
                 {pendingLeaves} pending
               </span>
             )}
           </div>
           <div className="sa-tabs">
-            <button className={`sa-tab${leaveTab==="employee"?" active":""}`} onClick={()=>setLeaveTab("employee")}>
-              Employees {empLeaves.length>0&&`(${empLeaves.length})`}
+            <button className={`sa-tab${leaveTab === "employee" ? " active" : ""}`} onClick={() => setLeaveTab("employee")}>
+              Employees {empLeaves.length > 0 && `(${empLeaves.length})`}
             </button>
-            <button className={`sa-tab${leaveTab==="admin"?" active":""}`} onClick={()=>setLeaveTab("admin")}>
-              Admins/Managers {adminLeaves.length>0&&`(${adminLeaves.length})`}
+            <button className={`sa-tab${leaveTab === "admin" ? " active" : ""}`} onClick={() => setLeaveTab("admin")}>
+              Admins/Managers {adminLeaves.length > 0 && `(${adminLeaves.length})`}
             </button>
           </div>
-          <div className="sa-leave-scroll" style={{ flex:1 }}>
+          <div className="sa-leave-scroll" style={{ flex: 1 }}>
             {leaveLoading ? (
               <div className="sa-empty"><div className="sa-empty-ico">⏳</div><p>Loading…</p></div>
             ) : activeLeaves.length === 0 ? (
               <div className="sa-empty">
-                <div className="sa-empty-ico"><FaCheckCircle style={{ color:"var(--green)" }} /></div>
+                <div className="sa-empty-ico"><FaCheckCircle style={{ color: "var(--green)" }} /></div>
                 <p>No leave requests in this category.</p>
               </div>
             ) : (
               activeLeaves.map((leave) => {
-                const emp     = leave.employee || leave.manager || {};
-                const name    = [emp.f_name, emp.l_name].filter(Boolean).join(" ") || leave.name || "Employee";
-                const type    = leave.leaveType || leave.type || "Leave";
-                const from    = leave.startDate || leave.from || "";
-                const to      = leave.endDate   || leave.to   || "";
+                const emp = leave.employee || leave.manager || {};
+                const name = [emp.f_name, emp.l_name].filter(Boolean).join(" ") || leave.name || "Employee";
+                const type = leave.leaveType || leave.type || "Leave";
+                const from = leave.startDate || leave.from || "";
+                const to = leave.endDate || leave.to || "";
                 const pending = isPendingLeave(leave);
                 return (
                   <div key={leave._id} className="sa-leave-item">
-                    <div className="sa-avatar" style={{ background:leaveTypeColor(type) }}>{initials(name)}</div>
+                    <div className="sa-avatar" style={{ background: leaveTypeColor(type) }}>{initials(name)}</div>
                     <div className="sa-leave-meta">
                       <div className="sa-leave-name">{name}</div>
                       <div className="sa-leave-info">
-                        {type.toUpperCase()} · {fmtDate(from)}{to&&to!==from?` → ${fmtDate(to)}`:""}
-                        {emp.designation?` · ${emp.designation}`:""}
+                        {type.toUpperCase()} · {fmtDate(from)}{to && to !== from ? ` → ${fmtDate(to)}` : ""}
+                        {emp.designation ? ` · ${emp.designation}` : ""}
                       </div>
                       {leave.reason && (
-                        <div className="sa-leave-info" style={{ marginTop:2, fontStyle:"italic" }}>"{leave.reason}"</div>
+                        <div className="sa-leave-info" style={{ marginTop: 2, fontStyle: "italic" }}>"{leave.reason}"</div>
                       )}
                       {pending ? (
                         <div className="sa-leave-actions">
-                          <button className="sa-btn-accept" onClick={()=>handleAcceptLeave(leave)} disabled={accepting}><FaCheck /> Approve</button>
-                          <button className="sa-btn-reject" onClick={()=>handleRejectLeave(leave)} disabled={rejecting}><FaBan /> Reject</button>
+                          <button className="sa-btn-accept" onClick={() => handleAcceptLeave(leave)} disabled={accepting}><FaCheck /> Approve</button>
+                          <button className="sa-btn-reject" onClick={() => handleRejectLeave(leave)} disabled={rejecting}><FaBan /> Reject</button>
                         </div>
                       ) : (
-                        <div style={{ marginTop:6 }}>
+                        <div style={{ marginTop: 6 }}>
                           <span className={leaveStatusClass(leave.status)}>{leaveStatusLabel(leave.status)}</span>
                         </div>
                       )}
@@ -1356,20 +1045,18 @@ function SuperAdminDashboard() {
         </div>
       </div>
 
-      {/* ── Admin Management ─────────────────────────────────── */}
-      <div className="sa-panel" style={{ marginBottom:22 }}>
+      <div className="sa-panel" style={{ marginBottom: 26 }}>
         <div className="sa-panel-head">
           <div className="sa-panel-title">
-            <FaUserCog style={{ color:"var(--p)", fontSize:15 }} />
+            <FaUserCog style={{ color: "var(--p)", fontSize: 15 }} />
             Admin Management
           </div>
-          {/* Wrapped in sa-head-actions for flex-wrap on narrow screens */}
-          <div className="sa-head-actions">
-            <button className="sa-btn-ghost" style={{ fontSize:11, padding:"6px 12px" }} onClick={()=>setReviewModal(true)}>
-              <FaStar style={{ fontSize:10, marginRight:4 }} /> Review Admin
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <button className="sa-btn-ghost" style={{ fontSize: 11, padding: "6px 12px" }} onClick={() => setReviewModal(true)}>
+              <FaStar style={{ fontSize: 10, marginRight: 4 }} /> Review Admin
             </button>
-            <button className="sa-btn-p" onClick={()=>setAdminModal({open:true,editing:null})}>
-              <FaPlus style={{ fontSize:10 }} /> Add Admin
+            <button className="sa-btn-p" onClick={() => setAdminModal({ open: true, editing: null })}>
+              <FaPlus style={{ fontSize: 10 }} /> Add Admin
             </button>
           </div>
         </div>
@@ -1383,22 +1070,22 @@ function SuperAdminDashboard() {
         ) : (
           <div className="sa-admin-grid">
             {admins.map((admin) => {
-              const name      = [admin.f_name, admin.l_name].filter(Boolean).join(" ");
-              const statusKey = (admin.status||"inactive").toLowerCase();
-              const roleKey   = admin.role || "admin";
+              const name = [admin.f_name, admin.l_name].filter(Boolean).join(" ");
+              const statusKey = (admin.status || "inactive").toLowerCase();
+              const roleKey = admin.role || "admin";
               return (
                 <div className="sa-admin-card" key={admin._id}>
-                  <div className="sa-admin-ava" style={{ background:`linear-gradient(135deg, ${avaColor(admin.f_name||"")}, #cd166e)` }}>
+                  <div className="sa-admin-ava" style={{ background: `linear-gradient(135deg, ${avaColor(admin.f_name || "")}, #cd166e)` }}>
                     {initials(name)}
                   </div>
                   <div className="sa-admin-name">{name}</div>
                   <div className="sa-admin-desg">{admin.designation}</div>
                   <div className="sa-admin-email">{admin.work_email}</div>
                   <div className="sa-admin-meta">
-                    <span className={`sa-badge ${statusKey==="active"?"sa-badge-active":statusKey==="suspended"?"sa-badge-suspended":"sa-badge-inactive"}`}>
-                      {statusKey.charAt(0).toUpperCase()+statusKey.slice(1)}
+                    <span className={`sa-badge ${statusKey === "active" ? "sa-badge-active" : statusKey === "suspended" ? "sa-badge-suspended" : "sa-badge-inactive"}`}>
+                      {statusKey.charAt(0).toUpperCase() + statusKey.slice(1)}
                     </span>
-                    <span className={roleBadgeClass(roleKey)}>{ROLE_LABEL[roleKey]||roleKey}</span>
+                    <span className={roleBadgeClass(roleKey)}>{ROLE_LABEL[roleKey] || roleKey}</span>
                   </div>
                   {admin.department && (
                     <div style={{ textAlign:"center", marginTop:4 }}>
@@ -1408,8 +1095,8 @@ function SuperAdminDashboard() {
                     </div>
                   )}
                   <div className="sa-admin-actions">
-                    <button className="sa-icon-btn" title="Edit" onClick={()=>setAdminModal({open:true,editing:admin})}><FaEdit /></button>
-                    <button className="sa-icon-btn del" title="Delete" onClick={()=>{ if(window.confirm(`Delete ${name}?`)) deleteAdmin(admin._id); }}><FaTrash /></button>
+                    <button className="sa-icon-btn" title="Edit" onClick={() => setAdminModal({ open: true, editing: admin })}><FaEdit /></button>
+                    <button className="sa-icon-btn del" title="Delete" onClick={() => { if (window.confirm(`Delete ${name}?`)) deleteAdmin(admin._id); }}><FaTrash /></button>
                   </div>
                 </div>
               );
@@ -1418,16 +1105,15 @@ function SuperAdminDashboard() {
         )}
       </div>
 
-      {/* ── Dept + Announcements ─────────────────────────────── */}
       <div className="sa-lower-grid">
         <div className="sa-panel">
           <div className="sa-panel-head">
             <div className="sa-panel-title">
-              <FaLayerGroup style={{ color:"var(--p)", fontSize:14 }} />
+              <FaLayerGroup style={{ color: "var(--p)", fontSize: 14 }} />
               Department Breakdown
             </div>
-            <span style={{ fontSize:11, color:"var(--light)", fontWeight:600 }}>
-              {deptLoading?"…":`${totalEmpCount} total`}
+            <span style={{ fontSize: 11, color: "var(--light)", fontWeight: 600 }}>
+              {deptLoading ? "…" : `${totalEmpCount} total`}
             </span>
           </div>
           {deptLoading ? (
@@ -1439,7 +1125,7 @@ function SuperAdminDashboard() {
               <div className="sa-dept-item" key={dep.department}>
                 <div className="sa-dept-name">{dep.department}</div>
                 <div className="sa-dept-bar-track">
-                  <div className="sa-dept-bar-fill" style={{ width:`${Math.round((dep.lastNumber/maxDept)*100)}%` }} />
+                  <div className="sa-dept-bar-fill" style={{ width: `${Math.round((dep.lastNumber / maxDept) * 100)}%` }} />
                 </div>
                 <div className="sa-dept-count">{dep.lastNumber}</div>
               </div>
@@ -1450,11 +1136,11 @@ function SuperAdminDashboard() {
         <div className="sa-panel">
           <div className="sa-panel-head">
             <div className="sa-panel-title">
-              <FaBullhorn style={{ color:"var(--p)", fontSize:14 }} />
+              <FaBullhorn style={{ color: "var(--p)", fontSize: 14 }} />
               Announcements
             </div>
-            <button className="sa-btn-p" onClick={()=>setAnnModal({open:true,editing:null})}>
-              <FaPlus style={{ fontSize:10 }} /> New
+            <button className="sa-btn-p" onClick={() => setAnnModal({ open: true, editing: null })}>
+              <FaPlus style={{ fontSize: 10 }} /> New
             </button>
           </div>
           {annLoading ? (
@@ -1462,24 +1148,24 @@ function SuperAdminDashboard() {
           ) : announcements.length === 0 ? (
             <div className="sa-empty"><div className="sa-empty-ico">📢</div><p>No announcements. Publish one to notify your team.</p></div>
           ) : (
-            <div style={{ paddingTop:6, paddingBottom:6 }}>
-              {announcements.slice(0,5).map((ann) => {
-                const priority = (ann.priority||"normal").toLowerCase();
+            <div style={{ paddingTop: 6, paddingBottom: 6 }}>
+              {announcements.slice(0, 5).map((ann) => {
+                const priority = (ann.priority || "normal").toLowerCase();
                 const audience = ann.audience || "all";
-                const chipCls  = priority==="urgent"?"chip-urgent":priority==="low"?"chip-event":"chip-general";
+                const chipCls = priority === "urgent" ? "chip-urgent" : priority === "low" ? "chip-event" : "chip-general";
                 return (
                   <div className="sa-ann-card" key={ann._id}>
-                    <div style={{ display:"flex", gap:6, marginBottom:8, flexWrap:"wrap" }}>
-                      <span className={`sa-ann-chip ${chipCls}`}>{priority.charAt(0).toUpperCase()+priority.slice(1)}</span>
-                      <span style={{ fontSize:10, background:"#f3f4f6", color:"#6b7280", padding:"3px 8px", borderRadius:99, fontWeight:600, textTransform:"uppercase", letterSpacing:".4px" }}>{audience}</span>
+                    <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                      <span className={`sa-ann-chip ${chipCls}`}>{priority.charAt(0).toUpperCase() + priority.slice(1)}</span>
+                      <span style={{ fontSize: 10, background: "#f3f4f6", color: "#6b7280", padding: "3px 8px", borderRadius: 99, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".4px" }}>{audience}</span>
                     </div>
                     <div className="sa-ann-title">{ann.title}</div>
                     <div className="sa-ann-body">{ann.message}</div>
                     <div className="sa-ann-foot">
-                      <button className="sa-icon-btn" onClick={()=>setAnnModal({open:true,editing:ann})}><FaEdit /> Edit</button>
-                      <button className="sa-icon-btn del" onClick={()=>{ if(window.confirm("Delete announcement?")) deleteAnn(ann._id); }}><FaTrash /> Delete</button>
+                      <button className="sa-icon-btn" onClick={() => setAnnModal({ open: true, editing: ann })}><FaEdit /> Edit</button>
+                      <button className="sa-icon-btn del" onClick={() => { if (window.confirm("Delete announcement?")) deleteAnn(ann._id); }}><FaTrash /> Delete</button>
                       {ann.expiresAt && (
-                        <span style={{ marginLeft:"auto", fontSize:10, color:"var(--light)" }}>
+                        <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--light)" }}>
                           Expires {fmtDate(ann.expiresAt)}
                         </span>
                       )}
@@ -1492,15 +1178,13 @@ function SuperAdminDashboard() {
         </div>
       </div>
 
-      {/* ── Employee Overview ────────────────────────────────── */}
-      <div className="sa-panel" style={{ marginBottom:26 }}>
+      <div className="sa-panel" style={{ marginBottom: 26 }}>
         <div className="sa-panel-head">
           <div className="sa-panel-title">
-            <FaUsers style={{ color:"var(--p)", fontSize:14 }} />
+            <FaUsers style={{ color: "var(--p)", fontSize: 14 }} />
             Employee Overview
           </div>
-          {/* sa-head-actions wraps on narrow screens */}
-          <div className="sa-head-actions">
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <div className="sa-search-wrap">
               <FaSearch className="sa-search-ico" />
               <input
@@ -1511,9 +1195,9 @@ function SuperAdminDashboard() {
               />
             </div>
             {filteredEmp.length > 10 && (
-              <button className="sa-btn-ghost" style={{ fontSize:11, padding:"6px 12px" }} onClick={()=>setEmpExpand((v)=>!v)}>
+              <button className="sa-btn-ghost" style={{ fontSize: 11, padding: "6px 12px" }} onClick={() => setEmpExpand((v) => !v)}>
                 {empExpand ? "Show Less" : `View All (${filteredEmp.length})`}
-                <FaChevronRight style={{ fontSize:9, marginLeft:4, transform:empExpand?"rotate(90deg)":"none", transition:".2s" }} />
+                <FaChevronRight style={{ fontSize: 9, marginLeft: 4, transform: empExpand ? "rotate(90deg)" : "none", transition: ".2s" }} />
               </button>
             )}
           </div>
@@ -1521,22 +1205,22 @@ function SuperAdminDashboard() {
         {empLoading ? (
           <div className="sa-empty"><div className="sa-empty-ico">⏳</div><p>Loading employees…</p></div>
         ) : filteredEmp.length === 0 ? (
-          <div className="sa-empty"><div className="sa-empty-ico"><FaUsers /></div><p>{empSearch?"No matching employees.":"No employees found."}</p></div>
+          <div className="sa-empty"><div className="sa-empty-ico"><FaUsers /></div><p>{empSearch ? "No matching employees." : "No employees found."}</p></div>
         ) : (
           <div className="sa-emp-grid">
             {displayEmp.map((emp, i) => {
-              const name      = [emp.f_name, emp.l_name].filter(Boolean).join(" ") || "Employee";
-              const role      = emp.designation || emp.role || "";
-              const dept      = emp.department  || "";
-              const isManager = (emp.role||"").toLowerCase() === "manager";
+              const name = [emp.f_name, emp.l_name].filter(Boolean).join(" ") || "Employee";
+              const role = emp.designation || emp.role || "";
+              const dept = emp.department || "";
+              const isManager = (emp.role || "").toLowerCase() === "manager";
               return (
-                <div className="sa-emp-card" key={emp._id||i}>
-                  <div className="sa-emp-ava" style={{ background:isManager?"linear-gradient(135deg,#730042,#cd166e)":`linear-gradient(135deg,${avaColor(emp.f_name||"")},${avaColor((emp.l_name||"A"))})` }}>
+                <div className="sa-emp-card" key={emp._id || i}>
+                  <div className="sa-emp-ava" style={{ background: isManager ? "linear-gradient(135deg,#730042,#cd166e)" : `linear-gradient(135deg,${avaColor(emp.f_name || "")},${avaColor((emp.l_name || "A"))})` }}>
                     {initials(name)}
                   </div>
-                  <div style={{ minWidth:0, flex:1 }}>
+                  <div style={{ minWidth: 0 }}>
                     <div className="sa-emp-name">{name}</div>
-                    {isManager && <span style={{ fontSize:9, background:"var(--p-wash)", color:"var(--p)", padding:"1px 6px", borderRadius:99, fontWeight:700, display:"inline-block", marginBottom:2 }}>MANAGER</span>}
+                    {isManager && <span style={{ fontSize: 9, background: "var(--p-wash)", color: "var(--p)", padding: "1px 6px", borderRadius: 99, fontWeight: 700, display: "inline-block", marginBottom: 2 }}>MANAGER</span>}
                     {role && <div className="sa-emp-role">{role}</div>}
                     {dept && <span className="sa-emp-dept">{dept}</span>}
                   </div>
@@ -1546,32 +1230,33 @@ function SuperAdminDashboard() {
           </div>
         )}
         {!empExpand && filteredEmp.length > 10 && (
-          <div style={{ padding:"12px 18px", borderTop:"1px solid var(--border)", textAlign:"center" }}>
-            <button className="sa-btn-ghost" onClick={()=>setEmpExpand(true)} style={{ fontSize:12 }}>
-              Show all {filteredEmp.length} employees <FaAngleDown style={{ marginLeft:4 }} />
+          <div style={{ padding: "12px 18px", borderTop: "1px solid var(--border)", textAlign: "center" }}>
+            <button className="sa-btn-ghost" onClick={() => setEmpExpand(true)} style={{ fontSize: 12 }}>
+              Show all {filteredEmp.length} employees <FaAngleDown style={{ marginLeft: 4 }} />
             </button>
           </div>
         )}
       </div>
 
-      {/* ── Modals ───────────────────────────────────────────── */}
       <AnnModal
         open={annModal.open}
-        onClose={()=>setAnnModal({open:false,editing:null})}
-        initial={annModal.editing ? { title:annModal.editing.title, message:annModal.editing.message, audience:annModal.editing.audience||"all", priority:annModal.editing.priority||"normal" } : null}
+        onClose={() => setAnnModal({ open: false, editing: null })}
+        initial={annModal.editing ? { title: annModal.editing.title, message: annModal.editing.message, audience: annModal.editing.audience || "all", priority: annModal.editing.priority || "normal" } : null}
         onSave={saveAnn}
-        loading={creatingAnn||updatingAnn}
+        loading={creatingAnn || updatingAnn}
       />
+
       <AdminModal
         open={adminModal.open}
-        onClose={()=>setAdminModal({open:false,editing:null})}
+        onClose={() => setAdminModal({ open: false, editing: null })}
         initial={adminModal.editing}
         onSave={saveAdmin}
-        loading={creatingAdmin||updatingAdmin}
+        loading={creatingAdmin || updatingAdmin}
       />
+
       <ReviewModal
         open={reviewModal}
-        onClose={()=>setReviewModal(false)}
+        onClose={() => setReviewModal(false)}
         admins={admins}
         onSave={saveReview}
         loading={reviewing}
