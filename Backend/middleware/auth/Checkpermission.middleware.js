@@ -1,3 +1,5 @@
+const PermissionModel = require("../../Models/permission.model");
+
 const checkPermission = (permissionPath) => {
   return async (req, res, next) => {
     try {
