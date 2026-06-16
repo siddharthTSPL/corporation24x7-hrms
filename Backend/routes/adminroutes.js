@@ -296,7 +296,7 @@ adminrouter.post(
 adminrouter.get(
   "/documents",
   adminauthmiddleware,
-  checkPermission("documents.can_view_all_documents"),
+  checkPermission("documents.can_upload_documents"),
   asyncHandler(getDocuments),
 );
 
