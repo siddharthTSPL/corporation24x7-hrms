@@ -39,7 +39,8 @@ const {
   getAllPersonalDocumentsSuperAdmin,
   getAllExpenseDocumentsSuperAdmin,
   getDocumentDetailsSuperAdmin,
-  updatePermissions
+  updatePermissions,
+  getPermissions,
 } = require("../controllers/superadmin.controller");
 
 superAdminRouter.post("/register", asyncHandler(registerSuperAdmin));
@@ -191,5 +192,11 @@ superAdminRouter.put(
   "/updatepermissions/:id",
   superAdminAuth,
   asyncHandler(updatePermissions),
+);
+
+superAdminRouter.get(
+  "/getpermissions/:id",
+  superAdminAuth,
+  asyncHandler(getPermissions),
 );
 module.exports = superAdminRouter;

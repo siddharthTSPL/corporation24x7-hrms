@@ -7,12 +7,14 @@ import {
   FaUserCog, FaAngleDown, FaSearch, FaEye, FaEyeSlash,
   FaShieldAlt, FaBuilding, FaPhone, FaEnvelope,
   FaIdCard, FaUniversity, FaGlobe, FaBriefcase,
+  FaLock,
 } from "react-icons/fa";
 
 import { useGetMeSuperAdmin } from "../../auth/server-state/superadmin/auth/suauth.hook";
 import {
   useGetTodayCheckins, useGetNoOfEmployees, useGetAllEmployees,
   useDeleteEmployee, useAddEmployee, useAddManager, useEditEmployee,
+  useGetPermissions, useUpdatePermissions,
 } from "../../auth/server-state/superadmin/other/suother.hook";
 import { useShowAllLeaves, useAcceptLeaveByAdmin, useRejectLeaveByAdmin } from "../../auth/server-state/superadmin/leave/suleave.hook";
 import { useGetAllAnnouncements, useCreateAnnouncement, useUpdateAnnouncement, useDeleteAnnouncement } from "../../auth/server-state/superadmin/announcement/suannouncement.hook";
@@ -43,6 +45,12 @@ const ROLE_OPTIONS = [
   { value: "official", label: "Official" },
 ];
 const ROLE_LABEL = { admin: "Admin", senior_admin: "Senior Admin", official: "Official" };
+
+const USER_MODEL_MAP = {
+  admin: "Admin", senior_admin: "Admin", official: "Admin",
+  manager: "Manager", senior_manager: "Manager",
+  employee: "User",
+};
 
 const DEFAULT_PERMISSIONS = {
   announcements: {
@@ -253,6 +261,161 @@ function SecHead({ icon, children }) {
   );
 }
 
+function PermissionEditor({ permissions, onChange }) {
+  const togglePerm = (module, key) => {
+    onChange({ ...permissions, [module]: { ...permissions[module], [key]: !permissions[module][key] } });
+  };
+
+  const toggleModule = (module) => {
+    const allOn = Object.values(permissions[module]).every(Boolean);
+    const next = Object.fromEntries(Object.keys(permissions[module]).map((k) => [k, !allOn]));
+    onChange({ ...permissions, [module]: next });
+  };
+
+  return (
+    <div className="space-y-3">
+      {Object.entries(PERMISSION_META).map(([module, meta]) => {
+        const modulePerms = permissions[module] || {};
+        const allOn = Object.values(modulePerms).every(Boolean);
+        const someOn = Object.values(modulePerms).some(Boolean);
+        const onCount = Object.values(modulePerms).filter(Boolean).length;
+        const total = Object.keys(meta.keys).length;
+        return (
+          <div key={module} className="border border-[#e8d5e2] rounded-xl overflow-hidden">
+            <div
+              className="flex items-center justify-between px-4 py-3 cursor-pointer select-none hover:bg-[#fdf5f9] transition-colors"
+              onClick={() => toggleModule(module)}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: meta.bg, color: meta.color }}>
+                  {meta.icon}
+                </div>
+                <div>
+                  <p className="text-[13px] font-semibold text-[#0d0209]">{meta.label}</p>
+                  <p className="text-[10px] text-[#c499b4] mt-0.5">{onCount}/{total} permissions enabled</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {someOn && !allOn && (
+                  <span className="text-[10px] bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">Partial</span>
+                )}
+                {allOn && (
+                  <span className="text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold">All On</span>
+                )}
+                <Toggle checked={allOn} onChange={() => toggleModule(module)} />
+              </div>
+            </div>
+            <div className="border-t border-[#f0dcea] divide-y divide-[#f7ecf3]">
+              {Object.entries(meta.keys).map(([key, label]) => (
+                <div key={key} className="flex items-center justify-between px-5 py-2.5 hover:bg-[#fdf5f9] transition-colors">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors ${modulePerms[key] ? "bg-[#730042]" : "bg-gray-200"}`} />
+                    <span className="text-[12px] text-[#4a3040]">{label}</span>
+                  </div>
+                  <Toggle checked={!!modulePerms[key]} onChange={() => togglePerm(module, key)} />
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function EditPermissionsModal({ open, onClose, user, onSave, loading }) {
+  const [permissions, setPermissions] = useState(DEFAULT_PERMISSIONS);
+  const userModel = user ? (USER_MODEL_MAP[user.role] || "User") : null;
+
+  const { data: permData, isLoading: permLoading } = useGetPermissions(
+    open ? user?._id : null,
+    open ? userModel : null
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    if (permData?.permissions) {
+      const p = permData.permissions;
+      setPermissions({
+        announcements: p.announcements || DEFAULT_PERMISSIONS.announcements,
+        documents: p.documents || DEFAULT_PERMISSIONS.documents,
+        tickets: p.tickets || DEFAULT_PERMISSIONS.tickets,
+        recruitment: p.recruitment || DEFAULT_PERMISSIONS.recruitment,
+      });
+    } else {
+      setPermissions(DEFAULT_PERMISSIONS);
+    }
+  }, [open, permData]);
+
+  if (!open || !user) return null;
+
+  const name = [user.f_name, user.l_name].filter(Boolean).join(" ");
+
+  const handleSave = () => {
+    onSave({
+      id: user._id,
+      data: { user_model: userModel, ...permissions },
+    });
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[1000] flex items-center justify-center p-3 sm:p-5 bg-[rgba(13,2,9,0.7)] backdrop-blur-md"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh] animate-[modalUp_0.22s_ease-out]">
+        <div className="sticky top-0 z-10 bg-white px-5 sm:px-6 pt-5 pb-4 border-b border-[#e8d5e2] flex items-center justify-between rounded-t-2xl">
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <FaLock size={11} className="text-[#730042]" />
+              <h2 className="text-base font-bold text-[#0d0209] tracking-tight">Edit Permissions</h2>
+            </div>
+            <p className="text-[11px] text-[#c499b4]">
+              {name} · <span className="font-semibold">{userModel}</span> · {user.designation}
+            </p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl text-[#7a5568] hover:bg-[#f7ecf3] hover:text-[#730042] transition-colors">
+            <FaTimes size={13} />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 px-5 sm:px-6 py-5">
+          {permLoading ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4]">
+              <span className="text-2xl">⏳</span>
+              <p className="text-[12px]">Loading current permissions…</p>
+            </div>
+          ) : (
+            <>
+              <p className="text-[12px] text-[#7a5568] mb-4 leading-relaxed">
+                Toggle individual permissions or use the module switch to grant all at once.
+              </p>
+              <PermissionEditor permissions={permissions} onChange={setPermissions} />
+            </>
+          )}
+        </div>
+
+        <div className="sticky bottom-0 bg-white border-t border-[#e8d5e2] px-5 sm:px-6 py-4 flex justify-end gap-3 rounded-b-2xl">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl border border-[#e8d5e2] text-[13px] font-medium text-[#7a5568] hover:border-[#730042] hover:text-[#730042] transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={loading || permLoading}
+            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-[#730042] text-white text-[13px] font-semibold hover:bg-[#4a0029] active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <FaCheck size={10} />
+            {loading ? "Saving…" : "Save Permissions"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AdminModal({ open, onClose, initial, onSave, loading }) {
   const [form, setForm] = useState(BLANK_FORM);
   const [errors, setErrors] = useState({});
@@ -302,16 +465,6 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
   };
 
   const showErr = (k) => (submitted || touched[k]) ? errors[k] : "";
-
-  const togglePerm = (module, key) => {
-    setPermissions((prev) => ({ ...prev, [module]: { ...prev[module], [key]: !prev[module][key] } }));
-  };
-
-  const toggleModule = (module) => {
-    const allOn = Object.values(permissions[module]).every(Boolean);
-    const next = Object.fromEntries(Object.keys(permissions[module]).map((k) => [k, !allOn]));
-    setPermissions((prev) => ({ ...prev, [module]: next }));
-  };
 
   const handleSave = () => {
     setSubmitted(true);
@@ -564,52 +717,9 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
 
           <SecHead icon={<FaShieldAlt size={11} />}>Permission Setup</SecHead>
           <p className="text-[12px] text-[#7a5568] mb-5 leading-relaxed -mt-2">
-            Control which modules and actions this admin can access. Toggle individual permissions or use the module switch to grant all at once.
+            Control which modules and actions this admin can access.
           </p>
-
-          <div className="space-y-3">
-            {Object.entries(PERMISSION_META).map(([module, meta]) => {
-              const allOn = Object.values(permissions[module]).every(Boolean);
-              const someOn = Object.values(permissions[module]).some(Boolean);
-              const onCount = Object.values(permissions[module]).filter(Boolean).length;
-              const total = Object.keys(permissions[module]).length;
-              return (
-                <div key={module} className="border border-[#e8d5e2] rounded-xl overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 cursor-pointer select-none hover:bg-[#fdf5f9] transition-colors" onClick={() => toggleModule(module)}>
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: meta.bg, color: meta.color }}>
-                        {meta.icon}
-                      </div>
-                      <div>
-                        <p className="text-[13px] font-semibold text-[#0d0209]">{meta.label}</p>
-                        <p className="text-[10px] text-[#c499b4] mt-0.5">{onCount}/{total} permissions enabled</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {someOn && !allOn && (
-                        <span className="text-[10px] bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">Partial</span>
-                      )}
-                      {allOn && (
-                        <span className="text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold">All On</span>
-                      )}
-                      <Toggle checked={allOn} onChange={() => toggleModule(module)} />
-                    </div>
-                  </div>
-                  <div className="border-t border-[#f0dcea] divide-y divide-[#f7ecf3]">
-                    {Object.entries(meta.keys).map(([key, label]) => (
-                      <div key={key} className="flex items-center justify-between px-5 py-2.5 hover:bg-[#fdf5f9] transition-colors">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors ${permissions[module][key] ? "bg-[#730042]" : "bg-gray-200"}`} />
-                          <span className="text-[12px] text-[#4a3040]">{label}</span>
-                        </div>
-                        <Toggle checked={permissions[module][key]} onChange={() => togglePerm(module, key)} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <PermissionEditor permissions={permissions} onChange={setPermissions} />
         </div>
 
         <div className="sticky bottom-0 bg-white border-t border-[#e8d5e2] px-5 sm:px-7 py-4 flex items-center gap-3 rounded-b-2xl">
@@ -857,7 +967,8 @@ function SuperAdminDashboard() {
   const [annModal, setAnnModal] = useState({ open: false, editing: null });
   const [adminModal, setAdminModal] = useState({ open: false, editing: null });
   const [reviewModal, setReviewModal] = useState(false);
-  const [leaveTab, setLeaveTab] = useState("employee");
+  const [permModal, setPermModal] = useState({ open: false, user: null });
+  const [leaveTab, setLeaveTab] = useState("admin");
   const [empExpand, setEmpExpand] = useState(false);
   const [empSearch, setEmpSearch] = useState("");
 
@@ -878,6 +989,7 @@ function SuperAdminDashboard() {
   const { mutate: acceptLeave, isPending: accepting } = useAcceptLeaveByAdmin();
   const { mutate: rejectLeave, isPending: rejecting } = useRejectLeaveByAdmin();
   const { mutate: reviewAdmin, isPending: reviewing } = useReviewToAdmin();
+  const { mutate: updatePermissions, isPending: updatingPerms } = useUpdatePermissions();
 
   const superAdmin = meData?.superAdmin || meData || {};
   const checkins = checkinData?.checkins ?? [];
@@ -888,14 +1000,12 @@ function SuperAdminDashboard() {
   const departments = Array.isArray(deptData?.departments) ? deptData.departments : [];
   const totalEmpCount = deptData?.totalEmployees ?? employees.length;
   const announcements = Array.isArray(annRaw?.announcements) ? annRaw.announcements : Array.isArray(annRaw) ? annRaw : [];
-  const empLeaves = Array.isArray(leavesRaw?.employeeLeaves?.leaves) ? leavesRaw.employeeLeaves.leaves : [];
-  const adminLeaves = Array.isArray(leavesRaw?.adminLeaves?.leaves) ? leavesRaw.adminLeaves.leaves : [];
-  const activeLeaves = leaveTab === "employee" ? empLeaves : adminLeaves;
 
-  const pendingLeaves = empLeaves.filter((l) => {
-    const s = (l.status || "").toLowerCase();
-    return s.includes("forwarded") || s.includes("pending");
-  }).length + adminLeaves.filter((l) => (l.status || "").includes("pending")).length;
+  // Only admin leaves shown — employee leaves are managed by admin role, not superadmin
+  const adminLeaves = Array.isArray(leavesRaw?.adminLeaves?.leaves) ? leavesRaw.adminLeaves.leaves : [];
+  const activeLeaves = adminLeaves;
+
+  const pendingAdminLeaves = adminLeaves.filter((l) => (l.status || "").includes("pending")).length;
 
   const attendanceRate = totalEmpCount > 0 ? Math.round((presentToday / totalEmpCount) * 100) : 0;
 
@@ -928,7 +1038,7 @@ function SuperAdminDashboard() {
     { icon: <FaUserShield />, label: "Total Admins", value: adminsLoading ? "—" : admins.length, sub: `${admins.filter((a) => a.status === "active").length} active`, color: "#730042", bgColor: "#f7ecf3", bar: null },
     { icon: <FaUsers />, label: "Total Employees", value: deptLoading || empLoading ? "—" : totalEmpCount, sub: `${departments.length} departments`, color: "#2563eb", bgColor: "#eff6ff", bar: null },
     { icon: <FaClock />, label: "Present Today", value: mapLoading ? "—" : presentToday, sub: `${attendanceRate}% · ${stillOnDuty} on duty`, color: "#0d9e6e", bgColor: "#e8f7f1", bar: mapLoading ? null : attendanceRate },
-    { icon: <FaCalendarAlt />, label: "Pending Leaves", value: leaveLoading ? "—" : pendingLeaves, sub: pendingLeaves > 0 ? "Needs attention" : "All clear ✓", color: pendingLeaves > 0 ? "#b8760a" : "#0d9e6e", bgColor: pendingLeaves > 0 ? "#fff8e1" : "#e8f7f1", bar: null },
+    { icon: <FaCalendarAlt />, label: "Admin Leaves", value: leaveLoading ? "—" : pendingAdminLeaves, sub: pendingAdminLeaves > 0 ? "Needs attention" : "All clear ✓", color: pendingAdminLeaves > 0 ? "#b8760a" : "#0d9e6e", bgColor: pendingAdminLeaves > 0 ? "#fff8e1" : "#e8f7f1", bar: null },
     { icon: <FaBullhorn />, label: "Announcements", value: annLoading ? "—" : announcements.length, sub: "Active broadcasts", color: "#7c3aed", bgColor: "#f5f3ff", bar: null },
   ];
 
@@ -948,13 +1058,19 @@ function SuperAdminDashboard() {
     }
   };
 
-  const handleAcceptLeave = (leave) => acceptLeave({ id: leave._id, leaveFor: leaveTab === "admin" ? "admin" : "employee" });
-  const handleRejectLeave = (leave) => rejectLeave({ id: leave._id, leaveFor: leaveTab === "admin" ? "admin" : "employee" });
+  // Only admin leave actions for super admin
+  const handleAcceptLeave = (leave) => acceptLeave({ id: leave._id, leaveFor: "admin" });
+  const handleRejectLeave = (leave) => rejectLeave({ id: leave._id, leaveFor: "admin" });
+
   const saveReview = (form) => reviewAdmin(form, { onSuccess: () => setReviewModal(false) });
+
+  const savePermissions = (payload) => {
+    updatePermissions(payload, { onSuccess: () => setPermModal({ open: false, user: null }) });
+  };
 
   const isPendingLeave = (leave) => {
     const s = (leave.status || "").toLowerCase();
-    return s.includes("forwarded") || s.includes("pending");
+    return s.includes("pending");
   };
 
   const leaveStatusClass = (status = "") => {
@@ -967,7 +1083,7 @@ function SuperAdminDashboard() {
   const leaveStatusLabel = (status = "") => {
     if (status.includes("approved")) return "Approved";
     if (status.includes("rejected")) return "Rejected";
-    if (status.includes("forwarded") || status.includes("pending")) return "Pending";
+    if (status.includes("pending")) return "Pending";
     return status;
   };
 
@@ -991,6 +1107,7 @@ function SuperAdminDashboard() {
         .animate-\\[modalUp_0\\.22s_ease-out\\] { animation: modalUp 0.22s ease-out; }
       `}</style>
 
+      {/* ─── Hero Banner ─────────────────────────────────── */}
       <div className="relative bg-gradient-to-br from-[#2a0017] via-[#730042] to-[#cd166e] rounded-2xl p-6 sm:p-8 lg:p-10 mb-6 overflow-hidden shadow-xl">
         <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-white/5 -translate-y-1/3 translate-x-1/4 pointer-events-none" />
         <div className="absolute bottom-0 left-1/3 w-48 h-48 rounded-full bg-white/3 translate-y-1/2 pointer-events-none" />
@@ -1007,7 +1124,7 @@ function SuperAdminDashboard() {
             <span className="bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-3 py-1.5 text-[11px] text-white/90 font-medium">🏢 {orgName}</span>
             <span className="bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-3 py-1.5 text-[11px] text-white/90 font-medium">👥 {totalEmpCount} Employees</span>
             {presentToday > 0 && <span className="bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-3 py-1.5 text-[11px] text-white/90 font-medium">✅ {presentToday} Present</span>}
-            {pendingLeaves > 0 && <span className="bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-3 py-1.5 text-[11px] text-white/90 font-medium">📋 {pendingLeaves} Leaves Pending</span>}
+            {pendingAdminLeaves > 0 && <span className="bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-3 py-1.5 text-[11px] text-white/90 font-medium">📋 {pendingAdminLeaves} Admin Leaves Pending</span>}
             <span className="bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-3 py-1.5 text-[11px] text-white/90 font-medium">📆 {today}</span>
           </div>
         </div>
@@ -1021,10 +1138,12 @@ function SuperAdminDashboard() {
         </div>
       </div>
 
+      {/* ─── Stats ───────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
         {stats.map((s, i) => <StatCard key={i} {...s} />)}
       </div>
 
+      {/* ─── Map + Leaves ────────────────────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-5 mb-5">
         <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-[#e8d5e2] flex items-center justify-between">
@@ -1054,24 +1173,18 @@ function SuperAdminDashboard() {
           </div>
         </div>
 
+        {/* Admin Leaves only — employee/manager leaves are handled by Admin role */}
         <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden flex flex-col">
           <div className="px-5 py-4 border-b border-[#e8d5e2] flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <FaCalendarAlt size={13} className="text-[#730042]" />
-              <span className="font-bold text-[15px] text-[#0d0209]">Leave Requests</span>
+              <span className="font-bold text-[15px] text-[#0d0209]">Admin Leave Requests</span>
             </div>
-            {pendingLeaves > 0 && (
-              <span className="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-full">{pendingLeaves} pending</span>
+            {pendingAdminLeaves > 0 && (
+              <span className="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-full">{pendingAdminLeaves} pending</span>
             )}
           </div>
-          <div className="flex border-b border-[#e8d5e2]">
-            {[["employee", "Employees", empLeaves.length], ["admin", "Admins", adminLeaves.length]].map(([val, lbl, cnt]) => (
-              <button key={val} onClick={() => setLeaveTab(val)} className={`flex-1 py-2.5 text-[12px] font-semibold border-b-2 transition-colors ${leaveTab === val ? "border-[#730042] text-[#730042]" : "border-transparent text-[#7a5568] hover:text-[#0d0209]"}`}>
-                {lbl} {cnt > 0 && `(${cnt})`}
-              </button>
-            ))}
-          </div>
-          <div className="overflow-y-auto flex-1 max-h-[360px]">
+          <div className="overflow-y-auto flex-1 max-h-[380px]">
             {leaveLoading ? (
               <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4]">
                 <span className="text-2xl">⏳</span>
@@ -1080,12 +1193,12 @@ function SuperAdminDashboard() {
             ) : activeLeaves.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4]">
                 <FaCheckCircle size={24} className="text-emerald-400" />
-                <p className="text-[12px]">No leave requests in this category.</p>
+                <p className="text-[12px]">No admin leave requests.</p>
               </div>
             ) : (
               activeLeaves.map((leave) => {
-                const emp = leave.employee || leave.manager || {};
-                const name = [emp.f_name, emp.l_name].filter(Boolean).join(" ") || "Employee";
+                const emp = leave.admin || {};
+                const name = [emp.f_name, emp.l_name].filter(Boolean).join(" ") || "Admin";
                 const type = leave.leaveType || leave.type || "Leave";
                 const from = leave.startDate || leave.from || "";
                 const to = leave.endDate || leave.to || "";
@@ -1104,10 +1217,18 @@ function SuperAdminDashboard() {
                       {leave.reason && <p className="text-[11px] text-[#c499b4] mt-1 italic line-clamp-1">"{leave.reason}"</p>}
                       {pending ? (
                         <div className="flex gap-2 mt-2">
-                          <button onClick={() => handleAcceptLeave(leave)} disabled={accepting} className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg px-2.5 py-1 text-[11px] font-semibold hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-colors disabled:opacity-50">
+                          <button
+                            onClick={() => handleAcceptLeave(leave)}
+                            disabled={accepting}
+                            className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg px-2.5 py-1 text-[11px] font-semibold hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-colors disabled:opacity-50"
+                          >
                             <FaCheck size={8} /> Approve
                           </button>
-                          <button onClick={() => handleRejectLeave(leave)} disabled={rejecting} className="flex items-center gap-1.5 bg-red-50 text-red-700 border border-red-200 rounded-lg px-2.5 py-1 text-[11px] font-semibold hover:bg-red-600 hover:text-white hover:border-red-600 transition-colors disabled:opacity-50">
+                          <button
+                            onClick={() => handleRejectLeave(leave)}
+                            disabled={rejecting}
+                            className="flex items-center gap-1.5 bg-red-50 text-red-700 border border-red-200 rounded-lg px-2.5 py-1 text-[11px] font-semibold hover:bg-red-600 hover:text-white hover:border-red-600 transition-colors disabled:opacity-50"
+                          >
                             <FaBan size={8} /> Reject
                           </button>
                         </div>
@@ -1125,6 +1246,7 @@ function SuperAdminDashboard() {
         </div>
       </div>
 
+      {/* ─── Admin Management ────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden mb-5">
         <div className="px-5 py-4 border-b border-[#e8d5e2] flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2.5">
@@ -1180,11 +1302,24 @@ function SuperAdminDashboard() {
                     </p>
                   )}
                   <div className="flex justify-center gap-1 mt-3 pt-3 border-t border-[#f0dcea]">
-                    <button onClick={() => setAdminModal({ open: true, editing: admin })} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] text-[#c499b4] hover:bg-[#f7ecf3] hover:text-[#730042] transition-colors">
+                    <button
+                      onClick={() => setPermModal({ open: true, user: admin })}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] text-[#c499b4] hover:bg-[#f7ecf3] hover:text-[#730042] transition-colors"
+                      title="Edit Permissions"
+                    >
+                      <FaLock size={9} /> Perms
+                    </button>
+                    <button
+                      onClick={() => setAdminModal({ open: true, editing: admin })}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] text-[#c499b4] hover:bg-[#f7ecf3] hover:text-[#730042] transition-colors"
+                    >
                       <FaEdit size={10} /> Edit
                     </button>
-                    <button onClick={() => { if (window.confirm(`Delete ${name}?`)) deleteAdmin(admin._id); }} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] text-[#c499b4] hover:bg-red-50 hover:text-red-600 transition-colors">
-                      <FaTrash size={10} /> Delete
+                    <button
+                      onClick={() => { if (window.confirm(`Delete ${name}?`)) deleteAdmin(admin._id); }}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] text-[#c499b4] hover:bg-red-50 hover:text-red-600 transition-colors"
+                    >
+                      <FaTrash size={10} /> Del
                     </button>
                   </div>
                 </div>
@@ -1194,6 +1329,7 @@ function SuperAdminDashboard() {
         )}
       </div>
 
+      {/* ─── Dept + Announcements ────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
         <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-[#e8d5e2] flex items-center justify-between">
@@ -1278,6 +1414,7 @@ function SuperAdminDashboard() {
         </div>
       </div>
 
+      {/* ─── Employee Overview ───────────────────────────── */}
       <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden mb-5">
         <div className="px-5 py-4 border-b border-[#e8d5e2] flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2.5">
@@ -1343,6 +1480,7 @@ function SuperAdminDashboard() {
         )}
       </div>
 
+      {/* ─── Modals ──────────────────────────────────────── */}
       <AnnModal
         open={annModal.open}
         onClose={() => setAnnModal({ open: false, editing: null })}
@@ -1365,6 +1503,14 @@ function SuperAdminDashboard() {
         admins={admins}
         onSave={saveReview}
         loading={reviewing}
+      />
+
+      <EditPermissionsModal
+        open={permModal.open}
+        onClose={() => setPermModal({ open: false, user: null })}
+        user={permModal.user}
+        onSave={savePermissions}
+        loading={updatingPerms}
       />
     </div>
   );
