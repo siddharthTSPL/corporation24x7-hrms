@@ -2,15 +2,15 @@ import React, { useState, useCallback } from "react";
 import { useSubmitTicket, useGetMyTickets, useRateTicket, useGetTicketDetail } from "../../auth/server-state/adminticket/adminticket.hook";
 
 const C = {
-  primary:  "#730042",
-  accent:   "#CD166E",
-  bg:       "#F8F4FB",
-  card:     "#ffffff",
-  border:   "rgba(115,0,66,.1)",
-  muted:    "#A08CB8",
-  text:     "#160D22",
-  subtext:  "#5C4470",
-  surface:  "#FBF8FE",
+  primary: "#730042",
+  accent:  "#CD166E",
+  bg:      "#F8F4FB",
+  card:    "#ffffff",
+  border:  "rgba(115,0,66,.1)",
+  muted:   "#A08CB8",
+  text:    "#160D22",
+  subtext: "#5C4470",
+  surface: "#FBF8FE",
 };
 
 const TICKET_TYPES = {
@@ -22,14 +22,14 @@ const TICKET_TYPES = {
 };
 
 const STATUS_META = {
-  open:         { label: "Open",          bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
-  acknowledged: { label: "Acknowledged",  bg: "#EFF6FF", color: "#1D4ED8", dot: "#3B82F6" },
-  under_review: { label: "Under Review",  bg: "#F5F3FF", color: "#5B21B6", dot: "#8B5CF6" },
-  action_taken: { label: "Action Taken",  bg: "#ECFDF5", color: "#065F46", dot: "#10B981" },
-  resolved:     { label: "Resolved",      bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
-  closed:       { label: "Closed",        bg: "#F3F4F6", color: "#374151", dot: "#9CA3AF" },
-  rejected:     { label: "Rejected",      bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
-  reopened:     { label: "Reopened",      bg: "#FFF7ED", color: "#9A3412", dot: "#F97316" },
+  open:         { label: "Open",         bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
+  acknowledged: { label: "Acknowledged", bg: "#EFF6FF", color: "#1D4ED8", dot: "#3B82F6" },
+  under_review: { label: "Under Review", bg: "#F5F3FF", color: "#5B21B6", dot: "#8B5CF6" },
+  action_taken: { label: "Action Taken", bg: "#ECFDF5", color: "#065F46", dot: "#10B981" },
+  resolved:     { label: "Resolved",     bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  closed:       { label: "Closed",       bg: "#F3F4F6", color: "#374151", dot: "#9CA3AF" },
+  rejected:     { label: "Rejected",     bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  reopened:     { label: "Reopened",     bg: "#FFF7ED", color: "#9A3412", dot: "#F97316" },
 };
 
 const SEV_META = {
@@ -85,31 +85,21 @@ const timeAgo = (d) => {
 const G = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Instrument+Sans:wght@400;500;600&display=swap');
-
     *, *::before, *::after { box-sizing: border-box; }
-
-    @keyframes spin        { to { transform: rotate(360deg); } }
-    @keyframes fadeUp      { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
-    @keyframes slideIn     { from { opacity:0; transform:translateX(24px); } to { opacity:1; transform:translateX(0); } }
-    @keyframes pulse       { 0%,100%{opacity:1} 50%{opacity:.4} }
-    @keyframes shimmer     { from{background-position:-200% 0} to{background-position:200% 0} }
+    @keyframes spin    { to { transform: rotate(360deg); } }
+    @keyframes fadeUp  { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes slideIn { from { opacity:0; transform:translateX(24px); } to { opacity:1; transform:translateX(0); } }
+    @keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:.4} }
+    @keyframes shimmer { from{background-position:-200% 0} to{background-position:200% 0} }
+    @keyframes popIn   { from{opacity:0;transform:scale(.88) translateY(18px)} to{opacity:1;transform:scale(1) translateY(0)} }
 
     .t-card {
-      background:#fff;
-      border-radius:14px;
-      border:1px solid rgba(115,0,66,.08);
-      padding:16px 20px;
-      margin-bottom:8px;
-      box-shadow:0 1px 6px rgba(80,20,90,.05);
-      transition:box-shadow .2s, border-color .2s, transform .2s;
-      animation:fadeUp .3s ease both;
-      cursor:pointer;
+      background:#fff; border-radius:14px; border:1px solid rgba(115,0,66,.08);
+      padding:16px 20px; margin-bottom:8px; box-shadow:0 1px 6px rgba(80,20,90,.05);
+      transition:box-shadow .2s,border-color .2s,transform .2s;
+      animation:fadeUp .3s ease both; cursor:pointer;
     }
-    .t-card:hover {
-      box-shadow:0 6px 24px rgba(115,0,66,.12);
-      border-color:rgba(115,0,66,.22);
-      transform:translateY(-2px);
-    }
+    .t-card:hover { box-shadow:0 6px 24px rgba(115,0,66,.12); border-color:rgba(115,0,66,.22); transform:translateY(-2px); }
 
     .t-btn {
       display:inline-flex; align-items:center; gap:6px;
@@ -126,7 +116,7 @@ const G = () => (
       width:100%; padding:10px 14px; border-radius:10px;
       font-size:13px; font-family:'Instrument Sans',sans-serif; color:#160D22;
       background:#FDFBFF; border:1.5px solid rgba(115,0,66,.12); outline:none;
-      transition:border .2s, box-shadow .2s;
+      transition:border .2s,box-shadow .2s;
     }
     .t-input:focus { border-color:#730042; box-shadow:0 0 0 3px rgba(115,0,66,.08); }
 
@@ -164,7 +154,7 @@ const Spinner = () => (
 
 const SkeletonDetail = () => (
   <div style={{ display:"flex", flexDirection:"column", gap:12, padding:24 }}>
-    {[200, 120, 80, 160, 100].map((w, i) => (
+    {[200,120,80,160,100].map((w,i) => (
       <div key={i} className="t-skeleton" style={{ height:16, width:`${w}px`, maxWidth:"100%" }}/>
     ))}
   </div>
@@ -203,19 +193,43 @@ const InfoRow = ({ label, val }) => (
   </div>
 );
 
+function LockedPopup({ onClose, title, message }) {
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(16,4,28,.55)", zIndex:400, display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(6px)" }}>
+      <div style={{ background:"#fff", borderRadius:22, padding:36, width:360, boxShadow:"0 28px 72px rgba(0,0,0,.24)", animation:"popIn .26s cubic-bezier(.34,1.56,.64,1) both", textAlign:"center" }}>
+        <div style={{ width:64, height:64, borderRadius:20, background:"linear-gradient(135deg,#FEF2F2,#FEE2E2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:30, margin:"0 auto 18px", border:"1px solid rgba(239,68,68,.15)" }}>
+          🔒
+        </div>
+        <div style={{ fontSize:17, fontWeight:700, color:C.text, fontFamily:"'Syne',sans-serif", marginBottom:8 }}>{title}</div>
+        <div style={{ fontSize:13, color:C.muted, fontFamily:"'Instrument Sans',sans-serif", lineHeight:1.7, marginBottom:24 }}>{message}</div>
+        <div style={{ background:"#FEF2F2", borderRadius:12, padding:"10px 16px", marginBottom:22, border:"1px solid rgba(239,68,68,.15)" }}>
+          <div style={{ fontSize:11, color:"#991B1B", fontFamily:"'Instrument Sans',sans-serif", fontWeight:500 }}>
+            Contact your Super Admin to request access to this feature.
+          </div>
+        </div>
+        <button className="t-btn" onClick={onClose}
+          style={{ background:`linear-gradient(135deg,${C.primary},${C.accent})`, color:"#fff", width:"100%", justifyContent:"center", padding:"11px", borderRadius:12, fontSize:13 }}>
+          Got it
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const BLANK = {
   type:"complaint", category:"", subCategory:"", title:"", description:"",
   incidentDate:"", incidentLocation:"", witnessNames:"",
   severity:"medium", isAnonymous:false,
 };
 
-function SubmitForm({ onSuccess }) {
+function SubmitForm({ onSuccess, canRaise }) {
   const [form,  setForm]  = useState(BLANK);
   const [toast, setToast] = useState(null);
+  const [showLocked, setShowLocked] = useState(!canRaise);
   const mut = useSubmitTicket();
 
   const set = useCallback((k, v) =>
-    setForm(p => ({ ...p, [k]:v, ...(k === "type" ? { category:"", subCategory:"" } : {}) }))
+    setForm(p => ({ ...p, [k]:v, ...(k==="type" ? { category:"", subCategory:"" } : {}) }))
   , []);
 
   const toast$ = useCallback((msg, kind="ok") => {
@@ -224,6 +238,7 @@ function SubmitForm({ onSuccess }) {
   }, []);
 
   const submit = async () => {
+    if (!canRaise) { setShowLocked(true); return; }
     if (!form.title.trim() || !form.description.trim() || !form.category) {
       toast$("Please fill in all required fields.", "err"); return;
     }
@@ -245,95 +260,119 @@ function SubmitForm({ onSuccess }) {
   const cats = CATEGORIES[form.type] || [];
 
   return (
-    <div style={{ background:"#fff", borderRadius:18, border:`1px solid ${C.border}`, padding:28, boxShadow:"0 4px 24px rgba(80,20,90,.06)" }}>
-
-      <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:26 }}>
-        <div style={{ width:46, height:46, borderRadius:14, background:`linear-gradient(135deg,${C.primary},${C.accent})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, boxShadow:"0 4px 16px rgba(115,0,66,.28)", flexShrink:0 }}>📝</div>
-        <div>
-          <div style={{ fontSize:18, fontWeight:700, color:C.text, fontFamily:"'Syne',sans-serif", lineHeight:1.2 }}>New Ticket</div>
-          <div style={{ fontSize:12, color:C.muted, fontFamily:"'Instrument Sans',sans-serif", marginTop:2 }}>Your submission is handled confidentially</div>
-        </div>
-        <span style={{ marginLeft:"auto", padding:"4px 12px", borderRadius:20, background:"rgba(115,0,66,.07)", color:C.primary, fontSize:11, fontWeight:600, fontFamily:"'Instrument Sans',sans-serif", border:`1px solid rgba(115,0,66,.14)` }}>Admin</span>
-      </div>
-
-      <div style={{ marginBottom:18 }}>
-        <Lbl req>Ticket Type</Lbl>
-        <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-          {Object.entries(TICKET_TYPES).map(([k, m]) => (
-            <button key={k} onClick={() => set("type", k)}
-              style={{ padding:"7px 14px", borderRadius:10, border:`1.5px solid ${form.type===k ? C.primary : "rgba(115,0,66,.12)"}`, background:form.type===k ? `linear-gradient(135deg,${C.primary},${C.accent})` : C.surface, color:form.type===k ? "#fff" : C.subtext, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"'Instrument Sans',sans-serif", transition:"all .18s", display:"flex", alignItems:"center", gap:5 }}>
-              {m.icon} {m.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:16 }}>
-        <div>
-          <Lbl req>Category</Lbl>
-          <select className="t-input" value={form.category} onChange={e => set("category", e.target.value)}>
-            <option value="">Select category…</option>
-            {cats.map(c => <option key={c} value={c}>{CAT_LABELS[c] || c}</option>)}
-          </select>
-        </div>
-        <div>
-          <Lbl>Severity</Lbl>
-          <select className="t-input" value={form.severity} onChange={e => set("severity", e.target.value)}>
-            {Object.entries(SEV_META).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
-          </select>
-        </div>
-      </div>
-
-      <div style={{ marginBottom:16 }}>
-        <Lbl req>Title</Lbl>
-        <input className="t-input" value={form.title} onChange={e => set("title", e.target.value)} placeholder="Brief, clear title for your ticket…" maxLength={120}/>
-      </div>
-
-      <div style={{ marginBottom:16 }}>
-        <Lbl req>Description</Lbl>
-        <textarea className="t-input" rows={4} value={form.description} onChange={e => set("description", e.target.value)} placeholder="Describe the issue in detail…" style={{ resize:"vertical", lineHeight:1.7 }}/>
-      </div>
-
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:16 }}>
-        <div>
-          <Lbl>Incident Date</Lbl>
-          <input className="t-input" type="date" value={form.incidentDate} onChange={e => set("incidentDate", e.target.value)}/>
-        </div>
-        <div>
-          <Lbl>Location</Lbl>
-          <input className="t-input" value={form.incidentLocation} onChange={e => set("incidentLocation", e.target.value)} placeholder="Office floor, remote, etc."/>
-        </div>
-      </div>
-
-      <div style={{ marginBottom:20 }}>
-        <Lbl>Witness Names <span style={{ fontWeight:400, textTransform:"none", fontSize:10 }}>(comma-separated)</span></Lbl>
-        <input className="t-input" value={form.witnessNames} onChange={e => set("witnessNames", e.target.value)} placeholder="John Doe, Jane Smith"/>
-      </div>
-
-      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:24, background:"#F5F0FE", borderRadius:12, padding:"12px 16px", border:"1px solid rgba(124,58,237,.12)" }}>
-        <button onClick={() => set("isAnonymous", !form.isAnonymous)}
-          style={{ width:42, height:24, borderRadius:12, border:"none", cursor:"pointer", background:form.isAnonymous ? `linear-gradient(135deg,${C.primary},${C.accent})` : "#DDD6F0", transition:"background .2s", position:"relative", flexShrink:0 }}>
-          <span style={{ position:"absolute", top:3, left:form.isAnonymous ? 20 : 3, width:18, height:18, borderRadius:"50%", background:"#fff", transition:"left .2s", boxShadow:"0 1px 4px rgba(0,0,0,.18)" }}/>
-        </button>
-        <div>
-          <div style={{ fontSize:12, fontWeight:600, color:"#5B21B6", fontFamily:"'Instrument Sans',sans-serif" }}>Submit Anonymously</div>
-          <div style={{ fontSize:11, color:"#8B5CF6", fontFamily:"'Instrument Sans',sans-serif" }}>Your identity will be hidden from Super Admin</div>
-        </div>
-      </div>
-
-      <button className="t-btn" onClick={submit} disabled={mut.isPending}
-        style={{ background:`linear-gradient(135deg,${C.primary},${C.accent})`, color:"#fff", width:"100%", justifyContent:"center", padding:"13px", borderRadius:12, fontSize:14, boxShadow:"0 4px 18px rgba(115,0,66,.28)" }}>
-        {mut.isPending
-          ? <><div style={{ width:15, height:15, border:"2px solid rgba(255,255,255,.35)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin .6s linear infinite" }}/> Submitting…</>
-          : "Submit Ticket →"}
-      </button>
-
-      {toast && (
-        <div style={{ marginTop:12, padding:"10px 16px", borderRadius:10, fontSize:13, fontFamily:"'Instrument Sans',sans-serif", fontWeight:500, background:toast.kind==="ok" ? "#F0FDF4" : "#FEF2F2", color:toast.kind==="ok" ? "#065F46" : "#991B1B", border:`1px solid ${toast.kind==="ok" ? "#86EFAC" : "#FCA5A5"}` }}>
-          {toast.kind==="ok" ? "✅" : "❌"} {toast.msg}
-        </div>
+    <>
+      {showLocked && !canRaise && (
+        <LockedPopup
+          onClose={() => setShowLocked(false)}
+          title="Permission Required"
+          message="You don't have permission to raise tickets. This feature requires the Raise Ticket permission from your Super Admin."
+        />
       )}
-    </div>
+
+      <div style={{ background:"#fff", borderRadius:18, border:`1px solid ${C.border}`, padding:28, boxShadow:"0 4px 24px rgba(80,20,90,.06)", position:"relative", overflow:"hidden" }}>
+
+        {!canRaise && (
+          <div style={{ position:"absolute", inset:0, background:"rgba(248,244,251,.82)", zIndex:10, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:12, backdropFilter:"blur(2px)", borderRadius:18 }}>
+            <div style={{ width:52, height:52, borderRadius:16, background:"linear-gradient(135deg,#FEF2F2,#FEE2E2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:24 }}>🔒</div>
+            <div style={{ fontSize:14, fontWeight:700, color:C.text, fontFamily:"'Syne',sans-serif" }}>Access Restricted</div>
+            <div style={{ fontSize:12, color:C.muted, fontFamily:"'Instrument Sans',sans-serif", textAlign:"center", maxWidth:240, lineHeight:1.6 }}>
+              You don't have permission to raise tickets.
+            </div>
+            <button className="t-btn" onClick={() => setShowLocked(true)}
+              style={{ background:`linear-gradient(135deg,${C.primary},${C.accent})`, color:"#fff", marginTop:4 }}>
+              Learn More
+            </button>
+          </div>
+        )}
+
+        <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:26 }}>
+          <div style={{ width:46, height:46, borderRadius:14, background:`linear-gradient(135deg,${C.primary},${C.accent})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, boxShadow:"0 4px 16px rgba(115,0,66,.28)", flexShrink:0 }}>📝</div>
+          <div>
+            <div style={{ fontSize:18, fontWeight:700, color:C.text, fontFamily:"'Syne',sans-serif", lineHeight:1.2 }}>New Ticket</div>
+            <div style={{ fontSize:12, color:C.muted, fontFamily:"'Instrument Sans',sans-serif", marginTop:2 }}>Your submission is handled confidentially</div>
+          </div>
+          <span style={{ marginLeft:"auto", padding:"4px 12px", borderRadius:20, background:"rgba(115,0,66,.07)", color:C.primary, fontSize:11, fontWeight:600, fontFamily:"'Instrument Sans',sans-serif", border:`1px solid rgba(115,0,66,.14)` }}>Admin</span>
+        </div>
+
+        <div style={{ marginBottom:18 }}>
+          <Lbl req>Ticket Type</Lbl>
+          <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+            {Object.entries(TICKET_TYPES).map(([k, m]) => (
+              <button key={k} onClick={() => set("type", k)}
+                style={{ padding:"7px 14px", borderRadius:10, border:`1.5px solid ${form.type===k ? C.primary : "rgba(115,0,66,.12)"}`, background:form.type===k ? `linear-gradient(135deg,${C.primary},${C.accent})` : C.surface, color:form.type===k ? "#fff" : C.subtext, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"'Instrument Sans',sans-serif", transition:"all .18s", display:"flex", alignItems:"center", gap:5 }}>
+                {m.icon} {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:16 }}>
+          <div>
+            <Lbl req>Category</Lbl>
+            <select className="t-input" value={form.category} onChange={e => set("category", e.target.value)}>
+              <option value="">Select category…</option>
+              {cats.map(c => <option key={c} value={c}>{CAT_LABELS[c] || c}</option>)}
+            </select>
+          </div>
+          <div>
+            <Lbl>Severity</Lbl>
+            <select className="t-input" value={form.severity} onChange={e => set("severity", e.target.value)}>
+              {Object.entries(SEV_META).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div style={{ marginBottom:16 }}>
+          <Lbl req>Title</Lbl>
+          <input className="t-input" value={form.title} onChange={e => set("title", e.target.value)} placeholder="Brief, clear title for your ticket…" maxLength={120}/>
+        </div>
+
+        <div style={{ marginBottom:16 }}>
+          <Lbl req>Description</Lbl>
+          <textarea className="t-input" rows={4} value={form.description} onChange={e => set("description", e.target.value)} placeholder="Describe the issue in detail…" style={{ resize:"vertical", lineHeight:1.7 }}/>
+        </div>
+
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:16 }}>
+          <div>
+            <Lbl>Incident Date</Lbl>
+            <input className="t-input" type="date" value={form.incidentDate} onChange={e => set("incidentDate", e.target.value)}/>
+          </div>
+          <div>
+            <Lbl>Location</Lbl>
+            <input className="t-input" value={form.incidentLocation} onChange={e => set("incidentLocation", e.target.value)} placeholder="Office floor, remote, etc."/>
+          </div>
+        </div>
+
+        <div style={{ marginBottom:20 }}>
+          <Lbl>Witness Names <span style={{ fontWeight:400, textTransform:"none", fontSize:10 }}>(comma-separated)</span></Lbl>
+          <input className="t-input" value={form.witnessNames} onChange={e => set("witnessNames", e.target.value)} placeholder="John Doe, Jane Smith"/>
+        </div>
+
+        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:24, background:"#F5F0FE", borderRadius:12, padding:"12px 16px", border:"1px solid rgba(124,58,237,.12)" }}>
+          <button onClick={() => set("isAnonymous", !form.isAnonymous)}
+            style={{ width:42, height:24, borderRadius:12, border:"none", cursor:"pointer", background:form.isAnonymous ? `linear-gradient(135deg,${C.primary},${C.accent})` : "#DDD6F0", transition:"background .2s", position:"relative", flexShrink:0 }}>
+            <span style={{ position:"absolute", top:3, left:form.isAnonymous ? 20 : 3, width:18, height:18, borderRadius:"50%", background:"#fff", transition:"left .2s", boxShadow:"0 1px 4px rgba(0,0,0,.18)" }}/>
+          </button>
+          <div>
+            <div style={{ fontSize:12, fontWeight:600, color:"#5B21B6", fontFamily:"'Instrument Sans',sans-serif" }}>Submit Anonymously</div>
+            <div style={{ fontSize:11, color:"#8B5CF6", fontFamily:"'Instrument Sans',sans-serif" }}>Your identity will be hidden from Super Admin</div>
+          </div>
+        </div>
+
+        <button className="t-btn" onClick={submit} disabled={mut.isPending}
+          style={{ background:`linear-gradient(135deg,${C.primary},${C.accent})`, color:"#fff", width:"100%", justifyContent:"center", padding:"13px", borderRadius:12, fontSize:14, boxShadow:"0 4px 18px rgba(115,0,66,.28)" }}>
+          {mut.isPending
+            ? <><div style={{ width:15, height:15, border:"2px solid rgba(255,255,255,.35)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin .6s linear infinite" }}/> Submitting…</>
+            : "Submit Ticket →"}
+        </button>
+
+        {toast && (
+          <div style={{ marginTop:12, padding:"10px 16px", borderRadius:10, fontSize:13, fontFamily:"'Instrument Sans',sans-serif", fontWeight:500, background:toast.kind==="ok" ? "#F0FDF4" : "#FEF2F2", color:toast.kind==="ok" ? "#065F46" : "#991B1B", border:`1px solid ${toast.kind==="ok" ? "#86EFAC" : "#FCA5A5"}` }}>
+            {toast.kind==="ok" ? "✅" : "❌"} {toast.msg}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -352,19 +391,19 @@ function RateModal({ ticket, onClose }) {
 
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(16,4,28,.55)", zIndex:300, display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(6px)" }}>
-      <div style={{ background:"#fff", borderRadius:20, padding:28, width:380, boxShadow:"0 24px 64px rgba(0,0,0,.22)", animation:"fadeUp .24s ease both" }}>
+      <div style={{ background:"#fff", borderRadius:20, padding:28, width:380, boxShadow:"0 24px 64px rgba(0,0,0,.22)", animation:"popIn .26s cubic-bezier(.34,1.56,.64,1) both" }}>
         <div style={{ fontSize:17, fontWeight:700, color:C.text, fontFamily:"'Syne',sans-serif", marginBottom:3 }}>Rate Your Experience</div>
         <div style={{ fontSize:12, color:C.muted, fontFamily:"'Instrument Sans',sans-serif", marginBottom:22 }}>{ticket.ticketNumber} · {ticket.title}</div>
         <div style={{ display:"flex", gap:4, marginBottom:18, justifyContent:"center" }}>
           {[1,2,3,4,5].map(n => (
             <button key={n} onClick={() => setRating(n)}
-              style={{ fontSize:32, background:"none", border:"none", cursor:"pointer", opacity:n<=rating ? 1 : .25, transition:"all .15s", transform:n<=rating ? "scale(1.12)" : "scale(1)", color:"#F59E0B" }}>★</button>
+              style={{ fontSize:32, background:"none", border:"none", cursor:"pointer", opacity:n<=rating?1:.25, transition:"all .15s", transform:n<=rating?"scale(1.12)":"scale(1)", color:"#F59E0B" }}>★</button>
           ))}
         </div>
         <textarea className="t-input" rows={3} value={feedback} onChange={e => setFeedback(e.target.value)} placeholder="Optional feedback…" style={{ marginBottom:18, resize:"none" }}/>
         <div style={{ display:"flex", gap:10 }}>
           <button className="t-btn" onClick={onClose} style={{ background:C.surface, color:C.subtext, flex:1, justifyContent:"center", border:`1px solid ${C.border}` }}>Cancel</button>
-          <button className="t-btn" onClick={submit} disabled={!rating || mut.isPending}
+          <button className="t-btn" onClick={submit} disabled={!rating||mut.isPending}
             style={{ background:`linear-gradient(135deg,${C.primary},${C.accent})`, color:"#fff", flex:1, justifyContent:"center" }}>
             {mut.isPending ? "Submitting…" : "Submit Rating"}
           </button>
@@ -374,11 +413,11 @@ function RateModal({ ticket, onClose }) {
   );
 }
 
-function TicketDetail({ ticketNumber, onBack, onRate }) {
+function TicketDetail({ ticketNumber, onBack, onRate, canRate }) {
   const { data, isLoading } = useGetTicketDetail(ticketNumber);
   const [tab, setTab] = useState("overview");
   const ticket = data?.ticket;
-  const canRate = ticket && ["resolved","closed"].includes(ticket.status) && !ticket.submitterRating;
+  const canRateThisTicket = canRate && ticket && ["resolved","closed"].includes(ticket.status) && !ticket.submitterRating;
 
   if (isLoading) return (
     <div className="t-detail">
@@ -397,7 +436,7 @@ function TicketDetail({ ticketNumber, onBack, onRate }) {
   );
 
   const tm = TICKET_TYPES[ticket.type] || { dot:C.primary };
-  const TABS = [{ key:"overview", label:"Overview" }, { key:"timeline", label:`Timeline (${ticket.timeline?.length || 0})` }, { key:"updates", label:"Updates" }];
+  const TABS = [{ key:"overview", label:"Overview" }, { key:"timeline", label:`Timeline (${ticket.timeline?.length||0})` }, { key:"updates", label:"Updates" }];
 
   return (
     <div className="t-detail">
@@ -407,7 +446,6 @@ function TicketDetail({ ticketNumber, onBack, onRate }) {
       </button>
 
       <div style={{ background:"#fff", borderRadius:18, border:`1px solid ${C.border}`, overflow:"hidden", boxShadow:"0 4px 24px rgba(80,20,90,.06)" }}>
-
         <div style={{ background:`linear-gradient(130deg,${C.primary}12,${C.accent}08)`, padding:"22px 26px", borderBottom:`1px solid ${C.border}` }}>
           <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:12, flexWrap:"wrap" }}>
             <div style={{ flex:1, minWidth:0 }}>
@@ -424,11 +462,14 @@ function TicketDetail({ ticketNumber, onBack, onRate }) {
                 Submitted {timeAgo(ticket.createdAt)} · SLA: {fmt(ticket.slaDeadline)}
               </div>
             </div>
-            {canRate && (
+            {canRateThisTicket && (
               <button className="t-btn" onClick={() => onRate(ticket)}
                 style={{ background:"linear-gradient(135deg,#D97706,#F59E0B)", color:"#fff", flexShrink:0 }}>
                 ⭐ Rate Resolution
               </button>
+            )}
+            {!canRate && ["resolved","closed"].includes(ticket.status) && !ticket.submitterRating && (
+              <span className="t-chip" style={{ background:"#F3F4F6", color:"#9CA3AF", flexShrink:0 }}>🔒 Rating locked</span>
             )}
           </div>
 
@@ -443,7 +484,6 @@ function TicketDetail({ ticketNumber, onBack, onRate }) {
         </div>
 
         <div style={{ padding:"22px 26px" }}>
-
           {tab === "overview" && (
             <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
               <div>
@@ -452,43 +492,38 @@ function TicketDetail({ ticketNumber, onBack, onRate }) {
                   {ticket.description}
                 </div>
               </div>
-
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-                <InfoRow label="Category"        val={CAT_LABELS[ticket.category] || ticket.category}/>
+                <InfoRow label="Category"        val={CAT_LABELS[ticket.category]||ticket.category}/>
                 <InfoRow label="Severity"        val={<SevChip sev={ticket.severity}/>}/>
                 <InfoRow label="Created"         val={fmtFull(ticket.createdAt)}/>
                 <InfoRow label="SLA Deadline"    val={fmt(ticket.slaDeadline)}/>
                 <InfoRow label="Incident Date"   val={ticket.incidentDate ? fmt(ticket.incidentDate) : "Not specified"}/>
-                <InfoRow label="Location"        val={ticket.incidentLocation || "Not specified"}/>
-                <InfoRow label="Confidentiality" val={(ticket.confidentialityLevel || "").replace(/_/g, " ")}/>
-                <InfoRow label="Anonymous"       val={ticket.isAnonymous ? "Yes" : "No"}/>
+                <InfoRow label="Location"        val={ticket.incidentLocation||"Not specified"}/>
+                <InfoRow label="Confidentiality" val={(ticket.confidentialityLevel||"").replace(/_/g," ")}/>
+                <InfoRow label="Anonymous"       val={ticket.isAnonymous?"Yes":"No"}/>
               </div>
-
               {ticket.witnessNames?.length > 0 && (
                 <div style={{ background:"#FFFBEB", borderRadius:12, padding:14, border:"1px solid rgba(245,158,11,.18)" }}>
                   <div style={{ fontSize:10, fontWeight:700, color:"#78350F", textTransform:"uppercase", letterSpacing:".5px", marginBottom:8, fontFamily:"'Instrument Sans',sans-serif" }}>Witnesses</div>
                   <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
-                    {ticket.witnessNames.map((w, i) => (
+                    {ticket.witnessNames.map((w,i) => (
                       <span key={i} className="t-chip" style={{ background:"#FEF3C7", color:"#78350F" }}>👤 {w}</span>
                     ))}
                   </div>
                 </div>
               )}
-
               {ticket.resolutionSummary && (
                 <div style={{ background:"#F0FDF4", borderRadius:12, padding:16, border:"1px solid rgba(34,197,94,.18)" }}>
                   <div style={{ fontSize:10, fontWeight:700, color:"#065F46", textTransform:"uppercase", letterSpacing:".5px", marginBottom:6, fontFamily:"'Instrument Sans',sans-serif" }}>✓ Resolution Summary</div>
                   <div style={{ fontSize:13, color:"#166534", lineHeight:1.7, fontFamily:"'Instrument Sans',sans-serif" }}>{ticket.resolutionSummary}</div>
                 </div>
               )}
-
               {ticket.rejectionReason && (
                 <div style={{ background:"#FEF2F2", borderRadius:12, padding:16, border:"1px solid rgba(239,68,68,.18)" }}>
                   <div style={{ fontSize:10, fontWeight:700, color:"#7F1D1D", textTransform:"uppercase", letterSpacing:".5px", marginBottom:6, fontFamily:"'Instrument Sans',sans-serif" }}>✕ Rejection Reason</div>
                   <div style={{ fontSize:13, color:"#7F1D1D", lineHeight:1.7, fontFamily:"'Instrument Sans',sans-serif" }}>{ticket.rejectionReason}</div>
                 </div>
               )}
-
               {ticket.submitterRating && (
                 <div style={{ background:"#FFFBEB", borderRadius:12, padding:14, border:"1px solid rgba(245,158,11,.18)" }}>
                   <div style={{ fontSize:10, fontWeight:700, color:"#78350F", textTransform:"uppercase", letterSpacing:".5px", marginBottom:6, fontFamily:"'Instrument Sans',sans-serif" }}>Your Rating</div>
@@ -498,15 +533,14 @@ function TicketDetail({ ticketNumber, onBack, onRate }) {
                   </div>
                 </div>
               )}
-
               <div style={{ background:C.surface, borderRadius:12, padding:16, border:`1px solid ${C.border}` }}>
                 <div style={{ fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:".5px", marginBottom:12, fontFamily:"'Instrument Sans',sans-serif" }}>SLA Metrics</div>
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 }}>
                   <div>
                     <div style={{ fontSize:10, color:C.muted, fontFamily:"'Instrument Sans',sans-serif", marginBottom:4 }}>First Response</div>
-                    <div style={{ fontSize:14, fontWeight:700, color:C.text, fontFamily:"'Syne',sans-serif" }}>{ticket.firstResponseHours != null ? `${ticket.firstResponseHours}h` : "Pending"}</div>
+                    <div style={{ fontSize:14, fontWeight:700, color:C.text, fontFamily:"'Syne',sans-serif" }}>{ticket.firstResponseHours!=null?`${ticket.firstResponseHours}h`:"Pending"}</div>
                   </div>
-                  {ticket.resolutionTimeHours != null && (
+                  {ticket.resolutionTimeHours!=null && (
                     <div>
                       <div style={{ fontSize:10, color:C.muted, fontFamily:"'Instrument Sans',sans-serif", marginBottom:4 }}>Resolution</div>
                       <div style={{ fontSize:14, fontWeight:700, color:"#065F46", fontFamily:"'Syne',sans-serif" }}>{ticket.resolutionTimeHours}h</div>
@@ -514,7 +548,7 @@ function TicketDetail({ ticketNumber, onBack, onRate }) {
                   )}
                   <div>
                     <div style={{ fontSize:10, color:C.muted, fontFamily:"'Instrument Sans',sans-serif", marginBottom:4 }}>Reopened</div>
-                    <div style={{ fontSize:14, fontWeight:700, color:C.text, fontFamily:"'Syne',sans-serif" }}>{ticket.reopenCount || 0}×</div>
+                    <div style={{ fontSize:14, fontWeight:700, color:C.text, fontFamily:"'Syne',sans-serif" }}>{ticket.reopenCount||0}×</div>
                   </div>
                 </div>
               </div>
@@ -525,18 +559,18 @@ function TicketDetail({ ticketNumber, onBack, onRate }) {
             <div>
               {!ticket.timeline?.length
                 ? <div style={{ textAlign:"center", padding:"40px 0", color:C.muted, fontFamily:"'Instrument Sans',sans-serif", fontSize:13 }}>No timeline entries yet</div>
-                : [...ticket.timeline].reverse().map((e, i, arr) => {
-                    const dot = TL_COLORS[e.action] || C.primary;
-                    const isLast = i === arr.length - 1;
+                : [...ticket.timeline].reverse().map((e,i,arr) => {
+                    const dot = TL_COLORS[e.action]||C.primary;
+                    const isLast = i===arr.length-1;
                     return (
-                      <div key={e._id || i} style={{ display:"flex", gap:14, marginBottom:isLast ? 0 : 4, animation:`fadeUp .25s ease ${i*.04}s both` }}>
+                      <div key={e._id||i} style={{ display:"flex", gap:14, marginBottom:isLast?0:4, animation:`fadeUp .25s ease ${i*.04}s both` }}>
                         <div style={{ display:"flex", flexDirection:"column", alignItems:"center", width:10, flexShrink:0 }}>
                           <div style={{ width:10, height:10, borderRadius:"50%", background:dot, flexShrink:0, marginTop:4, boxShadow:`0 0 0 3px ${dot}22` }}/>
                           {!isLast && <div style={{ width:1.5, background:`${dot}30`, flex:1, margin:"4px auto", minHeight:14 }}/>}
                         </div>
-                        <div style={{ flex:1, paddingBottom:isLast ? 0 : 18 }}>
+                        <div style={{ flex:1, paddingBottom:isLast?0:18 }}>
                           <div style={{ fontSize:11, fontWeight:700, color:dot, textTransform:"capitalize", letterSpacing:".3px", fontFamily:"'Instrument Sans',sans-serif" }}>
-                            {e.action.replace(/_/g, " ")}
+                            {e.action.replace(/_/g," ")}
                           </div>
                           {e.fromStatus && e.toStatus && (
                             <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:5, flexWrap:"wrap" }}>
@@ -551,7 +585,7 @@ function TicketDetail({ ticketNumber, onBack, onRate }) {
                             </div>
                           )}
                           <div style={{ fontSize:10, color:C.muted, marginTop:5, fontFamily:"'Instrument Sans',sans-serif" }}>
-                            {fmtFull(e.timestamp)}{e.byName && ` · ${e.byName}`}
+                            {fmtFull(e.timestamp)}{e.byName&&` · ${e.byName}`}
                           </div>
                         </div>
                       </div>
@@ -580,11 +614,10 @@ function TicketDetail({ ticketNumber, onBack, onRate }) {
                   </div>
                 )
               }
-
               {ticket.statusHistory?.length > 0 && (
                 <div>
                   <div style={{ fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:".5px", marginBottom:10, fontFamily:"'Instrument Sans',sans-serif" }}>Status History</div>
-                  {[...ticket.statusHistory].reverse().map((h, i) => (
+                  {[...ticket.statusHistory].reverse().map((h,i) => (
                     <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 14px", background:C.surface, borderRadius:10, marginBottom:6, border:`1px solid ${C.border}`, animation:`fadeUp .2s ease ${i*.04}s both` }}>
                       <StatusChip status={h.status}/>
                       <div style={{ flex:1, fontSize:11, color:C.muted, fontFamily:"'Instrument Sans',sans-serif" }}>
@@ -603,11 +636,35 @@ function TicketDetail({ ticketNumber, onBack, onRate }) {
   );
 }
 
-function MyTickets() {
-  const { data, isLoading } = useGetMyTickets();
-  const [selected, setSelected] = useState(null);
-  const [rateTarget, setRateTarget] = useState(null);
+function MyTickets({ canView, canRate }) {
+  const { data, isLoading } = useGetMyTickets({ enabled: canView });
+  const [selected,    setSelected]    = useState(null);
+  const [rateTarget,  setRateTarget]  = useState(null);
+  const [showLocked,  setShowLocked]  = useState(!canView);
   const tickets = data?.tickets || [];
+
+  if (!canView) return (
+    <>
+      {showLocked && (
+        <LockedPopup
+          onClose={() => setShowLocked(false)}
+          title="Permission Required"
+          message="You don't have permission to view tickets. Contact your Super Admin to enable ticket viewing access."
+        />
+      )}
+      <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"320px", gap:16 }}>
+        <div style={{ width:64, height:64, borderRadius:20, background:"linear-gradient(135deg,#FEF2F2,#FEE2E2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:28 }}>🔒</div>
+        <div style={{ fontSize:15, fontWeight:700, color:C.text, fontFamily:"'Syne',sans-serif" }}>Access Restricted</div>
+        <div style={{ fontSize:12, color:C.muted, fontFamily:"'Instrument Sans',sans-serif", textAlign:"center", maxWidth:280, lineHeight:1.7 }}>
+          You don't have permission to view tickets.
+        </div>
+        <button className="t-btn" onClick={() => setShowLocked(true)}
+          style={{ background:`linear-gradient(135deg,${C.primary},${C.accent})`, color:"#fff" }}>
+          Learn More
+        </button>
+      </div>
+    </>
+  );
 
   if (isLoading) return <Spinner />;
 
@@ -618,6 +675,7 @@ function MyTickets() {
           ticketNumber={selected}
           onBack={() => setSelected(null)}
           onRate={t => setRateTarget(t)}
+          canRate={canRate}
         />
         {rateTarget && <RateModal ticket={rateTarget} onClose={() => setRateTarget(null)} />}
       </>
@@ -639,7 +697,7 @@ function MyTickets() {
       <div style={{ width:"100%", maxWidth:720 }}>
         {tickets.map((t, i) => {
           const tm = TICKET_TYPES[t.type] || { dot:C.primary };
-          const canRate = ["resolved","closed"].includes(t.status) && !t.submitterRating;
+          const canRateThis = canRate && ["resolved","closed"].includes(t.status) && !t.submitterRating;
 
           return (
             <div
@@ -651,51 +709,41 @@ function MyTickets() {
               <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:8, flexWrap:"wrap" }}>
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:8, alignItems:"center" }}>
-                    <span style={{ fontSize:10, fontWeight:700, color:C.muted, fontFamily:"'Instrument Sans',sans-serif", letterSpacing:".4px" }}>
-                      {t.ticketNumber}
-                    </span>
+                    <span style={{ fontSize:10, fontWeight:700, color:C.muted, fontFamily:"'Instrument Sans',sans-serif", letterSpacing:".4px" }}>{t.ticketNumber}</span>
                     <TypeChip type={t.type}/>
                     <StatusChip status={t.status}/>
-                    {t.isAnonymous && <span className="t-chip" style={{ background:"#F3F4F6", color:"#6B7280" }}>Anonymous</span>}
-                    {t.isOverdue && <span className="t-chip" style={{ background:"#FEF2F2", color:"#991B1B", animation:"pulse 1.5s infinite" }}>⚠ Overdue</span>}
-                    {t.isEscalated && <span className="t-chip" style={{ background:"#FFF7ED", color:"#9A3412" }}>🔺 Escalated</span>}
+                    {t.isAnonymous  && <span className="t-chip" style={{ background:"#F3F4F6", color:"#6B7280" }}>Anonymous</span>}
+                    {t.isOverdue    && <span className="t-chip" style={{ background:"#FEF2F2", color:"#991B1B", animation:"pulse 1.5s infinite" }}>⚠ Overdue</span>}
+                    {t.isEscalated  && <span className="t-chip" style={{ background:"#FFF7ED", color:"#9A3412" }}>🔺 Escalated</span>}
                   </div>
-
                   <div style={{ fontSize:13.5, fontWeight:600, color:C.text, fontFamily:"'Syne',sans-serif", marginBottom:5, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                     {t.title}
                   </div>
-
                   <div style={{ fontSize:11, color:C.muted, fontFamily:"'Instrument Sans',sans-serif" }}>
-                    {CAT_LABELS[t.category] || t.category} · SLA: {fmt(t.slaDeadline)} · {timeAgo(t.createdAt)}
+                    {CAT_LABELS[t.category]||t.category} · SLA: {fmt(t.slaDeadline)} · {timeAgo(t.createdAt)}
                   </div>
-
                   {t.superAdminNote && (
                     <div style={{ marginTop:10, background:"#F0FDF4", borderRadius:8, padding:"8px 12px", fontSize:12, color:"#065F46", fontFamily:"'Instrument Sans',sans-serif", borderLeft:"3px solid #22C55E" }}>
                       <strong>Admin Reply:</strong> {t.superAdminNote}
                     </div>
                   )}
-
                   {t.submitterRating && (
                     <div style={{ marginTop:6, fontSize:11, color:"#92400E", fontFamily:"'Instrument Sans',sans-serif", letterSpacing:1 }}>
-                      {"★".repeat(t.submitterRating)}
-                      {"☆".repeat(5 - t.submitterRating)}
-                      <span style={{ letterSpacing:0 }}>You rated this</span>
+                      {"★".repeat(t.submitterRating)}{"☆".repeat(5-t.submitterRating)}
+                      <span style={{ letterSpacing:0 }}> You rated this</span>
                     </div>
                   )}
                 </div>
-
                 <div style={{ display:"flex", flexDirection:"column", gap:6, alignItems:"flex-end", flexShrink:0 }}>
-                  {canRate && (
-                    <button
-                      className="t-btn"
-                      onClick={e => {
-                        e.stopPropagation();
-                        setRateTarget(t);
-                      }}
-                      style={{ background:"linear-gradient(135deg,#D97706,#F59E0B)", color:"#fff", fontSize:11, padding:"6px 12px" }}
-                    >
+                  {canRateThis && (
+                    <button className="t-btn"
+                      onClick={e => { e.stopPropagation(); setRateTarget(t); }}
+                      style={{ background:"linear-gradient(135deg,#D97706,#F59E0B)", color:"#fff", fontSize:11, padding:"6px 12px" }}>
                       ⭐ Rate
                     </button>
+                  )}
+                  {!canRate && ["resolved","closed"].includes(t.status) && !t.submitterRating && (
+                    <span className="t-chip" style={{ background:"#F3F4F6", color:"#9CA3AF" }}>🔒 Locked</span>
                   )}
                   <span style={{ fontSize:10, color:C.muted, fontFamily:"'Instrument Sans',sans-serif" }}>Tap to view →</span>
                 </div>
@@ -704,16 +752,19 @@ function MyTickets() {
           );
         })}
       </div>
-
       {rateTarget && <RateModal ticket={rateTarget} onClose={() => setRateTarget(null)} />}
     </div>
   );
 }
 
-export default function AdminTickets() {
+export default function AdminTickets({ permissions = {} }) {
   const [tab, setTab] = useState("submit");
   const { data } = useGetMyTickets();
   const count = data?.count || 0;
+
+  const canRaise = !!permissions?.tickets?.can_raise_ticket;
+  const canView  = !!permissions?.tickets?.can_view_all_tickets;
+  const canRate  = !!permissions?.tickets?.can_rate_ticket;
 
   return (
     <div style={{ minHeight:"100vh", background:C.bg, fontFamily:"'Instrument Sans',sans-serif", padding:"32px 36px" }}>
@@ -725,9 +776,7 @@ export default function AdminTickets() {
             🎫
           </div>
           <div>
-            <h1 style={{ fontSize:22, fontWeight:800, color:C.text, margin:0, fontFamily:"'Syne',sans-serif" }}>
-              My Tickets
-            </h1>
+            <h1 style={{ fontSize:22, fontWeight:800, color:C.text, margin:0, fontFamily:"'Syne',sans-serif" }}>My Tickets</h1>
             <p style={{ fontSize:12, color:C.muted, margin:"3px 0 0", fontFamily:"'Instrument Sans',sans-serif" }}>
               Admin · Submit &amp; track grievances, complaints, and suggestions
             </p>
@@ -735,13 +784,15 @@ export default function AdminTickets() {
         </div>
 
         <div style={{ display:"flex", gap:3, background:"rgba(230,220,245,.55)", borderRadius:12, padding:4, marginBottom:26, width:"fit-content", border:`1px solid ${C.border}` }}>
-          {[["submit","📝 Submit New"], ["mytickets", `📋 My Tickets${count ? ` (${count})` : ""}`]].map(([k, l]) => (
+          {[
+            ["submit",    `📝 Submit New${!canRaise ? " 🔒" : ""}`],
+            ["mytickets", `📋 My Tickets${count ? ` (${count})` : ""}${!canView ? " 🔒" : ""}`],
+          ].map(([k, l]) => (
             <button
               key={k}
               onClick={() => setTab(k)}
               className={tab===k ? "t-tab-active" : "t-tab-idle"}
-              style={{ padding:"8px 20px", borderRadius:9, border:"none", cursor:"pointer", fontSize:12.5, fontWeight:tab===k?600:400, fontFamily:"'Instrument Sans',sans-serif", transition:"all .2s" }}
-            >
+              style={{ padding:"8px 20px", borderRadius:9, border:"none", cursor:"pointer", fontSize:12.5, fontWeight:tab===k?600:400, fontFamily:"'Instrument Sans',sans-serif", transition:"all .2s" }}>
               {l}
             </button>
           ))}
@@ -749,8 +800,8 @@ export default function AdminTickets() {
       </div>
 
       <div style={{ maxWidth:720, margin:"0 auto" }}>
-        {tab === "submit" && <SubmitForm onSuccess={() => setTab("mytickets")} />}
-        {tab === "mytickets" && <MyTickets />}
+        {tab === "submit"    && <SubmitForm onSuccess={() => setTab("mytickets")} canRaise={canRaise} />}
+        {tab === "mytickets" && <MyTickets canView={canView} canRate={canRate} />}
       </div>
     </div>
   );
