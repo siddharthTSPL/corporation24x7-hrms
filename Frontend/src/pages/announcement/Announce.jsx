@@ -35,9 +35,9 @@ const PRIORITY_CONFIG = {
 };
 
 const AUDIENCE_CONFIG = {
-  all: { label: "All", color: "bg-[#EEEDFE] text-[#3C3489]" },
+  all:       { label: "All",       color: "bg-[#EEEDFE] text-[#3C3489]" },
   employees: { label: "Employees", color: "bg-[#E6F1FB] text-[#0C447C]" },
-  managers: { label: "Managers", color: "bg-[#FBEAF0] text-[#730042]" },
+  managers:  { label: "Managers",  color: "bg-[#FBEAF0] text-[#730042]" },
 };
 
 const AVATAR_BG = ["#730042", "#993556", "#72243E", "#CD166E", "#4B1528"];
@@ -52,14 +52,17 @@ function IconMegaphone({ size = 20, color = "currentColor" }) {
 function IconAlert({ size = 18, color = "currentColor" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8">
-      <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
     </svg>
   );
 }
 function IconGlobe({ size = 18, color = "currentColor" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8">
-      <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" />
+      <circle cx="12" cy="12" r="10" />
+      <line x1="2" y1="12" x2="22" y2="12" />
       <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
     </svg>
   );
@@ -67,14 +70,16 @@ function IconGlobe({ size = 18, color = "currentColor" }) {
 function IconClock({ size = 18, color = "currentColor" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8">
-      <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
     </svg>
   );
 }
 function IconFile({ size = 18, color = "currentColor" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
     </svg>
   );
 }
@@ -99,21 +104,24 @@ function IconTrash({ size = 13 }) {
 function IconPlus({ size = 14 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
     </svg>
   );
 }
 function IconClose({ size = 13 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
     </svg>
   );
 }
 function IconLock({ size = 12, color = "currentColor" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
-      <rect x="3" y="11" width="18" height="10" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+      <rect x="3" y="11" width="18" height="10" rx="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
   );
 }
@@ -158,8 +166,8 @@ function PriorityBadge({ priority }) {
   const cfg = PRIORITY_CONFIG[priority];
   if (!cfg) return null;
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold ${cfg.badge}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold whitespace-nowrap ${cfg.badge}`}>
+      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
       {cfg.label}
     </span>
   );
@@ -169,13 +177,30 @@ function AudienceBadge({ audience }) {
   const cfg = AUDIENCE_CONFIG[audience];
   if (!cfg) return null;
   return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold ${cfg.color}`}>
+    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold whitespace-nowrap ${cfg.color}`}>
       {cfg.label}
     </span>
   );
 }
 
-function SkeletonRows() {
+function SkeletonCard() {
+  return (
+    <div className="bg-white rounded-[14px] border border-[#F4C0D1] overflow-hidden animate-pulse">
+      <div className="w-full h-32 bg-[#FBEAF0]" />
+      <div className="p-4 space-y-3">
+        <div className="flex gap-2">
+          <div className="h-6 w-16 bg-[#FBEAF0] rounded-full" />
+          <div className="h-6 w-16 bg-[#FBEAF0] rounded-full" />
+        </div>
+        <div className="h-3 w-3/4 bg-[#FBEAF0] rounded" />
+        <div className="h-3 w-full bg-[#FBEAF0] rounded" />
+        <div className="h-3 w-2/3 bg-[#FBEAF0] rounded" />
+      </div>
+    </div>
+  );
+}
+
+function SkeletonTableRows() {
   return [...Array(3)].map((_, i) => (
     <tr key={i}>
       {[...Array(7)].map((_, j) => (
@@ -187,14 +212,87 @@ function SkeletonRows() {
   ));
 }
 
+function SkeletonMobileRows() {
+  return [...Array(3)].map((_, i) => (
+    <div key={i} className="bg-white rounded-[14px] border border-[#F4C0D1] p-4 animate-pulse space-y-3">
+      <div className="flex gap-3">
+        <div className="w-12 h-12 rounded-[9px] bg-[#FBEAF0] flex-shrink-0" />
+        <div className="flex-1 space-y-2">
+          <div className="h-3 w-3/4 bg-[#FBEAF0] rounded" />
+          <div className="h-3 w-full bg-[#FBEAF0] rounded" />
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <div className="h-6 w-16 bg-[#FBEAF0] rounded-full" />
+        <div className="h-6 w-16 bg-[#FBEAF0] rounded-full" />
+      </div>
+    </div>
+  ));
+}
+
 function ModalOverlay({ onClose, children }) {
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center z-50 px-4"
+      className="fixed inset-0 flex items-end sm:items-center justify-center z-50 px-0 sm:px-4"
       style={{ background: "rgba(115,0,66,0.32)", backdropFilter: "blur(2px)" }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       {children}
+    </div>
+  );
+}
+
+function MobileAnnouncementCard({ item, idx, canEdit, canDelete, onEdit, onDelete }) {
+  return (
+    <div className="bg-white rounded-[14px] border border-[#F4C0D1] overflow-hidden">
+      <div className="flex items-start gap-3 p-4">
+        <ImageOrPlaceholder
+          src={item.notice_image}
+          alt="notice"
+          className="w-12 h-12 object-cover rounded-[9px] border border-[#F4C0D1] flex-shrink-0"
+          placeholderBg={AVATAR_BG[idx % AVATAR_BG.length]}
+        />
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] font-semibold text-[#730042] truncate">{item.title}</p>
+          <p className="text-[11px] text-[#993556] mt-0.5 line-clamp-2 leading-relaxed">{item.message}</p>
+        </div>
+      </div>
+
+      <div className="px-4 pb-3 flex flex-wrap items-center gap-2">
+        <PriorityBadge priority={item.priority} />
+        <AudienceBadge audience={item.audience} />
+        {item.expiresAt && (
+          <span className="text-[10px] text-[#B4B2A9]">
+            Expires {new Date(item.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+          </span>
+        )}
+        <span className="text-[10px] text-[#B4B2A9] ml-auto">
+          {new Date(item.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+        </span>
+      </div>
+
+      {(canEdit || canDelete) && (
+        <div className="px-4 pb-4 flex gap-2 border-t border-[#FBEAF0] pt-3">
+          {canEdit && (
+            <button
+              onClick={() => onEdit(item)}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-[8px] border border-[#F4C0D1] text-[12px] font-medium text-[#993556] hover:bg-[#FBEAF0] hover:text-[#CD166E] transition-all"
+              style={{ background: "#F9F8F2" }}
+            >
+              <IconEdit size={12} /> Edit
+            </button>
+          )}
+          {canDelete && (
+            <button
+              onClick={() => onDelete(item)}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-[8px] border border-[#F4C0D1] text-[12px] font-medium text-[#993556] hover:bg-[#FCEBEB] hover:text-[#A32D2D] transition-all"
+              style={{ background: "#F9F8F2" }}
+            >
+              <IconTrash size={12} /> Delete
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -208,7 +306,7 @@ export default function AnnouncementPage() {
 
   const can = usePermissionStore((state) => state.can);
   const canCreate = can("announcements.can_create_announcement");
-  const canEdit = can("announcements.can_edit_announcement");
+  const canEdit   = can("announcements.can_edit_announcement");
   const canDelete = can("announcements.can_delete_announcement");
 
   const { mutate: createAnnouncement, isPending: isCreating } = useCreateAnnouncement();
@@ -230,12 +328,12 @@ export default function AnnouncementPage() {
     if (!canEdit) return;
     setSelectedItem(item);
     setForm({
-      title: item.title,
-      message: item.message,
-      audience: item.audience,
-      priority: item.priority,
+      title:        item.title,
+      message:      item.message,
+      audience:     item.audience,
+      priority:     item.priority,
       notice_image: item.notice_image || "",
-      expiresAt: item.expiresAt ? new Date(item.expiresAt).toISOString().split("T")[0] : "",
+      expiresAt:    item.expiresAt ? new Date(item.expiresAt).toISOString().split("T")[0] : "",
     });
     setErrors({});
     setModalMode("edit");
@@ -277,23 +375,24 @@ export default function AnnouncementPage() {
   };
 
   const stats = [
-    { label: "Total", value: announcements.length, icon: <IconFile size={18} color="#CD166E" />, bg: "bg-[#FBEAF0]" },
-    { label: "High priority", value: announcements.filter((a) => a.priority === "high").length, icon: <IconAlert size={18} color="#A32D2D" />, bg: "bg-[#FCEBEB]" },
-    { label: "Audience: all", value: announcements.filter((a) => a.audience === "all").length, icon: <IconGlobe size={18} color="#3C3489" />, bg: "bg-[#EEEDFE]" },
-    { label: "With expiry", value: announcements.filter((a) => a.expiresAt && new Date(a.expiresAt) > new Date()).length, icon: <IconClock size={18} color="#633806" />, bg: "bg-[#FAEEDA]" },
+    { label: "Total",         value: announcements.length,                                                                                           icon: <IconFile  size={18} color="#CD166E" />, bg: "bg-[#FBEAF0]" },
+    { label: "High priority", value: announcements.filter((a) => a.priority === "high").length,                                                      icon: <IconAlert size={18} color="#A32D2D" />, bg: "bg-[#FCEBEB]" },
+    { label: "Audience: all", value: announcements.filter((a) => a.audience === "all").length,                                                       icon: <IconGlobe size={18} color="#3C3489" />, bg: "bg-[#EEEDFE]" },
+    { label: "With expiry",   value: announcements.filter((a) => a.expiresAt && new Date(a.expiresAt) > new Date()).length, icon: <IconClock size={18} color="#633806" />, bg: "bg-[#FAEEDA]" },
   ];
 
   return (
-    <div className="p-4 md:p-8 min-h-screen" style={{ background: "#F9F8F2" }}>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div className="p-4 sm:p-6 md:p-8 min-h-screen" style={{ background: "#F9F8F2" }}>
+
+      <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-3 mb-6 sm:mb-8">
         <div>
-          <h1 className="text-xl font-semibold text-[#730042] tracking-tight">Announcements</h1>
+          <h1 className="text-lg sm:text-xl font-semibold text-[#730042] tracking-tight">Announcements</h1>
           <p className="text-[12px] text-[#993556] mt-1">Create and manage announcements for your team</p>
         </div>
         {canCreate ? (
           <button
             onClick={openCreate}
-            className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-2.5 rounded-xl text-[13px] font-medium text-white transition-opacity hover:opacity-88"
+            className="inline-flex items-center justify-center gap-2 w-full xs:w-auto px-5 py-2.5 rounded-xl text-[13px] font-medium text-white transition-opacity hover:opacity-88 flex-shrink-0"
             style={{ background: "#730042" }}
           >
             <IconPlus size={14} />
@@ -301,7 +400,7 @@ export default function AnnouncementPage() {
           </button>
         ) : (
           <div
-            className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-2.5 rounded-xl text-[13px] font-medium text-[#993556] border border-[#F4C0D1] opacity-60"
+            className="inline-flex items-center justify-center gap-2 w-full xs:w-auto px-5 py-2.5 rounded-xl text-[13px] font-medium text-[#993556] border border-[#F4C0D1] opacity-60 flex-shrink-0"
             style={{ background: "#fff" }}
             title="You don't have permission to create announcements"
           >
@@ -311,26 +410,26 @@ export default function AnnouncementPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-6 sm:mb-8">
         {stats.map((s) => (
-          <div key={s.label} className="bg-white rounded-xl border border-[#F4C0D1] p-4 flex items-center gap-4">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${s.bg}`}>
+          <div key={s.label} className="bg-white rounded-xl border border-[#F4C0D1] p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
+            <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${s.bg}`}>
               {s.icon}
             </div>
-            <div>
-              <div className="text-xl font-semibold text-[#730042]">{s.value}</div>
-              <div className="text-[11px] text-[#993556] mt-0.5">{s.label}</div>
+            <div className="min-w-0">
+              <div className="text-lg sm:text-xl font-semibold text-[#730042]">{s.value}</div>
+              <div className="text-[10px] sm:text-[11px] text-[#993556] mt-0.5 truncate">{s.label}</div>
             </div>
           </div>
         ))}
       </div>
 
       {!isLoading && announcements.length > 0 && (
-        <div className="mb-8">
+        <div className="mb-6 sm:mb-8">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-[#993556] mb-3">
             Latest announcements
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {announcements.slice(0, 3).map((item, idx) => (
               <div
                 key={item._id}
@@ -339,11 +438,11 @@ export default function AnnouncementPage() {
                 <ImageOrPlaceholder
                   src={item.notice_image}
                   alt={item.title}
-                  className="w-full h-32 object-cover"
+                  className="w-full h-28 sm:h-32 object-cover"
                   placeholderBg={AVATAR_BG[idx % AVATAR_BG.length]}
                 />
-                <div className="p-4">
-                  <div className="flex items-center justify-between gap-2 mb-2.5">
+                <div className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between gap-2 mb-2.5 flex-wrap">
                     <PriorityBadge priority={item.priority} />
                     <AudienceBadge audience={item.audience} />
                   </div>
@@ -363,132 +462,161 @@ export default function AnnouncementPage() {
       )}
 
       <div className="bg-white rounded-[14px] border border-[#F4C0D1] overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#F4C0D1] flex items-center justify-between">
+        <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#F4C0D1] flex items-center justify-between gap-3">
           <span className="text-[13px] font-semibold text-[#730042]">All announcements</span>
-          <span className="text-[11px] font-semibold px-3 py-1 rounded-full bg-[#FBEAF0] text-[#730042]">
+          <span className="text-[11px] font-semibold px-3 py-1 rounded-full bg-[#FBEAF0] text-[#730042] flex-shrink-0">
             {announcements.length} total
           </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[820px] text-sm">
-            <thead>
-              <tr className="border-b border-[#F4C0D1]" style={{ background: "#F9F8F2" }}>
-                {["Image", "Title & Message", "Audience", "Priority", "Expiry", "Created", "Actions"].map((h) => (
-                  <th
-                    key={h}
-                    className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-[#993556]"
-                    style={h === "Actions" ? { textAlign: "center" } : {}}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-[#FBEAF0]">
-              {isLoading ? (
-                <SkeletonRows />
-              ) : isError ? (
-                <tr>
-                  <td colSpan={7} className="py-16 text-center">
-                    <div className="flex flex-col items-center gap-2">
-                      <IconAlert size={28} color="#A32D2D" />
-                      <p className="text-[13px] font-semibold text-[#730042]">Failed to load announcements</p>
-                      <p className="text-[11px] text-[#993556]">Check your network and try again</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : announcements.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-20 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-[#FBEAF0] flex items-center justify-center">
-                        <IconMegaphone size={22} color="#CD166E" />
-                      </div>
-                      <p className="text-[13px] font-semibold text-[#730042]">No announcements yet</p>
-                      <p className="text-[11px] text-[#993556]">Click "New Announcement" to get started</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                announcements.map((item, idx) => (
-                  <tr
-                    key={item._id}
-                    className="transition-colors duration-100"
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "#FEF4F9")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                  >
-                    <td className="px-5 py-4">
-                      <ImageOrPlaceholder
-                        src={item.notice_image}
-                        alt="notice"
-                        className="w-10 h-10 object-cover rounded-[9px] border border-[#F4C0D1]"
-                        placeholderBg={AVATAR_BG[idx % AVATAR_BG.length]}
-                      />
-                    </td>
-
-                    <td className="px-5 py-4 max-w-[200px]">
-                      <p className="text-[13px] font-semibold text-[#730042] truncate">{item.title}</p>
-                      <p className="text-[11px] text-[#993556] truncate mt-0.5">{item.message}</p>
-                    </td>
-
-                    <td className="px-5 py-4"><AudienceBadge audience={item.audience} /></td>
-
-                    <td className="px-5 py-4"><PriorityBadge priority={item.priority} /></td>
-
-                    <td className="px-5 py-4 text-[11px] text-[#B4B2A9]">
-                      {item.expiresAt
-                        ? new Date(item.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
-                        : <span className="text-[#D3D1C7]">—</span>}
-                    </td>
-
-                    <td className="px-5 py-4 text-[11px] text-[#B4B2A9]">
-                      {new Date(item.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                    </td>
-
-                    <td className="px-5 py-4">
-                      {canEdit || canDelete ? (
-                        <div className="flex items-center justify-center gap-2">
-                          {canEdit && (
-                            <button
-                              onClick={() => openEdit(item)}
-                              title="Edit"
-                              className="w-8 h-8 rounded-[8px] border border-[#F4C0D1] flex items-center justify-center text-[#993556] transition-all hover:bg-[#FBEAF0] hover:text-[#CD166E] hover:border-[#F4C0D1]"
-                              style={{ background: "#F9F8F2" }}
-                            >
-                              <IconEdit size={12} />
-                            </button>
-                          )}
-                          {canDelete && (
-                            <button
-                              onClick={() => setDeleteTarget(item)}
-                              title="Delete"
-                              className="w-8 h-8 rounded-[8px] border border-[#F4C0D1] flex items-center justify-center text-[#993556] transition-all hover:bg-[#FCEBEB] hover:text-[#A32D2D] hover:border-[#F7C1C1]"
-                              style={{ background: "#F9F8F2" }}
-                            >
-                              <IconTrash size={12} />
-                            </button>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center text-[#D3D1C7]">
-                          <IconLock size={12} />
-                        </div>
-                      )}
-                    </td>
+        {isLoading ? (
+          <>
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full min-w-[820px] text-sm">
+                <thead>
+                  <tr className="border-b border-[#F4C0D1]" style={{ background: "#F9F8F2" }}>
+                    {["Image", "Title & Message", "Audience", "Priority", "Expiry", "Created", "Actions"].map((h) => (
+                      <th key={h} className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-[#993556]"
+                        style={h === "Actions" ? { textAlign: "center" } : {}}>
+                        {h}
+                      </th>
+                    ))}
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody className="divide-y divide-[#FBEAF0]">
+                  <SkeletonTableRows />
+                </tbody>
+              </table>
+            </div>
+            <div className="md:hidden p-4 space-y-3">
+              <SkeletonMobileRows />
+            </div>
+          </>
+        ) : isError ? (
+          <div className="py-14 sm:py-16 text-center">
+            <div className="flex flex-col items-center gap-2">
+              <IconAlert size={28} color="#A32D2D" />
+              <p className="text-[13px] font-semibold text-[#730042]">Failed to load announcements</p>
+              <p className="text-[11px] text-[#993556]">Check your network and try again</p>
+            </div>
+          </div>
+        ) : announcements.length === 0 ? (
+          <div className="py-16 sm:py-20 text-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-[#FBEAF0] flex items-center justify-center">
+                <IconMegaphone size={22} color="#CD166E" />
+              </div>
+              <p className="text-[13px] font-semibold text-[#730042]">No announcements yet</p>
+              <p className="text-[11px] text-[#993556]">Click "New Announcement" to get started</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full min-w-[820px] text-sm">
+                <thead>
+                  <tr className="border-b border-[#F4C0D1]" style={{ background: "#F9F8F2" }}>
+                    {["Image", "Title & Message", "Audience", "Priority", "Expiry", "Created", "Actions"].map((h) => (
+                      <th
+                        key={h}
+                        className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-[#993556]"
+                        style={h === "Actions" ? { textAlign: "center" } : {}}
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#FBEAF0]">
+                  {announcements.map((item, idx) => (
+                    <tr
+                      key={item._id}
+                      className="transition-colors duration-100"
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "#FEF4F9")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    >
+                      <td className="px-5 py-4">
+                        <ImageOrPlaceholder
+                          src={item.notice_image}
+                          alt="notice"
+                          className="w-10 h-10 object-cover rounded-[9px] border border-[#F4C0D1]"
+                          placeholderBg={AVATAR_BG[idx % AVATAR_BG.length]}
+                        />
+                      </td>
+                      <td className="px-5 py-4 max-w-[200px]">
+                        <p className="text-[13px] font-semibold text-[#730042] truncate">{item.title}</p>
+                        <p className="text-[11px] text-[#993556] truncate mt-0.5">{item.message}</p>
+                      </td>
+                      <td className="px-5 py-4"><AudienceBadge audience={item.audience} /></td>
+                      <td className="px-5 py-4"><PriorityBadge priority={item.priority} /></td>
+                      <td className="px-5 py-4 text-[11px] text-[#B4B2A9]">
+                        {item.expiresAt
+                          ? new Date(item.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                          : <span className="text-[#D3D1C7]">—</span>}
+                      </td>
+                      <td className="px-5 py-4 text-[11px] text-[#B4B2A9]">
+                        {new Date(item.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                      </td>
+                      <td className="px-5 py-4">
+                        {canEdit || canDelete ? (
+                          <div className="flex items-center justify-center gap-2">
+                            {canEdit && (
+                              <button
+                                onClick={() => openEdit(item)}
+                                title="Edit"
+                                className="w-8 h-8 rounded-[8px] border border-[#F4C0D1] flex items-center justify-center text-[#993556] transition-all hover:bg-[#FBEAF0] hover:text-[#CD166E]"
+                                style={{ background: "#F9F8F2" }}
+                              >
+                                <IconEdit size={12} />
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button
+                                onClick={() => setDeleteTarget(item)}
+                                title="Delete"
+                                className="w-8 h-8 rounded-[8px] border border-[#F4C0D1] flex items-center justify-center text-[#993556] transition-all hover:bg-[#FCEBEB] hover:text-[#A32D2D]"
+                                style={{ background: "#F9F8F2" }}
+                              >
+                                <IconTrash size={12} />
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center text-[#D3D1C7]">
+                            <IconLock size={12} />
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="md:hidden p-4 space-y-3">
+              {announcements.map((item, idx) => (
+                <MobileAnnouncementCard
+                  key={item._id}
+                  item={item}
+                  idx={idx}
+                  canEdit={canEdit}
+                  canDelete={canDelete}
+                  onEdit={openEdit}
+                  onDelete={setDeleteTarget}
+                />
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {modalMode && (canCreate || canEdit) && (
         <ModalOverlay onClose={closeModal}>
-          <div className="bg-white w-full max-w-lg rounded-2xl max-h-[92vh] overflow-y-auto border border-[#F4C0D1]">
-            <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-[#F4C0D1] rounded-t-2xl" style={{ background: "#730042" }}>
+          <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[95vh] sm:max-h-[92vh] overflow-y-auto border border-[#F4C0D1] sm:border">
+            <div
+              className="sticky top-0 z-10 flex items-center justify-between px-5 sm:px-6 py-4 border-b border-[#F4C0D1] rounded-t-2xl"
+              style={{ background: "#730042" }}
+            >
               <div>
                 <h2 className="text-[15px] font-semibold text-white">
                   {modalMode === "create" ? "New Announcement" : "Edit Announcement"}
@@ -497,7 +625,7 @@ export default function AnnouncementPage() {
               </div>
               <button
                 onClick={closeModal}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-white transition-colors"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-white transition-colors flex-shrink-0"
                 style={{ background: "rgba(255,255,255,0.18)" }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.28)")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.18)")}
@@ -506,7 +634,7 @@ export default function AnnouncementPage() {
               </button>
             </div>
 
-            <div className="px-6 py-5 flex flex-col gap-4" style={{ background: "#F9F8F2" }}>
+            <div className="px-5 sm:px-6 py-5 flex flex-col gap-4" style={{ background: "#F9F8F2" }}>
               <Field label="Title" error={errors.title}>
                 <input
                   name="title"
@@ -551,7 +679,7 @@ export default function AnnouncementPage() {
                 )}
               </Field>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <Field label="Audience">
                   <select name="audience" value={form.audience} onChange={handleChange} className={inputCls}>
                     <option value="all">All</option>
@@ -579,10 +707,13 @@ export default function AnnouncementPage() {
               </Field>
             </div>
 
-            <div className="sticky bottom-0 flex flex-col sm:flex-row sm:justify-end gap-3 px-6 py-4 border-t border-[#F4C0D1] rounded-b-2xl" style={{ background: "#F9F8F2" }}>
+            <div
+              className="sticky bottom-0 flex flex-col sm:flex-row sm:justify-end gap-3 px-5 sm:px-6 py-4 border-t border-[#F4C0D1] rounded-b-2xl"
+              style={{ background: "#F9F8F2" }}
+            >
               <button
                 onClick={closeModal}
-                className="px-5 py-2.5 rounded-xl border border-[#F4C0D1] text-[13px] font-medium text-[#730042] transition-colors hover:bg-[#FBEAF0]"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-[#F4C0D1] text-[13px] font-medium text-[#730042] transition-colors hover:bg-[#FBEAF0]"
                 style={{ background: "#fff" }}
               >
                 Cancel
@@ -590,7 +721,7 @@ export default function AnnouncementPage() {
               <button
                 onClick={handleSubmit}
                 disabled={isPending}
-                className="px-6 py-2.5 rounded-xl text-[13px] font-medium text-white transition-opacity disabled:opacity-50 hover:opacity-88"
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-[13px] font-medium text-white transition-opacity disabled:opacity-50 hover:opacity-88"
                 style={{ background: "#730042" }}
               >
                 {isPending
@@ -604,7 +735,7 @@ export default function AnnouncementPage() {
 
       {deleteTarget && canDelete && (
         <ModalOverlay onClose={() => setDeleteTarget(null)}>
-          <div className="bg-white w-full max-w-sm rounded-2xl border border-[#F4C0D1] overflow-hidden">
+          <div className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl border border-[#F4C0D1] overflow-hidden">
             <div className="px-6 pt-8 pb-5 text-center" style={{ background: "#FBEAF0" }}>
               <div
                 className="w-12 h-12 rounded-full border border-[#F7C1C1] flex items-center justify-center mx-auto mb-3"
