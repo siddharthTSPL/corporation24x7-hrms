@@ -19,22 +19,15 @@ const STYLES = `
   @keyframes fadeUp    { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
   @keyframes fadeIn    { from { opacity:0; } to { opacity:1; } }
   @keyframes scaleIn   { from { opacity:0; transform:scale(0.93); } to { opacity:1; transform:scale(1); } }
-  @keyframes shimmer   { 0% { background-position:-600px 0; } 100% { background-position:600px 0; } }
   @keyframes drawH     { from { transform:scaleX(0); } to { transform:scaleX(1); } }
   @keyframes drawV     { from { transform:scaleY(0); } to { transform:scaleY(1); } }
-  @keyframes spin      { to { transform:rotate(360deg); } }
   @keyframes slideR    { from { opacity:0; transform:translateX(28px); } to { opacity:1; transform:translateX(0); } }
-  @keyframes breathe   { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
   @keyframes ringPulse {
     0%,100% { box-shadow: 0 0 0 0 rgba(115,0,66,0.25), 0 4px 20px rgba(115,0,66,0.1); }
     50%      { box-shadow: 0 0 0 7px rgba(115,0,66,0.06), 0 8px 28px rgba(115,0,66,0.18); }
   }
 
-  .su-card-hover {
-    transition: transform 0.16s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.16s ease, border-color 0.14s ease;
-    cursor: pointer;
-    touch-action: manipulation;
-  }
+  .su-card-hover { transition: transform 0.16s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.16s ease, border-color 0.14s ease; cursor: pointer; touch-action: manipulation; }
   .su-card-hover:hover { transform: translateY(-4px) scale(1.015); }
   .su-card-highlight { outline: 2px solid #730042 !important; outline-offset: 3px; box-shadow: 0 0 0 6px rgba(115,0,66,0.1) !important; }
   .su-card-dim { opacity: 0.15; filter: grayscale(0.5) blur(0.3px); transition: opacity 0.22s, filter 0.22s; }
@@ -60,48 +53,37 @@ const normalize   = (s = "") => s.toLowerCase().trim();
 
 function Skeleton({ w, h, r = 8 }) {
   return (
-    <div style={{
-      width: w, height: h, borderRadius: r, flexShrink: 0,
-      background: "linear-gradient(90deg,#f0f4f8 25%,#e4ecf4 50%,#f0f4f8 75%)",
-      backgroundSize: "600px 100%",
-      animation: "shimmer 1.5s infinite linear",
-    }} />
+    <div 
+      className="shrink-0 bg-gray-200 animate-pulse" 
+      style={{ width: w, height: h, borderRadius: r }} 
+    />
   );
 }
 
-// Added className support to hide lines on mobile
-function VLine({ h = 32, delay = 0, className = "" }) {
+function VLine({ h = 32, delay = 0 }) {
   return (
-    <div className={className} style={{
-      width: 1.5, height: h, margin: "0 auto", flexShrink: 0,
-      background: "linear-gradient(to bottom, #dde3ec, #c8d2e0)",
-      transformOrigin: "top",
-      animation: `drawV 0.25s ease ${delay}ms forwards`, transform: "scaleY(0)",
-    }} />
+    <div 
+      className="shrink-0 origin-top mx-auto"
+      style={{ width: 1.5, height: h, background: "linear-gradient(to bottom, #dde3ec, #c8d2e0)", animation: `drawV 0.25s ease ${delay}ms forwards`, transform: "scaleY(0)" }}
+    />
   );
 }
 
-function HLine({ w, delay = 0, className = "" }) {
+function HLine({ w, delay = 0 }) {
   return (
-    <div className={className} style={{
-      width: w, height: 1.5, flexShrink: 0,
-      background: "linear-gradient(to right, #dde3ec, #dde3ec)",
-      transformOrigin: "center",
-      animation: `drawH 0.3s ease ${delay}ms forwards`, transform: "scaleX(0)",
-    }} />
+    <div 
+      className="shrink-0 origin-center"
+      style={{ width: w, height: 1.5, background: "#dde3ec", animation: `drawH 0.3s ease ${delay}ms forwards`, transform: "scaleX(0)" }}
+    />
   );
 }
 
 function Avatar({ initials, size = 48, bg = BRAND, fontSize = 16 }) {
   return (
-    <div style={{
-      width: size, height: size, borderRadius: "50%",
-      background: bg, color: "#fff",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize, fontWeight: 700, flexShrink: 0,
-      letterSpacing: "0.02em",
-      boxShadow: `0 2px 8px ${bg}40`,
-    }}>
+    <div 
+      className="flex items-center justify-center rounded-full font-bold text-white shrink-0"
+      style={{ width: size, height: size, background: bg, fontSize, boxShadow: `0 2px 8px ${bg}40`, letterSpacing: "0.02em" }}
+    >
       {initials}
     </div>
   );
@@ -109,12 +91,10 @@ function Avatar({ initials, size = 48, bg = BRAND, fontSize = 16 }) {
 
 function Badge({ children, color = BRAND, bg = BRAND_LIGHT }) {
   return (
-    <span style={{
-      display: "inline-flex", alignItems: "center",
-      padding: "3px 10px", borderRadius: 20,
-      fontSize: 11, fontWeight: 600, color, background: bg,
-      letterSpacing: "0.02em",
-    }}>
+    <span 
+      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold"
+      style={{ color, background: bg, letterSpacing: "0.02em" }}
+    >
       {children}
     </span>
   );
@@ -131,16 +111,16 @@ function LiveDot() {
 
 function SuperAdminNode({ name, role, initials, delay = 0, onClick }) {
   return (
-    <div style={{ animation: `scaleIn 0.4s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms forwards`, opacity: 0, flexShrink: 0 }}>
+    <div className="opacity-0 shrink-0" style={{ animation: `scaleIn 0.4s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms forwards` }}>
       <div
-        className="su-card-hover su-card-sa w-[200px] max-w-[85vw] sm:w-[210px] bg-white border-[1.5px] border-[#e8edf5] rounded-2xl p-4 sm:p-5 flex flex-col items-center relative overflow-hidden shadow-sm"
+        className="su-card-hover su-card-sa w-[210px] bg-white border-[1.5px] border-[#e8edf5] rounded-2xl p-4 sm:p-5 flex flex-col items-center relative overflow-hidden shadow-sm"
         onClick={onClick}
       >
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#730042] to-[#a8005a] rounded-t-2xl" />
-        <span className="absolute top-3 right-3 text-[9px] font-bold tracking-widest text-gray-400 uppercase">SA</span>
+        <span className="absolute top-3 right-3 text-[9px] font-bold tracking-widest text-gray-400 uppercase" style={{ fontFamily: "'JetBrains Mono',monospace" }}>SA</span>
         <Avatar initials={initials} size={56} bg={BRAND} fontSize={19} />
-        <p className="text-base font-bold text-slate-900 mt-3 text-center">{name}</p>
-        <p className="text-xs text-gray-500 mt-1 text-center">{role}</p>
+        <p className="text-base font-bold text-slate-900 mt-3 text-center break-words">{name}</p>
+        <p className="text-xs text-gray-500 mt-1 text-center break-words">{role}</p>
         <div className="mt-3 flex gap-1.5">
           <Badge>Super Admin</Badge>
         </div>
@@ -152,13 +132,13 @@ function SuperAdminNode({ name, role, initials, delay = 0, onClick }) {
 function AdminNode({ admin, delay = 0, dimmed, highlighted, onClick }) {
   const name = `${admin.f_name} ${admin.l_name}`.trim();
   return (
-    <div style={{ animation: `scaleIn 0.35s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms forwards`, opacity: 0, flexShrink: 0 }}>
+    <div className="opacity-0 shrink-0" style={{ animation: `scaleIn 0.35s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms forwards` }}>
       <div
-        className={`su-card-hover w-[150px] max-w-[80vw] sm:w-[174px] bg-white border-[1.5px] border-[#e8edf5] rounded-xl p-3 sm:p-4 flex flex-col items-center relative overflow-hidden shadow-sm ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
+        className={`su-card-hover w-[174px] bg-white border-[1.5px] border-[#e8edf5] rounded-xl p-3 sm:p-4 flex flex-col items-center relative overflow-hidden shadow-sm ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
         onClick={onClick}
       >
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-indigo-400 rounded-t-xl" />
-        <span className="absolute top-2.5 right-3 text-[9px] font-bold text-indigo-300 uppercase">ADM</span>
+        <span className="absolute top-2.5 right-3 text-[9px] font-bold text-indigo-300 uppercase" style={{ fontFamily: "'JetBrains Mono',monospace" }}>ADM</span>
         <Avatar initials={getInitials(admin.f_name, admin.l_name)} size={44} bg="#6366f1" fontSize={14} />
         <p className="text-[13px] font-semibold text-slate-900 mt-2.5 text-center max-w-[140px] truncate w-full">{name}</p>
         <p className="text-[11px] text-gray-400 mt-1 text-center max-w-[140px] truncate w-full">{admin.designation || "Admin"}</p>
@@ -173,9 +153,9 @@ function AdminNode({ admin, delay = 0, dimmed, highlighted, onClick }) {
 function ManagerNode({ manager, delay = 0, dimmed, highlighted, onClick }) {
   const name = `${manager.f_name} ${manager.l_name}`.trim();
   return (
-    <div style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards`, opacity: 0, flexShrink: 0 }}>
+    <div className="opacity-0 shrink-0" style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards` }}>
       <div
-        className={`su-card-hover w-[135px] max-w-[75vw] sm:w-[152px] bg-[#f9fbfe] border-[1.5px] border-[#e4edf6] rounded-lg p-3 flex flex-col items-center relative overflow-hidden shadow-sm ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
+        className={`su-card-hover w-[152px] bg-[#f9fbfe] border-[1.5px] border-[#e4edf6] rounded-lg p-3 flex flex-col items-center relative overflow-hidden shadow-sm ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
         onClick={onClick}
       >
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-500 to-sky-400 rounded-t-lg" />
@@ -193,9 +173,9 @@ function ManagerNode({ manager, delay = 0, dimmed, highlighted, onClick }) {
 function EmployeeNode({ employee, delay = 0, dimmed, highlighted, onClick }) {
   const name = `${employee.f_name} ${employee.l_name}`.trim();
   return (
-    <div style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards`, opacity: 0, flexShrink: 0 }}>
+    <div className="opacity-0 shrink-0" style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards` }}>
       <div
-        className={`su-card-hover w-[115px] max-w-[70vw] sm:w-[132px] bg-[#fafbfc] border-[1.5px] border-[#e8edf5] rounded-lg p-2.5 flex flex-col items-center relative ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
+        className={`su-card-hover w-[132px] bg-[#fafbfc] border-[1.5px] border-[#e8edf5] rounded-lg p-2.5 flex flex-col items-center relative ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
         onClick={onClick}
       >
         <Avatar initials={getInitials(employee.f_name, employee.l_name)} size={32} bg="#e2e8f0" fontSize={10} />
@@ -210,15 +190,17 @@ function SkeletonTree() {
   return (
     <div className="flex flex-col items-center gap-0">
       <Skeleton w={210} h={130} r={16} />
-      <div className="h-7" />
-      <div className="flex gap-5 flex-wrap justify-center">
+      <div className="w-1.5 h-7 bg-gray-200 mx-auto" />
+      <div className="flex gap-5 justify-center">
         {[1, 2, 3].map(i => (
           <div key={i} className="flex flex-col items-center">
+            <div className="w-1.5 h-5 bg-gray-200 mx-auto" />
             <Skeleton w={174} h={104} r={13} />
-            <div className="h-5" />
-            <div className="flex gap-3.5 flex-wrap justify-center">
+            <div className="w-1.5 h-5 bg-gray-200 mx-auto" />
+            <div className="flex gap-3.5 justify-center">
               {[1, 2].map(j => (
                 <div key={j} className="flex flex-col items-center">
+                  <div className="w-1.5 h-4 bg-gray-200 mx-auto" />
                   <Skeleton w={132} h={82} r={10} />
                 </div>
               ))}
@@ -288,7 +270,6 @@ function EmployeeDetailPanel({ person, type, onClose }) {
       <div className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm animate-[fadeIn_0.2s_ease_forwards]" onClick={onClose} />
       <div className="fixed top-0 right-0 bottom-0 w-full sm:max-w-md md:max-w-lg h-full bg-white shadow-2xl z-50 overflow-y-auto flex flex-col animate-[slideR_0.25s_cubic-bezier(0.22,1,0.36,1)_forwards]">
         
-        {/* Drawer Header */}
         <div className="sticky top-0 bg-white border-b border-gray-100 px-4 sm:px-6 py-4 flex items-center justify-between z-10">
           <div className="min-w-0">
             <h2 className="text-base sm:text-lg font-bold text-slate-900 truncate">Profile details</h2>
@@ -302,10 +283,8 @@ function EmployeeDetailPanel({ person, type, onClose }) {
           </button>
         </div>
 
-        {/* Drawer Content */}
         <div className="p-4 sm:p-6 flex-1 min-w-0">
           
-          {/* Profile Card */}
           <div 
             className="rounded-xl p-4 sm:p-6 mb-5 flex flex-col items-center gap-2.5 border"
             style={{ background: `linear-gradient(135deg, ${accentColor}0d, ${accentColor}05)`, borderColor: `${accentColor}20` }}
@@ -328,7 +307,6 @@ function EmployeeDetailPanel({ person, type, onClose }) {
             </div>
           </div>
 
-          {/* Tabs */}
           {!isSA && (
             <div className="flex gap-2 mb-5 flex-wrap">
               {["info", "leave", "reviews"].map((t) => (
@@ -343,7 +321,6 @@ function EmployeeDetailPanel({ person, type, onClose }) {
             </div>
           )}
 
-          {/* Info Section */}
           {(tab === "info" || isSA) && (
             <div className="bg-[#fafbfc] rounded-xl p-4 sm:px-5 border border-gray-100 flex flex-col min-w-0">
               {fields.map(([label, val]) => (
@@ -460,8 +437,8 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
   const ADM_W   = 174;
 
   return (
-    // Removed inline style minWidth to allow natural wrapping on mobile
-    <div className="flex flex-col items-center w-full min-w-0">
+    // Removed inline style minWidth. Using w-max min-w-full to prevent page cutoff and allow internal scrolling
+    <div className="flex flex-col items-center w-max min-w-full">
       <SuperAdminNode
         name={`${superAdmin?.f_name || ""} ${superAdmin?.l_name || ""}`.trim() || "Super Admin"}
         role={superAdmin?.organisation_name || "Super Admin"}
@@ -472,14 +449,12 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
 
       {admins.length > 0 && (
         <>
-          {/* Spacers and lines hidden on mobile to prevent horizontal scroll */}
-          <div className="h-4 md:hidden"></div>
-          <VLine className="hidden md:block" h={30} delay={220} />
-          {admins.length > 1 && <HLine className="hidden md:block" w={(admins.length - 1) * (ADM_W + ADM_GAP)} delay={280} />}
+          <VLine h={30} delay={220} />
+          {admins.length > 1 && <HLine w={(admins.length - 1) * (ADM_W + ADM_GAP)} delay={280} />}
         </>
       )}
 
-      <div className="flex flex-wrap gap-4 sm:gap-7 justify-center items-start w-full min-w-0 mt-4 md:mt-0">
+      <div className="flex gap-7 justify-center items-start">
         {admins.map((admin, ai) => {
           const admMatch  = hasQ && matchName(admin.f_name, admin.l_name, "", admin.designation);
           const admDimmed = hasQ && !admMatch;
@@ -492,7 +467,7 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
 
           return (
             <div key={admin._id} className="flex flex-col items-center min-w-0">
-              <VLine className="hidden md:block" h={22} delay={admDelay - 60} />
+              <VLine h={22} delay={admDelay - 60} />
               <AdminNode
                 admin={admin}
                 delay={admDelay}
@@ -503,13 +478,12 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
 
               {admManagers.length > 0 && (
                 <>
-                  <div className="h-4 md:hidden"></div>
-                  <VLine className="hidden md:block" h={26} delay={admDelay + 120} />
-                  {admManagers.length > 1 && <HLine className="hidden md:block" w={manTotal} delay={admDelay + 160} />}
+                  <VLine h={26} delay={admDelay + 120} />
+                  {admManagers.length > 1 && <HLine w={manTotal} delay={admDelay + 160} />}
                 </>
               )}
 
-              <div className="flex flex-wrap gap-3 sm:gap-4 justify-center items-start w-full min-w-0 mt-4 md:mt-0">
+              <div className="flex gap-4 justify-center items-start">
                 {admManagers.map((mgr, mi) => {
                   const mgrMatch  = hasQ && matchName(mgr.f_name, mgr.l_name, mgr.department, mgr.designation);
                   const mgrDimmed = hasQ && !mgrMatch && !admMatch;
@@ -525,7 +499,7 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
 
                   return (
                     <div key={mgr._id} className="flex flex-col items-center min-w-0">
-                      <VLine className="hidden md:block" h={18} delay={mgrDelay - 55} />
+                      <VLine h={18} delay={mgrDelay - 55} />
                       <ManagerNode
                         manager={mgr}
                         delay={mgrDelay}
@@ -536,20 +510,19 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
 
                       {mgrEmps.length > 0 && (
                         <>
-                          <div className="h-4 md:hidden"></div>
-                          <VLine className="hidden md:block" h={20} delay={mgrDelay + 100} />
-                          {mgrEmps.length > 1 && <HLine className="hidden md:block" w={empTotal} delay={mgrDelay + 140} />}
+                          <VLine h={20} delay={mgrDelay + 100} />
+                          {mgrEmps.length > 1 && <HLine w={empTotal} delay={mgrDelay + 140} />}
                         </>
                       )}
 
-                      <div className="flex flex-wrap gap-2 sm:gap-3 justify-center items-start w-full min-w-0 mt-4 md:mt-0">
+                      <div className="flex gap-3 justify-center items-start">
                         {mgrEmps.map((emp, ei) => {
                           const empMatch  = hasQ && matchName(emp.f_name, emp.l_name, emp.department, emp.designation);
                           const empDimmed = hasQ && !empMatch && !mgrMatch && !admMatch;
                           const empDelay  = mgrDelay + 180 + ei * 45;
                           return (
                             <div key={emp._id} className="flex flex-col items-center min-w-0">
-                              <VLine className="hidden md:block" h={16} delay={empDelay - 45} />
+                              <VLine h={16} delay={empDelay - 45} />
                               <EmployeeNode
                                 employee={emp}
                                 delay={empDelay}
@@ -642,32 +615,33 @@ export default function SuperAdminOrgChart() {
   ];
 
   return (
-    <div className="su-org min-h-screen bg-[#f4f7fb] w-full overflow-x-hidden min-w-0">
+    <div className="su-org min-h-screen bg-[#f4f7fb] w-full overflow-x-hidden flex flex-col min-w-0">
       <style>{STYLES}</style>
 
       {/* Header / Navigation */}
       <header className="w-full bg-white border-b border-gray-200 shadow-sm overflow-hidden min-w-0">
-        <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4 min-w-0">
+        <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-4 min-w-0">
           
-          {/* Left section */}
+          {/* Left section - Adjusted for mobile */}
           <div className={`flex items-center gap-2 sm:gap-3 min-w-0 ${searchOpen ? "hidden sm:flex" : "flex"}`}>
-            <div className="w-2.5 h-2.5 rounded-full bg-[#730042] shrink-0 shadow-[0_0_0_3px_rgba(115,0,66,0.15)]"></div>
+            <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-[#730042] shrink-0 shadow-[0_0_0_3px_rgba(115,0,66,0.15)]"></div>
+            {/* Org Name hidden on very small screens to save space */}
             <span className="hidden md:inline text-sm text-gray-400 font-medium truncate min-w-0">{orgName}</span>
             <svg className="hidden md:block w-3 h-3 shrink-0" viewBox="0 0 13 13" fill="none">
               <path d="M5 3l3 3.5L5 10" stroke="#d1d5db" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight truncate min-w-0">Org Chart</h1>
-            <span className="hidden sm:inline-block px-2 py-0.5 text-[10.5px] font-bold text-[#730042] bg-[#730042]/10 rounded-full shrink-0">
+            <h1 className="text-sm sm:text-base lg:text-lg font-bold text-slate-900 tracking-tight truncate min-w-0">Org Chart</h1>
+            <span className="px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10.5px] font-bold text-[#730042] bg-[#730042]/10 rounded-full shrink-0">
               Super Admin
             </span>
-            {!loading && <div className="hidden md:block shrink-0"><LiveDot /></div>}
+            {!loading && <div className="hidden sm:block shrink-0"><LiveDot /></div>}
           </div>
 
           {/* Right section */}
           <div className={`flex items-center gap-2 min-w-0 ${searchOpen ? "w-full sm:w-auto sm:ml-auto" : "ml-auto"}`}>
             {searchOpen ? (
               <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
-                <div className="flex items-center gap-2 border-[1.5px] border-[#730042] rounded-lg px-3 h-11 sm:h-9 flex-1 sm:w-72 shadow-[0_0_0_4px_rgba(115,0,66,0.08)] min-w-0">
+                <div className="flex items-center gap-2 border-[1.5px] border-[#730042] rounded-lg px-3 h-10 sm:h-9 flex-1 sm:w-72 shadow-[0_0_0_4px_rgba(115,0,66,0.08)] min-w-0">
                   <svg className="w-3 h-3 shrink-0" viewBox="0 0 13 13" fill="none">
                     <circle cx="5.5" cy="5.5" r="4" stroke="#9ca3af" strokeWidth="1.3" />
                     <path d="M9 9l2.5 2.5" stroke="#9ca3af" strokeWidth="1.3" strokeLinecap="round" />
@@ -693,7 +667,7 @@ export default function SuperAdminOrgChart() {
                   </span>
                 )}
                 <button
-                  className="flex items-center justify-center gap-1.5 px-3 sm:px-4 h-11 sm:h-9 rounded-lg border border-gray-200 bg-white text-gray-600 text-xs font-medium hover:bg-gray-50 shrink-0 min-w-[44px]"
+                  className="flex items-center justify-center gap-1.5 px-3 sm:px-4 h-10 sm:h-9 rounded-lg border border-gray-200 bg-white text-gray-600 text-xs font-medium hover:bg-gray-50 shrink-0 min-w-[44px]"
                   onClick={() => { setSearchOpen(false); setSearchQuery(""); }}
                 >
                   <svg className="w-3 h-3" viewBox="0 0 13 13" fill="none">
@@ -704,7 +678,7 @@ export default function SuperAdminOrgChart() {
               </div>
             ) : (
               <button
-                className="flex items-center gap-1.5 px-3 sm:px-4 h-11 sm:h-9 rounded-lg border border-gray-200 bg-white text-gray-600 text-xs font-medium hover:bg-gray-50 shrink-0 min-w-[44px]"
+                className="flex items-center gap-1.5 px-3 sm:px-4 h-10 sm:h-9 rounded-lg border border-gray-200 bg-white text-gray-600 text-xs font-medium hover:bg-gray-50 shrink-0 min-w-[44px]"
                 onClick={() => setSearchOpen(true)}
               >
                 <svg className="w-3 h-3" viewBox="0 0 13 13" fill="none">
@@ -719,11 +693,11 @@ export default function SuperAdminOrgChart() {
       </header>
 
       {/* Main Content */}
-      <main className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 min-w-0">
+      <main className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 min-w-0 flex-1">
 
         {/* Title Area */}
         <div className="mb-6 lg:mb-8 min-w-0">
-          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight truncate">
+          <h2 className="text-lg sm:text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight truncate">
             Organisation Chart
           </h2>
           <p className="text-xs sm:text-sm text-gray-400 mt-1 truncate">
@@ -732,11 +706,11 @@ export default function SuperAdminOrgChart() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6 mb-6 lg:mb-8 min-w-0">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 lg:mb-8 min-w-0">
           {statItems.map(({ label, value, color }, i) => (
             <div
               key={label}
-              className="relative bg-white border border-gray-200 rounded-xl lg:rounded-2xl p-4 lg:p-5 flex items-center gap-3 lg:gap-4 shadow-sm overflow-hidden hover:shadow-md transition-shadow min-w-0"
+              className="relative bg-white border border-gray-200 rounded-xl lg:rounded-2xl p-3 sm:p-4 lg:p-5 flex items-center gap-3 lg:gap-4 shadow-sm overflow-hidden hover:shadow-md transition-shadow min-w-0"
               style={{ animation: `fadeUp 0.35s ease ${100 + i * 55}ms forwards`, opacity: 0 }}
             >
               <div className="absolute top-0 left-0 right-0 h-1" style={{ background: color }}></div>
@@ -750,10 +724,10 @@ export default function SuperAdminOrgChart() {
                 />
               </div>
               <div className="min-w-0">
-                <div className="text-xl lg:text-2xl font-bold text-slate-900 leading-none truncate" style={{ fontFamily: "'JetBrains Mono',monospace" }}>
+                <div className="text-lg sm:text-xl lg:text-2xl font-bold text-slate-900 leading-none truncate" style={{ fontFamily: "'JetBrains Mono',monospace" }}>
                   {loading ? "—" : value}
                 </div>
-                <div className="text-xs text-gray-400 mt-1 font-medium truncate">{label}</div>
+                <div className="text-[11px] sm:text-xs text-gray-400 mt-1 font-medium truncate">{label}</div>
               </div>
             </div>
           ))}
@@ -762,7 +736,6 @@ export default function SuperAdminOrgChart() {
         {/* Tree Card */}
         <div className="bg-white border border-gray-200 rounded-xl lg:rounded-2xl shadow-sm overflow-hidden min-w-0">
           
-          {/* Tree Header */}
           <div className="px-4 sm:px-5 py-3 border-b border-gray-100 flex flex-wrap items-center gap-2 bg-gradient-to-br from-gray-50 to-gray-100/50 min-w-0">
             <span className="text-sm font-semibold text-slate-700 truncate">Hierarchy</span>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-semibold shrink-0" style={{ fontFamily: "'JetBrains Mono',monospace" }}>
@@ -776,7 +749,7 @@ export default function SuperAdminOrgChart() {
             <span className="hidden sm:block ml-auto text-xs text-gray-400 truncate">Click any card for details</span>
           </div>
 
-          {/* Tree Scroll Container - overflow-x-auto handles any internal overflow gracefully if tree grows huge */}
+          {/* Tree Scroll Container - overflow-x-auto works perfectly with w-max min-w-full inside */}
           <div className="su-scroll w-full overflow-x-auto bg-white p-4 sm:p-6 lg:p-8 min-w-0">
             <OrgTree
               superAdmin={superAdmin}
@@ -792,7 +765,7 @@ export default function SuperAdminOrgChart() {
 
         {/* Legend */}
         {!loading && (
-          <div className="flex gap-4 lg:gap-6 mt-4 lg:mt-6 justify-center flex-wrap min-w-0">
+          <div className="flex gap-3 sm:gap-4 lg:gap-6 mt-4 lg:mt-6 justify-center flex-wrap min-w-0">
             {[
               { dot: BRAND,     label: "Super Admin", glow: true },
               { dot: "#6366f1", label: "Admin"   },
