@@ -1,34 +1,16 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   useGetAllPersonalDocumentsSuperAdmin,
   useGetAllExpenseDocumentsSuperAdmin,
   useGetDocumentDetailsSuperAdmin,
 } from "../../auth/server-state/superadmin/other/suother.hook";
 
-const C = {
-  brand:      "#730042",
-  brandLight: "rgba(115,0,66,0.08)",
-  brandMid:   "rgba(115,0,66,0.15)",
-  amber:      "#BA7517",
-  amberBg:    "#faeeda",
-  blue:       "#185FA5",
-  blueBg:     "#E6F1FB",
-  red:        "#E24B4A",
-  redBg:      "#fcebeb",
-  green:      "#1D9E75",
-  greenBg:    "#e8f5e9",
-  surface:    "#ffffff",
-  page:       "#f9f8f2",
-  border:     "#ede5e0",
-  text:       "#2a1a16",
-  muted:      "#b0948a",
-  mutedMid:   "#c9bab5",
-};
-
 function fmtDate(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-IN", {
-    day: "numeric", month: "short", year: "numeric",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
   });
 }
 
@@ -38,28 +20,67 @@ function fmtSize(kb) {
 }
 
 function getInitials(name = "") {
-  return name.split(" ").map((w) => w[0] || "").join("").toUpperCase().slice(0, 2);
+  return name
+    .split(" ")
+    .map((w) => w[0] || "")
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 }
 
-function Spinner({ size = 28, color = C.brand }) {
+function exportToCSV(docs, tabLabel) {
+  const headers = [
+    "Title",
+    "Type",
+    "Employee Name",
+    "Email",
+    "Role",
+    "Department",
+    "Designation",
+    "Size",
+    "Uploaded At",
+    "Viewed by Admin",
+    "Viewed by Super Admin",
+  ];
+
+  const rows = docs.map((d) => [
+    `"${d.title}"`,
+    tabLabel,
+    `"${d.employee?.name || "—"}"`,
+    `"${d.employee?.email || "—"}"`,
+    `"${d.employee?.role || d.uploaderModel || "—"}"`,
+    `"${d.employee?.department || "—"}"`,
+    `"${d.employee?.designation || "—"}"`,
+    fmtSize(d.sizeKB),
+    fmtDate(d.uploadedAt),
+    d.viewedByAdmin ? "Yes" : "No",
+    d.viewedBySuperAdmin ? "Yes" : "No",
+  ]);
+
+  const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${tabLabel}-documents-${Date.now()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function Spinner({ size = 28 }) {
   return (
-    <div style={{
-      width: size, height: size, borderRadius: "50%",
-      border: `2px solid ${color}33`,
-      borderTop: `2px solid ${color}`,
-      animation: "spin 0.7s linear infinite",
-      flexShrink: 0,
-    }} />
+    <div
+      className="rounded-full border-2 border-[#730042]/20 border-t-[#730042] animate-spin flex-shrink-0"
+      style={{ width: size, height: size }}
+    />
   );
 }
 
-function Badge({ children, color, bg }) {
+function Badge({ children, className }) {
   return (
-    <span style={{
-      display: "inline-flex", alignItems: "center",
-      padding: "2px 10px", borderRadius: 20,
-      fontSize: 11, fontWeight: 500, color, background: bg,
-    }}>
+    <span
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap ${className}`}
+    >
       {children}
     </span>
   );
@@ -67,24 +88,27 @@ function Badge({ children, color, bg }) {
 
 function EmptyState({ message }) {
   return (
-    <div style={{
-      display: "flex", flexDirection: "column", alignItems: "center",
-      justifyContent: "center", padding: "60px 24px", gap: 14,
-    }}>
-      <div style={{
-        width: 56, height: 56, borderRadius: "50%",
-        background: C.brandLight,
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }}>
+    <div className="flex flex-col items-center justify-center py-16 px-6 gap-3">
+      <div className="w-14 h-14 rounded-full bg-[#730042]/10 flex items-center justify-center">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
-            stroke={C.brand} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          <polyline points="14 2 14 8 20 8"
-            stroke={C.brand} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+            stroke="#730042"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <polyline
+            points="14 2 14 8 20 8"
+            stroke="#730042"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </div>
-      <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>No documents found</div>
-      <div style={{ fontSize: 12, color: C.muted }}>{message}</div>
+      <p className="text-sm font-medium text-[#2a1a16]">No documents found</p>
+      <p className="text-xs text-[#b0948a] text-center">{message}</p>
     </div>
   );
 }
@@ -94,151 +118,152 @@ function DetailDrawer({ documentId, docType, onClose }) {
   const doc = data?.document;
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", justifyContent: "flex-end" }}>
-      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(42,26,22,0.35)" }} />
-      <div style={{
-        position: "relative", width: 420, height: "100%",
-        background: C.surface, overflowY: "auto",
-        display: "flex", flexDirection: "column",
-        boxShadow: "-4px 0 32px rgba(115,0,66,0.10)",
-      }}>
-        <div style={{
-          padding: "20px 24px", borderBottom: `0.5px solid ${C.border}`,
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          position: "sticky", top: 0, background: C.surface, zIndex: 1,
-        }}>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 500, color: C.text }}>Document details</div>
-            <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div
+        onClick={onClose}
+        className="absolute inset-0 bg-[#2a1a16]/40 backdrop-blur-[2px]"
+      />
+      <div className="relative w-full sm:max-w-md md:max-w-lg h-full bg-white flex flex-col shadow-2xl overflow-hidden">
+        <div className="sticky top-0 bg-white z-10 px-4 sm:px-6 py-4 border-b border-[#ede5e0] flex items-center justify-between shrink-0">
+          <div className="min-w-0 pr-4">
+            <p className="text-sm sm:text-[15px] font-medium text-[#2a1a16] truncate">Document details</p>
+            <p className="text-xs text-[#b0948a] mt-0.5">
               {docType === "personal" ? "Personal" : "Expense"} document
-            </div>
+            </p>
           </div>
-          <button onClick={onClose} style={{
-            background: "none", border: `0.5px solid ${C.border}`,
-            borderRadius: 8, cursor: "pointer", padding: "6px 10px",
-            color: C.muted, fontSize: 18, lineHeight: 1,
-          }}>×</button>
+          <button
+            onClick={onClose}
+            className="w-9 h-9 rounded-lg border border-[#ede5e0] flex items-center justify-center text-[#b0948a] hover:bg-[#f9f8f2] transition-colors text-lg leading-none shrink-0"
+          >
+            ×
+          </button>
         </div>
 
-        <div style={{ flex: 1, padding: "24px" }}>
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto">
           {isLoading && (
-            <div style={{ display: "flex", justifyContent: "center", paddingTop: 60 }}>
+            <div className="flex justify-center pt-16">
               <Spinner />
             </div>
           )}
           {isError && (
-            <div style={{ padding: "14px 16px", background: C.redBg, borderRadius: 10, fontSize: 13, color: C.red }}>
+            <div className="p-4 bg-red-50 rounded-xl text-sm text-red-500">
               Failed to load document details.
             </div>
           )}
           {doc && (
             <>
-              <div style={{
-                background: C.brandLight, borderRadius: 14,
-                padding: "24px", marginBottom: 20,
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
-                border: `0.5px solid ${C.brandMid}`,
-              }}>
-                <div style={{
-                  width: 56, height: 56, borderRadius: 14, background: C.brand,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
+              <div className="bg-[#730042]/8 border border-[#730042]/15 rounded-2xl p-4 sm:p-6 mb-5 flex flex-col items-center gap-3">
+                <div className="w-14 h-14 rounded-2xl bg-[#730042] flex items-center justify-center">
                   <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
-                      stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                    <polyline points="14 2 14 8 20 8"
-                      stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                    <path
+                      d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                      stroke="#fff"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <polyline
+                      points="14 2 14 8 20 8"
+                      stroke="#fff"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                 </div>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: C.text, marginBottom: 4 }}>{doc.title}</div>
+                <div className="text-center w-full min-w-0">
+                  <p className="text-sm font-medium text-[#2a1a16] mb-1.5 truncate">{doc.title}</p>
                   <Badge
-                    color={docType === "personal" ? C.brand : C.blue}
-                    bg={docType === "personal" ? C.brandLight : C.blueBg}
+                    className={
+                      docType === "personal"
+                        ? "bg-[#730042]/10 text-[#730042]"
+                        : "bg-blue-50 text-blue-700"
+                    }
                   >
                     {docType === "personal" ? "Personal" : "Expense"}
                   </Badge>
                 </div>
-                <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" style={{
-                  display: "inline-flex", alignItems: "center", gap: 6,
-                  padding: "9px 18px", background: C.brand, color: "#fff",
-                  borderRadius: 9, fontSize: 13, fontWeight: 500,
-                  textDecoration: "none", marginTop: 4,
-                }}>
+                <a
+                  href={doc.fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#730042] text-white text-sm font-medium rounded-xl hover:bg-[#5a0033] transition-colors mt-1"
+                >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path
+                      d="M7 1v8M4 6l3 3 3-3M2 11h10"
+                      stroke="#fff"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                   Open / Download
                 </a>
               </div>
 
-              {[
-                ["File size",             fmtSize(doc.sizeKB)],
-                ["Uploaded on",           fmtDate(doc.uploadedAt)],
-                ["Viewed by manager",     doc.viewedByManager     ? "Yes" : "Not yet"],
-                ["Viewed by admin",       doc.viewedByAdmin       ? "Yes" : "Not yet"],
-                ["Viewed by super admin", doc.viewedBySuperAdmin  ? "Yes" : "Not yet"],
-              ].map(([label, val]) => (
-                <div key={label} style={{
-                  display: "flex", justifyContent: "space-between",
-                  padding: "12px 0", borderBottom: `0.5px solid ${C.border}`, fontSize: 13,
-                }}>
-                  <span style={{ color: C.muted }}>{label}</span>
-                  <span style={{ color: C.text, fontWeight: 500 }}>{val}</span>
-                </div>
-              ))}
+              <div className="space-y-1">
+                {[
+                  ["File size", fmtSize(doc.sizeKB)],
+                  ["Uploaded on", fmtDate(doc.uploadedAt)],
+                  ["Viewed by manager", doc.viewedByManager ? "Yes" : "Not yet"],
+                  ["Viewed by admin", doc.viewedByAdmin ? "Yes" : "Not yet"],
+                  ["Viewed by super admin", doc.viewedBySuperAdmin ? "Yes" : "Not yet"],
+                ].map(([label, val]) => (
+                  <div
+                    key={label}
+                    className="flex justify-between items-center py-3 border-b border-[#ede5e0] text-sm gap-4"
+                  >
+                    <span className="text-[#b0948a] shrink-0">{label}</span>
+                    <span className="text-[#2a1a16] font-medium text-right">{val}</span>
+                  </div>
+                ))}
+              </div>
 
               {doc.employee ? (
-                <div style={{
-                  marginTop: 24, background: C.page,
-                  borderRadius: 12, padding: "16px",
-                  border: `0.5px solid ${C.border}`,
-                }}>
-                  <div style={{ fontSize: 12, fontWeight: 500, color: C.muted, marginBottom: 12 }}>Uploaded by</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{
-                      width: 40, height: 40, borderRadius: "50%", background: C.brand,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 14, fontWeight: 500, color: "#fff", flexShrink: 0,
-                    }}>
+                <div className="mt-6 bg-[#f9f8f2] rounded-xl p-4 border border-[#ede5e0]">
+                  <p className="text-[11px] font-medium text-[#b0948a] uppercase tracking-wide mb-3">
+                    Uploaded by
+                  </p>
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[#730042] flex items-center justify-center text-sm font-semibold text-white flex-shrink-0">
                       {getInitials(doc.employee.name)}
                     </div>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{doc.employee.name}</div>
-                      <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{doc.employee.email}</div>
-                      <div style={{ fontSize: 12, color: C.muted, marginTop: 1 }}>{doc.employee.department}</div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-[#2a1a16] truncate">{doc.employee.name}</p>
+                      <p className="text-xs text-[#b0948a] mt-0.5 truncate">{doc.employee.email}</p>
+                      <div className="flex flex-wrap gap-x-3 mt-1">
+                        {doc.employee.role && (
+                          <p className="text-xs text-[#b0948a] capitalize">Role: {doc.employee.role}</p>
+                        )}
+                        {doc.employee.department && (
+                          <p className="text-xs text-[#b0948a]">{doc.employee.department}</p>
+                        )}
+                        {doc.employee.designation && (
+                          <p className="text-xs text-[#b0948a]">{doc.employee.designation}</p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div style={{
-                  marginTop: 24, background: C.page,
-                  borderRadius: 12, padding: "14px 16px",
-                  border: `0.5px solid ${C.border}`,
-                  fontSize: 13, color: C.muted,
-                }}>
+                <div className="mt-6 bg-[#f9f8f2] rounded-xl p-4 border border-[#ede5e0] text-sm text-[#b0948a]">
                   Employee information not available
                 </div>
               )}
 
               {doc.reportingManager && (
-                <div style={{
-                  marginTop: 12, background: C.page,
-                  borderRadius: 12, padding: "16px",
-                  border: `0.5px solid ${C.border}`,
-                }}>
-                  <div style={{ fontSize: 12, fontWeight: 500, color: C.muted, marginBottom: 12 }}>Reporting manager</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{
-                      width: 40, height: 40, borderRadius: "50%", background: C.blue,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 14, fontWeight: 500, color: "#fff", flexShrink: 0,
-                    }}>
+                <div className="mt-3 bg-[#f9f8f2] rounded-xl p-4 border border-[#ede5e0]">
+                  <p className="text-[11px] font-medium text-[#b0948a] uppercase tracking-wide mb-3">
+                    Reporting manager
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-sm font-semibold text-white flex-shrink-0">
                       {getInitials(doc.reportingManager.name)}
                     </div>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{doc.reportingManager.name}</div>
-                      <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{doc.reportingManager.email}</div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-[#2a1a16] truncate">{doc.reportingManager.name}</p>
+                      <p className="text-xs text-[#b0948a] mt-0.5 truncate">{doc.reportingManager.email}</p>
                     </div>
                   </div>
                 </div>
@@ -251,253 +276,588 @@ function DetailDrawer({ documentId, docType, onClose }) {
   );
 }
 
-function DocRow({ doc, docType, onClick }) {
+function DocCard({ doc, docType, onClick }) {
   return (
     <div
       onClick={onClick}
-      style={{
-        display: "flex", alignItems: "center", gap: 16,
-        padding: "16px 20px", cursor: "pointer",
-        borderBottom: `0.5px solid ${C.border}`,
-        transition: "background 0.12s",
-      }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = C.page)}
-      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+      className="flex items-start gap-4 p-4 cursor-pointer border-b border-[#ede5e0] hover:bg-[#f9f8f2] transition-colors group"
     >
-      <div style={{
-        width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-        background: docType === "personal" ? C.brandLight : C.blueBg,
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }}>
+      <div
+        className={`w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center ${
+          docType === "personal" ? "bg-[#730042]/10" : "bg-blue-50"
+        }`}
+      >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
-            stroke={docType === "personal" ? C.brand : C.blue}
-            strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-          <polyline points="14 2 14 8 20 8"
-            stroke={docType === "personal" ? C.brand : C.blue}
-            strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+            stroke={docType === "personal" ? "#730042" : "#185FA5"}
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <polyline
+            points="14 2 14 8 20 8"
+            stroke={docType === "personal" ? "#730042" : "#185FA5"}
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </div>
 
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontSize: 13, fontWeight: 500, color: C.text,
-          marginBottom: 4, overflow: "hidden",
-          textOverflow: "ellipsis", whiteSpace: "nowrap",
-        }}>
-          {doc.title}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-medium text-[#2a1a16] truncate flex-1 min-w-0">
+            {doc.title}
+          </p>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {!doc.viewedBySuperAdmin && (
+              <Badge className="bg-amber-50 text-amber-700">New</Badge>
+            )}
+            <div
+              title={doc.viewedByAdmin ? "Admin viewed" : "Not viewed by admin"}
+              className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
+                doc.viewedByAdmin ? "bg-green-50" : "bg-red-50"
+              }`}
+            >
+              {doc.viewedByAdmin ? (
+                <svg width="10" height="10" viewBox="0 0 10 10">
+                  <polyline
+                    points="1.5,5 4,7.5 8.5,2.5"
+                    fill="none"
+                    stroke="#1D9E75"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              ) : (
+                <svg width="10" height="10" viewBox="0 0 10 10">
+                  <line x1="2" y1="2" x2="8" y2="8" stroke="#E24B4A" strokeWidth="1.5" strokeLinecap="round" />
+                  <line x1="8" y1="2" x2="2" y2="8" stroke="#E24B4A" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              )}
+            </div>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              className="text-[#c9bab5] group-hover:translate-x-0.5 transition-transform shrink-0"
+            >
+              <path
+                d="M6 4l4 4-4 4"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          {!doc.viewedBySuperAdmin && (
-            <Badge color={C.amber} bg={C.amberBg}>New</Badge>
-          )}
-          <span style={{ fontSize: 11, color: C.mutedMid }}>
-            {fmtSize(doc.sizeKB)} · {fmtDate(doc.uploadedAt)}
-          </span>
-        </div>
-      </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <p className="text-xs text-[#c9bab5] mt-1">
+          {fmtSize(doc.sizeKB)} · {fmtDate(doc.uploadedAt)}
+        </p>
+
         {doc.employee ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{
-              width: 28, height: 28, borderRadius: "50%", background: C.brand,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 10, fontWeight: 600, color: "#fff", flexShrink: 0,
-            }}>
+          <div className="mt-2.5 flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full bg-[#730042] flex items-center justify-center text-[9px] font-semibold text-white flex-shrink-0">
               {getInitials(doc.employee.name)}
             </div>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 500, color: C.text }}>{doc.employee.name}</div>
-              <div style={{ fontSize: 11, color: C.muted }}>{doc.employee.department || doc.employee.designation || "—"}</div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-medium text-[#2a1a16] truncate">
+                {doc.employee.name}
+              </p>
+              <p className="text-[10px] text-[#b0948a] truncate">{doc.employee.email}</p>
             </div>
+            {doc.employee.role && (
+              <Badge className="bg-[#f9f8f2] text-[#b0948a] border border-[#ede5e0] ml-auto capitalize hidden sm:inline-flex">
+                {doc.employee.role}
+              </Badge>
+            )}
           </div>
         ) : (
-          <span style={{ fontSize: 12, color: C.mutedMid }}>No employee info</span>
+          <p className="text-[11px] text-[#c9bab5] mt-2">No employee info</p>
         )}
-      </div>
-
-      <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
-        <div title="Viewed by admin" style={{
-          width: 20, height: 20, borderRadius: "50%",
-          background: doc.viewedByAdmin ? C.greenBg : C.redBg,
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          {doc.viewedByAdmin
-            ? <svg width="10" height="10" viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5" fill="none" stroke={C.green} strokeWidth="1.5" strokeLinecap="round"/></svg>
-            : <svg width="10" height="10" viewBox="0 0 10 10"><line x1="2" y1="2" x2="8" y2="8" stroke={C.red} strokeWidth="1.5" strokeLinecap="round"/><line x1="8" y1="2" x2="2" y2="8" stroke={C.red} strokeWidth="1.5" strokeLinecap="round"/></svg>
-          }
-        </div>
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-          <path d="M6 4l4 4-4 4" stroke={C.mutedMid} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
       </div>
     </div>
   );
 }
 
+function TableRow({ doc, docType, onClick }) {
+  return (
+    <tr
+      onClick={onClick}
+      className="border-b border-[#ede5e0] hover:bg-[#f9f8f2] cursor-pointer transition-colors group"
+    >
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div
+            className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+              docType === "personal" ? "bg-[#730042]/10" : "bg-blue-50"
+            }`}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                stroke={docType === "personal" ? "#730042" : "#185FA5"}
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <polyline
+                points="14 2 14 8 20 8"
+                stroke={docType === "personal" ? "#730042" : "#185FA5"}
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-[#2a1a16] truncate max-w-[150px] xl:max-w-xs">{doc.title}</p>
+            <p className="text-[10px] text-[#c9bab5]">{fmtSize(doc.sizeKB)}</p>
+          </div>
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        {doc.employee ? (
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-7 h-7 rounded-full bg-[#730042] flex items-center justify-center text-[9px] font-semibold text-white flex-shrink-0">
+              {getInitials(doc.employee.name)}
+            </div>
+            <div className="min-w-0">
+              <p className="text-[12px] font-medium text-[#2a1a16] truncate max-w-[150px] xl:max-w-xs">{doc.employee.name}</p>
+              <p className="text-[10px] text-[#b0948a] truncate max-w-[150px] xl:max-w-xs">{doc.employee.email}</p>
+            </div>
+          </div>
+        ) : (
+          <span className="text-xs text-[#c9bab5]">—</span>
+        )}
+      </td>
+      <td className="px-4 py-3">
+        {doc.employee?.role ? (
+          <Badge className="bg-[#730042]/8 text-[#730042] capitalize">
+            {doc.employee.role}
+          </Badge>
+        ) : (
+          <span className="text-xs text-[#c9bab5]">—</span>
+        )}
+      </td>
+      <td className="px-4 py-3">
+        <p className="text-xs text-[#b0948a] truncate max-w-[100px] xl:max-w-xs">
+          {doc.employee?.department || "—"}
+        </p>
+      </td>
+      <td className="px-4 py-3">
+        <p className="text-xs text-[#b0948a] whitespace-nowrap">{fmtDate(doc.uploadedAt)}</p>
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-1.5">
+          {!doc.viewedBySuperAdmin && (
+            <Badge className="bg-amber-50 text-amber-700">New</Badge>
+          )}
+          <div
+            className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
+              doc.viewedByAdmin ? "bg-green-50" : "bg-red-50"
+            }`}
+          >
+            {doc.viewedByAdmin ? (
+              <svg width="10" height="10" viewBox="0 0 10 10">
+                <polyline points="1.5,5 4,7.5 8.5,2.5" fill="none" stroke="#1D9E75" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg width="10" height="10" viewBox="0 0 10 10">
+                <line x1="2" y1="2" x2="8" y2="8" stroke="#E24B4A" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="8" y1="2" x2="2" y2="8" stroke="#E24B4A" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            )}
+          </div>
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-[#c9bab5] group-hover:translate-x-0.5 transition-transform">
+          <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </td>
+    </tr>
+  );
+}
+
+const ROLE_OPTIONS = ["all", "employee", "manager", "admin", "senior_admin", "official", "senior_manager"];
+const STATUS_OPTIONS = ["all", "new", "viewed"];
+const DEPT_VIEWED_OPTIONS = ["all", "viewed_admin", "not_viewed_admin"];
+
 export default function SuperAdminDocuments() {
-  const [activeTab, setActiveTab]     = useState("personal");
-  const [search, setSearch]           = useState("");
+  const [activeTab, setActiveTab] = useState("personal");
+  const [search, setSearch] = useState("");
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [selectedDocType, setSelectedDocType] = useState(null);
+  const [filterRole, setFilterRole] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterAdminViewed, setFilterAdminViewed] = useState("all");
+  const [filterDept, setFilterDept] = useState("all");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
 
   const { data: personalData, isLoading: loadingPersonal } = useGetAllPersonalDocumentsSuperAdmin();
-  const { data: expenseData,  isLoading: loadingExpense  } = useGetAllExpenseDocumentsSuperAdmin();
+  const { data: expenseData, isLoading: loadingExpense } = useGetAllExpenseDocumentsSuperAdmin();
 
   const personalDocs = personalData?.documents ?? [];
-  const expenseDocs  = expenseData?.documents  ?? [];
+  const expenseDocs = expenseData?.documents ?? [];
 
   const activeDocs = activeTab === "personal" ? personalDocs : expenseDocs;
-  const loading    = activeTab === "personal" ? loadingPersonal : loadingExpense;
+  const loading = activeTab === "personal" ? loadingPersonal : loadingExpense;
 
-  const filtered = activeDocs.filter((d) =>
-    d.title.toLowerCase().includes(search.toLowerCase()) ||
-    (d.employee?.name  || "").toLowerCase().includes(search.toLowerCase()) ||
-    (d.employee?.email || "").toLowerCase().includes(search.toLowerCase())
-  );
+  const departments = useMemo(() => {
+    const set = new Set(activeDocs.map((d) => d.employee?.department).filter(Boolean));
+    return ["all", ...Array.from(set).sort()];
+  }, [activeDocs]);
+
+  const filtered = useMemo(() => {
+    return activeDocs.filter((d) => {
+      const q = search.toLowerCase();
+      const matchSearch =
+        !q ||
+        d.title.toLowerCase().includes(q) ||
+        (d.employee?.name || "").toLowerCase().includes(q) ||
+        (d.employee?.email || "").toLowerCase().includes(q) ||
+        (d.employee?.department || "").toLowerCase().includes(q) ||
+        (d.employee?.designation || "").toLowerCase().includes(q) ||
+        (d.employee?.role || "").toLowerCase().includes(q);
+
+      const matchRole =
+        filterRole === "all" || (d.employee?.role || "").toLowerCase() === filterRole;
+
+      const matchStatus =
+        filterStatus === "all" ||
+        (filterStatus === "new" && !d.viewedBySuperAdmin) ||
+        (filterStatus === "viewed" && d.viewedBySuperAdmin);
+
+      const matchAdminViewed =
+        filterAdminViewed === "all" ||
+        (filterAdminViewed === "viewed_admin" && d.viewedByAdmin) ||
+        (filterAdminViewed === "not_viewed_admin" && !d.viewedByAdmin);
+
+      const matchDept =
+        filterDept === "all" || (d.employee?.department || "") === filterDept;
+
+      const uploadDate = d.uploadedAt ? new Date(d.uploadedAt) : null;
+      const matchFrom = !filterDateFrom || (uploadDate && uploadDate >= new Date(filterDateFrom));
+      const matchTo = !filterDateTo || (uploadDate && uploadDate <= new Date(filterDateTo + "T23:59:59"));
+
+      return matchSearch && matchRole && matchStatus && matchAdminViewed && matchDept && matchFrom && matchTo;
+    });
+  }, [activeDocs, search, filterRole, filterStatus, filterAdminViewed, filterDept, filterDateFrom, filterDateTo]);
 
   const unviewedPersonal = personalDocs.filter((d) => !d.viewedBySuperAdmin).length;
-  const unviewedExpense  = expenseDocs.filter((d)  => !d.viewedBySuperAdmin).length;
+  const unviewedExpense = expenseDocs.filter((d) => !d.viewedBySuperAdmin).length;
+
+  const activeFiltersCount = [
+    filterRole !== "all",
+    filterStatus !== "all",
+    filterAdminViewed !== "all",
+    filterDept !== "all",
+    !!filterDateFrom,
+    !!filterDateTo,
+  ].filter(Boolean).length;
+
+  function clearFilters() {
+    setFilterRole("all");
+    setFilterStatus("all");
+    setFilterAdminViewed("all");
+    setFilterDept("all");
+    setFilterDateFrom("");
+    setFilterDateTo("");
+    setSearch("");
+  }
 
   return (
-    <div style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", background: C.page, minHeight: "100vh", padding: "28px 32px", color: C.text }}>
+    <div className="min-h-screen w-full overflow-x-hidden bg-[#f9f8f2] p-4 sm:p-6 lg:p-8 font-[DM_Sans,ui-sans-serif,system-ui,sans-serif] text-[#2a1a16]">
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0, letterSpacing: "-0.3px" }}>Documents</h1>
-        <p style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>
+      <div className="mb-6">
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Documents</h1>
+        <p className="text-sm text-[#b0948a] mt-1">
           View and manage personal and expense documents submitted by employees
         </p>
       </div>
 
-      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
-        {[
-          ["Total personal", personalDocs.length, C.brand, C.brandLight],
-          ["Total expense",  expenseDocs.length,  C.blue,  C.blueBg],
-          ["Unviewed",       unviewedPersonal + unviewedExpense, C.amber, C.amberBg],
-        ].map(([label, val, color, bg]) => (
-          <div key={label} style={{
-            background: C.surface, borderRadius: 10,
-            border: `0.5px solid ${C.border}`,
-            padding: "10px 16px", display: "flex", alignItems: "center", gap: 10,
-          }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
-            <span style={{ fontSize: 13, color: C.muted }}>{label}</span>
-            <span style={{ fontSize: 14, fontWeight: 500, color: C.text }}>{val}</span>
-          </div>
-        ))}
-
-        <div style={{ marginLeft: "auto", position: "relative" }}>
-          <svg width="15" height="15" viewBox="0 0 15 15" fill="none"
-            style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }}>
-            <circle cx="6.5" cy="6.5" r="4.5" stroke={C.muted} strokeWidth="1.3" />
-            <path d="M10 10l3 3" stroke={C.muted} strokeWidth="1.3" strokeLinecap="round" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search title, employee..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{
-              padding: "9px 14px 9px 34px", borderRadius: 10,
-              border: `0.5px solid ${C.border}`, fontSize: 13,
-              color: C.text, background: C.surface,
-              outline: "none", width: 240, fontFamily: "inherit",
-            }}
-            onFocus={(e) => (e.target.style.borderColor = C.brand)}
-            onBlur={(e)  => (e.target.style.borderColor = C.border)}
-          />
-        </div>
-      </div>
-
-      <div style={{ background: C.surface, borderRadius: 16, border: `0.5px solid ${C.border}`, overflow: "hidden" }}>
-        <div style={{ height: 3, background: activeTab === "personal" ? C.brand : C.blue }} />
-
-        <div style={{
-          display: "flex", gap: 0,
-          borderBottom: `0.5px solid ${C.border}`,
-          padding: "0 20px",
-        }}>
+      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-3 mb-5 items-start sm:items-center">
+        <div className="flex flex-wrap gap-2 sm:gap-3 w-full sm:w-auto">
           {[
-            { key: "personal", label: "Personal",  count: personalDocs.length, unviewed: unviewedPersonal },
-            { key: "expense",  label: "Expense",   count: expenseDocs.length,  unviewed: unviewedExpense  },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => { setActiveTab(tab.key); setSearch(""); }}
-              style={{
-                padding: "14px 20px",
-                background: "none",
-                border: "none",
-                borderBottom: activeTab === tab.key
-                  ? `2px solid ${tab.key === "personal" ? C.brand : C.blue}`
-                  : "2px solid transparent",
-                color: activeTab === tab.key ? (tab.key === "personal" ? C.brand : C.blue) : C.muted,
-                fontSize: 13, fontWeight: activeTab === tab.key ? 500 : 400,
-                cursor: "pointer", fontFamily: "inherit",
-                display: "flex", alignItems: "center", gap: 8,
-                marginBottom: -1,
-              }}
+            ["Total personal", personalDocs.length, "bg-[#730042]/10 text-[#730042]", "bg-[#730042]"],
+            ["Total expense", expenseDocs.length, "bg-blue-50 text-blue-700", "bg-blue-500"],
+            ["Unviewed", unviewedPersonal + unviewedExpense, "bg-amber-50 text-amber-700", "bg-amber-500"],
+          ].map(([label, val, badge, dot]) => (
+            <div
+              key={label}
+              className={`flex-1 sm:flex-none bg-white border border-[#ede5e0] rounded-xl px-3 py-2 flex items-center gap-2 text-sm ${badge}`}
             >
-              {tab.label}
-              <span style={{
-                fontSize: 11, padding: "1px 7px", borderRadius: 20,
-                background: activeTab === tab.key
-                  ? (tab.key === "personal" ? C.brandLight : C.blueBg)
-                  : "#f2eeec",
-                color: activeTab === tab.key
-                  ? (tab.key === "personal" ? C.brand : C.blue)
-                  : C.muted,
-              }}>
-                {tab.count}
-              </span>
-              {tab.unviewed > 0 && (
-                <span style={{
-                  fontSize: 10, padding: "1px 6px", borderRadius: 20,
-                  background: C.amberBg, color: C.amber, fontWeight: 600,
-                }}>
-                  {tab.unviewed} new
-                </span>
-              )}
-            </button>
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dot}`} />
+              <span className="text-[#b0948a] text-xs">{label}</span>
+              <span className="font-semibold text-[#2a1a16]">{val}</span>
+            </div>
           ))}
         </div>
 
+        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto sm:ml-auto justify-end">
+          <div className="relative flex-1 sm:flex-none">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 15 15"
+              fill="none"
+              className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+            >
+              <circle cx="6.5" cy="6.5" r="4.5" stroke="#b0948a" strokeWidth="1.3" />
+              <path d="M10 10l3 3" stroke="#b0948a" strokeWidth="1.3" strokeLinecap="round" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full sm:w-56 pl-9 pr-3 py-2 rounded-xl border border-[#ede5e0] bg-white text-sm text-[#2a1a16] outline-none focus:border-[#730042] transition-colors placeholder:text-[#c9bab5]"
+            />
+          </div>
+
+          <button
+            onClick={() => setShowFilters((v) => !v)}
+            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-colors ${
+              showFilters || activeFiltersCount > 0
+                ? "bg-[#730042] text-white border-[#730042]"
+                : "bg-white text-[#2a1a16] border-[#ede5e0] hover:border-[#730042]"
+            }`}
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M1 3h12M3 7h8M5 11h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+            Filters
+            {activeFiltersCount > 0 && (
+              <span className="bg-white text-[#730042] text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                {activeFiltersCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => exportToCSV(filtered, activeTab)}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-[#ede5e0] bg-white text-sm font-medium text-[#2a1a16] hover:border-[#730042] transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="#730042" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="hidden sm:inline">Export CSV</span>
+            <span className="sm:hidden">Export</span>
+          </button>
+        </div>
+      </div>
+
+      {showFilters && (
+        <div className="bg-white border border-[#ede5e0] rounded-2xl p-4 sm:p-5 mb-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <label className="text-[10px] font-medium text-[#b0948a] uppercase tracking-wide">Role</label>
+            <select
+              value={filterRole}
+              onChange={(e) => setFilterRole(e.target.value)}
+              className="px-2.5 py-2 rounded-lg border border-[#ede5e0] bg-[#f9f8f2] text-xs text-[#2a1a16] outline-none focus:border-[#730042] capitalize w-full"
+            >
+              {ROLE_OPTIONS.map((r) => (
+                <option key={r} value={r} className="capitalize">
+                  {r === "all" ? "All roles" : r.replace("_", " ")}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <label className="text-[10px] font-medium text-[#b0948a] uppercase tracking-wide">SA Status</label>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="px-2.5 py-2 rounded-lg border border-[#ede5e0] bg-[#f9f8f2] text-xs text-[#2a1a16] outline-none focus:border-[#730042] w-full"
+            >
+              <option value="all">All</option>
+              <option value="new">New (unviewed)</option>
+              <option value="viewed">Viewed</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <label className="text-[10px] font-medium text-[#b0948a] uppercase tracking-wide">Admin view</label>
+            <select
+              value={filterAdminViewed}
+              onChange={(e) => setFilterAdminViewed(e.target.value)}
+              className="px-2.5 py-2 rounded-lg border border-[#ede5e0] bg-[#f9f8f2] text-xs text-[#2a1a16] outline-none focus:border-[#730042] w-full"
+            >
+              <option value="all">All</option>
+              <option value="viewed_admin">Admin viewed</option>
+              <option value="not_viewed_admin">Not viewed</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <label className="text-[10px] font-medium text-[#b0948a] uppercase tracking-wide">Department</label>
+            <select
+              value={filterDept}
+              onChange={(e) => setFilterDept(e.target.value)}
+              className="px-2.5 py-2 rounded-lg border border-[#ede5e0] bg-[#f9f8f2] text-xs text-[#2a1a16] outline-none focus:border-[#730042] w-full"
+            >
+              {departments.map((d) => (
+                <option key={d} value={d}>
+                  {d === "all" ? "All depts" : d}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <label className="text-[10px] font-medium text-[#b0948a] uppercase tracking-wide">From date</label>
+            <input
+              type="date"
+              value={filterDateFrom}
+              onChange={(e) => setFilterDateFrom(e.target.value)}
+              className="px-2.5 py-2 rounded-lg border border-[#ede5e0] bg-[#f9f8f2] text-xs text-[#2a1a16] outline-none focus:border-[#730042] w-full"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <label className="text-[10px] font-medium text-[#b0948a] uppercase tracking-wide">To date</label>
+            <input
+              type="date"
+              value={filterDateTo}
+              onChange={(e) => setFilterDateTo(e.target.value)}
+              className="px-2.5 py-2 rounded-lg border border-[#ede5e0] bg-[#f9f8f2] text-xs text-[#2a1a16] outline-none focus:border-[#730042] w-full"
+            />
+          </div>
+
+          {activeFiltersCount > 0 && (
+            <div className="col-span-2 sm:col-span-3 lg:col-span-6 flex justify-end">
+              <button
+                onClick={clearFilters}
+                className="text-xs text-[#730042] font-medium hover:underline"
+              >
+                Clear all filters
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden">
+        <div
+          className="h-0.5 transition-colors duration-300"
+          style={{ background: activeTab === "personal" ? "#730042" : "#185FA5" }}
+        />
+
+        <div className="flex border-b border-[#ede5e0] px-2 sm:px-5 overflow-x-auto">
+          {[
+            { key: "personal", label: "Personal", count: personalDocs.length, unviewed: unviewedPersonal },
+            { key: "expense", label: "Expense", count: expenseDocs.length, unviewed: unviewedExpense },
+          ].map((tab) => {
+            const isActive = activeTab === tab.key;
+            const color = tab.key === "personal" ? "#730042" : "#185FA5";
+            return (
+              <button
+                key={tab.key}
+                onClick={() => {
+                  setActiveTab(tab.key);
+                  setSearch("");
+                  clearFilters();
+                }}
+                style={{
+                  borderBottom: isActive ? `2px solid ${color}` : "2px solid transparent",
+                  color: isActive ? color : "#b0948a",
+                }}
+                className="px-4 py-3.5 bg-transparent border-none text-sm whitespace-nowrap font-medium cursor-pointer flex items-center gap-2 -mb-px transition-colors flex-shrink-0"
+              >
+                {tab.label}
+                <span
+                  className="text-[10px] px-1.5 py-0.5 rounded-full"
+                  style={{
+                    background: isActive ? `${color}15` : "#f2eeec",
+                    color: isActive ? color : "#b0948a",
+                  }}
+                >
+                  {tab.count}
+                </span>
+                {tab.unviewed > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-semibold">
+                    {tab.unviewed} new
+                  </span>
+                )}
+              </button>
+            );
+          })}
+
+          <div className="ml-auto flex items-center pl-4 py-2 flex-shrink-0">
+            <span className="text-[11px] text-[#b0948a]">
+              {filtered.length} result{filtered.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+        </div>
+
         {loading && (
-          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "60px 0", gap: 12 }}>
+          <div className="flex justify-center items-center py-16 gap-3">
             <Spinner />
-            <span style={{ fontSize: 13, color: C.muted }}>Loading documents...</span>
+            <span className="text-sm text-[#b0948a]">Loading documents...</span>
           </div>
         )}
 
         {!loading && filtered.length === 0 && (
-          <EmptyState message={search ? "No results match your search." : `No ${activeTab} documents uploaded yet.`} />
+          <EmptyState
+            message={
+              search || activeFiltersCount > 0
+                ? "No results match your filters."
+                : `No ${activeTab} documents uploaded yet.`
+            }
+          />
         )}
 
         {!loading && filtered.length > 0 && (
           <>
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "40px 1fr 200px 60px",
-              padding: "10px 20px",
-              borderBottom: `0.5px solid ${C.border}`,
-              gap: 16,
-            }}>
-              {["", "Document", "Employee", "Status"].map((h, i) => (
-                <div key={i} style={{ fontSize: 11, fontWeight: 500, color: C.mutedMid, textTransform: "uppercase", letterSpacing: "0.4px" }}>
-                  {h}
-                </div>
-              ))}
+            <div className="hidden lg:block overflow-x-auto">
+              <table className="w-full min-w-full">
+                <thead>
+                  <tr className="border-b border-[#ede5e0]">
+                    {["Document", "Employee", "Role", "Department", "Uploaded", "Status", ""].map((h) => (
+                      <th
+                        key={h}
+                        className="px-4 py-3 text-left text-[10px] font-semibold text-[#c9bab5] uppercase tracking-wider whitespace-nowrap"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((doc) => (
+                    <TableRow
+                      key={doc.id}
+                      doc={doc}
+                      docType={activeTab}
+                      onClick={() => {
+                        setSelectedDoc(doc.id);
+                        setSelectedDocType(activeTab);
+                      }}
+                    />
+                  ))}
+                </tbody>
+              </table>
             </div>
 
-            <div>
+            <div className="lg:hidden">
               {filtered.map((doc) => (
-                <DocRow
+                <DocCard
                   key={doc.id}
                   doc={doc}
                   docType={activeTab}
-                  onClick={() => { setSelectedDoc(doc.id); setSelectedDocType(activeTab); }}
+                  onClick={() => {
+                    setSelectedDoc(doc.id);
+                    setSelectedDocType(activeTab);
+                  }}
                 />
               ))}
             </div>
@@ -509,7 +869,10 @@ export default function SuperAdminDocuments() {
         <DetailDrawer
           documentId={selectedDoc}
           docType={selectedDocType}
-          onClose={() => { setSelectedDoc(null); setSelectedDocType(null); }}
+          onClose={() => {
+            setSelectedDoc(null);
+            setSelectedDocType(null);
+          }}
         />
       )}
     </div>

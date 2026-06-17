@@ -128,3 +128,13 @@ export const getDocumentDetailsSuperAdmin = async (documentId) => {
   return res.data;
 };
 
+
+export const getPermissions = async (id, user_model) => {
+  const res = await api.get(`superadmin/getpermissions/${id}`, { params: { user_model } });
+  return res.data;
+};
+
+export const updatePermissions = async ({ id, data }) => {
+  const res = await api.put(`superadmin/updatepermissions/${id}`, data);
+  return res.data;
+};

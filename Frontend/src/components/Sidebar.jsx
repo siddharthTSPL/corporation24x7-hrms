@@ -17,6 +17,7 @@ import {
   FaTimes,
   FaShieldAlt,
   FaUsersCog,
+  FaLock,
 } from "react-icons/fa";
 import { useAuth } from "../auth/store/getmeauth/getmeauth";
 import { useAdminLogout } from "../auth/server-state/adminauth/adminauth.hook";
@@ -24,6 +25,9 @@ import { useLogoutManager } from "../auth/server-state/manager/managerauth/manag
 import { useLogoutUser } from "../auth/server-state/employee/employeeauth/employeeauth.hook";
 import { useLogoutSuperAdmin } from "../auth/server-state/superadmin/auth/suauth.hook";
 import { usePermissionStore } from "../auth/store/permission/permissionStore";
+
+// permissionGroup: lock the sidebar item only when ALL listed permissions are false.
+// If even one is true, the item is accessible (no lock).
 
 const superAdminMenu = [
   { name: "Dashboard",      path: "/superadmin-dashboard",     icon: <FaHome /> },
@@ -39,37 +43,37 @@ const superAdminMenu = [
 const adminMenu = [
   { name: "Dashboard",     path: "/dashboard",           icon: <FaHome /> },
   { name: "Onboarding",    path: "/employee",            icon: <FaUsers /> },
-  { name: "Announcement",  path: "/announcement",        icon: <FaBullhorn />,  permission: "announcements.can_view_announcements" },
+  { name: "Announcement",  path: "/announcement",        icon: <FaBullhorn />,  permissionGroup: ["announcements.can_view_announcements", "announcements.can_create_announcement", "announcements.can_edit_announcement", "announcements.can_delete_announcement"] },
   { name: "Review",        path: "/review-admin",        icon: <FaBullhorn /> },
   { name: "Leave",         path: "/leave-admin",         icon: <FaCalendarAlt /> },
   { name: "Organisation",  path: "/organisation",        icon: <FaBuilding /> },
-  { name: "Recruitment",   path: "/recruitment-admin",   icon: <FaUsersCog />,  permission: "recruitment.can_view_hiring_requisitions" },
-  { name: "TorchX Voice",  path: "/admin-complaints",    icon: <FaShieldAlt />, permission: "tickets.can_raise_ticket" },
-  { name: "Document",      path: "/document-admin",      icon: <FaFileAlt />,   permission: "documents.can_view_all_documents" },
-  { name: "Team Document", path: "/document-admin-team", icon: <FaFileAlt />,   permission: "documents.can_view_all_documents" },
+  { name: "Recruitment",   path: "/recruitment-admin",   icon: <FaUsersCog />,  permissionGroup: ["recruitment.can_view_hiring_requisitions", "recruitment.can_create_hiring_requisition", "recruitment.can_view_candidates", "recruitment.can_add_candidate"] },
+  { name: "TorchX Voice",  path: "/admin-complaints",    icon: <FaShieldAlt />, permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"] },
+  { name: "Document",      path: "/document-admin",      icon: <FaFileAlt />,   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
+  { name: "Team Document", path: "/document-admin-team", icon: <FaFileAlt />,   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Settings",      path: "/settings",            icon: <FaCog /> },
 ];
 
 const managerMenu = [
   { name: "Dashboard",    path: "/manager-dashboard",    icon: <FaHome /> },
   { name: "Leave",        path: "/leave-manager",        icon: <FaCalendarAlt /> },
-  { name: "Announcement", path: "/announcement-manager", icon: <FaBullhorn />,  permission: "announcements.can_view_announcements" },
+  { name: "Announcement", path: "/announcement-manager", icon: <FaBullhorn />,  permissionGroup: ["announcements.can_view_announcements", "announcements.can_create_announcement", "announcements.can_edit_announcement", "announcements.can_delete_announcement"] },
   { name: "Organisation", path: "/organisation-manager", icon: <FaBuilding /> },
   { name: "Review",       path: "/review-manager",       icon: <FaBullhorn /> },
-  { name: "Document",     path: "/document-manager",     icon: <FaFileAlt />,   permission: "documents.can_view_all_documents" },
-  { name: "File",         path: "/file-manager",         icon: <FaFolder />,    permission: "documents.can_upload_documents" },
-  { name: "Recruitment",  path: "/recruitment-manager",  icon: <FaUsersCog />,  permission: "recruitment.can_view_hiring_requisitions" },
-  { name: "TorchX Voice", path: "/manager-complaints",   icon: <FaShieldAlt />, permission: "tickets.can_raise_ticket" },
+  { name: "Document",     path: "/document-manager",     icon: <FaFileAlt />,   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
+  { name: "File",         path: "/file-manager",         icon: <FaFolder />,    permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
+  { name: "Recruitment",  path: "/recruitment-manager",  icon: <FaUsersCog />,  permissionGroup: ["recruitment.can_view_hiring_requisitions", "recruitment.can_create_hiring_requisition", "recruitment.can_view_candidates", "recruitment.can_add_candidate"] },
+  { name: "TorchX Voice", path: "/manager-complaints",   icon: <FaShieldAlt />, permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"] },
   { name: "Settings",     path: "/settings-manager",     icon: <FaCog /> },
 ];
 
 const employeeMenu = [
   { name: "Dashboard",    path: "/employee-dashboard",    icon: <FaHome /> },
   { name: "Leave",        path: "/leave-employee",        icon: <FaCalendarAlt /> },
-  { name: "Announcement", path: "/announcement-employee", icon: <FaBullhorn />,  permission: "announcements.can_view_announcements" },
+  { name: "Announcement", path: "/announcement-employee", icon: <FaBullhorn />,  permissionGroup: ["announcements.can_view_announcements", "announcements.can_create_announcement", "announcements.can_edit_announcement", "announcements.can_delete_announcement"] },
   { name: "Organisation", path: "/organisation-employee", icon: <FaBuilding /> },
-  { name: "File",         path: "/file-employee",         icon: <FaFolder />,    permission: "documents.can_upload_documents" },
-  { name: "TorchX Voice", path: "/employee-complaints",   icon: <FaShieldAlt />, permission: "tickets.can_raise_ticket" },
+  { name: "File",         path: "/file-employee",         icon: <FaFolder />,    permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
+  { name: "TorchX Voice", path: "/employee-complaints",   icon: <FaShieldAlt />, permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"] },
   { name: "Settings",     path: "/settings-employee",     icon: <FaCog /> },
 ];
 
@@ -97,10 +101,17 @@ function Sidebar({ collapsed, setCollapsed }) {
   const [open,       setOpen]       = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const rawMenu = menuByRole[role] ?? employeeMenu;
-  const menu    = rawMenu.filter((item) => !item.permission || can(item.permission));
+  const menu = menuByRole[role] ?? employeeMenu;
 
   const isPending = pendingSuperAdmin || pendingAdmin || pendingManager || pendingEmployee;
+
+  // Returns true (allowed) if:
+  // - item has no permissionGroup (no restriction)
+  // - OR at least one permission in the group is true
+  const isAllowed = (item) => {
+    if (!item.permissionGroup || item.permissionGroup.length === 0) return true;
+    return item.permissionGroup.some((p) => can(p));
+  };
 
   const handleLogout = () => {
     const onSuccess = async () => {
@@ -168,17 +179,34 @@ function Sidebar({ collapsed, setCollapsed }) {
           {open && (
             <nav className="px-2 flex flex-col gap-1">
               {menu.map((item, index) => {
-                const active = location.pathname === item.path;
+                const active  = location.pathname === item.path;
+                const allowed = isAllowed(item);
+
                 return (
                   <Link
                     key={index}
-                    to={item.path}
-                    className={`flex items-center gap-3 p-3 rounded-lg ${
-                      active ? "bg-[#730042] text-white" : "hover:bg-gray-100"
-                    }`}
+                    to={allowed ? item.path : location.pathname}
+                    onClick={(e) => { if (!allowed) e.preventDefault(); }}
+                    title={!allowed && collapsed ? `${item.name} — No permission` : undefined}
+                    className={`flex items-center gap-3 p-3 rounded-lg transition-colors
+                      ${active && allowed  ? "bg-[#730042] text-white" : ""}
+                      ${active && !allowed ? "bg-gray-100 text-gray-400" : ""}
+                      ${!active && allowed  ? "hover:bg-gray-100 text-gray-700" : ""}
+                      ${!active && !allowed ? "text-gray-400 cursor-not-allowed" : ""}
+                    `}
                   >
-                    {item.icon}
-                    {!collapsed && item.name}
+                    <span className={`text-sm flex-shrink-0 ${!allowed ? "opacity-50" : ""}`}>
+                      {item.icon}
+                    </span>
+
+                    {!collapsed && (
+                      <span className="flex-1 flex items-center justify-between text-sm">
+                        <span className={!allowed ? "opacity-50" : ""}>{item.name}</span>
+                        {!allowed && (
+                          <FaLock size={9} className="text-gray-400 flex-shrink-0" />
+                        )}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
@@ -186,7 +214,7 @@ function Sidebar({ collapsed, setCollapsed }) {
               <button
                 onClick={handleLogout}
                 disabled={isPending}
-                className="flex items-center gap-3 p-3 rounded-lg hover:bg-red-100 text-gray-800"
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-red-100 text-gray-800 transition-colors"
               >
                 <FaSignOutAlt />
                 {!collapsed && (isPending ? "Logging out..." : "Logout")}
