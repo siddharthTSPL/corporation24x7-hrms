@@ -79,7 +79,7 @@ function Spinner({ size = 28 }) {
 function Badge({ children, className }) {
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-medium ${className}`}
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap ${className}`}
     >
       {children}
     </span>
@@ -108,7 +108,7 @@ function EmptyState({ message }) {
         </svg>
       </div>
       <p className="text-sm font-medium text-[#2a1a16]">No documents found</p>
-      <p className="text-xs text-[#b0948a]">{message}</p>
+      <p className="text-xs text-[#b0948a] text-center">{message}</p>
     </div>
   );
 }
@@ -123,23 +123,23 @@ function DetailDrawer({ documentId, docType, onClose }) {
         onClick={onClose}
         className="absolute inset-0 bg-[#2a1a16]/40 backdrop-blur-[2px]"
       />
-      <div className="relative w-full max-w-[440px] h-full bg-white flex flex-col shadow-2xl overflow-y-auto">
-        <div className="sticky top-0 bg-white z-10 px-6 py-4 border-b border-[#ede5e0] flex items-center justify-between">
-          <div>
-            <p className="text-[15px] font-medium text-[#2a1a16]">Document details</p>
+      <div className="relative w-full sm:max-w-md md:max-w-lg h-full bg-white flex flex-col shadow-2xl overflow-hidden">
+        <div className="sticky top-0 bg-white z-10 px-4 sm:px-6 py-4 border-b border-[#ede5e0] flex items-center justify-between shrink-0">
+          <div className="min-w-0 pr-4">
+            <p className="text-sm sm:text-[15px] font-medium text-[#2a1a16] truncate">Document details</p>
             <p className="text-xs text-[#b0948a] mt-0.5">
               {docType === "personal" ? "Personal" : "Expense"} document
             </p>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg border border-[#ede5e0] flex items-center justify-center text-[#b0948a] hover:bg-[#f9f8f2] transition-colors text-lg leading-none"
+            className="w-9 h-9 rounded-lg border border-[#ede5e0] flex items-center justify-center text-[#b0948a] hover:bg-[#f9f8f2] transition-colors text-lg leading-none shrink-0"
           >
             ×
           </button>
         </div>
 
-        <div className="flex-1 p-6">
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto">
           {isLoading && (
             <div className="flex justify-center pt-16">
               <Spinner />
@@ -152,7 +152,7 @@ function DetailDrawer({ documentId, docType, onClose }) {
           )}
           {doc && (
             <>
-              <div className="bg-[#730042]/8 border border-[#730042]/15 rounded-2xl p-6 mb-5 flex flex-col items-center gap-3">
+              <div className="bg-[#730042]/8 border border-[#730042]/15 rounded-2xl p-4 sm:p-6 mb-5 flex flex-col items-center gap-3">
                 <div className="w-14 h-14 rounded-2xl bg-[#730042] flex items-center justify-center">
                   <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
                     <path
@@ -171,8 +171,8 @@ function DetailDrawer({ documentId, docType, onClose }) {
                     />
                   </svg>
                 </div>
-                <div className="text-center">
-                  <p className="text-sm font-medium text-[#2a1a16] mb-1.5">{doc.title}</p>
+                <div className="text-center w-full min-w-0">
+                  <p className="text-sm font-medium text-[#2a1a16] mb-1.5 truncate">{doc.title}</p>
                   <Badge
                     className={
                       docType === "personal"
@@ -202,21 +202,23 @@ function DetailDrawer({ documentId, docType, onClose }) {
                 </a>
               </div>
 
-              {[
-                ["File size", fmtSize(doc.sizeKB)],
-                ["Uploaded on", fmtDate(doc.uploadedAt)],
-                ["Viewed by manager", doc.viewedByManager ? "Yes" : "Not yet"],
-                ["Viewed by admin", doc.viewedByAdmin ? "Yes" : "Not yet"],
-                ["Viewed by super admin", doc.viewedBySuperAdmin ? "Yes" : "Not yet"],
-              ].map(([label, val]) => (
-                <div
-                  key={label}
-                  className="flex justify-between py-3 border-b border-[#ede5e0] text-sm"
-                >
-                  <span className="text-[#b0948a]">{label}</span>
-                  <span className="text-[#2a1a16] font-medium">{val}</span>
-                </div>
-              ))}
+              <div className="space-y-1">
+                {[
+                  ["File size", fmtSize(doc.sizeKB)],
+                  ["Uploaded on", fmtDate(doc.uploadedAt)],
+                  ["Viewed by manager", doc.viewedByManager ? "Yes" : "Not yet"],
+                  ["Viewed by admin", doc.viewedByAdmin ? "Yes" : "Not yet"],
+                  ["Viewed by super admin", doc.viewedBySuperAdmin ? "Yes" : "Not yet"],
+                ].map(([label, val]) => (
+                  <div
+                    key={label}
+                    className="flex justify-between items-center py-3 border-b border-[#ede5e0] text-sm gap-4"
+                  >
+                    <span className="text-[#b0948a] shrink-0">{label}</span>
+                    <span className="text-[#2a1a16] font-medium text-right">{val}</span>
+                  </div>
+                ))}
+              </div>
 
               {doc.employee ? (
                 <div className="mt-6 bg-[#f9f8f2] rounded-xl p-4 border border-[#ede5e0]">
@@ -227,20 +229,20 @@ function DetailDrawer({ documentId, docType, onClose }) {
                     <div className="w-10 h-10 rounded-full bg-[#730042] flex items-center justify-center text-sm font-semibold text-white flex-shrink-0">
                       {getInitials(doc.employee.name)}
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-[#2a1a16]">{doc.employee.name}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-[#2a1a16] truncate">{doc.employee.name}</p>
                       <p className="text-xs text-[#b0948a] mt-0.5 truncate">{doc.employee.email}</p>
-                      {doc.employee.role && (
-                        <p className="text-xs text-[#b0948a] mt-0.5 capitalize">
-                          Role: {doc.employee.role}
-                        </p>
-                      )}
-                      {doc.employee.department && (
-                        <p className="text-xs text-[#b0948a] mt-0.5">{doc.employee.department}</p>
-                      )}
-                      {doc.employee.designation && (
-                        <p className="text-xs text-[#b0948a] mt-0.5">{doc.employee.designation}</p>
-                      )}
+                      <div className="flex flex-wrap gap-x-3 mt-1">
+                        {doc.employee.role && (
+                          <p className="text-xs text-[#b0948a] capitalize">Role: {doc.employee.role}</p>
+                        )}
+                        {doc.employee.department && (
+                          <p className="text-xs text-[#b0948a]">{doc.employee.department}</p>
+                        )}
+                        {doc.employee.designation && (
+                          <p className="text-xs text-[#b0948a]">{doc.employee.designation}</p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -259,9 +261,9 @@ function DetailDrawer({ documentId, docType, onClose }) {
                     <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-sm font-semibold text-white flex-shrink-0">
                       {getInitials(doc.reportingManager.name)}
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-[#2a1a16]">{doc.reportingManager.name}</p>
-                      <p className="text-xs text-[#b0948a] mt-0.5">{doc.reportingManager.email}</p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-[#2a1a16] truncate">{doc.reportingManager.name}</p>
+                      <p className="text-xs text-[#b0948a] mt-0.5 truncate">{doc.reportingManager.email}</p>
                     </div>
                   </div>
                 </div>
@@ -278,7 +280,7 @@ function DocCard({ doc, docType, onClick }) {
   return (
     <div
       onClick={onClick}
-      className="flex items-start gap-4 p-4 sm:p-5 cursor-pointer border-b border-[#ede5e0] hover:bg-[#f9f8f2] transition-colors group"
+      className="flex items-start gap-4 p-4 cursor-pointer border-b border-[#ede5e0] hover:bg-[#f9f8f2] transition-colors group"
     >
       <div
         className={`w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center ${
@@ -304,8 +306,8 @@ function DocCard({ doc, docType, onClick }) {
       </div>
 
       <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2 flex-wrap">
-          <p className="text-sm font-medium text-[#2a1a16] truncate max-w-[200px] sm:max-w-none">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-medium text-[#2a1a16] truncate flex-1 min-w-0">
             {doc.title}
           </p>
           <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -340,7 +342,7 @@ function DocCard({ doc, docType, onClick }) {
               height="16"
               viewBox="0 0 16 16"
               fill="none"
-              className="text-[#c9bab5] group-hover:translate-x-0.5 transition-transform"
+              className="text-[#c9bab5] group-hover:translate-x-0.5 transition-transform shrink-0"
             >
               <path
                 d="M6 4l4 4-4 4"
@@ -362,7 +364,7 @@ function DocCard({ doc, docType, onClick }) {
             <div className="w-6 h-6 rounded-full bg-[#730042] flex items-center justify-center text-[9px] font-semibold text-white flex-shrink-0">
               {getInitials(doc.employee.name)}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-[11px] font-medium text-[#2a1a16] truncate">
                 {doc.employee.name}
               </p>
@@ -371,11 +373,6 @@ function DocCard({ doc, docType, onClick }) {
             {doc.employee.role && (
               <Badge className="bg-[#f9f8f2] text-[#b0948a] border border-[#ede5e0] ml-auto capitalize hidden sm:inline-flex">
                 {doc.employee.role}
-              </Badge>
-            )}
-            {doc.employee.department && (
-              <Badge className="bg-[#f9f8f2] text-[#b0948a] border border-[#ede5e0] hidden lg:inline-flex">
-                {doc.employee.department}
               </Badge>
             )}
           </div>
@@ -394,7 +391,7 @@ function TableRow({ doc, docType, onClick }) {
       className="border-b border-[#ede5e0] hover:bg-[#f9f8f2] cursor-pointer transition-colors group"
     >
       <td className="px-4 py-3">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0">
           <div
             className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
               docType === "personal" ? "bg-[#730042]/10" : "bg-blue-50"
@@ -418,20 +415,20 @@ function TableRow({ doc, docType, onClick }) {
             </svg>
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-medium text-[#2a1a16] truncate max-w-[180px]">{doc.title}</p>
+            <p className="text-sm font-medium text-[#2a1a16] truncate max-w-[150px] xl:max-w-xs">{doc.title}</p>
             <p className="text-[10px] text-[#c9bab5]">{fmtSize(doc.sizeKB)}</p>
           </div>
         </div>
       </td>
       <td className="px-4 py-3">
         {doc.employee ? (
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-7 h-7 rounded-full bg-[#730042] flex items-center justify-center text-[9px] font-semibold text-white flex-shrink-0">
               {getInitials(doc.employee.name)}
             </div>
             <div className="min-w-0">
-              <p className="text-[12px] font-medium text-[#2a1a16] truncate">{doc.employee.name}</p>
-              <p className="text-[10px] text-[#b0948a] truncate max-w-[160px]">{doc.employee.email}</p>
+              <p className="text-[12px] font-medium text-[#2a1a16] truncate max-w-[150px] xl:max-w-xs">{doc.employee.name}</p>
+              <p className="text-[10px] text-[#b0948a] truncate max-w-[150px] xl:max-w-xs">{doc.employee.email}</p>
             </div>
           </div>
         ) : (
@@ -448,12 +445,12 @@ function TableRow({ doc, docType, onClick }) {
         )}
       </td>
       <td className="px-4 py-3">
-        <p className="text-xs text-[#b0948a] truncate max-w-[120px]">
+        <p className="text-xs text-[#b0948a] truncate max-w-[100px] xl:max-w-xs">
           {doc.employee?.department || "—"}
         </p>
       </td>
       <td className="px-4 py-3">
-        <p className="text-xs text-[#b0948a]">{fmtDate(doc.uploadedAt)}</p>
+        <p className="text-xs text-[#b0948a] whitespace-nowrap">{fmtDate(doc.uploadedAt)}</p>
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-1.5">
@@ -461,7 +458,7 @@ function TableRow({ doc, docType, onClick }) {
             <Badge className="bg-amber-50 text-amber-700">New</Badge>
           )}
           <div
-            className={`w-5 h-5 rounded-full flex items-center justify-center ${
+            className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
               doc.viewedByAdmin ? "bg-green-50" : "bg-red-50"
             }`}
           >
@@ -577,7 +574,7 @@ export default function SuperAdminDocuments() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f9f8f2] p-4 sm:p-6 lg:p-8 font-[DM_Sans,ui-sans-serif,system-ui,sans-serif] text-[#2a1a16]">
+    <div className="min-h-screen w-full overflow-x-hidden bg-[#f9f8f2] p-4 sm:p-6 lg:p-8 font-[DM_Sans,ui-sans-serif,system-ui,sans-serif] text-[#2a1a16]">
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       <div className="mb-6">
@@ -587,24 +584,26 @@ export default function SuperAdminDocuments() {
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2 sm:gap-3 mb-5 items-center">
-        {[
-          ["Total personal", personalDocs.length, "bg-[#730042]/10 text-[#730042]", "bg-[#730042]"],
-          ["Total expense", expenseDocs.length, "bg-blue-50 text-blue-700", "bg-blue-500"],
-          ["Unviewed", unviewedPersonal + unviewedExpense, "bg-amber-50 text-amber-700", "bg-amber-500"],
-        ].map(([label, val, badge, dot]) => (
-          <div
-            key={label}
-            className="bg-white border border-[#ede5e0] rounded-xl px-3 py-2 flex items-center gap-2 text-sm"
-          >
-            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dot}`} />
-            <span className="text-[#b0948a] text-xs">{label}</span>
-            <span className="font-semibold text-[#2a1a16]">{val}</span>
-          </div>
-        ))}
+      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-3 mb-5 items-start sm:items-center">
+        <div className="flex flex-wrap gap-2 sm:gap-3 w-full sm:w-auto">
+          {[
+            ["Total personal", personalDocs.length, "bg-[#730042]/10 text-[#730042]", "bg-[#730042]"],
+            ["Total expense", expenseDocs.length, "bg-blue-50 text-blue-700", "bg-blue-500"],
+            ["Unviewed", unviewedPersonal + unviewedExpense, "bg-amber-50 text-amber-700", "bg-amber-500"],
+          ].map(([label, val, badge, dot]) => (
+            <div
+              key={label}
+              className={`flex-1 sm:flex-none bg-white border border-[#ede5e0] rounded-xl px-3 py-2 flex items-center gap-2 text-sm ${badge}`}
+            >
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dot}`} />
+              <span className="text-[#b0948a] text-xs">{label}</span>
+              <span className="font-semibold text-[#2a1a16]">{val}</span>
+            </div>
+          ))}
+        </div>
 
-        <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
-          <div className="relative">
+        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto sm:ml-auto justify-end">
+          <div className="relative flex-1 sm:flex-none">
             <svg
               width="15"
               height="15"
@@ -620,13 +619,13 @@ export default function SuperAdminDocuments() {
               placeholder="Search..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-3 py-2 rounded-xl border border-[#ede5e0] bg-white text-sm text-[#2a1a16] outline-none focus:border-[#730042] w-40 sm:w-56 transition-colors placeholder:text-[#c9bab5]"
+              className="w-full sm:w-56 pl-9 pr-3 py-2 rounded-xl border border-[#ede5e0] bg-white text-sm text-[#2a1a16] outline-none focus:border-[#730042] transition-colors placeholder:text-[#c9bab5]"
             />
           </div>
 
           <button
             onClick={() => setShowFilters((v) => !v)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-colors ${
+            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-colors ${
               showFilters || activeFiltersCount > 0
                 ? "bg-[#730042] text-white border-[#730042]"
                 : "bg-white text-[#2a1a16] border-[#ede5e0] hover:border-[#730042]"
@@ -645,7 +644,7 @@ export default function SuperAdminDocuments() {
 
           <button
             onClick={() => exportToCSV(filtered, activeTab)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#ede5e0] bg-white text-sm font-medium text-[#2a1a16] hover:border-[#730042] transition-colors"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-[#ede5e0] bg-white text-sm font-medium text-[#2a1a16] hover:border-[#730042] transition-colors"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="#730042" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -658,12 +657,12 @@ export default function SuperAdminDocuments() {
 
       {showFilters && (
         <div className="bg-white border border-[#ede5e0] rounded-2xl p-4 sm:p-5 mb-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5 min-w-0">
             <label className="text-[10px] font-medium text-[#b0948a] uppercase tracking-wide">Role</label>
             <select
               value={filterRole}
               onChange={(e) => setFilterRole(e.target.value)}
-              className="px-2.5 py-2 rounded-lg border border-[#ede5e0] bg-[#f9f8f2] text-xs text-[#2a1a16] outline-none focus:border-[#730042] capitalize"
+              className="px-2.5 py-2 rounded-lg border border-[#ede5e0] bg-[#f9f8f2] text-xs text-[#2a1a16] outline-none focus:border-[#730042] capitalize w-full"
             >
               {ROLE_OPTIONS.map((r) => (
                 <option key={r} value={r} className="capitalize">
@@ -673,12 +672,12 @@ export default function SuperAdminDocuments() {
             </select>
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5 min-w-0">
             <label className="text-[10px] font-medium text-[#b0948a] uppercase tracking-wide">SA Status</label>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-2.5 py-2 rounded-lg border border-[#ede5e0] bg-[#f9f8f2] text-xs text-[#2a1a16] outline-none focus:border-[#730042]"
+              className="px-2.5 py-2 rounded-lg border border-[#ede5e0] bg-[#f9f8f2] text-xs text-[#2a1a16] outline-none focus:border-[#730042] w-full"
             >
               <option value="all">All</option>
               <option value="new">New (unviewed)</option>
@@ -686,12 +685,12 @@ export default function SuperAdminDocuments() {
             </select>
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5 min-w-0">
             <label className="text-[10px] font-medium text-[#b0948a] uppercase tracking-wide">Admin view</label>
             <select
               value={filterAdminViewed}
               onChange={(e) => setFilterAdminViewed(e.target.value)}
-              className="px-2.5 py-2 rounded-lg border border-[#ede5e0] bg-[#f9f8f2] text-xs text-[#2a1a16] outline-none focus:border-[#730042]"
+              className="px-2.5 py-2 rounded-lg border border-[#ede5e0] bg-[#f9f8f2] text-xs text-[#2a1a16] outline-none focus:border-[#730042] w-full"
             >
               <option value="all">All</option>
               <option value="viewed_admin">Admin viewed</option>
@@ -699,12 +698,12 @@ export default function SuperAdminDocuments() {
             </select>
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5 min-w-0">
             <label className="text-[10px] font-medium text-[#b0948a] uppercase tracking-wide">Department</label>
             <select
               value={filterDept}
               onChange={(e) => setFilterDept(e.target.value)}
-              className="px-2.5 py-2 rounded-lg border border-[#ede5e0] bg-[#f9f8f2] text-xs text-[#2a1a16] outline-none focus:border-[#730042]"
+              className="px-2.5 py-2 rounded-lg border border-[#ede5e0] bg-[#f9f8f2] text-xs text-[#2a1a16] outline-none focus:border-[#730042] w-full"
             >
               {departments.map((d) => (
                 <option key={d} value={d}>
@@ -714,23 +713,23 @@ export default function SuperAdminDocuments() {
             </select>
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5 min-w-0">
             <label className="text-[10px] font-medium text-[#b0948a] uppercase tracking-wide">From date</label>
             <input
               type="date"
               value={filterDateFrom}
               onChange={(e) => setFilterDateFrom(e.target.value)}
-              className="px-2.5 py-2 rounded-lg border border-[#ede5e0] bg-[#f9f8f2] text-xs text-[#2a1a16] outline-none focus:border-[#730042]"
+              className="px-2.5 py-2 rounded-lg border border-[#ede5e0] bg-[#f9f8f2] text-xs text-[#2a1a16] outline-none focus:border-[#730042] w-full"
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5 min-w-0">
             <label className="text-[10px] font-medium text-[#b0948a] uppercase tracking-wide">To date</label>
             <input
               type="date"
               value={filterDateTo}
               onChange={(e) => setFilterDateTo(e.target.value)}
-              className="px-2.5 py-2 rounded-lg border border-[#ede5e0] bg-[#f9f8f2] text-xs text-[#2a1a16] outline-none focus:border-[#730042]"
+              className="px-2.5 py-2 rounded-lg border border-[#ede5e0] bg-[#f9f8f2] text-xs text-[#2a1a16] outline-none focus:border-[#730042] w-full"
             />
           </div>
 
@@ -753,7 +752,7 @@ export default function SuperAdminDocuments() {
           style={{ background: activeTab === "personal" ? "#730042" : "#185FA5" }}
         />
 
-        <div className="flex border-b border-[#ede5e0] px-4 sm:px-5 overflow-x-auto">
+        <div className="flex border-b border-[#ede5e0] px-2 sm:px-5 overflow-x-auto">
           {[
             { key: "personal", label: "Personal", count: personalDocs.length, unviewed: unviewedPersonal },
             { key: "expense", label: "Expense", count: expenseDocs.length, unviewed: unviewedExpense },
@@ -772,7 +771,7 @@ export default function SuperAdminDocuments() {
                   borderBottom: isActive ? `2px solid ${color}` : "2px solid transparent",
                   color: isActive ? color : "#b0948a",
                 }}
-                className="px-4 py-3.5 bg-transparent border-none text-sm whitespace-nowrap font-medium cursor-pointer flex items-center gap-2 -mb-px transition-colors"
+                className="px-4 py-3.5 bg-transparent border-none text-sm whitespace-nowrap font-medium cursor-pointer flex items-center gap-2 -mb-px transition-colors flex-shrink-0"
               >
                 {tab.label}
                 <span
@@ -793,7 +792,7 @@ export default function SuperAdminDocuments() {
             );
           })}
 
-          <div className="ml-auto flex items-center pl-4 py-2">
+          <div className="ml-auto flex items-center pl-4 py-2 flex-shrink-0">
             <span className="text-[11px] text-[#b0948a]">
               {filtered.length} result{filtered.length !== 1 ? "s" : ""}
             </span>
@@ -820,13 +819,13 @@ export default function SuperAdminDocuments() {
         {!loading && filtered.length > 0 && (
           <>
             <div className="hidden lg:block overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-full">
                 <thead>
                   <tr className="border-b border-[#ede5e0]">
                     {["Document", "Employee", "Role", "Department", "Uploaded", "Status", ""].map((h) => (
                       <th
                         key={h}
-                        className="px-4 py-3 text-left text-[10px] font-semibold text-[#c9bab5] uppercase tracking-wider"
+                        className="px-4 py-3 text-left text-[10px] font-semibold text-[#c9bab5] uppercase tracking-wider whitespace-nowrap"
                       >
                         {h}
                       </th>
