@@ -202,7 +202,20 @@ function App() {
               }
             />
 
-            {/* ── Documents — requires can_view_all_documents ── */}
+            {/*
+              ── Documents ──
+              NOTE: these were previously all gated on "documents.can_view_all_documents",
+              but Admindocument.jsx (the "My Documents" upload/edit/delete page) only ever
+              checks "documents.can_upload_documents" internally. That mismatch is what was
+              causing the AccessDenied screen even when can_upload_documents was true.
+
+              /document-admin is fixed below to match what its component actually checks.
+              /document, /document-manager, and /document-admin-team are left as
+              "can_view_all_documents" for now — verify Doc.jsx, Managerdocument.jsx, and
+              Adminteamdocument.jsx use that same permission internally. If any of them are
+              also "my own documents" pages (like Admindocument.jsx), switch their guard to
+              "documents.can_upload_documents" too.
+            */}
             <Route
               path="/document"
               element={
@@ -222,7 +235,7 @@ function App() {
             <Route
               path="/document-admin"
               element={
-                <ProtectedRoute permission="documents.can_view_all_documents">
+                <ProtectedRoute permission="documents.can_upload_documents">
                   <Admindocument />
                 </ProtectedRoute>
               }

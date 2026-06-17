@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from "react";
 import { useSubmitTicket, useGetMyTickets, useRateTicket, useGetTicketDetail } from "../../auth/server-state/adminticket/adminticket.hook";
+import { usePermissionStore } from "../../auth/store/permission/permissionStore";
 
 const TICKET_TYPES = {
   suggestion:    { label: "Suggestion",    icon: "💡", bg: "bg-emerald-50", color: "text-emerald-800", dot: "bg-emerald-400" },
@@ -115,6 +116,14 @@ const SkeletonCard = () => (
   </div>
 );
 
+const PermissionBlocked = ({ message }) => (
+  <div className="bg-white rounded-2xl border border-purple-100 shadow-sm p-10 flex flex-col items-center gap-4 text-center">
+    <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center text-3xl border border-red-100">🔒</div>
+    <p className="text-base font-bold text-gray-800">Permission Required</p>
+    <p className="text-sm text-gray-400 max-w-xs leading-relaxed">{message}</p>
+  </div>
+);
+
 const inputCls = "w-full px-3.5 py-2.5 rounded-xl border-[1.5px] border-purple-100 bg-purple-50/30 text-sm text-gray-800 outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 transition placeholder:text-gray-400 font-[Instrument_Sans,sans-serif]";
 
 const BLANK = {
@@ -127,6 +136,15 @@ function SubmitForm({ onSuccess, canRaise }) {
   const [form,  setForm]  = useState(BLANK);
   const [toast, setToast] = useState(null);
   const mut = useSubmitTicket();
+
+  const { role } = usePermissionStore();
+
+  const roleLabel = {
+    superadmin: "Super Admin",
+    admin:      "Admin",
+    manager:    "Manager",
+    employee:   "Employee",
+  }[role] ?? "User";
 
   const set = useCallback((k, v) =>
     setForm(p => ({ ...p, [k]:v, ...(k==="type" ? { category:"", subCategory:"" } : {}) }))
@@ -157,13 +175,7 @@ function SubmitForm({ onSuccess, canRaise }) {
   };
 
   if (!canRaise) return (
-    <div className="bg-white rounded-2xl border border-purple-100 shadow-sm p-10 flex flex-col items-center gap-4 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center text-3xl border border-red-100">🔒</div>
-      <p className="text-base font-bold text-gray-800">Permission Required</p>
-      <p className="text-sm text-gray-400 max-w-xs leading-relaxed">
-        You don't have permission to raise tickets. Contact your Super Admin to enable this feature.
-      </p>
-    </div>
+    <PermissionBlocked message="You don't have permission to raise tickets. Contact your Super Admin to enable this feature." />
   );
 
   const cats = CATEGORIES[form.type] || [];
@@ -179,7 +191,9 @@ function SubmitForm({ onSuccess, canRaise }) {
           <p className="text-base font-bold text-gray-900">New Ticket</p>
           <p className="text-xs text-purple-400 mt-0.5">Your submission is handled confidentially</p>
         </div>
-        <span className="ml-auto text-[11px] font-semibold text-[#730042] bg-[#730042]/8 border border-[#730042]/15 px-3 py-1 rounded-full">Admin</span>
+        <span className="ml-auto text-[11px] font-semibold text-[#730042] bg-[#730042]/8 border border-[#730042]/15 px-3 py-1 rounded-full">
+          {roleLabel}
+        </span>
       </div>
 
       <div className="mb-5">
@@ -644,13 +658,15 @@ function MyTickets({ canRate }) {
   );
 }
 
-export default function AdminTickets({ permissions = {} }) {
+export default function AdminTickets() {
   const [tab, setTab] = useState("submit");
   const { data } = useGetMyTickets();
   const count = data?.count || 0;
 
-  const canRaise = !!permissions?.tickets?.can_raise_ticket;
-  const canRate  = !!permissions?.tickets?.can_rate_ticket;
+  const can = usePermissionStore((state) => state.can);
+  const canRaise = can("tickets.can_raise_ticket");
+  const canView  = can("tickets.can_view_all_tickets");
+  const canRate  = can("tickets.can_rate_ticket");
 
   return (
     <div className="min-h-screen bg-[#F8F4FB] p-4 sm:p-6 lg:p-8">
@@ -675,8 +691,8 @@ export default function AdminTickets({ permissions = {} }) {
 
         <div className="flex gap-1 bg-purple-100/60 rounded-xl p-1 border border-purple-100">
           {[
-            ["submit",    `📝 Submit New${!canRaise?" 🔒":""}`],
-            ["mytickets", `📋 My Tickets${count?` (${count})`:""}`],
+            ["submit",    `📝 Submit New${!canRaise ? " 🔒" : ""}`],
+            ["mytickets", `📋 My Tickets${canView && count ? ` (${count})` : ""}${!canView ? " 🔒" : ""}`],
           ].map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)}
               className={`px-5 py-2 rounded-[10px] border-none cursor-pointer text-xs font-semibold transition-all
@@ -689,8 +705,14 @@ export default function AdminTickets({ permissions = {} }) {
       </div>
 
       <div className="max-w-2xl mx-auto">
-        {tab === "submit"    && <SubmitForm onSuccess={() => setTab("mytickets")} canRaise={canRaise}/>}
-        {tab === "mytickets" && <MyTickets canRate={canRate}/>}
+        {tab === "submit" && (
+          <SubmitForm onSuccess={() => setTab("mytickets")} canRaise={canRaise}/>
+        )}
+        {tab === "mytickets" && (
+          canView
+            ? <MyTickets canRate={canRate}/>
+            : <PermissionBlocked message="You don't have permission to view tickets. Contact your Super Admin to enable this feature." />
+        )}
       </div>
     </div>
   );
