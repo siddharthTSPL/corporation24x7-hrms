@@ -1224,29 +1224,49 @@ function Testimonials() {
           </div>
 
           {/* Pagination dots: mb = SP.section.sm (48px) */}
- <div
+<div
   style={{
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: '16px',
+    gap: '20px',
     marginBottom: SP.section.sm,
   }}
 >
   <button
-    onClick={() =>Math.max(prev - 1, 0)}
-    style={{
-      width: 32,
-      height: 32,
-      borderRadius: '50%',
-      border: '1px solid #DDB7CB',
-      background: 'transparent',
-      color: P,
-      cursor: 'pointer',
-    }}
-  >
-    ←
-  </button>
+  onClick={() =>
+    setStartIndex(prev => Math.max(prev - 1, 0))
+  }
+  style={{
+    width: '42px',
+    height: '42px',
+    minWidth: '42px',
+    borderRadius: '50%',
+    border: '1.5px solid #DDB7CB',
+    background: '#fff',
+    color: '#730042',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '18px',
+    fontWeight: '400',
+    transition: 'all .3s ease',
+    boxShadow: '0 4px 12px rgba(115,0,66,0.08)'
+  }}
+  onMouseEnter={e => {
+    e.currentTarget.style.background = '#730042';
+    e.currentTarget.style.color = '#fff';
+    e.currentTarget.style.transform = 'translateY(-2px)';
+  }}
+  onMouseLeave={e => {
+    e.currentTarget.style.background = '#fff';
+    e.currentTarget.style.color = '#730042';
+    e.currentTarget.style.transform = 'translateY(0)';
+  }}
+>
+  ←
+</button>
 
   <div
   style={{
@@ -1254,42 +1274,59 @@ function Testimonials() {
     alignItems: 'center',
     gap: '6px',
   }}
->
-  {[0,1,2].map(i => (
-    <button
-      key={i}
-      onClick={() => setStartIndex(i)}
-      style={{
-        width: startIndex === i ? '18px' : '6px',
-        height: '6px',
-        borderRadius: '20px',
-        border: 'none',
-        cursor: 'pointer',
-        background:
-          startIndex === i
-            ? '#730042'
-            : '#DDB7CB',
-        transition: 'all .3s ease',
-      }}
-    />
-  ))}
-</div>
-
+>{[0,1,2].map(i => (
   <button
-    onClick={() => setStartIndex(prev =>
-    Math.min(prev + 1, testimonials.length - 3))}
+    key={i}
+    onClick={() => setStartIndex(i)}
     style={{
-      width: 32,
-      height: 32,
+      width: startIndex === i ? '40px' : '25px',
+      height: startIndex === i ? '15px' : '8px',
       borderRadius: '50%',
-      border: '1px solid #DDB7CB',
-      background: 'transparent',
-      color: P,
+      border: 'none',
       cursor: 'pointer',
+      background: startIndex === i ? '#730042' : '#DDB7CB',
+      transition: 'all 0.3s ease',
+      padding: 0,
     }}
-  >
-    →
-  </button>
+  />
+))}
+</div>
+<button
+  onClick={() =>
+    setStartIndex(prev =>
+      Math.min(prev + 1, testimonials.length - 3)
+    )
+  }
+  style={{
+    width: '42px',
+    height: '42px',
+    minWidth: '42px',
+    borderRadius: '50%',
+    border: '1.5px solid #DDB7CB',
+    background: '#fff',
+    color: '#730042',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '18px',
+    fontWeight: '400',
+    transition: 'all .3s ease',
+    boxShadow: '0 4px 12px rgba(115,0,66,0.08)'
+  }}
+  onMouseEnter={e => {
+    e.currentTarget.style.background = '#730042';
+    e.currentTarget.style.color = '#fff';
+    e.currentTarget.style.transform = 'translateY(-2px)';
+  }}
+  onMouseLeave={e => {
+    e.currentTarget.style.background = '#fff';
+    e.currentTarget.style.color = '#730042';
+    e.currentTarget.style.transform = 'translateY(0)';
+  }}
+>
+  →
+</button>
 </div>
           {/* CTA banner: padding SP.section.sm (48px) SP.card.pad (32px) */}
           <div className="testimonial-cta"
@@ -1438,7 +1475,7 @@ function Footer() {
     { title: 'Resources', links: ['Documentation', 'Api Reference', 'Guides', 'Blog', 'Community'] },
   ]
   const socials = [
-    { icon: <FiLinkedin />, href: '#', label: 'LinkedIn' },
+    { icon: <FiLinkedin />, href: "https://www.linkedin.com/company/103362190/admin/dashboard/", label: 'LinkedIn' },
     { icon: <FiInstagram />, href: '#', label: 'Instagram' },
     { icon: <FiTwitter />, href: '#', label: 'Twitter' },
     { icon: <FiMail />, href: '#', label: 'Email' },
@@ -1451,13 +1488,7 @@ function Footer() {
       <style>{modalStyles}</style>
       <footer style={{ background: '#F6EDF2', borderTop: `1px solid ${FOOTER_BORDER}`, fontFamily: 'DM Sans, sans-serif' }}>
 
-        {/*
-          ── Footer main: Wrap (1280px + clamp gutter)
-          CRITICAL FIX: was maxWidth:1100px which caused footer content to be
-          visually indented vs every other section's 1280px container.
-          Now using Wrap → all sections share the same left/right walls.
-          paddingTop: SP.section.sm (48px) — footer starts after a full breath
-        */}
+      
         <Wrap style={{ paddingTop: '30px', paddingBottom: 0 }}>
           <div style={{ display: 'grid', gap: '40px' }} className="footer-grid">
 

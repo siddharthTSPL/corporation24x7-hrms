@@ -28,6 +28,8 @@ import {
     getAllPersonalDocumentsSuperAdmin,
   getAllExpenseDocumentsSuperAdmin,
   getDocumentDetailsSuperAdmin,
+  updatePermissions,
+  getPermissions
 } from "../../../api/superadmin/other/su.other";
 
 
@@ -301,5 +303,25 @@ export const useGetDocumentDetailsSuperAdmin = (documentId) => {
     queryFn: () => getDocumentDetailsSuperAdmin(documentId),
     enabled: !!documentId,
     refetchOnWindowFocus: false,
+  });
+};
+
+export const useGetPermissions = (id, user_model) => {
+  return useQuery({
+    queryKey: ["permissions", id, user_model],
+    queryFn: () => getPermissions(id, user_model),
+    enabled: !!id && !!user_model,
+    refetchOnWindowFocus: false,
+    staleTime: 1000 * 60 * 2,
+  });
+};
+
+export const useUpdatePermissions = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updatePermissions,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["permissions", variables.id] });
+    },
   });
 };

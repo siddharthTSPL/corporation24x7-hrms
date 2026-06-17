@@ -66,12 +66,10 @@ function daysLeft(dateStr) {
 
 function Badge({ children, color = C.brand, bg = C.brandLight }) {
   return (
-    <span style={{
-      display: "inline-flex", alignItems: "center",
-      padding: "2px 10px", borderRadius: 20,
-      fontSize: 11, fontWeight: 500,
-      color, background: bg,
-    }}>
+    <span 
+      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap"
+      style={{ color, background: bg }}
+    >
       {children}
     </span>
   );
@@ -80,14 +78,14 @@ function Badge({ children, color = C.brand, bg = C.brandLight }) {
 function PlanBadge({ plan }) {
   const isTrial = plan === "trial" || plan === "free_trial";
   return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 4,
-      padding: "3px 10px", borderRadius: 20,
-      fontSize: 11, fontWeight: 600,
-      color: isTrial ? C.amber : "#1a5c3a",
-      background: isTrial ? C.amberBg : C.greenBg,
-      border: `0.5px solid ${isTrial ? "#f5d98a" : "#a8dfc3"}`,
-    }}>
+    <span 
+      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap"
+      style={{
+        color: isTrial ? C.amber : "#1a5c3a",
+        background: isTrial ? C.amberBg : C.greenBg,
+        border: `0.5px solid ${isTrial ? "#f5d98a" : "#a8dfc3"}`,
+      }}
+    >
       {isTrial ? "⏱ Free Trial" : "✓ " + (plan || "Active")}
     </span>
   );
@@ -95,13 +93,14 @@ function PlanBadge({ plan }) {
 
 function Spinner({ size = 16, color = "#fff" }) {
   return (
-    <div style={{
-      width: size, height: size, borderRadius: "50%",
-      border: `2px solid ${color}33`,
-      borderTop: `2px solid ${color}`,
-      animation: "spin 0.7s linear infinite",
-      flexShrink: 0,
-    }} />
+    <div 
+      className="rounded-full animate-spin shrink-0"
+      style={{
+        width: size, height: size,
+        border: `2px solid ${color}33`,
+        borderTop: `2px solid ${color}`,
+      }} 
+    />
   );
 }
 
@@ -114,78 +113,67 @@ function Toast({ message, type, onClose }) {
   if (!message) return null;
   const isSuccess = type === "success";
   return (
-    <div style={{
-      position: "fixed", top: 24, right: 24, zIndex: 999,
-      background: isSuccess ? "#f0faf5" : "#fff5f5",
-      border: `0.5px solid ${isSuccess ? "#a8dfc3" : "#f5c6c6"}`,
-      borderRadius: 12, padding: "14px 18px",
-      display: "flex", alignItems: "center", gap: 10,
-      boxShadow: "0 4px 24px rgba(115,0,66,0.10)",
-      minWidth: 260, maxWidth: 360,
-      animation: "slideIn 0.25s ease",
-    }}>
-      <div style={{
-        width: 28, height: 28, borderRadius: "50%",
-        background: isSuccess ? C.greenBg : C.redBg,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        flexShrink: 0,
-      }}>
+    <div 
+      className="fixed top-4 right-4 left-4 sm:left-auto z-[999] flex items-center gap-2.5 p-3.5 rounded-xl shadow-lg animate-[slideIn_0.25s_ease]"
+      style={{
+        background: isSuccess ? "#f0faf5" : "#fff5f5",
+        border: `0.5px solid ${isSuccess ? "#a8dfc3" : "#f5c6c6"}`,
+      }}
+    >
+      <div 
+        className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+        style={{ background: isSuccess ? C.greenBg : C.redBg }}
+      >
         {isSuccess
           ? <svg width="14" height="14" viewBox="0 0 14 14"><polyline points="2,7 5.5,10.5 12,4" fill="none" stroke={C.green} strokeWidth="2" strokeLinecap="round"/></svg>
           : <svg width="14" height="14" viewBox="0 0 14 14"><line x1="3" y1="3" x2="11" y2="11" stroke={C.red} strokeWidth="2" strokeLinecap="round"/><line x1="11" y1="3" x2="3" y2="11" stroke={C.red} strokeWidth="2" strokeLinecap="round"/></svg>
         }
       </div>
-      <span style={{ fontSize: 13, fontWeight: 500, color: isSuccess ? "#1a5c3a" : "#7a1a1a", flex: 1 }}>
+      <span 
+        className="text-[13px] font-medium flex-1"
+        style={{ color: isSuccess ? "#1a5c3a" : "#7a1a1a" }}
+      >
         {message}
       </span>
-      <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
+      <button onClick={onClose} className="bg-none border-none cursor-pointer text-[#b0948a] text-base p-0 leading-none">×</button>
     </div>
   );
 }
 
 function SectionCard({ title, subtitle, accent = C.brand, children }) {
   return (
-    <div style={{
-      background: C.surface, borderRadius: 16,
-      border: `0.5px solid ${C.border}`,
-      overflow: "hidden", position: "relative",
-      marginBottom: 16,
-    }}>
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: accent, borderRadius: "16px 16px 0 0" }} />
-      <div style={{ padding: "20px 24px 16px", borderBottom: `0.5px solid ${C.border}` }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>{title}</div>
-        {subtitle && <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>{subtitle}</div>}
+    <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative mb-4 sm:mb-6">
+      <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl" style={{ background: accent }} />
+      <div className="p-5 sm:p-6 border-b border-[#ede5e0]">
+        <div className="text-sm font-medium text-[#2a1a16]">{title}</div>
+        {subtitle && <div className="text-xs text-[#b0948a] mt-1">{subtitle}</div>}
       </div>
-      <div style={{ padding: "20px 24px" }}>{children}</div>
+      <div className="p-5 sm:p-6">{children}</div>
     </div>
   );
 }
 
 function FieldLabel({ children }) {
-  return <div style={{ fontSize: 12, fontWeight: 500, color: C.muted, marginBottom: 6, letterSpacing: "0.2px" }}>{children}</div>;
+  return <div className="text-xs font-medium text-[#b0948a] mb-1.5 tracking-wide">{children}</div>;
 }
 
 function ReadonlyField({ value, label }) {
   return (
-    <div style={{ marginBottom: 16 }}>
+    <div className="mb-4">
       <FieldLabel>{label}</FieldLabel>
-      <div style={{
-        padding: "10px 14px", borderRadius: 10,
-        background: "#f9f4f2", border: `0.5px solid ${C.border}`,
-        fontSize: 13, color: C.text, fontWeight: 500,
-      }}>
+      <div className="px-3.5 py-2.5 rounded-lg bg-[#f9f4f2] border border-[#ede5e0] text-sm text-[#2a1a16] font-medium">
         {value || "—"}
       </div>
-      <div style={{ fontSize: 11, color: C.mutedMid, marginTop: 4 }}>Read-only</div>
+      <div className="text-[11px] text-[#c9bab5] mt-1">Read-only</div>
     </div>
   );
 }
 
 function InputField({ label, value, onChange, type = "text", placeholder, hint, rightEl, name, disabled }) {
   return (
-    <div style={{ marginBottom: 16 }}>
+    <div className="mb-4">
       <FieldLabel>{label}</FieldLabel>
-      <div style={{ position: "relative" }}>
+      <div className="relative">
         <input
           type={type}
           name={name}
@@ -193,58 +181,38 @@ function InputField({ label, value, onChange, type = "text", placeholder, hint, 
           onChange={onChange}
           placeholder={placeholder}
           disabled={disabled}
-          style={{
-            width: "100%", padding: "10px 14px",
-            paddingRight: rightEl ? 40 : 14,
-            borderRadius: 10, border: `0.5px solid ${C.border}`,
-            fontSize: 13, color: C.text, background: disabled ? "#f9f4f2" : C.surface,
-            outline: "none", fontFamily: "inherit",
-            transition: "border-color 0.15s",
-            boxSizing: "border-box",
-            cursor: disabled ? "not-allowed" : "text",
-          }}
-          onFocus={e => { if (!disabled) e.target.style.borderColor = C.brand; }}
-          onBlur={e => e.target.style.borderColor = C.border}
+          className={`w-full px-3.5 py-2.5 ${rightEl ? 'pr-10' : ''} rounded-lg border border-[#ede5e0] text-sm text-[#2a1a16] outline-none transition-all focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 font-sans ${disabled ? 'bg-[#f9f4f2] cursor-not-allowed' : 'bg-white'}`}
         />
         {rightEl && (
-          <div style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)" }}>
+          <div className="absolute right-3 top-1/2 -translate-y-1/2">
             {rightEl}
           </div>
         )}
       </div>
-      {hint && <div style={{ fontSize: 11, color: C.mutedMid, marginTop: 4 }}>{hint}</div>}
+      {hint && <div className="text-[11px] text-[#c9bab5] mt-1">{hint}</div>}
     </div>
   );
 }
 
 function SelectField({ label, value, onChange, options, hint }) {
   return (
-    <div style={{ marginBottom: 16 }}>
+    <div className="mb-4">
       <FieldLabel>{label}</FieldLabel>
       <select
         value={value}
         onChange={onChange}
+        className="w-full px-3.5 py-2.5 rounded-lg border border-[#ede5e0] text-sm text-[#2a1a16] bg-white outline-none transition-all focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 font-sans cursor-pointer appearance-none"
         style={{
-          width: "100%", padding: "10px 14px",
-          borderRadius: 10, border: `0.5px solid ${C.border}`,
-          fontSize: 13, color: C.text, background: C.surface,
-          outline: "none", fontFamily: "inherit",
-          appearance: "none",
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23b0948a' fill='none' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E")`,
           backgroundRepeat: "no-repeat",
           backgroundPosition: "right 14px center",
-          paddingRight: 36,
-          cursor: "pointer",
-          boxSizing: "border-box",
         }}
-        onFocus={e => e.target.style.borderColor = C.brand}
-        onBlur={e => e.target.style.borderColor = C.border}
       >
         {options.map(opt => (
           <option key={opt} value={opt}>{opt}</option>
         ))}
       </select>
-      {hint && <div style={{ fontSize: 11, color: C.mutedMid, marginTop: 4 }}>{hint}</div>}
+      {hint && <div className="text-[11px] text-[#c9bab5] mt-1">{hint}</div>}
     </div>
   );
 }
@@ -254,13 +222,10 @@ function PrimaryButton({ onClick, disabled, loading, children, color = C.brand }
     <button
       onClick={onClick}
       disabled={disabled || loading}
-      style={{
-        width: "100%", padding: "11px 0",
-        background: disabled || loading ? `${color}99` : color,
-        color: "#fff", border: "none", borderRadius: 10,
-        fontSize: 13, fontWeight: 500, cursor: disabled || loading ? "not-allowed" : "pointer",
-        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-        transition: "opacity 0.15s", fontFamily: "inherit",
+      className="w-full py-2.5 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-opacity hover:opacity-90 font-sans"
+      style={{ 
+        background: disabled || loading ? `${color}99` : color, 
+        cursor: disabled || loading ? "not-allowed" : "pointer" 
       }}
     >
       {loading ? <><Spinner />{children}</> : children}
@@ -272,27 +237,27 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
   const tabs = [
     {
       key: "overview", label: "Overview", icon: (
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><rect x="9" y="2" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><rect x="2" y="9" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><rect x="9" y="9" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.4"/></svg>
+        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><rect x="9" y="2" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><rect x="2" y="9" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><rect x="9" y="9" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.4"/></svg>
       )
     },
     {
       key: "profile", label: "Profile", icon: (
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.4"/><path d="M2 13c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.4"/><path d="M2 13c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
       )
     },
     {
       key: "organisation", label: "Organisation", icon: (
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 14V6l6-4 6 4v8" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><rect x="6" y="9" width="4" height="5" rx="1" stroke="currentColor" strokeWidth="1.4"/></svg>
+        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M2 14V6l6-4 6 4v8" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><rect x="6" y="9" width="4" height="5" rx="1" stroke="currentColor" strokeWidth="1.4"/></svg>
       )
     },
     {
       key: "password", label: "Password", icon: (
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="4" y="7" width="8" height="6" rx="2" stroke="currentColor" strokeWidth="1.4"/><path d="M6 7V5a2 2 0 0 1 4 0v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><rect x="4" y="7" width="8" height="6" rx="2" stroke="currentColor" strokeWidth="1.4"/><path d="M6 7V5a2 2 0 0 1 4 0v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
       )
     },
     {
       key: "avatar", label: "Avatar", icon: (
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4"/><circle cx="8" cy="6" r="2" stroke="currentColor" strokeWidth="1.2"/><path d="M4 12.5c0-2.2 1.8-3.5 4-3.5s4 1.3 4 3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4"/><circle cx="8" cy="6" r="2" stroke="currentColor" strokeWidth="1.2"/><path d="M4 12.5c0-2.2 1.8-3.5 4-3.5s4 1.3 4 3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
       )
     },
   ];
@@ -300,46 +265,42 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
   const days = daysLeft(superAdmin?.plan_expires_at || superAdmin?.trial_expires_at);
 
   return (
-    <div style={{ width: 220, flexShrink: 0 }}>
-      <div style={{
-        background: C.surface, borderRadius: 16,
-        border: `0.5px solid ${C.border}`,
-        padding: "20px 16px", marginBottom: 12,
-        position: "relative", overflow: "hidden",
-      }}>
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${C.grad1}, ${C.grad2})`, borderRadius: "16px 16px 0 0" }} />
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-          <div style={{
-            width: 60, height: 60, borderRadius: "50%",
-            background: superAdmin?.profile_image ? "transparent" : `linear-gradient(135deg, ${C.grad1}, ${C.grad2})`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 20, fontWeight: 600, color: "#fff",
-            overflow: "hidden", border: `3px solid ${C.brandLight}`,
-          }}>
+    <div className="w-full lg:w-64 lg:shrink-0">
+      <div className="bg-white rounded-2xl border border-[#ede5e0] p-4 sm:p-5 mb-3 relative overflow-hidden">
+        <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl" style={{ background: `linear-gradient(90deg, ${C.grad1}, ${C.grad2})` }} />
+        <div className="flex flex-col items-center gap-2.5">
+          <div 
+            className="w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-xl sm:text-2xl font-semibold text-white overflow-hidden border-[3px]"
+            style={{ 
+              background: superAdmin?.profile_image ? "transparent" : `linear-gradient(135deg, ${C.grad1}, ${C.grad2})`,
+              borderColor: C.brandLight 
+            }}
+          >
             {superAdmin?.profile_image
-              ? <img src={superAdmin.profile_image} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ? <img src={superAdmin.profile_image} alt="avatar" className="w-full h-full object-cover" />
               : initials
             }
           </div>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{superAdmin?.f_name} {superAdmin?.l_name}</div>
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{superAdmin?.organisation_name || "—"}</div>
-            <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 5, alignItems: "center" }}>
+          <div className="text-center w-full min-w-0">
+            <div className="text-sm font-semibold text-[#2a1a16] truncate">{superAdmin?.f_name} {superAdmin?.l_name}</div>
+            <div className="text-[11px] text-[#b0948a] mt-0.5 truncate">{superAdmin?.organisation_name || "—"}</div>
+            <div className="mt-2 flex flex-col gap-1.5 items-center">
               <Badge color={C.brand} bg={C.brandLight}>{superAdmin?.role || "super_admin"}</Badge>
               {superAdmin?.is_trial_active && <PlanBadge plan="free_trial" />}
             </div>
           </div>
           {days !== null && days <= 30 && (
-            <div style={{
-              width: "100%", padding: "8px 12px", borderRadius: 10,
-              background: days <= 5 ? C.redBg : C.amberBg,
-              border: `0.5px solid ${days <= 5 ? "#f5c6c6" : "#f5d98a"}`,
-              textAlign: "center",
-            }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: days <= 5 ? C.red : C.amber }}>
+            <div 
+              className="w-full p-2 rounded-lg text-center"
+              style={{
+                background: days <= 5 ? C.redBg : C.amberBg,
+                border: `0.5px solid ${days <= 5 ? "#f5c6c6" : "#f5d98a"}`,
+              }}
+            >
+              <div className="text-[11px] font-semibold" style={{ color: days <= 5 ? C.red : C.amber }}>
                 {days === 0 ? "Expires today!" : `${days} day${days !== 1 ? "s" : ""} left`}
               </div>
-              <div style={{ fontSize: 10, color: C.muted, marginTop: 1 }}>
+              <div className="text-[10px] text-[#b0948a] mt-0.5">
                 Trial expires {formatDate(superAdmin?.trial_expires_at)}
               </div>
             </div>
@@ -347,28 +308,19 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
         </div>
       </div>
 
-      <div style={{ background: C.surface, borderRadius: 16, border: `0.5px solid ${C.border}`, overflow: "hidden" }}>
+      <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden flex flex-col">
         {tabs.map((t, i) => {
           const active = tab === t.key;
           return (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              style={{
-                width: "100%", padding: "13px 16px",
-                display: "flex", alignItems: "center", gap: 10,
-                background: active ? C.brandLight : "transparent",
-                color: active ? C.brand : C.muted,
-                border: "none", borderBottom: i < tabs.length - 1 ? `0.5px solid ${C.border}` : "none",
-                cursor: "pointer", fontFamily: "inherit",
-                fontSize: 13, fontWeight: active ? 500 : 400,
-                transition: "all 0.15s", textAlign: "left",
-              }}
+              className={`w-full px-4 py-3 flex items-center gap-2.5 text-sm transition-all text-left font-sans ${active ? 'bg-[#730042]/10 text-[#730042] font-medium' : 'text-[#b0948a] hover:bg-gray-50'} ${i < tabs.length - 1 ? 'border-b border-[#ede5e0]' : ''}`}
             >
               {t.icon}
               {t.label}
               {active && (
-                <div style={{ marginLeft: "auto", width: 5, height: 5, borderRadius: "50%", background: C.brand }} />
+                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#730042]"></div>
               )}
             </button>
           );
@@ -384,7 +336,7 @@ function OverviewTab({ superAdmin }) {
   return (
     <>
       <SectionCard title="Account summary" subtitle="Your super admin account at a glance" accent={`linear-gradient(90deg, ${C.grad1}, ${C.grad2})`}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
           <ReadonlyField label="Full name" value={`${superAdmin?.f_name || ""} ${superAdmin?.l_name || ""}`.trim()} />
           <ReadonlyField label="Email address" value={superAdmin?.email} />
           <ReadonlyField label="Role" value={superAdmin?.role} />
@@ -395,24 +347,26 @@ function OverviewTab({ superAdmin }) {
       </SectionCard>
 
       <SectionCard title="Plan & billing" subtitle="Current subscription details" accent={C.amber}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
-          <div style={{ marginBottom: 16 }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
+          <div className="mb-4">
             <FieldLabel>Current plan</FieldLabel>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div className="flex items-center gap-2 py-2.5">
               <PlanBadge plan={superAdmin?.is_trial_active ? "free_trial" : "active"} />
             </div>
           </div>
           <ReadonlyField label="Trial started" value={formatDate(superAdmin?.trial_started_at)} />
-          <div style={{ marginBottom: 16 }}>
+          <div className="mb-4">
             <FieldLabel>Trial expires</FieldLabel>
-            <div style={{
-              padding: "10px 14px", borderRadius: 10,
-              background: days !== null && days <= 5 ? C.redBg : "#f9f4f2",
-              border: `0.5px solid ${days !== null && days <= 5 ? "#f5c6c6" : C.border}`,
-              fontSize: 13, color: days !== null && days <= 5 ? C.red : C.text, fontWeight: 500,
-            }}>
+            <div 
+              className="px-3.5 py-2.5 rounded-lg text-sm font-medium"
+              style={{
+                background: days !== null && days <= 5 ? C.redBg : "#f9f4f2",
+                border: `0.5px solid ${days !== null && days <= 5 ? "#f5c6c6" : C.border}`,
+                color: days !== null && days <= 5 ? C.red : C.text,
+              }}
+            >
               {formatDate(superAdmin?.trial_expires_at)}
-              {days !== null && <span style={{ fontSize: 11, marginLeft: 8, opacity: 0.7 }}>({days}d left)</span>}
+              {days !== null && <span className="text-[11px] ml-2 opacity-70">({days}d left)</span>}
             </div>
           </div>
           <ReadonlyField label="Company domain" value={superAdmin?.company_domain} />
@@ -420,12 +374,12 @@ function OverviewTab({ superAdmin }) {
       </SectionCard>
 
       <SectionCard title="Organisation snapshot" subtitle="Your company profile" accent={C.blue}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
           <ReadonlyField label="Organisation name" value={superAdmin?.organisation_name} />
           <ReadonlyField label="Industry" value={superAdmin?.industry} />
           <ReadonlyField label="Company size" value={superAdmin?.company_size} />
           <ReadonlyField label="Phone" value={superAdmin?.phone} />
-          <div style={{ gridColumn: "1 / -1" }}>
+          <div className="md:col-span-2">
             <ReadonlyField label="Company address" value={superAdmin?.company_address} />
           </div>
         </div>
@@ -467,7 +421,7 @@ function ProfileTab({ superAdmin, onSuccess, onError }) {
 
   return (
     <SectionCard title="Personal details" subtitle="Update your name and contact information" accent={C.brand}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
         <InputField
           label="First name *"
           value={form.f_name}
@@ -494,7 +448,7 @@ function ProfileTab({ superAdmin, onSuccess, onError }) {
         onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
         placeholder="Enter phone number"
       />
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
         <ReadonlyField label="Role" value={superAdmin?.role} />
         <ReadonlyField label="Company domain" value={superAdmin?.company_domain} />
       </div>
@@ -546,7 +500,7 @@ function OrganisationTab({ superAdmin, onSuccess, onError }) {
         onChange={e => setForm(p => ({ ...p, organisation_name: e.target.value }))}
         placeholder="Your company name"
       />
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
         <SelectField
           label="Industry"
           value={form.industry}
@@ -595,11 +549,11 @@ function PasswordTab({ onSuccess, onError }) {
   const strengthColor = ["", C.red, C.amber, "#f9a825", C.green, C.green][s];
 
   const EyeIcon = ({ open }) => open
-    ? <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3"/><circle cx="8" cy="8" r="2" stroke={C.muted} strokeWidth="1.3"/></svg>
-    : <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3"/><line x1="2" y1="2" x2="14" y2="14" stroke={C.muted} strokeWidth="1.3" strokeLinecap="round"/></svg>;
+    ? <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3"/><circle cx="8" cy="8" r="2" stroke={C.muted} strokeWidth="1.3"/></svg>
+    : <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3"/><line x1="2" y1="2" x2="14" y2="14" stroke={C.muted} strokeWidth="1.3" strokeLinecap="round"/></svg>;
 
   const eyeToggle = (
-    <button type="button" onClick={() => setShow(s => !s)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", padding: 0 }}>
+    <button type="button" onClick={() => setShow(s => !s)} className="bg-none border-none cursor-pointer flex p-0">
       <EyeIcon open={show} />
     </button>
   );
@@ -619,7 +573,7 @@ function PasswordTab({ onSuccess, onError }) {
 
   return (
     <SectionCard title="Change password" subtitle="Keep your super admin account secure" accent={C.brand}>
-      <div style={{ maxWidth: 400 }}>
+      <div className="w-full max-w-md">
         <InputField label="Current password *" type={show ? "text" : "password"} name="currentPassword"
           value={form.currentPassword} onChange={e => setForm(p => ({ ...p, currentPassword: e.target.value }))}
           placeholder="Enter current password" rightEl={eyeToggle} />
@@ -629,13 +583,13 @@ function PasswordTab({ onSuccess, onError }) {
           placeholder="Enter new password" rightEl={eyeToggle} />
 
         {form.newPassword && (
-          <div style={{ marginTop: -8, marginBottom: 16 }}>
-            <div style={{ display: "flex", gap: 4, marginBottom: 5 }}>
+          <div className="-mt-2 mb-4">
+            <div className="flex gap-1 mb-1.5">
               {[1,2,3,4,5].map(i => (
-                <div key={i} style={{ flex: 1, height: 3, borderRadius: 3, background: i <= s ? strengthColor : C.border, transition: "background 0.2s" }} />
+                <div key={i} className="flex-1 h-1 rounded-full transition-colors" style={{ background: i <= s ? strengthColor : C.border }} />
               ))}
             </div>
-            <div style={{ fontSize: 11, color: strengthColor, fontWeight: 500 }}>{strengthLabel}</div>
+            <div className="text-[11px] font-medium" style={{ color: strengthColor }}>{strengthLabel}</div>
           </div>
         )}
 
@@ -649,7 +603,7 @@ function PasswordTab({ onSuccess, onError }) {
           Update password
         </PrimaryButton>
 
-        <div style={{ marginTop: 16, padding: "12px 14px", background: C.brandLight, borderRadius: 10, fontSize: 12, color: C.brand, lineHeight: 1.6 }}>
+        <div className="mt-4 p-3.5 rounded-lg text-xs leading-relaxed" style={{ background: C.brandLight, color: C.brand }}>
           Tips: use 10+ characters, mix uppercase, numbers and symbols for a strong password.
         </div>
       </div>
@@ -692,30 +646,29 @@ function AvatarTab({ superAdmin, onSuccess, onError }) {
 
   return (
     <SectionCard title="Profile avatar" subtitle="Choose an avatar that represents you" accent={C.blue}>
-      <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 24, padding: "16px 20px", background: C.page, borderRadius: 12, border: `0.5px solid ${C.border}` }}>
-        <div style={{
-          width: 72, height: 72, borderRadius: "50%",
-          background: currentImg ? "transparent" : `linear-gradient(135deg, ${C.grad1}, ${C.grad2})`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 24, fontWeight: 600, color: "#fff",
-          overflow: "hidden", border: `3px solid ${C.brandLight}`,
-          flexShrink: 0,
-        }}>
+      <div className="flex flex-col sm:flex-row items-center gap-4 mb-6 p-4 sm:p-5 bg-[#f9f8f2] rounded-xl border border-[#ede5e0]">
+        <div 
+          className="w-16 h-16 sm:w-18 sm:h-18 rounded-full flex items-center justify-center text-2xl font-semibold text-white overflow-hidden border-[3px] shrink-0"
+          style={{ 
+            background: currentImg ? "transparent" : `linear-gradient(135deg, ${C.grad1}, ${C.grad2})`,
+            borderColor: C.brandLight 
+          }}
+        >
           {currentImg
-            ? <img src={currentImg} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ? <img src={currentImg} alt="avatar" className="w-full h-full object-cover" />
             : initials
           }
         </div>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 500, color: C.text, marginBottom: 4 }}>Current avatar</div>
-          <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>
+        <div className="text-center sm:text-left">
+          <div className="text-sm font-medium text-[#2a1a16] mb-1">Current avatar</div>
+          <div className="text-xs text-[#b0948a] mb-2.5">
             {currentImg ? "DiceBear avatar" : "Initials avatar (default)"}
           </div>
           {currentImg && (
             <button
               onClick={removeAvatar}
               disabled={updateProfile.isPending}
-              style={{ fontSize: 12, color: C.red, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: 0, fontWeight: 500 }}
+              className="text-xs text-[#E24B4A] bg-none border-none cursor-pointer font-sans p-0 font-medium hover:underline"
             >
               Remove avatar
             </button>
@@ -724,7 +677,7 @@ function AvatarTab({ superAdmin, onSuccess, onError }) {
       </div>
 
       <FieldLabel>Choose a style</FieldLabel>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {AVATAR_STYLES.map((style) => {
           const url = `https://api.dicebear.com/7.x/${style}/svg?seed=${seed}`;
           const isActive = currentImg?.includes(style);
@@ -734,23 +687,25 @@ function AvatarTab({ superAdmin, onSuccess, onError }) {
               key={style}
               onClick={() => applyAvatar(url)}
               disabled={updateProfile.isPending}
+              className="p-2 rounded-xl border transition-all relative flex flex-col items-center"
               style={{
-                padding: "12px 8px", borderRadius: 12,
-                border: `0.5px solid ${isActive ? C.brand : C.border}`,
+                borderColor: isActive ? C.brand : C.border,
                 background: isActive ? C.brandLight : C.surface,
                 cursor: updateProfile.isPending ? "not-allowed" : "pointer",
-                transition: "all 0.15s", position: "relative",
                 outline: isActive ? `2px solid ${C.brand}` : "none",
                 outlineOffset: 2,
               }}
             >
               {isLoading && (
-                <div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "rgba(255,255,255,0.7)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div className="absolute inset-0 rounded-xl bg-white/70 flex items-center justify-center">
                   <Spinner size={18} color={C.brand} />
                 </div>
               )}
-              <img src={url} alt={style} style={{ width: "100%", aspectRatio: "1", display: "block", borderRadius: 8 }} />
-              <div style={{ fontSize: 10, color: isActive ? C.brand : C.muted, marginTop: 6, textAlign: "center", fontWeight: isActive ? 500 : 400, textTransform: "capitalize" }}>
+              <img src={url} alt={style} className="w-full aspect-square block rounded-lg" />
+              <div 
+                className="text-[10px] mt-1.5 text-center capitalize"
+                style={{ color: isActive ? C.brand : C.muted, fontWeight: isActive ? 500 : 400 }}
+              >
                 {style}
               </div>
             </button>
@@ -774,43 +729,40 @@ export default function SuperAdminSettingsPage() {
 
   if (isLoading) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: C.page, fontFamily: "'DM Sans','Segoe UI',sans-serif" }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+      <div className="min-h-screen flex items-center justify-center bg-[#f9f8f2] font-sans">
+        <div className="flex flex-col items-center gap-4">
           <Spinner size={36} color={C.brand} />
-          <div style={{ fontSize: 13, color: C.muted }}>Loading your profile...</div>
+          <div className="text-sm text-[#b0948a]">Loading your profile...</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", background: C.page, minHeight: "100vh", padding: "28px 32px", color: C.text }}>
+    <div className="min-h-screen w-full overflow-x-hidden bg-[#f9f8f2] p-4 sm:p-6 lg:p-8 text-[#2a1a16] font-sans">
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes slideIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
-        input:focus { border-color: ${C.brand} !important; box-shadow: 0 0 0 3px ${C.brandLight}; }
-        select:focus { border-color: ${C.brand} !important; box-shadow: 0 0 0 3px ${C.brandLight}; }
-        button:not([disabled]):hover { opacity: 0.88; }
       `}</style>
 
       <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: "", type: "" })} />
 
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0, letterSpacing: "-0.3px" }}>Settings</h1>
-        <p style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>Manage your super admin profile, organisation and security</p>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-lg sm:text-xl font-medium m-0 tracking-tight">Settings</h1>
+        <p className="text-sm text-[#b0948a] mt-1">Manage your super admin profile, organisation and security</p>
       </div>
 
-      <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+      <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-8 items-start w-full">
         <Sidebar tab={tab} setTab={setTab} superAdmin={superAdmin} initials={initials} />
 
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="flex-1 w-full min-w-0">
           {tab === "overview"      && <OverviewTab superAdmin={superAdmin} />}
           {tab === "profile"       && <ProfileTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
           {tab === "organisation"  && <OrganisationTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
           {tab === "password"      && <PasswordTab onSuccess={showSuccess} onError={showError} />}
           {tab === "avatar"        && <AvatarTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
 
-          <div style={{ textAlign: "center", fontSize: 12, color: C.mutedMid, marginTop: 8 }}>
+          <div className="text-center text-xs text-[#c9bab5] mt-2">
             Changes are saved to your account automatically
           </div>
         </div>
