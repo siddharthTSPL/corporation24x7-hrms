@@ -92,7 +92,7 @@ function Avatar({ initials, size = 48, bg = BRAND, fontSize = 16 }) {
 function Badge({ children, color = BRAND, bg = BRAND_LIGHT }) {
   return (
     <span 
-      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold"
+      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold shrink-0"
       style={{ color, background: bg, letterSpacing: "0.02em" }}
     >
       {children}
@@ -102,7 +102,7 @@ function Badge({ children, color = BRAND, bg = BRAND_LIGHT }) {
 
 function LiveDot() {
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-gray-500">
+    <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 shrink-0">
       <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
       Live
     </span>
@@ -188,18 +188,18 @@ function EmployeeNode({ employee, delay = 0, dimmed, highlighted, onClick }) {
 
 function SkeletonTree() {
   return (
-    <div className="flex flex-col items-center gap-0">
+    <div className="flex flex-col items-center gap-0 w-full min-w-0">
       <Skeleton w={210} h={130} r={16} />
       <div className="w-1.5 h-7 bg-gray-200 mx-auto" />
-      <div className="flex gap-5 justify-center">
+      <div className="flex gap-5 justify-center w-full min-w-0">
         {[1, 2, 3].map(i => (
-          <div key={i} className="flex flex-col items-center">
+          <div key={i} className="flex flex-col items-center min-w-0">
             <div className="w-1.5 h-5 bg-gray-200 mx-auto" />
             <Skeleton w={174} h={104} r={13} />
             <div className="w-1.5 h-5 bg-gray-200 mx-auto" />
-            <div className="flex gap-3.5 justify-center">
+            <div className="flex gap-3.5 justify-center w-full min-w-0">
               {[1, 2].map(j => (
-                <div key={j} className="flex flex-col items-center">
+                <div key={j} className="flex flex-col items-center min-w-0">
                   <div className="w-1.5 h-4 bg-gray-200 mx-auto" />
                   <Skeleton w={132} h={82} r={10} />
                 </div>
@@ -270,7 +270,7 @@ function EmployeeDetailPanel({ person, type, onClose }) {
       <div className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm animate-[fadeIn_0.2s_ease_forwards]" onClick={onClose} />
       <div className="fixed top-0 right-0 bottom-0 w-full sm:max-w-md md:max-w-lg h-full bg-white shadow-2xl z-50 overflow-y-auto flex flex-col animate-[slideR_0.25s_cubic-bezier(0.22,1,0.36,1)_forwards]">
         
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-4 sm:px-6 py-4 flex items-center justify-between z-10">
+        <div className="sticky top-0 bg-white border-b border-gray-100 px-4 sm:px-6 py-4 flex items-center justify-between z-10 min-w-0">
           <div className="min-w-0">
             <h2 className="text-base sm:text-lg font-bold text-slate-900 truncate">Profile details</h2>
             <p className="text-xs text-gray-400 mt-0.5 truncate">{roleLabel} · {name}</p>
@@ -286,7 +286,7 @@ function EmployeeDetailPanel({ person, type, onClose }) {
         <div className="p-4 sm:p-6 flex-1 min-w-0">
           
           <div 
-            className="rounded-xl p-4 sm:p-6 mb-5 flex flex-col items-center gap-2.5 border"
+            className="rounded-xl p-4 sm:p-6 mb-5 flex flex-col items-center gap-2.5 border min-w-0"
             style={{ background: `linear-gradient(135deg, ${accentColor}0d, ${accentColor}05)`, borderColor: `${accentColor}20` }}
           >
             <div 
@@ -308,11 +308,11 @@ function EmployeeDetailPanel({ person, type, onClose }) {
           </div>
 
           {!isSA && (
-            <div className="flex gap-2 mb-5 flex-wrap">
+            <div className="flex gap-2 mb-5 flex-wrap min-w-0">
               {["info", "leave", "reviews"].map((t) => (
                 <button 
                   key={t} 
-                  className={`px-4 py-2 rounded-lg border text-xs font-medium transition-all min-h-[40px] flex items-center ${tab === t ? "bg-[#730042] text-white border-[#730042] shadow-md" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}
+                  className={`px-4 py-2 rounded-lg border text-xs font-medium transition-all min-h-[40px] flex items-center shrink-0 ${tab === t ? "bg-[#730042] text-white border-[#730042] shadow-md" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}
                   onClick={() => setTab(t)}
                 >
                   {t === "info" ? "Information" : t === "leave" ? "Leave" : "Reviews"}
@@ -403,7 +403,7 @@ function ReviewsTab({ uid, role }) {
       {reviews.map((r) => (
         <div key={r._id} className="bg-[#fafbfc] rounded-xl border border-gray-100 p-3 sm:p-4 min-w-0">
           <div className="flex justify-between items-start mb-2 gap-2">
-            <span className="text-xs sm:text-sm font-semibold text-slate-900 truncate">
+            <span className="text-xs sm:text-sm font-semibold text-slate-900 truncate min-w-0">
               {r.reviewer?.f_name} {r.reviewer?.l_name}
             </span>
             <div className="flex gap-0.5 shrink-0">
@@ -437,8 +437,8 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
   const ADM_W   = 174;
 
   return (
-    // Removed inline style minWidth. Using w-max min-w-full to prevent page cutoff and allow internal scrolling
-    <div className="flex flex-col items-center w-max min-w-full">
+    // w-max min-w-full ensures it takes natural width but min 100% of parent. mx-auto centers it.
+    <div className="w-max min-w-full flex flex-col items-center mx-auto">
       <SuperAdminNode
         name={`${superAdmin?.f_name || ""} ${superAdmin?.l_name || ""}`.trim() || "Super Admin"}
         role={superAdmin?.organisation_name || "Super Admin"}
@@ -454,7 +454,7 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
         </>
       )}
 
-      <div className="flex gap-7 justify-center items-start">
+      <div className="flex gap-7 justify-center items-start min-w-0">
         {admins.map((admin, ai) => {
           const admMatch  = hasQ && matchName(admin.f_name, admin.l_name, "", admin.designation);
           const admDimmed = hasQ && !admMatch;
@@ -483,7 +483,7 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
                 </>
               )}
 
-              <div className="flex gap-4 justify-center items-start">
+              <div className="flex gap-4 justify-center items-start min-w-0">
                 {admManagers.map((mgr, mi) => {
                   const mgrMatch  = hasQ && matchName(mgr.f_name, mgr.l_name, mgr.department, mgr.designation);
                   const mgrDimmed = hasQ && !mgrMatch && !admMatch;
@@ -515,7 +515,7 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
                         </>
                       )}
 
-                      <div className="flex gap-3 justify-center items-start">
+                      <div className="flex gap-3 justify-center items-start min-w-0">
                         {mgrEmps.map((emp, ei) => {
                           const empMatch  = hasQ && matchName(emp.f_name, emp.l_name, emp.department, emp.designation);
                           const empDimmed = hasQ && !empMatch && !mgrMatch && !admMatch;
@@ -544,7 +544,7 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
       </div>
 
       {admins.length === 0 && !loading && (
-        <div className="mt-9 px-6 py-4 rounded-xl border-[1.5px] border-dashed border-gray-200 text-xs sm:text-sm text-gray-300 bg-[#fafbfc]">
+        <div className="mt-9 px-6 py-4 rounded-xl border-[1.5px] border-dashed border-gray-200 text-xs sm:text-sm text-gray-300 bg-[#fafbfc] min-w-0">
           No admins created yet
         </div>
       )}
@@ -615,17 +615,17 @@ export default function SuperAdminOrgChart() {
   ];
 
   return (
-    <div className="su-org min-h-screen bg-[#f4f7fb] w-full overflow-x-hidden flex flex-col min-w-0">
+    // Root: w-full max-w-full min-w-0 overflow-x-hidden strictly prevents page level horizontal scroll on sidebar toggle
+    <div className="su-org w-full max-w-full min-w-0 min-h-screen bg-[#f4f7fb] flex flex-col overflow-x-hidden">
       <style>{STYLES}</style>
 
       {/* Header / Navigation */}
-      <header className="w-full bg-white border-b border-gray-200 shadow-sm overflow-hidden min-w-0">
+      <header className="w-full max-w-full min-w-0 bg-white border-b border-gray-200 shadow-sm overflow-hidden">
         <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-4 min-w-0">
           
-          {/* Left section - Adjusted for mobile */}
-          <div className={`flex items-center gap-2 sm:gap-3 min-w-0 ${searchOpen ? "hidden sm:flex" : "flex"}`}>
+          {/* Left section */}
+          <div className={`flex items-center gap-2 sm:gap-3 min-w-0 flex-1 ${searchOpen ? "hidden sm:flex" : "flex"}`}>
             <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-[#730042] shrink-0 shadow-[0_0_0_3px_rgba(115,0,66,0.15)]"></div>
-            {/* Org Name hidden on very small screens to save space */}
             <span className="hidden md:inline text-sm text-gray-400 font-medium truncate min-w-0">{orgName}</span>
             <svg className="hidden md:block w-3 h-3 shrink-0" viewBox="0 0 13 13" fill="none">
               <path d="M5 3l3 3.5L5 10" stroke="#d1d5db" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -638,7 +638,7 @@ export default function SuperAdminOrgChart() {
           </div>
 
           {/* Right section */}
-          <div className={`flex items-center gap-2 min-w-0 ${searchOpen ? "w-full sm:w-auto sm:ml-auto" : "ml-auto"}`}>
+          <div className={`flex items-center gap-2 min-w-0 ${searchOpen ? "w-full sm:w-auto sm:flex-none sm:ml-auto" : "flex-none ml-auto"}`}>
             {searchOpen ? (
               <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
                 <div className="flex items-center gap-2 border-[1.5px] border-[#730042] rounded-lg px-3 h-10 sm:h-9 flex-1 sm:w-72 shadow-[0_0_0_4px_rgba(115,0,66,0.08)] min-w-0">
@@ -706,7 +706,7 @@ export default function SuperAdminOrgChart() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 lg:mb-8 min-w-0">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 lg:mb-8 min-w-0 max-w-full">
           {statItems.map(({ label, value, color }, i) => (
             <div
               key={label}
@@ -734,9 +734,9 @@ export default function SuperAdminOrgChart() {
         </div>
 
         {/* Tree Card */}
-        <div className="bg-white border border-gray-200 rounded-xl lg:rounded-2xl shadow-sm overflow-hidden min-w-0">
+        <div className="w-full max-w-full min-w-0 bg-white border border-gray-200 rounded-xl lg:rounded-2xl shadow-sm overflow-hidden flex flex-col">
           
-          <div className="px-4 sm:px-5 py-3 border-b border-gray-100 flex flex-wrap items-center gap-2 bg-gradient-to-br from-gray-50 to-gray-100/50 min-w-0">
+          <div className="w-full min-w-0 px-4 sm:px-5 py-3 border-b border-gray-100 flex flex-wrap items-center gap-2 bg-gradient-to-br from-gray-50 to-gray-100/50">
             <span className="text-sm font-semibold text-slate-700 truncate">Hierarchy</span>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-semibold shrink-0" style={{ fontFamily: "'JetBrains Mono',monospace" }}>
               {loading ? "…" : `${totalNodes} nodes`}
@@ -749,8 +749,8 @@ export default function SuperAdminOrgChart() {
             <span className="hidden sm:block ml-auto text-xs text-gray-400 truncate">Click any card for details</span>
           </div>
 
-          {/* Tree Scroll Container - overflow-x-auto works perfectly with w-max min-w-full inside */}
-          <div className="su-scroll w-full overflow-x-auto bg-white p-4 sm:p-6 lg:p-8 min-w-0">
+          {/* Tree Scroll Container - overflow-x-auto allows internal scroll if tree is wider than the sidebar allows */}
+          <div className="su-scroll w-full max-w-full min-w-0 overflow-x-auto bg-white p-4 sm:p-6 lg:p-8">
             <OrgTree
               superAdmin={superAdmin}
               admins={admins}
@@ -765,7 +765,7 @@ export default function SuperAdminOrgChart() {
 
         {/* Legend */}
         {!loading && (
-          <div className="flex gap-3 sm:gap-4 lg:gap-6 mt-4 lg:mt-6 justify-center flex-wrap min-w-0">
+          <div className="flex gap-3 sm:gap-4 lg:gap-6 mt-4 lg:mt-6 justify-center flex-wrap min-w-0 max-w-full">
             {[
               { dot: BRAND,     label: "Super Admin", glow: true },
               { dot: "#6366f1", label: "Admin"   },
