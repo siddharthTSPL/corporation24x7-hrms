@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   FaUsers, FaClock, FaCalendarAlt, FaBullhorn,
   FaPlus, FaEdit, FaTrash, FaTimes, FaCheck,
   FaMapMarkerAlt, FaChevronRight, FaBan, FaEnvelope, FaCheckCircle, FaStar,
 } from "react-icons/fa";
-import Charts from "./Charts";
+import Charts from "./Charts"; // Assuming this is used elsewhere or imported correctly
 import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
 import { useGetAllEmployee } from "../../auth/server-state/adminother/adminother.hook";
 import {
@@ -20,216 +20,25 @@ import {
 } from "../../auth/server-state/adminannounce/adminannounce.hook";
 import { useGetTodayCheckins } from "../../auth/server-state/adminother/adminother.hook";
 
-const useInjectStyles = () => {
-  useEffect(() => {
-    const fontLink = document.createElement("link");
-    fontLink.rel = "stylesheet";
-    fontLink.href =
-      "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Outfit:wght@300;400;500;600&display=swap";
-    document.head.appendChild(fontLink);
-
-    const styleEl = document.createElement("style");
-    styleEl.id = "dash-styles";
-    styleEl.textContent = `
-      :root {
-        --p:       #730042;
-        --p-dark:  #4a0029;
-        --p-deep:  #2e0019;
-        --p-mid:   #a0005c;
-        --p-soft:  #c0527e;
-        --p-wash:  #f7edf3;
-        --p-pale:  #fdf5f9;
-        --border:  #eedde8;
-        --surface: #ffffff;
-        --text:    #1a0010;
-        --muted:   #8a6070;
-        --light:   #c49ab2;
-        --green:   #0d9e6e;
-        --red:     #d93025;
-        --gold:    #b8760a;
-        --blue:    #185FA5;
-        --shadow:  0 2px 12px rgba(115,0,66,.09);
-        --shadow-lg: 0 12px 40px rgba(115,0,66,.16);
-        --r: 14px;
-        --r-sm: 8px;
-        font-family: 'Outfit', sans-serif;
-      }
-
-      .db { background: var(--p-pale); min-height: 100vh; padding: 24px 28px; font-family: 'Outfit', sans-serif; color: var(--text); }
-
-      .hero {
-        background: linear-gradient(135deg, var(--p-deep) 0%, var(--p-dark) 40%, var(--p) 70%, var(--p-mid) 100%);
-        border-radius: var(--r);
-        padding: 30px 36px;
-        margin-bottom: 26px;
-        position: relative;
-        overflow: hidden;
-        box-shadow: var(--shadow-lg);
-      }
-      .hero::before {
-        content: ''; position: absolute;
-        width: 420px; height: 420px; border-radius: 50%;
-        top: -180px; right: -100px;
-        background: rgba(255,255,255,.05);
-        pointer-events: none;
-      }
-      .hero::after {
-        content: ''; position: absolute;
-        width: 260px; height: 260px; border-radius: 50%;
-        bottom: -140px; left: 38%;
-        background: rgba(255,255,255,.04);
-        pointer-events: none;
-      }
-      .hero-eyebrow { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,.5); margin-bottom: 8px; font-weight: 500; }
-      .hero-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(26px, 3vw, 36px); color: #fff; margin: 0 0 6px; font-weight: 700; line-height: 1.1; }
-      .hero-thought { font-size: 13px; color: rgba(255,255,255,.65); font-weight: 300; max-width: 520px; line-height: 1.6; }
-      .hero-chips { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
-      .hero-chip { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); border-radius: 99px; padding: 5px 14px; font-size: 12px; color: rgba(255,255,255,.85); font-weight: 500; backdrop-filter: blur(4px); }
-
-      .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 18px; margin-bottom: 26px; }
-      @media(max-width:1100px){ .stats-grid { grid-template-columns: repeat(2,1fr); } }
-      @media(max-width:600px) { .stats-grid { grid-template-columns: 1fr; } }
-
-      .stat-card {
-        background: var(--surface);
-        border-radius: var(--r);
-        border: 1px solid var(--border);
-        padding: 22px 20px 18px;
-        box-shadow: var(--shadow);
-        position: relative;
-        overflow: hidden;
-        transition: transform .2s, box-shadow .2s;
-        cursor: default;
-      }
-      .stat-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
-      .stat-card-stripe { position: absolute; top: 0; left: 0; width: 100%; height: 3px; background: var(--p); }
-      .stat-icon-ring {
-        width: 44px; height: 44px; border-radius: 50%;
-        background: var(--p-wash);
-        display: flex; align-items: center; justify-content: center;
-        color: var(--p); font-size: 16px;
-        margin-bottom: 16px;
-      }
-      .stat-lbl { font-size: 11px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
-      .stat-val { font-family: 'Cormorant Garamond', serif; font-size: 36px; line-height: 1; color: var(--text); font-weight: 700; }
-      .stat-sub { font-size: 11px; margin-top: 8px; font-weight: 500; }
-      .stat-bar-track { height: 3px; background: var(--border); border-radius: 99px; margin-top: 12px; overflow: hidden; }
-      .stat-bar-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--p-dark), var(--p-soft)); transition: width .8s ease; }
-
-      .panel { background: var(--surface); border-radius: var(--r); border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; }
-      .panel-head { padding: 18px 22px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-      .panel-title { font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 9px; }
-      .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: livePulse 2s infinite; }
-      @keyframes livePulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.4)} }
-
-      .map-wrap { height: 310px; position: relative; }
-      .map-footer { padding: 11px 20px; background: var(--p-wash); border-top: 1px solid var(--border); display: flex; gap: 20px; align-items: center; }
-      .map-leg { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
-      .leg-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
-
-      .mid-grid { display: grid; grid-template-columns: 1fr 370px; gap: 20px; margin-bottom: 26px; }
-      @media(max-width:1050px){ .mid-grid { grid-template-columns: 1fr; } }
-
-      .lower-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 26px; }
-      @media(max-width:900px){ .lower-grid { grid-template-columns: 1fr; } }
-
-      .leave-scroll { overflow-y: auto; max-height: 340px; }
-      .leave-scroll::-webkit-scrollbar { width: 4px; }
-      .leave-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
-
-      .leave-item { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 12px; transition: background .15s; }
-      .leave-item:hover { background: var(--p-pale); }
-      .leave-item:last-child { border-bottom: none; }
-      .leave-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white; flex-shrink: 0; font-family: 'Outfit', sans-serif; background: var(--p); }
-      .leave-meta { flex: 1; min-width: 0; }
-      .leave-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .leave-info { font-size: 11px; color: var(--muted); margin-top: 2px; }
-      .leave-actions { display: flex; gap: 6px; margin-top: 8px; }
-      .btn-accept { background: #e8f7f1; color: var(--green); border: 1px solid #b8e8d4; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all .15s; font-family: 'Outfit',sans-serif; }
-      .btn-accept:hover { background: var(--green); color: white; }
-      .btn-reject { background: #fbeaea; color: var(--red); border: 1px solid #f0c5c5; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all .15s; font-family: 'Outfit',sans-serif; }
-      .btn-reject:hover { background: var(--red); color: white; }
-
-      .status-badge { display: inline-flex; align-items: center; font-size: 10px; font-weight: 600; letter-spacing: .4px; padding: 2px 8px; border-radius: 99px; }
-      .status-pending  { background: #fff8e1; color: var(--gold); }
-      .status-approved { background: #e8f7f1; color: var(--green); }
-      .status-rejected { background: #fbeaea; color: var(--red); }
-
-      .ann-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 18px; }
-      @media(max-width:700px){ .ann-grid { grid-template-columns: 1fr; } }
-      .ann-card { border-radius: var(--r-sm); border: 1px solid var(--border); padding: 16px; transition: all .2s; cursor: default; }
-      .ann-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
-      .ann-type-chip { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; padding: 3px 10px; border-radius: 99px; margin-bottom: 8px; }
-      .chip-general { background: var(--p-wash); color: var(--p); }
-      .chip-urgent   { background: #fbeaea; color: var(--red); }
-      .chip-event    { background: #e8f7f1; color: var(--green); }
-      .chip-policy   { background: #fff8e1; color: var(--gold); }
-      .ann-card-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 5px; line-height: 1.3; }
-      .ann-card-body  { font-size: 12px; color: var(--muted); line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-      .ann-card-foot  { display: flex; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
-      .icon-btn { background: none; border: none; cursor: pointer; padding: 4px 7px; border-radius: 5px; font-size: 12px; color: var(--light); transition: all .15s; display: flex; align-items: center; gap: 4px; font-family: 'Outfit',sans-serif; }
-      .icon-btn:hover { background: var(--p-wash); color: var(--p); }
-      .icon-btn.del:hover { background: #fbeaea; color: var(--red); }
-
-      .emp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; padding: 18px; }
-      .emp-card { border: 1px solid var(--border); border-radius: var(--r-sm); padding: 16px 14px; display: flex; align-items: center; gap: 12px; transition: all .2s; }
-      .emp-card:hover { box-shadow: var(--shadow); background: var(--p-wash); }
-      .emp-ava { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: white; flex-shrink: 0; background: linear-gradient(135deg, var(--p-dark), var(--p-mid)); }
-      .emp-name { font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.2; }
-      .emp-role { font-size: 11px; color: var(--muted); margin-top: 2px; }
-      .emp-dept { display: inline-block; font-size: 10px; font-weight: 600; background: var(--p-wash); color: var(--p); padding: 2px 7px; border-radius: 99px; margin-top: 5px; }
-
-      .charts-panel { background: var(--surface); border-radius: var(--r); border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 26px; }
-      .charts-body { padding: 20px; }
-
-      .btn-p { background: var(--p); color: white; border: none; padding: 8px 16px; border-radius: var(--r-sm); font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; font-family: 'Outfit',sans-serif; letter-spacing: .3px; transition: all .2s; }
-      .btn-p:hover { background: var(--p-dark); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(115,0,66,.3); }
-      .btn-ghost { background: none; color: var(--muted); border: 1px solid var(--border); padding: 8px 16px; border-radius: var(--r-sm); font-size: 12px; font-weight: 500; cursor: pointer; font-family: 'Outfit',sans-serif; transition: all .2s; }
-      .btn-ghost:hover { border-color: var(--p); color: var(--p); }
-
-      .overlay { position: fixed; inset: 0; background: rgba(30,0,18,.6); backdrop-filter: blur(5px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; animation: ov .18s; }
-      @keyframes ov { from{opacity:0} to{opacity:1} }
-      .modal { background: var(--surface); border-radius: var(--r); width: 100%; max-width: 500px; box-shadow: var(--shadow-lg); animation: mup .22s; }
-      @keyframes mup { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
-      .modal-hd { padding: 22px 26px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-      .modal-hd-title { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 700; color: var(--text); }
-      .modal-x { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 15px; padding: 5px; border-radius: 6px; transition: all .15s; }
-      .modal-x:hover { background: var(--p-wash); color: var(--p); }
-      .modal-bd { padding: 22px 26px; }
-      .modal-ft { padding: 14px 26px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
-      .fld { margin-bottom: 18px; }
-      .flbl { display: block; font-size: 11px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
-      .finp, .ftxt, .fsel { width: 100%; padding: 10px 13px; background: var(--p-pale); border: 1px solid var(--border); border-radius: var(--r-sm); font-size: 14px; color: var(--text); font-family: 'Outfit',sans-serif; outline: none; transition: border-color .15s, box-shadow .15s; box-sizing: border-box; }
-      .finp:focus, .ftxt:focus, .fsel:focus { border-color: var(--p); box-shadow: 0 0 0 3px var(--p-wash); }
-      .ftxt { resize: vertical; min-height: 88px; line-height: 1.6; }
-
-      .empty { text-align: center; padding: 38px 20px; color: var(--light); }
-      .empty-ico { font-size: 28px; margin-bottom: 10px; }
-      .empty p { font-size: 13px; }
-
-      .lb-row { padding: 13px 0; border-bottom: 1px solid var(--border); }
-      .lb-row:last-child { border-bottom: none; }
-      .lb-bar-track { height: 4px; background: var(--border); border-radius: 99px; margin-top: 8px; overflow: hidden; }
-      .lb-bar-fill { height: 100%; border-radius: 99px; transition: width .8s ease; }
-
-      .review-card-inner { padding: 18px 22px; }
-      .star-row { display: flex; gap: 3px; align-items: center; }
-
-      @keyframes mPulse {
-        0%,100% { transform: translate(-50%,-50%) scale(1); opacity: .5; }
-        50%      { transform: translate(-50%,-50%) scale(2.2); opacity: 0; }
-      }
-      @keyframes progressIn { from { width: 0; } }
-      .lb-bar-fill { animation: progressIn .8s ease both; }
-    `;
-    document.head.appendChild(styleEl);
-    return () => {
-      document.head.removeChild(fontLink);
-      const el = document.getElementById("dash-styles");
-      if (el) document.head.removeChild(el);
-    };
-  }, []);
-};
+// Minimal styles for keyframes and leaflet overrides
+const GlobalDashStyles = () => (
+  <style>{`
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Outfit:wght@300;400;500;600&display=swap');
+    
+    @keyframes livePulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.4)} }
+    @keyframes mPulse { 0%,100% { transform: translate(-50%,-50%) scale(1); opacity: .5; } 50% { transform: translate(-50%,-50%) scale(2.2); opacity: 0; } }
+    @keyframes progressIn { from { width: 0; } }
+    @keyframes ov { from{opacity:0} to{opacity:1} }
+    @keyframes mup { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+    
+    .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #0d9e6e; animation: livePulse 2s infinite; }
+    .lb-bar-fill { animation: progressIn .8s ease both; }
+    
+    .leaflet-container { font-family: 'Outfit', sans-serif; }
+    .leaflet-popup-content-wrapper { border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,.1); }
+    .leaflet-popup-content { margin: 12px 16px; }
+  `}</style>
+);
 
 const initials = (name = "") =>
   name.trim().split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
@@ -243,24 +52,9 @@ const leaveTypeColor = (type = "") => {
   return "#730042";
 };
 
-const ANN_TYPE_MAP = {
-  general: "chip-general",
-  urgent:  "chip-urgent",
-  event:   "chip-event",
-  policy:  "chip-policy",
-};
-
-const ROLE_COLOR = { manager: "#730042", employee: "#a0005c" };
-
 const fmtTime = (iso) => {
   if (!iso) return "—";
   try { return new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }); }
-  catch { return "—"; }
-};
-
-const fmtDate = (iso) => {
-  if (!iso) return "—";
-  try { return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); }
   catch { return "—"; }
 };
 
@@ -309,7 +103,7 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
     const bounds = [];
     checkins.forEach(({ lat, lng, name, role, dept, email, checkIn, checkedOut }) => {
       if (!lat || !lng) return;
-      const color = ROLE_COLOR[role?.toLowerCase()] ?? ROLE_COLOR.employee;
+      const color = role?.toLowerCase() === "manager" ? "#730042" : "#a0005c";
       const size  = role?.toLowerCase() === "manager" ? 15 : 11;
       const pulse = size + 14;
       const inits = initials(name || "?");
@@ -363,25 +157,17 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
   }, []);
 
   return (
-    <div style={{ height: "100%", width: "100%", position: "relative" }}>
-      <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
+    <div className="h-full w-full relative">
+      <div ref={mapRef} className="h-full w-full" />
       {loading && (
-        <div style={{
-          position: "absolute", inset: 0, background: "rgba(253,245,249,.75)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 13, color: "#8a6070", gap: 8, zIndex: 500,
-        }}>
-          <span style={{ fontSize: 18 }}>⏳</span> Fetching check-ins…
+        <div className="absolute inset-0 bg-[#fdf5f9]/75 flex items-center justify-center text-sm text-[#8a6070] gap-2 z-[500]">
+          <span className="text-lg">⏳</span> Fetching check-ins…
         </div>
       )}
       {!loading && checkins.length === 0 && (
-        <div style={{
-          position: "absolute", inset: 0, display: "flex", flexDirection: "column",
-          alignItems: "center", justifyContent: "center",
-          gap: 8, zIndex: 500, pointerEvents: "none",
-        }}>
-          <span style={{ fontSize: 32 }}>📍</span>
-          <p style={{ fontSize: 13, color: "#8a6070", margin: 0 }}>No check-ins recorded yet today</p>
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-[500] pointer-events-none">
+          <span className="text-3xl">📍</span>
+          <p className="text-sm text-[#8a6070] m-0">No check-ins recorded yet today</p>
         </div>
       )}
     </div>
@@ -399,35 +185,60 @@ const AnnModal = ({ open, onClose, initial, onSave, loading }) => {
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   return (
-    <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal">
-        <div className="modal-hd">
-          <h2 className="modal-hd-title">{initial ? "Edit Announcement" : "New Announcement"}</h2>
-          <button className="modal-x" onClick={onClose}><FaTimes /></button>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[1000] flex items-center justify-center p-4 animate-[ov_.18s]" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-[mup_.22s] flex flex-col max-h-[90vh]">
+        <div className="p-5 sm:p-6 border-b border-[#eedde8] flex items-center justify-between shrink-0">
+          <h2 className="font-['Cormorant_Garamond',serif] text-xl sm:text-2xl font-bold text-[#1a0010]">
+            {initial ? "Edit Announcement" : "New Announcement"}
+          </h2>
+          <button className="bg-none border-none cursor-pointer text-[#8a6070] text-base p-1.5 rounded-md hover:bg-[#f7edf3] hover:text-[#730042]" onClick={onClose}>
+            <FaTimes />
+          </button>
         </div>
-        <div className="modal-bd">
-          <div className="fld">
-            <label className="flbl">Title</label>
-            <input className="finp" placeholder="Announcement title…" value={form.title} onChange={set("title")} required />
+        <div className="p-5 sm:p-6 overflow-y-auto">
+          <div className="mb-4">
+            <label className="block text-xs font-semibold tracking-wide uppercase text-[#8a6070] mb-1.5">Title</label>
+            <input 
+              className="w-full px-3 py-2.5 bg-[#fdf5f9] border border-[#eedde8] rounded-lg text-sm text-[#1a0010] outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 box-border"
+              placeholder="Announcement title…" 
+              value={form.title} 
+              onChange={set("title")} 
+              required 
+            />
           </div>
-          <div className="fld">
-            <label className="flbl">Type</label>
-            <select className="fsel" value={form.type} onChange={set("type")}>
+          <div className="mb-4">
+            <label className="block text-xs font-semibold tracking-wide uppercase text-[#8a6070] mb-1.5">Type</label>
+            <select 
+              className="w-full px-3 py-2.5 bg-[#fdf5f9] border border-[#eedde8] rounded-lg text-sm text-[#1a0010] outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 box-border cursor-pointer"
+              value={form.type} 
+              onChange={set("type")}
+            >
               <option value="general">General</option>
               <option value="urgent">Urgent</option>
               <option value="event">Event</option>
               <option value="policy">Policy</option>
             </select>
           </div>
-          <div className="fld" style={{ marginBottom: 0 }}>
-            <label className="flbl">Message</label>
-            <textarea className="ftxt" placeholder="Write your announcement…" value={form.message} onChange={set("message")} />
+          <div className="mb-0">
+            <label className="block text-xs font-semibold tracking-wide uppercase text-[#8a6070] mb-1.5">Message</label>
+            <textarea 
+              className="w-full px-3 py-2.5 bg-[#fdf5f9] border border-[#eedde8] rounded-lg text-sm text-[#1a0010] outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 box-border resize-y min-h-[88px] leading-relaxed"
+              placeholder="Write your announcement…" 
+              value={form.message} 
+              onChange={set("message")} 
+            />
           </div>
         </div>
-        <div className="modal-ft">
-          <button className="btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn-p" onClick={() => onSave(form)} disabled={loading || !form.title}>
-            <FaCheck style={{ fontSize: 10 }} />
+        <div className="p-4 sm:p-6 border-t border-[#eedde8] flex justify-end gap-2.5 shrink-0">
+          <button className="bg-none text-[#8a6070] border border-[#eedde8] px-4 py-2 rounded-lg text-xs font-medium cursor-pointer hover:border-[#730042] hover:text-[#730042]" onClick={onClose}>
+            Cancel
+          </button>
+          <button 
+            className="bg-[#730042] text-white border-none px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1.5 hover:bg-[#4a0029] transition-all disabled:opacity-50"
+            onClick={() => onSave(form)} 
+            disabled={loading || !form.title}
+          >
+            <FaCheck className="text-[10px]" />
             {loading ? "Saving…" : initial ? "Update" : "Publish"}
           </button>
         </div>
@@ -438,17 +249,15 @@ const AnnModal = ({ open, onClose, initial, onSave, loading }) => {
 
 const StarDisplay = ({ rating, max = 5 }) => {
   return (
-    <div className="star-row">
+    <div className="flex gap-1 items-center">
       {Array.from({ length: max }, (_, i) => (
         <FaStar
           key={i}
-          style={{
-            fontSize: 13,
-            color: i < Math.round(rating) ? "#e8b84b" : "#eedde8",
-          }}
+          className="text-[13px]"
+          style={{ color: i < Math.round(rating) ? "#e8b84b" : "#eedde8" }}
         />
       ))}
-      <span style={{ fontSize: 12, color: "#8a6070", marginLeft: 5, fontWeight: 600 }}>
+      <span className="text-xs text-[#8a6070] ml-1.5 font-semibold">
         {Number(rating).toFixed(1)}
       </span>
     </div>
@@ -458,18 +267,18 @@ const StarDisplay = ({ rating, max = 5 }) => {
 const LeaveBalancePanel = ({ leaveBalance, loading }) => {
   if (loading) {
     return (
-      <div className="panel" style={{ padding: 22 }}>
-        <div style={{ fontSize: 13, color: "#8a6070" }}>Loading leave balance…</div>
+      <div className="bg-white rounded-2xl border border-[#eedde8] shadow-sm p-5">
+        <div className="text-sm text-[#8a6070]">Loading leave balance…</div>
       </div>
     );
   }
 
   if (!leaveBalance) {
     return (
-      <div className="panel">
-        <div className="empty">
-          <div className="empty-ico">📋</div>
-          <p>No leave balance found.</p>
+      <div className="bg-white rounded-2xl border border-[#eedde8] shadow-sm">
+        <div className="text-center py-10 px-5 text-[#c49ab2]">
+          <div className="text-3xl mb-2.5">📋</div>
+          <p className="text-sm">No leave balance found.</p>
         </div>
       </div>
     );
@@ -509,66 +318,60 @@ const LeaveBalancePanel = ({ leaveBalance, loading }) => {
   ];
 
   return (
-    <div className="panel">
-      <div className="panel-head">
-        <div className="panel-title">
-          <FaCalendarAlt style={{ color: "var(--p)", fontSize: 15 }} />
+    <div className="bg-white rounded-2xl border border-[#eedde8] shadow-sm overflow-hidden h-full flex flex-col">
+      <div className="p-4 sm:p-5 border-b border-[#eedde8] flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2 font-['Cormorant_Garamond',serif] text-lg font-bold text-[#1a0010]">
+          <FaCalendarAlt className="text-[#730042] text-sm" />
           My Leave Balance
         </div>
-        <span style={{ fontSize: 11, color: "var(--light)", fontWeight: 500 }}>FY 2025–26</span>
+        <span className="text-xs text-[#c49ab2] font-medium hidden sm:inline">FY 2025–26</span>
       </div>
-      <div style={{ padding: "4px 22px 10px" }}>
+      <div className="p-4 sm:p-5 flex-1 overflow-y-auto">
         {rows.map((row, i) => {
           const remaining = row.entitled - row.availed;
           const pct = row.entitled > 0 ? Math.min(100, Math.round((row.availed / row.entitled) * 100)) : 0;
           return (
-            <div className="lb-row" key={i}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>{row.label}</div>
+            <div className="py-3 border-b border-[#eedde8] last:border-b-0" key={i}>
+              <div className="flex justify-between items-start mb-1.5">
+                <div className="min-w-0 pr-2">
+                  <div className="text-xs font-semibold text-[#1a0010]">{row.label}</div>
                   {row.accrued != null && (
-                    <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 1 }}>
+                    <div className="text-[10px] text-[#8a6070] mt-0.5">
                       Accrued this month: <strong>{row.accrued}</strong>
                     </div>
                   )}
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: row.color, lineHeight: 1, fontFamily: "'Cormorant Garamond', serif" }}>
+                <div className="text-right shrink-0">
+                  <div className="text-xl font-bold leading-none font-['Cormorant_Garamond',serif]" style={{ color: row.color }}>
                     {remaining}
                   </div>
-                  <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2 }}>of {row.entitled} left</div>
+                  <div className="text-[10px] text-[#8a6070] mt-0.5">of {row.entitled} left</div>
                 </div>
               </div>
-              <div className="lb-bar-track">
-                <div className="lb-bar-fill" style={{ width: `${pct}%`, background: row.color }} />
+              <div className="h-1 bg-[#eedde8] rounded-full overflow-hidden">
+                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: row.color }} />
               </div>
-              <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 3 }}>
+              <div className="text-[10px] text-[#8a6070] mt-1">
                 {row.availed} used · {pct}%
               </div>
             </div>
           );
         })}
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+        <div className="flex gap-2 flex-wrap mt-2.5 pt-2.5 border-t border-[#eedde8]">
           {[
             ["LWP Used", lb.lwp ?? 0],
             ["PBC", lb.pbc ?? 0],
           ].map(([l, v]) => (
-            <div key={l} style={{
-              background: "var(--p-pale)", border: "1px solid var(--border)", borderRadius: 8,
-              padding: "6px 12px", fontSize: 11,
-            }}>
-              <span style={{ color: "var(--muted)" }}>{l} </span>
-              <strong style={{ color: "var(--text)" }}>{v}</strong>
+            <div key={l} className="bg-[#fdf5f9] border border-[#eedde8] rounded-lg px-3 py-1.5 text-xs">
+              <span className="text-[#8a6070]">{l} </span>
+              <strong className="text-[#1a0010]">{v}</strong>
             </div>
           ))}
           {lb.lastAccrualDate && (
-            <div style={{
-              background: "var(--p-pale)", border: "1px solid var(--border)", borderRadius: 8,
-              padding: "6px 12px", fontSize: 11,
-            }}>
-              <span style={{ color: "var(--muted)" }}>Last accrual </span>
-              <strong style={{ color: "var(--text)" }}>
+            <div className="bg-[#fdf5f9] border border-[#eedde8] rounded-lg px-3 py-1.5 text-xs">
+              <span className="text-[#8a6070]">Last accrual </span>
+              <strong className="text-[#1a0010]">
                 {new Date(lb.lastAccrualDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
               </strong>
             </div>
@@ -582,105 +385,93 @@ const LeaveBalancePanel = ({ leaveBalance, loading }) => {
 const ReviewsPanel = ({ reviews, loading }) => {
   if (loading) {
     return (
-      <div className="panel" style={{ padding: 22 }}>
-        <div style={{ fontSize: 13, color: "#8a6070" }}>Loading reviews…</div>
+      <div className="bg-white rounded-2xl border border-[#eedde8] shadow-sm p-5">
+        <div className="text-sm text-[#8a6070]">Loading reviews…</div>
       </div>
     );
   }
 
   const safeReviews = Array.isArray(reviews) ? reviews : [];
-
   const avg = safeReviews.length
     ? safeReviews.reduce((s, r) => s + (r.rating || 0), 0) / safeReviews.length
     : null;
 
   return (
-    <div className="panel">
-      <div className="panel-head">
-        <div className="panel-title">
-          <FaStar style={{ color: "#e8b84b", fontSize: 15 }} />
+    <div className="bg-white rounded-2xl border border-[#eedde8] shadow-sm overflow-hidden h-full flex flex-col">
+      <div className="p-4 sm:p-5 border-b border-[#eedde8] flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2 font-['Cormorant_Garamond',serif] text-lg font-bold text-[#1a0010]">
+          <FaStar className="text-[#e8b84b] text-sm" />
           Reviews Received
         </div>
         {safeReviews.length > 0 && (
-          <span style={{
-            background: "#fff8e1", color: "#b8760a", fontSize: 11,
-            fontWeight: 700, padding: "3px 10px", borderRadius: 99, border: "1px solid #f0d870",
-          }}>
+          <span className="bg-[#fff8e1] text-[#b8760a] text-xs font-bold px-2.5 py-1 rounded-full border border-[#f0d870]">
             {safeReviews.length} review{safeReviews.length !== 1 ? "s" : ""}
           </span>
         )}
       </div>
 
-      <div className="review-card-inner">
+      <div className="p-4 sm:p-5 flex-1 overflow-y-auto">
         {safeReviews.length === 0 ? (
-          <div className="empty">
-            <div className="empty-ico">⭐</div>
-            <p>No reviews received yet.</p>
+          <div className="text-center py-10 px-5 text-[#c49ab2]">
+            <div className="text-3xl mb-2.5">⭐</div>
+            <p className="text-sm">No reviews received yet.</p>
           </div>
         ) : (
           <>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 12, marginBottom: 16, paddingBottom: 16, borderBottom: "1px solid var(--border)" }}>
-              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 48, fontWeight: 700, color: "#e8b84b", lineHeight: 1 }}>
+            <div className="flex items-end gap-3 mb-4 pb-4 border-b border-[#eedde8]">
+              <div className="font-['Cormorant_Garamond',serif] text-5xl font-bold text-[#e8b84b] leading-none">
                 {avg.toFixed(1)}
               </div>
-              <div>
+              <div className="pb-1">
                 <StarDisplay rating={avg} />
-                <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
+                <div className="text-xs text-[#8a6070] mt-1">
                   Based on {safeReviews.length} review{safeReviews.length !== 1 ? "s" : ""}
                 </div>
               </div>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 16 }}>
+            <div className="flex flex-col gap-1.5 mb-4">
               {[5, 4, 3, 2, 1].map((star) => {
                 const cnt = safeReviews.filter((r) => Math.round(r.rating) === star).length;
                 const pct = safeReviews.length > 0 ? (cnt / safeReviews.length) * 100 : 0;
                 return (
-                  <div key={star} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 11, color: "var(--muted)", width: 8 }}>{star}</span>
-                    <FaStar style={{ fontSize: 11, color: "#e8b84b" }} />
-                    <div style={{ flex: 1, height: 5, borderRadius: 4, background: "var(--border)", overflow: "hidden" }}>
-                      <div style={{ width: `${pct}%`, height: "100%", background: "#e8b84b", borderRadius: 4, animation: "progressIn .8s ease both" }} />
+                  <div key={star} className="flex items-center gap-2">
+                    <span className="text-xs text-[#8a6070] w-2">{star}</span>
+                    <FaStar className="text-xs text-[#e8b84b]" />
+                    <div className="flex-1 h-1.5 rounded bg-[#eedde8] overflow-hidden">
+                      <div className="h-full rounded bg-[#e8b84b]" style={{ width: `${pct}%` }} />
                     </div>
-                    <span style={{ fontSize: 10, color: "var(--muted)", width: 14, textAlign: "right" }}>{cnt}</span>
+                    <span className="text-[10px] text-[#8a6070] w-3.5 text-right">{cnt}</span>
                   </div>
                 );
               })}
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div className="flex flex-col gap-2.5">
               {safeReviews.map((rev, i) => {
                 const reviewerName = rev.reviewer
                   ? [rev.reviewer.f_name, rev.reviewer.l_name].filter(Boolean).join(" ")
                   : "Unknown";
                 const reviewerRole = rev.reviewer?.role || rev.reviewerRole || "";
                 return (
-                  <div key={rev._id || i} style={{
-                    background: "var(--p-pale)", borderRadius: 10, padding: "12px 14px",
-                    borderLeft: "3px solid #e8b84b",
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div style={{
-                          width: 28, height: 28, borderRadius: "50%",
-                          background: "var(--p)", color: "white",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 11, fontWeight: 700, flexShrink: 0,
-                        }}>
+                  <div key={rev._id || i} className="bg-[#fdf5f9] rounded-lg p-3 border-l-4 border-[#e8b84b]">
+                    <div className="flex justify-between items-start mb-1.5 gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-7 h-7 rounded-full bg-[#730042] text-white flex items-center justify-center text-[11px] font-bold shrink-0">
                           {initials(reviewerName)}
                         </div>
-                        <div>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>{reviewerName}</div>
-                          <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "capitalize" }}>{reviewerRole.replace("_", " ")}</div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold text-[#1a0010] truncate">{reviewerName}</div>
+                          <div className="text-[10px] text-[#8a6070] capitalize">{reviewerRole.replace("_", " ")}</div>
                         </div>
                       </div>
-                      <div style={{ textAlign: "right" }}>
+                      <div className="text-right shrink-0">
                         <StarDisplay rating={rev.rating} />
-                        <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2 }}>{rev.monthYear}</div>
+                        <div className="text-[10px] text-[#8a6070] mt-0.5">{rev.monthYear}</div>
                       </div>
                     </div>
                     {rev.comment && (
-                      <div style={{ fontSize: 12, color: "var(--muted)", fontStyle: "italic", lineHeight: 1.55, marginTop: 6 }}>
+                      <div className="text-xs text-[#8a6070] italic leading-relaxed mt-1.5">
                         "{rev.comment}"
                       </div>
                     )}
@@ -696,8 +487,6 @@ const ReviewsPanel = ({ reviews, loading }) => {
 };
 
 function Dashboard() {
-  useInjectStyles();
-
   const [greeting, setGreeting]   = useState("");
   const [thought, setThought]     = useState("");
   const [annModal, setAnnModal]   = useState({ open: false, editing: null });
@@ -771,7 +560,7 @@ function Dashboard() {
       label: "Total Employees",
       value: empLoading ? "—" : totalEmployees,
       sub: "+2% from last month",
-      subColor: "var(--green)",
+      subColor: "#0d9e6e",
       bar: null,
     },
     {
@@ -779,7 +568,7 @@ function Dashboard() {
       label: "Present Today",
       value: mapLoading ? "—" : presentToday,
       sub: mapLoading ? "Loading…" : `${attendanceRate}% attendance · ${stillOnDuty} on duty`,
-      subColor: "var(--muted)",
+      subColor: "#8a6070",
       bar: mapLoading ? null : attendanceRate,
     },
     {
@@ -787,7 +576,7 @@ function Dashboard() {
       label: "Pending Leaves",
       value: leaveLoading ? "—" : pendingLeaves,
       sub: pendingLeaves > 0 ? "Needs attention" : "All clear",
-      subColor: pendingLeaves > 0 ? "var(--gold)" : "var(--green)",
+      subColor: pendingLeaves > 0 ? "#b8760a" : "#0d9e6e",
       bar: null,
     },
     {
@@ -795,7 +584,7 @@ function Dashboard() {
       label: "My Rating",
       value: adminLoading ? "—" : avgRating != null ? avgRating.toFixed(1) : "—",
       sub: reviews.length > 0 ? `${reviews.length} review${reviews.length !== 1 ? "s" : ""} received` : "No reviews yet",
-      subColor: avgRating != null ? "#e8b84b" : "var(--muted)",
+      subColor: avgRating != null ? "#e8b84b" : "#8a6070",
       bar: avgRating != null ? Math.round((avgRating / 5) * 100) : null,
     },
   ];
@@ -820,107 +609,132 @@ function Dashboard() {
   const displayEmployees = empExpand ? employees : employees.slice(0, 8);
 
   return (
-    <div className="db">
+    <div className="min-h-screen w-full overflow-x-hidden bg-[#fdf5f9] p-4 sm:p-6 lg:p-8 font-['Outfit',sans-serif] text-[#1a0010]">
+      <GlobalDashStyles />
 
-      <div className="hero">
-        <p className="hero-eyebrow">{today}</p>
-        <h1 className="hero-title">
+      {/* Hero Section */}
+      <div className="bg-gradient-to-br from-[#2e0019] via-[#4a0029] to-[#730042] rounded-2xl p-6 sm:p-8 lg:p-10 mb-6 sm:mb-8 relative overflow-hidden shadow-lg">
+        <div className="absolute w-[420px] h-[420px] rounded-full top-[-180px] right-[-100px] bg-white/5 pointer-events-none hidden md:block"></div>
+        <div className="absolute w-[260px] h-[260px] rounded-full bottom-[-140px] left-[38%] bg-white/5 pointer-events-none hidden md:block"></div>
+        
+        <p className="text-[11px] tracking-widest uppercase text-white/50 mb-2 font-medium">{today}</p>
+        <h1 className="font-['Cormorant_Garamond',serif] text-2xl sm:text-3xl lg:text-4xl text-white font-bold leading-tight m-0">
           {greeting}, {adminName}!
         </h1>
-        <p className="hero-thought">"{thought}"</p>
-        <div className="hero-chips">
-          <span className="hero-chip">🏢 {totalEmployees} Employees</span>
+        <p className="text-sm text-white/65 font-light max-w-xl leading-relaxed mt-1.5">"{thought}"</p>
+        
+        <div className="flex gap-2.5 mt-5 flex-wrap">
+          <span className="bg-white/10 border border-white/20 rounded-full px-3.5 py-1.5 text-xs text-white/85 font-medium backdrop-blur-sm">
+            🏢 {totalEmployees} Employees
+          </span>
           {presentToday > 0 && (
-            <span className="hero-chip">✅ {presentToday} Present Today</span>
+            <span className="bg-white/10 border border-white/20 rounded-full px-3.5 py-1.5 text-xs text-white/85 font-medium backdrop-blur-sm">
+              ✅ {presentToday} Present Today
+            </span>
           )}
           {pendingLeaves > 0 && (
-            <span className="hero-chip">📋 {pendingLeaves} Leave{pendingLeaves > 1 ? "s" : ""} Pending</span>
+            <span className="bg-white/10 border border-white/20 rounded-full px-3.5 py-1.5 text-xs text-white/85 font-medium backdrop-blur-sm">
+              📋 {pendingLeaves} Leave{pendingLeaves > 1 ? "s" : ""} Pending
+            </span>
           )}
-          <span className="hero-chip">📢 {totalAnn} Announcement{totalAnn !== 1 ? "s" : ""}</span>
+          <span className="bg-white/10 border border-white/20 rounded-full px-3.5 py-1.5 text-xs text-white/85 font-medium backdrop-blur-sm">
+            📢 {totalAnn} Announcement{totalAnn !== 1 ? "s" : ""}
+          </span>
           {avgRating != null && (
-            <span className="hero-chip">⭐ {avgRating.toFixed(1)} Rating</span>
+            <span className="bg-white/10 border border-white/20 rounded-full px-3.5 py-1.5 text-xs text-white/85 font-medium backdrop-blur-sm">
+              ⭐ {avgRating.toFixed(1)} Rating
+            </span>
           )}
         </div>
       </div>
 
-      <div className="stats-grid">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
         {stats.map((s, i) => (
-          <div className="stat-card" key={i}>
-            <div className="stat-card-stripe" style={{ background: i === 3 ? "#e8b84b" : "var(--p)" }} />
-            <div className="stat-icon-ring" style={{ color: i === 3 ? "#e8b84b" : "var(--p)", background: i === 3 ? "#fff8e1" : "var(--p-wash)" }}>
+          <div key={i} className="bg-white rounded-2xl border border-[#eedde8] p-4 sm:p-5 shadow-sm relative overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg">
+            <div className="absolute top-0 left-0 w-full h-1" style={{ background: i === 3 ? "#e8b84b" : "#730042" }} />
+            <div 
+              className="w-11 h-11 rounded-full flex items-center justify-center text-base mb-4"
+              style={{ color: i === 3 ? "#e8b84b" : "#730042", background: i === 3 ? "#fff8e1" : "#f7edf3" }}
+            >
               {s.icon}
             </div>
-            <div className="stat-lbl">{s.label}</div>
-            <div className="stat-val">{s.value}</div>
-            <p className="stat-sub" style={{ color: s.subColor }}>{s.sub}</p>
+            <div className="text-[11px] font-semibold tracking-wide uppercase text-[#8a6070] mb-1.5">{s.label}</div>
+            <div className="font-['Cormorant_Garamond',serif] text-4xl leading-none text-[#1a0010] font-bold">{s.value}</div>
+            <p className="text-xs mt-2 font-medium" style={{ color: s.subColor }}>{s.sub}</p>
             {s.bar !== null && (
-              <div className="stat-bar-track">
-                <div className="stat-bar-fill" style={{ width: `${s.bar}%`, background: i === 3 ? "linear-gradient(90deg,#c8920a,#e8b84b)" : undefined }} />
+              <div className="h-1 bg-[#eedde8] rounded-full mt-3 overflow-hidden">
+                <div 
+                  className="h-full rounded-full" 
+                  style={{ 
+                    width: `${s.bar}%`, 
+                    background: i === 3 ? "linear-gradient(90deg,#c8920a,#e8b84b)" : "linear-gradient(90deg,#4a0029,#c0527e)" 
+                  }} 
+                />
               </div>
             )}
           </div>
         ))}
       </div>
 
-      <div className="mid-grid">
-        <div className="panel">
-          <div className="panel-head">
-            <div className="panel-title">
-              <div className="live-dot" />
+      {/* Mid Grid: Map & Leave Requests */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+        <div className="bg-white rounded-2xl border border-[#eedde8] shadow-sm overflow-hidden lg:col-span-2 flex flex-col">
+          <div className="p-4 sm:p-5 border-b border-[#eedde8] flex items-center justify-between">
+            <div className="flex items-center gap-2 font-['Cormorant_Garamond',serif] text-lg font-bold text-[#1a0010]">
+              <div className="live-dot"></div>
               Live Attendance Map
             </div>
-            <span style={{ fontSize: 11, color: "var(--light)", fontWeight: 500 }}>
-              <FaMapMarkerAlt style={{ marginRight: 4 }} />
-              {mapLoading
-                ? "Loading…"
-                : `${checkins.length} check-in${checkins.length !== 1 ? "s" : ""} today`}
+            <span className="text-xs text-[#c49ab2] font-medium hidden sm:flex items-center">
+              <FaMapMarkerAlt className="mr-1" />
+              {mapLoading ? "Loading…" : `${checkins.length} check-in${checkins.length !== 1 ? "s" : ""} today`}
             </span>
           </div>
-          <div className="map-wrap">
+          <div className="h-[300px] sm:h-[400px] lg:h-[450px] w-full">
             <AttendanceMap checkins={checkins} loading={mapLoading} />
           </div>
-          <div className="map-footer">
-            <div className="map-leg">
-              <div className="leg-dot" style={{ background: "#730042" }} />
+          <div className="p-3 sm:p-4 bg-[#f7edf3] border-t border-[#eedde8] flex flex-wrap gap-4 sm:gap-5 items-center">
+            <div className="flex items-center gap-1.5 text-xs text-[#8a6070]">
+              <div className="w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm bg-[#730042]"></div>
               Manager
             </div>
-            <div className="map-leg">
-              <div className="leg-dot" style={{ background: "#a0005c" }} />
+            <div className="flex items-center gap-1.5 text-xs text-[#8a6070]">
+              <div className="w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm bg-[#a0005c]"></div>
               Employee
             </div>
-            <div className="map-leg" style={{ marginLeft: 4 }}>
-              <div className="leg-dot" style={{ background: "#aaa", opacity: .5 }} />
+            <div className="flex items-center gap-1.5 text-xs text-[#8a6070]">
+              <div className="w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm bg-gray-400 opacity-50"></div>
               Checked out
             </div>
-            <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--light)" }}>
+            <span className="ml-auto text-xs text-[#c49ab2] hidden md:inline">
               Click a pin for details · updates every 2 min
             </span>
           </div>
         </div>
 
-        <div className="panel" style={{ display: "flex", flexDirection: "column" }}>
-          <div className="panel-head">
-            <div className="panel-title">
-              <FaCalendarAlt style={{ color: "var(--p)", fontSize: 15 }} />
+        <div className="bg-white rounded-2xl border border-[#eedde8] shadow-sm overflow-hidden flex flex-col">
+          <div className="p-4 sm:p-5 border-b border-[#eedde8] flex items-center justify-between">
+            <div className="flex items-center gap-2 font-['Cormorant_Garamond',serif] text-lg font-bold text-[#1a0010]">
+              <FaCalendarAlt className="text-[#730042] text-sm" />
               Leave Requests
             </div>
             {pendingLeaves > 0 && (
-              <span style={{
-                background: "#fff8e1", color: "var(--gold)", fontSize: 11,
-                fontWeight: 700, padding: "3px 10px", borderRadius: 99, border: "1px solid #f0d870",
-              }}>
+              <span className="bg-[#fff8e1] text-[#b8760a] text-xs font-bold px-2.5 py-1 rounded-full border border-[#f0d870]">
                 {pendingLeaves} pending
               </span>
             )}
           </div>
 
-          <div className="leave-scroll" style={{ flex: 1 }}>
+          <div className="overflow-y-auto max-h-[400px] lg:max-h-[450px] flex-1">
             {leaveLoading ? (
-              <div className="empty"><div className="empty-ico">⏳</div><p>Loading…</p></div>
+              <div className="text-center py-10 px-5 text-[#c49ab2]">
+                <div className="text-3xl mb-2.5">⏳</div>
+                <p className="text-sm">Loading…</p>
+              </div>
             ) : leaves.length === 0 ? (
-              <div className="empty">
-                <div className="empty-ico"><FaCheckCircle style={{ color: "var(--green)" }} /></div>
-                <p>No leave requests.<br />All employees are accounted for.</p>
+              <div className="text-center py-10 px-5 text-[#c49ab2]">
+                <div className="text-3xl mb-2.5 text-[#0d9e6e]"><FaCheckCircle /></div>
+                <p className="text-sm">No leave requests.<br />All employees are accounted for.</p>
               </div>
             ) : (
               leaves.map((leave) => {
@@ -946,31 +760,34 @@ function Dashboard() {
                 };
 
                 return (
-                  <div key={leave._id || leave.id} className="leave-item">
-                    <div className="leave-avatar" style={{ background: leaveTypeColor(type) }}>
+                  <div key={leave._id || leave.id} className="p-4 border-b border-[#eedde8] flex items-start gap-3 transition-colors hover:bg-[#fdf5f9] last:border-b-0">
+                    <div 
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-[13px] font-bold text-white shrink-0 bg-[#730042]"
+                      style={{ background: leaveTypeColor(type) }}
+                    >
                       {initials(name)}
                     </div>
-                    <div className="leave-meta">
-                      <div className="leave-name">{name}</div>
-                      <div className="leave-info">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-[#1a0010] truncate">{name}</div>
+                      <div className="text-[11px] text-[#8a6070] mt-0.5">
                         {type} · {fmtShort(from)}{to && to !== from ? ` → ${fmtShort(to)}` : ""}
                       </div>
                       {leave.reason && (
-                        <div className="leave-info" style={{ marginTop: 2, fontStyle: "italic" }}>
+                        <div className="text-[11px] text-[#8a6070] mt-0.5 italic truncate">
                           "{leave.reason}"
                         </div>
                       )}
                       {isPending ? (
-                        <div className="leave-actions">
+                        <div className="flex gap-1.5 mt-2">
                           <button
-                            className="btn-accept"
+                            className="bg-[#e8f7f1] text-[#0d9e6e] border border-[#b8e8d4] rounded-md px-2.5 py-1 text-[11px] font-semibold cursor-pointer flex items-center gap-1 hover:bg-[#0d9e6e] hover:text-white transition-all disabled:opacity-50"
                             onClick={() => acceptLeave(leave._id || leave.id)}
                             disabled={accepting}
                           >
                             <FaCheck /> Approve
                           </button>
                           <button
-                            className="btn-reject"
+                            className="bg-[#fbeaea] text-[#d93025] border border-[#f0c5c5] rounded-md px-2.5 py-1 text-[11px] font-semibold cursor-pointer flex items-center gap-1 hover:bg-[#d93025] hover:text-white transition-all disabled:opacity-50"
                             onClick={() => rejectLeave(leave._id || leave.id)}
                             disabled={rejecting}
                           >
@@ -978,9 +795,15 @@ function Dashboard() {
                           </button>
                         </div>
                       ) : (
-                        <div style={{ marginTop: 6 }}>
-                          <span className={`status-badge status-${status}`}>
-                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                        <div className="mt-1.5">
+                          <span 
+                            className="inline-flex items-center text-[10px] font-semibold tracking-wide px-2 py-0.5 rounded-full capitalize"
+                            style={{
+                              background: status === 'approved' ? '#e8f7f1' : status === 'rejected' ? '#fbeaea' : '#fff8e1',
+                              color: status === 'approved' ? '#0d9e6e' : status === 'rejected' ? '#d93025' : '#b8760a'
+                            }}
+                          >
+                            {status}
                           </span>
                         </div>
                       )}
@@ -993,45 +816,70 @@ function Dashboard() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 26 }}>
+      {/* Lower Grid: Leave Balance & Reviews */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
         <LeaveBalancePanel leaveBalance={leaveBalance} loading={adminLoading} />
         <ReviewsPanel reviews={reviews} loading={adminLoading} />
       </div>
 
-      <div className="panel" style={{ marginBottom: 26 }}>
-        <div className="panel-head">
-          <div className="panel-title">
-            <FaBullhorn style={{ color: "var(--p)", fontSize: 15 }} />
+      {/* Announcements Panel */}
+      <div className="bg-white rounded-2xl border border-[#eedde8] shadow-sm overflow-hidden mb-6 sm:mb-8">
+        <div className="p-4 sm:p-5 border-b border-[#eedde8] flex items-center justify-between">
+          <div className="flex items-center gap-2 font-['Cormorant_Garamond',serif] text-lg font-bold text-[#1a0010]">
+            <FaBullhorn className="text-[#730042] text-sm" />
             Announcements
           </div>
-          <button className="btn-p" onClick={() => setAnnModal({ open: true, editing: null })}>
-            <FaPlus style={{ fontSize: 10 }} /> New
+          <button 
+            className="bg-[#730042] text-white border-none px-3 sm:px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1.5 hover:bg-[#4a0029] transition-all"
+            onClick={() => setAnnModal({ open: true, editing: null })}
+          >
+            <FaPlus className="text-[10px]" /> New
           </button>
         </div>
         {annLoading ? (
-          <div className="empty"><div className="empty-ico">⏳</div><p>Loading…</p></div>
+          <div className="text-center py-10 px-5 text-[#c49ab2]">
+            <div className="text-3xl mb-2.5">⏳</div>
+            <p className="text-sm">Loading…</p>
+          </div>
         ) : announcements.length === 0 ? (
-          <div className="empty">
-            <div className="empty-ico">📢</div>
-            <p>No announcements yet.<br />Publish one to notify your team.</p>
+          <div className="text-center py-10 px-5 text-[#c49ab2]">
+            <div className="text-3xl mb-2.5">📢</div>
+            <p className="text-sm">No announcements yet.<br />Publish one to notify your team.</p>
           </div>
         ) : (
-          <div className="ann-grid">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 sm:p-5">
             {announcements.map((ann) => {
               const typeKey = (ann.type || "general").toLowerCase();
-              const chipCls = ANN_TYPE_MAP[typeKey] || "chip-general";
+              const chipStyles = {
+                general: "bg-[#f7edf3] text-[#730042]",
+                urgent: "bg-[#fbeaea] text-[#d93025]",
+                event: "bg-[#e8f7f1] text-[#0d9e6e]",
+                policy: "bg-[#fff8e1] text-[#b8760a]"
+              };
               return (
-                <div className="ann-card" key={ann._id}>
-                  <span className={`ann-type-chip ${chipCls}`}>
+                <div key={ann._id} className="rounded-lg border border-[#eedde8] p-4 transition-all hover:shadow-sm hover:-translate-y-0.5 flex flex-col">
+                  <span 
+                    className="inline-block text-[10px] font-bold tracking-wide uppercase px-2.5 py-1 rounded-full mb-2 w-fit"
+                    style={{ 
+                      background: typeKey === 'urgent' ? '#fbeaea' : typeKey === 'event' ? '#e8f7f1' : typeKey === 'policy' ? '#fff8e1' : '#f7edf3', 
+                      color: typeKey === 'urgent' ? '#d93025' : typeKey === 'event' ? '#0d9e6e' : typeKey === 'policy' ? '#b8760a' : '#730042' 
+                    }}
+                  >
                     {typeKey.charAt(0).toUpperCase() + typeKey.slice(1)}
                   </span>
-                  <div className="ann-card-title">{ann.title}</div>
-                  <div className="ann-card-body">{ann.message}</div>
-                  <div className="ann-card-foot">
-                    <button className="icon-btn" onClick={() => setAnnModal({ open: true, editing: ann })}>
+                  <div className="text-sm font-semibold text-[#1a0010] mb-1.5 leading-tight">{ann.title}</div>
+                  <div className="text-xs text-[#8a6070] leading-relaxed line-clamp-2 flex-1">{ann.message}</div>
+                  <div className="flex gap-1.5 mt-2.5 pt-2.5 border-t border-[#eedde8]">
+                    <button 
+                      className="bg-none border-none cursor-pointer px-1.5 py-1 rounded text-xs text-[#c49ab2] hover:bg-[#f7edf3] hover:text-[#730042] flex items-center gap-1"
+                      onClick={() => setAnnModal({ open: true, editing: ann })}
+                    >
                       <FaEdit /> Edit
                     </button>
-                    <button className="icon-btn del" onClick={() => removeAnn(ann._id)}>
+                    <button 
+                      className="bg-none border-none cursor-pointer px-1.5 py-1 rounded text-xs text-[#c49ab2] hover:bg-[#fbeaea] hover:text-[#d93025] flex items-center gap-1"
+                      onClick={() => removeAnn(ann._id)}
+                    >
                       <FaTrash /> Delete
                     </button>
                   </div>
@@ -1042,52 +890,53 @@ function Dashboard() {
         )}
       </div>
 
-      <div className="panel" style={{ marginBottom: 26 }}>
-        <div className="panel-head">
-          <div className="panel-title">
-            <FaUsers style={{ color: "var(--p)", fontSize: 15 }} />
+      {/* Employee Overview Panel */}
+      <div className="bg-white rounded-2xl border border-[#eedde8] shadow-sm overflow-hidden mb-6 sm:mb-8">
+        <div className="p-4 sm:p-5 border-b border-[#eedde8] flex items-center justify-between">
+          <div className="flex items-center gap-2 font-['Cormorant_Garamond',serif] text-lg font-bold text-[#1a0010]">
+            <FaUsers className="text-[#730042] text-sm" />
             Employee Overview
           </div>
           {employees.length > 8 && (
             <button
-              className="btn-ghost"
-              style={{ fontSize: 12, padding: "6px 14px" }}
+              className="bg-none text-[#8a6070] border border-[#eedde8] px-3 sm:px-4 py-2 rounded-lg text-xs font-medium cursor-pointer hover:border-[#730042] hover:text-[#730042] transition-all flex items-center"
               onClick={() => setEmpExpand((v) => !v)}
             >
               {empExpand ? "Show Less" : `View All (${employees.length})`}
-              <FaChevronRight style={{
-                fontSize: 10, marginLeft: 4,
-                transform: empExpand ? "rotate(90deg)" : "none",
-                transition: ".2s",
-              }} />
+              <FaChevronRight className="text-[10px] ml-1 transition-transform" style={{ transform: empExpand ? "rotate(90deg)" : "none" }} />
             </button>
           )}
         </div>
 
         {empLoading ? (
-          <div className="empty"><div className="empty-ico">⏳</div><p>Loading employees…</p></div>
+          <div className="text-center py-10 px-5 text-[#c49ab2]">
+            <div className="text-3xl mb-2.5">⏳</div>
+            <p className="text-sm">Loading employees…</p>
+          </div>
         ) : employees.length === 0 ? (
-          <div className="empty">
-            <div className="empty-ico"><FaUsers /></div>
-            <p>No employees found.</p>
+          <div className="text-center py-10 px-5 text-[#c49ab2]">
+            <div className="text-3xl mb-2.5"><FaUsers /></div>
+            <p className="text-sm">No employees found.</p>
           </div>
         ) : (
-          <div className="emp-grid">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 p-4 sm:p-5">
             {displayEmployees.map((emp, i) => {
               const name  = [emp.f_name, emp.l_name].filter(Boolean).join(" ") || "Employee";
               const role  = emp.designation || emp.role || "";
               const dept  = emp.department  || "";
               const email = emp.work_email  || "";
               return (
-                <div className="emp-card" key={emp._id || emp.id || i}>
-                  <div className="emp-ava">{initials(name)}</div>
-                  <div style={{ minWidth: 0 }}>
-                    <div className="emp-name">{name}</div>
-                    {role  && <div className="emp-role">{role}</div>}
-                    {dept  && <span className="emp-dept">{dept}</span>}
+                <div key={emp._id || emp.id || i} className="border border-[#eedde8] rounded-lg p-4 flex items-center gap-3 transition-all hover:shadow-sm hover:bg-[#f7edf3]">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 bg-gradient-to-br from-[#4a0029] to-[#a0005c]">
+                    {initials(name)}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-[#1a0010] leading-tight truncate">{name}</div>
+                    {role  && <div className="text-[11px] text-[#8a6070] mt-0.5 truncate">{role}</div>}
+                    {dept  && <span className="inline-block text-[10px] font-semibold bg-[#f7edf3] text-[#730042] px-1.5 py-0.5 rounded-full mt-1">{dept}</span>}
                     {email && (
-                      <div style={{ fontSize: 10, color: "var(--light)", marginTop: 4 }}>
-                        <FaEnvelope style={{ marginRight: 4 }} />{email}
+                      <div className="text-[10px] text-[#c49ab2] mt-1 truncate flex items-center gap-1">
+                        <FaEnvelope /> {email}
                       </div>
                     )}
                   </div>

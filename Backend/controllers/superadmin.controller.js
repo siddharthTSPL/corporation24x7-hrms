@@ -2137,6 +2137,97 @@ const getDocumentDetailsSuperAdmin = async (req, res, next) => {
   });
 };
 
+const updatePermissions = async (req, res, next) => {
+  try {
+    if (!req.superAdmin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const { id: user_id } = req.params;
+    const organisation_id = req.superAdmin._id;
+    const { user_model, announcements, documents, tickets, recruitment } = req.body;
+
+    if (!user_model)
+      return next(Object.assign(new Error("user_model is required"), { statusCode: 400 }));
+
+    if (!["Admin", "Manager", "User"].includes(user_model))
+      return next(Object.assign(new Error("user_model must be Admin, Manager, or User"), { statusCode: 400 }));
+
+    if (!announcements && !documents && !tickets && !recruitment)
+      return next(Object.assign(new Error("At least one permission group is required"), { statusCode: 400 }));
+
+    const existing = await PermissionModel.findOne({ user_id, user_model, organisation_id });
+    if (!existing)
+      return next(Object.assign(new Error("Permission record not found for this user"), { statusCode: 404 }));
+
+    const $set = {
+      granted_by: req.superAdmin._id,
+      granted_by_model: "SuperAdmin",
+    };
+
+    if (announcements) {
+      if (announcements.can_view_announcements !== undefined) $set["announcements.can_view_announcements"] = announcements.can_view_announcements;
+      if (announcements.can_create_announcement !== undefined) $set["announcements.can_create_announcement"] = announcements.can_create_announcement;
+      if (announcements.can_edit_announcement !== undefined) $set["announcements.can_edit_announcement"] = announcements.can_edit_announcement;
+      if (announcements.can_delete_announcement !== undefined) $set["announcements.can_delete_announcement"] = announcements.can_delete_announcement;
+    }
+
+    if (documents) {
+      if (documents.can_upload_documents !== undefined) $set["documents.can_upload_documents"] = documents.can_upload_documents;
+      if (documents.can_view_all_documents !== undefined) $set["documents.can_view_all_documents"] = documents.can_view_all_documents;
+    }
+
+    if (tickets) {
+      if (tickets.can_raise_ticket !== undefined) $set["tickets.can_raise_ticket"] = tickets.can_raise_ticket;
+      if (tickets.can_view_all_tickets !== undefined) $set["tickets.can_view_all_tickets"] = tickets.can_view_all_tickets;
+      if (tickets.can_resolve_ticket !== undefined) $set["tickets.can_resolve_ticket"] = tickets.can_resolve_ticket;
+      if (tickets.can_rate_ticket !== undefined) $set["tickets.can_rate_ticket"] = tickets.can_rate_ticket;
+    }
+
+    if (recruitment) {
+      if (recruitment.can_view_hiring_requisitions !== undefined) $set["recruitment.can_view_hiring_requisitions"] = recruitment.can_view_hiring_requisitions;
+      if (recruitment.can_create_hiring_requisition !== undefined) $set["recruitment.can_create_hiring_requisition"] = recruitment.can_create_hiring_requisition;
+      if (recruitment.can_view_candidates !== undefined) $set["recruitment.can_view_candidates"] = recruitment.can_view_candidates;
+      if (recruitment.can_add_candidate !== undefined) $set["recruitment.can_add_candidate"] = recruitment.can_add_candidate;
+    }
+
+    const updated = await PermissionModel.findOneAndUpdate(
+      { user_id, user_model, organisation_id },
+      { $set },
+      { new: true, runValidators: true }
+    ).lean();
+
+    return res.status(200).json({
+      success: true,
+      message: "Permissions updated successfully",
+      permissions: updated,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getPermissions = async (req, res, next) => {
+  try {
+    if (!req.superAdmin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const { id: user_id } = req.params;
+    const { user_model } = req.query;
+    const organisation_id = req.superAdmin._id;
+
+    if (!user_model || !["Admin", "Manager", "User"].includes(user_model))
+      return next(Object.assign(new Error("user_model query param must be Admin, Manager, or User"), { statusCode: 400 }));
+
+    const permissions = await PermissionModel.findOne({ user_id, user_model, organisation_id }).lean();
+    if (!permissions)
+      return next(Object.assign(new Error("Permission record not found for this user"), { statusCode: 404 }));
+
+    return res.status(200).json({ success: true, permissions });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   registerSuperAdmin,
   verifySuperAdmin,
@@ -2174,4 +2265,6 @@ module.exports = {
   getAllPersonalDocumentsSuperAdmin,
   getAllExpenseDocumentsSuperAdmin,
   getDocumentDetailsSuperAdmin,
+   updatePermissions,
+  getPermissions
 };

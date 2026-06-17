@@ -3,9 +3,26 @@ const PermissionModel = require("../../Models/permission.model");
 const checkPermission = (permissionPath) => {
   return async (req, res, next) => {
     try {
-      const { _id, role, organisation_id } = req.user;
+      const user =
+        req.user ||
+        req.admin ||
+        req.manager ||
+        req.employee ||
+        req.superAdmin;
 
-      if (role === "super_admin") return next();
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: "Unauthorized",
+        });
+      }
+
+      // Super Admin bypass
+      if (req.superAdmin || user.role === "super_admin") {
+        return next();
+      }
+
+      const { _id, role, organisation_id } = user;
 
       const modelMap = {
         admin: "Admin",
@@ -17,8 +34,12 @@ const checkPermission = (permissionPath) => {
       };
 
       const userModel = modelMap[role];
+
       if (!userModel) {
-        return res.status(403).json({ success: false, message: "Unknown role. Access denied." });
+        return res.status(403).json({
+          success: false,
+          message: "Unknown role. Access denied.",
+        });
       }
 
       const permDoc = await PermissionModel.findOne({
@@ -28,11 +49,15 @@ const checkPermission = (permissionPath) => {
       });
 
       if (!permDoc) {
-        return res.status(403).json({ success: false, message: "No permissions found for this user." });
+        return res.status(403).json({
+          success: false,
+          message: "No permissions found.",
+        });
       }
 
       const keys = permissionPath.split(".");
       let value = permDoc;
+
       for (const key of keys) {
         value = value?.[key];
       }
@@ -40,7 +65,7 @@ const checkPermission = (permissionPath) => {
       if (!value) {
         return res.status(403).json({
           success: false,
-          message: `Access denied. You do not have permission: ${permissionPath}`,
+          message: `Access denied. Missing permission: ${permissionPath}`,
         });
       }
 

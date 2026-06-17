@@ -46,7 +46,7 @@ const AVATAR_BG = ["#730042", "#993556", "#72243E", "#CD166E", "#4B1528"];
 // ─── Shared input class ───────────────────────────────────────────────────────
 
 const inputCls =
-  "w-full px-3 py-2.5 border border-[#F4C0D1] rounded-[9px] bg-[#F9F8F2] text-[13px] text-[#730042] " +
+  "w-full px-3 py-2.5 sm:py-2.5 border border-[#F4C0D1] rounded-[9px] bg-[#F9F8F2] text-[13px] text-[#730042] " +
   "outline-none focus:border-[#CD166E] focus:ring-2 focus:ring-[#CD166E]/20 transition-all placeholder-[#993556]/40 font-[inherit]";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -56,9 +56,9 @@ function PriorityBadge({ priority }) {
   if (!cfg) return null;
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold ${cfg.badge}`}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold whitespace-nowrap ${cfg.badge}`}
     >
-      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
       {cfg.label}
     </span>
   );
@@ -69,7 +69,7 @@ function AudienceBadge({ audience }) {
   if (!cfg) return null;
   return (
     <span
-      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold ${cfg.color}`}
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold whitespace-nowrap ${cfg.color}`}
     >
       {cfg.label}
     </span>
@@ -101,14 +101,14 @@ function AnnouncementThumb({ src, alt, bg }) {
       <img
         src={src}
         alt={alt}
-        className="w-10 h-10 object-cover rounded-[9px] border border-[#F4C0D1]"
+        className="w-10 h-10 sm:w-10 sm:h-10 max-w-full object-cover rounded-[9px] border border-[#F4C0D1] flex-shrink-0"
         onError={(e) => (e.currentTarget.style.display = "none")}
       />
     );
   }
   return (
     <div
-      className="w-10 h-10 rounded-[9px] border border-[#F4C0D1] flex items-center justify-center"
+      className="w-10 h-10 rounded-[9px] border border-[#F4C0D1] flex items-center justify-center flex-shrink-0"
       style={{ background: bg }}
     >
       <svg
@@ -118,6 +118,7 @@ function AnnouncementThumb({ src, alt, bg }) {
         fill="none"
         stroke="rgba(255,255,255,0.4)"
         strokeWidth="1.8"
+        className="max-w-full h-auto"
       >
         <path d="M3 11l19-9-9 19-2-8-8-2z" />
       </svg>
@@ -131,14 +132,14 @@ function PreviewCardImage({ src, bg }) {
       <img
         src={src}
         alt="notice"
-        className="w-full h-32 object-cover"
+        className="w-full h-28 sm:h-32 object-cover"
         onError={(e) => (e.currentTarget.style.display = "none")}
       />
     );
   }
   return (
     <div
-      className="w-full h-32 flex items-center justify-center"
+      className="w-full h-28 sm:h-32 flex items-center justify-center"
       style={{ background: bg }}
     >
       <svg
@@ -148,6 +149,7 @@ function PreviewCardImage({ src, bg }) {
         fill="none"
         stroke="rgba(255,255,255,0.25)"
         strokeWidth="1.5"
+        className="max-w-full h-auto"
       >
         <path d="M3 11l19-9-9 19-2-8-8-2z" />
       </svg>
@@ -159,7 +161,7 @@ function SkeletonRows() {
   return [...Array(4)].map((_, i) => (
     <tr key={i}>
       {[...Array(7)].map((_, j) => (
-        <td key={j} className="px-5 py-4">
+        <td key={j} className="px-4 sm:px-5 py-4">
           <div
             className={`bg-[#FBEAF0] rounded-lg animate-pulse ${
               j === 0 ? "w-10 h-10 rounded-xl" : "h-3"
@@ -171,10 +173,23 @@ function SkeletonRows() {
   ));
 }
 
+function SkeletonCards() {
+  return [...Array(4)].map((_, i) => (
+    <div key={i} className="p-4 flex gap-3">
+      <div className="w-10 h-10 rounded-xl bg-[#FBEAF0] animate-pulse flex-shrink-0" />
+      <div className="flex-1 flex flex-col gap-2">
+        <div className="h-3 w-2/3 bg-[#FBEAF0] rounded-lg animate-pulse" />
+        <div className="h-3 w-full bg-[#FBEAF0] rounded-lg animate-pulse" />
+        <div className="h-3 w-1/2 bg-[#FBEAF0] rounded-lg animate-pulse" />
+      </div>
+    </div>
+  ));
+}
+
 function ModalOverlay({ onClose, children }) {
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center z-50 px-4"
+      className="fixed inset-0 flex items-center justify-center z-50 px-3 sm:px-4 py-6 overflow-y-auto"
       style={{
         background: "rgba(115,0,66,0.28)",
         backdropFilter: "blur(3px)",
@@ -190,65 +205,99 @@ function ModalOverlay({ onClose, children }) {
 
 function StatCard({ label, value, iconPath, bg, iconColor }) {
   return (
-    <div className="bg-white rounded-xl border border-[#F4C0D1] p-4 flex items-center gap-4">
+    <div className="bg-white rounded-xl border border-[#F4C0D1] p-3 sm:p-4 flex items-center gap-3 sm:gap-4 min-w-0">
       <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0"
         style={{ background: bg }}
       >
         <svg
-          width="18"
-          height="18"
+          width="16"
+          height="16"
           viewBox="0 0 24 24"
           fill="none"
           stroke={iconColor}
           strokeWidth="1.8"
+          className="sm:w-[18px] sm:h-[18px]"
         >
           {iconPath}
         </svg>
       </div>
-      <div>
-        <div className="text-xl font-semibold text-[#730042]">{value}</div>
-        <div className="text-[11px] text-[#993556] mt-0.5">{label}</div>
+      <div className="min-w-0">
+        <div className="text-lg sm:text-xl font-semibold text-[#730042]">{value}</div>
+        <div className="text-[10px] sm:text-[11px] text-[#993556] mt-0.5 leading-snug">{label}</div>
       </div>
     </div>
   );
 }
 
-// ─── Empty State ──────────────────────────────────────────────────────────────
+// ─── Empty / Error content (shared between table + mobile list) ──────────────
+
+function EmptyStateContent({ onCreateClick }) {
+  return (
+    <div className="flex flex-col items-center gap-3 px-4">
+      <div className="w-14 h-14 rounded-2xl bg-[#FBEAF0] flex items-center justify-center">
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#CD166E"
+          strokeWidth="1.8"
+        >
+          <path d="M3 11l19-9-9 19-2-8-8-2z" />
+        </svg>
+      </div>
+      <div>
+        <p className="text-[13px] font-semibold text-[#730042]">
+          No announcements yet
+        </p>
+        <p className="text-[11px] text-[#993556] mt-1">
+          Create your first announcement to get started
+        </p>
+      </div>
+      <button
+        onClick={onCreateClick}
+        className="mt-1 px-4 py-2.5 min-h-[44px] rounded-xl text-[12px] font-medium text-white"
+        style={{ background: "#730042" }}
+      >
+        + New Announcement
+      </button>
+    </div>
+  );
+}
+
+function ErrorStateContent() {
+  return (
+    <div className="flex flex-col items-center gap-2 px-4">
+      <div className="w-12 h-12 rounded-full bg-[#FCEBEB] flex items-center justify-center">
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#A32D2D"
+          strokeWidth="1.8"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+      </div>
+      <p className="text-[13px] font-semibold text-[#730042] text-center">
+        Failed to load announcements
+      </p>
+      <p className="text-[11px] text-[#993556] text-center">
+        Check your network connection and try again
+      </p>
+    </div>
+  );
+}
 
 function EmptyState({ onCreateClick }) {
   return (
     <tr>
-      <td colSpan={7} className="py-20 text-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-14 h-14 rounded-2xl bg-[#FBEAF0] flex items-center justify-center">
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#CD166E"
-              strokeWidth="1.8"
-            >
-              <path d="M3 11l19-9-9 19-2-8-8-2z" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-[13px] font-semibold text-[#730042]">
-              No announcements yet
-            </p>
-            <p className="text-[11px] text-[#993556] mt-1">
-              Create your first announcement to get started
-            </p>
-          </div>
-          <button
-            onClick={onCreateClick}
-            className="mt-1 px-4 py-2 rounded-xl text-[12px] font-medium text-white"
-            style={{ background: "#730042" }}
-          >
-            + New Announcement
-          </button>
-        </div>
+      <td colSpan={7} className="py-16 sm:py-20 text-center">
+        <EmptyStateContent onCreateClick={onCreateClick} />
       </td>
     </tr>
   );
@@ -257,29 +306,8 @@ function EmptyState({ onCreateClick }) {
 function ErrorState() {
   return (
     <tr>
-      <td colSpan={7} className="py-16 text-center">
-        <div className="flex flex-col items-center gap-2">
-          <div className="w-12 h-12 rounded-full bg-[#FCEBEB] flex items-center justify-center">
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#A32D2D"
-              strokeWidth="1.8"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-          </div>
-          <p className="text-[13px] font-semibold text-[#730042]">
-            Failed to load announcements
-          </p>
-          <p className="text-[11px] text-[#993556]">
-            Check your network connection and try again
-          </p>
-        </div>
+      <td colSpan={7} className="py-14 sm:py-16 text-center">
+        <ErrorStateContent />
       </td>
     </tr>
   );
@@ -292,23 +320,23 @@ function AnnouncementFormModal({ mode, form, errors, isPending, onChange, onSubm
 
   return (
     <ModalOverlay onClose={onClose}>
-      <div className="bg-white w-full max-w-lg rounded-2xl max-h-[92vh] overflow-y-auto border border-[#F4C0D1]">
+      <div className="bg-white w-full max-w-lg rounded-xl sm:rounded-2xl max-h-[90vh] overflow-y-auto border border-[#F4C0D1]">
         {/* Header */}
         <div
-          className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-[#F4C0D1] rounded-t-2xl"
+          className="sticky top-0 z-10 flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-[#F4C0D1] rounded-t-xl sm:rounded-t-2xl"
           style={{ background: "#730042" }}
         >
-          <div>
-            <h2 className="text-[15px] font-semibold text-white">
+          <div className="min-w-0">
+            <h2 className="text-sm sm:text-[15px] font-semibold text-white">
               {isEdit ? "Edit Announcement" : "New Announcement"}
             </h2>
-            <p className="text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.55)" }}>
+            <p className="text-[10px] sm:text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.55)" }}>
               Fill in the details below
             </p>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-white transition-colors"
+            className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-white transition-colors flex-shrink-0"
             style={{ background: "rgba(255,255,255,0.18)" }}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -319,7 +347,7 @@ function AnnouncementFormModal({ mode, form, errors, isPending, onChange, onSubm
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5 flex flex-col gap-4" style={{ background: "#F9F8F2" }}>
+        <div className="px-4 sm:px-6 py-4 sm:py-5 flex flex-col gap-4" style={{ background: "#F9F8F2" }}>
           <Field label="Title" error={errors.title}>
             <input
               name="title"
@@ -357,7 +385,7 @@ function AnnouncementFormModal({ mode, form, errors, isPending, onChange, onSubm
                 <img
                   src={form.notice_image}
                   alt="preview"
-                  className="w-full h-28 object-cover"
+                  className="w-full h-24 sm:h-28 object-cover"
                   onError={(e) => (e.currentTarget.style.display = "none")}
                 />
               </div>
@@ -404,19 +432,19 @@ function AnnouncementFormModal({ mode, form, errors, isPending, onChange, onSubm
 
         {/* Footer */}
         <div
-          className="sticky bottom-0 flex justify-end gap-3 px-6 py-4 border-t border-[#F4C0D1] rounded-b-2xl"
+          className="sticky bottom-0 flex flex-col sm:flex-row sm:justify-end gap-3 px-4 sm:px-6 py-3 sm:py-4 border-t border-[#F4C0D1] rounded-b-xl sm:rounded-b-2xl"
           style={{ background: "#F9F8F2" }}
         >
           <button
             onClick={onClose}
-            className="px-5 py-2.5 rounded-xl border border-[#F4C0D1] text-[13px] font-medium text-[#730042] bg-white hover:bg-[#FBEAF0] transition-colors"
+            className="w-full sm:w-auto px-5 py-3 sm:py-2.5 min-h-[44px] rounded-xl border border-[#F4C0D1] text-[13px] font-medium text-[#730042] bg-white hover:bg-[#FBEAF0] transition-colors order-2 sm:order-1"
           >
             Cancel
           </button>
           <button
             onClick={onSubmit}
             disabled={isPending}
-            className="px-6 py-2.5 rounded-xl text-[13px] font-medium text-white transition-opacity disabled:opacity-50 hover:opacity-90"
+            className="w-full sm:w-auto px-6 py-3 sm:py-2.5 min-h-[44px] rounded-xl text-[13px] font-medium text-white transition-opacity disabled:opacity-50 hover:opacity-90 order-1 sm:order-2"
             style={{ background: "#730042" }}
           >
             {isPending
@@ -438,8 +466,8 @@ function AnnouncementFormModal({ mode, form, errors, isPending, onChange, onSubm
 function DeleteModal({ item, isDeleting, onConfirm, onClose }) {
   return (
     <ModalOverlay onClose={onClose}>
-      <div className="bg-white w-full max-w-sm rounded-2xl border border-[#F4C0D1] overflow-hidden">
-        <div className="px-6 pt-8 pb-5 text-center" style={{ background: "#FBEAF0" }}>
+      <div className="bg-white w-full max-w-sm rounded-xl sm:rounded-2xl border border-[#F4C0D1] overflow-hidden">
+        <div className="px-4 sm:px-6 pt-7 sm:pt-8 pb-5 text-center" style={{ background: "#FBEAF0" }}>
           <div
             className="w-12 h-12 rounded-full border border-[#F7C1C1] flex items-center justify-center mx-auto mb-3"
             style={{ background: "#FCEBEB" }}
@@ -462,8 +490,8 @@ function DeleteModal({ item, isDeleting, onConfirm, onClose }) {
             Delete announcement?
           </h3>
         </div>
-        <div className="px-6 py-5 text-center">
-          <p className="text-[12px] text-[#993556] leading-relaxed">
+        <div className="px-4 sm:px-6 py-5 text-center">
+          <p className="text-[12px] text-[#993556] leading-relaxed break-words">
             You're about to delete{" "}
             <span className="font-semibold text-[#730042]">
               "{item.title}"
@@ -472,17 +500,17 @@ function DeleteModal({ item, isDeleting, onConfirm, onClose }) {
             This action cannot be undone.
           </p>
         </div>
-        <div className="flex gap-3 px-6 pb-6">
+        <div className="flex flex-col sm:flex-row gap-3 px-4 sm:px-6 pb-5 sm:pb-6">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl border border-[#F4C0D1] text-[12px] font-medium text-[#730042] bg-white hover:bg-[#FBEAF0] transition-colors"
+            className="w-full sm:flex-1 py-3 sm:py-2.5 min-h-[44px] rounded-xl border border-[#F4C0D1] text-[12px] font-medium text-[#730042] bg-white hover:bg-[#FBEAF0] transition-colors order-2 sm:order-1"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
             disabled={isDeleting}
-            className="flex-1 py-2.5 rounded-xl text-[12px] font-medium text-white transition-opacity disabled:opacity-50 hover:opacity-90"
+            className="w-full sm:flex-1 py-3 sm:py-2.5 min-h-[44px] rounded-xl text-[12px] font-medium text-white transition-opacity disabled:opacity-50 hover:opacity-90 order-1 sm:order-2"
             style={{ background: "#A32D2D" }}
           >
             {isDeleting ? "Deleting..." : "Delete"}
@@ -636,21 +664,21 @@ export default function AnnouncementPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-4 md:p-8 min-h-screen" style={{ background: "#F9F8F2" }}>
+    <div className="p-3 sm:p-4 md:p-6 lg:p-8 min-h-screen overflow-x-hidden" style={{ background: "#F9F8F2" }}>
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-xl font-semibold text-[#730042] tracking-tight">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6 sm:mb-8">
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-xl font-semibold text-[#730042] tracking-tight">
             Announcements
           </h1>
-          <p className="text-[12px] text-[#993556] mt-1">
+          <p className="text-[11px] sm:text-[12px] text-[#993556] mt-1">
             Create and manage announcements for your team
           </p>
         </div>
         <button
           onClick={openCreate}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-medium text-white transition-opacity hover:opacity-90 self-start sm:self-auto"
+          className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-3 sm:py-2.5 min-h-[44px] rounded-xl text-[13px] font-medium text-white transition-opacity hover:opacity-90"
           style={{ background: "#730042" }}
         >
           <svg
@@ -669,7 +697,7 @@ export default function AnnouncementPage() {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
         {statCards.map((s) => (
           <StatCard key={s.label} {...s} />
         ))}
@@ -677,8 +705,8 @@ export default function AnnouncementPage() {
 
       {/* Latest Preview Cards */}
       {!isLoading && announcements.length > 0 && (
-        <div className="mb-8">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-[#993556] mb-3">
+        <div className="mb-6 sm:mb-8">
+          <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-2.5 sm:mb-3">
             Latest announcements
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -691,8 +719,8 @@ export default function AnnouncementPage() {
                   src={item.notice_image}
                   bg={AVATAR_BG[idx % AVATAR_BG.length]}
                 />
-                <div className="p-4">
-                  <div className="flex items-center justify-between gap-2 mb-2.5">
+                <div className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between gap-2 mb-2.5 flex-wrap">
                     <PriorityBadge priority={item.priority} />
                     <AudienceBadge audience={item.audience} />
                   </div>
@@ -727,20 +755,124 @@ export default function AnnouncementPage() {
         </div>
       )}
 
-      {/* Table */}
+      {/* List / Table container */}
       <div className="bg-white rounded-[14px] border border-[#F4C0D1] overflow-hidden">
-        {/* Table Header */}
-        <div className="px-5 py-4 border-b border-[#F4C0D1] flex items-center justify-between">
+        {/* Header */}
+        <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#F4C0D1] flex items-center justify-between gap-2 flex-wrap">
           <span className="text-[13px] font-semibold text-[#730042]">
             All announcements
           </span>
-          <span className="text-[11px] font-semibold px-3 py-1 rounded-full bg-[#FBEAF0] text-[#730042]">
+          <span className="text-[11px] font-semibold px-3 py-1 rounded-full bg-[#FBEAF0] text-[#730042] whitespace-nowrap">
             {announcements.length} total
           </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[820px] text-sm">
+        {/* ── Mobile / tablet card list (below md) ───────────────────────── */}
+        <div className="md:hidden divide-y divide-[#FBEAF0]">
+          {isLoading ? (
+            <SkeletonCards />
+          ) : isError ? (
+            <div className="py-14"><ErrorStateContent /></div>
+          ) : announcements.length === 0 ? (
+            <div className="py-14"><EmptyStateContent onCreateClick={openCreate} /></div>
+          ) : (
+            announcements.map((item, idx) => (
+              <div key={item._id} className="p-4 flex gap-3">
+                <AnnouncementThumb
+                  src={item.notice_image}
+                  alt={item.title}
+                  bg={AVATAR_BG[idx % AVATAR_BG.length]}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <p className="text-[13px] font-semibold text-[#730042] truncate min-w-0">
+                      {item.title}
+                    </p>
+                  </div>
+                  <p
+                    className="text-[11px] text-[#993556] leading-relaxed mb-2"
+                    style={{
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {item.message}
+                  </p>
+                  <div className="flex items-center gap-1.5 flex-wrap mb-2">
+                    <PriorityBadge priority={item.priority} />
+                    <AudienceBadge audience={item.audience} />
+                  </div>
+                  <div className="flex items-center justify-between gap-2 text-[10px] text-[#B4B2A9] flex-wrap">
+                    <span>
+                      Created{" "}
+                      {new Date(item.createdAt).toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </span>
+                    {item.expiresAt && (
+                      <span>
+                        Expires{" "}
+                        {new Date(item.expiresAt).toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 mt-3">
+                    <button
+                      onClick={() => openEdit(item)}
+                      className="flex-1 h-11 rounded-[8px] border border-[#F4C0D1] flex items-center justify-center gap-1.5 text-[12px] font-medium text-[#993556] transition-all hover:bg-[#FBEAF0] hover:text-[#CD166E]"
+                      style={{ background: "#F9F8F2" }}
+                    >
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                      </svg>
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => setDeleteTarget(item)}
+                      className="flex-1 h-11 rounded-[8px] border border-[#F4C0D1] flex items-center justify-center gap-1.5 text-[12px] font-medium text-[#993556] transition-all hover:bg-[#FCEBEB] hover:text-[#A32D2D] hover:border-[#F7C1C1]"
+                      style={{ background: "#F9F8F2" }}
+                    >
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                        <path d="M10 11v6M14 11v6" />
+                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                      </svg>
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* ── Desktop / tablet table (md and up) ─────────────────────────── */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-sm table-auto">
             <thead>
               <tr
                 className="border-b border-[#F4C0D1]"
@@ -757,7 +889,7 @@ export default function AnnouncementPage() {
                 ].map((h) => (
                   <th
                     key={h}
-                    className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-[#993556]"
+                    className="px-3 md:px-4 lg:px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-[#993556] whitespace-nowrap"
                     style={h === "Actions" ? { textAlign: "center" } : {}}
                   >
                     {h}
@@ -780,7 +912,7 @@ export default function AnnouncementPage() {
                     className="transition-colors duration-100 hover:bg-[#FEF4F9]"
                   >
                     {/* Image */}
-                    <td className="px-5 py-4">
+                    <td className="px-3 md:px-4 lg:px-5 py-4">
                       <AnnouncementThumb
                         src={item.notice_image}
                         alt={item.title}
@@ -789,7 +921,7 @@ export default function AnnouncementPage() {
                     </td>
 
                     {/* Title + Message */}
-                    <td className="px-5 py-4 max-w-[200px]">
+                    <td className="px-3 md:px-4 lg:px-5 py-4 max-w-[160px] lg:max-w-[220px]">
                       <p className="text-[13px] font-semibold text-[#730042] truncate">
                         {item.title}
                       </p>
@@ -799,17 +931,17 @@ export default function AnnouncementPage() {
                     </td>
 
                     {/* Audience */}
-                    <td className="px-5 py-4">
+                    <td className="px-3 md:px-4 lg:px-5 py-4">
                       <AudienceBadge audience={item.audience} />
                     </td>
 
                     {/* Priority */}
-                    <td className="px-5 py-4">
+                    <td className="px-3 md:px-4 lg:px-5 py-4">
                       <PriorityBadge priority={item.priority} />
                     </td>
 
                     {/* Expiry */}
-                    <td className="px-5 py-4 text-[11px] text-[#B4B2A9]">
+                    <td className="px-3 md:px-4 lg:px-5 py-4 text-[11px] text-[#B4B2A9] whitespace-nowrap">
                       {item.expiresAt ? (
                         new Date(item.expiresAt).toLocaleDateString("en-IN", {
                           day: "numeric",
@@ -822,7 +954,7 @@ export default function AnnouncementPage() {
                     </td>
 
                     {/* Created */}
-                    <td className="px-5 py-4 text-[11px] text-[#B4B2A9]">
+                    <td className="px-3 md:px-4 lg:px-5 py-4 text-[11px] text-[#B4B2A9] whitespace-nowrap">
                       {new Date(item.createdAt).toLocaleDateString("en-IN", {
                         day: "numeric",
                         month: "short",
@@ -831,13 +963,13 @@ export default function AnnouncementPage() {
                     </td>
 
                     {/* Actions */}
-                    <td className="px-5 py-4">
+                    <td className="px-3 md:px-4 lg:px-5 py-4">
                       <div className="flex items-center justify-center gap-2">
                         {/* Edit */}
                         <button
                           onClick={() => openEdit(item)}
                           title="Edit"
-                          className="w-8 h-8 rounded-[8px] border border-[#F4C0D1] flex items-center justify-center text-[#993556] transition-all hover:bg-[#FBEAF0] hover:text-[#CD166E]"
+                          className="w-9 h-9 lg:w-8 lg:h-8 rounded-[8px] border border-[#F4C0D1] flex items-center justify-center text-[#993556] transition-all hover:bg-[#FBEAF0] hover:text-[#CD166E] flex-shrink-0"
                           style={{ background: "#F9F8F2" }}
                         >
                           <svg
@@ -856,7 +988,7 @@ export default function AnnouncementPage() {
                         <button
                           onClick={() => setDeleteTarget(item)}
                           title="Delete"
-                          className="w-8 h-8 rounded-[8px] border border-[#F4C0D1] flex items-center justify-center text-[#993556] transition-all hover:bg-[#FCEBEB] hover:text-[#A32D2D] hover:border-[#F7C1C1]"
+                          className="w-9 h-9 lg:w-8 lg:h-8 rounded-[8px] border border-[#F4C0D1] flex items-center justify-center text-[#993556] transition-all hover:bg-[#FCEBEB] hover:text-[#A32D2D] hover:border-[#F7C1C1] flex-shrink-0"
                           style={{ background: "#F9F8F2" }}
                         >
                           <svg
