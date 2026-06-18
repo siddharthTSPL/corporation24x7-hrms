@@ -15,7 +15,7 @@ const AccessDenied = () => (
   </div>
 );
 
-const ProtectedRoute = ({ children, allowedRoles, permission }) => {
+const ProtectedRoute = ({ children, allowedRoles, permission, permissionGroup }) => {
   const { data, isLoading } = useAuth();
   const can = usePermissionStore((state) => state.can);
 
@@ -26,7 +26,12 @@ const ProtectedRoute = ({ children, allowedRoles, permission }) => {
   if (allowedRoles && !allowedRoles.includes(data.role))
     return <AccessDenied />;
 
+  // Single permission check — exact match required
   if (permission && !can(permission))
+    return <AccessDenied />;
+
+  // Group check — allowed if AT LEAST ONE permission in the group is true
+  if (permissionGroup?.length && !permissionGroup.some((p) => can(p)))
     return <AccessDenied />;
 
   return children ?? <Outlet />;

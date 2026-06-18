@@ -1,453 +1,626 @@
+// ─────────────────────────────────────────────────────────────────────────
+// Managerdocument.jsx
+//
+// Two permission-gated sections, shown as tabs:
+//   "My Documents"   -> gated on documents.can_upload_documents
+//   "All Documents"  -> gated on documents.can_view_all_documents
+//
+// Both tabs always render. If a manager lacks the permission for a tab,
+// <Can> shows its built-in "Access Restricted" lock state for that tab only
+// — the other tab keeps working normally.
+//
+// Adjust the two import paths below to match your project structure:
+// ─────────────────────────────────────────────────────────────────────────
 import { useState } from "react";
 import {
+  FaCloudUploadAlt,
+  FaEdit,
+  FaTrash,
+  FaEye,
+  FaDownload,
+  FaTimes,
+  FaFilePdf,
+  FaFileImage,
+  FaFolderOpen,
+  FaWallet,
+  FaIdCard,
+  FaPlus,
+} from "react-icons/fa";
+import Can from "../../components/can";
+import {
+  useGetManagerDocuments,
+  useUploadManagerDocument,
+  useUpdateManagerDocument,
+  useDeleteManagerDocument,
   useGetAllExpenseDocuments,
-  useGetDocumentDetails,
-} from "../../auth/server-state/manager/managgerother/managerother.hook";
+  useGetAllPersonalDocuments,
+} from "../../auth/server-state/manager/managerdocument/managerdocument.hook";
 
+const BRAND = "#730042";
+const MAX_SIZE_KB = 2048;
+const ACCEPTED_TYPES = ["application/pdf", "image/png", "image/jpeg"];
 
-const C = {
-  brand:      "#730042",
-  brandLight: "rgba(115,0,66,0.08)",
-  brandMid:   "rgba(115,0,66,0.15)",
-  green:      "#1D9E75",
-  greenBg:    "#e8f5e9",
-  blue:       "#378ADD",
-  blueBg:     "#e6f1fb",
-  amber:      "#BA7517",
-  amberBg:    "#faeeda",
-  red:        "#E24B4A",
-  redBg:      "#fcebeb",
-  surface:    "#ffffff",
-  page:       "#f9f8f2",
-  border:     "#ede5e0",
-  text:       "#2a1a16",
-  muted:      "#b0948a",
-  mutedMid:   "#c9bab5",
-};
+const TABS = { MINE: "mine", ORG: "org" };
+const SUB = { PERSONAL: "personal", EXPENSE: "expense" };
 
-// ─── UTILS ────────────────────────────────────────────────────────────────
-function fmtDate(iso) {
+// ── small helpers ───────────────────────────────────────────────────────
+const formatDate = (iso) => {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-IN", {
-    day: "numeric", month: "short", year: "numeric",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
-}
+};
 
-function fmtSize(kb) {
-  if (!kb) return "—";
-  return kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`;
-}
+const formatSize = (kb) => {
+  if (kb == null) return "—";
+  return kb > 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`;
+};
 
-function getInitials(name = "") {
-  return name.split(" ").map(w => w[0] || "").join("").toUpperCase().slice(0, 2);
-}
-
-// ─── SPINNER ──────────────────────────────────────────────────────────────
-function Spinner({ size = 28, color = C.brand }) {
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: "50%",
-      border: `2px solid ${color}33`,
-      borderTop: `2px solid ${color}`,
-      animation: "spin 0.7s linear infinite",
-      flexShrink: 0,
-    }} />
+const FileIcon = ({ url, className }) => {
+  const isImage = /\.(png|jpe?g)$/i.test(url || "");
+  return isImage ? (
+    <FaFileImage className={className} />
+  ) : (
+    <FaFilePdf className={className} />
   );
-}
+};
 
-// ─── BADGE ────────────────────────────────────────────────────────────────
-function Badge({ children, color = C.brand, bg = C.brandLight }) {
+const TypeBadge = ({ type }) => {
+  const isExpense = type === "expense";
   return (
-    <span style={{
-      display: "inline-flex", alignItems: "center",
-      padding: "2px 10px", borderRadius: 20,
-      fontSize: 11, fontWeight: 500, color, background: bg,
-    }}>
-      {children}
+    <span
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
+        isExpense
+          ? "bg-amber-50 text-amber-700"
+          : "bg-blue-50 text-blue-600"
+      }`}
+    >
+      {isExpense ? <FaWallet size={10} /> : <FaIdCard size={10} />}
+      {isExpense ? "Expense" : "Personal"}
     </span>
   );
-}
+};
 
-// ─── EMPTY STATE ──────────────────────────────────────────────────────────
-function EmptyState({ message }) {
-  return (
-    <div style={{
-      display: "flex", flexDirection: "column", alignItems: "center",
-      justifyContent: "center", padding: "60px 24px", gap: 14,
-    }}>
-      <div style={{
-        width: 56, height: 56, borderRadius: "50%",
-        background: C.amberBg,
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <rect x="2" y="5" width="20" height="14" rx="2"
-            stroke={C.amber} strokeWidth="1.5" strokeLinecap="round" />
-          <path d="M2 10h20" stroke={C.amber} strokeWidth="1.5" strokeLinecap="round" />
-        </svg>
-      </div>
-      <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>No expense documents found</div>
-      <div style={{ fontSize: 12, color: C.muted }}>{message}</div>
+const EmptyState = ({ title, subtitle, action }) => (
+  <div className="flex flex-col items-center justify-center text-center py-14 px-4">
+    <div className="w-16 h-16 rounded-full bg-[#730042]/8 flex items-center justify-center mb-4">
+      <FaFolderOpen size={26} className="text-[#730042]/60" />
     </div>
-  );
-}
+    <p className="font-semibold text-gray-700">{title}</p>
+    <p className="text-sm text-gray-400 mt-1 max-w-xs">{subtitle}</p>
+    {action}
+  </div>
+);
 
-// ─── DOCUMENT DETAIL DRAWER ───────────────────────────────────────────────
-function DetailDrawer({ documentId, onClose }) {
-  const { data, isLoading, isError } = useGetDocumentDetails(documentId);
-  const doc = data?.document;
+const RowSkeleton = () => (
+  <div className="animate-pulse flex items-center gap-4 px-4 py-4 border-b border-gray-100">
+    <div className="w-9 h-9 rounded-lg bg-gray-100" />
+    <div className="flex-1 space-y-2">
+      <div className="h-3 w-1/3 bg-gray-100 rounded" />
+      <div className="h-2 w-1/5 bg-gray-100 rounded" />
+    </div>
+  </div>
+);
+
+const Banner = ({ tone, message, onClose }) => (
+  <div
+    className={`flex items-start justify-between gap-3 px-4 py-3 rounded-xl text-sm mb-4 ${
+      tone === "error"
+        ? "bg-red-50 text-red-600"
+        : "bg-emerald-50 text-emerald-700"
+    }`}
+  >
+    <span>{message}</span>
+    <button onClick={onClose} className="text-current opacity-60 hover:opacity-100">
+      <FaTimes size={12} />
+    </button>
+  </div>
+);
+
+// ── Upload / Edit modal ─────────────────────────────────────────────────
+const DocumentFormModal = ({ mode, initial, onClose, onSubmit, submitting, error }) => {
+  const [title, setTitle] = useState(initial?.title || "");
+  const [fileType, setFileType] = useState(initial?.fileType || SUB.PERSONAL);
+  const [file, setFile] = useState(null);
+  const [localError, setLocalError] = useState("");
+
+  const handleFile = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (!ACCEPTED_TYPES.includes(f.type)) {
+      setLocalError("Only PDF, PNG, or JPG files are allowed.");
+      return;
+    }
+    if (f.size > MAX_SIZE_KB * 1024) {
+      setLocalError("File size must be under 2MB.");
+      return;
+    }
+    setLocalError("");
+    setFile(f);
+  };
+
+  const handleSubmit = () => {
+    if (!title.trim()) return setLocalError("Title is required.");
+    if (mode === "upload" && !file) return setLocalError("Please choose a file to upload.");
+    const formData = new FormData();
+    formData.append("title", title.trim());
+    formData.append("fileType", fileType);
+    if (file) formData.append("file", file);
+    onSubmit(formData);
+  };
 
   return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 50,
-      display: "flex", justifyContent: "flex-end",
-    }}>
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        style={{ position: "absolute", inset: 0, background: "rgba(42,26,22,0.35)" }}
-      />
-      {/* Panel */}
-      <div style={{
-        position: "relative", width: 420, height: "100%",
-        background: C.surface, overflowY: "auto",
-        display: "flex", flexDirection: "column",
-        boxShadow: "-4px 0 32px rgba(115,0,66,0.10)",
-      }}>
-        {/* Header */}
-        <div style={{
-          padding: "20px 24px", borderBottom: `0.5px solid ${C.border}`,
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          position: "sticky", top: 0, background: C.surface, zIndex: 1,
-        }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+      <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-800">
+            {mode === "upload" ? "Upload document" : "Edit document"}
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <FaTimes />
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          {(localError || error) && (
+            <p className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">
+              {localError || error}
+            </p>
+          )}
+
           <div>
-            <div style={{ fontSize: 15, fontWeight: 500, color: C.text }}>Document details</div>
-            <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Expense document</div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">Title</label>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. PAN Card, March Travel Bill"
+              className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#730042]/20 focus:border-[#730042]"
+            />
           </div>
-          <button onClick={onClose} style={{
-            background: "none", border: `0.5px solid ${C.border}`,
-            borderRadius: 8, cursor: "pointer", padding: "6px 10px",
-            color: C.muted, fontSize: 18, lineHeight: 1,
-          }}>×</button>
-        </div>
 
-        {/* Body */}
-        <div style={{ flex: 1, padding: "24px" }}>
-          {isLoading && (
-            <div style={{ display: "flex", justifyContent: "center", paddingTop: 60 }}>
-              <Spinner />
-            </div>
-          )}
-          {isError && (
-            <div style={{
-              padding: "14px 16px", background: C.redBg,
-              borderRadius: 10, fontSize: 13, color: C.red,
-            }}>
-              Failed to load document details.
-            </div>
-          )}
-          {doc && (
-            <>
-              {/* File preview card */}
-              <div style={{
-                background: C.amberBg, borderRadius: 14,
-                padding: "24px", marginBottom: 20,
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
-                border: `0.5px solid ${C.amber}44`,
-              }}>
-                <div style={{
-                  width: 56, height: 56, borderRadius: 14,
-                  background: C.amber,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-                    <rect x="2" y="5" width="20" height="14" rx="2"
-                      stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
-                    <path d="M2 10h20" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
-                  </svg>
-                </div>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: C.text, marginBottom: 4 }}>
-                    {doc.title}
-                  </div>
-                  <Badge color={C.amber} bg={C.amberBg}>Expense</Badge>
-                </div>
-                <a
-                  href={doc.fileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: "inline-flex", alignItems: "center", gap: 6,
-                    padding: "9px 18px", background: C.amber, color: "#fff",
-                    borderRadius: 9, fontSize: 13, fontWeight: 500,
-                    textDecoration: "none", marginTop: 4,
-                  }}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">Category</label>
+            <div className="flex gap-2">
+              {[SUB.PERSONAL, SUB.EXPENSE].map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setFileType(t)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition ${
+                    fileType === t
+                      ? "bg-[#730042] text-white border-[#730042]"
+                      : "border-gray-200 text-gray-500 hover:border-gray-300"
+                  }`}
                 >
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  Open / Download
-                </a>
-              </div>
-
-              {/* Meta rows */}
-              {[
-                ["File size",    fmtSize(doc.sizeKB)],
-                ["Uploaded on",  fmtDate(doc.uploadedAt)],
-                ["Viewed",       doc.viewedByManager ? "✓ Viewed by you" : "Not viewed yet"],
-              ].map(([label, val]) => (
-                <div key={label} style={{
-                  display: "flex", justifyContent: "space-between",
-                  padding: "12px 0", borderBottom: `0.5px solid ${C.border}`,
-                  fontSize: 13,
-                }}>
-                  <span style={{ color: C.muted }}>{label}</span>
-                  <span style={{ color: C.text, fontWeight: 500 }}>{val}</span>
-                </div>
+                  {t === SUB.PERSONAL ? "Personal" : "Expense"}
+                </button>
               ))}
+            </div>
+          </div>
 
-              {/* Employee card */}
-              <div style={{
-                marginTop: 24, background: C.page,
-                borderRadius: 12, padding: "16px",
-                border: `0.5px solid ${C.border}`,
-              }}>
-                <div style={{ fontSize: 12, fontWeight: 500, color: C.muted, marginBottom: 12 }}>
-                  Submitted by
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{
-                    width: 40, height: 40, borderRadius: "50%",
-                    background: C.amber,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 14, fontWeight: 500, color: "#fff", flexShrink: 0,
-                  }}>
-                    {getInitials(doc.employee.name)}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>
-                      {doc.employee.name}
-                    </div>
-                    <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
-                      {doc.employee.email}
-                    </div>
-                    <div style={{ fontSize: 12, color: C.muted, marginTop: 1 }}>
-                      {doc.employee.contact}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">
+              File {mode === "edit" && <span className="text-gray-400">(optional — keep existing)</span>}
+            </label>
+            <label className="flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 rounded-lg py-6 text-sm text-gray-400 cursor-pointer hover:border-[#730042]/40 hover:text-[#730042]/70 transition">
+              <FaCloudUploadAlt size={18} />
+              {file ? file.name : "PDF, PNG or JPG, up to 2MB"}
+              <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={handleFile} />
+            </label>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-gray-100">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="px-4 py-2 text-sm font-medium text-white rounded-lg bg-[#730042] hover:bg-[#5c0335] disabled:opacity-50 transition"
+          >
+            {submitting ? "Saving…" : mode === "upload" ? "Upload" : "Save changes"}
+          </button>
         </div>
       </div>
     </div>
   );
-}
+};
 
-// ─── DOCUMENT CARD ────────────────────────────────────────────────────────
-function DocCard({ doc, onClick }) {
-  return (
-    <div
-      onClick={onClick}
-      style={{
-        background: C.surface, borderRadius: 14,
-        border: `0.5px solid ${C.border}`,
-        padding: "18px 20px", cursor: "pointer",
-        transition: "border-color 0.15s, box-shadow 0.15s",
-        position: "relative", overflow: "hidden",
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.borderColor = C.amber;
-        e.currentTarget.style.boxShadow = `0 0 0 3px ${C.amberBg}`;
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.borderColor = C.border;
-        e.currentTarget.style.boxShadow = "none";
-      }}
-    >
-      {/* Accent top bar */}
-      <div style={{
-        position: "absolute", top: 0, left: 0, right: 0, height: 3,
-        background: C.amber, borderRadius: "14px 14px 0 0",
-      }} />
-
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
-        {/* File icon */}
-        <div style={{
-          width: 44, height: 44, borderRadius: 11,
-          background: C.amberBg, flexShrink: 0,
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <rect x="2" y="5" width="20" height="14" rx="2"
-              stroke={C.amber} strokeWidth="1.6" strokeLinecap="round" />
-            <path d="M2 10h20" stroke={C.amber} strokeWidth="1.6" strokeLinecap="round" />
-          </svg>
-        </div>
-
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontSize: 13, fontWeight: 500, color: C.text,
-            marginBottom: 4, overflow: "hidden",
-            textOverflow: "ellipsis", whiteSpace: "nowrap",
-          }}>
-            {doc.title}
-          </div>
-          <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>
-            {doc.employee.name} · {doc.employee.email}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <Badge color={C.amber} bg={C.amberBg}>Expense</Badge>
-            {!doc.viewedByManager && (
-              <Badge color={C.brand} bg={C.brandLight}>New</Badge>
-            )}
-            <span style={{ fontSize: 11, color: C.mutedMid }}>
-              {fmtSize(doc.sizeKB)} · {fmtDate(doc.uploadedAt)}
-            </span>
-          </div>
-        </div>
-
-        {/* Arrow */}
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, marginTop: 2 }}>
-          <path d="M6 4l4 4-4 4" stroke={C.mutedMid} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+// ── Delete confirm modal ────────────────────────────────────────────────
+const DeleteConfirmModal = ({ doc, onClose, onConfirm, submitting }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+    <div className="bg-white w-full max-w-sm rounded-2xl shadow-xl p-5">
+      <h3 className="font-semibold text-gray-800 mb-1">Delete document?</h3>
+      <p className="text-sm text-gray-400 mb-5">
+        "{doc?.title}" will be permanently removed. This can't be undone.
+      </p>
+      <div className="flex justify-end gap-3">
+        <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">
+          Cancel
+        </button>
+        <button
+          onClick={onConfirm}
+          disabled={submitting}
+          className="px-4 py-2 text-sm font-medium text-white rounded-lg bg-red-500 hover:bg-red-600 disabled:opacity-50 transition"
+        >
+          {submitting ? "Deleting…" : "Delete"}
+        </button>
       </div>
     </div>
-  );
-}
+  </div>
+);
 
-// ─── MAIN PAGE ────────────────────────────────────────────────────────────
-export default function Filema() {
-  const { data, isLoading, isError, error } = useGetAllExpenseDocuments();
-  const [selectedId, setSelectedId] = useState(null);
-  const [search, setSearch] = useState("");
+// ── "My Documents" tab content ──────────────────────────────────────────
+const MyDocumentsSection = () => {
+  const { data, isLoading } = useGetManagerDocuments();
+  const uploadMutation = useUploadManagerDocument();
+  const updateMutation = useUpdateManagerDocument();
+  const deleteMutation = useDeleteManagerDocument();
+
+  const [filter, setFilter] = useState("all");
+  const [modal, setModal] = useState(null); // { type: 'upload' | 'edit' | 'delete', doc }
+  const [banner, setBanner] = useState(null);
 
   const docs = data?.documents ?? [];
+  const filtered = filter === "all" ? docs : docs.filter((d) => d.fileType === filter);
 
-  const filtered = docs.filter(d =>
-    d.title.toLowerCase().includes(search.toLowerCase()) ||
-    d.employee.name.toLowerCase().includes(search.toLowerCase()) ||
-    d.employee.email.toLowerCase().includes(search.toLowerCase())
-  );
+  const closeModal = () => setModal(null);
+
+  const handleUpload = (formData) => {
+    uploadMutation.mutate(formData, {
+      onSuccess: () => {
+        setBanner({ tone: "success", message: "Document uploaded successfully." });
+        closeModal();
+      },
+      onError: (err) => setBanner({ tone: "error", message: err.message }),
+    });
+  };
+
+  const handleEdit = (formData) => {
+    updateMutation.mutate(
+      { id: modal.doc.id, data: formData },
+      {
+        onSuccess: () => {
+          setBanner({ tone: "success", message: "Document updated successfully." });
+          closeModal();
+        },
+        onError: (err) => setBanner({ tone: "error", message: err.message }),
+      }
+    );
+  };
+
+  const handleDelete = () => {
+    deleteMutation.mutate(modal.doc.id, {
+      onSuccess: () => {
+        setBanner({ tone: "success", message: "Document deleted." });
+        closeModal();
+      },
+      onError: (err) => setBanner({ tone: "error", message: err.message }),
+    });
+  };
 
   return (
-    <div style={{
-      fontFamily: "'DM Sans','Segoe UI',sans-serif",
-      background: C.page, minHeight: "100vh",
-      padding: "28px 32px", color: C.text,
-    }}>
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
+    <div>
+      {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
 
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0, letterSpacing: "-0.3px" }}>
-          Expense Documents
-        </h1>
-        <p style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>
-          Expense files submitted by your team members
-        </p>
-      </div>
-
-      {/* Stats + Search row */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-        <div style={{
-          background: C.surface, borderRadius: 12,
-          border: `0.5px solid ${C.border}`,
-          padding: "10px 16px", display: "flex", alignItems: "center", gap: 10,
-        }}>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.amber }} />
-          <span style={{ fontSize: 13, color: C.muted }}>Total</span>
-          <span style={{ fontSize: 14, fontWeight: 500, color: C.text }}>{data?.total ?? 0}</span>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <div className="flex gap-2">
+          {["all", SUB.PERSONAL, SUB.EXPENSE].map((t) => (
+            <button
+              key={t}
+              onClick={() => setFilter(t)}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-medium capitalize transition ${
+                filter === t
+                  ? "bg-[#730042] text-white"
+                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
         </div>
 
-        <div style={{
-          background: C.surface, borderRadius: 12,
-          border: `0.5px solid ${C.border}`,
-          padding: "10px 16px", display: "flex", alignItems: "center", gap: 10,
-        }}>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.brand }} />
-          <span style={{ fontSize: 13, color: C.muted }}>Unviewed</span>
-          <span style={{ fontSize: 14, fontWeight: 500, color: C.text }}>
-            {docs.filter(d => !d.viewedByManager).length}
-          </span>
+        <button
+          onClick={() => setModal({ type: "upload" })}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#730042] text-white text-sm font-medium hover:bg-[#5c0335] transition"
+        >
+          <FaPlus size={12} /> Upload document
+        </button>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        {/* Desktop table */}
+        <div className="hidden md:block">
+          {isLoading ? (
+            <>
+              <RowSkeleton />
+              <RowSkeleton />
+              <RowSkeleton />
+            </>
+          ) : filtered.length === 0 ? (
+            <EmptyState
+              title="No documents yet"
+              subtitle="Upload your ID, certificates, or expense receipts to keep them organized here."
+            />
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+                  <th className="px-5 py-3 font-medium">Document</th>
+                  <th className="px-5 py-3 font-medium">Category</th>
+                  <th className="px-5 py-3 font-medium">Size</th>
+                  <th className="px-5 py-3 font-medium">Uploaded</th>
+                  <th className="px-5 py-3 font-medium text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((doc) => (
+                  <tr key={doc.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60">
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-gray-50 flex items-center justify-center">
+                          <FileIcon url={doc.fileUrl} className="text-gray-400" />
+                        </div>
+                        <span className="font-medium text-gray-700">{doc.title}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3.5"><TypeBadge type={doc.fileType} /></td>
+                    <td className="px-5 py-3.5 text-gray-500">{formatSize(doc.sizeKB)}</td>
+                    <td className="px-5 py-3.5 text-gray-500">{formatDate(doc.uploadedAt)}</td>
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center justify-end gap-3 text-gray-400">
+                        <a href={doc.fileUrl} target="_blank" rel="noreferrer" title="View" className="hover:text-[#730042]">
+                          <FaEye size={14} />
+                        </a>
+                        <button onClick={() => setModal({ type: "edit", doc })} title="Edit" className="hover:text-[#730042]">
+                          <FaEdit size={14} />
+                        </button>
+                        <button onClick={() => setModal({ type: "delete", doc })} title="Delete" className="hover:text-red-500">
+                          <FaTrash size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
-        {/* Search */}
-        <div style={{ marginLeft: "auto", position: "relative" }}>
-          <svg width="15" height="15" viewBox="0 0 15 15" fill="none"
-            style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}>
-            <circle cx="6.5" cy="6.5" r="4.5" stroke={C.muted} strokeWidth="1.3" />
-            <path d="M10 10l3 3" stroke={C.muted} strokeWidth="1.3" strokeLinecap="round" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search documents or employees..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{
-              padding: "10px 14px 10px 36px", borderRadius: 10,
-              border: `0.5px solid ${C.border}`, fontSize: 13,
-              color: C.text, background: C.surface,
-              outline: "none", width: 260, fontFamily: "inherit",
-            }}
-            onFocus={e => e.target.style.borderColor = C.amber}
-            onBlur={e => e.target.style.borderColor = C.border}
-          />
+        {/* Mobile cards */}
+        <div className="md:hidden divide-y divide-gray-50">
+          {isLoading ? (
+            <>
+              <RowSkeleton />
+              <RowSkeleton />
+            </>
+          ) : filtered.length === 0 ? (
+            <EmptyState
+              title="No documents yet"
+              subtitle="Upload your ID, certificates, or expense receipts to keep them organized here."
+            />
+          ) : (
+            filtered.map((doc) => (
+              <div key={doc.id} className="px-4 py-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
+                    <FileIcon url={doc.fileUrl} className="text-gray-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-700 truncate">{doc.title}</p>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <TypeBadge type={doc.fileType} />
+                      <span className="text-xs text-gray-400">{formatSize(doc.sizeKB)}</span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">Uploaded {formatDate(doc.uploadedAt)}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 mt-3 pl-12 text-gray-400">
+                  <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs hover:text-[#730042]">
+                    <FaEye size={12} /> View
+                  </a>
+                  <button onClick={() => setModal({ type: "edit", doc })} className="flex items-center gap-1.5 text-xs hover:text-[#730042]">
+                    <FaEdit size={12} /> Edit
+                  </button>
+                  <button onClick={() => setModal({ type: "delete", doc })} className="flex items-center gap-1.5 text-xs hover:text-red-500">
+                    <FaTrash size={12} /> Delete
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
-      {/* Content */}
-      <div style={{
-        background: C.surface, borderRadius: 16,
-        border: `0.5px solid ${C.border}`, overflow: "hidden",
-      }}>
-        <div style={{ position: "relative", height: 3, background: C.amber }} />
-
-        {isLoading && (
-          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "60px 0", gap: 12 }}>
-            <Spinner color={C.amber} />
-            <span style={{ fontSize: 13, color: C.muted }}>Loading documents...</span>
-          </div>
-        )}
-
-        {isError && (
-          <div style={{ padding: "20px 24px" }}>
-            <div style={{
-              padding: "14px 16px", background: C.redBg,
-              borderRadius: 10, fontSize: 13, color: C.red,
-            }}>
-              {error?.response?.data?.message || "Failed to load documents."}
-            </div>
-          </div>
-        )}
-
-        {!isLoading && !isError && filtered.length === 0 && (
-          <EmptyState message={search ? "No results match your search." : "No expense documents submitted yet."} />
-        )}
-
-        {!isLoading && !isError && filtered.length > 0 && (
-          <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: 12 }}>
-            {filtered.map(doc => (
-              <DocCard
-                key={doc.id}
-                doc={doc}
-                onClick={() => setSelectedId(doc.id)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Detail drawer */}
-      {selectedId && (
-        <DetailDrawer
-          documentId={selectedId}
-          onClose={() => setSelectedId(null)}
+      {modal?.type === "upload" && (
+        <DocumentFormModal
+          mode="upload"
+          onClose={closeModal}
+          onSubmit={handleUpload}
+          submitting={uploadMutation.isPending}
+          error={uploadMutation.error?.message}
+        />
+      )}
+      {modal?.type === "edit" && (
+        <DocumentFormModal
+          mode="edit"
+          initial={modal.doc}
+          onClose={closeModal}
+          onSubmit={handleEdit}
+          submitting={updateMutation.isPending}
+          error={updateMutation.error?.message}
+        />
+      )}
+      {modal?.type === "delete" && (
+        <DeleteConfirmModal
+          doc={modal.doc}
+          onClose={closeModal}
+          onConfirm={handleDelete}
+          submitting={deleteMutation.isPending}
         />
       )}
     </div>
   );
+};
+
+// ── "All Documents" tab content (read-only, org-wide) ──────────────────
+const AllDocumentsSection = () => {
+  const [subTab, setSubTab] = useState(SUB.PERSONAL);
+  const { data: personalData, isLoading: personalLoading } = useGetAllPersonalDocuments();
+  const { data: expenseData, isLoading: expenseLoading } = useGetAllExpenseDocuments();
+
+  const isLoading = subTab === SUB.PERSONAL ? personalLoading : expenseLoading;
+  const docs = (subTab === SUB.PERSONAL ? personalData?.documents : expenseData?.documents) ?? [];
+
+  return (
+    <div>
+      <div className="flex gap-2 mb-5">
+        {[SUB.PERSONAL, SUB.EXPENSE].map((t) => (
+          <button
+            key={t}
+            onClick={() => setSubTab(t)}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-medium capitalize transition ${
+              subTab === t ? "bg-[#730042] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+            }`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="hidden md:block">
+          {isLoading ? (
+            <>
+              <RowSkeleton />
+              <RowSkeleton />
+              <RowSkeleton />
+            </>
+          ) : docs.length === 0 ? (
+            <EmptyState
+              title="Nothing here yet"
+              subtitle={`No ${subTab} documents have been uploaded across the organization.`}
+            />
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+                  <th className="px-5 py-3 font-medium">Document</th>
+                  <th className="px-5 py-3 font-medium">Uploaded by</th>
+                  <th className="px-5 py-3 font-medium">Size</th>
+                  <th className="px-5 py-3 font-medium">Date</th>
+                  <th className="px-5 py-3 font-medium text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {docs.map((doc) => (
+                  <tr key={doc.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60">
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-gray-50 flex items-center justify-center">
+                          <FileIcon url={doc.fileUrl} className="text-gray-400" />
+                        </div>
+                        <span className="font-medium text-gray-700">{doc.title}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3.5 text-gray-500">{doc.uploaderModel}</td>
+                    <td className="px-5 py-3.5 text-gray-500">{formatSize(doc.sizeKB)}</td>
+                    <td className="px-5 py-3.5 text-gray-500">{formatDate(doc.uploadedAt)}</td>
+                    <td className="px-5 py-3.5 text-right">
+                      <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-medium text-[#730042] hover:underline">
+                        <FaDownload size={11} /> Open
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="md:hidden divide-y divide-gray-50">
+          {isLoading ? (
+            <RowSkeleton />
+          ) : docs.length === 0 ? (
+            <EmptyState
+              title="Nothing here yet"
+              subtitle={`No ${subTab} documents have been uploaded across the organization.`}
+            />
+          ) : (
+            docs.map((doc) => (
+              <div key={doc.id} className="flex items-start gap-3 px-4 py-4">
+                <div className="w-9 h-9 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
+                  <FileIcon url={doc.fileUrl} className="text-gray-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-700 truncate">{doc.title}</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {doc.uploaderModel} · {formatSize(doc.sizeKB)} · {formatDate(doc.uploadedAt)}
+                  </p>
+                </div>
+                <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="text-[#730042] shrink-0">
+                  <FaDownload size={14} />
+                </a>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Page ─────────────────────────────────────────────────────────────────
+function Managerdocument() {
+  const [activeTab, setActiveTab] = useState(TABS.MINE);
+
+  return (
+    <div className="min-h-screen bg-[#FAF8F6] px-4 sm:px-6 lg:px-10 py-6 sm:py-8">
+      <div className="max-w-5xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-800">Documents</h1>
+          <p className="text-sm text-gray-400 mt-1">Manage your files and browse organization documents.</p>
+        </div>
+
+        <div className="flex gap-6 border-b border-gray-200 mb-6">
+          {[
+            { key: TABS.MINE, label: "My Documents" },
+            { key: TABS.ORG, label: "All Documents" },
+          ].map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              className={`pb-3 text-sm font-medium border-b-2 transition ${
+                activeTab === t.key
+                  ? "border-[#730042] text-[#730042]"
+                  : "border-transparent text-gray-400 hover:text-gray-600"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === TABS.MINE && (
+          <Can do="documents.can_upload_documents">
+            <MyDocumentsSection />
+          </Can>
+        )}
+
+        {activeTab === TABS.ORG && (
+          <Can do="documents.can_view_all_documents">
+            <AllDocumentsSection />
+          </Can>
+        )}
+      </div>
+    </div>
+  );
 }
+
+export default Managerdocument;

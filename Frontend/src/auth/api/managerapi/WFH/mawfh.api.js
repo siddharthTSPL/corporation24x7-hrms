@@ -9,11 +9,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const message = error.response?.data?.message || "Something went wrong";
-
-    if (error.response?.status === 401) {
-      return Promise.reject(null);
-    }
-
+    if (error.response?.status === 401) return Promise.reject(null);
     return Promise.reject(new Error(message));
   }
 );
@@ -50,5 +46,22 @@ export const managerRejectWFH = async (data) => {
 
 export const managerForwardWFH = async (data) => {
   const res = await api.post("wfh/manager/forwardWFH", data);
+  return res.data;
+};
+
+
+
+export const managerApproveForwardedWFH = async (data) => {
+  const res = await api.post("wfh/manager/approveForwardedWFH", data);
+  return res.data;
+};
+
+export const managerRejectForwardedWFH = async (data) => {
+  const res = await api.post("wfh/manager/rejectForwardedWFH", data);
+  return res.data;
+};
+
+export const managerGetForwardedWFH = async () => {
+  const res = await api.get("wfh/manager/getForwardedWFH");
   return res.data;
 };
