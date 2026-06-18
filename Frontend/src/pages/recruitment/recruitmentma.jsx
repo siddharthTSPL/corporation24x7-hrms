@@ -4,6 +4,7 @@ import {
   useCreateRequisition,
   useGetMyRequisitions,
 } from "../../auth/server-state/manager/managerrecruitment/marecruitment.hook";
+import { usePermissionStore } from "../../auth/store/permission/permissionStore";
 
 const GlobalStyles = () => (
   <style>{`
@@ -84,6 +85,22 @@ const GlobalStyles = () => (
       box-shadow: 0 4px 16px rgba(115,0,66,0.3);
     }
     .rc-btn-primary:disabled { opacity: .55; cursor: not-allowed; }
+
+    .rc-btn-locked {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px 24px;
+      border-radius: 10px;
+      border: none;
+      background: rgba(115,0,66,0.08);
+      color: #b0948a;
+      cursor: not-allowed;
+      letter-spacing: .2px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
 
     .rc-btn-ghost {
       font-family: 'DM Sans', sans-serif;
@@ -308,7 +325,11 @@ function StatsBar({ reqs }) {
   ];
 
   return (
-    <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:10, marginBottom:16 }}>
+    <div style={{
+      display:"grid",
+      gridTemplateColumns:"repeat(auto-fit, minmax(110px, 1fr))",
+      gap:10, marginBottom:16,
+    }}>
       {stats.map(s => (
         <div key={s.label} className="rc-card" style={{ animationDelay:".05s" }}>
           <div style={{ padding:"14px 16px" }}>
@@ -317,6 +338,54 @@ function StatsBar({ reqs }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function LockedPanel({ title, message, action }) {
+  return (
+    <div className="rc-empty-state">
+      <div style={{
+        width: 52, height: 52, borderRadius: "50%",
+        background: "rgba(115,0,66,0.08)", display: "flex",
+        alignItems: "center", justifyContent: "center", fontSize: 22,
+      }}>
+        🔒
+      </div>
+      <div style={{ fontSize:14, fontWeight:600, fontFamily:"'Lora',serif", color:"#2a1a16" }}>
+        {title}
+      </div>
+      <div style={{ fontSize:12, color:"#b0948a", fontFamily:"'DM Sans',sans-serif", textAlign:"center", maxWidth:300 }}>
+        {message}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function AccessDeniedFull() {
+  return (
+    <div style={{
+      fontFamily:"'DM Sans','Segoe UI',sans-serif", background:"#f9f8f2",
+      minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center",
+      padding:24,
+    }}>
+      <GlobalStyles/>
+      <div style={{ textAlign:"center", maxWidth:360 }}>
+        <div style={{
+          width:84, height:84, borderRadius:"50%", background:"rgba(115,0,66,0.08)",
+          display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 22px",
+          fontSize:34,
+        }}>
+          🔒
+        </div>
+        <h2 style={{ fontSize:"clamp(20px,5vw,24px)", fontWeight:700, color:"#2a1a16", margin:"0 0 8px", fontFamily:"'Lora',serif" }}>
+          Access Restricted
+        </h2>
+        <p style={{ fontSize:13, color:"#b0948a", lineHeight:1.7, margin:0, fontFamily:"'DM Sans',sans-serif" }}>
+          You don't have permission to use recruitment. Contact your admin to request access.
+        </p>
+      </div>
     </div>
   );
 }
@@ -429,7 +498,7 @@ const EMPTY_FORM = {
   expected_joining_date: "",
 };
 
-function CreateForm({ onSuccess, onCancel }) {
+function CreateForm({ onSuccess, onCancel, allowCancel }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [skillInput, setSkillInput] = useState("");
   const [error, setError] = useState("");
@@ -641,8 +710,10 @@ function CreateForm({ onSuccess, onCancel }) {
         </div>
       )}
 
-      <div style={{ display:"flex", gap:10, justifyContent:"flex-end", paddingTop:4 }}>
-        <button className="rc-btn-ghost" type="button" onClick={onCancel}>Cancel</button>
+      <div style={{ display:"flex", gap:10, justifyContent:"flex-end", paddingTop:4, flexWrap:"wrap" }}>
+        {allowCancel && (
+          <button className="rc-btn-ghost" type="button" onClick={onCancel}>Cancel</button>
+        )}
         <button className="rc-btn-primary" type="button" onClick={handleSubmit} disabled={isPending}>
           {isPending ? <span style={{ display:"flex", alignItems:"center", gap:8 }}><span className="rc-spinner"/></span> : "Submit Requisition"}
         </button>
@@ -720,17 +791,26 @@ const FILTER_LABELS = { All:"All", PENDING:"Pending", APPROVED:"Approved", REJEC
 
 export default function RecruitmentMA() {
   const navigate = useNavigate();
-  const [view, setView] = useState("list");
+
+  const can = usePermissionStore((state) => state.can);
+  const canView   = can("recruitment.can_view_hiring_requisitions");
+  const canCreate = can("recruitment.can_create_hiring_requisition");
+  const hasAccess = canView || canCreate;
+
+  const [view, setView] = useState(canView ? "list" : "create");
   const [filterTab, setFilterTab] = useState("All");
   const [search, setSearch] = useState("");
   const [selectedReq, setSelectedReq] = useState(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
   const { data, isLoading, isError, error, refetch } = useGetMyRequisitions();
+
+  if (!hasAccess) return <AccessDeniedFull/>;
+
   const reqs = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
 
   const handleSuccess = () => {
-    setView("list");
+    setView(canView ? "list" : "create");
     setSubmitSuccess(true);
     setTimeout(() => setSubmitSuccess(false), 4000);
   };
@@ -747,7 +827,7 @@ export default function RecruitmentMA() {
 
   return (
     <div style={{ fontFamily:"'DM Sans','Segoe UI',sans-serif", background:"#f9f8f2",
-      minHeight:"100vh", padding:"24px 28px", color:"#2a1a16" }}>
+      minHeight:"100vh", padding:"clamp(16px,4vw,24px) clamp(16px,4vw,28px)", color:"#2a1a16" }}>
       <GlobalStyles/>
 
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20, flexWrap:"wrap", gap:12 }}>
@@ -768,9 +848,15 @@ export default function RecruitmentMA() {
         </div>
         <div style={{ display:"flex", gap:10, alignItems:"center" }}>
           {view === "list" && (
-            <button className="rc-btn-primary" onClick={() => { setView("create"); setSubmitSuccess(false); }}>
-              + New Requisition
-            </button>
+            canCreate ? (
+              <button className="rc-btn-primary" onClick={() => { setView("create"); setSubmitSuccess(false); }}>
+                + New Requisition
+              </button>
+            ) : (
+              <button className="rc-btn-locked" disabled title="No permission to create requisitions">
+                🔒 New Requisition
+              </button>
+            )
           )}
           {view === "create" && (
             <div style={{ fontSize:12, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>
@@ -795,15 +881,29 @@ export default function RecruitmentMA() {
       )}
 
       {view === "create" ? (
-        <div className="rc-card" style={{ animationDelay:".05s" }}>
-          <CardAccent color="#730042"/>
-          <div style={{ padding:"20px 24px 24px" }}>
-            <div style={{ fontSize:16, fontWeight:700, fontFamily:"'Lora',serif", marginBottom:20, color:"#2a1a16" }}>
-              New Hiring Requisition
+        canCreate ? (
+          <div className="rc-card" style={{ animationDelay:".05s" }}>
+            <CardAccent color="#730042"/>
+            <div style={{ padding:"20px 24px 24px" }}>
+              <div style={{ fontSize:16, fontWeight:700, fontFamily:"'Lora',serif", marginBottom:20, color:"#2a1a16" }}>
+                New Hiring Requisition
+              </div>
+              <CreateForm
+                onSuccess={handleSuccess}
+                onCancel={() => setView("list")}
+                allowCancel={canView}
+              />
             </div>
-            <CreateForm onSuccess={handleSuccess} onCancel={() => setView("list")}/>
           </div>
-        </div>
+        ) : (
+          <div className="rc-card">
+            <CardAccent color="#730042"/>
+            <LockedPanel
+              title="Creating requisitions is restricted"
+              message="You don't have permission to create hiring requisitions. Contact your admin to request access."
+            />
+          </div>
+        )
       ) : (
         <>
           {!isLoading && reqs.length > 0 && <StatsBar reqs={reqs}/>}
@@ -830,7 +930,7 @@ export default function RecruitmentMA() {
               </div>
               <input
                 className="rc-input"
-                style={{ width:220, padding:"7px 12px" }}
+                style={{ width:220, maxWidth:"100%", padding:"7px 12px" }}
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Search by title, dept, skill…"
@@ -869,9 +969,15 @@ export default function RecruitmentMA() {
                     : "Try adjusting your search or filter."}
                 </div>
                 {reqs.length === 0 && (
-                  <button className="rc-btn-primary" style={{ marginTop:8 }} onClick={() => setView("create")}>
-                    + New Requisition
-                  </button>
+                  canCreate ? (
+                    <button className="rc-btn-primary" style={{ marginTop:8 }} onClick={() => setView("create")}>
+                      + New Requisition
+                    </button>
+                  ) : (
+                    <button className="rc-btn-locked" style={{ marginTop:8 }} disabled>
+                      🔒 New Requisition
+                    </button>
+                  )
                 )}
               </div>
             ) : (

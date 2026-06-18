@@ -7,14 +7,18 @@ const PermissionGate = ({ permission, children }) => {
   if (!permission || can(permission)) return children;
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[70vh] gap-4 text-center px-4">
-      <div className="bg-[#730042]/10 p-5 rounded-full">
-        <FaLock size={32} className="text-[#730042]" />
+    <div className="flex items-center justify-center min-h-screen bg-[#F0F4F8] px-4">
+      <div className="flex flex-col items-center text-center max-w-sm w-full">
+        <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-[#730042]/10 flex items-center justify-center mb-6">
+          <FaLock size={36} className="text-[#730042] sm:text-[44px]" />
+        </div>
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-700 mb-2">
+          Access Restricted
+        </h2>
+        <p className="text-sm sm:text-base text-gray-400 leading-relaxed">
+          You don't have permission to access this page. Contact your admin to request access.
+        </p>
       </div>
-      <h2 className="text-xl font-semibold text-gray-700">Access Restricted</h2>
-      <p className="text-sm text-gray-400 max-w-sm">
-        You don't have permission to access this feature. Please contact your admin to request access.
-      </p>
     </div>
   );
 };

@@ -19,6 +19,9 @@ const {
   forwardWFH,
   managerApplyWFH,
   managerGetMyWFH,
+  getForwardedWFH,
+  approveForwardedWFH,
+  rejectForwardedWFH,
   adminGetPendingWFH,
   adminApproveWFH,
   adminRejectWFH,
@@ -138,5 +141,21 @@ wfhRouter.post(
   superadminmiddleware,
   asyncHandler(superadminRejectWFH),
 );
+wfhRouter.get(
+  "/manager/getForwardedWFH",
+  managermiddleware,
+  asyncHandler(getForwardedWFH),
+);
 
+wfhRouter.post(
+  "/manager/approveForwardedWFH",
+  managermiddleware,
+  asyncHandler(approveForwardedWFH),
+);
+
+wfhRouter.post(
+  "/manager/rejectForwardedWFH",
+  managermiddleware,
+  asyncHandler(rejectForwardedWFH),
+);
 module.exports = wfhRouter;
