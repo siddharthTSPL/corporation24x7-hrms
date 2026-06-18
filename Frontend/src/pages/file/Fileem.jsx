@@ -74,14 +74,31 @@ function Modal({ isOpen, onClose, title, children }) {
 
 function NoPermission() {
   return (
-    <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
-      <div className="w-14 h-14 rounded-full bg-red-50 border border-red-200 flex items-center justify-center mb-4">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#CD166E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-        </svg>
+    <div className="min-h-screen bg-[#F0F4F8] flex items-center justify-center px-4 py-12">
+      <div className="flex flex-col items-center text-center max-w-sm w-full">
+        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#730042]/10 flex items-center justify-center mb-6">
+          <svg
+            width="36"
+            height="36"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#730042"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="sm:w-11 sm:h-11"
+          >
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </div>
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-700 mb-2 tracking-tight">
+          Access Restricted
+        </h2>
+        <p className="text-sm sm:text-[15px] text-gray-400 leading-relaxed">
+          You don't have permission to access this page. Contact your admin to request access.
+        </p>
       </div>
-      <h3 className="text-[16px] font-semibold text-[#730042] mb-1">Access Restricted</h3>
-      <p className="text-[13px] text-[#9B7A8E]">You don't have permission to upload or manage documents.</p>
     </div>
   );
 }
@@ -89,6 +106,7 @@ function NoPermission() {
 export default function FileEm() {
   const can = usePermissionStore((s) => s.can);
   const canUpload = can("documents.can_upload_documents");
+  const canView = can("documents.can_view_all_documents");
 
   const { data, isLoading } = useGetDocuments();
   const uploadMut = useUploadDocument();
@@ -105,13 +123,14 @@ export default function FileEm() {
   const [fileType, setFileType] = useState("personal");
   const [toast, setToast] = useState(null);
 
+  if (!canUpload && !canView) return <NoPermission />;
+
   const showToast = (msg, kind = "ok") => {
     setToast({ msg, kind });
     setTimeout(() => setToast(null), 3200);
   };
 
   const openUpload = () => {
-    if (!canUpload) return;
     setEditDoc(null);
     setFile(null);
     setTitle("");
@@ -120,7 +139,6 @@ export default function FileEm() {
   };
 
   const openEdit = (doc) => {
-    if (!canUpload) return;
     setEditDoc(doc);
     setFile(null);
     setTitle(doc.title);
@@ -190,8 +208,6 @@ export default function FileEm() {
           </button>
         )}
       </div>
-
-      {!canUpload && docs.length === 0 && !isLoading && <NoPermission />}
 
       <div className="flex gap-2 mb-4 flex-wrap">
         {["all", "personal", "expense"].map((f) => (
@@ -311,29 +327,31 @@ export default function FileEm() {
         </div>
       )}
 
-      <Modal isOpen={modalOpen} onClose={closeModal} title={editDoc ? "Edit document" : "Upload document"}>
-        <FileDropZone onFileSelect={setFile} selectedFile={file} />
+      {canUpload && (
+        <Modal isOpen={modalOpen} onClose={closeModal} title={editDoc ? "Edit document" : "Upload document"}>
+          <FileDropZone onFileSelect={setFile} selectedFile={file} />
 
-        <div className="mb-4">
-          <label className={labelCls}>Document title</label>
-          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Health Insurance Card" className={inputCls} />
-        </div>
+          <div className="mb-4">
+            <label className={labelCls}>Document title</label>
+            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Health Insurance Card" className={inputCls} />
+          </div>
 
-        <div className="mb-4">
-          <label className={labelCls}>File type</label>
-          <select value={fileType} onChange={(e) => setFileType(e.target.value)} className={inputCls}>
-            <option value="personal">Personal</option>
-            <option value="expense">Expense</option>
-          </select>
-        </div>
+          <div className="mb-4">
+            <label className={labelCls}>File type</label>
+            <select value={fileType} onChange={(e) => setFileType(e.target.value)} className={inputCls}>
+              <option value="personal">Personal</option>
+              <option value="expense">Expense</option>
+            </select>
+          </div>
 
-        <button onClick={handleSubmit} disabled={isBusy}
-          className="w-full py-3 bg-[#CD166E] text-white border-none rounded-xl text-[14px] font-semibold cursor-pointer hover:opacity-90 transition-opacity disabled:bg-gray-300 disabled:cursor-not-allowed mt-2"
-        >
-          {isBusy ? "Saving…" : editDoc ? "Save changes" : "Upload"}
-        </button>
-      </Modal>
+          <button onClick={handleSubmit} disabled={isBusy}
+            className="w-full py-3 bg-[#CD166E] text-white border-none rounded-xl text-[14px] font-semibold cursor-pointer hover:opacity-90 transition-opacity disabled:bg-gray-300 disabled:cursor-not-allowed mt-2"
+          >
+            {isBusy ? "Saving…" : editDoc ? "Save changes" : "Upload"}
+          </button>
+        </Modal>
+      )}
     </div>
   );
 }
