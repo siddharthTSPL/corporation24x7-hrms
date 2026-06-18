@@ -100,6 +100,8 @@ function DetailModal({ id, onClose }) {
                     {(ann.postedBy?.f_name||ann.postedBy?.name||"A")[0].toUpperCase()}
                   </div>
                   <div>
+
+                    
                     <p className="text-[13px] font-medium text-[#730042] m-0">
                       {ann.postedBy?.f_name ? `${ann.postedBy.f_name} ${ann.postedBy.l_name||""}` : ann.postedBy?.name||"Admin"}
                     </p>
@@ -163,16 +165,29 @@ function AnnCard({ ann, index, onClick, isFeatured }) {
 
 function NoPermission() {
   return (
-    <div className="min-h-screen bg-[#F9F8F2] flex items-center justify-center p-6">
-      <div className="text-center max-w-sm">
-        <div className="w-16 h-16 rounded-full border-[1.5px] border-[rgba(205,22,110,0.25)] flex items-center justify-center mx-auto mb-5">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#CD166E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    <div className="min-h-screen bg-[#F0F4F8] flex items-center justify-center px-4 py-12">
+      <div className="flex flex-col items-center text-center max-w-sm w-full">
+        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#730042]/10 flex items-center justify-center mb-6">
+          <svg
+            width="36"
+            height="36"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#730042"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="sm:w-11 sm:h-11"
+          >
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
           </svg>
         </div>
-        <h3 className="text-2xl font-semibold text-[#730042] mb-2">Access Restricted</h3>
-        <p className="text-[13px] text-[rgba(115,0,66,0.45)]">
-          You don't have permission to view announcements. Contact your administrator.
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-700 mb-2 tracking-tight">
+          Access Restricted
+        </h2>
+        <p className="text-sm sm:text-[15px] text-gray-400 leading-relaxed">
+          You don't have permission to access this page. Contact your admin to request access.
         </p>
       </div>
     </div>
