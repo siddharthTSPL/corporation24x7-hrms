@@ -64,7 +64,7 @@ managerrouter.get("/getTicketDetail/:ticketNumber", managermiddleware, checkPerm
 managerrouter.get(
   "/viewallleaves",
   managermiddleware,
-  asyncHandler(managercontroller.getmyleaves)
+  asyncHandler(managercontroller.viewallleaves)
 );
 
 module.exports = managerrouter;
