@@ -275,11 +275,26 @@ function App() {
               }
             />
 
-            {/* ── Recruitment — requires can_view_hiring_requisitions ── */}
+            {/*
+              ── Recruitment ──
+              Changed from a single "can_view_hiring_requisitions" check to a
+              permissionGroup: a manager/admin with ANY recruitment permission
+              (view, create, view candidates, add candidate) can reach the page.
+              The page component itself (Managerrecruitment / Adminrecruitment)
+              is responsible for showing the right view (list vs create-only vs
+              locked) based on exactly which permissions are true.
+            */}
             <Route
               path="/recruitment-admin"
               element={
-                <ProtectedRoute permission="recruitment.can_view_hiring_requisitions">
+                <ProtectedRoute
+                  permissionGroup={[
+                    "recruitment.can_view_hiring_requisitions",
+                    "recruitment.can_create_hiring_requisition",
+                    "recruitment.can_view_candidates",
+                    "recruitment.can_add_candidate",
+                  ]}
+                >
                   <Adminrecruitment />
                 </ProtectedRoute>
               }
@@ -287,7 +302,14 @@ function App() {
             <Route
               path="/recruitment-manager"
               element={
-                <ProtectedRoute permission="recruitment.can_view_hiring_requisitions">
+                <ProtectedRoute
+                  permissionGroup={[
+                    "recruitment.can_view_hiring_requisitions",
+                    "recruitment.can_create_hiring_requisition",
+                    "recruitment.can_view_candidates",
+                    "recruitment.can_add_candidate",
+                  ]}
+                >
                   <Managerrecruitment />
                 </ProtectedRoute>
               }
@@ -295,7 +317,14 @@ function App() {
             <Route
               path="/manager/recruitment"
               element={
-                <ProtectedRoute permission="recruitment.can_view_hiring_requisitions">
+                <ProtectedRoute
+                  permissionGroup={[
+                    "recruitment.can_view_hiring_requisitions",
+                    "recruitment.can_create_hiring_requisition",
+                    "recruitment.can_view_candidates",
+                    "recruitment.can_add_candidate",
+                  ]}
+                >
                   <Managerrecruitment />
                 </ProtectedRoute>
               }
