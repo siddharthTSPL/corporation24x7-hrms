@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { FaLock, FaPlus, FaPen, FaTrash } from "react-icons/fa";
 import {
   useManagerAnnouncements,
   useParticularAnnouncement,
 } from "../../auth/server-state/manager/managerannounce/managerannounce.hook";
+import { usePermissionStore } from "../../auth/store/permission/permissionStore";
 
-/* ── COLOR PALETTE ─────────────────────────── */
 const C = {
   deep:    "#730042",
   mid:     "#CD166E",
@@ -20,7 +21,13 @@ const C = {
   midA25:  "rgba(205,22,110,0.25)",
 };
 
-/* ── FONTS & ANIMATIONS ────────────────────── */
+const PERMS = {
+  view:   "announcements.can_view_announcements",
+  create: "announcements.can_create_announcement",
+  edit:   "announcements.can_edit_announcement",
+  delete: "announcements.can_delete_announcement",
+};
+
 const FontInjector = () => (
   <style>{`
     * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
@@ -30,10 +37,11 @@ const FontInjector = () => (
     .ann-card-hover:hover { border-color: rgba(205,22,110,0.45) !important; transform: translateY(-3px); }
     .read-more-btn:hover  { color: #730042 !important; }
     .filter-btn:hover     { background: rgba(115,0,66,0.08) !important; }
+    .icon-btn:hover        { filter: brightness(0.96); }
+    .create-btn:hover:not(:disabled) { filter: brightness(0.93); }
   `}</style>
 );
 
-/* ── HELPERS ───────────────────────────────── */
 const fmtDate = (d) => {
   if (!d) return "";
   return new Date(d).toLocaleDateString("en-IN", {
@@ -51,7 +59,6 @@ const excerpt = (text, len = 130) => {
   return text.length > len ? text.slice(0, len).trimEnd() + "…" : text;
 };
 
-/* ── PRIORITY PILL ─────────────────────────── */
 const PRIORITY_STYLES = {
   high:   { label: "Urgent",  bg: C.midA10,  border: C.midA25,  color: C.deep },
   medium: { label: "Info",    bg: C.deepA10, border: C.deepA15, color: C.deep },
@@ -73,7 +80,6 @@ const PriorityPill = ({ priority }) => {
   );
 };
 
-/* ── AUDIENCE PILL ─────────────────────────── */
 const AudiencePill = ({ audience }) => {
   const isManagers = (audience || "").toLowerCase() === "managers";
   return (
@@ -91,8 +97,49 @@ const AudiencePill = ({ audience }) => {
   );
 };
 
-/* ── DETAIL MODAL ──────────────────────────── */
-const DetailModal = ({ id, onClose }) => {
+const iconBtnStyle = {
+  display: "inline-flex", alignItems: "center", justifyContent: "center",
+  width: 28, height: 28, borderRadius: 8, border: "none", cursor: "pointer",
+  background: C.deepA10, color: C.deep, flexShrink: 0,
+};
+
+const lockBtnStyle = {
+  ...iconBtnStyle,
+  background: C.deepA10, color: C.deepA45, cursor: "not-allowed",
+};
+
+const actionBtnStyle = {
+  flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+  gap: 6, padding: "10px 16px", borderRadius: 10, border: "none",
+  fontSize: 12.5, fontWeight: 500, fontFamily: "'Segoe UI', sans-serif",
+};
+
+const AccessDenied = () => (
+  <div style={{
+    minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+    background: C.cream, fontFamily: "'Segoe UI', sans-serif", padding: 24,
+  }}>
+    <div style={{ textAlign: "center", maxWidth: 360 }}>
+      <div style={{
+        width: 84, height: 84, borderRadius: "50%", background: C.deepA10,
+        display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 22px",
+      }}>
+        <FaLock size={30} color={C.deep} />
+      </div>
+      <h2 style={{
+        fontSize: "clamp(22px,5vw,28px)", fontWeight: 600, color: C.deep,
+        margin: "0 0 8px", fontFamily: "'Segoe UI', sans-serif",
+      }}>
+        Access Restricted
+      </h2>
+      <p style={{ fontSize: 14, color: C.deepA55, lineHeight: 1.7, margin: 0 }}>
+        You don't have permission to use announcements. Contact your admin to request access.
+      </p>
+    </div>
+  </div>
+);
+
+const DetailModal = ({ id, onClose, canEdit, canDelete, onEdit, onDelete }) => {
   const { data, isLoading, error } = useParticularAnnouncement(id);
   const ann = data?.announcement;
 
@@ -114,7 +161,6 @@ const DetailModal = ({ id, onClose }) => {
         fontFamily: "'Segoe UI', sans-serif",
         boxShadow: "0 24px 48px rgba(115,0,66,0.12)",
       }}>
-        {/* Modal header */}
         <div style={{
           background: C.white, padding: "18px 24px",
           borderBottom: `.5px solid ${C.deepA10}`,
@@ -146,15 +192,11 @@ const DetailModal = ({ id, onClose }) => {
               background: C.deepA10, border: "none", cursor: "pointer",
               color: C.deep, fontSize: 16, display: "flex",
               alignItems: "center", justifyContent: "center",
-              transition: "background .2s",
             }}
-            onMouseEnter={(e) => e.currentTarget.style.background = C.deepA15}
-            onMouseLeave={(e) => e.currentTarget.style.background = C.deepA10}
           >✕</button>
         </div>
 
-        {/* Modal body */}
-        <div style={{ padding: "28px 28px 32px" }}>
+        <div style={{ padding: "28px clamp(18px,4vw,28px) 32px" }}>
           {isLoading ? (
             <div style={{ textAlign: "center", padding: "48px 0" }}>
               <div style={{
@@ -185,7 +227,7 @@ const DetailModal = ({ id, onClose }) => {
 
               <h2 style={{
                 fontFamily: "'Segoe UI', sans-serif",
-                fontSize: 28, fontWeight: 600, color: C.deep,
+                fontSize: "clamp(20px,5vw,28px)", fontWeight: 600, color: C.deep,
                 lineHeight: 1.3, margin: 0, letterSpacing: "-0.3px",
               }}>
                 {ann.title}
@@ -213,6 +255,36 @@ const DetailModal = ({ id, onClose }) => {
                   </span>
                 </div>
               )}
+
+              <div style={{
+                display: "flex", flexWrap: "wrap", gap: 10,
+                marginTop: 24, paddingTop: 20, borderTop: `.5px solid ${C.deepA10}`,
+              }}>
+                {canEdit ? (
+                  <button
+                    onClick={() => onEdit(ann)}
+                    style={{ ...actionBtnStyle, background: C.deep, color: C.white, cursor: "pointer" }}
+                  >
+                    <FaPen size={11} /> Edit
+                  </button>
+                ) : (
+                  <button disabled style={{ ...actionBtnStyle, background: C.deepA10, color: C.deepA45, cursor: "not-allowed" }}>
+                    <FaLock size={11} /> Edit
+                  </button>
+                )}
+                {canDelete ? (
+                  <button
+                    onClick={() => onDelete(ann)}
+                    style={{ ...actionBtnStyle, background: C.midA10, color: C.mid, border: `1px solid ${C.midA25}`, cursor: "pointer" }}
+                  >
+                    <FaTrash size={11} /> Delete
+                  </button>
+                ) : (
+                  <button disabled style={{ ...actionBtnStyle, background: C.deepA10, color: C.deepA45, cursor: "not-allowed" }}>
+                    <FaLock size={11} /> Delete
+                  </button>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -221,8 +293,7 @@ const DetailModal = ({ id, onClose }) => {
   );
 };
 
-/* ── CARD ──────────────────────────────────── */
-const AnnCard = ({ ann, index, onClick }) => {
+const AnnCard = ({ ann, index, onClick, canEdit, canDelete, onEdit, onDelete }) => {
   const isFeatured = index === 0;
 
   return (
@@ -236,7 +307,7 @@ const AnnCard = ({ ann, index, onClick }) => {
         padding: isFeatured ? "30px 28px 24px" : "22px 22px 20px",
         cursor: "pointer",
         transition: "border-color .2s, transform .2s",
-        gridColumn: isFeatured ? "span 2" : "span 1",
+        gridColumn: isFeatured ? "1 / -1" : "auto",
         position: "relative",
         overflow: "hidden",
         animation: `fadeUp 0.4s ease both`,
@@ -270,14 +341,31 @@ const AnnCard = ({ ann, index, onClick }) => {
             </span>
           )}
         </div>
-        <span style={{ fontSize: 11, color: C.deepA45, letterSpacing: ".03em" }}>
-          {fmtDate(ann.createdAt)}
-        </span>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 11, color: C.deepA45, letterSpacing: ".03em" }}>
+            {fmtDate(ann.createdAt)}
+          </span>
+          {canEdit ? (
+            <button className="icon-btn" onClick={(e) => { e.stopPropagation(); onEdit(ann); }} style={iconBtnStyle}>
+              <FaPen size={11} />
+            </button>
+          ) : (
+            <span title="Edit — No permission" style={lockBtnStyle}><FaLock size={10} /></span>
+          )}
+          {canDelete ? (
+            <button className="icon-btn" onClick={(e) => { e.stopPropagation(); onDelete(ann); }} style={{ ...iconBtnStyle, background: C.midA10, color: C.mid }}>
+              <FaTrash size={11} />
+            </button>
+          ) : (
+            <span title="Delete — No permission" style={lockBtnStyle}><FaLock size={10} /></span>
+          )}
+        </div>
       </div>
 
       <h3 style={{
         fontFamily: "'Segoe UI', sans-serif",
-        fontSize: isFeatured ? 22 : 17, fontWeight: 600,
+        fontSize: isFeatured ? "clamp(18px,3vw,22px)" : 17, fontWeight: 600,
         color: C.deep, lineHeight: 1.3, marginBottom: 10,
         letterSpacing: "-0.2px",
       }}>
@@ -315,11 +403,19 @@ const AnnCard = ({ ann, index, onClick }) => {
   );
 };
 
-/* ── MAIN ──────────────────────────────────── */
-const Announcema = () => {
+const Announcema = ({ onCreate = () => {}, onEdit = () => {}, onDelete = () => {} } = {}) => {
   const { data, isLoading, isError: error } = useManagerAnnouncements();
   const [selectedId, setSelectedId] = useState(null);
   const [filter, setFilter] = useState("all");
+
+  const can = usePermissionStore((state) => state.can);
+  const canView = can(PERMS.view);
+  const canCreate = can(PERMS.create);
+  const canEdit = can(PERMS.edit);
+  const canDelete = can(PERMS.delete);
+  const hasAccess = canView || canCreate || canEdit || canDelete;
+
+  if (!hasAccess) return <AccessDenied />;
 
   const allAnnouncements = data || [];
 
@@ -347,18 +443,14 @@ const Announcema = () => {
   ];
 
   return (
-    <div style={{
-      background: C.cream, minHeight: "100vh",
-      fontFamily: "'Segoe UI', sans-serif",
-    }}>
+    <div style={{ background: C.cream, minHeight: "100vh", fontFamily: "'Segoe UI', sans-serif" }}>
       <FontInjector />
 
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 24px" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "clamp(24px,5vw,40px) clamp(16px,4vw,24px)" }}>
 
-        {/* Eyebrow */}
         <div style={{
           display: "flex", alignItems: "center", gap: 10,
-          marginBottom: "1.25rem", animation: "fadeUp .45s ease both",
+          marginBottom: "1.25rem", animation: "fadeUp .45s ease both", flexWrap: "wrap",
         }}>
           <div style={{ width: 32, height: 1, background: C.deep }} />
           <span style={{
@@ -385,81 +477,68 @@ const Announcema = () => {
           </div>
         </div>
 
-        {/* Title */}
-        <h1 style={{
-          fontFamily: "'Segoe UI', sans-serif",
-          fontSize: 48, fontWeight: 600, color: C.deep,
-          letterSpacing: "-1px", lineHeight: 1.1,
-          margin: "0 0 .35rem", animation: "fadeUp .5s ease both",
-        }}>
-          Announce<span style={{ fontWeight: 600, color: C.mid }}>ments</span>
-        </h1>
-
-        {/* Rule + filters */}
         <div style={{
-          display: "flex", alignItems: "center", gap: 14,
-          margin: "1.25rem 0 2rem", animation: "fadeUp .55s ease both",
-          flexWrap: "wrap",
+          display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
+          animation: "fadeUp .5s ease both",
         }}>
-          <div style={{ flex: 1, height: .5, background: C.deepA25, minWidth: 40 }} />
+          <h1 style={{
+            fontFamily: "'Segoe UI', sans-serif",
+            fontSize: "clamp(30px,7vw,48px)", fontWeight: 600, color: C.deep,
+            letterSpacing: "-1px", lineHeight: 1.1, margin: "0 .35rem 0 0",
+          }}>
+            Announce<span style={{ fontWeight: 600, color: C.mid }}>ments</span>
+          </h1>
 
-          {/* Filter pills */}
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {FILTERS.map((f) => (
-              <button
-                key={f.id}
-                className="filter-btn"
-                onClick={() => setFilter(f.id)}
-                style={{
-                  padding: "5px 14px", borderRadius: 99, cursor: "pointer",
-                  fontSize: 11, fontWeight: 500, letterSpacing: ".08em",
-                  textTransform: "uppercase", transition: "all .2s",
-                  background: filter === f.id ? C.deep : "transparent",
-                  color:      filter === f.id ? C.white : C.deepA45,
-                  border: `1px solid ${filter === f.id ? C.deep : C.deepA25}`,
-                }}
-              >
-                {f.label} · {f.count}
-              </button>
-            ))}
-          </div>
-
-          <div style={{ flex: 1, height: .5, background: C.deepA25, minWidth: 40 }} />
+          <button
+            className="create-btn"
+            onClick={() => canCreate && onCreate()}
+            disabled={!canCreate}
+            title={!canCreate ? "New Announcement — No permission" : undefined}
+            style={{
+              marginLeft: "auto", display: "flex", alignItems: "center", gap: 8,
+              padding: "10px 18px", borderRadius: 99, border: "none",
+              fontSize: 12.5, fontWeight: 500, letterSpacing: ".05em", textTransform: "uppercase",
+              fontFamily: "'Segoe UI', sans-serif",
+              cursor: canCreate ? "pointer" : "not-allowed",
+              background: canCreate ? C.deep : C.deepA10,
+              color: canCreate ? C.white : C.deepA45,
+            }}
+          >
+            {canCreate ? <FaPlus size={11} /> : <FaLock size={11} />}
+            New Announcement
+          </button>
         </div>
 
-        {/* Loading */}
-        {isLoading && (
+        {canView && (
           <div style={{
-            display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center",
-            padding: "80px 0", gap: 16,
+            display: "flex", alignItems: "center", gap: 14,
+            margin: "1.25rem 0 2rem", animation: "fadeUp .55s ease both", flexWrap: "wrap",
           }}>
-            <div style={{
-              width: 38, height: 38,
-              border: `3px solid ${C.deepA10}`,
-              borderTopColor: C.mid, borderRadius: "50%",
-              animation: "spin .8s linear infinite",
-            }} />
-            <p style={{ color: C.deepA45, fontSize: 13, margin: 0 }}>
-              Loading announcements…
-            </p>
+            <div style={{ flex: 1, height: .5, background: C.deepA25, minWidth: 40 }} />
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {FILTERS.map((f) => (
+                <button
+                  key={f.id}
+                  className="filter-btn"
+                  onClick={() => setFilter(f.id)}
+                  style={{
+                    padding: "5px 14px", borderRadius: 99, cursor: "pointer",
+                    fontSize: 11, fontWeight: 500, letterSpacing: ".08em",
+                    textTransform: "uppercase", transition: "all .2s",
+                    background: filter === f.id ? C.deep : "transparent",
+                    color:      filter === f.id ? C.white : C.deepA45,
+                    border: `1px solid ${filter === f.id ? C.deep : C.deepA25}`,
+                  }}
+                >
+                  {f.label} · {f.count}
+                </button>
+              ))}
+            </div>
+            <div style={{ flex: 1, height: .5, background: C.deepA25, minWidth: 40 }} />
           </div>
         )}
 
-        {/* Error */}
-        {error && (
-          <div style={{ textAlign: "center", padding: "64px 0" }}>
-            <p style={{ color: C.mid, fontWeight: 500, fontSize: 15, margin: "0 0 6px" }}>
-              Failed to load announcements
-            </p>
-            <p style={{ color: C.deepA45, fontSize: 13, margin: 0 }}>
-              Please try refreshing the page.
-            </p>
-          </div>
-        )}
-
-        {/* Empty */}
-        {!isLoading && !error && filtered.length === 0 && (
+        {!canView ? (
           <div style={{ textAlign: "center", padding: "5rem 1rem" }}>
             <div style={{
               width: 60, height: 60, borderRadius: "50%",
@@ -467,40 +546,109 @@ const Announcema = () => {
               display: "flex", alignItems: "center", justifyContent: "center",
               margin: "0 auto 1.25rem",
             }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
-                stroke={C.mid} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-              </svg>
+              <FaLock size={22} color={C.mid} />
             </div>
             <h3 style={{
               fontFamily: "'Segoe UI', sans-serif",
-              fontSize: 24, fontWeight: 600,
+              fontSize: "clamp(20px,4vw,24px)", fontWeight: 600,
               color: C.deep, marginBottom: ".5rem",
             }}>
-              Nothing yet
+              Viewing is restricted
             </h3>
             <p style={{ fontSize: 13, color: C.deepA45, margin: 0 }}>
-              {filter !== "all" ? "Try a different filter." : "New announcements will appear here."}
+              You don't have permission to view announcements. Contact your admin to request access.
             </p>
           </div>
-        )}
+        ) : (
+          <>
+            {isLoading && (
+              <div style={{
+                display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "center",
+                padding: "80px 0", gap: 16,
+              }}>
+                <div style={{
+                  width: 38, height: 38,
+                  border: `3px solid ${C.deepA10}`,
+                  borderTopColor: C.mid, borderRadius: "50%",
+                  animation: "spin .8s linear infinite",
+                }} />
+                <p style={{ color: C.deepA45, fontSize: 13, margin: 0 }}>
+                  Loading announcements…
+                </p>
+              </div>
+            )}
 
-        {/* Grid */}
-        {!isLoading && filtered.length > 0 && (
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(290px, 1fr))",
-            gap: 14,
-          }}>
-            {filtered.map((ann, i) => (
-              <AnnCard key={ann._id} ann={ann} index={i} onClick={setSelectedId} />
-            ))}
-          </div>
+            {error && (
+              <div style={{ textAlign: "center", padding: "64px 0" }}>
+                <p style={{ color: C.mid, fontWeight: 500, fontSize: 15, margin: "0 0 6px" }}>
+                  Failed to load announcements
+                </p>
+                <p style={{ color: C.deepA45, fontSize: 13, margin: 0 }}>
+                  Please try refreshing the page.
+                </p>
+              </div>
+            )}
+
+            {!isLoading && !error && filtered.length === 0 && (
+              <div style={{ textAlign: "center", padding: "5rem 1rem" }}>
+                <div style={{
+                  width: 60, height: 60, borderRadius: "50%",
+                  border: `1.5px solid ${C.midA25}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  margin: "0 auto 1.25rem",
+                }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke={C.mid} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                  </svg>
+                </div>
+                <h3 style={{
+                  fontFamily: "'Segoe UI', sans-serif",
+                  fontSize: "clamp(20px,4vw,24px)", fontWeight: 600,
+                  color: C.deep, marginBottom: ".5rem",
+                }}>
+                  Nothing yet
+                </h3>
+                <p style={{ fontSize: 13, color: C.deepA45, margin: 0 }}>
+                  {filter !== "all" ? "Try a different filter." : "New announcements will appear here."}
+                </p>
+              </div>
+            )}
+
+            {!isLoading && filtered.length > 0 && (
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+                gap: 14,
+              }}>
+                {filtered.map((ann, i) => (
+                  <AnnCard
+                    key={ann._id}
+                    ann={ann}
+                    index={i}
+                    onClick={setSelectedId}
+                    canEdit={canEdit}
+                    canDelete={canDelete}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {selectedId && (
-        <DetailModal id={selectedId} onClose={() => setSelectedId(null)} />
+        <DetailModal
+          id={selectedId}
+          onClose={() => setSelectedId(null)}
+          canEdit={canEdit}
+          canDelete={canDelete}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
       )}
     </div>
   );
