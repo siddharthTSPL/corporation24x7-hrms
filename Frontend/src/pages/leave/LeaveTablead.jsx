@@ -761,7 +761,10 @@ const AllLeavesPanel = ({ showToast }) => {
 
   const filtered     = filter === "all" ? employeeLeaves : employeeLeaves.filter((l) => isStatus(l, filter));
   const count        = (key) => key === "all" ? employeeLeaves.length : employeeLeaves.filter((l) => isStatus(l, key)).length;
-  const isActionable = (status) => status === "forwarded_reporting_manager" || status === "pending_manager";
+  const isActionable = (status) =>
+  status === "pending_admin" ||
+  status === "forwarded_reporting_manager" ||
+  status === "pending_manager";
 
   const handleAction = async (leave, action) => {
     setProcessingId(leave._id);
