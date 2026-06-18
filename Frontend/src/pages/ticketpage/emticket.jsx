@@ -7,41 +7,11 @@ import {
 import { usePermissionStore } from "../../auth/store/permission/permissionStore";
 
 const TYPE_META = {
-  suggestion: {
-    label: "Suggestion",
-    bg: "bg-emerald-50",
-    text: "text-emerald-800",
-    dot: "bg-emerald-400",
-    icon: "💡",
-  },
-  complaint: {
-    label: "Complaint",
-    bg: "bg-amber-50",
-    text: "text-amber-800",
-    dot: "bg-amber-400",
-    icon: "📋",
-  },
-  posh: {
-    label: "POSH",
-    bg: "bg-red-50",
-    text: "text-red-800",
-    dot: "bg-red-400",
-    icon: "🔴",
-  },
-  grievance: {
-    label: "Grievance",
-    bg: "bg-violet-50",
-    text: "text-violet-800",
-    dot: "bg-violet-500",
-    icon: "⚖️",
-  },
-  whistleblower: {
-    label: "Whistleblower",
-    bg: "bg-blue-50",
-    text: "text-blue-900",
-    dot: "bg-blue-500",
-    icon: "🔒",
-  },
+  suggestion: { label: "Suggestion", bg: "bg-emerald-50", text: "text-emerald-800", dot: "bg-emerald-400", icon: "💡" },
+  complaint: { label: "Complaint", bg: "bg-amber-50", text: "text-amber-800", dot: "bg-amber-400", icon: "📋" },
+  posh: { label: "POSH", bg: "bg-red-50", text: "text-red-800", dot: "bg-red-400", icon: "🔴" },
+  grievance: { label: "Grievance", bg: "bg-violet-50", text: "text-violet-800", dot: "bg-violet-500", icon: "⚖️" },
+  whistleblower: { label: "Whistleblower", bg: "bg-blue-50", text: "text-blue-900", dot: "bg-blue-500", icon: "🔒" },
 };
 
 const STATUS_META = {
@@ -160,28 +130,45 @@ function InfoRow({ label, val }) {
   );
 }
 
+function AccessDeniedModal({ onClose }) {
+  return (
+    <div
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      className="fixed inset-0 bg-[rgba(26,10,18,0.45)] z-[300] flex items-center justify-center p-4"
+    >
+      <div className="bg-white rounded-2xl p-6 sm:p-8 w-full max-w-sm border border-[rgba(115,0,66,0.12)] shadow-xl flex flex-col items-center text-center">
+        <div className="w-16 h-16 rounded-full bg-[#730042]/10 flex items-center justify-center mb-4">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#730042" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </div>
+        <h3 className="text-[17px] font-bold text-gray-700 mb-1.5">Access Restricted</h3>
+        <p className="text-[13px] text-gray-400 leading-relaxed mb-5">
+          You don't have permission to perform this action. Contact your admin to request access.
+        </p>
+        <button
+          onClick={onClose}
+          className="px-6 py-2.5 bg-[#730042] text-white rounded-xl text-[13px] font-semibold border-none cursor-pointer hover:opacity-90 transition-opacity"
+        >
+          Got it
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function NoPermission() {
   return (
     <div className="min-h-screen bg-[#F0F4F8] flex items-center justify-center px-4 py-12">
       <div className="flex flex-col items-center text-center max-w-sm w-full">
         <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#730042]/10 flex items-center justify-center mb-6">
-          <svg
-            width="36"
-            height="36"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#730042"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#730042" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
           </svg>
         </div>
-        <h2 className="text-2xl sm:text-3xl font-bold text-gray-700 mb-2 tracking-tight">
-          Access Restricted
-        </h2>
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-700 mb-2 tracking-tight">Access Restricted</h2>
         <p className="text-sm sm:text-[15px] text-gray-400 leading-relaxed">
           You don't have permission to access this page. Contact your admin to request access.
         </p>
@@ -191,16 +178,9 @@ function NoPermission() {
 }
 
 const BLANK = {
-  type: "complaint",
-  category: "",
-  subCategory: "",
-  title: "",
-  description: "",
-  incidentDate: "",
-  incidentLocation: "",
-  witnessNames: "",
-  severity: "medium",
-  isAnonymous: false,
+  type: "complaint", category: "", subCategory: "", title: "",
+  description: "", incidentDate: "", incidentLocation: "",
+  witnessNames: "", severity: "medium", isAnonymous: false,
 };
 
 function SubmitForm({ onSuccess }) {
@@ -208,15 +188,9 @@ function SubmitForm({ onSuccess }) {
   const [toast, setToast] = useState(null);
   const mut = useEmployeeSubmitTicket();
 
-  const set = useCallback(
-    (k, v) =>
-      setForm((p) => ({
-        ...p,
-        [k]: v,
-        ...(k === "type" ? { category: "", subCategory: "" } : {}),
-      })),
-    [],
-  );
+  const set = useCallback((k, v) =>
+    setForm((p) => ({ ...p, [k]: v, ...(k === "type" ? { category: "", subCategory: "" } : {}) })),
+  []);
 
   const showToast = useCallback((msg, kind = "ok") => {
     setToast({ msg, kind });
@@ -244,15 +218,12 @@ function SubmitForm({ onSuccess }) {
   };
 
   const cats = CATEGORIES[form.type] || [];
-  const inputCls =
-    "w-full px-3.5 py-2.5 rounded-xl text-[13px] text-[#1A0A12] bg-[#FDFBFF] border border-[rgba(115,0,66,0.12)] outline-none focus:border-[#730042] transition-colors font-[inherit]";
+  const inputCls = "w-full px-3.5 py-2.5 rounded-xl text-[13px] text-[#1A0A12] bg-[#FDFBFF] border border-[rgba(115,0,66,0.12)] outline-none focus:border-[#730042] transition-colors font-[inherit]";
 
   return (
     <div className="bg-white rounded-2xl border border-[rgba(115,0,66,0.1)] p-5 sm:p-6 shadow-[0_4px_24px_rgba(80,20,90,0.06)]">
       <div className="flex items-center gap-3 mb-5">
-        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#730042] to-[#CD166E] flex items-center justify-center text-lg flex-shrink-0">
-          📝
-        </div>
+        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#730042] to-[#CD166E] flex items-center justify-center text-lg flex-shrink-0">📝</div>
         <div>
           <div className="text-[15px] font-bold text-[#1A0A12]">New Ticket</div>
           <div className="text-[11px] text-[#9B7A8E] mt-0.5">Your submission is handled confidentially</div>
@@ -265,9 +236,7 @@ function SubmitForm({ onSuccess }) {
         </div>
         <div className="flex flex-wrap gap-2">
           {Object.entries(TYPE_META).map(([k, m]) => (
-            <button
-              key={k}
-              onClick={() => set("type", k)}
+            <button key={k} onClick={() => set("type", k)}
               className={`px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition-all flex items-center gap-1.5 ${
                 form.type === k
                   ? "bg-[#730042] text-white border-[#730042]"
@@ -287,17 +256,13 @@ function SubmitForm({ onSuccess }) {
           </div>
           <select className={inputCls} value={form.category} onChange={(e) => set("category", e.target.value)}>
             <option value="">Select…</option>
-            {cats.map((c) => (
-              <option key={c} value={c}>{CAT_LABELS[c] || c}</option>
-            ))}
+            {cats.map((c) => <option key={c} value={c}>{CAT_LABELS[c] || c}</option>)}
           </select>
         </div>
         <div>
           <div className="text-[11px] font-semibold text-[#9B7A8E] uppercase tracking-wider mb-1.5">Severity</div>
           <select className={inputCls} value={form.severity} onChange={(e) => set("severity", e.target.value)}>
-            {Object.entries(SEV_META).map(([k, m]) => (
-              <option key={k} value={k}>{m.label}</option>
-            ))}
+            {Object.entries(SEV_META).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
           </select>
         </div>
       </div>
@@ -306,26 +271,16 @@ function SubmitForm({ onSuccess }) {
         <div className="text-[11px] font-semibold text-[#9B7A8E] uppercase tracking-wider mb-1.5">
           Title <span className="text-[#CD166E]">*</span>
         </div>
-        <input
-          className={inputCls}
-          value={form.title}
-          onChange={(e) => set("title", e.target.value)}
-          placeholder="Brief, clear title…"
-          maxLength={120}
-        />
+        <input className={inputCls} value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="Brief, clear title…" maxLength={120} />
       </div>
 
       <div className="mb-3.5">
         <div className="text-[11px] font-semibold text-[#9B7A8E] uppercase tracking-wider mb-1.5">
           Description <span className="text-[#CD166E]">*</span>
         </div>
-        <textarea
-          className={`${inputCls} resize-y leading-relaxed`}
-          rows={4}
-          value={form.description}
+        <textarea className={`${inputCls} resize-y leading-relaxed`} rows={4} value={form.description}
           onChange={(e) => set("description", e.target.value)}
-          placeholder="Describe the issue with dates, people involved, and what happened…"
-        />
+          placeholder="Describe the issue with dates, people involved, and what happened…" />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3.5">
@@ -343,17 +298,11 @@ function SubmitForm({ onSuccess }) {
         <div className="text-[11px] font-semibold text-[#9B7A8E] uppercase tracking-wider mb-1.5">
           Witness Names <span className="text-[10px] normal-case font-normal">(comma-separated)</span>
         </div>
-        <input
-          className={inputCls}
-          value={form.witnessNames}
-          onChange={(e) => set("witnessNames", e.target.value)}
-          placeholder="John Doe, Jane Smith"
-        />
+        <input className={inputCls} value={form.witnessNames} onChange={(e) => set("witnessNames", e.target.value)} placeholder="John Doe, Jane Smith" />
       </div>
 
       <div className="flex items-center gap-3 mb-5 bg-violet-50 rounded-xl p-3.5 border border-violet-100">
-        <button
-          onClick={() => set("isAnonymous", !form.isAnonymous)}
+        <button onClick={() => set("isAnonymous", !form.isAnonymous)}
           className={`relative w-11 h-6 rounded-full border-none transition-colors flex-shrink-0 cursor-pointer ${form.isAnonymous ? "bg-[#730042]" : "bg-gray-300"}`}
         >
           <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${form.isAnonymous ? "left-6" : "left-1"}`} />
@@ -364,19 +313,12 @@ function SubmitForm({ onSuccess }) {
         </div>
       </div>
 
-      <button
-        onClick={submit}
-        disabled={mut.isPending}
+      <button onClick={submit} disabled={mut.isPending}
         className="w-full bg-gradient-to-r from-[#730042] to-[#CD166E] text-white rounded-xl py-3.5 text-[14px] font-semibold flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
       >
         {mut.isPending ? (
-          <>
-            <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-            Submitting…
-          </>
-        ) : (
-          "Submit Ticket →"
-        )}
+          <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />Submitting…</>
+        ) : "Submit Ticket →"}
       </button>
 
       {toast && (
@@ -396,10 +338,7 @@ function TicketDetail({ ticketNumber, onBack }) {
   const ticket = data?.ticket;
 
   const backBtn = (
-    <button
-      onClick={onBack}
-      className="inline-flex items-center gap-1.5 bg-transparent border-none text-[#730042] text-[13px] font-semibold cursor-pointer mb-3.5 p-0"
-    >
+    <button onClick={onBack} className="inline-flex items-center gap-1.5 bg-transparent border-none text-[#730042] text-[13px] font-semibold cursor-pointer mb-3.5 p-0">
       ← Back to My Tickets
     </button>
   );
@@ -410,11 +349,7 @@ function TicketDetail({ ticketNumber, onBack }) {
         {backBtn}
         <div className="bg-white rounded-2xl border border-[rgba(115,0,66,0.1)] p-6 flex flex-col gap-3">
           {[200, 120, 80, 160, 100].map((w, i) => (
-            <div
-              key={i}
-              className="h-3.5 rounded-lg bg-gradient-to-r from-[#f0e8ed] via-[#f8f3f6] to-[#f0e8ed] animate-pulse"
-              style={{ width: w, maxWidth: "100%" }}
-            />
+            <div key={i} className="h-3.5 rounded-lg bg-gradient-to-r from-[#f0e8ed] via-[#f8f3f6] to-[#f0e8ed] animate-pulse" style={{ width: w, maxWidth: "100%" }} />
           ))}
         </div>
       </div>
@@ -440,7 +375,7 @@ function TicketDetail({ ticketNumber, onBack }) {
       {backBtn}
       <div className="bg-white rounded-2xl border border-[rgba(115,0,66,0.1)] overflow-hidden shadow-[0_4px_24px_rgba(80,20,90,0.06)]">
         <div className="bg-[rgba(115,0,66,0.03)] p-4 sm:p-5 border-b border-[rgba(115,0,66,0.1)]">
-          <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+          <div className="flex items-start gap-3 flex-wrap mb-4">
             <div className="flex-1 min-w-0">
               <div className="flex gap-1.5 flex-wrap mb-2.5 items-center">
                 <span className="text-[10px] font-bold text-[#9B7A8E] tracking-wide">{ticket.ticketNumber}</span>
@@ -456,9 +391,7 @@ function TicketDetail({ ticketNumber, onBack }) {
           </div>
           <div className="flex gap-1 bg-white/70 rounded-xl p-1 w-fit border border-[rgba(115,0,66,0.1)] flex-wrap">
             {TABS.map((t) => (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
+              <button key={t.key} onClick={() => setTab(t.key)}
                 className={`px-3.5 py-1.5 rounded-lg border-none cursor-pointer text-[12px] transition-all font-[inherit] ${
                   tab === t.key ? "bg-[#730042] text-white font-semibold" : "bg-transparent text-[#9B7A8E] font-normal"
                 }`}
@@ -492,9 +425,7 @@ function TicketDetail({ ticketNumber, onBack }) {
                 <div className="bg-amber-50 rounded-xl p-3.5 border border-amber-100">
                   <div className="text-[10px] font-bold text-amber-800 uppercase tracking-wide mb-2">Witnesses</div>
                   <div className="flex flex-wrap gap-1.5">
-                    {ticket.witnessNames.map((w, i) => (
-                      <Chip key={i} bg="bg-amber-100" text="text-amber-800">👤 {w}</Chip>
-                    ))}
+                    {ticket.witnessNames.map((w, i) => <Chip key={i} bg="bg-amber-100" text="text-amber-800">👤 {w}</Chip>)}
                   </div>
                 </div>
               )}
@@ -515,9 +446,7 @@ function TicketDetail({ ticketNumber, onBack }) {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <div>
                     <div className="text-[10px] text-[#9B7A8E] mb-1">First Response</div>
-                    <div className="text-[16px] font-bold text-[#1A0A12]">
-                      {ticket.firstResponseHours != null ? `${ticket.firstResponseHours}h` : "Pending"}
-                    </div>
+                    <div className="text-[16px] font-bold text-[#1A0A12]">{ticket.firstResponseHours != null ? `${ticket.firstResponseHours}h` : "Pending"}</div>
                   </div>
                   {ticket.resolutionTimeHours != null && (
                     <div>
@@ -549,9 +478,7 @@ function TicketDetail({ ticketNumber, onBack }) {
                         {!isLast && <div className="w-px flex-1 mt-1 mb-0 min-h-[14px]" style={{ background: `${dot}30` }} />}
                       </div>
                       <div className={`flex-1 ${isLast ? "" : "pb-5"}`}>
-                        <div className="text-[11px] font-bold capitalize tracking-wide" style={{ color: dot }}>
-                          {e.action.replace(/_/g, " ")}
-                        </div>
+                        <div className="text-[11px] font-bold capitalize tracking-wide" style={{ color: dot }}>{e.action.replace(/_/g, " ")}</div>
                         {e.fromStatus && e.toStatus && (
                           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                             <StatusChip status={e.fromStatus} />
@@ -564,9 +491,7 @@ function TicketDetail({ ticketNumber, onBack }) {
                             {e.note}
                           </div>
                         )}
-                        <div className="text-[10px] text-[#9B7A8E] mt-1.5">
-                          {fmtFull(e.timestamp)}{e.byName && ` · ${e.byName}`}
-                        </div>
+                        <div className="text-[10px] text-[#9B7A8E] mt-1.5">{fmtFull(e.timestamp)}{e.byName && ` · ${e.byName}`}</div>
                       </div>
                     </div>
                   );
@@ -620,8 +545,7 @@ function MyTickets() {
 
   if (isLoading) return <Spinner />;
 
-  if (selected)
-    return <TicketDetail ticketNumber={selected} onBack={() => setSelected(null)} />;
+  if (selected) return <TicketDetail ticketNumber={selected} onBack={() => setSelected(null)} />;
 
   if (!tickets.length)
     return (
@@ -637,9 +561,7 @@ function MyTickets() {
   return (
     <div className="flex flex-col gap-2">
       {tickets.map((t) => (
-        <div
-          key={t._id}
-          onClick={() => setSelected(t.ticketNumber)}
+        <div key={t._id} onClick={() => setSelected(t.ticketNumber)}
           className="bg-white rounded-xl border border-[rgba(115,0,66,0.1)] border-l-4 p-3.5 sm:p-4 cursor-pointer transition-all hover:shadow-[0_6px_20px_rgba(115,0,66,0.1)] hover:-translate-y-px"
           style={{ borderLeftColor: "#730042" }}
         >
@@ -678,19 +600,26 @@ export default function EmployeeTickets() {
   const { data } = useEmployeeGetMyTickets();
   const count = data?.count || 0;
 
-  const defaultTab = canRaise ? "submit" : "mytickets";
-  const [tab, setTab] = useState(defaultTab);
+  const [tab, setTab] = useState("submit");
+  const [accessDenied, setAccessDenied] = useState(false);
 
   if (!canRaise && !canView) return <NoPermission />;
+
+  const handleTabClick = (key) => {
+    if (key === "submit" && !canRaise) { setAccessDenied(true); return; }
+    if (key === "mytickets" && !canView) { setAccessDenied(true); return; }
+    setTab(key);
+  };
 
   return (
     <div className="min-h-screen bg-[#F9F8F2] p-4 sm:p-6 lg:p-8">
       <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}`}</style>
+
+      {accessDenied && <AccessDeniedModal onClose={() => setAccessDenied(false)} />}
+
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center gap-3 mb-5 flex-wrap">
-          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-[#730042] to-[#CD166E] flex items-center justify-center text-xl flex-shrink-0">
-            🎫
-          </div>
+          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-[#730042] to-[#CD166E] flex items-center justify-center text-xl flex-shrink-0">🎫</div>
           <div>
             <h1 className="text-[18px] sm:text-[20px] font-extrabold text-[#1A0A12] m-0">TorchX Voice</h1>
             <p className="text-[12px] text-[#9B7A8E] mt-0.5 m-0">Submit & track your grievances, complaints, and suggestions</p>
@@ -698,26 +627,42 @@ export default function EmployeeTickets() {
         </div>
 
         <div className="flex gap-1 bg-violet-50/50 rounded-xl p-1 mb-5 w-fit border border-[rgba(115,0,66,0.1)] flex-wrap">
-          {canRaise && (
-            <button
-              onClick={() => setTab("submit")}
-              className={`px-4 sm:px-5 py-2 rounded-lg border-none cursor-pointer text-[12.5px] transition-all font-[inherit] ${
-                tab === "submit" ? "bg-[#730042] text-white font-semibold" : "bg-transparent text-[#9B7A8E]"
-              }`}
-            >
-              📝 Submit New
-            </button>
-          )}
-          {canView && (
-            <button
-              onClick={() => setTab("mytickets")}
-              className={`px-4 sm:px-5 py-2 rounded-lg border-none cursor-pointer text-[12.5px] transition-all font-[inherit] ${
-                tab === "mytickets" ? "bg-[#730042] text-white font-semibold" : "bg-transparent text-[#9B7A8E]"
-              }`}
-            >
-              📋 My Tickets{count ? ` (${count})` : ""}
-            </button>
-          )}
+          <button
+            onClick={() => handleTabClick("submit")}
+            className={`px-4 sm:px-5 py-2 rounded-lg border-none cursor-pointer text-[12.5px] transition-all font-[inherit] flex items-center gap-1.5 ${
+              tab === "submit" && canRaise
+                ? "bg-[#730042] text-white font-semibold"
+                : !canRaise
+                ? "text-gray-400 bg-gray-100/60"
+                : "bg-transparent text-[#9B7A8E]"
+            }`}
+          >
+            {!canRaise && (
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            )}
+            📝 Submit New
+          </button>
+          <button
+            onClick={() => handleTabClick("mytickets")}
+            className={`px-4 sm:px-5 py-2 rounded-lg border-none cursor-pointer text-[12.5px] transition-all font-[inherit] flex items-center gap-1.5 ${
+              tab === "mytickets" && canView
+                ? "bg-[#730042] text-white font-semibold"
+                : !canView
+                ? "text-gray-400 bg-gray-100/60"
+                : "bg-transparent text-[#9B7A8E]"
+            }`}
+          >
+            {!canView && (
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            )}
+            📋 My Tickets{count ? ` (${count})` : ""}
+          </button>
         </div>
 
         {tab === "submit" && canRaise && <SubmitForm onSuccess={() => canView && setTab("mytickets")} />}

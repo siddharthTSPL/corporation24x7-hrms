@@ -72,29 +72,45 @@ function Modal({ isOpen, onClose, title, children }) {
   );
 }
 
+function AccessDeniedModal({ onClose }) {
+  return (
+    <div
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      className="fixed inset-0 bg-[rgba(26,10,18,0.45)] z-[300] flex items-center justify-center p-4"
+    >
+      <div className="bg-white rounded-2xl p-6 sm:p-8 w-full max-w-sm border border-[rgba(115,0,66,0.12)] shadow-xl flex flex-col items-center text-center">
+        <div className="w-16 h-16 rounded-full bg-[#730042]/10 flex items-center justify-center mb-4">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#730042" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </div>
+        <h3 className="text-[17px] font-bold text-gray-700 mb-1.5">Access Restricted</h3>
+        <p className="text-[13px] text-gray-400 leading-relaxed mb-5">
+          You don't have permission to perform this action. Contact your admin to request access.
+        </p>
+        <button
+          onClick={onClose}
+          className="px-6 py-2.5 bg-[#730042] text-white rounded-xl text-[13px] font-semibold border-none cursor-pointer hover:opacity-90 transition-opacity"
+        >
+          Got it
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function NoPermission() {
   return (
     <div className="min-h-screen bg-[#F0F4F8] flex items-center justify-center px-4 py-12">
       <div className="flex flex-col items-center text-center max-w-sm w-full">
         <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#730042]/10 flex items-center justify-center mb-6">
-          <svg
-            width="36"
-            height="36"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#730042"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="sm:w-11 sm:h-11"
-          >
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#730042" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
             <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
           </svg>
         </div>
-        <h2 className="text-2xl sm:text-3xl font-bold text-gray-700 mb-2 tracking-tight">
-          Access Restricted
-        </h2>
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-700 mb-2 tracking-tight">Access Restricted</h2>
         <p className="text-sm sm:text-[15px] text-gray-400 leading-relaxed">
           You don't have permission to access this page. Contact your admin to request access.
         </p>
@@ -122,6 +138,7 @@ export default function FileEm() {
   const [title, setTitle] = useState("");
   const [fileType, setFileType] = useState("personal");
   const [toast, setToast] = useState(null);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   if (!canUpload && !canView) return <NoPermission />;
 
@@ -130,21 +147,26 @@ export default function FileEm() {
     setTimeout(() => setToast(null), 3200);
   };
 
-  const openUpload = () => {
+  const guardedAction = (fn) => {
+    if (!canUpload) { setAccessDenied(true); return; }
+    fn();
+  };
+
+  const openUpload = () => guardedAction(() => {
     setEditDoc(null);
     setFile(null);
     setTitle("");
     setFileType("personal");
     setModalOpen(true);
-  };
+  });
 
-  const openEdit = (doc) => {
+  const openEdit = (doc) => guardedAction(() => {
     setEditDoc(doc);
     setFile(null);
     setTitle(doc.title);
     setFileType(doc.fileType);
     setModalOpen(true);
-  };
+  });
 
   const closeModal = () => setModalOpen(false);
 
@@ -173,6 +195,7 @@ export default function FileEm() {
   };
 
   const handleDelete = (id) => {
+    if (!canUpload) { setAccessDenied(true); return; }
     if (!window.confirm("Delete this document?")) return;
     deleteMut.mutate(id, {
       onSuccess: () => showToast("Document deleted."),
@@ -190,23 +213,36 @@ export default function FileEm() {
     <div className="py-5 px-0 font-[inherit]">
       <style>{`@keyframes shimmer{from{background-position:-200% 0}to{background-position:200% 0}}`}</style>
 
+      {accessDenied && <AccessDeniedModal onClose={() => setAccessDenied(false)} />}
+
       <div className="flex items-start sm:items-center justify-between mb-5 gap-3 flex-wrap">
         <div>
           <h1 className="text-[18px] font-bold text-[#730042] m-0">My Documents</h1>
           <p className="text-[12px] text-[#9B7A8E] mt-1 mb-0">Manage your personal and expense files</p>
         </div>
-        {canUpload && (
-          <button onClick={openUpload}
-            className="flex items-center gap-1.5 bg-[#730042] text-white border-none rounded-xl px-4 py-2.5 text-[13px] font-semibold cursor-pointer hover:opacity-90 transition-opacity whitespace-nowrap flex-shrink-0"
-          >
+        <button
+          onClick={openUpload}
+          className={`flex items-center gap-1.5 border-none rounded-xl px-4 py-2.5 text-[13px] font-semibold cursor-pointer transition-opacity whitespace-nowrap flex-shrink-0 ${
+            canUpload
+              ? "bg-[#730042] text-white hover:opacity-90"
+              : "bg-gray-200 text-gray-400 cursor-not-allowed"
+          }`}
+        >
+          {!canUpload && (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+          )}
+          {canUpload && (
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
               <polyline points="17 8 12 3 7 8"/>
               <line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
-            Upload
-          </button>
-        )}
+          )}
+          Upload
+        </button>
       </div>
 
       <div className="flex gap-2 mb-4 flex-wrap">
@@ -237,13 +273,12 @@ export default function FileEm() {
           <p className="text-[13px] text-[#9B7A8E] m-0">
             {filter === "all" ? "No documents yet." : `No ${filter} documents.`}
           </p>
-          {canUpload && (
-            <button onClick={openUpload}
-              className="mt-3 bg-transparent border-none text-[#CD166E] text-[13px] font-semibold cursor-pointer underline"
-            >
-              Upload your first document
-            </button>
-          )}
+          <button
+            onClick={openUpload}
+            className="mt-3 bg-transparent border-none text-[#CD166E] text-[13px] font-semibold cursor-pointer underline"
+          >
+            Upload your first document
+          </button>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
@@ -291,27 +326,51 @@ export default function FileEm() {
                 </div>
               </div>
 
-              {canUpload && (
-                <div className="flex gap-1.5 flex-shrink-0">
-                  <button onClick={() => openEdit(doc)} title="Edit"
-                    className="w-8 h-8 rounded-lg border border-[rgba(115,0,66,0.12)] bg-transparent cursor-pointer flex items-center justify-center hover:bg-[rgba(115,0,66,0.07)] transition-colors"
-                  >
+              <div className="flex gap-1.5 flex-shrink-0">
+                <button
+                  onClick={() => openEdit(doc)}
+                  title={canUpload ? "Edit" : "No permission"}
+                  className={`w-8 h-8 rounded-lg border cursor-pointer flex items-center justify-center transition-colors ${
+                    canUpload
+                      ? "border-[rgba(115,0,66,0.12)] bg-transparent hover:bg-[rgba(115,0,66,0.07)]"
+                      : "border-gray-200 bg-gray-50"
+                  }`}
+                >
+                  {canUpload ? (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#730042" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                       <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                     </svg>
-                  </button>
-                  <button onClick={() => handleDelete(doc._id)} title="Delete"
-                    className="w-8 h-8 rounded-lg border border-[rgba(205,22,110,0.2)] bg-transparent cursor-pointer flex items-center justify-center hover:bg-red-50 transition-colors"
-                  >
+                  ) : (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                  )}
+                </button>
+                <button
+                  onClick={() => handleDelete(doc._id)}
+                  title={canUpload ? "Delete" : "No permission"}
+                  className={`w-8 h-8 rounded-lg border cursor-pointer flex items-center justify-center transition-colors ${
+                    canUpload
+                      ? "border-[rgba(205,22,110,0.2)] bg-transparent hover:bg-red-50"
+                      : "border-gray-200 bg-gray-50"
+                  }`}
+                >
+                  {canUpload ? (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#CD166E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="3 6 5 6 21 6"/>
                       <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
                       <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
                     </svg>
-                  </button>
-                </div>
-              )}
+                  ) : (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -330,13 +389,11 @@ export default function FileEm() {
       {canUpload && (
         <Modal isOpen={modalOpen} onClose={closeModal} title={editDoc ? "Edit document" : "Upload document"}>
           <FileDropZone onFileSelect={setFile} selectedFile={file} />
-
           <div className="mb-4">
             <label className={labelCls}>Document title</label>
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Health Insurance Card" className={inputCls} />
           </div>
-
           <div className="mb-4">
             <label className={labelCls}>File type</label>
             <select value={fileType} onChange={(e) => setFileType(e.target.value)} className={inputCls}>
@@ -344,7 +401,6 @@ export default function FileEm() {
               <option value="expense">Expense</option>
             </select>
           </div>
-
           <button onClick={handleSubmit} disabled={isBusy}
             className="w-full py-3 bg-[#CD166E] text-white border-none rounded-xl text-[14px] font-semibold cursor-pointer hover:opacity-90 transition-opacity disabled:bg-gray-300 disabled:cursor-not-allowed mt-2"
           >
