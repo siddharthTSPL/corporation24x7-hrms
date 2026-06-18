@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from "react";
 import { useManagerSubmitTicket, useManagerGetMyTickets, useManagerRateTicket, useGetManagerTicketDetail } from "../../auth/server-state/manager/managerticket/managerticket";
+import { usePermissionStore } from "../../auth/store/permission/permissionStore";
 
 const C = {
   primary:  "#730042",
@@ -172,6 +173,37 @@ const InfoRow = ({label,val}) => (
   </div>
 );
 
+/* ── ACCESS GATING UI ─────────────────────── */
+
+function AccessRestricted() {
+  return (
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Instrument Sans',sans-serif",padding:24}}>
+      <G/>
+      <div style={{textAlign:"center",maxWidth:380}}>
+        <div style={{width:84,height:84,borderRadius:"50%",background:"rgba(115,0,66,.08)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 22px",fontSize:34}}>
+          🔒
+        </div>
+        <h2 style={{fontSize:"clamp(20px,5vw,24px)",fontWeight:800,color:C.text,margin:"0 0 8px",fontFamily:"'Syne',sans-serif"}}>
+          Access Restricted
+        </h2>
+        <p style={{fontSize:13,color:C.muted,lineHeight:1.7,margin:0,fontFamily:"'Instrument Sans',sans-serif"}}>
+          You don't have permission to use TorchX Voice. Contact your admin to request access.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function LockedPanel({title,message}) {
+  return (
+    <div style={{background:"#fff",borderRadius:18,border:`1px solid ${C.border}`,padding:"56px 28px",boxShadow:"0 4px 24px rgba(80,20,90,.06)",display:"flex",flexDirection:"column",alignItems:"center",gap:10,textAlign:"center"}}>
+      <div style={{width:52,height:52,borderRadius:"50%",background:"rgba(115,0,66,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🔒</div>
+      <div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:"'Syne',sans-serif"}}>{title}</div>
+      <div style={{fontSize:12.5,color:C.muted,fontFamily:"'Instrument Sans',sans-serif",maxWidth:300}}>{message}</div>
+    </div>
+  );
+}
+
 const BLANK = {
   type:"complaint",category:"",subCategory:"",title:"",description:"",
   incidentDate:"",incidentLocation:"",witnessNames:"",severity:"medium",isAnonymous:false,
@@ -314,8 +346,8 @@ function RateModal({ticket,onClose}) {
   };
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(16,4,28,.55)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(6px)"}}>
-      <div style={{background:"#fff",borderRadius:20,padding:28,width:380,boxShadow:"0 24px 64px rgba(0,0,0,.22)",animation:"fadeUp .24s ease both"}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(16,4,28,.55)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(6px)",padding:16}}>
+      <div style={{background:"#fff",borderRadius:20,padding:28,width:380,maxWidth:"100%",boxShadow:"0 24px 64px rgba(0,0,0,.22)",animation:"fadeUp .24s ease both"}}>
         <div style={{fontSize:17,fontWeight:700,color:C.text,fontFamily:"'Syne',sans-serif",marginBottom:3}}>Rate Your Experience</div>
         <div style={{fontSize:12,color:C.muted,fontFamily:"'Instrument Sans',sans-serif",marginBottom:22}}>{ticket.ticketNumber} · {ticket.title}</div>
         <div style={{display:"flex",gap:4,marginBottom:18,justifyContent:"center"}}>
@@ -337,11 +369,11 @@ function RateModal({ticket,onClose}) {
   );
 }
 
-function TicketDetail({ticketNumber,onBack,onRate}) {
+function TicketDetail({ticketNumber,onBack,onRate,canRate}) {
   const {data,isLoading} = useGetManagerTicketDetail(ticketNumber);
   const [tab,setTab]     = useState("overview");
   const ticket = data?.ticket;
-  const canRate = ticket&&["resolved","closed"].includes(ticket.status)&&!ticket.submitterRating;
+  const ratable = ticket&&["resolved","closed"].includes(ticket.status)&&!ticket.submitterRating;
 
   if (isLoading) return (
     <div className="m-detail">
@@ -379,8 +411,18 @@ function TicketDetail({ticketNumber,onBack,onRate}) {
               <div style={{fontSize:19,fontWeight:700,color:C.text,fontFamily:"'Syne',sans-serif",lineHeight:1.3,marginBottom:4}}>{ticket.title}</div>
               <div style={{fontSize:12,color:C.muted,fontFamily:"'Instrument Sans',sans-serif"}}>Submitted {timeAgo(ticket.createdAt)} · SLA: {fmt(ticket.slaDeadline)}</div>
             </div>
-            {canRate&&(
-              <button className="m-btn" onClick={()=>onRate(ticket)} style={{background:"linear-gradient(135deg,#D97706,#F59E0B)",color:"#fff",flexShrink:0}}>⭐ Rate Resolution</button>
+            {ratable&&(
+              canRate ? (
+                <button className="m-btn" onClick={()=>onRate(ticket)} style={{background:"linear-gradient(135deg,#D97706,#F59E0B)",color:"#fff",flexShrink:0}}>⭐ Rate Resolution</button>
+              ) : (
+                <span
+                  className="m-chip"
+                  title="No permission to rate tickets"
+                  style={{background:"#F3F4F6",color:"#9CA3AF",flexShrink:0,cursor:"not-allowed"}}
+                >
+                  🔒 Rate Resolution
+                </span>
+              )
             )}
           </div>
 
@@ -542,7 +584,7 @@ function TicketDetail({ticketNumber,onBack,onRate}) {
   );
 }
 
-function MyTickets() {
+function MyTickets({canRate}) {
   const {data,isLoading}           = useManagerGetMyTickets();
   const [selected,setSelected]     = useState(null);
   const [rateTarget,setRateTarget] = useState(null);
@@ -552,7 +594,7 @@ function MyTickets() {
 
   if (selected) return (
     <>
-      <TicketDetail ticketNumber={selected} onBack={()=>setSelected(null)} onRate={t=>setRateTarget(t)}/>
+      <TicketDetail ticketNumber={selected} onBack={()=>setSelected(null)} onRate={t=>setRateTarget(t)} canRate={canRate}/>
       {rateTarget&&<RateModal ticket={rateTarget} onClose={()=>setRateTarget(null)}/>}
     </>
   );
@@ -572,7 +614,7 @@ function MyTickets() {
       <div style={{width:"100%",maxWidth:720}}>
         {tickets.map((t,i)=>{
           const tm = TYPE_META[t.type]||{dot:C.primary};
-          const canRate = ["resolved","closed"].includes(t.status)&&!t.submitterRating;
+          const ratable = ["resolved","closed"].includes(t.status)&&!t.submitterRating;
 
           return (
             <div key={t._id} className="m-card" style={{animationDelay:`${i*.05}s`,borderLeft:`3px solid ${tm.dot}`}} onClick={()=>setSelected(t.ticketNumber)}>
@@ -609,14 +651,24 @@ function MyTickets() {
                 </div>
 
                 <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end",flexShrink:0}}>
-                  {canRate&&(
-                    <button
-                      className="m-btn"
-                      onClick={e=>{e.stopPropagation();setRateTarget(t);}}
-                      style={{background:"linear-gradient(135deg,#D97706,#F59E0B)",color:"#fff",fontSize:11,padding:"6px 12px"}}
-                    >
-                      ⭐ Rate
-                    </button>
+                  {ratable&&(
+                    canRate ? (
+                      <button
+                        className="m-btn"
+                        onClick={e=>{e.stopPropagation();setRateTarget(t);}}
+                        style={{background:"linear-gradient(135deg,#D97706,#F59E0B)",color:"#fff",fontSize:11,padding:"6px 12px"}}
+                      >
+                        ⭐ Rate
+                      </button>
+                    ) : (
+                      <span
+                        className="m-chip"
+                        title="No permission to rate tickets"
+                        style={{background:"#F3F4F6",color:"#9CA3AF",cursor:"not-allowed"}}
+                      >
+                        🔒 Rate
+                      </span>
+                    )
                   )}
                   <span style={{fontSize:10,color:C.muted,fontFamily:"'Instrument Sans',sans-serif"}}>Tap to view →</span>
                 </div>
@@ -632,16 +684,25 @@ function MyTickets() {
 }
 
 export default function ManagerTickets() {
-  const [tab,setTab] = useState("submit");
+  const can = usePermissionStore((state) => state.can);
+  const canRaise   = can("tickets.can_raise_ticket");
+  const canViewAll = can("tickets.can_view_all_tickets");
+  const canResolve = can("tickets.can_resolve_ticket");
+  const canRate    = can("tickets.can_rate_ticket");
+  const hasAccess  = canRaise || canViewAll || canResolve || canRate;
+
+  const [tab,setTab] = useState(canRaise ? "submit" : "mytickets");
   const {data}       = useManagerGetMyTickets();
   const count        = data?.count||0;
 
+  if (!hasAccess) return <AccessRestricted/>;
+
   return (
-    <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'Instrument Sans',sans-serif",padding:"32px 36px"}}>
+    <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'Instrument Sans',sans-serif",padding:"clamp(20px,5vw,32px) clamp(16px,5vw,36px)"}}>
       <G/>
 
       <div style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
-        <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:28}}>
+        <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:28,flexWrap:"wrap",justifyContent:"center"}}>
           <div style={{width:50,height:50,borderRadius:16,background:`linear-gradient(135deg,${C.primary},${C.accent})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,boxShadow:"0 6px 22px rgba(115,0,66,.32)",flexShrink:0}}>🎫</div>
           <div>
             <h1 style={{fontSize:22,fontWeight:800,color:C.text,margin:0,fontFamily:"'Syne',sans-serif"}}>My Tickets</h1>
@@ -651,23 +712,40 @@ export default function ManagerTickets() {
           </div>
         </div>
 
-        <div style={{display:"flex",gap:3,background:"rgba(230,220,245,.55)",borderRadius:12,padding:4,marginBottom:26,width:"fit-content",border:`1px solid ${C.border}`}}>
-          {[["submit","📝 Submit New"],["mytickets",`📋 My Tickets${count?` (${count})`:""}`]].map(([k,l])=>(
-            <button
-              key={k}
-              onClick={()=>setTab(k)}
-              className={tab===k?"m-tab-active":"m-tab-idle"}
-              style={{padding:"8px 20px",borderRadius:9,border:"none",cursor:"pointer",fontSize:12.5,fontWeight:tab===k?600:400,fontFamily:"'Instrument Sans',sans-serif",transition:"all .2s"}}
-            >
-              {l}
-            </button>
-          ))}
+        <div style={{display:"flex",gap:3,background:"rgba(230,220,245,.55)",borderRadius:12,padding:4,marginBottom:26,width:"fit-content",border:`1px solid ${C.border}`,flexWrap:"wrap"}}>
+          {[["submit","📝 Submit New"],["mytickets",`📋 My Tickets${count?` (${count})`:""}`]].map(([k,l])=>{
+            const locked = k==="submit" && !canRaise;
+            return (
+              <button
+                key={k}
+                onClick={()=>setTab(k)}
+                className={tab===k?"m-tab-active":"m-tab-idle"}
+                title={locked?"No permission to raise tickets":undefined}
+                style={{
+                  padding:"8px 20px", borderRadius:9, border:"none", cursor:"pointer",
+                  fontSize:12.5, fontWeight:tab===k?600:400, fontFamily:"'Instrument Sans',sans-serif",
+                  transition:"all .2s", opacity:locked?0.65:1, display:"flex", alignItems:"center", gap:5,
+                }}
+              >
+                {locked && "🔒"} {l}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       <div style={{maxWidth:720,margin:"0 auto"}}>
-        {tab==="submit" && <SubmitForm onSuccess={()=>setTab("mytickets")}/>}
-        {tab==="mytickets" && <MyTickets/>}
+        {tab==="submit" && (
+          canRaise ? (
+            <SubmitForm onSuccess={()=>setTab("mytickets")}/>
+          ) : (
+            <LockedPanel
+              title="Raising tickets is restricted"
+              message="You don't have permission to submit new tickets. Contact your admin to request access."
+            />
+          )
+        )}
+        {tab==="mytickets" && <MyTickets canRate={canRate}/>}
       </div>
     </div>
   );

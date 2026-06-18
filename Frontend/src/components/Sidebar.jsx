@@ -60,7 +60,6 @@ const managerMenu = [
   { name: "Announcement", path: "/announcement-manager", icon: <FaBullhorn />,  permissionGroup: ["announcements.can_view_announcements", "announcements.can_create_announcement", "announcements.can_edit_announcement", "announcements.can_delete_announcement"] },
   { name: "Organisation", path: "/organisation-manager", icon: <FaBuilding /> },
   { name: "Review",       path: "/review-manager",       icon: <FaBullhorn /> },
-  { name: "Document",     path: "/document-manager",     icon: <FaFileAlt />,   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "File",         path: "/file-manager",         icon: <FaFolder />,    permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Recruitment",  path: "/recruitment-manager",  icon: <FaUsersCog />,  permissionGroup: ["recruitment.can_view_hiring_requisitions", "recruitment.can_create_hiring_requisition", "recruitment.can_view_candidates", "recruitment.can_add_candidate"] },
   { name: "TorchX Voice", path: "/manager-complaints",   icon: <FaShieldAlt />, permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"] },
