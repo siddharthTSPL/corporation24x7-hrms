@@ -8,7 +8,7 @@ import {
   getAllExpenseDocuments,
   getAllPersonalDocuments,
   getDocumentDetails,
-} from "../../api/managerapi/document/madocument.api";
+} from "../../../api/managerapi/document/madocument.api";
 
 // Upload
 export const useUploadManagerDocument = () => {
