@@ -435,6 +435,62 @@ const superadminRejectWFH = async (req, res, next) => {
   res.status(200).json({ success: true, message: "WFH request rejected", wfh });
 };
 
+
+const getForwardedWFH = async (req, res, next) => {
+  const wfhList = await WFH.find({
+    currentHandler: req.manager._id,
+    currentHandlerModel: "Manager",
+    organisation_id: req.manager.organisation_id,
+    status: "pending_reporting_manager",
+  })
+    .populate("requester", "f_name l_name work_email department designation")
+    .sort({ createdAt: -1 })
+    .lean();
+  res.status(200).json({ success: true, count: wfhList.length, wfhList });
+};
+
+const approveForwardedWFH = async (req, res, next) => {
+  const { wfhId, remarks } = req.body;
+  if (!wfhId)
+    return next(Object.assign(new Error("wfhId is required"), { statusCode: 400 }));
+
+  const wfh = await WFH.findOne({ _id: wfhId, organisation_id: req.manager.organisation_id });
+  if (!wfh)
+    return next(Object.assign(new Error("WFH request not found"), { statusCode: 404 }));
+  if (wfh.currentHandler.toString() !== req.manager._id.toString() || wfh.currentHandlerModel !== "Manager")
+    return next(Object.assign(new Error("This WFH request is not in your queue"), { statusCode: 403 }));
+  if (wfh.status !== "pending_reporting_manager")
+    return next(Object.assign(new Error("WFH request is not awaiting your approval"), { statusCode: 400 }));
+
+  wfh.status = "approved_reporting_manager";
+  wfh.approvedBy = req.manager._id;
+  wfh.remarks = remarks || "";
+  await wfh.save();
+  res.status(200).json({ success: true, message: "WFH request approved", wfh });
+};
+
+const rejectForwardedWFH = async (req, res, next) => {
+  const { wfhId, remarks } = req.body;
+  if (!wfhId)
+    return next(Object.assign(new Error("wfhId is required"), { statusCode: 400 }));
+
+  const wfh = await WFH.findOne({ _id: wfhId, organisation_id: req.manager.organisation_id });
+  if (!wfh)
+    return next(Object.assign(new Error("WFH request not found"), { statusCode: 404 }));
+  if (wfh.currentHandler.toString() !== req.manager._id.toString() || wfh.currentHandlerModel !== "Manager")
+    return next(Object.assign(new Error("This WFH request is not in your queue"), { statusCode: 403 }));
+  if (wfh.status !== "pending_reporting_manager")
+    return next(Object.assign(new Error("WFH request is not awaiting your decision"), { statusCode: 400 }));
+
+  wfh.status = "rejected_reporting_manager";
+  wfh.rejectedBy = req.manager._id;
+  wfh.remarks = remarks || "";
+  wfh.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  await wfh.save();
+  res.status(200).json({ success: true, message: "WFH request rejected", wfh });
+};
+
+
 module.exports = {
   applyWFH,
   editWFH,
@@ -447,6 +503,9 @@ module.exports = {
   forwardWFH,
   managerApplyWFH,
   managerGetMyWFH,
+  getForwardedWFH,
+  approveForwardedWFH,
+  rejectForwardedWFH,
   adminGetPendingWFH,
   adminApproveWFH,
   adminRejectWFH,
