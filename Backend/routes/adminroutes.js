@@ -54,6 +54,7 @@ const {
   adminGetMyTickets,
   adminRateTicket,
   adminGetTicketDetail,
+  findallmanagerswoadmin
 } = require("../controllers/admin.controller");
 
 const {
@@ -298,6 +299,12 @@ adminrouter.get(
   adminauthmiddleware,
   checkPermission("documents.can_upload_documents"),
   asyncHandler(getDocuments),
+);
+
+adminrouter.get(
+  "/all-no-admin",
+  adminauthmiddleware,
+  asyncHandler(findallmanagerswoadmin)
 );
 
 module.exports = adminrouter;
