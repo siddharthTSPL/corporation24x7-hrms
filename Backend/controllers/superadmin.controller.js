@@ -503,6 +503,7 @@ const getMe = async (req, res, next) => {
     res.status(200).json({
       success: true,
       superAdmin: {
+        profile_image: superAdmin.profile_image,
         _id: superAdmin._id,
         f_name: superAdmin.f_name,
         l_name: superAdmin.l_name,
@@ -2087,6 +2088,7 @@ const getAllExpenseDocumentsSuperAdmin = async (req, res, next) => {
             contact: doc.uploader.personal_contact,
             department: doc.uploader.department,
             designation: doc.uploader.designation,
+            role: doc.uploader.role,
           }
         : null,
     })),
@@ -2105,10 +2107,10 @@ const getDocumentDetailsSuperAdmin = async (req, res, next) => {
 
   const document = await Document.findOne({ _id: id, organisation_id })
     .populate("uploader", "f_name l_name work_email personal_contact department designation");
-
+    
   if (!document)
     return next(Object.assign(new Error("Document not found"), { statusCode: 404 }));
-
+  
   document.viewedBySuperAdmin = true;
   await document.save();
 
@@ -2131,6 +2133,7 @@ const getDocumentDetailsSuperAdmin = async (req, res, next) => {
             email: document.uploader.work_email,
             department: document.uploader.department,
             designation: document.uploader.designation,
+            role: document.uploader.role,
           }
         : null,
     },
