@@ -10,6 +10,7 @@ import {
   addManager,
   addEmployee,
   findAllManagers,
+  findAllManagerswithoutAdmin,
   editAdminProfile,
   changeAdminPassword,
 } from "../../api/adminapi/auth/ad.auth.api";
@@ -116,5 +117,13 @@ export const useEditAdminProfile = () => {
 export const useChangeAdminPassword = () => {
   return useMutation({
     mutationFn: changeAdminPassword,
+  });
+};
+
+
+export const useFindAllManagerswithoutAdmin = () => {
+  return useQuery({
+    queryKey: ["managerswithoutadmin"],
+    queryFn: findAllManagerswithoutAdmin,
   });
 };
