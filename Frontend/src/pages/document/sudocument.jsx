@@ -519,7 +519,11 @@ function UploaderCard({ group, onClick }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <p className="text-sm font-medium text-[#2a1a16] truncate">{group.name}</p>
-          {unviewed > 0 && <Badge className="bg-amber-50 text-amber-700">{unviewed} new</Badge>}
+          {unviewed > 0 ? (
+            <Badge className="bg-amber-50 text-amber-700">{unviewed} new</Badge>
+          ) : (
+            <Badge className="bg-green-50 text-green-700">All viewed</Badge>
+          )}
         </div>
         <p className="text-xs text-[#b0948a] truncate mt-0.5">{group.email}</p>
         <div className="flex items-center gap-1.5 mt-2 flex-wrap">
@@ -532,11 +536,15 @@ function UploaderCard({ group, onClick }) {
 
       <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
         <div className="flex items-center gap-1.5">
-          {group.personalCount > 0 && (
+          {group.personalCount > 0 ? (
             <Badge className="bg-[#730042]/10 text-[#730042]">{group.personalCount} personal</Badge>
+          ) : (
+            <Badge className="bg-[#f9f8f2] text-[#c9bab5] border border-[#ede5e0]">0 personal</Badge>
           )}
-          {group.expenseCount > 0 && (
+          {group.expenseCount > 0 ? (
             <Badge className="bg-blue-50 text-blue-700">{group.expenseCount} expense</Badge>
+          ) : (
+            <Badge className="bg-[#f9f8f2] text-[#c9bab5] border border-[#ede5e0]">0 expense</Badge>
           )}
         </div>
         <div className="flex items-center gap-1 text-xs text-[#b0948a] font-medium">
@@ -585,14 +593,14 @@ function UploaderTableRow({ group, onClick }) {
         {group.personalCount > 0 ? (
           <Badge className="bg-[#730042]/10 text-[#730042]">{group.personalCount}</Badge>
         ) : (
-          <span className="text-xs text-[#c9bab5]">—</span>
+          <Badge className="bg-[#f9f8f2] text-[#c9bab5] border border-[#ede5e0]">0</Badge>
         )}
       </td>
       <td className="px-4 py-3">
         {group.expenseCount > 0 ? (
           <Badge className="bg-blue-50 text-blue-700">{group.expenseCount}</Badge>
         ) : (
-          <span className="text-xs text-[#c9bab5]">—</span>
+          <Badge className="bg-[#f9f8f2] text-[#c9bab5] border border-[#ede5e0]">0</Badge>
         )}
       </td>
       <td className="px-4 py-3">
@@ -602,7 +610,7 @@ function UploaderTableRow({ group, onClick }) {
         {group.unviewedCount > 0 ? (
           <Badge className="bg-amber-50 text-amber-700">{group.unviewedCount} new</Badge>
         ) : (
-          <span className="text-xs text-[#c9bab5]">—</span>
+          <Badge className="bg-green-50 text-green-700">All viewed</Badge>
         )}
       </td>
       <td className="px-4 py-3">
