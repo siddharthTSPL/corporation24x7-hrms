@@ -71,6 +71,12 @@ export const findAllManagers = async () => {
   return res.data;
 };
 
+
+export const findAllManagerswithoutAdmin = async () => {
+  const res = await api.get('admin/all-no-admin');
+  return res.data;
+}
+
 export const editAdminProfile = async (data) => {
   const res = await api.put('admin/editadminprofile', data);
   return res.data;
