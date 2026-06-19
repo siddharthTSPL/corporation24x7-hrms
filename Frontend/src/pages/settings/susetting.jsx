@@ -12,35 +12,26 @@ const AVATAR_STYLES = [
   "micah", "open-peeps", "big-ears", "croodles",
 ];
 
-const INDUSTRY_OPTIONS = [
-  "Technology", "Healthcare", "Finance", "Education",
-  "Retail", "Manufacturing", "Consulting", "Real Estate", "Other",
-];
-
-const COMPANY_SIZE_OPTIONS = [
-  "1–10", "11–50", "51–200", "201–500", "501–1000", "1000+",
-];
-
 const C = {
-  brand:      "#730042",
+  brand: "#730042",
   brandLight: "rgba(115,0,66,0.08)",
-  brandMid:   "rgba(115,0,66,0.18)",
-  grad1:      "#730042",
-  grad2:      "#CD166E",
-  green:      "#1D9E75",
-  greenBg:    "#e8f5e9",
-  blue:       "#378ADD",
-  blueBg:     "#e6f1fb",
-  amber:      "#BA7517",
-  amberBg:    "#faeeda",
-  red:        "#E24B4A",
-  redBg:      "#fcebeb",
-  surface:    "#ffffff",
-  page:       "#f9f8f2",
-  border:     "#ede5e0",
-  text:       "#2a1a16",
-  muted:      "#b0948a",
-  mutedMid:   "#c9bab5",
+  brandMid: "rgba(115,0,66,0.18)",
+  grad1: "#730042",
+  grad2: "#CD166E",
+  green: "#1D9E75",
+  greenBg: "#e8f5e9",
+  blue: "#378ADD",
+  blueBg: "#e6f1fb",
+  amber: "#BA7517",
+  amberBg: "#faeeda",
+  red: "#E24B4A",
+  redBg: "#fcebeb",
+  surface: "#ffffff",
+  page: "#f9f8f2",
+  border: "#ede5e0",
+  text: "#2a1a16",
+  muted: "#b0948a",
+  mutedMid: "#c9bab5",
 };
 
 function getInitials(fName = "", lName = "") {
@@ -66,8 +57,8 @@ function daysLeft(dateStr) {
 
 function Badge({ children, color = C.brand, bg = C.brandLight }) {
   return (
-    <span 
-      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap"
+    <span
+      className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-medium whitespace-nowrap"
       style={{ color, background: bg }}
     >
       {children}
@@ -78,8 +69,8 @@ function Badge({ children, color = C.brand, bg = C.brandLight }) {
 function PlanBadge({ plan }) {
   const isTrial = plan === "trial" || plan === "free_trial";
   return (
-    <span 
-      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap"
+    <span
+      className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold whitespace-nowrap"
       style={{
         color: isTrial ? C.amber : "#1a5c3a",
         background: isTrial ? C.amberBg : C.greenBg,
@@ -91,15 +82,27 @@ function PlanBadge({ plan }) {
   );
 }
 
+function StatusBadge({ status }) {
+  const isActive = status === "active";
+  return (
+    <Badge
+      color={isActive ? "#1a5c3a" : C.muted}
+      bg={isActive ? C.greenBg : "#f3f0ee"}
+    >
+      {status || "—"}
+    </Badge>
+  );
+}
+
 function Spinner({ size = 16, color = "#fff" }) {
   return (
-    <div 
+    <div
       className="rounded-full animate-spin shrink-0"
       style={{
         width: size, height: size,
         border: `2px solid ${color}33`,
         borderTop: `2px solid ${color}`,
-      }} 
+      }}
     />
   );
 }
@@ -113,42 +116,42 @@ function Toast({ message, type, onClose }) {
   if (!message) return null;
   const isSuccess = type === "success";
   return (
-    <div 
-      className="fixed top-4 right-4 left-4 sm:left-auto z-[999] flex items-center gap-2.5 p-3.5 rounded-xl shadow-lg animate-[slideIn_0.25s_ease]"
+    <div
+      className="fixed top-3 right-3 left-3 sm:left-auto sm:top-4 sm:right-4 z-[999] flex items-center gap-2 sm:gap-2.5 p-3 sm:p-3.5 rounded-xl shadow-lg max-w-full sm:max-w-sm animate-[slideIn_0.25s_ease]"
       style={{
         background: isSuccess ? "#f0faf5" : "#fff5f5",
         border: `0.5px solid ${isSuccess ? "#a8dfc3" : "#f5c6c6"}`,
       }}
     >
-      <div 
-        className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+      <div
+        className="w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center shrink-0"
         style={{ background: isSuccess ? C.greenBg : C.redBg }}
       >
         {isSuccess
-          ? <svg width="14" height="14" viewBox="0 0 14 14"><polyline points="2,7 5.5,10.5 12,4" fill="none" stroke={C.green} strokeWidth="2" strokeLinecap="round"/></svg>
-          : <svg width="14" height="14" viewBox="0 0 14 14"><line x1="3" y1="3" x2="11" y2="11" stroke={C.red} strokeWidth="2" strokeLinecap="round"/><line x1="11" y1="3" x2="3" y2="11" stroke={C.red} strokeWidth="2" strokeLinecap="round"/></svg>
+          ? <svg width="12" height="12" viewBox="0 0 14 14"><polyline points="2,7 5.5,10.5 12,4" fill="none" stroke={C.green} strokeWidth="2" strokeLinecap="round" /></svg>
+          : <svg width="12" height="12" viewBox="0 0 14 14"><line x1="3" y1="3" x2="11" y2="11" stroke={C.red} strokeWidth="2" strokeLinecap="round" /><line x1="11" y1="3" x2="3" y2="11" stroke={C.red} strokeWidth="2" strokeLinecap="round" /></svg>
         }
       </div>
-      <span 
-        className="text-[13px] font-medium flex-1"
+      <span
+        className="text-xs sm:text-[13px] font-medium flex-1 break-words"
         style={{ color: isSuccess ? "#1a5c3a" : "#7a1a1a" }}
       >
         {message}
       </span>
-      <button onClick={onClose} className="bg-none border-none cursor-pointer text-[#b0948a] text-base p-0 leading-none">×</button>
+      <button onClick={onClose} className="bg-none border-none cursor-pointer text-[#b0948a] text-base p-0 leading-none shrink-0">×</button>
     </div>
   );
 }
 
 function SectionCard({ title, subtitle, accent = C.brand, children }) {
   return (
-    <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative mb-4 sm:mb-6">
+    <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative mb-4 sm:mb-6 w-full">
       <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl" style={{ background: accent }} />
-      <div className="p-5 sm:p-6 border-b border-[#ede5e0]">
+      <div className="px-4 py-4 sm:px-6 sm:py-6 border-b border-[#ede5e0]">
         <div className="text-sm font-medium text-[#2a1a16]">{title}</div>
         {subtitle && <div className="text-xs text-[#b0948a] mt-1">{subtitle}</div>}
       </div>
-      <div className="p-5 sm:p-6">{children}</div>
+      <div className="px-4 py-4 sm:px-6 sm:py-6">{children}</div>
     </div>
   );
 }
@@ -159,9 +162,9 @@ function FieldLabel({ children }) {
 
 function ReadonlyField({ value, label }) {
   return (
-    <div className="mb-4">
+    <div className="mb-4 min-w-0">
       <FieldLabel>{label}</FieldLabel>
-      <div className="px-3.5 py-2.5 rounded-lg bg-[#f9f4f2] border border-[#ede5e0] text-sm text-[#2a1a16] font-medium">
+      <div className="px-3 sm:px-3.5 py-2.5 rounded-lg bg-[#f9f4f2] border border-[#ede5e0] text-sm text-[#2a1a16] font-medium break-words">
         {value || "—"}
       </div>
       <div className="text-[11px] text-[#c9bab5] mt-1">Read-only</div>
@@ -171,7 +174,7 @@ function ReadonlyField({ value, label }) {
 
 function InputField({ label, value, onChange, type = "text", placeholder, hint, rightEl, name, disabled }) {
   return (
-    <div className="mb-4">
+    <div className="mb-4 min-w-0">
       <FieldLabel>{label}</FieldLabel>
       <div className="relative">
         <input
@@ -181,7 +184,7 @@ function InputField({ label, value, onChange, type = "text", placeholder, hint, 
           onChange={onChange}
           placeholder={placeholder}
           disabled={disabled}
-          className={`w-full px-3.5 py-2.5 ${rightEl ? 'pr-10' : ''} rounded-lg border border-[#ede5e0] text-sm text-[#2a1a16] outline-none transition-all focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 font-sans ${disabled ? 'bg-[#f9f4f2] cursor-not-allowed' : 'bg-white'}`}
+          className={`w-full min-w-0 px-3 sm:px-3.5 py-2.5 ${rightEl ? "pr-10" : ""} rounded-lg border border-[#ede5e0] text-sm text-[#2a1a16] outline-none transition-all focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 font-sans ${disabled ? "bg-[#f9f4f2] cursor-not-allowed" : "bg-white"}`}
         />
         {rightEl && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -194,38 +197,15 @@ function InputField({ label, value, onChange, type = "text", placeholder, hint, 
   );
 }
 
-function SelectField({ label, value, onChange, options, hint }) {
-  return (
-    <div className="mb-4">
-      <FieldLabel>{label}</FieldLabel>
-      <select
-        value={value}
-        onChange={onChange}
-        className="w-full px-3.5 py-2.5 rounded-lg border border-[#ede5e0] text-sm text-[#2a1a16] bg-white outline-none transition-all focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 font-sans cursor-pointer appearance-none"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23b0948a' fill='none' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E")`,
-          backgroundRepeat: "no-repeat",
-          backgroundPosition: "right 14px center",
-        }}
-      >
-        {options.map(opt => (
-          <option key={opt} value={opt}>{opt}</option>
-        ))}
-      </select>
-      {hint && <div className="text-[11px] text-[#c9bab5] mt-1">{hint}</div>}
-    </div>
-  );
-}
-
 function PrimaryButton({ onClick, disabled, loading, children, color = C.brand }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled || loading}
       className="w-full py-2.5 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-opacity hover:opacity-90 font-sans"
-      style={{ 
-        background: disabled || loading ? `${color}99` : color, 
-        cursor: disabled || loading ? "not-allowed" : "pointer" 
+      style={{
+        background: disabled || loading ? `${color}99` : color,
+        cursor: disabled || loading ? "not-allowed" : "pointer",
       }}
     >
       {loading ? <><Spinner />{children}</> : children}
@@ -237,43 +217,43 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
   const tabs = [
     {
       key: "overview", label: "Overview", icon: (
-        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><rect x="9" y="2" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><rect x="2" y="9" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><rect x="9" y="9" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.4"/></svg>
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.4" /><rect x="9" y="2" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.4" /><rect x="2" y="9" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.4" /><rect x="9" y="9" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.4" /></svg>
       )
     },
     {
       key: "profile", label: "Profile", icon: (
-        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.4"/><path d="M2 13c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.4" /><path d="M2 13c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
       )
     },
     {
       key: "organisation", label: "Organisation", icon: (
-        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M2 14V6l6-4 6 4v8" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><rect x="6" y="9" width="4" height="5" rx="1" stroke="currentColor" strokeWidth="1.4"/></svg>
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none"><path d="M2 14V6l6-4 6 4v8" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /><rect x="6" y="9" width="4" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" /></svg>
       )
     },
     {
       key: "password", label: "Password", icon: (
-        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><rect x="4" y="7" width="8" height="6" rx="2" stroke="currentColor" strokeWidth="1.4"/><path d="M6 7V5a2 2 0 0 1 4 0v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none"><rect x="4" y="7" width="8" height="6" rx="2" stroke="currentColor" strokeWidth="1.4" /><path d="M6 7V5a2 2 0 0 1 4 0v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
       )
     },
     {
       key: "avatar", label: "Avatar", icon: (
-        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4"/><circle cx="8" cy="6" r="2" stroke="currentColor" strokeWidth="1.2"/><path d="M4 12.5c0-2.2 1.8-3.5 4-3.5s4 1.3 4 3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" /><circle cx="8" cy="6" r="2" stroke="currentColor" strokeWidth="1.2" /><path d="M4 12.5c0-2.2 1.8-3.5 4-3.5s4 1.3 4 3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>
       )
     },
   ];
 
-  const days = daysLeft(superAdmin?.plan_expires_at || superAdmin?.trial_expires_at);
+  const days = daysLeft(superAdmin?.trial_expires_at);
 
   return (
     <div className="w-full lg:w-64 lg:shrink-0">
       <div className="bg-white rounded-2xl border border-[#ede5e0] p-4 sm:p-5 mb-3 relative overflow-hidden">
         <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl" style={{ background: `linear-gradient(90deg, ${C.grad1}, ${C.grad2})` }} />
-        <div className="flex flex-col items-center gap-2.5">
-          <div 
-            className="w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-xl sm:text-2xl font-semibold text-white overflow-hidden border-[3px]"
-            style={{ 
+        <div className="flex flex-col items-center gap-2.5 min-w-0">
+          <div
+            className="w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-xl sm:text-2xl font-semibold text-white overflow-hidden border-[3px] shrink-0"
+            style={{
               background: superAdmin?.profile_image ? "transparent" : `linear-gradient(135deg, ${C.grad1}, ${C.grad2})`,
-              borderColor: C.brandLight 
+              borderColor: C.brandLight,
             }}
           >
             {superAdmin?.profile_image
@@ -281,16 +261,16 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
               : initials
             }
           </div>
-          <div className="text-center w-full min-w-0">
+          <div className="text-center w-full min-w-0 px-1">
             <div className="text-sm font-semibold text-[#2a1a16] truncate">{superAdmin?.f_name} {superAdmin?.l_name}</div>
             <div className="text-[11px] text-[#b0948a] mt-0.5 truncate">{superAdmin?.organisation_name || "—"}</div>
-            <div className="mt-2 flex flex-col gap-1.5 items-center">
+            <div className="mt-2 flex flex-wrap gap-1.5 items-center justify-center">
               <Badge color={C.brand} bg={C.brandLight}>{superAdmin?.role || "super_admin"}</Badge>
               {superAdmin?.is_trial_active && <PlanBadge plan="free_trial" />}
             </div>
           </div>
           {days !== null && days <= 30 && (
-            <div 
+            <div
               className="w-full p-2 rounded-lg text-center"
               style={{
                 background: days <= 5 ? C.redBg : C.amberBg,
@@ -308,19 +288,19 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden flex flex-col sm:flex-row lg:flex-col">
         {tabs.map((t, i) => {
           const active = tab === t.key;
           return (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`w-full px-4 py-3 flex items-center gap-2.5 text-sm transition-all text-left font-sans ${active ? 'bg-[#730042]/10 text-[#730042] font-medium' : 'text-[#b0948a] hover:bg-gray-50'} ${i < tabs.length - 1 ? 'border-b border-[#ede5e0]' : ''}`}
+              className={`flex-1 lg:flex-none w-full px-3 sm:px-4 py-3 flex items-center justify-center sm:justify-start lg:justify-start gap-2 sm:gap-2.5 text-xs sm:text-sm transition-all text-left font-sans ${active ? "bg-[#730042]/10 text-[#730042] font-medium" : "text-[#b0948a] hover:bg-gray-50"} ${i < tabs.length - 1 ? "border-b sm:border-b-0 sm:border-r lg:border-r-0 lg:border-b border-[#ede5e0]" : ""}`}
             >
               {t.icon}
-              {t.label}
+              <span className="hidden sm:inline lg:inline truncate">{t.label}</span>
               {active && (
-                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#730042]"></div>
+                <div className="hidden lg:block ml-auto w-1.5 h-1.5 rounded-full bg-[#730042] shrink-0" />
               )}
             </button>
           );
@@ -335,19 +315,24 @@ function OverviewTab({ superAdmin }) {
 
   return (
     <>
-      <SectionCard title="Account summary" subtitle="Your super admin account at a glance" accent={`linear-gradient(90deg, ${C.grad1}, ${C.grad2})`}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
+      <SectionCard title="Account summary" subtitle="Your super admin account at a glance" accent={C.brand}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-0">
           <ReadonlyField label="Full name" value={`${superAdmin?.f_name || ""} ${superAdmin?.l_name || ""}`.trim()} />
           <ReadonlyField label="Email address" value={superAdmin?.email} />
           <ReadonlyField label="Role" value={superAdmin?.role} />
-          <ReadonlyField label="Account status" value={superAdmin?.status} />
-          <ReadonlyField label="Last login" value={formatDate(superAdmin?.last_login)} />
+          <div className="mb-4">
+            <FieldLabel>Account status</FieldLabel>
+            <div className="px-3.5 py-2.5 rounded-lg bg-[#f9f4f2] border border-[#ede5e0] flex items-center">
+              <StatusBadge status={superAdmin?.status} />
+            </div>
+          </div>
+          <ReadonlyField label="Email verified" value={superAdmin?.isVerified ? "Yes" : "No"} />
           <ReadonlyField label="Account created" value={formatDate(superAdmin?.createdAt)} />
         </div>
       </SectionCard>
 
       <SectionCard title="Plan & billing" subtitle="Current subscription details" accent={C.amber}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-0">
           <div className="mb-4">
             <FieldLabel>Current plan</FieldLabel>
             <div className="flex items-center gap-2 py-2.5">
@@ -357,8 +342,8 @@ function OverviewTab({ superAdmin }) {
           <ReadonlyField label="Trial started" value={formatDate(superAdmin?.trial_started_at)} />
           <div className="mb-4">
             <FieldLabel>Trial expires</FieldLabel>
-            <div 
-              className="px-3.5 py-2.5 rounded-lg text-sm font-medium"
+            <div
+              className="px-3.5 py-2.5 rounded-lg text-sm font-medium break-words"
               style={{
                 background: days !== null && days <= 5 ? C.redBg : "#f9f4f2",
                 border: `0.5px solid ${days !== null && days <= 5 ? "#f5c6c6" : C.border}`,
@@ -370,18 +355,15 @@ function OverviewTab({ superAdmin }) {
             </div>
           </div>
           <ReadonlyField label="Company domain" value={superAdmin?.company_domain} />
+          <ReadonlyField label="Licenses" value={superAdmin?.licenses?.length ? `${superAdmin.licenses.length} active` : "None"} />
+          <ReadonlyField label="Purchased products" value={superAdmin?.purchased_products?.length ? `${superAdmin.purchased_products.length}` : "None"} />
         </div>
       </SectionCard>
 
       <SectionCard title="Organisation snapshot" subtitle="Your company profile" accent={C.blue}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-0">
           <ReadonlyField label="Organisation name" value={superAdmin?.organisation_name} />
-          <ReadonlyField label="Industry" value={superAdmin?.industry} />
-          <ReadonlyField label="Company size" value={superAdmin?.company_size} />
-          <ReadonlyField label="Phone" value={superAdmin?.phone} />
-          <div className="md:col-span-2">
-            <ReadonlyField label="Company address" value={superAdmin?.company_address} />
-          </div>
+          <ReadonlyField label="Company domain" value={superAdmin?.company_domain} />
         </div>
       </SectionCard>
     </>
@@ -395,7 +377,6 @@ function ProfileTab({ superAdmin, onSuccess, onError }) {
   const [form, setForm] = useState({
     f_name: superAdmin?.f_name || "",
     l_name: superAdmin?.l_name || "",
-    phone: superAdmin?.phone || "",
   });
 
   useEffect(() => {
@@ -403,7 +384,6 @@ function ProfileTab({ superAdmin, onSuccess, onError }) {
       setForm({
         f_name: superAdmin.f_name || "",
         l_name: superAdmin.l_name || "",
-        phone: superAdmin.phone || "",
       });
     }
   }, [superAdmin]);
@@ -420,8 +400,8 @@ function ProfileTab({ superAdmin, onSuccess, onError }) {
   };
 
   return (
-    <SectionCard title="Personal details" subtitle="Update your name and contact information" accent={C.brand}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
+    <SectionCard title="Personal details" subtitle="Update your name" accent={C.brand}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-0">
         <InputField
           label="First name *"
           value={form.f_name}
@@ -441,14 +421,7 @@ function ProfileTab({ superAdmin, onSuccess, onError }) {
         disabled
         hint="Email cannot be changed. Contact support if needed."
       />
-      <InputField
-        label="Phone number"
-        type="tel"
-        value={form.phone}
-        onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
-        placeholder="Enter phone number"
-      />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-0">
         <ReadonlyField label="Role" value={superAdmin?.role} />
         <ReadonlyField label="Company domain" value={superAdmin?.company_domain} />
       </div>
@@ -465,18 +438,12 @@ function OrganisationTab({ superAdmin, onSuccess, onError }) {
 
   const [form, setForm] = useState({
     organisation_name: superAdmin?.organisation_name || "",
-    company_address: superAdmin?.company_address || "",
-    company_size: superAdmin?.company_size || COMPANY_SIZE_OPTIONS[0],
-    industry: superAdmin?.industry || INDUSTRY_OPTIONS[0],
   });
 
   useEffect(() => {
     if (superAdmin) {
       setForm({
         organisation_name: superAdmin.organisation_name || "",
-        company_address: superAdmin.company_address || "",
-        company_size: superAdmin.company_size || COMPANY_SIZE_OPTIONS[0],
-        industry: superAdmin.industry || INDUSTRY_OPTIONS[0],
       });
     }
   }, [superAdmin]);
@@ -499,26 +466,6 @@ function OrganisationTab({ superAdmin, onSuccess, onError }) {
         value={form.organisation_name}
         onChange={e => setForm(p => ({ ...p, organisation_name: e.target.value }))}
         placeholder="Your company name"
-      />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
-        <SelectField
-          label="Industry"
-          value={form.industry}
-          onChange={e => setForm(p => ({ ...p, industry: e.target.value }))}
-          options={INDUSTRY_OPTIONS}
-        />
-        <SelectField
-          label="Company size"
-          value={form.company_size}
-          onChange={e => setForm(p => ({ ...p, company_size: e.target.value }))}
-          options={COMPANY_SIZE_OPTIONS}
-        />
-      </div>
-      <InputField
-        label="Company address"
-        value={form.company_address}
-        onChange={e => setForm(p => ({ ...p, company_address: e.target.value }))}
-        placeholder="Full company address"
       />
       <ReadonlyField label="Company domain" value={superAdmin?.company_domain} />
       <PrimaryButton onClick={handleSave} loading={updateProfile.isPending}>
@@ -549,8 +496,8 @@ function PasswordTab({ onSuccess, onError }) {
   const strengthColor = ["", C.red, C.amber, "#f9a825", C.green, C.green][s];
 
   const EyeIcon = ({ open }) => open
-    ? <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3"/><circle cx="8" cy="8" r="2" stroke={C.muted} strokeWidth="1.3"/></svg>
-    : <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3"/><line x1="2" y1="2" x2="14" y2="14" stroke={C.muted} strokeWidth="1.3" strokeLinecap="round"/></svg>;
+    ? <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3" /><circle cx="8" cy="8" r="2" stroke={C.muted} strokeWidth="1.3" /></svg>
+    : <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3" /><line x1="2" y1="2" x2="14" y2="14" stroke={C.muted} strokeWidth="1.3" strokeLinecap="round" /></svg>;
 
   const eyeToggle = (
     <button type="button" onClick={() => setShow(s => !s)} className="bg-none border-none cursor-pointer flex p-0">
@@ -585,7 +532,7 @@ function PasswordTab({ onSuccess, onError }) {
         {form.newPassword && (
           <div className="-mt-2 mb-4">
             <div className="flex gap-1 mb-1.5">
-              {[1,2,3,4,5].map(i => (
+              {[1, 2, 3, 4, 5].map(i => (
                 <div key={i} className="flex-1 h-1 rounded-full transition-colors" style={{ background: i <= s ? strengthColor : C.border }} />
               ))}
             </div>
@@ -647,11 +594,11 @@ function AvatarTab({ superAdmin, onSuccess, onError }) {
   return (
     <SectionCard title="Profile avatar" subtitle="Choose an avatar that represents you" accent={C.blue}>
       <div className="flex flex-col sm:flex-row items-center gap-4 mb-6 p-4 sm:p-5 bg-[#f9f8f2] rounded-xl border border-[#ede5e0]">
-        <div 
-          className="w-16 h-16 sm:w-18 sm:h-18 rounded-full flex items-center justify-center text-2xl font-semibold text-white overflow-hidden border-[3px] shrink-0"
-          style={{ 
+        <div
+          className="w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-full flex items-center justify-center text-2xl font-semibold text-white overflow-hidden border-[3px] shrink-0"
+          style={{
             background: currentImg ? "transparent" : `linear-gradient(135deg, ${C.grad1}, ${C.grad2})`,
-            borderColor: C.brandLight 
+            borderColor: C.brandLight,
           }}
         >
           {currentImg
@@ -659,7 +606,7 @@ function AvatarTab({ superAdmin, onSuccess, onError }) {
             : initials
           }
         </div>
-        <div className="text-center sm:text-left">
+        <div className="text-center sm:text-left min-w-0">
           <div className="text-sm font-medium text-[#2a1a16] mb-1">Current avatar</div>
           <div className="text-xs text-[#b0948a] mb-2.5">
             {currentImg ? "DiceBear avatar" : "Initials avatar (default)"}
@@ -677,7 +624,7 @@ function AvatarTab({ superAdmin, onSuccess, onError }) {
       </div>
 
       <FieldLabel>Choose a style</FieldLabel>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-4 gap-2 sm:gap-3">
         {AVATAR_STYLES.map((style) => {
           const url = `https://api.dicebear.com/7.x/${style}/svg?seed=${seed}`;
           const isActive = currentImg?.includes(style);
@@ -687,7 +634,7 @@ function AvatarTab({ superAdmin, onSuccess, onError }) {
               key={style}
               onClick={() => applyAvatar(url)}
               disabled={updateProfile.isPending}
-              className="p-2 rounded-xl border transition-all relative flex flex-col items-center"
+              className="p-1.5 sm:p-2 rounded-xl border transition-all relative flex flex-col items-center min-w-0"
               style={{
                 borderColor: isActive ? C.brand : C.border,
                 background: isActive ? C.brandLight : C.surface,
@@ -702,8 +649,8 @@ function AvatarTab({ superAdmin, onSuccess, onError }) {
                 </div>
               )}
               <img src={url} alt={style} className="w-full aspect-square block rounded-lg" />
-              <div 
-                className="text-[10px] mt-1.5 text-center capitalize"
+              <div
+                className="text-[9px] sm:text-[10px] mt-1 sm:mt-1.5 text-center capitalize truncate w-full"
                 style={{ color: isActive ? C.brand : C.muted, fontWeight: isActive ? 500 : 400 }}
               >
                 {style}
@@ -725,11 +672,11 @@ export default function SuperAdminSettingsPage() {
   const initials = superAdmin ? getInitials(superAdmin.f_name, superAdmin.l_name) : "SA";
 
   const showSuccess = (msg) => setToast({ message: msg, type: "success" });
-  const showError   = (msg) => setToast({ message: msg, type: "error" });
+  const showError = (msg) => setToast({ message: msg, type: "error" });
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f9f8f2] font-sans">
+      <div className="min-h-screen flex items-center justify-center bg-[#f9f8f2] font-sans px-4">
         <div className="flex flex-col items-center gap-4">
           <Spinner size={36} color={C.brand} />
           <div className="text-sm text-[#b0948a]">Loading your profile...</div>
@@ -739,7 +686,7 @@ export default function SuperAdminSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-[#f9f8f2] p-4 sm:p-6 lg:p-8 text-[#2a1a16] font-sans">
+    <div className="min-h-screen w-full overflow-x-hidden bg-[#f9f8f2] p-3 sm:p-6 lg:p-8 text-[#2a1a16] font-sans">
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes slideIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
@@ -747,20 +694,20 @@ export default function SuperAdminSettingsPage() {
 
       <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: "", type: "" })} />
 
-      <div className="mb-6 sm:mb-8">
+      <div className="mb-5 sm:mb-8">
         <h1 className="text-lg sm:text-xl font-medium m-0 tracking-tight">Settings</h1>
-        <p className="text-sm text-[#b0948a] mt-1">Manage your super admin profile, organisation and security</p>
+        <p className="text-xs sm:text-sm text-[#b0948a] mt-1">Manage your super admin profile, organisation and security</p>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-8 items-start w-full">
         <Sidebar tab={tab} setTab={setTab} superAdmin={superAdmin} initials={initials} />
 
         <div className="flex-1 w-full min-w-0">
-          {tab === "overview"      && <OverviewTab superAdmin={superAdmin} />}
-          {tab === "profile"       && <ProfileTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
-          {tab === "organisation"  && <OrganisationTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
-          {tab === "password"      && <PasswordTab onSuccess={showSuccess} onError={showError} />}
-          {tab === "avatar"        && <AvatarTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
+          {tab === "overview" && <OverviewTab superAdmin={superAdmin} />}
+          {tab === "profile" && <ProfileTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
+          {tab === "organisation" && <OrganisationTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
+          {tab === "password" && <PasswordTab onSuccess={showSuccess} onError={showError} />}
+          {tab === "avatar" && <AvatarTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
 
           <div className="text-center text-xs text-[#c9bab5] mt-2">
             Changes are saved to your account automatically
