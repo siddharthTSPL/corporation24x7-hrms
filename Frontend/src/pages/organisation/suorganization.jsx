@@ -37,6 +37,12 @@ const STYLES = `
   .su-scroll::-webkit-scrollbar-track { background:transparent; }
   .su-scroll::-webkit-scrollbar-thumb { background:#dde3ec; border-radius:6px; }
   .su-scroll { -webkit-overflow-scrolling: touch; }
+
+  .su-field-row { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; }
+  @media (max-width: 380px) {
+    .su-field-row { flex-direction:column; gap:0.2rem; }
+    .su-field-row .su-field-val { text-align:left; max-width:100% !important; }
+  }
 `;
 
 const BRAND       = "#730042";
@@ -113,14 +119,14 @@ function SuperAdminNode({ name, role, initials, delay = 0, onClick }) {
   return (
     <div className="opacity-0 shrink-0" style={{ animation: `scaleIn 0.4s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms forwards` }}>
       <div
-        className="su-card-hover su-card-sa w-[210px] bg-white border-[1.5px] border-[#e8edf5] rounded-2xl p-4 sm:p-5 flex flex-col items-center relative overflow-hidden shadow-sm"
+        className="su-card-hover su-card-sa w-[180px] sm:w-[210px] bg-white border-[1.5px] border-[#e8edf5] rounded-2xl p-3.5 sm:p-5 flex flex-col items-center relative overflow-hidden shadow-sm"
         onClick={onClick}
       >
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#730042] to-[#a8005a] rounded-t-2xl" />
         <span className="absolute top-3 right-3 text-[9px] font-bold tracking-widest text-gray-400 uppercase" style={{ fontFamily: "'JetBrains Mono',monospace" }}>SA</span>
-        <Avatar initials={initials} size={56} bg={BRAND} fontSize={19} />
-        <p className="text-base font-bold text-slate-900 mt-3 text-center break-words">{name}</p>
-        <p className="text-xs text-gray-500 mt-1 text-center break-words">{role}</p>
+        <Avatar initials={initials} size={48} bg={BRAND} fontSize={17} />
+        <p className="text-sm sm:text-base font-bold text-slate-900 mt-3 text-center break-words">{name}</p>
+        <p className="text-[11px] sm:text-xs text-gray-500 mt-1 text-center break-words">{role}</p>
         <div className="mt-3 flex gap-1.5">
           <Badge>Super Admin</Badge>
         </div>
@@ -134,16 +140,16 @@ function AdminNode({ admin, delay = 0, dimmed, highlighted, onClick }) {
   return (
     <div className="opacity-0 shrink-0" style={{ animation: `scaleIn 0.35s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms forwards` }}>
       <div
-        className={`su-card-hover w-[174px] bg-white border-[1.5px] border-[#e8edf5] rounded-xl p-3 sm:p-4 flex flex-col items-center relative overflow-hidden shadow-sm ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
+        className={`su-card-hover w-[150px] sm:w-[174px] bg-white border-[1.5px] border-[#e8edf5] rounded-xl p-3 sm:p-4 flex flex-col items-center relative overflow-hidden shadow-sm ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
         onClick={onClick}
       >
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-indigo-400 rounded-t-xl" />
         <span className="absolute top-2.5 right-3 text-[9px] font-bold text-indigo-300 uppercase" style={{ fontFamily: "'JetBrains Mono',monospace" }}>ADM</span>
-        <Avatar initials={getInitials(admin.f_name, admin.l_name)} size={44} bg="#6366f1" fontSize={14} />
-        <p className="text-[13px] font-semibold text-slate-900 mt-2.5 text-center max-w-[140px] truncate w-full">{name}</p>
-        <p className="text-[11px] text-gray-400 mt-1 text-center max-w-[140px] truncate w-full">{admin.designation || "Admin"}</p>
+        <Avatar initials={getInitials(admin.f_name, admin.l_name)} size={40} bg="#6366f1" fontSize={13} />
+        <p className="text-xs sm:text-[13px] font-semibold text-slate-900 mt-2.5 text-center max-w-[120px] sm:max-w-[140px] truncate w-full">{name}</p>
+        <p className="text-[10px] sm:text-[11px] text-gray-400 mt-1 text-center max-w-[120px] sm:max-w-[140px] truncate w-full">{admin.designation || "Admin"}</p>
         <div className="mt-2">
-          <span className="text-[10px] px-2 py-1 rounded bg-indigo-50 text-indigo-700 font-semibold">Admin</span>
+          <span className="text-[9.5px] sm:text-[10px] px-2 py-1 rounded bg-indigo-50 text-indigo-700 font-semibold">Admin</span>
         </div>
       </div>
     </div>
@@ -155,15 +161,15 @@ function ManagerNode({ manager, delay = 0, dimmed, highlighted, onClick }) {
   return (
     <div className="opacity-0 shrink-0" style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards` }}>
       <div
-        className={`su-card-hover w-[152px] bg-[#f9fbfe] border-[1.5px] border-[#e4edf6] rounded-lg p-3 flex flex-col items-center relative overflow-hidden shadow-sm ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
+        className={`su-card-hover w-[132px] sm:w-[152px] bg-[#f9fbfe] border-[1.5px] border-[#e4edf6] rounded-lg p-2.5 sm:p-3 flex flex-col items-center relative overflow-hidden shadow-sm ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
         onClick={onClick}
       >
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-500 to-sky-400 rounded-t-lg" />
-        <Avatar initials={getInitials(manager.f_name, manager.l_name)} size={38} bg="#0ea5e9" fontSize={13} />
-        <p className="text-xs font-semibold text-slate-800 mt-2 text-center max-w-[120px] truncate w-full">{name}</p>
-        <p className="text-[10.5px] text-slate-400 mt-0.5 text-center max-w-[120px] truncate w-full">{manager.department || manager.designation || "Manager"}</p>
+        <Avatar initials={getInitials(manager.f_name, manager.l_name)} size={34} bg="#0ea5e9" fontSize={12} />
+        <p className="text-[11px] sm:text-xs font-semibold text-slate-800 mt-2 text-center max-w-[104px] sm:max-w-[120px] truncate w-full">{name}</p>
+        <p className="text-[9.5px] sm:text-[10.5px] text-slate-400 mt-0.5 text-center max-w-[104px] sm:max-w-[120px] truncate w-full">{manager.department || manager.designation || "Manager"}</p>
         <div className="mt-1.5">
-          <span className="text-[9.5px] px-2 py-0.5 rounded bg-sky-50 text-sky-700 font-semibold">Manager</span>
+          <span className="text-[9px] sm:text-[9.5px] px-2 py-0.5 rounded bg-sky-50 text-sky-700 font-semibold">Manager</span>
         </div>
       </div>
     </div>
@@ -175,12 +181,12 @@ function EmployeeNode({ employee, delay = 0, dimmed, highlighted, onClick }) {
   return (
     <div className="opacity-0 shrink-0" style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards` }}>
       <div
-        className={`su-card-hover w-[132px] bg-[#fafbfc] border-[1.5px] border-[#e8edf5] rounded-lg p-2.5 flex flex-col items-center relative ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
+        className={`su-card-hover w-[114px] sm:w-[132px] bg-[#fafbfc] border-[1.5px] border-[#e8edf5] rounded-lg p-2 sm:p-2.5 flex flex-col items-center relative ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
         onClick={onClick}
       >
-        <Avatar initials={getInitials(employee.f_name, employee.l_name)} size={32} bg="#e2e8f0" fontSize={10} />
-        <p className="text-[11px] font-semibold text-slate-800 mt-1.5 text-center max-w-[100px] truncate w-full">{name}</p>
-        <p className="text-[10px] text-slate-400 mt-0.5 text-center max-w-[100px] truncate w-full">{employee.department || employee.designation || "Employee"}</p>
+        <Avatar initials={getInitials(employee.f_name, employee.l_name)} size={28} bg="#e2e8f0" fontSize={9} />
+        <p className="text-[10px] sm:text-[11px] font-semibold text-slate-800 mt-1.5 text-center max-w-[88px] sm:max-w-[100px] truncate w-full">{name}</p>
+        <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 text-center max-w-[88px] sm:max-w-[100px] truncate w-full">{employee.department || employee.designation || "Employee"}</p>
       </div>
     </div>
   );
@@ -189,19 +195,19 @@ function EmployeeNode({ employee, delay = 0, dimmed, highlighted, onClick }) {
 function SkeletonTree() {
   return (
     <div className="flex flex-col items-center gap-0 w-full min-w-0">
-      <Skeleton w={210} h={130} r={16} />
+      <Skeleton w={180} h={120} r={16} />
       <div className="w-1.5 h-7 bg-gray-200 mx-auto" />
-      <div className="flex gap-5 justify-center w-full min-w-0">
+      <div className="flex gap-4 sm:gap-5 justify-center w-full min-w-0">
         {[1, 2, 3].map(i => (
           <div key={i} className="flex flex-col items-center min-w-0">
             <div className="w-1.5 h-5 bg-gray-200 mx-auto" />
-            <Skeleton w={174} h={104} r={13} />
+            <Skeleton w={150} h={100} r={13} />
             <div className="w-1.5 h-5 bg-gray-200 mx-auto" />
-            <div className="flex gap-3.5 justify-center w-full min-w-0">
+            <div className="flex gap-2.5 sm:gap-3.5 justify-center w-full min-w-0">
               {[1, 2].map(j => (
                 <div key={j} className="flex flex-col items-center min-w-0">
                   <div className="w-1.5 h-4 bg-gray-200 mx-auto" />
-                  <Skeleton w={132} h={82} r={10} />
+                  <Skeleton w={114} h={78} r={10} />
                 </div>
               ))}
             </div>
@@ -214,7 +220,6 @@ function SkeletonTree() {
 
 function EmployeeDetailPanel({ person, type, onClose }) {
   const [tab, setTab] = useState("info");
-  const isEmployee = type === "employee";
   const isManager  = type === "manager";
   const isAdmin    = type === "admin";
   const isSA       = type === "superadmin";
@@ -277,7 +282,7 @@ function EmployeeDetailPanel({ person, type, onClose }) {
           </div>
           <button 
             onClick={onClose} 
-            className="flex items-center justify-center w-10 h-10 sm:w-8 sm:h-8 rounded-lg border border-gray-200 text-gray-500 text-xl hover:bg-gray-50 transition-colors shrink-0"
+            className="flex items-center justify-center w-9 h-9 sm:w-8 sm:h-8 rounded-lg border border-gray-200 text-gray-500 text-xl hover:bg-gray-50 transition-colors shrink-0"
           >
             ×
           </button>
@@ -324,9 +329,9 @@ function EmployeeDetailPanel({ person, type, onClose }) {
           {(tab === "info" || isSA) && (
             <div className="bg-[#fafbfc] rounded-xl p-4 sm:px-5 border border-gray-100 flex flex-col min-w-0">
               {fields.map(([label, val]) => (
-                <div key={label} className="flex justify-between items-start py-2.5 border-b border-gray-100 last:border-b-0 text-xs sm:text-sm gap-4 min-w-0">
+                <div key={label} className="su-field-row py-2.5 border-b border-gray-100 last:border-b-0 text-xs sm:text-sm min-w-0">
                   <span className="text-gray-500 shrink-0">{label}</span>
-                  <span className="text-slate-900 font-medium text-right break-all min-w-0" style={{ maxWidth: "65%" }}>{val || "—"}</span>
+                  <span className="su-field-val text-slate-900 font-medium text-right break-all min-w-0" style={{ maxWidth: "65%" }}>{val || "—"}</span>
                 </div>
               ))}
             </div>
@@ -433,8 +438,8 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
            normalize(desig).includes(q);
   };
 
-  const ADM_GAP = 28;
-  const ADM_W   = 174;
+  const ADM_GAP = 24;
+  const ADM_W   = 150;
 
   return (
     // w-max min-w-full ensures it takes natural width but min 100% of parent. mx-auto centers it.
@@ -454,15 +459,15 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
         </>
       )}
 
-      <div className="flex gap-7 justify-center items-start min-w-0">
+      <div className="flex gap-5 sm:gap-7 justify-center items-start min-w-0">
         {admins.map((admin, ai) => {
           const admMatch  = hasQ && matchName(admin.f_name, admin.l_name, "", admin.designation);
           const admDimmed = hasQ && !admMatch;
           const admDelay  = 340 + ai * 60;
 
           const admManagers = managers.filter(() => true);
-          const MAN_GAP = 18;
-          const MAN_W   = 152;
+          const MAN_GAP = 16;
+          const MAN_W   = 132;
           const manTotal = admManagers.length > 1 ? (admManagers.length - 1) * (MAN_W + MAN_GAP) : 0;
 
           return (
@@ -483,7 +488,7 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
                 </>
               )}
 
-              <div className="flex gap-4 justify-center items-start min-w-0">
+              <div className="flex gap-3 sm:gap-4 justify-center items-start min-w-0">
                 {admManagers.map((mgr, mi) => {
                   const mgrMatch  = hasQ && matchName(mgr.f_name, mgr.l_name, mgr.department, mgr.designation);
                   const mgrDimmed = hasQ && !mgrMatch && !admMatch;
@@ -493,8 +498,8 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
                     e.Under_manager?._id?.toString() === mgr._id?.toString() ||
                     e.Under_manager?.toString()      === mgr._id?.toString()
                   );
-                  const EMP_GAP = 12;
-                  const EMP_W   = 132;
+                  const EMP_GAP = 10;
+                  const EMP_W   = 114;
                   const empTotal = mgrEmps.length > 1 ? (mgrEmps.length - 1) * (EMP_W + EMP_GAP) : 0;
 
                   return (
@@ -515,7 +520,7 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
                         </>
                       )}
 
-                      <div className="flex gap-3 justify-center items-start min-w-0">
+                      <div className="flex gap-2 sm:gap-3 justify-center items-start min-w-0">
                         {mgrEmps.map((emp, ei) => {
                           const empMatch  = hasQ && matchName(emp.f_name, emp.l_name, emp.department, emp.designation);
                           const empDimmed = hasQ && !empMatch && !mgrMatch && !admMatch;
@@ -621,17 +626,17 @@ export default function SuperAdminOrgChart() {
 
       {/* Header / Navigation */}
       <header className="w-full max-w-full min-w-0 bg-white border-b border-gray-200 shadow-sm overflow-hidden">
-        <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-4 min-w-0">
+        <div className="w-full max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4 min-w-0">
           
           {/* Left section */}
-          <div className={`flex items-center gap-2 sm:gap-3 min-w-0 flex-1 ${searchOpen ? "hidden sm:flex" : "flex"}`}>
-            <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-[#730042] shrink-0 shadow-[0_0_0_3px_rgba(115,0,66,0.15)]"></div>
+          <div className={`flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1 ${searchOpen ? "hidden sm:flex" : "flex"}`}>
+            <div className="hidden xs:block w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-[#730042] shrink-0 shadow-[0_0_0_3px_rgba(115,0,66,0.15)]"></div>
             <span className="hidden md:inline text-sm text-gray-400 font-medium truncate min-w-0">{orgName}</span>
             <svg className="hidden md:block w-3 h-3 shrink-0" viewBox="0 0 13 13" fill="none">
               <path d="M5 3l3 3.5L5 10" stroke="#d1d5db" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <h1 className="text-sm sm:text-base lg:text-lg font-bold text-slate-900 tracking-tight truncate min-w-0">Org Chart</h1>
-            <span className="px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10.5px] font-bold text-[#730042] bg-[#730042]/10 rounded-full shrink-0">
+            <span className="hidden xs:inline-block px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10.5px] font-bold text-[#730042] bg-[#730042]/10 rounded-full shrink-0">
               Super Admin
             </span>
             {!loading && <div className="hidden sm:block shrink-0"><LiveDot /></div>}
@@ -640,7 +645,7 @@ export default function SuperAdminOrgChart() {
           {/* Right section */}
           <div className={`flex items-center gap-2 min-w-0 ${searchOpen ? "w-full sm:w-auto sm:flex-none sm:ml-auto" : "flex-none ml-auto"}`}>
             {searchOpen ? (
-              <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto min-w-0">
                 <div className="flex items-center gap-2 border-[1.5px] border-[#730042] rounded-lg px-3 h-10 sm:h-9 flex-1 sm:w-72 shadow-[0_0_0_4px_rgba(115,0,66,0.08)] min-w-0">
                   <svg className="w-3 h-3 shrink-0" viewBox="0 0 13 13" fill="none">
                     <circle cx="5.5" cy="5.5" r="4" stroke="#9ca3af" strokeWidth="1.3" />
@@ -667,7 +672,7 @@ export default function SuperAdminOrgChart() {
                   </span>
                 )}
                 <button
-                  className="flex items-center justify-center gap-1.5 px-3 sm:px-4 h-10 sm:h-9 rounded-lg border border-gray-200 bg-white text-gray-600 text-xs font-medium hover:bg-gray-50 shrink-0 min-w-[44px]"
+                  className="flex items-center justify-center gap-1.5 px-3 sm:px-4 h-10 sm:h-9 rounded-lg border border-gray-200 bg-white text-gray-600 text-xs font-medium hover:bg-gray-50 shrink-0 min-w-[40px] sm:min-w-[44px]"
                   onClick={() => { setSearchOpen(false); setSearchQuery(""); }}
                 >
                   <svg className="w-3 h-3" viewBox="0 0 13 13" fill="none">
@@ -678,14 +683,14 @@ export default function SuperAdminOrgChart() {
               </div>
             ) : (
               <button
-                className="flex items-center gap-1.5 px-3 sm:px-4 h-10 sm:h-9 rounded-lg border border-gray-200 bg-white text-gray-600 text-xs font-medium hover:bg-gray-50 shrink-0 min-w-[44px]"
+                className="flex items-center gap-1.5 px-3 sm:px-4 h-10 sm:h-9 rounded-lg border border-gray-200 bg-white text-gray-600 text-xs font-medium hover:bg-gray-50 shrink-0 min-w-[40px] sm:min-w-[44px]"
                 onClick={() => setSearchOpen(true)}
               >
                 <svg className="w-3 h-3" viewBox="0 0 13 13" fill="none">
                   <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.3" />
                   <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
                 </svg>
-                <span>Search</span>
+                <span className="hidden xs:inline">Search</span>
               </button>
             )}
           </div>
@@ -693,11 +698,11 @@ export default function SuperAdminOrgChart() {
       </header>
 
       {/* Main Content */}
-      <main className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 min-w-0 flex-1">
+      <main className="w-full max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-6 lg:py-8 min-w-0 flex-1">
 
         {/* Title Area */}
-        <div className="mb-6 lg:mb-8 min-w-0">
-          <h2 className="text-lg sm:text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight truncate">
+        <div className="mb-5 sm:mb-6 lg:mb-8 min-w-0">
+          <h2 className="text-base sm:text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight truncate">
             Organisation Chart
           </h2>
           <p className="text-xs sm:text-sm text-gray-400 mt-1 truncate">
@@ -706,28 +711,28 @@ export default function SuperAdminOrgChart() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 lg:mb-8 min-w-0 max-w-full">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-6 mb-5 sm:mb-6 lg:mb-8 min-w-0 max-w-full">
           {statItems.map(({ label, value, color }, i) => (
             <div
               key={label}
-              className="relative bg-white border border-gray-200 rounded-xl lg:rounded-2xl p-3 sm:p-4 lg:p-5 flex items-center gap-3 lg:gap-4 shadow-sm overflow-hidden hover:shadow-md transition-shadow min-w-0"
+              className="relative bg-white border border-gray-200 rounded-xl lg:rounded-2xl p-3 sm:p-4 lg:p-5 flex items-center gap-2.5 sm:gap-4 lg:gap-4 shadow-sm overflow-hidden hover:shadow-md transition-shadow min-w-0"
               style={{ animation: `fadeUp 0.35s ease ${100 + i * 55}ms forwards`, opacity: 0 }}
             >
               <div className="absolute top-0 left-0 right-0 h-1" style={{ background: color }}></div>
               <div
-                className="w-9 h-9 lg:w-12 lg:h-12 rounded-lg lg:rounded-xl flex items-center justify-center shrink-0"
+                className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg lg:rounded-xl flex items-center justify-center shrink-0"
                 style={{ background: `${color}12` }}
               >
                 <div
-                  className="w-4 h-4 lg:w-5 lg:h-5 rounded-full"
+                  className="w-3.5 h-3.5 sm:w-5 sm:h-5 rounded-full"
                   style={{ background: color, boxShadow: `0 2px 6px ${color}40` }}
                 />
               </div>
               <div className="min-w-0">
-                <div className="text-lg sm:text-xl lg:text-2xl font-bold text-slate-900 leading-none truncate" style={{ fontFamily: "'JetBrains Mono',monospace" }}>
+                <div className="text-base sm:text-xl lg:text-2xl font-bold text-slate-900 leading-none truncate" style={{ fontFamily: "'JetBrains Mono',monospace" }}>
                   {loading ? "—" : value}
                 </div>
-                <div className="text-[11px] sm:text-xs text-gray-400 mt-1 font-medium truncate">{label}</div>
+                <div className="text-[10px] sm:text-xs text-gray-400 mt-1 font-medium truncate">{label}</div>
               </div>
             </div>
           ))}
@@ -736,13 +741,13 @@ export default function SuperAdminOrgChart() {
         {/* Tree Card */}
         <div className="w-full max-w-full min-w-0 bg-white border border-gray-200 rounded-xl lg:rounded-2xl shadow-sm overflow-hidden flex flex-col">
           
-          <div className="w-full min-w-0 px-4 sm:px-5 py-3 border-b border-gray-100 flex flex-wrap items-center gap-2 bg-gradient-to-br from-gray-50 to-gray-100/50">
-            <span className="text-sm font-semibold text-slate-700 truncate">Hierarchy</span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-semibold shrink-0" style={{ fontFamily: "'JetBrains Mono',monospace" }}>
+          <div className="w-full min-w-0 px-3 sm:px-5 py-2.5 sm:py-3 border-b border-gray-100 flex flex-wrap items-center gap-2 bg-gradient-to-br from-gray-50 to-gray-100/50">
+            <span className="text-xs sm:text-sm font-semibold text-slate-700 truncate">Hierarchy</span>
+            <span className="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-semibold shrink-0" style={{ fontFamily: "'JetBrains Mono',monospace" }}>
               {loading ? "…" : `${totalNodes} nodes`}
             </span>
             {searchQuery && matchCount > 0 && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#730042]/10 text-[#730042] font-semibold shrink-0">
+              <span className="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full bg-[#730042]/10 text-[#730042] font-semibold shrink-0">
                 {matchCount} highlighted
               </span>
             )}
@@ -750,7 +755,7 @@ export default function SuperAdminOrgChart() {
           </div>
 
           {/* Tree Scroll Container - overflow-x-auto allows internal scroll if tree is wider than the sidebar allows */}
-          <div className="su-scroll w-full max-w-full min-w-0 overflow-x-auto bg-white p-4 sm:p-6 lg:p-8">
+          <div className="su-scroll w-full max-w-full min-w-0 overflow-x-auto bg-white p-3 sm:p-6 lg:p-8">
             <OrgTree
               superAdmin={superAdmin}
               admins={admins}
@@ -765,14 +770,14 @@ export default function SuperAdminOrgChart() {
 
         {/* Legend */}
         {!loading && (
-          <div className="flex gap-3 sm:gap-4 lg:gap-6 mt-4 lg:mt-6 justify-center flex-wrap min-w-0 max-w-full">
+          <div className="flex gap-2.5 sm:gap-4 lg:gap-6 mt-4 lg:mt-6 justify-center flex-wrap min-w-0 max-w-full">
             {[
               { dot: BRAND,     label: "Super Admin", glow: true },
               { dot: "#6366f1", label: "Admin"   },
               { dot: "#0ea5e9", label: "Manager" },
               { dot: "#cbd5e1", label: "Employee", border: "#b0b8c8" },
             ].map(({ dot, label, border, glow }) => (
-              <div key={label} className="flex items-center gap-1.5 text-xs text-gray-400 shrink-0">
+              <div key={label} className="flex items-center gap-1.5 text-[11px] sm:text-xs text-gray-400 shrink-0">
                 <span
                   className="w-2.5 h-2.5 rounded-full shrink-0"
                   style={{
