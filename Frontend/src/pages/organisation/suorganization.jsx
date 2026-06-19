@@ -15,7 +15,7 @@ const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
   .su-org *, .su-org { font-family: 'Inter', sans-serif; box-sizing: border-box; }
-  
+
   @keyframes fadeUp    { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
   @keyframes fadeIn    { from { opacity:0; } to { opacity:1; } }
   @keyframes scaleIn   { from { opacity:0; transform:scale(0.93); } to { opacity:1; transform:scale(1); } }
@@ -37,11 +37,15 @@ const STYLES = `
   .su-scroll::-webkit-scrollbar-track { background:transparent; }
   .su-scroll::-webkit-scrollbar-thumb { background:#dde3ec; border-radius:6px; }
   .su-scroll { -webkit-overflow-scrolling: touch; }
+
+  .su-export-flat .su-card-hover { cursor: default !important; }
+  .su-export-flat .su-card-hover:hover { transform: none !important; }
 `;
 
 const BRAND       = "#730042";
 const BRAND_LIGHT = "rgba(115,0,66,0.07)";
 const REFRESH_MS  = 1000 * 60 * 2;
+const HTML_TO_IMAGE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js";
 
 const fmtDate = (iso) => {
   if (!iso) return "—";
@@ -50,19 +54,51 @@ const fmtDate = (iso) => {
 
 const getInitials = (f = "", l = "") => `${f[0] || ""}${l[0] || ""}`.toUpperCase();
 const normalize   = (s = "") => s.toLowerCase().trim();
+const fullName    = (p) => `${p?.f_name || ""} ${p?.l_name || ""}`.trim();
+
+function idStr(v) {
+  if (!v) return "";
+  if (typeof v === "string") return v;
+  return v._id ? v._id.toString() : v.toString();
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) return resolve();
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.body.appendChild(s);
+  });
+}
+
+function csvCell(v) {
+  const s = v === null || v === undefined ? "" : String(v);
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 function Skeleton({ w, h, r = 8 }) {
   return (
-    <div 
-      className="shrink-0 bg-gray-200 animate-pulse" 
-      style={{ width: w, height: h, borderRadius: r }} 
+    <div
+      className="shrink-0 bg-gray-200 animate-pulse"
+      style={{ width: w, height: h, borderRadius: r }}
     />
   );
 }
 
 function VLine({ h = 32, delay = 0 }) {
   return (
-    <div 
+    <div
       className="shrink-0 origin-top mx-auto"
       style={{ width: 1.5, height: h, background: "linear-gradient(to bottom, #dde3ec, #c8d2e0)", animation: `drawV 0.25s ease ${delay}ms forwards`, transform: "scaleY(0)" }}
     />
@@ -71,7 +107,7 @@ function VLine({ h = 32, delay = 0 }) {
 
 function HLine({ w, delay = 0 }) {
   return (
-    <div 
+    <div
       className="shrink-0 origin-center"
       style={{ width: w, height: 1.5, background: "#dde3ec", animation: `drawH 0.3s ease ${delay}ms forwards`, transform: "scaleX(0)" }}
     />
@@ -80,7 +116,7 @@ function HLine({ w, delay = 0 }) {
 
 function Avatar({ initials, size = 48, bg = BRAND, fontSize = 16 }) {
   return (
-    <div 
+    <div
       className="flex items-center justify-center rounded-full font-bold text-white shrink-0"
       style={{ width: size, height: size, background: bg, fontSize, boxShadow: `0 2px 8px ${bg}40`, letterSpacing: "0.02em" }}
     >
@@ -91,7 +127,7 @@ function Avatar({ initials, size = 48, bg = BRAND, fontSize = 16 }) {
 
 function Badge({ children, color = BRAND, bg = BRAND_LIGHT }) {
   return (
-    <span 
+    <span
       className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold shrink-0"
       style={{ color, background: bg, letterSpacing: "0.02em" }}
     >
@@ -130,7 +166,7 @@ function SuperAdminNode({ name, role, initials, delay = 0, onClick }) {
 }
 
 function AdminNode({ admin, delay = 0, dimmed, highlighted, onClick }) {
-  const name = `${admin.f_name} ${admin.l_name}`.trim();
+  const name = fullName(admin);
   return (
     <div className="opacity-0 shrink-0" style={{ animation: `scaleIn 0.35s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms forwards` }}>
       <div
@@ -151,7 +187,7 @@ function AdminNode({ admin, delay = 0, dimmed, highlighted, onClick }) {
 }
 
 function ManagerNode({ manager, delay = 0, dimmed, highlighted, onClick }) {
-  const name = `${manager.f_name} ${manager.l_name}`.trim();
+  const name = fullName(manager);
   return (
     <div className="opacity-0 shrink-0" style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards` }}>
       <div
@@ -171,7 +207,7 @@ function ManagerNode({ manager, delay = 0, dimmed, highlighted, onClick }) {
 }
 
 function EmployeeNode({ employee, delay = 0, dimmed, highlighted, onClick }) {
-  const name = `${employee.f_name} ${employee.l_name}`.trim();
+  const name = fullName(employee);
   return (
     <div className="opacity-0 shrink-0" style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards` }}>
       <div
@@ -219,7 +255,7 @@ function EmployeeDetailPanel({ person, type, onClose }) {
   const isAdmin    = type === "admin";
   const isSA       = type === "superadmin";
 
-  const name = `${person.f_name || ""} ${person.l_name || ""}`.trim();
+  const name = fullName(person);
 
   const accentColor = isSA ? BRAND : isAdmin ? "#6366f1" : isManager ? "#0ea5e9" : "#64748b";
   const roleLabel   = isSA ? "Super Admin" : isAdmin ? "Admin" : isManager ? "Manager" : "Employee";
@@ -269,14 +305,14 @@ function EmployeeDetailPanel({ person, type, onClose }) {
     <>
       <div className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm animate-[fadeIn_0.2s_ease_forwards]" onClick={onClose} />
       <div className="fixed top-0 right-0 bottom-0 w-full sm:max-w-md md:max-w-lg h-full bg-white shadow-2xl z-50 overflow-y-auto flex flex-col animate-[slideR_0.25s_cubic-bezier(0.22,1,0.36,1)_forwards]">
-        
+
         <div className="sticky top-0 bg-white border-b border-gray-100 px-4 sm:px-6 py-4 flex items-center justify-between z-10 min-w-0">
           <div className="min-w-0">
             <h2 className="text-base sm:text-lg font-bold text-slate-900 truncate">Profile details</h2>
             <p className="text-xs text-gray-400 mt-0.5 truncate">{roleLabel} · {name}</p>
           </div>
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={onClose}
             className="flex items-center justify-center w-10 h-10 sm:w-8 sm:h-8 rounded-lg border border-gray-200 text-gray-500 text-xl hover:bg-gray-50 transition-colors shrink-0"
           >
             ×
@@ -284,12 +320,12 @@ function EmployeeDetailPanel({ person, type, onClose }) {
         </div>
 
         <div className="p-4 sm:p-6 flex-1 min-w-0">
-          
-          <div 
+
+          <div
             className="rounded-xl p-4 sm:p-6 mb-5 flex flex-col items-center gap-2.5 border min-w-0"
             style={{ background: `linear-gradient(135deg, ${accentColor}0d, ${accentColor}05)`, borderColor: `${accentColor}20` }}
           >
-            <div 
+            <div
               className="w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-xl sm:text-2xl font-bold text-white shrink-0"
               style={{ background: accentColor, boxShadow: `0 4px 16px ${accentColor}35` }}
             >
@@ -310,8 +346,8 @@ function EmployeeDetailPanel({ person, type, onClose }) {
           {!isSA && (
             <div className="flex gap-2 mb-5 flex-wrap min-w-0">
               {["info", "leave", "reviews"].map((t) => (
-                <button 
-                  key={t} 
+                <button
+                  key={t}
                   className={`px-4 py-2 rounded-lg border text-xs font-medium transition-all min-h-[40px] flex items-center shrink-0 ${tab === t ? "bg-[#730042] text-white border-[#730042] shadow-md" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}
                   onClick={() => setTab(t)}
                 >
@@ -420,6 +456,93 @@ function ReviewsTab({ uid, role }) {
   );
 }
 
+function ManagerBranch({ manager, allManagers, employees, depth, delayBase, matchName, hasQ, parentMatched, onNodeClick }) {
+  const mgrMatch  = hasQ && matchName(manager.f_name, manager.l_name, manager.department, manager.designation);
+  const mgrDimmed = hasQ && !mgrMatch && !parentMatched;
+  const mgrId = idStr(manager._id);
+
+  const subManagers = allManagers.filter((m) => idStr(m.reporting_manager) === mgrId && m.reporting_manager_model === "Manager");
+  const mgrEmps = employees.filter((e) => idStr(e.Under_manager) === mgrId);
+
+  const childCount = subManagers.length + mgrEmps.length;
+  const CHILD_GAP = depth > 0 ? 14 : 12;
+  const SUB_W = 152;
+  const EMP_W = 132;
+
+  const subTotalW = subManagers.length > 1 ? (subManagers.length - 1) * (SUB_W + CHILD_GAP) : 0;
+  const empTotalW = mgrEmps.length > 1 ? (mgrEmps.length - 1) * (EMP_W + CHILD_GAP) : 0;
+
+  return (
+    <div className="flex flex-col items-center min-w-0">
+      <VLine h={18} delay={delayBase - 55} />
+      <ManagerNode
+        manager={manager}
+        delay={delayBase}
+        highlighted={mgrMatch}
+        dimmed={mgrDimmed}
+        onClick={() => onNodeClick(manager, "manager")}
+      />
+
+      {subManagers.length > 0 && (
+        <>
+          <VLine h={20} delay={delayBase + 100} />
+          {subManagers.length > 1 && <HLine w={subTotalW} delay={delayBase + 140} />}
+        </>
+      )}
+
+      {subManagers.length > 0 && (
+        <div className="flex gap-3.5 justify-center items-start min-w-0">
+          {subManagers.map((sub, si) => (
+            <ManagerBranch
+              key={sub._id}
+              manager={sub}
+              allManagers={allManagers}
+              employees={employees}
+              depth={depth + 1}
+              delayBase={delayBase + 180 + si * 50}
+              matchName={matchName}
+              hasQ={hasQ}
+              parentMatched={mgrMatch || parentMatched}
+              onNodeClick={onNodeClick}
+            />
+          ))}
+        </div>
+      )}
+
+      {mgrEmps.length > 0 && (
+        <>
+          <VLine h={20} delay={delayBase + 100} />
+          {mgrEmps.length > 1 && <HLine w={empTotalW} delay={delayBase + 140} />}
+        </>
+      )}
+
+      {mgrEmps.length > 0 && (
+        <div className="flex gap-3 justify-center items-start min-w-0">
+          {mgrEmps.map((emp, ei) => {
+            const empMatch  = hasQ && matchName(emp.f_name, emp.l_name, emp.department, emp.designation);
+            const empDimmed = hasQ && !empMatch && !mgrMatch && !parentMatched;
+            const empDelay  = delayBase + 180 + ei * 45;
+            return (
+              <div key={emp._id} className="flex flex-col items-center min-w-0">
+                <VLine h={16} delay={empDelay - 45} />
+                <EmployeeNode
+                  employee={emp}
+                  delay={empDelay}
+                  highlighted={empMatch}
+                  dimmed={empDimmed}
+                  onClick={() => onNodeClick(emp, "employee")}
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {childCount === 0 && null}
+    </div>
+  );
+}
+
 function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery, onNodeClick }) {
   if (loading) return <SkeletonTree />;
 
@@ -436,11 +559,24 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
   const ADM_GAP = 28;
   const ADM_W   = 174;
 
+  const unassignedManagers = useMemo(() => {
+    return managers.filter((m) => {
+      if (!m.reporting_manager) return true;
+      const parentId = idStr(m.reporting_manager);
+      if (m.reporting_manager_model === "Admin") {
+        return !admins.some((a) => idStr(a._id) === parentId);
+      }
+      if (m.reporting_manager_model === "Manager") {
+        return !managers.some((mm) => idStr(mm._id) === parentId);
+      }
+      return false;
+    });
+  }, [managers, admins]);
+
   return (
-    // w-max min-w-full ensures it takes natural width but min 100% of parent. mx-auto centers it.
     <div className="w-max min-w-full flex flex-col items-center mx-auto">
       <SuperAdminNode
-        name={`${superAdmin?.f_name || ""} ${superAdmin?.l_name || ""}`.trim() || "Super Admin"}
+        name={fullName(superAdmin) || "Super Admin"}
         role={superAdmin?.organisation_name || "Super Admin"}
         initials={getInitials(superAdmin?.f_name, superAdmin?.l_name)}
         delay={60}
@@ -459,8 +595,11 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
           const admMatch  = hasQ && matchName(admin.f_name, admin.l_name, "", admin.designation);
           const admDimmed = hasQ && !admMatch;
           const admDelay  = 340 + ai * 60;
+          const adminId   = idStr(admin._id);
 
-          const admManagers = managers.filter(() => true);
+          const admManagers = managers.filter(
+            (m) => idStr(m.reporting_manager) === adminId && m.reporting_manager_model === "Admin"
+          );
           const MAN_GAP = 18;
           const MAN_W   = 152;
           const manTotal = admManagers.length > 1 ? (admManagers.length - 1) * (MAN_W + MAN_GAP) : 0;
@@ -483,65 +622,52 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
                 </>
               )}
 
-              <div className="flex gap-4 justify-center items-start min-w-0">
-                {admManagers.map((mgr, mi) => {
-                  const mgrMatch  = hasQ && matchName(mgr.f_name, mgr.l_name, mgr.department, mgr.designation);
-                  const mgrDimmed = hasQ && !mgrMatch && !admMatch;
-                  const mgrDelay  = admDelay + 200 + mi * 55;
-
-                  const mgrEmps = employees.filter(e =>
-                    e.Under_manager?._id?.toString() === mgr._id?.toString() ||
-                    e.Under_manager?.toString()      === mgr._id?.toString()
-                  );
-                  const EMP_GAP = 12;
-                  const EMP_W   = 132;
-                  const empTotal = mgrEmps.length > 1 ? (mgrEmps.length - 1) * (EMP_W + EMP_GAP) : 0;
-
-                  return (
-                    <div key={mgr._id} className="flex flex-col items-center min-w-0">
-                      <VLine h={18} delay={mgrDelay - 55} />
-                      <ManagerNode
-                        manager={mgr}
-                        delay={mgrDelay}
-                        highlighted={mgrMatch}
-                        dimmed={mgrDimmed}
-                        onClick={() => onNodeClick(mgr, "manager")}
-                      />
-
-                      {mgrEmps.length > 0 && (
-                        <>
-                          <VLine h={20} delay={mgrDelay + 100} />
-                          {mgrEmps.length > 1 && <HLine w={empTotal} delay={mgrDelay + 140} />}
-                        </>
-                      )}
-
-                      <div className="flex gap-3 justify-center items-start min-w-0">
-                        {mgrEmps.map((emp, ei) => {
-                          const empMatch  = hasQ && matchName(emp.f_name, emp.l_name, emp.department, emp.designation);
-                          const empDimmed = hasQ && !empMatch && !mgrMatch && !admMatch;
-                          const empDelay  = mgrDelay + 180 + ei * 45;
-                          return (
-                            <div key={emp._id} className="flex flex-col items-center min-w-0">
-                              <VLine h={16} delay={empDelay - 45} />
-                              <EmployeeNode
-                                employee={emp}
-                                delay={empDelay}
-                                highlighted={empMatch}
-                                dimmed={empDimmed}
-                                onClick={() => onNodeClick(emp, "employee")}
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              {admManagers.length > 0 && (
+                <div className="flex gap-4 justify-center items-start min-w-0">
+                  {admManagers.map((mgr, mi) => (
+                    <ManagerBranch
+                      key={mgr._id}
+                      manager={mgr}
+                      allManagers={managers}
+                      employees={employees}
+                      depth={0}
+                      delayBase={admDelay + 200 + mi * 55}
+                      matchName={matchName}
+                      hasQ={hasQ}
+                      parentMatched={admMatch}
+                      onNodeClick={onNodeClick}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
       </div>
+
+      {unassignedManagers.length > 0 && (
+        <div className="mt-10 w-full flex flex-col items-center">
+          <div className="px-3 py-1 rounded-full bg-amber-50 text-amber-700 text-[11px] font-semibold mb-4 border border-amber-200">
+            Unassigned managers (no valid reporting line)
+          </div>
+          <div className="flex gap-4 justify-center items-start flex-wrap min-w-0">
+            {unassignedManagers.map((mgr, mi) => (
+              <ManagerBranch
+                key={mgr._id}
+                manager={mgr}
+                allManagers={managers}
+                employees={employees}
+                depth={0}
+                delayBase={60 + mi * 55}
+                matchName={matchName}
+                hasQ={hasQ}
+                parentMatched={false}
+                onNodeClick={onNodeClick}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {admins.length === 0 && !loading && (
         <div className="mt-9 px-6 py-4 rounded-xl border-[1.5px] border-dashed border-gray-200 text-xs sm:text-sm text-gray-300 bg-[#fafbfc] min-w-0">
@@ -564,7 +690,11 @@ export default function SuperAdminOrgChart() {
   const [searchOpen,  setSearchOpen]  = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selected,    setSelected]    = useState(null);
+  const [exportOpen,  setExportOpen]  = useState(false);
+  const [exporting,   setExporting]   = useState(false);
   const inputRef = useRef(null);
+  const exportBtnRef = useRef(null);
+  const treeRef = useRef(null);
 
   const superAdmin = saData?.superAdmin || saData;
   const admins     = useMemo(() => admData?.admins || [], [admData]);
@@ -597,7 +727,7 @@ export default function SuperAdminOrgChart() {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); setSelected(null); }
+      if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); setSelected(null); setExportOpen(false); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -607,6 +737,75 @@ export default function SuperAdminOrgChart() {
     if (searchOpen) setTimeout(() => inputRef.current?.focus(), 40);
   }, [searchOpen]);
 
+  useEffect(() => {
+    if (!exportOpen) return;
+    const onClickAway = (e) => {
+      if (exportBtnRef.current && !exportBtnRef.current.contains(e.target)) setExportOpen(false);
+    };
+    document.addEventListener("mousedown", onClickAway);
+    return () => document.removeEventListener("mousedown", onClickAway);
+  }, [exportOpen]);
+
+  function buildCsvRows() {
+    const rows = [["Role", "Name", "Email", "Phone", "Department", "Designation", "Office Location", "Reports To"]];
+
+    if (superAdmin) {
+      rows.push(["Super Admin", fullName(superAdmin), superAdmin.email || "", "", "", "", "", ""]);
+    }
+
+    admins.forEach((a) => {
+      rows.push(["Admin", fullName(a), a.work_email || "", a.personal_contact || "", a.department || "", a.designation || "", a.office_location || "", "Super Admin"]);
+    });
+
+    managers.forEach((m) => {
+      const parentLabel = m.reporting_manager_model === "Admin"
+        ? (admins.find((a) => idStr(a._id) === idStr(m.reporting_manager)) ? `Admin: ${fullName(admins.find((a) => idStr(a._id) === idStr(m.reporting_manager)))}` : "Unassigned")
+        : m.reporting_manager_model === "Manager"
+          ? (managers.find((mm) => idStr(mm._id) === idStr(m.reporting_manager)) ? `Manager: ${fullName(managers.find((mm) => idStr(mm._id) === idStr(m.reporting_manager)))}` : "Unassigned")
+          : "Unassigned";
+      rows.push(["Manager", fullName(m), m.work_email || "", m.personal_contact || "", m.department || "", m.designation || "", m.office_location || "", parentLabel]);
+    });
+
+    employees.forEach((e) => {
+      const mgr = managers.find((m) => idStr(m._id) === idStr(e.Under_manager));
+      rows.push(["Employee", fullName(e), e.work_email || "", e.personal_contact || "", e.department || "", e.designation || "", e.office_location || "", mgr ? `Manager: ${fullName(mgr)}` : "Unassigned"]);
+    });
+
+    return rows;
+  }
+
+  function exportCsv() {
+    const rows = buildCsvRows();
+    const csv = rows.map((r) => r.map(csvCell).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    downloadBlob(blob, `${normalize(orgName).replace(/\s+/g, "-") || "organisation"}-org-chart-${Date.now()}.csv`);
+    setExportOpen(false);
+  }
+
+  async function exportPng() {
+    if (!treeRef.current) return;
+    setExporting(true);
+    try {
+      await loadScript(HTML_TO_IMAGE_CDN);
+      treeRef.current.classList.add("su-export-flat");
+      const dataUrl = await window.htmlToImage.toPng(treeRef.current, {
+        backgroundColor: "#ffffff",
+        pixelRatio: 2,
+        cacheBust: true,
+      });
+      treeRef.current.classList.remove("su-export-flat");
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      downloadBlob(blob, `${normalize(orgName).replace(/\s+/g, "-") || "organisation"}-org-chart-${Date.now()}.png`);
+    } catch (err) {
+      treeRef.current?.classList.remove("su-export-flat");
+      window.alert("Could not generate the image export. Please try again.");
+    } finally {
+      setExporting(false);
+      setExportOpen(false);
+    }
+  }
+
   const statItems = [
     { label: "Admins",    value: admins.length,    color: "#6366f1" },
     { label: "Managers",  value: managers.length,  color: "#0ea5e9" },
@@ -615,15 +814,12 @@ export default function SuperAdminOrgChart() {
   ];
 
   return (
-    // Root: w-full max-w-full min-w-0 overflow-x-hidden strictly prevents page level horizontal scroll on sidebar toggle
     <div className="su-org w-full max-w-full min-w-0 min-h-screen bg-[#f4f7fb] flex flex-col overflow-x-hidden">
       <style>{STYLES}</style>
 
-      {/* Header / Navigation */}
       <header className="w-full max-w-full min-w-0 bg-white border-b border-gray-200 shadow-sm overflow-hidden">
         <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-4 min-w-0">
-          
-          {/* Left section */}
+
           <div className={`flex items-center gap-2 sm:gap-3 min-w-0 flex-1 ${searchOpen ? "hidden sm:flex" : "flex"}`}>
             <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-[#730042] shrink-0 shadow-[0_0_0_3px_rgba(115,0,66,0.15)]"></div>
             <span className="hidden md:inline text-sm text-gray-400 font-medium truncate min-w-0">{orgName}</span>
@@ -637,7 +833,6 @@ export default function SuperAdminOrgChart() {
             {!loading && <div className="hidden sm:block shrink-0"><LiveDot /></div>}
           </div>
 
-          {/* Right section */}
           <div className={`flex items-center gap-2 min-w-0 ${searchOpen ? "w-full sm:w-auto sm:flex-none sm:ml-auto" : "flex-none ml-auto"}`}>
             {searchOpen ? (
               <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
@@ -677,25 +872,79 @@ export default function SuperAdminOrgChart() {
                 </button>
               </div>
             ) : (
-              <button
-                className="flex items-center gap-1.5 px-3 sm:px-4 h-10 sm:h-9 rounded-lg border border-gray-200 bg-white text-gray-600 text-xs font-medium hover:bg-gray-50 shrink-0 min-w-[44px]"
-                onClick={() => setSearchOpen(true)}
-              >
-                <svg className="w-3 h-3" viewBox="0 0 13 13" fill="none">
-                  <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.3" />
-                  <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                </svg>
-                <span>Search</span>
-              </button>
+              <>
+                <div className="relative" ref={exportBtnRef}>
+                  <button
+                    className="flex items-center gap-1.5 px-3 sm:px-4 h-10 sm:h-9 rounded-lg border border-gray-200 bg-white text-gray-600 text-xs font-medium hover:bg-gray-50 shrink-0 min-w-[44px] disabled:opacity-50"
+                    onClick={() => setExportOpen((v) => !v)}
+                    disabled={loading || exporting}
+                  >
+                    {exporting ? (
+                      <div className="w-3 h-3 rounded-full border-2 border-gray-300 border-t-gray-600 animate-spin" />
+                    ) : (
+                      <svg className="w-3 h-3" viewBox="0 0 13 13" fill="none">
+                        <path d="M6.5 1.5v7M3.5 5.5l3 3 3-3M1.5 10.5h10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                    <span className="hidden xs:inline sm:inline">{exporting ? "Exporting…" : "Export"}</span>
+                  </button>
+
+                  {exportOpen && (
+                    <div className="absolute right-0 top-[calc(100%+6px)] w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden animate-[fadeUp_0.18s_ease_forwards]">
+                      <button
+                        className="w-full flex items-center gap-2.5 px-3.5 py-3 text-left text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                        onClick={exportPng}
+                      >
+                        <span className="w-7 h-7 rounded-lg bg-[#730042]/10 flex items-center justify-center shrink-0">
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
+                            <rect x="1.5" y="1.5" width="11" height="11" rx="1.5" stroke="#730042" strokeWidth="1.2" />
+                            <circle cx="5" cy="5.5" r="1" fill="#730042" />
+                            <path d="M2 10l3-3 2 2 2.5-2.5L12 9" stroke="#730042" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </span>
+                        <span>
+                          <span className="block">Image (PNG)</span>
+                          <span className="block text-[10px] text-gray-400 font-normal">Full tree as a picture</span>
+                        </span>
+                      </button>
+                      <div className="h-px bg-gray-100" />
+                      <button
+                        className="w-full flex items-center gap-2.5 px-3.5 py-3 text-left text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                        onClick={exportCsv}
+                      >
+                        <span className="w-7 h-7 rounded-lg bg-[#730042]/10 flex items-center justify-center shrink-0">
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
+                            <path d="M3 1.5h6l2.5 2.5v8.5h-8.5z" stroke="#730042" strokeWidth="1.2" strokeLinejoin="round" />
+                            <path d="M4.5 7.5h5M4.5 9.5h5M4.5 11h3" stroke="#730042" strokeWidth="1.1" strokeLinecap="round" />
+                          </svg>
+                        </span>
+                        <span>
+                          <span className="block">Spreadsheet (CSV)</span>
+                          <span className="block text-[10px] text-gray-400 font-normal">Everyone in a table</span>
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  className="flex items-center gap-1.5 px-3 sm:px-4 h-10 sm:h-9 rounded-lg border border-gray-200 bg-white text-gray-600 text-xs font-medium hover:bg-gray-50 shrink-0 min-w-[44px]"
+                  onClick={() => setSearchOpen(true)}
+                >
+                  <svg className="w-3 h-3" viewBox="0 0 13 13" fill="none">
+                    <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.3" />
+                    <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                  </svg>
+                  <span>Search</span>
+                </button>
+              </>
             )}
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 min-w-0 flex-1">
 
-        {/* Title Area */}
         <div className="mb-6 lg:mb-8 min-w-0">
           <h2 className="text-lg sm:text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight truncate">
             Organisation Chart
@@ -705,7 +954,6 @@ export default function SuperAdminOrgChart() {
           </p>
         </div>
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 lg:mb-8 min-w-0 max-w-full">
           {statItems.map(({ label, value, color }, i) => (
             <div
@@ -733,9 +981,8 @@ export default function SuperAdminOrgChart() {
           ))}
         </div>
 
-        {/* Tree Card */}
         <div className="w-full max-w-full min-w-0 bg-white border border-gray-200 rounded-xl lg:rounded-2xl shadow-sm overflow-hidden flex flex-col">
-          
+
           <div className="w-full min-w-0 px-4 sm:px-5 py-3 border-b border-gray-100 flex flex-wrap items-center gap-2 bg-gradient-to-br from-gray-50 to-gray-100/50">
             <span className="text-sm font-semibold text-slate-700 truncate">Hierarchy</span>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-semibold shrink-0" style={{ fontFamily: "'JetBrains Mono',monospace" }}>
@@ -749,8 +996,7 @@ export default function SuperAdminOrgChart() {
             <span className="hidden sm:block ml-auto text-xs text-gray-400 truncate">Click any card for details</span>
           </div>
 
-          {/* Tree Scroll Container - overflow-x-auto allows internal scroll if tree is wider than the sidebar allows */}
-          <div className="su-scroll w-full max-w-full min-w-0 overflow-x-auto bg-white p-4 sm:p-6 lg:p-8">
+          <div ref={treeRef} className="su-scroll w-full max-w-full min-w-0 overflow-x-auto bg-white p-4 sm:p-6 lg:p-8">
             <OrgTree
               superAdmin={superAdmin}
               admins={admins}
@@ -763,7 +1009,6 @@ export default function SuperAdminOrgChart() {
           </div>
         </div>
 
-        {/* Legend */}
         {!loading && (
           <div className="flex gap-3 sm:gap-4 lg:gap-6 mt-4 lg:mt-6 justify-center flex-wrap min-w-0 max-w-full">
             {[
