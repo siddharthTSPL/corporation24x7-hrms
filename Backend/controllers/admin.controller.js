@@ -510,6 +510,30 @@ const findallmanagers = async (req, res, next) => {
 };
 
 
+const findallmanagerswoadmin = async (req, res, next) => {
+  try {
+    if (!req.admin) {
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+    }
+
+    const organisation_id = req.admin.organisation_id;
+
+    const managers = await Managermodel.find({ organisation_id })
+      .select(EXCLUDE)
+      .populate("reporting_manager", "f_name l_name work_email designation")
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      organisation_id,
+      count: managers.length,
+      managers,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getallemployee = async (req, res, next) => {
   try {
     if (!req.admin)
@@ -2845,4 +2869,5 @@ module.exports = {
   adminGetMyTickets,
   adminRateTicket,
   adminGetTicketDetail,
+  findallmanagerswoadmin
 };
