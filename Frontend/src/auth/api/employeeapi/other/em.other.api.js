@@ -46,11 +46,11 @@ export const fetchOrgInfo = async () => {
 };
 
 export const getExpenseDocuments = async () => {
-  const res = await api.get("user/expense-documents");
+  const res = await api.get("user/getExpenseDocuments");
   return res.data;
 };
 
 export const getPersonalDocuments = async () => {
-  const res = await api.get("user/personal-documents");
+  const res = await api.get("user/getPersonalDocuments");
   return res.data;
 };
