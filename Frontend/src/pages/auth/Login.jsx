@@ -3,7 +3,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Player } from "@lottiefiles/react-lottie-player";
-import { useLogin } from "../../auth/store/getmeauth/getuselogin";
+import { useLogin } from "../../auth/store/getmeauth/getmeauth";
 import {
   useSendForgetPasswordOtp,
   useVerifyAdminOtp,
@@ -29,6 +29,8 @@ import { getMeAdmin } from "../../auth/api/adminapi/auth/ad.auth.api";
 import { getMeManager } from "../../auth/api/managerapi/auth/ma.auth.api";
 import { getMeUser } from "../../auth/api/employeeapi/auth/em.auth.api";
 import { getMeSuperAdmin } from "../../auth/api/superadmin/auth/su.auth";
+import { fetchMyPermissions } from "../../auth/api/permission/permission.api";
+import { usePermissionStore } from "../../auth/store/permission/permissionStore";
 
 function Login() {
   const navigate = useNavigate();

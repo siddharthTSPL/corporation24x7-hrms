@@ -541,12 +541,12 @@ function TodayBanner({ isOnLeave, leaveType, onCheckIn, onRecruitment }) {
       </div>
 
       <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
-        <button
+        {/* <button
           className="md-recruit-btn"
           onClick={onRecruitment}
         >
           🧑‍💼 Recruitment
-        </button>
+        </button> */}
         <button
           className="md-checkin-btn"
           disabled={isOnLeave}

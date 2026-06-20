@@ -187,6 +187,11 @@ const adminSchema = new mongoose.Schema(
       enum: ["active", "inactive", "suspended"],
       default: "active",
     },
+     working_status:{
+      type:String,
+      enum:["working","resigned","fired","terminated"],
+      default:"working"
+    },
 
     isVerified: {
       type: Boolean,

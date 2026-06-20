@@ -60,6 +60,32 @@ export const useAuth = () => {
   });
 };
 
+export const usePermissionsSync = () => {
+  const { setPermissions, clearPermissions } = usePermissionStore();
+  const savedRole = localStorage.getItem("role");
+
+  return useQuery({
+    queryKey: ["permissions", savedRole],
+    enabled: !!savedRole && savedRole !== "superadmin",
+
+    queryFn: async () => {
+      try {
+        const perms = await fetchMyPermissions(savedRole);
+        setPermissions(savedRole, perms);
+        return perms;
+      } catch {
+        clearPermissions();
+        return {};
+      }
+    },
+
+    staleTime: 0,
+    retry: false,
+    refetchOnWindowFocus: true,
+    refetchInterval: false,
+  });
+};
+
 export const useLogin = () => {
   const queryClient = useQueryClient();
   const { setPermissions, clearPermissions } = usePermissionStore();
@@ -79,28 +105,39 @@ export const useLogin = () => {
       const role = variables.role;
       localStorage.setItem("role", role);
 
-      try {
-        let fullData;
-        if (role === "admin") fullData = await getMeAdmin();
-        else if (role === "manager") fullData = await getMeManager();
-        else if (role === "employee") fullData = await getMeUser();
-        else if (role === "superadmin") fullData = await getMeSuperAdmin();
-
-        queryClient.setQueryData(["auth"], { role, data: fullData });
-      } catch {
-        queryClient.setQueryData(["auth"], { role, data });
-      }
-
       if (role === "superadmin") {
         setPermissions("superadmin", null);
-      } else {
         try {
-          const perms = await fetchMyPermissions(role);
-          setPermissions(role, perms);
+          const fullData = await getMeSuperAdmin();
+          queryClient.setQueryData(["auth"], { role, data: fullData });
         } catch {
-          clearPermissions();
+          queryClient.setQueryData(["auth"], { role, data });
         }
+        return;
       }
+
+      const getMeFn =
+        role === "admin" ? getMeAdmin
+        : role === "manager" ? getMeManager
+        : getMeUser;
+
+      const [fullDataResult, permsResult] = await Promise.allSettled([
+        getMeFn(),
+        fetchMyPermissions(role),
+      ]);
+
+      if (permsResult.status === "fulfilled") {
+        setPermissions(role, permsResult.value);
+      } else {
+        clearPermissions();
+      }
+
+      queryClient.setQueryData(["auth"], {
+        role,
+        data: fullDataResult.status === "fulfilled" ? fullDataResult.value : data,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["permissions", role] });
     },
   });
 };

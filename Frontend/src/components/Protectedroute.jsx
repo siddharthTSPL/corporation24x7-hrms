@@ -18,6 +18,7 @@ const AccessDenied = () => (
 const ProtectedRoute = ({ children, allowedRoles, permission, permissionGroup }) => {
   const { data, isLoading } = useAuth();
   const can = usePermissionStore((state) => state.can);
+  const permRole = usePermissionStore((state) => state.role);
 
   if (isLoading) return <p>Loading...</p>;
 
@@ -26,13 +27,17 @@ const ProtectedRoute = ({ children, allowedRoles, permission, permissionGroup })
   if (allowedRoles && !allowedRoles.includes(data.role))
     return <AccessDenied />;
 
-  // Single permission check — exact match required
-  if (permission && !can(permission))
-    return <AccessDenied />;
+  const hasPermissionCheck = permission || permissionGroup?.length;
 
-  // Group check — allowed if AT LEAST ONE permission in the group is true
-  if (permissionGroup?.length && !permissionGroup.some((p) => can(p)))
-    return <AccessDenied />;
+  if (hasPermissionCheck) {
+    const permissionsNotYetLoaded = !permRole && data.role !== "superadmin";
+    if (permissionsNotYetLoaded) return <p>Loading...</p>;
+
+    if (permission && !can(permission)) return <AccessDenied />;
+
+    if (permissionGroup?.length && !permissionGroup.some((p) => can(p)))
+      return <AccessDenied />;
+  }
 
   return children ?? <Outlet />;
 };

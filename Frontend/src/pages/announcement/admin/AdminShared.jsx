@@ -1,7 +1,7 @@
 import { PriorityBadge, AudienceBadge } from "../../../components/announcement/shared/Badges";
 import { fmtShortDate } from "../../../components/announcement/shared/helpers";
 import { AVATAR_BG } from "../../../components/announcement/shared/constants";
-import { IconMegaphone, IconAlert, IconGlobe, IconClock, IconFile } from "./Icons";
+import { IconMegaphone, IconAlert, IconGlobe, IconClock, IconFile, IconShield, IconLock, IconMail } from "./Icons";
 
 /* ── Image placeholder ────────────────────────────────────────────────────── */
 export function ImageOrPlaceholder({ src, alt, className, placeholderBg }) {
@@ -60,8 +60,51 @@ export function SkeletonRows() {
   ));
 }
 
+/* ── Full page lock (no announcement permissions at all) ─────────────────── */
+export function FullPageLockScreen() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[70vh] text-center px-4">
+      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center mb-5"
+        style={{ background: "#FBEAF0", border: "1px solid #F4C0D1" }}>
+        <IconShield size={36} color="#CD166E" />
+      </div>
+      <h2 className="text-base sm:text-lg font-semibold text-[#730042] mb-2">Access Restricted</h2>
+      <p className="text-[12px] sm:text-[13px] text-[#993556] max-w-xs sm:max-w-sm leading-relaxed mb-5">
+        You don't have permission to use any announcement features. Contact your super admin to request access.
+      </p>
+      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-semibold"
+        style={{ background: "#FBEAF0", color: "#730042" }}>
+        <IconMail size={12} />
+        Contact Super Admin
+      </div>
+    </div>
+  );
+}
+
+/* ── Blur overlay (view permission off, but other actions may be on) ─────── */
+export function ViewBlurOverlay() {
+  return (
+    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-center px-4 rounded-[14px]"
+      style={{ background: "rgba(249,248,242,0.78)", backdropFilter: "blur(6px)" }}>
+      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center mb-3"
+        style={{ background: "#FFFFFF", border: "1px solid #F4C0D1" }}>
+        <IconLock size={20} color="#CD166E" />
+      </div>
+      <p className="text-[13px] font-semibold text-[#730042] mb-1">Viewing is restricted</p>
+      <p className="text-[11px] text-[#993556] max-w-[220px] sm:max-w-xs leading-relaxed mb-3">
+        You can't view announcement details. Contact your super admin for access.
+      </p>
+      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-semibold"
+        style={{ background: "#fff", color: "#730042", border: "1px solid #F4C0D1" }}>
+        <IconMail size={11} />
+        Contact Super Admin
+      </div>
+    </div>
+  );
+}
+
 /* ── Stat cards ───────────────────────────────────────────────────────────── */
-export function StatCards({ announcements }) {
+export function StatCards({ announcements, hideValues }) {
   const stats = [
     { label: "Total",         value: announcements.length,
       icon: <IconFile  size={18} color="#CD166E" />, bg: "bg-[#FBEAF0]" },
@@ -78,7 +121,7 @@ export function StatCards({ announcements }) {
         <div key={s.label} className="bg-white rounded-xl border border-[#F4C0D1] p-4 flex items-center gap-4">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${s.bg}`}>{s.icon}</div>
           <div>
-            <div className="text-xl font-semibold text-[#730042]">{s.value}</div>
+            <div className="text-xl font-semibold text-[#730042]">{hideValues ? "•••" : s.value}</div>
             <div className="text-[11px] text-[#993556] mt-0.5">{s.label}</div>
           </div>
         </div>

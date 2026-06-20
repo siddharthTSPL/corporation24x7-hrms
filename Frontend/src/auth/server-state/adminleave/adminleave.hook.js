@@ -5,16 +5,18 @@ export const useGetForwardedLeaves = () => {
   return useQuery({
     queryKey: ["AllLeaves"],
     queryFn: getAllLeaves,
-    staleTime: 1000 * 60 * 2,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 };
 
 export const useAcceptLeave = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: acceptLeave, 
+    mutationFn: acceptLeave,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["AllLeaves"] }); 
+      queryClient.invalidateQueries({ queryKey: ["AllLeaves"] });
       queryClient.invalidateQueries({ queryKey: ["employeeStats"] });
     },
   });
@@ -23,20 +25,19 @@ export const useAcceptLeave = () => {
 export const useRejectLeave = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: rejectLeave, 
+    mutationFn: rejectLeave,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["AllLeaves"] }); 
+      queryClient.invalidateQueries({ queryKey: ["AllLeaves"] });
     },
   });
 };
 
-
 export const useAdminApplyLeave = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: applyleave, 
+    mutationFn: applyleave,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["AllLeaves"] }); 
+      queryClient.invalidateQueries({ queryKey: ["AllLeaves"] });
     },
   });
 };
@@ -45,6 +46,8 @@ export const useAdminGetMyLeaveHistory = () => {
   return useQuery({
     queryKey: ["leaveHistory"],
     queryFn: getLeavehistory,
-    staleTime: 1000 * 60 * 2,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 };

@@ -12,7 +12,6 @@ const C = {
   brand:      "#CD166E",
   brandDark:  "#730042",
   brandLight: "rgba(205,22,110,0.08)",
-  brandMid:   "rgba(205,22,110,0.15)",
   green:      "#1D9E75",
   greenBg:    "#e8f5e9",
   blue:       "#378ADD",
@@ -29,76 +28,71 @@ const C = {
   mutedMid:   "#c9bab5",
 };
 
-function getOrgInitials(name = "") {
-  return (
-    name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) || "?"
-  );
+const TABS = [
+  { key: "profile",   label: "Profile" },
+  { key: "contact",   label: "Contact" },
+  { key: "address",   label: "Address" },
+  { key: "documents", label: "Documents" },
+  { key: "leave",     label: "Leave Balance" },
+  { key: "reviews",   label: "Reviews" },
+  { key: "password",  label: "Password" },
+  { key: "avatar",    label: "Avatar" },
+];
+
+function getInitials(name = "") {
+  return name.split(" ").filter(Boolean).map(w => w[0]).join("").toUpperCase().slice(0, 2) || "?";
 }
 
 function getErrorMessage(err) {
   return err?.response?.data?.message || err?.message || "Something went wrong";
 }
 
-function Badge({ children, color = C.brand, bg = C.brandLight }) {
-  return (
-    <span style={{
-      display: "inline-flex", alignItems: "center",
-      padding: "2px 10px", borderRadius: 20,
-      fontSize: 11, fontWeight: 500,
-      color, background: bg,
-    }}>
-      {children}
-    </span>
-  );
+function fmtDate(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
 }
 
 function Spinner({ size = 16, color = "#fff" }) {
   return (
     <div style={{
       width: size, height: size, borderRadius: "50%",
-      border: `2px solid ${color}33`,
-      borderTop: `2px solid ${color}`,
-      animation: "spin 0.7s linear infinite",
-      flexShrink: 0,
+      border: `2px solid ${color}33`, borderTop: `2px solid ${color}`,
+      animation: "spin 0.7s linear infinite", flexShrink: 0,
     }} />
   );
 }
 
 function Toast({ message, type, onClose }) {
   useEffect(() => {
+    if (!message) return;
     const t = setTimeout(onClose, 3200);
     return () => clearTimeout(t);
   }, [message]);
-
   if (!message) return null;
-
-  const isSuccess = type === "success";
+  const ok = type === "success";
   return (
     <div style={{
-      position: "fixed", top: 24, right: 24, zIndex: 999,
-      background: isSuccess ? "#f0faf5" : "#fff5f5",
-      border: `0.5px solid ${isSuccess ? "#a8dfc3" : "#f5c6c6"}`,
-      borderRadius: 12, padding: "14px 18px",
+      position: "fixed", top: 16, right: 16, zIndex: 999,
+      background: ok ? "#f0faf5" : "#fff5f5",
+      border: `1px solid ${ok ? "#a8dfc3" : "#f5c6c6"}`,
+      borderRadius: 12, padding: "12px 16px",
       display: "flex", alignItems: "center", gap: 10,
-      boxShadow: "0 4px 24px rgba(205,22,110,0.12)",
-      minWidth: 260, maxWidth: 360,
+      boxShadow: "0 4px 24px rgba(0,0,0,0.1)",
+      minWidth: 240, maxWidth: "calc(100vw - 32px)",
       animation: "slideIn 0.25s ease",
     }}>
       <div style={{
-        width: 28, height: 28, borderRadius: "50%",
-        background: isSuccess ? C.greenBg : C.redBg,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        flexShrink: 0,
+        width: 26, height: 26, borderRadius: "50%",
+        background: ok ? C.greenBg : C.redBg,
+        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
       }}>
-        {isSuccess
-          ? <svg width="14" height="14" viewBox="0 0 14 14"><polyline points="2,7 5.5,10.5 12,4" fill="none" stroke={C.green} strokeWidth="2" strokeLinecap="round" /></svg>
-          : <svg width="14" height="14" viewBox="0 0 14 14"><line x1="3" y1="3" x2="11" y2="11" stroke={C.red} strokeWidth="2" strokeLinecap="round" /><line x1="11" y1="3" x2="3" y2="11" stroke={C.red} strokeWidth="2" strokeLinecap="round" /></svg>
+        {ok
+          ? <svg width="13" height="13" viewBox="0 0 14 14"><polyline points="2,7 5.5,10.5 12,4" fill="none" stroke={C.green} strokeWidth="2" strokeLinecap="round"/></svg>
+          : <svg width="13" height="13" viewBox="0 0 14 14"><line x1="3" y1="3" x2="11" y2="11" stroke={C.red} strokeWidth="2" strokeLinecap="round"/><line x1="11" y1="3" x2="3" y2="11" stroke={C.red} strokeWidth="2" strokeLinecap="round"/></svg>
         }
       </div>
-      <span style={{ fontSize: 13, fontWeight: 500, color: isSuccess ? "#1a5c3a" : "#7a1a1a", flex: 1 }}>
-        {message}
-      </span>
-      <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
+      <span style={{ fontSize: 13, fontWeight: 500, color: ok ? "#1a5c3a" : "#7a1a1a", flex: 1 }}>{message}</span>
+      <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: 18, lineHeight: 1, padding: 0 }}>×</button>
     </div>
   );
 }
@@ -106,176 +100,107 @@ function Toast({ message, type, onClose }) {
 function SectionCard({ title, subtitle, accent = C.brand, children }) {
   return (
     <div style={{
-      background: C.surface, borderRadius: 16,
-      border: `0.5px solid ${C.border}`,
-      overflow: "hidden", position: "relative",
-      marginBottom: 16,
+      background: C.surface, borderRadius: 14,
+      border: `1px solid ${C.border}`, overflow: "hidden",
+      position: "relative", marginBottom: 16,
     }}>
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: accent, borderRadius: "16px 16px 0 0" }} />
-      <div style={{ padding: "20px 24px 16px", borderBottom: `0.5px solid ${C.border}` }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>{title}</div>
-        {subtitle && <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>{subtitle}</div>}
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: accent }} />
+      <div style={{ padding: "18px 20px 14px", borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{title}</div>
+        {subtitle && <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{subtitle}</div>}
       </div>
-      <div style={{ padding: "20px 24px" }}>{children}</div>
+      <div style={{ padding: "18px 20px" }}>{children}</div>
     </div>
   );
 }
 
 function FieldLabel({ children }) {
-  return <div style={{ fontSize: 12, fontWeight: 500, color: C.muted, marginBottom: 6, letterSpacing: "0.2px" }}>{children}</div>;
+  return <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.4px" }}>{children}</div>;
 }
 
 function ReadonlyField({ label, value }) {
   return (
-    <div style={{ marginBottom: 16 }}>
+    <div style={{ marginBottom: 14 }}>
       <FieldLabel>{label}</FieldLabel>
       <div style={{
-        padding: "10px 14px", borderRadius: 10,
-        background: "#f9f4f2", border: `0.5px solid ${C.border}`,
-        fontSize: 13, color: C.text, fontWeight: 500,
+        padding: "9px 12px", borderRadius: 8,
+        background: "#f7f3f1", border: `1px solid ${C.border}`,
+        fontSize: 13, color: value ? C.text : C.muted, fontWeight: 500,
       }}>
         {value || "—"}
       </div>
-      <div style={{ fontSize: 11, color: C.mutedMid, marginTop: 4 }}>Read-only</div>
     </div>
   );
 }
 
 function InputField({ label, value, onChange, type = "text", placeholder, hint, rightEl, name }) {
+  const [focused, setFocused] = useState(false);
   return (
-    <div style={{ marginBottom: 16 }}>
+    <div style={{ marginBottom: 14 }}>
       <FieldLabel>{label}</FieldLabel>
       <div style={{ position: "relative" }}>
         <input
-          type={type}
-          name={name}
-          value={value}
-          onChange={onChange}
-          placeholder={placeholder}
+          type={type} name={name} value={value} onChange={onChange} placeholder={placeholder}
+          onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
           style={{
-            width: "100%", padding: "10px 14px",
-            paddingRight: rightEl ? 40 : 14,
-            borderRadius: 10, border: `0.5px solid ${C.border}`,
+            width: "100%", padding: "9px 12px",
+            paddingRight: rightEl ? 40 : 12,
+            borderRadius: 8, border: `1px solid ${focused ? C.brand : C.border}`,
             fontSize: 13, color: C.text, background: C.surface,
             outline: "none", fontFamily: "inherit",
-            transition: "border-color 0.15s",
-            boxSizing: "border-box",
+            boxSizing: "border-box", transition: "border-color 0.15s",
+            boxShadow: focused ? `0 0 0 3px ${C.brandLight}` : "none",
           }}
-          onFocus={e => e.target.style.borderColor = C.brand}
-          onBlur={e => e.target.style.borderColor = C.border}
         />
         {rightEl && (
-          <div style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)" }}>
+          <div style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)" }}>
             {rightEl}
           </div>
         )}
       </div>
-      {hint && <div style={{ fontSize: 11, color: C.red, marginTop: 4 }}>{hint}</div>}
+      {hint && <div style={{ fontSize: 11, color: C.red, marginTop: 3 }}>{hint}</div>}
     </div>
   );
 }
 
-function PrimaryButton({ onClick, disabled, loading, children, color = C.brand }) {
+function SelectField({ label, value, onChange, options }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled || loading}
-      style={{
-        width: "100%", padding: "11px 0",
-        background: disabled || loading ? `${color}99` : color,
-        color: "#fff", border: "none", borderRadius: 10,
-        fontSize: 13, fontWeight: 500, cursor: disabled || loading ? "not-allowed" : "pointer",
-        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-        transition: "opacity 0.15s", fontFamily: "inherit",
-      }}
-    >
-      {loading ? <><Spinner />{children}</> : children}
-    </button>
+    <div style={{ marginBottom: 14 }}>
+      <FieldLabel>{label}</FieldLabel>
+      <select
+        value={value} onChange={onChange}
+        style={{
+          width: "100%", padding: "9px 12px",
+          borderRadius: 8, border: `1px solid ${C.border}`,
+          fontSize: 13, color: C.text, background: C.surface,
+          fontFamily: "inherit", outline: "none", boxSizing: "border-box",
+        }}
+      >
+        {options.map(o => <option key={o.value || o} value={o.value || o}>{o.label || o}</option>)}
+      </select>
+    </div>
   );
 }
 
-function Sidebar({ tab, setTab, adminData, initials }) {
-  const tabs = [
-    { key: "profile", label: "Profile", icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.4" /><path d="M2 13c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
-    )},
-    { key: "contact", label: "Contact & office", icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="3" stroke="currentColor" strokeWidth="1.4" /><path d="M5 6h6M5 9h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
-    )},
-    { key: "address", label: "Address", icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5C5.515 1.5 3.5 3.515 3.5 6c0 3.75 4.5 8.5 4.5 8.5S12.5 9.75 12.5 6c0-2.485-2.015-4.5-4.5-4.5z" stroke="currentColor" strokeWidth="1.4" /><circle cx="8" cy="6" r="1.5" stroke="currentColor" strokeWidth="1.2" /></svg>
-    )},
-    { key: "documents", label: "Documents", icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3" y="1" width="10" height="14" rx="2" stroke="currentColor" strokeWidth="1.4" /><path d="M5.5 5h5M5.5 8h5M5.5 11h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>
-    )},
-    { key: "password", label: "Password", icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="4" y="7" width="8" height="6" rx="2" stroke="currentColor" strokeWidth="1.4" /><path d="M6 7V5a2 2 0 0 1 4 0v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
-    )},
-    { key: "avatar", label: "Avatar", icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" /><circle cx="8" cy="6" r="2" stroke="currentColor" strokeWidth="1.2" /><path d="M4 12.5c0-2.2 1.8-3.5 4-3.5s4 1.3 4 3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>
-    )},
-    { key: "system", label: "System", icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.3" /><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.42 1.42M11.53 11.53l1.42 1.42M3.05 12.95l1.42-1.42M11.53 4.47l1.42-1.42" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
-    )},
-  ];
-
+function ToggleGroup({ label, value, onChange, options }) {
   return (
-    <div style={{ width: 220, flexShrink: 0 }}>
-      <div style={{
-        background: C.surface, borderRadius: 16,
-        border: `0.5px solid ${C.border}`,
-        padding: "20px 16px", marginBottom: 12,
-        position: "relative", overflow: "hidden",
-      }}>
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${C.brand}, ${C.brandDark})`, borderRadius: "16px 16px 0 0" }} />
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: "50%",
-            background: adminData?.profile_image ? "transparent" : `linear-gradient(135deg, ${C.brand}, ${C.brandDark})`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 20, fontWeight: 500, color: "#fff",
-            overflow: "hidden", border: `3px solid ${C.brandLight}`,
-          }}>
-            {adminData?.profile_image
-              ? <img src={adminData.profile_image} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              : initials
-            }
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>
-              {adminData?.organisation_name || `${adminData?.f_name || ""} ${adminData?.l_name || ""}`.trim() || "Admin"}
-            </div>
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{adminData?.work_email || adminData?.email || "—"}</div>
-            <div style={{ marginTop: 8 }}>
-              <Badge>{adminData?.role || "admin"}</Badge>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div style={{ background: C.surface, borderRadius: 16, border: `0.5px solid ${C.border}`, overflow: "hidden" }}>
-        {tabs.map((t, i) => {
-          const active = tab === t.key;
+    <div style={{ marginBottom: 14 }}>
+      <FieldLabel>{label}</FieldLabel>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {options.map(opt => {
+          const active = value === opt;
           return (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
+            <button key={opt} onClick={() => onChange(opt)}
               style={{
-                width: "100%", padding: "13px 16px",
-                display: "flex", alignItems: "center", gap: 10,
-                background: active ? C.brandLight : "transparent",
+                flex: 1, minWidth: 60, padding: "8px 12px",
+                borderRadius: 8, border: `1px solid ${active ? C.brand : C.border}`,
+                background: active ? C.brandLight : C.surface,
                 color: active ? C.brand : C.muted,
-                border: "none", borderBottom: i < tabs.length - 1 ? `0.5px solid ${C.border}` : "none",
+                fontSize: 12, fontWeight: active ? 600 : 400,
                 cursor: "pointer", fontFamily: "inherit",
-                fontSize: 13, fontWeight: active ? 500 : 400,
-                transition: "all 0.15s", textAlign: "left",
-              }}
-            >
-              {t.icon}
-              {t.label}
-              {active && (
-                <div style={{ marginLeft: "auto", width: 5, height: 5, borderRadius: "50%", background: C.brand }} />
-              )}
+                textTransform: "capitalize", transition: "all 0.15s",
+              }}>
+              {opt}
             </button>
           );
         })}
@@ -284,57 +209,81 @@ function Sidebar({ tab, setTab, adminData, initials }) {
   );
 }
 
-function ProfileTab({ adminData }) {
-  const joined = adminData?.createdAt;
-  const joinedFmt = joined
-    ? new Date(joined).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })
-    : "—";
-  const lastLogin = adminData?.last_login
-    ? new Date(adminData.last_login).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })
-    : "—";
+function PrimaryButton({ onClick, disabled, loading, children, color = C.brand, fullWidth = true }) {
+  return (
+    <button onClick={onClick} disabled={disabled || loading}
+      style={{
+        width: fullWidth ? "100%" : "auto",
+        padding: "10px 20px",
+        background: disabled || loading ? `${color}80` : color,
+        color: "#fff", border: "none", borderRadius: 9,
+        fontSize: 13, fontWeight: 600,
+        cursor: disabled || loading ? "not-allowed" : "pointer",
+        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+        fontFamily: "inherit", transition: "opacity 0.15s",
+      }}>
+      {loading ? <><Spinner />{children}</> : children}
+    </button>
+  );
+}
 
+function Grid({ cols = 2, children }) {
+  return (
+    <div style={{
+      display: "grid",
+      gridTemplateColumns: `repeat(${cols}, 1fr)`,
+      gap: "0 16px",
+    }}>
+      {children}
+    </div>
+  );
+}
+
+function ProfileTab({ adminData }) {
   return (
     <>
-      <SectionCard title="Personal details" subtitle="Your core information on record" accent={C.brand}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
-          <ReadonlyField label="First name"     value={adminData?.f_name} />
-          <ReadonlyField label="Last name"      value={adminData?.l_name} />
-          <ReadonlyField label="Work email"     value={adminData?.work_email} />
-          <ReadonlyField label="Employee ID"    value={adminData?.uid} />
-          <ReadonlyField label="Gender"         value={adminData?.gender} />
+      <SectionCard title="Personal details" subtitle="Core information on record" accent={C.brand}>
+        <Grid>
+          <ReadonlyField label="First name" value={adminData?.f_name} />
+          <ReadonlyField label="Last name" value={adminData?.l_name} />
+          <ReadonlyField label="Work email" value={adminData?.work_email} />
+          <ReadonlyField label="Employee ID" value={adminData?.uid} />
+          <ReadonlyField label="Gender" value={adminData?.gender} />
           <ReadonlyField label="Marital status" value={adminData?.marital_status} />
-        </div>
+          <ReadonlyField label="Country" value={adminData?.country} />
+          <ReadonlyField label="Account status" value={adminData?.status || "active"} />
+        </Grid>
       </SectionCard>
 
-      <SectionCard title="Job information" subtitle="Your current role and team" accent={C.blue}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
-          <ReadonlyField label="Role"            value={adminData?.role} />
-          <ReadonlyField label="Designation"     value={adminData?.designation} />
-          <ReadonlyField label="Department"      value={adminData?.department} />
+      <SectionCard title="Job information" accent={C.blue}>
+        <Grid>
+          <ReadonlyField label="Role" value={adminData?.role} />
+          <ReadonlyField label="Designation" value={adminData?.designation} />
+          <ReadonlyField label="Department" value={adminData?.department} />
           <ReadonlyField label="Office location" value={adminData?.office_location} />
-          <ReadonlyField label="Date of joining" value={joinedFmt} />
-          <ReadonlyField label="Account status"  value={adminData?.status} />
-          <ReadonlyField label="Email verified"  value={adminData?.isVerified ? "✓ Verified" : "Not verified"} />
-          <ReadonlyField label="Last login"      value={lastLogin} />
-        </div>
+          <ReadonlyField label="Date of joining" value={fmtDate(adminData?.createdAt)} />
+          <ReadonlyField label="Last login" value={fmtDate(adminData?.last_login)} />
+          <ReadonlyField label="Email verified" value={adminData?.isVerified ? "✓ Verified" : "Not verified"} />
+          <ReadonlyField label="Reporting manager" value={adminData?.reporting_manager ? adminData.reporting_manager : "—"} />
+        </Grid>
       </SectionCard>
 
-      <SectionCard title="Experience" subtitle="Your work background" accent={C.amber}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
-          <ReadonlyField label="Fresher"                  value={adminData?.is_fresher ? "Yes" : "No"} />
-          <ReadonlyField label="Total experience (years)" value={adminData?.total_experience !== undefined ? String(adminData.total_experience) : "—"} />
-          <ReadonlyField label="Previous company"         value={adminData?.previous_company} />
-          <ReadonlyField label="Previous designation"     value={adminData?.previous_designation} />
-        </div>
+      <SectionCard title="Experience" accent={C.amber}>
+        <Grid>
+          <ReadonlyField label="Fresher" value={adminData?.is_fresher ? "Yes" : "No"} />
+          <ReadonlyField label="Total experience (yrs)" value={adminData?.total_experience !== undefined ? String(adminData.total_experience) : "—"} />
+          <ReadonlyField label="Previous company" value={adminData?.previous_company} />
+          <ReadonlyField label="Previous designation" value={adminData?.previous_designation} />
+        </Grid>
       </SectionCard>
 
-      <SectionCard title="Banking details" subtitle="Your bank information on record" accent={C.green}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
-          <ReadonlyField label="Bank name"           value={adminData?.bank_name} />
-          <ReadonlyField label="Account holder name" value={adminData?.account_holder_name} />
-          <ReadonlyField label="Account number"      value={adminData?.account_number} />
-          <ReadonlyField label="IFSC code"           value={adminData?.ifsc_code} />
-        </div>
+      <SectionCard title="Banking details" accent={C.green}>
+        <Grid>
+          <ReadonlyField label="Bank name" value={adminData?.bank_name} />
+          <ReadonlyField label="Account holder" value={adminData?.account_holder_name} />
+          <ReadonlyField label="Account number" value={adminData?.account_number} />
+          <ReadonlyField label="IFSC code" value={adminData?.ifsc_code} />
+        </Grid>
       </SectionCard>
     </>
   );
@@ -342,199 +291,79 @@ function ProfileTab({ adminData }) {
 
 function ContactTab({ adminData, onSuccess, onError }) {
   const queryClient = useQueryClient();
-  const editProfileMutation = useEditAdminProfile();
-
+  const { mutate, isPending } = useEditAdminProfile();
   const [form, setForm] = useState({
-    phone:           adminData?.phone           || "",
-    e_contact:       adminData?.e_contact       || "",
-    marital_status:  adminData?.marital_status  || "single",
-    gender:          adminData?.gender          || "male",
-    designation:     adminData?.designation     || "",
-    office_location: adminData?.office_location || "Bareilly",
+    phone: "", e_contact: "", designation: "", office_location: "Bareilly",
+    gender: "male", marital_status: "single",
   });
 
   useEffect(() => {
     if (adminData) {
       setForm({
-        phone:           adminData.phone           || "",
-        e_contact:       adminData.e_contact       || "",
-        marital_status:  adminData.marital_status  || "single",
-        gender:          adminData.gender          || "male",
-        designation:     adminData.designation     || "",
+        phone: adminData.phone || adminData.personal_contact || "",
+        e_contact: adminData.e_contact || "",
+        designation: adminData.designation || "",
         office_location: adminData.office_location || "Bareilly",
+        gender: adminData.gender || "male",
+        marital_status: adminData.marital_status || "single",
       });
     }
   }, [adminData]);
 
+  const set = (key) => (e) => setForm(p => ({ ...p, [key]: typeof e === "string" ? e : e.target.value }));
+
   const handleSave = () => {
     if (!form.phone) { onError("Phone number is required"); return; }
-    editProfileMutation.mutate(
+    mutate(
       { phone: form.phone, profile_image: adminData?.profile_image || "" },
       {
-        onSuccess: (data) => {
-          queryClient.setQueryData(["auth"], old => {
-            if (!old) return old;
-            return {
-              ...old,
-              data: {
-                ...old.data,
-                user: {
-                  ...old.data.user,
-                  ...(data.admin || { phone: form.phone }),
-                },
-              },
-            };
-          });
+        onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["auth"] });
-          onSuccess("Contact info updated successfully!");
+          onSuccess("Contact info updated!");
         },
         onError: (err) => onError(getErrorMessage(err)),
       }
     );
   };
 
-  const MARITAL_OPTIONS = ["single", "married", "divorced"];
-  const OFFICE_LOCATIONS = ["Noida", "Bareilly", "Delhi", "Mumbai"];
-
   return (
-    <SectionCard title="Contact & office information" subtitle="Fields you can update yourself" accent={C.green}>
-      <InputField
-        label="Phone number"
-        type="tel"
-        value={form.phone}
-        onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
-        placeholder="Enter phone number"
-      />
-      <InputField
-        label="Emergency contact"
-        type="tel"
-        value={form.e_contact}
-        onChange={e => setForm(p => ({ ...p, e_contact: e.target.value }))}
-        placeholder="Enter emergency contact"
-        hint="This contact will be reached in case of emergency"
-      />
-      <InputField
-        label="Designation"
-        value={form.designation}
-        onChange={e => setForm(p => ({ ...p, designation: e.target.value }))}
-        placeholder="Enter your designation"
-      />
-      <div style={{ marginBottom: 16 }}>
-        <FieldLabel>Office location</FieldLabel>
-        <select
-          value={form.office_location}
-          onChange={e => setForm(p => ({ ...p, office_location: e.target.value }))}
-          style={{
-            width: "100%", padding: "10px 14px",
-            borderRadius: 10, border: `0.5px solid ${C.border}`,
-            fontSize: 13, color: C.text, background: C.surface,
-            fontFamily: "inherit", outline: "none", boxSizing: "border-box",
-          }}
-          onFocus={e => e.target.style.borderColor = C.brand}
-          onBlur={e => e.target.style.borderColor = C.border}
-        >
-          {OFFICE_LOCATIONS.map(o => <option key={o} value={o}>{o}</option>)}
-        </select>
-      </div>
-      <div style={{ marginBottom: 20 }}>
-        <FieldLabel>Gender</FieldLabel>
-        <div style={{ display: "flex", gap: 10 }}>
-          {["male", "female"].map(opt => {
-            const active = form.gender === opt;
-            return (
-              <button
-                key={opt}
-                onClick={() => setForm(p => ({ ...p, gender: opt }))}
-                style={{
-                  flex: 1, padding: "10px 0",
-                  borderRadius: 10, border: `0.5px solid ${active ? C.brand : C.border}`,
-                  background: active ? C.brandLight : C.surface,
-                  color: active ? C.brand : C.muted,
-                  fontSize: 12, fontWeight: active ? 500 : 400,
-                  cursor: "pointer", fontFamily: "inherit",
-                  textTransform: "capitalize", transition: "all 0.15s",
-                }}
-              >
-                {opt}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      <div style={{ marginBottom: 20 }}>
-        <FieldLabel>Marital status</FieldLabel>
-        <div style={{ display: "flex", gap: 10 }}>
-          {MARITAL_OPTIONS.map(opt => {
-            const active = form.marital_status === opt;
-            return (
-              <button
-                key={opt}
-                onClick={() => setForm(p => ({ ...p, marital_status: opt }))}
-                style={{
-                  flex: 1, padding: "10px 0",
-                  borderRadius: 10, border: `0.5px solid ${active ? C.brand : C.border}`,
-                  background: active ? C.brandLight : C.surface,
-                  color: active ? C.brand : C.muted,
-                  fontSize: 12, fontWeight: active ? 500 : 400,
-                  cursor: "pointer", fontFamily: "inherit",
-                  textTransform: "capitalize", transition: "all 0.15s",
-                }}
-              >
-                {opt}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      <PrimaryButton onClick={handleSave} loading={editProfileMutation.isPending}>
-        Save contact info
-      </PrimaryButton>
+    <SectionCard title="Contact & office" subtitle="Fields you can update" accent={C.green}>
+      <InputField label="Phone number" type="tel" value={form.phone} onChange={set("phone")} placeholder="Enter phone number" />
+      <InputField label="Emergency contact" type="tel" value={form.e_contact} onChange={set("e_contact")} placeholder="Emergency contact" hint="Reached in case of emergency" />
+      <InputField label="Designation" value={form.designation} onChange={set("designation")} placeholder="Your designation" />
+      <SelectField label="Office location" value={form.office_location} onChange={set("office_location")} options={["Noida","Bareilly","Delhi","Mumbai"]} />
+      <ToggleGroup label="Gender" value={form.gender} onChange={set("gender")} options={["male","female"]} />
+      <ToggleGroup label="Marital status" value={form.marital_status} onChange={set("marital_status")} options={["single","married","divorced"]} />
+      <PrimaryButton onClick={handleSave} loading={isPending}>Save contact info</PrimaryButton>
     </SectionCard>
   );
 }
 
 function AddressTab({ adminData, onSuccess, onError }) {
   const queryClient = useQueryClient();
-  const editProfileMutation = useEditAdminProfile();
-
-  const [form, setForm] = useState({
-    address: adminData?.address || "",
-    city:    adminData?.city    || "",
-    state:   adminData?.state   || "",
-    pincode: adminData?.pincode || "",
-  });
+  const { mutate, isPending } = useEditAdminProfile();
+  const [form, setForm] = useState({ address: "", city: "", state: "", pincode: "" });
 
   useEffect(() => {
     if (adminData) {
       setForm({
         address: adminData.address || "",
-        city:    adminData.city    || "",
-        state:   adminData.state   || "",
+        city: adminData.city || "",
+        state: adminData.state || "",
         pincode: adminData.pincode || "",
       });
     }
   }, [adminData]);
 
+  const set = (key) => (e) => setForm(p => ({ ...p, [key]: e.target.value }));
+
   const handleSave = () => {
-    editProfileMutation.mutate(
-      { ...form, phone: adminData?.phone || "", profile_image: adminData?.profile_image || "" },
+    mutate(
+      { ...form, phone: adminData?.phone || adminData?.personal_contact || "", profile_image: adminData?.profile_image || "" },
       {
-        onSuccess: (data) => {
-          queryClient.setQueryData(["auth"], old => {
-            if (!old) return old;
-            return {
-              ...old,
-              data: {
-                ...old.data,
-                user: {
-                  ...old.data.user,
-                  ...(data.admin || form),
-                },
-              },
-            };
-          });
+        onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["auth"] });
-          onSuccess("Address updated successfully!");
+          onSuccess("Address updated!");
         },
         onError: (err) => onError(getErrorMessage(err)),
       }
@@ -542,101 +371,203 @@ function AddressTab({ adminData, onSuccess, onError }) {
   };
 
   return (
-    <SectionCard title="Address information" subtitle="Your residential details" accent={C.amber}>
-      <InputField
-        label="Address"
-        value={form.address}
-        onChange={e => setForm(p => ({ ...p, address: e.target.value }))}
-        placeholder="Enter your address"
-      />
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}>
-        <InputField
-          label="City"
-          value={form.city}
-          onChange={e => setForm(p => ({ ...p, city: e.target.value }))}
-          placeholder="City"
-        />
-        <InputField
-          label="State"
-          value={form.state}
-          onChange={e => setForm(p => ({ ...p, state: e.target.value }))}
-          placeholder="State"
-        />
-      </div>
-      <InputField
-        label="Pincode"
-        value={form.pincode}
-        onChange={e => setForm(p => ({ ...p, pincode: e.target.value }))}
-        placeholder="Enter pincode"
-      />
-      <PrimaryButton onClick={handleSave} loading={editProfileMutation.isPending}>
-        Save address
-      </PrimaryButton>
+    <SectionCard title="Address information" accent={C.amber}>
+      <InputField label="Address" value={form.address} onChange={set("address")} placeholder="Residential address" />
+      <Grid>
+        <InputField label="City" value={form.city} onChange={set("city")} placeholder="City" />
+        <InputField label="State" value={form.state} onChange={set("state")} placeholder="State" />
+      </Grid>
+      <InputField label="Pincode" value={form.pincode} onChange={set("pincode")} placeholder="Pincode" />
+      <PrimaryButton onClick={handleSave} loading={isPending}>Save address</PrimaryButton>
     </SectionCard>
   );
 }
 
 function DocumentsTab({ adminData }) {
-  const docFields = [
-    { label: "Aadhaar number",      value: adminData?.aadhaar_number },
-    { label: "PAN number",          value: adminData?.pan_number },
-    { label: "Bank name",           value: adminData?.bank_name },
-    { label: "Account holder name", value: adminData?.account_holder_name },
-    { label: "Account number",      value: adminData?.account_number },
-    { label: "IFSC code",           value: adminData?.ifsc_code },
+  const idFields = [
+    { label: "Aadhaar number", value: adminData?.aadhaar_number },
+    { label: "PAN number", value: adminData?.pan_number },
+    { label: "Bank name", value: adminData?.bank_name },
+    { label: "Account holder", value: adminData?.account_holder_name },
+    { label: "Account number", value: adminData?.account_number },
+    { label: "IFSC code", value: adminData?.ifsc_code },
   ];
-
   const fileFields = [
-    { label: "Resume",            value: adminData?.resume },
-    { label: "Aadhaar card",      value: adminData?.aadhaar_card },
-    { label: "PAN card",          value: adminData?.pan_card },
+    { label: "Resume", value: adminData?.resume },
+    { label: "Aadhaar card", value: adminData?.aadhaar_card },
+    { label: "PAN card", value: adminData?.pan_card },
     { label: "Experience letter", value: adminData?.experience_letter },
   ];
-
   return (
     <>
-      <SectionCard title="Identity & banking" subtitle="Your identity and bank details on record" accent={C.brand}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
-          {docFields.map(f => (
-            <ReadonlyField key={f.label} label={f.label} value={f.value} />
-          ))}
-        </div>
+      <SectionCard title="Identity & banking" accent={C.brand}>
+        <Grid>
+          {idFields.map(f => <ReadonlyField key={f.label} label={f.label} value={f.value} />)}
+        </Grid>
       </SectionCard>
-
       <SectionCard title="Uploaded documents" subtitle="Files submitted during onboarding" accent={C.blue}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+        <Grid>
           {fileFields.map(f => (
-            <div key={f.label} style={{ marginBottom: 16 }}>
+            <div key={f.label} style={{ marginBottom: 14 }}>
               <FieldLabel>{f.label}</FieldLabel>
               <div style={{
-                padding: "10px 14px", borderRadius: 10,
-                background: "#f9f4f2", border: `0.5px solid ${C.border}`,
-                fontSize: 13, color: f.value ? C.blue : C.muted, fontWeight: 500,
+                padding: "9px 12px", borderRadius: 8,
+                background: "#f7f3f1", border: `1px solid ${C.border}`,
+                fontSize: 13, fontWeight: 500,
                 display: "flex", alignItems: "center", gap: 8,
+                color: f.value ? C.blue : C.muted,
               }}>
                 {f.value
-                  ? <><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="1" width="10" height="12" rx="2" stroke={C.blue} strokeWidth="1.3"/><path d="M4.5 4.5h5M4.5 7h5M4.5 9.5h3" stroke={C.blue} strokeWidth="1.2" strokeLinecap="round"/></svg>Uploaded</>
+                  ? <><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><rect x="2" y="1" width="10" height="12" rx="2" stroke={C.blue} strokeWidth="1.3"/><path d="M4.5 4.5h5M4.5 7h5M4.5 9.5h3" stroke={C.blue} strokeWidth="1.2" strokeLinecap="round"/></svg>Uploaded</>
                   : "Not uploaded"
                 }
               </div>
-              <div style={{ fontSize: 11, color: C.mutedMid, marginTop: 4 }}>Read-only</div>
             </div>
           ))}
-        </div>
+        </Grid>
       </SectionCard>
     </>
   );
 }
 
+function LeaveTab({ leaveBalance }) {
+  if (!leaveBalance) {
+    return (
+      <SectionCard title="Leave Balance" accent={C.green}>
+        <div style={{ textAlign: "center", padding: "32px 0", color: C.muted, fontSize: 13 }}>
+          No leave balance data available.
+        </div>
+      </SectionCard>
+    );
+  }
+
+  const leaves = [
+    { key: "EL", label: "Earned Leave", color: C.brand, entitled: leaveBalance.EL?.entitled, availed: leaveBalance.EL?.availed, accrued: leaveBalance.EL?.accrued },
+    { key: "SL", label: "Sick Leave", color: C.blue, entitled: leaveBalance.SL?.entitled, availed: leaveBalance.SL?.availed },
+    { key: "ML", label: "Maternity Leave", color: C.amber, entitled: leaveBalance.ML, availed: null },
+    { key: "PL", label: "Paternity Leave", color: C.green, entitled: leaveBalance.PL, availed: null },
+  ];
+
+  return (
+    <SectionCard title="Leave Balance" subtitle="Your current leave entitlements" accent={C.green}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginBottom: 16 }}>
+        {leaves.map(l => {
+          const entitled = l.entitled ?? 0;
+          const availed = l.availed ?? 0;
+          const remaining = entitled - availed;
+          const pct = entitled > 0 ? Math.max(0, Math.min(100, (remaining / entitled) * 100)) : 0;
+          return (
+            <div key={l.key} style={{
+              padding: "14px 16px", borderRadius: 12,
+              border: `1px solid ${C.border}`, background: C.surface,
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{l.label}</span>
+                <span style={{
+                  fontSize: 11, fontWeight: 600, padding: "2px 8px",
+                  borderRadius: 20, background: `${l.color}15`, color: l.color,
+                }}>
+                  {remaining} left
+                </span>
+              </div>
+              <div style={{ height: 5, borderRadius: 4, background: C.border, marginBottom: 8 }}>
+                <div style={{ height: "100%", width: `${pct}%`, borderRadius: 4, background: l.color, transition: "width 0.4s" }} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: C.muted }}>
+                <span>Entitled: <b style={{ color: C.text }}>{entitled}</b></span>
+                <span>Availed: <b style={{ color: C.text }}>{availed}</b></span>
+              </div>
+              {l.accrued !== undefined && (
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>
+                  Accrued: <b style={{ color: C.text }}>{l.accrued}</b>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        {[
+          { label: "LWP (Loss of Pay)", value: leaveBalance.lwp ?? 0 },
+          { label: "PBC (Public Holidays)", value: leaveBalance.pbc ?? 0 },
+        ].map(item => (
+          <div key={item.label} style={{
+            flex: 1, minWidth: 140, padding: "12px 14px",
+            borderRadius: 10, border: `1px solid ${C.border}`,
+            background: C.surface,
+          }}>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>{item.label}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{item.value}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ marginTop: 12, fontSize: 11, color: C.muted }}>
+        Last accrual: {fmtDate(leaveBalance.lastAccrualDate)}
+      </div>
+    </SectionCard>
+  );
+}
+
+function ReviewsTab({ reviews }) {
+  if (!reviews?.length) {
+    return (
+      <SectionCard title="My Reviews" accent={C.brand}>
+        <div style={{ textAlign: "center", padding: "32px 0", color: C.muted, fontSize: 13 }}>
+          No reviews received yet.
+        </div>
+      </SectionCard>
+    );
+  }
+
+  const avg = (reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length).toFixed(1);
+
+  return (
+    <SectionCard title="My Reviews" subtitle={`${reviews.length} review${reviews.length !== 1 ? "s" : ""} · avg ${avg}/5`} accent={C.brand}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {reviews.map((r, i) => (
+          <div key={r._id || i} style={{
+            padding: "14px 16px", borderRadius: 10,
+            border: `1px solid ${C.border}`, background: C.surface,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8, gap: 8 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>
+                  {r.reviewer?.f_name ? `${r.reviewer.f_name} ${r.reviewer.l_name || ""}` : "Anonymous"}
+                </div>
+                <div style={{ fontSize: 11, color: C.muted }}>{r.reviewer?.role || ""} · {r.monthYear || fmtDate(r.createdAt)}</div>
+              </div>
+              <div style={{ display: "flex", gap: 2 }}>
+                {[1,2,3,4,5].map(s => (
+                  <svg key={s} width="14" height="14" viewBox="0 0 24 24">
+                    <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
+                      fill={s <= (r.rating || 0) ? "#f59e0b" : "transparent"}
+                      stroke="#f59e0b" strokeWidth="1.5" strokeLinejoin="round" />
+                  </svg>
+                ))}
+              </div>
+            </div>
+            {r.comment && (
+              <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, fontStyle: "italic" }}>
+                "{r.comment}"
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
 function PasswordTab({ onSuccess, onError }) {
-  const changePasswordMutation = useChangeAdminPassword();
+  const { mutate, isPending } = useChangeAdminPassword();
   const [show, setShow] = useState(false);
   const [form, setForm] = useState({ currentPassword: "", newPassword: "", confirm: "" });
+  const set = (key) => (e) => setForm(p => ({ ...p, [key]: e.target.value }));
 
   const strength = (pw) => {
     if (!pw) return 0;
     let s = 0;
-    if (pw.length >= 6)  s++;
+    if (pw.length >= 6) s++;
     if (pw.length >= 10) s++;
     if (/[A-Z]/.test(pw)) s++;
     if (/[0-9]/.test(pw)) s++;
@@ -645,70 +576,54 @@ function PasswordTab({ onSuccess, onError }) {
   };
 
   const s = strength(form.newPassword);
-  const strengthLabel = ["", "Weak", "Fair", "Good", "Strong", "Very strong"][s];
-  const strengthColor = ["", C.red, C.amber, "#f9a825", C.green, C.green][s];
+  const sLabel = ["","Weak","Fair","Good","Strong","Very strong"][s];
+  const sColor = ["",C.red,C.amber,"#f9a825",C.green,C.green][s];
 
-  const EyeIcon = ({ open }) => open
-    ? <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3"/><circle cx="8" cy="8" r="2" stroke={C.muted} strokeWidth="1.3"/></svg>
-    : <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3"/><line x1="2" y1="2" x2="14" y2="14" stroke={C.muted} strokeWidth="1.3" strokeLinecap="round"/></svg>;
+  const EyeBtn = () => (
+    <button type="button" onClick={() => setShow(v => !v)}
+      style={{ background: "none", border: "none", cursor: "pointer", display: "flex", padding: 0 }}>
+      {show
+        ? <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3"/><circle cx="8" cy="8" r="2" stroke={C.muted} strokeWidth="1.3"/></svg>
+        : <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3"/><line x1="2" y1="2" x2="14" y2="14" stroke={C.muted} strokeWidth="1.3" strokeLinecap="round"/></svg>
+      }
+    </button>
+  );
 
   const handleChange = () => {
-    if (!form.currentPassword || !form.newPassword) { onError("All password fields are required"); return; }
-    if (form.newPassword !== form.confirm)           { onError("New passwords do not match"); return; }
-    if (form.newPassword.length < 6)                { onError("Password must be at least 6 characters"); return; }
-    if (form.currentPassword === form.newPassword)   { onError("New password must differ from current password"); return; }
-    changePasswordMutation.mutate(
+    if (!form.currentPassword || !form.newPassword) { onError("All fields are required"); return; }
+    if (form.newPassword !== form.confirm) { onError("Passwords do not match"); return; }
+    if (form.newPassword.length < 6) { onError("Password must be at least 6 characters"); return; }
+    if (form.currentPassword === form.newPassword) { onError("New password must differ from current"); return; }
+    mutate(
       { currentPassword: form.currentPassword, newPassword: form.newPassword },
       {
-        onSuccess: () => {
-          setForm({ currentPassword: "", newPassword: "", confirm: "" });
-          onSuccess("Password changed successfully!");
-        },
+        onSuccess: () => { setForm({ currentPassword: "", newPassword: "", confirm: "" }); onSuccess("Password changed!"); },
         onError: (err) => onError(getErrorMessage(err)),
       }
     );
   };
 
-  const eyeToggle = (
-    <button type="button" onClick={() => setShow(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", padding: 0 }}>
-      <EyeIcon open={show} />
-    </button>
-  );
-
   return (
-    <SectionCard title="Change password" subtitle="Keep your admin account secure with a strong password" accent={C.brand}>
-      <div style={{ maxWidth: 400 }}>
-        <InputField label="Current password *" type={show ? "text" : "password"} name="currentPassword"
-          value={form.currentPassword} onChange={e => setForm(p => ({ ...p, currentPassword: e.target.value }))}
-          placeholder="Enter current password" rightEl={eyeToggle} />
-
-        <InputField label="New password *" type={show ? "text" : "password"} name="newPassword"
-          value={form.newPassword} onChange={e => setForm(p => ({ ...p, newPassword: e.target.value }))}
-          placeholder="Enter new password" rightEl={eyeToggle} />
-
+    <SectionCard title="Change password" subtitle="Keep your account secure" accent={C.brand}>
+      <div style={{ maxWidth: 420 }}>
+        <InputField label="Current password *" type={show ? "text" : "password"} value={form.currentPassword} onChange={set("currentPassword")} placeholder="Current password" rightEl={<EyeBtn />} />
+        <InputField label="New password *" type={show ? "text" : "password"} value={form.newPassword} onChange={set("newPassword")} placeholder="New password" rightEl={<EyeBtn />} />
         {form.newPassword && (
-          <div style={{ marginTop: -8, marginBottom: 16 }}>
-            <div style={{ display: "flex", gap: 4, marginBottom: 5 }}>
-              {[1, 2, 3, 4, 5].map(i => (
-                <div key={i} style={{ flex: 1, height: 3, borderRadius: 3, background: i <= s ? strengthColor : C.border, transition: "background 0.2s" }} />
+          <div style={{ marginTop: -6, marginBottom: 12 }}>
+            <div style={{ display: "flex", gap: 3, marginBottom: 4 }}>
+              {[1,2,3,4,5].map(i => (
+                <div key={i} style={{ flex: 1, height: 3, borderRadius: 3, background: i <= s ? sColor : C.border, transition: "background 0.2s" }} />
               ))}
             </div>
-            <div style={{ fontSize: 11, color: strengthColor, fontWeight: 500 }}>{strengthLabel}</div>
+            <div style={{ fontSize: 11, color: sColor, fontWeight: 600 }}>{sLabel}</div>
           </div>
         )}
-
-        <InputField label="Confirm new password *" type={show ? "text" : "password"} name="confirm"
-          value={form.confirm} onChange={e => setForm(p => ({ ...p, confirm: e.target.value }))}
-          placeholder="Confirm new password"
+        <InputField label="Confirm new password *" type={show ? "text" : "password"} value={form.confirm} onChange={set("confirm")} placeholder="Confirm password"
           hint={form.confirm && form.newPassword !== form.confirm ? "Passwords do not match" : ""}
         />
-
-        <PrimaryButton onClick={handleChange} loading={changePasswordMutation.isPending}>
-          Update password
-        </PrimaryButton>
-
-        <div style={{ marginTop: 16, padding: "12px 14px", background: C.brandLight, borderRadius: 10, fontSize: 12, color: C.brandDark, lineHeight: 1.6 }}>
-          Tips: use 10+ characters, mix uppercase, numbers and symbols for a strong password.
+        <PrimaryButton onClick={handleChange} loading={isPending}>Update password</PrimaryButton>
+        <div style={{ marginTop: 14, padding: "11px 14px", background: C.brandLight, borderRadius: 9, fontSize: 12, color: C.brandDark, lineHeight: 1.6 }}>
+          Use 10+ characters with uppercase, numbers and symbols for a strong password.
         </div>
       </div>
     </SectionCard>
@@ -717,35 +632,25 @@ function PasswordTab({ onSuccess, onError }) {
 
 function AvatarTab({ adminData, onSuccess, onError }) {
   const queryClient = useQueryClient();
-  const editProfileMutation = useEditAdminProfile();
+  const { mutate, isPending } = useEditAdminProfile();
   const [currentImg, setCurrentImg] = useState(adminData?.profile_image || "");
   const [pending, setPending] = useState(null);
 
   useEffect(() => { setCurrentImg(adminData?.profile_image || ""); }, [adminData]);
 
-  const initials = getOrgInitials(adminData?.organisation_name || `${adminData?.f_name || ""} ${adminData?.l_name || ""}`);
-  const seed = initials || "default";
+  const displayName = adminData?.f_name
+    ? `${adminData.f_name} ${adminData.l_name || ""}`
+    : adminData?.work_email || "admin";
+  const seed = getInitials(displayName) || "default";
+  const initials = getInitials(displayName);
 
   const applyAvatar = (url) => {
     setPending(url);
     setCurrentImg(url);
-    editProfileMutation.mutate(
-      { phone: adminData?.phone || "", profile_image: url },
+    mutate(
+      { phone: adminData?.phone || adminData?.personal_contact || "", profile_image: url },
       {
-        onSuccess: (data) => {
-          queryClient.setQueryData(["auth"], old => {
-            if (!old) return old;
-            return {
-              ...old,
-              data: {
-                ...old.data,
-                user: {
-                  ...old.data.user,
-                  ...(data.admin || { profile_image: url }),
-                },
-              },
-            };
-          });
+        onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["auth"] });
           onSuccess("Avatar updated!");
           setPending(null);
@@ -759,18 +664,18 @@ function AvatarTab({ adminData, onSuccess, onError }) {
     );
   };
 
-  const removeAvatar = () => applyAvatar("");
-
   return (
     <SectionCard title="Profile avatar" subtitle="Choose an avatar that represents you" accent={C.blue}>
-      <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 24, padding: "16px 20px", background: C.page, borderRadius: 12, border: `0.5px solid ${C.border}` }}>
+      <div style={{
+        display: "flex", alignItems: "center", gap: 16, marginBottom: 20,
+        padding: "14px 16px", background: C.page, borderRadius: 11, border: `1px solid ${C.border}`,
+      }}>
         <div style={{
-          width: 72, height: 72, borderRadius: "50%",
+          width: 64, height: 64, borderRadius: "50%",
           background: currentImg ? "transparent" : `linear-gradient(135deg, ${C.brand}, ${C.brandDark})`,
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 24, fontWeight: 500, color: "#fff",
-          overflow: "hidden", border: `3px solid ${C.brandLight}`,
-          flexShrink: 0,
+          fontSize: 22, fontWeight: 700, color: "#fff",
+          overflow: "hidden", border: `3px solid ${C.brandLight}`, flexShrink: 0,
         }}>
           {currentImg
             ? <img src={currentImg} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -778,16 +683,13 @@ function AvatarTab({ adminData, onSuccess, onError }) {
           }
         </div>
         <div>
-          <div style={{ fontSize: 13, fontWeight: 500, color: C.text, marginBottom: 4 }}>Current avatar</div>
-          <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>
-            {currentImg ? "DiceBear avatar" : "Initials avatar (default)"}
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 3 }}>Current avatar</div>
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>
+            {currentImg ? "DiceBear avatar" : "Initials (default)"}
           </div>
           {currentImg && (
-            <button
-              onClick={removeAvatar}
-              disabled={editProfileMutation.isPending}
-              style={{ fontSize: 12, color: C.red, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: 0, fontWeight: 500 }}
-            >
+            <button onClick={() => applyAvatar("")} disabled={isPending}
+              style={{ fontSize: 12, color: C.red, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: 0, fontWeight: 600 }}>
               Remove avatar
             </button>
           )}
@@ -795,33 +697,28 @@ function AvatarTab({ adminData, onSuccess, onError }) {
       </div>
 
       <FieldLabel>Choose a style</FieldLabel>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
         {AVATAR_STYLES.map(style => {
           const url = `https://api.dicebear.com/7.x/${style}/svg?seed=${seed}`;
           const isActive = currentImg?.includes(style);
           const isLoading = pending === url;
           return (
-            <button
-              key={style}
-              onClick={() => applyAvatar(url)}
-              disabled={editProfileMutation.isPending}
+            <button key={style} onClick={() => applyAvatar(url)} disabled={isPending}
               style={{
-                padding: "12px 8px", borderRadius: 12,
-                border: `0.5px solid ${isActive ? C.brand : C.border}`,
+                padding: "10px 6px", borderRadius: 10,
+                border: `1px solid ${isActive ? C.brand : C.border}`,
                 background: isActive ? C.brandLight : C.surface,
-                cursor: editProfileMutation.isPending ? "not-allowed" : "pointer",
+                cursor: isPending ? "not-allowed" : "pointer",
                 transition: "all 0.15s", position: "relative",
-                outline: isActive ? `2px solid ${C.brand}` : "none",
-                outlineOffset: 2,
-              }}
-            >
+                outline: isActive ? `2px solid ${C.brand}` : "none", outlineOffset: 2,
+              }}>
               {isLoading && (
-                <div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "rgba(255,255,255,0.7)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ position: "absolute", inset: 0, borderRadius: 10, background: "rgba(255,255,255,0.75)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Spinner size={18} color={C.brand} />
                 </div>
               )}
-              <img src={url} alt={style} style={{ width: "100%", aspectRatio: "1", display: "block", borderRadius: 8 }} />
-              <div style={{ fontSize: 10, color: isActive ? C.brand : C.muted, marginTop: 6, textAlign: "center", fontWeight: isActive ? 500 : 400, textTransform: "capitalize" }}>
+              <img src={url} alt={style} style={{ width: "100%", aspectRatio: "1", display: "block", borderRadius: 6 }} />
+              <div style={{ fontSize: 10, color: isActive ? C.brand : C.muted, marginTop: 5, textAlign: "center", fontWeight: isActive ? 600 : 400, textTransform: "capitalize" }}>
                 {style}
               </div>
             </button>
@@ -832,115 +729,198 @@ function AvatarTab({ adminData, onSuccess, onError }) {
   );
 }
 
-function SystemTab({ onSuccess }) {
-  const [theme, setTheme] = useState("Light");
-  const [language, setLanguage] = useState("English");
-
-  const THEME_OPTIONS    = ["Light", "Dark", "Auto"];
-  const LANGUAGE_OPTIONS = ["English", "Hindi"];
-
+function MobileTabBar({ tab, setTab, onClose }) {
   return (
-    <SectionCard title="System preferences" subtitle="Customize your admin dashboard experience" accent={C.brandDark}>
-      <div style={{ maxWidth: 400 }}>
-        <div style={{ marginBottom: 16 }}>
-          <FieldLabel>Theme</FieldLabel>
-          <select
-            value={theme}
-            onChange={e => setTheme(e.target.value)}
-            style={{
-              width: "100%", padding: "10px 14px",
-              borderRadius: 10, border: `0.5px solid ${C.border}`,
-              fontSize: 13, color: C.text, background: C.surface,
-              fontFamily: "inherit", outline: "none", boxSizing: "border-box",
-            }}
-            onFocus={e => e.target.style.borderColor = C.brand}
-            onBlur={e => e.target.style.borderColor = C.border}
-          >
-            {THEME_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-          </select>
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 200,
+      background: "rgba(42,26,22,0.45)", backdropFilter: "blur(2px)",
+    }} onClick={onClose}>
+      <div style={{
+        position: "absolute", bottom: 0, left: 0, right: 0,
+        background: C.surface, borderRadius: "20px 20px 0 0",
+        paddingBottom: "env(safe-area-inset-bottom, 16px)",
+        maxHeight: "80vh", overflowY: "auto",
+      }} onClick={e => e.stopPropagation()}>
+        <div style={{ padding: "14px 20px 0", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Settings</span>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 22, color: C.muted, padding: 0 }}>×</button>
         </div>
-        <div style={{ marginBottom: 20 }}>
-          <FieldLabel>Language</FieldLabel>
-          <select
-            value={language}
-            onChange={e => setLanguage(e.target.value)}
+        {TABS.map(t => (
+          <button key={t.key} onClick={() => { setTab(t.key); onClose(); }}
             style={{
-              width: "100%", padding: "10px 14px",
-              borderRadius: 10, border: `0.5px solid ${C.border}`,
-              fontSize: 13, color: C.text, background: C.surface,
-              fontFamily: "inherit", outline: "none", boxSizing: "border-box",
-            }}
-            onFocus={e => e.target.style.borderColor = C.brand}
-            onBlur={e => e.target.style.borderColor = C.border}
-          >
-            {LANGUAGE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-          </select>
-        </div>
-        <PrimaryButton onClick={() => onSuccess("System settings saved!")} color={C.brandDark}>
-          Save settings
-        </PrimaryButton>
+              width: "100%", padding: "14px 20px",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              background: tab === t.key ? C.brandLight : "transparent",
+              color: tab === t.key ? C.brand : C.text,
+              border: "none", borderBottom: `1px solid ${C.border}`,
+              cursor: "pointer", fontFamily: "inherit",
+              fontSize: 14, fontWeight: tab === t.key ? 600 : 400,
+            }}>
+            {t.label}
+            {tab === t.key && <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><polyline points="4,8 7,11 12,5" stroke={C.brand} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+          </button>
+        ))}
       </div>
-    </SectionCard>
+    </div>
   );
 }
 
 export default function AdminSettingsPage() {
-  const [tab, setTab]     = useState("profile");
+  const [tab, setTab] = useState("profile");
   const [toast, setToast] = useState({ message: "", type: "" });
-
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { data: auth } = useAuth();
 
-  const adminData = auth?.data?.user;
+  const adminData = auth?.data?.user || auth?.user;
+  const leaveBalance = auth?.data?.leaveBalance || auth?.leaveBalance;
+  const reviews = auth?.data?.reviews || auth?.reviews || [];
 
   const showSuccess = (msg) => setToast({ message: msg, type: "success" });
   const showError   = (msg) => setToast({ message: msg, type: "error" });
 
-  const initials = getOrgInitials(
-    adminData?.organisation_name || `${adminData?.f_name || ""} ${adminData?.l_name || ""}`
-  );
+  const displayName = adminData?.f_name
+    ? `${adminData.f_name} ${adminData.l_name || ""}`.trim()
+    : "Admin";
+  const initials = getInitials(displayName);
 
   if (!adminData) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: C.page, fontFamily: "'DM Sans','Segoe UI',sans-serif" }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
           <Spinner size={36} color={C.brand} />
-          <div style={{ fontSize: 13, color: C.muted }}>Loading admin profile...</div>
+          <div style={{ fontSize: 13, color: C.muted }}>Loading profile…</div>
         </div>
       </div>
     );
   }
 
+  const currentTabLabel = TABS.find(t => t.key === tab)?.label || "Settings";
+
   return (
-    <div style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", background: C.page, minHeight: "100vh", padding: "28px 32px", color: C.text }}>
+    <div style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", background: C.page, minHeight: "100vh", color: C.text }}>
       <style>{`
-        @keyframes spin    { to { transform: rotate(360deg); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes slideIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
-        input:focus  { border-color: ${C.brand} !important; box-shadow: 0 0 0 3px ${C.brandLight}; }
-        select:focus { border-color: ${C.brand} !important; box-shadow: 0 0 0 3px ${C.brandLight}; outline: none; }
-        button:not([disabled]):hover { opacity: 0.88; }
+        * { box-sizing: border-box; }
+        input::placeholder { color: #c9bab5; }
+        select option { color: #2a1a16; }
+        @media (max-width: 768px) {
+          .settings-layout { flex-direction: column !important; }
+          .settings-sidebar { display: none !important; }
+          .settings-grid-2 { grid-template-columns: 1fr !important; }
+          .settings-avatar-grid { grid-template-columns: repeat(4, 1fr) !important; }
+          .leave-grid { grid-template-columns: 1fr !important; }
+        }
+        @media (max-width: 480px) {
+          .settings-avatar-grid { grid-template-columns: repeat(3, 1fr) !important; }
+        }
       `}</style>
 
       <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: "", type: "" })} />
+      {mobileMenuOpen && <MobileTabBar tab={tab} setTab={setTab} onClose={() => setMobileMenuOpen(false)} />}
 
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0, letterSpacing: "-0.3px" }}>Settings</h1>
-        <p style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>Manage your admin profile, contact info and security</p>
-      </div>
+      <div style={{ padding: "clamp(16px, 4vw, 32px)" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
 
-      <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-        <Sidebar tab={tab} setTab={setTab} adminData={adminData} initials={initials} />
+          <div style={{ marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <div>
+              <h1 style={{ fontSize: "clamp(18px, 3vw, 22px)", fontWeight: 700, margin: 0, color: C.text }}>Settings</h1>
+              <p style={{ fontSize: 13, color: C.muted, marginTop: 3, marginBottom: 0 }}>Manage your profile and account preferences</p>
+            </div>
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              style={{
+                display: "none",
+                padding: "8px 14px", borderRadius: 9,
+                border: `1px solid ${C.border}`, background: C.surface,
+                cursor: "pointer", fontSize: 13, fontWeight: 600,
+                color: C.brand, fontFamily: "inherit",
+                alignItems: "center", gap: 6,
+              }}
+              className="mobile-menu-btn"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><line x1="1" y1="3.5" x2="13" y2="3.5" stroke={C.brand} strokeWidth="1.5" strokeLinecap="round"/><line x1="1" y1="7" x2="13" y2="7" stroke={C.brand} strokeWidth="1.5" strokeLinecap="round"/><line x1="1" y1="10.5" x2="13" y2="10.5" stroke={C.brand} strokeWidth="1.5" strokeLinecap="round"/></svg>
+              {currentTabLabel}
+            </button>
+          </div>
 
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {tab === "profile"   && <ProfileTab   adminData={adminData} />}
-          {tab === "contact"   && <ContactTab   adminData={adminData} onSuccess={showSuccess} onError={showError} />}
-          {tab === "address"   && <AddressTab   adminData={adminData} onSuccess={showSuccess} onError={showError} />}
-          {tab === "documents" && <DocumentsTab adminData={adminData} />}
-          {tab === "password"  && <PasswordTab  onSuccess={showSuccess} onError={showError} />}
-          {tab === "avatar"    && <AvatarTab    adminData={adminData} onSuccess={showSuccess} onError={showError} />}
-          {tab === "system"    && <SystemTab    onSuccess={showSuccess} />}
+          <div className="settings-layout" style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
 
-          <div style={{ textAlign: "center", fontSize: 12, color: C.mutedMid, marginTop: 8 }}>
-            Changes are saved to your account automatically
+            <div className="settings-sidebar" style={{ width: 210, flexShrink: 0 }}>
+              <div style={{
+                background: C.surface, borderRadius: 14, border: `1px solid ${C.border}`,
+                padding: "18px 14px", marginBottom: 12, position: "relative", overflow: "hidden",
+              }}>
+                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${C.brand}, ${C.brandDark})` }} />
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+                  <div style={{
+                    width: 54, height: 54, borderRadius: "50%",
+                    background: adminData?.profile_image ? "transparent" : `linear-gradient(135deg, ${C.brand}, ${C.brandDark})`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 18, fontWeight: 700, color: "#fff",
+                    overflow: "hidden", border: `3px solid ${C.brandLight}`,
+                  }}>
+                    {adminData?.profile_image
+                      ? <img src={adminData.profile_image} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      : initials
+                    }
+                  </div>
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{displayName}</div>
+                    <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{adminData?.work_email || "—"}</div>
+                    <div style={{ marginTop: 7, display: "inline-block", padding: "2px 10px", borderRadius: 20, fontSize: 10, fontWeight: 600, color: C.brand, background: C.brandLight }}>
+                      {adminData?.role || "admin"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ background: C.surface, borderRadius: 14, border: `1px solid ${C.border}`, overflow: "hidden" }}>
+                {TABS.map((t, i) => {
+                  const active = tab === t.key;
+                  return (
+                    <button key={t.key} onClick={() => setTab(t.key)}
+                      style={{
+                        width: "100%", padding: "12px 14px",
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        background: active ? C.brandLight : "transparent",
+                        color: active ? C.brand : C.muted,
+                        border: "none",
+                        borderBottom: i < TABS.length - 1 ? `1px solid ${C.border}` : "none",
+                        cursor: "pointer", fontFamily: "inherit",
+                        fontSize: 13, fontWeight: active ? 600 : 400,
+                        transition: "all 0.15s",
+                      }}>
+                      {t.label}
+                      {active && <div style={{ width: 5, height: 5, borderRadius: "50%", background: C.brand }} />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <style>{`
+                @media (max-width: 768px) {
+                  .mobile-menu-btn { display: flex !important; }
+                  .settings-grid-2 { grid-template-columns: 1fr !important; }
+                  .leave-grid { grid-template-columns: 1fr !important; }
+                }
+              `}</style>
+
+              {tab === "profile"   && <ProfileTab adminData={adminData} />}
+              {tab === "contact"   && <ContactTab adminData={adminData} onSuccess={showSuccess} onError={showError} />}
+              {tab === "address"   && <AddressTab adminData={adminData} onSuccess={showSuccess} onError={showError} />}
+              {tab === "documents" && <DocumentsTab adminData={adminData} />}
+              {tab === "leave"     && <LeaveTab leaveBalance={leaveBalance} />}
+              {tab === "reviews"   && <ReviewsTab reviews={reviews} />}
+              {tab === "password"  && <PasswordTab onSuccess={showSuccess} onError={showError} />}
+              {tab === "avatar"    && <AvatarTab adminData={adminData} onSuccess={showSuccess} onError={showError} />}
+
+              <div style={{ textAlign: "center", fontSize: 11, color: C.mutedMid, marginTop: 8, paddingBottom: 16 }}>
+                Changes are saved to your account automatically
+              </div>
+            </div>
           </div>
         </div>
       </div>

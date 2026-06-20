@@ -503,6 +503,7 @@ const getMe = async (req, res, next) => {
     res.status(200).json({
       success: true,
       superAdmin: {
+        profile_image: superAdmin.profile_image,
         _id: superAdmin._id,
         f_name: superAdmin.f_name,
         l_name: superAdmin.l_name,
@@ -1893,6 +1894,54 @@ const buildManagerTree = (managers, parentId, parentModel, employees) => {
     }));
 };
 
+function buildManagerNode(manager, allManagers, allEmployees) {
+  const directReports = allManagers.filter(
+    (m) =>
+      m.reporting_manager &&
+      m.reporting_manager.toString() === manager._id.toString() &&
+      m.reporting_manager_model === "Manager"
+  );
+
+  const directEmployees = allEmployees.filter(
+    (emp) =>
+      emp.Under_manager &&
+      emp.Under_manager.toString() === manager._id.toString()
+  );
+
+  return {
+    id: manager._id,
+    name: `${manager.f_name} ${manager.l_name}`,
+    email: manager.work_email,
+    designation: manager.designation,
+    department: manager.department,
+    office_location: manager.office_location,
+    role: manager.role,
+    reportsTo: manager.reporting_manager_model,
+    employees: directEmployees.map((emp) => ({
+      id: emp._id,
+      name: `${emp.f_name} ${emp.l_name}`,
+      email: emp.work_email,
+      designation: emp.designation,
+      department: emp.department,
+      office_location: emp.office_location,
+    })),
+    subManagers: directReports.map((sub) =>
+      buildManagerNode(sub, allManagers, allEmployees)
+    ),
+    employeeCount: directEmployees.length,
+    teamSize: 0,
+  };
+}
+
+function countTeamSize(node) {
+  let count = node.employees.length;
+  for (const sub of node.subManagers) {
+    count += countTeamSize(sub) + 1;
+  }
+  node.teamSize = count;
+  return count;
+}
+
 const getOrgInfo = async (req, res, next) => {
   try {
     if (!req.superAdmin) {
@@ -1903,9 +1952,7 @@ const getOrgInfo = async (req, res, next) => {
     }
 
     const superAdmin = await SuperAdminModel.findById(req.superAdmin._id)
-      .select(
-        "f_name l_name email organisation_name profile_image"
-      )
+      .select("f_name l_name email organisation_name profile_image")
       .lean();
 
     if (!superAdmin) {
@@ -1917,66 +1964,77 @@ const getOrgInfo = async (req, res, next) => {
 
     const organisation_id = superAdmin._id;
 
-    const admins = await AdminModel.find({ organisation_id })
-      .select(
-        "f_name l_name work_email designation department office_location"
-      )
-      .lean();
+    const [admins, managers, employees] = await Promise.all([
+      AdminModel.find({ organisation_id })
+        .select(
+          "f_name l_name work_email designation department office_location role reporting_manager reporting_manager_model"
+        )
+        .lean(),
+      Managermodel.find({ organisation_id })
+        .select(
+          "f_name l_name work_email designation department office_location role reporting_manager reporting_manager_model"
+        )
+        .lean(),
+      Usermodel.find({ organisation_id })
+        .select(
+          "f_name l_name work_email designation department office_location Under_manager"
+        )
+        .lean(),
+    ]);
 
-    const managers = await Managermodel.find({ organisation_id })
-      .select(
-        "f_name l_name work_email designation department office_location reporting_manager reporting_manager_model"
-      )
-      .lean();
+    const unassignedEmployees = employees.filter((emp) => !emp.Under_manager);
 
-    const employees = managers.length
-      ? await Usermodel.find({
-          organisation_id,
-          Under_manager: {
-            $in: managers.map((m) => m._id),
-          },
-        })
-          .select(
-            "f_name l_name work_email designation department office_location Under_manager"
-          )
-          .lean()
-      : [];
-
-    const topLevelManagers = managers
-      .filter(
+    const adminTree = admins.map((admin) => {
+      const directManagers = managers.filter(
         (mgr) =>
-          !mgr.reporting_manager ||
+          mgr.reporting_manager &&
+          mgr.reporting_manager.toString() === admin._id.toString() &&
           mgr.reporting_manager_model === "Admin"
-      )
-      .map((mgr) => ({
-        id: mgr._id,
-        name: `${mgr.f_name} ${mgr.l_name}`,
-        email: mgr.work_email,
-        designation: mgr.designation,
-        department: mgr.department,
-        office_location: mgr.office_location,
+      );
 
-        employees: employees
-          .filter(
-            (emp) =>
-              emp.Under_manager?.toString() === mgr._id.toString()
-          )
-          .map((emp) => ({
-            id: emp._id,
-            name: `${emp.f_name} ${emp.l_name}`,
-            email: emp.work_email,
-            designation: emp.designation,
-            department: emp.department,
-            office_location: emp.office_location,
-          })),
-
-        subManagers: buildManagerTree(
-          managers,
-          mgr._id,
-          "Manager",
-          employees
+      const node = {
+        id: admin._id,
+        name: `${admin.f_name} ${admin.l_name}`,
+        email: admin.work_email,
+        designation: admin.designation,
+        department: admin.department,
+        office_location: admin.office_location,
+        role: admin.role,
+        managers: directManagers.map((mgr) =>
+          buildManagerNode(mgr, managers, employees)
         ),
-      }));
+        teamSize: 0,
+      };
+
+      let total = node.managers.length;
+      for (const mgr of node.managers) {
+        total += countTeamSize(mgr);
+      }
+      node.teamSize = total;
+
+      return node;
+    });
+
+    const orphanManagers = managers.filter((mgr) => {
+      if (!mgr.reporting_manager) return true;
+      if (mgr.reporting_manager_model === "Admin") {
+        const parentExists = admins.some(
+          (a) => a._id.toString() === mgr.reporting_manager.toString()
+        );
+        return !parentExists;
+      }
+      if (mgr.reporting_manager_model === "Manager") {
+        const parentExists = managers.some(
+          (m) => m._id.toString() === mgr.reporting_manager.toString()
+        );
+        return !parentExists;
+      }
+      return false;
+    });
+
+    const orphanManagerTree = orphanManagers.map((mgr) =>
+      buildManagerNode(mgr, managers, employees)
+    );
 
     return res.status(200).json({
       success: true,
@@ -1991,21 +2049,30 @@ const getOrgInfo = async (req, res, next) => {
         email: superAdmin.email,
       },
 
-      admins: admins.map((admin) => ({
-        id: admin._id,
-        name: `${admin.f_name} ${admin.l_name}`,
-        email: admin.work_email,
-        designation: admin.designation,
-        department: admin.department,
-        office_location: admin.office_location,
-      })),
+      totals: {
+        admins: admins.length,
+        managers: managers.length,
+        employees: employees.length,
+      },
 
-      managers: topLevelManagers,
+      admins: adminTree,
+
+      unassignedManagers: orphanManagerTree,
+      unassignedEmployees: unassignedEmployees.map((emp) => ({
+        id: emp._id,
+        name: `${emp.f_name} ${emp.l_name}`,
+        email: emp.work_email,
+        designation: emp.designation,
+        department: emp.department,
+        office_location: emp.office_location,
+      })),
     });
   } catch (error) {
     next(error);
   }
 };
+
+
 
 const getAllPersonalDocumentsSuperAdmin = async (req, res, next) => {
   if (!req.superAdmin)
@@ -2087,6 +2154,7 @@ const getAllExpenseDocumentsSuperAdmin = async (req, res, next) => {
             contact: doc.uploader.personal_contact,
             department: doc.uploader.department,
             designation: doc.uploader.designation,
+            role: doc.uploader.role,
           }
         : null,
     })),
@@ -2105,10 +2173,10 @@ const getDocumentDetailsSuperAdmin = async (req, res, next) => {
 
   const document = await Document.findOne({ _id: id, organisation_id })
     .populate("uploader", "f_name l_name work_email personal_contact department designation");
-
+    
   if (!document)
     return next(Object.assign(new Error("Document not found"), { statusCode: 404 }));
-
+  
   document.viewedBySuperAdmin = true;
   await document.save();
 
@@ -2131,6 +2199,7 @@ const getDocumentDetailsSuperAdmin = async (req, res, next) => {
             email: document.uploader.work_email,
             department: document.uploader.department,
             designation: document.uploader.designation,
+            role: document.uploader.role,
           }
         : null,
     },
