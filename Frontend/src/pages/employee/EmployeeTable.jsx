@@ -140,7 +140,7 @@ function resolveLeaveValue(val) {
   return String(val);
 }
 
-const LEAVE_SKIP_KEYS = ["_id","employee","organisation_id","__v","createdAt","updatedAt","mlStartDate","mlEndDate"];
+const LEAVE_SKIP_KEYS = ["_id","employee","organisation_id","__v","createdAt","updatedAt","mlStartDate","mlEndDate","lastAccrualDate"];
 
 function Field({label,error,children,required,span2}){
   return(
@@ -227,12 +227,16 @@ function getDisabledKeys(roleType) {
   if (roleType === "employee") {
     return {
       announcements: ["can_create_announcement","can_edit_announcement","can_delete_announcement"],
+      documents: ["can_view_all_documents"],
+      tickets: ["can_resolve_ticket","can_rate_ticket"],
       recruitment: ["can_view_hiring_requisitions","can_create_hiring_requisition","can_view_candidates","can_add_candidate"],
     };
   }
   if (roleType === "manager") {
     return {
       announcements: ["can_create_announcement","can_edit_announcement","can_delete_announcement"],
+      documents: ["can_view_all_documents"],
+      tickets: ["can_resolve_ticket","can_rate_ticket"],
       recruitment: ["can_view_candidates","can_add_candidate"],
     };
   }
