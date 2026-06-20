@@ -134,6 +134,14 @@ function IconShield({ size = 40, color = "currentColor" }) {
     </svg>
   );
 }
+function IconMail({ size = 13, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="m22 7-10 5L2 7" />
+    </svg>
+  );
+}
 
 const inputCls =
   "w-full px-3 py-2.5 border border-[#F4C0D1] rounded-[9px] bg-[#F9F8F2] text-[13px] text-[#730042] " +
@@ -189,23 +197,6 @@ function AudienceBadge({ audience }) {
     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold whitespace-nowrap ${cfg.color}`}>
       {cfg.label}
     </span>
-  );
-}
-
-function SkeletonCard() {
-  return (
-    <div className="bg-white rounded-[14px] border border-[#F4C0D1] overflow-hidden animate-pulse">
-      <div className="w-full h-32 bg-[#FBEAF0]" />
-      <div className="p-4 space-y-3">
-        <div className="flex gap-2">
-          <div className="h-6 w-16 bg-[#FBEAF0] rounded-full" />
-          <div className="h-6 w-16 bg-[#FBEAF0] rounded-full" />
-        </div>
-        <div className="h-3 w-3/4 bg-[#FBEAF0] rounded" />
-        <div className="h-3 w-full bg-[#FBEAF0] rounded" />
-        <div className="h-3 w-2/3 bg-[#FBEAF0] rounded" />
-      </div>
-    </div>
   );
 }
 
@@ -280,7 +271,6 @@ function MobileAnnouncementCard({ item, idx, canEdit, canDelete, onEdit, onDelet
         </span>
       </div>
 
-      {/* Only show action row if at least one action is permitted */}
       {(canEdit || canDelete) && (
         <div className="px-4 pb-4 flex gap-2 border-t border-[#FBEAF0] pt-3">
           {canEdit && (
@@ -307,20 +297,53 @@ function MobileAnnouncementCard({ item, idx, canEdit, canDelete, onEdit, onDelet
   );
 }
 
-// ─── Restricted full-page banner ─────────────────────────────────────────────
-function AccessRestrictedBanner() {
+function FullPageLockScreen() {
   return (
-    <div className="flex flex-col items-center justify-center py-20 sm:py-28 text-center px-4">
+    <div className="flex flex-col items-center justify-center min-h-[70vh] text-center px-4">
       <div
-        className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
+        className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center mb-5"
         style={{ background: "#FBEAF0", border: "1px solid #F4C0D1" }}
       >
-        <IconShield size={32} color="#CD166E" />
+        <IconShield size={36} color="#CD166E" />
       </div>
-      <p className="text-[15px] font-semibold text-[#730042] mb-1">Access Restricted</p>
-      <p className="text-[12px] text-[#993556] max-w-xs leading-relaxed">
-        You don't have permission to view announcements. Contact your administrator to request access.
+      <h2 className="text-base sm:text-lg font-semibold text-[#730042] mb-2">Access Restricted</h2>
+      <p className="text-[12px] sm:text-[13px] text-[#993556] max-w-xs sm:max-w-sm leading-relaxed mb-5">
+        You don't have permission to use any announcement features. Contact your super admin to request access.
       </p>
+      <div
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-semibold"
+        style={{ background: "#FBEAF0", color: "#730042" }}
+      >
+        <IconMail size={12} />
+        Contact Super Admin
+      </div>
+    </div>
+  );
+}
+
+function ViewBlurOverlay() {
+  return (
+    <div
+      className="absolute inset-0 z-10 flex flex-col items-center justify-center text-center px-4 rounded-[14px]"
+      style={{ background: "rgba(249,248,242,0.78)", backdropFilter: "blur(6px)" }}
+    >
+      <div
+        className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center mb-3"
+        style={{ background: "#FFFFFF", border: "1px solid #F4C0D1" }}
+      >
+        <IconLock size={20} color="#CD166E" />
+      </div>
+      <p className="text-[13px] font-semibold text-[#730042] mb-1">Viewing is restricted</p>
+      <p className="text-[11px] text-[#993556] max-w-[220px] sm:max-w-xs leading-relaxed mb-3">
+        You can't view announcement details. Contact your super admin for access.
+      </p>
+      <div
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-semibold"
+        style={{ background: "#fff", color: "#730042", border: "1px solid #F4C0D1" }}
+      >
+        <IconMail size={11} />
+        Contact Super Admin
+      </div>
     </div>
   );
 }
@@ -338,12 +361,13 @@ export default function AnnouncementPage() {
   const canEdit   = can("announcements.can_edit_announcement");
   const canDelete = can("announcements.can_delete_announcement");
 
+  const allLocked = !canView && !canCreate && !canEdit && !canDelete;
+
   const { mutate: createAnnouncement, isPending: isCreating } = useCreateAnnouncement();
   const { mutate: updateAnnouncement, isPending: isUpdating } = useUpdateAnnouncement();
   const { mutate: deleteAnnouncement, isPending: isDeleting } = useDeleteAnnouncement();
 
-  // Only fetch if the user can view; pass `enabled` flag to the hook
-  const { data, isLoading, isError } = useGetAllAnnouncement({ enabled: canView });
+  const { data, isLoading, isError } = useGetAllAnnouncement();
 
   const announcements = data?.announcements || [];
   const isPending = isCreating || isUpdating;
@@ -405,6 +429,16 @@ export default function AnnouncementPage() {
     deleteAnnouncement(deleteTarget._id, { onSuccess: () => setDeleteTarget(null) });
   };
 
+  if (allLocked) {
+    return (
+      <div className="p-4 sm:p-6 md:p-8 min-h-screen" style={{ background: "#F9F8F2" }}>
+        <div className="bg-white rounded-[14px] border border-[#F4C0D1] overflow-hidden">
+          <FullPageLockScreen />
+        </div>
+      </div>
+    );
+  }
+
   const stats = [
     { label: "Total",         value: announcements.length,                                                                icon: <IconFile  size={18} color="#CD166E" />, bg: "bg-[#FBEAF0]" },
     { label: "High priority", value: announcements.filter((a) => a.priority === "high").length,                          icon: <IconAlert size={18} color="#A32D2D" />, bg: "bg-[#FCEBEB]" },
@@ -415,14 +449,12 @@ export default function AnnouncementPage() {
   return (
     <div className="p-4 sm:p-6 md:p-8 min-h-screen" style={{ background: "#F9F8F2" }}>
 
-      {/* ── Header ── */}
       <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-3 mb-6 sm:mb-8">
         <div>
           <h1 className="text-lg sm:text-xl font-semibold text-[#730042] tracking-tight">Announcements</h1>
           <p className="text-[12px] text-[#993556] mt-1">Create and manage announcements for your team</p>
         </div>
 
-        {/* New Announcement button — always visible, locked when no permission */}
         {canCreate ? (
           <button
             onClick={openCreate}
@@ -444,14 +476,10 @@ export default function AnnouncementPage() {
         )}
       </div>
 
-      {/* ── No view permission — show restricted state inside full layout ── */}
-      {!canView ? (
-        <div className="bg-white rounded-[14px] border border-[#F4C0D1] overflow-hidden">
-          <AccessRestrictedBanner />
-        </div>
-      ) : (
-        <>
-          {/* ── Stats ── */}
+      <div className="relative">
+        {!canView && <ViewBlurOverlay />}
+
+        <div className={!canView ? "pointer-events-none select-none" : ""} aria-hidden={!canView}>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-6 sm:mb-8">
             {stats.map((s) => (
               <div key={s.label} className="bg-white rounded-xl border border-[#F4C0D1] p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
@@ -459,15 +487,16 @@ export default function AnnouncementPage() {
                   {s.icon}
                 </div>
                 <div className="min-w-0">
-                  <div className="text-lg sm:text-xl font-semibold text-[#730042]">{isLoading ? "—" : s.value}</div>
+                  <div className="text-lg sm:text-xl font-semibold text-[#730042]">
+                    {!canView ? "•••" : isLoading ? "—" : s.value}
+                  </div>
                   <div className="text-[10px] sm:text-[11px] text-[#993556] mt-0.5 truncate">{s.label}</div>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* ── Latest 3 cards ── */}
-          {!isLoading && announcements.length > 0 && (
+          {canView && !isLoading && announcements.length > 0 && (
             <div className="mb-6 sm:mb-8">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-[#993556] mb-3">
                 Latest announcements
@@ -504,16 +533,33 @@ export default function AnnouncementPage() {
             </div>
           )}
 
-          {/* ── Full table ── */}
           <div className="bg-white rounded-[14px] border border-[#F4C0D1] overflow-hidden">
             <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#F4C0D1] flex items-center justify-between gap-3">
               <span className="text-[13px] font-semibold text-[#730042]">All announcements</span>
               <span className="text-[11px] font-semibold px-3 py-1 rounded-full bg-[#FBEAF0] text-[#730042] flex-shrink-0">
-                {isLoading ? "—" : `${announcements.length} total`}
+                {!canView ? "•••" : isLoading ? "—" : `${announcements.length} total`}
               </span>
             </div>
 
-            {isLoading ? (
+            {!canView ? (
+              <>
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full min-w-[820px] text-sm">
+                    <thead>
+                      <tr className="border-b border-[#F4C0D1]" style={{ background: "#F9F8F2" }}>
+                        {["Image", "Title & Message", "Audience", "Priority", "Expiry", "Created", "Actions"].map((h) => (
+                          <th key={h} className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-[#993556]">
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#FBEAF0]"><SkeletonTableRows /></tbody>
+                  </table>
+                </div>
+                <div className="md:hidden p-4 space-y-3"><SkeletonMobileRows /></div>
+              </>
+            ) : isLoading ? (
               <>
                 <div className="hidden md:block overflow-x-auto">
                   <table className="w-full min-w-[820px] text-sm">
@@ -527,14 +573,10 @@ export default function AnnouncementPage() {
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#FBEAF0]">
-                      <SkeletonTableRows />
-                    </tbody>
+                    <tbody className="divide-y divide-[#FBEAF0]"><SkeletonTableRows /></tbody>
                   </table>
                 </div>
-                <div className="md:hidden p-4 space-y-3">
-                  <SkeletonMobileRows />
-                </div>
+                <div className="md:hidden p-4 space-y-3"><SkeletonMobileRows /></div>
               </>
             ) : isError ? (
               <div className="py-14 sm:py-16 text-center">
@@ -556,7 +598,6 @@ export default function AnnouncementPage() {
               </div>
             ) : (
               <>
-                {/* Desktop table */}
                 <div className="hidden md:block overflow-x-auto">
                   <table className="w-full min-w-[820px] text-sm">
                     <thead>
@@ -603,7 +644,6 @@ export default function AnnouncementPage() {
                             {new Date(item.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                           </td>
                           <td className="px-5 py-4">
-                            {/* Actions cell: show buttons if permitted, lock icon if not */}
                             {canEdit || canDelete ? (
                               <div className="flex items-center justify-center gap-2">
                                 {canEdit && (
@@ -628,7 +668,6 @@ export default function AnnouncementPage() {
                                 )}
                               </div>
                             ) : (
-                              /* No edit/delete permission → show a subtle lock */
                               <div className="flex items-center justify-center text-[#D3D1C7]" title="No action permissions">
                                 <IconLock size={12} />
                               </div>
@@ -640,7 +679,6 @@ export default function AnnouncementPage() {
                   </table>
                 </div>
 
-                {/* Mobile cards */}
                 <div className="md:hidden p-4 space-y-3">
                   {announcements.map((item, idx) => (
                     <MobileAnnouncementCard
@@ -657,10 +695,9 @@ export default function AnnouncementPage() {
               </>
             )}
           </div>
-        </>
-      )}
+        </div>
+      </div>
 
-      {/* ── Create / Edit modal ── */}
       {modalMode && (canCreate || canEdit) && (
         <ModalOverlay onClose={closeModal}>
           <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[95vh] sm:max-h-[92vh] overflow-y-auto border border-[#F4C0D1] sm:border">
@@ -784,7 +821,6 @@ export default function AnnouncementPage() {
         </ModalOverlay>
       )}
 
-      {/* ── Delete confirmation modal ── */}
       {deleteTarget && canDelete && (
         <ModalOverlay onClose={() => setDeleteTarget(null)}>
           <div className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl border border-[#F4C0D1] overflow-hidden">
