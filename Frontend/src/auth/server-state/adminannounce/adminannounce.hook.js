@@ -3,7 +3,6 @@ import { createAnnouncement, getAllAnnouncement, deleteAnnouncement, updateAnnou
 
 export const useCreateAnnouncement = () => {
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: createAnnouncement,
     onSuccess: () => {
@@ -16,6 +15,9 @@ export const useGetAllAnnouncement = () => {
   return useQuery({
     queryKey: ["announcements"],
     queryFn: getAllAnnouncement,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 };
 
