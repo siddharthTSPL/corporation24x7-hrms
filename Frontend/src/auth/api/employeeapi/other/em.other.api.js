@@ -44,3 +44,13 @@ export const fetchOrgInfo = async () => {
   const res = await api.get("user/getOrgInfo");
   return res.data;
 };
+
+export const getExpenseDocuments = async () => {
+  const res = await api.get("user/expense-documents");
+  return res.data;
+};
+
+export const getPersonalDocuments = async () => {
+  const res = await api.get("user/personal-documents");
+  return res.data;
+};
