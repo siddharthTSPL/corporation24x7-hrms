@@ -103,7 +103,7 @@ function Spinner({ size = 28 }) {
 function Badge({ children, className }) {
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap ${className}`}
+      className={`inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-medium whitespace-nowrap ${className}`}
     >
       {children}
     </span>
@@ -112,9 +112,9 @@ function Badge({ children, className }) {
 
 function EmptyState({ message }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 px-6 gap-3">
-      <div className="w-14 h-14 rounded-full bg-[#730042]/10 flex items-center justify-center">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+    <div className="flex flex-col items-center justify-center py-12 sm:py-16 px-4 sm:px-6 gap-3">
+      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#730042]/10 flex items-center justify-center">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
           <path
             d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
             stroke="#730042"
@@ -132,16 +132,16 @@ function EmptyState({ message }) {
         </svg>
       </div>
       <p className="text-sm font-medium text-[#2a1a16]">No documents found</p>
-      <p className="text-xs text-[#b0948a] text-center">{message}</p>
+      <p className="text-xs text-[#b0948a] text-center max-w-[280px]">{message}</p>
     </div>
   );
 }
 
 function InfoRow({ label, value }) {
   return (
-    <div className="flex justify-between items-center py-3 border-b border-[#ede5e0] text-sm gap-4">
-      <span className="text-[#b0948a] shrink-0">{label}</span>
-      <span className="text-[#2a1a16] font-medium text-right break-all">{value}</span>
+    <div className="flex flex-col xs:flex-row xs:justify-between xs:items-center py-3 border-b border-[#ede5e0] text-sm gap-1 xs:gap-4">
+      <span className="text-[#b0948a] shrink-0 text-xs xs:text-sm">{label}</span>
+      <span className="text-[#2a1a16] font-medium xs:text-right break-all text-sm">{value}</span>
     </div>
   );
 }
@@ -166,7 +166,7 @@ function DetailDrawer({ documentId, docType, onClose }) {
           </div>
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-lg border border-[#ede5e0] flex items-center justify-center text-[#b0948a] hover:bg-[#f9f8f2] transition-colors text-lg leading-none shrink-0"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg border border-[#ede5e0] flex items-center justify-center text-[#b0948a] hover:bg-[#f9f8f2] transition-colors text-lg leading-none shrink-0"
           >
             ×
           </button>
@@ -186,8 +186,8 @@ function DetailDrawer({ documentId, docType, onClose }) {
           {doc && (
             <>
               <div className="bg-[#730042]/8 border border-[#730042]/15 rounded-2xl p-4 sm:p-6 mb-5 flex flex-col items-center gap-3">
-                <div className="w-14 h-14 rounded-2xl bg-[#730042] flex items-center justify-center">
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#730042] flex items-center justify-center shrink-0">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                     <path
                       d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
                       stroke="#fff"
@@ -205,7 +205,7 @@ function DetailDrawer({ documentId, docType, onClose }) {
                   </svg>
                 </div>
                 <div className="text-center w-full min-w-0">
-                  <p className="text-sm font-medium text-[#2a1a16] mb-1.5 break-words">{doc.title}</p>
+                  <p className="text-sm font-medium text-[#2a1a16] mb-1.5 break-words px-2">{doc.title}</p>
                   <div className="flex items-center justify-center gap-1.5 flex-wrap">
                     <Badge
                       className={
@@ -226,9 +226,9 @@ function DetailDrawer({ documentId, docType, onClose }) {
                     href={doc.fileUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#730042] text-white text-sm font-medium rounded-xl hover:bg-[#5a0033] transition-colors"
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 bg-[#730042] text-white text-xs sm:text-sm font-medium rounded-xl hover:bg-[#5a0033] transition-colors min-w-0"
                   >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0">
                       <path
                         d="M1 7s2.5-4.5 6-4.5S13 7 13 7s-2.5 4.5-6 4.5S1 7 1 7z"
                         stroke="#fff"
@@ -238,16 +238,16 @@ function DetailDrawer({ documentId, docType, onClose }) {
                       />
                       <circle cx="7" cy="7" r="1.6" stroke="#fff" strokeWidth="1.3" />
                     </svg>
-                    View
+                    <span className="truncate">View</span>
                   </a>
                   <a
                     href={doc.fileUrl}
                     download
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-[#730042] text-[#730042] text-sm font-medium rounded-xl hover:bg-[#730042]/5 transition-colors"
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 bg-white border border-[#730042] text-[#730042] text-xs sm:text-sm font-medium rounded-xl hover:bg-[#730042]/5 transition-colors min-w-0"
                   >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0">
                       <path
                         d="M7 1v8M4 6l3 3 3-3M2 11h10"
                         stroke="#730042"
@@ -256,7 +256,7 @@ function DetailDrawer({ documentId, docType, onClose }) {
                         strokeLinejoin="round"
                       />
                     </svg>
-                    Download
+                    <span className="truncate">Download</span>
                   </a>
                 </div>
               </div>
@@ -282,7 +282,7 @@ function DetailDrawer({ documentId, docType, onClose }) {
                     Uploaded by
                   </p>
                   <div className="flex items-start gap-3 mb-3">
-                    <div className="w-11 h-11 rounded-full bg-[#730042] flex items-center justify-center text-sm font-semibold text-white flex-shrink-0">
+                    <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#730042] flex items-center justify-center text-sm font-semibold text-white flex-shrink-0">
                       {getInitials(doc.uploader.name)}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -310,7 +310,7 @@ function DetailDrawer({ documentId, docType, onClose }) {
                   <p className="text-[11px] font-medium text-[#b0948a] uppercase tracking-wide mb-3">
                     Reporting manager
                   </p>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-sm font-semibold text-white flex-shrink-0">
                       {getInitials(doc.reportingManager.name)}
                     </div>
@@ -333,14 +333,14 @@ function DocRow({ doc, docType, onClick }) {
   return (
     <div
       onClick={onClick}
-      className="flex items-center gap-3 p-3 sm:p-4 cursor-pointer border-b border-[#ede5e0] hover:bg-[#f9f8f2] transition-colors group last:border-b-0"
+      className="flex items-center gap-2 sm:gap-3 p-3 sm:p-4 cursor-pointer border-b border-[#ede5e0] hover:bg-[#f9f8f2] transition-colors group last:border-b-0"
     >
       <div
-        className={`w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center ${
+        className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex-shrink-0 flex items-center justify-center ${
           docType === "personal" ? "bg-[#730042]/10" : "bg-blue-50"
         }`}
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
           <path
             d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
             stroke={docType === "personal" ? "#730042" : "#185FA5"}
@@ -360,24 +360,24 @@ function DocRow({ doc, docType, onClick }) {
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-medium text-[#2a1a16] truncate flex-1 min-w-0">{doc.title}</p>
+          <p className="text-xs sm:text-sm font-medium text-[#2a1a16] truncate flex-1 min-w-0">{doc.title}</p>
           {!doc.viewedBySuperAdmin && <Badge className="bg-amber-50 text-amber-700 flex-shrink-0">New</Badge>}
         </div>
-        <p className="text-xs text-[#c9bab5] mt-1">
+        <p className="text-[11px] sm:text-xs text-[#c9bab5] mt-1 truncate">
           {fmtSize(doc.sizeKB)} · {fmtDate(doc.uploadedAt)}
         </p>
       </div>
 
-      <div className="flex items-center gap-2 flex-shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
         <a
           href={doc.fileUrl}
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
           title="View"
-          className="w-8 h-8 rounded-lg border border-[#ede5e0] flex items-center justify-center hover:bg-white hover:border-[#730042] transition-colors"
+          className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg border border-[#ede5e0] flex items-center justify-center hover:bg-white hover:border-[#730042] transition-colors"
         >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
             <path
               d="M1 7s2.5-4.5 6-4.5S13 7 13 7s-2.5 4.5-6 4.5S1 7 1 7z"
               stroke="#730042"
@@ -395,9 +395,9 @@ function DocRow({ doc, docType, onClick }) {
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
           title="Download"
-          className="w-8 h-8 rounded-lg border border-[#ede5e0] flex items-center justify-center hover:bg-white hover:border-[#730042] transition-colors"
+          className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg border border-[#ede5e0] flex items-center justify-center hover:bg-white hover:border-[#730042] transition-colors"
         >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
             <path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="#730042" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </a>
@@ -420,8 +420,8 @@ function UploaderDrawer({ group, personalDocs, expenseDocs, onClose, onOpenDoc }
     <div className="fixed inset-0 z-40 flex justify-end">
       <div onClick={onClose} className="absolute inset-0 bg-[#2a1a16]/40 backdrop-blur-[2px]" />
       <div className="relative w-full sm:max-w-md md:max-w-lg h-full bg-white flex flex-col shadow-2xl overflow-hidden">
-        <div className="sticky top-0 bg-white z-10 px-4 sm:px-6 py-4 border-b border-[#ede5e0] flex items-center gap-3 shrink-0">
-          <div className="w-11 h-11 rounded-full bg-[#730042] flex items-center justify-center text-sm font-semibold text-white flex-shrink-0">
+        <div className="sticky top-0 bg-white z-10 px-4 sm:px-6 py-4 border-b border-[#ede5e0] flex items-center gap-2.5 sm:gap-3 shrink-0">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#730042] flex items-center justify-center text-sm font-semibold text-white flex-shrink-0">
             {getInitials(group.name)}
           </div>
           <div className="min-w-0 flex-1">
@@ -430,26 +430,26 @@ function UploaderDrawer({ group, personalDocs, expenseDocs, onClose, onOpenDoc }
           </div>
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-lg border border-[#ede5e0] flex items-center justify-center text-[#b0948a] hover:bg-[#f9f8f2] transition-colors text-lg leading-none shrink-0"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg border border-[#ede5e0] flex items-center justify-center text-[#b0948a] hover:bg-[#f9f8f2] transition-colors text-lg leading-none shrink-0"
           >
             ×
           </button>
         </div>
 
-        <div className="px-4 sm:px-6 py-3 border-b border-[#ede5e0] grid grid-cols-2 gap-3 bg-[#f9f8f2]/60 shrink-0">
-          <div>
+        <div className="px-4 sm:px-6 py-3 border-b border-[#ede5e0] grid grid-cols-2 gap-2 sm:gap-3 bg-[#f9f8f2]/60 shrink-0">
+          <div className="min-w-0">
             <p className="text-[10px] text-[#b0948a] uppercase tracking-wide">Role</p>
-            <p className="text-xs font-medium text-[#2a1a16] mt-0.5">{fmtRole(group.role)}</p>
+            <p className="text-xs font-medium text-[#2a1a16] mt-0.5 truncate">{fmtRole(group.role)}</p>
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-[10px] text-[#b0948a] uppercase tracking-wide">Department</p>
-            <p className="text-xs font-medium text-[#2a1a16] mt-0.5">{group.department || "—"}</p>
+            <p className="text-xs font-medium text-[#2a1a16] mt-0.5 truncate">{group.department || "—"}</p>
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-[10px] text-[#b0948a] uppercase tracking-wide">Designation</p>
-            <p className="text-xs font-medium text-[#2a1a16] mt-0.5">{group.designation || "—"}</p>
+            <p className="text-xs font-medium text-[#2a1a16] mt-0.5 truncate">{group.designation || "—"}</p>
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-[10px] text-[#b0948a] uppercase tracking-wide">Total documents</p>
             <p className="text-xs font-medium text-[#2a1a16] mt-0.5">
               {personalDocs.length + expenseDocs.length}
@@ -457,7 +457,7 @@ function UploaderDrawer({ group, personalDocs, expenseDocs, onClose, onOpenDoc }
           </div>
         </div>
 
-        <div className="flex border-b border-[#ede5e0] px-4 sm:px-6 shrink-0">
+        <div className="flex border-b border-[#ede5e0] px-4 sm:px-6 shrink-0 overflow-x-auto">
           {[
             { key: "personal", label: "Personal", count: personalDocs.length },
             { key: "expense", label: "Expense", count: expenseDocs.length },
@@ -472,7 +472,7 @@ function UploaderDrawer({ group, personalDocs, expenseDocs, onClose, onOpenDoc }
                   borderBottom: isActive ? `2px solid ${color}` : "2px solid transparent",
                   color: isActive ? color : "#b0948a",
                 }}
-                className="px-4 py-3 bg-transparent border-none text-sm font-medium cursor-pointer flex items-center gap-2 -mb-px transition-colors"
+                className="px-3 sm:px-4 py-3 bg-transparent border-none text-xs sm:text-sm font-medium cursor-pointer flex items-center gap-1.5 sm:gap-2 -mb-px transition-colors whitespace-nowrap"
               >
                 {t.label}
                 <span
@@ -510,32 +510,34 @@ function UploaderCard({ group, onClick }) {
   return (
     <div
       onClick={onClick}
-      className="flex items-center gap-3 sm:gap-4 p-4 cursor-pointer border-b border-[#ede5e0] hover:bg-[#f9f8f2] transition-colors group"
+      className="flex flex-col sm:flex-row sm:items-center gap-3 p-3.5 sm:p-4 cursor-pointer border-b border-[#ede5e0] hover:bg-[#f9f8f2] transition-colors group"
     >
-      <div className="w-11 h-11 rounded-full bg-[#730042] flex items-center justify-center text-sm font-semibold text-white flex-shrink-0">
-        {getInitials(group.name)}
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#730042] flex items-center justify-center text-xs sm:text-sm font-semibold text-white flex-shrink-0">
+          {getInitials(group.name)}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm font-medium text-[#2a1a16] truncate">{group.name}</p>
+            {unviewed > 0 ? (
+              <Badge className="bg-amber-50 text-amber-700">{unviewed} new</Badge>
+            ) : (
+              <Badge className="bg-green-50 text-green-700">All viewed</Badge>
+            )}
+          </div>
+          <p className="text-xs text-[#b0948a] truncate mt-0.5">{group.email}</p>
+          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+            <Badge className="bg-[#730042]/8 text-[#730042] capitalize">{fmtRole(group.role)}</Badge>
+            {group.department && (
+              <Badge className="bg-[#f9f8f2] text-[#b0948a] border border-[#ede5e0] truncate max-w-[120px]">{group.department}</Badge>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <p className="text-sm font-medium text-[#2a1a16] truncate">{group.name}</p>
-          {unviewed > 0 ? (
-            <Badge className="bg-amber-50 text-amber-700">{unviewed} new</Badge>
-          ) : (
-            <Badge className="bg-green-50 text-green-700">All viewed</Badge>
-          )}
-        </div>
-        <p className="text-xs text-[#b0948a] truncate mt-0.5">{group.email}</p>
-        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-          <Badge className="bg-[#730042]/8 text-[#730042] capitalize">{fmtRole(group.role)}</Badge>
-          {group.department && (
-            <Badge className="bg-[#f9f8f2] text-[#b0948a] border border-[#ede5e0]">{group.department}</Badge>
-          )}
-        </div>
-      </div>
-
-      <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-        <div className="flex items-center gap-1.5">
+      <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 sm:gap-1.5 flex-shrink-0 pl-[52px] sm:pl-0">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {group.personalCount > 0 ? (
             <Badge className="bg-[#730042]/10 text-[#730042]">{group.personalCount} personal</Badge>
           ) : (
@@ -547,14 +549,14 @@ function UploaderCard({ group, onClick }) {
             <Badge className="bg-[#f9f8f2] text-[#c9bab5] border border-[#ede5e0]">0 expense</Badge>
           )}
         </div>
-        <div className="flex items-center gap-1 text-xs text-[#b0948a] font-medium">
-          {total} document{total !== 1 ? "s" : ""}
+        <div className="flex items-center gap-1 text-xs text-[#b0948a] font-medium whitespace-nowrap">
+          {total} doc{total !== 1 ? "s" : ""}
           <svg
             width="16"
             height="16"
             viewBox="0 0 16 16"
             fill="none"
-            className="text-[#c9bab5] group-hover:translate-x-0.5 transition-transform"
+            className="text-[#c9bab5] group-hover:translate-x-0.5 transition-transform hidden sm:block"
           >
             <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -699,57 +701,57 @@ export default function SuperAdminDocuments() {
   const selectedGroup = groups.find((g) => g.id === selectedUploaderId) || null;
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-[#f9f8f2] p-4 sm:p-6 lg:p-8 font-[DM_Sans,ui-sans-serif,system-ui,sans-serif] text-[#2a1a16]">
-      <div className="mb-6">
-        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Documents</h1>
-        <p className="text-sm text-[#b0948a] mt-1">
+    <div className="min-h-screen w-full overflow-x-hidden bg-[#f9f8f2] p-3 sm:p-6 lg:p-8 font-[DM_Sans,ui-sans-serif,system-ui,sans-serif] text-[#2a1a16]">
+      <div className="mb-5 sm:mb-6">
+        <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold tracking-tight">Documents</h1>
+        <p className="text-xs sm:text-sm text-[#b0948a] mt-1">
           Personal and expense documents submitted by employees, grouped by uploader
         </p>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-3 mb-5 items-start sm:items-center">
-        <div className="flex flex-wrap gap-2 sm:gap-3 w-full sm:w-auto">
-          {[
-            ["Uploaders", groups.length, "bg-[#730042]/10 text-[#730042]", "bg-[#730042]"],
-            ["Total documents", totalDocs, "bg-blue-50 text-blue-700", "bg-blue-500"],
-            ["Unviewed", totalUnviewed, "bg-amber-50 text-amber-700", "bg-amber-500"],
-          ].map(([label, val, badge, dot]) => (
-            <div
-              key={label}
-              className={`flex-1 sm:flex-none bg-white border border-[#ede5e0] rounded-xl px-3 py-2 flex items-center gap-2 text-sm ${badge}`}
-            >
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dot}`} />
-              <span className="text-[#b0948a] text-xs">{label}</span>
-              <span className="font-semibold text-[#2a1a16]">{val}</span>
-            </div>
-          ))}
+      <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-2 sm:gap-3 mb-4">
+        {[
+          ["Uploaders", groups.length, "bg-[#730042]/10 text-[#730042]", "bg-[#730042]"],
+          ["Total docs", totalDocs, "bg-blue-50 text-blue-700", "bg-blue-500"],
+          ["Unviewed", totalUnviewed, "bg-amber-50 text-amber-700", "bg-amber-500"],
+        ].map(([label, val, badge, dot]) => (
+          <div
+            key={label}
+            className={`bg-white border border-[#ede5e0] rounded-xl px-2 sm:px-3 py-2 flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-2 text-xs sm:text-sm ${badge} min-w-0`}
+          >
+            <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full flex-shrink-0 ${dot}`} />
+            <span className="text-[#b0948a] text-[10px] sm:text-xs text-center sm:text-left truncate">{label}</span>
+            <span className="font-semibold text-[#2a1a16] text-sm">{val}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-5">
+        <div className="relative w-full sm:flex-1 sm:max-w-xs">
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 15 15"
+            fill="none"
+            className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+          >
+            <circle cx="6.5" cy="6.5" r="4.5" stroke="#b0948a" strokeWidth="1.3" />
+            <path d="M10 10l3 3" stroke="#b0948a" strokeWidth="1.3" strokeLinecap="round" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search uploader..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 rounded-xl border border-[#ede5e0] bg-white text-sm text-[#2a1a16] outline-none focus:border-[#730042] transition-colors placeholder:text-[#c9bab5]"
+          />
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto sm:ml-auto justify-end">
-          <div className="relative flex-1 sm:flex-none">
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 15 15"
-              fill="none"
-              className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
-            >
-              <circle cx="6.5" cy="6.5" r="4.5" stroke="#b0948a" strokeWidth="1.3" />
-              <path d="M10 10l3 3" stroke="#b0948a" strokeWidth="1.3" strokeLinecap="round" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Search uploader..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full sm:w-56 pl-9 pr-3 py-2 rounded-xl border border-[#ede5e0] bg-white text-sm text-[#2a1a16] outline-none focus:border-[#730042] transition-colors placeholder:text-[#c9bab5]"
-            />
-          </div>
-
+        <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
           <select
             value={filterRole}
             onChange={(e) => setFilterRole(e.target.value)}
-            className="px-3 py-2 rounded-xl border border-[#ede5e0] bg-white text-sm text-[#2a1a16] outline-none focus:border-[#730042]"
+            className="flex-1 sm:flex-none px-3 py-2 rounded-xl border border-[#ede5e0] bg-white text-xs sm:text-sm text-[#2a1a16] outline-none focus:border-[#730042] min-w-0"
           >
             {ROLE_OPTIONS.map((r) => (
               <option key={r} value={r}>
@@ -760,13 +762,12 @@ export default function SuperAdminDocuments() {
 
           <button
             onClick={() => exportToCSV([...personalDocs, ...expenseDocs], "all")}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-[#ede5e0] bg-white text-sm font-medium text-[#2a1a16] hover:border-[#730042] transition-colors"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-[#ede5e0] bg-white text-xs sm:text-sm font-medium text-[#2a1a16] hover:border-[#730042] transition-colors shrink-0"
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0">
               <path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="#730042" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <span className="hidden sm:inline">Export CSV</span>
-            <span className="sm:hidden">Export</span>
+            <span>Export</span>
           </button>
         </div>
       </div>
