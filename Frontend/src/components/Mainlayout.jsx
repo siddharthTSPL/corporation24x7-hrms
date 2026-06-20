@@ -8,6 +8,7 @@ export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(false);
 
   usePermissionsSync();
+  
 
   return (
     <div className="flex h-screen bg-(--background)">
