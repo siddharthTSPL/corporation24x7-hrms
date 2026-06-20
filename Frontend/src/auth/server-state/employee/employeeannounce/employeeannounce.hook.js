@@ -1,29 +1,22 @@
-
-import { getAnnouncements , particularAnnouncement} from "../../../api/employeeapi/announcement/em.announce.api";
-
-
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getAnnouncements, particularAnnouncement } from "../../../api/employeeapi/announcement/em.announce.api";
+import { useQuery } from "@tanstack/react-query";
 
 export const useGetAnnouncements = () => {
-    const queryClient = useQueryClient();
-
-    return useQuery({
-        queryKey: ["announcements"],
-        queryFn: () => getAnnouncements(),
-
-        onSuccess: (data) => {
-            queryClient.setQueryData(["announcements"], data.announcements);
-        },
-        staleTime: 1000 * 60 * 5,
-        refetchOnMount: true,
-    })
+  return useQuery({
+    queryKey: ["announcements"],
+    queryFn: () => getAnnouncements(),
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
 };
 
 export const useGetAnnouncement = (id) => {
-    return useQuery({
-        queryKey: ["announcement", id],
-        queryFn: () => particularAnnouncement(id),
-        staleTime: 1000 * 60 * 5,
-        refetchOnMount: true,
-    })
+  return useQuery({
+    queryKey: ["announcement", id],
+    queryFn: () => particularAnnouncement(id),
+    enabled: !!id,
+    staleTime: 0,
+    refetchOnMount: true,
+  });
 };
