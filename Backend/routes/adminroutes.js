@@ -54,6 +54,9 @@ const {
   adminGetMyTickets,
   adminRateTicket,
   adminGetTicketDetail,
+  findallmanagerswoadmin,
+  setEmployeeWorkingStatus,
+  setManagerWorkingStatus,
 } = require("../controllers/admin.controller");
 
 const {
@@ -299,5 +302,24 @@ adminrouter.get(
   checkPermission("documents.can_upload_documents"),
   asyncHandler(getDocuments),
 );
+
+adminrouter.get(
+  "/all-no-admin",
+  adminauthmiddleware,
+  asyncHandler(findallmanagerswoadmin)
+);
+
+adminrouter.put(
+  "/employee/:id/working-status",
+  adminauthmiddleware,
+  asyncHandler(setEmployeeWorkingStatus)
+);
+
+adminrouter.put(
+  "/manager/:id/working-status",
+  adminauthmiddleware,
+  asyncHandler(setManagerWorkingStatus)
+);
+
 
 module.exports = adminrouter;

@@ -588,7 +588,7 @@ function Managerdocument() {
           <p className="text-sm text-gray-400 mt-1">Manage your files and browse organization documents.</p>
         </div>
 
-        <div className="flex gap-6 border-b border-gray-200 mb-6">
+        {/* <div className="flex gap-6 border-b border-gray-200 mb-6">
           {[
             { key: TABS.MINE, label: "My Documents" },
             { key: TABS.ORG, label: "All Documents" },
@@ -605,7 +605,7 @@ function Managerdocument() {
               {t.label}
             </button>
           ))}
-        </div>
+        </div> */}
 
         {activeTab === TABS.MINE && (
           <Can do="documents.can_upload_documents">

@@ -532,22 +532,40 @@ const DaysBadge = ({days,color,bg}) => (
 const EmployeeLeavesPanel = ({showToast}) => {
   const [filter,setFilter]         = useState("all");
   const [processingId,setProcessingId] = useState(null);
+  const [localOverrides,setLocalOverrides] = useState({}); // leaveId -> status (optimistic)
 
   const {data:rawLeaves,isLoading,refetch} = useGetAllManagerLeaves();
   const acceptMut  = useAcceptLeaveRequest();
   const rejectMut  = useRejectLeaveRequest();
   const forwardMut = useForwardLeaveToReportingManager();
 
-  const leaves   = extractArray(rawLeaves);
+  const rawList = extractArray(rawLeaves);
+  // apply optimistic overrides so UI updates instantly after an action
+  const leaves = rawList.map(l =>
+    localOverrides[l._id] ? { ...l, status: localOverrides[l._id] } : l
+  );
+
   const filtered = filter==="all" ? leaves : leaves.filter(l=>l.status===filter);
   const count    = (key) => key==="all" ? leaves.length : leaves.filter(l=>l.status===key).length;
 
   const handleAction = async (leaveId,action) => {
     setProcessingId(leaveId);
     try {
-      if (action==="accept")  { await acceptMut.mutateAsync({leaveId});  showToast("Leave approved","success"); }
-      if (action==="reject")  { await rejectMut.mutateAsync({leaveId});  showToast("Leave rejected","error"); }
-      if (action==="forward") { await forwardMut.mutateAsync({leaveId}); showToast("Forwarded to reporting manager","info"); }
+      if (action==="accept")  {
+        await acceptMut.mutateAsync({leaveId});
+        setLocalOverrides(p=>({...p,[leaveId]:"approved_manager"}));
+        showToast("Leave approved","success");
+      }
+      if (action==="reject")  {
+        await rejectMut.mutateAsync({leaveId});
+        setLocalOverrides(p=>({...p,[leaveId]:"rejected_manager"}));
+        showToast("Leave rejected","error");
+      }
+      if (action==="forward") {
+        await forwardMut.mutateAsync({leaveId});
+        setLocalOverrides(p=>({...p,[leaveId]:"forwarded_reporting_manager"}));
+        showToast("Forwarded to reporting manager","info");
+      }
       refetch();
     } catch(err) {
       showToast(err?.response?.data?.message||err?.message||"Action failed","error");

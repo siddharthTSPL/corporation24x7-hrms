@@ -1,21 +1,9 @@
 import {
-  managerApplyWFH,
-  managerGetMyWFH,
-  managerGetPendingWFH,
-  managerGetAllTeamWFH,
-  managerApproveWFH,
-  managerRejectWFH,
-  managerForwardWFH,
-  managerGetForwardedWFH,
-  managerApproveForwardedWFH,
-  managerRejectForwardedWFH,
+  managerApplyWFH, managerGetMyWFH, managerGetPendingWFH, managerGetAllTeamWFH,
+  managerApproveWFH, managerRejectWFH, managerForwardWFH,
+  managerGetForwardedWFH, managerApproveForwardedWFH, managerRejectForwardedWFH,
 } from "../../../api/managerapi/WFH/mawfh.api";
-
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const useManagerApplyWFH = () => {
   const queryClient = useQueryClient();
@@ -28,13 +16,31 @@ export const useManagerApplyWFH = () => {
 };
 
 export const useManagerGetMyWFH = () =>
-  useQuery({ queryKey: ["managerWFH"], queryFn: managerGetMyWFH });
+  useQuery({
+    queryKey: ["managerWFH"],
+    queryFn: managerGetMyWFH,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
 
 export const useManagerGetPendingWFH = () =>
-  useQuery({ queryKey: ["pendingWFH"], queryFn: managerGetPendingWFH });
+  useQuery({
+    queryKey: ["pendingWFH"],
+    queryFn: managerGetPendingWFH,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
 
 export const useManagerGetAllTeamWFH = () =>
-  useQuery({ queryKey: ["teamWFH"], queryFn: managerGetAllTeamWFH });
+  useQuery({
+    queryKey: ["teamWFH"],
+    queryFn: managerGetAllTeamWFH,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
 
 export const useManagerApproveWFH = () => {
   const queryClient = useQueryClient();
@@ -70,7 +76,13 @@ export const useManagerForwardWFH = () => {
 };
 
 export const useManagerGetForwardedWFH = () =>
-  useQuery({ queryKey: ["forwardedWFH"], queryFn: managerGetForwardedWFH });
+  useQuery({
+    queryKey: ["forwardedWFH"],
+    queryFn: managerGetForwardedWFH,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
 
 export const useManagerApproveForwardedWFH = () => {
   const queryClient = useQueryClient();

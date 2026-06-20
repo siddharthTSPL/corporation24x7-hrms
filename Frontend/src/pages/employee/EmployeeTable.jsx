@@ -5,16 +5,17 @@ import {
   FaChevronLeft, FaChevronRight, FaFileExcel, FaArrowUp, FaArrowDown,
   FaEllipsisV, FaEnvelope, FaPhone, FaBuilding, FaMapMarkerAlt, FaIdCard,
   FaStar, FaUser, FaBriefcase, FaUniversity, FaFileAlt, FaShieldAlt,
-  FaLock, FaToggleOn, FaToggleOff, FaKey,
+  FaToggleOn, FaToggleOff, FaKey, FaBan, FaCheck,
 } from "react-icons/fa";
 import {
-  useAddManager, useAddEmployee, useFindAllManagers,
+  useAddManager, useAddEmployee, useFindAllManagers, useFindAllManagerswithoutAdmin,
 } from "../../auth/server-state/adminauth/adminauth.hook";
 import {
   useGetAllEmployee, useDeleteUser, useEditEmployee, useEditManager,
   usePromoteEmployeeToManager, usePromoteEmployeeToAdmin, usePromoteManagerToAdmin,
   useDemoteManagerToEmployee, useDemoteAdminToManager, useDemoteAdminToEmployee,
   useGetParticularEmployee, useGetParticularManager,
+  useSetEmployeeWorkingStatus, useSetManagerWorkingStatus,
 } from "../../auth/server-state/adminother/adminother.hook";
 import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
 import axios from "axios";
@@ -34,6 +35,8 @@ const INDIAN_STATES = [
   "Uttarakhand","West Bengal","Delhi","Jammu and Kashmir","Ladakh",
 ];
 
+const WORKING_STATUSES = ["working", "resigned", "fired", "terminated"];
+
 const EMPTY_EMP = {
   f_name:"",l_name:"",work_email:"",password:"",gender:"",marital_status:"single",
   personal_contact:"",e_contact:"",department:"",designation:"",role:"employee",
@@ -52,11 +55,18 @@ const EMPTY_MGR = {
   account_number:"",ifsc_code:"",resume:"",aadhaar_card:"",pan_card:"",experience_letter:"",
 };
 
-const DEFAULT_PERMISSIONS = {
+const EMP_DEFAULT_PERMISSIONS = {
   announcements:{can_view_announcements:true,can_create_announcement:false,can_edit_announcement:false,can_delete_announcement:false},
   documents:{can_upload_documents:true,can_view_all_documents:false},
   tickets:{can_raise_ticket:true,can_view_all_tickets:false,can_resolve_ticket:false,can_rate_ticket:true},
   recruitment:{can_view_hiring_requisitions:false,can_create_hiring_requisition:false,can_view_candidates:false,can_add_candidate:false},
+};
+
+const MGR_DEFAULT_PERMISSIONS = {
+  announcements:{can_view_announcements:true,can_create_announcement:false,can_edit_announcement:false,can_delete_announcement:false},
+  documents:{can_upload_documents:true,can_view_all_documents:true},
+  tickets:{can_raise_ticket:true,can_view_all_tickets:true,can_resolve_ticket:true,can_rate_ticket:true},
+  recruitment:{can_view_hiring_requisitions:true,can_create_hiring_requisition:true,can_view_candidates:false,can_add_candidate:false},
 };
 
 const ADMIN_PERMISSIONS = {
@@ -96,7 +106,7 @@ function exportToCSV(data) {
     "UID","First Name","Last Name","Work Email","Role","Department",
     "Designation","Office Location","Gender","Marital Status",
     "Personal Contact","Emergency Contact","City","State","Pincode",
-    "Reporting / Under Manager","Is Fresher","Total Experience","Status",
+    "Reporting / Under Manager","Is Fresher","Total Experience","Status","Working Status",
   ];
   const rows = data.map((u) => [
     u.uid??"",u.f_name??"",u.l_name??"",u.work_email??"",u.role??"",
@@ -108,7 +118,7 @@ function exportToCSV(data) {
       :u.reporting_manager
         ?`${u.reporting_manager.f_name??""} ${u.reporting_manager.l_name??""}`.trim()
         :"",
-    u.is_fresher?"Yes":"No",u.total_experience??"",u.status??"",
+    u.is_fresher?"Yes":"No",u.total_experience??"",u.status??"",u.working_status??"",
   ]);
   const escape=(v)=>{const s=String(v??"");return s.includes(",")||s.includes('"')||s.includes("\n")?`"${s.replace(/"/g,'""')}"`:s;};
   const csv=[headers,...rows].map((r)=>r.map(escape).join(",")).join("\n");
@@ -118,6 +128,19 @@ function exportToCSV(data) {
   a.href=url;a.download=`employees_${new Date().toISOString().slice(0,10)}.csv`;a.click();
   URL.revokeObjectURL(url);
 }
+
+function resolveLeaveValue(val) {
+  if (val === null || val === undefined) return "—";
+  if (typeof val === "object") {
+    if (val.remaining !== undefined) return String(val.remaining);
+    if (val.balance !== undefined) return String(val.balance);
+    if (val.total !== undefined) return String(val.total);
+    return "—";
+  }
+  return String(val);
+}
+
+const LEAVE_SKIP_KEYS = ["_id","employee","organisation_id","__v","createdAt","updatedAt","mlStartDate","mlEndDate","lastAccrualDate"];
 
 function Field({label,error,children,required,span2}){
   return(
@@ -154,6 +177,10 @@ function Badge({label,type="dept"}){
     active:"bg-[#D1FAE5] text-[#065F46]",
     inactive:"bg-[#F3F4F6] text-[#6B7280]",
     suspended:"bg-[#FEE2E2] text-[#991B1B]",
+    working:"bg-[#D1FAE5] text-[#065F46]",
+    resigned:"bg-[#FEF3C7] text-[#92400E]",
+    fired:"bg-[#FEE2E2] text-[#991B1B]",
+    terminated:"bg-[#F3F4F6] text-[#374151]",
   };
   return(
     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${styles[type]??styles.dept}`}>
@@ -177,13 +204,18 @@ function InfoRow({icon,label,value}){
   );
 }
 
-function PermissionToggle({label,value,onChange}){
+function PermissionToggle({label,value,onChange,disabled}){
   return(
     <div className="flex items-center justify-between py-1.5">
-      <span className="text-xs text-[#730042] font-medium">{label}</span>
-      <button type="button" onClick={()=>onChange(!value)} className="transition-colors">
+      <span className={`text-xs font-medium ${disabled?"text-[#993556]/40":"text-[#730042]"}`}>{label}</span>
+      <button
+        type="button"
+        onClick={()=>!disabled&&onChange(!value)}
+        className={`transition-colors ${disabled?"cursor-not-allowed opacity-40":""}`}
+        title={disabled?"This permission cannot be changed for this role":""}
+      >
         {value
-          ?<FaToggleOn size={22} className="text-[#CD166E]"/>
+          ?<FaToggleOn size={22} className={disabled?"text-[#F4C0D1]":"text-[#CD166E]"}/>
           :<FaToggleOff size={22} className="text-[#F4C0D1]"/>
         }
       </button>
@@ -191,7 +223,28 @@ function PermissionToggle({label,value,onChange}){
   );
 }
 
-function PermissionsPanel({perms,onChange}){
+function getDisabledKeys(roleType) {
+  if (roleType === "employee") {
+    return {
+      announcements: ["can_create_announcement","can_edit_announcement","can_delete_announcement"],
+      documents: ["can_view_all_documents"],
+      tickets: ["can_resolve_ticket","can_rate_ticket"],
+      recruitment: ["can_view_hiring_requisitions","can_create_hiring_requisition","can_view_candidates","can_add_candidate"],
+    };
+  }
+  if (roleType === "manager") {
+    return {
+      announcements: ["can_create_announcement","can_edit_announcement","can_delete_announcement"],
+      documents: ["can_view_all_documents"],
+      tickets: ["can_resolve_ticket","can_rate_ticket"],
+      recruitment: ["can_view_candidates","can_add_candidate"],
+    };
+  }
+  return {};
+}
+
+function PermissionsPanel({perms,onChange,roleType="employee"}){
+  const disabledKeys = getDisabledKeys(roleType);
   const sections=[
     {key:"announcements",label:"Announcements",fields:[
       {k:"can_view_announcements",label:"View"},
@@ -224,14 +277,18 @@ function PermissionsPanel({perms,onChange}){
             {sec.label}
           </div>
           <div className="px-3 divide-y divide-[#F4C0D1]/50">
-            {sec.fields.map((f)=>(
-              <PermissionToggle
-                key={f.k}
-                label={f.label}
-                value={perms?.[sec.key]?.[f.k]??false}
-                onChange={(v)=>onChange(sec.key,f.k,v)}
-              />
-            ))}
+            {sec.fields.map((f)=>{
+              const isDisabled = (disabledKeys[sec.key]||[]).includes(f.k);
+              return(
+                <PermissionToggle
+                  key={f.k}
+                  label={f.label}
+                  value={perms?.[sec.key]?.[f.k]??false}
+                  onChange={(v)=>onChange(sec.key,f.k,v)}
+                  disabled={isDisabled}
+                />
+              );
+            })}
           </div>
         </div>
       ))}
@@ -239,24 +296,31 @@ function PermissionsPanel({perms,onChange}){
   );
 }
 
-function ReportingManagerSelect({value,onChange,managers,allEmployees,label="Reporting Manager",name="reporting_manager"}){
-  const managers_list=managers?.managers??[];
-  const admins_list=(allEmployees??[]).filter((u)=>["admin","senior_admin"].includes(u.role));
+function ReportingManagerSelect({value,onChange,managersOnly,managersWithAdmin,label="Reporting Manager",name="reporting_manager"}){
+  const managersList = managersOnly?.managers ?? [];
+  const withAdminList = managersWithAdmin?.managers ?? [];
+  const adminList = withAdminList.filter(m => m.isAdmin);
+  const pureManagers = managersList;
+
   return(
     <Field label={label}>
       <select name={name} value={value} onChange={onChange} className={inputCls}>
         <option value="">Select (optional)</option>
-        {managers_list.length>0&&(
-          <optgroup label="Managers">
-            {managers_list.map((m)=>(
-              <option key={m._id} value={m._id}>{m.f_name} {m.l_name} — {m.designation||"Manager"}</option>
+        {adminList.length > 0 && (
+          <optgroup label="Admins">
+            {adminList.map((a) => (
+              <option key={a._id} value={a._id}>
+                {a.f_name} {a.l_name} — {a.work_email} ({a.role?.replace("_"," ")||"Admin"})
+              </option>
             ))}
           </optgroup>
         )}
-        {admins_list.length>0&&(
-          <optgroup label="Admins">
-            {admins_list.map((a)=>(
-              <option key={a._id} value={a._id}>{a.f_name} {a.l_name} — {a.designation||"Admin"}</option>
+        {pureManagers.length > 0 && (
+          <optgroup label="Managers">
+            {pureManagers.map((m) => (
+              <option key={m._id} value={m._id}>
+                {m.f_name} {m.l_name} — {m.work_email} ({m.role?.replace("_"," ")||"Manager"})
+              </option>
             ))}
           </optgroup>
         )}
@@ -265,20 +329,53 @@ function ReportingManagerSelect({value,onChange,managers,allEmployees,label="Rep
   );
 }
 
-function PermissionsDrawer({userId,userModel,onClose}){
+function UnderManagerSelect({value,onChange,managersOnly,label="Under Manager",name="Under_manager"}){
+  const list = managersOnly?.managers ?? [];
+  return(
+    <Field label={label}>
+      <select name={name} value={value} onChange={onChange} className={inputCls}>
+        <option value="">Select Manager (optional)</option>
+        {list.map((m) => (
+          <option key={m._id} value={m._id}>
+            {m.f_name} {m.l_name} — {m.work_email} ({m.role?.replace("_"," ")||"Manager"})
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
+}
+
+function PermissionsDrawer({userId,userModel,userRole,onClose}){
   const [perms,setPerms]=useState(null);
   const [loading,setLoading]=useState(true);
   const [saving,setSaving]=useState(false);
   const [msg,setMsg]=useState("");
+
+  const roleType = ["admin","senior_admin","official"].includes(userRole)
+    ? "admin"
+    : ["manager","senior_manager"].includes(userRole)
+    ? "manager"
+    : "employee";
+
+  const defaultPerms = roleType === "admin"
+    ? ADMIN_PERMISSIONS
+    : roleType === "manager"
+    ? MGR_DEFAULT_PERMISSIONS
+    : EMP_DEFAULT_PERMISSIONS;
+
   useEffect(()=>{
     api.get(`permission/admin/${userModel}/${userId}`)
-      .then((r)=>setPerms(r.data.data))
-      .catch(()=>setPerms({...DEFAULT_PERMISSIONS}))
+      .then((r)=>setPerms(r.data.data||r.data))
+      .catch(()=>setPerms({...defaultPerms}))
       .finally(()=>setLoading(false));
   },[userId,userModel]);
+
   const handleToggle=(section,key,val)=>{
+    const disabled = getDisabledKeys(roleType);
+    if ((disabled[section]||[]).includes(key)) return;
     setPerms((p)=>({...p,[section]:{...p[section],[key]:val}}));
   };
+
   const handleSave=async()=>{
     setSaving(true);
     try{
@@ -290,6 +387,7 @@ function PermissionsDrawer({userId,userModel,onClose}){
       setTimeout(()=>setMsg(""),2500);
     }finally{setSaving(false);}
   };
+
   return(
     <div className="fixed inset-0 z-[60] flex" onClick={(e)=>e.target===e.currentTarget&&onClose()}>
       <div className="flex-1" onClick={onClose}/>
@@ -312,13 +410,13 @@ function PermissionsDrawer({userId,userModel,onClose}){
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               <div className="flex gap-2 mb-3">
                 <button onClick={()=>setPerms({...ADMIN_PERMISSIONS})} className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-[#F4C0D1] text-[#730042] hover:bg-[#FBEAF0]">Set All On</button>
-                <button onClick={()=>setPerms({...DEFAULT_PERMISSIONS})} className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-[#F4C0D1] text-[#730042] hover:bg-[#FBEAF0]">Reset Default</button>
+                <button onClick={()=>setPerms({...defaultPerms})} className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-[#F4C0D1] text-[#730042] hover:bg-[#FBEAF0]">Reset Default</button>
               </div>
-              {perms&&<PermissionsPanel perms={perms} onChange={handleToggle}/>}
+              {perms&&<PermissionsPanel perms={perms} onChange={handleToggle} roleType={roleType}/>}
             </div>
             <div className="px-4 py-3 border-t border-[#F4C0D1] flex-shrink-0 bg-[#F9F8F2]">
               {msg&&<p className={`text-xs mb-2 text-center font-medium ${msg.includes("success")?"text-[#065F46]":"text-[#A32D2D]"}`}>{msg}</p>}
-              <button onClick={handleSave} disabled={saving} className="w-full py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-60 transition-all hover:opacity-90" style={{background:"#730042"}}>
+              <button onClick={handleSave} disabled={saving} className="w-full py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-60 hover:opacity-90" style={{background:"#730042"}}>
                 {saving?"Saving…":"Save Permissions"}
               </button>
             </div>
@@ -329,7 +427,47 @@ function PermissionsDrawer({userId,userModel,onClose}){
   );
 }
 
-function AccountSummaryDrawer({userId,userRole,onClose,onEdit,onDelete,onPromoteToManager,onPromoteToAdmin,onDemoteToEmployee,onDemoteToManager,onDemoteToEmployee2,managers,allEmployees,currentAdminId}){
+function WorkingStatusBadge({status}){
+  if(!status||status==="working") return <Badge label="Working" type="working"/>;
+  if(status==="resigned") return <Badge label="Resigned" type="resigned"/>;
+  if(status==="fired") return <Badge label="Fired" type="fired"/>;
+  if(status==="terminated") return <Badge label="Terminated" type="terminated"/>;
+  return <Badge label={status} type="inactive"/>;
+}
+
+function WorkingStatusSelector({currentStatus,onSave,loading}){
+  const [selected,setSelected]=useState(currentStatus||"working");
+  return(
+    <div className="mt-3 p-3 rounded-xl border border-[#F4C0D1] bg-[#F9F8F2]">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-[#993556] mb-2">Employment Status</p>
+      <div className="flex flex-col gap-2">
+        <select
+          value={selected}
+          onChange={(e)=>setSelected(e.target.value)}
+          className={inputCls}
+        >
+          {WORKING_STATUSES.map(s=>(
+            <option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>
+          ))}
+        </select>
+        <button
+          onClick={()=>onSave(selected)}
+          disabled={loading||selected===currentStatus}
+          className="w-full py-2 rounded-lg text-white text-xs font-semibold disabled:opacity-50 hover:opacity-90 transition-all"
+          style={{background:"#730042"}}
+        >
+          {loading?"Updating…":"Update Status"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AccountSummaryDrawer({
+  userId,userRole,onClose,onEdit,onDelete,
+  onPromoteToManager,onPromoteToAdmin,onDemoteToEmployee,onDemoteToManager,onDemoteToEmployee2,
+  managersOnly,managersWithAdmin,allEmployees,currentAdminId,onRefresh,
+}){
   const isManager=userRole==="manager"||userRole==="senior_manager";
   const isAdmin=userRole==="admin"||userRole==="senior_admin"||userRole==="official";
   const empQuery=useGetParticularEmployee(!isManager&&!isAdmin?userId:null);
@@ -341,9 +479,33 @@ function AccountSummaryDrawer({userId,userRole,onClose,onEdit,onDelete,onPromote
   const reviews=data?.reviews||[];
   const [tab,setTab]=useState("info");
   const [showPermissions,setShowPermissions]=useState(false);
+  const [wsLoading,setWsLoading]=useState(false);
+
+  const setEmpWS=useSetEmployeeWorkingStatus(userId);
+  const setMgrWS=useSetManagerWorkingStatus(userId);
+
   const avgRating=reviews.length?reviews.reduce((s,r)=>s+(r.rating||0),0)/reviews.length:null;
   const isSelf=currentAdminId&&userId&&currentAdminId===userId;
   const userModel=isAdmin?"Admin":isManager?"Manager":"User";
+
+  const roleType = isAdmin?"admin":isManager?"manager":"employee";
+
+  const handleWorkingStatusSave=async(ws)=>{
+    setWsLoading(true);
+    try{
+      if(isManager){
+        await setMgrWS.mutateAsync(ws);
+      }else{
+        await setEmpWS.mutateAsync(ws);
+      }
+      onRefresh&&onRefresh();
+      if(isManager) mgrQuery.refetch();
+      else empQuery.refetch();
+    }catch(e){
+      console.error(e);
+    }finally{setWsLoading(false);}
+  };
+
   const roleBadgeEl=(r)=>{
     if(r==="manager")return<Badge label="Manager" type="manager"/>;
     if(r==="senior_manager")return<Badge label="Sr. Manager" type="smgr"/>;
@@ -352,6 +514,7 @@ function AccountSummaryDrawer({userId,userRole,onClose,onEdit,onDelete,onPromote
     if(r==="official")return<Badge label="Official" type="role"/>;
     return<Badge label={r?.replace("_"," ")||"—"} type="role"/>;
   };
+
   return(
     <>
       <div className="fixed inset-0 z-50 flex" onClick={(e)=>e.target===e.currentTarget&&onClose()}>
@@ -387,6 +550,9 @@ function AccountSummaryDrawer({userId,userRole,onClose,onEdit,onDelete,onPromote
                       {roleBadgeEl(person.role)}
                       {person.department&&<Badge label={person.department} type="dept"/>}
                       {person.status&&<Badge label={person.status} type={person.status==="active"?"active":person.status==="suspended"?"suspended":"inactive"}/>}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      <WorkingStatusBadge status={person.working_status}/>
                     </div>
                     {person.uid&&<p className="text-[11px] text-[#993556] mt-1.5 font-mono bg-[#F9F8F2] px-1.5 py-0.5 rounded inline-block border border-[#F4C0D1]">{person.uid}</p>}
                   </div>
@@ -452,18 +618,27 @@ function AccountSummaryDrawer({userId,userRole,onClose,onEdit,onDelete,onPromote
                         </div>
                       </div>
                     )}
+                    {!isAdmin&&(
+                      <WorkingStatusSelector
+                        currentStatus={person.working_status||"working"}
+                        onSave={handleWorkingStatusSave}
+                        loading={wsLoading}
+                      />
+                    )}
                   </div>
                 )}
                 {tab==="leave"&&(
                   <div>
                     {leaveBalance?(
                       <div className="grid grid-cols-2 gap-2">
-                        {Object.entries(leaveBalance).filter(([k])=>!["_id","employee","organisation_id","__v","createdAt","updatedAt","mlStartDate","mlEndDate"].includes(k)).map(([k,v])=>(
-                          <div key={k} className="p-3 rounded-xl border border-[#F4C0D1] bg-[#FBEAF0]">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-[#993556]">{k.replace(/_/g," ")}</p>
-                            <p className="text-xl font-bold text-[#730042] mt-0.5">{String(v)}</p>
-                          </div>
-                        ))}
+                        {Object.entries(leaveBalance)
+                          .filter(([k])=>!LEAVE_SKIP_KEYS.includes(k))
+                          .map(([k,v])=>(
+                            <div key={k} className="p-3 rounded-xl border border-[#F4C0D1] bg-[#FBEAF0]">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-[#993556]">{k.replace(/_/g," ")}</p>
+                              <p className="text-xl font-bold text-[#730042] mt-0.5">{resolveLeaveValue(v)}</p>
+                            </div>
+                          ))}
                       </div>
                     ):(
                       <div className="text-center py-8 text-[#993556] text-sm">No leave balance data</div>
@@ -545,6 +720,7 @@ function AccountSummaryDrawer({userId,userRole,onClose,onEdit,onDelete,onPromote
         <PermissionsDrawer
           userId={person._id}
           userModel={userModel}
+          userRole={person.role}
           onClose={()=>setShowPermissions(false)}
         />
       )}
@@ -564,7 +740,7 @@ function StepModal({title,icon,onClose,onSubmit,steps,currentStep,setCurrentStep
             <span className="text-white text-lg sm:text-xl flex-shrink-0">{icon}</span>
             <div className="min-w-0">
               <h2 className="text-base sm:text-lg font-bold text-white truncate">{title}</h2>
-              <p className="text-[11px] sm:text-xs hidden xs:block" style={{color:"rgba(255,255,255,0.65)"}}>
+              <p className="text-[11px] sm:text-xs" style={{color:"rgba(255,255,255,0.65)"}}>
                 Step {currentStep+1} of {totalSteps} — {steps[currentStep].label}
               </p>
             </div>
@@ -759,7 +935,7 @@ function MobileSkeletons(){
 
 function EmptyState({onAdd}){
   return(
-    <tr><td colSpan={7}>
+    <tr><td colSpan={8}>
       <div className="flex flex-col items-center justify-center py-12 sm:py-16 gap-3 text-center">
         <div className="text-4xl sm:text-5xl">👥</div>
         <p className="text-[#730042] font-medium text-sm sm:text-base">No employees found</p>
@@ -809,6 +985,7 @@ function MobileCard({u,onView,onEdit,onDelete,onPromoteToManager,onPromoteToAdmi
         <div className="flex flex-wrap gap-1.5 mt-2">
           {u.department&&<Badge label={u.department} type="dept"/>}
           {u.office_location&&<span className="px-2 py-0.5 rounded-full text-xs bg-[#F9F8F2] text-[#993556] border border-[#F4C0D1]">📍 {u.office_location}</span>}
+          {u.working_status&&u.working_status!=="working"&&<WorkingStatusBadge status={u.working_status}/>}
         </div>
         <div className="flex items-center justify-between mt-3">
           {u.Under_manager?(
@@ -828,7 +1005,7 @@ function MobileCard({u,onView,onEdit,onDelete,onPromoteToManager,onPromoteToAdmi
   );
 }
 
-function EmpStepFields({step,form,onChange,errors,managers,perms,onPermChange}){
+function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChange}){
   if(step===0)return(
     <>
       <Field label="First Name" required error={errors.f_name}><input name="f_name" placeholder="First name" value={form.f_name} onChange={onChange} className={inputCls}/></Field>
@@ -867,12 +1044,9 @@ function EmpStepFields({step,form,onChange,errors,managers,perms,onPermChange}){
           <option value="">Select Location</option>{LOCATIONS.map((l)=><option key={l} value={l}>{l}</option>)}
         </select>
       </Field>
-      <Field label="Under Manager" span2>
-        <select name="Under_manager" value={form.Under_manager} onChange={onChange} className={inputCls}>
-          <option value="">Select Manager (optional)</option>
-          {managers?.managers?.map((m)=><option key={m._id} value={m._id}>{m.f_name} {m.l_name} ({m.uid})</option>)}
-        </select>
-      </Field>
+      <div className="col-span-1 sm:col-span-2">
+        <UnderManagerSelect value={form.Under_manager} onChange={onChange} managersOnly={managersOnly}/>
+      </div>
     </>
   );
   if(step===2)return(
@@ -928,14 +1102,15 @@ function EmpStepFields({step,form,onChange,errors,managers,perms,onPermChange}){
   );
   if(step===6)return(
     <div className="col-span-2">
-      <p className="text-xs text-[#993556] mb-3">Set initial permissions for this employee. These can be changed anytime from their profile.</p>
-      <PermissionsPanel perms={perms} onChange={onPermChange}/>
+      <p className="text-xs text-[#993556] mb-1">Set initial permissions for this employee.</p>
+      <p className="text-[11px] text-[#993556]/70 mb-3">Greyed toggles are restricted by role and cannot be enabled.</p>
+      <PermissionsPanel perms={perms} onChange={onPermChange} roleType="employee"/>
     </div>
   );
   return null;
 }
 
-function MgrStepFields({step,form,onChange,errors,managers,allEmployees,perms,onPermChange}){
+function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin,perms,onPermChange}){
   const [showPwd,setShowPwd]=useState(false);
   const [showCPwd,setShowCPwd]=useState(false);
   const pwdErr=form.password&&!PWD_REGEX.test(form.password)?"Min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special character.":"";
@@ -990,7 +1165,14 @@ function MgrStepFields({step,form,onChange,errors,managers,allEmployees,perms,on
         </select>
       </Field>
       <div className="col-span-1 sm:col-span-2">
-        <ReportingManagerSelect value={form.reporting_manager} onChange={onChange} managers={managers} allEmployees={allEmployees} label="Reporting Manager" name="reporting_manager"/>
+        <ReportingManagerSelect
+          value={form.reporting_manager}
+          onChange={onChange}
+          managersOnly={managersOnly}
+          managersWithAdmin={managersWithAdmin}
+          label="Reporting Manager"
+          name="reporting_manager"
+        />
       </div>
     </>
   );
@@ -1047,8 +1229,9 @@ function MgrStepFields({step,form,onChange,errors,managers,allEmployees,perms,on
   );
   if(step===6)return(
     <div className="col-span-2">
-      <p className="text-xs text-[#993556] mb-3">Set initial permissions for this manager. These can be changed anytime from their profile.</p>
-      <PermissionsPanel perms={perms} onChange={onPermChange}/>
+      <p className="text-xs text-[#993556] mb-1">Set initial permissions for this manager.</p>
+      <p className="text-[11px] text-[#993556]/70 mb-3">Greyed toggles are restricted by role and cannot be enabled.</p>
+      <PermissionsPanel perms={perms} onChange={onPermChange} roleType="manager"/>
     </div>
   );
   return null;
@@ -1103,8 +1286,8 @@ export default function EmployeeTable(){
   const [mgrForm,setMgrForm]=useState(EMPTY_MGR);
   const [empErrors,setEmpErrors]=useState({});
   const [mgrErrors,setMgrErrors]=useState({});
-  const [empPerms,setEmpPerms]=useState({...DEFAULT_PERMISSIONS});
-  const [mgrPerms,setMgrPerms]=useState({...ADMIN_PERMISSIONS});
+  const [empPerms,setEmpPerms]=useState({...EMP_DEFAULT_PERMISSIONS});
+  const [mgrPerms,setMgrPerms]=useState({...MGR_DEFAULT_PERMISSIONS});
   const [editTarget,setEditTarget]=useState(null);
   const [editForm,setEditForm]=useState({});
   const [editErrors,setEditErrors]=useState({});
@@ -1120,14 +1303,15 @@ export default function EmployeeTable(){
   const [demoteAdminToMgrForm,setDemoteAdminToMgrForm]=useState({reporting_manager:"",designation:"",role:"manager"});
   const [demoteAdminToEmpTarget,setDemoteAdminToEmpTarget]=useState(null);
   const [demoteAdminToEmpForm,setDemoteAdminToEmpForm]=useState({Under_manager:"",designation:""});
-  const [filters,setFilters]=useState({search:"",department:"",role:"",location:"",gender:"",type:"",status:""});
+  const [filters,setFilters]=useState({search:"",department:"",role:"",location:"",gender:"",type:"",status:"",working_status:""});
 
   const {data:adminData}=useGetMeAdmin();
   const currentAdminId=adminData?.user?._id||adminData?._id;
 
   const {mutate:addEmployeeApi}=useAddEmployee();
   const {mutate:addManagerApi}=useAddManager();
-  const {data:managers}=useFindAllManagers();
+  const {data:managersOnly}=useFindAllManagerswithoutAdmin();
+  const {data:managersWithAdmin}=useFindAllManagers();
   const {data:employeeData,isLoading:listLoading,refetch:refetchList}=useGetAllEmployee();
   const allUsers=employeeData?.users??[];
   const {mutate:editUserApi}=useEditEmployee(editTarget?._id);
@@ -1235,8 +1419,17 @@ export default function EmployeeTable(){
   const handleEmpChange=(e)=>setEmpForm({...empForm,[e.target.name]:e.target.value});
   const handleMgrChange=(e)=>setMgrForm({...mgrForm,[e.target.name]:e.target.value});
 
-  const handleEmpPermChange=(section,key,val)=>setEmpPerms((p)=>({...p,[section]:{...p[section],[key]:val}}));
-  const handleMgrPermChange=(section,key,val)=>setMgrPerms((p)=>({...p,[section]:{...p[section],[key]:val}}));
+  const handleEmpPermChange=(section,key,val)=>{
+    const disabled=getDisabledKeys("employee");
+    if((disabled[section]||[]).includes(key))return;
+    setEmpPerms((p)=>({...p,[section]:{...p[section],[key]:val}}));
+  };
+
+  const handleMgrPermChange=(section,key,val)=>{
+    const disabled=getDisabledKeys("manager");
+    if((disabled[section]||[]).includes(key))return;
+    setMgrPerms((p)=>({...p,[section]:{...p[section],[key]:val}}));
+  };
 
   const handleEmpSubmit=()=>{
     const errs=validateFormFields(empForm,false);
@@ -1261,7 +1454,7 @@ export default function EmployeeTable(){
       pan_card:empForm.pan_card||undefined,experience_letter:empForm.experience_letter||undefined,
       permissions:empPerms,
     },{
-      onSuccess:(res)=>{showPopup("success",res?.message||"Employee added successfully");setOpen(false);setEmpForm(EMPTY_EMP);setEmpErrors({});setEmpStep(0);setEmpPerms({...DEFAULT_PERMISSIONS});refetchList();},
+      onSuccess:(res)=>{showPopup("success",res?.message||"Employee added successfully");setOpen(false);setEmpForm(EMPTY_EMP);setEmpErrors({});setEmpStep(0);setEmpPerms({...EMP_DEFAULT_PERMISSIONS});refetchList();},
       onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Something went wrong"),
     });
   };
@@ -1289,7 +1482,7 @@ export default function EmployeeTable(){
       pan_card:mgrForm.pan_card||undefined,experience_letter:mgrForm.experience_letter||undefined,
       permissions:mgrPerms,
     },{
-      onSuccess:(res)=>{showPopup("success",res?.message||"Manager added & verification email sent");setOpenManager(false);setMgrForm(EMPTY_MGR);setMgrErrors({});setMgrStep(0);setMgrPerms({...ADMIN_PERMISSIONS});refetchList();},
+      onSuccess:(res)=>{showPopup("success",res?.message||"Manager added & verification email sent");setOpenManager(false);setMgrForm(EMPTY_MGR);setMgrErrors({});setMgrStep(0);setMgrPerms({...MGR_DEFAULT_PERMISSIONS});refetchList();},
       onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Something went wrong"),
     });
   };
@@ -1304,12 +1497,14 @@ export default function EmployeeTable(){
       (filters.role?u.role===filters.role:true)&&
       (filters.location?u.office_location===filters.location:true)&&
       (filters.gender?u.gender===filters.gender:true)&&
-      (filters.status?u.status===filters.status:true)&&matchType
+      (filters.status?u.status===filters.status:true)&&
+      (filters.working_status?u.working_status===filters.working_status:true)&&
+      matchType
     );
   });
 
-  const clearFilters=()=>setFilters({search:"",department:"",role:"",location:"",gender:"",type:"",status:""});
-  const activeFilterCount=[filters.department,filters.role,filters.location,filters.gender,filters.type,filters.status].filter(Boolean).length;
+  const clearFilters=()=>setFilters({search:"",department:"",role:"",location:"",gender:"",type:"",status:"",working_status:""});
+  const activeFilterCount=[filters.department,filters.role,filters.location,filters.gender,filters.type,filters.status,filters.working_status].filter(Boolean).length;
 
   const openPromoteToManager=(user)=>{setPromoteToMgrTarget(user);setPromoteToMgrForm({reporting_manager:"",designation:user.designation||"",role:"manager"});};
   const openPromoteToAdmin=(user)=>{setPromoteToAdminTarget(user);setPromoteToAdminForm({reporting_manager:"",designation:user.designation||"",role:"admin"});};
@@ -1393,7 +1588,6 @@ export default function EmployeeTable(){
                 <option value="">All Roles</option>
                 <option value="employee">Employee</option><option value="manager">Manager</option>
                 <option value="senior_manager">Senior Manager</option><option value="official">Official</option>
-                <option value="admin">Admin</option>
               </select>
               <select className={`${inputCls} flex-1`} value={filters.location} onChange={(e)=>setFilters({...filters,location:e.target.value})}>
                 <option value="">All Locations</option>{LOCATIONS.map((l)=><option key={l} value={l}>{l}</option>)}
@@ -1410,6 +1604,10 @@ export default function EmployeeTable(){
                     <option value="">All Status</option>
                     <option value="active">Active</option><option value="inactive">Inactive</option><option value="suspended">Suspended</option>
                   </select>
+                  <select className={inputCls} value={filters.working_status} onChange={(e)=>setFilters({...filters,working_status:e.target.value})}>
+                    <option value="">All Employment</option>
+                    {WORKING_STATUSES.map(s=><option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}
+                  </select>
                 </div>
                 {activeFilterCount>0&&(
                   <div className="flex flex-wrap gap-1.5 mt-2 items-center">
@@ -1419,6 +1617,7 @@ export default function EmployeeTable(){
                     {filters.location&&<FilterChip label={`Loc: ${filters.location}`} onRemove={()=>setFilters({...filters,location:""})}/>}
                     {filters.gender&&<FilterChip label={`Gender: ${filters.gender}`} onRemove={()=>setFilters({...filters,gender:""})}/>}
                     {filters.status&&<FilterChip label={`Status: ${filters.status}`} onRemove={()=>setFilters({...filters,status:""})}/>}
+                    {filters.working_status&&<FilterChip label={`Employment: ${filters.working_status}`} onRemove={()=>setFilters({...filters,working_status:""})}/>}
                     <button onClick={clearFilters} className="text-xs text-[#A32D2D] font-semibold hover:underline ml-1">Clear All</button>
                   </div>
                 )}
@@ -1439,10 +1638,10 @@ export default function EmployeeTable(){
           </div>
 
           <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full min-w-[700px] lg:min-w-[900px] text-sm">
+            <table className="w-full min-w-[800px] text-sm">
               <thead>
                 <tr className="border-b border-[#F4C0D1]" style={{background:"#F9F8F2"}}>
-                  {["Employee","Department","Designation","Location","Manager / Reports To","Role","Actions"].map((h)=>(
+                  {["Employee","Department","Designation","Location","Manager / Reports To","Role","Employment","Actions"].map((h)=>(
                     <th key={h} className="px-3 lg:px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-[#993556] whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -1457,8 +1656,8 @@ export default function EmployeeTable(){
                       <div className="flex items-center gap-2 lg:gap-3">
                         <Avatar name={`${u.f_name??""} ${u.l_name??""}`}/>
                         <div className="min-w-0">
-                          <p className="font-semibold text-[#730042] text-xs lg:text-sm truncate max-w-[100px] lg:max-w-[160px]">{u.f_name} {u.l_name}</p>
-                          <p className="text-[11px] text-[#993556] truncate max-w-[100px] lg:max-w-[160px]">{u.work_email}</p>
+                          <p className="font-semibold text-[#730042] text-xs lg:text-sm truncate max-w-[120px] lg:max-w-[160px]">{u.f_name} {u.l_name}</p>
+                          <p className="text-[11px] text-[#993556] truncate max-w-[120px] lg:max-w-[160px]">{u.work_email}</p>
                           {u.uid&&<p className="text-[10px] text-[#993556]/60 font-mono">{u.uid}</p>}
                         </div>
                       </div>
@@ -1480,6 +1679,7 @@ export default function EmployeeTable(){
                       ):<span className="text-[#F4C0D1] text-xs">—</span>}
                     </td>
                     <td className="px-3 lg:px-4 py-3">{roleBadge(u.role)}</td>
+                    <td className="px-3 lg:px-4 py-3"><WorkingStatusBadge status={u.working_status}/></td>
                     <td className="px-3 lg:px-4 py-3">
                       <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e)=>e.stopPropagation()}>
                         <ActionMenu user={u} onView={handleView} onEdit={handleOpenEdit} onDelete={setDeleteTarget} {...actionMenuProps}/>
@@ -1512,21 +1712,23 @@ export default function EmployeeTable(){
           onDemoteToEmployee={openDemoteMgrToEmp}
           onDemoteToManager={openDemoteAdminToMgr}
           onDemoteToEmployee2={openDemoteAdminToEmp}
-          managers={managers}
+          managersOnly={managersOnly}
+          managersWithAdmin={managersWithAdmin}
           allEmployees={allUsers}
           currentAdminId={currentAdminId}
+          onRefresh={refetchList}
         />
       )}
 
       {open&&(
         <StepModal title="Add Employee" icon={<FaUserPlus/>} onClose={()=>{setOpen(false);setEmpErrors({});setEmpStep(0);setEmpForm(EMPTY_EMP);}} onSubmit={handleEmpSubmit} steps={EMP_STEPS} currentStep={empStep} setCurrentStep={setEmpStep} accentColor="#730042">
-          <EmpStepFields step={empStep} form={empForm} onChange={handleEmpChange} errors={empErrors} managers={managers} perms={empPerms} onPermChange={handleEmpPermChange}/>
+          <EmpStepFields step={empStep} form={empForm} onChange={handleEmpChange} errors={empErrors} managersOnly={managersOnly} perms={empPerms} onPermChange={handleEmpPermChange}/>
         </StepModal>
       )}
 
       {openManager&&(
         <StepModal title="Add Manager" icon={<FaUserTie/>} onClose={()=>{setOpenManager(false);setMgrErrors({});setMgrStep(0);setMgrForm(EMPTY_MGR);}} onSubmit={handleMgrSubmit} steps={EMP_STEPS} currentStep={mgrStep} setCurrentStep={setMgrStep} accentColor="#730042">
-          <MgrStepFields step={mgrStep} form={mgrForm} onChange={handleMgrChange} errors={mgrErrors} managers={managers} allEmployees={allUsers} perms={mgrPerms} onPermChange={handleMgrPermChange}/>
+          <MgrStepFields step={mgrStep} form={mgrForm} onChange={handleMgrChange} errors={mgrErrors} managersOnly={managersOnly} managersWithAdmin={managersWithAdmin} perms={mgrPerms} onPermChange={handleMgrPermChange}/>
         </StepModal>
       )}
 
@@ -1553,15 +1755,14 @@ export default function EmployeeTable(){
             </select>
           </Field>
           {(editTarget.role==="employee"||editTarget.role==="official"||editForm.role==="employee"||editForm.role==="official")&&(
-            <Field label="Under Manager">
-              <select name="Under_manager" value={editForm.Under_manager} onChange={handleEditChange} className={inputCls}>
-                <option value="">Select Manager</option>
-                {managers?.managers?.map((m)=><option key={m._id} value={m._id}>{m.f_name} {m.l_name} ({m.uid})</option>)}
-              </select>
-            </Field>
+            <div className="col-span-1 sm:col-span-2">
+              <UnderManagerSelect value={editForm.Under_manager} onChange={handleEditChange} managersOnly={managersOnly}/>
+            </div>
           )}
           {(editTarget.role==="manager"||editTarget.role==="senior_manager")&&(
-            <ReportingManagerSelect value={editForm.reporting_manager} onChange={handleEditChange} managers={managers} allEmployees={allUsers} label="Reporting Manager" name="reporting_manager"/>
+            <div className="col-span-1 sm:col-span-2">
+              <ReportingManagerSelect value={editForm.reporting_manager} onChange={handleEditChange} managersOnly={managersOnly} managersWithAdmin={managersWithAdmin} label="Reporting Manager" name="reporting_manager"/>
+            </div>
           )}
           <Field label="Gender">
             <select name="gender" value={editForm.gender} onChange={handleEditChange} className={inputCls}>
@@ -1602,7 +1803,7 @@ export default function EmployeeTable(){
                 <option value="manager">Manager</option><option value="senior_manager">Senior Manager</option><option value="official">Official</option>
               </select>
             </Field>
-            <ReportingManagerSelect value={promoteToMgrForm.reporting_manager} onChange={(e)=>setPromoteToMgrForm({...promoteToMgrForm,reporting_manager:e.target.value})} managers={managers} allEmployees={allUsers} label="Reporting Manager" name="reporting_manager"/>
+            <ReportingManagerSelect value={promoteToMgrForm.reporting_manager} onChange={(e)=>setPromoteToMgrForm({...promoteToMgrForm,reporting_manager:e.target.value})} managersOnly={managersOnly} managersWithAdmin={managersWithAdmin} label="Reporting Manager" name="reporting_manager"/>
           </div>
         </ConfirmModal>
       )}
@@ -1614,24 +1815,19 @@ export default function EmployeeTable(){
           onConfirm={handlePromoteToAdmin} onCancel={()=>setPromoteToAdminTarget(null)}>
           <div className="flex flex-col gap-2 -mt-1">
             <Field label="New Designation"><input className={inputCls} placeholder="e.g. HR Manager" value={promoteToAdminForm.designation} onChange={(e)=>setPromoteToAdminForm({...promoteToAdminForm,designation:e.target.value})}/></Field>
-            <ReportingManagerSelect value={promoteToAdminForm.reporting_manager} onChange={(e)=>setPromoteToAdminForm({...promoteToAdminForm,reporting_manager:e.target.value})} managers={managers} allEmployees={allUsers} label="Reporting Manager (optional)" name="reporting_manager"/>
+            <ReportingManagerSelect value={promoteToAdminForm.reporting_manager} onChange={(e)=>setPromoteToAdminForm({...promoteToAdminForm,reporting_manager:e.target.value})} managersOnly={managersOnly} managersWithAdmin={managersWithAdmin} label="Reporting Manager (optional)" name="reporting_manager"/>
           </div>
         </ConfirmModal>
       )}
 
       {demoteMgrToEmpTarget&&(
         <ConfirmModal title="Demote to Employee?" icon="⬇️"
-          message={`Demote ${demoteMgrToEmpTarget.f_name} ${demoteMgrToEmpTarget.l_name} from Manager to Employee. Their direct reports will be reassigned.`}
+          message={`Demote ${demoteMgrToEmpTarget.f_name} ${demoteMgrToEmpTarget.l_name} from Manager to Employee.`}
           confirmLabel="Demote" confirmColor="#7A3500"
           onConfirm={handleDemoteMgrToEmp} onCancel={()=>setDemoteMgrToEmpTarget(null)}>
           <div className="flex flex-col gap-2 -mt-1">
             <Field label="New Designation"><input className={inputCls} placeholder="e.g. Senior Associate" value={demoteMgrToEmpForm.designation} onChange={(e)=>setDemoteMgrToEmpForm({...demoteMgrToEmpForm,designation:e.target.value})}/></Field>
-            <Field label="Assign Under Manager">
-              <select className={inputCls} value={demoteMgrToEmpForm.Under_manager} onChange={(e)=>setDemoteMgrToEmpForm({...demoteMgrToEmpForm,Under_manager:e.target.value})}>
-                <option value="">Select Manager (optional)</option>
-                {managers?.managers?.filter((m)=>m._id!==demoteMgrToEmpTarget._id).map((m)=><option key={m._id} value={m._id}>{m.f_name} {m.l_name}</option>)}
-              </select>
-            </Field>
+            <UnderManagerSelect value={demoteMgrToEmpForm.Under_manager} onChange={(e)=>setDemoteMgrToEmpForm({...demoteMgrToEmpForm,Under_manager:e.target.value})} managersOnly={{managers:(managersOnly?.managers||[]).filter(m=>m._id!==demoteMgrToEmpTarget._id)}} label="Assign Under Manager"/>
           </div>
         </ConfirmModal>
       )}
@@ -1648,7 +1844,7 @@ export default function EmployeeTable(){
                 <option value="manager">Manager</option><option value="senior_manager">Senior Manager</option>
               </select>
             </Field>
-            <ReportingManagerSelect value={demoteAdminToMgrForm.reporting_manager} onChange={(e)=>setDemoteAdminToMgrForm({...demoteAdminToMgrForm,reporting_manager:e.target.value})} managers={managers} allEmployees={allUsers} label="Reporting Manager (optional)" name="reporting_manager"/>
+            <ReportingManagerSelect value={demoteAdminToMgrForm.reporting_manager} onChange={(e)=>setDemoteAdminToMgrForm({...demoteAdminToMgrForm,reporting_manager:e.target.value})} managersOnly={managersOnly} managersWithAdmin={managersWithAdmin} label="Reporting Manager (optional)" name="reporting_manager"/>
           </div>
         </ConfirmModal>
       )}
@@ -1660,12 +1856,7 @@ export default function EmployeeTable(){
           onConfirm={handleDemoteAdminToEmp} onCancel={()=>setDemoteAdminToEmpTarget(null)}>
           <div className="flex flex-col gap-2 -mt-1">
             <Field label="New Designation"><input className={inputCls} placeholder="e.g. Associate" value={demoteAdminToEmpForm.designation} onChange={(e)=>setDemoteAdminToEmpForm({...demoteAdminToEmpForm,designation:e.target.value})}/></Field>
-            <Field label="Assign Under Manager">
-              <select className={inputCls} value={demoteAdminToEmpForm.Under_manager} onChange={(e)=>setDemoteAdminToEmpForm({...demoteAdminToEmpForm,Under_manager:e.target.value})}>
-                <option value="">Select Manager (optional)</option>
-                {managers?.managers?.map((m)=><option key={m._id} value={m._id}>{m.f_name} {m.l_name}</option>)}
-              </select>
-            </Field>
+            <UnderManagerSelect value={demoteAdminToEmpForm.Under_manager} onChange={(e)=>setDemoteAdminToEmpForm({...demoteAdminToEmpForm,Under_manager:e.target.value})} managersOnly={managersOnly} label="Assign Under Manager"/>
           </div>
         </ConfirmModal>
       )}
