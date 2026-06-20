@@ -23,6 +23,8 @@ import {
   getAllExpenseDocuments,
   getDocumentDetails,
   adminActionOnLeave,
+  setEmployeeWorkingStatus,
+  setManagerWorkingStatus,
 } from "../../api/adminapi/other/ad.other.api";
 
 export const useGetAllEmployee = () => {
@@ -247,6 +249,30 @@ export const useAdminActionOnLeave = () => {
     mutationFn: adminActionOnLeave,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["todayLeaves"] });
+    },
+  });
+};
+
+
+export const useSetEmployeeWorkingStatus = (id) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (working_status) => setEmployeeWorkingStatus(id, working_status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employee", id] });
+    },
+  });
+};
+
+export const useSetManagerWorkingStatus = (id) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (working_status) => setManagerWorkingStatus(id, working_status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["managers"] });
+      queryClient.invalidateQueries({ queryKey: ["manager", id] });
     },
   });
 };

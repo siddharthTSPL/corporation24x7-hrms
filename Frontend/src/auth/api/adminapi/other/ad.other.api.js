@@ -130,3 +130,15 @@ export const adminActionOnLeave = async (data) => {
   const res = await api.post("/admin/actionleave", data);
   return res.data;
 };
+
+
+
+export const setEmployeeWorkingStatus = async (id, working_status) => {
+  const res = await api.put(`/admin/employee/${id}/working-status`, { working_status });
+  return res.data;
+};
+
+export const setManagerWorkingStatus = async (id, working_status) => {
+  const res = await api.put(`/admin/manager/${id}/working-status`, { working_status });
+  return res.data;
+};
