@@ -1,10 +1,10 @@
 import { PriorityBadge, AudienceBadge } from "../../../components/announcement/shared/Badges";
 import { fmtShortDate } from "../../../components/announcement/shared/helpers";
 import { AVATAR_BG } from "../../../components/announcement/shared/constants";
-import { IconMegaphone, IconAlert, IconEdit, IconTrash } from "./Icons";
+import { IconMegaphone, IconAlert, IconEdit, IconTrash, IconLock } from "./Icons";
 import { ImageOrPlaceholder, SkeletonRows } from "./AdminShared";
 
-export default function AnnouncementTable({ announcements, isLoading, isError, onEdit, onDelete }) {
+export default function AnnouncementTable({ announcements, isLoading, isError, onEdit, onDelete, canEdit, canDelete }) {
   return (
     <div className="bg-white rounded-[14px] border border-[#F4C0D1] overflow-hidden">
 
@@ -89,18 +89,28 @@ export default function AnnouncementTable({ announcements, isLoading, isError, o
                   </td>
 
                   <td className="px-5 py-4">
-                    <div className="flex items-center justify-center gap-2">
-                      <button onClick={() => onEdit(item)} title="Edit"
-                        className="w-8 h-8 rounded-[8px] border border-[#F4C0D1] flex items-center justify-center text-[#993556] transition-all hover:bg-[#FBEAF0] hover:text-[#CD166E]"
-                        style={{ background: "#F9F8F2" }}>
-                        <IconEdit size={12} />
-                      </button>
-                      <button onClick={() => onDelete(item)} title="Delete"
-                        className="w-8 h-8 rounded-[8px] border border-[#F4C0D1] flex items-center justify-center text-[#993556] transition-all hover:bg-[#FCEBEB] hover:text-[#A32D2D] hover:border-[#F7C1C1]"
-                        style={{ background: "#F9F8F2" }}>
-                        <IconTrash size={12} />
-                      </button>
-                    </div>
+                    {canEdit || canDelete ? (
+                      <div className="flex items-center justify-center gap-2">
+                        {canEdit && (
+                          <button onClick={() => onEdit(item)} title="Edit"
+                            className="w-8 h-8 rounded-[8px] border border-[#F4C0D1] flex items-center justify-center text-[#993556] transition-all hover:bg-[#FBEAF0] hover:text-[#CD166E]"
+                            style={{ background: "#F9F8F2" }}>
+                            <IconEdit size={12} />
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button onClick={() => onDelete(item)} title="Delete"
+                            className="w-8 h-8 rounded-[8px] border border-[#F4C0D1] flex items-center justify-center text-[#993556] transition-all hover:bg-[#FCEBEB] hover:text-[#A32D2D] hover:border-[#F7C1C1]"
+                            style={{ background: "#F9F8F2" }}>
+                            <IconTrash size={12} />
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center text-[#D3D1C7]" title="No action permissions">
+                        <IconLock size={12} />
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))
