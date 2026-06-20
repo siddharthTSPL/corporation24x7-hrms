@@ -1308,6 +1308,47 @@ const sendPasswordSetupLink = async (req, res, next) => {
     next(error);
   }
 };
+
+
+const Document = require("../Models/document.model");
+
+const getExpenseDocuments = async (req, res, next) => {
+  try {
+    const documents = await Document.find({
+      organisation_id: req.employee.organisation_id,
+      uploader: req.employee._id,
+      uploaderModel: "User",
+      fileType: "expense",
+    }).sort({ uploadedAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      count: documents.length,
+      documents,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getPersonalDocuments = async (req, res, next) => {
+  try {
+    const documents = await Document.find({
+      organisation_id: req.employee.organisation_id,
+      uploader: req.employee._id,
+      uploaderModel: "User",
+      fileType: "personal",
+    }).sort({ uploadedAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      count: documents.length,
+      documents,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 module.exports = {
   verifyUserEmail,
   userlogin,
@@ -1334,4 +1375,6 @@ module.exports = {
   firstLoginPasswordChange,
   showPasswordPage,
   sendPasswordSetupLink,
+  getExpenseDocuments,
+  getPersonalDocuments
 };

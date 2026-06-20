@@ -33,6 +33,8 @@ const {
   firstLoginPasswordChange,
   showPasswordPage,
   sendPasswordSetupLink,
+  getExpenseDocuments,
+  getPersonalDocuments
 } = require("../controllers/user.controller");
 
 const {
@@ -76,5 +78,9 @@ userrouter.post("/submitTicket", employeemiddleware, checkPermission("tickets.ca
 userrouter.get("/getMyTickets", employeemiddleware, checkPermission("tickets.can_raise_ticket"), asyncHandler(employeeGetMyTickets));
 userrouter.post("/rateTicket", employeemiddleware, checkPermission("tickets.can_rate_ticket"), asyncHandler(employeeRateTicket));
 userrouter.get("/getTicketDetail/:ticketNumber", employeemiddleware, checkPermission("tickets.can_raise_ticket"), asyncHandler(employeeGetTicketDetail));
+
+
+userrouter.get("/getExpenseDocuments", employeemiddleware, checkPermission("documents.can_view_all_documents"), asyncHandler(getExpenseDocuments));
+userrouter.get("/getPersonalDocuments", employeemiddleware, checkPermission("documents.can_view_all_documents"), asyncHandler(getPersonalDocuments));
 
 module.exports = userrouter;

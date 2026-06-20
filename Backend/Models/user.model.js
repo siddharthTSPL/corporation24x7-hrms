@@ -115,6 +115,11 @@ const userSchema = new mongoose.Schema(
       enum: ["active", "inactive"],
       default: "active",
     },
+     working_status:{
+      type:String,
+      enum:["working","resigned","fired","terminated"],
+      default:"working"
+    },
 
     isFirstLogin: { type: Boolean, default: true },
     passwordupdatedAt: { type: Date, default: Date.now },

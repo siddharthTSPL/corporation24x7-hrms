@@ -26,9 +26,6 @@ import { useLogoutUser } from "../auth/server-state/employee/employeeauth/employ
 import { useLogoutSuperAdmin } from "../auth/server-state/superadmin/auth/suauth.hook";
 import { usePermissionStore } from "../auth/store/permission/permissionStore";
 
-// permissionGroup: lock the sidebar item only when ALL listed permissions are false.
-// If even one is true, the item is accessible (no lock).
-
 const superAdminMenu = [
   { name: "Dashboard",      path: "/superadmin-dashboard",     icon: <FaHome /> },
   { name: "Organisations",  path: "/superadmin-organisations", icon: <FaBuilding /> },
@@ -90,6 +87,7 @@ function Sidebar({ collapsed, setCollapsed }) {
   const role = auth?.role;
 
   const can = usePermissionStore((state) => state.can);
+  const permRole = usePermissionStore((state) => state.role);
   const clearPermissions = usePermissionStore((state) => state.clearPermissions);
 
   const { mutate: logoutSuperAdmin, isPending: pendingSuperAdmin } = useLogoutSuperAdmin();
@@ -104,11 +102,11 @@ function Sidebar({ collapsed, setCollapsed }) {
 
   const isPending = pendingSuperAdmin || pendingAdmin || pendingManager || pendingEmployee;
 
-  // Returns true (allowed) if:
-  // - item has no permissionGroup (no restriction)
-  // - OR at least one permission in the group is true
+  const permissionsReady = role === "superadmin" || !!permRole;
+
   const isAllowed = (item) => {
     if (!item.permissionGroup || item.permissionGroup.length === 0) return true;
+    if (!permissionsReady) return false;
     return item.permissionGroup.some((p) => can(p));
   };
 

@@ -1,22 +1,13 @@
-import {
-  applyWFH,
-  editWFH,
-  deleteWFH,
-  getMyWFH,
-} from "../../../api/employeeapi/wfh/emwfh.api";
-
-import {
-  useQuery,
-  useMutation,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { applyWFH, editWFH, deleteWFH, getMyWFH } from "../../../api/employeeapi/wfh/emwfh.api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export const useGetMyWFH = () => {
   return useQuery({
     queryKey: ["employee-wfh"],
     queryFn: getMyWFH,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 0,
     refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 };
 

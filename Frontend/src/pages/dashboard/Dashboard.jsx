@@ -1,67 +1,525 @@
-import React, { useEffect, useState, useRef } from "react";
-import {
-  FaUsers, FaClock, FaCalendarAlt, FaBullhorn,
-  FaPlus, FaEdit, FaTrash, FaTimes, FaCheck,
-  FaMapMarkerAlt, FaChevronRight, FaBan, FaEnvelope, FaCheckCircle, FaStar,
-} from "react-icons/fa";
-import Charts from "./Charts"; // Assuming this is used elsewhere or imported correctly
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
-import { useGetAllEmployee } from "../../auth/server-state/adminother/adminother.hook";
+import { useGetAllEmployee, useGetTodayCheckins } from "../../auth/server-state/adminother/adminother.hook";
 import {
   useGetForwardedLeaves,
   useAcceptLeave,
   useRejectLeave,
+  useAdminGetMyLeaveHistory,
 } from "../../auth/server-state/adminleave/adminleave.hook";
-import {
-  useGetAllAnnouncement,
-  useCreateAnnouncement,
-  useDeleteAnnouncement,
-  useUpdateAnnouncement,
-} from "../../auth/server-state/adminannounce/adminannounce.hook";
-import { useGetTodayCheckins } from "../../auth/server-state/adminother/adminother.hook";
+import { useAdminGetMyWFH } from "../../auth/server-state/adminwfh/adminwfh.hook";
+import { useTodayAttendance, useCheckin, useCheckout } from "../../auth/server-state/attendance/attendance.hook";
 
-// Minimal styles for keyframes and leaflet overrides
-const GlobalDashStyles = () => (
-  <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Outfit:wght@300;400;500;600&display=swap');
-    
-    @keyframes livePulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.4)} }
-    @keyframes mPulse { 0%,100% { transform: translate(-50%,-50%) scale(1); opacity: .5; } 50% { transform: translate(-50%,-50%) scale(2.2); opacity: 0; } }
-    @keyframes progressIn { from { width: 0; } }
-    @keyframes ov { from{opacity:0} to{opacity:1} }
-    @keyframes mup { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
-    
-    .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #0d9e6e; animation: livePulse 2s infinite; }
-    .lb-bar-fill { animation: progressIn .8s ease both; }
-    
-    .leaflet-container { font-family: 'Outfit', sans-serif; }
-    .leaflet-popup-content-wrapper { border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,.1); }
-    .leaflet-popup-content { margin: 12px 16px; }
-  `}</style>
-);
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DAYS = ["S","M","T","W","T","F","S"];
+const APPROVED_STATUSES = ["approved_manager","approved_admin","approved_reporting_manager","approved"];
+const APPROVED_WFH_STATUSES = ["approved","approved_admin","approved_reporting_manager"];
 
-const initials = (name = "") =>
-  name.trim().split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
+function getInitials(f="",l="") {
+  return `${f[0]||""}${l[0]||""}`.toUpperCase();
+}
 
-const leaveTypeColor = (type = "") => {
-  const t = type.toLowerCase();
-  if (t.includes("sick") || t.includes("sl")) return "#0d9e6e";
-  if (t.includes("earn") || t.includes("el")) return "#730042";
-  if (t.includes("priv") || t.includes("pl")) return "#b8760a";
-  if (t.includes("mat") || t.includes("ml"))  return "#7c3aed";
-  return "#730042";
-};
+function computeTenure(dateStr) {
+  if (!dateStr) return { years:0, months:0, yearsFloat:"0.0", nextMilestoneLabel:"—", fracInYear:0 };
+  const joined = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now - joined;
+  const totalMonths = Math.floor(diffMs / (1000*60*60*24*30.44));
+  const years = Math.floor(totalMonths/12);
+  const months = totalMonths%12;
+  const yearsFloat = (diffMs/(1000*60*60*24*365.25)).toFixed(1);
+  const nextMilestoneYear = years+1;
+  const nextDate = new Date(joined);
+  nextDate.setFullYear(joined.getFullYear()+nextMilestoneYear);
+  const nextLabel = `${nextMilestoneYear}yr — ${nextDate.toLocaleDateString("en-IN",{month:"short",year:"numeric"})}`;
+  const fracInYear = parseFloat(yearsFloat)%1;
+  return { years, months, yearsFloat, nextMilestoneLabel:nextLabel, fracInYear };
+}
 
-const fmtTime = (iso) => {
+function fmtDate(iso) {
   if (!iso) return "—";
-  try { return new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }); }
+  return new Date(iso).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});
+}
+
+function fmtTime(iso) {
+  if (!iso) return "—";
+  try { return new Date(iso).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"}); }
   catch { return "—"; }
+}
+
+function isDateInRange(date,start,end) {
+  const d=new Date(date); d.setHours(0,0,0,0);
+  const s=new Date(start); s.setHours(0,0,0,0);
+  const e=new Date(end); e.setHours(0,0,0,0);
+  return d>=s && d<=e;
+}
+
+function resolveAttendanceStatus(record) {
+  if (!record) return null;
+  if (record.checkIn && !record.checkOut) return "checkedin";
+  const s=(record.status||"").toLowerCase();
+  if (s.includes("half")) return "halfday";
+  if (s==="present") return "present";
+  if (s==="absent") return "absent";
+  if (s==="late") return "late";
+  if (s==="lwp") return "absent";
+  if (record.checkIn && record.checkOut) return "present";
+  return "absent";
+}
+
+function Avatar({ src, initials, size=36, className="", style={} }) {
+  const [imgError, setImgError] = useState(false);
+  const showImg = src && !imgError;
+  return (
+    <div
+      className={`flex-shrink-0 overflow-hidden flex items-center justify-center font-semibold text-[#f9f8f2] ${className}`}
+      style={{ width:size, height:size, borderRadius:"50%", background:showImg?"transparent":"#730042", fontSize:size*0.35, ...style }}
+    >
+      {showImg
+        ? <img src={src} alt="avatar" className="w-full h-full object-cover" onError={()=>setImgError(true)} />
+        : initials
+      }
+    </div>
+  );
+}
+
+function Badge({ children, variant="brand" }) {
+  const map = {
+    brand: "bg-[rgba(115,0,66,0.08)] text-[#730042]",
+    green: "bg-green-50 text-green-800",
+    blue: "bg-blue-50 text-blue-800",
+    amber: "bg-amber-50 text-amber-800",
+    red: "bg-red-50 text-red-800",
+    purple: "bg-purple-50 text-purple-800",
+    slate: "bg-slate-100 text-slate-600",
+  };
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium font-sans ${map[variant]||map.brand}`}>
+      {children}
+    </span>
+  );
+}
+
+function Skeleton({ className="" }) {
+  return (
+    <div className={`rounded-md bg-gradient-to-r from-[#f0e8e4] via-[#f9f4f2] to-[#f0e8e4] bg-[length:200%_100%] animate-pulse ${className}`} />
+  );
+}
+
+function InfoField({ label, value, loading }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[10px] text-[#b0948a] uppercase tracking-wide font-sans">{label}</span>
+      <span className="text-[12px] font-medium text-[#2a1a16] font-sans break-all">
+        {loading ? <Skeleton className="h-3 w-24" /> : (value||"—")}
+      </span>
+    </div>
+  );
+}
+
+function CardAccent({ color }) {
+  return <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl" style={{ background:color }} />;
+}
+
+function LeaveRow({ label, availed, entitled, accrued, color }) {
+  const used=availed??0;
+  const total=entitled??0;
+  const pct=total>0?Math.min(100,Math.round((used/total)*100)):0;
+  const remaining=total-used;
+  return (
+    <div className="py-3 border-b border-[#ede5e0] last:border-0">
+      <div className="flex justify-between items-start mb-2">
+        <div>
+          <div className="text-[12px] font-medium text-[#2a1a16] font-sans">{label}</div>
+          {accrued!=null && <div className="text-[10px] text-[#b0948a] mt-0.5">Accrued: {accrued}</div>}
+        </div>
+        <div className="text-right">
+          <div className="text-lg font-bold leading-none" style={{ color, fontFamily:"'Lora',serif" }}>{remaining}</div>
+          <div className="text-[10px] text-[#b0948a] mt-0.5">of {total} left</div>
+        </div>
+      </div>
+      <div className="h-1 rounded-full bg-[#f0e8e4] overflow-hidden">
+        <div className="h-full rounded-full transition-all duration-700" style={{ width:`${pct}%`, background:color }} />
+      </div>
+      <div className="text-[9px] text-[#b0948a] mt-1 font-sans">{used} used · {pct}%</div>
+    </div>
+  );
+}
+
+function FlatRow({ label, value, color }) {
+  return (
+    <div className="py-3 border-b border-[#ede5e0] last:border-0">
+      <div className="flex justify-between items-start">
+        <div className="text-[12px] font-medium text-[#2a1a16] font-sans">{label}</div>
+        <div className="text-right">
+          <div className="text-lg font-bold leading-none" style={{ color, fontFamily:"'Lora',serif" }}>{value}</div>
+          <div className="text-[10px] text-[#b0948a] mt-0.5">days</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SegBar({ segments }) {
+  return (
+    <>
+      <div className="flex h-1.5 rounded-full overflow-hidden gap-0.5 my-2.5">
+        {segments.map((s,i) => <div key={i} style={{ flex:Math.max(s.pct,0.001), background:s.color }} />)}
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1">
+        {segments.map((s,i) => (
+          <div key={i} className="flex items-center gap-1 text-[10px] text-[#b0948a] font-sans">
+            <div className="w-1.5 h-1.5 rounded-sm" style={{ background:s.color }} />
+            {s.label}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=[], approvedWFH=[] }) {
+  const year=new Date().getFullYear();
+  const firstDay=new Date(year,month,1).getDay();
+  const daysInMo=new Date(year,month+1,0).getDate();
+  const today=new Date(); today.setHours(0,0,0,0);
+
+  const joiningMidnight=useMemo(()=>{
+    if (!joiningDate) return null;
+    const d=new Date(joiningDate); d.setHours(0,0,0,0); return d;
+  },[joiningDate]);
+
+  const leaveDaySet=useMemo(()=>{
+    const set=new Set();
+    approvedLeaves.forEach(lv=>{
+      for (let d=new Date(lv.startDate); d<=new Date(lv.endDate); d.setDate(d.getDate()+1)) {
+        if (d.getFullYear()===year && d.getMonth()===month) set.add(d.getDate());
+      }
+    });
+    return set;
+  },[approvedLeaves,month,year]);
+
+  const wfhDaySet=useMemo(()=>{
+    const set=new Set();
+    approvedWFH.forEach(w=>{
+      const start = w.startDate || w.date || w.fromDate;
+      const end = w.endDate || w.date || w.toDate;
+      if (!start) return;
+      for (let d=new Date(start); d<=new Date(end||start); d.setDate(d.getDate()+1)) {
+        if (d.getFullYear()===year && d.getMonth()===month) set.add(d.getDate());
+      }
+    });
+    return set;
+  },[approvedWFH,month,year]);
+
+  const cells=[];
+  for (let i=0; i<firstDay; i++) cells.push(null);
+  for (let d=1; d<=daysInMo; d++) {
+    const date=new Date(year,month,d); date.setHours(0,0,0,0);
+    const isToday=date.toDateString()===today.toDateString();
+    const isFuture=date>today;
+    const isBeforeJoining=joiningMidnight && date<joiningMidnight;
+    let status="future";
+    if (isBeforeJoining) { status="before_joining"; }
+    else if (leaveDaySet.has(d)) { status="leave"; }
+    else if (wfhDaySet.has(d)) { status="wfh"; }
+    else if (!isFuture) {
+      const key=date.toISOString().slice(0,10);
+      const record=attendanceMap.get(key);
+      status=resolveAttendanceStatus(record)??"absent";
+    }
+    cells.push({ day:d, status, isToday });
+  }
+
+  const calStyle={
+    present:{ bg:"bg-[rgba(115,0,66,0.07)]", text:"text-[#730042] font-medium" },
+    absent:{ bg:"bg-red-50", text:"text-red-700 font-medium" },
+    halfday:{ bg:"bg-amber-50", text:"text-amber-700 font-medium" },
+    late:{ bg:"bg-orange-50", text:"text-orange-700 font-medium" },
+    leave:{ bg:"bg-indigo-50", text:"text-indigo-700 font-semibold" },
+    wfh:{ bg:"bg-teal-50", text:"text-teal-700 font-semibold" },
+    checkedin:{ bg:"bg-[rgba(29,158,117,0.12)]", text:"text-[#1D9E75] font-semibold" },
+    future:{ bg:"", text:"text-[#d4c8c4]" },
+    before_joining:{ bg:"", text:"text-[#cfc6c1] opacity-35" },
+  };
+
+  return (
+    <div>
+      <div className="grid grid-cols-7 mb-1">
+        {DAYS.map((d,i) => (
+          <div key={i} className="text-center text-[10px] text-[#b0948a] py-1 font-medium font-sans">{d}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-0.5">
+        {cells.map((cell,i) => {
+          const s=cell?calStyle[cell.status]??calStyle.future:{bg:"",text:""};
+          return (
+            <div
+              key={i}
+              title={cell ? (cell.status==="before_joining"?"Before joining":cell.status.replace(/_/g," ")) : ""}
+              className={`aspect-square flex items-center justify-center rounded text-[10px] font-sans transition-transform hover:scale-110 cursor-default ${s.bg} ${s.text} ${cell?.isToday?"outline outline-[1.5px] outline-[#730042] outline-offset-[-1.5px]":""}`}
+            >
+              {cell?.day}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function DOJCard({ joiningDate }) {
+  const { years, months, yearsFloat, nextMilestoneLabel, fracInYear }=computeTenure(joiningDate);
+  const R=36, circ=Math.PI*R;
+  const dash=fracInYear*circ;
+  const pips=Math.min(Math.floor(parseFloat(yearsFloat)),5);
+  return (
+    <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative animate-[fadeUp_.35s_ease_both] hover:shadow-lg transition-shadow">
+      <CardAccent color="#378ADD" />
+      <div className="p-4 pt-5">
+        <div className="text-[11px] text-[#b0948a] font-medium tracking-wide mb-3 font-sans uppercase">Date of joining</div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative w-20 h-20 flex-shrink-0">
+            <svg width="80" height="80" viewBox="0 0 88 88">
+              <circle cx="44" cy="44" r={R} fill="none" stroke="#ede5e0" strokeWidth="6"/>
+              <circle cx="44" cy="44" r={R} fill="none" stroke="#378ADD" strokeWidth="6"
+                strokeDasharray={`${dash} ${circ}`} strokeDashoffset={circ*0.25} strokeLinecap="round"/>
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-xl font-bold text-[#730042] leading-none" style={{ fontFamily:"'Lora',serif" }}>{yearsFloat}</span>
+              <span className="text-[9px] text-[#b0948a] mt-0.5 font-sans">yrs</span>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 flex-1 min-w-0">
+            <InfoField label="Joined on" value={joiningDate?fmtDate(joiningDate):"—"} loading={false} />
+            <InfoField label="Experience" value={`${years} yr${years!==1?"s":""} ${months} mo`} loading={false} />
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[10px] text-[#b0948a] uppercase tracking-wide font-sans">Next milestone</span>
+              <span className="text-[12px] font-medium text-[#378ADD] font-sans">{nextMilestoneLabel}</span>
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-1 mt-3">
+          {[0,1,2,3,4].map(i => (
+            <div key={i} className="h-1 flex-1 rounded-full" style={{ background:i<pips?"#378ADD":"#ede5e0" }} />
+          ))}
+        </div>
+        <div className="flex justify-between mt-1 text-[9px] text-[#b0948a] font-sans">
+          <span>0</span><span>1yr</span><span>2yr</span><span>3yr</span><span>4yr</span><span>5yr</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, onCheckIn, onCheckOut, checkingIn, checkingOut }) {
+  const today=new Date();
+  const day=today.toLocaleDateString("en-IN",{weekday:"long"});
+  const date=today.toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"});
+  const leaveLabel={ el:"Earned Leave",sl:"Sick Leave",pl:"Paternity Leave",ml:"Maternity Leave",cl:"Casual Leave",lwp:"Leave Without Pay" };
+
+  let buttonLabel = "Check In";
+  let buttonAction = onCheckIn;
+  let buttonDisabled = isOnLeave || checkingIn;
+  let buttonAria = "🟢";
+
+  if (isOnLeave) {
+    buttonLabel = "🚫 Check-in Disabled";
+  } else if (isCheckedOut) {
+    buttonLabel = "✅ Completed";
+  } else if (isCheckedIn) {
+    buttonLabel = checkingOut ? "Checking out…" : "🔴 Check Out";
+    buttonAction = onCheckOut;
+    buttonDisabled = checkingOut;
+  } else {
+    buttonLabel = checkingIn ? "Checking in…" : "Check In";
+  }
+
+  return (
+    <div className={`rounded-2xl p-4 sm:p-5 flex items-center justify-between mb-4 flex-wrap gap-3 ${
+      isOnLeave
+        ? "bg-gradient-to-br from-indigo-100 to-indigo-200 shadow-indigo-100 shadow-lg"
+        : "bg-gradient-to-br from-[#730042] to-[#a0004a] shadow-[0_4px_20px_rgba(115,0,66,0.28)]"
+    }`}>
+      <div>
+        <div className={`text-[11px] font-medium tracking-wide uppercase font-sans ${isOnLeave?"text-indigo-500":"text-[rgba(249,248,242,0.65)]"}`}>{day}</div>
+        <div className={`text-lg sm:text-xl font-bold mt-0.5 ${isOnLeave?"text-indigo-800":"text-[#f9f8f2]"}`} style={{ fontFamily:"'Lora',serif" }}>{date}</div>
+        {isOnLeave && (
+          <div className="flex items-center gap-1.5 mt-2">
+            <span className="text-[11px] text-indigo-700 font-semibold bg-indigo-200/60 px-2.5 py-1 rounded-full font-sans">
+              🏖️ On Leave — {leaveLabel[leaveType]||"Approved Leave"}
+            </span>
+          </div>
+        )}
+        {!isOnLeave && (isCheckedIn || isCheckedOut) && (
+          <div className="flex items-center gap-3 mt-2 text-[11px] text-white/70 font-sans">
+            <span>In: <strong className="text-white">{fmtTime(myAtt?.checkIn)}</strong></span>
+            {isCheckedOut && <span>Out: <strong className="text-white">{fmtTime(myAtt?.checkOut)}</strong></span>}
+          </div>
+        )}
+      </div>
+      <button
+        disabled={buttonDisabled || isCheckedOut}
+        onClick={buttonAction}
+        className={`text-[13px] font-semibold px-5 py-2.5 rounded-xl border-none transition-all font-sans ${
+          isOnLeave || isCheckedOut
+            ? "bg-white/30 text-indigo-400 cursor-not-allowed opacity-70"
+            : "bg-white text-[#730042] cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(115,0,66,0.35)] active:translate-y-0 shadow-md"
+        }`}
+      >
+        {buttonLabel}
+      </button>
+    </div>
+  );
+}
+
+const LEAVE_TYPE_META = {
+  el:{ label:"Earned", color:"#730042", bg:"rgba(115,0,66,0.08)" },
+  sl:{ label:"Sick", color:"#1D9E75", bg:"rgba(29,158,117,0.08)" },
+  pl:{ label:"Paternity", color:"#378ADD", bg:"rgba(55,138,221,0.08)" },
+  ml:{ label:"Maternity", color:"#9333EA", bg:"rgba(147,51,234,0.08)" },
+  cl:{ label:"Casual", color:"#BA7517", bg:"rgba(186,117,23,0.08)" },
+  lwp:{ label:"LWP", color:"#E24B4A", bg:"rgba(226,75,74,0.08)" },
 };
+
+const STATUS_COLORS = {
+  pending_manager:{ label:"Pending", color:"#92400E", bg:"#faeeda" },
+  pending_admin:{ label:"Pending", color:"#92400E", bg:"#faeeda" },
+  pending_superadmin:{ label:"Pending", color:"#92400E", bg:"#faeeda" },
+  approved_manager:{ label:"Approved", color:"#1a6b48", bg:"#e8f5e9" },
+  approved_admin:{ label:"Approved ✓", color:"#1a6b48", bg:"#e8f5e9" },
+  approved_superadmin:{ label:"Approved ✓", color:"#1a6b48", bg:"#e8f5e9" },
+  rejected_manager:{ label:"Rejected", color:"#791F1F", bg:"#fcebeb" },
+  rejected_admin:{ label:"Rejected ✗", color:"#791F1F", bg:"#fcebeb" },
+  rejected_superadmin:{ label:"Rejected ✗", color:"#791F1F", bg:"#fcebeb" },
+  forwarded_admin:{ label:"Forwarded", color:"#185FA5", bg:"#e6f1fb" },
+};
+
+function LeaveHistoryList({ leaves=[], loading }) {
+  if (loading) return (
+    <div className="px-4 sm:px-5 pb-4 flex flex-col gap-2.5">
+      {[1,2,3].map(i => <Skeleton key={i} className="h-11 rounded-xl w-full" />)}
+    </div>
+  );
+
+  if (!leaves.length) return (
+    <div className="py-10 px-4 text-center">
+      <div className="text-3xl mb-3">📋</div>
+      <div className="text-[13px] font-medium text-[#2a1a16] mb-1 font-sans">No leave history yet</div>
+      <div className="text-[11px] text-[#b0948a] font-sans">Your leave applications will appear here</div>
+    </div>
+  );
+
+  return (
+    <div className="px-4 sm:px-5 pb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+        {leaves.map((lv,i) => {
+          const lm=LEAVE_TYPE_META[lv.leaveType]||{ label:lv.leaveType?.toUpperCase()||"Leave", color:"#730042", bg:"rgba(115,0,66,0.08)" };
+          const sm=STATUS_COLORS[lv.status]||{ label:lv.status, color:"#475569", bg:"#f1f5f9" };
+          const days=lv.days||1;
+          return (
+            <div key={lv._id||i} className="flex items-center gap-2.5 p-3 rounded-xl bg-[#fdfcfb] border border-[#f0e8e4] hover:border-[#e0d4ce] transition-colors">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+                style={{ background:lm.bg, color:lm.color }}>
+                {lm.label.slice(0,2).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[12px] font-medium text-[#2a1a16] font-sans">{lm.label}</div>
+                <div className="text-[10px] text-[#b0948a] mt-0.5 font-sans truncate">
+                  {fmtDate(lv.startDate)} → {fmtDate(lv.endDate)} · {days}d
+                </div>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap flex-shrink-0"
+                style={{ background:sm.bg, color:sm.color }}>
+                {sm.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function StarRating({ rating=0, max=5, size=14 }) {
+  return (
+    <div className="flex gap-0.5 items-center">
+      {Array.from({length:max},(_,i) => {
+        const filled=i<Math.floor(rating);
+        const half=!filled && i<rating;
+        return (
+          <svg key={i} width={size} height={size} viewBox="0 0 16 16" fill="none">
+            <path d="M8 1l1.8 3.6L14 5.4l-3 2.9.7 4.1L8 10.4l-3.7 2 .7-4.1-3-2.9 4.2-.8z"
+              fill={filled?"#e8b84b":half?"url(#half)":"#e8ddd8"}
+              stroke={filled||half?"#d4a33a":"#d9ceca"} strokeWidth=".5" />
+            {half && (
+              <defs>
+                <linearGradient id="half">
+                  <stop offset="50%" stopColor="#e8b84b"/>
+                  <stop offset="50%" stopColor="#e8ddd8"/>
+                </linearGradient>
+              </defs>
+            )}
+          </svg>
+        );
+      })}
+      {rating>0 && <span className="text-[10px] text-[#b0948a] ml-1 font-sans">{Number(rating).toFixed(1)}</span>}
+    </div>
+  );
+}
+
+function ReviewCard({ reviews=[], loading }) {
+  if (loading) return (
+    <div className="p-4 flex flex-col gap-2.5">
+      <Skeleton className="h-4 w-3/5" /><Skeleton className="h-8 w-2/5" /><Skeleton className="h-3 w-4/5" />
+    </div>
+  );
+  const avg=reviews.length?(reviews.reduce((s,r)=>s+(r.rating||0),0)/reviews.length):null;
+  const thisMonth=new Date().toISOString().slice(0,7);
+  const newThisMonth=reviews.filter(r=>r.monthYear===thisMonth).length;
+  return (
+    <div className="p-4 pb-5">
+      {avg!==null ? (
+        <>
+          <div className="flex items-end gap-2.5 mb-3">
+            <span className="text-4xl font-bold text-[#e8b84b] leading-none" style={{ fontFamily:"'Lora',serif" }}>{avg.toFixed(1)}</span>
+            <div>
+              <StarRating rating={avg} size={15} />
+              <div className="text-[10px] text-[#b0948a] mt-1 font-sans">from {reviews.length} review{reviews.length!==1?"s":""}</div>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1 mb-3">
+            {[5,4,3,2,1].map(star => {
+              const cnt=reviews.filter(r=>Math.round(r.rating)===star).length;
+              const pct=reviews.length>0?(cnt/reviews.length)*100:0;
+              return (
+                <div key={star} className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-[#b0948a] w-2 font-sans">{star}</span>
+                  <svg width="10" height="10" viewBox="0 0 16 16" fill="#e8b84b"><path d="M8 1l1.8 3.6L14 5.4l-3 2.9.7 4.1L8 10.4l-3.7 2 .7-4.1-3-2.9 4.2-.8z"/></svg>
+                  <div className="flex-1 h-1.5 rounded-full bg-[#f0e8e4] overflow-hidden">
+                    <div className="h-full rounded-full bg-[#e8b84b] transition-all duration-700" style={{ width:`${pct}%` }} />
+                  </div>
+                  <span className="text-[10px] text-[#b0948a] w-4 text-right font-sans">{cnt}</span>
+                </div>
+              );
+            })}
+          </div>
+          {newThisMonth>0 && <Badge variant="green">+{newThisMonth} this month</Badge>}
+        </>
+      ) : (
+        <div className="text-center py-4">
+          <div className="text-2xl mb-1.5">⭐</div>
+          <div className="text-[12px] text-[#b0948a] font-sans">No reviews yet</div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const AttendanceMap = ({ checkins = [], loading = false }) => {
-  const mapRef      = useRef(null);
+  const mapRef = useRef(null);
   const instanceRef = useRef(null);
-  const markersRef  = useRef([]);
+  const markersRef = useRef([]);
 
   useEffect(() => {
     let active = true;
@@ -70,17 +528,17 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
       if (!window.L) {
         await new Promise((res) => {
           const css = document.createElement("link");
-          css.rel  = "stylesheet";
+          css.rel = "stylesheet";
           css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
           document.head.appendChild(css);
-          const js  = document.createElement("script");
-          js.src    = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+          const js = document.createElement("script");
+          js.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
           js.onload = res;
           document.head.appendChild(js);
         });
       }
       if (!active || !mapRef.current || instanceRef.current) return;
-      const L   = window.L;
+      const L = window.L;
       const map = L.map(mapRef.current, { zoomControl: false }).setView([22.5, 80.0], 5);
       L.control.zoom({ position: "bottomright" }).addTo(map);
       L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
@@ -92,7 +550,7 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
   }, []);
 
   useEffect(() => {
-    const L   = window.L;
+    const L = window.L;
     const map = instanceRef.current;
     if (!L || !map) return;
 
@@ -103,10 +561,10 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
     const bounds = [];
     checkins.forEach(({ lat, lng, name, role, dept, email, checkIn, checkedOut }) => {
       if (!lat || !lng) return;
-      const color = role?.toLowerCase() === "manager" ? "#730042" : "#a0005c";
-      const size  = role?.toLowerCase() === "manager" ? 15 : 11;
+      const color = role?.toLowerCase() === "admin" ? "#4a0029" : role?.toLowerCase() === "manager" ? "#730042" : "#a0005c";
+      const size = role?.toLowerCase() === "manager" || role?.toLowerCase() === "admin" ? 15 : 11;
       const pulse = size + 14;
-      const inits = initials(name || "?");
+      const inits = getInitials(...(name || "?").split(" "));
 
       const icon = L.divIcon({
         className: "",
@@ -119,7 +577,7 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
 
       const marker = L.marker([lat, lng], { icon })
         .bindPopup(
-          `<div style="font-family:'Outfit',sans-serif;padding:6px 4px;min-width:175px;">
+          `<div style="font-family:'DM Sans',sans-serif;padding:6px 4px;min-width:175px;">
             <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px;">
               <div style="width:32px;height:32px;border-radius:50%;background:${color};color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">${inits}</div>
               <div>
@@ -174,792 +632,586 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
   );
 };
 
-const AnnModal = ({ open, onClose, initial, onSave, loading }) => {
-  const [form, setForm] = useState({ title: "", message: "", type: "general" });
+function leaveTypeColor(type="") {
+  const t=type.toLowerCase();
+  if (t.includes("sick")||t.includes("sl")) return "#1D9E75";
+  if (t.includes("earn")||t.includes("el")) return "#730042";
+  if (t.includes("pat")||t.includes("pl")) return "#378ADD";
+  if (t.includes("mat")||t.includes("ml")) return "#9333EA";
+  return "#730042";
+}
 
-  useEffect(() => {
-    if (open) setForm({ title: "", message: "", type: "general", ...(initial || {}) });
-  }, [open]);
-
-  if (!open) return null;
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
-
+function LeaveRequestsPanel({ leaves, loading, onAccept, onReject, accepting, rejecting }) {
+  const pendingCount = leaves.filter(l => (l.status||"").toLowerCase().includes("pending")).length;
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[1000] flex items-center justify-center p-4 animate-[ov_.18s]" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-[mup_.22s] flex flex-col max-h-[90vh]">
-        <div className="p-5 sm:p-6 border-b border-[#eedde8] flex items-center justify-between shrink-0">
-          <h2 className="font-['Cormorant_Garamond',serif] text-xl sm:text-2xl font-bold text-[#1a0010]">
-            {initial ? "Edit Announcement" : "New Announcement"}
-          </h2>
-          <button className="bg-none border-none cursor-pointer text-[#8a6070] text-base p-1.5 rounded-md hover:bg-[#f7edf3] hover:text-[#730042]" onClick={onClose}>
-            <FaTimes />
-          </button>
-        </div>
-        <div className="p-5 sm:p-6 overflow-y-auto">
-          <div className="mb-4">
-            <label className="block text-xs font-semibold tracking-wide uppercase text-[#8a6070] mb-1.5">Title</label>
-            <input 
-              className="w-full px-3 py-2.5 bg-[#fdf5f9] border border-[#eedde8] rounded-lg text-sm text-[#1a0010] outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 box-border"
-              placeholder="Announcement title…" 
-              value={form.title} 
-              onChange={set("title")} 
-              required 
-            />
+    <div className="bg-white rounded-2xl border border-[#ede5e0] shadow-sm overflow-hidden flex flex-col h-full">
+      <div className="px-4 sm:px-5 py-3.5 border-b border-[#ede5e0] flex items-center justify-between">
+        <span className="text-[12px] font-semibold font-sans">Leave Requests</span>
+        {pendingCount>0 && <Badge variant="amber">{pendingCount} pending</Badge>}
+      </div>
+      <div className="overflow-y-auto max-h-[420px] flex-1">
+        {loading ? (
+          <div className="p-4 flex flex-col gap-2.5">
+            {[1,2,3].map(i => <Skeleton key={i} className="h-14 rounded-xl w-full" />)}
           </div>
-          <div className="mb-4">
-            <label className="block text-xs font-semibold tracking-wide uppercase text-[#8a6070] mb-1.5">Type</label>
-            <select 
-              className="w-full px-3 py-2.5 bg-[#fdf5f9] border border-[#eedde8] rounded-lg text-sm text-[#1a0010] outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 box-border cursor-pointer"
-              value={form.type} 
-              onChange={set("type")}
-            >
-              <option value="general">General</option>
-              <option value="urgent">Urgent</option>
-              <option value="event">Event</option>
-              <option value="policy">Policy</option>
-            </select>
+        ) : leaves.length===0 ? (
+          <div className="text-center py-10 px-5 text-[#cfc3bc]">
+            <div className="text-3xl mb-2.5">✅</div>
+            <p className="text-[12px] font-sans">No leave requests. All clear.</p>
           </div>
-          <div className="mb-0">
-            <label className="block text-xs font-semibold tracking-wide uppercase text-[#8a6070] mb-1.5">Message</label>
-            <textarea 
-              className="w-full px-3 py-2.5 bg-[#fdf5f9] border border-[#eedde8] rounded-lg text-sm text-[#1a0010] outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 box-border resize-y min-h-[88px] leading-relaxed"
-              placeholder="Write your announcement…" 
-              value={form.message} 
-              onChange={set("message")} 
-            />
-          </div>
-        </div>
-        <div className="p-4 sm:p-6 border-t border-[#eedde8] flex justify-end gap-2.5 shrink-0">
-          <button className="bg-none text-[#8a6070] border border-[#eedde8] px-4 py-2 rounded-lg text-xs font-medium cursor-pointer hover:border-[#730042] hover:text-[#730042]" onClick={onClose}>
-            Cancel
-          </button>
-          <button 
-            className="bg-[#730042] text-white border-none px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1.5 hover:bg-[#4a0029] transition-all disabled:opacity-50"
-            onClick={() => onSave(form)} 
-            disabled={loading || !form.title}
-          >
-            <FaCheck className="text-[10px]" />
-            {loading ? "Saving…" : initial ? "Update" : "Publish"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const StarDisplay = ({ rating, max = 5 }) => {
-  return (
-    <div className="flex gap-1 items-center">
-      {Array.from({ length: max }, (_, i) => (
-        <FaStar
-          key={i}
-          className="text-[13px]"
-          style={{ color: i < Math.round(rating) ? "#e8b84b" : "#eedde8" }}
-        />
-      ))}
-      <span className="text-xs text-[#8a6070] ml-1.5 font-semibold">
-        {Number(rating).toFixed(1)}
-      </span>
-    </div>
-  );
-};
-
-const LeaveBalancePanel = ({ leaveBalance, loading }) => {
-  if (loading) {
-    return (
-      <div className="bg-white rounded-2xl border border-[#eedde8] shadow-sm p-5">
-        <div className="text-sm text-[#8a6070]">Loading leave balance…</div>
-      </div>
-    );
-  }
-
-  if (!leaveBalance) {
-    return (
-      <div className="bg-white rounded-2xl border border-[#eedde8] shadow-sm">
-        <div className="text-center py-10 px-5 text-[#c49ab2]">
-          <div className="text-3xl mb-2.5">📋</div>
-          <p className="text-sm">No leave balance found.</p>
-        </div>
-      </div>
-    );
-  }
-
-  const lb = leaveBalance;
-
-  const rows = [
-    {
-      label: "Earned Leave (EL)",
-      availed: lb.EL?.availed ?? 0,
-      entitled: lb.EL?.entitled ?? 0,
-      accrued: lb.EL?.accrued != null ? Number(lb.EL.accrued).toFixed(2) : null,
-      color: "#730042",
-    },
-    {
-      label: "Sick Leave (SL)",
-      availed: lb.SL?.availed ?? 0,
-      entitled: lb.SL?.entitled ?? 0,
-      accrued: null,
-      color: "#0d9e6e",
-    },
-    {
-      label: "Paternity Leave (PL)",
-      availed: lb.pbc ?? 0,
-      entitled: lb.PL ?? 0,
-      accrued: null,
-      color: "#185FA5",
-    },
-    {
-      label: "Maternity Leave (ML)",
-      availed: 0,
-      entitled: lb.ML ?? 0,
-      accrued: null,
-      color: "#7c3aed",
-    },
-  ];
-
-  return (
-    <div className="bg-white rounded-2xl border border-[#eedde8] shadow-sm overflow-hidden h-full flex flex-col">
-      <div className="p-4 sm:p-5 border-b border-[#eedde8] flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2 font-['Cormorant_Garamond',serif] text-lg font-bold text-[#1a0010]">
-          <FaCalendarAlt className="text-[#730042] text-sm" />
-          My Leave Balance
-        </div>
-        <span className="text-xs text-[#c49ab2] font-medium hidden sm:inline">FY 2025–26</span>
-      </div>
-      <div className="p-4 sm:p-5 flex-1 overflow-y-auto">
-        {rows.map((row, i) => {
-          const remaining = row.entitled - row.availed;
-          const pct = row.entitled > 0 ? Math.min(100, Math.round((row.availed / row.entitled) * 100)) : 0;
-          return (
-            <div className="py-3 border-b border-[#eedde8] last:border-b-0" key={i}>
-              <div className="flex justify-between items-start mb-1.5">
-                <div className="min-w-0 pr-2">
-                  <div className="text-xs font-semibold text-[#1a0010]">{row.label}</div>
-                  {row.accrued != null && (
-                    <div className="text-[10px] text-[#8a6070] mt-0.5">
-                      Accrued this month: <strong>{row.accrued}</strong>
+        ) : (
+          leaves.map((leave) => {
+            const name = leave.employeeName || leave.name ||
+              (leave.employee ? [leave.employee.f_name, leave.employee.l_name].filter(Boolean).join(" ") : "") ||
+              leave.manager ? [leave.manager?.f_name, leave.manager?.l_name].filter(Boolean).join(" ") : "Employee";
+            const type = leave.leaveType || leave.type || "Leave";
+            const from = leave.startDate || leave.from || leave.fromDate || "";
+            const to = leave.endDate || leave.to || leave.toDate || "";
+            const status = (leave.status||"pending").toLowerCase();
+            const isPending = status.includes("pending");
+            return (
+              <div key={leave._id||leave.id} className="p-3.5 border-b border-[#f0e8e4] last:border-0 flex items-start gap-2.5 hover:bg-[#fdfcfb] transition-colors">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
+                  style={{ background: leaveTypeColor(type) }}>
+                  {getInitials(...(name||"E").split(" "))}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[12px] font-semibold text-[#2a1a16] truncate font-sans">{name||"Employee"}</div>
+                  <div className="text-[10px] text-[#b0948a] mt-0.5 font-sans">{type} · {fmtDate(from)}{to&&to!==from?` → ${fmtDate(to)}`:""}</div>
+                  {isPending ? (
+                    <div className="flex gap-1.5 mt-2">
+                      <button onClick={()=>onAccept(leave._id||leave.id)} disabled={accepting}
+                        className="bg-green-50 text-green-700 border border-green-200 rounded-md px-2.5 py-1 text-[10px] font-semibold cursor-pointer hover:bg-green-600 hover:text-white transition-all disabled:opacity-50 font-sans">
+                        Approve
+                      </button>
+                      <button onClick={()=>onReject(leave._id||leave.id)} disabled={rejecting}
+                        className="bg-red-50 text-red-700 border border-red-200 rounded-md px-2.5 py-1 text-[10px] font-semibold cursor-pointer hover:bg-red-600 hover:text-white transition-all disabled:opacity-50 font-sans">
+                        Reject
+                      </button>
                     </div>
+                  ) : (
+                    <span className="inline-block mt-1.5 px-2 py-0.5 rounded-full text-[9px] font-semibold capitalize"
+                      style={{
+                        background: status.includes("approved") ? "#e8f5e9" : status.includes("rejected") ? "#fcebeb" : "#faeeda",
+                        color: status.includes("approved") ? "#1a6b48" : status.includes("rejected") ? "#791F1F" : "#92400E",
+                      }}>
+                      {status.replace(/_/g," ")}
+                    </span>
                   )}
                 </div>
-                <div className="text-right shrink-0">
-                  <div className="text-xl font-bold leading-none font-['Cormorant_Garamond',serif]" style={{ color: row.color }}>
-                    {remaining}
-                  </div>
-                  <div className="text-[10px] text-[#8a6070] mt-0.5">of {row.entitled} left</div>
-                </div>
               </div>
-              <div className="h-1 bg-[#eedde8] rounded-full overflow-hidden">
-                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: row.color }} />
-              </div>
-              <div className="text-[10px] text-[#8a6070] mt-1">
-                {row.availed} used · {pct}%
-              </div>
-            </div>
-          );
-        })}
-
-        <div className="flex gap-2 flex-wrap mt-2.5 pt-2.5 border-t border-[#eedde8]">
-          {[
-            ["LWP Used", lb.lwp ?? 0],
-            ["PBC", lb.pbc ?? 0],
-          ].map(([l, v]) => (
-            <div key={l} className="bg-[#fdf5f9] border border-[#eedde8] rounded-lg px-3 py-1.5 text-xs">
-              <span className="text-[#8a6070]">{l} </span>
-              <strong className="text-[#1a0010]">{v}</strong>
-            </div>
-          ))}
-          {lb.lastAccrualDate && (
-            <div className="bg-[#fdf5f9] border border-[#eedde8] rounded-lg px-3 py-1.5 text-xs">
-              <span className="text-[#8a6070]">Last accrual </span>
-              <strong className="text-[#1a0010]">
-                {new Date(lb.lastAccrualDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-              </strong>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const ReviewsPanel = ({ reviews, loading }) => {
-  if (loading) {
-    return (
-      <div className="bg-white rounded-2xl border border-[#eedde8] shadow-sm p-5">
-        <div className="text-sm text-[#8a6070]">Loading reviews…</div>
-      </div>
-    );
-  }
-
-  const safeReviews = Array.isArray(reviews) ? reviews : [];
-  const avg = safeReviews.length
-    ? safeReviews.reduce((s, r) => s + (r.rating || 0), 0) / safeReviews.length
-    : null;
-
-  return (
-    <div className="bg-white rounded-2xl border border-[#eedde8] shadow-sm overflow-hidden h-full flex flex-col">
-      <div className="p-4 sm:p-5 border-b border-[#eedde8] flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2 font-['Cormorant_Garamond',serif] text-lg font-bold text-[#1a0010]">
-          <FaStar className="text-[#e8b84b] text-sm" />
-          Reviews Received
-        </div>
-        {safeReviews.length > 0 && (
-          <span className="bg-[#fff8e1] text-[#b8760a] text-xs font-bold px-2.5 py-1 rounded-full border border-[#f0d870]">
-            {safeReviews.length} review{safeReviews.length !== 1 ? "s" : ""}
-          </span>
+            );
+          })
         )}
       </div>
-
-      <div className="p-4 sm:p-5 flex-1 overflow-y-auto">
-        {safeReviews.length === 0 ? (
-          <div className="text-center py-10 px-5 text-[#c49ab2]">
-            <div className="text-3xl mb-2.5">⭐</div>
-            <p className="text-sm">No reviews received yet.</p>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-end gap-3 mb-4 pb-4 border-b border-[#eedde8]">
-              <div className="font-['Cormorant_Garamond',serif] text-5xl font-bold text-[#e8b84b] leading-none">
-                {avg.toFixed(1)}
-              </div>
-              <div className="pb-1">
-                <StarDisplay rating={avg} />
-                <div className="text-xs text-[#8a6070] mt-1">
-                  Based on {safeReviews.length} review{safeReviews.length !== 1 ? "s" : ""}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5 mb-4">
-              {[5, 4, 3, 2, 1].map((star) => {
-                const cnt = safeReviews.filter((r) => Math.round(r.rating) === star).length;
-                const pct = safeReviews.length > 0 ? (cnt / safeReviews.length) * 100 : 0;
-                return (
-                  <div key={star} className="flex items-center gap-2">
-                    <span className="text-xs text-[#8a6070] w-2">{star}</span>
-                    <FaStar className="text-xs text-[#e8b84b]" />
-                    <div className="flex-1 h-1.5 rounded bg-[#eedde8] overflow-hidden">
-                      <div className="h-full rounded bg-[#e8b84b]" style={{ width: `${pct}%` }} />
-                    </div>
-                    <span className="text-[10px] text-[#8a6070] w-3.5 text-right">{cnt}</span>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="flex flex-col gap-2.5">
-              {safeReviews.map((rev, i) => {
-                const reviewerName = rev.reviewer
-                  ? [rev.reviewer.f_name, rev.reviewer.l_name].filter(Boolean).join(" ")
-                  : "Unknown";
-                const reviewerRole = rev.reviewer?.role || rev.reviewerRole || "";
-                return (
-                  <div key={rev._id || i} className="bg-[#fdf5f9] rounded-lg p-3 border-l-4 border-[#e8b84b]">
-                    <div className="flex justify-between items-start mb-1.5 gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-7 h-7 rounded-full bg-[#730042] text-white flex items-center justify-center text-[11px] font-bold shrink-0">
-                          {initials(reviewerName)}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-semibold text-[#1a0010] truncate">{reviewerName}</div>
-                          <div className="text-[10px] text-[#8a6070] capitalize">{reviewerRole.replace("_", " ")}</div>
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <StarDisplay rating={rev.rating} />
-                        <div className="text-[10px] text-[#8a6070] mt-0.5">{rev.monthYear}</div>
-                      </div>
-                    </div>
-                    {rev.comment && (
-                      <div className="text-xs text-[#8a6070] italic leading-relaxed mt-1.5">
-                        "{rev.comment}"
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
-
-function Dashboard() {
-  const [greeting, setGreeting]   = useState("");
-  const [thought, setThought]     = useState("");
-  const [annModal, setAnnModal]   = useState({ open: false, editing: null });
-  const [empExpand, setEmpExpand] = useState(false);
-
-  const { data: adminData, isLoading: adminLoading } = useGetMeAdmin();
-  const { data: empData,   isLoading: empLoading  } = useGetAllEmployee();
-  const { data: leaveData, isLoading: leaveLoading} = useGetForwardedLeaves();
-  const { data: annRaw,    isLoading: annLoading  } = useGetAllAnnouncement();
-  const { data: checkinData, isLoading: mapLoading} = useGetTodayCheckins();
-
-  const { mutate: acceptLeave, isPending: accepting } = useAcceptLeave();
-  const { mutate: rejectLeave, isPending: rejecting } = useRejectLeave();
-  const { mutate: createAnn,   isPending: creating  } = useCreateAnnouncement();
-  const { mutate: deleteAnn                         } = useDeleteAnnouncement();
-  const { mutate: updateAnn,   isPending: updating  } = useUpdateAnnouncement();
-
-  const admin        = adminData?.user       ?? null;
-  const leaveBalance = adminData?.leaveBalance ?? null;
-  const reviews      = adminData?.reviews    ?? [];
-
-  const employees = Array.isArray(empData?.employees)
-    ? empData.employees
-    : Array.isArray(empData) ? empData : [];
-
-  const leaves = Array.isArray(leaveData?.leaves)
-    ? leaveData.leaves
-    : Array.isArray(leaveData) ? leaveData : [];
-
-  const announcements = Array.isArray(annRaw?.announcements)
-    ? annRaw.announcements
-    : Array.isArray(annRaw) ? annRaw : [];
-
-  const checkins       = checkinData?.checkins ?? [];
-  const presentToday   = checkinData?.total    ?? checkins.length;
-  const stillOnDuty    = checkins.filter((c) => !c.checkedOut).length;
-  const attendanceRate = employees.length > 0
-    ? Math.round((presentToday / employees.length) * 100)
-    : 0;
-
-  const totalEmployees = empData?.count || employees.length || 0;
-  const pendingLeaves  = leaves.filter((l) => (l.status || "").toLowerCase() === "pending").length
-    || leaveData?.count || 0;
-  const totalAnn = announcements.length;
-
-  const avgRating = reviews.length
-    ? reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length
-    : null;
-
-  const THOUGHTS = [
-    "Great teams are built on trust and transparency.",
-    "Leadership is not about being in charge — it's about caring.",
-    "Small decisions made consistently become culture.",
-    "Your team's success is your greatest achievement.",
-    "Clarity is kindness. Communicate with purpose.",
-  ];
-
-  useEffect(() => {
-    const h = new Date().getHours();
-    setGreeting(h < 12 ? "Good Morning ☀️" : h < 17 ? "Good Afternoon 🌤️" : h < 21 ? "Good Evening 🌆" : "Good Night 🌙");
-    setThought(THOUGHTS[Math.floor(Math.random() * THOUGHTS.length)]);
-  }, []);
-
-  const adminName = admin
-    ? [admin.f_name, admin.l_name].filter(Boolean).join(" ")
-    : admin?.organisation_name || "Admin";
-
-  const stats = [
-    {
-      icon: <FaUsers />,
-      label: "Total Employees",
-      value: empLoading ? "—" : totalEmployees,
-      sub: "+2% from last month",
-      subColor: "#0d9e6e",
-      bar: null,
-    },
-    {
-      icon: <FaClock />,
-      label: "Present Today",
-      value: mapLoading ? "—" : presentToday,
-      sub: mapLoading ? "Loading…" : `${attendanceRate}% attendance · ${stillOnDuty} on duty`,
-      subColor: "#8a6070",
-      bar: mapLoading ? null : attendanceRate,
-    },
-    {
-      icon: <FaCalendarAlt />,
-      label: "Pending Leaves",
-      value: leaveLoading ? "—" : pendingLeaves,
-      sub: pendingLeaves > 0 ? "Needs attention" : "All clear",
-      subColor: pendingLeaves > 0 ? "#b8760a" : "#0d9e6e",
-      bar: null,
-    },
-    {
-      icon: <FaStar />,
-      label: "My Rating",
-      value: adminLoading ? "—" : avgRating != null ? avgRating.toFixed(1) : "—",
-      sub: reviews.length > 0 ? `${reviews.length} review${reviews.length !== 1 ? "s" : ""} received` : "No reviews yet",
-      subColor: avgRating != null ? "#e8b84b" : "#8a6070",
-      bar: avgRating != null ? Math.round((avgRating / 5) * 100) : null,
-    },
-  ];
-
-  const saveAnn = (form) => {
-    if (annModal.editing) {
-      updateAnn(
-        { id: annModal.editing._id, data: form },
-        { onSuccess: () => setAnnModal({ open: false, editing: null }) }
-      );
-    } else {
-      createAnn(form, { onSuccess: () => setAnnModal({ open: false, editing: null }) });
-    }
-  };
-
-  const removeAnn = (id) => { if (window.confirm("Delete this announcement?")) deleteAnn(id); };
-
-  const today = new Date().toLocaleDateString("en-IN", {
-    weekday: "long", year: "numeric", month: "long", day: "numeric",
-  });
-
-  const displayEmployees = empExpand ? employees : employees.slice(0, 8);
-
-  return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-[#fdf5f9] p-4 sm:p-6 lg:p-8 font-['Outfit',sans-serif] text-[#1a0010]">
-      <GlobalDashStyles />
-
-      {/* Hero Section */}
-      <div className="bg-gradient-to-br from-[#2e0019] via-[#4a0029] to-[#730042] rounded-2xl p-6 sm:p-8 lg:p-10 mb-6 sm:mb-8 relative overflow-hidden shadow-lg">
-        <div className="absolute w-[420px] h-[420px] rounded-full top-[-180px] right-[-100px] bg-white/5 pointer-events-none hidden md:block"></div>
-        <div className="absolute w-[260px] h-[260px] rounded-full bottom-[-140px] left-[38%] bg-white/5 pointer-events-none hidden md:block"></div>
-        
-        <p className="text-[11px] tracking-widest uppercase text-white/50 mb-2 font-medium">{today}</p>
-        <h1 className="font-['Cormorant_Garamond',serif] text-2xl sm:text-3xl lg:text-4xl text-white font-bold leading-tight m-0">
-          {greeting}, {adminName}!
-        </h1>
-        <p className="text-sm text-white/65 font-light max-w-xl leading-relaxed mt-1.5">"{thought}"</p>
-        
-        <div className="flex gap-2.5 mt-5 flex-wrap">
-          <span className="bg-white/10 border border-white/20 rounded-full px-3.5 py-1.5 text-xs text-white/85 font-medium backdrop-blur-sm">
-            🏢 {totalEmployees} Employees
-          </span>
-          {presentToday > 0 && (
-            <span className="bg-white/10 border border-white/20 rounded-full px-3.5 py-1.5 text-xs text-white/85 font-medium backdrop-blur-sm">
-              ✅ {presentToday} Present Today
-            </span>
-          )}
-          {pendingLeaves > 0 && (
-            <span className="bg-white/10 border border-white/20 rounded-full px-3.5 py-1.5 text-xs text-white/85 font-medium backdrop-blur-sm">
-              📋 {pendingLeaves} Leave{pendingLeaves > 1 ? "s" : ""} Pending
-            </span>
-          )}
-          <span className="bg-white/10 border border-white/20 rounded-full px-3.5 py-1.5 text-xs text-white/85 font-medium backdrop-blur-sm">
-            📢 {totalAnn} Announcement{totalAnn !== 1 ? "s" : ""}
-          </span>
-          {avgRating != null && (
-            <span className="bg-white/10 border border-white/20 rounded-full px-3.5 py-1.5 text-xs text-white/85 font-medium backdrop-blur-sm">
-              ⭐ {avgRating.toFixed(1)} Rating
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
-        {stats.map((s, i) => (
-          <div key={i} className="bg-white rounded-2xl border border-[#eedde8] p-4 sm:p-5 shadow-sm relative overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg">
-            <div className="absolute top-0 left-0 w-full h-1" style={{ background: i === 3 ? "#e8b84b" : "#730042" }} />
-            <div 
-              className="w-11 h-11 rounded-full flex items-center justify-center text-base mb-4"
-              style={{ color: i === 3 ? "#e8b84b" : "#730042", background: i === 3 ? "#fff8e1" : "#f7edf3" }}
-            >
-              {s.icon}
-            </div>
-            <div className="text-[11px] font-semibold tracking-wide uppercase text-[#8a6070] mb-1.5">{s.label}</div>
-            <div className="font-['Cormorant_Garamond',serif] text-4xl leading-none text-[#1a0010] font-bold">{s.value}</div>
-            <p className="text-xs mt-2 font-medium" style={{ color: s.subColor }}>{s.sub}</p>
-            {s.bar !== null && (
-              <div className="h-1 bg-[#eedde8] rounded-full mt-3 overflow-hidden">
-                <div 
-                  className="h-full rounded-full" 
-                  style={{ 
-                    width: `${s.bar}%`, 
-                    background: i === 3 ? "linear-gradient(90deg,#c8920a,#e8b84b)" : "linear-gradient(90deg,#4a0029,#c0527e)" 
-                  }} 
-                />
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Mid Grid: Map & Leave Requests */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-        <div className="bg-white rounded-2xl border border-[#eedde8] shadow-sm overflow-hidden lg:col-span-2 flex flex-col">
-          <div className="p-4 sm:p-5 border-b border-[#eedde8] flex items-center justify-between">
-            <div className="flex items-center gap-2 font-['Cormorant_Garamond',serif] text-lg font-bold text-[#1a0010]">
-              <div className="live-dot"></div>
-              Live Attendance Map
-            </div>
-            <span className="text-xs text-[#c49ab2] font-medium hidden sm:flex items-center">
-              <FaMapMarkerAlt className="mr-1" />
-              {mapLoading ? "Loading…" : `${checkins.length} check-in${checkins.length !== 1 ? "s" : ""} today`}
-            </span>
-          </div>
-          <div className="h-[300px] sm:h-[400px] lg:h-[450px] w-full">
-            <AttendanceMap checkins={checkins} loading={mapLoading} />
-          </div>
-          <div className="p-3 sm:p-4 bg-[#f7edf3] border-t border-[#eedde8] flex flex-wrap gap-4 sm:gap-5 items-center">
-            <div className="flex items-center gap-1.5 text-xs text-[#8a6070]">
-              <div className="w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm bg-[#730042]"></div>
-              Manager
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-[#8a6070]">
-              <div className="w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm bg-[#a0005c]"></div>
-              Employee
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-[#8a6070]">
-              <div className="w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm bg-gray-400 opacity-50"></div>
-              Checked out
-            </div>
-            <span className="ml-auto text-xs text-[#c49ab2] hidden md:inline">
-              Click a pin for details · updates every 2 min
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-[#eedde8] shadow-sm overflow-hidden flex flex-col">
-          <div className="p-4 sm:p-5 border-b border-[#eedde8] flex items-center justify-between">
-            <div className="flex items-center gap-2 font-['Cormorant_Garamond',serif] text-lg font-bold text-[#1a0010]">
-              <FaCalendarAlt className="text-[#730042] text-sm" />
-              Leave Requests
-            </div>
-            {pendingLeaves > 0 && (
-              <span className="bg-[#fff8e1] text-[#b8760a] text-xs font-bold px-2.5 py-1 rounded-full border border-[#f0d870]">
-                {pendingLeaves} pending
-              </span>
-            )}
-          </div>
-
-          <div className="overflow-y-auto max-h-[400px] lg:max-h-[450px] flex-1">
-            {leaveLoading ? (
-              <div className="text-center py-10 px-5 text-[#c49ab2]">
-                <div className="text-3xl mb-2.5">⏳</div>
-                <p className="text-sm">Loading…</p>
-              </div>
-            ) : leaves.length === 0 ? (
-              <div className="text-center py-10 px-5 text-[#c49ab2]">
-                <div className="text-3xl mb-2.5 text-[#0d9e6e]"><FaCheckCircle /></div>
-                <p className="text-sm">No leave requests.<br />All employees are accounted for.</p>
-              </div>
-            ) : (
-              leaves.map((leave) => {
-                const name =
-                  leave.employeeName ||
-                  leave.name ||
-                  (leave.employee
-                    ? [leave.employee.f_name, leave.employee.l_name].filter(Boolean).join(" ")
-                    : "") ||
-                  leave.user?.name ||
-                  "Employee";
-
-                const type   = leave.leaveType || leave.type || "Leave";
-                const from   = leave.from      || leave.startDate || leave.fromDate || "";
-                const to     = leave.to        || leave.endDate   || leave.toDate   || "";
-                const status = (leave.status || "pending").toLowerCase();
-                const isPending = status === "pending";
-
-                const fmtShort = (d) => {
-                  if (!d) return "";
-                  try { return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }); }
-                  catch { return d; }
-                };
-
-                return (
-                  <div key={leave._id || leave.id} className="p-4 border-b border-[#eedde8] flex items-start gap-3 transition-colors hover:bg-[#fdf5f9] last:border-b-0">
-                    <div 
-                      className="w-9 h-9 rounded-full flex items-center justify-center text-[13px] font-bold text-white shrink-0 bg-[#730042]"
-                      style={{ background: leaveTypeColor(type) }}
-                    >
-                      {initials(name)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold text-[#1a0010] truncate">{name}</div>
-                      <div className="text-[11px] text-[#8a6070] mt-0.5">
-                        {type} · {fmtShort(from)}{to && to !== from ? ` → ${fmtShort(to)}` : ""}
-                      </div>
-                      {leave.reason && (
-                        <div className="text-[11px] text-[#8a6070] mt-0.5 italic truncate">
-                          "{leave.reason}"
-                        </div>
-                      )}
-                      {isPending ? (
-                        <div className="flex gap-1.5 mt-2">
-                          <button
-                            className="bg-[#e8f7f1] text-[#0d9e6e] border border-[#b8e8d4] rounded-md px-2.5 py-1 text-[11px] font-semibold cursor-pointer flex items-center gap-1 hover:bg-[#0d9e6e] hover:text-white transition-all disabled:opacity-50"
-                            onClick={() => acceptLeave(leave._id || leave.id)}
-                            disabled={accepting}
-                          >
-                            <FaCheck /> Approve
-                          </button>
-                          <button
-                            className="bg-[#fbeaea] text-[#d93025] border border-[#f0c5c5] rounded-md px-2.5 py-1 text-[11px] font-semibold cursor-pointer flex items-center gap-1 hover:bg-[#d93025] hover:text-white transition-all disabled:opacity-50"
-                            onClick={() => rejectLeave(leave._id || leave.id)}
-                            disabled={rejecting}
-                          >
-                            <FaBan /> Reject
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="mt-1.5">
-                          <span 
-                            className="inline-flex items-center text-[10px] font-semibold tracking-wide px-2 py-0.5 rounded-full capitalize"
-                            style={{
-                              background: status === 'approved' ? '#e8f7f1' : status === 'rejected' ? '#fbeaea' : '#fff8e1',
-                              color: status === 'approved' ? '#0d9e6e' : status === 'rejected' ? '#d93025' : '#b8760a'
-                            }}
-                          >
-                            {status}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Lower Grid: Leave Balance & Reviews */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
-        <LeaveBalancePanel leaveBalance={leaveBalance} loading={adminLoading} />
-        <ReviewsPanel reviews={reviews} loading={adminLoading} />
-      </div>
-
-      {/* Announcements Panel */}
-      <div className="bg-white rounded-2xl border border-[#eedde8] shadow-sm overflow-hidden mb-6 sm:mb-8">
-        <div className="p-4 sm:p-5 border-b border-[#eedde8] flex items-center justify-between">
-          <div className="flex items-center gap-2 font-['Cormorant_Garamond',serif] text-lg font-bold text-[#1a0010]">
-            <FaBullhorn className="text-[#730042] text-sm" />
-            Announcements
-          </div>
-          <button 
-            className="bg-[#730042] text-white border-none px-3 sm:px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1.5 hover:bg-[#4a0029] transition-all"
-            onClick={() => setAnnModal({ open: true, editing: null })}
-          >
-            <FaPlus className="text-[10px]" /> New
-          </button>
-        </div>
-        {annLoading ? (
-          <div className="text-center py-10 px-5 text-[#c49ab2]">
-            <div className="text-3xl mb-2.5">⏳</div>
-            <p className="text-sm">Loading…</p>
-          </div>
-        ) : announcements.length === 0 ? (
-          <div className="text-center py-10 px-5 text-[#c49ab2]">
-            <div className="text-3xl mb-2.5">📢</div>
-            <p className="text-sm">No announcements yet.<br />Publish one to notify your team.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 sm:p-5">
-            {announcements.map((ann) => {
-              const typeKey = (ann.type || "general").toLowerCase();
-              const chipStyles = {
-                general: "bg-[#f7edf3] text-[#730042]",
-                urgent: "bg-[#fbeaea] text-[#d93025]",
-                event: "bg-[#e8f7f1] text-[#0d9e6e]",
-                policy: "bg-[#fff8e1] text-[#b8760a]"
-              };
-              return (
-                <div key={ann._id} className="rounded-lg border border-[#eedde8] p-4 transition-all hover:shadow-sm hover:-translate-y-0.5 flex flex-col">
-                  <span 
-                    className="inline-block text-[10px] font-bold tracking-wide uppercase px-2.5 py-1 rounded-full mb-2 w-fit"
-                    style={{ 
-                      background: typeKey === 'urgent' ? '#fbeaea' : typeKey === 'event' ? '#e8f7f1' : typeKey === 'policy' ? '#fff8e1' : '#f7edf3', 
-                      color: typeKey === 'urgent' ? '#d93025' : typeKey === 'event' ? '#0d9e6e' : typeKey === 'policy' ? '#b8760a' : '#730042' 
-                    }}
-                  >
-                    {typeKey.charAt(0).toUpperCase() + typeKey.slice(1)}
-                  </span>
-                  <div className="text-sm font-semibold text-[#1a0010] mb-1.5 leading-tight">{ann.title}</div>
-                  <div className="text-xs text-[#8a6070] leading-relaxed line-clamp-2 flex-1">{ann.message}</div>
-                  <div className="flex gap-1.5 mt-2.5 pt-2.5 border-t border-[#eedde8]">
-                    <button 
-                      className="bg-none border-none cursor-pointer px-1.5 py-1 rounded text-xs text-[#c49ab2] hover:bg-[#f7edf3] hover:text-[#730042] flex items-center gap-1"
-                      onClick={() => setAnnModal({ open: true, editing: ann })}
-                    >
-                      <FaEdit /> Edit
-                    </button>
-                    <button 
-                      className="bg-none border-none cursor-pointer px-1.5 py-1 rounded text-xs text-[#c49ab2] hover:bg-[#fbeaea] hover:text-[#d93025] flex items-center gap-1"
-                      onClick={() => removeAnn(ann._id)}
-                    >
-                      <FaTrash /> Delete
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Employee Overview Panel */}
-      <div className="bg-white rounded-2xl border border-[#eedde8] shadow-sm overflow-hidden mb-6 sm:mb-8">
-        <div className="p-4 sm:p-5 border-b border-[#eedde8] flex items-center justify-between">
-          <div className="flex items-center gap-2 font-['Cormorant_Garamond',serif] text-lg font-bold text-[#1a0010]">
-            <FaUsers className="text-[#730042] text-sm" />
-            Employee Overview
-          </div>
-          {employees.length > 8 && (
-            <button
-              className="bg-none text-[#8a6070] border border-[#eedde8] px-3 sm:px-4 py-2 rounded-lg text-xs font-medium cursor-pointer hover:border-[#730042] hover:text-[#730042] transition-all flex items-center"
-              onClick={() => setEmpExpand((v) => !v)}
-            >
-              {empExpand ? "Show Less" : `View All (${employees.length})`}
-              <FaChevronRight className="text-[10px] ml-1 transition-transform" style={{ transform: empExpand ? "rotate(90deg)" : "none" }} />
-            </button>
-          )}
-        </div>
-
-        {empLoading ? (
-          <div className="text-center py-10 px-5 text-[#c49ab2]">
-            <div className="text-3xl mb-2.5">⏳</div>
-            <p className="text-sm">Loading employees…</p>
-          </div>
-        ) : employees.length === 0 ? (
-          <div className="text-center py-10 px-5 text-[#c49ab2]">
-            <div className="text-3xl mb-2.5"><FaUsers /></div>
-            <p className="text-sm">No employees found.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 p-4 sm:p-5">
-            {displayEmployees.map((emp, i) => {
-              const name  = [emp.f_name, emp.l_name].filter(Boolean).join(" ") || "Employee";
-              const role  = emp.designation || emp.role || "";
-              const dept  = emp.department  || "";
-              const email = emp.work_email  || "";
-              return (
-                <div key={emp._id || emp.id || i} className="border border-[#eedde8] rounded-lg p-4 flex items-center gap-3 transition-all hover:shadow-sm hover:bg-[#f7edf3]">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 bg-gradient-to-br from-[#4a0029] to-[#a0005c]">
-                    {initials(name)}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-[#1a0010] leading-tight truncate">{name}</div>
-                    {role  && <div className="text-[11px] text-[#8a6070] mt-0.5 truncate">{role}</div>}
-                    {dept  && <span className="inline-block text-[10px] font-semibold bg-[#f7edf3] text-[#730042] px-1.5 py-0.5 rounded-full mt-1">{dept}</span>}
-                    {email && (
-                      <div className="text-[10px] text-[#c49ab2] mt-1 truncate flex items-center gap-1">
-                        <FaEnvelope /> {email}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <AnnModal
-        open={annModal.open}
-        onClose={() => setAnnModal({ open: false, editing: null })}
-        initial={
-          annModal.editing
-            ? { title: annModal.editing.title, message: annModal.editing.message, type: annModal.editing.type || "general" }
-            : null
-        }
-        onSave={saveAnn}
-        loading={creating || updating}
-      />
     </div>
   );
 }
 
-export default React.memo(Dashboard);
+export default function Dashboard() {
+  const [selectedMonth, setSelectedMonth]=useState(new Date().getMonth());
+  const [empExpand, setEmpExpand]=useState(false);
+
+  const { data:meData, isLoading:meLoading, isError:meError }=useGetMeAdmin();
+  const { data:histData, isLoading:histLoading }=useAdminGetMyLeaveHistory();
+  const { data:attData, isLoading:attLoading }=useTodayAttendance();
+  const { data:wfhData, isLoading:wfhLoading }=useAdminGetMyWFH();
+  const { data:empData, isLoading:empLoading }=useGetAllEmployee();
+  const { data:checkinData, isLoading:mapLoading }=useGetTodayCheckins();
+  const { data:leaveReqData, isLoading:leaveReqLoading }=useGetForwardedLeaves();
+
+  const { mutate:acceptLeave, isPending:accepting }=useAcceptLeave();
+  const { mutate:rejectLeave, isPending:rejecting }=useRejectLeave();
+  const { mutate:doCheckin, isPending:checkingIn }=useCheckin();
+  const { mutate:doCheckout, isPending:checkingOut }=useCheckout();
+
+  const employee=meData?.user??null;
+  const lb=meData?.leaveBalance??null;
+  const allLeaves=histData?.leave??histData?.leaves??[];
+  const reviews=meData?.reviews??[];
+
+  const joiningDate=employee?.createdAt??null;
+
+  const employees = Array.isArray(empData?.employees) ? empData.employees : Array.isArray(empData) ? empData : [];
+  const checkins = checkinData?.checkins ?? [];
+  const leaveRequests = Array.isArray(leaveReqData?.leaves) ? leaveReqData.leaves : Array.isArray(leaveReqData) ? leaveReqData : [];
+
+  const myAtt = attData?.attendance ?? null;
+  const isCheckedIn = attData?.isCheckedIn ?? false;
+  const isCheckedOut = attData?.isCheckedOut ?? false;
+
+  const handleCheckin = () => {
+    if (!navigator.geolocation) { doCheckin({ latitude:null, longitude:null }); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => doCheckin({ latitude:pos.coords.latitude, longitude:pos.coords.longitude }),
+      () => doCheckin({ latitude:null, longitude:null })
+    );
+  };
+  const handleCheckout = () => doCheckout();
+
+  const attendanceMap=useMemo(()=>{
+    const records=Array.isArray(attData?.history)?attData.history:Array.isArray(attData)?attData:[];
+    const IST_OFFSET_MS=5.5*60*60*1000;
+    const map=new Map();
+    records.forEach(rec=>{
+      if (!rec.date) return;
+      const istKey=new Date(new Date(rec.date).getTime()+IST_OFFSET_MS).toISOString().slice(0,10);
+      map.set(istKey,rec);
+    });
+    if (myAtt?.date) {
+      const istKey=new Date(new Date(myAtt.date).getTime()+IST_OFFSET_MS).toISOString().slice(0,10);
+      map.set(istKey, myAtt);
+    }
+    return map;
+  },[attData, myAtt]);
+
+  const approvedLeaves=useMemo(()=>allLeaves.filter(lv=>APPROVED_STATUSES.includes(lv.status)),[allLeaves]);
+
+  const wfhList = Array.isArray(wfhData?.wfh) ? wfhData.wfh : Array.isArray(wfhData?.requests) ? wfhData.requests : Array.isArray(wfhData) ? wfhData : [];
+  const approvedWFH = useMemo(()=>wfhList.filter(w=>APPROVED_WFH_STATUSES.includes((w.status||"").toLowerCase())),[wfhList]);
+
+  const todayLeave=useMemo(()=>{
+    const today=new Date();
+    return approvedLeaves.find(lv=>isDateInRange(today,lv.startDate,lv.endDate))??null;
+  },[approvedLeaves]);
+
+  const isOnLeaveToday=Boolean(todayLeave);
+  const empInitials=employee?getInitials(employee.f_name,employee.l_name):"—";
+  const fullName=employee?`${employee.f_name} ${employee.l_name}`:"—";
+
+  const joiningMidnight=useMemo(()=>{
+    if (!joiningDate) return null;
+    const d=new Date(joiningDate); d.setHours(0,0,0,0); return d;
+  },[joiningDate]);
+
+  const { presentCount, absentCount, halfCount, checkedInCount, attendanceRate }=useMemo(()=>{
+    const year=new Date().getFullYear();
+    const today=new Date(); today.setHours(0,0,0,0);
+    let present=0,absent=0,half=0,checkedIn=0,counted=0;
+    const daysInMonth=new Date(year,selectedMonth+1,0).getDate();
+    for (let d=1; d<=daysInMonth; d++) {
+      const date=new Date(year,selectedMonth,d); date.setHours(0,0,0,0);
+      if (date>today) break;
+      if (joiningMidnight && date<joiningMidnight) continue;
+      if (approvedLeaves.some(lv=>isDateInRange(date,lv.startDate,lv.endDate))) continue;
+      counted++;
+      const key=date.toISOString().slice(0,10);
+      const rec=attendanceMap.get(key);
+      const status=resolveAttendanceStatus(rec);
+      if (status==="present") present++;
+      else if (status==="absent"||!status) absent++;
+      else if (status==="halfday"||status==="late") half++;
+      else if (status==="checkedin") checkedIn++;
+    }
+    const rate=counted>0?Math.round(((present+checkedIn)/counted)*100):0;
+    return { presentCount:present, absentCount:absent, halfCount:half, checkedInCount:checkedIn, attendanceRate:rate };
+  },[attendanceMap,selectedMonth,approvedLeaves,joiningMidnight]);
+
+  const elRemaining=(lb?.EL?.entitled??0)-(lb?.EL?.availed??0);
+  const slRemaining=(lb?.SL?.entitled??0)-(lb?.SL?.availed??0);
+  const plEntitled=lb?.PL??0;
+
+  const totalEmployees = empData?.count || employees.length || 0;
+  const presentTodayCount = checkinData?.total ?? checkins.length;
+
+  if (meError) return (
+    <div className="font-sans bg-[#f9f8f2] min-h-screen flex items-center justify-center p-6">
+      <div className="bg-white rounded-2xl border border-[#ede5e0] p-8 text-center max-w-xs">
+        <div className="text-4xl mb-3">⚠️</div>
+        <div className="text-[14px] font-semibold mb-1.5" style={{ fontFamily:"'Lora',serif" }}>Failed to load dashboard</div>
+        <div className="text-[12px] text-[#b0948a]">Check your connection or log in again.</div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="bg-[#f9f8f2] min-h-screen text-[#2a1a16]" style={{ fontFamily:"'DM Sans','Segoe UI',sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+        @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes pulse-ring { 0%{box-shadow:0 0 0 0 rgba(115,0,66,0.35)} 70%{box-shadow:0 0 0 8px rgba(115,0,66,0)} 100%{box-shadow:0 0 0 0 rgba(115,0,66,0)} }
+        @keyframes mPulse { 0%,100% { transform: translate(-50%,-50%) scale(1); opacity: .5; } 50% { transform: translate(-50%,-50%) scale(2.2); opacity: 0; } }
+        @keyframes livePulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.4)} }
+        .animate-fadein { animation: fadeUp .35s ease both; }
+        .pulse-ring { animation: pulse-ring 2s infinite; }
+        .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #0d9e6e; animation: livePulse 2s infinite; }
+        .leaflet-container { font-family: 'DM Sans', sans-serif; }
+        .leaflet-popup-content-wrapper { border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,.1); }
+        .leaflet-popup-content { margin: 12px 16px; }
+      `}</style>
+
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7">
+
+        <div className="flex justify-between items-center mb-5">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold m-0 tracking-tight" style={{ fontFamily:"'Lora',serif" }}>Dashboard</h1>
+            <p className="text-[12px] text-[#b0948a] mt-0.5 font-sans">
+              {employee?`Welcome back, ${employee.f_name} · ${employee.uid}`:"Welcome back"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 sm:gap-3">
+            {employee?.office_location && (
+              <div className="hidden sm:block text-[11px] text-[#b0948a] bg-white border border-[#ede5e0] rounded-full px-3 py-1 font-sans">
+                📍 {employee.office_location}
+              </div>
+            )}
+            <div className="relative">
+              <Avatar
+                src={employee?.profile_image}
+                initials={meLoading?"—":empInitials}
+                size={38}
+                style={{ boxShadow:"0 2px 8px rgba(115,0,66,0.25)", borderRadius:10 }}
+                className={isOnLeaveToday?"pulse-ring":""}
+              />
+              {isOnLeaveToday && (
+                <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-indigo-700 border-2 border-[#f9f8f2] flex items-center justify-center">
+                  <span className="text-[7px]">🏖</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <TodayBanner
+          isOnLeave={isOnLeaveToday}
+          leaveType={todayLeave?.leaveType}
+          isCheckedIn={isCheckedIn}
+          isCheckedOut={isCheckedOut}
+          myAtt={myAtt}
+          onCheckIn={handleCheckin}
+          onCheckOut={handleCheckout}
+          checkingIn={checkingIn}
+          checkingOut={checkingOut}
+        />
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 mb-3.5">
+          <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative animate-fadein hover:shadow-lg transition-shadow lg:col-span-2">
+            <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between border-b border-[#ede5e0] flex-wrap gap-2">
+              <div className="flex items-center gap-2 font-sans text-[12px] font-semibold">
+                <div className="live-dot"></div>
+                Live Attendance Map
+              </div>
+              <span className="text-[10px] text-[#b0948a] font-sans flex items-center gap-1">
+                📍 {mapLoading?"Loading…":`${checkins.length} check-in${checkins.length!==1?"s":""} today`}
+              </span>
+            </div>
+            <div className="h-[260px] sm:h-[320px] lg:h-[360px] w-full">
+              <AttendanceMap checkins={checkins} loading={mapLoading} />
+            </div>
+            <div className="px-4 py-2.5 border-t border-[#f0e8e4] flex flex-wrap gap-3 items-center bg-[#fdfcfb]">
+              {[["#4a0029","Admin"],["#730042","Manager"],["#a0005c","Employee"]].map(([c,l])=>(
+                <div key={l} className="flex items-center gap-1.5 text-[10px] text-[#b0948a] font-sans">
+                  <div className="w-2 h-2 rounded-full" style={{ background:c }} />{l}
+                </div>
+              ))}
+              <span className="ml-auto text-[10px] text-[#cfc3bc] font-sans hidden sm:inline">
+                🏢 {totalEmployees} employees · {presentTodayCount} present
+              </span>
+            </div>
+          </div>
+
+          <LeaveRequestsPanel
+            leaves={leaveRequests}
+            loading={leaveReqLoading}
+            onAccept={(id)=>acceptLeave(id)}
+            onReject={(id)=>rejectLeave(id)}
+            accepting={accepting}
+            rejecting={rejecting}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 mb-3.5">
+
+          <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative animate-fadein hover:shadow-lg transition-shadow">
+            <CardAccent color="#730042" />
+            <div className="p-4 pt-5">
+              <div className="text-[11px] text-[#b0948a] font-medium tracking-wide mb-3 uppercase font-sans">Admin</div>
+              {meLoading ? (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <Skeleton className="w-11 h-11 rounded-xl" />
+                    <div className="flex-1 flex flex-col gap-1.5"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-1/2" /></div>
+                  </div>
+                  <Skeleton className="h-5 w-3/5" />
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <Avatar src={employee?.profile_image} initials={empInitials} size={44}
+                      style={{ borderRadius:12, boxShadow:"0 3px 10px rgba(115,0,66,0.22)" }} />
+                    <div>
+                      <div className="text-[14px] font-semibold leading-snug" style={{ fontFamily:"'Lora',serif" }}>{fullName}</div>
+                      <div className="text-[11px] text-[#b0948a] capitalize mt-0.5 font-sans">{employee?.designation??"—"}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <Badge variant="brand">{employee?.uid??"—"}</Badge>
+                    <Badge variant="green">Active</Badge>
+                    <Badge variant="blue">{employee?.department??"—"}</Badge>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-[#ede5e0] flex flex-col gap-1">
+                    <div className="text-[10px] text-[#b0948a] font-sans">📧 {employee?.work_email??"—"}</div>
+                    <div className="text-[10px] text-[#b0948a] font-sans">📞 {employee?.personal_contact??"—"}</div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          <DOJCard joiningDate={joiningDate} />
+
+          <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative animate-fadein hover:shadow-lg transition-shadow" style={{ animationDelay:".1s" }}>
+            <CardAccent color="#1D9E75" />
+            <div className="p-4 pt-5">
+              <div className="text-[11px] text-[#b0948a] font-medium tracking-wide mb-3 uppercase font-sans">Leave overview</div>
+              {meLoading ? (
+                <div className="flex flex-col gap-2"><Skeleton className="h-8 w-1/2" /><Skeleton className="h-3.5 w-4/5" /><Skeleton className="h-3.5 w-3/5" /></div>
+              ) : (
+                <>
+                  <div className="flex items-baseline gap-1.5 mb-1">
+                    <span className="text-3xl font-bold text-[#1D9E75] leading-none" style={{ fontFamily:"'Lora',serif" }}>{elRemaining}</span>
+                    <span className="text-[12px] text-[#b0948a] font-sans">EL remaining</span>
+                  </div>
+                  <div className="text-[11px] text-[#b0948a] mb-3 font-sans">
+                    Accrued this month: <strong className="text-[#2a1a16]">{lb?.EL?.accrued??0}</strong> days
+                  </div>
+                  {isOnLeaveToday && (
+                    <div className="bg-indigo-50 rounded-xl px-2.5 py-1.5 text-[11px] text-indigo-700 font-semibold mb-3 font-sans">
+                      🏖️ Currently on leave
+                    </div>
+                  )}
+                  <SegBar segments={[
+                    { pct:elRemaining, color:"#1D9E75", label:`EL (${elRemaining} left)` },
+                    { pct:slRemaining, color:"#378ADD", label:`SL (${slRemaining} left)` },
+                    { pct:plEntitled, color:"#BA7517", label:`PL (${plEntitled})` },
+                  ]} />
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-2xl overflow-hidden relative animate-fadein bg-[#730042] border border-[#5a0033] hover:shadow-lg transition-shadow" style={{ animationDelay:".15s" }}>
+            <div className="absolute -top-5 -right-5 w-20 h-20 rounded-full bg-white/[.06]" />
+            <div className="absolute -bottom-2.5 -left-2.5 w-16 h-16 rounded-full bg-white/[.04]" />
+            <div className="p-4 pt-5 relative">
+              <div className="text-[11px] text-white/60 font-medium tracking-wide mb-3 uppercase font-sans">Organisation</div>
+              {empLoading||mapLoading ? (
+                <div className="flex flex-col gap-2"><Skeleton className="h-5 w-3/5" /><Skeleton className="h-3.5 w-4/5" /></div>
+              ) : (
+                <>
+                  <div className="flex items-baseline gap-1.5 mb-3">
+                    <span className="text-3xl font-bold text-[#f9f8f2] leading-none" style={{ fontFamily:"'Lora',serif" }}>{totalEmployees}</span>
+                    <span className="text-[12px] text-white/60 font-sans">total people</span>
+                  </div>
+                  <div className="h-px bg-white/15 mb-3" />
+                  <div className="flex justify-between text-[11px] font-sans mb-2">
+                    <span className="text-white/50">Present today</span>
+                    <span className="font-medium text-white/80">{presentTodayCount}</span>
+                  </div>
+                  <div className="flex justify-between text-[11px] font-sans mb-2">
+                    <span className="text-white/50">Pending leaves</span>
+                    <span className="font-medium text-white/80">{leaveRequests.filter(l=>(l.status||"").toLowerCase().includes("pending")).length}</span>
+                  </div>
+                  <div className="flex justify-between text-[11px] font-sans">
+                    <span className="text-white/50">Attendance rate</span>
+                    <span className="font-medium text-white/80">{totalEmployees>0?Math.round((presentTodayCount/totalEmployees)*100):0}%</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-3.5">
+          <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative animate-fadein hover:shadow-lg transition-shadow" style={{ animationDelay:".2s" }}>
+            <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between border-b border-[#ede5e0] flex-wrap gap-2">
+              <span className="text-[12px] font-semibold font-sans">Attendance</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                {(attLoading||wfhLoading) && <span className="text-[10px] text-[#b0948a] font-sans">Loading…</span>}
+                {isOnLeaveToday && <Badge variant="blue">On Leave Today</Badge>}
+                <select value={selectedMonth} onChange={e=>setSelectedMonth(Number(e.target.value))}
+                  className="font-sans text-[11px] text-[#b0948a] bg-[#f9f8f2] border border-[#ede5e0] rounded-lg px-2 py-1 cursor-pointer outline-none focus:border-[#730042]">
+                  {MONTHS.map((m,i) => <option key={i} value={i}>{m}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="px-3 sm:px-4 pt-3">
+              {joiningDate && (
+                <div className="flex items-center gap-1.5 mb-2">
+                  <div className="w-1.5 h-1.5 rounded-sm bg-[#cfc6c1]" />
+                  <span className="text-[10px] text-[#b0948a] font-sans">Joined {fmtDate(joiningDate)} · days before this are not counted</span>
+                </div>
+              )}
+              <div className="max-w-2xl mx-auto">
+                <Calendar month={selectedMonth} joiningDate={joiningDate} attendanceMap={attendanceMap} approvedLeaves={approvedLeaves} approvedWFH={approvedWFH} />
+              </div>
+            </div>
+            <div className="grid grid-cols-5 border-t border-[#f0e8e4] mt-3">
+              {[[presentCount,"#730042","Present"],[absentCount,"#E24B4A","Absent"],[halfCount,"#BA7517","Half/Late"],[checkedInCount,"#1D9E75","Active Now"],[`${attendanceRate}%`,"#378ADD","Rate"]].map(([v,c,l]) => (
+                <div key={l} className="py-2.5 text-center border-r border-[#f0e8e4] last:border-0">
+                  <div className="text-[15px] font-bold leading-none" style={{ color:c, fontFamily:"'Lora',serif" }}>{v}</div>
+                  <div className="text-[10px] text-[#b0948a] mt-1 font-sans">{l}</div>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2 px-4 py-3 border-t border-[#f0e8e4]">
+              {[["#730042","Present"],["#E24B4A","Absent"],["#f57f17","Half day"],["#e65100","Late"],["#1D9E75","Checked in"],["#283593","On leave"],["#0f766e","WFH"]].map(([c,l]) => (
+                <div key={l} className="flex items-center gap-1 text-[10px] text-[#b0948a] font-sans">
+                  <div className="w-2 h-2 rounded-sm" style={{ background:c }} />{l}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5 mb-3.5">
+
+          <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative animate-fadein hover:shadow-lg transition-shadow" style={{ animationDelay:".3s" }}>
+            <CardAccent color="#730042" />
+            <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between border-b border-[#ede5e0]">
+              <span className="text-[12px] font-semibold font-sans">Admin profile</span>
+              <Badge variant="brand">{employee?.role??"admin"}</Badge>
+            </div>
+            <div className="px-4 sm:px-5 py-3.5 flex items-center gap-3.5 border-b border-[#ede5e0]">
+              <Avatar src={employee?.profile_image} initials={meLoading?"—":empInitials}
+                size={52} style={{ borderRadius:14, boxShadow:"0 4px 14px rgba(115,0,66,0.22)" }} />
+              <div>
+                <div className="text-[16px] font-bold" style={{ fontFamily:"'Lora',serif" }}>
+                  {meLoading?<Skeleton className="h-5 w-32" />:fullName}
+                </div>
+                <div className="text-[12px] text-[#b0948a] capitalize mt-0.5 font-sans">
+                  {meLoading?<Skeleton className="h-3.5 w-24" />:(employee?.designation??"—")}
+                </div>
+                <div className="mt-1.5 flex gap-1.5 flex-wrap">
+                  <Badge variant="green">Active</Badge>
+                  <Badge variant="blue">{employee?.uid??"—"}</Badge>
+                  {reviews.length>0 && <StarRating rating={reviews.reduce((s,r)=>s+r.rating,0)/reviews.length} size={12} />}
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 px-4 sm:px-5 py-3.5">
+              <InfoField label="Work email" value={employee?.work_email} loading={meLoading} />
+              <InfoField label="Department" value={employee?.department} loading={meLoading} />
+              <InfoField label="Office" value={employee?.office_location} loading={meLoading} />
+              <InfoField label="Gender" value={employee?.gender} loading={meLoading} />
+              <InfoField label="Marital status" value={employee?.marital_status} loading={meLoading} />
+              <InfoField label="Contact" value={employee?.personal_contact} loading={meLoading} />
+              <InfoField label="Emergency contact" value={employee?.e_contact} loading={meLoading} />
+              <InfoField label="Member since" value={employee?.createdAt?fmtDate(employee.createdAt):null} loading={meLoading} />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative animate-fadein hover:shadow-lg transition-shadow" style={{ animationDelay:".35s" }}>
+            <CardAccent color="#1D9E75" />
+            <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between border-b border-[#ede5e0]">
+              <span className="text-[12px] font-semibold font-sans">Leave balance</span>
+              <span className="text-[10px] text-[#b0948a] font-sans">FY 2025–26</span>
+            </div>
+            <div className="px-4 sm:px-5 pb-1">
+              {meLoading
+                ? [1,2,3,4,5,6].map(i => <div key={i} className="py-3 border-b border-[#ede5e0]"><Skeleton className="h-10" /></div>)
+                : (
+                  <>
+                    <LeaveRow label="Earned Leave (EL)" availed={lb?.EL?.availed??0} entitled={lb?.EL?.entitled??0} accrued={lb?.EL?.accrued??null} color="#0d9e6e" />
+                    <LeaveRow label="Sick Leave (SL)" availed={lb?.SL?.availed??0} entitled={lb?.SL?.entitled??0} accrued={null} color="#378ADD" />
+                    <FlatRow label="Paternity Leave (PL)" value={lb?.PL??0} color="#730042" />
+                    <FlatRow label="Maternity Leave (ML)" value={lb?.ML??0} color="#9333EA" />
+                    <FlatRow label="Paid by Company (PBC)" value={lb?.pbc??0} color="#BA7517" />
+                    <FlatRow label="Leave Without Pay (LWP)" value={lb?.lwp??0} color="#E24B4A" />
+                  </>
+                )
+              }
+            </div>
+            {!meLoading && lb?.lastAccrualDate && (
+              <div className="mx-4 sm:mx-5 mb-4">
+                <div className="bg-[#f9f8f2] border border-[#ede5e0] rounded-xl px-2.5 py-1.5 text-[11px] font-sans inline-block">
+                  <span className="text-[#b0948a]">Last accrual </span>
+                  <strong className="text-[#2a1a16]">{new Date(lb.lastAccrualDate).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</strong>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative animate-fadein md:col-span-2 xl:col-span-1 hover:shadow-lg transition-shadow" style={{ animationDelay:".4s" }}>
+            <CardAccent color="#e8b84b" />
+            <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between border-b border-[#ede5e0]">
+              <span className="text-[12px] font-semibold font-sans">My Reviews</span>
+              {reviews.length>0 && <Badge variant="amber">{reviews.length} total</Badge>}
+            </div>
+            <ReviewCard reviews={reviews} loading={meLoading} />
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative animate-fadein hover:shadow-lg transition-shadow mb-3.5" style={{ animationDelay:".45s" }}>
+          <CardAccent color="#378ADD" />
+          <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between border-b border-[#ede5e0] flex-wrap gap-2">
+            <div>
+              <span className="text-[12px] font-semibold font-sans">Leave History</span>
+              {!histLoading && (
+                <span className="ml-2 text-[11px] text-[#b0948a] font-sans">({allLeaves.length} total)</span>
+              )}
+            </div>
+            <div className="flex gap-1.5 flex-wrap">
+              <Badge variant="green">{approvedLeaves.length} approved</Badge>
+              <Badge variant="amber">{allLeaves.filter(l=>l.status?.includes("pending")).length} pending</Badge>
+              <Badge variant="red">{allLeaves.filter(l=>l.status?.includes("rejected")).length} rejected</Badge>
+            </div>
+          </div>
+          <LeaveHistoryList leaves={allLeaves} loading={histLoading} />
+        </div>
+
+        <div className="bg-white rounded-2xl border border-[#ede5e0] shadow-sm overflow-hidden">
+          <div className="p-4 sm:p-5 border-b border-[#ede5e0] flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2 font-sans text-[12px] font-semibold">
+              👥 Employee Overview
+            </div>
+            {employees.length > 8 && (
+              <button
+                className="bg-none text-[#b0948a] border border-[#ede5e0] px-3 sm:px-4 py-2 rounded-lg text-[11px] font-medium cursor-pointer hover:border-[#730042] hover:text-[#730042] transition-all font-sans"
+                onClick={() => setEmpExpand((v) => !v)}
+              >
+                {empExpand ? "Show Less" : `View All (${employees.length})`}
+              </button>
+            )}
+          </div>
+
+          {empLoading ? (
+            <div className="text-center py-10 px-5 text-[#cfc3bc]">
+              <div className="text-3xl mb-2.5">⏳</div>
+              <p className="text-[12px] font-sans">Loading employees…</p>
+            </div>
+          ) : employees.length === 0 ? (
+            <div className="text-center py-10 px-5 text-[#cfc3bc]">
+              <div className="text-3xl mb-2.5">👥</div>
+              <p className="text-[12px] font-sans">No employees found.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 p-4 sm:p-5">
+              {(empExpand?employees:employees.slice(0,8)).map((emp, i) => {
+                const name = [emp.f_name, emp.l_name].filter(Boolean).join(" ") || "Employee";
+                const role = emp.designation || emp.role || "";
+                const dept = emp.department || "";
+                const email = emp.work_email || "";
+                return (
+                  <div key={emp._id || emp.id || i} className="border border-[#ede5e0] rounded-xl p-3.5 flex items-center gap-3 transition-all hover:shadow-sm hover:bg-[#fdfcfb]">
+                    <Avatar src={emp.profile_image} initials={getInitials(emp.f_name,emp.l_name)} size={40}
+                      style={{ borderRadius:10, background:"linear-gradient(135deg,#4a0029,#a0005c)" }} />
+                    <div className="min-w-0">
+                      <div className="text-[12px] font-semibold text-[#2a1a16] leading-tight truncate font-sans">{name}</div>
+                      {role && <div className="text-[10px] text-[#b0948a] mt-0.5 truncate font-sans">{role}</div>}
+                      {dept && <span className="inline-block text-[9px] font-semibold bg-[rgba(115,0,66,0.08)] text-[#730042] px-1.5 py-0.5 rounded-full mt-1 font-sans">{dept}</span>}
+                      {email && (
+                        <div className="text-[9px] text-[#cfc3bc] mt-1 truncate font-sans">✉ {email}</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
+}
