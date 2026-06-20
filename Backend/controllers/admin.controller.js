@@ -2822,6 +2822,105 @@ const adminGetTicketDetail = async (req, res, next) => {
   }
 };
 
+
+
+const setEmployeeWorkingStatus = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const { id } = req.params;
+    const { working_status } = req.body;
+    const organisation_id = req.admin.organisation_id;
+
+    if (!working_status)
+      return next(Object.assign(new Error("working_status is required"), { statusCode: 400 }));
+
+    const allowedStatuses = ["working", "resigned", "fired", "terminated"];
+    if (!allowedStatuses.includes(working_status))
+      return next(
+        Object.assign(
+          new Error(`Invalid working_status. Must be one of: ${allowedStatuses.join(", ")}`),
+          { statusCode: 400 }
+        )
+      );
+
+    const user = await Usermodel.findOneAndUpdate(
+      { _id: id, organisation_id },
+      {
+        $set: {
+          working_status,
+          ...(working_status !== "working" && { status: "inactive" }),
+          ...(working_status === "working" && { status: "active" }),
+        },
+      },
+      { new: true, runValidators: true }
+    )
+      .select("_id uid f_name l_name work_email role department designation working_status status")
+      .lean();
+
+    if (!user)
+      return next(Object.assign(new Error("Employee not found"), { statusCode: 404 }));
+
+    return res.status(200).json({
+      success: true,
+      message: `Employee working status updated to '${working_status}' successfully`,
+      employee: user,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+const setManagerWorkingStatus = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const { id } = req.params;
+    const { working_status } = req.body;
+    const organisation_id = req.admin.organisation_id;
+
+    if (!working_status)
+      return next(Object.assign(new Error("working_status is required"), { statusCode: 400 }));
+
+    const allowedStatuses = ["working", "resigned", "fired", "terminated"];
+    if (!allowedStatuses.includes(working_status))
+      return next(
+        Object.assign(
+          new Error(`Invalid working_status. Must be one of: ${allowedStatuses.join(", ")}`),
+          { statusCode: 400 }
+        )
+      );
+
+    const manager = await Managermodel.findOneAndUpdate(
+      { _id: id, organisation_id },
+      {
+        $set: {
+          working_status,
+          ...(working_status !== "working" && { status: "inactive" }),
+          ...(working_status === "working" && { status: "active" }),
+        },
+      },
+      { new: true, runValidators: true }
+    )
+      .select("_id uid f_name l_name work_email role department designation working_status status")
+      .lean();
+
+    if (!manager)
+      return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
+
+    return res.status(200).json({
+      success: true,
+      message: `Manager working status updated to '${working_status}' successfully`,
+      manager,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   verifyAdmin,
   adminlogin,
@@ -2869,5 +2968,7 @@ module.exports = {
   adminGetMyTickets,
   adminRateTicket,
   adminGetTicketDetail,
-  findallmanagerswoadmin
+  findallmanagerswoadmin,
+  setEmployeeWorkingStatus,
+  setManagerWorkingStatus,
 };

@@ -54,7 +54,9 @@ const {
   adminGetMyTickets,
   adminRateTicket,
   adminGetTicketDetail,
-  findallmanagerswoadmin
+  findallmanagerswoadmin,
+  setEmployeeWorkingStatus,
+  setManagerWorkingStatus,
 } = require("../controllers/admin.controller");
 
 const {
@@ -306,5 +308,18 @@ adminrouter.get(
   adminauthmiddleware,
   asyncHandler(findallmanagerswoadmin)
 );
+
+adminrouter.put(
+  "/employee/:id/working-status",
+  adminauthmiddleware,
+  asyncHandler(setEmployeeWorkingStatus)
+);
+
+adminrouter.put(
+  "/manager/:id/working-status",
+  adminauthmiddleware,
+  asyncHandler(setManagerWorkingStatus)
+);
+
 
 module.exports = adminrouter;
