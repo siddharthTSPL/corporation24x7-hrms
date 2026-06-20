@@ -1,37 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  getAllEmployee,
-  getParticularEmployee,
-  deleteUser,
-  getEmployeeStats,
-  reviewToManager,
-  editEmployee,
-  editManager,
-  getparticularEmployeeStats,
-  getParticularManager,
-  getTodayCheckins,
-  getOrgInfo,
-  changeManagerRole,
-  demoteManagerToEmployee,
-  demoteAdminToManager,
-  demoteAdminToEmployee,
-  promoteEmployeeToManager,
-  promoteEmployeeToAdmin,
-  promoteManagerToAdmin,
-  getTodayLeaves,
-  getAllPersonalDocuments,
-  getAllExpenseDocuments,
-  getDocumentDetails,
-  adminActionOnLeave,
-  setEmployeeWorkingStatus,
-  setManagerWorkingStatus,
+  getAllEmployee, getParticularEmployee, deleteUser, getEmployeeStats, reviewToManager,
+  editEmployee, editManager, getparticularEmployeeStats, getParticularManager,
+  getTodayCheckins, getOrgInfo, changeManagerRole, demoteManagerToEmployee,
+  demoteAdminToManager, demoteAdminToEmployee, promoteEmployeeToManager,
+  promoteEmployeeToAdmin, promoteManagerToAdmin, getTodayLeaves,
+  getAllPersonalDocuments, getAllExpenseDocuments, getDocumentDetails,
+  adminActionOnLeave, setEmployeeWorkingStatus, setManagerWorkingStatus,
 } from "../../api/adminapi/other/ad.other.api";
 
 export const useGetAllEmployee = () => {
   return useQuery({
     queryKey: ["employees"],
     queryFn: getAllEmployee,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 };
 
@@ -40,6 +24,8 @@ export const useGetParticularEmployee = (id) => {
     queryKey: ["employee", id],
     queryFn: () => getParticularEmployee(id),
     enabled: !!id,
+    staleTime: 0,
+    refetchOnMount: true,
   });
 };
 
@@ -48,6 +34,8 @@ export const useGetParticularManager = (id) => {
     queryKey: ["manager", id],
     queryFn: () => getParticularManager(id),
     enabled: !!id,
+    staleTime: 0,
+    refetchOnMount: true,
   });
 };
 
@@ -56,6 +44,8 @@ export const useGetParticularManagerStats = (id) => {
     queryKey: ["managerStats", id],
     queryFn: () => getParticularManager(id),
     enabled: !!id,
+    staleTime: 0,
+    refetchOnMount: true,
   });
 };
 
@@ -177,15 +167,16 @@ export const useChangeManagerRole = () => {
 };
 
 export const useReviewToManager = () => {
-  return useMutation({
-    mutationFn: reviewToManager,
-  });
+  return useMutation({ mutationFn: reviewToManager });
 };
 
 export const useGetEmployeeStats = () => {
   return useQuery({
     queryKey: ["employeeStats"],
     queryFn: getEmployeeStats,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 };
 
@@ -194,6 +185,8 @@ export const useGetParticularEmployeeStats = (id) => {
     queryKey: ["employeeStats", id],
     queryFn: () => getparticularEmployeeStats(id),
     enabled: !!id,
+    staleTime: 0,
+    refetchOnMount: true,
   });
 };
 
@@ -211,6 +204,9 @@ export const useGetOrgInfo = () => {
   return useQuery({
     queryKey: ["orgInfo"],
     queryFn: getOrgInfo,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 };
 
@@ -218,6 +214,9 @@ export const useGetTodayLeaves = () => {
   return useQuery({
     queryKey: ["todayLeaves"],
     queryFn: getTodayLeaves,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 };
 
@@ -225,6 +224,9 @@ export const useGetAllPersonalDocuments = () => {
   return useQuery({
     queryKey: ["personalDocuments"],
     queryFn: getAllPersonalDocuments,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 };
 
@@ -232,6 +234,9 @@ export const useGetAllExpenseDocuments = () => {
   return useQuery({
     queryKey: ["expenseDocuments"],
     queryFn: getAllExpenseDocuments,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 };
 
@@ -240,6 +245,8 @@ export const useGetDocumentDetails = (documentId) => {
     queryKey: ["document", documentId],
     queryFn: () => getDocumentDetails(documentId),
     enabled: !!documentId,
+    staleTime: 0,
+    refetchOnMount: true,
   });
 };
 
@@ -252,7 +259,6 @@ export const useAdminActionOnLeave = () => {
     },
   });
 };
-
 
 export const useSetEmployeeWorkingStatus = (id) => {
   const queryClient = useQueryClient();

@@ -1,11 +1,4 @@
-import {
-  adminApplyWFH,
-  adminGetMyWFH,
-  adminGetPendingWFH,
-  adminApproveWFH,
-  adminRejectWFH,
-} from "../../api/adminapi/WFH/adminwfh.api";
-
+import { adminApplyWFH, adminGetMyWFH, adminGetPendingWFH, adminApproveWFH, adminRejectWFH } from "../../api/adminapi/WFH/adminwfh.api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const useAdminApplyWFH = () => {
@@ -22,24 +15,27 @@ export const useAdminGetMyWFH = () =>
   useQuery({
     queryKey: ["adminMyWFH"],
     queryFn: adminGetMyWFH,
+    staleTime: 0,
+    refetchOnMount: true,
     refetchOnWindowFocus: true,
-    staleTime: 30000,
   });
 
 export const useAdminGetPendingWFH = () =>
   useQuery({
     queryKey: ["adminPendingWFH"],
     queryFn: adminGetPendingWFH,
+    staleTime: 0,
+    refetchOnMount: true,
     refetchOnWindowFocus: true,
-    staleTime: 30000,
   });
 
 export const useAdminGetForwardedWFH = () =>
   useQuery({
     queryKey: ["adminPendingWFH"],
     queryFn: adminGetPendingWFH,
+    staleTime: 0,
+    refetchOnMount: true,
     refetchOnWindowFocus: true,
-    staleTime: 30000,
   });
 
 export const useAdminApproveWFH = () => {
