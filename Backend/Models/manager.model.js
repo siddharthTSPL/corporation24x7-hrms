@@ -99,6 +99,11 @@ const managerSchema = new mongoose.Schema(
       enum: ["active", "inactive"],
       default: "active",
     },
+    working_status:{
+      type:String,
+      enum:["working","resigned","fired","terminated"],
+      default:"working"
+    },
 
     isVerified: { type: Boolean, default: false },
     isFirstLogin: { type: Boolean, default: true },
