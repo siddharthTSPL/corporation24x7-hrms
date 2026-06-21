@@ -1,6 +1,6 @@
-const TSJob = require("../Models/tsjob.model");
+const TSJob = require("../Models/Tsjob.model");
 const TSProject = require("../Models/tsproject.model");
-const { assertCanAssign, resolveActor, resolveOrgId, getDirectReportIds, httpError } = require("../utils/hierarchy.utils");
+const { assertCanAssign, resolveActor, resolveOrgId, getDirectReportIds, httpError } = require("../utils/heirarchy.utils");
 
 const createJob = async (req, res, next) => {
   const actor = resolveActor(req);
