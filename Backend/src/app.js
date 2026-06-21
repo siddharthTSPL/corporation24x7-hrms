@@ -5,6 +5,8 @@ const cors = require('cors');
 const compression = require('compression');
 
 require('../automatic/autoelcredit');
+require('../automatic/timerautopause');
+require('../automatic/Timesheetescalation');
 
 const app = express();
 
