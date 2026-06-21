@@ -1,9 +1,9 @@
-const Timesheet = require("../Models/timesheet.model");
-const TimeLog = require("../Models/timelog.model");
+const Timesheet = require("../Models/Timesheet.model");
+const TimeLog = require("../Models/Timelog.model");
 const Manager = require("../Models/manager.model");
 const Admin = require("../Models/Admin.model");
 const User = require("../Models/user.model");
-const { resolveActor, resolveOrgId, httpError } = require("../utils/hierarchy.utils");
+const { resolveActor, resolveOrgId, httpError } = require("../utils/heirarchy.utils");
 
 const getWeekBounds = (anyDateInWeek) => {
   const date = new Date(anyDateInWeek);

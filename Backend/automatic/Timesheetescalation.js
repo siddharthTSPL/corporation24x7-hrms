@@ -1,5 +1,5 @@
 const cron = require("node-cron");
-const Timesheet = require("../Models/timesheet.model");
+const Timesheet = require("../Models/Timesheet.model");
 const Manager = require("../Models/manager.model");
 const Admin = require("../Models/Admin.model");
 

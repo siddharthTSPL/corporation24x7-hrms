@@ -1,6 +1,6 @@
 const TSProject = require("../Models/tsproject.model");
 const TSClient = require("../Models/tsclient.model");
-const { assertCanAssign, resolveActor, resolveOrgId, getDirectReportIds, httpError } = require("../utils/hierarchy.utils");
+const { assertCanAssign, resolveActor, resolveOrgId, getDirectReportIds, httpError } = require("../utils/heirarchy.utils");
 
 const createProject = async (req, res, next) => {
   const actor = resolveActor(req);
