@@ -1,6 +1,6 @@
-const TimeLog = require("../Models/timelog.model");
-const TSJob = require("../Models/tsjob.model");
-const { resolveActor, resolveOrgId, httpError } = require("../utils/hierarchy.utils");
+const TimeLog = require("../Models/Timelog.model");
+const TSJob = require("../Models/Tsjob.model");
+const { resolveActor, resolveOrgId, httpError } = require("../utils/heirarchy.utils");
 
 const recomputeJobHours = async (jobId) => {
   const result = await TimeLog.aggregate([

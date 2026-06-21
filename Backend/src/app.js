@@ -56,6 +56,7 @@ const ticketroute = require('../routes/ticket.routes');
 const recruitmentroute = require('../routes/Recruitment.route');
 const wfhroute = require('../routes/wfh.routes');
 const permissionroute = require('../routes/permission.route');
+const timesheetroute = require('../routes/timesheet.route');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 app.use('/admin', adminrouter);
@@ -67,6 +68,7 @@ app.use('/ticket', ticketroute);
 app.use('/recruitment', recruitmentroute);
 app.use('/wfh', wfhroute);
 app.use('/permission', permissionroute);
+app.use('/timesheet', timesheetroute);
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 

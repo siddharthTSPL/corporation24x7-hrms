@@ -1,7 +1,7 @@
-const ActiveTimer = require("../Models/activetimer.model");
-const TSJob = require("../Models/tsjob.model");
-const TimeLog = require("../Models/timelog.model");
-const { resolveActor, resolveOrgId, httpError } = require("../utils/hierarchy.utils");
+const ActiveTimer = require("../Models/Activetimer.model");
+const TSJob = require("../Models/Tsjob.model");
+const TimeLog = require("../Models/Timelog.model");
+const { resolveActor, resolveOrgId, httpError } = require("../utils/heirarchy.utils");
 const { recomputeJobHours } = require("./timelog.controller");
 
 const IDLE_THRESHOLD_SECONDS = 300;
