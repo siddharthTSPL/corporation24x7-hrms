@@ -11,9 +11,7 @@ const MainLayout = lazy(() => import("./layout/MainLayout"));
 const ProtectedRoute = lazy(() => import("./components/Protectedroute"));
 
 const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
-const EmployeeDashboard = lazy(
-  () => import("./pages/dashboard/EmployeeDashboard"),
-);
+const EmployeeDashboard = lazy(() => import("./pages/dashboard/EmployeeDashboard"));
 const Managerdashboard = lazy(() => import("./pages/dashboard/Dashboardma"));
 
 const EmployeeTable = lazy(() => import("./pages/employee/EmployeeTable"));
@@ -23,15 +21,9 @@ const LeaveTableem = lazy(() => import("./pages/leave/LeaveTableem"));
 const LeaveTablema = lazy(() => import("./pages/leave/LeaveTablema"));
 const LeaveTablead = lazy(() => import("./pages/leave/LeaveTablead"));
 
-const Announce = lazy(
-  () => import("./pages/announcement/admin/AnnouncementPage"),
-);
-const Announceem = lazy(
-  () => import("./pages/announcement/employee/Announceem"),
-);
-const Announcema = lazy(
-  () => import("./pages/announcement/manager/Announcema"),
-);
+const Announce = lazy(() => import("./pages/announcement/admin/AnnouncementPage"));
+const Announceem = lazy(() => import("./pages/announcement/employee/Announceem"));
+const Announcema = lazy(() => import("./pages/announcement/manager/Announcema"));
 
 const Doc = lazy(() => import("./pages/document/Doc"));
 const Docma = lazy(() => import("./pages/document/Docma"));
@@ -45,12 +37,8 @@ const Fileem = lazy(() => import("./pages/file/Fileem"));
 const Filema = lazy(() => import("./pages/file/Filema"));
 
 const Organisation = lazy(() => import("./pages/organisation/Organisation"));
-const Organisationem = lazy(
-  () => import("./pages/organisation/organisationem"),
-);
-const Organisationma = lazy(
-  () => import("./pages/organisation/organisationma"),
-);
+const Organisationem = lazy(() => import("./pages/organisation/organisationem"));
+const Organisationma = lazy(() => import("./pages/organisation/organisationma"));
 
 const Reviewad = lazy(() => import("./pages/review/reviewad"));
 const Reviewma = lazy(() => import("./pages/review/reviewma"));
@@ -58,12 +46,8 @@ const Reviewma = lazy(() => import("./pages/review/reviewma"));
 const Attendancepage = lazy(() => import("./pages/attendance/attendancepage"));
 
 const SuperAdminDashboard = lazy(() => import("./pages/dashboard/sudashboard"));
-const SuperAdminOrganisations = lazy(
-  () => import("./pages/organisation/suorganization"),
-);
-const SuperAdminAnnouncements = lazy(
-  () => import("./pages/announcement/suannounce"),
-);
+const SuperAdminOrganisations = lazy(() => import("./pages/organisation/suorganization"));
+const SuperAdminAnnouncements = lazy(() => import("./pages/announcement/suannounce"));
 const SuperAdminLeaves = lazy(() => import("./pages/leave/suleave"));
 const SuperAdminReviews = lazy(() => import("./pages/review/sureview"));
 const SuperAdminSettings = lazy(() => import("./pages/settings/susetting"));
@@ -72,17 +56,15 @@ const SuperAdminComplaints = lazy(() => import("./pages/ticketpage/suticket"));
 const AdminComplaints = lazy(() => import("./pages/ticketpage/adticket"));
 const EmployeeComplaints = lazy(() => import("./pages/ticketpage/emticket"));
 const ManagerComplaints = lazy(() => import("./pages/ticketpage/maticket"));
-const Managerrecruitment = lazy(
-  () => import("./pages/recruitment/recruitmentma"),
-);
-const Adminrecruitment = lazy(
-  () => import("./pages/recruitment/recruitmentad"),
-);
+const Managerrecruitment = lazy(() => import("./pages/recruitment/recruitmentma"));
+const Adminrecruitment = lazy(() => import("./pages/recruitment/recruitmentad"));
 const Managerdocument = lazy(() => import("./pages/document/managerdocument"));
 const Admindocument = lazy(() => import("./pages/document/admindocument"));
-const Adminteamdocument = lazy(
-  () => import("./pages/document/adminteamdocument"),
-);
+const Adminteamdocument = lazy(() => import("./pages/document/adminteamdocument"));
+const Adminrimesheet = lazy(() => import("./pages/timesheet/adtimesheet"));
+const Managertimesheet = lazy(() => import("./pages/timesheet/matimesheet"));
+const Employeetimesheet = lazy(() => import("./pages/timesheet/emtimesheet"));
+const SuperAdmintimesheet = lazy(() => import("./pages/timesheet/sutimesheet"));
 
 function PageSkeleton() {
   const [animationData, setAnimationData] = useState(null);
@@ -154,11 +136,9 @@ function RoleBasedRedirect() {
 
   if (isLoading) return <PageSkeleton />;
   if (!auth) return <Navigate to="/login" replace />;
-  if (auth.role === "superadmin")
-    return <Navigate to="/superadmin-dashboard" replace />;
+  if (auth.role === "superadmin") return <Navigate to="/superadmin-dashboard" replace />;
   if (auth.role === "admin") return <Navigate to="/dashboard" replace />;
-  if (auth.role === "manager")
-    return <Navigate to="/manager-dashboard" replace />;
+  if (auth.role === "manager") return <Navigate to="/manager-dashboard" replace />;
   return <Navigate to="/employee-dashboard" replace />;
 }
 
@@ -188,7 +168,6 @@ function App() {
             }
           />
 
-          {/* ── Admin / Manager / Employee routes ── */}
           <Route
             element={
               <ProtectedRoute allowedRoles={["admin", "manager", "employee"]}>
@@ -196,29 +175,30 @@ function App() {
               </ProtectedRoute>
             }
           >
-            {/* No permission required */}
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
-            <Route path="/manager-dashboard" element={<Managerdashboard />} />
-            <Route path="/employee" element={<EmployeeTable />} />
-            <Route path="/leave-manager" element={<LeaveTablema />} />
-            <Route path="/leave-employee" element={<LeaveTableem />} />
-            <Route path="/leave-admin" element={<LeaveTablead />} />
-            <Route path="/leave" element={<LeaveTable />} />
-            <Route path="/file" element={<File />} />
-            <Route path="/file-employee" element={<Fileem />} />
-            <Route path="/file-manager" element={<Filema />} />
-            <Route path="/settings" element={<Set />} />
-            <Route path="/settings-employee" element={<Setem />} />
-            <Route path="/settings-manager" element={<Setma />} />
-            <Route path="/organisation" element={<Organisation />} />
+            <Route path="/dashboard"           element={<Dashboard />} />
+            <Route path="/employee-dashboard"  element={<EmployeeDashboard />} />
+            <Route path="/manager-dashboard"   element={<Managerdashboard />} />
+            <Route path="/employee"            element={<EmployeeTable />} />
+            <Route path="/leave-manager"       element={<LeaveTablema />} />
+            <Route path="/leave-employee"      element={<LeaveTableem />} />
+            <Route path="/leave-admin"         element={<LeaveTablead />} />
+            <Route path="/leave"               element={<LeaveTable />} />
+            <Route path="/file"                element={<File />} />
+            <Route path="/file-employee"       element={<Fileem />} />
+            <Route path="/file-manager"        element={<Filema />} />
+            <Route path="/settings"            element={<Set />} />
+            <Route path="/settings-employee"   element={<Setem />} />
+            <Route path="/settings-manager"    element={<Setma />} />
+            <Route path="/organisation"        element={<Organisation />} />
             <Route path="/organisation-employee" element={<Organisationem />} />
-            <Route path="/organisation-manager" element={<Organisationma />} />
-            <Route path="/review-admin" element={<Reviewad />} />
-            <Route path="/review-manager" element={<Reviewma />} />
-            <Route path="/mark-attendance" element={<Attendancepage />} />
+            <Route path="/organisation-manager"  element={<Organisationma />} />
+            <Route path="/review-admin"        element={<Reviewad />} />
+            <Route path="/review-manager"      element={<Reviewma />} />
+            <Route path="/mark-attendance"     element={<Attendancepage />} />
+            <Route path="/admin-timesheet"     element={<Adminrimesheet />} />
+            <Route path="/manager-timesheet"   element={<Managertimesheet />} />
+            <Route path="/employee-timesheet"  element={<Employeetimesheet />} />
 
-            {/* ── Announcements — requires can_view_announcements ── */}
             <Route
               path="/announcement"
               element={
@@ -244,20 +224,6 @@ function App() {
               }
             />
 
-            {/*
-              ── Documents ──
-              NOTE: these were previously all gated on "documents.can_view_all_documents",
-              but Admindocument.jsx (the "My Documents" upload/edit/delete page) only ever
-              checks "documents.can_upload_documents" internally. That mismatch is what was
-              causing the AccessDenied screen even when can_upload_documents was true.
-
-              /document-admin is fixed below to match what its component actually checks.
-              /document, /document-manager, and /document-admin-team are left as
-              "can_view_all_documents" for now — verify Doc.jsx, Managerdocument.jsx, and
-              Adminteamdocument.jsx use that same permission internally. If any of them are
-              also "my own documents" pages (like Admindocument.jsx), switch their guard to
-              "documents.can_upload_documents" too.
-            */}
             <Route
               path="/document"
               element={
@@ -296,7 +262,6 @@ function App() {
               }
             />
 
-            {/* ── Tickets — requires can_raise_ticket ── */}
             <Route
               path="/admin-complaints"
               element={
@@ -322,15 +287,6 @@ function App() {
               }
             />
 
-            {/*
-              ── Recruitment ──
-              Changed from a single "can_view_hiring_requisitions" check to a
-              permissionGroup: a manager/admin with ANY recruitment permission
-              (view, create, view candidates, add candidate) can reach the page.
-              The page component itself (Managerrecruitment / Adminrecruitment)
-              is responsible for showing the right view (list vs create-only vs
-              locked) based on exactly which permissions are true.
-            */}
             <Route
               path="/recruitment-admin"
               element={
@@ -378,7 +334,6 @@ function App() {
             />
           </Route>
 
-          {/* ── SuperAdmin routes ── */}
           <Route
             element={
               <ProtectedRoute allowedRoles={["superadmin"]}>
@@ -386,32 +341,15 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route
-              path="/superadmin-dashboard"
-              element={<SuperAdminDashboard />}
-            />
-            <Route
-              path="/superadmin-organisations"
-              element={<SuperAdminOrganisations />}
-            />
-            <Route
-              path="/superadmin-announcements"
-              element={<SuperAdminAnnouncements />}
-            />
-            <Route path="/superadmin-leaves" element={<SuperAdminLeaves />} />
-            <Route path="/superadmin-reviews" element={<SuperAdminReviews />} />
-            <Route
-              path="/superadmin-settings"
-              element={<SuperAdminSettings />}
-            />
-            <Route
-              path="/superadmin-documents"
-              element={<SuperAdminDocuments />}
-            />
-            <Route
-              path="/superadmin-complaints"
-              element={<SuperAdminComplaints />}
-            />
+            <Route path="/superadmin-dashboard"     element={<SuperAdminDashboard />} />
+            <Route path="/superadmin-organisations" element={<SuperAdminOrganisations />} />
+            <Route path="/superadmin-announcements" element={<SuperAdminAnnouncements />} />
+            <Route path="/superadmin-leaves"        element={<SuperAdminLeaves />} />
+            <Route path="/superadmin-reviews"       element={<SuperAdminReviews />} />
+            <Route path="/superadmin-settings"      element={<SuperAdminSettings />} />
+            <Route path="/superadmin-documents"     element={<SuperAdminDocuments />} />
+            <Route path="/superadmin-complaints"    element={<SuperAdminComplaints />} />
+            <Route path="/superadmin-timesheet"     element={<SuperAdmintimesheet />} />
           </Route>
         </Routes>
       </Suspense>
