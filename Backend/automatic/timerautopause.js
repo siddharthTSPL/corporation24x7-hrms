@@ -13,15 +13,12 @@ const autoPauseStaleTimers = async () => {
     });
 
     for (const timer of staleTimers) {
-  
+      const sessionStart = timer.paused_at || timer.started_at; // ✅ resume point, not always started_at
       const sessionSeconds = Math.floor(
-        (timer.last_heartbeat_at - timer.started_at) / 1000
-      );
-      timer.accumulated_seconds = Math.max(
-        timer.accumulated_seconds + sessionSeconds, 
-        sessionSeconds
+        (timer.last_heartbeat_at - sessionStart) / 1000
       );
 
+      timer.accumulated_seconds = timer.accumulated_seconds + Math.max(sessionSeconds, 0); // ✅ clean addition
       timer.status = "paused";
       timer.paused_at = timer.last_heartbeat_at;
       timer.is_idle = true;
