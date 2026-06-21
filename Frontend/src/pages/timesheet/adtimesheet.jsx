@@ -1,80 +1,118 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useCallback } from "react";
 import {
-  useMyProjects, useCreateProject, useAssignableTargets,
-  useCreateJob, useJobsCreatedByMe, useUpdateJobStatus, useArchiveJob,
-  useOverrunRiskJobs, useIdleJobs, useTeamWorkloadHeatmap, useMyProductivitySummary,
-  useMyTimesheets, usePendingApprovals, useApproveTimesheet, useRejectTimesheet, useForwardTimesheet,
-  useMyDayLog, useMyWeekLog, useActiveTimer, useStartTimer, usePauseTimer, useResumeTimer, useStopTimer,
-  useSubmitTimesheet, useLogTime,
+  useMyAssignedJobs,
+  useJobsCreatedByMe,
+  useCreateJob,
+  useAssignableTargets,
+  useUpdateJobStatus,
+  useArchiveJob,
+  useMyWeekLog,
+  useLogTime,
+  useActiveTimer,
+  useStartTimer,
+  usePauseTimer,
+  useResumeTimer,
+  useStopTimer,
+  useDiscardTimer,
+  useHeartbeatTimer,
+  useMyTimesheets,
+  useSubmitTimesheet,
+  usePendingApprovals,
+  useApproveTimesheet,
+  useRejectTimesheet,
+  useForwardTimesheet,
+  useTeamWorkloadHeatmap,
+  useOverrunRiskJobs,
+  useIdleJobs,
+  useMyProductivitySummary,
 } from "../../auth/server-state/timesheet/timesheet.hook";
 
 const C = {
-  bg: "#F6F7FB",
+  brand: "#730042",
+  brandLight: "rgba(115,0,66,0.08)",
+  bg: "#F7F8FC",
   surface: "#FFFFFF",
-  surfaceAlt: "#F0F2F8",
-  border: "#E4E7F0",
-  borderStrong: "#CBD0E0",
-  accent: "#4F46E5",
-  accentLight: "rgba(79,70,229,0.08)",
-  accentMid: "rgba(79,70,229,0.15)",
-  gold: "#D97706",
-  goldLight: "rgba(217,119,6,0.08)",
-  red: "#DC2626",
-  redLight: "rgba(220,38,38,0.08)",
-  green: "#059669",
-  greenLight: "rgba(5,150,105,0.08)",
-  blue: "#0284C7",
-  blueLight: "rgba(2,132,199,0.08)",
-  purple: "#7C3AED",
-  text: "#0F172A",
-  textMid: "#475569",
+  surfaceAlt: "#F1F3F9",
+  border: "#E3E6F0",
+  text: "#0F1729",
+  textMid: "#4A5568",
   textMuted: "#94A3B8",
+  green: "#059669",
+  greenLight: "rgba(5,150,105,0.09)",
+  amber: "#B45309",
+  amberLight: "rgba(180,83,9,0.09)",
+  red: "#DC2626",
+  redLight: "rgba(220,38,38,0.09)",
+  blue: "#2563EB",
+  blueLight: "rgba(37,99,235,0.09)",
 };
 
-function cn(...a) { return a.filter(Boolean).join(" "); }
+const getMonday = (d = new Date()) => {
+  const dt = new Date(d); const day = dt.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  dt.setDate(dt.getDate() + diff); dt.setHours(0, 0, 0, 0);
+  return dt.toISOString().slice(0, 10);
+};
 
-function Tag({ color = C.accent, bg, children }) {
-  return (
-    <span style={{ color, background: bg || color + "15", borderRadius: 6 }}
-      className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold tracking-wide">
-      {children}
-    </span>
-  );
+const fmtDate = (d) => new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+const fmtDuration = (mins) => `${Math.floor(mins / 60)}h ${mins % 60}m`;
+const fmtSeconds = (s) => { const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60; return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`; };
+
+const STATUS_STYLE = {
+  draft: { color: "#94A3B8", bg: "#F1F3F9", label: "Draft" },
+  pending_manager: { color: "#B45309", bg: "rgba(180,83,9,0.09)", label: "Pending Manager" },
+  pending_reporting_manager: { color: "#B45309", bg: "rgba(180,83,9,0.09)", label: "Pending Review" },
+  pending_admin: { color: "#2563EB", bg: "rgba(37,99,235,0.09)", label: "Pending Admin" },
+  pending_superadmin: { color: "#730042", bg: "rgba(115,0,66,0.08)", label: "Pending SA" },
+  approved: { color: "#059669", bg: "rgba(5,150,105,0.09)", label: "Approved" },
+  rejected: { color: "#DC2626", bg: "rgba(220,38,38,0.09)", label: "Rejected" },
+};
+
+const PRIORITY_COLOR = { low: "#94A3B8", medium: "#B45309", high: "#DC2626", urgent: "#730042" };
+const JOB_STATUS_COLOR = { not_started: "#94A3B8", in_progress: "#2563EB", on_hold: "#B45309", completed: "#059669", cancelled: "#DC2626" };
+
+const TABS = [
+  { id: "overview", label: "Overview", icon: "⊞" },
+  { id: "team-jobs", label: "Team Jobs", icon: "👥" },
+  { id: "approvals", label: "Approvals", icon: "✅" },
+  { id: "insights", label: "Insights", icon: "📊" },
+  { id: "my-work", label: "My Work", icon: "⏱" },
+  { id: "timesheets", label: "Timesheets", icon: "📄" },
+];
+
+function Badge({ status }) {
+  const s = STATUS_STYLE[status] || { color: C.textMuted, bg: C.surfaceAlt, label: status };
+  return <span style={{ color: s.color, background: s.bg, borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", padding: "2px 10px", textTransform: "uppercase" }}>{s.label}</span>;
 }
 
-function Card({ children, className = "", style = {}, onClick }) {
-  return (
-    <div onClick={onClick}
-      style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, ...style }}
-      className={cn("shadow-sm transition-shadow", onClick && "cursor-pointer hover:shadow-md", className)}>
-      {children}
-    </div>
-  );
+function Chip({ color = C.brand, children }) {
+  return <span style={{ color, background: color + "14", borderRadius: 20, fontSize: 10, fontWeight: 700, padding: "2px 9px", textTransform: "uppercase", letterSpacing: "0.04em" }}>{children}</span>;
 }
 
-function Stat({ label, value, delta, color = C.accent, icon }) {
+function Card({ children, style = {} }) {
+  return <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, boxShadow: "0 1px 6px rgba(0,0,0,0.04)", ...style }}>{children}</div>;
+}
+
+function StatCard({ label, value, color = C.brand, sub }) {
   return (
-    <Card className="p-5">
-      <div className="flex items-start justify-between mb-3">
-        <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: C.textMuted }}>{label}</div>
-        {icon && <div style={{ background: color + "15", borderRadius: 10, width: 34, height: 34, color }} className="flex items-center justify-center text-lg">{icon}</div>}
-      </div>
-      <div className="text-[26px] font-black leading-none" style={{ color, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>{value}</div>
-      {delta && <div className="text-[11px] mt-1.5" style={{ color: C.textMuted }}>{delta}</div>}
+    <Card style={{ padding: "18px 20px" }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>{label}</div>
+      <div style={{ fontSize: 26, fontWeight: 900, color }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>{sub}</div>}
     </Card>
   );
 }
 
-function Modal({ open, onClose, title, children }) {
+function Modal({ open, onClose, title, width = 500, children }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.5)", backdropFilter: "blur(6px)" }}>
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, maxWidth: 520, width: "100%", borderRadius: 20 }} className="shadow-2xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: C.border }}>
-          <span className="font-bold text-[15px]" style={{ color: C.text, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>{title}</span>
-          <button onClick={onClose} style={{ color: C.textMuted }} className="text-xl leading-none hover:text-gray-800">×</button>
+    <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(15,23,41,0.5)", backdropFilter: "blur(5px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, width: "100%", maxWidth: width, boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", borderBottom: `1px solid ${C.border}` }}>
+          <span style={{ fontWeight: 700, fontSize: 15, color: C.text }}>{title}</span>
+          <button onClick={onClose} style={{ color: C.textMuted, fontSize: 20, lineHeight: 1, background: "none", border: "none", cursor: "pointer" }}>×</button>
         </div>
-        <div className="p-6">{children}</div>
+        <div style={{ padding: 24 }}>{children}</div>
       </div>
     </div>
   );
@@ -82,586 +120,597 @@ function Modal({ open, onClose, title, children }) {
 
 function Input({ label, ...props }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      {label && <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: C.textMuted }}>{label}</label>}
-      <input {...props} style={{ background: C.surfaceAlt, border: `1.5px solid ${C.border}`, color: C.text, borderRadius: 10, outline: "none" }}
-        className="px-3.5 py-2.5 text-[13px] w-full placeholder:text-slate-300 focus:border-indigo-400 transition-colors" />
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {label && <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</label>}
+      <input {...props} style={{ background: C.surfaceAlt, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: "10px 14px", fontSize: 13, color: C.text, outline: "none", width: "100%", boxSizing: "border-box" }} onFocus={e => e.target.style.borderColor = C.brand} onBlur={e => e.target.style.borderColor = C.border} />
     </div>
   );
 }
 
-function Select({ label, children, ...props }) {
+function Sel({ label, children, ...props }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      {label && <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: C.textMuted }}>{label}</label>}
-      <select {...props} style={{ background: C.surfaceAlt, border: `1.5px solid ${C.border}`, color: C.text, borderRadius: 10, outline: "none" }}
-        className="px-3.5 py-2.5 text-[13px] w-full focus:border-indigo-400 transition-colors appearance-none">
-        {children}
-      </select>
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {label && <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</label>}
+      <select {...props} style={{ background: C.surfaceAlt, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: "10px 14px", fontSize: 13, color: C.text, outline: "none", width: "100%", appearance: "none", boxSizing: "border-box" }}>{children}</select>
     </div>
   );
 }
 
-function Btn({ children, variant = "primary", onClick, disabled, type = "button", className = "" }) {
-  const v = {
-    primary: { background: C.accent, color: "#fff" },
-    ghost: { background: C.surfaceAlt, color: C.textMid, border: `1px solid ${C.border}` },
-    danger: { background: C.redLight, color: C.red },
-    success: { background: C.greenLight, color: C.green },
-    warning: { background: C.goldLight, color: C.gold },
-  };
+function Btn({ children, variant = "primary", onClick, disabled, style: ex = {} }) {
+  const v = { primary: { background: C.brand, color: "#fff", border: "none" }, ghost: { background: C.surfaceAlt, color: C.textMid, border: `1px solid ${C.border}` }, danger: { background: C.redLight, color: C.red, border: `1px solid ${C.red}30` }, success: { background: C.greenLight, color: C.green, border: `1px solid ${C.green}30` }, amber: { background: C.amberLight, color: C.amber, border: `1px solid ${C.amber}30` } };
+  return <button onClick={onClick} disabled={disabled} style={{ ...v[variant], borderRadius: 10, padding: "9px 18px", fontSize: 12, fontWeight: 700, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.55 : 1, whiteSpace: "nowrap", transition: "opacity 0.15s", ...ex }}>{children}</button>;
+}
+
+import { useEffect } from "react";
+
+function TimerWidget({ jobs }) {
+  const { data: timerData, refetch: refetchTimer } = useActiveTimer({ refetchInterval: 10000 });
+  const timer = timerData?.timer;
+  const startTimer = useStartTimer(); const pauseTimer = usePauseTimer(); const resumeTimer = useResumeTimer(); const stopTimer = useStopTimer(); const discardTimer = useDiscardTimer(); const heartbeat = useHeartbeatTimer();
+  const [elapsed, setElapsed] = useState(0);
+  const [startModal, setStartModal] = useState(false);
+  const [startForm, setStartForm] = useState({ job: "", note: "" });
+  const [stopModal, setStopModal] = useState(false);
+  const [stopNote, setStopNote] = useState("");
+
+  useEffect(() => {
+    if (!timer || timer.status !== "running") { setElapsed(timer?.accumulated_seconds || 0); return; }
+    const tick = () => { const base = timer.accumulated_seconds || 0; const since = Math.floor((Date.now() - new Date(timer.last_heartbeat_at)) / 1000); setElapsed(base + Math.max(0, since)); };
+    tick(); const id = setInterval(tick, 1000); return () => clearInterval(id);
+  }, [timer]);
+
+  useEffect(() => {
+    if (!timer || timer.status !== "running") return;
+    const id = setInterval(() => heartbeat.mutate(), 60000); return () => clearInterval(id);
+  }, [timer]);
+
+  const isRunning = timer?.status === "running"; const isPaused = timer?.status === "paused";
+  const displaySecs = isRunning ? elapsed : (timer?.accumulated_seconds || 0);
+
   return (
-    <button type={type} onClick={onClick} disabled={disabled}
-      style={{ ...v[variant], borderRadius: 10, opacity: disabled ? 0.5 : 1 }}
-      className={cn("px-4 py-2 text-[12px] font-semibold transition-all hover:opacity-80 active:scale-[0.97] whitespace-nowrap", className)}>
-      {children}
-    </button>
+    <>
+      <Card style={{ overflow: "hidden" }}>
+        <div style={{ background: isRunning ? C.brand : C.surfaceAlt, padding: "14px 20px", display: "flex", alignItems: "center", gap: 10 }}>
+          {isRunning && <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#fff", animation: "pulse 1.5s infinite" }} />}
+          <span style={{ color: isRunning ? "#fff" : C.textMuted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>{isRunning ? "Timer Running" : isPaused ? "Timer Paused" : "No Active Timer"}</span>
+          {timer?.job?.title && <span style={{ marginLeft: "auto", color: isRunning ? "rgba(255,255,255,0.75)" : C.textMuted, fontSize: 12 }}>{timer.job.title}</span>}
+        </div>
+        <div style={{ padding: "20px 24px" }}>
+          <div style={{ fontFamily: "monospace", fontSize: 40, fontWeight: 900, color: isRunning ? C.brand : isPaused ? C.amber : C.textMuted, letterSpacing: "0.05em", lineHeight: 1, marginBottom: 16 }}>{fmtSeconds(displaySecs)}</div>
+          {!timer ? (
+            <Btn onClick={() => setStartModal(true)}>▶ Start Timer</Btn>
+          ) : (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {isRunning && <Btn variant="amber" onClick={() => pauseTimer.mutate({}, { onSuccess: refetchTimer })}>⏸ Pause</Btn>}
+              {isPaused && <Btn onClick={() => resumeTimer.mutate({}, { onSuccess: refetchTimer })}>▶ Resume</Btn>}
+              <Btn variant="success" onClick={() => setStopModal(true)}>■ Stop & Log</Btn>
+              <Btn variant="danger" onClick={() => discardTimer.mutate({}, { onSuccess: refetchTimer })}>✕ Discard</Btn>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <Modal open={startModal} onClose={() => setStartModal(false)} title="Start Timer">
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <Sel label="Job (assigned to me)" value={startForm.job} onChange={e => setStartForm(p => ({ ...p, job: e.target.value }))}>
+            <option value="">Select a job…</option>
+            {(jobs||[]).filter(j=>!["completed","cancelled"].includes(j.status)).map(j=><option key={j._id} value={j._id}>{j.title}</option>)}
+          </Sel>
+          <Input label="Note (optional)" placeholder="What are you working on?" value={startForm.note} onChange={e => setStartForm(p => ({ ...p, note: e.target.value }))} />
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <Btn variant="ghost" onClick={() => setStartModal(false)}>Cancel</Btn>
+            <Btn onClick={() => startTimer.mutate({ job: startForm.job, note: startForm.note }, { onSuccess: () => { setStartModal(false); setStartForm({ job: "", note: "" }); refetchTimer(); } })} disabled={!startForm.job || startTimer.isPending}>▶ Start</Btn>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={stopModal} onClose={() => setStopModal(false)} title="Stop & Log Time">
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ background: C.surfaceAlt, borderRadius: 12, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: C.textMuted }}>Elapsed</span>
+            <span style={{ fontFamily: "monospace", fontWeight: 800, fontSize: 20, color: C.brand }}>{fmtSeconds(displaySecs)}</span>
+          </div>
+          <Input label="Note (optional)" placeholder="Brief description…" value={stopNote} onChange={e => setStopNote(e.target.value)} />
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <Btn variant="ghost" onClick={() => setStopModal(false)}>Cancel</Btn>
+            <Btn variant="success" onClick={() => stopTimer.mutate({ note: stopNote }, { onSuccess: () => { setStopModal(false); setStopNote(""); refetchTimer(); } })} disabled={stopTimer.isPending}>{stopTimer.isPending ? "Logging…" : "■ Log Time"}</Btn>
+          </div>
+        </div>
+      </Modal>
+      <style>{`@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}`}</style>
+    </>
   );
 }
 
-function SectionHead({ title, sub, right }) {
-  return (
-    <div className="flex items-start justify-between mb-4 gap-3 flex-wrap">
-      <div>
-        <h2 className="text-[15px] font-bold" style={{ color: C.text, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>{title}</h2>
-        {sub && <p className="text-[11px] mt-0.5" style={{ color: C.textMuted }}>{sub}</p>}
-      </div>
-      {right}
-    </div>
-  );
-}
-
-const NAV = [
-  { id: "overview", label: "Overview", icon: "⊞" },
-  { id: "team", label: "My Team", icon: "⊹" },
-  { id: "jobs", label: "Jobs", icon: "◫" },
-  { id: "approvals", label: "Approvals", icon: "◈" },
-  { id: "timelog", label: "Time Log", icon: "◷" },
-  { id: "timesheets", label: "Timesheets", icon: "◧" },
-];
-
-export default function AdminDashboard() {
+export default function AdminTimesheet() {
   const [tab, setTab] = useState("overview");
-  const [sideOpen, setSideOpen] = useState(false);
+  const [weekStart, setWeekStart] = useState(getMonday());
   const [jobModal, setJobModal] = useState(false);
   const [logModal, setLogModal] = useState(false);
-  const [jobForm, setJobForm] = useState({ title: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: false, hourly_rate: "", currency: "INR" });
-  const [logForm, setLogForm] = useState({ job: "", log_date: new Date().toISOString().slice(0,10), duration_minutes: "", note: "" });
-  const [selectedDate] = useState(new Date().toISOString().slice(0,10));
-  const [weekStart] = useState(() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); });
+  const [rejectModal, setRejectModal] = useState({ open: false, ts: null });
+  const [rejectReason, setRejectReason] = useState("");
+  const [jobForm, setJobForm] = useState({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: false, hourly_rate: "", due_date: "" });
+  const [logForm, setLogForm] = useState({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" });
 
-  const { data: jobsData } = useJobsCreatedByMe();
-  const { data: approvalsData } = usePendingApprovals();
-  const { data: overrunData } = useOverrunRiskJobs();
-  const { data: idleData } = useIdleJobs(5);
-  const { data: heatmapData } = useTeamWorkloadHeatmap(weekStart);
-  const { data: prodData } = useMyProductivitySummary(weekStart);
-  const { data: dayLogData } = useMyDayLog(selectedDate);
-  const { data: weekLogData } = useMyWeekLog(weekStart);
+  const { data: assignedJobsData } = useMyAssignedJobs();
+  const assignedJobs = assignedJobsData?.jobs || [];
+
+  const { data: createdJobsData, refetch: refetchCreated } = useJobsCreatedByMe();
+  const createdJobs = createdJobsData?.jobs || [];
+
   const { data: targetsData } = useAssignableTargets();
-  const { data: mySheets } = useMyTimesheets();
+  const targets = targetsData?.targets || [];
+
+  const { data: weekData, refetch: refetchWeek } = useMyWeekLog(weekStart);
+  const weekDays = weekData?.days || {};
+  const totalWeekMins = Object.values(weekDays).reduce((s, d) => s + (d.totalMinutes || 0), 0);
+
+  const { data: tsData, refetch: refetchTS } = useMyTimesheets();
+  const timesheets = tsData?.timesheets || [];
+
+  const { data: approvalsData, refetch: refetchApprovals } = usePendingApprovals();
+  const approvals = approvalsData?.timesheets || [];
+
+  const { data: heatmapData } = useTeamWorkloadHeatmap(weekStart);
+  const heatmap = heatmapData?.heatmap || [];
+
+  const { data: overrunData } = useOverrunRiskJobs();
+  const overrunJobs = overrunData?.jobs || [];
+
+  const { data: idleData } = useIdleJobs(7);
+  const idleJobs = idleData?.jobs || [];
+
+  const { data: prodData } = useMyProductivitySummary(weekStart);
 
   const createJob = useCreateJob();
+  const updateJobStatus = useUpdateJobStatus();
+  const archiveJob = useArchiveJob();
   const logTime = useLogTime();
+  const submitTS = useSubmitTimesheet();
   const approveTS = useApproveTimesheet();
   const rejectTS = useRejectTimesheet();
   const forwardTS = useForwardTimesheet();
-  const submitTS = useSubmitTimesheet();
-  const archiveJob = useArchiveJob();
-  const updateJobStatus = useUpdateJobStatus();
 
-  const jobs = jobsData?.jobs ?? [];
-  const approvals = approvalsData?.timesheets ?? [];
-  const overrunJobs = overrunData?.jobs ?? [];
-  const idleJobs = idleData?.jobs ?? [];
-  const heatmap = heatmapData?.heatmap ?? [];
-  const targets = targetsData?.targets ?? [];
-  const dayLogs = dayLogData?.logs ?? [];
-  const weekLogs = weekLogData?.days ?? {};
-  const myTimesheets = mySheets?.timesheets ?? [];
+  const shiftWeek = useCallback((dir) => {
+    const d = new Date(weekStart); d.setDate(d.getDate() + dir * 7);
+    setWeekStart(d.toISOString().slice(0, 10));
+  }, [weekStart]);
 
-  const weekTotal = useMemo(() => Object.values(weekLogs).reduce((s, d) => s + (d.totalMinutes || 0), 0), [weekLogs]);
-  const completedJobs = useMemo(() => jobs.filter(j => j.status === "completed").length, [jobs]);
+  const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6);
 
-  const statusColor = { not_started: C.textMuted, in_progress: C.accent, on_hold: C.gold, completed: C.green, cancelled: C.red };
-  const priorityColor = { low: C.green, medium: C.gold, high: C.red, urgent: "#9333EA" };
-
-  const handleCreateJob = async () => {
-    const target = targets.find(t => t.id.toString() === jobForm.assigned_to);
-    await createJob.mutateAsync({ ...jobForm, assigned_to_model: target?.model || "User", estimated_hours: Number(jobForm.estimated_hours) || 0, hourly_rate: Number(jobForm.hourly_rate) || 0 });
-    setJobModal(false);
+  const handleCreateJob = () => {
+    if (!jobForm.title || !jobForm.assigned_to) return;
+    const target = targets.find(t => t.id === jobForm.assigned_to);
+    createJob.mutate({
+      title: jobForm.title, description: jobForm.description,
+      assigned_to: jobForm.assigned_to, assigned_to_model: target?.model || "Manager",
+      priority: jobForm.priority,
+      estimated_hours: Number(jobForm.estimated_hours) || 0,
+      billable: jobForm.billable, hourly_rate: Number(jobForm.hourly_rate) || 0,
+      due_date: jobForm.due_date || null,
+    }, {
+      onSuccess: () => { setJobModal(false); setJobForm({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: false, hourly_rate: "", due_date: "" }); refetchCreated(); },
+    });
   };
 
-  const handleLogTime = async () => {
-    await logTime.mutateAsync({ ...logForm, duration_minutes: Number(logForm.duration_minutes) });
-    setLogModal(false);
-    setLogForm({ job: "", log_date: new Date().toISOString().slice(0,10), duration_minutes: "", note: "" });
+  const handleLogTime = () => {
+    logTime.mutate({ ...logForm, duration_minutes: Number(logForm.duration_minutes) }, {
+      onSuccess: () => { setLogModal(false); setLogForm({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" }); refetchWeek(); },
+    });
   };
 
   return (
-    <div className="min-h-screen" style={{ background: C.bg, fontFamily: "'Inter',sans-serif", color: C.text }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');`}</style>
-
-      {sideOpen && <div className="fixed inset-0 z-30 bg-black/30 lg:hidden" onClick={() => setSideOpen(false)} />}
-
-      <aside className={cn(
-        "fixed lg:sticky top-0 left-0 h-screen w-60 z-40 flex flex-col transition-transform duration-300 lg:translate-x-0",
-        sideOpen ? "translate-x-0" : "-translate-x-full"
-      )} style={{ background: C.surface, borderRight: `1px solid ${C.border}` }}>
-        <div className="px-5 py-5 border-b" style={{ borderColor: C.border }}>
-          <div className="flex items-center gap-2.5">
-            <div style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.purple})`, borderRadius: 10, width: 34, height: 34 }} className="flex items-center justify-center text-white font-black text-sm">A</div>
-            <div>
-              <div className="text-[14px] font-extrabold" style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", color: C.text }}>TorchX</div>
-              <div className="text-[10px]" style={{ color: C.textMuted }}>Admin Portal</div>
+    <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <header style={{ background: C.surface, borderBottom: `1px solid ${C.border}`, position: "sticky", top: 0, zIndex: 40 }}>
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, height: 56, overflowX: "auto" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+              <div style={{ width: 30, height: 30, background: C.brand, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ color: "#fff", fontSize: 14 }}>⏱</span>
+              </div>
+              <span style={{ fontWeight: 800, fontSize: 15, color: C.text }}>Timesheet</span>
+              <span style={{ color: C.border, margin: "0 4px" }}>·</span>
+              <span style={{ fontSize: 12, color: C.textMuted }}>Admin</span>
             </div>
+            <nav style={{ display: "flex", gap: 2, flex: 1 }}>
+              {TABS.map(t => (
+                <button key={t.id} onClick={() => setTab(t.id)} style={{ background: tab === t.id ? C.brandLight : "none", color: tab === t.id ? C.brand : C.textMid, border: "none", borderRadius: 8, padding: "7px 12px", fontSize: 12, fontWeight: tab === t.id ? 700 : 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, transition: "all 0.15s", whiteSpace: "nowrap" }}>
+                  <span>{t.icon}</span><span>{t.label}</span>
+                  {t.id === "approvals" && approvals.length > 0 && <span style={{ background: C.brand, color: "#fff", borderRadius: 8, fontSize: 10, fontWeight: 800, padding: "1px 5px" }}>{approvals.length}</span>}
+                </button>
+              ))}
+            </nav>
+            <Btn onClick={() => setJobModal(true)} style={{ flexShrink: 0 }}>+ Create Job</Btn>
           </div>
         </div>
-        <nav className="flex flex-col gap-0.5 p-3 flex-1 overflow-auto">
-          {NAV.map(n => (
-            <button key={n.id} onClick={() => { setTab(n.id); setSideOpen(false); }}
-              style={{
-                background: tab === n.id ? C.accentLight : "transparent",
-                color: tab === n.id ? C.accent : C.textMid,
-                borderRadius: 10, textAlign: "left",
-              }}
-              className="flex items-center gap-2.5 px-3 py-2.5 text-[13px] font-medium transition-colors hover:bg-slate-50">
-              <span className="text-base leading-none w-4">{n.icon}</span>
-              {n.label}
-              {n.id === "approvals" && approvals.length > 0 && (
-                <span style={{ background: C.red, color: "#fff" }} className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full">{approvals.length}</span>
-              )}
-            </button>
-          ))}
-        </nav>
-        <div className="p-4 border-t" style={{ borderColor: C.border }}>
-          <div style={{ background: `linear-gradient(135deg, ${C.accentLight}, ${C.blueLight})`, border: `1px solid ${C.border}`, borderRadius: 12 }} className="p-3">
-            <div className="text-[11px] font-bold" style={{ color: C.accent }}>Admin Access</div>
-            <div className="text-[10px] mt-0.5" style={{ color: C.textMuted }}>Manage team & approvals</div>
-          </div>
-        </div>
-      </aside>
+      </header>
 
-      <div className="lg:ml-60 flex flex-col min-h-screen">
-        <header className="sticky top-0 z-20 flex items-center gap-3 px-4 sm:px-6 py-3.5 border-b" style={{ background: C.surface + "f5", borderColor: C.border, backdropFilter: "blur(10px)" }}>
-          <button onClick={() => setSideOpen(true)} className="lg:hidden p-2 rounded-lg hover:bg-slate-100" style={{ color: C.textMid }}>☰</button>
-          <div className="flex-1">
-            <h1 className="text-[16px] font-extrabold" style={{ fontFamily: "'Plus Jakarta Sans',sans-serif" }}>{NAV.find(n => n.id === tab)?.label}</h1>
-          </div>
-          <div className="flex gap-2">
-            <Btn onClick={() => setLogModal(true)} variant="ghost">Log Time</Btn>
-            <Btn onClick={() => setJobModal(true)}>＋ Job</Btn>
-          </div>
-        </header>
-
-        <main className="flex-1 p-4 sm:p-6 overflow-auto">
-          {tab === "overview" && (
-            <div className="space-y-5">
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <Stat label="Jobs Created" value={jobs.length} delta={`${completedJobs} completed`} color={C.accent} icon="◫" />
-                <Stat label="Week Hours" value={`${(weekTotal/60).toFixed(1)}h`} delta={`of 40h capacity`} color={C.blue} icon="◷" />
-                <Stat label="Pending Reviews" value={approvals.length} delta="Timesheets" color={C.red} icon="◈" />
-                <Stat label="At-Risk Jobs" value={overrunJobs.length} delta="Exceeding estimate" color={C.gold} icon="⚠" />
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="lg:col-span-2 space-y-4">
-                  <Card className="p-5">
-                    <SectionHead title="Team Workload" sub={`Week of ${weekStart}`} />
-                    {heatmap.length === 0 ? (
-                      <div className="py-8 text-center" style={{ color: C.textMuted }}>
-                        <div className="text-3xl mb-2">⊹</div>
-                        <div className="text-[12px]">No team data this week</div>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {heatmap.slice(0, 5).map((row, i) => {
-                          const days = Array.from({ length: 5 }, (_, idx) => {
-                            const d = new Date(weekStart); d.setDate(d.getDate() + idx);
-                            return row.days?.[d.toISOString().slice(0,10)];
-                          });
-                          const totalPct = days.reduce((s, d) => s + (d?.loadPercent ?? 0), 0) / 5;
-                          return (
-                            <div key={i} className="flex items-center gap-3">
-                              <div className="w-20 text-[11px] font-medium truncate" style={{ color: C.textMid }}>Member {i+1}</div>
-                              <div className="flex-1 flex gap-1">
-                                {days.map((day, j) => {
-                                  const pct = day?.loadPercent ?? 0;
-                                  const bg = pct === 0 ? C.surfaceAlt : pct < 60 ? C.green + "25" : pct < 90 ? C.gold + "25" : C.red + "25";
-                                  const border = pct === 0 ? C.border : pct < 60 ? C.green + "50" : pct < 90 ? C.gold + "50" : C.red + "50";
-                                  return (
-                                    <div key={j} style={{ background: bg, border: `1px solid ${border}`, borderRadius: 8 }} className="flex-1 py-2 text-center text-[10px] font-bold" style2={{ color: pct === 0 ? C.textMuted : "inherit" }}>
-                                      <span style={{ color: pct === 0 ? C.textMuted : pct < 60 ? C.green : pct < 90 ? C.gold : C.red }}>{pct > 0 ? `${pct}%` : "—"}</span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              <div className="text-[11px] font-bold w-10 text-right" style={{ color: totalPct < 60 ? C.green : totalPct < 90 ? C.gold : C.red }}>
-                                {Math.round(totalPct)}%
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </Card>
-
-                  <Card className="p-5">
-                    <SectionHead title="My Productivity" sub={`Week of ${weekStart}`} />
-                    {prodData ? (
-                      <div>
-                        <div className="flex items-baseline gap-3 mb-4">
-                          <span className="text-3xl font-black" style={{ color: C.accent, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>{(prodData.totalMinutes/60).toFixed(1)}h</span>
-                          <span className="text-[12px]" style={{ color: C.textMuted }}>this week · {prodData.capacityPercent}% capacity</span>
-                        </div>
-                        <div className="h-2 rounded-full overflow-hidden mb-4" style={{ background: C.surfaceAlt }}>
-                          <div className="h-full rounded-full" style={{ width: `${Math.min(prodData.capacityPercent, 100)}%`, background: `linear-gradient(90deg, ${C.accent}, ${C.purple})` }} />
-                        </div>
-                        <div className="grid grid-cols-3 gap-3">
-                          {[
-                            ["Total", `${(prodData.totalMinutes/60).toFixed(1)}h`, C.accent],
-                            ["Billable", `${(prodData.billableMinutes/60).toFixed(1)}h`, C.green],
-                            ["Non-Bill.", `${(prodData.nonBillableMinutes/60).toFixed(1)}h`, C.textMuted],
-                          ].map(([l, v, c]) => (
-                            <div key={l} style={{ background: C.surfaceAlt, borderRadius: 12 }} className="p-3 text-center">
-                              <div className="text-[16px] font-bold" style={{ color: c, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>{v}</div>
-                              <div className="text-[10px] mt-0.5" style={{ color: C.textMuted }}>{l}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : <div className="py-6 text-center text-[12px]" style={{ color: C.textMuted }}>Loading productivity data…</div>}
-                  </Card>
-                </div>
-
-                <div className="space-y-4">
-                  <Card className="p-5">
-                    <SectionHead title="Today's Log" sub={selectedDate} />
-                    {dayLogs.length === 0 ? (
-                      <div className="py-6 text-center">
-                        <div className="text-2xl mb-1.5">◷</div>
-                        <div className="text-[12px]" style={{ color: C.textMuted }}>No time logged today</div>
-                        <button onClick={() => setLogModal(true)} className="mt-2 text-[11px] font-semibold" style={{ color: C.accent }}>Log time →</button>
-                      </div>
-                    ) : (
-                      <div className="space-y-2 max-h-48 overflow-auto">
-                        {dayLogs.map(log => (
-                          <div key={log._id} style={{ background: C.surfaceAlt, borderRadius: 10 }} className="flex items-center gap-2.5 p-2.5">
-                            <div style={{ background: C.accentLight, color: C.accent, borderRadius: 8, width: 34, height: 34 }} className="flex items-center justify-center text-[11px] font-bold flex-shrink-0">
-                              {log.duration_minutes}m
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-[11px] font-semibold truncate">{log.job?.title || "—"}</div>
-                              <div className="text-[10px]" style={{ color: C.textMuted }}>{log.billable ? "Billable" : "Non-billable"}</div>
-                            </div>
-                          </div>
-                        ))}
-                        <div className="pt-1 text-[11px] font-semibold" style={{ color: C.textMid }}>
-                          Total: {dayLogData?.totalMinutes}m
-                        </div>
-                      </div>
-                    )}
-                  </Card>
-
-                  <Card className="p-5">
-                    <SectionHead title="Overrun Jobs" />
-                    {overrunJobs.length === 0 ? (
-                      <div className="py-4 text-center"><div className="text-[12px]" style={{ color: C.textMuted }}>All jobs on track ✓</div></div>
-                    ) : (
-                      <div className="space-y-2">
-                        {overrunJobs.slice(0,4).map(j => (
-                          <div key={j._id} className="flex items-center gap-2">
-                            <div className="flex-1 min-w-0">
-                              <div className="text-[11px] font-semibold truncate">{j.title}</div>
-                              <div className="mt-1 h-1.5 rounded-full overflow-hidden" style={{ background: C.border }}>
-                                <div style={{ width: `${Math.min(j.riskPercent, 100)}%`, background: j.riskPercent >= 100 ? C.red : C.gold }} className="h-full rounded-full" />
-                              </div>
-                            </div>
-                            <span className="text-[10px] font-bold flex-shrink-0" style={{ color: j.riskPercent >= 100 ? C.red : C.gold }}>{j.riskPercent}%</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </Card>
-                </div>
-              </div>
+      <main style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 20px" }}>
+        {/* Overview */}
+        {tab === "overview" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
+              <StatCard label="Jobs Created" value={createdJobs.length} color={C.brand} />
+              <StatCard label="Pending Approvals" value={approvals.length} color={C.amber} />
+              <StatCard label="Overrun Risk" value={overrunJobs.length} color={C.red} sub="≥75% estimate used" />
+              <StatCard label="Idle Jobs" value={idleJobs.length} color={C.textMuted} sub="7+ days inactive" />
+              <StatCard label="My Hours This Week" value={fmtDuration(totalWeekMins)} color={C.green} />
             </div>
-          )}
 
-          {tab === "team" && (
-            <div className="space-y-4">
-              <SectionHead title="Team Workload Heatmap" sub={`Week of ${weekStart}`} />
-              <Card className="p-5 overflow-x-auto">
-                <table className="w-full text-[11px] min-w-[500px]">
-                  <thead>
-                    <tr>
-                      <th className="text-left py-2 pr-6 font-semibold" style={{ color: C.textMuted }}>Member</th>
-                      {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => (
-                        <th key={d} className="text-center py-2 px-2 font-semibold" style={{ color: C.textMuted }}>{d}</th>
-                      ))}
-                      <th className="text-right py-2 pl-2 font-semibold" style={{ color: C.textMuted }}>Avg</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {heatmap.map((row, i) => {
-                      const days = Array.from({ length: 7 }, (_, idx) => {
-                        const d = new Date(weekStart); d.setDate(d.getDate() + idx);
-                        return row.days?.[d.toISOString().slice(0,10)];
-                      });
-                      const avg = days.reduce((s, d) => s + (d?.loadPercent ?? 0), 0) / 7;
-                      return (
-                        <tr key={i} className="border-t" style={{ borderColor: C.border }}>
-                          <td className="py-2.5 pr-6 font-medium" style={{ color: C.textMid }}>Member {i+1}</td>
-                          {days.map((day, j) => {
-                            const pct = day?.loadPercent ?? 0;
-                            const bg = pct === 0 ? C.surfaceAlt : pct < 60 ? C.green + "20" : pct < 90 ? C.gold + "20" : C.red + "20";
-                            const fc = pct === 0 ? C.textMuted : pct < 60 ? C.green : pct < 90 ? C.gold : C.red;
-                            return (
-                              <td key={j} className="text-center py-1.5 px-1">
-                                <span style={{ background: bg, color: fc, borderRadius: 6 }} className="px-2 py-1 font-semibold inline-block w-full">
-                                  {pct > 0 ? `${pct}%` : "—"}
-                                </span>
-                              </td>
-                            );
-                          })}
-                          <td className="text-right py-1.5 pl-2 font-bold" style={{ color: avg < 60 ? C.green : avg < 90 ? C.gold : C.red }}>
-                            {Math.round(avg)}%
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+            {approvals.length > 0 && (
+              <Card>
+                <div style={{ padding: "14px 22px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Pending Approvals</span>
+                  <Chip color={C.amber}>{approvals.length} waiting</Chip>
+                </div>
+                {approvals.slice(0, 3).map(ts => (
+                  <div key={ts._id} style={{ padding: "12px 22px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{ts.owner?.f_name} {ts.owner?.l_name}</div>
+                      <div style={{ fontSize: 11, color: C.textMuted }}>Week of {fmtDate(ts.week_start)} · {fmtDuration(ts.total_minutes)}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <Btn variant="success" onClick={() => approveTS.mutate({ timesheetId: ts._id, remarks: "Approved" }, { onSuccess: refetchApprovals })}>Approve</Btn>
+                      <Btn variant="danger" onClick={() => setRejectModal({ open: true, ts })}>Reject</Btn>
+                    </div>
+                  </div>
+                ))}
+                {approvals.length > 3 && (
+                  <div style={{ padding: "12px 22px" }}>
+                    <button onClick={() => setTab("approvals")} style={{ fontSize: 12, color: C.brand, background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>View all {approvals.length} pending →</button>
+                  </div>
+                )}
               </Card>
+            )}
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <Card className="p-5">
-                  <SectionHead title="Idle Jobs" sub={`No activity in 5+ days`} />
-                  {idleJobs.length === 0 ? (
-                    <div className="py-6 text-center text-[12px]" style={{ color: C.textMuted }}>All jobs are active</div>
-                  ) : (
-                    <div className="space-y-2">
-                      {idleJobs.map(j => (
-                        <div key={j._id} style={{ background: C.surfaceAlt, borderRadius: 10 }} className="flex items-center gap-3 p-3">
-                          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: C.gold }} />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-[12px] font-semibold truncate">{j.title}</div>
-                            <div className="text-[10px]" style={{ color: C.textMuted }}>Updated {new Date(j.updatedAt).toLocaleDateString("en-IN", {day:"numeric",month:"short"})}</div>
-                          </div>
-                          <Tag color={statusColor[j.status]}>{j.status.replace(/_/g," ")}</Tag>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </Card>
-                <Card className="p-5">
-                  <SectionHead title="Overrun Risk" sub="Jobs ≥ 75% of estimate" />
-                  {overrunJobs.length === 0 ? (
-                    <div className="py-6 text-center text-[12px]" style={{ color: C.textMuted }}>No jobs at risk ✓</div>
-                  ) : (
-                    <div className="space-y-3">
-                      {overrunJobs.map(j => (
-                        <div key={j._id}>
-                          <div className="flex justify-between text-[11px] mb-1">
-                            <span className="font-semibold truncate max-w-[70%]">{j.title}</span>
-                            <span className="font-bold" style={{ color: j.riskPercent >= 100 ? C.red : C.gold }}>{j.riskPercent}%</span>
-                          </div>
-                          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: C.border }}>
-                            <div style={{ width: `${Math.min(j.riskPercent, 100)}%`, background: j.riskPercent >= 100 ? C.red : C.gold }} className="h-full rounded-full" />
-                          </div>
-                          <div className="text-[10px] mt-0.5" style={{ color: C.textMuted }}>{j.logged_hours_cache}h / {j.estimated_hours}h</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </Card>
+            {/* Jobs by status */}
+            <Card>
+              <div style={{ padding: "14px 22px", borderBottom: `1px solid ${C.border}` }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Jobs by Status</span>
               </div>
-            </div>
-          )}
+              <div style={{ padding: "16px 22px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 10 }}>
+                {["not_started","in_progress","on_hold","completed","cancelled"].map(s => {
+                  const count = createdJobs.filter(j => j.status === s).length;
+                  const col = JOB_STATUS_COLOR[s];
+                  return (
+                    <div key={s} style={{ background: col + "10", border: `1px solid ${col}30`, borderRadius: 12, padding: "14px 12px", textAlign: "center" }}>
+                      <div style={{ fontSize: 22, fontWeight: 900, color: col }}>{count}</div>
+                      <div style={{ fontSize: 10, color: col, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: 4 }}>{s.replace(/_/g, " ")}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          </div>
+        )}
 
-          {tab === "jobs" && (
-            <div className="space-y-4">
-              <SectionHead title="Jobs I Created" sub={`${jobs.length} total`} right={<Btn onClick={() => setJobModal(true)}>＋ Create Job</Btn>} />
-              <div className="space-y-2">
-                {jobs.map(job => (
-                  <Card key={job._id} className="p-4">
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[13px] font-bold">{job.title}</span>
-                          <Tag color={priorityColor[job.priority]}>{job.priority}</Tag>
-                          {job.billable && <Tag color={C.gold}>Billable</Tag>}
-                          {job.overrun_flagged && <Tag color={C.red}>Overrun</Tag>}
-                        </div>
-                        <div className="text-[11px] mt-1 flex gap-3 flex-wrap" style={{ color: C.textMuted }}>
-                          <span>{job.logged_hours_cache?.toFixed(1)}h logged</span>
-                          {job.estimated_hours > 0 && <span>/ {job.estimated_hours}h est.</span>}
-                          {job.due_date && <span>Due {new Date(job.due_date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</span>}
-                        </div>
-                        {job.estimated_hours > 0 && (
-                          <div className="mt-2 h-1 rounded-full overflow-hidden" style={{ background: C.border }}>
-                            <div className="h-full rounded-full" style={{ width: `${Math.min((job.logged_hours_cache/job.estimated_hours)*100,100)}%`, background: job.overrun_flagged ? C.red : C.accent }} />
+        {/* Team Jobs */}
+        {tab === "team-jobs" && (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+              <div>
+                <h1 style={{ fontSize: 18, fontWeight: 800, color: C.text, margin: 0 }}>Team Jobs</h1>
+                <p style={{ fontSize: 12, color: C.textMuted, margin: "4px 0 0" }}>{createdJobs.length} jobs created by you</p>
+              </div>
+              <Btn onClick={() => setJobModal(true)}>+ Create Job</Btn>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {createdJobs.length === 0 ? (
+                <Card style={{ padding: "60px 32px", textAlign: "center" }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: C.text, marginBottom: 12 }}>No jobs created yet</div>
+                  <Btn onClick={() => setJobModal(true)}>+ Create First Job</Btn>
+                </Card>
+              ) : (
+                createdJobs.map(j => (
+                  <Card key={j._id} style={{ padding: "16px 20px", display: "flex", alignItems: "flex-start", gap: 14, flexWrap: "wrap" }}>
+                    <div style={{ width: 4, height: 44, background: JOB_STATUS_COLOR[j.status] || C.textMuted, borderRadius: 4, flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 200 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 6 }}>{j.title}</div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <Chip color={PRIORITY_COLOR[j.priority]}>{j.priority}</Chip>
+                        <Chip color={JOB_STATUS_COLOR[j.status]}>{j.status.replace(/_/g, " ")}</Chip>
+                        {j.billable && <Chip color={C.green}>Billable</Chip>}
+                        {j.estimated_hours > 0 && <Chip color={C.blue}>{j.logged_hours_cache}h / {j.estimated_hours}h</Chip>}
+                      </div>
+                      {j.estimated_hours > 0 && (
+                        <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ width: 140, height: 4, background: C.surfaceAlt, borderRadius: 4 }}>
+                            <div style={{ width: `${Math.min(100, (j.logged_hours_cache/j.estimated_hours)*100)}%`, height: "100%", background: j.overrun_flagged ? C.red : C.brand, borderRadius: 4 }} />
                           </div>
+                          <span style={{ fontSize: 10, color: j.overrun_flagged ? C.red : C.textMuted }}>{Math.round((j.logged_hours_cache/j.estimated_hours)*100)}% used</span>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      {!["completed","cancelled"].includes(j.status) && (
+                        <button onClick={() => updateJobStatus.mutate({ id: j._id, status: "completed" }, { onSuccess: refetchCreated })} style={{ background: C.greenLight, color: C.green, border: "none", borderRadius: 8, padding: "5px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>Complete</button>
+                      )}
+                      <button onClick={() => archiveJob.mutate(j._id, { onSuccess: refetchCreated })} style={{ background: C.surfaceAlt, color: C.textMid, border: `1px solid ${C.border}`, borderRadius: 8, padding: "5px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>Archive</button>
+                    </div>
+                  </Card>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Approvals */}
+        {tab === "approvals" && (
+          <div>
+            <div style={{ marginBottom: 20 }}>
+              <h1 style={{ fontSize: 18, fontWeight: 800, color: C.text, margin: 0 }}>Timesheet Approvals</h1>
+              <p style={{ fontSize: 12, color: C.textMuted, margin: "4px 0 0" }}>{approvals.length} pending your review</p>
+            </div>
+            {approvals.length === 0 ? (
+              <Card style={{ padding: "60px 32px", textAlign: "center" }}>
+                <div style={{ fontSize: 36, marginBottom: 12 }}>✅</div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: C.text }}>All clear — no pending approvals</div>
+              </Card>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {approvals.map(ts => (
+                  <Card key={ts._id} style={{ padding: "20px 24px" }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+                      <div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{ts.owner?.f_name} {ts.owner?.l_name}</div>
+                        <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{ts.owner?.work_email}</div>
+                        <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>Week: {fmtDate(ts.week_start)} – {fmtDate(ts.week_end)}</div>
+                        <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                          <Chip color={C.brand}>{fmtDuration(ts.total_minutes)}</Chip>
+                          {ts.billable_minutes > 0 && <Chip color={C.green}>{fmtDuration(ts.billable_minutes)} billable</Chip>}
+                          <Badge status={ts.status} />
+                        </div>
+                        {ts.total_billed_amount > 0 && (
+                          <div style={{ fontSize: 12, fontWeight: 700, color: C.green, marginTop: 8 }}>₹{ts.total_billed_amount.toFixed(2)} billed</div>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <select value={job.status} onChange={e => updateJobStatus.mutate({ id: job._id, status: e.target.value })}
-                          style={{ background: C.surfaceAlt, border: `1px solid ${C.border}`, color: statusColor[job.status], borderRadius: 8, fontSize: 11, outline: "none" }}
-                          className="px-2.5 py-1.5 font-semibold">
-                          {["not_started","in_progress","on_hold","completed","cancelled"].map(s => (
-                            <option key={s} value={s} style={{ color: C.text }}>{s.replace(/_/g," ")}</option>
-                          ))}
-                        </select>
-                        <Btn variant="ghost" onClick={() => archiveJob.mutate(job._id)}>Archive</Btn>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <Btn variant="success" onClick={() => approveTS.mutate({ timesheetId: ts._id, remarks: "Approved by Admin" }, { onSuccess: refetchApprovals })}>Approve</Btn>
+                        <Btn variant="amber" onClick={() => forwardTS.mutate({ timesheetId: ts._id, remarks: "Forwarded to SuperAdmin" }, { onSuccess: refetchApprovals })}>Forward to SA</Btn>
+                        <Btn variant="danger" onClick={() => setRejectModal({ open: true, ts })}>Reject</Btn>
                       </div>
                     </div>
                   </Card>
                 ))}
-                {jobs.length === 0 && (
-                  <Card className="py-14 text-center">
-                    <div className="text-3xl mb-2">◫</div>
-                    <div className="font-semibold mb-1">No jobs yet</div>
-                    <div className="text-[12px] mb-3" style={{ color: C.textMuted }}>Create a job and assign it to your team</div>
-                    <Btn onClick={() => setJobModal(true)}>Create Job</Btn>
-                  </Card>
-                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Insights */}
+        {tab === "insights" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+              <h1 style={{ fontSize: 18, fontWeight: 800, color: C.text, margin: 0 }}>Insights</h1>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", background: C.surfaceAlt, borderRadius: 10, padding: "5px 10px" }}>
+                <button onClick={() => shiftWeek(-1)} style={{ background: "none", border: "none", cursor: "pointer", color: C.textMid, fontSize: 16 }}>‹</button>
+                <span style={{ fontSize: 11, fontWeight: 600, color: C.textMid }}>
+                  {new Date(weekStart).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} – {weekEnd.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                </span>
+                <button onClick={() => shiftWeek(1)} style={{ background: "none", border: "none", cursor: "pointer", color: C.textMid, fontSize: 16 }}>›</button>
               </div>
             </div>
-          )}
 
-          {tab === "approvals" && (
-            <div className="space-y-4">
-              <SectionHead title="Pending Approvals" sub={`${approvals.length} timesheets`} />
-              {approvals.length === 0 ? (
-                <Card className="py-14 text-center">
-                  <div className="text-3xl mb-2">◈</div>
-                  <div className="font-semibold mb-1">All clear</div>
-                  <div className="text-[12px]" style={{ color: C.textMuted }}>No timesheets pending your review</div>
-                </Card>
-              ) : (
-                <div className="space-y-3">
-                  {approvals.map(ts => (
-                    <Card key={ts._id} className="p-5">
-                      <div className="flex items-start justify-between gap-4 flex-wrap">
-                        <div>
-                          <div className="text-[14px] font-bold">{ts.owner?.f_name} {ts.owner?.l_name}</div>
-                          <div className="text-[11px] mt-0.5" style={{ color: C.textMuted }}>
-                            {ts.owner?.work_email} · Week: {new Date(ts.week_start).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}–{new Date(ts.week_end).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}
-                          </div>
-                          <div className="flex gap-3 mt-2">
-                            <Tag color={C.accent}>{(ts.total_minutes/60).toFixed(1)}h total</Tag>
-                            <Tag color={C.green}>{(ts.billable_minutes/60).toFixed(1)}h billable</Tag>
-                            <Tag color={C.textMuted}>{ts.status?.replace(/_/g," ")}</Tag>
-                          </div>
-                        </div>
-                        <div className="flex gap-2 flex-wrap">
-                          <Btn variant="success" onClick={() => approveTS.mutate({ timesheetId: ts._id, remarks: "Approved" })}>Approve</Btn>
-                          <Btn variant="warning" onClick={() => forwardTS.mutate({ timesheetId: ts._id, remarks: "Forwarded to reporting manager" })}>Forward</Btn>
-                          <Btn variant="danger" onClick={() => rejectTS.mutate({ timesheetId: ts._id, remarks: "Rejected" })}>Reject</Btn>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {tab === "timelog" && (
-            <div className="space-y-4">
-              <SectionHead title="Time Log" sub="Your logged hours" right={<Btn onClick={() => setLogModal(true)}>＋ Log Time</Btn>} />
-              <Card className="p-5">
-                <SectionHead title={`Week of ${weekStart}`} />
-                <div className="space-y-1">
-                  {Object.entries(weekLogs).map(([date, data]) => (
-                    <div key={date} style={{ borderRadius: 10, background: data.totalMinutes > 0 ? C.accentLight : C.surfaceAlt }} className="flex items-center gap-3 px-4 py-3">
-                      <div className="w-20 text-[11px] font-semibold" style={{ color: C.textMid }}>{new Date(date).toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}</div>
-                      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: C.border }}>
-                        <div style={{ width: `${Math.min((data.totalMinutes/480)*100, 100)}%`, background: C.accent }} className="h-full rounded-full" />
-                      </div>
-                      <div className="text-[12px] font-bold w-12 text-right" style={{ color: data.totalMinutes > 0 ? C.accent : C.textMuted }}>
-                        {data.totalMinutes > 0 ? `${(data.totalMinutes/60).toFixed(1)}h` : "—"}
-                      </div>
+            {/* Team heatmap */}
+            <Card>
+              <div style={{ padding: "14px 22px", borderBottom: `1px solid ${C.border}` }}>
+                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: C.text }}>Team Workload Heatmap</h3>
+                <p style={{ margin: "2px 0 0", fontSize: 11, color: C.textMuted }}>Daily capacity usage (8h = 100%)</p>
+              </div>
+              <div style={{ padding: "16px 22px" }}>
+                {heatmap.length === 0 ? (
+                  <div style={{ textAlign: "center", color: C.textMuted, fontSize: 13, padding: "24px 0" }}>No team data for this week</div>
+                ) : (
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10, paddingLeft: 40 }}>
+                      {Array.from({ length: 7 }, (_, i) => { const d = new Date(weekStart); d.setDate(d.getDate() + i); return d; }).map((d, i) => (
+                        <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 10, color: C.textMuted, fontWeight: 600 }}>{d.toLocaleDateString("en-IN", { weekday: "short" })}</div>
+                      ))}
                     </div>
-                  ))}
+                    {heatmap.map((row, i) => {
+                      const dayKeys = Array.from({ length: 7 }, (_, d) => { const dt = new Date(weekStart); dt.setDate(dt.getDate() + d); return dt.toISOString().slice(0, 10); });
+                      return (
+                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
+                          <div style={{ width: 28, height: 28, background: C.brandLight, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: C.brand, flexShrink: 0 }}>
+                            {String(row.person).slice(-2).toUpperCase()}
+                          </div>
+                          {dayKeys.map(dk => {
+                            const day = row.days[dk]; const pct = day?.loadPercent || 0;
+                            const bg = pct === 0 ? C.surfaceAlt : pct < 60 ? "#d1fae5" : pct < 90 ? "#fef3c7" : "#fee2e2";
+                            const col = pct === 0 ? C.textMuted : pct < 60 ? C.green : pct < 90 ? C.amber : C.red;
+                            return (
+                              <div key={dk} title={`${pct}%`} style={{ flex: 1, height: 34, background: bg, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: col }}>
+                                {pct > 0 ? `${pct}%` : "—"}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              {/* Overrun */}
+              <Card>
+                <div style={{ padding: "14px 22px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: C.red }}>⚠ Overrun Risk</span>
+                  <Chip color={C.red}>{overrunJobs.length}</Chip>
                 </div>
+                {overrunJobs.length === 0 ? (
+                  <div style={{ padding: "24px 22px", fontSize: 13, color: C.textMuted }}>No jobs at risk</div>
+                ) : (
+                  overrunJobs.map(j => (
+                    <div key={j._id} style={{ padding: "12px 22px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{j.title}</div>
+                        <div style={{ fontSize: 11, color: C.textMuted }}>{j.logged_hours_cache}h / {j.estimated_hours}h</div>
+                      </div>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: j.riskPercent >= 100 ? C.red : C.amber }}>{j.riskPercent}%</span>
+                    </div>
+                  ))
+                )}
+              </Card>
+
+              {/* Idle */}
+              <Card>
+                <div style={{ padding: "14px 22px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: C.textMid }}>💤 Idle Jobs</span>
+                  <Chip color={C.textMuted}>{idleJobs.length}</Chip>
+                </div>
+                {idleJobs.length === 0 ? (
+                  <div style={{ padding: "24px 22px", fontSize: 13, color: C.textMuted }}>No idle jobs</div>
+                ) : (
+                  idleJobs.map(j => (
+                    <div key={j._id} style={{ padding: "12px 22px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{j.title}</div>
+                        <div style={{ fontSize: 11, color: C.textMuted }}>Last updated {fmtDate(j.updatedAt)}</div>
+                      </div>
+                      <Chip color={JOB_STATUS_COLOR[j.status]}>{j.status.replace(/_/g, " ")}</Chip>
+                    </div>
+                  ))
+                )}
               </Card>
             </div>
-          )}
+          </div>
+        )}
 
-          {tab === "timesheets" && (
-            <div className="space-y-4">
-              <SectionHead title="My Timesheets" sub={`${myTimesheets.length} total`}
-                right={<Btn onClick={() => submitTS.mutate({ week_start: weekStart })}>Submit Week</Btn>} />
-              <div className="space-y-2">
-                {myTimesheets.map(ts => {
-                  const sc = { draft: C.textMuted, pending_manager: C.gold, pending_admin: C.blue, approved: C.green, rejected: C.red };
+        {/* My Work */}
+        {tab === "my-work" && (
+          <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 20 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <TimerWidget jobs={assignedJobs} />
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <h2 style={{ fontSize: 15, fontWeight: 700, color: C.text, margin: 0 }}>My Time This Week</h2>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", background: C.surfaceAlt, borderRadius: 10, padding: "5px 10px" }}>
+                    <button onClick={() => shiftWeek(-1)} style={{ background: "none", border: "none", cursor: "pointer", color: C.textMid, fontSize: 16 }}>‹</button>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: C.textMid }}>{new Date(weekStart).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} – {weekEnd.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
+                    <button onClick={() => shiftWeek(1)} style={{ background: "none", border: "none", cursor: "pointer", color: C.textMid, fontSize: 16 }}>›</button>
+                  </div>
+                  <Btn onClick={() => setLogModal(true)}>+ Log Time</Btn>
+                </div>
+              </div>
+              <Card style={{ marginBottom: 12 }}>
+                <div style={{ padding: "12px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", gap: 24 }}>
+                  <div><div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: "uppercase" }}>Total</div><div style={{ fontSize: 20, fontWeight: 800, color: C.brand }}>{fmtDuration(totalWeekMins)}</div></div>
+                  {prodData && <>
+                    <div><div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: "uppercase" }}>Billable</div><div style={{ fontSize: 20, fontWeight: 800, color: C.green }}>{fmtDuration(prodData.billableMinutes)}</div></div>
+                    <div><div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: "uppercase" }}>Capacity</div><div style={{ fontSize: 20, fontWeight: 800, color: C.blue }}>{prodData.capacityPercent}%</div></div>
+                  </>}
+                </div>
+                {Object.entries(weekDays).sort(([a],[b])=>a.localeCompare(b)).map(([date, data]) => {
+                  const pct = Math.min(100, Math.round(((data.totalMinutes||0)/480)*100));
                   return (
-                    <Card key={ts._id} className="p-4">
-                      <div className="flex items-center justify-between gap-3 flex-wrap">
-                        <div>
-                          <div className="text-[13px] font-bold">Week of {new Date(ts.week_start).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</div>
-                          <div className="flex gap-2 mt-1.5">
-                            <Tag color={sc[ts.status] || C.textMuted}>{ts.status?.replace(/_/g," ")}</Tag>
-                            <Tag color={C.accent}>{(ts.total_minutes/60).toFixed(1)}h</Tag>
-                            {ts.billable_minutes > 0 && <Tag color={C.green}>{(ts.billable_minutes/60).toFixed(1)}h bill.</Tag>}
-                          </div>
-                        </div>
-                        {ts.remarks && <div className="text-[11px] italic" style={{ color: C.textMuted }}>"{ts.remarks}"</div>}
+                    <div key={date} style={{ padding: "10px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 12 }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: C.textMid, width: 100 }}>{new Date(date).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}</span>
+                      <div style={{ flex: 1, height: 6, background: C.surfaceAlt, borderRadius: 4 }}>
+                        <div style={{ width: `${pct}%`, height: "100%", background: pct >= 100 ? C.green : C.brand, borderRadius: 4 }} />
                       </div>
-                    </Card>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: data.totalMinutes > 0 ? C.brand : C.textMuted, width: 50, textAlign: "right" }}>{data.totalMinutes > 0 ? fmtDuration(data.totalMinutes) : "—"}</span>
+                    </div>
                   );
                 })}
-                {myTimesheets.length === 0 && (
-                  <Card className="py-12 text-center">
-                    <div className="text-3xl mb-2">◧</div>
-                    <div className="font-semibold mb-1">No timesheets yet</div>
-                    <div className="text-[12px] mb-3" style={{ color: C.textMuted }}>Submit your week to start tracking</div>
-                    <Btn onClick={() => submitTS.mutate({ week_start: weekStart })}>Submit Current Week</Btn>
-                  </Card>
-                )}
+              </Card>
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <Btn onClick={() => submitTS.mutate({ week_start: weekStart }, { onSuccess: () => { refetchTS(); refetchWeek(); } })} disabled={submitTS.isPending}>
+                  {submitTS.isPending ? "Submitting…" : "Submit Week for Approval"}
+                </Btn>
               </div>
             </div>
-          )}
-        </main>
-      </div>
-
-      <Modal open={jobModal} onClose={() => setJobModal(false)} title="Create Job">
-        <div className="space-y-4">
-          <Input label="Job Title" placeholder="e.g. API Integration" value={jobForm.title} onChange={e => setJobForm(p => ({...p,title:e.target.value}))} />
-          <Select label="Assign To" value={jobForm.assigned_to} onChange={e => setJobForm(p => ({...p,assigned_to:e.target.value}))}>
-            <option value="">Select member…</option>
-            {targets.map(t => <option key={t.id} value={t.id}>{t.id} ({t.model})</option>)}
-          </Select>
-          <div className="grid grid-cols-2 gap-3">
-            <Select label="Priority" value={jobForm.priority} onChange={e => setJobForm(p => ({...p,priority:e.target.value}))}>
-              <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="urgent">Urgent</option>
-            </Select>
-            <Input label="Est. Hours" type="number" placeholder="0" value={jobForm.estimated_hours} onChange={e => setJobForm(p => ({...p,estimated_hours:e.target.value}))} />
           </div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={jobForm.billable} onChange={e => setJobForm(p => ({...p,billable:e.target.checked}))} className="accent-indigo-600 w-4 h-4" />
-            <span className="text-[13px]" style={{ color: C.textMid }}>Billable</span>
+        )}
+
+        {/* Timesheets */}
+        {tab === "timesheets" && (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <h1 style={{ fontSize: 18, fontWeight: 800, color: C.text, margin: 0 }}>My Timesheets</h1>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {timesheets.length === 0 ? (
+                <Card style={{ padding: "60px 32px", textAlign: "center" }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: C.text, marginBottom: 12 }}>No timesheets yet</div>
+                  <Btn onClick={() => setTab("my-work")}>Go to My Work</Btn>
+                </Card>
+              ) : timesheets.map(ts => (
+                <Card key={ts._id} style={{ padding: "18px 24px", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 6 }}>Week of {fmtDate(ts.week_start)}</div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <Badge status={ts.status} />
+                      <Chip color={C.brand}>{fmtDuration(ts.total_minutes)}</Chip>
+                      {ts.billable_minutes > 0 && <Chip color={C.green}>{fmtDuration(ts.billable_minutes)} billable</Chip>}
+                    </div>
+                  </div>
+                  {ts.remarks && <div style={{ fontSize: 12, color: C.textMid, fontStyle: "italic" }}>"{ts.remarks}"</div>}
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Create Job Modal */}
+      <Modal open={jobModal} onClose={() => setJobModal(false)} title="Create Job" width={540}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <Input label="Job Title *" placeholder="e.g. Design Login Page" value={jobForm.title} onChange={e => setJobForm(p => ({ ...p, title: e.target.value }))} />
+          <Input label="Description" placeholder="Job details…" value={jobForm.description} onChange={e => setJobForm(p => ({ ...p, description: e.target.value }))} />
+          <Sel label="Assign To *" value={jobForm.assigned_to} onChange={e => setJobForm(p => ({ ...p, assigned_to: e.target.value }))}>
+            <option value="">Select team member…</option>
+            {targets.map(t => <option key={t.id} value={t.id}>{t.id} ({t.model})</option>)}
+          </Sel>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Sel label="Priority" value={jobForm.priority} onChange={e => setJobForm(p => ({ ...p, priority: e.target.value }))}>
+              <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="urgent">Urgent</option>
+            </Sel>
+            <Input label="Est. Hours" type="number" placeholder="0" value={jobForm.estimated_hours} onChange={e => setJobForm(p => ({ ...p, estimated_hours: e.target.value }))} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Input label="Hourly Rate (₹)" type="number" placeholder="0" value={jobForm.hourly_rate} onChange={e => setJobForm(p => ({ ...p, hourly_rate: e.target.value }))} />
+            <Input label="Due Date" type="date" value={jobForm.due_date} onChange={e => setJobForm(p => ({ ...p, due_date: e.target.value }))} />
+          </div>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input type="checkbox" checked={jobForm.billable} onChange={e => setJobForm(p => ({ ...p, billable: e.target.checked }))} style={{ width: 15, height: 15, accentColor: C.brand }} />
+            <span style={{ fontSize: 13, color: C.textMid }}>Billable job</span>
           </label>
-          <div className="flex gap-2 justify-end pt-2">
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <Btn variant="ghost" onClick={() => setJobModal(false)}>Cancel</Btn>
             <Btn onClick={handleCreateJob} disabled={!jobForm.title || !jobForm.assigned_to || createJob.isPending}>{createJob.isPending ? "Creating…" : "Create Job"}</Btn>
           </div>
         </div>
       </Modal>
 
+      {/* Log Time Modal */}
       <Modal open={logModal} onClose={() => setLogModal(false)} title="Log Time">
-        <div className="space-y-4">
-          <Select label="Job" value={logForm.job} onChange={e => setLogForm(p => ({...p,job:e.target.value}))}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <Sel label="Job" value={logForm.job} onChange={e => setLogForm(p => ({ ...p, job: e.target.value }))}>
             <option value="">Select job…</option>
-            {jobs.map(j => <option key={j._id} value={j._id}>{j.title}</option>)}
-          </Select>
-          <Input label="Date" type="date" value={logForm.log_date} onChange={e => setLogForm(p => ({...p,log_date:e.target.value}))} />
-          <Input label="Duration (minutes)" type="number" placeholder="e.g. 120" value={logForm.duration_minutes} onChange={e => setLogForm(p => ({...p,duration_minutes:e.target.value}))} />
-          <Input label="Note" placeholder="What did you work on?" value={logForm.note} onChange={e => setLogForm(p => ({...p,note:e.target.value}))} />
-          <div className="flex gap-2 justify-end pt-2">
+            {assignedJobs.map(j => <option key={j._id} value={j._id}>{j.title}</option>)}
+          </Sel>
+          <Input label="Date" type="date" value={logForm.log_date} onChange={e => setLogForm(p => ({ ...p, log_date: e.target.value }))} />
+          <Input label="Duration (minutes)" type="number" placeholder="e.g. 90" value={logForm.duration_minutes} onChange={e => setLogForm(p => ({ ...p, duration_minutes: e.target.value }))} />
+          <Input label="Note" placeholder="What did you work on?" value={logForm.note} onChange={e => setLogForm(p => ({ ...p, note: e.target.value }))} />
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <Btn variant="ghost" onClick={() => setLogModal(false)}>Cancel</Btn>
-            <Btn onClick={handleLogTime} disabled={!logForm.job || !logForm.duration_minutes || logTime.isPending}>{logTime.isPending ? "Logging…" : "Log Time"}</Btn>
+            <Btn onClick={handleLogTime} disabled={!logForm.job || !logForm.duration_minutes || logTime.isPending}>{logTime.isPending ? "Logging…" : "Save Entry"}</Btn>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Reject Modal */}
+      <Modal open={rejectModal.open} onClose={() => setRejectModal({ open: false, ts: null })} title="Reject Timesheet">
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <p style={{ fontSize: 13, color: C.textMid, margin: 0 }}>Provide a reason for rejection.</p>
+          <Input label="Reason *" placeholder="Enter reason…" value={rejectReason} onChange={e => setRejectReason(e.target.value)} />
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <Btn variant="ghost" onClick={() => setRejectModal({ open: false, ts: null })}>Cancel</Btn>
+            <Btn variant="danger" onClick={() => { rejectTS.mutate({ timesheetId: rejectModal.ts._id, remarks: rejectReason }, { onSuccess: () => { setRejectModal({ open: false, ts: null }); setRejectReason(""); refetchApprovals(); } }); }} disabled={!rejectReason || rejectTS.isPending}>{rejectTS.isPending ? "Rejecting…" : "Reject"}</Btn>
           </div>
         </div>
       </Modal>
