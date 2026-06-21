@@ -83,7 +83,10 @@ const Admindocument = lazy(() => import("./pages/document/admindocument"));
 const Adminteamdocument = lazy(
   () => import("./pages/document/adminteamdocument"),
 );
-
+const Adminrimesheet = lazy(() => import("./pages/timesheet/adtimesheet"));
+const Managertimesheet = lazy(() => import("./pages/timesheet/mattimesheet"));
+const Employeetimesheet = lazy(() => import("./pages/timesheet/emtimesheet"));
+const SuperAdmintimesheet = lazy(() => import("./pages/timesheet/sutimesheet"));
 function PageSkeleton() {
   const [animationData, setAnimationData] = useState(null);
 
