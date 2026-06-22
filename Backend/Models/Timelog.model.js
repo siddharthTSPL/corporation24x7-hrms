@@ -99,12 +99,16 @@ timeLogSchema.methods.computeBilledAmount = function () {
   return Math.round(hours * this.hourly_rate * 100) / 100;
 };
 
-timeLogSchema.pre("save", function () {
+// BUG FIX: pre-save hook was missing next() — caused all .save() calls on
+// TimeLog to hang indefinitely when not using async pre-save middleware.
+timeLogSchema.pre("save", function (next) {
   if (this.billable) {
     this.billed_amount = this.computeBilledAmount();
   } else {
     this.billed_amount = 0;
   }
+  next();
 });
 
-module.exports = mongoose.models.TimeLog || mongoose.model("TimeLog", timeLogSchema);
+module.exports =
+  mongoose.models.TimeLog || mongoose.model("TimeLog", timeLogSchema);
