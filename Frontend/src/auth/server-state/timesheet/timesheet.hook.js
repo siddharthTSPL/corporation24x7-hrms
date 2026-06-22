@@ -8,6 +8,7 @@ import {
   startTimer, heartbeatTimer, pauseTimer, resumeTimer, stopTimer, getActiveTimer, discardTimer,
   submitTimesheet, getMyTimesheets, getPendingApprovals, approveTimesheet, rejectTimesheet, forwardTimesheet,
   getTeamWorkloadHeatmap, getOverrunRiskJobs, getIdleJobs, getMyProductivitySummary,
+  getOrgAllTimeLogs, getOrgAllTimesheets,
 } from "../../api/timesheet/timesheet.api";
 
 export const useCreateProject = () => {
@@ -363,4 +364,23 @@ export const useMyProductivitySummary = (weekStart) =>
     queryKey: ["tsProductivitySummary", weekStart],
     queryFn: () => getMyProductivitySummary(weekStart),
     enabled: !!weekStart,
+  });
+
+// ─── SA / Admin: org-wide visibility ─────────────────────────────────────────
+export const useOrgAllTimeLogs = (params = {}) =>
+  useQuery({
+    queryKey: ["tsOrgAllTimeLogs", params],
+    queryFn: () => getOrgAllTimeLogs(params),
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
+
+export const useOrgAllTimesheets = (params = {}) =>
+  useQuery({
+    queryKey: ["tsOrgAllTimesheets", params],
+    queryFn: () => getOrgAllTimesheets(params),
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });

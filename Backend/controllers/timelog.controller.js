@@ -283,6 +283,38 @@ const getJobTimeLogs = async (req, res, next) => {
   res.status(200).json({ success: true, count: logs.length, logs });
 };
 
+// ─── ADMIN / SUPERADMIN: org-wide log visibility ─────────────────────────────
+
+const getAllTimeLogs = async (req, res, next) => {
+  const organisation_id = resolveOrgId(req);
+  const { date, week_start, user_id, job_id, status } = req.query;
+
+  const filter = { organisation_id };
+  if (user_id) filter.logged_by = user_id;
+  if (job_id) filter.job = job_id;
+  if (status) filter.status = status;
+
+  if (date) {
+    const dayStart = new Date(date); dayStart.setHours(0, 0, 0, 0);
+    const dayEnd   = new Date(date); dayEnd.setHours(23, 59, 59, 999);
+    filter.log_date = { $gte: dayStart, $lte: dayEnd };
+  } else if (week_start) {
+    const start = new Date(week_start); start.setHours(0, 0, 0, 0);
+    const end   = new Date(start);      end.setDate(end.getDate() + 7);
+    filter.log_date = { $gte: start, $lt: end };
+  }
+
+  const logs = await TimeLog.find(filter)
+    .populate("job", "title project")
+    .populate("logged_by", "f_name l_name work_email")
+    .sort({ log_date: -1, createdAt: -1 })
+    .lean();
+
+  const totalMinutes = logs.reduce((s, l) => s + l.duration_minutes, 0);
+
+  res.status(200).json({ success: true, count: logs.length, totalMinutes, logs });
+};
+
 module.exports = {
   logTime,
   getMyDayLog,
@@ -290,5 +322,6 @@ module.exports = {
   updateTimeLog,
   deleteTimeLog,
   getJobTimeLogs,
+  getAllTimeLogs,
   recomputeJobHours,
 };

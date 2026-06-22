@@ -144,7 +144,7 @@ timesheetRouter.get("/insights/overrun-risk", anyRole, asyncHandler(getOverrunRi
 timesheetRouter.get("/insights/idle-jobs", anyRole, asyncHandler(getIdleJobs));
 timesheetRouter.get("/insights/my-productivity", anyRole, asyncHandler(getMyProductivitySummary));
 
-
+// ─── SA / Admin: org-wide visibility endpoints ────────────────────────────────
 timesheetRouter.get("/admin/time-logs", saOrAdmin, asyncHandler(getAllTimeLogs));
 timesheetRouter.get("/admin/timesheets", saOrAdmin, asyncHandler(getAllTimesheets));
 
