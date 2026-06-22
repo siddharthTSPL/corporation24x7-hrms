@@ -41,4 +41,5 @@ const clientSchema = new mongoose.Schema(
 clientSchema.index({ organisation_id: 1, status: 1 });
 clientSchema.index({ organisation_id: 1, name: 1 });
 
-module.exports = mongoose.models.TSClient || mongoose.model("TSClient", clientSchema);
+module.exports =
+  mongoose.models.TSClient || mongoose.model("TSClient", clientSchema);
