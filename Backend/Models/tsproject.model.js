@@ -92,11 +92,17 @@ const projectSchema = new mongoose.Schema(
 projectSchema.index({ organisation_id: 1, status: 1 });
 projectSchema.index({ organisation_id: 1, owner: 1 });
 projectSchema.index({ organisation_id: 1, "members.member": 1 });
-projectSchema.index({ organisation_id: 1, code: 1 }, { unique: true, sparse: true });
+projectSchema.index(
+  { organisation_id: 1, code: 1 },
+  { unique: true, sparse: true }
+);
 projectSchema.index({ client: 1 });
 
 projectSchema.methods.hasMember = function (memberId) {
-  return this.members.some((m) => m.member.toString() === memberId.toString());
+  return this.members.some(
+    (m) => m.member.toString() === memberId.toString()
+  );
 };
 
-module.exports = mongoose.models.TSProject || mongoose.model("TSProject", projectSchema);
+module.exports =
+  mongoose.models.TSProject || mongoose.model("TSProject", projectSchema);
