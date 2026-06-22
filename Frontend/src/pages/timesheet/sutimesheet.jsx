@@ -7,29 +7,6 @@ import {
   useOrgAllTimeLogs, useOrgAllTimesheets,
 } from "../../auth/server-state/timesheet/timesheet.hook";
 
-const C = {
-  brand: "#730042",
-  brandHover: "#8B0050",
-  brandLight: "rgba(115,0,66,0.07)",
-  brandMid: "rgba(115,0,66,0.18)",
-  accent: "#CD166E",
-  bg: "#F4F5F9",
-  surface: "#FFFFFF",
-  surfaceAlt: "#F8F9FC",
-  border: "#E4E6EF",
-  text: "#111827",
-  textMid: "#374151",
-  textMuted: "#9CA3AF",
-  green: "#059669",
-  greenLight: "rgba(5,150,105,0.08)",
-  amber: "#D97706",
-  amberLight: "rgba(217,119,6,0.08)",
-  red: "#DC2626",
-  redLight: "rgba(220,38,38,0.08)",
-  blue: "#2563EB",
-  blueLight: "rgba(37,99,235,0.08)",
-};
-
 const getMonday = (d = new Date()) => {
   const dt = new Date(d);
   const day = dt.getDay();
@@ -41,69 +18,78 @@ const getMonday = (d = new Date()) => {
 
 const fmtDate = (d) =>
   new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+
 const fmtDuration = (mins) => {
   if (!mins && mins !== 0) return "—";
   return `${Math.floor(mins / 60)}h ${mins % 60}m`;
 };
 
 const STATUS_STYLE = {
-  draft:                    { color: C.textMuted, bg: C.surfaceAlt,  label: "Draft" },
-  pending_manager:          { color: C.amber,     bg: C.amberLight,  label: "Pending Manager" },
-  pending_reporting_manager:{ color: C.amber,     bg: C.amberLight,  label: "Pending Review" },
-  pending_admin:            { color: C.blue,      bg: C.blueLight,   label: "Pending Admin" },
-  pending_superadmin:       { color: C.brand,     bg: C.brandLight,  label: "Pending SA" },
-  approved:                 { color: C.green,     bg: C.greenLight,  label: "Approved" },
-  rejected:                 { color: C.red,       bg: C.redLight,    label: "Rejected" },
+  draft:                     { tw: "text-gray-400 bg-gray-100 border-gray-200",              label: "Draft" },
+  pending_manager:           { tw: "text-amber-600 bg-amber-50 border-amber-200",            label: "Pending Manager" },
+  pending_reporting_manager: { tw: "text-amber-600 bg-amber-50 border-amber-200",            label: "Pending Review" },
+  pending_admin:             { tw: "text-blue-600 bg-blue-50 border-blue-200",               label: "Pending Admin" },
+  pending_superadmin:        { tw: "text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20", label: "Pending SA" },
+  approved:                  { tw: "text-emerald-600 bg-emerald-50 border-emerald-200",      label: "Approved" },
+  rejected:                  { tw: "text-red-600 bg-red-50 border-red-200",                  label: "Rejected" },
 };
 
-const PRIORITY_COLOR = { low: C.textMuted, medium: C.amber, high: C.red, urgent: C.brand };
-const JOB_STATUS_COLOR = {
-  not_started: C.textMuted, in_progress: C.blue, on_hold: C.amber,
-  completed: C.green, cancelled: C.red,
+const PRIORITY_TW = {
+  low:    "text-gray-400 bg-gray-100 border-gray-200",
+  medium: "text-amber-600 bg-amber-50 border-amber-200",
+  high:   "text-red-600 bg-red-50 border-red-200",
+  urgent: "text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20",
+};
+
+const JOB_STATUS_TW = {
+  not_started: "text-gray-400",
+  in_progress: "text-blue-600",
+  on_hold:     "text-amber-600",
+  completed:   "text-emerald-600",
+  cancelled:   "text-red-600",
 };
 
 const NAV_TABS = [
-  { id: "overview",    label: "Overview"     },
-  { id: "projects",    label: "Projects"     },
-  { id: "jobs",        label: "Jobs"         },
-  { id: "approvals",   label: "Approvals"    },
-  { id: "org-logs",    label: "All Logs"     },
-  { id: "org-sheets",  label: "All Timesheets"},
-  { id: "analytics",   label: "Analytics"    },
+  { id: "overview",   label: "Overview"       },
+  { id: "projects",   label: "Projects"       },
+  { id: "jobs",       label: "Jobs"           },
+  { id: "approvals",  label: "Approvals"      },
+  { id: "org-logs",   label: "All Logs"       },
+  { id: "org-sheets", label: "All Timesheets" },
+  { id: "analytics",  label: "Analytics"      },
 ];
 
 function cn(...args) { return args.filter(Boolean).join(" "); }
 
-function Badge({ color, bg, children }) {
+function Badge({ tw = "text-gray-400 bg-gray-100 border-gray-200", children }) {
   return (
-    <span style={{
-      background: bg || color + "18", color,
-      border: `1px solid ${color}30`, borderRadius: 6,
-      padding: "2px 8px", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap",
-    }}>
+    <span className={cn("inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap", tw)}>
       {children}
     </span>
   );
 }
 
-function Card({ children, style = {}, className = "", onClick }) {
+function Card({ children, className = "", onClick }) {
   return (
-    <div onClick={onClick} className={className} style={{
-      background: C.surface, border: `1px solid ${C.border}`,
-      borderRadius: 14, overflow: "hidden", ...style,
-      ...(onClick ? { cursor: "pointer" } : {}),
-    }}>
+    <div
+      onClick={onClick}
+      className={cn(
+        "bg-white border border-[#E4E6EF] rounded-2xl overflow-hidden",
+        onClick && "cursor-pointer hover:border-[#730042]/30 transition-colors",
+        className
+      )}
+    >
       {children}
     </div>
   );
 }
 
-function StatTile({ label, value, sub, color = C.brand }) {
+function StatTile({ label, value, sub, colorClass = "text-[#730042]" }) {
   return (
-    <Card style={{ padding: "20px 24px" }}>
-      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: C.textMuted, marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 32, fontWeight: 800, color, lineHeight: 1, marginBottom: 4 }}>{value}</div>
-      {sub && <div style={{ fontSize: 12, color: C.textMuted }}>{sub}</div>}
+    <Card className="px-5 py-4 sm:px-6 sm:py-5">
+      <div className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">{label}</div>
+      <div className={cn("text-3xl sm:text-4xl font-extrabold leading-none mb-1", colorClass)}>{value}</div>
+      {sub && <div className="text-[12px] text-gray-400">{sub}</div>}
     </Card>
   );
 }
@@ -111,52 +97,67 @@ function StatTile({ label, value, sub, color = C.brand }) {
 function Modal({ open, onClose, title, children }) {
   if (!open) return null;
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(6px)" }}>
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, width: "100%", maxWidth: 520 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 24px", borderBottom: `1px solid ${C.border}` }}>
-          <span style={{ fontWeight: 700, fontSize: 15, color: C.text }}>{title}</span>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: C.textMuted, lineHeight: 1 }}>×</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/45 backdrop-blur-[6px]">
+      <div className="bg-white border border-[#E4E6EF] rounded-[18px] w-full max-w-[95vw] sm:max-w-[520px] max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-[#E4E6EF] shrink-0">
+          <span className="font-bold text-[15px] text-gray-900">{title}</span>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors text-xl leading-none"
+          >×</button>
         </div>
-        <div style={{ padding: 24 }}>{children}</div>
+        <div className="p-5 sm:p-6 overflow-y-auto">{children}</div>
       </div>
     </div>
   );
 }
 
-function Input({ label, ...props }) {
+function Input({ label, className = "", ...props }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      {label && <label style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: C.textMuted }}>{label}</label>}
-      <input {...props} style={{ background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 14px", fontSize: 13, color: C.text, outline: "none", width: "100%", boxSizing: "border-box" }} />
+    <div className="flex flex-col gap-1.5">
+      {label && (
+        <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{label}</label>
+      )}
+      <input
+        {...props}
+        className={cn(
+          "bg-[#F8F9FC] border border-[#E4E6EF] rounded-[10px] px-3.5 py-2.5 text-[13px] text-gray-900 outline-none w-full focus:border-[#730042] transition-colors placeholder:text-gray-300",
+          className
+        )}
+      />
     </div>
   );
 }
 
-function Select({ label, children, ...props }) {
+function Select({ label, children, className = "", ...props }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      {label && <label style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: C.textMuted }}>{label}</label>}
-      <select {...props} style={{ background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 14px", fontSize: 13, color: C.text, outline: "none", width: "100%", appearance: "none" }}>
+    <div className="flex flex-col gap-1.5">
+      {label && (
+        <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{label}</label>
+      )}
+      <select
+        {...props}
+        className={cn(
+          "bg-[#F8F9FC] border border-[#E4E6EF] rounded-[10px] px-3.5 py-2.5 text-[13px] text-gray-900 outline-none w-full appearance-none cursor-pointer focus:border-[#730042] transition-colors",
+          className
+        )}
+      >
         {children}
       </select>
     </div>
   );
 }
 
-function Btn({ children, variant = "primary", onClick, disabled, type = "button" }) {
-  const styles = {
-    primary: { background: C.brand, color: "#fff", border: "none" },
-    ghost:   { background: "transparent", color: C.textMid, border: `1px solid ${C.border}` },
-    danger:  { background: C.redLight, color: C.red, border: `1px solid ${C.red}30` },
-    success: { background: C.greenLight, color: C.green, border: `1px solid ${C.green}30` },
+function Btn({ children, variant = "primary", onClick, disabled, type = "button", className = "" }) {
+  const base = "inline-flex items-center justify-center rounded-[10px] px-4 py-2.5 text-[13px] font-semibold whitespace-nowrap transition-opacity disabled:opacity-55 disabled:cursor-not-allowed min-h-[38px]";
+  const variants = {
+    primary: "bg-[#730042] text-white hover:bg-[#8B0050]",
+    ghost:   "bg-transparent text-gray-600 border border-[#E4E6EF] hover:bg-gray-50",
+    danger:  "bg-red-50 text-red-600 border border-red-200 hover:bg-red-100",
+    success: "bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100",
   };
   return (
-    <button type={type} onClick={onClick} disabled={disabled} style={{
-      ...styles[variant], borderRadius: 10, padding: "9px 18px",
-      fontSize: 13, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer",
-      opacity: disabled ? 0.55 : 1, whiteSpace: "nowrap",
-      transition: "opacity .15s",
-    }}>
+    <button type={type} onClick={onClick} disabled={disabled} className={cn(base, variants[variant], className)}>
       {children}
     </button>
   );
@@ -164,22 +165,22 @@ function Btn({ children, variant = "primary", onClick, disabled, type = "button"
 
 function SectionHeader({ title, sub, action }) {
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 18, gap: 12 }}>
+    <div className="flex items-start justify-between gap-3 mb-4 sm:mb-5">
       <div>
-        <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{title}</div>
-        {sub && <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{sub}</div>}
+        <div className="text-[15px] sm:text-[16px] font-bold text-gray-900">{title}</div>
+        {sub && <div className="text-[12px] text-gray-400 mt-0.5">{sub}</div>}
       </div>
-      {action}
+      {action && <div className="shrink-0">{action}</div>}
     </div>
   );
 }
 
 function EmptyState({ icon, title, sub, action }) {
   return (
-    <div style={{ padding: "48px 24px", textAlign: "center" }}>
-      <div style={{ fontSize: 36, marginBottom: 10 }}>{icon}</div>
-      <div style={{ fontWeight: 700, fontSize: 15, color: C.text, marginBottom: 4 }}>{title}</div>
-      <div style={{ fontSize: 13, color: C.textMuted, marginBottom: action ? 16 : 0 }}>{sub}</div>
+    <div className="py-10 sm:py-12 text-center px-6">
+      <div className="text-4xl mb-2.5">{icon}</div>
+      <div className="font-bold text-[15px] text-gray-900 mb-1">{title}</div>
+      <div className="text-[13px] text-gray-400 mb-4">{sub}</div>
       {action}
     </div>
   );
@@ -192,12 +193,13 @@ export default function SuperAdminTimesheet() {
   const [approveModal, setApproveModal] = useState(null);
   const [rejectModal, setRejectModal] = useState(null);
   const [rejectRemarks, setRejectRemarks] = useState("");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const [projectForm, setProjectForm] = useState({ name: "", description: "", billing_type: "hourly", currency: "INR", default_hourly_rate: "" });
   const [jobForm, setJobForm] = useState({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: true, hourly_rate: "", currency: "INR" });
 
   const [weekStart] = useState(getMonday);
-  const [logsWeek, setLogsWeek]     = useState(weekStart);
+  const [logsWeek, setLogsWeek] = useState(weekStart);
   const [sheetsStatus, setSheetsStatus] = useState("");
   const [sheetsOwnerModel, setSheetsOwnerModel] = useState("");
 
@@ -208,7 +210,6 @@ export default function SuperAdminTimesheet() {
   const { data: idleData }      = useIdleJobs(7);
   const { data: heatmapData }   = useTeamWorkloadHeatmap(weekStart);
   const { data: targetsData }   = useAssignableTargets();
-
   const { data: orgLogsData }   = useOrgAllTimeLogs({ week_start: logsWeek });
   const { data: orgSheetsData } = useOrgAllTimesheets({
     ...(sheetsStatus ? { status: sheetsStatus } : {}),
@@ -222,19 +223,19 @@ export default function SuperAdminTimesheet() {
   const archiveJob      = useArchiveJob();
   const updateJobStatus = useUpdateJobStatus();
 
-  const projects  = projectsData?.projects    ?? [];
-  const jobs      = jobsData?.jobs            ?? [];
-  const approvals = approvalsData?.timesheets ?? [];
-  const overrunJobs = overrunData?.jobs       ?? [];
-  const idleJobs    = idleData?.jobs          ?? [];
-  const heatmap     = heatmapData?.heatmap    ?? [];
-  const targets     = targetsData?.targets    ?? [];
-  const orgLogs     = orgLogsData?.logs       ?? [];
-  const orgSheets   = orgSheetsData?.timesheets ?? [];
+  const projects    = projectsData?.projects      ?? [];
+  const jobs        = jobsData?.jobs              ?? [];
+  const approvals   = approvalsData?.timesheets   ?? [];
+  const overrunJobs = overrunData?.jobs           ?? [];
+  const idleJobs    = idleData?.jobs              ?? [];
+  const heatmap     = heatmapData?.heatmap        ?? [];
+  const targets     = targetsData?.targets        ?? [];
+  const orgLogs     = orgLogsData?.logs           ?? [];
+  const orgSheets   = orgSheetsData?.timesheets   ?? [];
 
-  const totalHours   = useMemo(() => jobs.reduce((s, j) => s + (j.logged_hours_cache || 0), 0), [jobs]);
-  const billableJobs = useMemo(() => jobs.filter(j => j.billable).length, [jobs]);
-  const completedJobs= useMemo(() => jobs.filter(j => j.status === "completed").length, [jobs]);
+  const totalHours    = useMemo(() => jobs.reduce((s, j) => s + (j.logged_hours_cache || 0), 0), [jobs]);
+  const billableJobs  = useMemo(() => jobs.filter(j => j.billable).length, [jobs]);
+  const completedJobs = useMemo(() => jobs.filter(j => j.status === "completed").length, [jobs]);
 
   const handleCreateProject = async () => {
     await createProject.mutateAsync({ ...projectForm, default_hourly_rate: Number(projectForm.default_hourly_rate) || 0 });
@@ -266,87 +267,130 @@ export default function SuperAdminTimesheet() {
     setRejectRemarks("");
   };
 
-  return (
-    <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'Inter', sans-serif", color: C.text }}>
+  const currentTabLabel = NAV_TABS.find(t => t.id === tab)?.label ?? "";
 
-      {/* ── Horizontal Nav ─────────────────────────────────────────────────── */}
-      <header style={{ background: C.surface, borderBottom: `1px solid ${C.border}`, position: "sticky", top: 0, zIndex: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 0, padding: "0 24px", overflowX: "auto" }}>
-          {/* Logo chip */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, paddingRight: 24, borderRight: `1px solid ${C.border}`, marginRight: 8, flexShrink: 0 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: C.brand, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <span style={{ color: "#fff", fontSize: 13, fontWeight: 800 }}>S</span>
+  return (
+    <div className="min-h-screen bg-[#F4F5F9]" style={{ fontFamily: "'Inter', sans-serif" }}>
+
+      <header className="bg-white border-b border-[#E4E6EF] sticky top-0 z-20">
+        <div className="flex items-center gap-0 px-4 sm:px-6 overflow-x-auto scrollbar-none">
+
+          <div className="flex items-center gap-2.5 pr-4 sm:pr-6 border-r border-[#E4E6EF] mr-1 sm:mr-2 shrink-0 py-3">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-[#730042] flex items-center justify-center shrink-0">
+              <span className="text-white text-[12px] sm:text-[13px] font-black">S</span>
             </div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>TorchX</div>
-              <div style={{ fontSize: 10, color: C.textMuted }}>Super Admin</div>
+            <div className="hidden sm:block">
+              <div className="text-[13px] font-bold text-gray-900">TorchX</div>
+              <div className="text-[10px] text-gray-400">Super Admin</div>
             </div>
           </div>
 
-          <nav style={{ display: "flex", alignItems: "center", gap: 2, flex: 1 }}>
+          <nav className="hidden md:flex items-center gap-0 flex-1 overflow-x-auto scrollbar-none">
             {NAV_TABS.map(t => (
-              <button key={t.id} onClick={() => setTab(t.id)} style={{
-                background: "none", border: "none", cursor: "pointer",
-                padding: "18px 14px", fontSize: 13, fontWeight: tab === t.id ? 700 : 500,
-                color: tab === t.id ? C.brand : C.textMid,
-                borderBottom: tab === t.id ? `2.5px solid ${C.brand}` : "2.5px solid transparent",
-                whiteSpace: "nowrap", transition: "color .15s, border-color .15s",
-                position: "relative",
-              }}>
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  "relative px-3.5 py-[18px] text-[13px] whitespace-nowrap border-b-[2.5px] transition-all shrink-0",
+                  tab === t.id
+                    ? "font-bold text-[#730042] border-[#730042]"
+                    : "font-medium text-gray-600 border-transparent hover:text-gray-900"
+                )}
+              >
                 {t.label}
                 {t.id === "approvals" && approvals.length > 0 && (
-                  <span style={{
-                    position: "absolute", top: 12, right: 6,
-                    background: C.red, color: "#fff", borderRadius: "50%",
-                    width: 16, height: 16, fontSize: 9, fontWeight: 800,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>{approvals.length}</span>
+                  <span className="absolute top-3 right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] font-black flex items-center justify-center">
+                    {approvals.length}
+                  </span>
                 )}
               </button>
             ))}
           </nav>
 
-          <div style={{ display: "flex", gap: 8, flexShrink: 0, paddingLeft: 16 }}>
-            <Btn onClick={() => setCreateJobOpen(true)}>＋ New Job</Btn>
-            <Btn variant="ghost" onClick={() => setCreateProjectOpen(true)}>＋ Project</Btn>
+          <div className="md:hidden flex items-center gap-2 flex-1 pl-3">
+            <button
+              onClick={() => setMobileNavOpen(v => !v)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E4E6EF] text-[13px] font-semibold text-gray-700 bg-[#F8F9FC]"
+            >
+              <span>{currentTabLabel}</span>
+              <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 16 16">
+                <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              {approvals.length > 0 && (
+                <span className="w-4 h-4 bg-red-500 text-white rounded-full text-[9px] font-black flex items-center justify-center">{approvals.length}</span>
+              )}
+            </button>
+          </div>
+
+          <div className="flex gap-2 shrink-0 pl-3 sm:pl-4 py-2.5 border-l border-[#E4E6EF] ml-auto">
+            <Btn onClick={() => setCreateJobOpen(true)} className="text-[12px] px-3 sm:px-4 hidden xs:inline-flex">＋ New Job</Btn>
+            <Btn variant="ghost" onClick={() => setCreateProjectOpen(true)} className="text-[12px] px-3 sm:px-4 hidden sm:inline-flex">＋ Project</Btn>
+            <Btn onClick={() => setCreateJobOpen(true)} className="text-[11px] px-2.5 xs:hidden">＋ Job</Btn>
           </div>
         </div>
+
+        {mobileNavOpen && (
+          <div className="md:hidden border-t border-[#E4E6EF] bg-white">
+            {NAV_TABS.map(t => (
+              <button
+                key={t.id}
+                onClick={() => { setTab(t.id); setMobileNavOpen(false); }}
+                className={cn(
+                  "w-full flex items-center justify-between px-5 py-3 text-[13px] font-medium border-b border-[#E4E6EF] last:border-0 transition-colors",
+                  tab === t.id ? "text-[#730042] bg-[#730042]/[0.04] font-bold" : "text-gray-700 hover:bg-gray-50"
+                )}
+              >
+                {t.label}
+                <div className="flex items-center gap-2">
+                  {t.id === "approvals" && approvals.length > 0 && (
+                    <span className="w-5 h-5 bg-red-500 text-white rounded-full text-[10px] font-black flex items-center justify-center">{approvals.length}</span>
+                  )}
+                  {tab === t.id && <span className="text-[#730042]">✓</span>}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </header>
 
-      {/* ── Full-access banner ─────────────────────────────────────────────── */}
-      <div style={{ background: C.brandLight, borderBottom: `1px solid ${C.brandMid}`, padding: "6px 24px", display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: C.brand }}>⬡ Super Admin</span>
-        <span style={{ fontSize: 11, color: C.brand, opacity: 0.7 }}>— Organisation-wide visibility across all roles</span>
+      <div className="bg-[#730042]/[0.07] border-b border-[#730042]/[0.18] px-4 sm:px-6 py-1.5 flex items-center gap-2">
+        <span className="text-[11px] font-bold text-[#730042]">⬡ Super Admin</span>
+        <span className="text-[11px] text-[#730042]/70 hidden sm:inline">— Organisation-wide visibility across all roles</span>
       </div>
 
-      <main style={{ padding: "28px 24px", maxWidth: 1280, margin: "0 auto" }}>
+      <main className="px-4 sm:px-6 py-5 sm:py-7 max-w-[1280px] mx-auto">
 
-        {/* ── OVERVIEW ───────────────────────────────────────────────────────── */}
         {tab === "overview" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
-              <StatTile label="Total Projects"   value={projects.length}                      sub="Across all teams"          color={C.brand} />
-              <StatTile label="Active Jobs"      value={jobs.filter(j => j.status === "in_progress").length} sub={`${completedJobs} completed`} color={C.blue}  />
-              <StatTile label="Hours Logged"     value={`${totalHours.toFixed(0)}h`}          sub={`${billableJobs} billable jobs`} color={C.green} />
-              <StatTile label="Pending Reviews"  value={approvals.length}                     sub="Timesheets awaiting"       color={C.red}   />
+          <div className="flex flex-col gap-5">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <StatTile label="Total Projects"  value={projects.length}                                sub="Across all teams"         colorClass="text-[#730042]"    />
+              <StatTile label="Active Jobs"     value={jobs.filter(j => j.status === "in_progress").length} sub={`${completedJobs} completed`} colorClass="text-blue-600" />
+              <StatTile label="Hours Logged"    value={`${totalHours.toFixed(0)}h`}                  sub={`${billableJobs} billable jobs`} colorClass="text-emerald-600" />
+              <StatTile label="Pending Reviews" value={approvals.length}                              sub="Timesheets awaiting"       colorClass="text-red-600"      />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <Card style={{ padding: 20 }}>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <Card className="p-4 sm:p-5">
                 <SectionHeader title="At-Risk Jobs" sub={`${overrunJobs.length} exceeding estimate`} />
                 {overrunJobs.length === 0 ? (
                   <EmptyState icon="✓" title="No jobs at risk" sub="All jobs within estimate" />
                 ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 260, overflowY: "auto" }}>
+                  <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-0.5">
                     {overrunJobs.map(job => (
-                      <div key={job._id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 10 }}>
-                        <span style={{ fontSize: 12, fontWeight: 800, color: C.red, minWidth: 36 }}>{job.riskPercent}%</span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{job.title}</div>
-                          <div style={{ fontSize: 11, color: C.textMuted }}>{job.logged_hours_cache}h / {job.estimated_hours}h est.</div>
+                      <div key={job._id} className="flex items-center gap-3 px-3.5 py-2.5 bg-[#F8F9FC] border border-[#E4E6EF] rounded-xl">
+                        <span className="text-[12px] font-black text-red-600 min-w-[36px]">{job.riskPercent}%</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[12px] font-semibold truncate">{job.title}</div>
+                          <div className="text-[11px] text-gray-400">{job.logged_hours_cache}h / {job.estimated_hours}h est.</div>
                         </div>
-                        <div style={{ width: 60, height: 4, background: C.border, borderRadius: 4, overflow: "hidden", flexShrink: 0 }}>
-                          <div style={{ width: `${Math.min(job.riskPercent, 100)}%`, height: "100%", background: job.riskPercent >= 100 ? C.red : C.amber, borderRadius: 4 }} />
+                        <div className="w-14 sm:w-16 h-1 bg-[#E4E6EF] rounded-full overflow-hidden shrink-0">
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${Math.min(job.riskPercent, 100)}%`,
+                              background: job.riskPercent >= 100 ? "#DC2626" : "#D97706",
+                            }}
+                          />
                         </div>
                       </div>
                     ))}
@@ -354,20 +398,22 @@ export default function SuperAdminTimesheet() {
                 )}
               </Card>
 
-              <Card style={{ padding: 20 }}>
+              <Card className="p-4 sm:p-5">
                 <SectionHeader title="Idle Jobs" sub="No activity in 7+ days" />
                 {idleJobs.length === 0 ? (
                   <EmptyState icon="🚀" title="All jobs are active" sub="" />
                 ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 260, overflowY: "auto" }}>
+                  <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-0.5">
                     {idleJobs.map(job => (
-                      <div key={job._id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 10 }}>
-                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.amber, flexShrink: 0 }} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{job.title}</div>
-                          <div style={{ fontSize: 11, color: C.textMuted }}>Last: {fmtDate(job.updatedAt)}</div>
+                      <div key={job._id} className="flex items-center gap-3 px-3.5 py-2.5 bg-[#F8F9FC] border border-[#E4E6EF] rounded-xl">
+                        <div className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[12px] font-semibold truncate">{job.title}</div>
+                          <div className="text-[11px] text-gray-400">Last: {fmtDate(job.updatedAt)}</div>
                         </div>
-                        <Badge color={JOB_STATUS_COLOR[job.status] || C.textMuted}>{job.status.replace(/_/g, " ")}</Badge>
+                        <Badge tw={JOB_STATUS_TW[job.status] ? `${JOB_STATUS_TW[job.status]} bg-gray-50 border-gray-200` : "text-gray-400 bg-gray-50 border-gray-200"}>
+                          {job.status.replace(/_/g, " ")}
+                        </Badge>
                       </div>
                     ))}
                   </div>
@@ -375,37 +421,44 @@ export default function SuperAdminTimesheet() {
               </Card>
             </div>
 
-            <Card style={{ padding: 20 }}>
+            <Card className="p-4 sm:p-5">
               <SectionHeader title="Team Workload Heatmap" sub={`Week of ${weekStart}`} />
               {heatmap.length === 0 ? (
                 <EmptyState icon="◎" title="No team data" sub="No time logs found for this week" />
               ) : (
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <div className="overflow-x-auto -mx-1">
+                  <table className="w-full border-collapse text-[12px] min-w-[480px]">
                     <thead>
                       <tr>
-                        <th style={{ textAlign: "left", padding: "8px 12px 8px 0", color: C.textMuted, fontWeight: 600 }}>Member</th>
-                        {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => (
-                          <th key={d} style={{ textAlign: "center", padding: "8px 6px", color: C.textMuted, fontWeight: 600 }}>{d}</th>
+                        <th className="text-left py-2 pr-4 pl-1 text-gray-400 font-semibold">Member</th>
+                        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => (
+                          <th key={d} className="text-center py-2 px-1.5 text-gray-400 font-semibold">{d}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {heatmap.map((row, i) => {
                         const days = Array.from({ length: 7 }, (_, idx) => {
-                          const d = new Date(weekStart); d.setDate(d.getDate() + idx);
+                          const d = new Date(weekStart);
+                          d.setDate(d.getDate() + idx);
                           return row.days?.[d.toISOString().slice(0, 10)];
                         });
+                        const memberName = row.name || row.member_name || `Member ${i + 1}`;
                         return (
-                          <tr key={i} style={{ borderTop: `1px solid ${C.border}` }}>
-                            <td style={{ padding: "10px 12px 10px 0", color: C.textMid, fontWeight: 500 }}>Member {i + 1}</td>
+                          <tr key={i} className="border-t border-[#E4E6EF]">
+                            <td className="py-2.5 pr-4 pl-1 text-gray-700 font-medium truncate max-w-[100px]">{memberName}</td>
                             {days.map((day, j) => {
                               const pct = day?.loadPercent ?? 0;
-                              const bg  = pct === 0 ? C.surfaceAlt : pct < 50 ? C.greenLight : pct < 80 ? C.amberLight : C.redLight;
-                              const fg  = pct === 0 ? C.textMuted  : pct < 50 ? C.green      : pct < 80 ? C.amber      : C.red;
+                              const cellClass = pct === 0
+                                ? "bg-[#F8F9FC] text-gray-400"
+                                : pct < 50
+                                ? "bg-emerald-50 text-emerald-600"
+                                : pct < 80
+                                ? "bg-amber-50 text-amber-600"
+                                : "bg-red-50 text-red-600";
                               return (
-                                <td key={j} style={{ textAlign: "center", padding: "6px" }}>
-                                  <div style={{ background: bg, color: fg, borderRadius: 8, padding: "6px 4px", fontWeight: 700, fontSize: 11 }}>
+                                <td key={j} className="text-center py-1.5 px-1.5">
+                                  <div className={cn("rounded-lg py-1.5 px-1 text-[11px] font-bold", cellClass)}>
                                     {pct > 0 ? `${pct}%` : "—"}
                                   </div>
                                 </td>
@@ -422,30 +475,40 @@ export default function SuperAdminTimesheet() {
           </div>
         )}
 
-        {/* ── PROJECTS ───────────────────────────────────────────────────────── */}
         {tab === "projects" && (
           <div>
-            <SectionHeader title="All Projects" sub={`${projects.length} total`}
-              action={<Btn onClick={() => setCreateProjectOpen(true)}>＋ New Project</Btn>} />
+            <SectionHeader
+              title="All Projects"
+              sub={`${projects.length} total`}
+              action={<Btn onClick={() => setCreateProjectOpen(true)}>＋ New Project</Btn>}
+            />
             {projects.length === 0 ? (
-              <Card><EmptyState icon="⬡" title="No projects yet" sub="Create your first project" action={<Btn onClick={() => setCreateProjectOpen(true)}>Create Project</Btn>} /></Card>
+              <Card>
+                <EmptyState icon="⬡" title="No projects yet" sub="Create your first project"
+                  action={<Btn onClick={() => setCreateProjectOpen(true)}>Create Project</Btn>} />
+              </Card>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                 {projects.map(p => (
-                  <Card key={p._id} style={{ padding: 20 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                      <div style={{ width: 34, height: 34, borderRadius: 10, background: (p.color_tag || C.brand) + "22", border: `2px solid ${p.color_tag || C.brand}`, flexShrink: 0 }} />
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</div>
-                        <div style={{ fontSize: 11, color: C.textMuted }}>{p.code || "—"} · {p.billing_type}</div>
+                  <Card key={p._id} className="p-4 sm:p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div
+                        className="w-8 h-8 sm:w-9 sm:h-9 rounded-[10px] shrink-0 border-2"
+                        style={{ background: (p.color_tag || "#730042") + "22", borderColor: p.color_tag || "#730042" }}
+                      />
+                      <div className="min-w-0">
+                        <div className="font-bold text-[14px] truncate text-gray-900">{p.name}</div>
+                        <div className="text-[11px] text-gray-400">{p.code || "—"} · {p.billing_type}</div>
                       </div>
                     </div>
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      <Badge color={p.status === "active" ? C.green : C.textMuted}>{p.status}</Badge>
-                      <Badge color={C.brand}>{p.visibility}</Badge>
-                      <Badge color={C.amber}>{p.members?.length || 0} members</Badge>
+                    <div className="flex gap-1.5 flex-wrap">
+                      <Badge tw={p.status === "active" ? "text-emerald-600 bg-emerald-50 border-emerald-200" : "text-gray-400 bg-gray-100 border-gray-200"}>{p.status}</Badge>
+                      <Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{p.visibility}</Badge>
+                      <Badge tw="text-amber-600 bg-amber-50 border-amber-200">{p.members?.length || 0} members</Badge>
                     </div>
-                    {p.description && <div style={{ fontSize: 12, color: C.textMuted, marginTop: 10 }}>{p.description}</div>}
+                    {p.description && (
+                      <div className="text-[12px] text-gray-400 mt-3 line-clamp-2">{p.description}</div>
+                    )}
                   </Card>
                 ))}
               </div>
@@ -453,46 +516,60 @@ export default function SuperAdminTimesheet() {
           </div>
         )}
 
-        {/* ── JOBS ───────────────────────────────────────────────────────────── */}
         {tab === "jobs" && (
           <div>
-            <SectionHeader title="Jobs Created by Me" sub={`${jobs.length} total`}
-              action={<Btn onClick={() => setCreateJobOpen(true)}>＋ New Job</Btn>} />
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <SectionHeader
+              title="Jobs Created by Me"
+              sub={`${jobs.length} total`}
+              action={<Btn onClick={() => setCreateJobOpen(true)}>＋ New Job</Btn>}
+            />
+            <div className="flex flex-col gap-2.5">
               {jobs.length === 0 ? (
-                <Card><EmptyState icon="⬢" title="No jobs yet" sub="Create a job to assign work" action={<Btn onClick={() => setCreateJobOpen(true)}>Create Job</Btn>} /></Card>
+                <Card>
+                  <EmptyState icon="⬢" title="No jobs yet" sub="Create a job to assign work"
+                    action={<Btn onClick={() => setCreateJobOpen(true)}>Create Job</Btn>} />
+                </Card>
               ) : jobs.map(job => (
-                <Card key={job._id} style={{ padding: 16 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
-                        <span style={{ fontWeight: 700, fontSize: 14 }}>{job.title}</span>
-                        <Badge color={PRIORITY_COLOR[job.priority]}>{job.priority}</Badge>
-                        {job.billable && <Badge color={C.amber}>Billable</Badge>}
-                        {job.overrun_flagged && <Badge color={C.red}>Overrun</Badge>}
+                <Card key={job._id} className="p-3.5 sm:p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="font-bold text-[13px] sm:text-[14px] text-gray-900">{job.title}</span>
+                        <Badge tw={PRIORITY_TW[job.priority] || PRIORITY_TW.medium}>{job.priority}</Badge>
+                        {job.billable && <Badge tw="text-amber-600 bg-amber-50 border-amber-200">Billable</Badge>}
+                        {job.overrun_flagged && <Badge tw="text-red-600 bg-red-50 border-red-200">Overrun</Badge>}
                       </div>
-                      <div style={{ fontSize: 11, color: C.textMuted, display: "flex", gap: 12 }}>
+                      <div className="flex items-center gap-3 text-[11px] text-gray-400 flex-wrap">
                         <span>{job.logged_hours_cache?.toFixed(1)}h logged</span>
                         {job.estimated_hours > 0 && <span>/ {job.estimated_hours}h est.</span>}
                         {job.due_date && <span>Due {fmtDate(job.due_date)}</span>}
                       </div>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                    <div className="flex items-center gap-2 shrink-0">
                       <select
                         value={job.status}
                         onChange={e => updateJobStatus.mutate({ id: job._id, status: e.target.value })}
-                        style={{ background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 10px", fontSize: 11, fontWeight: 600, color: JOB_STATUS_COLOR[job.status] || C.text, outline: "none" }}
+                        className={cn(
+                          "bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-2.5 py-1.5 text-[11px] font-semibold outline-none cursor-pointer",
+                          JOB_STATUS_TW[job.status] || "text-gray-900"
+                        )}
                       >
-                        {["not_started","in_progress","on_hold","completed","cancelled"].map(s => (
-                          <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
+                        {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map(s => (
+                          <option key={s} value={s} className="text-gray-900">{s.replace(/_/g, " ")}</option>
                         ))}
                       </select>
-                      <Btn variant="ghost" onClick={() => archiveJob.mutate(job._id)}>Archive</Btn>
+                      <Btn variant="ghost" onClick={() => archiveJob.mutate(job._id)} className="text-[12px] px-3">Archive</Btn>
                     </div>
                   </div>
                   {job.estimated_hours > 0 && (
-                    <div style={{ height: 3, background: C.border, borderRadius: 4, marginTop: 12, overflow: "hidden" }}>
-                      <div style={{ width: `${Math.min((job.logged_hours_cache / job.estimated_hours) * 100, 100)}%`, height: "100%", background: job.overrun_flagged ? C.red : C.brand, borderRadius: 4 }} />
+                    <div className="h-0.5 bg-[#E4E6EF] rounded-full mt-3 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${Math.min((job.logged_hours_cache / job.estimated_hours) * 100, 100)}%`,
+                          background: job.overrun_flagged ? "#DC2626" : "#730042",
+                        }}
+                      />
                     </div>
                   )}
                 </Card>
@@ -501,36 +578,35 @@ export default function SuperAdminTimesheet() {
           </div>
         )}
 
-        {/* ── APPROVALS ──────────────────────────────────────────────────────── */}
         {tab === "approvals" && (
           <div>
             <SectionHeader title="Pending Timesheets" sub={`${approvals.length} awaiting your review`} />
             {approvals.length === 0 ? (
               <Card><EmptyState icon="✦" title="All clear" sub="No timesheets pending review" /></Card>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div className="flex flex-col gap-3">
                 {approvals.map(ts => (
-                  <Card key={ts._id} style={{ padding: 20 }}>
-                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 15 }}>{ts.owner?.f_name} {ts.owner?.l_name}</div>
-                        <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
+                  <Card key={ts._id} className="p-4 sm:p-5">
+                    <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-[15px] text-gray-900">{ts.owner?.f_name} {ts.owner?.l_name}</div>
+                        <div className="text-[12px] text-gray-400 mt-0.5">
                           {ts.owner?.work_email} · {ts.owner_model}
                         </div>
-                        <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>
+                        <div className="text-[12px] text-gray-400 mt-1">
                           Week: {fmtDate(ts.week_start)} — {fmtDate(ts.week_end)}
                         </div>
-                        <div style={{ display: "flex", gap: 12, marginTop: 8, fontSize: 12 }}>
-                          <span style={{ color: C.brand, fontWeight: 600 }}>{fmtDuration(ts.total_minutes)} total</span>
-                          <span style={{ color: C.green }}>{fmtDuration(ts.billable_minutes)} billable</span>
-                          <Badge color={(STATUS_STYLE[ts.status] || STATUS_STYLE.draft).color} bg={(STATUS_STYLE[ts.status] || STATUS_STYLE.draft).bg}>
+                        <div className="flex items-center gap-3 mt-2 flex-wrap text-[12px]">
+                          <span className="text-[#730042] font-semibold">{fmtDuration(ts.total_minutes)} total</span>
+                          <span className="text-emerald-600">{fmtDuration(ts.billable_minutes)} billable</span>
+                          <Badge tw={(STATUS_STYLE[ts.status] || STATUS_STYLE.draft).tw}>
                             {(STATUS_STYLE[ts.status] || STATUS_STYLE.draft).label}
                           </Badge>
                         </div>
                       </div>
-                      <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                      <div className="flex gap-2 shrink-0">
                         <Btn variant="success" onClick={() => setApproveModal(ts)}>Approve</Btn>
-                        <Btn variant="danger"  onClick={() => { setRejectModal(ts); setRejectRemarks(""); }}>Reject</Btn>
+                        <Btn variant="danger" onClick={() => { setRejectModal(ts); setRejectRemarks(""); }}>Reject</Btn>
                       </div>
                     </div>
                   </Card>
@@ -540,83 +616,79 @@ export default function SuperAdminTimesheet() {
           </div>
         )}
 
-        {/* ── ORG ALL LOGS ───────────────────────────────────────────────────── */}
         {tab === "org-logs" && (
           <div>
             <SectionHeader
               title="All Time Logs — Organisation"
               sub={`${orgLogs.length} entries · ${fmtDuration(orgLogsData?.totalMinutes || 0)} total`}
               action={
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <Input
+                <div className="flex items-center gap-2">
+                  <input
                     type="date"
                     value={logsWeek}
                     onChange={e => setLogsWeek(e.target.value)}
-                    style={{ fontSize: 12, padding: "7px 12px" }}
+                    className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-3 py-2 text-[12px] text-gray-900 outline-none focus:border-[#730042] transition-colors"
                   />
-                  <span style={{ fontSize: 11, color: C.textMuted }}>week of</span>
+                  <span className="text-[11px] text-gray-400 hidden sm:inline">week of</span>
                 </div>
               }
             />
             {orgLogs.length === 0 ? (
               <Card><EmptyState icon="📋" title="No logs found" sub="No time entries for this week across the org" /></Card>
             ) : (
-              <Card style={{ overflow: "hidden" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                  <thead>
-                    <tr style={{ background: C.surfaceAlt, borderBottom: `1px solid ${C.border}` }}>
-                      {["Member", "Role", "Job", "Date", "Duration", "Mode", "Status"].map(h => (
-                        <th key={h} style={{ textAlign: "left", padding: "12px 16px", fontWeight: 700, fontSize: 11, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orgLogs.map(log => (
-                      <tr key={log._id} style={{ borderBottom: `1px solid ${C.border}` }}>
-                        <td style={{ padding: "12px 16px", fontWeight: 600 }}>
-                          {log.logged_by?.f_name || "—"} {log.logged_by?.l_name || ""}
-                        </td>
-                        <td style={{ padding: "12px 16px" }}>
-                          <Badge color={C.brand}>{log.logged_by_model}</Badge>
-                        </td>
-                        <td style={{ padding: "12px 16px", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {log.job?.title || "—"}
-                        </td>
-                        <td style={{ padding: "12px 16px", color: C.textMuted, whiteSpace: "nowrap" }}>
-                          {fmtDate(log.log_date)}
-                        </td>
-                        <td style={{ padding: "12px 16px", fontWeight: 600, color: C.green, whiteSpace: "nowrap" }}>
-                          {fmtDuration(log.duration_minutes)}
-                        </td>
-                        <td style={{ padding: "12px 16px" }}>
-                          <Badge color={log.entry_mode === "timer" ? C.blue : C.textMuted}>{log.entry_mode}</Badge>
-                        </td>
-                        <td style={{ padding: "12px 16px" }}>
-                          <Badge color={(STATUS_STYLE[log.status] || STATUS_STYLE.draft).color} bg={(STATUS_STYLE[log.status] || STATUS_STYLE.draft).bg}>
-                            {(STATUS_STYLE[log.status] || STATUS_STYLE.draft).label}
-                          </Badge>
-                        </td>
+              <Card className="overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-[13px] min-w-[640px]">
+                    <thead>
+                      <tr className="bg-[#F8F9FC] border-b border-[#E4E6EF]">
+                        {["Member", "Role", "Job", "Date", "Duration", "Mode", "Status"].map(h => (
+                          <th key={h} className="text-left px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {orgLogs.map(log => (
+                        <tr key={log._id} className="border-b border-[#E4E6EF] hover:bg-[#F8F9FC] transition-colors">
+                          <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">
+                            {log.logged_by?.f_name || "—"} {log.logged_by?.l_name || ""}
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{log.logged_by_model}</Badge>
+                          </td>
+                          <td className="px-4 py-3 max-w-[180px] truncate text-gray-700">{log.job?.title || "—"}</td>
+                          <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{fmtDate(log.log_date)}</td>
+                          <td className="px-4 py-3 font-semibold text-emerald-600 whitespace-nowrap">{fmtDuration(log.duration_minutes)}</td>
+                          <td className="px-4 py-3">
+                            <Badge tw={log.entry_mode === "timer" ? "text-blue-600 bg-blue-50 border-blue-200" : "text-gray-400 bg-gray-100 border-gray-200"}>
+                              {log.entry_mode}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge tw={(STATUS_STYLE[log.status] || STATUS_STYLE.draft).tw}>
+                              {(STATUS_STYLE[log.status] || STATUS_STYLE.draft).label}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </Card>
             )}
           </div>
         )}
 
-        {/* ── ORG ALL TIMESHEETS ─────────────────────────────────────────────── */}
         {tab === "org-sheets" && (
           <div>
             <SectionHeader
               title="All Timesheets — Organisation"
               sub={`${orgSheets.length} timesheets`}
               action={
-                <div style={{ display: "flex", gap: 8 }}>
+                <div className="flex gap-2 flex-wrap">
                   <select
                     value={sheetsStatus}
                     onChange={e => setSheetsStatus(e.target.value)}
-                    style={{ background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 10, padding: "7px 12px", fontSize: 12, color: C.text, outline: "none" }}
+                    className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-3 py-2 text-[12px] text-gray-900 outline-none focus:border-[#730042] transition-colors cursor-pointer appearance-none"
                   >
                     <option value="">All Statuses</option>
                     {Object.entries(STATUS_STYLE).map(([k, v]) => (
@@ -626,7 +698,7 @@ export default function SuperAdminTimesheet() {
                   <select
                     value={sheetsOwnerModel}
                     onChange={e => setSheetsOwnerModel(e.target.value)}
-                    style={{ background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 10, padding: "7px 12px", fontSize: 12, color: C.text, outline: "none" }}
+                    className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-3 py-2 text-[12px] text-gray-900 outline-none focus:border-[#730042] transition-colors cursor-pointer appearance-none"
                   >
                     <option value="">All Roles</option>
                     <option value="User">Employee</option>
@@ -639,37 +711,38 @@ export default function SuperAdminTimesheet() {
             {orgSheets.length === 0 ? (
               <Card><EmptyState icon="📄" title="No timesheets found" sub="Adjust filters to view timesheets" /></Card>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div className="flex flex-col gap-2.5">
                 {orgSheets.map(ts => {
                   const ss = STATUS_STYLE[ts.status] || STATUS_STYLE.draft;
                   return (
-                    <Card key={ts._id} style={{ padding: 18 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
-                            <span style={{ fontWeight: 700, fontSize: 14 }}>
-                              {ts.owner?.f_name} {ts.owner?.l_name}
-                            </span>
-                            <Badge color={C.brand}>{ts.owner_model}</Badge>
-                            <Badge color={ss.color} bg={ss.bg}>{ss.label}</Badge>
+                    <Card key={ts._id} className="p-4 sm:p-5">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className="font-bold text-[14px] text-gray-900">{ts.owner?.f_name} {ts.owner?.l_name}</span>
+                            <Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{ts.owner_model}</Badge>
+                            <Badge tw={ss.tw}>{ss.label}</Badge>
                           </div>
-                          <div style={{ fontSize: 12, color: C.textMuted }}>
+                          <div className="text-[12px] text-gray-400">
                             {ts.owner?.work_email} · Week: {fmtDate(ts.week_start)} — {fmtDate(ts.week_end)}
                           </div>
                         </div>
-                        <div style={{ display: "flex", gap: 20, flexShrink: 0, textAlign: "right" }}>
-                          <div>
-                            <div style={{ fontSize: 16, fontWeight: 800, color: C.brand }}>{fmtDuration(ts.total_minutes)}</div>
-                            <div style={{ fontSize: 11, color: C.textMuted }}>total</div>
+                        <div className="flex gap-5 shrink-0">
+                          <div className="text-right">
+                            <div className="text-[16px] font-extrabold text-[#730042]">{fmtDuration(ts.total_minutes)}</div>
+                            <div className="text-[11px] text-gray-400">total</div>
                           </div>
-                          <div>
-                            <div style={{ fontSize: 16, fontWeight: 800, color: C.green }}>{fmtDuration(ts.billable_minutes)}</div>
-                            <div style={{ fontSize: 11, color: C.textMuted }}>billable</div>
+                          <div className="text-right">
+                            <div className="text-[16px] font-extrabold text-emerald-600">{fmtDuration(ts.billable_minutes)}</div>
+                            <div className="text-[11px] text-gray-400">billable</div>
                           </div>
                         </div>
                       </div>
                       {ts.remarks && (
-                        <div style={{ marginTop: 10, fontSize: 12, color: C.textMuted, padding: "8px 12px", background: C.surfaceAlt, borderRadius: 8, borderLeft: `3px solid ${ss.color}` }}>
+                        <div
+                          className="mt-3 text-[12px] text-gray-500 px-3 py-2 bg-[#F8F9FC] rounded-lg border-l-[3px]"
+                          style={{ borderLeftColor: ss.tw.includes("emerald") ? "#059669" : ss.tw.includes("red") ? "#DC2626" : ss.tw.includes("amber") ? "#D97706" : ss.tw.includes("blue") ? "#2563EB" : "#730042" }}
+                        >
                           {ts.remarks}
                         </div>
                       )}
@@ -681,24 +754,23 @@ export default function SuperAdminTimesheet() {
           </div>
         )}
 
-        {/* ── ANALYTICS ──────────────────────────────────────────────────────── */}
         {tab === "analytics" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
-              <StatTile label="Total Hours"    value={`${totalHours.toFixed(0)}h`}  sub="All time logged"      color={C.brand}    />
-              <StatTile label="Billable Jobs"  value={billableJobs}                 sub={`of ${jobs.length} total`} color={C.green} />
-              <StatTile label="Overrun Jobs"   value={overrunJobs.length}           sub="Exceeding estimate"   color={C.red}      />
-              <StatTile label="Idle Jobs"      value={idleJobs.length}              sub="7+ days inactive"     color={C.amber}    />
+          <div className="flex flex-col gap-5">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <StatTile label="Total Hours"   value={`${totalHours.toFixed(0)}h`} sub="All time logged"       colorClass="text-[#730042]"   />
+              <StatTile label="Billable Jobs" value={billableJobs}                sub={`of ${jobs.length} total`} colorClass="text-emerald-600" />
+              <StatTile label="Overrun Jobs"  value={overrunJobs.length}          sub="Exceeding estimate"    colorClass="text-red-600"     />
+              <StatTile label="Idle Jobs"     value={idleJobs.length}             sub="7+ days inactive"      colorClass="text-amber-600"   />
             </div>
-            <Card style={{ padding: 20 }}>
+            <Card className="p-4 sm:p-5">
               <SectionHeader title="Jobs by Status" />
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10 }}>
-                {["not_started","in_progress","on_hold","completed","cancelled"].map(s => {
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+                {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map(s => {
                   const count = jobs.filter(j => j.status === s).length;
                   return (
-                    <div key={s} style={{ background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 12, padding: "16px 12px", textAlign: "center" }}>
-                      <div style={{ fontSize: 28, fontWeight: 800, color: JOB_STATUS_COLOR[s] || C.textMuted }}>{count}</div>
-                      <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4, textTransform: "capitalize" }}>{s.replace(/_/g, " ")}</div>
+                    <div key={s} className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-xl p-3 sm:p-4 text-center">
+                      <div className={cn("text-2xl sm:text-3xl font-extrabold", JOB_STATUS_TW[s] || "text-gray-400")}>{count}</div>
+                      <div className="text-[11px] text-gray-400 mt-1 capitalize">{s.replace(/_/g, " ")}</div>
                     </div>
                   );
                 })}
@@ -708,13 +780,12 @@ export default function SuperAdminTimesheet() {
         )}
       </main>
 
-      {/* ── Approve confirmation modal ─────────────────────────────────────── */}
       <Modal open={!!approveModal} onClose={() => setApproveModal(null)} title="Approve Timesheet">
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ fontSize: 14, color: C.text }}>
-            Approve the timesheet for <strong>{approveModal?.owner?.f_name} {approveModal?.owner?.l_name}</strong>?
+        <div className="flex flex-col gap-4">
+          <div className="text-[14px] text-gray-700">
+            Approve the timesheet for <strong className="text-gray-900">{approveModal?.owner?.f_name} {approveModal?.owner?.l_name}</strong>?
           </div>
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <div className="flex gap-2 justify-end">
             <Btn variant="ghost" onClick={() => setApproveModal(null)}>Cancel</Btn>
             <Btn variant="success" onClick={() => handleApprove(approveModal)} disabled={approveTS.isPending}>
               {approveTS.isPending ? "Approving…" : "Approve"}
@@ -723,11 +794,10 @@ export default function SuperAdminTimesheet() {
         </div>
       </Modal>
 
-      {/* ── Reject modal ───────────────────────────────────────────────────── */}
       <Modal open={!!rejectModal} onClose={() => setRejectModal(null)} title="Reject Timesheet">
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ fontSize: 14, color: C.text }}>
-            Rejecting timesheet for <strong>{rejectModal?.owner?.f_name} {rejectModal?.owner?.l_name}</strong>
+        <div className="flex flex-col gap-4">
+          <div className="text-[14px] text-gray-700">
+            Rejecting timesheet for <strong className="text-gray-900">{rejectModal?.owner?.f_name} {rejectModal?.owner?.l_name}</strong>
           </div>
           <Input
             label="Reason (required)"
@@ -735,7 +805,7 @@ export default function SuperAdminTimesheet() {
             value={rejectRemarks}
             onChange={e => setRejectRemarks(e.target.value)}
           />
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <div className="flex gap-2 justify-end">
             <Btn variant="ghost" onClick={() => setRejectModal(null)}>Cancel</Btn>
             <Btn variant="danger" onClick={handleReject} disabled={!rejectRemarks.trim() || rejectTS.isPending}>
               {rejectTS.isPending ? "Rejecting…" : "Reject"}
@@ -744,12 +814,11 @@ export default function SuperAdminTimesheet() {
         </div>
       </Modal>
 
-      {/* ── Create Project modal ───────────────────────────────────────────── */}
       <Modal open={createProjectOpen} onClose={() => setCreateProjectOpen(false)} title="Create Project">
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div className="flex flex-col gap-3.5">
           <Input label="Project Name" placeholder="e.g. Website Redesign" value={projectForm.name} onChange={e => setProjectForm(p => ({ ...p, name: e.target.value }))} />
           <Input label="Description" placeholder="Brief description…" value={projectForm.description} onChange={e => setProjectForm(p => ({ ...p, description: e.target.value }))} />
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div className="grid grid-cols-2 gap-2.5">
             <Select label="Billing Type" value={projectForm.billing_type} onChange={e => setProjectForm(p => ({ ...p, billing_type: e.target.value }))}>
               <option value="hourly">Hourly</option>
               <option value="fixed">Fixed</option>
@@ -762,7 +831,7 @@ export default function SuperAdminTimesheet() {
             </Select>
           </div>
           <Input label="Default Hourly Rate" type="number" placeholder="0.00" value={projectForm.default_hourly_rate} onChange={e => setProjectForm(p => ({ ...p, default_hourly_rate: e.target.value }))} />
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", paddingTop: 4 }}>
+          <div className="flex gap-2 justify-end pt-1">
             <Btn variant="ghost" onClick={() => setCreateProjectOpen(false)}>Cancel</Btn>
             <Btn onClick={handleCreateProject} disabled={!projectForm.name || createProject.isPending}>
               {createProject.isPending ? "Creating…" : "Create Project"}
@@ -771,9 +840,8 @@ export default function SuperAdminTimesheet() {
         </div>
       </Modal>
 
-      {/* ── Create Job modal ───────────────────────────────────────────────── */}
       <Modal open={createJobOpen} onClose={() => setCreateJobOpen(false)} title="Create Job">
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div className="flex flex-col gap-3.5">
           <Input label="Job Title" placeholder="e.g. Design Login Page" value={jobForm.title} onChange={e => setJobForm(p => ({ ...p, title: e.target.value }))} />
           <Input label="Description" placeholder="Job details…" value={jobForm.description} onChange={e => setJobForm(p => ({ ...p, description: e.target.value }))} />
           <Select label="Assign To" value={jobForm.assigned_to} onChange={e => setJobForm(p => ({ ...p, assigned_to: e.target.value }))}>
@@ -782,7 +850,7 @@ export default function SuperAdminTimesheet() {
               <option key={t.id} value={t.id}>{t.id} ({t.model})</option>
             ))}
           </Select>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div className="grid grid-cols-2 gap-2.5">
             <Select label="Priority" value={jobForm.priority} onChange={e => setJobForm(p => ({ ...p, priority: e.target.value }))}>
               <option value="low">Low</option>
               <option value="medium">Medium</option>
@@ -791,7 +859,7 @@ export default function SuperAdminTimesheet() {
             </Select>
             <Input label="Estimated Hours" type="number" placeholder="0" value={jobForm.estimated_hours} onChange={e => setJobForm(p => ({ ...p, estimated_hours: e.target.value }))} />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div className="grid grid-cols-2 gap-2.5">
             <Input label="Hourly Rate" type="number" placeholder="0.00" value={jobForm.hourly_rate} onChange={e => setJobForm(p => ({ ...p, hourly_rate: e.target.value }))} />
             <Select label="Currency" value={jobForm.currency} onChange={e => setJobForm(p => ({ ...p, currency: e.target.value }))}>
               <option value="INR">INR</option>
@@ -799,11 +867,16 @@ export default function SuperAdminTimesheet() {
               <option value="EUR">EUR</option>
             </Select>
           </div>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-            <input type="checkbox" checked={jobForm.billable} onChange={e => setJobForm(p => ({ ...p, billable: e.target.checked }))} style={{ accentColor: C.brand, width: 15, height: 15 }} />
-            <span style={{ fontSize: 13, color: C.textMid }}>Billable job</span>
+          <label className="flex items-center gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={jobForm.billable}
+              onChange={e => setJobForm(p => ({ ...p, billable: e.target.checked }))}
+              className="w-4 h-4 accent-[#730042]"
+            />
+            <span className="text-[13px] text-gray-600">Billable job</span>
           </label>
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", paddingTop: 4 }}>
+          <div className="flex gap-2 justify-end pt-1">
             <Btn variant="ghost" onClick={() => setCreateJobOpen(false)}>Cancel</Btn>
             <Btn onClick={handleCreateJob} disabled={!jobForm.title || !jobForm.assigned_to || createJob.isPending}>
               {createJob.isPending ? "Creating…" : "Create Job"}
