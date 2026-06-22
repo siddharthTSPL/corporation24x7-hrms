@@ -208,3 +208,13 @@ export const getMyProductivitySummary = async (week_start) => {
   const res = await api.get("timesheet/insights/my-productivity", { params: { week_start } });
   return res.data;
 };
+
+export const getOrgAllTimeLogs = async (params) => {
+  const res = await api.get("timesheet/admin/time-logs", { params });
+  return res.data;
+};
+
+export const getOrgAllTimesheets = async (params) => {
+  const res = await api.get("timesheet/admin/timesheets", { params });
+  return res.data;
+};

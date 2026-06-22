@@ -1,63 +1,109 @@
 import React, { useState, useMemo } from "react";
 import {
   useMyProjects, useCreateProject, useAssignableTargets,
-  useCreateJob, useJobsCreatedByMe, useUpdateJob, useUpdateJobStatus, useArchiveJob,
+  useCreateJob, useJobsCreatedByMe, useUpdateJobStatus, useArchiveJob,
   useOverrunRiskJobs, useIdleJobs, useTeamWorkloadHeatmap,
-  useMyTimesheets, usePendingApprovals, useApproveTimesheet, useRejectTimesheet,
+  usePendingApprovals, useApproveTimesheet, useRejectTimesheet,
+  useOrgAllTimeLogs, useOrgAllTimesheets,
 } from "../../auth/server-state/timesheet/timesheet.hook";
 
 const C = {
-  bg: "#0A0A0F",
-  surface: "#13131A",
-  surfaceUp: "#1C1C28",
-  border: "#2A2A3D",
-  borderHover: "#3D3D5C",
-  accent: "#7C5CFC",
-  accentHover: "#9B7FFF",
-  accentGlow: "rgba(124,92,252,0.18)",
-  gold: "#F0B429",
-  goldGlow: "rgba(240,180,41,0.15)",
-  red: "#F04438",
-  redGlow: "rgba(240,68,56,0.15)",
-  green: "#12B76A",
-  greenGlow: "rgba(18,183,106,0.15)",
-  text: "#F2F2FF",
-  textMid: "#9898B8",
-  textMuted: "#5C5C7A",
+  brand: "#730042",
+  brandHover: "#8B0050",
+  brandLight: "rgba(115,0,66,0.07)",
+  brandMid: "rgba(115,0,66,0.18)",
+  accent: "#CD166E",
+  bg: "#F4F5F9",
+  surface: "#FFFFFF",
+  surfaceAlt: "#F8F9FC",
+  border: "#E4E6EF",
+  text: "#111827",
+  textMid: "#374151",
+  textMuted: "#9CA3AF",
+  green: "#059669",
+  greenLight: "rgba(5,150,105,0.08)",
+  amber: "#D97706",
+  amberLight: "rgba(217,119,6,0.08)",
+  red: "#DC2626",
+  redLight: "rgba(220,38,38,0.08)",
+  blue: "#2563EB",
+  blueLight: "rgba(37,99,235,0.08)",
 };
+
+const getMonday = (d = new Date()) => {
+  const dt = new Date(d);
+  const day = dt.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  dt.setDate(dt.getDate() + diff);
+  dt.setHours(0, 0, 0, 0);
+  return dt.toISOString().slice(0, 10);
+};
+
+const fmtDate = (d) =>
+  new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+const fmtDuration = (mins) => {
+  if (!mins && mins !== 0) return "—";
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+};
+
+const STATUS_STYLE = {
+  draft:                    { color: C.textMuted, bg: C.surfaceAlt,  label: "Draft" },
+  pending_manager:          { color: C.amber,     bg: C.amberLight,  label: "Pending Manager" },
+  pending_reporting_manager:{ color: C.amber,     bg: C.amberLight,  label: "Pending Review" },
+  pending_admin:            { color: C.blue,      bg: C.blueLight,   label: "Pending Admin" },
+  pending_superadmin:       { color: C.brand,     bg: C.brandLight,  label: "Pending SA" },
+  approved:                 { color: C.green,     bg: C.greenLight,  label: "Approved" },
+  rejected:                 { color: C.red,       bg: C.redLight,    label: "Rejected" },
+};
+
+const PRIORITY_COLOR = { low: C.textMuted, medium: C.amber, high: C.red, urgent: C.brand };
+const JOB_STATUS_COLOR = {
+  not_started: C.textMuted, in_progress: C.blue, on_hold: C.amber,
+  completed: C.green, cancelled: C.red,
+};
+
+const NAV_TABS = [
+  { id: "overview",    label: "Overview"     },
+  { id: "projects",    label: "Projects"     },
+  { id: "jobs",        label: "Jobs"         },
+  { id: "approvals",   label: "Approvals"    },
+  { id: "org-logs",    label: "All Logs"     },
+  { id: "org-sheets",  label: "All Timesheets"},
+  { id: "analytics",   label: "Analytics"    },
+];
 
 function cn(...args) { return args.filter(Boolean).join(" "); }
 
-function Pill({ color = C.accent, children }) {
+function Badge({ color, bg, children }) {
   return (
-    <span style={{ background: color + "22", color, border: `1px solid ${color}44` }}
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide">
+    <span style={{
+      background: bg || color + "18", color,
+      border: `1px solid ${color}30`, borderRadius: 6,
+      padding: "2px 8px", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap",
+    }}>
       {children}
     </span>
   );
 }
 
-function Card({ children, className = "", glow, onClick, style = {} }) {
+function Card({ children, style = {}, className = "", onClick }) {
   return (
-    <div onClick={onClick}
-      style={{
-        background: C.surface,
-        border: `1px solid ${C.border}`,
-        boxShadow: glow ? `0 0 24px ${glow}` : "none",
-        ...style,
-      }}
-      className={cn("rounded-2xl overflow-hidden transition-all duration-200", onClick && "cursor-pointer hover:border-[#3D3D5C]", className)}>
+    <div onClick={onClick} className={className} style={{
+      background: C.surface, border: `1px solid ${C.border}`,
+      borderRadius: 14, overflow: "hidden", ...style,
+      ...(onClick ? { cursor: "pointer" } : {}),
+    }}>
       {children}
     </div>
   );
 }
 
-function StatTile({ label, value, sub, color = C.accent, glow }) {
+function StatTile({ label, value, sub, color = C.brand }) {
   return (
-    <Card glow={glow} className="p-5">
-      <div className="text-[10px] uppercase tracking-widest mb-2" style={{ color: C.textMuted }}>{label}</div>
-      <div className="text-3xl font-black leading-none mb-1" style={{ color, fontFamily: "'Space Grotesk',sans-serif" }}>{value}</div>
-      {sub && <div className="text-[11px]" style={{ color: C.textMuted }}>{sub}</div>}
+    <Card style={{ padding: "20px 24px" }}>
+      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: C.textMuted, marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 32, fontWeight: 800, color, lineHeight: 1, marginBottom: 4 }}>{value}</div>
+      {sub && <div style={{ fontSize: 12, color: C.textMuted }}>{sub}</div>}
     </Card>
   );
 }
@@ -65,13 +111,13 @@ function StatTile({ label, value, sub, color = C.accent, glow }) {
 function Modal({ open, onClose, title, children }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)" }}>
-      <div style={{ background: C.surfaceUp, border: `1px solid ${C.border}`, maxWidth: 540, width: "100%", borderRadius: 20 }}>
-        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: C.border }}>
-          <span className="font-bold text-[15px]" style={{ color: C.text, fontFamily: "'Space Grotesk',sans-serif" }}>{title}</span>
-          <button onClick={onClose} style={{ color: C.textMuted }} className="hover:text-white text-xl leading-none">×</button>
+    <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(6px)" }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, width: "100%", maxWidth: 520 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 24px", borderBottom: `1px solid ${C.border}` }}>
+          <span style={{ fontWeight: 700, fontSize: 15, color: C.text }}>{title}</span>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: C.textMuted, lineHeight: 1 }}>×</button>
         </div>
-        <div className="p-6">{children}</div>
+        <div style={{ padding: 24 }}>{children}</div>
       </div>
     </div>
   );
@@ -79,43 +125,38 @@ function Modal({ open, onClose, title, children }) {
 
 function Input({ label, ...props }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      {label && <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: C.textMuted }}>{label}</label>}
-      <input
-        {...props}
-        style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, borderRadius: 10, outline: "none" }}
-        className="px-3.5 py-2.5 text-[13px] w-full placeholder:text-[#3a3a55] focus:border-[#7C5CFC] transition-colors"
-      />
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {label && <label style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: C.textMuted }}>{label}</label>}
+      <input {...props} style={{ background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 14px", fontSize: 13, color: C.text, outline: "none", width: "100%", boxSizing: "border-box" }} />
     </div>
   );
 }
 
 function Select({ label, children, ...props }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      {label && <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: C.textMuted }}>{label}</label>}
-      <select
-        {...props}
-        style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, borderRadius: 10, outline: "none" }}
-        className="px-3.5 py-2.5 text-[13px] w-full focus:border-[#7C5CFC] transition-colors appearance-none"
-      >
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {label && <label style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: C.textMuted }}>{label}</label>}
+      <select {...props} style={{ background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 14px", fontSize: 13, color: C.text, outline: "none", width: "100%", appearance: "none" }}>
         {children}
       </select>
     </div>
   );
 }
 
-function Btn({ children, variant = "primary", onClick, type = "button", disabled, className = "" }) {
+function Btn({ children, variant = "primary", onClick, disabled, type = "button" }) {
   const styles = {
-    primary: { background: C.accent, color: "#fff", border: "none" },
-    ghost: { background: "transparent", color: C.textMid, border: `1px solid ${C.border}` },
-    danger: { background: C.red + "22", color: C.red, border: `1px solid ${C.red}44` },
-    success: { background: C.green + "22", color: C.green, border: `1px solid ${C.green}44` },
+    primary: { background: C.brand, color: "#fff", border: "none" },
+    ghost:   { background: "transparent", color: C.textMid, border: `1px solid ${C.border}` },
+    danger:  { background: C.redLight, color: C.red, border: `1px solid ${C.red}30` },
+    success: { background: C.greenLight, color: C.green, border: `1px solid ${C.green}30` },
   };
   return (
-    <button type={type} onClick={onClick} disabled={disabled}
-      style={{ ...styles[variant], borderRadius: 10, opacity: disabled ? 0.5 : 1 }}
-      className={cn("px-4 py-2 text-[12px] font-semibold transition-all hover:opacity-90 active:scale-95 whitespace-nowrap", className)}>
+    <button type={type} onClick={onClick} disabled={disabled} style={{
+      ...styles[variant], borderRadius: 10, padding: "9px 18px",
+      fontSize: 13, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer",
+      opacity: disabled ? 0.55 : 1, whiteSpace: "nowrap",
+      transition: "opacity .15s",
+    }}>
       {children}
     </button>
   );
@@ -123,60 +164,77 @@ function Btn({ children, variant = "primary", onClick, type = "button", disabled
 
 function SectionHeader({ title, sub, action }) {
   return (
-    <div className="flex items-start justify-between mb-4 gap-3">
+    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 18, gap: 12 }}>
       <div>
-        <h2 className="text-[16px] font-bold" style={{ color: C.text, fontFamily: "'Space Grotesk',sans-serif" }}>{title}</h2>
-        {sub && <p className="text-[11px] mt-0.5" style={{ color: C.textMuted }}>{sub}</p>}
+        <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{title}</div>
+        {sub && <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{sub}</div>}
       </div>
       {action}
     </div>
   );
 }
 
-const NAV_ITEMS = [
-  { id: "overview", label: "Overview", icon: "◈" },
-  { id: "projects", label: "Projects", icon: "⬡" },
-  { id: "jobs", label: "Jobs", icon: "⬢" },
-  { id: "approvals", label: "Approvals", icon: "✦" },
-  { id: "analytics", label: "Analytics", icon: "◎" },
-];
+function EmptyState({ icon, title, sub, action }) {
+  return (
+    <div style={{ padding: "48px 24px", textAlign: "center" }}>
+      <div style={{ fontSize: 36, marginBottom: 10 }}>{icon}</div>
+      <div style={{ fontWeight: 700, fontSize: 15, color: C.text, marginBottom: 4 }}>{title}</div>
+      <div style={{ fontSize: 13, color: C.textMuted, marginBottom: action ? 16 : 0 }}>{sub}</div>
+      {action}
+    </div>
+  );
+}
 
-export default function SuperAdminDashboard() {
+export default function SuperAdminTimesheet() {
   const [tab, setTab] = useState("overview");
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [createJobOpen, setCreateJobOpen] = useState(false);
+  const [approveModal, setApproveModal] = useState(null);
+  const [rejectModal, setRejectModal] = useState(null);
+  const [rejectRemarks, setRejectRemarks] = useState("");
+
   const [projectForm, setProjectForm] = useState({ name: "", description: "", billing_type: "hourly", currency: "INR", default_hourly_rate: "" });
-  const [jobForm, setJobForm] = useState({ title: "", description: "", assigned_to: "", assigned_to_model: "User", priority: "medium", estimated_hours: "", billable: true, hourly_rate: "", currency: "INR" });
-  const [weekStart] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); d.setHours(0,0,0,0); return d.toISOString().slice(0,10);
+  const [jobForm, setJobForm] = useState({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: true, hourly_rate: "", currency: "INR" });
+
+  const [weekStart] = useState(getMonday);
+  const [logsWeek, setLogsWeek]     = useState(weekStart);
+  const [sheetsStatus, setSheetsStatus] = useState("");
+  const [sheetsOwnerModel, setSheetsOwnerModel] = useState("");
+
+  const { data: projectsData }  = useMyProjects();
+  const { data: jobsData }      = useJobsCreatedByMe();
+  const { data: approvalsData } = usePendingApprovals();
+  const { data: overrunData }   = useOverrunRiskJobs();
+  const { data: idleData }      = useIdleJobs(7);
+  const { data: heatmapData }   = useTeamWorkloadHeatmap(weekStart);
+  const { data: targetsData }   = useAssignableTargets();
+
+  const { data: orgLogsData }   = useOrgAllTimeLogs({ week_start: logsWeek });
+  const { data: orgSheetsData } = useOrgAllTimesheets({
+    ...(sheetsStatus ? { status: sheetsStatus } : {}),
+    ...(sheetsOwnerModel ? { owner_model: sheetsOwnerModel } : {}),
   });
 
-  const { data: projectsData } = useMyProjects();
-  const { data: jobsData } = useJobsCreatedByMe();
-  const { data: approvalsData } = usePendingApprovals();
-  const { data: overrunData } = useOverrunRiskJobs();
-  const { data: idleData } = useIdleJobs(7);
-  const { data: heatmapData } = useTeamWorkloadHeatmap(weekStart);
-  const { data: targetsData } = useAssignableTargets();
-
-  const createProject = useCreateProject();
-  const createJob = useCreateJob();
-  const approveTS = useApproveTimesheet();
-  const rejectTS = useRejectTimesheet();
-  const archiveJob = useArchiveJob();
+  const createProject   = useCreateProject();
+  const createJob       = useCreateJob();
+  const approveTS       = useApproveTimesheet();
+  const rejectTS        = useRejectTimesheet();
+  const archiveJob      = useArchiveJob();
   const updateJobStatus = useUpdateJobStatus();
 
-  const projects = projectsData?.projects ?? [];
-  const jobs = jobsData?.jobs ?? [];
+  const projects  = projectsData?.projects    ?? [];
+  const jobs      = jobsData?.jobs            ?? [];
   const approvals = approvalsData?.timesheets ?? [];
-  const overrunJobs = overrunData?.jobs ?? [];
-  const idleJobs = idleData?.jobs ?? [];
-  const heatmap = heatmapData?.heatmap ?? [];
-  const targets = targetsData?.targets ?? [];
+  const overrunJobs = overrunData?.jobs       ?? [];
+  const idleJobs    = idleData?.jobs          ?? [];
+  const heatmap     = heatmapData?.heatmap    ?? [];
+  const targets     = targetsData?.targets    ?? [];
+  const orgLogs     = orgLogsData?.logs       ?? [];
+  const orgSheets   = orgSheetsData?.timesheets ?? [];
 
-  const totalHours = useMemo(() => jobs.reduce((s, j) => s + (j.logged_hours_cache || 0), 0), [jobs]);
+  const totalHours   = useMemo(() => jobs.reduce((s, j) => s + (j.logged_hours_cache || 0), 0), [jobs]);
   const billableJobs = useMemo(() => jobs.filter(j => j.billable).length, [jobs]);
-  const completedJobs = useMemo(() => jobs.filter(j => j.status === "completed").length, [jobs]);
+  const completedJobs= useMemo(() => jobs.filter(j => j.status === "completed").length, [jobs]);
 
   const handleCreateProject = async () => {
     await createProject.mutateAsync({ ...projectForm, default_hourly_rate: Number(projectForm.default_hourly_rate) || 0 });
@@ -188,348 +246,510 @@ export default function SuperAdminDashboard() {
     const target = targets.find(t => t.id.toString() === jobForm.assigned_to);
     await createJob.mutateAsync({
       ...jobForm,
-      assigned_to_model: target?.model || jobForm.assigned_to_model,
+      assigned_to_model: target?.model || "Admin",
       estimated_hours: Number(jobForm.estimated_hours) || 0,
       hourly_rate: Number(jobForm.hourly_rate) || 0,
     });
     setCreateJobOpen(false);
-    setJobForm({ title: "", description: "", assigned_to: "", assigned_to_model: "User", priority: "medium", estimated_hours: "", billable: true, hourly_rate: "", currency: "INR" });
+    setJobForm({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: true, hourly_rate: "", currency: "INR" });
   };
 
-  const priorityColor = { low: C.green, medium: C.gold, high: C.red, urgent: "#FF4FA0" };
-  const statusColor = { not_started: C.textMuted, in_progress: C.accent, on_hold: C.gold, completed: C.green, cancelled: C.red };
+  const handleApprove = async (ts) => {
+    await approveTS.mutateAsync({ timesheetId: ts._id, remarks: "Approved by Super Admin" });
+    setApproveModal(null);
+  };
+
+  const handleReject = async () => {
+    if (!rejectModal) return;
+    await rejectTS.mutateAsync({ timesheetId: rejectModal._id, remarks: rejectRemarks || "Rejected by Super Admin" });
+    setRejectModal(null);
+    setRejectRemarks("");
+  };
 
   return (
-    <div className="min-h-screen" style={{ background: C.bg, fontFamily: "'Inter',sans-serif", color: C.text }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');`}</style>
+    <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'Inter', sans-serif", color: C.text }}>
 
-      <div className="flex min-h-screen">
-        <aside className="hidden lg:flex flex-col w-56 shrink-0 sticky top-0 h-screen" style={{ background: C.surface, borderRight: `1px solid ${C.border}` }}>
-          <div className="px-5 py-6 border-b" style={{ borderColor: C.border }}>
-            <div className="flex items-center gap-2.5">
-              <div style={{ background: C.accent, borderRadius: 10, width: 32, height: 32 }} className="flex items-center justify-center text-white font-black text-sm">S</div>
-              <div>
-                <div className="text-[13px] font-bold" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>TorchX</div>
-                <div className="text-[10px]" style={{ color: C.textMuted }}>Super Admin</div>
-              </div>
+      {/* ── Horizontal Nav ─────────────────────────────────────────────────── */}
+      <header style={{ background: C.surface, borderBottom: `1px solid ${C.border}`, position: "sticky", top: 0, zIndex: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 0, padding: "0 24px", overflowX: "auto" }}>
+          {/* Logo chip */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, paddingRight: 24, borderRight: `1px solid ${C.border}`, marginRight: 8, flexShrink: 0 }}>
+            <div style={{ width: 30, height: 30, borderRadius: 8, background: C.brand, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ color: "#fff", fontSize: 13, fontWeight: 800 }}>S</span>
+            </div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>TorchX</div>
+              <div style={{ fontSize: 10, color: C.textMuted }}>Super Admin</div>
             </div>
           </div>
-          <nav className="flex flex-col gap-1 p-3 flex-1">
-            {NAV_ITEMS.map(n => (
-              <button key={n.id} onClick={() => setTab(n.id)}
-                style={{
-                  background: tab === n.id ? C.accentGlow : "transparent",
-                  color: tab === n.id ? C.accent : C.textMid,
-                  border: tab === n.id ? `1px solid ${C.accent}33` : "1px solid transparent",
-                  borderRadius: 10, textAlign: "left",
-                }}
-                className="flex items-center gap-2.5 px-3 py-2.5 text-[13px] font-medium transition-all hover:text-white">
-                <span className="text-base leading-none">{n.icon}</span>
-                {n.label}
-                {n.id === "approvals" && approvals.length > 0 && (
-                  <span style={{ background: C.red, color: "#fff" }} className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full">{approvals.length}</span>
+
+          <nav style={{ display: "flex", alignItems: "center", gap: 2, flex: 1 }}>
+            {NAV_TABS.map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)} style={{
+                background: "none", border: "none", cursor: "pointer",
+                padding: "18px 14px", fontSize: 13, fontWeight: tab === t.id ? 700 : 500,
+                color: tab === t.id ? C.brand : C.textMid,
+                borderBottom: tab === t.id ? `2.5px solid ${C.brand}` : "2.5px solid transparent",
+                whiteSpace: "nowrap", transition: "color .15s, border-color .15s",
+                position: "relative",
+              }}>
+                {t.label}
+                {t.id === "approvals" && approvals.length > 0 && (
+                  <span style={{
+                    position: "absolute", top: 12, right: 6,
+                    background: C.red, color: "#fff", borderRadius: "50%",
+                    width: 16, height: 16, fontSize: 9, fontWeight: 800,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>{approvals.length}</span>
                 )}
               </button>
             ))}
           </nav>
-          <div className="p-4 border-t" style={{ borderColor: C.border }}>
-            <div style={{ background: C.accentGlow, border: `1px solid ${C.accent}33`, borderRadius: 12 }} className="p-3">
-              <div className="text-[11px] font-semibold" style={{ color: C.accent }}>Full Access</div>
-              <div className="text-[10px] mt-0.5" style={{ color: C.textMuted }}>All modules unlocked</div>
-            </div>
+
+          <div style={{ display: "flex", gap: 8, flexShrink: 0, paddingLeft: 16 }}>
+            <Btn onClick={() => setCreateJobOpen(true)}>＋ New Job</Btn>
+            <Btn variant="ghost" onClick={() => setCreateProjectOpen(true)}>＋ Project</Btn>
           </div>
-        </aside>
+        </div>
+      </header>
 
-        <div className="flex-1 flex flex-col min-w-0">
-          <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-3.5 border-b" style={{ background: C.surface + "ee", borderColor: C.border, backdropFilter: "blur(12px)" }}>
-            <div>
-              <h1 className="text-[18px] font-bold" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>
-                {NAV_ITEMS.find(n => n.id === tab)?.label}
-              </h1>
-              <p className="text-[11px]" style={{ color: C.textMuted }}>Super Admin · Full Control</p>
+      {/* ── Full-access banner ─────────────────────────────────────────────── */}
+      <div style={{ background: C.brandLight, borderBottom: `1px solid ${C.brandMid}`, padding: "6px 24px", display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: C.brand }}>⬡ Super Admin</span>
+        <span style={{ fontSize: 11, color: C.brand, opacity: 0.7 }}>— Organisation-wide visibility across all roles</span>
+      </div>
+
+      <main style={{ padding: "28px 24px", maxWidth: 1280, margin: "0 auto" }}>
+
+        {/* ── OVERVIEW ───────────────────────────────────────────────────────── */}
+        {tab === "overview" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
+              <StatTile label="Total Projects"   value={projects.length}                      sub="Across all teams"          color={C.brand} />
+              <StatTile label="Active Jobs"      value={jobs.filter(j => j.status === "in_progress").length} sub={`${completedJobs} completed`} color={C.blue}  />
+              <StatTile label="Hours Logged"     value={`${totalHours.toFixed(0)}h`}          sub={`${billableJobs} billable jobs`} color={C.green} />
+              <StatTile label="Pending Reviews"  value={approvals.length}                     sub="Timesheets awaiting"       color={C.red}   />
             </div>
-            <div className="flex items-center gap-2">
-              <Btn onClick={() => setCreateJobOpen(true)}>＋ New Job</Btn>
-              <Btn variant="ghost" onClick={() => setCreateProjectOpen(true)}>＋ Project</Btn>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <Card style={{ padding: 20 }}>
+                <SectionHeader title="At-Risk Jobs" sub={`${overrunJobs.length} exceeding estimate`} />
+                {overrunJobs.length === 0 ? (
+                  <EmptyState icon="✓" title="No jobs at risk" sub="All jobs within estimate" />
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 260, overflowY: "auto" }}>
+                    {overrunJobs.map(job => (
+                      <div key={job._id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 10 }}>
+                        <span style={{ fontSize: 12, fontWeight: 800, color: C.red, minWidth: 36 }}>{job.riskPercent}%</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{job.title}</div>
+                          <div style={{ fontSize: 11, color: C.textMuted }}>{job.logged_hours_cache}h / {job.estimated_hours}h est.</div>
+                        </div>
+                        <div style={{ width: 60, height: 4, background: C.border, borderRadius: 4, overflow: "hidden", flexShrink: 0 }}>
+                          <div style={{ width: `${Math.min(job.riskPercent, 100)}%`, height: "100%", background: job.riskPercent >= 100 ? C.red : C.amber, borderRadius: 4 }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+
+              <Card style={{ padding: 20 }}>
+                <SectionHeader title="Idle Jobs" sub="No activity in 7+ days" />
+                {idleJobs.length === 0 ? (
+                  <EmptyState icon="🚀" title="All jobs are active" sub="" />
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 260, overflowY: "auto" }}>
+                    {idleJobs.map(job => (
+                      <div key={job._id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 10 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.amber, flexShrink: 0 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{job.title}</div>
+                          <div style={{ fontSize: 11, color: C.textMuted }}>Last: {fmtDate(job.updatedAt)}</div>
+                        </div>
+                        <Badge color={JOB_STATUS_COLOR[job.status] || C.textMuted}>{job.status.replace(/_/g, " ")}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
             </div>
-          </header>
 
-          <main className="flex-1 p-5 lg:p-6 overflow-auto">
-            {tab === "overview" && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <StatTile label="Total Projects" value={projects.length} sub="Across all teams" color={C.accent} glow={C.accentGlow} />
-                  <StatTile label="Active Jobs" value={jobs.filter(j => j.status === "in_progress").length} sub={`${completedJobs} completed`} color={C.green} glow={C.greenGlow} />
-                  <StatTile label="Hours Logged" value={`${totalHours.toFixed(0)}h`} sub={`${billableJobs} billable jobs`} color={C.gold} glow={C.goldGlow} />
-                  <StatTile label="Pending Reviews" value={approvals.length} sub="Timesheets awaiting" color={C.red} glow={C.redGlow} />
-                </div>
-
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                  <Card className="p-5">
-                    <SectionHeader title="At-Risk Jobs" sub={`${overrunJobs.length} jobs exceeding estimate`} />
-                    {overrunJobs.length === 0 ? (
-                      <div className="py-8 text-center" style={{ color: C.textMuted }}>
-                        <div className="text-3xl mb-2">✓</div>
-                        <div className="text-[12px]">No jobs at risk</div>
-                      </div>
-                    ) : (
-                      <div className="space-y-2.5 max-h-64 overflow-auto pr-1">
-                        {overrunJobs.map(job => (
-                          <div key={job._id} style={{ background: C.surfaceUp, border: `1px solid ${C.border}`, borderRadius: 12 }} className="flex items-center gap-3 p-3">
-                            <div style={{ width: 36, height: 36, background: C.redGlow, border: `1px solid ${C.red}44`, borderRadius: 10 }} className="flex items-center justify-center flex-shrink-0 text-xs font-bold" style2={{ color: C.red }}>
-                              <span style={{ color: C.red }}>{job.riskPercent}%</span>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-[12px] font-semibold truncate">{job.title}</div>
-                              <div className="text-[10px] mt-0.5" style={{ color: C.textMuted }}>{job.logged_hours_cache}h / {job.estimated_hours}h est.</div>
-                            </div>
-                            <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: C.border }}>
-                              <div className="h-full rounded-full" style={{ width: `${Math.min(job.riskPercent, 100)}%`, background: job.riskPercent >= 100 ? C.red : C.gold }} />
-                            </div>
-                          </div>
+            <Card style={{ padding: 20 }}>
+              <SectionHeader title="Team Workload Heatmap" sub={`Week of ${weekStart}`} />
+              {heatmap.length === 0 ? (
+                <EmptyState icon="◎" title="No team data" sub="No time logs found for this week" />
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: "left", padding: "8px 12px 8px 0", color: C.textMuted, fontWeight: 600 }}>Member</th>
+                        {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => (
+                          <th key={d} style={{ textAlign: "center", padding: "8px 6px", color: C.textMuted, fontWeight: 600 }}>{d}</th>
                         ))}
-                      </div>
-                    )}
-                  </Card>
-
-                  <Card className="p-5">
-                    <SectionHeader title="Idle Jobs" sub="No activity in 7+ days" />
-                    {idleJobs.length === 0 ? (
-                      <div className="py-8 text-center" style={{ color: C.textMuted }}>
-                        <div className="text-3xl mb-2">🚀</div>
-                        <div className="text-[12px]">All jobs are active</div>
-                      </div>
-                    ) : (
-                      <div className="space-y-2 max-h-64 overflow-auto pr-1">
-                        {idleJobs.map(job => (
-                          <div key={job._id} style={{ background: C.surfaceUp, border: `1px solid ${C.border}`, borderRadius: 12 }} className="flex items-center gap-3 p-3">
-                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: C.gold }} />
-                            <div className="flex-1 min-w-0">
-                              <div className="text-[12px] font-semibold truncate">{job.title}</div>
-                              <div className="text-[10px]" style={{ color: C.textMuted }}>Last updated: {new Date(job.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</div>
-                            </div>
-                            <Pill color={job.status === "in_progress" ? C.accent : C.textMuted}>{job.status.replace("_", " ")}</Pill>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </Card>
-                </div>
-
-                <Card className="p-5">
-                  <SectionHeader title="Team Workload Heatmap" sub={`Week of ${weekStart}`} />
-                  {heatmap.length === 0 ? (
-                    <div className="py-8 text-center" style={{ color: C.textMuted }}>No team data for this week</div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-[11px]">
-                        <thead>
-                          <tr>
-                            <th className="text-left py-2 pr-4 font-medium" style={{ color: C.textMuted }}>Member</th>
-                            {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => (
-                              <th key={d} className="text-center py-2 px-2 font-medium" style={{ color: C.textMuted }}>{d}</th>
-                            ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {heatmap.map((row, i) => {
+                        const days = Array.from({ length: 7 }, (_, idx) => {
+                          const d = new Date(weekStart); d.setDate(d.getDate() + idx);
+                          return row.days?.[d.toISOString().slice(0, 10)];
+                        });
+                        return (
+                          <tr key={i} style={{ borderTop: `1px solid ${C.border}` }}>
+                            <td style={{ padding: "10px 12px 10px 0", color: C.textMid, fontWeight: 500 }}>Member {i + 1}</td>
+                            {days.map((day, j) => {
+                              const pct = day?.loadPercent ?? 0;
+                              const bg  = pct === 0 ? C.surfaceAlt : pct < 50 ? C.greenLight : pct < 80 ? C.amberLight : C.redLight;
+                              const fg  = pct === 0 ? C.textMuted  : pct < 50 ? C.green      : pct < 80 ? C.amber      : C.red;
+                              return (
+                                <td key={j} style={{ textAlign: "center", padding: "6px" }}>
+                                  <div style={{ background: bg, color: fg, borderRadius: 8, padding: "6px 4px", fontWeight: 700, fontSize: 11 }}>
+                                    {pct > 0 ? `${pct}%` : "—"}
+                                  </div>
+                                </td>
+                              );
+                            })}
                           </tr>
-                        </thead>
-                        <tbody>
-                          {heatmap.map((row, i) => {
-                            const days = Array.from({ length: 7 }, (_, idx) => {
-                              const d = new Date(weekStart); d.setDate(d.getDate() + idx);
-                              const key = d.toISOString().slice(0, 10);
-                              return row.days?.[key];
-                            });
-                            return (
-                              <tr key={i} className="border-t" style={{ borderColor: C.border }}>
-                                <td className="py-2.5 pr-4 font-medium text-[11px]" style={{ color: C.textMid }}>Member {i + 1}</td>
-                                {days.map((day, j) => {
-                                  const pct = day?.loadPercent ?? 0;
-                                  const bg = pct === 0 ? C.surfaceUp : pct < 50 ? C.green + "33" : pct < 80 ? C.gold + "33" : C.red + "33";
-                                  const fg = pct === 0 ? C.textMuted : pct < 50 ? C.green : pct < 80 ? C.gold : C.red;
-                                  return (
-                                    <td key={j} className="text-center py-2 px-2">
-                                      <div style={{ background: bg, color: fg, borderRadius: 8 }} className="py-1.5 px-1 font-semibold">
-                                        {pct > 0 ? `${pct}%` : "—"}
-                                      </div>
-                                    </td>
-                                  );
-                                })}
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+
+        {/* ── PROJECTS ───────────────────────────────────────────────────────── */}
+        {tab === "projects" && (
+          <div>
+            <SectionHeader title="All Projects" sub={`${projects.length} total`}
+              action={<Btn onClick={() => setCreateProjectOpen(true)}>＋ New Project</Btn>} />
+            {projects.length === 0 ? (
+              <Card><EmptyState icon="⬡" title="No projects yet" sub="Create your first project" action={<Btn onClick={() => setCreateProjectOpen(true)}>Create Project</Btn>} /></Card>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
+                {projects.map(p => (
+                  <Card key={p._id} style={{ padding: 20 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                      <div style={{ width: 34, height: 34, borderRadius: 10, background: (p.color_tag || C.brand) + "22", border: `2px solid ${p.color_tag || C.brand}`, flexShrink: 0 }} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</div>
+                        <div style={{ fontSize: 11, color: C.textMuted }}>{p.code || "—"} · {p.billing_type}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <Badge color={p.status === "active" ? C.green : C.textMuted}>{p.status}</Badge>
+                      <Badge color={C.brand}>{p.visibility}</Badge>
+                      <Badge color={C.amber}>{p.members?.length || 0} members</Badge>
+                    </div>
+                    {p.description && <div style={{ fontSize: 12, color: C.textMuted, marginTop: 10 }}>{p.description}</div>}
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── JOBS ───────────────────────────────────────────────────────────── */}
+        {tab === "jobs" && (
+          <div>
+            <SectionHeader title="Jobs Created by Me" sub={`${jobs.length} total`}
+              action={<Btn onClick={() => setCreateJobOpen(true)}>＋ New Job</Btn>} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {jobs.length === 0 ? (
+                <Card><EmptyState icon="⬢" title="No jobs yet" sub="Create a job to assign work" action={<Btn onClick={() => setCreateJobOpen(true)}>Create Job</Btn>} /></Card>
+              ) : jobs.map(job => (
+                <Card key={job._id} style={{ padding: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                        <span style={{ fontWeight: 700, fontSize: 14 }}>{job.title}</span>
+                        <Badge color={PRIORITY_COLOR[job.priority]}>{job.priority}</Badge>
+                        {job.billable && <Badge color={C.amber}>Billable</Badge>}
+                        {job.overrun_flagged && <Badge color={C.red}>Overrun</Badge>}
+                      </div>
+                      <div style={{ fontSize: 11, color: C.textMuted, display: "flex", gap: 12 }}>
+                        <span>{job.logged_hours_cache?.toFixed(1)}h logged</span>
+                        {job.estimated_hours > 0 && <span>/ {job.estimated_hours}h est.</span>}
+                        {job.due_date && <span>Due {fmtDate(job.due_date)}</span>}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                      <select
+                        value={job.status}
+                        onChange={e => updateJobStatus.mutate({ id: job._id, status: e.target.value })}
+                        style={{ background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 10px", fontSize: 11, fontWeight: 600, color: JOB_STATUS_COLOR[job.status] || C.text, outline: "none" }}
+                      >
+                        {["not_started","in_progress","on_hold","completed","cancelled"].map(s => (
+                          <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
+                        ))}
+                      </select>
+                      <Btn variant="ghost" onClick={() => archiveJob.mutate(job._id)}>Archive</Btn>
+                    </div>
+                  </div>
+                  {job.estimated_hours > 0 && (
+                    <div style={{ height: 3, background: C.border, borderRadius: 4, marginTop: 12, overflow: "hidden" }}>
+                      <div style={{ width: `${Math.min((job.logged_hours_cache / job.estimated_hours) * 100, 100)}%`, height: "100%", background: job.overrun_flagged ? C.red : C.brand, borderRadius: 4 }} />
                     </div>
                   )}
                 </Card>
-              </div>
-            )}
+              ))}
+            </div>
+          </div>
+        )}
 
-            {tab === "projects" && (
-              <div className="space-y-4">
-                <SectionHeader title="All Projects" sub={`${projects.length} total`}
-                  action={<Btn onClick={() => setCreateProjectOpen(true)}>＋ New Project</Btn>} />
-                {projects.length === 0 ? (
-                  <Card className="py-16 text-center">
-                    <div className="text-4xl mb-3">⬡</div>
-                    <div className="font-semibold mb-1">No projects yet</div>
-                    <div className="text-[12px] mb-4" style={{ color: C.textMuted }}>Create your first project to start tracking</div>
-                    <Btn onClick={() => setCreateProjectOpen(true)}>Create Project</Btn>
-                  </Card>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                    {projects.map(p => (
-                      <Card key={p._id} className="p-5">
-                        <div className="flex items-start gap-3 mb-3">
-                          <div style={{ width: 36, height: 36, background: p.color_tag + "33", borderRadius: 10, border: `2px solid ${p.color_tag}` }} className="flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-[14px] font-bold truncate" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>{p.name}</div>
-                            <div className="text-[11px]" style={{ color: C.textMuted }}>{p.code || "—"} · {p.billing_type}</div>
-                          </div>
+        {/* ── APPROVALS ──────────────────────────────────────────────────────── */}
+        {tab === "approvals" && (
+          <div>
+            <SectionHeader title="Pending Timesheets" sub={`${approvals.length} awaiting your review`} />
+            {approvals.length === 0 ? (
+              <Card><EmptyState icon="✦" title="All clear" sub="No timesheets pending review" /></Card>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {approvals.map(ts => (
+                  <Card key={ts._id} style={{ padding: 20 }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 15 }}>{ts.owner?.f_name} {ts.owner?.l_name}</div>
+                        <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
+                          {ts.owner?.work_email} · {ts.owner_model}
                         </div>
-                        <div className="flex gap-2 flex-wrap mt-2">
-                          <Pill color={p.status === "active" ? C.green : C.textMuted}>{p.status}</Pill>
-                          <Pill color={C.accent}>{p.visibility}</Pill>
-                          <Pill color={C.gold}>{p.members?.length || 0} members</Pill>
+                        <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>
+                          Week: {fmtDate(ts.week_start)} — {fmtDate(ts.week_end)}
                         </div>
-                        {p.description && (
-                          <div className="text-[11px] mt-3 line-clamp-2" style={{ color: C.textMuted }}>{p.description}</div>
-                        )}
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {tab === "jobs" && (
-              <div className="space-y-4">
-                <SectionHeader title="Jobs Created by Me" sub={`${jobs.length} total`}
-                  action={<Btn onClick={() => setCreateJobOpen(true)}>＋ New Job</Btn>} />
-                <div className="space-y-2">
-                  {jobs.map(job => (
-                    <Card key={job._id} className="p-4">
-                      <div className="flex items-center gap-4 flex-wrap">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[14px] font-semibold">{job.title}</span>
-                            <Pill color={priorityColor[job.priority]}>{job.priority}</Pill>
-                            {job.billable && <Pill color={C.gold}>Billable</Pill>}
-                            {job.overrun_flagged && <Pill color={C.red}>Overrun</Pill>}
-                          </div>
-                          <div className="text-[11px] mt-1 flex items-center gap-3 flex-wrap" style={{ color: C.textMuted }}>
-                            <span>{job.logged_hours_cache?.toFixed(1)}h logged</span>
-                            {job.estimated_hours > 0 && <span>/ {job.estimated_hours}h est.</span>}
-                            {job.due_date && <span>Due {new Date(job.due_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <select
-                            value={job.status}
-                            onChange={e => updateJobStatus.mutate({ id: job._id, status: e.target.value })}
-                            style={{ background: C.surfaceUp, border: `1px solid ${C.border}`, color: statusColor[job.status], borderRadius: 8, fontSize: 11, outline: "none" }}
-                            className="px-2.5 py-1.5 font-semibold cursor-pointer"
-                          >
-                            {["not_started","in_progress","on_hold","completed","cancelled"].map(s => (
-                              <option key={s} value={s} style={{ color: C.text, background: C.surfaceUp }}>{s.replace(/_/g," ")}</option>
-                            ))}
-                          </select>
-                          <Btn variant="ghost" onClick={() => archiveJob.mutate(job._id)}>Archive</Btn>
+                        <div style={{ display: "flex", gap: 12, marginTop: 8, fontSize: 12 }}>
+                          <span style={{ color: C.brand, fontWeight: 600 }}>{fmtDuration(ts.total_minutes)} total</span>
+                          <span style={{ color: C.green }}>{fmtDuration(ts.billable_minutes)} billable</span>
+                          <Badge color={(STATUS_STYLE[ts.status] || STATUS_STYLE.draft).color} bg={(STATUS_STYLE[ts.status] || STATUS_STYLE.draft).bg}>
+                            {(STATUS_STYLE[ts.status] || STATUS_STYLE.draft).label}
+                          </Badge>
                         </div>
                       </div>
-                      {job.estimated_hours > 0 && (
-                        <div className="mt-3 h-1 rounded-full overflow-hidden" style={{ background: C.border }}>
-                          <div className="h-full rounded-full transition-all" style={{
-                            width: `${Math.min((job.logged_hours_cache / job.estimated_hours) * 100, 100)}%`,
-                            background: job.overrun_flagged ? C.red : C.accent
-                          }} />
+                      <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                        <Btn variant="success" onClick={() => setApproveModal(ts)}>Approve</Btn>
+                        <Btn variant="danger"  onClick={() => { setRejectModal(ts); setRejectRemarks(""); }}>Reject</Btn>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── ORG ALL LOGS ───────────────────────────────────────────────────── */}
+        {tab === "org-logs" && (
+          <div>
+            <SectionHeader
+              title="All Time Logs — Organisation"
+              sub={`${orgLogs.length} entries · ${fmtDuration(orgLogsData?.totalMinutes || 0)} total`}
+              action={
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <Input
+                    type="date"
+                    value={logsWeek}
+                    onChange={e => setLogsWeek(e.target.value)}
+                    style={{ fontSize: 12, padding: "7px 12px" }}
+                  />
+                  <span style={{ fontSize: 11, color: C.textMuted }}>week of</span>
+                </div>
+              }
+            />
+            {orgLogs.length === 0 ? (
+              <Card><EmptyState icon="📋" title="No logs found" sub="No time entries for this week across the org" /></Card>
+            ) : (
+              <Card style={{ overflow: "hidden" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: C.surfaceAlt, borderBottom: `1px solid ${C.border}` }}>
+                      {["Member", "Role", "Job", "Date", "Duration", "Mode", "Status"].map(h => (
+                        <th key={h} style={{ textAlign: "left", padding: "12px 16px", fontWeight: 700, fontSize: 11, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orgLogs.map(log => (
+                      <tr key={log._id} style={{ borderBottom: `1px solid ${C.border}` }}>
+                        <td style={{ padding: "12px 16px", fontWeight: 600 }}>
+                          {log.logged_by?.f_name || "—"} {log.logged_by?.l_name || ""}
+                        </td>
+                        <td style={{ padding: "12px 16px" }}>
+                          <Badge color={C.brand}>{log.logged_by_model}</Badge>
+                        </td>
+                        <td style={{ padding: "12px 16px", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {log.job?.title || "—"}
+                        </td>
+                        <td style={{ padding: "12px 16px", color: C.textMuted, whiteSpace: "nowrap" }}>
+                          {fmtDate(log.log_date)}
+                        </td>
+                        <td style={{ padding: "12px 16px", fontWeight: 600, color: C.green, whiteSpace: "nowrap" }}>
+                          {fmtDuration(log.duration_minutes)}
+                        </td>
+                        <td style={{ padding: "12px 16px" }}>
+                          <Badge color={log.entry_mode === "timer" ? C.blue : C.textMuted}>{log.entry_mode}</Badge>
+                        </td>
+                        <td style={{ padding: "12px 16px" }}>
+                          <Badge color={(STATUS_STYLE[log.status] || STATUS_STYLE.draft).color} bg={(STATUS_STYLE[log.status] || STATUS_STYLE.draft).bg}>
+                            {(STATUS_STYLE[log.status] || STATUS_STYLE.draft).label}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* ── ORG ALL TIMESHEETS ─────────────────────────────────────────────── */}
+        {tab === "org-sheets" && (
+          <div>
+            <SectionHeader
+              title="All Timesheets — Organisation"
+              sub={`${orgSheets.length} timesheets`}
+              action={
+                <div style={{ display: "flex", gap: 8 }}>
+                  <select
+                    value={sheetsStatus}
+                    onChange={e => setSheetsStatus(e.target.value)}
+                    style={{ background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 10, padding: "7px 12px", fontSize: 12, color: C.text, outline: "none" }}
+                  >
+                    <option value="">All Statuses</option>
+                    {Object.entries(STATUS_STYLE).map(([k, v]) => (
+                      <option key={k} value={k}>{v.label}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={sheetsOwnerModel}
+                    onChange={e => setSheetsOwnerModel(e.target.value)}
+                    style={{ background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 10, padding: "7px 12px", fontSize: 12, color: C.text, outline: "none" }}
+                  >
+                    <option value="">All Roles</option>
+                    <option value="User">Employee</option>
+                    <option value="Manager">Manager</option>
+                    <option value="Admin">Admin</option>
+                  </select>
+                </div>
+              }
+            />
+            {orgSheets.length === 0 ? (
+              <Card><EmptyState icon="📄" title="No timesheets found" sub="Adjust filters to view timesheets" /></Card>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {orgSheets.map(ts => {
+                  const ss = STATUS_STYLE[ts.status] || STATUS_STYLE.draft;
+                  return (
+                    <Card key={ts._id} style={{ padding: 18 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
+                            <span style={{ fontWeight: 700, fontSize: 14 }}>
+                              {ts.owner?.f_name} {ts.owner?.l_name}
+                            </span>
+                            <Badge color={C.brand}>{ts.owner_model}</Badge>
+                            <Badge color={ss.color} bg={ss.bg}>{ss.label}</Badge>
+                          </div>
+                          <div style={{ fontSize: 12, color: C.textMuted }}>
+                            {ts.owner?.work_email} · Week: {fmtDate(ts.week_start)} — {fmtDate(ts.week_end)}
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 20, flexShrink: 0, textAlign: "right" }}>
+                          <div>
+                            <div style={{ fontSize: 16, fontWeight: 800, color: C.brand }}>{fmtDuration(ts.total_minutes)}</div>
+                            <div style={{ fontSize: 11, color: C.textMuted }}>total</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 16, fontWeight: 800, color: C.green }}>{fmtDuration(ts.billable_minutes)}</div>
+                            <div style={{ fontSize: 11, color: C.textMuted }}>billable</div>
+                          </div>
+                        </div>
+                      </div>
+                      {ts.remarks && (
+                        <div style={{ marginTop: 10, fontSize: 12, color: C.textMuted, padding: "8px 12px", background: C.surfaceAlt, borderRadius: 8, borderLeft: `3px solid ${ss.color}` }}>
+                          {ts.remarks}
                         </div>
                       )}
                     </Card>
-                  ))}
-                  {jobs.length === 0 && (
-                    <Card className="py-16 text-center">
-                      <div className="text-4xl mb-3">⬢</div>
-                      <div className="font-semibold mb-1">No jobs yet</div>
-                      <div className="text-[12px] mb-4" style={{ color: C.textMuted }}>Create a job to assign work to your team</div>
-                      <Btn onClick={() => setCreateJobOpen(true)}>Create Job</Btn>
-                    </Card>
-                  )}
-                </div>
+                  );
+                })}
               </div>
             )}
+          </div>
+        )}
 
-            {tab === "approvals" && (
-              <div className="space-y-4">
-                <SectionHeader title="Pending Timesheets" sub={`${approvals.length} awaiting your review`} />
-                {approvals.length === 0 ? (
-                  <Card className="py-16 text-center">
-                    <div className="text-4xl mb-3">✦</div>
-                    <div className="font-semibold mb-1">All clear</div>
-                    <div className="text-[12px]" style={{ color: C.textMuted }}>No timesheets pending review</div>
-                  </Card>
-                ) : (
-                  <div className="space-y-3">
-                    {approvals.map(ts => (
-                      <Card key={ts._id} className="p-5">
-                        <div className="flex items-start justify-between gap-4 flex-wrap">
-                          <div>
-                            <div className="text-[14px] font-bold" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>
-                              {ts.owner?.f_name} {ts.owner?.l_name}
-                            </div>
-                            <div className="text-[11px] mt-1" style={{ color: C.textMuted }}>
-                              Week: {new Date(ts.week_start).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} — {new Date(ts.week_end).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                            </div>
-                            <div className="flex gap-3 mt-2 text-[11px]">
-                              <span style={{ color: C.accent }}>{(ts.total_minutes / 60).toFixed(1)}h total</span>
-                              <span style={{ color: C.gold }}>{(ts.billable_minutes / 60).toFixed(1)}h billable</span>
-                              <Pill color={C.textMuted}>{ts.status?.replace(/_/g," ")}</Pill>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <Btn variant="success" onClick={() => approveTS.mutate({ timesheetId: ts._id, remarks: "Approved by SuperAdmin" })}>Approve</Btn>
-                            <Btn variant="danger" onClick={() => rejectTS.mutate({ timesheetId: ts._id, remarks: "Rejected by SuperAdmin" })}>Reject</Btn>
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                )}
+        {/* ── ANALYTICS ──────────────────────────────────────────────────────── */}
+        {tab === "analytics" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
+              <StatTile label="Total Hours"    value={`${totalHours.toFixed(0)}h`}  sub="All time logged"      color={C.brand}    />
+              <StatTile label="Billable Jobs"  value={billableJobs}                 sub={`of ${jobs.length} total`} color={C.green} />
+              <StatTile label="Overrun Jobs"   value={overrunJobs.length}           sub="Exceeding estimate"   color={C.red}      />
+              <StatTile label="Idle Jobs"      value={idleJobs.length}              sub="7+ days inactive"     color={C.amber}    />
+            </div>
+            <Card style={{ padding: 20 }}>
+              <SectionHeader title="Jobs by Status" />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10 }}>
+                {["not_started","in_progress","on_hold","completed","cancelled"].map(s => {
+                  const count = jobs.filter(j => j.status === s).length;
+                  return (
+                    <div key={s} style={{ background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 12, padding: "16px 12px", textAlign: "center" }}>
+                      <div style={{ fontSize: 28, fontWeight: 800, color: JOB_STATUS_COLOR[s] || C.textMuted }}>{count}</div>
+                      <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4, textTransform: "capitalize" }}>{s.replace(/_/g, " ")}</div>
+                    </div>
+                  );
+                })}
               </div>
-            )}
+            </Card>
+          </div>
+        )}
+      </main>
 
-            {tab === "analytics" && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <StatTile label="Total Hours" value={`${totalHours.toFixed(0)}h`} sub="All time logged" color={C.accent} />
-                  <StatTile label="Billable Jobs" value={billableJobs} sub={`of ${jobs.length} total`} color={C.gold} />
-                  <StatTile label="Overrun Jobs" value={overrunJobs.length} sub="Exceeding estimate" color={C.red} />
-                  <StatTile label="Idle Jobs" value={idleJobs.length} sub="7+ days inactive" color={C.textMid} />
-                </div>
-                <Card className="p-5">
-                  <SectionHeader title="Jobs by Status" />
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                    {["not_started","in_progress","on_hold","completed","cancelled"].map(s => {
-                      const count = jobs.filter(j => j.status === s).length;
-                      return (
-                        <div key={s} style={{ background: C.surfaceUp, border: `1px solid ${C.border}`, borderRadius: 12 }} className="p-4 text-center">
-                          <div className="text-2xl font-black" style={{ color: statusColor[s], fontFamily: "'Space Grotesk',sans-serif" }}>{count}</div>
-                          <div className="text-[10px] mt-1 capitalize" style={{ color: C.textMuted }}>{s.replace(/_/g," ")}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </Card>
-              </div>
-            )}
-          </main>
+      {/* ── Approve confirmation modal ─────────────────────────────────────── */}
+      <Modal open={!!approveModal} onClose={() => setApproveModal(null)} title="Approve Timesheet">
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ fontSize: 14, color: C.text }}>
+            Approve the timesheet for <strong>{approveModal?.owner?.f_name} {approveModal?.owner?.l_name}</strong>?
+          </div>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <Btn variant="ghost" onClick={() => setApproveModal(null)}>Cancel</Btn>
+            <Btn variant="success" onClick={() => handleApprove(approveModal)} disabled={approveTS.isPending}>
+              {approveTS.isPending ? "Approving…" : "Approve"}
+            </Btn>
+          </div>
         </div>
-      </div>
+      </Modal>
 
+      {/* ── Reject modal ───────────────────────────────────────────────────── */}
+      <Modal open={!!rejectModal} onClose={() => setRejectModal(null)} title="Reject Timesheet">
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ fontSize: 14, color: C.text }}>
+            Rejecting timesheet for <strong>{rejectModal?.owner?.f_name} {rejectModal?.owner?.l_name}</strong>
+          </div>
+          <Input
+            label="Reason (required)"
+            placeholder="Explain the issue…"
+            value={rejectRemarks}
+            onChange={e => setRejectRemarks(e.target.value)}
+          />
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <Btn variant="ghost" onClick={() => setRejectModal(null)}>Cancel</Btn>
+            <Btn variant="danger" onClick={handleReject} disabled={!rejectRemarks.trim() || rejectTS.isPending}>
+              {rejectTS.isPending ? "Rejecting…" : "Reject"}
+            </Btn>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Create Project modal ───────────────────────────────────────────── */}
       <Modal open={createProjectOpen} onClose={() => setCreateProjectOpen(false)} title="Create Project">
-        <div className="space-y-4">
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <Input label="Project Name" placeholder="e.g. Website Redesign" value={projectForm.name} onChange={e => setProjectForm(p => ({ ...p, name: e.target.value }))} />
-          <Input label="Description" placeholder="Brief description..." value={projectForm.description} onChange={e => setProjectForm(p => ({ ...p, description: e.target.value }))} />
-          <div className="grid grid-cols-2 gap-3">
+          <Input label="Description" placeholder="Brief description…" value={projectForm.description} onChange={e => setProjectForm(p => ({ ...p, description: e.target.value }))} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <Select label="Billing Type" value={projectForm.billing_type} onChange={e => setProjectForm(p => ({ ...p, billing_type: e.target.value }))}>
               <option value="hourly">Hourly</option>
               <option value="fixed">Fixed</option>
@@ -542,7 +762,7 @@ export default function SuperAdminDashboard() {
             </Select>
           </div>
           <Input label="Default Hourly Rate" type="number" placeholder="0.00" value={projectForm.default_hourly_rate} onChange={e => setProjectForm(p => ({ ...p, default_hourly_rate: e.target.value }))} />
-          <div className="flex gap-2 justify-end pt-2">
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", paddingTop: 4 }}>
             <Btn variant="ghost" onClick={() => setCreateProjectOpen(false)}>Cancel</Btn>
             <Btn onClick={handleCreateProject} disabled={!projectForm.name || createProject.isPending}>
               {createProject.isPending ? "Creating…" : "Create Project"}
@@ -551,17 +771,18 @@ export default function SuperAdminDashboard() {
         </div>
       </Modal>
 
+      {/* ── Create Job modal ───────────────────────────────────────────────── */}
       <Modal open={createJobOpen} onClose={() => setCreateJobOpen(false)} title="Create Job">
-        <div className="space-y-4">
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <Input label="Job Title" placeholder="e.g. Design Login Page" value={jobForm.title} onChange={e => setJobForm(p => ({ ...p, title: e.target.value }))} />
-          <Input label="Description" placeholder="Job details..." value={jobForm.description} onChange={e => setJobForm(p => ({ ...p, description: e.target.value }))} />
+          <Input label="Description" placeholder="Job details…" value={jobForm.description} onChange={e => setJobForm(p => ({ ...p, description: e.target.value }))} />
           <Select label="Assign To" value={jobForm.assigned_to} onChange={e => setJobForm(p => ({ ...p, assigned_to: e.target.value }))}>
             <option value="">Select team member…</option>
             {targets.map(t => (
               <option key={t.id} value={t.id}>{t.id} ({t.model})</option>
             ))}
           </Select>
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <Select label="Priority" value={jobForm.priority} onChange={e => setJobForm(p => ({ ...p, priority: e.target.value }))}>
               <option value="low">Low</option>
               <option value="medium">Medium</option>
@@ -570,7 +791,7 @@ export default function SuperAdminDashboard() {
             </Select>
             <Input label="Estimated Hours" type="number" placeholder="0" value={jobForm.estimated_hours} onChange={e => setJobForm(p => ({ ...p, estimated_hours: e.target.value }))} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <Input label="Hourly Rate" type="number" placeholder="0.00" value={jobForm.hourly_rate} onChange={e => setJobForm(p => ({ ...p, hourly_rate: e.target.value }))} />
             <Select label="Currency" value={jobForm.currency} onChange={e => setJobForm(p => ({ ...p, currency: e.target.value }))}>
               <option value="INR">INR</option>
@@ -578,11 +799,11 @@ export default function SuperAdminDashboard() {
               <option value="EUR">EUR</option>
             </Select>
           </div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={jobForm.billable} onChange={e => setJobForm(p => ({ ...p, billable: e.target.checked }))} className="accent-[#7C5CFC] w-4 h-4" />
-            <span className="text-[13px]" style={{ color: C.textMid }}>Billable job</span>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input type="checkbox" checked={jobForm.billable} onChange={e => setJobForm(p => ({ ...p, billable: e.target.checked }))} style={{ accentColor: C.brand, width: 15, height: 15 }} />
+            <span style={{ fontSize: 13, color: C.textMid }}>Billable job</span>
           </label>
-          <div className="flex gap-2 justify-end pt-2">
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", paddingTop: 4 }}>
             <Btn variant="ghost" onClick={() => setCreateJobOpen(false)}>Cancel</Btn>
             <Btn onClick={handleCreateJob} disabled={!jobForm.title || !jobForm.assigned_to || createJob.isPending}>
               {createJob.isPending ? "Creating…" : "Create Job"}
