@@ -56,6 +56,7 @@ const {
   updateTimeLog,
   deleteTimeLog,
   getJobTimeLogs,
+  getAllTimeLogs,
 } = require("../controllers/timelog.controller");
 
 const {
@@ -75,7 +76,21 @@ const {
   approveTimesheet,
   rejectTimesheet,
   forwardTimesheet,
+  getAllTimesheets,
 } = require("../controllers/timesheet.controller");
+
+// ─── SA / Admin only middleware ───────────────────────────────────────────────
+const saOrAdmin = (req, res, next) => {
+  const token = req.cookies?.token;
+  if (!token) return res.status(401).json({ message: "Unauthorized" });
+  const jwt = require("jsonwebtoken");
+  let decoded;
+  try { decoded = jwt.verify(token, process.env.JWT_SECRET); }
+  catch (e) { return res.status(401).json({ message: "Invalid or expired token" }); }
+  if (decoded.role === "super_admin") return superAdminAuth(req, res, next);
+  if (["admin", "senior_admin", "official"].includes(decoded.role)) return adminAuth(req, res, next);
+  return res.status(403).json({ message: "Admin or Super Admin access required" });
+};
 
 const {
   getTeamWorkloadHeatmap,
@@ -128,5 +143,9 @@ timesheetRouter.get("/insights/workload-heatmap", anyRole, asyncHandler(getTeamW
 timesheetRouter.get("/insights/overrun-risk", anyRole, asyncHandler(getOverrunRiskJobs));
 timesheetRouter.get("/insights/idle-jobs", anyRole, asyncHandler(getIdleJobs));
 timesheetRouter.get("/insights/my-productivity", anyRole, asyncHandler(getMyProductivitySummary));
+
+// ─── SA / Admin: org-wide visibility endpoints ────────────────────────────────
+timesheetRouter.get("/admin/time-logs", saOrAdmin, asyncHandler(getAllTimeLogs));
+timesheetRouter.get("/admin/timesheets", saOrAdmin, asyncHandler(getAllTimesheets));
 
 module.exports = timesheetRouter;

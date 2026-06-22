@@ -99,12 +99,9 @@ timeLogSchema.methods.computeBilledAmount = function () {
   return Math.round(hours * this.hourly_rate * 100) / 100;
 };
 
-timeLogSchema.pre("save", function () {
-  if (this.billable) {
-    this.billed_amount = this.computeBilledAmount();
-  } else {
-    this.billed_amount = 0;
-  }
+timeLogSchema.pre("save", async function () {
+  this.billed_amount = this.billable ? this.computeBilledAmount() : 0;
 });
 
-module.exports = mongoose.models.TimeLog || mongoose.model("TimeLog", timeLogSchema);
+module.exports =
+  mongoose.models.TimeLog || mongoose.model("TimeLog", timeLogSchema);

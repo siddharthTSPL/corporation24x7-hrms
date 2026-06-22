@@ -50,4 +50,6 @@ const activeTimerSchema = new mongoose.Schema(
 activeTimerSchema.index({ organisation_id: 1, user: 1 }, { unique: true });
 activeTimerSchema.index({ status: 1, last_heartbeat_at: 1 });
 
-module.exports = mongoose.models.ActiveTimer || mongoose.model("ActiveTimer", activeTimerSchema);
+module.exports =
+  mongoose.models.ActiveTimer ||
+  mongoose.model("ActiveTimer", activeTimerSchema);

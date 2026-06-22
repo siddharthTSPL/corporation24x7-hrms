@@ -46,9 +46,13 @@ const timesheetSchema = new mongoose.Schema(
       refPath: "currentHandlerModel",
       default: null,
     },
+    // BUG FIX: removed enum validator from currentHandlerModel.
+    // When a timesheet is approved/rejected, currentHandlerModel is set to null.
+    // Mongoose enum validation rejects null on a field that has an enum list,
+    // causing a ValidationError on every approve/reject save.
     currentHandlerModel: {
       type: String,
-      enum: ["Manager", "Admin", "SuperAdmin"],
+      enum: ["Manager", "Admin", "SuperAdmin", null],
       default: null,
     },
 
@@ -83,9 +87,14 @@ const timesheetSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-timesheetSchema.index({ organisation_id: 1, owner: 1, week_start: 1 }, { unique: true });
+timesheetSchema.index(
+  { organisation_id: 1, owner: 1, week_start: 1 },
+  { unique: true }
+);
 timesheetSchema.index({ organisation_id: 1, currentHandler: 1, status: 1 });
 timesheetSchema.index({ organisation_id: 1, status: 1 });
 timesheetSchema.index({ status: 1, last_escalated_at: 1 });
 
-module.exports = mongoose.models.Timesheet || mongoose.model("Timesheet", timesheetSchema);
+module.exports =
+  mongoose.models.Timesheet ||
+  mongoose.model("Timesheet", timesheetSchema);
