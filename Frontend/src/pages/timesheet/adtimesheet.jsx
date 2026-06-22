@@ -25,6 +25,8 @@ import {
   useOverrunRiskJobs,
   useIdleJobs,
   useMyProductivitySummary,
+  useOrgAllTimeLogs,
+  useOrgAllTimesheets,
 } from "../../auth/server-state/timesheet/timesheet.hook";
 
 const C = {
@@ -88,12 +90,14 @@ const JOB_STATUS_COLOR = {
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const TABS = [
-  { id: "overview", label: "Overview" },
-  { id: "team-jobs", label: "Team Jobs" },
-  { id: "approvals", label: "Approvals" },
-  { id: "insights", label: "Insights" },
-  { id: "my-work", label: "My Work" },
-  { id: "timesheets", label: "Timesheets" },
+  { id: "overview",   label: "Overview"       },
+  { id: "team-jobs",  label: "Team Jobs"      },
+  { id: "approvals",  label: "Approvals"      },
+  { id: "insights",   label: "Insights"       },
+  { id: "my-work",    label: "My Work"        },
+  { id: "timesheets", label: "Timesheets"     },
+  { id: "org-logs",   label: "All Logs"       },
+  { id: "org-sheets", label: "All Timesheets" },
 ];
 
 function TorchXLogo() {
@@ -472,6 +476,18 @@ export default function AdminTimesheet() {
   const idleJobs = idleData?.jobs || [];
 
   const { data: prodData } = useMyProductivitySummary(weekStart);
+
+  const [logsWeek, setLogsWeek]         = useState(weekStart);
+  const [sheetsStatus, setSheetsStatus] = useState("");
+  const [sheetsOwnerModel, setSheetsOwnerModel] = useState("");
+
+  const { data: orgLogsData }   = useOrgAllTimeLogs({ week_start: logsWeek });
+  const { data: orgSheetsData } = useOrgAllTimesheets({
+    ...(sheetsStatus     ? { status:      sheetsStatus     } : {}),
+    ...(sheetsOwnerModel ? { owner_model: sheetsOwnerModel } : {}),
+  });
+  const orgLogs   = orgLogsData?.logs       ?? [];
+  const orgSheets = orgSheetsData?.timesheets ?? [];
 
   const createJob = useCreateJob();
   const updateJobStatus = useUpdateJobStatus();
@@ -900,6 +916,153 @@ export default function AdminTimesheet() {
                 </Card>
               ))}
             </div>
+          </div>
+        )}
+        {tab === "org-logs" && (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+              <div>
+                <h1 style={{ fontSize: 20, fontWeight: 800, color: C.text, margin: 0 }}>All Time Logs — Organisation</h1>
+                <p style={{ fontSize: 12, color: C.textMuted, margin: "4px 0 0" }}>
+                  {orgLogs.length} entries · {Math.floor((orgLogsData?.totalMinutes || 0) / 60)}h {(orgLogsData?.totalMinutes || 0) % 60}m total
+                </p>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 12, color: C.textMuted }}>Week of</span>
+                <input
+                  type="date"
+                  value={logsWeek}
+                  onChange={e => setLogsWeek(e.target.value)}
+                  style={{ background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 8, padding: "7px 12px", fontSize: 12, color: C.text, outline: "none" }}
+                />
+              </div>
+            </div>
+            {orgLogs.length === 0 ? (
+              <Card style={{ padding: "60px 32px", textAlign: "center" }}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: C.text, marginBottom: 8 }}>No logs found</div>
+                <div style={{ color: C.textMuted, fontSize: 13 }}>No time entries across the org for this week</div>
+              </Card>
+            ) : (
+              <Card style={{ overflow: "hidden" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: C.surfaceAlt, borderBottom: `1px solid ${C.border}` }}>
+                      {["Member", "Role", "Job", "Date", "Duration", "Mode", "Status"].map(h => (
+                        <th key={h} style={{ textAlign: "left", padding: "10px 16px", fontWeight: 700, fontSize: 11, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orgLogs.map(log => {
+                      const ss = STATUS_STYLE[log.status] || STATUS_STYLE.draft;
+                      return (
+                        <tr key={log._id} style={{ borderBottom: `1px solid ${C.border}` }}>
+                          <td style={{ padding: "12px 16px", fontWeight: 600, color: C.text }}>
+                            {log.logged_by?.f_name || "—"} {log.logged_by?.l_name || ""}
+                          </td>
+                          <td style={{ padding: "12px 16px" }}>
+                            <Chip color={C.brand}>{log.logged_by_model}</Chip>
+                          </td>
+                          <td style={{ padding: "12px 16px", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: C.textMid }}>
+                            {log.job?.title || "—"}
+                          </td>
+                          <td style={{ padding: "12px 16px", color: C.textMuted, whiteSpace: "nowrap" }}>
+                            {fmtDate(log.log_date)}
+                          </td>
+                          <td style={{ padding: "12px 16px", fontWeight: 700, color: C.green, whiteSpace: "nowrap" }}>
+                            {fmtDuration(log.duration_minutes)}
+                          </td>
+                          <td style={{ padding: "12px 16px" }}>
+                            <Chip color={log.entry_mode === "timer" ? C.blue : C.textMuted}>{log.entry_mode}</Chip>
+                          </td>
+                          <td style={{ padding: "12px 16px" }}>
+                            <Badge status={log.status} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {tab === "org-sheets" && (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+              <div>
+                <h1 style={{ fontSize: 20, fontWeight: 800, color: C.text, margin: 0 }}>All Timesheets — Organisation</h1>
+                <p style={{ fontSize: 12, color: C.textMuted, margin: "4px 0 0" }}>{orgSheets.length} timesheets</p>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <select
+                  value={sheetsStatus}
+                  onChange={e => setSheetsStatus(e.target.value)}
+                  style={{ background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 8, padding: "7px 12px", fontSize: 12, color: C.text, outline: "none" }}
+                >
+                  <option value="">All Statuses</option>
+                  {Object.entries(STATUS_STYLE).map(([k, v]) => (
+                    <option key={k} value={k}>{v.label}</option>
+                  ))}
+                </select>
+                <select
+                  value={sheetsOwnerModel}
+                  onChange={e => setSheetsOwnerModel(e.target.value)}
+                  style={{ background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 8, padding: "7px 12px", fontSize: 12, color: C.text, outline: "none" }}
+                >
+                  <option value="">All Roles</option>
+                  <option value="User">Employee</option>
+                  <option value="Manager">Manager</option>
+                  <option value="Admin">Admin</option>
+                </select>
+              </div>
+            </div>
+            {orgSheets.length === 0 ? (
+              <Card style={{ padding: "60px 32px", textAlign: "center" }}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: C.text, marginBottom: 8 }}>No timesheets found</div>
+                <div style={{ color: C.textMuted, fontSize: 13 }}>Adjust filters to view timesheets</div>
+              </Card>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {orgSheets.map(ts => {
+                  const ss = STATUS_STYLE[ts.status] || STATUS_STYLE.draft;
+                  return (
+                    <Card key={ts._id} style={{ padding: "18px 24px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                            <span style={{ fontWeight: 700, fontSize: 15, color: C.text }}>
+                              {ts.owner?.f_name} {ts.owner?.l_name}
+                            </span>
+                            <Chip color={C.brand}>{ts.owner_model}</Chip>
+                            <Badge status={ts.status} />
+                          </div>
+                          <div style={{ fontSize: 12, color: C.textMuted }}>
+                            {ts.owner?.work_email} · Week of {fmtDate(ts.week_start)}
+                          </div>
+                          {ts.remarks && (
+                            <div style={{ fontSize: 12, color: C.textMid, fontStyle: "italic", marginTop: 6 }}>"{ts.remarks}"</div>
+                          )}
+                        </div>
+                        <div style={{ display: "flex", gap: 16, flexShrink: 0 }}>
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ fontSize: 18, fontWeight: 800, color: C.brand }}>{fmtDuration(ts.total_minutes)}</div>
+                            <div style={{ fontSize: 11, color: C.textMuted }}>total</div>
+                          </div>
+                          {ts.billable_minutes > 0 && (
+                            <div style={{ textAlign: "right" }}>
+                              <div style={{ fontSize: 18, fontWeight: 800, color: C.green }}>{fmtDuration(ts.billable_minutes)}</div>
+                              <div style={{ fontSize: 11, color: C.textMuted }}>billable</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </main>
