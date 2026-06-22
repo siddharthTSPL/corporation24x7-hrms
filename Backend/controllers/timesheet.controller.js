@@ -331,6 +331,28 @@ const forwardTimesheet = async (req, res, next) => {
     .json({ success: true, message: "Timesheet forwarded", timesheet });
 };
 
+// ─── ADMIN / SUPERADMIN: org-wide timesheet visibility ───────────────────────
+
+const getAllTimesheets = async (req, res, next) => {
+  const organisation_id = resolveOrgId(req);
+  const { status, owner_model, week_start } = req.query;
+
+  const filter = { organisation_id };
+  if (status) filter.status = status;
+  if (owner_model) filter.owner_model = owner_model;
+  if (week_start) {
+    const { start, end } = getWeekBounds(week_start);
+    filter.week_start = { $gte: start, $lt: end };
+  }
+
+  const timesheets = await Timesheet.find(filter)
+    .populate("owner", "f_name l_name work_email")
+    .sort({ submitted_at: -1, week_start: -1 })
+    .lean();
+
+  res.status(200).json({ success: true, count: timesheets.length, timesheets });
+};
+
 module.exports = {
   submitTimesheet,
   getMyTimesheets,
@@ -338,5 +360,6 @@ module.exports = {
   approveTimesheet,
   rejectTimesheet,
   forwardTimesheet,
+  getAllTimesheets,
   getWeekBounds,
 };
