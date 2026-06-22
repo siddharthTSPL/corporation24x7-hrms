@@ -154,7 +154,7 @@ const resumeTimer = async (req, res, next) => {
   res.status(200).json({ success: true, message: "Timer resumed", timer });
 };
 
-const stopTimer = async (req, res, next) => {
+const stopTimer = async (req, res) => {
   const actor = resolveActor(req);
   const organisation_id = resolveOrgId(req);
   const { note } = req.body;
@@ -164,16 +164,13 @@ const stopTimer = async (req, res, next) => {
     user: actor.id,
     user_model: actor.model,
   });
-  if (!timer) return next(httpError("No active timer found", 404));
+  if (!timer) throw httpError("No active timer found", 404);
 
   const jobDoc = await TSJob.findOne({ _id: timer.job, organisation_id });
-  if (!jobDoc) return next(httpError("Job not found", 404));
+  if (!jobDoc) throw httpError("Job not found", 404);
 
   let finalSeconds = timer.accumulated_seconds;
 
-  // BUG FIX: when status is "running", add seconds elapsed since last
-  // heartbeat. When status is "paused", accumulated_seconds already has the
-  // full count — do NOT add anything extra.
   if (timer.status === "running") {
     const now = new Date();
     finalSeconds += Math.max(
@@ -205,9 +202,7 @@ const stopTimer = async (req, res, next) => {
   await ActiveTimer.deleteOne({ _id: timer._id });
   await recomputeJobHours(jobDoc._id);
 
-  res
-    .status(200)
-    .json({ success: true, message: "Timer stopped and logged", timeLog });
+  res.status(200).json({ success: true, message: "Timer stopped and logged", timeLog });
 };
 
 const getActiveTimer = async (req, res, next) => {
