@@ -131,18 +131,18 @@ function Modal({ open, onClose, title, children }) {
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-[200] bg-gray-900/55 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 z-[200] bg-gray-900/55 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-[480px] shadow-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col mt-auto sm:mt-0">
-        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-gray-200 flex-shrink-0">
-          <span className="font-bold text-[15px] text-gray-900">{title}</span>
+      <div className="bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-[480px] shadow-2xl max-h-[88vh] sm:max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-200 flex-shrink-0">
+          <span className="font-bold text-[14px] sm:text-[15px] text-gray-900">{title}</span>
           <button
             onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center text-gray-400 text-lg bg-gray-50 border-none rounded-lg cursor-pointer flex-shrink-0"
+            className="w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center text-gray-400 text-lg bg-gray-50 border-none rounded-lg cursor-pointer flex-shrink-0"
           >×</button>
         </div>
-        <div className="p-5 sm:p-6 overflow-y-auto">{children}</div>
+        <div className="px-4 sm:px-6 py-4 sm:py-6 overflow-y-auto flex-1 min-h-0">{children}</div>
       </div>
     </div>
   );
@@ -157,7 +157,7 @@ function Field({ label, children }) {
   );
 }
 
-const inputClass = "bg-gray-50 border-[1.5px] border-gray-200 rounded-[10px] px-3.5 py-2.5 text-[13px] text-gray-900 outline-none w-full box-border font-inherit focus:border-[#730042] transition-colors";
+const inputClass = "bg-gray-50 border-[1.5px] border-gray-200 rounded-[10px] px-3.5 py-2.5 text-[16px] sm:text-[13px] text-gray-900 outline-none w-full box-border font-inherit focus:border-[#730042] transition-colors";
 
 function Input({ label, ...props }) {
   return (
@@ -193,6 +193,14 @@ function Btn({ children, variant = "primary", onClick, disabled, className = "" 
     >
       {children}
     </button>
+  );
+}
+
+function ModalFooter({ children }) {
+  return (
+    <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-1">
+      {children}
+    </div>
   );
 }
 
@@ -268,13 +276,13 @@ function TimerWidget({ jobs }) {
               <p className="text-[13px] text-gray-400 mb-4 mt-0">
                 Select a job and start tracking time.
               </p>
-              <Btn onClick={() => setStartModal(true)}>
+              <Btn onClick={() => setStartModal(true)} className="w-full sm:w-auto">
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><polygon points="3,1 11,6 3,11" /></svg>
                 Start Timer
               </Btn>
             </div>
           ) : (
-            <div className="flex gap-2 flex-wrap">
+            <div className="grid grid-cols-2 sm:flex gap-2 sm:flex-wrap">
               {isRunning && (
                 <Btn variant="amber" onClick={() => pauseTimer.mutate({}, { onSuccess: refetchTimer })}>⏸ Pause</Btn>
               )}
@@ -306,7 +314,7 @@ function TimerWidget({ jobs }) {
             value={startForm.note}
             onChange={(e) => setStartForm((p) => ({ ...p, note: e.target.value }))}
           />
-          <div className="flex flex-col sm:flex-row gap-2 justify-end">
+          <ModalFooter>
             <Btn variant="ghost" onClick={() => setStartModal(false)} className="w-full sm:w-auto">Cancel</Btn>
             <Btn
               onClick={() =>
@@ -319,7 +327,7 @@ function TimerWidget({ jobs }) {
             >
               {startTimer.isPending ? "Starting…" : "▶ Start"}
             </Btn>
-          </div>
+          </ModalFooter>
         </div>
       </Modal>
 
@@ -335,7 +343,7 @@ function TimerWidget({ jobs }) {
             value={stopNote}
             onChange={(e) => setStopNote(e.target.value)}
           />
-          <div className="flex flex-col sm:flex-row gap-2 justify-end">
+          <ModalFooter>
             <Btn variant="ghost" onClick={() => setStopModal(false)} className="w-full sm:w-auto">Cancel</Btn>
             <Btn
               variant="success"
@@ -349,7 +357,7 @@ function TimerWidget({ jobs }) {
             >
               {stopTimer.isPending ? "Logging…" : "■ Log Time"}
             </Btn>
-          </div>
+          </ModalFooter>
         </div>
       </Modal>
 
@@ -834,12 +842,12 @@ export default function EmployeeTimesheet() {
           <Input label="Date" type="date" value={logForm.log_date} onChange={(e) => setLogForm((p) => ({ ...p, log_date: e.target.value }))} />
           <Input label="Duration (minutes)" type="number" placeholder="e.g. 90 for 1.5 hours" value={logForm.duration_minutes} onChange={(e) => setLogForm((p) => ({ ...p, duration_minutes: e.target.value }))} />
           <Input label="Note" placeholder="What did you work on?" value={logForm.note} onChange={(e) => setLogForm((p) => ({ ...p, note: e.target.value }))} />
-          <div className="flex flex-col sm:flex-row gap-2 justify-end">
+          <ModalFooter>
             <Btn variant="ghost" onClick={() => setLogModal(false)} className="w-full sm:w-auto">Cancel</Btn>
             <Btn onClick={handleLogTime} disabled={!logForm.job || !logForm.duration_minutes || logTime.isPending} className="w-full sm:w-auto">
               {logTime.isPending ? "Saving…" : "Save Entry"}
             </Btn>
-          </div>
+          </ModalFooter>
         </div>
       </Modal>
 
@@ -848,10 +856,10 @@ export default function EmployeeTimesheet() {
           <Input label="Duration (minutes)" type="number" value={editForm.duration_minutes} onChange={(e) => setEditForm((p) => ({ ...p, duration_minutes: e.target.value }))} />
           <Input label="Note" value={editForm.note} onChange={(e) => setEditForm((p) => ({ ...p, note: e.target.value }))} />
           <Input label="Reason for edit" placeholder="Required if duration changed…" value={editForm.reason} onChange={(e) => setEditForm((p) => ({ ...p, reason: e.target.value }))} />
-          <div className="flex flex-col sm:flex-row gap-2 justify-end">
+          <ModalFooter>
             <Btn variant="ghost" onClick={() => setEditModal({ open: false, log: null })} className="w-full sm:w-auto">Cancel</Btn>
             <Btn onClick={handleUpdate} disabled={updateLog.isPending} className="w-full sm:w-auto">{updateLog.isPending ? "Saving…" : "Save Changes"}</Btn>
-          </div>
+          </ModalFooter>
         </div>
       </Modal>
 
