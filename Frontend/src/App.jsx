@@ -65,6 +65,7 @@ const Adminrimesheet = lazy(() => import("./pages/timesheet/adtimesheet"));
 const Managertimesheet = lazy(() => import("./pages/timesheet/matimesheet"));
 const Employeetimesheet = lazy(() => import("./pages/timesheet/emtimesheet"));
 const SuperAdmintimesheet = lazy(() => import("./pages/timesheet/sutimesheet"));
+const Pagenotfound = lazy(() => import("./pages/pagenotfound/pagenotfound"));
 
 function PageSkeleton() {
   const [animationData, setAnimationData] = useState(null);
@@ -351,6 +352,8 @@ function App() {
             <Route path="/superadmin-complaints"    element={<SuperAdminComplaints />} />
             <Route path="/superadmin-timesheet"     element={<SuperAdmintimesheet />} />
           </Route>
+
+          <Route path="*" element={<Pagenotfound />} />
         </Routes>
       </Suspense>
     </BrowserRouter>
