@@ -197,7 +197,7 @@ const userunderme = async (req, res, next) => {
     }
 
     const users = await usermodel
-      .find({ Under_manager: req.manager._id, organisation_id: req.manager.organisation_id })
+      .find({ Under_manager: req.manager._id, organisation_id: req.manager.organisation_id, working_status: "working" })
       .select("-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt")
       .lean();
 
@@ -676,7 +676,7 @@ const getAllPersonalDocuments = async (req, res, next) => {
     if (!req.manager)
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
     const employees = await usermodel
-      .find({ Under_manager: req.manager._id, organisation_id: req.manager.organisation_id })
+      .find({ Under_manager: req.manager._id, organisation_id: req.manager.organisation_id, working_status: "working" })
       .select("_id")
       .lean();
     const employeeIds = employees.map((emp) => emp._id);
@@ -719,7 +719,7 @@ const getAllExpenseDocuments = async (req, res, next) => {
     if (!req.manager)
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
     const employees = await usermodel
-      .find({ Under_manager: req.manager._id, organisation_id: req.manager.organisation_id })
+      .find({ Under_manager: req.manager._id, organisation_id: req.manager.organisation_id, working_status: "working" })
       .select("_id")
       .lean();
     const employeeIds = employees.map((emp) => emp._id);
@@ -1229,11 +1229,11 @@ const getOrgInfoForManager = async (req, res, next) => {
       });
     }
 
-    const admins = await AdminModel.find({ organisation_id })
+    const admins = await AdminModel.find({ organisation_id, working_status: "working" })
       .select("f_name l_name work_email designation department")
       .lean();
 
-    const managers = await managermodel.find({ organisation_id })
+    const managers = await managermodel.find({ organisation_id, working_status: "working" })
       .select(
         "f_name l_name work_email designation department office_location reporting_manager reporting_manager_model"
       )
@@ -1241,6 +1241,7 @@ const getOrgInfoForManager = async (req, res, next) => {
 
     const employees = await usermodel.find({
       organisation_id,
+      working_status: "working",
       Under_manager: {
         $in: managers.map((m) => m._id),
       },
