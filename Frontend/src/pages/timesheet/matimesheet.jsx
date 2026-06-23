@@ -79,12 +79,14 @@ const JOB_STATUS_CHIP = {
 
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+// Mobile-first priority order: Approvals (urgent action) and My Work (daily driver)
+// surface before the passive Overview dashboard. Desktop keeps the original order.
 const TABS = [
-  { id: "overview", label: "Overview" },
-  { id: "team", label: "Team Jobs" },
-  { id: "my-work", label: "My Work" },
-  { id: "approvals", label: "Approvals" },
-  { id: "timesheets", label: "Timesheets" },
+  { id: "overview", label: "Overview", mobileOrder: 4 },
+  { id: "team", label: "Team Jobs", mobileOrder: 3 },
+  { id: "my-work", label: "My Work", mobileOrder: 1 },
+  { id: "approvals", label: "Approvals", mobileOrder: 0 },
+  { id: "timesheets", label: "Timesheets", mobileOrder: 2 },
 ];
 
 function TorchXLogo() {
@@ -162,18 +164,18 @@ function Modal({ open, onClose, title, children }) {
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-[200] bg-gray-900/55 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 z-[200] bg-gray-900/55 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-[540px] shadow-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col mt-auto sm:mt-0">
-        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-gray-200 flex-shrink-0">
-          <span className="font-bold text-[15px] text-gray-900">{title}</span>
+      <div className="bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-[540px] shadow-2xl max-h-[88vh] sm:max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-200 flex-shrink-0">
+          <span className="font-bold text-[14px] sm:text-[15px] text-gray-900">{title}</span>
           <button
             onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center text-gray-400 text-lg bg-gray-50 border-none rounded-lg cursor-pointer flex-shrink-0"
+            className="w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center text-gray-400 text-lg bg-gray-50 border-none rounded-lg cursor-pointer flex-shrink-0"
           >×</button>
         </div>
-        <div className="p-5 sm:p-6 overflow-y-auto">{children}</div>
+        <div className="px-4 sm:px-6 py-4 sm:py-6 overflow-y-auto flex-1 min-h-0">{children}</div>
       </div>
     </div>
   );
@@ -188,7 +190,7 @@ function Field({ label, children }) {
   );
 }
 
-const inputClass = "bg-gray-50 border-[1.5px] border-gray-200 rounded-[10px] px-3.5 py-2.5 text-[13px] text-gray-900 outline-none w-full box-border font-inherit focus:border-[#730042] transition-colors";
+const inputClass = "bg-gray-50 border-[1.5px] border-gray-200 rounded-[10px] px-3.5 py-2.5 text-[16px] sm:text-[13px] text-gray-900 outline-none w-full box-border font-inherit focus:border-[#730042] transition-colors";
 
 function Input({ label, ...props }) {
   return (
@@ -224,6 +226,14 @@ function Btn({ children, variant = "primary", onClick, disabled, className = "" 
     >
       {children}
     </button>
+  );
+}
+
+function ModalFooter({ children }) {
+  return (
+    <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-1">
+      {children}
+    </div>
   );
 }
 
@@ -289,7 +299,7 @@ function TimerWidget({ jobs }) {
           {!timer ? (
             <Btn onClick={() => setStartModal(true)} className="w-full sm:w-auto">▶ Start Timer</Btn>
           ) : (
-            <div className="flex gap-2 flex-wrap">
+            <div className="grid grid-cols-2 sm:flex gap-2 sm:flex-wrap">
               {isRunning && <Btn variant="amber" onClick={() => pauseTimer.mutate({}, { onSuccess: refetchTimer })}>⏸ Pause</Btn>}
               {isPaused && <Btn onClick={() => resumeTimer.mutate({}, { onSuccess: refetchTimer })}>▶ Resume</Btn>}
               <Btn variant="success" onClick={() => setStopModal(true)}>■ Stop & Log</Btn>
@@ -308,10 +318,10 @@ function TimerWidget({ jobs }) {
             ))}
           </Sel>
           <Input label="Note (optional)" placeholder="What are you working on?" value={startForm.note} onChange={(e) => setStartForm((p) => ({ ...p, note: e.target.value }))} />
-          <div className="flex flex-col sm:flex-row gap-2 justify-end">
+          <ModalFooter>
             <Btn variant="ghost" onClick={() => setStartModal(false)} className="w-full sm:w-auto">Cancel</Btn>
             <Btn onClick={() => startTimer.mutate({ job: startForm.job, note: startForm.note }, { onSuccess: () => { setStartModal(false); setStartForm({ job: "", note: "" }); refetchTimer(); } })} disabled={!startForm.job || startTimer.isPending} className="w-full sm:w-auto">▶ Start</Btn>
-          </div>
+          </ModalFooter>
         </div>
       </Modal>
 
@@ -322,10 +332,10 @@ function TimerWidget({ jobs }) {
             <span className="font-mono font-extrabold text-lg sm:text-xl text-[#730042]">{fmtSeconds(displaySecs)}</span>
           </div>
           <Input label="Note (optional)" placeholder="Brief description…" value={stopNote} onChange={(e) => setStopNote(e.target.value)} />
-          <div className="flex flex-col sm:flex-row gap-2 justify-end">
+          <ModalFooter>
             <Btn variant="ghost" onClick={() => setStopModal(false)} className="w-full sm:w-auto">Cancel</Btn>
             <Btn variant="success" onClick={() => stopTimer.mutate({ note: stopNote }, { onSuccess: () => { setStopModal(false); setStopNote(""); refetchTimer(); } })} disabled={stopTimer.isPending} className="w-full sm:w-auto">{stopTimer.isPending ? "Logging…" : "■ Log Time"}</Btn>
-          </div>
+          </ModalFooter>
         </div>
       </Modal>
       <style>{`@keyframes timerPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.5)}}`}</style>
@@ -468,39 +478,64 @@ export default function ManagerTimesheet() {
     });
   };
 
+  const mobileTabs = [...TABS].sort((a, b) => a.mobileOrder - b.mobileOrder);
+
   return (
     <div className="min-h-screen bg-[#F4F5F9] font-sans">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6">
-          <div className="flex items-center h-14 sm:h-[60px] gap-3 sm:gap-5">
-            <TorchXLogo />
-            <div className="hidden sm:block w-px h-7 bg-gray-200 flex-shrink-0" />
-            <nav className="flex gap-0.5 flex-1 overflow-x-auto no-scrollbar">
-              {TABS.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
-                  className={`relative rounded-lg px-2.5 sm:px-3.5 py-1.5 text-xs sm:text-[13px] cursor-pointer transition-all whitespace-nowrap border-b-2 flex-shrink-0 ${
-                    tab === t.id
-                      ? "bg-[#730042]/10 text-[#730042] font-bold border-[#730042]"
-                      : "bg-transparent text-gray-700 font-medium border-transparent"
-                  }`}
-                >
-                  {t.label}
-                  {t.id === "approvals" && approvals.length > 0 && (
-                    <span className="absolute top-1 right-1 bg-red-600 text-white rounded-full text-[8px] font-extrabold w-3.5 h-3.5 flex items-center justify-center">
-                      {approvals.length}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </nav>
-            <Btn onClick={() => setJobModal(true)} className="hidden sm:inline-flex">+ Create Job</Btn>
+          <div className="flex items-center justify-between h-14 sm:h-[60px] gap-3">
+            <div className="flex items-center gap-3 sm:gap-5 min-w-0">
+              <TorchXLogo />
+              <div className="hidden sm:block w-px h-7 bg-gray-200 flex-shrink-0" />
+              <nav className="hidden sm:flex gap-0.5 overflow-x-auto no-scrollbar">
+                {TABS.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setTab(t.id)}
+                    className={`relative rounded-lg px-3.5 py-1.5 text-[13px] cursor-pointer transition-all whitespace-nowrap border-b-2 flex-shrink-0 ${
+                      tab === t.id
+                        ? "bg-[#730042]/10 text-[#730042] font-bold border-[#730042]"
+                        : "bg-transparent text-gray-700 font-medium border-transparent"
+                    }`}
+                  >
+                    {t.label}
+                    {t.id === "approvals" && approvals.length > 0 && (
+                      <span className="absolute top-1 right-1 bg-red-600 text-white rounded-full text-[8px] font-extrabold w-3.5 h-3.5 flex items-center justify-center">
+                        {approvals.length}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </nav>
+            </div>
+            <Btn onClick={() => setJobModal(true)} className="hidden sm:inline-flex flex-shrink-0">+ Create Job</Btn>
             <button
               onClick={() => setJobModal(true)}
               className="sm:hidden flex-shrink-0 w-9 h-9 rounded-lg bg-[#730042] text-white flex items-center justify-center text-lg font-bold"
             >+</button>
           </div>
+
+          <nav className="sm:hidden flex gap-1.5 overflow-x-auto no-scrollbar pb-2.5 -mt-0.5">
+            {mobileTabs.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`relative rounded-lg px-3 py-1.5 text-xs cursor-pointer transition-all whitespace-nowrap border flex-shrink-0 flex items-center gap-1.5 ${
+                  tab === t.id
+                    ? "bg-[#730042]/10 text-[#730042] font-bold border-[#730042]/30"
+                    : "bg-gray-50 text-gray-700 font-medium border-gray-200"
+                }`}
+              >
+                {t.label}
+                {t.id === "approvals" && approvals.length > 0 && (
+                  <span className="bg-red-600 text-white rounded-full text-[9px] font-extrabold w-4 h-4 flex items-center justify-center flex-shrink-0">
+                    {approvals.length}
+                  </span>
+                )}
+              </button>
+            ))}
+          </nav>
         </div>
       </header>
 
@@ -811,10 +846,10 @@ export default function ManagerTimesheet() {
             <input type="checkbox" checked={jobForm.billable} onChange={(e) => setJobForm((p) => ({ ...p, billable: e.target.checked }))} className="w-[15px] h-[15px] accent-[#730042]" />
             <span className="text-[13px] text-gray-700">Billable job</span>
           </label>
-          <div className="flex flex-col sm:flex-row gap-2 justify-end">
+          <ModalFooter>
             <Btn variant="ghost" onClick={() => setJobModal(false)} className="w-full sm:w-auto">Cancel</Btn>
             <Btn onClick={handleCreateJob} disabled={!jobForm.title || !jobForm.assigned_to || createJob.isPending} className="w-full sm:w-auto">{createJob.isPending ? "Creating…" : "Create Job"}</Btn>
-          </div>
+          </ModalFooter>
         </div>
       </Modal>
 
@@ -827,10 +862,10 @@ export default function ManagerTimesheet() {
           <Input label="Date" type="date" value={logForm.log_date} onChange={(e) => setLogForm((p) => ({ ...p, log_date: e.target.value }))} />
           <Input label="Duration (minutes)" type="number" placeholder="e.g. 90" value={logForm.duration_minutes} onChange={(e) => setLogForm((p) => ({ ...p, duration_minutes: e.target.value }))} />
           <Input label="Note" placeholder="What did you work on?" value={logForm.note} onChange={(e) => setLogForm((p) => ({ ...p, note: e.target.value }))} />
-          <div className="flex flex-col sm:flex-row gap-2 justify-end">
+          <ModalFooter>
             <Btn variant="ghost" onClick={() => setLogModal(false)} className="w-full sm:w-auto">Cancel</Btn>
             <Btn onClick={handleLogTime} disabled={!logForm.job || !logForm.duration_minutes || logTime.isPending} className="w-full sm:w-auto">{logTime.isPending ? "Logging…" : "Save Entry"}</Btn>
-          </div>
+          </ModalFooter>
         </div>
       </Modal>
 
@@ -838,12 +873,12 @@ export default function ManagerTimesheet() {
         <div className="flex flex-col gap-4">
           <p className="text-[13px] text-gray-700 m-0">Provide a reason for rejection. This will be sent to the submitter.</p>
           <Input label="Reason *" placeholder="Enter reason for rejection…" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
-          <div className="flex flex-col sm:flex-row gap-2 justify-end">
+          <ModalFooter>
             <Btn variant="ghost" onClick={() => setRejectModal({ open: false, ts: null })} className="w-full sm:w-auto">Cancel</Btn>
             <Btn variant="danger" onClick={() => { rejectTS.mutate({ timesheetId: rejectModal.ts._id, remarks: rejectReason }, { onSuccess: () => { setRejectModal({ open: false, ts: null }); setRejectReason(""); refetchApprovals(); } }); }} disabled={!rejectReason || rejectTS.isPending} className="w-full sm:w-auto">
               {rejectTS.isPending ? "Rejecting…" : "Reject"}
             </Btn>
-          </div>
+          </ModalFooter>
         </div>
       </Modal>
 
