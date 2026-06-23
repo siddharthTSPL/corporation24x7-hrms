@@ -22,6 +22,7 @@ const PermissionModel = require("../Models/permission.model");
 const Document = require("../Models/document.model");
 const OtpModel = require("../Models/otpbasedlogin.model");
 const AdminLeave = require("../Models/adleave.model");
+const { canOnboardUser } = require("../utils/licenseCheck");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
@@ -846,6 +847,10 @@ const createAdmin = async (req, res, next) => {
       );
     }
 
+    const licenseCheck = await canOnboardUser(organisation_id);
+    if (!licenseCheck.allowed)
+      return next(Object.assign(new Error(licenseCheck.message), { statusCode: 403 }));
+
     const uid = await generateUID(department, organisation_id);
 
     const admin = await AdminModel.create({
@@ -1346,19 +1351,19 @@ const getallemployee = async (req, res, next) => {
     const organisation_id = req.superAdmin._id;
 
     const [admins, managers, users] = await Promise.all([
-      AdminModel.find({ organisation_id })
+      AdminModel.find({ organisation_id, working_status: "working" })
         .select(
           "uid f_name l_name work_email role department designation office_location organisation_id",
         )
         .lean(),
 
-      Managermodel.find({ organisation_id })
+      Managermodel.find({ organisation_id, working_status: "working" })
         .select(
           "uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact",
         )
         .lean(),
 
-      Usermodel.find({ organisation_id })
+      Usermodel.find({ organisation_id, working_status: "working" })
         .select(
           "uid f_name l_name work_email role department designation office_location organisation_id Under_manager",
         )
