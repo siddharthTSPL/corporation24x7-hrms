@@ -55,7 +55,7 @@ const licenseSchema = new mongoose.Schema(
     },
     plan: {
       type: String,
-      enum: ["startup", "business", "enterprise"],
+      enum: ["basic", "premium", "enterprise"],
       default: "startup",
     },
     plan_type: {
