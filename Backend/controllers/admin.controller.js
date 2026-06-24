@@ -25,6 +25,7 @@ const Ticket = require("../Models/ticket.model");
 const { processLeaveDeduction } = require("../automatic/calculateleave");
 const AttendanceSummary = require("../Models/attendancesummary.model");
 const WFH = require("../Models/wfh.model");
+const { canOnboardUser } = require("../utils/licenseCheck");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
@@ -348,6 +349,10 @@ const addmanager = async (req, res, next) => {
     if (existingManager)
       return next(Object.assign(new Error("Manager already exists"), { statusCode: 400 }));
 
+    const licenseCheck = await canOnboardUser(organisation_id);
+    if (!licenseCheck.allowed)
+      return next(Object.assign(new Error(licenseCheck.message), { statusCode: 403 }));
+
     const uid = await generateUID(department, organisation_id);
     const { reportingManagerId, reportingManagerModel } = await resolveReportingManager(
       reporting_manager,
@@ -429,6 +434,10 @@ const addemployee = async (req, res, next) => {
   if (existingUser)
     return next(Object.assign(new Error("User already exists"), { statusCode: 400 }));
 
+  const licenseCheck = await canOnboardUser(organisation_id);
+  if (!licenseCheck.allowed)
+    return next(Object.assign(new Error(licenseCheck.message), { statusCode: 403 }));
+
   if (Under_manager) {
     const managerExists = await Managermodel.findOne({ _id: Under_manager, organisation_id })
       .select("_id")
@@ -484,7 +493,7 @@ const findallmanagers = async (req, res, next) => {
     const organisation_id = req.admin.organisation_id;
 
     const [managers, adminData] = await Promise.all([
-      Managermodel.find({ organisation_id })
+      Managermodel.find({ organisation_id, working_status: "working" })
         .select(EXCLUDE)
         .populate("reporting_manager", "f_name l_name work_email designation")
         .lean(),
@@ -518,7 +527,7 @@ const findallmanagerswoadmin = async (req, res, next) => {
 
     const organisation_id = req.admin.organisation_id;
 
-    const managers = await Managermodel.find({ organisation_id })
+    const managers = await Managermodel.find({ organisation_id, working_status: "working" })
       .select(EXCLUDE)
       .populate("reporting_manager", "f_name l_name work_email designation")
       .lean();
@@ -542,11 +551,11 @@ const getallemployee = async (req, res, next) => {
     const organisation_id = req.admin.organisation_id;
 
     const [users, managers] = await Promise.all([
-      Usermodel.find({ organisation_id })
+      Usermodel.find({ organisation_id, working_status: "working" })
         .select("uid f_name l_name work_email role department designation office_location Under_manager organisation_id")
         .populate({ path: "Under_manager", select: "uid f_name l_name work_email role" })
         .lean(),
-      Managermodel.find({ organisation_id })
+      Managermodel.find({ organisation_id, working_status: "working" })
         .select("uid f_name l_name work_email role designation office_location department gender personal_contact e_contact reporting_manager reporting_manager_model organisation_id")
         .populate({ path: "reporting_manager", select: "f_name l_name work_email role" })
         .lean(),
