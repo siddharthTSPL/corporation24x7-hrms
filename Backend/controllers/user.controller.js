@@ -976,11 +976,11 @@ const getOrgInfo = async (req, res, next) => {
       .select("f_name l_name email organisation_name profile_image")
       .lean();
  
-    const admins = await Adminmodel.find({ organisation_id })
+    const admins = await Adminmodel.find({ organisation_id, working_status: "working" })
       .select("f_name l_name work_email designation")
       .lean();
  
-    const managers = await Managermodel.find({ organisation_id })
+    const managers = await Managermodel.find({ organisation_id, working_status: "working" })
       .select(
         "f_name l_name work_email designation department office_location reporting_manager reporting_manager_model"
       )
@@ -991,6 +991,7 @@ const getOrgInfo = async (req, res, next) => {
           .find({
             Under_manager: { $in: managers.map((m) => m._id) },
             organisation_id,
+            working_status: "working",
           })
           .select(
             "f_name l_name work_email designation department office_location Under_manager"
