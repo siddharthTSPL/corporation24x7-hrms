@@ -22,7 +22,7 @@ const PermissionModel = require("../Models/permission.model");
 const Document = require("../Models/document.model");
 const OtpModel = require("../Models/otpbasedlogin.model");
 const AdminLeave = require("../Models/adleave.model");
-const { canOnboardUser } = require("../utils/licenseCheck");
+const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = require("../utils/licenseCheck");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
@@ -2302,6 +2302,127 @@ const getPermissions = async (req, res, next) => {
   }
 };
 
+const setAdminWorkingStatus = async (req, res, next) => {
+  try {
+    if (!req.superAdmin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const { id } = req.params;
+    const { working_status } = req.body;
+    const organisation_id = req.superAdmin._id;
+
+    if (!working_status)
+      return next(Object.assign(new Error("working_status is required"), { statusCode: 400 }));
+
+    const allowedStatuses = ["working", "resigned", "fired", "terminated"];
+    if (!allowedStatuses.includes(working_status))
+      return next(
+        Object.assign(
+          new Error(`Invalid working_status. Must be one of: ${allowedStatuses.join(", ")}`),
+          { statusCode: 400 }
+        )
+      );
+
+    const admin = await AdminModel.findOneAndUpdate(
+      { _id: id, organisation_id },
+      {
+        $set: {
+          working_status,
+          ...(working_status !== "working" && { status: "inactive" }),
+          ...(working_status === "working" && { status: "active" }),
+        },
+      },
+      { new: true, runValidators: true }
+    )
+      .select("_id uid f_name l_name work_email role department designation working_status status")
+      .lean();
+
+    if (!admin)
+      return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
+
+    if (working_status !== "working") {
+      await decrementActiveUserCount(organisation_id);
+    } else {
+      await incrementActiveUserCount(organisation_id);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Admin working status updated to '${working_status}' successfully`,
+      admin,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getInactiveUsers = async (req, res, next) => {
+  try {
+    if (!req.superAdmin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const organisation_id = req.superAdmin._id;
+    const inactiveStatuses = ["resigned", "fired", "terminated"];
+
+    const [admins, managers, employees] = await Promise.all([
+      AdminModel.find({ organisation_id, working_status: { $in: inactiveStatuses } })
+        .select("uid f_name l_name work_email role department designation working_status status")
+        .lean(),
+      Managermodel.find({ organisation_id, working_status: { $in: inactiveStatuses } })
+        .select("uid f_name l_name work_email role department designation working_status status")
+        .lean(),
+      Usermodel.find({ organisation_id, working_status: { $in: inactiveStatuses } })
+        .select("uid f_name l_name work_email role department designation working_status status")
+        .lean(),
+    ]);
+
+    const all = [
+      ...admins.map((a) => ({ type: "admin", ...a })),
+      ...managers.map((m) => ({ type: "manager", ...m })),
+      ...employees.map((e) => ({ type: "employee", ...e })),
+    ];
+
+    return res.status(200).json({
+      success: true,
+      count: all.length,
+      admins: admins.length,
+      managers: managers.length,
+      employees: employees.length,
+      users: all,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getActiveUserCount = async (req, res, next) => {
+  try {
+    if (!req.superAdmin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const superAdmin = await SuperAdminModel.findById(req.superAdmin._id)
+      .select("active_user_count licenses is_trial_active trial_expires_at")
+      .lean();
+
+    const license = superAdmin.licenses?.find(
+      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
+    );
+
+    const trialActive =
+      superAdmin.is_trial_active && new Date() < new Date(superAdmin.trial_expires_at);
+
+    return res.status(200).json({
+      success: true,
+      active_user_count: superAdmin.active_user_count || 0,
+      allowed_users: trialActive ? 4 : (license?.users || 0),
+      plan: trialActive ? "trial" : (license?.plan || null),
+      plan_type: license?.plan_type || null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   registerSuperAdmin,
   verifySuperAdmin,
@@ -2340,5 +2461,8 @@ module.exports = {
   getAllExpenseDocumentsSuperAdmin,
   getDocumentDetailsSuperAdmin,
    updatePermissions,
-  getPermissions
+  getPermissions,
+  setAdminWorkingStatus,
+  getInactiveUsers,
+  getActiveUserCount
 };

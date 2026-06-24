@@ -29,7 +29,10 @@ import {
   getAllExpenseDocumentsSuperAdmin,
   getDocumentDetailsSuperAdmin,
   updatePermissions,
-  getPermissions
+  getPermissions,
+  getInactiveUsers,
+  setAdminWorkingStatus,
+  getActiveUserCount
 } from "../../../api/superadmin/other/su.other";
 
 
@@ -323,5 +326,32 @@ export const useUpdatePermissions = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["permissions", variables.id] });
     },
+  });
+};
+
+
+export const useSuperAdminInactiveUsers = () => {
+  return useQuery({
+    queryKey: ["superadmin", "inactive-users"],
+    queryFn: getInactiveUsers,
+  });
+};
+
+export const useSetAdminWorkingStatus = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, working_status }) => setAdminWorkingStatus(id, working_status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["superadmin", "inactive-users"] });
+      queryClient.invalidateQueries({ queryKey: ["superadmin", "all-employees"] });
+      queryClient.invalidateQueries({ queryKey: ["superadmin", "all-admins"] });
+    },
+  });
+};
+
+export const useSuperAdminActiveUserCount = () => {
+  return useQuery({
+    queryKey: ["superadmin", "active-user-count"],
+    queryFn: getActiveUserCount,
   });
 };

@@ -150,6 +150,11 @@ const superAdminSchema = new mongoose.Schema(
       default: "super_admin",
     },
 
+    active_user_count:{
+      type: Number,
+      default: 0
+    },
+
     working_status: {
       type: String,
       enum: ["working", "resigned", "fired", "terminated"],
