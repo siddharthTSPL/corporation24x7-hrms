@@ -41,6 +41,10 @@ const {
   getDocumentDetailsSuperAdmin,
   updatePermissions,
   getPermissions,
+    setAdminWorkingStatus,
+  getInactiveUsers,
+  getActiveUserCount
+  
 } = require("../controllers/superadmin.controller");
 
 superAdminRouter.post("/register", asyncHandler(registerSuperAdmin));
@@ -199,4 +203,9 @@ superAdminRouter.get(
   superAdminAuth,
   asyncHandler(getPermissions),
 );
+
+superAdminRouter.patch("/admin/:id/working-status", superAdminAuth, setAdminWorkingStatus);
+superAdminRouter.get("/inactive-users", superAdminAuth, getInactiveUsers);
+superAdminRouter.get("/active-user-count", superAdminAuth, getActiveUserCount);
+
 module.exports = superAdminRouter;
