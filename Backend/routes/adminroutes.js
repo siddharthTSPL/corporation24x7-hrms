@@ -57,6 +57,7 @@ const {
   findallmanagerswoadmin,
   setEmployeeWorkingStatus,
   setManagerWorkingStatus,
+  getInactiveUsers
 } = require("../controllers/admin.controller");
 
 const {
@@ -321,5 +322,6 @@ adminrouter.put(
   asyncHandler(setManagerWorkingStatus)
 );
 
+router.get("/inactive-users", adminMiddleware, asyncHandler(getInactiveUsers));
 
 module.exports = adminrouter;

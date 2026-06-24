@@ -2930,6 +2930,39 @@ const setManagerWorkingStatus = async (req, res, next) => {
   }
 };
 
+const getInactiveUsers = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const organisation_id = req.admin.organisation_id;
+    const inactiveStatuses = ["resigned", "fired", "terminated"];
+
+    const [managers, employees] = await Promise.all([
+      Managermodel.find({ organisation_id, working_status: { $in: inactiveStatuses } })
+        .select("uid f_name l_name work_email role department designation working_status status")
+        .lean(),
+      Usermodel.find({ organisation_id, working_status: { $in: inactiveStatuses } })
+        .select("uid f_name l_name work_email role department designation working_status status")
+        .lean(),
+    ]);
+
+    const all = [
+      ...managers.map((m) => ({ type: "manager", ...m })),
+      ...employees.map((e) => ({ type: "employee", ...e })),
+    ];
+
+    return res.status(200).json({
+      success: true,
+      count: all.length,
+      managers: managers.length,
+      employees: employees.length,
+      users: all,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 module.exports = {
   verifyAdmin,
   adminlogin,
@@ -2980,4 +3013,5 @@ module.exports = {
   findallmanagerswoadmin,
   setEmployeeWorkingStatus,
   setManagerWorkingStatus,
+  getInactiveUsers
 };
