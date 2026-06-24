@@ -1,6 +1,6 @@
 const SuperAdminModel = require("../Models/superadmin.model");
 
-const TRIAL_USER_LIMIT = 5;
+const TRIAL_USER_LIMIT = 2;
 
 const canOnboardUser = async (organisation_id) => {
   const superAdmin = await SuperAdminModel.findById(organisation_id)
