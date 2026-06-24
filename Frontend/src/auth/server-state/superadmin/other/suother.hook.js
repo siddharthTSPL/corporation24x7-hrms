@@ -31,7 +31,8 @@ import {
   updatePermissions,
   getPermissions,
   getInactiveUsers,
-  setAdminWorkingStatus
+  setAdminWorkingStatus,
+  getActiveUserCount
 } from "../../../api/superadmin/other/su.other";
 
 
@@ -345,5 +346,12 @@ export const useSetAdminWorkingStatus = () => {
       queryClient.invalidateQueries({ queryKey: ["superadmin", "all-employees"] });
       queryClient.invalidateQueries({ queryKey: ["superadmin", "all-admins"] });
     },
+  });
+};
+
+export const useSuperAdminActiveUserCount = () => {
+  return useQuery({
+    queryKey: ["superadmin", "active-user-count"],
+    queryFn: getActiveUserCount,
   });
 };

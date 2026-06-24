@@ -147,3 +147,8 @@ export const getInactiveUsers = async () => {
   const res = await api.get("/admin/inactive-users");
   return res.data;
 };
+
+export const getActiveUserCount = async () => {
+  const res = await api.get("/admin/active-user-count");
+  return res.data;
+};

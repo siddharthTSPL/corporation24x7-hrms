@@ -7,7 +7,7 @@ import {
   promoteEmployeeToAdmin, promoteManagerToAdmin, getTodayLeaves,
   getAllPersonalDocuments, getAllExpenseDocuments, getDocumentDetails,
   adminActionOnLeave, setEmployeeWorkingStatus, setManagerWorkingStatus,
-  getInactiveUsers
+  getInactiveUsers, getActiveUserCount
 } from "../../api/adminapi/other/ad.other.api";
 
 export const useGetAllEmployee = () => {
@@ -289,5 +289,11 @@ export const useAdminInactiveUsers = () => {
   return useQuery({
     queryKey: ["admin", "inactive-users"],
     queryFn: getInactiveUsers,
+  });
+};
+export const useAdminActiveUserCount = () => {
+  return useQuery({
+    queryKey: ["admin", "active-user-count"],
+    queryFn: getActiveUserCount,
   });
 };
