@@ -268,6 +268,8 @@ export const useSetEmployeeWorkingStatus = (id) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["employee", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "inactive-users"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "active-user-count"] });
     },
   });
 };
@@ -280,6 +282,8 @@ export const useSetManagerWorkingStatus = (id) => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["managers"] });
       queryClient.invalidateQueries({ queryKey: ["manager", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "inactive-users"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "active-user-count"] });
     },
   });
 };
