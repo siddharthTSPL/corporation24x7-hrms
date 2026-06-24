@@ -42,7 +42,8 @@ const {
   updatePermissions,
   getPermissions,
     setAdminWorkingStatus,
-  getInactiveUsers
+  getInactiveUsers,
+  getActiveUserCount
   
 } = require("../controllers/superadmin.controller");
 
@@ -205,4 +206,6 @@ superAdminRouter.get(
 
 superAdminRouter.patch("/admin/:id/working-status", superAdminAuth, setAdminWorkingStatus);
 superAdminRouter.get("/inactive-users", superAdminAuth, getInactiveUsers);
+superAdminRouter.get("/active-user-count", superAdminAuth, getActiveUserCount);
+
 module.exports = superAdminRouter;
