@@ -2302,6 +2302,93 @@ const getPermissions = async (req, res, next) => {
   }
 };
 
+const setAdminWorkingStatus = async (req, res, next) => {
+  try {
+    if (!req.superAdmin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const { id } = req.params;
+    const { working_status } = req.body;
+    const organisation_id = req.superAdmin._id;
+
+    if (!working_status)
+      return next(Object.assign(new Error("working_status is required"), { statusCode: 400 }));
+
+    const allowedStatuses = ["working", "resigned", "fired", "terminated"];
+    if (!allowedStatuses.includes(working_status))
+      return next(
+        Object.assign(
+          new Error(`Invalid working_status. Must be one of: ${allowedStatuses.join(", ")}`),
+          { statusCode: 400 }
+        )
+      );
+
+    const admin = await AdminModel.findOneAndUpdate(
+      { _id: id, organisation_id },
+      {
+        $set: {
+          working_status,
+          ...(working_status !== "working" && { status: "inactive" }),
+          ...(working_status === "working" && { status: "active" }),
+        },
+      },
+      { new: true, runValidators: true }
+    )
+      .select("_id uid f_name l_name work_email role department designation working_status status")
+      .lean();
+
+    if (!admin)
+      return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
+
+    return res.status(200).json({
+      success: true,
+      message: `Admin working status updated to '${working_status}' successfully`,
+      admin,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getInactiveUsers = async (req, res, next) => {
+  try {
+    if (!req.superAdmin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const organisation_id = req.superAdmin._id;
+    const inactiveStatuses = ["resigned", "fired", "terminated"];
+
+    const [admins, managers, employees] = await Promise.all([
+      AdminModel.find({ organisation_id, working_status: { $in: inactiveStatuses } })
+        .select("uid f_name l_name work_email role department designation working_status status")
+        .lean(),
+      Managermodel.find({ organisation_id, working_status: { $in: inactiveStatuses } })
+        .select("uid f_name l_name work_email role department designation working_status status")
+        .lean(),
+      Usermodel.find({ organisation_id, working_status: { $in: inactiveStatuses } })
+        .select("uid f_name l_name work_email role department designation working_status status")
+        .lean(),
+    ]);
+
+    const all = [
+      ...admins.map((a) => ({ type: "admin", ...a })),
+      ...managers.map((m) => ({ type: "manager", ...m })),
+      ...employees.map((e) => ({ type: "employee", ...e })),
+    ];
+
+    return res.status(200).json({
+      success: true,
+      count: all.length,
+      admins: admins.length,
+      managers: managers.length,
+      employees: employees.length,
+      users: all,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   registerSuperAdmin,
   verifySuperAdmin,
@@ -2340,5 +2427,7 @@ module.exports = {
   getAllExpenseDocumentsSuperAdmin,
   getDocumentDetailsSuperAdmin,
    updatePermissions,
-  getPermissions
+  getPermissions,
+  setAdminWorkingStatus,
+  getInactiveUsers
 };
