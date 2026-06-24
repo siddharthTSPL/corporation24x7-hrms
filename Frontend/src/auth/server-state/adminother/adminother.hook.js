@@ -7,6 +7,7 @@ import {
   promoteEmployeeToAdmin, promoteManagerToAdmin, getTodayLeaves,
   getAllPersonalDocuments, getAllExpenseDocuments, getDocumentDetails,
   adminActionOnLeave, setEmployeeWorkingStatus, setManagerWorkingStatus,
+  getInactiveUsers
 } from "../../api/adminapi/other/ad.other.api";
 
 export const useGetAllEmployee = () => {
@@ -280,5 +281,13 @@ export const useSetManagerWorkingStatus = (id) => {
       queryClient.invalidateQueries({ queryKey: ["managers"] });
       queryClient.invalidateQueries({ queryKey: ["manager", id] });
     },
+  });
+};
+
+
+export const useAdminInactiveUsers = () => {
+  return useQuery({
+    queryKey: ["admin", "inactive-users"],
+    queryFn: getInactiveUsers,
   });
 };

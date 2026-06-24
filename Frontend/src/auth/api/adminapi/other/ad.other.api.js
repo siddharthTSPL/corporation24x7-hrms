@@ -142,3 +142,8 @@ export const setManagerWorkingStatus = async (id, working_status) => {
   const res = await api.put(`/admin/manager/${id}/working-status`, { working_status });
   return res.data;
 };
+
+export const getInactiveUsers = async () => {
+  const res = await api.get("/admin/inactive-users");
+  return res.data;
+};
