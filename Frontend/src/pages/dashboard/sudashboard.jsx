@@ -7,14 +7,15 @@ import {
   FaUserCog, FaAngleDown, FaSearch, FaEye, FaEyeSlash,
   FaShieldAlt, FaBuilding, FaPhone, FaEnvelope,
   FaIdCard, FaUniversity, FaGlobe, FaBriefcase,
-  FaLock,
+  FaLock, FaUserSlash, FaExclamationTriangle, FaToggleOn,
 } from "react-icons/fa";
 
 import { useGetMeSuperAdmin } from "../../auth/server-state/superadmin/auth/suauth.hook";
 import {
   useGetTodayCheckins, useGetNoOfEmployees, useGetAllEmployees,
   useDeleteEmployee, useAddEmployee, useAddManager, useEditEmployee,
-  useGetPermissions, useUpdatePermissions,
+  useGetPermissions, useUpdatePermissions, useSetAdminWorkingStatus,
+  useSuperAdminActiveUserCount,
 } from "../../auth/server-state/superadmin/other/suother.hook";
 import { useShowAllLeaves, useAcceptLeaveByAdmin, useRejectLeaveByAdmin } from "../../auth/server-state/superadmin/leave/suleave.hook";
 import { useGetAllAnnouncements, useCreateAnnouncement, useUpdateAnnouncement, useDeleteAnnouncement } from "../../auth/server-state/superadmin/announcement/suannouncement.hook";
@@ -45,6 +46,19 @@ const ROLE_OPTIONS = [
   { value: "official", label: "Official" },
 ];
 const ROLE_LABEL = { admin: "Admin", senior_admin: "Senior Admin", official: "Official" };
+
+const WORKING_STATUS_OPTIONS = [
+  { value: "resigned", label: "Resigned" },
+  { value: "fired", label: "Fired" },
+  { value: "terminated", label: "Terminated" },
+];
+
+const WORKING_STATUS_META = {
+  resigned: { color: "#b8760a", bg: "#fff8e1", border: "#ffe082", label: "Resigned" },
+  fired: { color: "#d93025", bg: "#fce8e6", border: "#f5c6c3", label: "Fired" },
+  terminated: { color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", label: "Terminated" },
+  working: { color: "#0d9e6e", bg: "#e8f7f1", border: "#a7f3d0", label: "Working" },
+};
 
 const USER_MODEL_MAP = {
   admin: "Admin", senior_admin: "Admin", official: "Admin",
@@ -325,6 +339,135 @@ function PermissionEditor({ permissions, onChange }) {
   );
 }
 
+function WorkingStatusModal({ open, onClose, admin, onConfirm, loading }) {
+  const [selectedStatus, setSelectedStatus] = useState("");
+  const [step, setStep] = useState(1);
+
+  useEffect(() => {
+    if (open) { setSelectedStatus(""); setStep(1); }
+  }, [open]);
+
+  if (!open || !admin) return null;
+
+  const name = [admin.f_name, admin.l_name].filter(Boolean).join(" ");
+  const meta = WORKING_STATUS_META[selectedStatus] || {};
+
+  const handleNext = () => {
+    if (!selectedStatus) return;
+    setStep(2);
+  };
+
+  const handleConfirm = () => {
+    onConfirm({ id: admin._id, working_status: selectedStatus });
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[1100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[rgba(13,2,9,0.75)] backdrop-blur-md"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl animate-[modalUp_0.22s_ease-out]">
+        <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-[#e8d5e2] flex items-center justify-between">
+          <div className="min-w-0 mr-3">
+            <div className="flex items-center gap-2 mb-0.5">
+              <FaUserSlash size={11} className="text-[#730042] flex-shrink-0" />
+              <h2 className="text-sm sm:text-base font-bold text-[#0d0209] tracking-tight truncate">Update Working Status</h2>
+            </div>
+            <p className="text-[11px] text-[#c499b4] truncate">{name} · {admin.designation}</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl text-[#7a5568] hover:bg-[#f7ecf3] hover:text-[#730042] transition-colors flex-shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center">
+            <FaTimes size={13} />
+          </button>
+        </div>
+
+        <div className="px-4 sm:px-6 py-4 sm:py-5">
+          {step === 1 && (
+            <>
+              <div className="flex items-start gap-3 p-3 sm:p-4 bg-amber-50 border border-amber-200 rounded-xl mb-4 sm:mb-5">
+                <FaExclamationTriangle size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                <p className="text-[12px] sm:text-[13px] text-amber-800 leading-relaxed font-medium">
+                  This action is <strong>permanent and irreversible.</strong> Once the working status is changed, it cannot be modified again.
+                </p>
+              </div>
+              <p className="text-[12px] text-[#7a5568] mb-3 font-medium">Select the reason for status change:</p>
+              <div className="space-y-2">
+                {WORKING_STATUS_OPTIONS.map((opt) => {
+                  const m = WORKING_STATUS_META[opt.value];
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setSelectedStatus(opt.value)}
+                      className={`w-full flex items-center gap-3 px-3 sm:px-4 py-3 rounded-xl border-2 transition-all text-left min-h-[52px] ${selectedStatus === opt.value ? "border-[#730042] bg-[#fdf5f9]" : "border-[#e8d5e2] hover:border-[#c499b4] hover:bg-[#fdf5f9]"}`}
+                    >
+                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: m.color }} />
+                      <span className="text-[13px] font-semibold text-[#0d0209]">{opt.label}</span>
+                      {selectedStatus === opt.value && <FaCheck size={10} className="ml-auto text-[#730042]" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {step === 2 && (
+            <>
+              <div className="flex items-start gap-3 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-xl mb-4 sm:mb-5">
+                <FaExclamationTriangle size={14} className="text-red-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-[13px] text-red-800 font-bold mb-1">Final Confirmation</p>
+                  <p className="text-[12px] text-red-700 leading-relaxed">
+                    You are about to mark <strong>{name}</strong> as <strong style={{ color: meta.color }}>{meta.label}</strong>. This cannot be undone. Are you absolutely sure?
+                  </p>
+                </div>
+              </div>
+              <div className="p-3 sm:p-4 rounded-xl border-2 flex items-center gap-3" style={{ borderColor: meta.color, background: meta.bg }}>
+                <div className="w-10 h-10 rounded-full flex items-center justify-center text-[12px] font-bold text-white flex-shrink-0" style={{ background: `linear-gradient(135deg, ${avaColor(admin.f_name || "")}, #cd166e)` }}>
+                  {initials(name)}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-bold text-[#0d0209] truncate">{name}</p>
+                  <p className="text-[11px] text-[#7a5568] truncate">{admin.designation} · {admin.department}</p>
+                  <span className="inline-flex items-center mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ color: meta.color, background: meta.bg, border: `1px solid ${meta.border}` }}>
+                    → {meta.label}
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="px-4 sm:px-6 pb-4 sm:pb-5 flex gap-2 sm:gap-3">
+          <button
+            onClick={step === 1 ? onClose : () => setStep(1)}
+            className="flex-1 px-3 sm:px-4 py-2.5 rounded-xl border border-[#e8d5e2] text-[13px] font-medium text-[#7a5568] hover:border-[#730042] hover:text-[#730042] transition-colors min-h-[44px]"
+          >
+            {step === 1 ? "Cancel" : "Back"}
+          </button>
+          {step === 1 ? (
+            <button
+              onClick={handleNext}
+              disabled={!selectedStatus}
+              className="flex-1 flex items-center justify-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl bg-[#730042] text-white text-[13px] font-semibold hover:bg-[#4a0029] active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
+            >
+              Continue <FaChevronRight size={9} />
+            </button>
+          ) : (
+            <button
+              onClick={handleConfirm}
+              disabled={loading}
+              className="flex-1 flex items-center justify-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl bg-red-600 text-white text-[13px] font-semibold hover:bg-red-700 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+            >
+              <FaCheck size={10} />
+              {loading ? "Updating…" : "Confirm"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EditPermissionsModal({ open, onClose, user, onSave, loading }) {
   const [permissions, setPermissions] = useState(DEFAULT_PERMISSIONS);
   const userModel = user ? (USER_MODEL_MAP[user.role] || "User") : null;
@@ -487,7 +630,6 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl shadow-2xl flex flex-col max-h-[94vh] animate-[modalUp_0.22s_ease-out]">
-        {/* Header */}
         <div className="sticky top-0 z-10 bg-white px-4 sm:px-7 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-[#e8d5e2] flex items-center justify-between rounded-t-2xl">
           <div className="min-w-0 mr-3">
             <h2 className="text-base sm:text-xl font-bold text-[#0d0209] tracking-tight">
@@ -500,7 +642,6 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
           </button>
         </div>
 
-        {/* Body */}
         <div className="overflow-y-auto flex-1 px-4 sm:px-7 py-4 sm:py-5">
           <SecHead icon={<FaUsers size={11} />}>Basic Information</SecHead>
 
@@ -726,7 +867,6 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
           <PermissionEditor permissions={permissions} onChange={setPermissions} />
         </div>
 
-        {/* Footer */}
         <div className="sticky bottom-0 bg-white border-t border-[#e8d5e2] px-4 sm:px-7 py-3 sm:py-4 flex flex-col xs:flex-row items-start xs:items-center gap-2 xs:gap-3 rounded-b-2xl">
           {submitted && hasErrors(errors) && (
             <p className="text-[11px] text-red-500 font-medium flex-1 w-full xs:w-auto">Please fix the errors above before saving.</p>
@@ -831,7 +971,7 @@ function ReviewModal({ open, onClose, admins, onSave, loading }) {
             <FLabel>Rating</FLabel>
             <div className="flex gap-1 sm:gap-2 mt-1">
               {[1,2,3,4,5].map((n) => (
-                <button key={n} type="button" onClick={() => setForm((f) => ({ ...f, rating: n }))} className={`text-2xl sm:text-2xl transition-transform hover:scale-110 min-w-[44px] min-h-[44px] flex items-center justify-center ${form.rating >= n ? "text-amber-400" : "text-gray-200"}`}>★</button>
+                <button key={n} type="button" onClick={() => setForm((f) => ({ ...f, rating: n }))} className={`text-2xl transition-transform hover:scale-110 min-w-[44px] min-h-[44px] flex items-center justify-center ${form.rating >= n ? "text-amber-400" : "text-gray-200"}`}>★</button>
               ))}
             </div>
           </div>
@@ -947,7 +1087,7 @@ const AttendanceMap = ({ checkins = [], loading }) => {
   );
 };
 
-function StatCard({ icon, label, value, sub, color, bgColor, bar }) {
+function StatCard({ icon, label, value, sub, color, bgColor, bar, badge }) {
   return (
     <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm hover:-translate-y-1 hover:shadow-md transition-all duration-200 overflow-hidden relative p-4 sm:p-5">
       <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${color}cc, ${color}44)` }} />
@@ -955,7 +1095,14 @@ function StatCard({ icon, label, value, sub, color, bgColor, bar }) {
         {icon}
       </div>
       <p className="text-[9px] sm:text-[10px] font-bold tracking-[0.8px] uppercase text-[#7a5568] mb-1">{label}</p>
-      <p className="text-2xl sm:text-3xl font-bold text-[#0d0209] leading-none mb-1">{value}</p>
+      <div className="flex items-end gap-2">
+        <p className="text-2xl sm:text-3xl font-bold text-[#0d0209] leading-none mb-1">{value}</p>
+        {badge && (
+          <span className="mb-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ color: badge.color, background: badge.bg, border: `1px solid ${badge.border}` }}>
+            {badge.label}
+          </span>
+        )}
+      </div>
       <p className="text-[10px] sm:text-[11px] font-medium mt-1.5" style={{ color }}>{sub}</p>
       {bar !== null && bar !== undefined && (
         <div className="h-[3px] bg-[#e8d5e2] rounded-full mt-3 overflow-hidden">
@@ -973,6 +1120,7 @@ function SuperAdminDashboard() {
   const [adminModal, setAdminModal] = useState({ open: false, editing: null });
   const [reviewModal, setReviewModal] = useState(false);
   const [permModal, setPermModal] = useState({ open: false, user: null });
+  const [workingStatusModal, setWorkingStatusModal] = useState({ open: false, admin: null });
   const [leaveTab, setLeaveTab] = useState("admin");
   const [empExpand, setEmpExpand] = useState(false);
   const [empSearch, setEmpSearch] = useState("");
@@ -984,6 +1132,7 @@ function SuperAdminDashboard() {
   const { data: deptData, isLoading: deptLoading } = useGetNoOfEmployees();
   const { data: leavesRaw, isLoading: leaveLoading } = useShowAllLeaves();
   const { data: annRaw, isLoading: annLoading } = useGetAllAnnouncements();
+  const { data: activeUserData, isLoading: activeUserLoading } = useSuperAdminActiveUserCount();
 
   const { mutate: createAnn, isPending: creatingAnn } = useCreateAnnouncement();
   const { mutate: updateAnn, isPending: updatingAnn } = useUpdateAnnouncement();
@@ -995,6 +1144,7 @@ function SuperAdminDashboard() {
   const { mutate: rejectLeave, isPending: rejecting } = useRejectLeaveByAdmin();
   const { mutate: reviewAdmin, isPending: reviewing } = useReviewToAdmin();
   const { mutate: updatePermissions, isPending: updatingPerms } = useUpdatePermissions();
+  const { mutate: setAdminWorkingStatus, isPending: settingWorkingStatus } = useSetAdminWorkingStatus();
 
   const superAdmin = meData?.superAdmin || meData || {};
   const checkins = checkinData?.checkins ?? [];
@@ -1010,6 +1160,12 @@ function SuperAdminDashboard() {
   const activeLeaves = adminLeaves;
   const pendingAdminLeaves = adminLeaves.filter((l) => (l.status || "").includes("pending")).length;
   const attendanceRate = totalEmpCount > 0 ? Math.round((presentToday / totalEmpCount) * 100) : 0;
+
+  const activeUserCount = activeUserData?.active_user_count ?? 0;
+  const allowedUsers = activeUserData?.allowed_users ?? 0;
+  const userUsagePercent = allowedUsers > 0 ? Math.min(Math.round((activeUserCount / allowedUsers) * 100), 100) : 0;
+  const isNearLimit = allowedUsers > 0 && activeUserCount >= allowedUsers * 0.8;
+  const isAtLimit = allowedUsers > 0 && activeUserCount >= allowedUsers;
 
   const THOUGHTS = [
     "The strength of an organisation lies in the people it cultivates.",
@@ -1036,12 +1192,30 @@ function SuperAdminDashboard() {
   });
   const displayEmp = empExpand ? filteredEmp : filteredEmp.slice(0, 10);
 
+  const activeUserBadge = isAtLimit
+    ? { label: "Limit reached", color: "#d93025", bg: "#fce8e6", border: "#f5c6c3" }
+    : isNearLimit
+    ? { label: "Near limit", color: "#b8760a", bg: "#fff8e1", border: "#ffe082" }
+    : null;
+
+  const activeUserColor = isAtLimit ? "#d93025" : isNearLimit ? "#b8760a" : "#730042";
+
   const stats = [
-    { icon: <FaUserShield />, label: "Total Admins", value: adminsLoading ? "—" : admins.length, sub: `${admins.filter((a) => a.status === "active").length} active`, color: "#730042", bgColor: "#f7ecf3", bar: null },
-    { icon: <FaUsers />, label: "Total Employees", value: deptLoading || empLoading ? "—" : totalEmpCount, sub: `${departments.length} departments`, color: "#2563eb", bgColor: "#eff6ff", bar: null },
-    { icon: <FaClock />, label: "Present Today", value: mapLoading ? "—" : presentToday, sub: `${attendanceRate}% · ${stillOnDuty} on duty`, color: "#0d9e6e", bgColor: "#e8f7f1", bar: mapLoading ? null : attendanceRate },
-    { icon: <FaCalendarAlt />, label: "Admin Leaves", value: leaveLoading ? "—" : pendingAdminLeaves, sub: pendingAdminLeaves > 0 ? "Needs attention" : "All clear ✓", color: pendingAdminLeaves > 0 ? "#b8760a" : "#0d9e6e", bgColor: pendingAdminLeaves > 0 ? "#fff8e1" : "#e8f7f1", bar: null },
-    { icon: <FaBullhorn />, label: "Announcements", value: annLoading ? "—" : announcements.length, sub: "Active broadcasts", color: "#7c3aed", bgColor: "#f5f3ff", bar: null },
+    { icon: <FaUserShield />, label: "Total Admins", value: adminsLoading ? "—" : admins.length, sub: `${admins.filter((a) => a.status === "active").length} active`, color: "#730042", bgColor: "#f7ecf3", bar: null, badge: null },
+    { icon: <FaUsers />, label: "Total Employees", value: deptLoading || empLoading ? "—" : totalEmpCount, sub: `${departments.length} departments`, color: "#2563eb", bgColor: "#eff6ff", bar: null, badge: null },
+    { icon: <FaClock />, label: "Present Today", value: mapLoading ? "—" : presentToday, sub: `${attendanceRate}% · ${stillOnDuty} on duty`, color: "#0d9e6e", bgColor: "#e8f7f1", bar: mapLoading ? null : attendanceRate, badge: null },
+    { icon: <FaCalendarAlt />, label: "Admin Leaves", value: leaveLoading ? "—" : pendingAdminLeaves, sub: pendingAdminLeaves > 0 ? "Needs attention" : "All clear ✓", color: pendingAdminLeaves > 0 ? "#b8760a" : "#0d9e6e", bgColor: pendingAdminLeaves > 0 ? "#fff8e1" : "#e8f7f1", bar: null, badge: null },
+    { icon: <FaBullhorn />, label: "Announcements", value: annLoading ? "—" : announcements.length, sub: "Active broadcasts", color: "#7c3aed", bgColor: "#f5f3ff", bar: null, badge: null },
+    {
+      icon: <FaToggleOn />,
+      label: "Active Users",
+      value: activeUserLoading ? "—" : `${activeUserCount}/${allowedUsers}`,
+      sub: activeUserLoading ? "Loading…" : isAtLimit ? "Seat limit reached" : isNearLimit ? "Approaching limit" : `${allowedUsers - activeUserCount} seats remaining`,
+      color: activeUserColor,
+      bgColor: isAtLimit ? "#fce8e6" : isNearLimit ? "#fff8e1" : "#f7ecf3",
+      bar: activeUserLoading ? null : userUsagePercent,
+      badge: activeUserBadge,
+    },
   ];
 
   const saveAnn = (form) => {
@@ -1067,6 +1241,17 @@ function SuperAdminDashboard() {
 
   const savePermissions = (payload) => {
     updatePermissions(payload, { onSuccess: () => setPermModal({ open: false, user: null }) });
+  };
+
+  const handleWorkingStatusConfirm = (payload) => {
+    setAdminWorkingStatus(payload, {
+      onSuccess: () => setWorkingStatusModal({ open: false, admin: null }),
+    });
+  };
+
+  const isAdminNonWorking = (admin) => {
+    const ws = (admin.working_status || "working").toLowerCase();
+    return ws !== "working";
   };
 
   const isPendingLeave = (leave) => {
@@ -1108,12 +1293,10 @@ function SuperAdminDashboard() {
         .animate-\\[modalUp_0\\.22s_ease-out\\] { animation: modalUp 0.22s ease-out; }
       `}</style>
 
-      {/* ─── Hero Banner ─────────────────────────────────── */}
       <div className="relative bg-gradient-to-br from-[#2a0017] via-[#730042] to-[#cd166e] rounded-2xl p-4 sm:p-8 lg:p-10 mb-5 sm:mb-6 overflow-hidden shadow-xl">
         <div className="absolute top-0 right-0 w-40 sm:w-64 h-40 sm:h-64 rounded-full bg-white/5 -translate-y-1/3 translate-x-1/4 pointer-events-none" />
         <div className="absolute bottom-0 left-1/3 w-32 sm:w-48 h-32 sm:h-48 rounded-full bg-white/3 translate-y-1/2 pointer-events-none" />
 
-        {/* Top-right action buttons — moved below title on mobile */}
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-3 sm:mb-4">
             <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#4ade80] flex-shrink-0" />
@@ -1126,7 +1309,6 @@ function SuperAdminDashboard() {
               </h1>
               <p className="text-xs sm:text-sm text-white/60 max-w-lg leading-relaxed mb-4 sm:mb-5">"{thought}"</p>
             </div>
-            {/* Action buttons — visible on sm+ inline with title */}
             <div className="hidden sm:flex items-center gap-2 flex-shrink-0 mt-1">
               <button onClick={() => setAdminModal({ open: true, editing: null })} className="flex items-center gap-1.5 bg-white/15 border border-white/25 text-white px-3 py-2 rounded-xl text-[12px] font-semibold hover:bg-white/25 transition-colors backdrop-blur-sm min-h-[44px]">
                 <FaPlus size={9} /> Add Admin
@@ -1137,7 +1319,6 @@ function SuperAdminDashboard() {
             </div>
           </div>
 
-          {/* Tags row */}
           <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-3 sm:mb-0">
             <span className="bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-[11px] text-white/90 font-medium">🏢 {orgName}</span>
             <span className="bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-[11px] text-white/90 font-medium">👥 {totalEmpCount} Employees</span>
@@ -1146,7 +1327,6 @@ function SuperAdminDashboard() {
             <span className="hidden md:inline-flex bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-[11px] text-white/90 font-medium">📆 {today}</span>
           </div>
 
-          {/* Mobile-only action buttons below tags */}
           <div className="flex sm:hidden gap-2 mt-3">
             <button onClick={() => setAdminModal({ open: true, editing: null })} className="flex-1 flex items-center justify-center gap-1.5 bg-white/15 border border-white/25 text-white px-3 py-2.5 rounded-xl text-[12px] font-semibold hover:bg-white/25 transition-colors backdrop-blur-sm min-h-[44px]">
               <FaPlus size={9} /> Add Admin
@@ -1158,14 +1338,11 @@ function SuperAdminDashboard() {
         </div>
       </div>
 
-      {/* ─── Stats ───────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 mb-5 sm:mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-5 sm:mb-6">
         {stats.map((s, i) => <StatCard key={i} {...s} />)}
       </div>
 
-      {/* ─── Map + Leaves ────────────────────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 sm:gap-5 mb-4 sm:mb-5">
-        {/* Map */}
         <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden">
           <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#e8d5e2] flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
@@ -1194,7 +1371,6 @@ function SuperAdminDashboard() {
           </div>
         </div>
 
-        {/* Admin Leaves */}
         <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden flex flex-col">
           <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#e8d5e2] flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
@@ -1267,7 +1443,6 @@ function SuperAdminDashboard() {
         </div>
       </div>
 
-      {/* ─── Admin Management ────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden mb-4 sm:mb-5">
         <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#e8d5e2] flex items-center justify-between flex-wrap gap-2 sm:gap-3">
           <div className="flex items-center gap-2 sm:gap-2.5">
@@ -1299,12 +1474,22 @@ function SuperAdminDashboard() {
               const name = [admin.f_name, admin.l_name].filter(Boolean).join(" ");
               const statusKey = (admin.status || "inactive").toLowerCase();
               const roleKey = admin.role || "admin";
+              const workingStatus = (admin.working_status || "working").toLowerCase();
+              const isNonWorking = workingStatus !== "working";
+              const wsMeta = WORKING_STATUS_META[workingStatus] || WORKING_STATUS_META.working;
               return (
-                <div key={admin._id} className="border border-[#e8d5e2] rounded-xl p-3 sm:p-4 hover:shadow-md hover:-translate-y-1 hover:bg-[#fdf5f9] transition-all duration-200 relative">
-                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-[13px] sm:text-[14px] font-bold text-white mx-auto mb-2 sm:mb-3" style={{ background: `linear-gradient(135deg, ${avaColor(admin.f_name || "")}, #cd166e)` }}>
+                <div key={admin._id} className={`border rounded-xl p-3 sm:p-4 hover:shadow-md hover:-translate-y-1 transition-all duration-200 relative ${isNonWorking ? "border-red-200 bg-red-50/40" : "border-[#e8d5e2] hover:bg-[#fdf5f9]"}`}>
+                  {isNonWorking && (
+                    <div className="absolute top-2 right-2">
+                      <span className="text-[8px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ color: wsMeta.color, background: wsMeta.bg, border: `1px solid ${wsMeta.border}` }}>
+                        {wsMeta.label}
+                      </span>
+                    </div>
+                  )}
+                  <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-[13px] sm:text-[14px] font-bold text-white mx-auto mb-2 sm:mb-3 ${isNonWorking ? "opacity-60" : ""}`} style={{ background: `linear-gradient(135deg, ${avaColor(admin.f_name || "")}, #cd166e)` }}>
                     {initials(name)}
                   </div>
-                  <p className="text-[12px] sm:text-[13px] font-bold text-[#0d0209] text-center truncate">{name}</p>
+                  <p className={`text-[12px] sm:text-[13px] font-bold text-center truncate ${isNonWorking ? "text-gray-400" : "text-[#0d0209]"}`}>{name}</p>
                   <p className="text-[10px] sm:text-[11px] text-[#7a5568] text-center mt-0.5 truncate">{admin.designation}</p>
                   <p className="text-[10px] text-[#c499b4] text-center mt-0.5 truncate hidden sm:block">{admin.work_email}</p>
                   <div className="flex flex-wrap justify-center gap-1 mt-2 sm:mt-2.5">
@@ -1323,6 +1508,15 @@ function SuperAdminDashboard() {
                     </p>
                   )}
                   <div className="flex justify-center gap-0.5 sm:gap-1 mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-[#f0dcea]">
+                    {!isNonWorking && (
+                      <button
+                        onClick={() => setWorkingStatusModal({ open: true, admin })}
+                        className="flex items-center gap-1 px-1.5 sm:px-2.5 py-1.5 rounded-lg text-[10px] sm:text-[11px] text-[#c499b4] hover:bg-red-50 hover:text-red-600 transition-colors min-h-[36px]"
+                        title="Update Working Status"
+                      >
+                        <FaUserSlash size={9} /> <span className="hidden sm:inline">Status</span>
+                      </button>
+                    )}
                     <button
                       onClick={() => setPermModal({ open: true, user: admin })}
                       className="flex items-center gap-1 px-1.5 sm:px-2.5 py-1.5 rounded-lg text-[10px] sm:text-[11px] text-[#c499b4] hover:bg-[#f7ecf3] hover:text-[#730042] transition-colors min-h-[36px]"
@@ -1350,9 +1544,7 @@ function SuperAdminDashboard() {
         )}
       </div>
 
-      {/* ─── Dept + Announcements ────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 mb-4 sm:mb-5">
-        {/* Department Breakdown */}
         <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden">
           <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#e8d5e2] flex items-center justify-between">
             <div className="flex items-center gap-2 sm:gap-2.5">
@@ -1384,7 +1576,6 @@ function SuperAdminDashboard() {
           )}
         </div>
 
-        {/* Announcements */}
         <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden">
           <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#e8d5e2] flex items-center justify-between">
             <div className="flex items-center gap-2 sm:gap-2.5">
@@ -1437,7 +1628,6 @@ function SuperAdminDashboard() {
         </div>
       </div>
 
-      {/* ─── Employee Overview ───────────────────────────── */}
       <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden mb-4 sm:mb-5">
         <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#e8d5e2] flex flex-col xs:flex-row xs:items-center gap-2 xs:gap-3">
           <div className="flex items-center gap-2 sm:gap-2.5">
@@ -1503,7 +1693,6 @@ function SuperAdminDashboard() {
         )}
       </div>
 
-      {/* ─── Modals ──────────────────────────────────────── */}
       <AnnModal
         open={annModal.open}
         onClose={() => setAnnModal({ open: false, editing: null })}
@@ -1534,6 +1723,14 @@ function SuperAdminDashboard() {
         user={permModal.user}
         onSave={savePermissions}
         loading={updatingPerms}
+      />
+
+      <WorkingStatusModal
+        open={workingStatusModal.open}
+        onClose={() => setWorkingStatusModal({ open: false, admin: null })}
+        admin={workingStatusModal.admin}
+        onConfirm={handleWorkingStatusConfirm}
+        loading={settingWorkingStatus}
       />
     </div>
   );
