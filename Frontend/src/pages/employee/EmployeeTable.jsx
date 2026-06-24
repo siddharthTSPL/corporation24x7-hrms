@@ -5,7 +5,7 @@ import {
   FaChevronLeft, FaChevronRight, FaFileExcel, FaArrowUp, FaArrowDown,
   FaEllipsisV, FaEnvelope, FaPhone, FaBuilding, FaMapMarkerAlt, FaIdCard,
   FaStar, FaUser, FaBriefcase, FaUniversity, FaFileAlt, FaShieldAlt,
-  FaToggleOn, FaToggleOff, FaKey, FaBan, FaCheck,
+  FaToggleOn, FaToggleOff, FaKey, FaBan, FaCheck, FaExclamationTriangle,
 } from "react-icons/fa";
 import {
   useAddManager, useAddEmployee, useFindAllManagers, useFindAllManagerswithoutAdmin,
@@ -16,6 +16,7 @@ import {
   useDemoteManagerToEmployee, useDemoteAdminToManager, useDemoteAdminToEmployee,
   useGetParticularEmployee, useGetParticularManager,
   useSetEmployeeWorkingStatus, useSetManagerWorkingStatus,
+  useAdminInactiveUsers,
 } from "../../auth/server-state/adminother/adminother.hook";
 import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
 import axios from "axios";
@@ -36,6 +37,7 @@ const INDIAN_STATES = [
 ];
 
 const WORKING_STATUSES = ["working", "resigned", "fired", "terminated"];
+const IRREVERSIBLE_STATUSES = ["resigned", "terminated"];
 
 const EMPTY_EMP = {
   f_name:"",l_name:"",work_email:"",password:"",gender:"",marital_status:"single",
@@ -435,30 +437,117 @@ function WorkingStatusBadge({status}){
   return <Badge label={status} type="inactive"/>;
 }
 
+// ─── WorkingStatusSelector with irreversible confirmation ────────────────────
 function WorkingStatusSelector({currentStatus,onSave,loading}){
   const [selected,setSelected]=useState(currentStatus||"working");
+  const [awaitingConfirm,setAwaitingConfirm]=useState(false);
+
+  const isIrreversible = IRREVERSIBLE_STATUSES.includes(selected);
+  const isAlreadyIrreversible = IRREVERSIBLE_STATUSES.includes(currentStatus);
+  const noChange = selected === currentStatus;
+
+  const handleSelectChange=(e)=>{
+    setSelected(e.target.value);
+    setAwaitingConfirm(false);
+  };
+
+  const handleUpdateClick=()=>{
+    if(isIrreversible){
+      setAwaitingConfirm(true);
+    } else {
+      onSave(selected);
+    }
+  };
+
+  const handleConfirm=()=>{
+    setAwaitingConfirm(false);
+    onSave(selected);
+  };
+
+  const handleCancel=()=>{
+    setAwaitingConfirm(false);
+    setSelected(currentStatus||"working");
+  };
+
+  const statusLabel = selected.charAt(0).toUpperCase()+selected.slice(1);
+
   return(
     <div className="mt-3 p-3 rounded-xl border border-[#F4C0D1] bg-[#F9F8F2]">
       <p className="text-[10px] font-bold uppercase tracking-wider text-[#993556] mb-2">Employment Status</p>
-      <div className="flex flex-col gap-2">
-        <select
-          value={selected}
-          onChange={(e)=>setSelected(e.target.value)}
-          className={inputCls}
-        >
-          {WORKING_STATUSES.map(s=>(
-            <option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>
-          ))}
-        </select>
-        <button
-          onClick={()=>onSave(selected)}
-          disabled={loading||selected===currentStatus}
-          className="w-full py-2 rounded-lg text-white text-xs font-semibold disabled:opacity-50 hover:opacity-90 transition-all"
-          style={{background:"#730042"}}
-        >
-          {loading?"Updating…":"Update Status"}
-        </button>
-      </div>
+
+      {awaitingConfirm ? (
+        <div className="rounded-xl border border-[#FCA5A5] bg-[#FFF5F5] p-3">
+          <div className="flex items-start gap-2 mb-3">
+            <FaExclamationTriangle size={14} className="text-[#DC2626] flex-shrink-0 mt-0.5"/>
+            <div>
+              <p className="text-xs font-bold text-[#991B1B]">
+                This action cannot be undone
+              </p>
+              <p className="text-[11px] text-[#7F1D1D] mt-0.5 leading-relaxed">
+                Setting status to <strong>{statusLabel}</strong> is permanent. The employee will be
+                marked as inactive and cannot be set back to <strong>Working</strong>.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleCancel}
+              className="flex-1 py-2 rounded-lg text-xs font-semibold border border-[#F4C0D1] text-[#730042] hover:bg-[#FBEAF0] transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={loading}
+              className="flex-1 py-2 rounded-lg text-white text-xs font-bold disabled:opacity-50 transition-all"
+              style={{background:"#DC2626"}}
+            >
+              {loading?"Updating…":`Confirm ${statusLabel}`}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <select
+            value={selected}
+            onChange={handleSelectChange}
+            disabled={isAlreadyIrreversible}
+            className={`${inputCls} ${isAlreadyIrreversible?"opacity-60 cursor-not-allowed":""}`}
+          >
+            {WORKING_STATUSES.map(s=>(
+              <option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>
+            ))}
+          </select>
+
+          {isAlreadyIrreversible ? (
+            <div className="flex items-center gap-1.5 px-2 py-2 rounded-lg bg-[#F3F4F6] border border-[#E5E7EB]">
+              <FaBan size={10} className="text-[#6B7280] flex-shrink-0"/>
+              <p className="text-[11px] text-[#6B7280]">
+                Status is permanently set to <strong>{currentStatus}</strong> and cannot be changed.
+              </p>
+            </div>
+          ) : (
+            <>
+              {isIrreversible && !noChange && (
+                <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-[#FEF3C7] border border-[#FCD34D]">
+                  <FaExclamationTriangle size={9} className="text-[#B45309] flex-shrink-0"/>
+                  <p className="text-[11px] text-[#92400E] font-medium">
+                    Warning: <strong>{statusLabel}</strong> is irreversible
+                  </p>
+                </div>
+              )}
+              <button
+                onClick={handleUpdateClick}
+                disabled={loading||noChange}
+                className="w-full py-2 rounded-lg text-white text-xs font-semibold disabled:opacity-50 hover:opacity-90 transition-all"
+                style={{background: isIrreversible && !noChange ? "#DC2626" : "#730042"}}
+              >
+                {loading?"Updating…":"Update Status"}
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -842,6 +931,7 @@ function ActionMenu({user,onView,onEdit,onDelete,onPromoteToManager,onPromoteToA
   const isManager=user.role==="manager"||user.role==="senior_manager";
   const isAdmin=user.role==="admin"||user.role==="senior_admin";
   const isSelf=currentAdminId&&user._id&&currentAdminId===user._id;
+  const isInactive=user.working_status&&user.working_status!=="working";
   return(
     <div className="relative" ref={ref} onClick={(e)=>e.stopPropagation()}>
       <button onClick={(e)=>{e.stopPropagation();setOpen((p)=>!p);}} className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center text-[#993556] border border-[#F4C0D1] hover:bg-[#FBEAF0]" style={{background:"#F9F8F2"}}>
@@ -852,10 +942,12 @@ function ActionMenu({user,onView,onEdit,onDelete,onPromoteToManager,onPromoteToA
           <button onClick={()=>{onView(user._id,user.role);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#730042] hover:bg-[#FBEAF0]">
             <FaUser size={10}/> View Profile
           </button>
-          <button onClick={()=>{onEdit(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#730042] hover:bg-[#FBEAF0]">
-            <FaEdit size={10}/> Edit
-          </button>
-          {!isSelf&&(
+          {!isInactive&&(
+            <button onClick={()=>{onEdit(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#730042] hover:bg-[#FBEAF0]">
+              <FaEdit size={10}/> Edit
+            </button>
+          )}
+          {!isSelf&&!isInactive&&(
             <>
               {isEmployee&&(
                 <>
@@ -888,11 +980,11 @@ function ActionMenu({user,onView,onEdit,onDelete,onPromoteToManager,onPromoteToA
                 </>
               )}
               <div className="border-t border-[#F4C0D1] my-1"/>
-              <button onClick={()=>{onDelete(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#A32D2D] hover:bg-[#FCEBEB]">
-                <FaTrash size={10}/> Delete
-              </button>
             </>
           )}
+          <button onClick={()=>{onDelete(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#A32D2D] hover:bg-[#FCEBEB]">
+            <FaTrash size={10}/> Delete
+          </button>
         </div>
       )}
     </div>
@@ -971,13 +1063,24 @@ function FilterChip({label,onRemove}){
 function MobileCard({u,onView,onEdit,onDelete,onPromoteToManager,onPromoteToAdmin,onDemoteToEmployee,onDemoteToManager,onDemoteToEmployee2,currentAdminId}){
   const roleType=u.role==="manager"?"manager":u.role==="senior_manager"?"smgr":u.role==="admin"||u.role==="senior_admin"?"admin":"role";
   const roleLabel=u.role==="senior_manager"?"Sr. Manager":u.role==="employee"?"Employee":u.role==="admin"||u.role==="senior_admin"?"Admin":u.role?.replace("_"," ")||"—";
+  const isInactive=u.working_status&&u.working_status!=="working";
   return(
-    <div className="bg-white border border-[#F4C0D1] rounded-xl p-4 flex gap-3 cursor-pointer active:scale-[0.99] transition-transform" onClick={()=>onView(u._id,u.role)}>
-      <Avatar name={`${u.f_name??""} ${u.l_name??""}`}/>
+    <div
+      className={`bg-white border rounded-xl p-4 flex gap-3 cursor-pointer active:scale-[0.99] transition-transform ${isInactive?"border-[#E5E7EB] opacity-80":"border-[#F4C0D1]"}`}
+      onClick={()=>onView(u._id,u.role)}
+    >
+      <div className="relative flex-shrink-0">
+        <Avatar name={`${u.f_name??""} ${u.l_name??""}`}/>
+        {isInactive&&(
+          <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[#6B7280] border border-white flex items-center justify-center">
+            <FaBan size={6} className="text-white"/>
+          </div>
+        )}
+      </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="font-semibold text-[#730042] text-sm truncate">{u.f_name} {u.l_name}</p>
+            <p className={`font-semibold text-sm truncate ${isInactive?"text-[#6B7280]":"text-[#730042]"}`}>{u.f_name} {u.l_name}</p>
             <p className="text-xs text-[#993556] truncate">{u.work_email}</p>
           </div>
           <Badge label={roleLabel} type={roleType}/>
@@ -985,7 +1088,7 @@ function MobileCard({u,onView,onEdit,onDelete,onPromoteToManager,onPromoteToAdmi
         <div className="flex flex-wrap gap-1.5 mt-2">
           {u.department&&<Badge label={u.department} type="dept"/>}
           {u.office_location&&<span className="px-2 py-0.5 rounded-full text-xs bg-[#F9F8F2] text-[#993556] border border-[#F4C0D1]">📍 {u.office_location}</span>}
-          {u.working_status&&u.working_status!=="working"&&<WorkingStatusBadge status={u.working_status}/>}
+          <WorkingStatusBadge status={u.working_status}/>
         </div>
         <div className="flex items-center justify-between mt-3">
           {u.Under_manager?(
@@ -1304,6 +1407,8 @@ export default function EmployeeTable(){
   const [demoteAdminToEmpTarget,setDemoteAdminToEmpTarget]=useState(null);
   const [demoteAdminToEmpForm,setDemoteAdminToEmpForm]=useState({Under_manager:"",designation:""});
   const [filters,setFilters]=useState({search:"",department:"",role:"",location:"",gender:"",type:"",status:"",working_status:""});
+  // ─── "show inactive" toggle ────────────────────────────────────────────────
+  const [showInactive,setShowInactive]=useState(false);
 
   const {data:adminData}=useGetMeAdmin();
   const currentAdminId=adminData?.user?._id||adminData?._id;
@@ -1313,7 +1418,20 @@ export default function EmployeeTable(){
   const {data:managersOnly}=useFindAllManagerswithoutAdmin();
   const {data:managersWithAdmin}=useFindAllManagers();
   const {data:employeeData,isLoading:listLoading,refetch:refetchList}=useGetAllEmployee();
-  const allUsers=employeeData?.users??[];
+  const {data:inactiveData}=useAdminInactiveUsers();
+
+  // Merge active + inactive, deduplicating by _id
+  const activeUsers = employeeData?.users ?? [];
+  const inactiveUsers = inactiveData?.users ?? [];
+  const allUsers = showInactive
+    ? (() => {
+        const ids = new Set(activeUsers.map(u => u._id));
+        const merged = [...activeUsers];
+        inactiveUsers.forEach(u => { if(!ids.has(u._id)) merged.push(u); });
+        return merged;
+      })()
+    : activeUsers;
+
   const {mutate:editUserApi}=useEditEmployee(editTarget?._id);
   const {mutate:editManagerApi}=useEditManager(editTarget?._id);
   const {mutate:deleteUserApi}=useDeleteUser();
@@ -1518,6 +1636,8 @@ export default function EmployeeTable(){
     onDemoteToEmployee2:openDemoteAdminToEmp,currentAdminId,
   };
 
+  const inactiveCount = inactiveData?.count ?? 0;
+
   return(
     <div className="min-h-screen p-3 sm:p-4 md:p-6 font-['DM_Sans',system-ui,sans-serif]" style={{background:"#F9F8F2"}}>
       <style>{`
@@ -1530,9 +1650,29 @@ export default function EmployeeTable(){
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-[#730042] tracking-tight">Employee Directory</h1>
-            <p className="text-xs sm:text-sm text-[#993556] mt-0.5">{allUsers.length} total · {filtered.length} shown · {employeeData?.employees??0} employees · {employeeData?.managers??0} managers</p>
+            <p className="text-xs sm:text-sm text-[#993556] mt-0.5">
+              {activeUsers.length} active · {filtered.length} shown · {employeeData?.employees??0} employees · {employeeData?.managers??0} managers
+              {inactiveCount>0&&<> · <span className="text-[#6B7280]">{inactiveCount} inactive</span></>}
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            {/* ── Show Inactive toggle ── */}
+            {inactiveCount>0&&(
+              <button
+                onClick={()=>setShowInactive(v=>!v)}
+                className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all"
+                style={showInactive
+                  ?{borderColor:"#6B7280",background:"#6B7280",color:"#fff"}
+                  :{borderColor:"#6B7280",color:"#6B7280",background:"transparent"}}
+              >
+                <FaBan size={11}/>
+                <span>{showInactive?"Hide Inactive":"Show Inactive"}</span>
+                <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+                  style={showInactive?{background:"rgba(255,255,255,0.25)"}:{background:"#E5E7EB",color:"#374151"}}>
+                  {inactiveCount}
+                </span>
+              </button>
+            )}
             <button onClick={()=>exportToCSV(filtered)}
               className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all"
               style={{borderColor:"#085041",color:"#085041"}}
@@ -1554,6 +1694,14 @@ export default function EmployeeTable(){
             </button>
           </div>
         </div>
+
+        {/* ── Inactive banner ── */}
+        {showInactive&&inactiveCount>0&&(
+          <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-xs text-[#6B7280]">
+            <FaBan size={11} className="flex-shrink-0"/>
+            <span>Showing <strong>{inactiveCount}</strong> inactive user{inactiveCount!==1?"s":""} (resigned / fired / terminated). Their profiles are read-only.</span>
+          </div>
+        )}
 
         <div className="bg-white rounded-2xl border border-[#F4C0D1] overflow-hidden">
           <div className="p-3 sm:p-4 border-b border-[#F4C0D1]" style={{background:"#F9F8F2"}}>
@@ -1647,46 +1795,57 @@ export default function EmployeeTable(){
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#FBEAF0]">
-                {listLoading?<SkeletonRows/>:filtered.length===0?<EmptyState onAdd={()=>setOpen(true)}/>:filtered.map((u)=>(
-                  <tr key={u._id} className="transition-colors group cursor-pointer"
-                    onMouseEnter={(e)=>e.currentTarget.style.background="#FEF4F9"}
-                    onMouseLeave={(e)=>e.currentTarget.style.background="transparent"}
-                    onClick={()=>handleView(u._id,u.role)}>
-                    <td className="px-3 lg:px-4 py-3">
-                      <div className="flex items-center gap-2 lg:gap-3">
-                        <Avatar name={`${u.f_name??""} ${u.l_name??""}`}/>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-[#730042] text-xs lg:text-sm truncate max-w-[120px] lg:max-w-[160px]">{u.f_name} {u.l_name}</p>
-                          <p className="text-[11px] text-[#993556] truncate max-w-[120px] lg:max-w-[160px]">{u.work_email}</p>
-                          {u.uid&&<p className="text-[10px] text-[#993556]/60 font-mono">{u.uid}</p>}
+                {listLoading?<SkeletonRows/>:filtered.length===0?<EmptyState onAdd={()=>setOpen(true)}/>:filtered.map((u)=>{
+                  const isInactive=u.working_status&&u.working_status!=="working";
+                  return(
+                    <tr key={u._id}
+                      className={`transition-colors group cursor-pointer ${isInactive?"opacity-70":""}`}
+                      onMouseEnter={(e)=>e.currentTarget.style.background=isInactive?"#F9FAFB":"#FEF4F9"}
+                      onMouseLeave={(e)=>e.currentTarget.style.background="transparent"}
+                      onClick={()=>handleView(u._id,u.role)}>
+                      <td className="px-3 lg:px-4 py-3">
+                        <div className="flex items-center gap-2 lg:gap-3">
+                          <div className="relative flex-shrink-0">
+                            <Avatar name={`${u.f_name??""} ${u.l_name??""}`}/>
+                            {isInactive&&(
+                              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[#6B7280] border border-white flex items-center justify-center">
+                                <FaBan size={6} className="text-white"/>
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className={`font-semibold text-xs lg:text-sm truncate max-w-[120px] lg:max-w-[160px] ${isInactive?"text-[#6B7280]":"text-[#730042]"}`}>{u.f_name} {u.l_name}</p>
+                            <p className="text-[11px] text-[#993556] truncate max-w-[120px] lg:max-w-[160px]">{u.work_email}</p>
+                            {u.uid&&<p className="text-[10px] text-[#993556]/60 font-mono">{u.uid}</p>}
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-3 lg:px-4 py-3"><Badge label={u.department||"—"} type="dept"/></td>
-                    <td className="px-3 lg:px-4 py-3 text-[#730042] text-xs lg:text-sm max-w-[100px] lg:max-w-none truncate">{u.designation||"—"}</td>
-                    <td className="px-3 lg:px-4 py-3 text-[#730042] text-xs lg:text-sm whitespace-nowrap">{u.office_location||"—"}</td>
-                    <td className="px-3 lg:px-4 py-3">
-                      {u.Under_manager?(
-                        <div className="text-xs">
-                          <p className="font-medium text-[#730042] truncate max-w-[80px] lg:max-w-none">{u.Under_manager.f_name} {u.Under_manager.l_name}</p>
-                          <p className="text-[#993556] text-[10px] hidden lg:block">{u.Under_manager.uid}</p>
+                      </td>
+                      <td className="px-3 lg:px-4 py-3"><Badge label={u.department||"—"} type="dept"/></td>
+                      <td className="px-3 lg:px-4 py-3 text-[#730042] text-xs lg:text-sm max-w-[100px] lg:max-w-none truncate">{u.designation||"—"}</td>
+                      <td className="px-3 lg:px-4 py-3 text-[#730042] text-xs lg:text-sm whitespace-nowrap">{u.office_location||"—"}</td>
+                      <td className="px-3 lg:px-4 py-3">
+                        {u.Under_manager?(
+                          <div className="text-xs">
+                            <p className="font-medium text-[#730042] truncate max-w-[80px] lg:max-w-none">{u.Under_manager.f_name} {u.Under_manager.l_name}</p>
+                            <p className="text-[#993556] text-[10px] hidden lg:block">{u.Under_manager.uid}</p>
+                          </div>
+                        ):u.reporting_manager?(
+                          <div className="text-xs">
+                            <p className="font-medium text-[#730042] truncate max-w-[80px] lg:max-w-none">{u.reporting_manager.f_name} {u.reporting_manager.l_name}</p>
+                            <p className="text-[#993556] text-[10px] hidden lg:block">{u.reporting_manager.work_email}</p>
+                          </div>
+                        ):<span className="text-[#F4C0D1] text-xs">—</span>}
+                      </td>
+                      <td className="px-3 lg:px-4 py-3">{roleBadge(u.role)}</td>
+                      <td className="px-3 lg:px-4 py-3"><WorkingStatusBadge status={u.working_status}/></td>
+                      <td className="px-3 lg:px-4 py-3">
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e)=>e.stopPropagation()}>
+                          <ActionMenu user={u} onView={handleView} onEdit={handleOpenEdit} onDelete={setDeleteTarget} {...actionMenuProps}/>
                         </div>
-                      ):u.reporting_manager?(
-                        <div className="text-xs">
-                          <p className="font-medium text-[#730042] truncate max-w-[80px] lg:max-w-none">{u.reporting_manager.f_name} {u.reporting_manager.l_name}</p>
-                          <p className="text-[#993556] text-[10px] hidden lg:block">{u.reporting_manager.work_email}</p>
-                        </div>
-                      ):<span className="text-[#F4C0D1] text-xs">—</span>}
-                    </td>
-                    <td className="px-3 lg:px-4 py-3">{roleBadge(u.role)}</td>
-                    <td className="px-3 lg:px-4 py-3"><WorkingStatusBadge status={u.working_status}/></td>
-                    <td className="px-3 lg:px-4 py-3">
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e)=>e.stopPropagation()}>
-                        <ActionMenu user={u} onView={handleView} onEdit={handleOpenEdit} onDelete={setDeleteTarget} {...actionMenuProps}/>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
