@@ -203,6 +203,6 @@ superAdminRouter.get(
   asyncHandler(getPermissions),
 );
 
-router.patch("/admin/:id/working-status", superAdminMiddleware, setAdminWorkingStatus);
-router.get("/inactive-users", superAdminMiddleware, getInactiveUsers);
+superAdminRouter.patch("/admin/:id/working-status", superAdminAuth, setAdminWorkingStatus);
+superAdminRouter.get("/inactive-users", superAdminAuth, getInactiveUsers);
 module.exports = superAdminRouter;
