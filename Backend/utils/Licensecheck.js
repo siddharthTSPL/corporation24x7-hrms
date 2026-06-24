@@ -3,7 +3,7 @@ const AdminModel = require("../Models/Admin.model");
 const ManagerModel = require("../Models/manager.model");
 const UserModel = require("../Models/user.model");
 
-const TRIAL_USER_LIMIT = 4;
+const TRIAL_USER_LIMIT = 5;
 
 /**
  * Counts all currently WORKING users (employees + managers + admins) for an org.
