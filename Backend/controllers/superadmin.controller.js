@@ -2414,7 +2414,7 @@ const getActiveUserCount = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       active_user_count: superAdmin.active_user_count || 0,
-      allowed_users: trialActive ? 4 : (license?.users || 0),
+      allowed_users: trialActive ? 1 : (license?.users || 0),
       plan: trialActive ? "trial" : (license?.plan || null),
       plan_type: license?.plan_type || null,
     });
