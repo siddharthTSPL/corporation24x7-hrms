@@ -22,7 +22,7 @@ const PermissionModel = require("../Models/permission.model");
 const Document = require("../Models/document.model");
 const OtpModel = require("../Models/otpbasedlogin.model");
 const AdminLeave = require("../Models/adleave.model");
-const { canOnboardUser } = require("../utils/licenseCheck");
+const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = require("../utils/licenseCheck");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
@@ -2339,6 +2339,12 @@ const setAdminWorkingStatus = async (req, res, next) => {
 
     if (!admin)
       return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
+
+    if (working_status !== "working") {
+      await decrementActiveUserCount(organisation_id);
+    } else {
+      await incrementActiveUserCount(organisation_id);
+    }
 
     return res.status(200).json({
       success: true,

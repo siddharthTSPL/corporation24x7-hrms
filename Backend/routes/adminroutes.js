@@ -322,6 +322,6 @@ adminrouter.put(
   asyncHandler(setManagerWorkingStatus)
 );
 
-router.get("/inactive-users", adminMiddleware, asyncHandler(getInactiveUsers));
+adminrouter.get("/inactive-users", adminauthmiddleware, asyncHandler(getInactiveUsers));
 
 module.exports = adminrouter;

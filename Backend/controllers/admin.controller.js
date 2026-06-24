@@ -25,7 +25,7 @@ const Ticket = require("../Models/ticket.model");
 const { processLeaveDeduction } = require("../automatic/calculateleave");
 const AttendanceSummary = require("../Models/attendancesummary.model");
 const WFH = require("../Models/wfh.model");
-const { canOnboardUser } = require("../utils/licenseCheck");
+const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = require("../utils/licenseCheck");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
@@ -393,6 +393,7 @@ const addmanager = async (req, res, next) => {
         subject: "Activate Your Manager Account",
         html: `<div style="font-family:Arial,sans-serif;padding:20px"><h2>Hello ${f_name},</h2><p>Your manager account has been created successfully.</p><p><strong>UID:</strong> ${uid}</p><p><strong>Department:</strong> ${department}</p><p><strong>Designation:</strong> ${designation}</p><p>Please verify your account by clicking below:</p><a href="${verifyLink}" style="background:#730042;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block;">Verify Account</a><p>This link will expire in 1 hour.</p><p>Regards,<br/>HR Team</p></div>`,
       }),
+      incrementActiveUserCount(organisation_id),
     ]);
 
     return res.status(201).json({
@@ -414,70 +415,71 @@ const addmanager = async (req, res, next) => {
 
 const addemployee = async (req, res, next) => {
   try {
-  if (!req.admin)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
-  const {
-    profile_image, f_name, l_name, work_email, password, gender, marital_status,
-    personal_contact, e_contact, aadhaar_number, pan_number, address, city, state,
-    pincode, role, office_location, designation, department, Under_manager, is_fresher,
-    total_experience, previous_company, previous_designation, bank_name, account_holder_name,
-    account_number, ifsc_code, resume, aadhaar_card, pan_card, experience_letter, permissions,
-  } = req.body;
+    const {
+      profile_image, f_name, l_name, work_email, password, gender, marital_status,
+      personal_contact, e_contact, aadhaar_number, pan_number, address, city, state,
+      pincode, role, office_location, designation, department, Under_manager, is_fresher,
+      total_experience, previous_company, previous_designation, bank_name, account_holder_name,
+      account_number, ifsc_code, resume, aadhaar_card, pan_card, experience_letter, permissions,
+    } = req.body;
 
-  if (!f_name || !l_name || !work_email || !password || !department || !designation || !office_location || !gender || !personal_contact || !e_contact)
-    return next(Object.assign(new Error("Required fields missing"), { statusCode: 400 }));
+    if (!f_name || !l_name || !work_email || !password || !department || !designation || !office_location || !gender || !personal_contact || !e_contact)
+      return next(Object.assign(new Error("Required fields missing"), { statusCode: 400 }));
 
-  const organisation_id = req.admin.organisation_id;
+    const organisation_id = req.admin.organisation_id;
 
-  const existingUser = await Usermodel.findOne({ work_email, organisation_id }).select("_id").lean();
-  if (existingUser)
-    return next(Object.assign(new Error("User already exists"), { statusCode: 400 }));
+    const existingUser = await Usermodel.findOne({ work_email, organisation_id }).select("_id").lean();
+    if (existingUser)
+      return next(Object.assign(new Error("User already exists"), { statusCode: 400 }));
 
-  const licenseCheck = await canOnboardUser(organisation_id);
-  if (!licenseCheck.allowed)
-    return next(Object.assign(new Error(licenseCheck.message), { statusCode: 403 }));
+    const licenseCheck = await canOnboardUser(organisation_id);
+    if (!licenseCheck.allowed)
+      return next(Object.assign(new Error(licenseCheck.message), { statusCode: 403 }));
 
-  if (Under_manager) {
-    const managerExists = await Managermodel.findOne({ _id: Under_manager, organisation_id })
-      .select("_id")
-      .lean();
-    if (!managerExists)
-      return next(Object.assign(new Error("Assigned manager not found in this organisation"), { statusCode: 404 }));
-  }
+    if (Under_manager) {
+      const managerExists = await Managermodel.findOne({ _id: Under_manager, organisation_id })
+        .select("_id")
+        .lean();
+      if (!managerExists)
+        return next(Object.assign(new Error("Assigned manager not found in this organisation"), { statusCode: 404 }));
+    }
 
-  const uid = await generateUID(department, organisation_id);
+    const uid = await generateUID(department, organisation_id);
 
-  const newuser = await Usermodel.create({
-    organisation_id, profile_image, uid, department, Under_manager: Under_manager || null,
-    f_name, l_name, work_email, password, gender, marital_status, personal_contact, e_contact,
-    aadhaar_number, pan_number, address, city, state, pincode, role, designation, office_location,
-    is_fresher, total_experience, previous_company, previous_designation, bank_name,
-    account_holder_name, account_number, ifsc_code, resume, aadhaar_card, pan_card, experience_letter,
-  });
+    const newuser = await Usermodel.create({
+      organisation_id, profile_image, uid, department, Under_manager: Under_manager || null,
+      f_name, l_name, work_email, password, gender, marital_status, personal_contact, e_contact,
+      aadhaar_number, pan_number, address, city, state, pincode, role, designation, office_location,
+      is_fresher, total_experience, previous_company, previous_designation, bank_name,
+      account_holder_name, account_number, ifsc_code, resume, aadhaar_card, pan_card, experience_letter,
+    });
 
-  const token = jwt.sign({ userid: newuser._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
-  const verifyLink = `${process.env.BASE_URL}talent/api/user/verify/${token}`;
+    const token = jwt.sign({ userid: newuser._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    const verifyLink = `${process.env.BASE_URL}talent/api/user/verify/${token}`;
 
-  await Promise.all([
-    assignDefaultLeave(newuser),
-    assignDefaultPermissions(
-      newuser._id,
-      newuser.role || "employee",
-      organisation_id,
-      req.admin._id,
-      "Admin",
-      null,
-      permissions
-    ),
-    sendEmail({
-      to: work_email,
-      subject: "Welcome! Verify Your Employee Account",
-      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F9F8F2;font-family:Segoe UI,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center"><table width="600" style="background:#fff;border-radius:14px;overflow:hidden;"><tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h1>Welcome Aboard</h1></td></tr><tr><td style="padding:40px;"><h2>Hello ${f_name}</h2><p>Your employee account has been created.</p><p><strong>Department:</strong> ${department}</p><p><strong>Location:</strong> ${office_location}</p><a href="${verifyLink}" style="background:#730042;color:white;padding:14px 30px;text-decoration:none;border-radius:8px;">Verify Account</a></td></tr></table></td></tr></table></body></html>`,
-    }),
-  ]);
+    await Promise.all([
+      assignDefaultLeave(newuser),
+      assignDefaultPermissions(
+        newuser._id,
+        newuser.role || "employee",
+        organisation_id,
+        req.admin._id,
+        "Admin",
+        null,
+        permissions
+      ),
+      sendEmail({
+        to: work_email,
+        subject: "Welcome! Verify Your Employee Account",
+        html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F9F8F2;font-family:Segoe UI,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center"><table width="600" style="background:#fff;border-radius:14px;overflow:hidden;"><tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h1>Welcome Aboard</h1></td></tr><tr><td style="padding:40px;"><h2>Hello ${f_name}</h2><p>Your employee account has been created.</p><p><strong>Department:</strong> ${department}</p><p><strong>Location:</strong> ${office_location}</p><a href="${verifyLink}" style="background:#730042;color:white;padding:14px 30px;text-decoration:none;border-radius:8px;">Verify Account</a></td></tr></table></td></tr></table></body></html>`,
+      }),
+      incrementActiveUserCount(organisation_id),
+    ]);
 
-  return res.status(201).json({ success: true, message: "User added successfully. Verification email sent." });
+    return res.status(201).json({ success: true, message: "User added successfully. Verification email sent." });
   } catch (error) {
     next(error);
   }
@@ -2871,6 +2873,12 @@ const setEmployeeWorkingStatus = async (req, res, next) => {
     if (!user)
       return next(Object.assign(new Error("Employee not found"), { statusCode: 404 }));
 
+    if (working_status !== "working") {
+      await decrementActiveUserCount(organisation_id);
+    } else {
+      await incrementActiveUserCount(organisation_id);
+    }
+
     return res.status(200).json({
       success: true,
       message: `Employee working status updated to '${working_status}' successfully`,
@@ -2919,6 +2927,12 @@ const setManagerWorkingStatus = async (req, res, next) => {
 
     if (!manager)
       return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
+
+    if (working_status !== "working") {
+      await decrementActiveUserCount(organisation_id);
+    } else {
+      await incrementActiveUserCount(organisation_id);
+    }
 
     return res.status(200).json({
       success: true,
