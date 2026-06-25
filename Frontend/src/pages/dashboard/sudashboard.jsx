@@ -8,6 +8,7 @@ import {
   FaShieldAlt, FaBuilding, FaPhone, FaEnvelope,
   FaIdCard, FaUniversity, FaGlobe, FaBriefcase,
   FaLock, FaUserSlash, FaExclamationTriangle, FaToggleOn,
+  FaCrown,
 } from "react-icons/fa";
 
 import { useGetMeSuperAdmin } from "../../auth/server-state/superadmin/auth/suauth.hook";
@@ -1113,6 +1114,36 @@ function StatCard({ icon, label, value, sub, color, bgColor, bar, badge }) {
   );
 }
 
+function AddAdminButton({ isAtLimit, onClick, variant = "header" }) {
+  const base = "flex items-center justify-center gap-1.5 rounded-xl text-[12px] font-semibold transition-colors min-h-[44px] relative group";
+
+  const variantCls = {
+    header: "bg-[#730042] text-white px-2.5 sm:px-3 py-1.5 sm:py-2 hover:bg-[#4a0029]",
+    hero: "bg-white/15 border border-white/25 text-white px-3 py-2 hover:bg-white/25 backdrop-blur-sm",
+    heroMobile: "flex-1 bg-white/15 border border-white/25 text-white px-3 py-2.5 hover:bg-white/25 backdrop-blur-sm",
+  };
+
+  const disabledCls = "opacity-50 cursor-not-allowed hover:bg-current";
+
+  return (
+    <button
+      type="button"
+      onClick={isAtLimit ? undefined : onClick}
+      disabled={isAtLimit}
+      aria-disabled={isAtLimit}
+      className={`${base} ${variantCls[variant]} ${isAtLimit ? disabledCls : ""}`}
+    >
+      <FaPlus size={9} />
+      <span className={variant === "header" ? "hidden xs:inline" : ""}>Add Admin</span>
+      {isAtLimit && (
+        <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 top-full mt-2 w-max max-w-[220px] text-center bg-[#0d0209] text-white text-[11px] font-medium px-3 py-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg">
+          You've reached your maximum limit. Upgrade your plan.
+        </span>
+      )}
+    </button>
+  );
+}
+
 function SuperAdminDashboard() {
   const [greeting, setGreeting] = useState("");
   const [thought, setThought] = useState("");
@@ -1165,7 +1196,7 @@ function SuperAdminDashboard() {
   const allowedUsers = activeUserData?.allowed_users ?? 0;
   const userUsagePercent = allowedUsers > 0 ? Math.min(Math.round((activeUserCount / allowedUsers) * 100), 100) : 0;
   const isNearLimit = allowedUsers > 0 && activeUserCount >= allowedUsers * 0.8;
-  const isAtLimit = allowedUsers > 0 && activeUserCount >= allowedUsers;
+  const isAtLimit = allowedUsers > 0 ? activeUserCount >= allowedUsers : (activeUserData?.is_limit_reached ?? false);
 
   const THOUGHTS = [
     "The strength of an organisation lies in the people it cultivates.",
@@ -1183,6 +1214,7 @@ function SuperAdminDashboard() {
 
   const today = new Date().toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   const orgName = superAdmin?.organisation_name || "Your Organisation";
+  const displayName = [superAdmin?.f_name, superAdmin?.l_name].filter(Boolean).join(" ") || "there";
   const maxDept = Math.max(...departments.map((d) => d.lastNumber), 1);
 
   const filteredEmp = employees.filter((e) => {
@@ -1305,14 +1337,12 @@ function SuperAdminDashboard() {
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <h1 className="text-xl sm:text-3xl lg:text-4xl font-bold text-white mb-2 leading-tight tracking-tight">
-                {greeting}, {orgName}!
+                {greeting}, {displayName}!
               </h1>
               <p className="text-xs sm:text-sm text-white/60 max-w-lg leading-relaxed mb-4 sm:mb-5">"{thought}"</p>
             </div>
             <div className="hidden sm:flex items-center gap-2 flex-shrink-0 mt-1">
-              <button onClick={() => setAdminModal({ open: true, editing: null })} className="flex items-center gap-1.5 bg-white/15 border border-white/25 text-white px-3 py-2 rounded-xl text-[12px] font-semibold hover:bg-white/25 transition-colors backdrop-blur-sm min-h-[44px]">
-                <FaPlus size={9} /> Add Admin
-              </button>
+              <AddAdminButton isAtLimit={isAtLimit} onClick={() => setAdminModal({ open: true, editing: null })} variant="hero" />
               <button onClick={() => setReviewModal(true)} className="flex items-center gap-1.5 bg-white/15 border border-white/25 text-white px-3 py-2 rounded-xl text-[12px] font-semibold hover:bg-white/25 transition-colors backdrop-blur-sm min-h-[44px]">
                 <FaStar size={9} /> Review
               </button>
@@ -1328,9 +1358,7 @@ function SuperAdminDashboard() {
           </div>
 
           <div className="flex sm:hidden gap-2 mt-3">
-            <button onClick={() => setAdminModal({ open: true, editing: null })} className="flex-1 flex items-center justify-center gap-1.5 bg-white/15 border border-white/25 text-white px-3 py-2.5 rounded-xl text-[12px] font-semibold hover:bg-white/25 transition-colors backdrop-blur-sm min-h-[44px]">
-              <FaPlus size={9} /> Add Admin
-            </button>
+            <AddAdminButton isAtLimit={isAtLimit} onClick={() => setAdminModal({ open: true, editing: null })} variant="heroMobile" />
             <button onClick={() => setReviewModal(true)} className="flex-1 flex items-center justify-center gap-1.5 bg-white/15 border border-white/25 text-white px-3 py-2.5 rounded-xl text-[12px] font-semibold hover:bg-white/25 transition-colors backdrop-blur-sm min-h-[44px]">
               <FaStar size={9} /> Review
             </button>
@@ -1448,14 +1476,17 @@ function SuperAdminDashboard() {
           <div className="flex items-center gap-2 sm:gap-2.5">
             <FaUserCog size={13} className="text-[#730042]" />
             <span className="font-bold text-[13px] sm:text-[15px] text-[#0d0209]">Admin Management</span>
+            {isAtLimit && (
+              <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full">
+                <FaCrown size={8} /> Seat limit reached
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
             <button onClick={() => setReviewModal(true)} className="flex items-center gap-1 sm:gap-1.5 border border-[#e8d5e2] text-[#7a5568] px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-[12px] font-semibold hover:border-[#730042] hover:text-[#730042] transition-colors min-h-[36px] sm:min-h-[40px]">
               <FaStar size={9} /> <span className="hidden xs:inline">Review Admin</span><span className="xs:hidden">Review</span>
             </button>
-            <button onClick={() => setAdminModal({ open: true, editing: null })} className="flex items-center gap-1 sm:gap-1.5 bg-[#730042] text-white px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-[12px] font-semibold hover:bg-[#4a0029] transition-colors min-h-[36px] sm:min-h-[40px]">
-              <FaPlus size={9} /> <span className="hidden xs:inline">Add Admin</span><span className="xs:hidden">Add</span>
-            </button>
+            <AddAdminButton isAtLimit={isAtLimit} onClick={() => setAdminModal({ open: true, editing: null })} variant="header" />
           </div>
         </div>
         {adminsLoading ? (
@@ -1469,7 +1500,7 @@ function SuperAdminDashboard() {
             <p className="text-[13px] text-center px-4">No admins yet. Create one to delegate management.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 p-3 sm:p-5">
+          <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 p-3 sm:p-5">
             {admins.map((admin) => {
               const name = [admin.f_name, admin.l_name].filter(Boolean).join(" ");
               const statusKey = (admin.status || "inactive").toLowerCase();
@@ -1478,7 +1509,7 @@ function SuperAdminDashboard() {
               const isNonWorking = workingStatus !== "working";
               const wsMeta = WORKING_STATUS_META[workingStatus] || WORKING_STATUS_META.working;
               return (
-                <div key={admin._id} className={`border rounded-xl p-3 sm:p-4 hover:shadow-md hover:-translate-y-1 transition-all duration-200 relative ${isNonWorking ? "border-red-200 bg-red-50/40" : "border-[#e8d5e2] hover:bg-[#fdf5f9]"}`}>
+                <div key={admin._id} className={`border rounded-xl p-3 sm:p-4 flex flex-col hover:shadow-md hover:-translate-y-1 transition-all duration-200 relative ${isNonWorking ? "border-red-200 bg-red-50/40" : "border-[#e8d5e2] hover:bg-[#fdf5f9]"}`}>
                   {isNonWorking && (
                     <div className="absolute top-2 right-2">
                       <span className="text-[8px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ color: wsMeta.color, background: wsMeta.bg, border: `1px solid ${wsMeta.border}` }}>
@@ -1507,34 +1538,36 @@ function SuperAdminDashboard() {
                       </span>
                     </p>
                   )}
-                  <div className="flex justify-center gap-0.5 sm:gap-1 mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-[#f0dcea]">
-                    {!isNonWorking && (
+                  <div className="grid grid-cols-2 gap-1 mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-[#f0dcea]">
+                    {!isNonWorking ? (
                       <button
                         onClick={() => setWorkingStatusModal({ open: true, admin })}
-                        className="flex items-center gap-1 px-1.5 sm:px-2.5 py-1.5 rounded-lg text-[10px] sm:text-[11px] text-[#c499b4] hover:bg-red-50 hover:text-red-600 transition-colors min-h-[36px]"
+                        className="flex items-center justify-center gap-1 px-1.5 py-1.5 rounded-lg text-[10px] sm:text-[11px] font-medium text-[#7a5568] hover:bg-red-50 hover:text-red-600 transition-colors min-h-[34px]"
                         title="Update Working Status"
                       >
-                        <FaUserSlash size={9} /> <span className="hidden sm:inline">Status</span>
+                        <FaUserSlash size={9} /> Status
                       </button>
+                    ) : (
+                      <span />
                     )}
                     <button
                       onClick={() => setPermModal({ open: true, user: admin })}
-                      className="flex items-center gap-1 px-1.5 sm:px-2.5 py-1.5 rounded-lg text-[10px] sm:text-[11px] text-[#c499b4] hover:bg-[#f7ecf3] hover:text-[#730042] transition-colors min-h-[36px]"
+                      className="flex items-center justify-center gap-1 px-1.5 py-1.5 rounded-lg text-[10px] sm:text-[11px] font-medium text-[#7a5568] hover:bg-[#f7ecf3] hover:text-[#730042] transition-colors min-h-[34px]"
                       title="Edit Permissions"
                     >
-                      <FaLock size={8} /> <span className="hidden sm:inline">Perms</span>
+                      <FaLock size={8} /> Perms
                     </button>
                     <button
                       onClick={() => setAdminModal({ open: true, editing: admin })}
-                      className="flex items-center gap-1 px-1.5 sm:px-2.5 py-1.5 rounded-lg text-[10px] sm:text-[11px] text-[#c499b4] hover:bg-[#f7ecf3] hover:text-[#730042] transition-colors min-h-[36px]"
+                      className="flex items-center justify-center gap-1 px-1.5 py-1.5 rounded-lg text-[10px] sm:text-[11px] font-medium text-[#7a5568] hover:bg-[#f7ecf3] hover:text-[#730042] transition-colors min-h-[34px]"
                     >
-                      <FaEdit size={9} /> <span className="hidden sm:inline">Edit</span>
+                      <FaEdit size={9} /> Edit
                     </button>
                     <button
                       onClick={() => { if (window.confirm(`Delete ${name}?`)) deleteAdmin(admin._id); }}
-                      className="flex items-center gap-1 px-1.5 sm:px-2.5 py-1.5 rounded-lg text-[10px] sm:text-[11px] text-[#c499b4] hover:bg-red-50 hover:text-red-600 transition-colors min-h-[36px]"
+                      className="flex items-center justify-center gap-1 px-1.5 py-1.5 rounded-lg text-[10px] sm:text-[11px] font-medium text-[#7a5568] hover:bg-red-50 hover:text-red-600 transition-colors min-h-[34px]"
                     >
-                      <FaTrash size={9} /> <span className="hidden sm:inline">Del</span>
+                      <FaTrash size={9} /> Del
                     </button>
                   </div>
                 </div>
