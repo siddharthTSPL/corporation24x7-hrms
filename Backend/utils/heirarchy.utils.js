@@ -16,15 +16,16 @@ const httpError = (message, statusCode) => {
 
 const isDirectReport = async ({ actorId, actorModel, targetId, targetModel, organisationId }) => {
   if (targetModel === "Admin") {
-    const admin = await Admin.findOne({ _id: targetId, organisation_id: organisationId })
-      .select("reporting_manager reporting_manager_model")
+    const admin = await Admin.findOne({
+      _id: targetId,
+      organisation_id: organisationId,
+      working_status: { $nin: ["resigned", "fired", "terminated"] },
+    })
+      .select("_id")
       .lean();
-    if (!admin) return false;
-    return (
-      actorModel === "SuperAdmin" &&
-      admin.reporting_manager_model === "SuperAdmin" &&
-      admin.reporting_manager?.toString() === actorId.toString()
-    );
+
+    if (actorModel === "SuperAdmin") return !!admin;
+    return false;
   }
 
   if (targetModel === "Manager") {
@@ -44,10 +45,27 @@ const isDirectReport = async ({ actorId, actorModel, targetId, targetModel, orga
       .select("Under_manager")
       .lean();
     if (!user) return false;
-    return (
-      actorModel === "Manager" &&
-      user.Under_manager?.toString() === actorId.toString()
-    );
+
+    if (actorModel === "Manager") {
+      return user.Under_manager?.toString() === actorId.toString();
+    }
+
+    if (actorModel === "Admin") {
+      if (!user.Under_manager) return false;
+      const manager = await Manager.findOne({
+        _id: user.Under_manager,
+        organisation_id: organisationId,
+        reporting_manager: actorId,
+        reporting_manager_model: "Admin",
+      }).lean();
+      return !!manager;
+    }
+
+    if (actorModel === "SuperAdmin") {
+      return true;
+    }
+
+    return false;
   }
 
   return false;
@@ -55,8 +73,8 @@ const isDirectReport = async ({ actorId, actorModel, targetId, targetModel, orga
 
 const assertCanAssign = async ({ actorId, actorModel, targetId, targetModel, organisationId }) => {
   const validPairs = {
-    SuperAdmin: ["Admin"],
-    Admin: ["Manager"],
+    SuperAdmin: ["Admin", "Manager", "User"],
+    Admin: ["Manager", "User"],
     Manager: ["Manager", "User"],
   };
 
@@ -97,15 +115,56 @@ const resolveActor = (req) => {
 };
 
 const getDirectReportIds = async ({ actorId, actorModel, organisationId }) => {
+  const results = [];
+
   if (actorModel === "SuperAdmin") {
     const admins = await Admin.find({
       organisation_id: organisationId,
-      reporting_manager: actorId,
-      reporting_manager_model: "SuperAdmin",
+      working_status: { $nin: ["resigned", "fired", "terminated"] },
     })
-      .select("_id")
+      .select("f_name l_name work_email")
       .lean();
-    return admins.map((a) => ({ id: a._id, model: "Admin" }));
+
+    admins.forEach((a) =>
+      results.push({
+        id: a._id,
+        model: "Admin",
+        name: `${a.f_name} ${a.l_name}`,
+        email: a.work_email,
+      })
+    );
+
+    const managers = await Manager.find({
+      organisation_id: organisationId,
+      working_status: { $nin: ["resigned", "terminated"] },
+    })
+      .select("f_name l_name work_email")
+      .lean();
+
+    managers.forEach((m) =>
+      results.push({
+        id: m._id,
+        model: "Manager",
+        name: `${m.f_name} ${m.l_name}`,
+        email: m.work_email,
+      })
+    );
+
+    const users = await User.find({
+      organisation_id: organisationId,
+      working_status: { $nin: ["resigned", "fired", "terminated"] },
+    })
+      .select("f_name l_name work_email")
+      .lean();
+
+    users.forEach((u) =>
+      results.push({
+        id: u._id,
+        model: "User",
+        name: `${u.f_name} ${u.l_name}`,
+        email: u.work_email,
+      })
+    );
   }
 
   if (actorModel === "Admin") {
@@ -113,35 +172,62 @@ const getDirectReportIds = async ({ actorId, actorModel, organisationId }) => {
       organisation_id: organisationId,
       reporting_manager: actorId,
       reporting_manager_model: "Admin",
+      working_status: { $nin: ["resigned", "terminated"] },
     })
-      .select("_id")
+      .select("f_name l_name work_email")
       .lean();
-    return managers.map((m) => ({ id: m._id, model: "Manager" }));
+
+    managers.forEach((m) =>
+      results.push({
+        id: m._id,
+        model: "Manager",
+        name: `${m.f_name} ${m.l_name}`,
+        email: m.work_email,
+      })
+    );
+
+    const managerIds = managers.map((m) => m._id);
+
+    if (managerIds.length) {
+      const users = await User.find({
+        organisation_id: organisationId,
+        Under_manager: { $in: managerIds },
+        working_status: { $nin: ["resigned", "fired", "terminated"] },
+      })
+        .select("f_name l_name work_email")
+        .lean();
+
+      users.forEach((u) =>
+        results.push({
+          id: u._id,
+          model: "User",
+          name: `${u.f_name} ${u.l_name}`,
+          email: u.work_email,
+        })
+      );
+    }
   }
 
   if (actorModel === "Manager") {
-    const [managers, users] = await Promise.all([
-      Manager.find({
-        organisation_id: organisationId,
-        reporting_manager: actorId,
-        reporting_manager_model: "Manager",
+    const users = await User.find({
+      organisation_id: organisationId,
+      Under_manager: actorId,
+      working_status: { $nin: ["resigned", "fired", "terminated"] },
+    })
+      .select("f_name l_name work_email")
+      .lean();
+
+    users.forEach((u) =>
+      results.push({
+        id: u._id,
+        model: "User",
+        name: `${u.f_name} ${u.l_name}`,
+        email: u.work_email,
       })
-        .select("_id")
-        .lean(),
-      User.find({
-        organisation_id: organisationId,
-        Under_manager: actorId,
-      })
-        .select("_id")
-        .lean(),
-    ]);
-    return [
-      ...managers.map((m) => ({ id: m._id, model: "Manager" })),
-      ...users.map((u) => ({ id: u._id, model: "User" })),
-    ];
+    );
   }
 
-  return [];
+  return results;
 };
 
 const resolveOrgId = (req) => {

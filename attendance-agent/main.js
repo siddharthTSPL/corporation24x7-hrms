@@ -4,8 +4,16 @@ const axios  = require("axios");
 const http   = require("http");
 const Store  = require("electron-store");
 
-const API_BASE       = "http://localhost:5000/attendance";
-const FRONTEND_URL   = "http://localhost:5173";
+const IS_DEV = !app.isPackaged;
+
+const API_BASE    = IS_DEV
+  ? "http://localhost:5001/attendance"
+  : "https://torchxsuite.com/talent/api/attendance";
+
+const FRONTEND_URL = IS_DEV
+  ? "http://localhost:5173"
+  : "https://torchxsuite.com/talent";
+
 const AGENT_PORT     = 47821;
 const PING_INTERVAL  = 60_000;
 const IDLE_THRESHOLD = 120_000;
@@ -19,15 +27,13 @@ let pingInterval        = null;
 let autoCheckoutTimer   = null;
 let isTracking          = false;
 
-// ─── Schedule 7 PM auto checkout ─────────────────────────────────────────────
 function schedule7PMCheckout() {
   clearTimeout(autoCheckoutTimer);
 
-  const now     = new Date();
+  const now      = new Date();
   const checkout = new Date();
-  checkout.setHours(19, 0, 0, 0); // 7:00 PM today
+  checkout.setHours(19, 0, 0, 0);
 
-  // If already past 7 PM, schedule for tomorrow
   if (now >= checkout) {
     checkout.setDate(checkout.getDate() + 1);
   }
@@ -38,7 +44,6 @@ function schedule7PMCheckout() {
   autoCheckoutTimer = setTimeout(async () => {
     console.log("[Agent] 7 PM — triggering auto checkout");
     await triggerAutoCheckout();
-    // Reschedule for tomorrow
     schedule7PMCheckout();
   }, msUntil7PM);
 }
@@ -60,7 +65,6 @@ async function triggerAutoCheckout() {
 
   } catch (err) {
     if (err?.response?.status === 400 || err?.response?.status === 404) {
-      // Already checked out or no record — fine
       console.log("[Agent] Already checked out or no record, skipping");
     } else {
       console.error("[Agent] Auto checkout failed:", err.message);
@@ -69,7 +73,6 @@ async function triggerAutoCheckout() {
   }
 }
 
-// ─── OS-Level Activity Hook ───────────────────────────────────────────────────
 function startGlobalHook() {
   uIOhook.on("mousemove", onActivity);
   uIOhook.on("mousedown", onActivity);
@@ -88,7 +91,6 @@ function onActivity() {
   wasActiveThisMinute = true;
 }
 
-// ─── Ping Backend ─────────────────────────────────────────────────────────────
 async function sendPing() {
   const now    = Date.now();
   const isIdle = now - lastActivityAt > IDLE_THRESHOLD;
@@ -119,7 +121,6 @@ async function sendPing() {
       stopTracking();
       updateTray("stopped");
     } else if (err?.response?.status === 400) {
-      // Already checked out — stop pinging
       console.log("[Agent] Session ended, stopping pings");
       stopTracking();
       updateTray("stopped");
@@ -129,7 +130,6 @@ async function sendPing() {
   }
 }
 
-// ─── Start / Stop Tracking ────────────────────────────────────────────────────
 function startTracking() {
   if (isTracking) return;
   isTracking          = true;
@@ -154,7 +154,6 @@ function stopTracking() {
   console.log("[Agent] Tracking stopped");
 }
 
-// ─── Tray ─────────────────────────────────────────────────────────────────────
 function updateTray(status) {
   if (!tray) return;
 
@@ -195,7 +194,6 @@ function openApp() {
   win.loadURL(`${FRONTEND_URL}/mark-attendance`);
 }
 
-// ─── Local HTTP Server ────────────────────────────────────────────────────────
 function startTokenServer() {
   const server = http.createServer((req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -217,7 +215,6 @@ function startTokenServer() {
           if (token) {
             store.set("token", token);
             startTracking();
-            // Start 7 PM scheduler when user logs in
             schedule7PMCheckout();
             console.log("[Agent] Token received, tracking started");
             res.writeHead(200);
@@ -266,7 +263,6 @@ function startTokenServer() {
   });
 }
 
-// ─── App Lifecycle ────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
   powerSaveBlocker.start("prevent-app-suspension");
   app.setLoginItemSettings({ openAtLogin: true });
@@ -281,7 +277,7 @@ app.whenReady().then(() => {
   if (savedToken) {
     console.log("[Agent] Saved token found, resuming tracking");
     startTracking();
-    schedule7PMCheckout(); // always schedule 7 PM checkout on startup
+    schedule7PMCheckout();
   } else {
     console.log("[Agent] No token, waiting for login...");
     updateTray("stopped");
