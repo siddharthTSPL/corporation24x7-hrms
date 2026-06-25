@@ -1645,6 +1645,19 @@ const getperticularemanager = async (req, res, next) => {
   const { id } = req.params;
   const organisation_id = req.admin.organisation_id;
 
+  // Debug: check if manager exists at all (ignoring org)
+  const managerExists = await Managermodel.findById(id).select("_id organisation_id").lean();
+  if (!managerExists) {
+    // Maybe it was promoted to Admin?
+    const asAdmin = await Adminmodel.findOne({ _id: id, organisation_id }).select("_id").lean();
+    if (asAdmin)
+      return next(Object.assign(new Error("This user is now an Admin, not a Manager"), { statusCode: 400 }));
+    return next(Object.assign(new Error("Manager not found in any collection"), { statusCode: 404 }));
+  }
+
+  if (managerExists.organisation_id.toString() !== organisation_id.toString())
+    return next(Object.assign(new Error("Manager belongs to a different organisation"), { statusCode: 403 }));
+
   const [manager, leaveBalance, reviews] = await Promise.all([
     Managermodel.findOne({ _id: id, organisation_id })
       .select(EXCLUDE)
@@ -1657,8 +1670,6 @@ const getperticularemanager = async (req, res, next) => {
       .lean(),
   ]);
 
-  if (!manager)
-    return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
   if (!leaveBalance)
     return next(Object.assign(new Error("Leave balance not found"), { statusCode: 404 }));
 
