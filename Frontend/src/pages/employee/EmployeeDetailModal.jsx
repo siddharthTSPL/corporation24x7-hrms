@@ -2,7 +2,7 @@
 import { useState } from "react";
 import {
   FaEdit, FaTrash, FaSearch, FaFilter, FaTimes, FaUserTie, FaUserPlus,
-  FaChevronLeft, FaChevronRight, FaBars, FaEye,
+  FaChevronLeft, FaChevronRight, FaEye,
 } from "react-icons/fa";
 import {
   useAddManager, useAddEmployee, useFindAllManagers,
@@ -23,7 +23,7 @@ const INDIAN_STATES = [
 ];
 
 const EMPTY_EMP = {
-  f_name: "", l_name: "", work_email: "", password: "", gender: "", marital_status: "single",
+  f_name: "", l_name: "", work_email: "", password: "", confirm_password: "", gender: "", marital_status: "single",
   personal_contact: "", e_contact: "", department: "", designation: "", role: "employee",
   office_location: "", Under_manager: "", address: "", city: "", state: "", pincode: "",
   aadhaar_number: "", pan_number: "", is_fresher: true, total_experience: "",
@@ -48,6 +48,8 @@ const EMP_STEPS = [
   { label: "Experience",  icon: "📋" },
   { label: "Bank & Docs", icon: "🏦" },
 ];
+
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 
 const inputCls =
   "w-full px-3 py-2.5 rounded-lg border border-[#F4C0D1] bg-[#F9F8F2] text-sm text-[#730042] " +
@@ -75,7 +77,6 @@ function StepModal({ title, icon, onClose, onSubmit, steps, currentStep, setCurr
     <div
       className="fixed inset-0 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
       style={{ background: "rgba(115,0,66,0.40)", backdropFilter: "blur(3px)" }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl flex flex-col max-h-[96vh] sm:max-h-[92vh] border-t sm:border border-[#F4C0D1] shadow-2xl">
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 rounded-t-2xl flex-shrink-0" style={{ background: accentColor }}>
@@ -148,7 +149,6 @@ function Modal({ title, icon, onClose, onSubmit, children, accentColor = "#CD166
     <div
       className="fixed inset-0 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
       style={{ background: "rgba(115,0,66,0.40)", backdropFilter: "blur(3px)" }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl flex flex-col max-h-[96vh] sm:max-h-[92vh] border-t sm:border border-[#F4C0D1] shadow-2xl">
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 rounded-t-2xl flex-shrink-0" style={{ background: accentColor }}>
@@ -342,12 +342,68 @@ function DeleteConfirm({ user, onConfirm, onCancel }) {
 }
 
 function EmpStepFields({ step, form, onChange, errors, managers }) {
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const passwordError =
+    form.password && !passwordRegex.test(form.password)
+      ? "Min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special character."
+      : "";
+
+  const confirmPasswordError =
+    form.confirm_password && form.password !== form.confirm_password
+      ? "Passwords do not match."
+      : "";
+
   if (step === 0) return (
     <>
-      <Field label="First Name" required error={errors.f_name}><input name="f_name" placeholder="First name" value={form.f_name} onChange={onChange} className={inputCls} /></Field>
-      <Field label="Last Name" required error={errors.l_name}><input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls} /></Field>
-      <Field label="Work Email" required error={errors.work_email}><input name="work_email" type="email" placeholder="name@company.com" value={form.work_email} onChange={onChange} className={inputCls} /></Field>
-      <Field label="Password" required error={errors.password}><input name="password" type="password" placeholder="Set password" value={form.password} onChange={onChange} className={inputCls} /></Field>
+      <Field label="First Name" required error={errors.f_name}>
+        <input name="f_name" placeholder="First name" value={form.f_name} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Last Name" required error={errors.l_name}>
+        <input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Work Email" required error={errors.work_email}>
+        <input name="work_email" type="email" placeholder="name@company.com" value={form.work_email} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Password" required error={passwordError || errors.password}>
+        <div className="relative">
+          <input
+            name="password"
+            type={showPassword ? "text" : "password"}
+            placeholder="Set password"
+            value={form.password}
+            onChange={onChange}
+            className={inputCls}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#993556] text-xs font-semibold hover:text-[#CD166E] transition-colors"
+          >
+            {showPassword ? "Hide" : "Show"}
+          </button>
+        </div>
+      </Field>
+      <Field label="Confirm Password" required error={confirmPasswordError || errors.confirm_password}>
+        <div className="relative">
+          <input
+            name="confirm_password"
+            type={showConfirmPassword ? "text" : "password"}
+            placeholder="Confirm password"
+            value={form.confirm_password}
+            onChange={onChange}
+            className={inputCls}
+          />
+          <button
+            type="button"
+            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#993556] text-xs font-semibold hover:text-[#CD166E] transition-colors"
+          >
+            {showConfirmPassword ? "Hide" : "Show"}
+          </button>
+        </div>
+      </Field>
       <Field label="Gender" required error={errors.gender}>
         <select name="gender" value={form.gender} onChange={onChange} className={inputCls}>
           <option value="">Select Gender</option>
@@ -363,8 +419,12 @@ function EmpStepFields({ step, form, onChange, errors, managers }) {
           <option value="divorced">Divorced</option>
         </select>
       </Field>
-      <Field label="Personal Contact" required error={errors.personal_contact}><input name="personal_contact" placeholder="+91 XXXXX XXXXX" value={form.personal_contact} onChange={onChange} className={inputCls} /></Field>
-      <Field label="Emergency Contact" required error={errors.e_contact}><input name="e_contact" placeholder="Emergency contact" value={form.e_contact} onChange={onChange} className={inputCls} /></Field>
+      <Field label="Personal Contact" required error={errors.personal_contact}>
+        <input name="personal_contact" placeholder="+91 XXXXX XXXXX" value={form.personal_contact} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Emergency Contact" required error={errors.e_contact}>
+        <input name="e_contact" placeholder="Emergency contact" value={form.e_contact} onChange={onChange} className={inputCls} />
+      </Field>
     </>
   );
 
@@ -376,7 +436,9 @@ function EmpStepFields({ step, form, onChange, errors, managers }) {
           {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
         </select>
       </Field>
-      <Field label="Designation" required error={errors.designation}><input name="designation" placeholder="e.g. Software Engineer" value={form.designation} onChange={onChange} className={inputCls} /></Field>
+      <Field label="Designation" required error={errors.designation}>
+        <input name="designation" placeholder="e.g. Software Engineer" value={form.designation} onChange={onChange} className={inputCls} />
+      </Field>
       <Field label="Role">
         <select name="role" value={form.role} onChange={onChange} className={inputCls}>
           <option value="employee">Employee</option>
@@ -402,22 +464,32 @@ function EmpStepFields({ step, form, onChange, errors, managers }) {
 
   if (step === 2) return (
     <>
-      <Field label="Address" span2><input name="address" placeholder="Street address" value={form.address} onChange={onChange} className={inputCls} /></Field>
-      <Field label="City"><input name="city" placeholder="City" value={form.city} onChange={onChange} className={inputCls} /></Field>
+      <Field label="Address" span2>
+        <input name="address" placeholder="Street address" value={form.address} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="City">
+        <input name="city" placeholder="City" value={form.city} onChange={onChange} className={inputCls} />
+      </Field>
       <Field label="State">
         <select name="state" value={form.state} onChange={onChange} className={inputCls}>
           <option value="">Select State</option>
           {INDIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
       </Field>
-      <Field label="Pincode"><input name="pincode" placeholder="6-digit pincode" maxLength={6} value={form.pincode} onChange={onChange} className={inputCls} /></Field>
+      <Field label="Pincode">
+        <input name="pincode" placeholder="6-digit pincode" maxLength={6} value={form.pincode} onChange={onChange} className={inputCls} />
+      </Field>
     </>
   );
 
   if (step === 3) return (
     <>
-      <Field label="Aadhaar Number"><input name="aadhaar_number" placeholder="XXXX XXXX XXXX" maxLength={12} value={form.aadhaar_number} onChange={onChange} className={inputCls} /></Field>
-      <Field label="PAN Number"><input name="pan_number" placeholder="ABCDE1234F" maxLength={10} value={form.pan_number} onChange={onChange} className={inputCls} /></Field>
+      <Field label="Aadhaar Number">
+        <input name="aadhaar_number" placeholder="XXXX XXXX XXXX" maxLength={12} value={form.aadhaar_number} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="PAN Number">
+        <input name="pan_number" placeholder="ABCDE1234F" maxLength={10} value={form.pan_number} onChange={onChange} className={inputCls} />
+      </Field>
     </>
   );
 
@@ -431,9 +503,15 @@ function EmpStepFields({ step, form, onChange, errors, managers }) {
       </Field>
       {!form.is_fresher && (
         <>
-          <Field label="Total Experience (years)"><input name="total_experience" type="number" min="0" placeholder="e.g. 3" value={form.total_experience} onChange={onChange} className={inputCls} /></Field>
-          <Field label="Previous Company"><input name="previous_company" placeholder="Company name" value={form.previous_company} onChange={onChange} className={inputCls} /></Field>
-          <Field label="Previous Designation"><input name="previous_designation" placeholder="Previous role" value={form.previous_designation} onChange={onChange} className={inputCls} /></Field>
+          <Field label="Total Experience (years)">
+            <input name="total_experience" type="number" min="0" placeholder="e.g. 3" value={form.total_experience} onChange={onChange} className={inputCls} />
+          </Field>
+          <Field label="Previous Company">
+            <input name="previous_company" placeholder="Company name" value={form.previous_company} onChange={onChange} className={inputCls} />
+          </Field>
+          <Field label="Previous Designation">
+            <input name="previous_designation" placeholder="Previous role" value={form.previous_designation} onChange={onChange} className={inputCls} />
+          </Field>
         </>
       )}
     </>
@@ -441,10 +519,18 @@ function EmpStepFields({ step, form, onChange, errors, managers }) {
 
   if (step === 5) return (
     <>
-      <Field label="Bank Name"><input name="bank_name" placeholder="e.g. State Bank of India" value={form.bank_name} onChange={onChange} className={inputCls} /></Field>
-      <Field label="Account Holder Name"><input name="account_holder_name" placeholder="Name as per bank" value={form.account_holder_name} onChange={onChange} className={inputCls} /></Field>
-      <Field label="Account Number"><input name="account_number" placeholder="Account number" value={form.account_number} onChange={onChange} className={inputCls} /></Field>
-      <Field label="IFSC Code"><input name="ifsc_code" placeholder="e.g. SBIN0001234" value={form.ifsc_code} onChange={onChange} className={inputCls} /></Field>
+      <Field label="Bank Name">
+        <input name="bank_name" placeholder="e.g. State Bank of India" value={form.bank_name} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Account Holder Name">
+        <input name="account_holder_name" placeholder="Name as per bank" value={form.account_holder_name} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Account Number">
+        <input name="account_number" placeholder="Account number" value={form.account_number} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="IFSC Code">
+        <input name="ifsc_code" placeholder="e.g. SBIN0001234" value={form.ifsc_code} onChange={onChange} className={inputCls} />
+      </Field>
       <div className="col-span-1 sm:col-span-2">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-3">Document URLs</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -461,100 +547,65 @@ function EmpStepFields({ step, form, onChange, errors, managers }) {
 }
 
 function MgrStepFields({ step, form, onChange, errors, managers }) {
-const [showPassword, setShowPassword] = useState(false);
-const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-const newErrors = {};
-const passwordRegex =
-  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const passwordError =
     form.password && !passwordRegex.test(form.password)
-      ? "Password must contain at least 8 characters, 1 uppercase letter, 1 lowercase letter, 1 number and 1 special character."
+      ? "Min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special character."
       : "";
 
   const confirmPasswordError =
-    form.confirm_password &&
-    form.password !== form.confirm_password
+    form.confirm_password && form.password !== form.confirm_password
       ? "Passwords do not match."
       : "";
- if (step === 0)
-    return (
-      <>
-        <Field label="First Name" required error={errors.f_name}>
+
+  if (step === 0) return (
+    <>
+      <Field label="First Name" required error={errors.f_name}>
+        <input name="f_name" placeholder="First name" value={form.f_name} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Last Name" required error={errors.l_name}>
+        <input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Password" required error={passwordError || errors.password}>
+        <div className="relative">
           <input
-            name="f_name"
-            placeholder="First name"
-            value={form.f_name}
+            name="password"
+            type={showPassword ? "text" : "password"}
+            placeholder="Set password"
+            value={form.password}
             onChange={onChange}
             className={inputCls}
           />
-        </Field>
-
-        <Field label="Last Name" required error={errors.l_name}>
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#993556] text-xs font-semibold hover:text-[#CD166E] transition-colors"
+          >
+            {showPassword ? "Hide" : "Show"}
+          </button>
+        </div>
+      </Field>
+      <Field label="Confirm Password" required error={confirmPasswordError || errors.confirm_password}>
+        <div className="relative">
           <input
-            name="l_name"
-            placeholder="Last name"
-            value={form.l_name}
+            name="confirm_password"
+            type={showConfirmPassword ? "text" : "password"}
+            placeholder="Confirm password"
+            value={form.confirm_password}
             onChange={onChange}
             className={inputCls}
           />
-        </Field>
-
-        <Field
-          label="Password"
-          required
-          error={passwordError || errors.password}
-        >
-          <div className="relative">
-            <input
-              name="password"
-              type={showPassword ? "text" : "password"}
-              placeholder="Set password"
-              value={form.password}
-              onChange={onChange}
-              className={inputCls}
-            />
-
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm"
-            >
-              {showPassword ? "Hide" : "Show"}
-            </button>
-          </div>
-
-         
-        </Field>
-
-        <Field
-          label="Confirm Password"
-          required
-          error={confirmPasswordError || errors.confirm_password}
-        >
-          <div className="relative">
-            <input
-              name="confirm_password"
-              type={showConfirmPassword ? "text" : "password"}
-              placeholder="Confirm password"
-              value={form.confirm_password}
-              onChange={onChange}
-              className={inputCls}
-            />
-
-            <button
-              type="button"
-              onClick={() =>
-                setShowConfirmPassword(!showConfirmPassword)
-              }
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm"
-            >
-              {showConfirmPassword ? "Hide" : "Show"}
-            </button>
-          </div>
-        </Field>
-    
-  
+          <button
+            type="button"
+            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#993556] text-xs font-semibold hover:text-[#CD166E] transition-colors"
+          >
+            {showConfirmPassword ? "Hide" : "Show"}
+          </button>
+        </div>
+      </Field>
       <Field label="Gender" required error={errors.gender}>
         <select name="gender" value={form.gender} onChange={onChange} className={inputCls}>
           <option value="">Select Gender</option>
@@ -570,8 +621,12 @@ const passwordRegex =
           <option value="divorced">Divorced</option>
         </select>
       </Field>
-      <Field label="Personal Contact" required error={errors.personal_contact}><input name="personal_contact" placeholder="+91 XXXXX XXXXX" value={form.personal_contact} onChange={onChange} className={inputCls} /></Field>
-      <Field label="Emergency Contact" required error={errors.e_contact}><input name="e_contact" placeholder="Emergency contact" value={form.e_contact} onChange={onChange} className={inputCls} /></Field>
+      <Field label="Personal Contact" required error={errors.personal_contact}>
+        <input name="personal_contact" placeholder="+91 XXXXX XXXXX" value={form.personal_contact} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Emergency Contact" required error={errors.e_contact}>
+        <input name="e_contact" placeholder="Emergency contact" value={form.e_contact} onChange={onChange} className={inputCls} />
+      </Field>
     </>
   );
 
@@ -583,7 +638,9 @@ const passwordRegex =
           {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
         </select>
       </Field>
-      <Field label="Designation" required error={errors.designation}><input name="designation" placeholder="e.g. Head of Engineering" value={form.designation} onChange={onChange} className={inputCls} /></Field>
+      <Field label="Designation" required error={errors.designation}>
+        <input name="designation" placeholder="e.g. Head of Engineering" value={form.designation} onChange={onChange} className={inputCls} />
+      </Field>
       <Field label="Role">
         <select name="role" value={form.role} onChange={onChange} className={inputCls}>
           <option value="manager">Manager</option>
@@ -610,22 +667,32 @@ const passwordRegex =
 
   if (step === 2) return (
     <>
-      <Field label="Address" span2><input name="address" placeholder="Street address" value={form.address} onChange={onChange} className={inputCls} /></Field>
-      <Field label="City"><input name="city" placeholder="City" value={form.city} onChange={onChange} className={inputCls} /></Field>
+      <Field label="Address" span2>
+        <input name="address" placeholder="Street address" value={form.address} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="City">
+        <input name="city" placeholder="City" value={form.city} onChange={onChange} className={inputCls} />
+      </Field>
       <Field label="State">
         <select name="state" value={form.state} onChange={onChange} className={inputCls}>
           <option value="">Select State</option>
           {INDIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
       </Field>
-      <Field label="Pincode"><input name="pincode" placeholder="6-digit pincode" maxLength={6} value={form.pincode} onChange={onChange} className={inputCls} /></Field>
+      <Field label="Pincode">
+        <input name="pincode" placeholder="6-digit pincode" maxLength={6} value={form.pincode} onChange={onChange} className={inputCls} />
+      </Field>
     </>
   );
 
   if (step === 3) return (
     <>
-      <Field label="Aadhaar Number"><input name="aadhaar_number" placeholder="XXXX XXXX XXXX" maxLength={12} value={form.aadhaar_number} onChange={onChange} className={inputCls} /></Field>
-      <Field label="PAN Number"><input name="pan_number" placeholder="ABCDE1234F" maxLength={10} value={form.pan_number} onChange={onChange} className={inputCls} /></Field>
+      <Field label="Aadhaar Number">
+        <input name="aadhaar_number" placeholder="XXXX XXXX XXXX" maxLength={12} value={form.aadhaar_number} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="PAN Number">
+        <input name="pan_number" placeholder="ABCDE1234F" maxLength={10} value={form.pan_number} onChange={onChange} className={inputCls} />
+      </Field>
     </>
   );
 
@@ -639,9 +706,15 @@ const passwordRegex =
       </Field>
       {!form.is_fresher && (
         <>
-          <Field label="Total Experience (years)"><input name="total_experience" type="number" min="0" placeholder="e.g. 3" value={form.total_experience} onChange={onChange} className={inputCls} /></Field>
-          <Field label="Previous Company"><input name="previous_company" placeholder="Company name" value={form.previous_company} onChange={onChange} className={inputCls} /></Field>
-          <Field label="Previous Designation"><input name="previous_designation" placeholder="Previous role" value={form.previous_designation} onChange={onChange} className={inputCls} /></Field>
+          <Field label="Total Experience (years)">
+            <input name="total_experience" type="number" min="0" placeholder="e.g. 3" value={form.total_experience} onChange={onChange} className={inputCls} />
+          </Field>
+          <Field label="Previous Company">
+            <input name="previous_company" placeholder="Company name" value={form.previous_company} onChange={onChange} className={inputCls} />
+          </Field>
+          <Field label="Previous Designation">
+            <input name="previous_designation" placeholder="Previous role" value={form.previous_designation} onChange={onChange} className={inputCls} />
+          </Field>
         </>
       )}
     </>
@@ -649,10 +722,18 @@ const passwordRegex =
 
   if (step === 5) return (
     <>
-      <Field label="Bank Name"><input name="bank_name" placeholder="e.g. State Bank of India" value={form.bank_name} onChange={onChange} className={inputCls} /></Field>
-      <Field label="Account Holder Name"><input name="account_holder_name" placeholder="Name as per bank" value={form.account_holder_name} onChange={onChange} className={inputCls} /></Field>
-      <Field label="Account Number"><input name="account_number" placeholder="Account number" value={form.account_number} onChange={onChange} className={inputCls} /></Field>
-      <Field label="IFSC Code"><input name="ifsc_code" placeholder="e.g. SBIN0001234" value={form.ifsc_code} onChange={onChange} className={inputCls} /></Field>
+      <Field label="Bank Name">
+        <input name="bank_name" placeholder="e.g. State Bank of India" value={form.bank_name} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Account Holder Name">
+        <input name="account_holder_name" placeholder="Name as per bank" value={form.account_holder_name} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="Account Number">
+        <input name="account_number" placeholder="Account number" value={form.account_number} onChange={onChange} className={inputCls} />
+      </Field>
+      <Field label="IFSC Code">
+        <input name="ifsc_code" placeholder="e.g. SBIN0001234" value={form.ifsc_code} onChange={onChange} className={inputCls} />
+      </Field>
       <div className="col-span-1 sm:col-span-2">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-3">Document URLs</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -673,7 +754,6 @@ export default function EmployeeTable() {
   const [openManager, setOpenManager] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [popup,       setPopup]       = useState({ show: false, type: "success", message: "" });
-  const [viewMode,    setViewMode]    = useState("table");
 
   const [selectedEmployeeId,   setSelectedEmployeeId]   = useState(null);
   const [selectedEmployeeRole, setSelectedEmployeeRole] = useState(null);
@@ -758,6 +838,9 @@ export default function EmployeeTable() {
     if (!empForm.l_name)           err.l_name           = "Required";
     if (!empForm.work_email)       err.work_email       = "Required";
     if (!empForm.password)         err.password         = "Required";
+    if (!passwordRegex.test(empForm.password)) err.password = "Min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special character.";
+    if (!empForm.confirm_password) err.confirm_password = "Required";
+    if (empForm.password !== empForm.confirm_password) err.confirm_password = "Passwords do not match.";
     if (!empForm.gender)           err.gender           = "Required";
     if (!empForm.personal_contact) err.personal_contact = "Required";
     if (!empForm.e_contact)        err.e_contact        = "Required";
@@ -802,6 +885,9 @@ export default function EmployeeTable() {
     if (!mgrForm.l_name)           err.l_name           = "Required";
     if (!mgrForm.work_email)       err.work_email       = "Required";
     if (!mgrForm.password)         err.password         = "Required";
+    if (!passwordRegex.test(mgrForm.password)) err.password = "Min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special character.";
+    if (!mgrForm.confirm_password) err.confirm_password = "Required";
+    if (mgrForm.password !== mgrForm.confirm_password) err.confirm_password = "Passwords do not match.";
     if (!mgrForm.gender)           err.gender           = "Required";
     if (!mgrForm.personal_contact) err.personal_contact = "Required";
     if (!mgrForm.e_contact)        err.e_contact        = "Required";
@@ -854,9 +940,9 @@ export default function EmployeeTable() {
   const activeFilterCount = [filters.department, filters.role, filters.location, filters.gender].filter(Boolean).length;
 
   function roleBadge(role) {
-    if (role === "employee")       return <Badge label="Employee"       type="role" />;
-    if (role === "manager")        return <Badge label="Manager"        type="manager" />;
-    if (role === "senior_manager") return <Badge label="Sr. Manager"    type="smgr" />;
+    if (role === "employee")       return <Badge label="Employee"    type="role" />;
+    if (role === "manager")        return <Badge label="Manager"     type="manager" />;
+    if (role === "senior_manager") return <Badge label="Sr. Manager" type="smgr" />;
     return <Badge label={role?.replace("_", " ") || "—"} type="manager" />;
   }
 
