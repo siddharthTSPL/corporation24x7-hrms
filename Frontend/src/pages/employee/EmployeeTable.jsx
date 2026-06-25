@@ -1,4 +1,3 @@
-"use client";
 import { useState, useRef, useEffect } from "react";
 import {
   FaEdit, FaTrash, FaSearch, FaFilter, FaTimes, FaUserTie, FaUserPlus,
@@ -40,7 +39,7 @@ const WORKING_STATUSES = ["working", "resigned", "fired", "terminated"];
 const IRREVERSIBLE_STATUSES = ["resigned", "terminated"];
 
 const EMPTY_EMP = {
-  f_name:"",l_name:"",work_email:"",password:"",gender:"",marital_status:"single",
+  f_name:"",l_name:"",work_email:"",password:"",confirm_password:"",gender:"",marital_status:"single",
   personal_contact:"",e_contact:"",department:"",designation:"",role:"employee",
   office_location:"",Under_manager:"",address:"",city:"",state:"",pincode:"",
   aadhaar_number:"",pan_number:"",is_fresher:true,total_experience:"",
@@ -303,7 +302,6 @@ function ReportingManagerSelect({value,onChange,managersOnly,managersWithAdmin,l
   const withAdminList = managersWithAdmin?.managers ?? [];
   const adminList = withAdminList.filter(m => m.isAdmin);
   const pureManagers = managersList;
-
   return(
     <Field label={label}>
       <select name={name} value={value} onChange={onChange} className={inputCls}>
@@ -437,7 +435,6 @@ function WorkingStatusBadge({status}){
   return <Badge label={status} type="inactive"/>;
 }
 
-// ─── WorkingStatusSelector with irreversible confirmation ────────────────────
 function WorkingStatusSelector({currentStatus,onSave,loading}){
   const [selected,setSelected]=useState(currentStatus||"working");
   const [awaitingConfirm,setAwaitingConfirm]=useState(false);
@@ -474,15 +471,12 @@ function WorkingStatusSelector({currentStatus,onSave,loading}){
   return(
     <div className="mt-3 p-3 rounded-xl border border-[#F4C0D1] bg-[#F9F8F2]">
       <p className="text-[10px] font-bold uppercase tracking-wider text-[#993556] mb-2">Employment Status</p>
-
       {awaitingConfirm ? (
         <div className="rounded-xl border border-[#FCA5A5] bg-[#FFF5F5] p-3">
           <div className="flex items-start gap-2 mb-3">
             <FaExclamationTriangle size={14} className="text-[#DC2626] flex-shrink-0 mt-0.5"/>
             <div>
-              <p className="text-xs font-bold text-[#991B1B]">
-                This action cannot be undone
-              </p>
+              <p className="text-xs font-bold text-[#991B1B]">This action cannot be undone</p>
               <p className="text-[11px] text-[#7F1D1D] mt-0.5 leading-relaxed">
                 Setting status to <strong>{statusLabel}</strong> is permanent. The employee will be
                 marked as inactive and cannot be set back to <strong>Working</strong>.
@@ -490,18 +484,8 @@ function WorkingStatusSelector({currentStatus,onSave,loading}){
             </div>
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={handleCancel}
-              className="flex-1 py-2 rounded-lg text-xs font-semibold border border-[#F4C0D1] text-[#730042] hover:bg-[#FBEAF0] transition-all"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleConfirm}
-              disabled={loading}
-              className="flex-1 py-2 rounded-lg text-white text-xs font-bold disabled:opacity-50 transition-all"
-              style={{background:"#DC2626"}}
-            >
+            <button onClick={handleCancel} className="flex-1 py-2 rounded-lg text-xs font-semibold border border-[#F4C0D1] text-[#730042] hover:bg-[#FBEAF0] transition-all">Cancel</button>
+            <button onClick={handleConfirm} disabled={loading} className="flex-1 py-2 rounded-lg text-white text-xs font-bold disabled:opacity-50 transition-all" style={{background:"#DC2626"}}>
               {loading?"Updating…":`Confirm ${statusLabel}`}
             </button>
           </div>
@@ -518,7 +502,6 @@ function WorkingStatusSelector({currentStatus,onSave,loading}){
               <option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>
             ))}
           </select>
-
           {isAlreadyIrreversible ? (
             <div className="flex items-center gap-1.5 px-2 py-2 rounded-lg bg-[#F3F4F6] border border-[#E5E7EB]">
               <FaBan size={10} className="text-[#6B7280] flex-shrink-0"/>
@@ -822,7 +805,10 @@ function StepModal({title,icon,onClose,onSubmit,steps,currentStep,setCurrentStep
   const isLast=currentStep===totalSteps-1;
   const isFirst=currentStep===0;
   return(
-    <div className="fixed inset-0 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4" style={{background:"rgba(115,0,66,0.40)",backdropFilter:"blur(3px)"}} onClick={(e)=>e.target===e.currentTarget&&onClose()}>
+    <div
+      className="fixed inset-0 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
+      style={{background:"rgba(115,0,66,0.40)",backdropFilter:"blur(3px)"}}
+    >
       <div className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl flex flex-col max-h-[96vh] sm:max-h-[92vh] border-t sm:border border-[#F4C0D1] shadow-2xl">
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 rounded-t-2xl flex-shrink-0" style={{background:accentColor}}>
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -834,7 +820,11 @@ function StepModal({title,icon,onClose,onSubmit,steps,currentStep,setCurrentStep
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center text-white flex-shrink-0 ml-2" style={{background:"rgba(255,255,255,0.18)"}}>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white flex-shrink-0 ml-2"
+            style={{background:"rgba(255,255,255,0.18)"}}
+          >
             <FaTimes size={13}/>
           </button>
         </div>
@@ -874,7 +864,10 @@ function StepModal({title,icon,onClose,onSubmit,steps,currentStep,setCurrentStep
 
 function Modal({title,icon,onClose,onSubmit,children,accentColor="#CD166E"}){
   return(
-    <div className="fixed inset-0 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4" style={{background:"rgba(115,0,66,0.40)",backdropFilter:"blur(3px)"}} onClick={(e)=>e.target===e.currentTarget&&onClose()}>
+    <div
+      className="fixed inset-0 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
+      style={{background:"rgba(115,0,66,0.40)",backdropFilter:"blur(3px)"}}
+    >
       <div className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl flex flex-col max-h-[96vh] sm:max-h-[92vh] border-t sm:border border-[#F4C0D1] shadow-2xl">
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 rounded-t-2xl flex-shrink-0" style={{background:accentColor}}>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -884,7 +877,11 @@ function Modal({title,icon,onClose,onSubmit,children,accentColor="#CD166E"}){
               <p className="text-[11px] sm:text-xs" style={{color:"rgba(255,255,255,0.6)"}}>Fill in all required fields</p>
             </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center text-white" style={{background:"rgba(255,255,255,0.18)"}}>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white"
+            style={{background:"rgba(255,255,255,0.18)"}}
+          >
             <FaTimes size={13}/>
           </button>
         </div>
@@ -1109,12 +1106,28 @@ function MobileCard({u,onView,onEdit,onDelete,onPromoteToManager,onPromoteToAdmi
 }
 
 function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChange}){
+  const [showPwd,setShowPwd]=useState(false);
+  const [showCPwd,setShowCPwd]=useState(false);
+  const pwdErr=form.password&&!PWD_REGEX.test(form.password)?"Min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special character.":"";
+  const cpwdErr=form.confirm_password&&form.password!==form.confirm_password?"Passwords do not match.":"";
+
   if(step===0)return(
     <>
       <Field label="First Name" required error={errors.f_name}><input name="f_name" placeholder="First name" value={form.f_name} onChange={onChange} className={inputCls}/></Field>
       <Field label="Last Name" required error={errors.l_name}><input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls}/></Field>
       <Field label="Work Email" required error={errors.work_email}><input name="work_email" type="email" placeholder="name@company.com" value={form.work_email} onChange={onChange} className={inputCls}/></Field>
-      <Field label="Password" required error={errors.password}><input name="password" type="password" placeholder="Min 8 chars, uppercase, number, special" value={form.password} onChange={onChange} className={inputCls}/></Field>
+      <Field label="Password" required error={pwdErr||errors.password}>
+        <div className="relative">
+          <input name="password" type={showPwd?"text":"password"} placeholder="Min 8 chars, uppercase, number, special" value={form.password} onChange={onChange} className={inputCls}/>
+          <button type="button" onClick={()=>setShowPwd(!showPwd)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#993556] text-xs font-medium">{showPwd?"Hide":"Show"}</button>
+        </div>
+      </Field>
+      <Field label="Confirm Password" required error={cpwdErr||errors.confirm_password}>
+        <div className="relative">
+          <input name="confirm_password" type={showCPwd?"text":"password"} placeholder="Confirm password" value={form.confirm_password} onChange={onChange} className={inputCls}/>
+          <button type="button" onClick={()=>setShowCPwd(!showCPwd)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#993556] text-xs font-medium">{showCPwd?"Hide":"Show"}</button>
+        </div>
+      </Field>
       <Field label="Gender" required error={errors.gender}>
         <select name="gender" value={form.gender} onChange={onChange} className={inputCls}>
           <option value="">Select Gender</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
@@ -1348,7 +1361,7 @@ function validateFormFields(form,isManager=false){
   else if(!EMAIL_REGEX.test(form.work_email))err.work_email="Invalid email address";
   if(!form.password)err.password="Required";
   else if(!PWD_REGEX.test(form.password))err.password="Min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special character";
-  if(isManager&&form.confirm_password!==form.password)err.confirm_password="Passwords do not match";
+  if(form.confirm_password!==form.password)err.confirm_password="Passwords do not match";
   if(!form.gender)err.gender="Required";
   if(!form.personal_contact?.trim())err.personal_contact="Required";
   else if(!PHONE_REGEX.test(form.personal_contact))err.personal_contact="Must be a valid 10-digit Indian mobile number";
@@ -1407,7 +1420,6 @@ export default function EmployeeTable(){
   const [demoteAdminToEmpTarget,setDemoteAdminToEmpTarget]=useState(null);
   const [demoteAdminToEmpForm,setDemoteAdminToEmpForm]=useState({Under_manager:"",designation:""});
   const [filters,setFilters]=useState({search:"",department:"",role:"",location:"",gender:"",type:"",status:"",working_status:""});
-  // ─── "show inactive" toggle ────────────────────────────────────────────────
   const [showInactive,setShowInactive]=useState(false);
 
   const {data:adminData}=useGetMeAdmin();
@@ -1420,7 +1432,6 @@ export default function EmployeeTable(){
   const {data:employeeData,isLoading:listLoading,refetch:refetchList}=useGetAllEmployee();
   const {data:inactiveData}=useAdminInactiveUsers();
 
-  // Merge active + inactive, deduplicating by _id
   const activeUsers = employeeData?.users ?? [];
   const inactiveUsers = inactiveData?.users ?? [];
   const allUsers = showInactive
@@ -1656,7 +1667,6 @@ export default function EmployeeTable(){
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {/* ── Show Inactive toggle ── */}
             {inactiveCount>0&&(
               <button
                 onClick={()=>setShowInactive(v=>!v)}
@@ -1695,7 +1705,6 @@ export default function EmployeeTable(){
           </div>
         </div>
 
-        {/* ── Inactive banner ── */}
         {showInactive&&inactiveCount>0&&(
           <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-xs text-[#6B7280]">
             <FaBan size={11} className="flex-shrink-0"/>
