@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   useMyAssignedJobs,
   useMyDayLog,
@@ -215,35 +215,54 @@ function TimerWidget({ jobs }) {
   const heartbeat = useHeartbeatTimer();
 
   const [elapsed, setElapsed] = useState(0);
+  const syncBaseRef = useRef(0);
+  const syncTimeRef = useRef(null);
+
   const [startModal, setStartModal] = useState(false);
   const [startForm, setStartForm] = useState({ job: "", note: "" });
   const [stopNote, setStopNote] = useState("");
   const [stopModal, setStopModal] = useState(false);
 
   useEffect(() => {
-    if (!timer || timer.status !== "running") {
-      setElapsed(timer?.accumulated_seconds || 0);
+    if (!timer) {
+      setElapsed(0);
+      syncBaseRef.current = 0;
+      syncTimeRef.current = null;
       return;
     }
-    const tick = () => {
-      const base = timer.accumulated_seconds || 0;
-      const since = Math.floor((Date.now() - new Date(timer.last_heartbeat_at)) / 1000);
-      setElapsed(base + Math.max(0, since));
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
+    if (timer.status !== "running") {
+      setElapsed(timer.accumulated_seconds || 0);
+      syncBaseRef.current = 0;
+      syncTimeRef.current = null;
+      return;
+    }
+    const serverElapsed =
+      (timer.accumulated_seconds || 0) +
+      Math.max(0, Math.floor((Date.now() - new Date(timer.last_heartbeat_at)) / 1000));
+    syncBaseRef.current = serverElapsed;
+    syncTimeRef.current = Date.now();
+    setElapsed(serverElapsed);
   }, [timer]);
+
+  useEffect(() => {
+    if (!timer || timer.status !== "running") return;
+    const id = setInterval(() => {
+      if (syncTimeRef.current === null) return;
+      const secondsSinceSync = Math.floor((Date.now() - syncTimeRef.current) / 1000);
+      setElapsed(syncBaseRef.current + secondsSinceSync);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [timer?.status, timer?._id]);
 
   useEffect(() => {
     if (!timer || timer.status !== "running") return;
     const id = setInterval(() => heartbeat.mutate(), 60000);
     return () => clearInterval(id);
-  }, [timer]);
+  }, [timer?.status, timer?._id]);
 
   const isRunning = timer?.status === "running";
   const isPaused = timer?.status === "paused";
-  const displaySecs = isRunning ? elapsed : (timer?.accumulated_seconds || 0);
+  const displaySecs = elapsed;
 
   return (
     <>

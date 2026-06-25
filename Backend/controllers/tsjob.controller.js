@@ -78,7 +78,26 @@ const getAssignableTargets = async (req, res, next) => {
     organisationId: organisation_id,
   });
 
-  res.status(200).json({ success: true, count: targets.length, targets });
+  const Admin = require("../Models/Admin.model");
+  const Manager = require("../Models/manager.model");
+  const User = require("../Models/user.model");
+
+  const modelMap = { Admin, Manager, User };
+
+  const populated = await Promise.all(
+    targets.map(async (t) => {
+      const Model = modelMap[t.model];
+      if (!Model) return { ...t, name: t.model };
+      const doc = await Model.findById(t.id).select("f_name l_name work_email").lean();
+      return {
+        ...t,
+        name: doc ? `${doc.f_name} ${doc.l_name}` : String(t.id),
+        email: doc?.work_email || "",
+      };
+    })
+  );
+
+  res.status(200).json({ success: true, count: populated.length, targets: populated });
 };
 
 const getMyAssignedJobs = async (req, res, next) => {
