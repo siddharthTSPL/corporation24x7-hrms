@@ -1645,6 +1645,19 @@ const getperticularemanager = async (req, res, next) => {
   const { id } = req.params;
   const organisation_id = req.admin.organisation_id;
 
+  // Debug: check if manager exists at all (ignoring org)
+  const managerExists = await Managermodel.findById(id).select("_id organisation_id").lean();
+  if (!managerExists) {
+    // Maybe it was promoted to Admin?
+    const asAdmin = await Adminmodel.findOne({ _id: id, organisation_id }).select("_id").lean();
+    if (asAdmin)
+      return next(Object.assign(new Error("This user is now an Admin, not a Manager"), { statusCode: 400 }));
+    return next(Object.assign(new Error("Manager not found in any collection"), { statusCode: 404 }));
+  }
+
+  if (managerExists.organisation_id.toString() !== organisation_id.toString())
+    return next(Object.assign(new Error("Manager belongs to a different organisation"), { statusCode: 403 }));
+
   const [manager, leaveBalance, reviews] = await Promise.all([
     Managermodel.findOne({ _id: id, organisation_id })
       .select(EXCLUDE)
@@ -1657,8 +1670,6 @@ const getperticularemanager = async (req, res, next) => {
       .lean(),
   ]);
 
-  if (!manager)
-    return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
   if (!leaveBalance)
     return next(Object.assign(new Error("Leave balance not found"), { statusCode: 404 }));
 
@@ -2979,33 +2990,34 @@ const getInactiveUsers = async (req, res, next) => {
 };
 
 
-const  getActiveUserCount = async (req, res, next) => {
+const getActiveUserCount = async (req, res, next) => {
   try {
     if (!req.admin)
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
- 
+
     const superAdmin = await SuperAdminModel.findById(req.admin.organisation_id)
       .select("active_user_count licenses is_trial_active trial_expires_at")
       .lean();
- 
+
     if (!superAdmin)
       return next(Object.assign(new Error("Organisation not found"), { statusCode: 404 }));
- 
+
     const license = superAdmin.licenses?.find(
       (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
     );
- 
+
     const trialActive =
       superAdmin.is_trial_active && new Date() < new Date(superAdmin.trial_expires_at);
- 
+
     const activeCount = superAdmin.active_user_count || 0;
     const allowedUsers = trialActive ? 4 : (license?.users || 0);
     const isLimitReached = allowedUsers > 0 ? activeCount >= allowedUsers : false;
- 
+
     return res.status(200).json({
       success: true,
       active_user_count: activeCount,
       allowed_users: allowedUsers,
+      remaining_slots: Math.max(0, allowedUsers - activeCount),
       is_limit_reached: isLimitReached,
       plan: trialActive ? "trial" : (license?.plan || null),
       plan_type: license?.plan_type || null,
