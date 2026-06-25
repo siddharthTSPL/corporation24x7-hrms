@@ -295,7 +295,7 @@ export const useAdminInactiveUsers = () => {
     queryFn: getInactiveUsers,
   });
 };
-export const useAdminActiveUserCount = () => {
+export const useGetActiveUserCount = () => {
   return useQuery({
     queryKey: ["admin", "active-user-count"],
     queryFn: getActiveUserCount,
