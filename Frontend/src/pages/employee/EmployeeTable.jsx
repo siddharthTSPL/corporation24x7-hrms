@@ -15,7 +15,7 @@ import {
   useDemoteManagerToEmployee, useDemoteAdminToManager, useDemoteAdminToEmployee,
   useGetParticularEmployee, useGetParticularManager,
   useSetEmployeeWorkingStatus, useSetManagerWorkingStatus,
-  useAdminInactiveUsers,
+  useAdminInactiveUsers, useGetActiveUserCount,
 } from "../../auth/server-state/adminother/adminother.hook";
 import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
 import axios from "axios";
@@ -924,9 +924,10 @@ function ActionMenu({user,onView,onEdit,onDelete,onPromoteToManager,onPromoteToA
     document.addEventListener("mousedown",h);
     return()=>document.removeEventListener("mousedown",h);
   },[]);
-  const isEmployee=user.role==="employee"||user.role==="official";
-  const isManager=user.role==="manager"||user.role==="senior_manager";
-  const isAdmin=user.role==="admin"||user.role==="senior_admin";
+  const effectiveType = user.type || (user.role === "manager" || user.role === "senior_manager" ? "manager" : "employee");
+  const isEmployee = effectiveType === "employee";
+  const isManager = effectiveType === "manager" || user.role === "senior_manager";
+  const isAdmin = user.role === "admin" || user.role === "senior_admin";
   const isSelf=currentAdminId&&user._id&&currentAdminId===user._id;
   const isInactive=user.working_status&&user.working_status!=="working";
   return(
@@ -956,7 +957,7 @@ function ActionMenu({user,onView,onEdit,onDelete,onPromoteToManager,onPromoteToA
                   </button>
                 </>
               )}
-              {isManager&&(
+              {isManager&&!isAdmin&&(
                 <>
                   <button onClick={()=>{onPromoteToAdmin(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#92400E] hover:bg-[#FEF3C7]">
                     <FaArrowUp size={10}/> Promote to Admin
@@ -988,13 +989,16 @@ function ActionMenu({user,onView,onEdit,onDelete,onPromoteToManager,onPromoteToA
   );
 }
 
-function roleBadge(role){
-  if(role==="employee")return<Badge label="Employee" type="role"/>;
-  if(role==="manager")return<Badge label="Manager" type="manager"/>;
-  if(role==="senior_manager")return<Badge label="Sr. Manager" type="smgr"/>;
-  if(role==="admin"||role==="senior_admin")return<Badge label="Admin" type="admin"/>;
-  if(role==="official")return<Badge label="Official" type="role"/>;
-  return<Badge label={role?.replace("_"," ")||"—"} type="manager"/>;
+function roleBadge(u){
+  const effectiveType = u.type || (u.role === "manager" || u.role === "senior_manager" ? "manager" : "employee");
+  if(effectiveType === "employee"){
+    if(u.role === "official") return <Badge label="Official" type="role"/>;
+    return <Badge label="Employee" type="role"/>;
+  }
+  if(u.role==="manager") return <Badge label="Manager" type="manager"/>;
+  if(u.role==="senior_manager") return <Badge label="Sr. Manager" type="smgr"/>;
+  if(u.role==="admin"||u.role==="senior_admin") return <Badge label="Admin" type="admin"/>;
+  return <Badge label={u.role?.replace("_"," ")||"—"} type="manager"/>;
 }
 
 function SkeletonRows(){
@@ -1058,8 +1062,13 @@ function FilterChip({label,onRemove}){
 }
 
 function MobileCard({u,onView,onEdit,onDelete,onPromoteToManager,onPromoteToAdmin,onDemoteToEmployee,onDemoteToManager,onDemoteToEmployee2,currentAdminId}){
-  const roleType=u.role==="manager"?"manager":u.role==="senior_manager"?"smgr":u.role==="admin"||u.role==="senior_admin"?"admin":"role";
-  const roleLabel=u.role==="senior_manager"?"Sr. Manager":u.role==="employee"?"Employee":u.role==="admin"||u.role==="senior_admin"?"Admin":u.role?.replace("_"," ")||"—";
+  const effectiveType = u.type || (u.role === "manager" || u.role === "senior_manager" ? "manager" : "employee");
+  const roleType = effectiveType === "manager"
+    ? (u.role === "senior_manager" ? "smgr" : "manager")
+    : u.role === "admin" || u.role === "senior_admin" ? "admin" : "role";
+  const roleLabel = effectiveType === "manager"
+    ? (u.role === "senior_manager" ? "Sr. Manager" : "Manager")
+    : u.role === "official" ? "Official" : "Employee";
   const isInactive=u.working_status&&u.working_status!=="working";
   return(
     <div
@@ -1431,6 +1440,11 @@ export default function EmployeeTable(){
   const {data:managersWithAdmin}=useFindAllManagers();
   const {data:employeeData,isLoading:listLoading,refetch:refetchList}=useGetAllEmployee();
   const {data:inactiveData}=useAdminInactiveUsers();
+  const {data:activeUserCountData}=useGetActiveUserCount();
+
+  const isLimitReached = activeUserCountData?.is_limit_reached ?? false;
+  const remainingSlots = activeUserCountData?.remaining_slots ?? null;
+  const allowedUsers = activeUserCountData?.allowed_users ?? null;
 
   const activeUsers = employeeData?.users ?? [];
   const inactiveUsers = inactiveData?.users ?? [];
@@ -1619,7 +1633,8 @@ export default function EmployeeTable(){
   const filtered=allUsers.filter((u)=>{
     const name=`${u.f_name??""} ${u.l_name??""}`.toLowerCase();
     const q=filters.search.toLowerCase();
-    const matchType=filters.type?filters.type==="employee"?u.type==="employee":filters.type==="manager"?u.type==="manager":u.role===filters.type:true;
+    const effectiveType = u.type || (u.role === "manager" || u.role === "senior_manager" ? "manager" : "employee");
+    const matchType=filters.type?filters.type==="employee"?effectiveType==="employee":filters.type==="manager"?effectiveType==="manager":u.role===filters.type:true;
     return(
       (name.includes(q)||(u.work_email??"").toLowerCase().includes(q)||(u.uid??"").toLowerCase().includes(q)||(u.designation??"").toLowerCase().includes(q))&&
       (filters.department?u.department===filters.department:true)&&
@@ -1664,6 +1679,7 @@ export default function EmployeeTable(){
             <p className="text-xs sm:text-sm text-[#993556] mt-0.5">
               {activeUsers.length} active · {filtered.length} shown · {employeeData?.employees??0} employees · {employeeData?.managers??0} managers
               {inactiveCount>0&&<> · <span className="text-[#6B7280]">{inactiveCount} inactive</span></>}
+              {allowedUsers!==null&&<> · <span className={isLimitReached?"text-[#DC2626] font-semibold":"text-[#993556]"}>{remainingSlots} slot{remainingSlots!==1?"s":""} remaining of {allowedUsers}</span></>}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -1690,18 +1706,28 @@ export default function EmployeeTable(){
               onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#085041";}}>
               <FaFileExcel size={12}/><span>Export CSV</span>
             </button>
-            <button onClick={()=>{setOpenManager(true);setMgrStep(0);}}
-              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all"
-              style={{borderColor:"#730042",color:"#730042"}}
-              onMouseEnter={(e)=>{e.currentTarget.style.background="#730042";e.currentTarget.style.color="#fff";}}
-              onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#730042";}}>
-              <FaUserTie size={12}/><span>Add Manager</span>
-            </button>
-            <button onClick={()=>{setOpen(true);setEmpStep(0);}}
-              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90"
-              style={{background:"#730042"}}>
-              <FaUserPlus size={12}/><span>Add Employee</span>
-            </button>
+            {isLimitReached ? (
+              <div className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 border-[#FCA5A5] bg-[#FFF5F5] text-xs sm:text-sm font-semibold text-[#991B1B]">
+                <FaExclamationTriangle size={12}/>
+                <span className="hidden sm:inline">Limit reached — contact your organization</span>
+                <span className="sm:hidden">Limit reached</span>
+              </div>
+            ):(
+              <>
+                <button onClick={()=>{setOpenManager(true);setMgrStep(0);}}
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all"
+                  style={{borderColor:"#730042",color:"#730042"}}
+                  onMouseEnter={(e)=>{e.currentTarget.style.background="#730042";e.currentTarget.style.color="#fff";}}
+                  onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#730042";}}>
+                  <FaUserTie size={12}/><span>Add Manager</span>
+                </button>
+                <button onClick={()=>{setOpen(true);setEmpStep(0);}}
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90"
+                  style={{background:"#730042"}}>
+                  <FaUserPlus size={12}/><span>Add Employee</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -1787,7 +1813,7 @@ export default function EmployeeTable(){
               <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
                 <div className="text-4xl">👥</div>
                 <p className="text-[#730042] font-medium text-sm">No employees found</p>
-                <button onClick={()=>setOpen(true)} className="mt-1 px-4 py-2 rounded-xl text-white text-sm font-semibold hover:opacity-90" style={{background:"#730042"}}>+ Add Employee</button>
+                {!isLimitReached&&<button onClick={()=>setOpen(true)} className="mt-1 px-4 py-2 rounded-xl text-white text-sm font-semibold hover:opacity-90" style={{background:"#730042"}}>+ Add Employee</button>}
               </div>
             ):filtered.map((u)=>(
               <MobileCard key={u._id} u={u} onView={handleView} onEdit={handleOpenEdit} onDelete={setDeleteTarget} {...actionMenuProps}/>
@@ -1804,7 +1830,7 @@ export default function EmployeeTable(){
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#FBEAF0]">
-                {listLoading?<SkeletonRows/>:filtered.length===0?<EmptyState onAdd={()=>setOpen(true)}/>:filtered.map((u)=>{
+                {listLoading?<SkeletonRows/>:filtered.length===0?<EmptyState onAdd={()=>!isLimitReached&&setOpen(true)}/>:filtered.map((u)=>{
                   const isInactive=u.working_status&&u.working_status!=="working";
                   return(
                     <tr key={u._id}
@@ -1845,7 +1871,7 @@ export default function EmployeeTable(){
                           </div>
                         ):<span className="text-[#F4C0D1] text-xs">—</span>}
                       </td>
-                      <td className="px-3 lg:px-4 py-3">{roleBadge(u.role)}</td>
+                      <td className="px-3 lg:px-4 py-3">{roleBadge(u)}</td>
                       <td className="px-3 lg:px-4 py-3"><WorkingStatusBadge status={u.working_status}/></td>
                       <td className="px-3 lg:px-4 py-3">
                         <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e)=>e.stopPropagation()}>
