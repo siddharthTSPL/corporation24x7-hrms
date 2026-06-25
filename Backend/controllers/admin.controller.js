@@ -2990,33 +2990,34 @@ const getInactiveUsers = async (req, res, next) => {
 };
 
 
-const  getActiveUserCount = async (req, res, next) => {
+const getActiveUserCount = async (req, res, next) => {
   try {
     if (!req.admin)
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
- 
+
     const superAdmin = await SuperAdminModel.findById(req.admin.organisation_id)
       .select("active_user_count licenses is_trial_active trial_expires_at")
       .lean();
- 
+
     if (!superAdmin)
       return next(Object.assign(new Error("Organisation not found"), { statusCode: 404 }));
- 
+
     const license = superAdmin.licenses?.find(
       (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
     );
- 
+
     const trialActive =
       superAdmin.is_trial_active && new Date() < new Date(superAdmin.trial_expires_at);
- 
+
     const activeCount = superAdmin.active_user_count || 0;
     const allowedUsers = trialActive ? 4 : (license?.users || 0);
     const isLimitReached = allowedUsers > 0 ? activeCount >= allowedUsers : false;
- 
+
     return res.status(200).json({
       success: true,
       active_user_count: activeCount,
       allowed_users: allowedUsers,
+      remaining_slots: Math.max(0, allowedUsers - activeCount),
       is_limit_reached: isLimitReached,
       plan: trialActive ? "trial" : (license?.plan || null),
       plan_type: license?.plan_type || null,
