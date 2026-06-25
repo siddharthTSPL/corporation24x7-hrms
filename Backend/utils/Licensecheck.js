@@ -1,6 +1,6 @@
 const SuperAdminModel = require("../Models/superadmin.model");
 
-const TRIAL_USER_LIMIT = 2;
+const TRIAL_USER_LIMIT = 5;
 
 const canOnboardUser = async (organisation_id) => {
   const superAdmin = await SuperAdminModel.findById(organisation_id)
@@ -18,7 +18,7 @@ const canOnboardUser = async (organisation_id) => {
     if (activeCount >= TRIAL_USER_LIMIT)
       return {
         allowed: false,
-        message: `Your free trial allows up to ${TRIAL_USER_LIMIT} active users. You have reached the limit. Please upgrade your plan at torchxsuite.com to onboard more users.`,
+        message: `You have reached your maximum active user count (${TRIAL_USER_LIMIT}) on the free trial. Upgrade your plan at torchxsuite.com to onboard more users.`,
       };
     return { allowed: true };
   }
@@ -39,10 +39,10 @@ const canOnboardUser = async (organisation_id) => {
 
   const allowedUsers = license.users || 0;
 
-  if (allowedUsers > 0 && activeCount >= allowedUsers)
+  if (activeCount >= allowedUsers)
     return {
       allowed: false,
-      message: `You have reached the maximum user limit (${allowedUsers}) for your current plan. Please upgrade your plan at torchxsuite.com to onboard more users.`,
+      message: `You have reached your maximum active user count (${allowedUsers}) on your current plan. Upgrade your plan at torchxsuite.com to onboard more users.`,
     };
 
   return { allowed: true };
