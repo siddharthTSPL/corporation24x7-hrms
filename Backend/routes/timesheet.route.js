@@ -147,5 +147,34 @@ timesheetRouter.get("/insights/my-productivity", anyRole, asyncHandler(getMyProd
 // ─── SA / Admin: org-wide visibility endpoints ────────────────────────────────
 timesheetRouter.get("/admin/time-logs", saOrAdmin, asyncHandler(getAllTimeLogs));
 timesheetRouter.get("/admin/timesheets", saOrAdmin, asyncHandler(getAllTimesheets));
+timesheetRouter.get("/debug/targets", anyRole, asyncHandler(async (req, res) => {
+  const Admin = require("../Models/Admin.model");
+  const Manager = require("../Models/manager.model");
+  const User = require("../Models/user.model");
 
+  const { resolveActor, resolveOrgId } = require("../utils/heirarchy.utils");
+
+  const actor = resolveActor(req);
+  const organisation_id = resolveOrgId(req);
+
+  const allManagers = await Manager.find({ organisation_id })
+    .select("f_name l_name reporting_manager reporting_manager_model working_status")
+    .lean();
+
+  const allUsers = await User.find({ organisation_id })
+    .select("f_name l_name Under_manager working_status")
+    .lean();
+
+  const allAdmins = await Admin.find({ organisation_id })
+    .select("f_name l_name working_status")
+    .lean();
+
+  res.json({
+    actor,
+    organisation_id,
+    allAdmins,
+    allManagers,
+    allUsers,
+  });
+}));
 module.exports = timesheetRouter;

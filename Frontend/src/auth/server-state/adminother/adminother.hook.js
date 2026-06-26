@@ -7,6 +7,7 @@ import {
   promoteEmployeeToAdmin, promoteManagerToAdmin, getTodayLeaves,
   getAllPersonalDocuments, getAllExpenseDocuments, getDocumentDetails,
   adminActionOnLeave, setEmployeeWorkingStatus, setManagerWorkingStatus,
+  getInactiveUsers, getActiveUserCount
 } from "../../api/adminapi/other/ad.other.api";
 
 export const useGetAllEmployee = () => {
@@ -267,6 +268,8 @@ export const useSetEmployeeWorkingStatus = (id) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["employee", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "inactive-users"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "active-user-count"] });
     },
   });
 };
@@ -279,6 +282,22 @@ export const useSetManagerWorkingStatus = (id) => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["managers"] });
       queryClient.invalidateQueries({ queryKey: ["manager", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "inactive-users"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "active-user-count"] });
     },
+  });
+};
+
+
+export const useAdminInactiveUsers = () => {
+  return useQuery({
+    queryKey: ["admin", "inactive-users"],
+    queryFn: getInactiveUsers,
+  });
+};
+export const useGetActiveUserCount = () => {
+  return useQuery({
+    queryKey: ["admin", "active-user-count"],
+    queryFn: getActiveUserCount,
   });
 };

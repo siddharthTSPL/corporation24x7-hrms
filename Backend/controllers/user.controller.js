@@ -181,14 +181,11 @@ const token = jwt.sign(
     }
   ).exec();
 
-  return res.status(200).json({
+  res.status(200).json({
     success: true,
     message: "Login successful",
-    role: user.role,
-    isFirstLogin: user.isFirstLogin,
-
-    canSetupPassword: user.isFirstLogin,
-    passwordSetupLink,
+    role: isvaliduser.role,
+    token
   });
 };
 
@@ -976,11 +973,11 @@ const getOrgInfo = async (req, res, next) => {
       .select("f_name l_name email organisation_name profile_image")
       .lean();
  
-    const admins = await Adminmodel.find({ organisation_id })
+    const admins = await Adminmodel.find({ organisation_id, working_status: "working" })
       .select("f_name l_name work_email designation")
       .lean();
  
-    const managers = await Managermodel.find({ organisation_id })
+    const managers = await Managermodel.find({ organisation_id, working_status: "working" })
       .select(
         "f_name l_name work_email designation department office_location reporting_manager reporting_manager_model"
       )
@@ -991,6 +988,7 @@ const getOrgInfo = async (req, res, next) => {
           .find({
             Under_manager: { $in: managers.map((m) => m._id) },
             organisation_id,
+            working_status: "working",
           })
           .select(
             "f_name l_name work_email designation department office_location Under_manager"
