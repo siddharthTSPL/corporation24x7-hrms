@@ -32,6 +32,14 @@ import { getMeSuperAdmin } from "../../auth/api/superadmin/auth/su.auth";
 import { fetchMyPermissions } from "../../auth/api/permission/permission.api";
 import { usePermissionStore } from "../../auth/store/permission/permissionStore";
 
+async function fetchFullProfile(role) {
+  if (role === "admin") return getMeAdmin();
+  if (role === "manager") return getMeManager();
+  if (role === "employee") return getMeUser();
+  if (role === "superadmin") return getMeSuperAdmin();
+  return null;
+}
+
 function Login() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -100,6 +108,21 @@ function Login() {
     return Object.keys(newErrors).length === 0;
   };
 
+  const syncProfileToCache = async (role, fallbackData) => {
+    localStorage.setItem("role", role);
+    try {
+      const fullData = await fetchFullProfile(role);
+      queryClient.setQueryData(["auth"], { role, data: fullData ?? fallbackData });
+
+      try {
+        const permissions = await fetchMyPermissions();
+        usePermissionStore.getState().setPermissions(permissions);
+      } catch (_) {}
+    } catch {
+      queryClient.setQueryData(["auth"], { role, data: fallbackData });
+    }
+  };
+
   const handleLogin = () => {
     if (!validate()) return;
     setShowLoader(true);
@@ -120,6 +143,7 @@ function Login() {
             });
           } catch (_) {}
         }
+        await syncProfileToCache(form.role, data);
         navigateByRole(form.role);
       },
       onError: (err) => {
@@ -176,20 +200,7 @@ function Login() {
         } catch (_) {}
       }
 
-      localStorage.setItem("role", role);
-
-      try {
-        let fullData;
-        if (role === "admin") fullData = await getMeAdmin();
-        else if (role === "manager") fullData = await getMeManager();
-        else if (role === "employee") fullData = await getMeUser();
-        else if (role === "superadmin") fullData = await getMeSuperAdmin();
-
-        queryClient.setQueryData(["auth"], { role, data: fullData });
-      } catch {
-        queryClient.setQueryData(["auth"], { role, data });
-      }
-
+      await syncProfileToCache(role, data);
       navigateByRole(role);
     };
 
@@ -206,9 +217,9 @@ function Login() {
 
   return (
     <div
-  className="min-h-screen flex flex-col bg-cover bg-center px-4 py-8"
-  style={{ backgroundImage: `url('${import.meta.env.BASE_URL}bg.jpeg')` }}
->
+      className="min-h-screen flex flex-col bg-cover bg-center px-4 py-8"
+      style={{ backgroundImage: `url('${import.meta.env.BASE_URL}bg.jpeg')` }}
+    >
       {showLoader && animationData && (
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
           <Player autoplay loop src={animationData} style={{ height: "140px", width: "140px" }} />
@@ -216,174 +227,174 @@ function Login() {
       )}
 
       <div className="flex-1 flex items-center justify-center">
-      <div className="w-full max-w-5xl bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden">
-        <div className="w-full md:w-1/2 p-8">
-          <img src={talent} alt="Talent" className="w-28 mb-6" />
+        <div className="w-full max-w-5xl bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden">
+          <div className="w-full md:w-1/2 p-8">
+            <img src={talent} alt="Talent" className="w-28 mb-6" />
 
-          {step === "login" && (
-            <>
-              <h2 className="text-2xl font-bold text-[#730042] mb-1">Sign in</h2>
-              <p className="text-gray-500 text-sm mb-4">Access your Talent account</p>
+            {step === "login" && (
+              <>
+                <h2 className="text-2xl font-bold text-[#730042] mb-1">Sign in</h2>
+                <p className="text-gray-500 text-sm mb-4">Access your Talent account</p>
 
-              <select
-                name="role"
-                value={form.role}
-                onChange={handleChange}
-                className="w-full mb-3 p-3 border rounded-lg bg-white text-gray-700"
-              >
-                <option value="superadmin">Super Admin</option>
-                <option value="admin">Admin</option>
-                <option value="manager">Manager</option>
-                <option value="employee">Employee</option>
-              </select>
+                <select
+                  name="role"
+                  value={form.role}
+                  onChange={handleChange}
+                  className="w-full mb-3 p-3 border rounded-lg bg-white text-gray-700"
+                >
+                  <option value="superadmin">Super Admin</option>
+                  <option value="admin">Admin</option>
+                  <option value="manager">Manager</option>
+                  <option value="employee">Employee</option>
+                </select>
 
-              {form.role === "superadmin" && (
-                <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-[#730042]/8 border border-[#730042]/20 rounded-lg">
-                  <span className="text-sm">🛡️</span>
-                  <p className="text-xs text-[#730042] font-medium">
-                    Super Admin — use your company work email
+                {form.role === "superadmin" && (
+                  <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-[#730042]/8 border border-[#730042]/20 rounded-lg">
+                    <span className="text-sm">🛡️</span>
+                    <p className="text-xs text-[#730042] font-medium">
+                      Super Admin — use your company work email
+                    </p>
+                  </div>
+                )}
+
+                {errors.general && (
+                  <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-red-600 text-sm">{errors.general}</p>
+                  </div>
+                )}
+
+                <input
+                  type="text"
+                  name="email"
+                  placeholder="Email address"
+                  value={form.email}
+                  onChange={handleChange}
+                  className="w-full mb-1 p-3 border rounded-lg"
+                />
+                {errors.email && <p className="text-red-500 text-sm mb-2">{errors.email}</p>}
+
+                <div className="relative mt-2 mb-1">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    placeholder="Password"
+                    value={form.password}
+                    onChange={handleChange}
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#730042]"
+                  />
+                  <span
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-3 cursor-pointer text-gray-500"
+                  >
+                    {showPassword ? "🙈" : "👁️"}
+                  </span>
+                </div>
+                {errors.password && <p className="text-red-500 text-sm mb-2">{errors.password}</p>}
+
+                <button
+                  onClick={handleLogin}
+                  disabled={isLoggingIn}
+                  className="w-full bg-[#730042] text-white py-3 rounded-lg mt-3 disabled:opacity-60"
+                >
+                  {isLoggingIn ? "Signing in..." : "Sign in"}
+                </button>
+
+                <div className="flex justify-between mt-4 text-sm text-gray-500">
+                  <p onClick={() => setStep("email")} className="cursor-pointer hover:text-[#730042]">
+                    Forgot Password?
+                  </p>
+                  <p
+                    onClick={() => (window.location.href = "/talent/signup")}
+                    className="cursor-pointer hover:text-[#730042] ml-auto"
+                  >
+                    Sign Up
                   </p>
                 </div>
-              )}
+              </>
+            )}
 
-              {errors.general && (
-                <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-red-600 text-sm">{errors.general}</p>
-                </div>
-              )}
-
-              <input
-                type="text"
-                name="email"
-                placeholder="Email address"
-                value={form.email}
-                onChange={handleChange}
-                className="w-full mb-1 p-3 border rounded-lg"
-              />
-              {errors.email && <p className="text-red-500 text-sm mb-2">{errors.email}</p>}
-
-              <div className="relative mt-2 mb-1">
+            {step === "email" && (
+              <>
+                <h2 className="text-xl font-bold text-[#730042] mb-4">Forgot Password</h2>
                 <input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  placeholder="Password"
-                  value={form.password}
+                  type="text"
+                  name="email"
+                  placeholder="Enter your email"
+                  value={form.email}
                   onChange={handleChange}
-                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#730042]"
+                  className="w-full mb-1 p-3 border rounded-lg"
                 />
-                <span
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 cursor-pointer text-gray-500"
+                {errors.email && <p className="text-red-500 text-sm mb-2">{errors.email}</p>}
+                <button
+                  onClick={handleSendOtp}
+                  disabled={isSendingOtp}
+                  className="w-full bg-[#730042] text-white py-3 rounded-lg disabled:opacity-60"
                 >
-                  {showPassword ? "🙈" : "👁️"}
-                </span>
-              </div>
-              {errors.password && <p className="text-red-500 text-sm mb-2">{errors.password}</p>}
-
-              <button
-                onClick={handleLogin}
-                disabled={isLoggingIn}
-                className="w-full bg-[#730042] text-white py-3 rounded-lg mt-3 disabled:opacity-60"
-              >
-                {isLoggingIn ? "Signing in..." : "Sign in"}
-              </button>
-
-              <div className="flex justify-between mt-4 text-sm text-gray-500">
-                <p onClick={() => setStep("email")} className="cursor-pointer hover:text-[#730042]">
-                  Forgot Password?
-                </p>
+                  {isSendingOtp ? "Sending..." : "Send OTP"}
+                </button>
                 <p
-                  onClick={() => (window.location.href = "/talent/signup")}
-                  className="cursor-pointer hover:text-[#730042] ml-auto"
+                  onClick={() => setStep("login")}
+                  className="text-sm text-gray-500 mt-3 cursor-pointer hover:text-[#730042]"
                 >
-                  Sign Up
+                  ← Back to login
                 </p>
-              </div>
-            </>
-          )}
+              </>
+            )}
 
-          {step === "email" && (
-            <>
-              <h2 className="text-xl font-bold text-[#730042] mb-4">Forgot Password</h2>
-              <input
-                type="text"
-                name="email"
-                placeholder="Enter your email"
-                value={form.email}
-                onChange={handleChange}
-                className="w-full mb-1 p-3 border rounded-lg"
-              />
-              {errors.email && <p className="text-red-500 text-sm mb-2">{errors.email}</p>}
-              <button
-                onClick={handleSendOtp}
-                disabled={isSendingOtp}
-                className="w-full bg-[#730042] text-white py-3 rounded-lg disabled:opacity-60"
-              >
-                {isSendingOtp ? "Sending..." : "Send OTP"}
-              </button>
-              <p
-                onClick={() => setStep("login")}
-                className="text-sm text-gray-500 mt-3 cursor-pointer hover:text-[#730042]"
-              >
-                ← Back to login
-              </p>
-            </>
-          )}
-
-          {step === "otp" && (
-            <>
-              <h2 className="text-xl font-bold text-[#730042] mb-4">Enter OTP</h2>
-              <input
-                type="text"
-                name="otp"
-                placeholder="Enter OTP"
-                value={form.otp}
-                onChange={handleChange}
-                className="w-full mb-1 p-3 border rounded-lg"
-              />
-              {errors.otp && <p className="text-red-500 text-sm mb-2">{errors.otp}</p>}
-              <button
-                onClick={handleVerifyOtp}
-                disabled={isVerifyingOtp}
-                className="w-full bg-[#730042] text-white py-3 rounded-lg disabled:opacity-60"
-              >
-                {isVerifyingOtp ? "Verifying..." : "Verify OTP"}
-              </button>
-              <p
-                onClick={() => setStep("login")}
-                className="text-sm text-gray-500 mt-3 cursor-pointer hover:text-[#730042]"
-              >
-                ← Back to login
-              </p>
-            </>
-          )}
-        </div>
-
-        <div className="hidden md:flex w-1/2 bg-gray-50 items-center justify-center p-6">
-          <div className="text-center">
-            <img src={images[currentSlide]} alt="slide" className="w-full max-h-65 object-contain" />
-            <h3 className="text-lg font-semibold text-[#730042] mt-4">Smart Secure Login</h3>
-            <p className="text-gray-500 text-sm mt-2">
-              Experience secure and seamless HRMS access with 2 factor authentication.
-            </p>
-            <div className="flex justify-center mt-4 gap-2">
-              {images.map((_, index) => (
-                <div
-                  key={index}
-                  className={`w-2 h-2 rounded-full ${
-                    currentSlide === index ? "bg-[#730042]" : "bg-gray-300"
-                  }`}
+            {step === "otp" && (
+              <>
+                <h2 className="text-xl font-bold text-[#730042] mb-4">Enter OTP</h2>
+                <input
+                  type="text"
+                  name="otp"
+                  placeholder="Enter OTP"
+                  value={form.otp}
+                  onChange={handleChange}
+                  className="w-full mb-1 p-3 border rounded-lg"
                 />
-              ))}
+                {errors.otp && <p className="text-red-500 text-sm mb-2">{errors.otp}</p>}
+                <button
+                  onClick={handleVerifyOtp}
+                  disabled={isVerifyingOtp}
+                  className="w-full bg-[#730042] text-white py-3 rounded-lg disabled:opacity-60"
+                >
+                  {isVerifyingOtp ? "Verifying..." : "Verify OTP"}
+                </button>
+                <p
+                  onClick={() => setStep("login")}
+                  className="text-sm text-gray-500 mt-3 cursor-pointer hover:text-[#730042]"
+                >
+                  ← Back to login
+                </p>
+              </>
+            )}
+          </div>
+
+          <div className="hidden md:flex w-1/2 bg-gray-50 items-center justify-center p-6">
+            <div className="text-center">
+              <img src={images[currentSlide]} alt="slide" className="w-full max-h-65 object-contain" />
+              <h3 className="text-lg font-semibold text-[#730042] mt-4">Smart Secure Login</h3>
+              <p className="text-gray-500 text-sm mt-2">
+                Experience secure and seamless HRMS access with 2 factor authentication.
+              </p>
+              <div className="flex justify-center mt-4 gap-2">
+                {images.map((_, index) => (
+                  <div
+                    key={index}
+                    className={`w-2 h-2 rounded-full ${
+                      currentSlide === index ? "bg-[#730042]" : "bg-gray-300"
+                    }`}
+                  />
+                ))}
+              </div>
             </div>
           </div>
         </div>
       </div>
-      </div>
 
-     <footer className="w-full py-4 text-center text-gray-600 text-sm font-medium">
-  © 2026, TechTorch Solutions Private Limited. All Rights Reserved.
-</footer>
+      <footer className="w-full py-4 text-center text-gray-600 text-sm font-medium">
+        © 2026, TechTorch Solutions Private Limited. All Rights Reserved.
+      </footer>
     </div>
   );
 }
