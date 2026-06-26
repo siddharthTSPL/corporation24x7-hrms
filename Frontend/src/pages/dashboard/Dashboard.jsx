@@ -8,7 +8,8 @@ import {
   useAdminGetMyLeaveHistory,
 } from "../../auth/server-state/adminleave/adminleave.hook";
 import { useAdminGetMyWFH } from "../../auth/server-state/adminwfh/adminwfh.hook";
-import { useTodayAttendance, useCheckin, useCheckout } from "../../auth/server-state/attendance/attendance.hook";
+import { useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
+import AttendanceModal from "./AttendanceModal";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS = ["S","M","T","W","T","F","S"];
@@ -312,28 +313,22 @@ function DOJCard({ joiningDate }) {
   );
 }
 
-function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, onCheckIn, onCheckOut, checkingIn, checkingOut }) {
+function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, onOpenAttendance }) {
   const today=new Date();
   const day=today.toLocaleDateString("en-IN",{weekday:"long"});
   const date=today.toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"});
   const leaveLabel={ el:"Earned Leave",sl:"Sick Leave",pl:"Paternity Leave",ml:"Maternity Leave",cl:"Casual Leave",lwp:"Leave Without Pay" };
 
   let buttonLabel = "Check In";
-  let buttonAction = onCheckIn;
-  let buttonDisabled = isOnLeave || checkingIn;
-  let buttonAria = "🟢";
-
   if (isOnLeave) {
     buttonLabel = "🚫 Check-in Disabled";
   } else if (isCheckedOut) {
     buttonLabel = "✅ Completed";
   } else if (isCheckedIn) {
-    buttonLabel = checkingOut ? "Checking out…" : "🔴 Check Out";
-    buttonAction = onCheckOut;
-    buttonDisabled = checkingOut;
-  } else {
-    buttonLabel = checkingIn ? "Checking in…" : "Check In";
+    buttonLabel = "🔴 Check Out";
   }
+
+  const buttonDisabled = isOnLeave;
 
   return (
     <div className={`rounded-2xl p-4 sm:p-5 flex items-center justify-between mb-4 flex-wrap gap-3 ${
@@ -360,7 +355,7 @@ function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, o
       </div>
       <button
         disabled={buttonDisabled || isCheckedOut}
-        onClick={buttonAction}
+        onClick={onOpenAttendance}
         className={`text-[13px] font-semibold px-5 py-2.5 rounded-xl border-none transition-all font-sans ${
           isOnLeave || isCheckedOut
             ? "bg-white/30 text-indigo-400 cursor-not-allowed opacity-70"
@@ -711,6 +706,7 @@ function LeaveRequestsPanel({ leaves, loading, onAccept, onReject, accepting, re
 export default function Dashboard() {
   const [selectedMonth, setSelectedMonth]=useState(new Date().getMonth());
   const [empExpand, setEmpExpand]=useState(false);
+  const [showAttendanceModal, setShowAttendanceModal]=useState(false);
 
   const { data:meData, isLoading:meLoading, isError:meError }=useGetMeAdmin();
   const { data:histData, isLoading:histLoading }=useAdminGetMyLeaveHistory();
@@ -722,8 +718,6 @@ export default function Dashboard() {
 
   const { mutate:acceptLeave, isPending:accepting }=useAcceptLeave();
   const { mutate:rejectLeave, isPending:rejecting }=useRejectLeave();
-  const { mutate:doCheckin, isPending:checkingIn }=useCheckin();
-  const { mutate:doCheckout, isPending:checkingOut }=useCheckout();
 
   const employee=meData?.user??null;
   const lb=meData?.leaveBalance??null;
@@ -739,15 +733,6 @@ export default function Dashboard() {
   const myAtt = attData?.attendance ?? null;
   const isCheckedIn = attData?.isCheckedIn ?? false;
   const isCheckedOut = attData?.isCheckedOut ?? false;
-
-  const handleCheckin = () => {
-    if (!navigator.geolocation) { doCheckin({ latitude:null, longitude:null }); return; }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => doCheckin({ latitude:pos.coords.latitude, longitude:pos.coords.longitude }),
-      () => doCheckin({ latitude:null, longitude:null })
-    );
-  };
-  const handleCheckout = () => doCheckout();
 
   const attendanceMap=useMemo(()=>{
     const records=Array.isArray(attData?.history)?attData.history:Array.isArray(attData)?attData:[];
@@ -878,10 +863,7 @@ export default function Dashboard() {
           isCheckedIn={isCheckedIn}
           isCheckedOut={isCheckedOut}
           myAtt={myAtt}
-          onCheckIn={handleCheckin}
-          onCheckOut={handleCheckout}
-          checkingIn={checkingIn}
-          checkingOut={checkingOut}
+          onOpenAttendance={()=>setShowAttendanceModal(true)}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 mb-3.5">
@@ -1212,6 +1194,13 @@ export default function Dashboard() {
         </div>
 
       </div>
+
+      {showAttendanceModal && (
+        <AttendanceModal
+          user={employee}
+          onClose={()=>setShowAttendanceModal(false)}
+        />
+      )}
     </div>
   );
 }

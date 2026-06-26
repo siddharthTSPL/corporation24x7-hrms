@@ -138,3 +138,19 @@ export const updatePermissions = async ({ id, data }) => {
   const res = await api.put(`superadmin/updatepermissions/${id}`, data);
   return res.data;
 };
+
+
+export const setAdminWorkingStatus = async (id, working_status) => {
+  const res = await api.patch(`superadmin/admin/${id}/working-status`, { working_status });
+  return res.data;
+};
+
+export const getInactiveUsers = async () => {
+  const res = await api.get("superadmin/inactive-users");
+  return res.data;
+};
+
+export const getActiveUserCount = async () => {
+  const res = await api.get("superadmin/active-user-count");
+  return res.data;
+};

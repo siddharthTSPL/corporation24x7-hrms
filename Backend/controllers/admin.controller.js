@@ -25,6 +25,7 @@ const Ticket = require("../Models/ticket.model");
 const { processLeaveDeduction } = require("../automatic/calculateleave");
 const AttendanceSummary = require("../Models/attendancesummary.model");
 const WFH = require("../Models/wfh.model");
+const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = require("../utils/licenseCheck");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
@@ -126,12 +127,11 @@ const adminlogin = async (req, res, next) => {
     message: "Login successful",
     admin: {
       id: admin._id,
-      f_name: admin.f_name,
-      l_name: admin.l_name,
-      work_email: admin.work_email,
-      designation: admin.designation,
-      role: admin.role,
+      username: admin.username,
+      email: admin.email,
     },
+    role: admin.role,
+    token
   });
 };
 
@@ -348,6 +348,10 @@ const addmanager = async (req, res, next) => {
     if (existingManager)
       return next(Object.assign(new Error("Manager already exists"), { statusCode: 400 }));
 
+    const licenseCheck = await canOnboardUser(organisation_id);
+    if (!licenseCheck.allowed)
+      return next(Object.assign(new Error(licenseCheck.message), { statusCode: 403 }));
+
     const uid = await generateUID(department, organisation_id);
     const { reportingManagerId, reportingManagerModel } = await resolveReportingManager(
       reporting_manager,
@@ -388,6 +392,7 @@ const addmanager = async (req, res, next) => {
         subject: "Activate Your Manager Account",
         html: `<div style="font-family:Arial,sans-serif;padding:20px"><h2>Hello ${f_name},</h2><p>Your manager account has been created successfully.</p><p><strong>UID:</strong> ${uid}</p><p><strong>Department:</strong> ${department}</p><p><strong>Designation:</strong> ${designation}</p><p>Please verify your account by clicking below:</p><a href="${verifyLink}" style="background:#730042;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block;">Verify Account</a><p>This link will expire in 1 hour.</p><p>Regards,<br/>HR Team</p></div>`,
       }),
+      incrementActiveUserCount(organisation_id),
     ]);
 
     return res.status(201).json({
@@ -409,66 +414,71 @@ const addmanager = async (req, res, next) => {
 
 const addemployee = async (req, res, next) => {
   try {
-  if (!req.admin)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
-  const {
-    profile_image, f_name, l_name, work_email, password, gender, marital_status,
-    personal_contact, e_contact, aadhaar_number, pan_number, address, city, state,
-    pincode, role, office_location, designation, department, Under_manager, is_fresher,
-    total_experience, previous_company, previous_designation, bank_name, account_holder_name,
-    account_number, ifsc_code, resume, aadhaar_card, pan_card, experience_letter, permissions,
-  } = req.body;
+    const {
+      profile_image, f_name, l_name, work_email, password, gender, marital_status,
+      personal_contact, e_contact, aadhaar_number, pan_number, address, city, state,
+      pincode, role, office_location, designation, department, Under_manager, is_fresher,
+      total_experience, previous_company, previous_designation, bank_name, account_holder_name,
+      account_number, ifsc_code, resume, aadhaar_card, pan_card, experience_letter, permissions,
+    } = req.body;
 
-  if (!f_name || !l_name || !work_email || !password || !department || !designation || !office_location || !gender || !personal_contact || !e_contact)
-    return next(Object.assign(new Error("Required fields missing"), { statusCode: 400 }));
+    if (!f_name || !l_name || !work_email || !password || !department || !designation || !office_location || !gender || !personal_contact || !e_contact)
+      return next(Object.assign(new Error("Required fields missing"), { statusCode: 400 }));
 
-  const organisation_id = req.admin.organisation_id;
+    const organisation_id = req.admin.organisation_id;
 
-  const existingUser = await Usermodel.findOne({ work_email, organisation_id }).select("_id").lean();
-  if (existingUser)
-    return next(Object.assign(new Error("User already exists"), { statusCode: 400 }));
+    const existingUser = await Usermodel.findOne({ work_email, organisation_id }).select("_id").lean();
+    if (existingUser)
+      return next(Object.assign(new Error("User already exists"), { statusCode: 400 }));
 
-  if (Under_manager) {
-    const managerExists = await Managermodel.findOne({ _id: Under_manager, organisation_id })
-      .select("_id")
-      .lean();
-    if (!managerExists)
-      return next(Object.assign(new Error("Assigned manager not found in this organisation"), { statusCode: 404 }));
-  }
+    const licenseCheck = await canOnboardUser(organisation_id);
+    if (!licenseCheck.allowed)
+      return next(Object.assign(new Error(licenseCheck.message), { statusCode: 403 }));
 
-  const uid = await generateUID(department, organisation_id);
+    if (Under_manager) {
+      const managerExists = await Managermodel.findOne({ _id: Under_manager, organisation_id })
+        .select("_id")
+        .lean();
+      if (!managerExists)
+        return next(Object.assign(new Error("Assigned manager not found in this organisation"), { statusCode: 404 }));
+    }
 
-  const newuser = await Usermodel.create({
-    organisation_id, profile_image, uid, department, Under_manager: Under_manager || null,
-    f_name, l_name, work_email, password, gender, marital_status, personal_contact, e_contact,
-    aadhaar_number, pan_number, address, city, state, pincode, role, designation, office_location,
-    is_fresher, total_experience, previous_company, previous_designation, bank_name,
-    account_holder_name, account_number, ifsc_code, resume, aadhaar_card, pan_card, experience_letter,
-  });
+    const uid = await generateUID(department, organisation_id);
 
-  const token = jwt.sign({ userid: newuser._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
-  const verifyLink = `${process.env.BASE_URL}talent/api/user/verify/${token}`;
+    const newuser = await Usermodel.create({
+      organisation_id, profile_image, uid, department, Under_manager: Under_manager || null,
+      f_name, l_name, work_email, password, gender, marital_status, personal_contact, e_contact,
+      aadhaar_number, pan_number, address, city, state, pincode, role, designation, office_location,
+      is_fresher, total_experience, previous_company, previous_designation, bank_name,
+      account_holder_name, account_number, ifsc_code, resume, aadhaar_card, pan_card, experience_letter,
+    });
 
-  await Promise.all([
-    assignDefaultLeave(newuser),
-    assignDefaultPermissions(
-      newuser._id,
-      newuser.role || "employee",
-      organisation_id,
-      req.admin._id,
-      "Admin",
-      null,
-      permissions
-    ),
-    sendEmail({
-      to: work_email,
-      subject: "Welcome! Verify Your Employee Account",
-      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F9F8F2;font-family:Segoe UI,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center"><table width="600" style="background:#fff;border-radius:14px;overflow:hidden;"><tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h1>Welcome Aboard</h1></td></tr><tr><td style="padding:40px;"><h2>Hello ${f_name}</h2><p>Your employee account has been created.</p><p><strong>Department:</strong> ${department}</p><p><strong>Location:</strong> ${office_location}</p><a href="${verifyLink}" style="background:#730042;color:white;padding:14px 30px;text-decoration:none;border-radius:8px;">Verify Account</a></td></tr></table></td></tr></table></body></html>`,
-    }),
-  ]);
+    const token = jwt.sign({ userid: newuser._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    const verifyLink = `${process.env.BASE_URL}talent/api/user/verify/${token}`;
 
-  return res.status(201).json({ success: true, message: "User added successfully. Verification email sent." });
+    await Promise.all([
+      assignDefaultLeave(newuser),
+      assignDefaultPermissions(
+        newuser._id,
+        newuser.role || "employee",
+        organisation_id,
+        req.admin._id,
+        "Admin",
+        null,
+        permissions
+      ),
+      sendEmail({
+        to: work_email,
+        subject: "Welcome! Verify Your Employee Account",
+        html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F9F8F2;font-family:Segoe UI,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center"><table width="600" style="background:#fff;border-radius:14px;overflow:hidden;"><tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h1>Welcome Aboard</h1></td></tr><tr><td style="padding:40px;"><h2>Hello ${f_name}</h2><p>Your employee account has been created.</p><p><strong>Department:</strong> ${department}</p><p><strong>Location:</strong> ${office_location}</p><a href="${verifyLink}" style="background:#730042;color:white;padding:14px 30px;text-decoration:none;border-radius:8px;">Verify Account</a></td></tr></table></td></tr></table></body></html>`,
+      }),
+      incrementActiveUserCount(organisation_id),
+    ]);
+
+    return res.status(201).json({ success: true, message: "User added successfully. Verification email sent." });
   } catch (error) {
     next(error);
   }
@@ -484,7 +494,7 @@ const findallmanagers = async (req, res, next) => {
     const organisation_id = req.admin.organisation_id;
 
     const [managers, adminData] = await Promise.all([
-      Managermodel.find({ organisation_id })
+      Managermodel.find({ organisation_id, working_status: "working" })
         .select(EXCLUDE)
         .populate("reporting_manager", "f_name l_name work_email designation")
         .lean(),
@@ -518,7 +528,7 @@ const findallmanagerswoadmin = async (req, res, next) => {
 
     const organisation_id = req.admin.organisation_id;
 
-    const managers = await Managermodel.find({ organisation_id })
+    const managers = await Managermodel.find({ organisation_id, working_status: "working" })
       .select(EXCLUDE)
       .populate("reporting_manager", "f_name l_name work_email designation")
       .lean();
@@ -542,11 +552,11 @@ const getallemployee = async (req, res, next) => {
     const organisation_id = req.admin.organisation_id;
 
     const [users, managers] = await Promise.all([
-      Usermodel.find({ organisation_id })
+      Usermodel.find({ organisation_id, working_status: "working" })
         .select("uid f_name l_name work_email role department designation office_location Under_manager organisation_id")
         .populate({ path: "Under_manager", select: "uid f_name l_name work_email role" })
         .lean(),
-      Managermodel.find({ organisation_id })
+      Managermodel.find({ organisation_id, working_status: "working" })
         .select("uid f_name l_name work_email role designation office_location department gender personal_contact e_contact reporting_manager reporting_manager_model organisation_id")
         .populate({ path: "reporting_manager", select: "f_name l_name work_email role" })
         .lean(),
@@ -1634,6 +1644,19 @@ const getperticularemanager = async (req, res, next) => {
   const { id } = req.params;
   const organisation_id = req.admin.organisation_id;
 
+  // Debug: check if manager exists at all (ignoring org)
+  const managerExists = await Managermodel.findById(id).select("_id organisation_id").lean();
+  if (!managerExists) {
+    // Maybe it was promoted to Admin?
+    const asAdmin = await Adminmodel.findOne({ _id: id, organisation_id }).select("_id").lean();
+    if (asAdmin)
+      return next(Object.assign(new Error("This user is now an Admin, not a Manager"), { statusCode: 400 }));
+    return next(Object.assign(new Error("Manager not found in any collection"), { statusCode: 404 }));
+  }
+
+  if (managerExists.organisation_id.toString() !== organisation_id.toString())
+    return next(Object.assign(new Error("Manager belongs to a different organisation"), { statusCode: 403 }));
+
   const [manager, leaveBalance, reviews] = await Promise.all([
     Managermodel.findOne({ _id: id, organisation_id })
       .select(EXCLUDE)
@@ -1646,8 +1669,6 @@ const getperticularemanager = async (req, res, next) => {
       .lean(),
   ]);
 
-  if (!manager)
-    return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
   if (!leaveBalance)
     return next(Object.assign(new Error("Leave balance not found"), { statusCode: 404 }));
 
@@ -2862,6 +2883,12 @@ const setEmployeeWorkingStatus = async (req, res, next) => {
     if (!user)
       return next(Object.assign(new Error("Employee not found"), { statusCode: 404 }));
 
+    if (working_status !== "working") {
+      await decrementActiveUserCount(organisation_id);
+    } else {
+      await incrementActiveUserCount(organisation_id);
+    }
+
     return res.status(200).json({
       success: true,
       message: `Employee working status updated to '${working_status}' successfully`,
@@ -2911,6 +2938,12 @@ const setManagerWorkingStatus = async (req, res, next) => {
     if (!manager)
       return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
 
+    if (working_status !== "working") {
+      await decrementActiveUserCount(organisation_id);
+    } else {
+      await incrementActiveUserCount(organisation_id);
+    }
+
     return res.status(200).json({
       success: true,
       message: `Manager working status updated to '${working_status}' successfully`,
@@ -2921,6 +2954,77 @@ const setManagerWorkingStatus = async (req, res, next) => {
   }
 };
 
+const getInactiveUsers = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const organisation_id = req.admin.organisation_id;
+    const inactiveStatuses = ["resigned", "fired", "terminated"];
+
+    const [managers, employees] = await Promise.all([
+      Managermodel.find({ organisation_id, working_status: { $in: inactiveStatuses } })
+        .select("uid f_name l_name work_email role department designation working_status status")
+        .lean(),
+      Usermodel.find({ organisation_id, working_status: { $in: inactiveStatuses } })
+        .select("uid f_name l_name work_email role department designation working_status status")
+        .lean(),
+    ]);
+
+    const all = [
+      ...managers.map((m) => ({ type: "manager", ...m })),
+      ...employees.map((e) => ({ type: "employee", ...e })),
+    ];
+
+    return res.status(200).json({
+      success: true,
+      count: all.length,
+      managers: managers.length,
+      employees: employees.length,
+      users: all,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+const getActiveUserCount = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const superAdmin = await SuperAdminModel.findById(req.admin.organisation_id)
+      .select("active_user_count licenses is_trial_active trial_expires_at")
+      .lean();
+
+    if (!superAdmin)
+      return next(Object.assign(new Error("Organisation not found"), { statusCode: 404 }));
+
+    const license = superAdmin.licenses?.find(
+      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
+    );
+
+    const trialActive =
+      superAdmin.is_trial_active && new Date() < new Date(superAdmin.trial_expires_at);
+
+    const activeCount = superAdmin.active_user_count || 0;
+    const allowedUsers = trialActive ? 4 : (license?.users || 0);
+    const isLimitReached = allowedUsers > 0 ? activeCount >= allowedUsers : false;
+
+    return res.status(200).json({
+      success: true,
+      active_user_count: activeCount,
+      allowed_users: allowedUsers,
+      remaining_slots: Math.max(0, allowedUsers - activeCount),
+      is_limit_reached: isLimitReached,
+      plan: trialActive ? "trial" : (license?.plan || null),
+      plan_type: license?.plan_type || null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 module.exports = {
   verifyAdmin,
   adminlogin,
@@ -2971,4 +3075,6 @@ module.exports = {
   findallmanagerswoadmin,
   setEmployeeWorkingStatus,
   setManagerWorkingStatus,
+  getInactiveUsers,
+  getActiveUserCount
 };

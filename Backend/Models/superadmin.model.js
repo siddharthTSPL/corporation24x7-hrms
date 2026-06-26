@@ -55,8 +55,17 @@ const licenseSchema = new mongoose.Schema(
     },
     plan: {
       type: String,
-      enum: ["startup", "business", "enterprise"],
+      enum: ["basic", "premium", "enterprise"],
       default: "startup",
+    },
+    plan_type: {
+      type: String,
+      enum: ["monthly", "yearly"],
+      default: "monthly",
+    },
+    users: {
+      type: Number,
+      default: 0,
     },
   },
   { _id: false }
@@ -139,6 +148,17 @@ const superAdminSchema = new mongoose.Schema(
     role: {
       type: String,
       default: "super_admin",
+    },
+
+    active_user_count:{
+      type: Number,
+      default: 0
+    },
+
+    working_status: {
+      type: String,
+      enum: ["working", "resigned", "fired", "terminated"],
+      default: "working",
     },
 
     status: {
