@@ -31,7 +31,6 @@ import { getMeUser } from "../../auth/api/employeeapi/auth/em.auth.api";
 import { getMeSuperAdmin } from "../../auth/api/superadmin/auth/su.auth";
 import { fetchMyPermissions } from "../../auth/api/permission/permission.api";
 import { usePermissionStore } from "../../auth/store/permission/permissionStore";
-<<<<<<< HEAD
 
 async function fetchFullProfile(role) {
   if (role === "admin") return getMeAdmin();
@@ -40,8 +39,6 @@ async function fetchFullProfile(role) {
   if (role === "superadmin") return getMeSuperAdmin();
   return null;
 }
-=======
->>>>>>> 518db3ffcc45308e42ed57c0188aa65f8314dca2
 
 function Login() {
   const navigate = useNavigate();
@@ -146,10 +143,7 @@ function Login() {
             });
           } catch (_) {}
         }
-<<<<<<< HEAD
         await syncProfileToCache(form.role, data);
-=======
->>>>>>> 518db3ffcc45308e42ed57c0188aa65f8314dca2
         navigateByRole(form.role);
       },
       onError: (err) => {
@@ -206,24 +200,7 @@ function Login() {
         } catch (_) {}
       }
 
-<<<<<<< HEAD
       await syncProfileToCache(role, data);
-=======
-      localStorage.setItem("role", role);
-
-      try {
-        let fullData;
-        if (role === "admin") fullData = await getMeAdmin();
-        else if (role === "manager") fullData = await getMeManager();
-        else if (role === "employee") fullData = await getMeUser();
-        else if (role === "superadmin") fullData = await getMeSuperAdmin();
-
-        queryClient.setQueryData(["auth"], { role, data: fullData });
-      } catch {
-        queryClient.setQueryData(["auth"], { role, data });
-      }
-
->>>>>>> 518db3ffcc45308e42ed57c0188aa65f8314dca2
       navigateByRole(role);
     };
 
@@ -240,15 +217,9 @@ function Login() {
 
   return (
     <div
-<<<<<<< HEAD
       className="min-h-screen flex flex-col bg-cover bg-center px-4 py-8"
       style={{ backgroundImage: `url('${import.meta.env.BASE_URL}bg.jpeg')` }}
     >
-=======
-  className="min-h-screen flex flex-col bg-cover bg-center px-4 py-8"
-  style={{ backgroundImage: `url('${import.meta.env.BASE_URL}bg.jpeg')` }}
->
->>>>>>> 518db3ffcc45308e42ed57c0188aa65f8314dca2
       {showLoader && animationData && (
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
           <Player autoplay loop src={animationData} style={{ height: "140px", width: "140px" }} />
@@ -256,7 +227,6 @@ function Login() {
       )}
 
       <div className="flex-1 flex items-center justify-center">
-<<<<<<< HEAD
         <div className="w-full max-w-5xl bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden">
           <div className="w-full md:w-1/2 p-8">
             <img src={talent} alt="Talent" className="w-28 mb-6" />
@@ -269,60 +239,6 @@ function Login() {
                 <select
                   name="role"
                   value={form.role}
-=======
-      <div className="w-full max-w-5xl bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden">
-        <div className="w-full md:w-1/2 p-8">
-          <img src={talent} alt="Talent" className="w-28 mb-6" />
-
-          {step === "login" && (
-            <>
-              <h2 className="text-2xl font-bold text-[#730042] mb-1">Sign in</h2>
-              <p className="text-gray-500 text-sm mb-4">Access your Talent account</p>
-
-              <select
-                name="role"
-                value={form.role}
-                onChange={handleChange}
-                className="w-full mb-3 p-3 border rounded-lg bg-white text-gray-700"
-              >
-                <option value="superadmin">Super Admin</option>
-                <option value="admin">Admin</option>
-                <option value="manager">Manager</option>
-                <option value="employee">Employee</option>
-              </select>
-
-              {form.role === "superadmin" && (
-                <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-[#730042]/8 border border-[#730042]/20 rounded-lg">
-                  <span className="text-sm">🛡️</span>
-                  <p className="text-xs text-[#730042] font-medium">
-                    Super Admin — use your company work email
-                  </p>
-                </div>
-              )}
-
-              {errors.general && (
-                <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-red-600 text-sm">{errors.general}</p>
-                </div>
-              )}
-
-              <input
-                type="text"
-                name="email"
-                placeholder="Email address"
-                value={form.email}
-                onChange={handleChange}
-                className="w-full mb-1 p-3 border rounded-lg"
-              />
-              {errors.email && <p className="text-red-500 text-sm mb-2">{errors.email}</p>}
-
-              <div className="relative mt-2 mb-1">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  placeholder="Password"
-                  value={form.password}
->>>>>>> 518db3ffcc45308e42ed57c0188aa65f8314dca2
                   onChange={handleChange}
                   className="w-full mb-3 p-3 border rounded-lg bg-white text-gray-700"
                 >
@@ -341,7 +257,6 @@ function Login() {
                   </div>
                 )}
 
-<<<<<<< HEAD
                 {errors.general && (
                   <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                     <p className="text-red-600 text-sm">{errors.general}</p>
@@ -408,93 +323,6 @@ function Login() {
                   value={form.email}
                   onChange={handleChange}
                   className="w-full mb-1 p-3 border rounded-lg"
-=======
-              <div className="flex justify-between mt-4 text-sm text-gray-500">
-                <p onClick={() => setStep("email")} className="cursor-pointer hover:text-[#730042]">
-                  Forgot Password?
-                </p>
-                <p
-                  onClick={() => (window.location.href = "/talent/signup")}
-                  className="cursor-pointer hover:text-[#730042] ml-auto"
-                >
-                  Sign Up
-                </p>
-              </div>
-            </>
-          )}
-
-          {step === "email" && (
-            <>
-              <h2 className="text-xl font-bold text-[#730042] mb-4">Forgot Password</h2>
-              <input
-                type="text"
-                name="email"
-                placeholder="Enter your email"
-                value={form.email}
-                onChange={handleChange}
-                className="w-full mb-1 p-3 border rounded-lg"
-              />
-              {errors.email && <p className="text-red-500 text-sm mb-2">{errors.email}</p>}
-              <button
-                onClick={handleSendOtp}
-                disabled={isSendingOtp}
-                className="w-full bg-[#730042] text-white py-3 rounded-lg disabled:opacity-60"
-              >
-                {isSendingOtp ? "Sending..." : "Send OTP"}
-              </button>
-              <p
-                onClick={() => setStep("login")}
-                className="text-sm text-gray-500 mt-3 cursor-pointer hover:text-[#730042]"
-              >
-                ← Back to login
-              </p>
-            </>
-          )}
-
-          {step === "otp" && (
-            <>
-              <h2 className="text-xl font-bold text-[#730042] mb-4">Enter OTP</h2>
-              <input
-                type="text"
-                name="otp"
-                placeholder="Enter OTP"
-                value={form.otp}
-                onChange={handleChange}
-                className="w-full mb-1 p-3 border rounded-lg"
-              />
-              {errors.otp && <p className="text-red-500 text-sm mb-2">{errors.otp}</p>}
-              <button
-                onClick={handleVerifyOtp}
-                disabled={isVerifyingOtp}
-                className="w-full bg-[#730042] text-white py-3 rounded-lg disabled:opacity-60"
-              >
-                {isVerifyingOtp ? "Verifying..." : "Verify OTP"}
-              </button>
-              <p
-                onClick={() => setStep("login")}
-                className="text-sm text-gray-500 mt-3 cursor-pointer hover:text-[#730042]"
-              >
-                ← Back to login
-              </p>
-            </>
-          )}
-        </div>
-
-        <div className="hidden md:flex w-1/2 bg-gray-50 items-center justify-center p-6">
-          <div className="text-center">
-            <img src={images[currentSlide]} alt="slide" className="w-full max-h-65 object-contain" />
-            <h3 className="text-lg font-semibold text-[#730042] mt-4">Smart Secure Login</h3>
-            <p className="text-gray-500 text-sm mt-2">
-              Experience secure and seamless HRMS access with 2 factor authentication.
-            </p>
-            <div className="flex justify-center mt-4 gap-2">
-              {images.map((_, index) => (
-                <div
-                  key={index}
-                  className={`w-2 h-2 rounded-full ${
-                    currentSlide === index ? "bg-[#730042]" : "bg-gray-300"
-                  }`}
->>>>>>> 518db3ffcc45308e42ed57c0188aa65f8314dca2
                 />
                 {errors.email && <p className="text-red-500 text-sm mb-2">{errors.email}</p>}
                 <button
@@ -563,18 +391,10 @@ function Login() {
           </div>
         </div>
       </div>
-<<<<<<< HEAD
 
       <footer className="w-full py-4 text-center text-gray-600 text-sm font-medium">
         © 2026, TechTorch Solutions Private Limited. All Rights Reserved.
       </footer>
-=======
-      </div>
-
-     <footer className="w-full py-4 text-center text-gray-600 text-sm font-medium">
-  © 2026, TechTorch Solutions Private Limited. All Rights Reserved.
-</footer>
->>>>>>> 518db3ffcc45308e42ed57c0188aa65f8314dca2
     </div>
   );
 }
