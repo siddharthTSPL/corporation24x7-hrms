@@ -127,12 +127,11 @@ const adminlogin = async (req, res, next) => {
     message: "Login successful",
     admin: {
       id: admin._id,
-      f_name: admin.f_name,
-      l_name: admin.l_name,
-      work_email: admin.work_email,
-      designation: admin.designation,
-      role: admin.role,
+      username: admin.username,
+      email: admin.email,
     },
+    role: admin.role,
+    token
   });
 };
 
