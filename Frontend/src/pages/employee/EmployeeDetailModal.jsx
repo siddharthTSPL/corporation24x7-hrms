@@ -1174,4 +1174,8 @@ export default function EmployeeTable() {
       )}
     </div>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 518db3ffcc45308e42ed57c0188aa65f8314dca2
