@@ -61,6 +61,14 @@ const permissionroute = require('../routes/permission.route');
 const timesheetroute = require('../routes/timesheet.route');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
+// DEBUG — remove after fix
+const routes = { adminrouter, managerrouter, userrouter, attendancerouter, superadminrouter, ticketroute, recruitmentroute, wfhroute, permissionroute, timesheetroute };
+Object.entries(routes).forEach(([name, r]) => {
+  if (!r) console.error(`❌ UNDEFINED: ${name}`);
+  else if (typeof r !== 'function') console.error(`❌ NOT A FUNCTION: ${name} — type: ${typeof r}, value:`, r);
+  else console.log(`✅ ${name} loaded`);
+});
+
 app.use('/admin', adminrouter);
 app.use('/manager', managerrouter);
 app.use('/user', userrouter);
