@@ -4,7 +4,7 @@ const axios  = require("axios");
 const http   = require("http");
 const Store  = require("electron-store");
 
-const IS_DEV = !app.isPackaged;
+const IS_DEV = process.env.NODE_ENV === "development";
 
 const API_BASE    = IS_DEV
   ? "http://localhost:5001/attendance"

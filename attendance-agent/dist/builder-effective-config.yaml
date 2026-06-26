@@ -1,0 +1,10 @@
+directories:
+  output: dist
+  buildResources: build
+appId: com.torchx.agent
+productName: TorchX Attendance
+win:
+  target: nsis
+  icon: icon.ico
+files: []
+electronVersion: 28.3.3

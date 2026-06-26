@@ -181,15 +181,15 @@ const token = jwt.sign(
     }
   ).exec();
 
-  return res.status(200).json({
-    success: true,
-    message: "Login successful",
-    role: user.role,
-    isFirstLogin: user.isFirstLogin,
-
-    canSetupPassword: user.isFirstLogin,
-    passwordSetupLink,
-  });
+return res.status(200).json({
+  success: true,
+  message: "Login successful",
+  token,
+  role: user.role,
+  isFirstLogin: user.isFirstLogin,
+  canSetupPassword: user.isFirstLogin,
+  passwordSetupLink,
+});
 };
 
 const userlogout = async (req, res, next) => {
