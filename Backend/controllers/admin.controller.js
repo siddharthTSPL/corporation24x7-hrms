@@ -123,17 +123,18 @@ const adminlogin = async (req, res, next) => {
     isFirstLogin: false,
   }).exec();
 
-  res.status(200).json({
-    message: "Login successful",
-    admin: {
-      id: admin._id,
-      f_name: admin.f_name,
-      l_name: admin.l_name,
-      work_email: admin.work_email,
-      designation: admin.designation,
-      role: admin.role,
-    },
-  });
+res.status(200).json({
+  message: "Login successful",
+  token,
+  admin: {
+    id: admin._id,
+    f_name: admin.f_name,
+    l_name: admin.l_name,
+    work_email: admin.work_email,
+    designation: admin.designation,
+    role: admin.role,
+  },
+});
 };
 
 const adminlogout = async (req, res, next) => {
