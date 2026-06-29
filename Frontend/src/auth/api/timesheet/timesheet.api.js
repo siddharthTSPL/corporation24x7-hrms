@@ -14,6 +14,8 @@ api.interceptors.response.use(
   }
 );
 
+// ─── Projects ─────────────────────────────────────────────────────────────────
+
 export const createProject = async (data) => {
   const res = await api.post("timesheet/projects", data);
   return res.data;
@@ -49,8 +51,12 @@ export const archiveProject = async (id) => {
   return res.data;
 };
 
+// ─── Jobs ─────────────────────────────────────────────────────────────────────
+
+// Returns people this actor can assign jobs to — each entry has { id, model, name, email, role }
+// Use name + role to build the dropdown label: `${t.name} (${t.role})`
 export const getAssignableTargets = async () => {
-  const res = await api.get("timesheet/assignable-targets");
+  const res = await api.get("timesheet/jobs/assignable-targets"); // route moved under /jobs/
   return res.data;
 };
 
@@ -59,11 +65,13 @@ export const createJob = async (data) => {
   return res.data;
 };
 
+// Jobs assigned TO the current user — used by timer dropdown + "My jobs" view
 export const getMyAssignedJobs = async (params) => {
   const res = await api.get("timesheet/jobs/assigned-to-me", { params });
   return res.data;
 };
 
+// Jobs this user created/assigned to others
 export const getJobsCreatedByMe = async (params) => {
   const res = await api.get("timesheet/jobs/created-by-me", { params });
   return res.data;
@@ -99,6 +107,8 @@ export const getJobTimeLogs = async (jobId) => {
   return res.data;
 };
 
+// ─── Time logs ────────────────────────────────────────────────────────────────
+
 export const logTime = async (data) => {
   const res = await api.post("timesheet/time-logs", data);
   return res.data;
@@ -124,11 +134,14 @@ export const deleteTimeLog = async (id) => {
   return res.data;
 };
 
+// ─── Timer ────────────────────────────────────────────────────────────────────
+
 export const startTimer = async (data) => {
   const res = await api.post("timesheet/timer/start", data);
   return res.data;
 };
 
+// Frontend must call this every exactly 60 000 ms via setInterval
 export const heartbeatTimer = async () => {
   const res = await api.post("timesheet/timer/heartbeat");
   return res.data;
@@ -159,8 +172,19 @@ export const discardTimer = async () => {
   return res.data;
 };
 
+// ─── Timesheets ───────────────────────────────────────────────────────────────
+
+// Submit all draft logs for the week as a timesheet
+// Body: { week_start: "YYYY-MM-DD" }
 export const submitTimesheet = async (data) => {
   const res = await api.post("timesheet/timesheets/submit", data);
+  return res.data;
+};
+
+// Pull back a submitted (but not yet approved) timesheet to draft
+// Body: { timesheetId }
+export const recallTimesheet = async (data) => {
+  const res = await api.post("timesheet/timesheets/recall", data);
   return res.data;
 };
 
@@ -169,25 +193,33 @@ export const getMyTimesheets = async () => {
   return res.data;
 };
 
+// Returns timesheets waiting for THIS user's approval
 export const getPendingApprovals = async () => {
   const res = await api.get("timesheet/timesheets/pending-approvals");
   return res.data;
 };
 
+// Body: { timesheetId, remarks? }
 export const approveTimesheet = async (data) => {
   const res = await api.post("timesheet/timesheets/approve", data);
   return res.data;
 };
 
+// Body: { timesheetId, remarks } — remarks required
 export const rejectTimesheet = async (data) => {
   const res = await api.post("timesheet/timesheets/reject", data);
   return res.data;
 };
 
+// Manager forwards to their reporting manager (Manager or Admin)
+// Admin forwards to SuperAdmin
+// Body: { timesheetId, remarks? }
 export const forwardTimesheet = async (data) => {
   const res = await api.post("timesheet/timesheets/forward", data);
   return res.data;
 };
+
+// ─── Insights ─────────────────────────────────────────────────────────────────
 
 export const getTeamWorkloadHeatmap = async (week_start) => {
   const res = await api.get("timesheet/insights/workload-heatmap", { params: { week_start } });
@@ -209,12 +241,29 @@ export const getMyProductivitySummary = async (week_start) => {
   return res.data;
 };
 
+// ─── Admin / SuperAdmin: org-wide visibility ──────────────────────────────────
+
+// All time logs across the org — params: { date?, week_start?, user_id?, job_id?, status? }
 export const getOrgAllTimeLogs = async (params) => {
   const res = await api.get("timesheet/admin/time-logs", { params });
   return res.data;
 };
 
+// All timesheets across the org — params: { status?, owner_model?, week_start? }
 export const getOrgAllTimesheets = async (params) => {
   const res = await api.get("timesheet/admin/timesheets", { params });
+  return res.data;
+};
+
+// All jobs across the org — params: { status?, assigned_to?, assigned_to_model?, project?, priority? }
+// Each job includes assigned_to_info and assigned_by_info with { name, email, role }
+export const getOrgAllJobs = async (params) => {
+  const res = await api.get("timesheet/admin/jobs", { params });
+  return res.data;
+};
+
+// Full timeline for a single job — who worked on it, how long, log by log
+export const getJobTimeline = async (id) => {
+  const res = await api.get(`timesheet/admin/jobs/${id}/timeline`);
   return res.data;
 };
