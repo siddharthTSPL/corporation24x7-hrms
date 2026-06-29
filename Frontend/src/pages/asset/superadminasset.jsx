@@ -14,8 +14,8 @@ import {
   useAssignAssetToAdmin,
   useRevokeAssetSuperAdmin,
   useGetAssetsOfPersonSuperAdmin,
-} from "../../../auth/server-state/superadmin/asset/suasset.hook";
-import { useGetAllAdmins } from "../../../auth/server-state/superadmin/other/suother.hook";
+} from "../../auth/server-state/superadmin/asset/superadminasset.hook";
+import { useGetAllAdmins } from "../../auth/server-state/superadmin/other/suother.hook";
 
 const ASSET_TYPES = ["laptop","desktop","monitor","keyboard","mouse","headset","mobile","tablet","other"];
 const CONDITIONS   = ["new","good","fair","poor"];
