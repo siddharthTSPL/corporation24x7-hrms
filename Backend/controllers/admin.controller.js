@@ -26,6 +26,7 @@ const { processLeaveDeduction } = require("../automatic/calculateleave");
 const AttendanceSummary = require("../Models/attendancesummary.model");
 const WFH = require("../Models/wfh.model");
 const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = require("../utils/licenseCheck");
+const AssetModel = require("../Models/asset.model");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
@@ -2889,10 +2890,34 @@ const setEmployeeWorkingStatus = async (req, res, next) => {
       await incrementActiveUserCount(organisation_id);
     }
 
+    // ── Asset return check ──────────────────────────────────────────────────
+    let asset_return_check = null;
+    if (working_status !== "working") {
+      const pendingAssets = await AssetModel.find({
+        organisation_id,
+        assigned_to: id,
+        assigned_to_model: "User",
+        status: "assigned",
+      })
+        .select("_id asset_id asset_name asset_type serial_number brand assigned_date")
+        .lean();
+
+      asset_return_check = {
+        has_pending_assets: pendingAssets.length > 0,
+        pending_asset_count: pendingAssets.length,
+        assets: pendingAssets,
+        message:
+          pendingAssets.length > 0
+            ? `⚠️ Warning: ${pendingAssets.length} asset(s) are still assigned to this employee and must be returned before offboarding.`
+            : "✅ No pending assets. All clear.",
+      };
+    }
+
     return res.status(200).json({
       success: true,
       message: `Employee working status updated to '${working_status}' successfully`,
       employee: user,
+      ...(asset_return_check && { asset_return_check }),
     });
   } catch (error) {
     next(error);
@@ -2944,10 +2969,34 @@ const setManagerWorkingStatus = async (req, res, next) => {
       await incrementActiveUserCount(organisation_id);
     }
 
+    // ── Asset return check ──────────────────────────────────────────────────
+    let asset_return_check = null;
+    if (working_status !== "working") {
+      const pendingAssets = await AssetModel.find({
+        organisation_id,
+        assigned_to: id,
+        assigned_to_model: "Manager",
+        status: "assigned",
+      })
+        .select("_id asset_id asset_name asset_type serial_number brand assigned_date")
+        .lean();
+
+      asset_return_check = {
+        has_pending_assets: pendingAssets.length > 0,
+        pending_asset_count: pendingAssets.length,
+        assets: pendingAssets,
+        message:
+          pendingAssets.length > 0
+            ? `⚠️ Warning: ${pendingAssets.length} asset(s) are still assigned to this manager and must be returned before offboarding.`
+            : "✅ No pending assets. All clear.",
+      };
+    }
+
     return res.status(200).json({
       success: true,
       message: `Manager working status updated to '${working_status}' successfully`,
       manager,
+      ...(asset_return_check && { asset_return_check }),
     });
   } catch (error) {
     next(error);
