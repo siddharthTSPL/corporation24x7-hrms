@@ -483,7 +483,7 @@ function DashboardMockup() {
             <text x="40" y="248" fontFamily="Instrument Sans,sans-serif" fontSize="13" fontWeight="400" fill="#555">Settings</text>
             <path d="M20,267 L20,277 Q20,279 22,279 L28,279" fill="none" stroke="#888" strokeWidth="1.5" strokeLinecap="round"/>
             <polyline points="26,276 30,279 26,282" fill="none" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <text x="40" y="276" fontFamily="Instrument Sans,sans-serif" fontSize="13" fontWeight="400" fill="#555">Logout</text>
+            <text x="40" y="272" fontFamily="Instrument Sans,sans-serif" fontSize="13" fontWeight="400" fill="#555">Logout</text>
             <text x="16" y="648" fontFamily="Instrument Sans,sans-serif" fontSize="8.5" fill="#ccc">Powered by TechTorch | © 2026</text>
             <rect x="210" y="0" width="750" height="660" fill="#eef2f8"/>
             <rect x="210" y="0" width="750" height="68" fill="#ffffff"/>
@@ -628,13 +628,7 @@ function DashboardMockup() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ██ HERO
-// Layout changes vs original:
-//   - padding: was '0px 40px 48px' — top was 0, bottom 48px
-//     → now paddingTop: SP.section.lg (96px) + paddingBottom: SP.section.md (72px)
-//     Hero gets the most generous vertical space on the page (Stripe/Linear pattern)
-//   - inner Wrap handles horizontal gutter — no more hardcoded 40px
-//   - hero-grid gap: 60px (unchanged from .hero-grid CSS class)
-//   - copy block: maxWidth 520px (was uncapped) — prevents overly long lines
+//=
 // ─────────────────────────────────────────────────────────────────────────────
 function Hero() {
   const navigate = useNavigate();
