@@ -7,18 +7,12 @@ const generateUID = async (department, organisation_id) => {
   if (!VALID_DEPARTMENTS.includes(department))
     throw new Error(`Invalid department: ${department}`);
 
-  const initDepts = {};
-  VALID_DEPARTMENTS.forEach((dept) => {
-    initDepts[`departments.${dept}.lastNumber`] = 0;
-  });
-
   const counter = await UidCounter.findOneAndUpdate(
     { organisation_id },
     {
       $inc: { [`departments.${department}.lastNumber`]: 1 },
-      $setOnInsert: initDepts,
     },
-    { new: true, upsert: true }
+    { returnDocument: "after", upsert: true }
   );
 
   const lastNumber = counter.departments[department].lastNumber;
