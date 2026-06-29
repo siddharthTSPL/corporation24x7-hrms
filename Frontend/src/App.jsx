@@ -66,6 +66,8 @@ const Managertimesheet = lazy(() => import("./pages/timesheet/matimesheet"));
 const Employeetimesheet = lazy(() => import("./pages/timesheet/emtimesheet"));
 const SuperAdmintimesheet = lazy(() => import("./pages/timesheet/sutimesheet"));
 const Pagenotfound = lazy(() => import("./pages/pagenotfound/pagenotfound"));
+const Adminasset= lazy(() => import("./pages/asset/adminasset"));
+const Superadmin = lazy(() => import("./pages/asset/superadminasset"));
 
 function PageSkeleton() {
   const [animationData, setAnimationData] = useState(null);
