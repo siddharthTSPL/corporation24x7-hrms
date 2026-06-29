@@ -13,9 +13,9 @@ import {
   useAssignAssetToEmployee,
   useAssignAssetToManager,
   useRevokeAssetAdmin,
-} from "../../auth/server-state/adminother/adminasset.hook";
-import { useFindAllManagers, useGetAllEmployee } from "../../auth/server-state/adminother/adminother.hook";
-
+} from "../../auth/server-state/adminasset/adminasset.hook";
+import { useFindAllManagerswithoutAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
+import {  useGetAllEmployee } from "../../auth/server-state/adminother/adminother.hook";
 const ASSET_TYPES = ["laptop","desktop","monitor","keyboard","mouse","headset","mobile","tablet","other"];
 const CONDITIONS  = ["new","good","fair","poor"];
 const STATUSES    = ["available","assigned","under_maintenance","retired"];
@@ -498,7 +498,7 @@ export default function AdminAssets() {
   const { data, isLoading } = useGetAllAssetsAdmin(
     Object.fromEntries(Object.entries(filters).filter(([, v]) => v))
   );
-  const { data: managersData } = useFindAllManagers();
+  const { data: managersData } = useFindAllManagerswithoutAdmin();
   const { data: employeesData } = useGetAllEmployee();
 
   const { mutate: createAsset, isPending: creating } = useCreateAssetAdmin();
