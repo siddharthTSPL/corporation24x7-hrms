@@ -47,6 +47,18 @@ const {
   
 } = require("../controllers/superadmin.controller");
 
+
+const {
+  createAssetSuperAdmin,
+  updateAssetSuperAdmin,
+  assignAssetToAdminSuperAdmin,
+  revokeAssetFromAdminSuperAdmin,
+  getAllAssetsSuperAdmin,
+  getAssetByIdSuperAdmin,
+  deleteAssetSuperAdmin,
+  getAssetsOfPerson,
+} = require("../controllers/asset.controller");
+
 superAdminRouter.post("/register", asyncHandler(registerSuperAdmin));
 superAdminRouter.get("/verify/:token", asyncHandler(verifySuperAdmin));
 superAdminRouter.post("/login", asyncHandler(loginSuperAdmin));
@@ -207,5 +219,20 @@ superAdminRouter.get(
 superAdminRouter.patch("/admin/:id/working-status", superAdminAuth, setAdminWorkingStatus);
 superAdminRouter.get("/inactive-users", superAdminAuth, getInactiveUsers);
 superAdminRouter.get("/active-user-count", superAdminAuth, getActiveUserCount);
+
+
+
+
+// assest route
+superAdminRouter.post("/assets", superAdminAuth, asyncHandler(createAssetSuperAdmin));
+superAdminRouter.get("/assets", superAdminAuth, asyncHandler(getAllAssetsSuperAdmin));
+superAdminRouter.get("/assets/:id", superAdminAuth, asyncHandler(getAssetByIdSuperAdmin));
+superAdminRouter.put("/assets/:id", superAdminAuth, asyncHandler(updateAssetSuperAdmin));
+superAdminRouter.delete("/assets/:id", superAdminAuth, asyncHandler(deleteAssetSuperAdmin));
+superAdminRouter.patch("/assets/:id/assign-admin", superAdminAuth, asyncHandler(assignAssetToAdminSuperAdmin));
+superAdminRouter.patch("/assets/:id/revoke", superAdminAuth, asyncHandler(revokeAssetFromAdminSuperAdmin));
+superAdminRouter.get("/assets/person/:person_id/:person_model", superAdminAuth, asyncHandler(getAssetsOfPerson));
+
+
 
 module.exports = superAdminRouter;

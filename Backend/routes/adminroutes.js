@@ -68,6 +68,19 @@ const {
   deleteDocument,
 } = require("../controllers/uploaddocument.controller");
 
+
+const {
+  createAssetAdmin,
+  updateAssetAdmin,
+  assignAssetToEmployee,
+  assignAssetToManager,
+  revokeAssetAdmin,
+  getAllAssetsAdmin,
+  getAssetByIdAdmin,
+  deleteAssetAdmin,
+  getAssetsOfPerson,
+} = require("../controllers/asset.controller");
+
 adminrouter.get("/verify/:token", asyncHandler(verifyAdmin));
 adminrouter.post("/login", asyncHandler(adminlogin));
 adminrouter.post("/forgetpassword", asyncHandler(forgetpasswordloginotp));
@@ -324,7 +337,17 @@ adminrouter.put(
 );
 
 adminrouter.get("/inactive-users", adminauthmiddleware, asyncHandler(getInactiveUsers));
-
 adminrouter.get("/active-user-count", adminauthmiddleware, getActiveUserCount);
+
+// ── Asset Management (Admin) ──────────────────────────────────────────────────
+adminrouter.post("/assets", adminauthmiddleware, asyncHandler(createAssetAdmin));
+adminrouter.get("/assets", adminauthmiddleware, asyncHandler(getAllAssetsAdmin));
+adminrouter.get("/assets/:id", adminauthmiddleware, asyncHandler(getAssetByIdAdmin));
+adminrouter.put("/assets/:id", adminauthmiddleware, asyncHandler(updateAssetAdmin));
+adminrouter.delete("/assets/:id", adminauthmiddleware, asyncHandler(deleteAssetAdmin));
+adminrouter.patch("/assets/:id/assign-employee", adminauthmiddleware, asyncHandler(assignAssetToEmployee));
+adminrouter.patch("/assets/:id/assign-manager", adminauthmiddleware, asyncHandler(assignAssetToManager));
+adminrouter.patch("/assets/:id/revoke", adminauthmiddleware, asyncHandler(revokeAssetAdmin));
+adminrouter.get("/assets/person/:person_id/:person_model", adminauthmiddleware, asyncHandler(getAssetsOfPerson));
 
 module.exports = adminrouter;
