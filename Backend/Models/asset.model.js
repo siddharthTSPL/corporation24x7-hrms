@@ -147,6 +147,6 @@ assetSchema.index({ asset_id: 1, organisation_id: 1 }, { unique: true });
 assetSchema.index({ assigned_to: 1 });
 assetSchema.index({ status: 1 });
 
-const AssetModel = mongoose.model("Asset", assetSchema);
+const AssetModel = mongoose.models.Asset || mongoose.model("Asset", assetSchema);
 
 module.exports = AssetModel;
