@@ -112,14 +112,17 @@ function Login() {
     localStorage.setItem("role", role);
     try {
       const fullData = await fetchFullProfile(role);
-      queryClient.setQueryData(["auth"], { role, data: fullData ?? fallbackData });
-
+      const authPayload = { role, data: fullData ?? fallbackData };
+      queryClient.setQueryData(["auth"], authPayload);
       try {
         const permissions = await fetchMyPermissions();
         usePermissionStore.getState().setPermissions(permissions);
       } catch (_) {}
+      return authPayload;
     } catch {
-      queryClient.setQueryData(["auth"], { role, data: fallbackData });
+      const authPayload = { role, data: fallbackData };
+      queryClient.setQueryData(["auth"], authPayload);
+      return authPayload;
     }
   };
 
@@ -144,6 +147,7 @@ function Login() {
           } catch (_) {}
         }
         await syncProfileToCache(form.role, data);
+        setShowLoader(false);
         navigateByRole(form.role);
       },
       onError: (err) => {
@@ -153,11 +157,8 @@ function Login() {
     });
   };
 
-  const isSendingOtp =
-    sendingAdminOtp || sendingSuperAdminOtp || sendingManagerOtp || sendingEmployeeOtp;
-
-  const isVerifyingOtp =
-    verifyingAdminOtp || verifyingSuperAdminOtp || verifyingManagerOtp || verifyingEmployeeOtp;
+  const isSendingOtp = sendingAdminOtp || sendingSuperAdminOtp || sendingManagerOtp || sendingEmployeeOtp;
+  const isVerifyingOtp = verifyingAdminOtp || verifyingSuperAdminOtp || verifyingManagerOtp || verifyingEmployeeOtp;
 
   const handleSendOtp = () => {
     if (!form.email) {
@@ -201,6 +202,7 @@ function Login() {
       }
 
       await syncProfileToCache(role, data);
+      setShowLoader(false);
       navigateByRole(role);
     };
 
