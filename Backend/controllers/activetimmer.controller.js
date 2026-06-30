@@ -4,7 +4,12 @@ const TimeLog = require("../Models/Timelog.model");
 const { resolveActor, resolveOrgId, httpError } = require("../utils/heirarchy.utils");
 const { recomputeJobHours } = require("./timelog.controller");
 
-const IDLE_THRESHOLD_SECONDS = 300;
+// Heartbeat must arrive every 60 s from the frontend.
+// Backend caps each heartbeat contribution at 60 s to prevent drift or cheating.
+const HEARTBEAT_CAP_SECONDS = 60;
+const IDLE_THRESHOLD_SECONDS = 300; // 5 min without a heartbeat → mark idle
+
+// ─── startTimer ──────────────────────────────────────────────────────────────
 
 const startTimer = async (req, res, next) => {
   const actor = resolveActor(req);
@@ -13,34 +18,31 @@ const startTimer = async (req, res, next) => {
 
   if (!job) return next(httpError("job is required", 400));
 
-  // BUG FIX: check for ANY existing timer (running OR paused) — original only
-  // blocked new timers when running, but a paused timer also occupies the
-  // unique (organisation_id, user) slot and would throw a duplicate-key error.
+  // Block if any timer (running OR paused) already exists
   const existing = await ActiveTimer.findOne({
     organisation_id,
     user: actor.id,
     user_model: actor.model,
   });
-  if (existing)
-    return next(
-      httpError(
-        existing.status === "paused"
-          ? "You have a paused timer. Resume or stop it before starting a new one."
-          : "A timer is already running. Stop it before starting a new one.",
-        409
-      )
-    );
+  if (existing) {
+    return next(httpError(
+      existing.status === "paused"
+        ? "You have a paused timer. Resume or stop it before starting a new one."
+        : "A timer is already running. Stop it first.",
+      409
+    ));
+  }
 
+  // Verify the job is assigned to this user
   const jobDoc = await TSJob.findOne({ _id: job, organisation_id });
   if (!jobDoc) return next(httpError("Job not found", 404));
 
   const isAssignee =
     jobDoc.assigned_to.toString() === actor.id.toString() &&
     jobDoc.assigned_to_model === actor.model;
-  if (!isAssignee)
-    return next(
-      httpError("You can only track time on jobs assigned to you", 403)
-    );
+  if (!isAssignee) {
+    return next(httpError("You can only track time on jobs assigned to you", 403));
+  }
 
   const now = new Date();
   const timer = await ActiveTimer.create({
@@ -58,6 +60,11 @@ const startTimer = async (req, res, next) => {
   res.status(201).json({ success: true, message: "Timer started", timer });
 };
 
+// ─── heartbeatTimer ───────────────────────────────────────────────────────────
+// Frontend calls this every exactly 60 000 ms.
+// Backend clamps elapsed time to HEARTBEAT_CAP_SECONDS so a late/double beat
+// never inflates the total. Idle is flagged if gap > IDLE_THRESHOLD_SECONDS.
+
 const heartbeatTimer = async (req, res, next) => {
   const actor = resolveActor(req);
   const organisation_id = resolveOrgId(req);
@@ -70,15 +77,18 @@ const heartbeatTimer = async (req, res, next) => {
   if (!timer) return next(httpError("No active timer found", 404));
 
   if (timer.status !== "running") {
-    return res
-      .status(200)
-      .json({ success: true, message: "Timer is paused, heartbeat ignored", timer });
+    return res.status(200).json({ success: true, message: "Timer is paused, heartbeat ignored", timer });
   }
 
   const now = new Date();
-  const secondsSinceLastBeat = (now - timer.last_heartbeat_at) / 1000;
+  const rawElapsed = Math.floor((now - timer.last_heartbeat_at) / 1000);
 
-  if (secondsSinceLastBeat >= IDLE_THRESHOLD_SECONDS) {
+  // Cap: never credit more than 60 s per heartbeat cycle
+  const creditSeconds = Math.min(rawElapsed, HEARTBEAT_CAP_SECONDS);
+  timer.accumulated_seconds += creditSeconds;
+
+  // Idle detection: if real gap > threshold, user is probably away
+  if (rawElapsed >= IDLE_THRESHOLD_SECONDS) {
     timer.is_idle = true;
     timer.idle_since = timer.idle_since || timer.last_heartbeat_at;
   } else {
@@ -92,6 +102,8 @@ const heartbeatTimer = async (req, res, next) => {
   res.status(200).json({ success: true, timer });
 };
 
+// ─── pauseTimer ───────────────────────────────────────────────────────────────
+
 const pauseTimer = async (req, res, next) => {
   const actor = resolveActor(req);
   const organisation_id = resolveOrgId(req);
@@ -102,22 +114,15 @@ const pauseTimer = async (req, res, next) => {
     user_model: actor.model,
   });
   if (!timer) return next(httpError("No active timer found", 404));
-  if (timer.status === "paused")
-    return next(httpError("Timer is already paused", 400));
+  if (timer.status === "paused") return next(httpError("Timer is already paused", 400));
 
   const now = new Date();
-
-  // BUG FIX: original code did:
-  //   elapsedSeconds = Math.floor((now - last_heartbeat_at) / 1000) + accumulated_seconds
-  // This is WRONG — it counts the gap since the last heartbeat (which may be
-  // seconds or minutes), not since the last resume point.
-  // Correct logic: add only the seconds elapsed since last_heartbeat_at to
-  // what is already in accumulated_seconds.
-  const secondsSinceHeartbeat = Math.max(
-    0,
-    Math.floor((now - timer.last_heartbeat_at) / 1000)
+  // Cap partial interval since last heartbeat
+  const secondsSinceHeartbeat = Math.min(
+    Math.max(0, Math.floor((now - timer.last_heartbeat_at) / 1000)),
+    HEARTBEAT_CAP_SECONDS
   );
-  timer.accumulated_seconds = timer.accumulated_seconds + secondsSinceHeartbeat;
+  timer.accumulated_seconds += secondsSinceHeartbeat;
   timer.status = "paused";
   timer.paused_at = now;
   timer.is_idle = false;
@@ -127,6 +132,8 @@ const pauseTimer = async (req, res, next) => {
 
   res.status(200).json({ success: true, message: "Timer paused", timer });
 };
+
+// ─── resumeTimer ──────────────────────────────────────────────────────────────
 
 const resumeTimer = async (req, res, next) => {
   const actor = resolveActor(req);
@@ -138,14 +145,11 @@ const resumeTimer = async (req, res, next) => {
     user_model: actor.model,
   });
   if (!timer) return next(httpError("No active timer found", 404));
-  if (timer.status === "running")
-    return next(httpError("Timer is already running", 400));
+  if (timer.status === "running") return next(httpError("Timer is already running", 400));
 
   const now = new Date();
   timer.status = "running";
-  // BUG FIX: reset last_heartbeat_at to NOW so the next heartbeat / pause /
-  // stop correctly measures only the time since resume, not since the original
-  // start or last heartbeat before the pause.
+  // Reset heartbeat anchor to NOW so the next cycle measures correctly from resume point
   timer.last_heartbeat_at = now;
   timer.paused_at = null;
 
@@ -154,7 +158,9 @@ const resumeTimer = async (req, res, next) => {
   res.status(200).json({ success: true, message: "Timer resumed", timer });
 };
 
-const stopTimer = async (req, res) => {
+// ─── stopTimer ────────────────────────────────────────────────────────────────
+
+const stopTimer = async (req, res, next) => {
   const actor = resolveActor(req);
   const organisation_id = resolveOrgId(req);
   const { note } = req.body;
@@ -164,21 +170,23 @@ const stopTimer = async (req, res) => {
     user: actor.id,
     user_model: actor.model,
   });
-  if (!timer) throw httpError("No active timer found", 404);
+  if (!timer) return next(httpError("No active timer found", 404));
 
   const jobDoc = await TSJob.findOne({ _id: timer.job, organisation_id });
-  if (!jobDoc) throw httpError("Job not found", 404);
+  if (!jobDoc) return next(httpError("Job not found", 404));
 
   let finalSeconds = timer.accumulated_seconds;
 
+  // If still running, add the remaining partial interval (capped)
   if (timer.status === "running") {
-    const now = new Date();
-    finalSeconds += Math.max(
-      0,
-      Math.floor((now - timer.last_heartbeat_at) / 1000)
+    const remaining = Math.min(
+      Math.max(0, Math.floor((new Date() - timer.last_heartbeat_at) / 1000)),
+      HEARTBEAT_CAP_SECONDS
     );
+    finalSeconds += remaining;
   }
 
+  // Minimum 1 minute — don't create 0-minute logs
   const durationMinutes = Math.max(1, Math.round(finalSeconds / 60));
 
   const timeLog = await TimeLog.create({
@@ -205,6 +213,8 @@ const stopTimer = async (req, res) => {
   res.status(200).json({ success: true, message: "Timer stopped and logged", timeLog });
 };
 
+// ─── getActiveTimer ───────────────────────────────────────────────────────────
+
 const getActiveTimer = async (req, res, next) => {
   const actor = resolveActor(req);
   const organisation_id = resolveOrgId(req);
@@ -214,11 +224,13 @@ const getActiveTimer = async (req, res, next) => {
     user: actor.id,
     user_model: actor.model,
   })
-    .populate("job", "title project")
+    .populate("job", "title project status")
     .lean();
 
   res.status(200).json({ success: true, timer: timer || null });
 };
+
+// ─── discardTimer ─────────────────────────────────────────────────────────────
 
 const discardTimer = async (req, res, next) => {
   const actor = resolveActor(req);
