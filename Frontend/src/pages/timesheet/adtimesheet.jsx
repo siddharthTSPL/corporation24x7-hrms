@@ -748,6 +748,60 @@ export default function AdminTimesheet() {
               </div>
               <Btn onClick={() => setJobModal(true)} className="w-full sm:w-auto">+ Create Job</Btn>
             </div>
+
+            <div className="mb-6">
+              <div className="text-sm font-bold text-gray-900 mb-2.5">My Jobs</div>
+              <p className="text-[12px] text-gray-400 -mt-2 mb-2.5">{assignedJobs.length} jobs assigned to you</p>
+              {assignedJobs.length === 0 ? (
+                <Card className="px-6 sm:px-8 py-8 sm:py-10 text-center">
+                  <div className="text-3xl mb-2">📭</div>
+                  <div className="font-bold text-sm text-gray-900">No jobs assigned to you</div>
+                  <div className="text-[12px] text-gray-400 mt-1">Jobs assigned to you will show up here</div>
+                </Card>
+              ) : (
+                <div className="flex flex-col gap-2.5">
+                  {assignedJobs.map((j) => (
+                    <Card key={j._id} className="px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-start gap-3.5">
+                      <div className="flex gap-3.5 flex-1 min-w-0">
+                        <div className={`w-1 rounded ${JOB_STATUS_DOT[j.status] || "bg-gray-400"} flex-shrink-0`} />
+                        <div className="flex-1 min-w-0">
+                          <button
+                            className="text-sm font-bold text-gray-900 hover:text-[#730042] transition-colors text-left mb-1.5"
+                            onClick={() => openJobDetail(j._id)}
+                          >
+                            {j.title}
+                          </button>
+                          <div className="flex gap-2 flex-wrap">
+                            <PriorityChip priority={j.priority} />
+                            <JobChip status={j.status} />
+                            {j.billable && <Chip color="green">Billable</Chip>}
+                            {j.estimated_hours > 0 && <Chip color="blue">{j.logged_hours_cache}h / {j.estimated_hours}h</Chip>}
+                          </div>
+                          {j.estimated_hours > 0 && (
+                            <div className="mt-2 flex items-center gap-2">
+                              <div className="w-24 sm:w-[120px] h-1 bg-gray-50 rounded-full">
+                                <div className={`h-full rounded-full ${j.overrun_flagged ? "bg-red-600" : "bg-[#730042]"}`} style={{ width: `${Math.min(100, (j.logged_hours_cache / j.estimated_hours) * 100)}%` }} />
+                              </div>
+                              <span className={`text-[10px] ${j.overrun_flagged ? "text-red-600" : "text-gray-400"}`}>
+                                {Math.round((j.logged_hours_cache / j.estimated_hours) * 100)}% used
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-1.5 flex-shrink-0 sm:self-start">
+                        <button onClick={() => openJobDetail(j._id)} className="bg-gray-50 text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 text-[11px] font-semibold cursor-pointer">View</button>
+                        {!["completed", "cancelled"].includes(j.status) && (
+                          <button onClick={() => updateJobStatus.mutate({ id: j._id, status: "completed" }, { onSuccess: refetchCreated })} className="bg-emerald-50 text-emerald-600 border-none rounded-lg px-3 py-1.5 text-[11px] font-semibold cursor-pointer">Complete</button>
+                        )}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="text-sm font-bold text-gray-900 mb-2.5">Assigned by Me</div>
             <div className="flex flex-col gap-2.5">
               {createdJobs.length === 0 ? (
                 <Card className="px-6 sm:px-8 py-12 sm:py-16 text-center">
