@@ -4,6 +4,7 @@ const TimeLog = require("../Models/Timelog.model");
 const Admin = require("../Models/Admin.model");
 const Manager = require("../Models/manager.model");
 const User = require("../Models/user.model");
+const SuperAdmin = require("../Models/superadmin.model"); // ⚠️ verify this matches your actual filename/casing in the Models folder
 const {
   assertCanAssign,
   resolveActor,
@@ -14,17 +15,23 @@ const {
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
-const MODEL_MAP = { Admin, Manager, User };
+const MODEL_MAP = { Admin, Manager, User, SuperAdmin };
 
 const enrichPerson = async (id, model) => {
   const M = MODEL_MAP[model];
   if (!M) return null;
-  const doc = await M.findById(id).select("f_name l_name work_email role").lean();
+  const doc = await M.findById(id).select("f_name l_name work_email role name email").lean();
   if (!doc) return null;
+
+  const name =
+    (doc.f_name || doc.l_name)
+      ? `${doc.f_name || ""} ${doc.l_name || ""}`.trim()
+      : (doc.name || "—");
+
   return {
     _id: id,
-    name: `${doc.f_name} ${doc.l_name}`,
-    email: doc.work_email,
+    name,
+    email: doc.work_email || doc.email || "",
     role: doc.role || model.toLowerCase(),
     model,
   };
