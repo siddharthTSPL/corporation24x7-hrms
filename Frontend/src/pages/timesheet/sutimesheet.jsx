@@ -95,10 +95,10 @@ function Card({ children, className = "", onClick }) {
 
 function StatTile({ label, value, sub, colorClass = "text-[#730042]" }) {
   return (
-    <Card className="px-5 py-4 sm:px-6 sm:py-5">
-      <div className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">{label}</div>
-      <div className={cn("text-3xl sm:text-4xl font-extrabold leading-none mb-1", colorClass)}>{value}</div>
-      {sub && <div className="text-[12px] text-gray-400">{sub}</div>}
+    <Card className="px-4 py-4 sm:px-6 sm:py-5">
+      <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1.5 truncate">{label}</div>
+      <div className={cn("text-2xl sm:text-3xl lg:text-4xl font-extrabold leading-none mb-1 truncate", colorClass)}>{value}</div>
+      {sub && <div className="text-[11px] sm:text-[12px] text-gray-400 truncate">{sub}</div>}
     </Card>
   );
 }
@@ -111,13 +111,13 @@ function Modal({ open, onClose, title, children }) {
   }, [open]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/45 backdrop-blur-[6px]">
-      <div className="bg-white border border-[#E4E6EF] rounded-[18px] w-full max-w-[95vw] sm:max-w-[520px] max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-[#E4E6EF] shrink-0">
-          <span className="font-bold text-[15px] text-gray-900">{title}</span>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors text-xl leading-none">×</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/45 backdrop-blur-[6px]">
+      <div className="bg-white border border-[#E4E6EF] sm:rounded-[18px] w-full h-full sm:h-auto sm:w-[95vw] md:w-[80vw] lg:max-w-[520px] max-h-full sm:max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#E4E6EF] shrink-0">
+          <span className="font-bold text-[14px] sm:text-[15px] text-gray-900">{title}</span>
+          <button onClick={onClose} className="w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors text-xl leading-none shrink-0">×</button>
         </div>
-        <div className="p-5 sm:p-6 overflow-y-auto">{children}</div>
+        <div className="p-4 sm:p-6 overflow-y-auto">{children}</div>
       </div>
     </div>
   );
@@ -127,7 +127,7 @@ function Input({ label, className = "", ...props }) {
   return (
     <div className="flex flex-col gap-1.5">
       {label && <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{label}</label>}
-      <input {...props} className={cn("bg-[#F8F9FC] border border-[#E4E6EF] rounded-[10px] px-3.5 py-2.5 text-[13px] text-gray-900 outline-none w-full focus:border-[#730042] transition-colors placeholder:text-gray-300", className)} />
+      <input {...props} className={cn("bg-[#F8F9FC] border border-[#E4E6EF] rounded-[10px] px-3.5 py-2.5 text-[13px] text-gray-900 outline-none w-full focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/15 transition-colors placeholder:text-gray-300 min-h-[44px]", className)} />
     </div>
   );
 }
@@ -136,7 +136,7 @@ function Select({ label, children, className = "", ...props }) {
   return (
     <div className="flex flex-col gap-1.5">
       {label && <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{label}</label>}
-      <select {...props} className={cn("bg-[#F8F9FC] border border-[#E4E6EF] rounded-[10px] px-3.5 py-2.5 text-[13px] text-gray-900 outline-none w-full appearance-none cursor-pointer focus:border-[#730042] transition-colors", className)}>
+      <select {...props} className={cn("bg-[#F8F9FC] border border-[#E4E6EF] rounded-[10px] px-3.5 py-2.5 text-[13px] text-gray-900 outline-none w-full appearance-none cursor-pointer focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/15 transition-colors min-h-[44px]", className)}>
         {children}
       </select>
     </div>
@@ -144,7 +144,7 @@ function Select({ label, children, className = "", ...props }) {
 }
 
 function Btn({ children, variant = "primary", onClick, disabled, type = "button", className = "" }) {
-  const base = "inline-flex items-center justify-center rounded-[10px] px-4 py-2.5 text-[13px] font-semibold whitespace-nowrap transition-opacity disabled:opacity-55 disabled:cursor-not-allowed min-h-[38px]";
+  const base = "inline-flex items-center justify-center rounded-[10px] px-4 py-2.5 text-[13px] font-semibold whitespace-nowrap transition-opacity disabled:opacity-55 disabled:cursor-not-allowed min-h-[44px]";
   const variants = {
     primary: "bg-[#730042] text-white hover:bg-[#8B0050]",
     ghost:   "bg-transparent text-gray-600 border border-[#E4E6EF] hover:bg-gray-50",
@@ -161,19 +161,19 @@ function Btn({ children, variant = "primary", onClick, disabled, type = "button"
 
 function SectionHeader({ title, sub, action }) {
   return (
-    <div className="flex items-start justify-between gap-3 mb-4 sm:mb-5">
-      <div>
-        <div className="text-[15px] sm:text-[16px] font-bold text-gray-900">{title}</div>
-        {sub && <div className="text-[12px] text-gray-400 mt-0.5">{sub}</div>}
+    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4 sm:mb-5">
+      <div className="min-w-0">
+        <div className="text-[15px] sm:text-[16px] font-bold text-gray-900 truncate">{title}</div>
+        {sub && <div className="text-[12px] text-gray-400 mt-0.5 truncate">{sub}</div>}
       </div>
-      {action && <div className="shrink-0">{action}</div>}
+      {action && <div className="shrink-0 w-full sm:w-auto">{action}</div>}
     </div>
   );
 }
 
 function EmptyState({ icon, title, sub, action }) {
   return (
-    <div className="py-10 sm:py-12 text-center px-6">
+    <div className="py-10 sm:py-12 text-center px-4 sm:px-6">
       <div className="text-4xl mb-2.5">{icon}</div>
       <div className="font-bold text-[15px] text-gray-900 mb-1">{title}</div>
       <div className="text-[13px] text-gray-400 mb-4">{sub}</div>
@@ -195,35 +195,35 @@ function JobDetailModal({ jobId, open, onClose }) {
       ) : (
         <div className="flex flex-col gap-4">
           <div>
-            <div className="font-bold text-[17px] text-gray-900 mb-1">{job.title}</div>
-            {job.description && <div className="text-[13px] text-gray-500 leading-relaxed">{job.description}</div>}
+            <div className="font-bold text-[16px] sm:text-[17px] text-gray-900 mb-1 break-words">{job.title}</div>
+            {job.description && <div className="text-[13px] text-gray-500 leading-relaxed break-words">{job.description}</div>}
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-[#F8F9FC] rounded-xl p-3">
+          <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 gap-3">
+            <div className="bg-[#F8F9FC] rounded-xl p-3 min-w-0">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Assigned To</div>
-              <div className="text-[13px] font-bold text-gray-900">{job.assigned_to_info?.name || "—"}</div>
-              <div className="text-[11px] text-[#730042] font-semibold">{job.assigned_to_info?.role || job.assigned_to_info?.model || ""}</div>
+              <div className="text-[13px] font-bold text-gray-900 truncate">{job.assigned_to_info?.name || "—"}</div>
+              <div className="text-[11px] text-[#730042] font-semibold truncate">{job.assigned_to_info?.role || job.assigned_to_info?.model || ""}</div>
             </div>
-            <div className="bg-[#F8F9FC] rounded-xl p-3">
+            <div className="bg-[#F8F9FC] rounded-xl p-3 min-w-0">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Assigned By</div>
-              <div className="text-[13px] font-bold text-gray-900">{job.assigned_by_info?.name || "—"}</div>
-              <div className="text-[11px] text-[#730042] font-semibold">{job.assigned_by_info?.role || job.assigned_by_info?.model || ""}</div>
+              <div className="text-[13px] font-bold text-gray-900 truncate">{job.assigned_by_info?.name || "—"}</div>
+              <div className="text-[11px] text-[#730042] font-semibold truncate">{job.assigned_by_info?.role || job.assigned_by_info?.model || ""}</div>
             </div>
-            <div className="bg-[#F8F9FC] rounded-xl p-3">
+            <div className="bg-[#F8F9FC] rounded-xl p-3 min-w-0">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Status</div>
               <Badge tw={JOB_STATUS_TW[job.status] ? `${JOB_STATUS_TW[job.status]} bg-gray-50 border-gray-200` : "text-gray-400 bg-gray-50 border-gray-200"}>
                 {job.status.replace(/_/g, " ")}
               </Badge>
             </div>
-            <div className="bg-[#F8F9FC] rounded-xl p-3">
+            <div className="bg-[#F8F9FC] rounded-xl p-3 min-w-0">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Priority</div>
               <Badge tw={PRIORITY_TW[job.priority] || PRIORITY_TW.medium}>{job.priority}</Badge>
             </div>
-            <div className="bg-[#F8F9FC] rounded-xl p-3">
+            <div className="bg-[#F8F9FC] rounded-xl p-3 min-w-0">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Logged</div>
               <div className="text-[15px] font-bold text-[#730042]">{job.logged_hours_cache?.toFixed(1) || 0}h</div>
             </div>
-            <div className="bg-[#F8F9FC] rounded-xl p-3">
+            <div className="bg-[#F8F9FC] rounded-xl p-3 min-w-0">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Estimated</div>
               <div className="text-[15px] font-bold text-gray-900">{job.estimated_hours || 0}h</div>
             </div>
@@ -256,14 +256,14 @@ function JobDetailModal({ jobId, open, onClose }) {
                     <span className={cn("w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 text-[10px]", wi.is_completed ? "bg-emerald-500 border-emerald-500 text-white" : "border-gray-300")}>
                       {wi.is_completed && "✓"}
                     </span>
-                    <span className={wi.is_completed ? "line-through text-gray-400" : "text-gray-700"}>{wi.name}</span>
+                    <span className={cn("break-words", wi.is_completed ? "line-through text-gray-400" : "text-gray-700")}>{wi.name}</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
           {job.billable && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Badge tw="text-emerald-600 bg-emerald-50 border-emerald-200">Billable</Badge>
               {job.hourly_rate > 0 && <span className="text-[12px] text-gray-500">₹{job.hourly_rate}/hr · {job.currency}</span>}
             </div>
@@ -341,18 +341,18 @@ function TimerWidget({ assignedJobs }) {
             {isRunning ? "Timer Running" : isPaused ? "Timer Paused" : "No Active Timer"}
           </span>
           {timer?.job?.title && (
-            <span className={cn("ml-auto text-[11px] truncate max-w-[140px]",
+            <span className={cn("ml-auto text-[11px] truncate max-w-[100px] sm:max-w-[140px]",
               isRunning ? "text-white/60" : "text-gray-400")}>{timer.job.title}</span>
           )}
         </div>
-        <div className="px-5 py-4 flex items-center justify-between gap-4">
-          <div className={cn("font-mono text-4xl font-extrabold tracking-widest tabular-nums select-none",
+        <div className="px-4 sm:px-5 py-4 flex flex-col xs:flex-row items-stretch xs:items-center justify-between gap-3 sm:gap-4">
+          <div className={cn("font-mono text-3xl sm:text-4xl font-extrabold tracking-widest tabular-nums select-none text-center xs:text-left",
             isRunning ? "text-white" : isPaused ? "text-amber-600" : "text-gray-200")}>
             {fmtSeconds(displaySecs)}
           </div>
-          <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+          <div className="flex gap-2 shrink-0 flex-wrap justify-center xs:justify-end">
             {!timer ? (
-              <Btn onClick={() => setStartModal(true)}>▶ Start</Btn>
+              <Btn onClick={() => setStartModal(true)} className="flex-1 xs:flex-initial">▶ Start</Btn>
             ) : (
               <>
                 {isRunning && (
@@ -377,11 +377,11 @@ function TimerWidget({ assignedJobs }) {
             {activeJobs.map((j) => <option key={j._id} value={j._id}>{j.title}</option>)}
           </Select>
           <Input label="Note (optional)" placeholder="What are you working on?" value={startForm.note} onChange={(e) => setStartForm((p) => ({ ...p, note: e.target.value }))} />
-          <div className="flex gap-2 justify-end">
-            <Btn variant="ghost" onClick={() => setStartModal(false)}>Cancel</Btn>
+          <div className="flex flex-col-reverse xs:flex-row gap-2 xs:justify-end">
+            <Btn variant="ghost" onClick={() => setStartModal(false)} className="w-full xs:w-auto">Cancel</Btn>
             <Btn onClick={() => startTimerMut.mutate({ job: startForm.job, note: startForm.note }, {
               onSuccess: () => { setStartModal(false); setStartForm({ job: "", note: "" }); refetchTimer(); }
-            })} disabled={!startForm.job || startTimerMut.isPending}>
+            })} disabled={!startForm.job || startTimerMut.isPending} className="w-full xs:w-auto">
               {startTimerMut.isPending ? "Starting…" : "▶ Start"}
             </Btn>
           </div>
@@ -390,16 +390,16 @@ function TimerWidget({ assignedJobs }) {
 
       <Modal open={stopModal} onClose={() => setStopModal(false)} title="Log Time">
         <div className="flex flex-col gap-3.5">
-          <div className="bg-[#730042]/[0.07] border border-[#730042]/20 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div className="bg-[#730042]/[0.07] border border-[#730042]/20 rounded-xl px-4 py-3 flex items-center justify-between gap-2">
             <span className="text-[12px] text-[#730042] font-semibold">Elapsed</span>
-            <span className="font-mono font-extrabold text-xl text-[#730042]">{fmtSeconds(displaySecs)}</span>
+            <span className="font-mono font-extrabold text-lg sm:text-xl text-[#730042]">{fmtSeconds(displaySecs)}</span>
           </div>
           <Input label="Note (optional)" placeholder="Brief summary…" value={stopNote} onChange={(e) => setStopNote(e.target.value)} />
-          <div className="flex gap-2 justify-end">
-            <Btn variant="ghost" onClick={() => setStopModal(false)}>Cancel</Btn>
+          <div className="flex flex-col-reverse xs:flex-row gap-2 xs:justify-end">
+            <Btn variant="ghost" onClick={() => setStopModal(false)} className="w-full xs:w-auto">Cancel</Btn>
             <Btn variant="success" onClick={() => stopTimerMut.mutate({ note: stopNote }, {
               onSuccess: () => { setStopModal(false); setStopNote(""); refetchTimer(); }
-            })} disabled={stopTimerMut.isPending}>
+            })} disabled={stopTimerMut.isPending} className="w-full xs:w-auto">
               {stopTimerMut.isPending ? "Logging…" : "■ Log Time"}
             </Btn>
           </div>
@@ -414,43 +414,45 @@ function WeekGrid({ weekStart, weekDays, onAddLog }) {
   const todayISO = new Date().toISOString().slice(0, 10);
   return (
     <div className="bg-white border border-[#E4E6EF] rounded-2xl overflow-hidden">
-      <div className="grid grid-cols-7 border-b border-[#E4E6EF] min-w-[560px]">
-        {days.map((d, i) => {
-          const iso = d.toISOString().slice(0, 10);
-          const isToday = iso === todayISO;
-          const mins = weekDays[iso]?.totalMinutes || 0;
-          return (
-            <div key={iso} className={cn("px-2 pt-3 pb-2 text-center", i < 6 ? "border-r border-[#E4E6EF]" : "", isToday ? "bg-[#730042]/[0.05]" : "")}>
-              <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{DAY_NAMES[i]}</div>
-              <div className={cn("text-lg font-extrabold mt-0.5", isToday ? "text-[#730042]" : "text-gray-800")}>{d.getDate()}</div>
-              {mins > 0
-                ? <div className="mt-1 text-[10px] font-bold text-[#730042] bg-[#730042]/[0.08] rounded px-1 py-0.5">{fmtDuration(mins)}</div>
-                : <div className="mt-1 h-[18px]" />}
-            </div>
-          );
-        })}
-      </div>
-      <div className="grid grid-cols-7 min-w-[560px]" style={{ minHeight: 120 }}>
-        {days.map((d, i) => {
-          const iso = d.toISOString().slice(0, 10);
-          const logs = weekDays[iso]?.logs || [];
-          const isToday = iso === todayISO;
-          return (
-            <div key={iso} className={cn("px-1.5 py-2 flex flex-col gap-1", i < 6 ? "border-r border-[#E4E6EF]" : "", isToday ? "bg-[#730042]/[0.02]" : "")}>
-              {logs.map((log) => (
-                <div key={log._id}
-                  className={cn("border rounded-lg px-2 py-1.5 cursor-default",
-                    log.billable ? "bg-emerald-50 border-emerald-200 border-l-[3px] border-l-emerald-500"
-                      : "bg-[#730042]/[0.06] border-[#730042]/20 border-l-[3px] border-l-[#730042]")}
-                  title={`${log.job?.title || "—"} · ${fmtDuration(log.duration_minutes)}`}>
-                  <div className="text-[11px] font-semibold text-gray-900 truncate leading-tight">{log.job?.title || "—"}</div>
-                  <div className={cn("text-[10px] font-bold mt-0.5", log.billable ? "text-emerald-600" : "text-[#730042]")}>{fmtDuration(log.duration_minutes)}</div>
-                </div>
-              ))}
-              <button onClick={() => onAddLog(iso)} className="mt-auto w-full border border-dashed border-gray-200 rounded-lg py-1 text-[11px] text-gray-300 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors">+ Add</button>
-            </div>
-          );
-        })}
+      <div className="overflow-x-auto">
+        <div className="grid grid-cols-7 border-b border-[#E4E6EF] min-w-[560px]">
+          {days.map((d, i) => {
+            const iso = d.toISOString().slice(0, 10);
+            const isToday = iso === todayISO;
+            const mins = weekDays[iso]?.totalMinutes || 0;
+            return (
+              <div key={iso} className={cn("px-2 pt-3 pb-2 text-center", i < 6 ? "border-r border-[#E4E6EF]" : "", isToday ? "bg-[#730042]/[0.05]" : "")}>
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{DAY_NAMES[i]}</div>
+                <div className={cn("text-lg font-extrabold mt-0.5", isToday ? "text-[#730042]" : "text-gray-800")}>{d.getDate()}</div>
+                {mins > 0
+                  ? <div className="mt-1 text-[10px] font-bold text-[#730042] bg-[#730042]/[0.08] rounded px-1 py-0.5">{fmtDuration(mins)}</div>
+                  : <div className="mt-1 h-[18px]" />}
+              </div>
+            );
+          })}
+        </div>
+        <div className="grid grid-cols-7 min-w-[560px]" style={{ minHeight: 120 }}>
+          {days.map((d, i) => {
+            const iso = d.toISOString().slice(0, 10);
+            const logs = weekDays[iso]?.logs || [];
+            const isToday = iso === todayISO;
+            return (
+              <div key={iso} className={cn("px-1.5 py-2 flex flex-col gap-1", i < 6 ? "border-r border-[#E4E6EF]" : "", isToday ? "bg-[#730042]/[0.02]" : "")}>
+                {logs.map((log) => (
+                  <div key={log._id}
+                    className={cn("border rounded-lg px-2 py-1.5 cursor-default",
+                      log.billable ? "bg-emerald-50 border-emerald-200 border-l-[3px] border-l-emerald-500"
+                        : "bg-[#730042]/[0.06] border-[#730042]/20 border-l-[3px] border-l-[#730042]")}
+                    title={`${log.job?.title || "—"} · ${fmtDuration(log.duration_minutes)}`}>
+                    <div className="text-[11px] font-semibold text-gray-900 truncate leading-tight">{log.job?.title || "—"}</div>
+                    <div className={cn("text-[10px] font-bold mt-0.5", log.billable ? "text-emerald-600" : "text-[#730042]")}>{fmtDuration(log.duration_minutes)}</div>
+                  </div>
+                ))}
+                <button onClick={() => onAddLog(iso)} className="mt-auto w-full border border-dashed border-gray-200 rounded-lg py-1 text-[11px] text-gray-300 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors min-h-[28px]">+ Add</button>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -592,8 +594,8 @@ export default function SuperAdminTimesheet() {
     <div className="min-h-screen bg-[#F4F5F9]" style={{ fontFamily: "'Inter', sans-serif" }}>
 
       <header className="bg-white border-b border-[#E4E6EF] sticky top-0 z-20">
-        <div className="flex items-center gap-0 px-4 sm:px-6 overflow-x-auto scrollbar-none">
-          <div className="flex items-center gap-2.5 pr-4 sm:pr-6 border-r border-[#E4E6EF] mr-1 sm:mr-2 shrink-0 py-3">
+        <div className="flex items-center gap-0 px-3 sm:px-6 overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-2 sm:gap-2.5 pr-3 sm:pr-6 border-r border-[#E4E6EF] mr-1 sm:mr-2 shrink-0 py-2.5 sm:py-3">
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-[#730042] flex items-center justify-center shrink-0">
               <span className="text-white text-[12px] sm:text-[13px] font-black">S</span>
             </div>
@@ -606,7 +608,7 @@ export default function SuperAdminTimesheet() {
           <nav className="hidden md:flex items-center gap-0 flex-1 overflow-x-auto scrollbar-none">
             {NAV_TABS.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)}
-                className={cn("relative px-3.5 py-[18px] text-[13px] whitespace-nowrap border-b-[2.5px] transition-all shrink-0",
+                className={cn("relative px-3 lg:px-3.5 py-[18px] text-[12px] lg:text-[13px] whitespace-nowrap border-b-[2.5px] transition-all shrink-0",
                   tab === t.id ? "font-bold text-[#730042] border-[#730042]" : "font-medium text-gray-600 border-transparent hover:text-gray-900")}>
                 {t.label}
                 {t.id === "approvals" && approvals.length > 0 && (
@@ -618,20 +620,20 @@ export default function SuperAdminTimesheet() {
             ))}
           </nav>
 
-          <div className="md:hidden flex items-center gap-2 flex-1 pl-3">
+          <div className="md:hidden flex items-center gap-2 flex-1 pl-2 sm:pl-3 min-w-0">
             <button onClick={() => setMobileNavOpen(v => !v)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E4E6EF] text-[13px] font-semibold text-gray-700 bg-[#F8F9FC]">
-              <span>{currentTabLabel}</span>
-              <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 16 16">
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#E4E6EF] text-[13px] font-semibold text-gray-700 bg-[#F8F9FC] min-h-[40px]">
+              <span className="truncate max-w-[110px] xs:max-w-none">{currentTabLabel}</span>
+              <svg className="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 16 16">
                 <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               {approvals.length > 0 && (
-                <span className="w-4 h-4 bg-red-500 text-white rounded-full text-[9px] font-black flex items-center justify-center">{approvals.length}</span>
+                <span className="w-4 h-4 bg-red-500 text-white rounded-full text-[9px] font-black flex items-center justify-center shrink-0">{approvals.length}</span>
               )}
             </button>
           </div>
 
-          <div className="flex gap-2 shrink-0 pl-3 sm:pl-4 py-2.5 border-l border-[#E4E6EF] ml-auto">
+          <div className="flex gap-2 shrink-0 pl-2 sm:pl-4 py-2 sm:py-2.5 border-l border-[#E4E6EF] ml-auto">
             <Btn onClick={() => setCreateJobOpen(true)} className="text-[12px] px-3 sm:px-4 hidden xs:inline-flex">＋ New Job</Btn>
             <Btn variant="ghost" onClick={() => setCreateProjectOpen(true)} className="text-[12px] px-3 sm:px-4 hidden sm:inline-flex">＋ Project</Btn>
             <Btn onClick={() => setCreateJobOpen(true)} className="text-[11px] px-2.5 xs:hidden">＋ Job</Btn>
@@ -639,10 +641,10 @@ export default function SuperAdminTimesheet() {
         </div>
 
         {mobileNavOpen && (
-          <div className="md:hidden border-t border-[#E4E6EF] bg-white">
+          <div className="md:hidden border-t border-[#E4E6EF] bg-white max-h-[70vh] overflow-y-auto">
             {NAV_TABS.map(t => (
               <button key={t.id} onClick={() => { setTab(t.id); setMobileNavOpen(false); }}
-                className={cn("w-full flex items-center justify-between px-5 py-3 text-[13px] font-medium border-b border-[#E4E6EF] last:border-0 transition-colors",
+                className={cn("w-full flex items-center justify-between px-4 sm:px-5 py-3 text-[13px] font-medium border-b border-[#E4E6EF] last:border-0 transition-colors min-h-[44px]",
                   tab === t.id ? "text-[#730042] bg-[#730042]/[0.04] font-bold" : "text-gray-700 hover:bg-gray-50")}>
                 {t.label}
                 <div className="flex items-center gap-2">
@@ -657,16 +659,16 @@ export default function SuperAdminTimesheet() {
         )}
       </header>
 
-      <div className="bg-[#730042]/[0.07] border-b border-[#730042]/[0.18] px-4 sm:px-6 py-1.5 flex items-center gap-2">
-        <span className="text-[11px] font-bold text-[#730042]">⬡ Super Admin</span>
-        <span className="text-[11px] text-[#730042]/70 hidden sm:inline">— Organisation-wide visibility across all roles</span>
+      <div className="bg-[#730042]/[0.07] border-b border-[#730042]/[0.18] px-3 sm:px-6 py-1.5 flex items-center gap-2 overflow-hidden">
+        <span className="text-[11px] font-bold text-[#730042] shrink-0">⬡ Super Admin</span>
+        <span className="text-[11px] text-[#730042]/70 hidden sm:inline truncate">— Organisation-wide visibility across all roles</span>
       </div>
 
-      <main className="px-4 sm:px-6 py-5 sm:py-7 max-w-[1280px] mx-auto">
+      <main className="px-3 sm:px-6 py-4 sm:py-7 max-w-[1280px] mx-auto">
 
         {tab === "overview" && (
-          <div className="flex flex-col gap-5">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="flex flex-col gap-4 sm:gap-5">
+            <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3">
               <StatTile label="Total Projects"  value={projects.length}                                     sub="Across all teams"           colorClass="text-[#730042]"    />
               <StatTile label="Active Jobs"     value={jobs.filter(j => j.status === "in_progress").length} sub={`${completedJobs} completed`} colorClass="text-blue-600"  />
               <StatTile label="Hours Logged"    value={`${totalHours.toFixed(0)}h`}                        sub={`${billableJobs} billable jobs`} colorClass="text-emerald-600" />
@@ -681,13 +683,13 @@ export default function SuperAdminTimesheet() {
                 ) : (
                   <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-0.5">
                     {overrunJobs.map(job => (
-                      <div key={job._id} className="flex items-center gap-3 px-3.5 py-2.5 bg-[#F8F9FC] border border-[#E4E6EF] rounded-xl">
+                      <div key={job._id} className="flex items-center gap-3 px-3 sm:px-3.5 py-2.5 bg-[#F8F9FC] border border-[#E4E6EF] rounded-xl">
                         <span className="text-[12px] font-black text-red-600 min-w-[36px]">{job.riskPercent}%</span>
                         <div className="flex-1 min-w-0">
                           <div className="text-[12px] font-semibold truncate">{job.title}</div>
                           <div className="text-[11px] text-gray-400">{job.logged_hours_cache}h / {job.estimated_hours}h est.</div>
                         </div>
-                        <div className="w-14 sm:w-16 h-1 bg-[#E4E6EF] rounded-full overflow-hidden shrink-0">
+                        <div className="w-12 sm:w-16 h-1 bg-[#E4E6EF] rounded-full overflow-hidden shrink-0">
                           <div className="h-full rounded-full" style={{ width: `${Math.min(job.riskPercent, 100)}%`, background: job.riskPercent >= 100 ? "#DC2626" : "#D97706" }} />
                         </div>
                       </div>
@@ -703,7 +705,7 @@ export default function SuperAdminTimesheet() {
                 ) : (
                   <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-0.5">
                     {idleJobs.map(job => (
-                      <div key={job._id} className="flex items-center gap-3 px-3.5 py-2.5 bg-[#F8F9FC] border border-[#E4E6EF] rounded-xl">
+                      <div key={job._id} className="flex items-center gap-3 px-3 sm:px-3.5 py-2.5 bg-[#F8F9FC] border border-[#E4E6EF] rounded-xl">
                         <div className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
                         <div className="flex-1 min-w-0">
                           <div className="text-[12px] font-semibold truncate">{job.title}</div>
@@ -728,7 +730,7 @@ export default function SuperAdminTimesheet() {
                   <table className="w-full border-collapse text-[12px] min-w-[480px]">
                     <thead>
                       <tr>
-                        <th className="text-left py-2 pr-4 pl-1 text-gray-400 font-semibold">Member</th>
+                        <th className="text-left py-2 pr-4 pl-1 text-gray-400 font-semibold sticky left-0 bg-white">Member</th>
                         {DAY_NAMES.map(d => (
                           <th key={d} className="text-center py-2 px-1.5 text-gray-400 font-semibold">{d}</th>
                         ))}
@@ -744,7 +746,7 @@ export default function SuperAdminTimesheet() {
                         const memberName = row.name || row.member_name || `Member ${i + 1}`;
                         return (
                           <tr key={i} className="border-t border-[#E4E6EF]">
-                            <td className="py-2.5 pr-4 pl-1 text-gray-700 font-medium truncate max-w-[100px]">{memberName}</td>
+                            <td className="py-2.5 pr-4 pl-1 text-gray-700 font-medium truncate max-w-[100px] sticky left-0 bg-white">{memberName}</td>
                             {days.map((day, j) => {
                               const pct = day?.loadPercent ?? 0;
                               const cellClass = pct === 0 ? "bg-[#F8F9FC] text-gray-400" : pct < 50 ? "bg-emerald-50 text-emerald-600" : pct < 80 ? "bg-amber-50 text-amber-600" : "bg-red-50 text-red-600";
@@ -769,7 +771,7 @@ export default function SuperAdminTimesheet() {
 
         {tab === "projects" && (
           <div>
-            <SectionHeader title="All Projects" sub={`${projects.length} total`} action={<Btn onClick={() => setCreateProjectOpen(true)}>＋ New Project</Btn>} />
+            <SectionHeader title="All Projects" sub={`${projects.length} total`} action={<Btn onClick={() => setCreateProjectOpen(true)} className="w-full sm:w-auto">＋ New Project</Btn>} />
             {projects.length === 0 ? (
               <Card><EmptyState icon="⬡" title="No projects yet" sub="Create your first project" action={<Btn onClick={() => setCreateProjectOpen(true)}>Create Project</Btn>} /></Card>
             ) : (
@@ -798,7 +800,7 @@ export default function SuperAdminTimesheet() {
 
         {tab === "jobs" && (
           <div>
-            <SectionHeader title="Jobs Created by Me" sub={`${jobs.length} total`} action={<Btn onClick={() => setCreateJobOpen(true)}>＋ New Job</Btn>} />
+            <SectionHeader title="Jobs Created by Me" sub={`${jobs.length} total`} action={<Btn onClick={() => setCreateJobOpen(true)} className="w-full sm:w-auto">＋ New Job</Btn>} />
             <div className="flex flex-col gap-2.5">
               {jobs.length === 0 ? (
                 <Card><EmptyState icon="⬢" title="No jobs yet" sub="Create a job to assign work" action={<Btn onClick={() => setCreateJobOpen(true)}>Create Job</Btn>} /></Card>
@@ -809,7 +811,7 @@ export default function SuperAdminTimesheet() {
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <button className="font-bold text-[13px] sm:text-[14px] text-gray-900 hover:text-[#730042] transition-colors text-left" onClick={() => openJobDetail(job._id)}>
+                          <button className="font-bold text-[13px] sm:text-[14px] text-gray-900 hover:text-[#730042] transition-colors text-left break-words" onClick={() => openJobDetail(job._id)}>
                             {job.title}
                           </button>
                           <Badge tw={PRIORITY_TW[job.priority] || PRIORITY_TW.medium}>{job.priority}</Badge>
@@ -817,7 +819,7 @@ export default function SuperAdminTimesheet() {
                           {job.overrun_flagged && <Badge tw="text-red-600 bg-red-50 border-red-200">Overrun</Badge>}
                         </div>
                         {assigneeInfo && (
-                          <div className="text-[11px] text-gray-400 mb-1">
+                          <div className="text-[11px] text-gray-400 mb-1 truncate">
                             Assigned to <span className="font-semibold text-gray-700">{assigneeInfo.name}</span>
                             <span className="text-[#730042] font-semibold"> · {assigneeInfo.role || assigneeInfo.model}</span>
                           </div>
@@ -828,15 +830,15 @@ export default function SuperAdminTimesheet() {
                           {job.due_date && <span>Due {fmtDate(job.due_date)}</span>}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button onClick={() => openJobDetail(job._id)} className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-gray-700 cursor-pointer">View</button>
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+                        <button onClick={() => openJobDetail(job._id)} className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-2.5 py-2 text-[11px] font-semibold text-gray-700 cursor-pointer min-h-[36px]">View</button>
                         <select value={job.status} onChange={e => updateJobStatus.mutate({ id: job._id, status: e.target.value }, { onSuccess: refetchJobs })}
-                          className={cn("bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-2.5 py-1.5 text-[11px] font-semibold outline-none cursor-pointer", JOB_STATUS_TW[job.status] || "text-gray-900")}>
+                          className={cn("bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-2.5 py-2 text-[11px] font-semibold outline-none cursor-pointer min-h-[36px]", JOB_STATUS_TW[job.status] || "text-gray-900")}>
                           {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map(s => (
                             <option key={s} value={s} className="text-gray-900">{s.replace(/_/g, " ")}</option>
                           ))}
                         </select>
-                        <Btn variant="ghost" onClick={() => archiveJob.mutate(job._id, { onSuccess: refetchJobs })} className="text-[12px] px-3">Archive</Btn>
+                        <Btn variant="ghost" onClick={() => archiveJob.mutate(job._id, { onSuccess: refetchJobs })} className="text-[12px] px-3 min-h-[36px]">Archive</Btn>
                       </div>
                     </div>
                     {job.estimated_hours > 0 && (
@@ -863,8 +865,8 @@ export default function SuperAdminTimesheet() {
                   <Card key={ts._id} className="p-4 sm:p-5">
                     <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                       <div className="flex-1 min-w-0">
-                        <div className="font-bold text-[15px] text-gray-900">{ts.owner?.f_name} {ts.owner?.l_name}</div>
-                        <div className="text-[12px] text-gray-400 mt-0.5">{ts.owner?.work_email} · {ts.owner_model}</div>
+                        <div className="font-bold text-[15px] text-gray-900 truncate">{ts.owner?.f_name} {ts.owner?.l_name}</div>
+                        <div className="text-[12px] text-gray-400 mt-0.5 truncate">{ts.owner?.work_email} · {ts.owner_model}</div>
                         <div className="text-[12px] text-gray-400 mt-1">Week: {fmtDate(ts.week_start)} — {fmtDate(ts.week_end)}</div>
                         <div className="flex items-center gap-3 mt-2 flex-wrap text-[12px]">
                           <span className="text-[#730042] font-semibold">{fmtDuration(ts.total_minutes)} total</span>
@@ -872,9 +874,9 @@ export default function SuperAdminTimesheet() {
                           <Badge tw={(STATUS_STYLE[ts.status] || STATUS_STYLE.draft).tw}>{(STATUS_STYLE[ts.status] || STATUS_STYLE.draft).label}</Badge>
                         </div>
                       </div>
-                      <div className="flex gap-2 shrink-0">
-                        <Btn variant="success" onClick={() => setApproveModal(ts)}>Approve</Btn>
-                        <Btn variant="danger" onClick={() => { setRejectModal(ts); setRejectRemarks(""); }}>Reject</Btn>
+                      <div className="flex gap-2 shrink-0 w-full sm:w-auto">
+                        <Btn variant="success" onClick={() => setApproveModal(ts)} className="flex-1 sm:flex-initial">Approve</Btn>
+                        <Btn variant="danger" onClick={() => { setRejectModal(ts); setRejectRemarks(""); }} className="flex-1 sm:flex-initial">Reject</Btn>
                       </div>
                     </div>
                   </Card>
@@ -890,53 +892,49 @@ export default function SuperAdminTimesheet() {
               <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">My Work</h1>
               <div className="flex gap-2 items-center flex-wrap">
                 <div className="flex items-center gap-1.5 bg-white border border-[#E4E6EF] rounded-[10px] px-2.5 py-1.5">
-                  <button onClick={() => shiftWeek(-1)} className="bg-transparent border-none cursor-pointer text-gray-700 text-base flex">‹</button>
+                  <button onClick={() => shiftWeek(-1)} className="bg-transparent border-none cursor-pointer text-gray-700 text-base flex w-6 h-6 items-center justify-center shrink-0">‹</button>
                   <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">{fmtShort(weekStart)} – {fmtShort(weekEnd)}</span>
-                  <button onClick={() => shiftWeek(1)} className="bg-transparent border-none cursor-pointer text-gray-700 text-base flex">›</button>
+                  <button onClick={() => shiftWeek(1)} className="bg-transparent border-none cursor-pointer text-gray-700 text-base flex w-6 h-6 items-center justify-center shrink-0">›</button>
                 </div>
-                <Btn onClick={() => setLogModal(true)}>+ Log Time</Btn>
+                <Btn onClick={() => setLogModal(true)} className="flex-1 xs:flex-initial">+ Log Time</Btn>
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
               {[
                 { label: "This Week", value: fmtDuration(totalWeekMins), color: "text-[#730042]" },
                 { label: "Billable", value: fmtDuration(prodData?.billableMinutes || 0), color: "text-emerald-600" },
                 { label: "Capacity", value: `${prodData?.capacityPercent || Math.round((totalWeekMins / 2400) * 100)}%`, color: "text-blue-600" },
               ].map(s => (
-                <Card key={s.label} className="px-4 py-4">
-                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">{s.label}</div>
-                  <div className={cn("text-2xl font-extrabold leading-none", s.color)}>{s.value}</div>
+                <Card key={s.label} className="px-2.5 sm:px-4 py-3 sm:py-4">
+                  <div className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1 sm:mb-1.5 truncate">{s.label}</div>
+                  <div className={cn("text-lg sm:text-2xl font-extrabold leading-none truncate", s.color)}>{s.value}</div>
                 </Card>
               ))}
             </div>
 
             <TimerWidget assignedJobs={assignedJobs} />
 
-            <div className="overflow-x-auto -mx-4 px-4">
-              <div className="min-w-[560px]">
-                <WeekGrid weekStart={weekStart} weekDays={weekDays}
-                  onAddLog={(date) => { setLogForm({ job: "", log_date: date, duration_minutes: "", note: "" }); setLogModal(true); }} />
-              </div>
-            </div>
+            <WeekGrid weekStart={weekStart} weekDays={weekDays}
+              onAddLog={(date) => { setLogForm({ job: "", log_date: date, duration_minutes: "", note: "" }); setLogModal(true); }} />
 
             <div className="bg-white border border-[#E4E6EF] rounded-2xl p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="min-w-0">
                   <div className="text-[13px] font-semibold text-gray-900">Week of {fmtShort(weekStart)} – {fmtShort(weekEnd)}</div>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     {currentWeekSheet
                       ? <Badge tw={(STATUS_STYLE[currentWeekSheet.status] || STATUS_STYLE.draft).tw}>{(STATUS_STYLE[currentWeekSheet.status] || STATUS_STYLE.draft).label}</Badge>
                       : <span className="text-[12px] text-gray-400">Not submitted</span>}
-                    {currentWeekSheet?.remarks && <span className="text-[12px] text-gray-500 italic">"{currentWeekSheet.remarks}"</span>}
+                    {currentWeekSheet?.remarks && <span className="text-[12px] text-gray-500 italic truncate">"{currentWeekSheet.remarks}"</span>}
                   </div>
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex gap-2 shrink-0 w-full sm:w-auto">
                   {canRecall && (
-                    <Btn variant="ghost" onClick={() => recallTS.mutate({ timesheetId: currentWeekSheet._id }, { onSuccess: () => { refetchTS(); refetchWeek(); } })} disabled={recallTS.isPending} className="text-[13px] px-3 py-2">Recall</Btn>
+                    <Btn variant="ghost" onClick={() => recallTS.mutate({ timesheetId: currentWeekSheet._id }, { onSuccess: () => { refetchTS(); refetchWeek(); } })} disabled={recallTS.isPending} className="text-[13px] px-3 py-2 flex-1 sm:flex-initial">Recall</Btn>
                   )}
                   {canSubmit && (
-                    <Btn onClick={() => submitTS.mutate({ week_start: weekStart }, { onSuccess: () => { refetchTS(); refetchWeek(); } })} disabled={submitTS.isPending || totalWeekMins === 0} className="text-[13px] px-3 py-2">
+                    <Btn onClick={() => submitTS.mutate({ week_start: weekStart }, { onSuccess: () => { refetchTS(); refetchWeek(); } })} disabled={submitTS.isPending || totalWeekMins === 0} className="text-[13px] px-3 py-2 flex-1 sm:flex-initial">
                       {submitTS.isPending ? "Submitting…" : "Submit Week"}
                     </Btn>
                   )}
@@ -952,9 +950,9 @@ export default function SuperAdminTimesheet() {
               title="All Time Logs — Organisation"
               sub={`${orgLogs.length} entries · ${fmtDuration(orgLogsData?.totalMinutes || 0)} total`}
               action={
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
                   <input type="date" value={logsWeek} onChange={e => setLogsWeek(e.target.value)}
-                    className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-3 py-2 text-[12px] text-gray-900 outline-none focus:border-[#730042] transition-colors" />
+                    className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-3 py-2 text-[12px] text-gray-900 outline-none focus:border-[#730042] transition-colors min-h-[40px] flex-1 sm:flex-initial" />
                   <span className="text-[11px] text-gray-400 hidden sm:inline">week of</span>
                 </div>
               }
@@ -962,36 +960,60 @@ export default function SuperAdminTimesheet() {
             {orgLogs.length === 0 ? (
               <Card><EmptyState icon="📋" title="No logs found" sub="No time entries for this week across the org" /></Card>
             ) : (
-              <Card className="overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-[13px] min-w-[640px]">
-                    <thead>
-                      <tr className="bg-[#F8F9FC] border-b border-[#E4E6EF]">
-                        {["Member", "Role", "Job", "Date", "Duration", "Mode", "Status"].map(h => (
-                          <th key={h} className="text-left px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {orgLogs.map(log => (
-                        <tr key={log._id} className="border-b border-[#E4E6EF] hover:bg-[#F8F9FC] transition-colors">
-                          <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">{log.logged_by?.f_name || "—"} {log.logged_by?.l_name || ""}</td>
-                          <td className="px-4 py-3"><Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{log.logged_by_model}</Badge></td>
-                          <td className="px-4 py-3 max-w-[180px] truncate text-gray-700">{log.job?.title || "—"}</td>
-                          <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{fmtDate(log.log_date)}</td>
-                          <td className="px-4 py-3 font-semibold text-emerald-600 whitespace-nowrap">{fmtDuration(log.duration_minutes)}</td>
-                          <td className="px-4 py-3">
-                            <Badge tw={log.entry_mode === "timer" ? "text-blue-600 bg-blue-50 border-blue-200" : "text-gray-400 bg-gray-100 border-gray-200"}>{log.entry_mode}</Badge>
-                          </td>
-                          <td className="px-4 py-3">
-                            <Badge tw={(STATUS_STYLE[log.status] || STATUS_STYLE.draft).tw}>{(STATUS_STYLE[log.status] || STATUS_STYLE.draft).label}</Badge>
-                          </td>
+              <>
+                <Card className="overflow-hidden hidden sm:block">
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-[13px] min-w-[640px]">
+                      <thead>
+                        <tr className="bg-[#F8F9FC] border-b border-[#E4E6EF] sticky top-0 z-[1]">
+                          {["Member", "Role", "Job", "Date", "Duration", "Mode", "Status"].map(h => (
+                            <th key={h} className="text-left px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                          ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {orgLogs.map(log => (
+                          <tr key={log._id} className="border-b border-[#E4E6EF] hover:bg-[#F8F9FC] transition-colors">
+                            <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">{log.logged_by?.f_name || "—"} {log.logged_by?.l_name || ""}</td>
+                            <td className="px-4 py-3"><Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{log.logged_by_model}</Badge></td>
+                            <td className="px-4 py-3 max-w-[180px] truncate text-gray-700">{log.job?.title || "—"}</td>
+                            <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{fmtDate(log.log_date)}</td>
+                            <td className="px-4 py-3 font-semibold text-emerald-600 whitespace-nowrap">{fmtDuration(log.duration_minutes)}</td>
+                            <td className="px-4 py-3">
+                              <Badge tw={log.entry_mode === "timer" ? "text-blue-600 bg-blue-50 border-blue-200" : "text-gray-400 bg-gray-100 border-gray-200"}>{log.entry_mode}</Badge>
+                            </td>
+                            <td className="px-4 py-3">
+                              <Badge tw={(STATUS_STYLE[log.status] || STATUS_STYLE.draft).tw}>{(STATUS_STYLE[log.status] || STATUS_STYLE.draft).label}</Badge>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+
+                <div className="flex flex-col gap-2.5 sm:hidden">
+                  {orgLogs.map(log => (
+                    <Card key={log._id} className="p-3.5">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="min-w-0">
+                          <div className="font-bold text-[13px] text-gray-900 truncate">{log.logged_by?.f_name || "—"} {log.logged_by?.l_name || ""}</div>
+                          <div className="text-[11px] text-gray-400 truncate">{log.job?.title || "—"}</div>
+                        </div>
+                        <Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{log.logged_by_model}</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-[11px] text-gray-500 mb-2">
+                        <div>Date: <span className="font-semibold text-gray-700">{fmtDate(log.log_date)}</span></div>
+                        <div>Duration: <span className="font-semibold text-emerald-600">{fmtDuration(log.duration_minutes)}</span></div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge tw={log.entry_mode === "timer" ? "text-blue-600 bg-blue-50 border-blue-200" : "text-gray-400 bg-gray-100 border-gray-200"}>{log.entry_mode}</Badge>
+                        <Badge tw={(STATUS_STYLE[log.status] || STATUS_STYLE.draft).tw}>{(STATUS_STYLE[log.status] || STATUS_STYLE.draft).label}</Badge>
+                      </div>
+                    </Card>
+                  ))}
                 </div>
-              </Card>
+              </>
             )}
           </div>
         )}
@@ -1004,12 +1026,12 @@ export default function SuperAdminTimesheet() {
               action={
                 <div className="flex gap-2 flex-wrap">
                   <select value={sheetsStatus} onChange={e => setSheetsStatus(e.target.value)}
-                    className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-3 py-2 text-[12px] text-gray-900 outline-none focus:border-[#730042] transition-colors cursor-pointer appearance-none">
+                    className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-3 py-2 text-[12px] text-gray-900 outline-none focus:border-[#730042] transition-colors cursor-pointer appearance-none min-h-[40px] flex-1 sm:flex-initial">
                     <option value="">All Statuses</option>
                     {Object.entries(STATUS_STYLE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                   </select>
                   <select value={sheetsOwnerModel} onChange={e => setSheetsOwnerModel(e.target.value)}
-                    className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-3 py-2 text-[12px] text-gray-900 outline-none focus:border-[#730042] transition-colors cursor-pointer appearance-none">
+                    className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-3 py-2 text-[12px] text-gray-900 outline-none focus:border-[#730042] transition-colors cursor-pointer appearance-none min-h-[40px] flex-1 sm:flex-initial">
                     <option value="">All Roles</option>
                     <option value="User">Employee</option>
                     <option value="Manager">Manager</option>
@@ -1029,25 +1051,25 @@ export default function SuperAdminTimesheet() {
                       <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
-                            <span className="font-bold text-[14px] text-gray-900">{ts.owner?.f_name} {ts.owner?.l_name}</span>
+                            <span className="font-bold text-[14px] text-gray-900 truncate">{ts.owner?.f_name} {ts.owner?.l_name}</span>
                             <Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{ts.owner_model}</Badge>
                             <Badge tw={ss.tw}>{ss.label}</Badge>
                           </div>
-                          <div className="text-[12px] text-gray-400">{ts.owner?.work_email} · Week: {fmtDate(ts.week_start)} — {fmtDate(ts.week_end)}</div>
+                          <div className="text-[12px] text-gray-400 truncate">{ts.owner?.work_email} · Week: {fmtDate(ts.week_start)} — {fmtDate(ts.week_end)}</div>
                         </div>
-                        <div className="flex gap-5 shrink-0">
+                        <div className="flex gap-4 sm:gap-5 shrink-0">
                           <div className="text-right">
-                            <div className="text-[16px] font-extrabold text-[#730042]">{fmtDuration(ts.total_minutes)}</div>
+                            <div className="text-[15px] sm:text-[16px] font-extrabold text-[#730042]">{fmtDuration(ts.total_minutes)}</div>
                             <div className="text-[11px] text-gray-400">total</div>
                           </div>
                           <div className="text-right">
-                            <div className="text-[16px] font-extrabold text-emerald-600">{fmtDuration(ts.billable_minutes)}</div>
+                            <div className="text-[15px] sm:text-[16px] font-extrabold text-emerald-600">{fmtDuration(ts.billable_minutes)}</div>
                             <div className="text-[11px] text-gray-400">billable</div>
                           </div>
                         </div>
                       </div>
                       {ts.remarks && (
-                        <div className="mt-3 text-[12px] text-gray-500 px-3 py-2 bg-[#F8F9FC] rounded-lg border-l-[3px] border-l-[#730042]">{ts.remarks}</div>
+                        <div className="mt-3 text-[12px] text-gray-500 px-3 py-2 bg-[#F8F9FC] rounded-lg border-l-[3px] border-l-[#730042] break-words">{ts.remarks}</div>
                       )}
                     </Card>
                   );
@@ -1058,7 +1080,7 @@ export default function SuperAdminTimesheet() {
         )}
 
         {tab === "analytics" && (
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-4 sm:gap-5">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               <StatTile label="Total Hours"   value={`${totalHours.toFixed(0)}h`} sub="All time logged"       colorClass="text-[#730042]"   />
               <StatTile label="Billable Jobs" value={billableJobs}                sub={`of ${jobs.length} total`} colorClass="text-emerald-600" />
@@ -1088,9 +1110,9 @@ export default function SuperAdminTimesheet() {
           <div className="text-[14px] text-gray-700">
             Approve the timesheet for <strong className="text-gray-900">{approveModal?.owner?.f_name} {approveModal?.owner?.l_name}</strong>?
           </div>
-          <div className="flex gap-2 justify-end">
-            <Btn variant="ghost" onClick={() => setApproveModal(null)}>Cancel</Btn>
-            <Btn variant="success" onClick={() => handleApprove(approveModal)} disabled={approveTS.isPending}>
+          <div className="flex flex-col-reverse xs:flex-row gap-2 xs:justify-end">
+            <Btn variant="ghost" onClick={() => setApproveModal(null)} className="w-full xs:w-auto">Cancel</Btn>
+            <Btn variant="success" onClick={() => handleApprove(approveModal)} disabled={approveTS.isPending} className="w-full xs:w-auto">
               {approveTS.isPending ? "Approving…" : "Approve"}
             </Btn>
           </div>
@@ -1103,9 +1125,9 @@ export default function SuperAdminTimesheet() {
             Rejecting timesheet for <strong className="text-gray-900">{rejectModal?.owner?.f_name} {rejectModal?.owner?.l_name}</strong>
           </div>
           <Input label="Reason (required)" placeholder="Explain the issue…" value={rejectRemarks} onChange={e => setRejectRemarks(e.target.value)} />
-          <div className="flex gap-2 justify-end">
-            <Btn variant="ghost" onClick={() => setRejectModal(null)}>Cancel</Btn>
-            <Btn variant="danger" onClick={handleReject} disabled={!rejectRemarks.trim() || rejectTS.isPending}>
+          <div className="flex flex-col-reverse xs:flex-row gap-2 xs:justify-end">
+            <Btn variant="ghost" onClick={() => setRejectModal(null)} className="w-full xs:w-auto">Cancel</Btn>
+            <Btn variant="danger" onClick={handleReject} disabled={!rejectRemarks.trim() || rejectTS.isPending} className="w-full xs:w-auto">
               {rejectTS.isPending ? "Rejecting…" : "Reject"}
             </Btn>
           </div>
@@ -1116,7 +1138,7 @@ export default function SuperAdminTimesheet() {
         <div className="flex flex-col gap-3.5">
           <Input label="Project Name" placeholder="e.g. Website Redesign" value={projectForm.name} onChange={e => setProjectForm(p => ({ ...p, name: e.target.value }))} />
           <Input label="Description" placeholder="Brief description…" value={projectForm.description} onChange={e => setProjectForm(p => ({ ...p, description: e.target.value }))} />
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 xs:grid-cols-2 gap-2.5">
             <Select label="Billing Type" value={projectForm.billing_type} onChange={e => setProjectForm(p => ({ ...p, billing_type: e.target.value }))}>
               <option value="hourly">Hourly</option>
               <option value="fixed">Fixed</option>
@@ -1129,9 +1151,9 @@ export default function SuperAdminTimesheet() {
             </Select>
           </div>
           <Input label="Default Hourly Rate" type="number" placeholder="0.00" value={projectForm.default_hourly_rate} onChange={e => setProjectForm(p => ({ ...p, default_hourly_rate: e.target.value }))} />
-          <div className="flex gap-2 justify-end pt-1">
-            <Btn variant="ghost" onClick={() => setCreateProjectOpen(false)}>Cancel</Btn>
-            <Btn onClick={handleCreateProject} disabled={!projectForm.name || createProject.isPending}>
+          <div className="flex flex-col-reverse xs:flex-row gap-2 xs:justify-end pt-1">
+            <Btn variant="ghost" onClick={() => setCreateProjectOpen(false)} className="w-full xs:w-auto">Cancel</Btn>
+            <Btn onClick={handleCreateProject} disabled={!projectForm.name || createProject.isPending} className="w-full xs:w-auto">
               {createProject.isPending ? "Creating…" : "Create Project"}
             </Btn>
           </div>
@@ -1148,7 +1170,7 @@ export default function SuperAdminTimesheet() {
               <option key={t.id} value={t.id}>{t.name} — {t.role || t.model}</option>
             ))}
           </Select>
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 xs:grid-cols-2 gap-2.5">
             <Select label="Priority" value={jobForm.priority} onChange={e => setJobForm(p => ({ ...p, priority: e.target.value }))}>
               <option value="low">Low</option>
               <option value="medium">Medium</option>
@@ -1157,7 +1179,7 @@ export default function SuperAdminTimesheet() {
             </Select>
             <Input label="Estimated Hours" type="number" placeholder="0" value={jobForm.estimated_hours} onChange={e => setJobForm(p => ({ ...p, estimated_hours: e.target.value }))} />
           </div>
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 xs:grid-cols-2 gap-2.5">
             <Input label="Hourly Rate" type="number" placeholder="0.00" value={jobForm.hourly_rate} onChange={e => setJobForm(p => ({ ...p, hourly_rate: e.target.value }))} />
             <Select label="Currency" value={jobForm.currency} onChange={e => setJobForm(p => ({ ...p, currency: e.target.value }))}>
               <option value="INR">INR</option>
@@ -1165,13 +1187,13 @@ export default function SuperAdminTimesheet() {
               <option value="EUR">EUR</option>
             </Select>
           </div>
-          <label className="flex items-center gap-2.5 cursor-pointer">
+          <label className="flex items-center gap-2.5 cursor-pointer min-h-[24px]">
             <input type="checkbox" checked={jobForm.billable} onChange={e => setJobForm(p => ({ ...p, billable: e.target.checked }))} className="w-4 h-4 accent-[#730042]" />
             <span className="text-[13px] text-gray-600">Billable job</span>
           </label>
-          <div className="flex gap-2 justify-end pt-1">
-            <Btn variant="ghost" onClick={() => setCreateJobOpen(false)}>Cancel</Btn>
-            <Btn onClick={handleCreateJob} disabled={!jobForm.title || !jobForm.assigned_to || createJob.isPending}>
+          <div className="flex flex-col-reverse xs:flex-row gap-2 xs:justify-end pt-1">
+            <Btn variant="ghost" onClick={() => setCreateJobOpen(false)} className="w-full xs:w-auto">Cancel</Btn>
+            <Btn onClick={handleCreateJob} disabled={!jobForm.title || !jobForm.assigned_to || createJob.isPending} className="w-full xs:w-auto">
               {createJob.isPending ? "Creating…" : "Create Job"}
             </Btn>
           </div>
@@ -1184,14 +1206,14 @@ export default function SuperAdminTimesheet() {
             <option value="">Select job…</option>
             {assignedJobs.map(j => <option key={j._id} value={j._id}>{j.title}</option>)}
           </Select>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
             <Input label="Date" type="date" value={logForm.log_date} onChange={e => setLogForm(p => ({ ...p, log_date: e.target.value }))} />
             <Input label="Duration (minutes)" type="number" placeholder="e.g. 90" min="1" value={logForm.duration_minutes} onChange={e => setLogForm(p => ({ ...p, duration_minutes: e.target.value }))} />
           </div>
           <Input label="Note (optional)" placeholder="What did you work on?" value={logForm.note} onChange={e => setLogForm(p => ({ ...p, note: e.target.value }))} />
-          <div className="flex gap-2 justify-end pt-1">
-            <Btn variant="ghost" onClick={() => setLogModal(false)}>Cancel</Btn>
-            <Btn onClick={handleLogTime} disabled={!logForm.job || !logForm.duration_minutes || logTime.isPending}>
+          <div className="flex flex-col-reverse xs:flex-row gap-2 xs:justify-end pt-1">
+            <Btn variant="ghost" onClick={() => setLogModal(false)} className="w-full xs:w-auto">Cancel</Btn>
+            <Btn onClick={handleLogTime} disabled={!logForm.job || !logForm.duration_minutes || logTime.isPending} className="w-full xs:w-auto">
               {logTime.isPending ? "Saving…" : "Save Entry"}
             </Btn>
           </div>

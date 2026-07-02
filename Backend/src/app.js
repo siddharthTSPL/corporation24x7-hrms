@@ -17,6 +17,7 @@ app.use((req, res, next) => {
     req.hostname === "localhost" ||
     req.hostname === "146.101.46.205" ||
     req.method === "OPTIONS" ||
+    
     req.secure
   ) {
     return next();
