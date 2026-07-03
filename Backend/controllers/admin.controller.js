@@ -1813,12 +1813,20 @@ const deleteemployee = async (req, res, next) => {
   const organisation_id = req.admin.organisation_id;
 
   const [user, manager] = await Promise.all([
-    Usermodel.findOneAndDelete({ _id: id, organisation_id }),
-    Managermodel.findOneAndDelete({ _id: id, organisation_id }),
+    Usermodel.findOne({ _id: id, organisation_id }).lean(),
+    Managermodel.findOne({ _id: id, organisation_id }).lean(),
   ]);
 
   if (!user && !manager)
     return next(Object.assign(new Error("User not found"), { statusCode: 404 }));
+
+  const target = user || manager;
+  const wasWorking = target.working_status === "working";
+
+  await Promise.all([
+    user && Usermodel.findByIdAndDelete(id),
+    manager && Managermodel.findByIdAndDelete(id),
+  ]);
 
   if (manager) {
     await Promise.all([
@@ -1828,6 +1836,10 @@ const deleteemployee = async (req, res, next) => {
         { reporting_manager: null, reporting_manager_model: null }
       ),
     ]);
+  }
+
+  if (wasWorking) {
+    await decrementActiveUserCount(organisation_id);
   }
 
   res.status(200).json({ message: "User deleted successfully" });
@@ -2996,13 +3008,22 @@ const setEmployeeWorkingStatus = async (req, res, next) => {
         )
       );
 
+    const existingUser = await Usermodel.findOne({ _id: id, organisation_id })
+      .select("_id working_status")
+      .lean();
+
+    if (!existingUser)
+      return next(Object.assign(new Error("Employee not found"), { statusCode: 404 }));
+
+    const wasWorking = existingUser.working_status === "working";
+    const willBeWorking = working_status === "working";
+
     const user = await Usermodel.findOneAndUpdate(
       { _id: id, organisation_id },
       {
         $set: {
           working_status,
-          ...(working_status !== "working" && { status: "inactive" }),
-          ...(working_status === "working" && { status: "active" }),
+          ...(willBeWorking ? { status: "active" } : { status: "inactive" }),
         },
       },
       { new: true, runValidators: true }
@@ -3010,18 +3031,14 @@ const setEmployeeWorkingStatus = async (req, res, next) => {
       .select("_id uid f_name l_name work_email role department designation working_status status")
       .lean();
 
-    if (!user)
-      return next(Object.assign(new Error("Employee not found"), { statusCode: 404 }));
-
-    if (working_status !== "working") {
-      await decrementActiveUserCount(organisation_id);
-    } else {
+    if (!wasWorking && willBeWorking) {
       await incrementActiveUserCount(organisation_id);
+    } else if (wasWorking && !willBeWorking) {
+      await decrementActiveUserCount(organisation_id);
     }
 
-    // ── Asset return check ──────────────────────────────────────────────────
     let asset_return_check = null;
-    if (working_status !== "working") {
+    if (willBeWorking === false && wasWorking) {
       const pendingAssets = await AssetModel.find({
         organisation_id,
         assigned_to: id,
@@ -3075,13 +3092,22 @@ const setManagerWorkingStatus = async (req, res, next) => {
         )
       );
 
+    const existingManager = await Managermodel.findOne({ _id: id, organisation_id })
+      .select("_id working_status")
+      .lean();
+
+    if (!existingManager)
+      return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
+
+    const wasWorking = existingManager.working_status === "working";
+    const willBeWorking = working_status === "working";
+
     const manager = await Managermodel.findOneAndUpdate(
       { _id: id, organisation_id },
       {
         $set: {
           working_status,
-          ...(working_status !== "working" && { status: "inactive" }),
-          ...(working_status === "working" && { status: "active" }),
+          ...(willBeWorking ? { status: "active" } : { status: "inactive" }),
         },
       },
       { new: true, runValidators: true }
@@ -3089,18 +3115,14 @@ const setManagerWorkingStatus = async (req, res, next) => {
       .select("_id uid f_name l_name work_email role department designation working_status status")
       .lean();
 
-    if (!manager)
-      return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
-
-    if (working_status !== "working") {
-      await decrementActiveUserCount(organisation_id);
-    } else {
+    if (!wasWorking && willBeWorking) {
       await incrementActiveUserCount(organisation_id);
+    } else if (wasWorking && !willBeWorking) {
+      await decrementActiveUserCount(organisation_id);
     }
 
-    // ── Asset return check ──────────────────────────────────────────────────
     let asset_return_check = null;
-    if (working_status !== "working") {
+    if (!willBeWorking && wasWorking) {
       const pendingAssets = await AssetModel.find({
         organisation_id,
         assigned_to: id,

@@ -1023,10 +1023,15 @@ const deleteAdmin = async (req, res, next) => {
     return next(
       Object.assign(new Error("Admin not found"), { statusCode: 404 }),
     );
+
+  const wasWorking = admin.working_status === "working";
+
   await AdminModel.findByIdAndDelete(id);
-  if (admin.working_status === "working") {
+
+  if (wasWorking) {
     await decrementActiveUserCount(organisation_id);
   }
+
   res
     .status(200)
     .json({ success: true, message: "Admin deleted successfully" });
