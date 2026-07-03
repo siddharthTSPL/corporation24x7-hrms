@@ -153,6 +153,12 @@ const BLANK_FORM = {
 
 const validateForm = (form, isEdit) => {
   const e = {};
+ if (form.account_number) {
+  if (!/^\d{9,18}$/.test(form.account_number)) {
+    errors.account_number =
+      "Account number must contain only digits (9-18 characters).";
+  }
+}
   if (!form.f_name.trim()) e.f_name = "First name is required";
   if (!form.l_name.trim()) e.l_name = "Last name is required";
   if (!form.work_email.trim()) e.work_email = "Work email is required";
@@ -850,10 +856,20 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-3 sm:mt-4">
-            <div>
-              <FLabel>Account Number</FLabel>
-              <FInput placeholder="Account number" value={form.account_number} onChange={set("account_number")} />
-            </div>
+<div>
+  <FLabel>Account Number</FLabel>
+
+  <FInput
+    placeholder="Account number"
+    value={form.account_number}
+    onChange={set("account_number")}
+    onBlur={blur("account_number")}
+    err={showErr("account_number")}
+    maxLength={18}
+  />
+
+  <FieldErr msg={showErr("account_number")} />
+</div>
             <div>
               <FLabel>IFSC Code</FLabel>
               <FInput placeholder="e.g. HDFC0001234" value={form.ifsc_code} onChange={setUpper("ifsc_code")} onBlur={blur("ifsc_code")} err={showErr("ifsc_code")} maxLength={11} />
