@@ -55,9 +55,15 @@ const incrementActiveUserCount = async (organisation_id) => {
 };
 
 const decrementActiveUserCount = async (organisation_id) => {
-  await SuperAdminModel.findByIdAndUpdate(organisation_id, {
-    $inc: { active_user_count: -1 },
-  });
+  await SuperAdminModel.findByIdAndUpdate(organisation_id, [
+    {
+      $set: {
+        active_user_count: {
+          $max: [0, { $subtract: [{ $ifNull: ["$active_user_count", 0] }, 1] }],
+        },
+      },
+    },
+  ]);
 };
 
 module.exports = { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount };
