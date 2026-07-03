@@ -16,12 +16,16 @@ const syncActiveUserCounts = async () => {
       UserModel.countDocuments({ organisation_id: org._id, working_status: "working" }),
     ]);
 
-    const realCount = admins + managers + employees;
-    const storedCount = org.active_user_count || 0;
+    const realCount = Math.max(0, admins + managers + employees);
+    const storedCount = org.active_user_count ?? 0;
 
     console.log(`Org: ${org.organisation_name} (${org._id})`);
     console.log(`  Stored active_user_count : ${storedCount}`);
     console.log(`  Real count (admins: ${admins} + managers: ${managers} + employees: ${employees}) = ${realCount}`);
+
+    if (storedCount < 0) {
+      console.log(`  ⚠️  Stored count was negative (${storedCount}) — this indicates an unguarded $inc decrement somewhere in the app.`);
+    }
 
     if (realCount !== storedCount) {
       await SuperAdminModel.findByIdAndUpdate(org._id, { active_user_count: realCount });
