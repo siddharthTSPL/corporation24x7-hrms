@@ -3,8 +3,6 @@ const AdminModel = require("../Models/Admin.model");
 const Managermodel = require("../Models/manager.model");
 const Usermodel = require("../Models/user.model");
 
-// ── helpers ──────────────────────────────────────────────────────────────────
-
 const generateAssetId = () => {
   const ts = Date.now().toString(36).toUpperCase();
   const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -32,8 +30,6 @@ const resolveAssignee = async (assigned_to, assigned_to_model, organisation_id) 
 
   return Model.findOne(query).select("_id f_name l_name uid work_email designation").lean();
 };
-
-// ── SuperAdmin: Create asset ──────────────────────────────────────────────────
 
 const createAssetSuperAdmin = async (req, res, next) => {
   try {
@@ -84,8 +80,6 @@ const createAssetSuperAdmin = async (req, res, next) => {
   }
 };
 
-// ── SuperAdmin: Update asset record ──────────────────────────────────────────
-
 const updateAssetSuperAdmin = async (req, res, next) => {
   try {
     if (!req.superAdmin)
@@ -129,8 +123,6 @@ const updateAssetSuperAdmin = async (req, res, next) => {
     next(error);
   }
 };
-
-// ── SuperAdmin: Assign asset to Admin ────────────────────────────────────────
 
 const assignAssetToAdminSuperAdmin = async (req, res, next) => {
   try {
@@ -196,8 +188,6 @@ const assignAssetToAdminSuperAdmin = async (req, res, next) => {
   }
 };
 
-// ── SuperAdmin: Revoke / return asset from Admin ─────────────────────────────
-
 const revokeAssetFromAdminSuperAdmin = async (req, res, next) => {
   try {
     if (!req.superAdmin)
@@ -243,8 +233,6 @@ const revokeAssetFromAdminSuperAdmin = async (req, res, next) => {
   }
 };
 
-// ── SuperAdmin: Get all assets ────────────────────────────────────────────────
-
 const getAllAssetsSuperAdmin = async (req, res, next) => {
   try {
     if (!req.superAdmin)
@@ -273,8 +261,6 @@ const getAllAssetsSuperAdmin = async (req, res, next) => {
   }
 };
 
-// ── SuperAdmin: Get single asset ──────────────────────────────────────────────
-
 const getAssetByIdSuperAdmin = async (req, res, next) => {
   try {
     if (!req.superAdmin)
@@ -295,8 +281,6 @@ const getAssetByIdSuperAdmin = async (req, res, next) => {
     next(error);
   }
 };
-
-// ── SuperAdmin: Delete asset ──────────────────────────────────────────────────
 
 const deleteAssetSuperAdmin = async (req, res, next) => {
   try {
@@ -324,8 +308,6 @@ const deleteAssetSuperAdmin = async (req, res, next) => {
     next(error);
   }
 };
-
-// ── Admin: Create asset ───────────────────────────────────────────────────────
 
 const createAssetAdmin = async (req, res, next) => {
   try {
@@ -376,8 +358,6 @@ const createAssetAdmin = async (req, res, next) => {
   }
 };
 
-// ── Admin: Update asset record ────────────────────────────────────────────────
-
 const updateAssetAdmin = async (req, res, next) => {
   try {
     if (!req.admin)
@@ -421,8 +401,6 @@ const updateAssetAdmin = async (req, res, next) => {
     next(error);
   }
 };
-
-// ── Admin: Assign asset to Employee ──────────────────────────────────────────
 
 const assignAssetToEmployee = async (req, res, next) => {
   try {
@@ -488,8 +466,6 @@ const assignAssetToEmployee = async (req, res, next) => {
   }
 };
 
-// ── Admin: Assign asset to Manager ───────────────────────────────────────────
-
 const assignAssetToManager = async (req, res, next) => {
   try {
     if (!req.admin)
@@ -554,8 +530,6 @@ const assignAssetToManager = async (req, res, next) => {
   }
 };
 
-// ── Admin: Revoke / return asset ──────────────────────────────────────────────
-
 const revokeAssetAdmin = async (req, res, next) => {
   try {
     if (!req.admin)
@@ -601,8 +575,6 @@ const revokeAssetAdmin = async (req, res, next) => {
   }
 };
 
-// ── Admin: Get all assets ─────────────────────────────────────────────────────
-
 const getAllAssetsAdmin = async (req, res, next) => {
   try {
     if (!req.admin)
@@ -631,8 +603,6 @@ const getAllAssetsAdmin = async (req, res, next) => {
   }
 };
 
-// ── Admin: Get single asset ───────────────────────────────────────────────────
-
 const getAssetByIdAdmin = async (req, res, next) => {
   try {
     if (!req.admin)
@@ -653,8 +623,6 @@ const getAssetByIdAdmin = async (req, res, next) => {
     next(error);
   }
 };
-
-// ── Admin: Delete asset ───────────────────────────────────────────────────────
 
 const deleteAssetAdmin = async (req, res, next) => {
   try {
@@ -682,8 +650,6 @@ const deleteAssetAdmin = async (req, res, next) => {
     next(error);
   }
 };
-
-// ── Shared: Get assets assigned to a specific user (any role) ─────────────────
 
 const getAssetsOfPerson = async (req, res, next) => {
   try {
@@ -716,6 +682,57 @@ const getAssetsOfPerson = async (req, res, next) => {
   }
 };
 
+const getAssignableAdminsSuperAdmin = async (req, res, next) => {
+  try {
+    if (!req.superAdmin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const organisation_id = req.superAdmin._id;
+
+    const admins = await AdminModel.find({ organisation_id, working_status: "working" })
+      .select("_id f_name l_name uid work_email designation working_status")
+      .lean();
+
+    return res.status(200).json({ success: true, total: admins.length, admins });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getAssignableManagersAdmin = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const organisation_id = req.admin.organisation_id;
+
+    const managers = await Managermodel.find({ organisation_id, working_status: "working" })
+      .select("_id f_name l_name uid work_email designation working_status")
+      .lean();
+
+    return res.status(200).json({ success: true, total: managers.length, managers });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getAssignableEmployeesAdmin = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const organisation_id = req.admin.organisation_id;
+
+    const employees = await Usermodel.find({ organisation_id, working_status: "working" })
+      .select("_id f_name l_name uid work_email designation working_status")
+      .lean();
+
+    return res.status(200).json({ success: true, total: employees.length, employees });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createAssetSuperAdmin,
   updateAssetSuperAdmin,
@@ -733,4 +750,7 @@ module.exports = {
   getAssetByIdAdmin,
   deleteAssetAdmin,
   getAssetsOfPerson,
+  getAssignableAdminsSuperAdmin,
+  getAssignableManagersAdmin,
+  getAssignableEmployeesAdmin,
 };

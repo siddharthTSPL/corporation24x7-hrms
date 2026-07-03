@@ -61,6 +61,10 @@ const managerlogin = async (req, res, next) => {
     return next(Object.assign(new Error("Please verify your email before login"), { statusCode: 400 }));
   }
 
+  if (manager.working_status !== "working") {
+    return next(Object.assign(new Error("Your account is not active. Please contact administrator."), { statusCode: 403 }));
+  }
+
   let organisationId = manager.organisation_id;
   let superAdmin = await SuperAdminModel.findById(organisationId);
 
