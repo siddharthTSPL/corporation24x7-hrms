@@ -1101,6 +1101,11 @@ const promoteManagerToAdmin = async (req, res, next) => {
 
     await session.commitTransaction();
 
+    if (manager.working_status === "working") {
+      await decrementActiveUserCount(organisation_id);
+    }
+    await incrementActiveUserCount(organisation_id);
+
     return res.status(200).json({
       success: true,
       message: `${manager.f_name} ${manager.l_name} has been promoted from Manager to Admin`,
@@ -1255,6 +1260,11 @@ const promoteEmployeeToAdmin = async (req, res, next) => {
     ]);
 
     await session.commitTransaction();
+
+    if (user.working_status === "working") {
+      await decrementActiveUserCount(organisation_id);
+    }
+    await incrementActiveUserCount(organisation_id);
 
     return res.status(200).json({
       success: true,
