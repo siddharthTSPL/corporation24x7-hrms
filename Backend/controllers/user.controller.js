@@ -85,6 +85,15 @@ const userlogin = async (req, res, next) => {
   //   );
   // }
 
+  if (user.working_status !== "working") {
+    return next(
+      Object.assign(
+        new Error("Your account is not active. Please contact administrator."),
+        { statusCode: 403 }
+      )
+    );
+  }
+
   const isvalidpassword = await user.isValidPassword(password);
 
   if (!isvalidpassword) {
@@ -184,7 +193,7 @@ const token = jwt.sign(
   res.status(200).json({
     success: true,
     message: "Login successful",
-    role: isvaliduser.role,
+    role: user.role,
     token
   });
 };

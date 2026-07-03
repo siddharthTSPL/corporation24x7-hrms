@@ -190,6 +190,9 @@ const adminlogin = async (req, res, next) => {
   if (admin.status === "suspended")
     return next(Object.assign(new Error("Your account has been suspended. Contact super admin."), { statusCode: 403 }));
 
+  if (admin.working_status !== "working")
+    return next(Object.assign(new Error("Your account is not active. Please contact super admin."), { statusCode: 403 }));
+
   const isMatch = await admin.isValidPassword(password);
   if (!isMatch)
     return next(Object.assign(new Error("Invalid credentials"), { statusCode: 401 }));

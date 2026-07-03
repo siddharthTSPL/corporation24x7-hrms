@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   FiMenu, FiX, FiArrowRight, FiCheck,
@@ -10,306 +10,82 @@ import {
   FiLogOut, FiSettings, FiMessageSquare
 } from 'react-icons/fi'
 import { HiOutlineSparkles } from 'react-icons/hi'
-import {
-  BsPeopleFill, BsGraphUp, BsPersonBadge, BsChatSquareText
-} from 'react-icons/bs'
+import { BsPeopleFill, BsGraphUp, BsPersonBadge } from 'react-icons/bs'
 import {
   RadarChart as RechartsRadar, Radar, PolarGrid, PolarAngleAxis,
   ResponsiveContainer
 } from 'recharts'
 import logo from '../../assets/TorchX.svg'
-import PlantImage from '../../assets/plant.png';
+import PlantImage from '../../assets/plant.png'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ██ LAYOUT DESIGN TOKENS — 8px base spacing system
+// ██ BRAND TOKENS — same palette as before, referenced as Tailwind arbitrary values
+// P  = #7A004B (primary)   PH = #5a0033 (primary hover)
+// PL = #FDF4F8 (tint bg)   PB = #EAC7D7 (border tint)
+// D  = #111111 (ink)       G  = #5C5C5C (muted text)
 // ─────────────────────────────────────────────────────────────────────────────
-//
-// Every spacing value below is a multiple of 8px.
-// This is the single source of truth — no more scattered hardcoded px values.
-//
-// PHILOSOPHY:
-//   - One container width cap  → all sections share the same left/right walls
-//   - One horizontal gutter    → consistent page margins at every breakpoint
-//   - Section spacing tiers    → lg / md / sm for visual hierarchy
-//   - Grid gap tiers           → cards / stats / footer columns
-//
-// HOW TO READ:
-//   SP.section.lg  = 96px top + bottom padding  (major sections: Features, Pricing)
-//   SP.section.md  = 72px top + bottom padding  (stats, testimonials)
-//   SP.section.sm  = 48px top + bottom padding  (dividers, utility rows)
-//   SP.gutter       = 20px → 40px → 64px (mobile → tablet → desktop)
-//   SP.maxW         = 1280px (Stripe/Vercel standard)
-//   SP.navbarH      = 72px (sticky nav target height)
-//
-// ─────────────────────────────────────────────────────────────────────────────
+const radarData = [
+  { metric: 'Leadership', value: 85 },
+  { metric: 'Teamwork', value: 72 },
+  { metric: 'Quality', value: 90 },
+  { metric: 'Problem Solving', value: 68 },
+  { metric: 'Communication', value: 80 },
+]
 
-const SP = {
-  // ── Container ──────────────────────────────────────────────────────────────
-  // 1280px is the industry-standard premium cap (Stripe ~1200px, Vercel 1280px)
-  // mx-auto + w-full centers it on all screens
-  maxW: '1500px',
-
-  // ── Horizontal gutters — applied to EVERY section via <Wrap> ───────────────
-  // 20px mobile / 40px tablet / 64px desktop
-  // Previously inconsistent: navbar = 40px, hero = 40px, pricing = 40px,
-  // footer = 40px BUT footer maxW was 1100px — now all unified at 1280px / 64px
-  gutter: {
-    x: 'clamp(20px, 5vw, 64px)',        // CSS clamp: fluid, no breakpoint jumps
-    css: '0 clamp(20px, 5vw, 64px)',    // shorthand for padding shorthand
-  },
-
-  // ── Section vertical padding tiers ────────────────────────────────────────
-  // lg  = 96px  (8 × 12) — Features, Pricing, Hero
-  // md  = 72px  (8 × 9)  — Testimonials, Stats
-  // sm  = 48px  (8 × 6)  — Footer top, utility rows
-  // xs  = 24px  (8 × 3)  — Dividers, bottom bars
-  section: {
-    lg:  '96px',
-    md:  '72px',
-    sm:  '48px',
-    xs:  '24px',
-  },
-
-  // ── Grid gaps ──────────────────────────────────────────────────────────────
-  // card  = 28px  (8 × 3.5) — feature cards, pricing cards
-  // stat  = 20px  (8 × 2.5) — compact stat row
-  // inner = 16px  (8 × 2)   — within-card sub-grids
-  // tight = 12px  (8 × 1.5) — badge rows, small icon grids
-  gap: {
-    card:  '28px',
-    stat:  '20px',
-    inner: '16px',
-    tight: '12px',
-  },
-
-  // ── Navbar ─────────────────────────────────────────────────────────────────
-  // Fixed 72px height (8 × 9). Previously height: 72 inline — now token-driven.
-  navH: '72px',
-
-  // ── Card padding ───────────────────────────────────────────────────────────
-  // cardPad  = 32px (8 × 4) — outer feature/pricing card padding
-  // cardInner= 16px (8 × 2) — inner card sub-section
-  card: {
-    pad:   '32px',
-    padSm: '24px',
-    inner: '16px',
-  },
-
-  // ── Heading gap ───────────────────────────────────────────────────────────
-  // Space between section headline block and content grid below it
-  // 64px (8 × 8) — matches Linear, Vercel
-  headingGap: '64px',
+const fadeUp = {
+  hidden: { opacity: 0, y: 36 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: 'easeOut' } }
+}
+const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.12 } } }
+const cardVariant = {
+  hidden: { opacity: 0, y: 40 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } }
 }
 
+const fontStyles = `
+  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800;900&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+
+  .font-display { font-family: 'Sora', sans-serif; }
+  .font-body { font-family: 'DM Sans', sans-serif; }
+  .font-ui { font-family: 'Instrument Sans', sans-serif; }
+  .font-hero { font-family: 'Roboto', sans-serif; }
+
+  html { scroll-behavior: smooth; overflow-x: hidden; }
+  body { -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  .scroll-anchor { scroll-margin-top: 90px; }
+
+  @keyframes menuDrop {
+    from { opacity: 0; transform: translateY(-8px); max-height: 0; }
+    to   { opacity: 1; transform: translateY(0);    max-height: 360px; }
+  }
+  .nav-mobile-menu { overflow: hidden; animation: menuDrop .24s ease both; }
+`
+
 // ─────────────────────────────────────────────────────────────────────────────
-// ██ GLOBAL WRAP COMPONENT
-// Every single section renders its content inside <Wrap>.
-// This enforces:
-//   1. Consistent max-width (1280px) across all sections
-//   2. Equal left/right margins via fluid clamp gutters
-//   3. Zero drift between sections — all content aligns to the same invisible grid
+// ██ WRAP — consistent 1500px container + fluid gutters, everywhere
 // ─────────────────────────────────────────────────────────────────────────────
-const Wrap = ({ children, style = {} }) => (
-  <div style={{
-    maxWidth: SP.maxW,
-    margin: '0 auto',
-    padding: SP.gutter.css,
-    width: '100%',
-    ...style,
-  }}>
+const Wrap = ({ children, className = '' }) => (
+  <div className={`max-w-[1500px] mx-auto w-full px-5 sm:px-10 lg:px-16 ${className}`}>
     {children}
   </div>
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ██ BRAND TOKENS — unchanged from original
-// ─────────────────────────────────────────────────────────────────────────────
-const P  = '#7A004B'
-const PH = '#5a0033'
-const PL = '#FDF4F8'
-const PB = '#EAC7D7'
-const D  = '#111111'
-const G  = '#5C5C5C'
-
-// ── Animation variants — unchanged ───────────────────────────────────────────
-const fadeUp = {
-  hidden: { opacity: 0, y: 36 },
-  show:   { opacity: 1, y: 0, transition: { duration: 0.55, ease: 'easeOut' } }
-}
-const stagger    = { hidden: {}, show: { transition: { staggerChildren: 0.12 } } }
-const cardVariant = {
-  hidden: { opacity: 0, y: 40 },
-  show:   { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } }
-}
-
-// ── Recharts data — unchanged ─────────────────────────────────────────────────
-const radarData = [
-  { metric: 'Leadership',     value: 85 },
-  { metric: 'Teamwork',       value: 72 },
-  { metric: 'Quality',        value: 90 },
-  { metric: 'Problem Solving',value: 68 },
-  { metric: 'Communication',  value: 80 },
-]
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ██ GLOBAL STYLES
-// Key layout changes vs original:
-//   - .section-container  → replaces ad-hoc maxWidth per section
-//   - .section-pad-*      → token-driven section padding classes
-//   - .grid-*             → unified gap values from SP.gap.*
-//   - Responsive overrides now target consistent breakpoints: 1023, 767, 480
-// ─────────────────────────────────────────────────────────────────────────────
-const globalStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800;900&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Instrument+Sans:wght@400;500;600;700&display=swap');
-
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html { scroll-behavior: smooth; overflow-x: hidden; }
-  body { font-family: 'DM Sans', sans-serif; background: #fff; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
-  #root { overflow-x: hidden; }
-  a { text-decoration: none; }
-  button { outline: none; min-height: 44px; }
-  img, svg { max-width: 100%; }
-  img { display: block; height: auto; }
-
-  /* ── Mobile nav animation — unchanged ── */
-  .nav-mobile-menu { overflow: hidden; animation: menuDrop .24s ease both; }
-  @keyframes menuDrop {
-    from { opacity: 0; transform: translateY(-8px); max-height: 0; }
-    to   { opacity: 1; transform: translateY(0);    max-height: 360px; }
-  }
-
-  /* ── Grid layouts ──────────────────────────────────────────────────────────
-     All gaps now reference SP.gap values. Named for readability.
-  ── */
-  .hero-grid         { grid-template-columns: minmax(0,.95fr) minmax(0,1.05fr); gap: 60px; }
-  .stats-grid        { grid-template-columns: repeat(4, minmax(0,1fr)); gap: 20px; }  /* SP.gap.stat */
-  .scroll-anchor     {  scroll-margin-top: 90px; }
-  .feat-section-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 28px; } /* SP.gap.card */
-  .pricing-grid      { grid-template-columns: repeat(3, minmax(0,1fr)); gap: 28px; } /* SP.gap.card */
-  .badge-grid        { grid-template-columns: repeat(4, minmax(0,1fr)); gap: 16px; } /* SP.gap.inner */
-  .storage-grid      { grid-template-columns: minmax(0,1.5fr) repeat(3,minmax(0,1fr)); gap: 16px; }
-  .testi-grid        { grid-template-columns: repeat(3, minmax(0,1fr)); gap: 28px; } /* SP.gap.card */
-  .footer-grid       { grid-template-columns: minmax(0,1.3fr) repeat(3,minmax(0,1fr)); gap: 40px; }
-
-  /* ── Card interaction — unchanged ── */
-  .pricing-card, .testi-card, .feat-card { min-width: 0; }
-  .pricing-card {
-    transition: transform 0.3s cubic-bezier(.34,1.56,.64,1), box-shadow 0.3s ease !important;
-    cursor: default;
-  }
-  @media (hover:hover) and (pointer:fine) {
-    .pricing-card:hover  { transform: scale(1.045) !important; box-shadow: none !important; z-index:10; position:relative; }
-    .testi-card:hover    { transform: translateY(-8px) !important; box-shadow: 0 20px 60px rgba(90,0,51,0.18) !important; border-color:#5a0033 !important; }
-    .feat-card:hover     { transform: translateY(-8px) !important; box-shadow: 0 16px 48px rgba(122,0,75,0.18) !important; }
-  }
-  .pricing-card-popular { transform: scale(1.045); box-shadow: none !important; z-index:5; position:relative; }
-  .testi-card  { transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease !important; }
-  .feat-card   { transition: transform 0.3s ease, box-shadow 0.3s ease !important; }
-
-  /* ── Tablet breakpoint: 1024px ─────────────────────────────────────────────
-     feat-section-grid collapses to 2 cols (cards too narrow at 3)
-  ── */
-  @media (max-width:1024px) {
-    .feat-section-grid { grid-template-columns: repeat(2,1fr) !important; }
-  }
-
-  /* ── Tablet breakpoint: 1023px ─────────────────────────────────────────────
-     All major grids go 2-col. hero stacks. nav burger appears.
-     Hero padding scales to mid value via clamp — no override needed.
-  ── */
-  @media (max-width:1023px) {
-    .nav-links  { display:none !important; }
-    .nav-burger { display:block !important; }
-
-    /* Hero grid collapses to 1-col, gap reduced proportionally */
-    .hero-grid  { grid-template-columns:1fr !important; gap: 40px !important; }
-
-    /* 2-col grids on tablet */
-    .feat-section-grid, .pricing-grid, .testi-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
-    .stats-grid, .badge-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
-    .storage-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
-    .footer-grid  { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
-
-    /* CTA / expert banners: stack on tablet */
-    .testi-cta, .expert-banner {
-      flex-direction: column !important;
-      align-items: flex-start !important;
-    }
-    .testimonial-cta {
-      flex-direction: column !important;
-      align-items: flex-start !important;
-      text-align: left !important;
-    }
-    .testimonial-cta > div:first-child { width: 100%; }
-  }
-
-  /* ── Mobile breakpoint: 767px ──────────────────────────────────────────────
-     All grids collapse to 1-col. CTA centers. Analytics overlay hidden.
-  ── */
-  @media (max-width:767px) {
-    .feat-section-grid, .pricing-grid, .testi-grid,
-    .badge-grid, .footer-grid, .storage-grid { grid-template-columns:1fr !important; }
-
-    /* analytics floating card: hide on small screens — saves space */
-    .analytics-card-wrap { display:none; }
-
-  
-  .hero-grid {
-    margin-top: 20px !important;
-  }
-
-
-    /* Popular pricing card: disable scale on mobile (breaks layout) */
-    .pricing-card-popular, .pricing-card:hover { transform:none !important; }
-
-    /* CTA: center-stack on mobile */
-    .testimonial-cta {
-      flex-direction: column !important;
-      align-items: center !important;
-      text-align: center !important;
-    }
-    .testimonial-cta > div:first-child {
-      flex-direction: column !important;
-      align-items: center !important;
-      justify-content: center !important;
-      text-align: center !important;
-    }
-    .testimonial-cta a { width: 100%; max-width: 320px; justify-content: center !important; }
-    .testimonial-cta h3, .testimonial-cta div { text-align: center; }
-  }
-
-  /* ── Small mobile: 480px ───────────────────────────────────────────────────
-     stats collapse to 1-col. CTA gets tighter padding.
-  ── */
-  @media (max-width:480px) {
-    .stats-grid { grid-template-columns:1fr !important; }
-    .testimonial-cta { border-radius: 18px !important; }
-    .testimonial-cta a { font-size: 12px !important; padding: 13px 20px !important; }
-    .testi-card { padding: 20px !important; }
-  }
-`
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ██ DIVIDER — unchanged content, padding now uses SP token
+// ██ DIVIDER
 // ─────────────────────────────────────────────────────────────────────────────
 function Divider() {
   return (
-    // py = SP.section.xs / 2 = 12px — intentionally tight, just a visual breath
-    <div style={{ background: PL, padding: '12px 0', display: 'flex', alignItems: 'center' }}>
-      <div style={{ width: '100%', height: '1px', background: `linear-gradient(to right, transparent 0%, ${PB} 20%, ${PB} 80%, transparent 100%)` }} />
+    <div className="bg-[#FDF4F8] py-3 flex items-center">
+      <div className="w-full h-px bg-gradient-to-r from-transparent via-[#EAC7D7] to-transparent" />
     </div>
   )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ██ NAVBAR
-// Layout changes:
-//   - maxWidth: 1280px (was 1500px — too wide, content misaligned with sections)
-//   - padding: 0 clamp(20px,5vw,64px) — matches Wrap gutter exactly
-//   - height: SP.navH = 72px (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
 function Navbar() {
-  const [open, setOpen]         = useState(false)
+  const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const links = ['Features', 'Testimonials', 'Pricing', 'About']
 
@@ -320,67 +96,59 @@ function Navbar() {
   }, [])
 
   return (
-   <nav
-  style={{
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    width: '100%',
-    zIndex: 9999,
-    background: '#fff',
+    <nav
+      className={`fixed top-0 left-0 right-0 w-full z-[9999] bg-white transition-shadow duration-300 ${
+        scrolled ? 'shadow-[0_2px_16px_rgba(122,0,75,.08)]' : 'shadow-[0_1px_0_#f0e0e8]'
+      }`}
+    >
+      <div className="max-w-[1500px] mx-auto px-5 sm:px-10 lg:px-16 h-[72px] flex items-center justify-between">
+        <img src={logo} alt="TorchX Logo" className="h-9 sm:h-11 w-auto object-contain block" />
 
-    boxShadow: scrolled
-      ? '0 2px 16px rgba(122,0,75,.08)'
-      : '0 1px 0 #f0e0e8',
-
-    transition: 'box-shadow .3s',
-  }}
->
-      {/*
-        ── Navbar inner: uses SP.maxW (1280px) and SP.gutter.css
-        Previously was maxWidth:1500px with px:40px — too wide relative to
-        all content sections which used maxWidth:1280px. This caused navbar
-        links to float into the gutters of content below.
-      */}
-      <div style={{
-        maxWidth: SP.maxW,         /* 1280px — matches every section */
-        margin: '0 auto',
-        padding: `0 ${SP.gutter.x}`,  /* fluid clamp gutter */
-        height: SP.navH,           /* 72px */
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-      }}>
-        <img
-          src={logo} alt="TorchX Logo"
-          style={{ height: 'clamp(36px, 4vw, 48px)', width: 'auto', objectFit: 'contain', display: 'block' }}
-        />
-
-        {/* Desktop nav: gap 36px (SP.gap.card + 8) — comfortable link spacing */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '36px' }} className="nav-links">
+        <div className="hidden lg:flex items-center gap-9">
           {links.map(l => (
-            <a key={l} href={`#${l.toLowerCase()}`} style={{ fontSize: 15, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 500, color: G, textDecoration: 'none', transition: 'color .2s' }}
-              onMouseEnter={e => e.currentTarget.style.color = P}
-              onMouseLeave={e => e.currentTarget.style.color = G}>{l}</a>
+            <a
+              key={l}
+              href={`#${l.toLowerCase()}`}
+              className="text-[15px] font-ui font-medium text-[#5C5C5C] no-underline transition-colors hover:text-[#7A004B]"
+            >
+              {l}
+            </a>
           ))}
-          <a href="https://torchxsuite.com/talent/login" style={{ background: P, color: '#fff', fontSize: 14, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 600, padding: '10px 28px', borderRadius: 50, textDecoration: 'none', boxShadow: `0 4px 18px ${P}40`, transition: 'all .2s' }}
-            onMouseEnter={e => { e.currentTarget.style.background = PH; e.currentTarget.style.transform = 'translateY(-1px)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = P; e.currentTarget.style.transform = 'none' }}>Login</a>
+          <a
+            href="https://torchxsuite.com/talent/login"
+            className="bg-[#7A004B] text-white text-sm font-ui font-semibold px-7 py-2.5 rounded-full no-underline shadow-[0_4px_18px_rgba(122,0,75,0.25)] transition-all hover:bg-[#5a0033] hover:-translate-y-0.5"
+          >
+            Login
+          </a>
         </div>
 
-        <button onClick={() => setOpen(!open)} className="nav-burger"
-          style={{ display: 'none', background: 'none', border: 'none', fontSize: 24, color: D, cursor: 'pointer' }}>
+        <button
+          onClick={() => setOpen(!open)}
+          className="lg:hidden bg-transparent border-none text-2xl text-[#111111] cursor-pointer"
+          aria-label="Toggle menu"
+        >
           {open ? <FiX /> : <FiMenu />}
         </button>
       </div>
 
-      {/* Mobile drawer: padding matches gutter for alignment */}
       {open && (
-        <div style={{ background: '#fff', borderTop: `1px solid ${PB}`, padding: `20px ${SP.gutter.x}`, display: 'flex', flexDirection: 'column', gap: '18px' }}>
+        <div className="nav-mobile-menu bg-white border-t border-[#EAC7D7] px-5 sm:px-10 lg:px-16 py-5 flex flex-col gap-4.5">
           {links.map(l => (
-            <a key={l} href={`#${l.toLowerCase()}`} onClick={() => setOpen(false)}
-              style={{ fontSize: 15, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 500, color: G, textDecoration: 'none' }}>{l}</a>
+            <a
+              key={l}
+              href={`#${l.toLowerCase()}`}
+              onClick={() => setOpen(false)}
+              className="text-[15px] font-ui font-medium text-[#5C5C5C] no-underline"
+            >
+              {l}
+            </a>
           ))}
-          <a href="/login" style={{ background: P, color: '#fff', fontSize: 14, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 600, padding: '12px 0', borderRadius: 50, textDecoration: 'none', textAlign: 'center' }}>Login</a>
+          <a
+            href="/login"
+            className="bg-[#7A004B] text-white text-sm font-ui font-semibold py-3 rounded-full no-underline text-center"
+          >
+            Login
+          </a>
         </div>
       )}
     </nav>
@@ -388,45 +156,48 @@ function Navbar() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ██ ANALYTICS FLOATING CARD — unchanged (purely decorative, no layout impact)
+// ██ ANALYTICS FLOATING CARD — decorative, SVG untouched
 // ─────────────────────────────────────────────────────────────────────────────
 function AnalyticsCard() {
+  const P = '#7A004B'
   return (
-    <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 12px 40px rgba(115,0,66,0.18)', width: 'clamp(140px,18vw,200px)', border: '1.5px solid #e0c8d8', display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
-      <div style={{ width: '12px', flexShrink: 0, background: P }} />
-      <div style={{ flex: 1, padding: '10px 9px 10px 8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        <div style={{ fontSize: '8px', fontWeight: 700, color: '#999', letterSpacing: '1.5px', textTransform: 'uppercase', fontFamily: 'Instrument Sans,sans-serif' }}>Analytics</div>
-        <div style={{ border: '1px solid #e0c8d8', borderRadius: '7px', padding: '5px 5px 3px', background: '#fff' }}>
+    <div className="bg-white rounded-2xl shadow-[0_12px_40px_rgba(115,0,66,0.18)] w-[clamp(140px,18vw,200px)] border-[1.5px] border-[#e0c8d8] flex flex-row overflow-hidden">
+      <div className="w-3 shrink-0" style={{ background: P }} />
+      <div className="flex-1 px-2.5 py-2.5 flex flex-col gap-1.5">
+        <div className="text-[8px] font-bold text-[#999] tracking-[1.5px] uppercase font-ui">Analytics</div>
+        <div className="border border-[#e0c8d8] rounded-[7px] px-[5px] pt-[5px] pb-[3px] bg-white">
           <svg width="100%" height="44" viewBox="0 0 120 44">
-            <line x1="10" y1="2"  x2="10"  y2="38" stroke="#e0c8d8" strokeWidth="0.8" />
+            <line x1="10" y1="2" x2="10" y2="38" stroke="#e0c8d8" strokeWidth="0.8" />
             <line x1="10" y1="38" x2="118" y2="38" stroke="#e0c8d8" strokeWidth="0.8" />
             <polyline points="10,34 22,28 32,30 42,18 52,24 62,12 72,18 82,10 92,14 102,7 112,11" fill="none" stroke="#f0d0e4" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
             <polyline points="10,34 22,28 32,30 42,18 52,24 62,12 72,18 82,10 92,14 102,7 112,11" fill="none" stroke={P} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
             <circle cx="102" cy="7" r="2.5" fill={P} />
           </svg>
         </div>
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'stretch' }}>
-          <div style={{ border: '1px solid #e0c8d8', borderRadius: '7px', padding: '5px', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div className="flex gap-1.5 items-stretch">
+          <div className="border border-[#e0c8d8] rounded-[7px] p-[5px] bg-white flex items-center justify-center shrink-0">
             <svg width="34" height="34" viewBox="0 0 34 34">
               <circle cx="17" cy="17" r="15" fill="#f0dcea" />
               <path d="M17,17 L17,2 A15,15 0 1,1 4.5,24.5 Z" fill={P} />
               <circle cx="17" cy="17" r="6" fill="white" />
             </svg>
           </div>
-          <div style={{ flex: 1, border: '1px solid #e0c8d8', borderRadius: '7px', padding: '4px 5px', background: '#fff' }}>
+          <div className="flex-1 border border-[#e0c8d8] rounded-[7px] px-[5px] py-1 bg-white">
             <svg width="100%" height="34" viewBox="0 0 80 34">
-              <rect x="1"  y="22" width="8" height="10" rx="2" fill="#f0dcea" />
+              <rect x="1" y="22" width="8" height="10" rx="2" fill="#f0dcea" />
               <rect x="12" y="18" width="8" height="14" rx="2" fill="#f0dcea" />
               <rect x="23" y="12" width="8" height="20" rx="2" fill={P} opacity=".6" />
-              <rect x="34" y="6"  width="8" height="26" rx="2" fill={P} />
+              <rect x="34" y="6" width="8" height="26" rx="2" fill={P} />
               <rect x="45" y="10" width="8" height="22" rx="2" fill="#CD166E" />
               <rect x="56" y="14" width="8" height="18" rx="2" fill={P} opacity=".8" />
               <rect x="67" y="20" width="8" height="12" rx="2" fill="#f0dcea" />
             </svg>
           </div>
         </div>
-        <div style={{ background: P, borderRadius: '6px', height: '14px', display: 'flex', alignItems: 'center', padding: '0 8px', gap: '4px' }}>
-          {[55, 36, 22].map((w, i) => <div key={i} style={{ height: '3px', width: `${w}px`, borderRadius: '2px', background: 'rgba(255,255,255,0.25)' }} />)}
+        <div className="rounded-[6px] h-3.5 flex items-center px-2 gap-1" style={{ background: P }}>
+          {[55, 36, 22].map((w, i) => (
+            <div key={i} className="h-[3px] rounded-sm bg-white/25" style={{ width: `${w}px` }} />
+          ))}
         </div>
       </div>
     </div>
@@ -434,25 +205,27 @@ function AnalyticsCard() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ██ DASHBOARD MOCKUP — unchanged (internal SVG layout unchanged)
+// ██ DASHBOARD MOCKUP — pure SVG, unaffected by Tailwind conversion
 // ─────────────────────────────────────────────────────────────────────────────
 function DashboardMockup() {
+  const P = '#7A004B'
   return (
-    <div style={{ background:'white', position:'relative', overflow:'visible' }}>
-      <div style={{ position:'relative', padding:'48px 24px 80px', display:'flex', alignItems:'center', justifyContent:'center' }}>
-        <div style={{
-          position:'absolute', top:'10%', right:'8%',
-          width:'420px', height:'480px',
-          background:'radial-gradient(ellipse at 60% 40%, #f5d6e8 0%, #fdf0f7 60%, transparent 100%)',
-          borderRadius:'60% 40% 55% 45% / 50% 55% 45% 50%',
-          zIndex:0
-        }}/>
-        <div style={{ position:'relative', zIndex:2, width:'100%', maxWidth:'100%' }}>
-          <div style={{ position:'absolute', bottom:'-28px', left:'-36px', zIndex:20 }}>
-            <AnalyticsCard/>
+    <div className="bg-white relative overflow-visible">
+      <div className="relative px-6 pt-12 pb-20 flex items-center justify-center">
+        <div
+          className="absolute top-[10%] right-[8%] w-[420px] h-[480px] z-0"
+          style={{
+            background: 'radial-gradient(ellipse at 60% 40%, #f5d6e8 0%, #fdf0f7 60%, transparent 100%)',
+            borderRadius: '60% 40% 55% 45% / 50% 55% 45% 50%',
+          }}
+        />
+        <div className="relative z-[2] w-full max-w-full">
+          <div className="absolute -bottom-7 -left-9 z-20">
+            <AnalyticsCard />
           </div>
           <svg viewBox="0 0 960 660" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"
-            style={{ width:'100%', maxWidth:'100%', height:'auto', borderRadius:'18px', display:'block', margin:'0 auto', overflow:'hidden', filter:'drop-shadow(0 24px 64px rgba(115,0,66,0.20))' }}>
+            className="w-full max-w-full h-auto rounded-[18px] block mx-auto overflow-hidden"
+            style={{ filter: 'drop-shadow(0 24px 64px rgba(115,0,66,0.20))' }}>
             <rect width="960" height="660" rx="18" fill="#eef2f8"/>
             <rect x="0" y="0" width="210" height="660" rx="18" fill="#ffffff"/>
             <rect x="10" y="0" width="200" height="660" fill="#ffffff"/>
@@ -628,83 +401,49 @@ function DashboardMockup() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ██ HERO
-//=
 // ─────────────────────────────────────────────────────────────────────────────
 function Hero() {
-  const navigate = useNavigate();
+  const navigate = useNavigate()
   return (
-    <section style={{
-      background: '#fff',
-      overflow: 'hidden',
-      /* SP.section.lg top + SP.section.md bottom = 96px + 72px
-         Hero breathes more at top (first impression) than bottom
-         where Stats follows immediately */
-      paddingTop: '80px',
-      paddingBottom: SP.section.md,
-    }}>
+    <section className="bg-white overflow-hidden pt-20 pb-[72px]">
       <Wrap>
-        <div style={{ display: 'grid', alignItems: 'center' }} className="hero-grid">
-
-          {/* ── Left: copy block ─────────────────────────────────────────────
-              maxWidth 520px caps line length — comfortable 60–70 char lines
-              at desktop. Previously uncapped → text sprawled too wide.
-          ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-[0.95fr_1.05fr] items-center gap-10 lg:gap-[60px] mt-5 lg:mt-0">
           <motion.div
             variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
-            style={{ maxWidth: '520px' }}
-          ><h1
-  style={{
-    fontSize: 'clamp(1.8rem,5vw,4rem)',
-    lineHeight: 1.08,
-    marginBottom: '20px',
-    fontFamily: 'Roboto, sans-serif',
-    fontWeight: 500,
-    color: '#111',
-    letterSpacing: '-1px',
-  }}
->
-  Manage Your Workforce
-  <br />
-  With Smart <span style={{ color: P }}>HR Solutions</span>
-</h1>
+            className="max-w-[520px]"
+          >
+            <h1 className="font-hero font-medium text-[#111] leading-[1.08] mb-5 text-[clamp(1.8rem,5vw,4rem)] tracking-[-1px]">
+              Manage Your Workforce
+              <br />
+              With Smart <span className="text-[#7A004B]">HR Solutions</span>
+            </h1>
 
-           <p
-  style={{
-    fontSize: 'clamp(0.9rem,1.8vw,1.1rem)',
-    color: '#555',
-    lineHeight: 1.75,
-    marginBottom: '34px',
-    fontFamily: 'Roboto, sans-serif',
-    fontWeight: 400,
-    maxWidth: '480px',
-  }}
->
+            <p className="font-hero font-normal text-[#555] leading-[1.75] mb-8 text-[clamp(0.9rem,1.8vw,1.1rem)] max-w-[480px]">
               Optimize every stage of the employee lifecycle with a robust and
               reliable Human Resource Management System.
             </p>
 
-            {/* CTA row: gap 14px (SP.gap.tight + 2) — tight pairing */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px' }}>
-              <button onClick={() => navigate('/signup')}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: P, color: '#fff', fontSize: 15, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 600, padding: '13px 28px', borderRadius: 50, border: 'none', cursor: 'pointer', boxShadow: `0 8px 24px ${P}40`, transition: 'all .2s' }}
-                onMouseEnter={e => { e.currentTarget.style.background = PH; e.currentTarget.style.transform = 'translateY(-2px)' }}
-                onMouseLeave={e => { e.currentTarget.style.background = P; e.currentTarget.style.transform = 'none' }}>
+            <div className="flex flex-wrap gap-3.5">
+              <button
+                onClick={() => navigate('/signup')}
+                className="inline-flex items-center gap-2 bg-[#7A004B] text-white text-[15px] font-ui font-semibold px-7 py-3.5 rounded-full border-none cursor-pointer shadow-[0_8px_24px_rgba(122,0,75,0.25)] transition-all hover:bg-[#5a0033] hover:-translate-y-0.5"
+              >
                 Sign Up For Free Trial <FiArrowRight />
               </button>
-              <a href="#expert"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: `2px solid ${P}`, color: P, background: 'transparent', fontSize: 15, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 600, padding: '13px 28px', borderRadius: 50, textDecoration: 'none', transition: 'all .2s' }}
-                onMouseEnter={e => { e.currentTarget.style.background = PL; e.currentTarget.style.transform = 'translateY(-2px)' }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.transform = 'none' }}>
+              <a
+                href="#expert"
+                className="inline-flex items-center gap-2 border-2 border-[#7A004B] text-[#7A004B] bg-transparent text-[15px] font-ui font-semibold px-7 py-3.5 rounded-full no-underline transition-all hover:bg-[#FDF4F8] hover:-translate-y-0.5"
+              >
                 Talk To Expert
               </a>
             </div>
           </motion.div>
 
-          {/* ── Right: dashboard mockup ───────────────────────────────────── */}
           <motion.div
             variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
             transition={{ delay: 0.15 }}
-            style={{ width: '100%', paddingBottom: 'clamp(15px,3vw,36px)', overflow: 'visible' }}>
+            className="w-full pb-[clamp(15px,3vw,36px)] overflow-visible"
+          >
             <DashboardMockup />
           </motion.div>
         </div>
@@ -715,51 +454,34 @@ function Hero() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ██ STATS
-// Layout changes vs original:
-//   - padding: was '40px 40px 60px' — top 40px, bottom 60px, hardcoded 40px gutter
-//     → now paddingTop/Bottom: SP.section.sm (48px) via Wrap
-//     Stats is a "bridge" section — intentionally tighter than full sections
-//   - maxWidth: was 1280px inline → now handled by Wrap (same 1280px, consistent)
-//   - gap: was 20px inline → now SP.gap.stat = '20px' (token)
 // ─────────────────────────────────────────────────────────────────────────────
 function Stats() {
   const stats = [
-    { icon: <BsPeopleFill size={22} />, num: '100+',  label: 'Happy customers of TorchX' },
-    { icon: <FiBarChart2 size={22} />,  num: '1000+', label: 'No. of live demos' },
-    { icon: <FiUsers size={22} />,      num: '10+',   label: 'Partners to collaborate' },
-    { icon: <FiStar size={22} />,       num: '98%',   label: 'Customer satisfaction' },
+    { icon: <BsPeopleFill size={22} />, num: '100+', label: 'Happy customers of TorchX' },
+    { icon: <FiBarChart2 size={22} />, num: '1000+', label: 'No. of live demos' },
+    { icon: <FiUsers size={22} />, num: '10+', label: 'Partners to collaborate' },
+    { icon: <FiStar size={22} />, num: '98%', label: 'Customer satisfaction' },
   ]
   return (
-    <section style={{
-      background: '#fff',
-      /* SP.section.sm = 48px — compact bridge between Hero and Features */
-      paddingTop: '0px',
-      paddingBottom: SP.section.sm,
-    }}>
+    <section className="bg-white pt-0 pb-12">
       <Wrap>
         <motion.div
           variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
-          style={{ display: 'grid', gap: SP.gap.stat }} /* 20px */
-          className="stats-grid"
+          className="grid grid-cols-1 max-[480px]:grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5"
         >
           {stats.map((s, i) => (
-            <motion.div key={s.num}
+            <motion.div
+              key={s.num}
               initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.45, delay: i * 0.08 }} viewport={{ once: true }}
-              style={{
-                background: '#fff', borderRadius: 18,
-                /* card padding: SP.card.padSm = 24px — compact for stat cards */
-                padding: `${SP.card.padSm} ${SP.card.padSm}`,
-                border: `1px solid ${PB}`, boxShadow: '0 2px 12px rgba(122,0,75,.06)',
-                transition: 'all .3s', display: 'flex', alignItems: 'center',
-                gap: SP.gap.inner, /* 16px between icon and text */
-              }}
-              onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 10px 32px ${P}1A`; e.currentTarget.style.transform = 'translateY(-4px)' }}
-              onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 2px 12px rgba(122,0,75,.06)'; e.currentTarget.style.transform = 'none' }}>
-              <div style={{ width: 52, height: 52, borderRadius: '50%', background: P, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff' }}>{s.icon}</div>
+              className="bg-white rounded-[18px] p-6 border border-[#EAC7D7] shadow-[0_2px_12px_rgba(122,0,75,.06)] flex items-center gap-4 transition-all hover:shadow-[0_10px_32px_rgba(122,0,75,0.10)] hover:-translate-y-1"
+            >
+              <div className="w-13 h-13 rounded-full bg-[#7A004B] flex items-center justify-center shrink-0 text-white">
+                {s.icon}
+              </div>
               <div>
-                <div style={{ fontSize: 28, fontFamily: 'Sora, sans-serif', fontWeight: 800, color: P, lineHeight: 1.1 }}>{s.num}</div>
-                <div style={{ fontSize: 13, fontFamily: 'DM Sans, sans-serif', fontWeight: 600, color: D, lineHeight: 1.4, marginTop: 2 }}>{s.label}</div>
+                <div className="text-[28px] font-display font-extrabold text-[#7A004B] leading-[1.1]">{s.num}</div>
+                <div className="text-[13px] font-body font-semibold text-[#111] leading-[1.4] mt-0.5">{s.label}</div>
               </div>
             </motion.div>
           ))}
@@ -771,64 +493,65 @@ function Stats() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ██ FEATURE CARD SUB-COMPONENTS
-// Layout changes: card padding uses SP.card.pad (32px) instead of '24px 24px 16px'
-// Inner card body uses SP.card.inner (16px) margin and padding
 // ─────────────────────────────────────────────────────────────────────────────
 function MiniSidebar() {
   const icons = [FiUser, FiMessageSquare, FiUsers, FiSettings, FiLogOut]
   return (
-    <div style={{ width: 44, background: P, borderRadius: '12px 0 0 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '14px 0', gap: 18, flexShrink: 0 }}>
-      {icons.map((Icon, i) => <Icon key={i} style={{ color: i === 0 ? '#fff' : 'rgba(255,255,255,0.45)', fontSize: 15 }} />)}
+    <div className="w-11 bg-[#7A004B] rounded-l-xl flex flex-col items-center py-3.5 gap-4.5 shrink-0">
+      {icons.map((Icon, i) => (
+        <Icon key={i} className={i === 0 ? 'text-white text-[15px]' : 'text-white/45 text-[15px]'} />
+      ))}
     </div>
   )
 }
 
 function AIRecruitmentCard() {
   const candidates = [
-    { name: 'Baibhav Gangwar', role: 'UI/UX Designer',       pct: 96 },
-    { name: 'Ashish Gangwar',  role: 'Full Stack Developer', pct: 92 },
-    { name: 'Pawan Kumar',     role: 'Frontend Developer',   pct: 89 },
+    { name: 'Baibhav Gangwar', role: 'UI/UX Designer', pct: 96 },
+    { name: 'Ashish Gangwar', role: 'Full Stack Developer', pct: 92 },
+    { name: 'Pawan Kumar', role: 'Frontend Developer', pct: 89 },
   ]
   return (
-    <motion.div variants={cardVariant} whileHover={{ y: -10, boxShadow: '0 20px 40px rgba(122,0,75,0.15)' }}
-      style={{ background: '#fff', border: `2px solid ${P}`, borderRadius: 18, overflow: 'hidden', boxShadow: '0 8px 24px rgba(122,0,75,0.08)', display: 'flex', flexDirection: 'column', transition: 'all 0.3s ease' }}>
-      {/* SP.card.pad = 32px top/sides, 16px bottom before inner mockup */}
-      <div style={{ padding: `${SP.card.pad} ${SP.card.pad} ${SP.card.inner}` }}>
-        <div style={{ width: 56, height: 56, background: PL, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-          <HiOutlineSparkles style={{ color: P, fontSize: 26 }} />
+    <motion.div
+      variants={cardVariant}
+      className="feat-card bg-white border-2 border-[#7A004B] rounded-[18px] overflow-hidden shadow-[0_8px_24px_rgba(122,0,75,0.08)] flex flex-col transition-all duration-300 hover:-translate-y-2.5 hover:shadow-[0_16px_48px_rgba(122,0,75,0.18)]"
+    >
+      <div className="px-8 pt-8 pb-4">
+        <div className="w-14 h-14 bg-[#FDF4F8] rounded-2xl flex items-center justify-center mb-3.5">
+          <HiOutlineSparkles className="text-[#7A004B] text-[26px]" />
         </div>
-        <h3 style={{ fontSize: 18, fontFamily: 'Sora, sans-serif', fontWeight: 700, color: D, margin: '0 0 8px' }}>AI Recruitment</h3>
-        <p style={{ fontSize: 13, color: G, lineHeight: 1.65, margin: 0, fontFamily: 'DM Sans, sans-serif' }}>
+        <h3 className="text-lg font-display font-bold text-[#111] mb-2">AI Recruitment</h3>
+        <p className="text-[13px] text-[#5C5C5C] leading-[1.65] font-body">
           Find the right talent faster with AI-powered candidate screening, smart matching, and automated shortlisting.
         </p>
       </div>
-      <motion.div style={{ margin: `0 ${SP.card.inner}`, background: PL, borderRadius: '12px 12px 0 0', overflow: 'hidden', display: 'flex', flex: 1 }}>
+      <div className="mx-4 bg-[#FDF4F8] rounded-t-xl overflow-hidden flex flex-1">
         <MiniSidebar />
-        <div style={{ flex: 1, padding: '14px 12px 16px' }}>
-          <div style={{ fontSize: 9, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 700, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 10 }}>Top Matched Candidates</div>
+        <div className="flex-1 px-3 pt-3.5 pb-4">
+          <div className="text-[9px] font-ui font-bold text-[#aaa] uppercase tracking-[0.8px] mb-2.5">Top Matched Candidates</div>
           {candidates.map(c => (
-            <div key={c.name} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, background: '#fff', borderRadius: 10, padding: '7px 10px', border: `1px solid ${PB}` }}>
-              <div style={{ width: 28, height: 28, borderRadius: '50%', background: `${P}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <FiUser style={{ color: P, fontSize: 12 }} />
+            <div key={c.name} className="flex items-center gap-2 mb-2 bg-white rounded-[10px] px-2.5 py-1.5 border border-[#EAC7D7]">
+              <div className="w-7 h-7 rounded-full bg-[#7A004B]/[0.09] flex items-center justify-center shrink-0">
+                <FiUser className="text-[#7A004B] text-xs" />
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 10, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 700, color: D, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
-                <div style={{ fontSize: 8, color: '#bbb', fontFamily: 'DM Sans, sans-serif' }}>{c.role}</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] font-ui font-bold text-[#111] whitespace-nowrap overflow-hidden text-ellipsis">{c.name}</div>
+                <div className="text-[8px] text-[#bbb] font-body">{c.role}</div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
-                <div style={{ width: 42, height: 4, background: '#e8e0ec', borderRadius: 4, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${c.pct}%`, background: '#00b050', borderRadius: 4 }} />
+              <div className="flex items-center gap-1.5 shrink-0">
+                <div className="w-[42px] h-1 bg-[#e8e0ec] rounded overflow-hidden">
+                  <div className="h-full bg-[#00b050] rounded" style={{ width: `${c.pct}%` }} />
                 </div>
-                <span style={{ fontSize: 9, fontWeight: 700, color: '#00b050', fontFamily: 'Instrument Sans, sans-serif' }}>{c.pct}%</span>
+                <span className="text-[9px] font-bold text-[#00b050] font-ui">{c.pct}%</span>
               </div>
             </div>
           ))}
         </div>
-      </motion.div>
-      <div style={{ padding: `14px ${SP.card.pad}`, borderTop: `1px solid ${PB}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 12, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 700, color: P }}>Smart hiring. Better teams.</span>
-        <div style={{ width: 30, height: 30, borderRadius: '50%', border: `1.5px solid ${PB}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <FiArrowRight style={{ color: P, fontSize: 13 }} />
+      </div>
+      <div className="px-8 py-3.5 border-t border-[#EAC7D7] flex justify-between items-center">
+        <span className="text-xs font-ui font-bold text-[#7A004B]">Smart hiring. Better teams.</span>
+        <div className="w-[30px] h-[30px] rounded-full border-[1.5px] border-[#EAC7D7] flex items-center justify-center">
+          <FiArrowRight className="text-[#7A004B] text-[13px]" />
         </div>
       </div>
     </motion.div>
@@ -836,27 +559,30 @@ function AIRecruitmentCard() {
 }
 
 function PerformanceCard() {
+  const P = '#7A004B'
   return (
-    <motion.div variants={cardVariant} whileHover={{ y: -10, boxShadow: '0 20px 40px rgba(122,0,75,0.15)' }}
-      style={{ background: '#fff', border: `2px solid ${P}`, borderRadius: 18, overflow: 'hidden', boxShadow: '0 8px 24px rgba(122,0,75,0.08)', display: 'flex', flexDirection: 'column', transition: 'all 0.3s ease' }}>
-      <div style={{ padding: `${SP.card.pad} ${SP.card.pad} ${SP.card.inner}` }}>
-        <div style={{ width: 56, height: 56, background: PL, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-          <BsGraphUp style={{ color: P, fontSize: 24 }} />
+    <motion.div
+      variants={cardVariant}
+      className="feat-card bg-white border-2 border-[#7A004B] rounded-[18px] overflow-hidden shadow-[0_8px_24px_rgba(122,0,75,0.08)] flex flex-col transition-all duration-300 hover:-translate-y-2.5 hover:shadow-[0_16px_48px_rgba(122,0,75,0.18)]"
+    >
+      <div className="px-8 pt-8 pb-4">
+        <div className="w-14 h-14 bg-[#FDF4F8] rounded-2xl flex items-center justify-center mb-3.5">
+          <BsGraphUp className="text-[#7A004B] text-2xl" />
         </div>
-        <h3 style={{ fontSize: 18, fontFamily: 'Sora, sans-serif', fontWeight: 700, color: D, margin: '0 0 8px' }}>Performance Reviews</h3>
-        <p style={{ fontSize: 13, color: G, lineHeight: 1.65, margin: 0, fontFamily: 'DM Sans, sans-serif' }}>
+        <h3 className="text-lg font-display font-bold text-[#111] mb-2">Performance Reviews</h3>
+        <p className="text-[13px] text-[#5C5C5C] leading-[1.65] font-body">
           Simplify performance evaluations with customizable reviews, goal tracking, and actionable feedback.
         </p>
       </div>
-      <motion.div style={{ margin: `0 ${SP.card.inner}`, background: PL, borderRadius: '12px 12px 0 0', padding: '14px 14px 10px', flex: 1 }}>
-        <div style={{ fontSize: 9, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 700, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 10 }}>Performance Overview</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-          <div style={{ minWidth: 80 }}>
-            <div style={{ fontSize: 9, color: '#aaa', fontFamily: 'DM Sans, sans-serif', marginBottom: 2 }}>Avg Rating</div>
-            <div style={{ fontSize: 30, fontFamily: 'Sora, sans-serif', fontWeight: 800, color: D, lineHeight: 1, marginBottom: 3 }}>4.6</div>
-            <div style={{ color: P, fontSize: 13, letterSpacing: 1 }}>★★★★★</div>
+      <div className="mx-4 bg-[#FDF4F8] rounded-t-xl px-3.5 pt-3.5 pb-2.5 flex-1">
+        <div className="text-[9px] font-ui font-bold text-[#aaa] uppercase tracking-[0.8px] mb-2.5">Performance Overview</div>
+        <div className="flex items-center gap-1.5 mb-3">
+          <div className="min-w-[80px]">
+            <div className="text-[9px] text-[#aaa] font-body mb-0.5">Avg Rating</div>
+            <div className="text-[30px] font-display font-extrabold text-[#111] leading-none mb-0.5">4.6</div>
+            <div className="text-[#7A004B] text-[13px] tracking-widest">★★★★★</div>
           </div>
-          <div style={{ flex: 1, height: 110 }}>
+          <div className="flex-1 h-[110px]">
             <ResponsiveContainer width="100%" height="100%">
               <RechartsRadar data={radarData} margin={{ top: 6, right: 10, bottom: 6, left: 10 }}>
                 <PolarGrid stroke="#e8d0de" strokeWidth={0.8} />
@@ -866,20 +592,20 @@ function PerformanceCard() {
             </ResponsiveContainer>
           </div>
         </div>
-        <div style={{ background: '#fff', borderRadius: 10, padding: '8px 10px', border: `1px solid ${PB}` }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-            <span style={{ fontSize: 10, fontFamily: 'DM Sans, sans-serif', color: G, fontWeight: 600 }}>Goals Achieved</span>
-            <span style={{ fontSize: 10, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 700, color: P }}>82%</span>
+        <div className="bg-white rounded-[10px] px-2.5 py-2 border border-[#EAC7D7]">
+          <div className="flex justify-between mb-1.5">
+            <span className="text-[10px] font-body text-[#5C5C5C] font-semibold">Goals Achieved</span>
+            <span className="text-[10px] font-ui font-bold text-[#7A004B]">82%</span>
           </div>
-          <div style={{ width: '100%', height: 6, background: '#e8d8e8', borderRadius: 6 }}>
-            <div style={{ width: '82%', height: '100%', background: P, borderRadius: 6 }} />
+          <div className="w-full h-1.5 bg-[#e8d8e8] rounded-md">
+            <div className="w-[82%] h-full bg-[#7A004B] rounded-md" />
           </div>
         </div>
-      </motion.div>
-      <div style={{ padding: `14px ${SP.card.pad}`, borderTop: `2px solid ${P}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 12, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 700, color: P }}>Evaluate. Improve. Grow.</span>
-        <div style={{ width: 30, height: 30, borderRadius: '50%', border: `1.5px solid ${PB}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <FiArrowRight style={{ color: P, fontSize: 13 }} />
+      </div>
+      <div className="px-8 py-3.5 border-t-2 border-[#7A004B] flex justify-between items-center">
+        <span className="text-xs font-ui font-bold text-[#7A004B]">Evaluate. Improve. Grow.</span>
+        <div className="w-[30px] h-[30px] rounded-full border-[1.5px] border-[#EAC7D7] flex items-center justify-center">
+          <FiArrowRight className="text-[#7A004B] text-[13px]" />
         </div>
       </div>
     </motion.div>
@@ -888,57 +614,59 @@ function PerformanceCard() {
 
 function EmployeePortalCard() {
   const quickActions = [
-    { icon: <FiUser />,     label: 'My\nProfile'   },
-    { icon: <FiBell />,     label: 'Company\nNews' },
-    { icon: <FiFileText />, label: 'My\nDocs'      },
-    { icon: <FiUsers />,    label: 'Leave\nReqs'   },
+    { icon: <FiUser />, label: 'My\nProfile' },
+    { icon: <FiBell />, label: 'Company\nNews' },
+    { icon: <FiFileText />, label: 'My\nDocs' },
+    { icon: <FiUsers />, label: 'Leave\nReqs' },
   ]
   return (
-    <motion.div variants={cardVariant} whileHover={{ y: -10, boxShadow: '0 20px 40px rgba(122,0,75,0.15)' }}
-      style={{ background: '#fff', border: `2px solid ${P}`, borderRadius: 18, overflow: 'hidden', boxShadow: '0 8px 24px rgba(122,0,75,0.08)', display: 'flex', flexDirection: 'column', transition: 'all 0.3s ease' }}>
-      <div style={{ padding: `${SP.card.pad} ${SP.card.pad} ${SP.card.inner}` }}>
-        <div style={{ width: 56, height: 56, background: PL, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-          <BsPersonBadge style={{ color: P, fontSize: 26 }} />
+    <motion.div
+      variants={cardVariant}
+      className="feat-card bg-white border-2 border-[#7A004B] rounded-[18px] overflow-hidden shadow-[0_8px_24px_rgba(122,0,75,0.08)] flex flex-col transition-all duration-300 hover:-translate-y-2.5 hover:shadow-[0_16px_48px_rgba(122,0,75,0.18)]"
+    >
+      <div className="px-8 pt-8 pb-4">
+        <div className="w-14 h-14 bg-[#FDF4F8] rounded-2xl flex items-center justify-center mb-3.5">
+          <BsPersonBadge className="text-[#7A004B] text-[26px]" />
         </div>
-        <h3 style={{ fontSize: 18, fontFamily: 'Sora, sans-serif', fontWeight: 700, color: D, margin: '0 0 8px' }}>Employee Portal</h3>
-        <p style={{ fontSize: 13, color: G, lineHeight: 1.65, margin: 0, fontFamily: 'DM Sans, sans-serif' }}>
+        <h3 className="text-lg font-display font-bold text-[#111] mb-2">Employee Portal</h3>
+        <p className="text-[13px] text-[#5C5C5C] leading-[1.65] font-body">
           Empower employees with a self-service portal for profiles, documents, requests, and company updates.
         </p>
       </div>
-      <motion.div style={{ margin: `0 ${SP.card.inner}`, background: PL, borderRadius: '12px 12px 0 0', overflow: 'hidden', display: 'flex', flex: 1 }}>
+      <div className="mx-4 bg-[#FDF4F8] rounded-t-xl overflow-hidden flex flex-1">
         <MiniSidebar />
-        <div style={{ flex: 1, padding: '12px 10px 14px' }}>
-          <div style={{ fontSize: 11, fontFamily: 'Sora, sans-serif', fontWeight: 700, color: D, marginBottom: 10 }}>Welcome back, Baibhav!</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+        <div className="flex-1 px-2.5 pt-3 pb-3.5">
+          <div className="text-[11px] font-display font-bold text-[#111] mb-2.5">Welcome back, Baibhav!</div>
+          <div className="grid grid-cols-2 gap-1.5 mb-2">
             {quickActions.map(item => (
-              <div key={item.label} style={{ background: '#fff', borderRadius: 10, padding: '7px 5px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, border: `1px solid ${PB}` }}>
-                <div style={{ color: P, fontSize: 15 }}>{item.icon}</div>
-                <div style={{ fontSize: 8, fontFamily: 'Instrument Sans, sans-serif', color: P, lineHeight: 1.3, fontWeight: 600, whiteSpace: 'pre-line' }}>{item.label}</div>
+              <div key={item.label} className="bg-white rounded-[10px] py-1.5 px-1.5 text-center flex flex-col items-center gap-1 border border-[#EAC7D7]">
+                <div className="text-[#7A004B] text-[15px]">{item.icon}</div>
+                <div className="text-[8px] font-ui text-[#7A004B] leading-[1.3] font-semibold whitespace-pre-line">{item.label}</div>
               </div>
             ))}
           </div>
-          <div style={{ background: '#fff', borderRadius: 10, padding: '7px 9px', marginBottom: 6, border: `1px solid ${PB}` }}>
-            <div style={{ fontSize: 8, color: '#aaa', fontFamily: 'DM Sans, sans-serif', fontWeight: 600, marginBottom: 2 }}>Upcoming Leave</div>
-            <div style={{ fontSize: 10, fontFamily: 'Sora, sans-serif', fontWeight: 700, color: D }}>15 – 18 May 2024</div>
+          <div className="bg-white rounded-[10px] px-2.5 py-1.5 mb-1.5 border border-[#EAC7D7]">
+            <div className="text-[8px] text-[#aaa] font-body font-semibold mb-0.5">Upcoming Leave</div>
+            <div className="text-[10px] font-display font-bold text-[#111]">15 – 18 May 2024</div>
           </div>
-          <div style={{ background: '#fff', borderRadius: 10, padding: '7px 9px', border: `1px solid ${PB}` }}>
-            <div style={{ fontSize: 8, color: '#aaa', fontFamily: 'DM Sans, sans-serif', fontWeight: 600, marginBottom: 5 }}>Team Birthday 🎂</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <div style={{ width: 24, height: 24, borderRadius: '50%', background: P, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <FiUser style={{ color: '#fff', fontSize: 11 }} />
+          <div className="bg-white rounded-[10px] px-2.5 py-1.5 border border-[#EAC7D7]">
+            <div className="text-[8px] text-[#aaa] font-body font-semibold mb-1.5">Team Birthday 🎂</div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-6 h-6 rounded-full bg-[#7A004B] flex items-center justify-center shrink-0">
+                <FiUser className="text-white text-[11px]" />
               </div>
               <div>
-                <div style={{ fontSize: 9, fontFamily: 'Sora, sans-serif', fontWeight: 700, color: D }}>Baibhav Gangwar</div>
-                <div style={{ fontSize: 7.5, color: '#bbb', fontFamily: 'DM Sans, sans-serif' }}>May 05</div>
+                <div className="text-[9px] font-display font-bold text-[#111]">Baibhav Gangwar</div>
+                <div className="text-[7.5px] text-[#bbb] font-body">May 05</div>
               </div>
             </div>
           </div>
         </div>
-      </motion.div>
-      <div style={{ padding: `14px ${SP.card.pad}`, borderTop: `1px solid ${PB}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 12, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 700, color: P }}>Everything you need, in one place.</span>
-        <div style={{ width: 30, height: 30, borderRadius: '50%', border: `1.5px solid ${PB}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <FiArrowRight style={{ color: P, fontSize: 13 }} />
+      </div>
+      <div className="px-8 py-3.5 border-t border-[#EAC7D7] flex justify-between items-center">
+        <span className="text-xs font-ui font-bold text-[#7A004B]">Everything you need, in one place.</span>
+        <div className="w-[30px] h-[30px] rounded-full border-[1.5px] border-[#EAC7D7] flex items-center justify-center">
+          <FiArrowRight className="text-[#7A004B] text-[13px]" />
         </div>
       </div>
     </motion.div>
@@ -947,43 +675,25 @@ function EmployeePortalCard() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ██ FEATURES SECTION
-// Layout changes vs original:
-//   - padding: was '100px 40px' hardcoded → SP.section.lg (96px) + Wrap gutter
-//   - section headline margin-bottom: was 64px → SP.headingGap (64px) — same but tokenized
-//   - grid gap: was 28px inline → SP.gap.card via CSS class
-//   - maxWidth: was 1280px inline → handled by Wrap
 // ─────────────────────────────────────────────────────────────────────────────
 function Features() {
   return (
-    <section id="features" 
-    className="scroll-anchor"
-    style={{
-      background: '#F8F5F7',
-      fontFamily: 'DM Sans, sans-serif',
-      /* SP.section.lg = 96px — full section tier */
-      paddingTop: '30px',
-      paddingBottom: '35px',
-    }}>
+    <section id="features" className="scroll-anchor bg-[#F8F5F7] font-body pt-8 pb-9">
       <Wrap>
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
-
-          {/* Section heading block: mb = SP.headingGap (64px) */}
-          <div style={{ textAlign: 'center', marginBottom: SP.headingGap }}>
-            <h2 style={{
-              fontSize: 'clamp(42px,5vw,52px)',
-              fontFamily: 'Roboto, sans-serif', fontWeight: 500,
-              color: D, lineHeight: 1.1,
-              margin: `0 0 ${SP.section.xs}`, /* 24px between h2 and p */
-            }}>
-              Powerful <span style={{ color: P }}>Features</span><br />Built for <span style={{ color: P }}>Modern</span> Teams
+          <div className="text-center mb-16">
+            <h2 className="font-hero font-medium text-[#111] leading-[1.1] mb-6 text-[clamp(42px,5vw,52px)]">
+              Powerful <span className="text-[#7A004B]">Features</span><br />Built for <span className="text-[#7A004B]">Modern</span> Teams
             </h2>
-            <p style={{ fontSize: 20, color: '#555', lineHeight: 1.6, maxWidth: 700, margin: '0 auto', fontFamily: 'DM Sans, sans-serif' }}>
+            <p className="text-xl text-[#555] leading-relaxed max-w-[700px] mx-auto font-body">
               Everything you need to hire smarter, evaluate better, and empower your employees.
             </p>
           </div>
 
-          {/* feat-section-grid: gap = SP.gap.card (28px) via CSS class */}
-          <motion.div className="feat-section-grid" variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.1 }}>
+          <motion.div
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7"
+            variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.1 }}
+          >
             <AIRecruitmentCard />
             <PerformanceCard />
             <EmployeePortalCard />
@@ -996,124 +706,112 @@ function Features() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ██ PRICING
-
+// ─────────────────────────────────────────────────────────────────────────────
 function Pricing() {
   const plans = [
-    { name: 'Basic',    desc: 'Perfect for small teams getting started',                       price: '₹109', features: ['Employee database','Attendance tracking','Leave management','Basic payroll','Employee self-service portal','Email support'] },
-    { name: 'Advance',   desc: 'For growing businesses that need more. Everything in Starter +', price: '₹249', popular: true, features: ['Recruitment / Applicant tracking','Performance management','Advanced payroll','Custom policies/workflows','Reports & analytics','Priority support'] },
-    { name: 'Enterprise', desc: 'Ultimate power and flexibility. Everything in Growth +',         price: '₹499', features: ['Multi-company support','Role-based permissions','SSO','API access','Custom integrations','Dedicated account manager'] },
+    { name: 'Basic', desc: 'Perfect for small teams getting started', price: '₹109', features: ['Employee database','Attendance tracking','Leave management','Basic payroll','Employee self-service portal','Email support'] },
+    { name: 'Advance', desc: 'For growing businesses that need more. Everything in Starter +', price: '₹249', popular: true, features: ['Recruitment / Applicant tracking','Performance management','Advanced payroll','Custom policies/workflows','Reports & analytics','Priority support'] },
+    { name: 'Enterprise', desc: 'Ultimate power and flexibility. Everything in Growth +', price: '₹499', features: ['Multi-company support','Role-based permissions','SSO','API access','Custom integrations','Dedicated account manager'] },
   ]
   const badges = [
-    { icon: <FiShield size={20} />,   label: 'Secure & Compliant', desc: 'Enterprise-grade security with regular backups.' },
-    { icon: <FiLink size={20} />,     label: 'Easy Integration',   desc: 'Seamlessly integrates with your favorite tools.' },
-    { icon: <FiActivity size={20} />, label: '99.9% Uptime',       desc: 'Reliable performance you can count on.' },
-    { icon: <FiBookOpen size={20} />, label: 'Free Onboarding',    desc: 'We help you and your team get started.' },
+    { icon: <FiShield size={20} />, label: 'Secure & Compliant', desc: 'Enterprise-grade security with regular backups.' },
+    { icon: <FiLink size={20} />, label: 'Easy Integration', desc: 'Seamlessly integrates with your favorite tools.' },
+    { icon: <FiActivity size={20} />, label: '99.9% Uptime', desc: 'Reliable performance you can count on.' },
+    { icon: <FiBookOpen size={20} />, label: 'Free Onboarding', desc: 'We help you and your team get started.' },
   ]
   return (
-    <section id="pricing" 
-    className="scroll-anchor"
-    style={{
-      background: '#fff',
-      paddingTop: '30px',  
-      paddingBottom: '35px',
-    }}>
+    <section id="pricing" className="scroll-anchor bg-white pt-8 pb-9">
       <Wrap>
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
-
-          {/* Heading: mb = SP.headingGap (64px) — same as Features */}
-          <div style={{ textAlign: 'center', marginBottom: SP.headingGap }}>
-            <h2 style={{
-              fontSize: 'clamp(28px,3.2vw,42px)',
-              fontFamily: 'Roboto, sans-serif', fontWeight: 500,
-              color: D, margin: `0 0 ${SP.section.xs}`, /* 24px */
-            }}>
-              Simple, Transparent <span style={{ color: P }}>Pricing</span><br />That Grows With You
+          <div className="text-center mb-16">
+            <h2 className="font-hero font-medium text-[#111] mb-6 text-[clamp(28px,3.2vw,42px)]">
+              Simple, Transparent <span className="text-[#7A004B]">Pricing</span><br />That Grows With You
             </h2>
-            <p style={{ fontSize: 18, fontFamily: 'DM Sans, sans-serif', color: G, maxWidth: 440, margin: '0 auto', lineHeight: 1.7 }}>
+            <p className="text-lg font-body text-[#5C5C5C] max-w-[440px] mx-auto leading-relaxed">
               Choose the perfect plan for your team. Upgrade or downgrade anytime as your needs change.
             </p>
           </div>
 
-          {/* Pricing cards: paddingTop 20px offset for popular badge overlap */}
-          <div style={{ display: 'grid', gap: SP.gap.card, alignItems: 'center', marginBottom: SP.section.xs, paddingTop: '20px' }} className="pricing-grid">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 items-center mb-6 pt-5">
             {plans.map(p => (
-              <div key={p.name}
-                className={`pricing-card${p.popular ? ' pricing-card-popular' : ''}`}
-                style={{ position: 'relative', borderRadius: 24, padding: SP.card.pad, display: 'flex', flexDirection: 'column', gap: SP.gap.stat, background: '#fff', border: `2px solid ${P}`, boxShadow: 'none' }}>
+              <div
+                key={p.name}
+                className={`relative rounded-3xl p-8 flex flex-col gap-5 bg-white border-2 border-[#7A004B] transition-transform duration-300 ${
+                  p.popular ? 'lg:scale-[1.045] relative z-[5]' : 'hover:scale-[1.02]'
+                }`}
+              >
                 {p.popular && (
-                  <div style={{ position: 'absolute', top: -16, left: '50%', transform: 'translateX(-50%)', zIndex: 2 }}>
-                    <span style={{ background: P, color: '#fff', fontSize: 11, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 700, padding: '6px 20px', borderRadius: 50, whiteSpace: 'nowrap', letterSpacing: '0.5px' }}>Most Popular</span>
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-[2]">
+                    <span className="bg-[#7A004B] text-white text-[11px] font-ui font-bold px-5 py-1.5 rounded-full whitespace-nowrap tracking-wide">Most Popular</span>
                   </div>
                 )}
                 <div>
-                  <div style={{ fontSize: 18, fontFamily: 'Sora, sans-serif', fontWeight: 700, color: D, marginBottom: 6 }}>{p.name}</div>
-                  <div style={{ fontSize: 12, fontFamily: 'DM Sans, sans-serif', color: '#999', lineHeight: 1.5 }}>{p.desc}</div>
+                  <div className="text-lg font-display font-bold text-[#111] mb-1.5">{p.name}</div>
+                  <div className="text-xs font-body text-[#999] leading-relaxed">{p.desc}</div>
                 </div>
                 <div>
-                  <span style={{ fontSize: 38, fontFamily: 'Sora, sans-serif', fontWeight: 800, color: D }}>{p.price}</span>
-                  <span style={{ fontSize: 12, fontFamily: 'DM Sans, sans-serif', color: '#aaa', marginLeft: 4 }}>/user/mo</span>
+                  <span className="text-[38px] font-display font-extrabold text-[#111]">{p.price}</span>
+                  <span className="text-xs font-body text-[#aaa] ml-1">/user/mo</span>
                 </div>
-                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 11 }}>
+                <ul className="list-none p-0 m-0 flex flex-col gap-2.5">
                   {p.features.map(f => (
-                    <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 13, fontFamily: 'DM Sans, sans-serif', color: G }}>
-                      <FiCheck style={{ color: P, flexShrink: 0, marginTop: 2 }} />{f}
+                    <li key={f} className="flex items-start gap-2.5 text-[13px] font-body text-[#5C5C5C]">
+                      <FiCheck className="text-[#7A004B] shrink-0 mt-0.5" />{f}
                     </li>
                   ))}
                 </ul>
-                <button style={{ marginTop: 'auto', width: '100%', padding: '12px 0', borderRadius: 50, fontSize: 14, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 700, cursor: 'pointer', background: P, color: '#fff', border: 'none', transition: 'all .2s' }}>
+                <button className="mt-auto w-full py-3 rounded-full text-sm font-ui font-bold cursor-pointer bg-[#7A004B] text-white border-none transition-all hover:bg-[#5a0033]">
                   Start Free Trial
                 </button>
               </div>
             ))}
           </div>
 
-          {/* Storage banner: mb = SP.section.xs (24px) */}
-          <div style={{ background: PL, borderRadius: 20, padding: `${SP.card.padSm} ${SP.card.pad}`, marginBottom: SP.section.xs, border: `2px solid ${P}` }}>
-            <div style={{ display: 'grid', gap: SP.gap.inner, alignItems: 'center' }} className="storage-grid">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <FiHardDrive style={{ color: P, fontSize: 22, flexShrink: 0 }} />
+          <div className="bg-[#FDF4F8] rounded-[20px] px-8 py-6 mb-6 border-2 border-[#7A004B]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr] gap-4 items-center">
+              <div className="flex items-center gap-2.5">
+                <FiHardDrive className="text-[#7A004B] text-[22px] shrink-0" />
                 <div>
-                  <div style={{ fontSize: 13, fontFamily: 'Sora, sans-serif', fontWeight: 700, color: D }}>Storage Guidance</div>
-                  <div style={{ fontSize: 11, fontFamily: 'DM Sans, sans-serif', color: '#aaa', lineHeight: 1.4 }}>Finance documents, invoices, receipts, ledgers grow fast.</div>
+                  <div className="text-[13px] font-display font-bold text-[#111]">Storage Guidance</div>
+                  <div className="text-[11px] font-body text-[#aaa] leading-snug">Finance documents, invoices, receipts, ledgers grow fast.</div>
                 </div>
               </div>
               {[{ label: 'Startup', val: '2 GB' }, { label: 'Business', val: '20 GB' }, { label: 'Enterprise', val: '100 GB' }].map(s => (
-                <div key={s.label} style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 24, fontFamily: 'Sora, sans-serif', fontWeight: 800, color: D }}>{s.val}</div>
-                  <div style={{ fontSize: 10, color: '#aaa', fontFamily: 'DM Sans', marginBottom: 4 }}>Per company</div>
-                  <span style={{ fontSize: 10, background: '#fff', color: P, fontWeight: 700, padding: '3px 14px', borderRadius: 20, border: `1px solid ${PB}`, fontFamily: 'Instrument Sans' }}>{s.label}</span>
+                <div key={s.label} className="text-center">
+                  <div className="text-2xl font-display font-extrabold text-[#111]">{s.val}</div>
+                  <div className="text-[10px] text-[#aaa] font-body mb-1">Per company</div>
+                  <span className="text-[10px] bg-white text-[#7A004B] font-bold px-3.5 py-0.5 rounded-full border border-[#EAC7D7] font-ui">{s.label}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Badge grid: gap = SP.gap.inner (16px), mb = SP.section.xs (24px) */}
-          <div style={{ display: 'grid', gap: SP.gap.inner, marginBottom: SP.section.xs }} className="badge-grid">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {badges.map(b => (
-              <div key={b.label} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: `${SP.card.inner} 18px`, background: PL, borderRadius: 16, border: `1px solid ${PB}` }}>
-                <div style={{ color: P, flexShrink: 0, marginTop: 2 }}>{b.icon}</div>
+              <div key={b.label} className="flex items-start gap-3 px-4.5 py-4 bg-[#FDF4F8] rounded-2xl border border-[#EAC7D7]">
+                <div className="text-[#7A004B] shrink-0 mt-0.5">{b.icon}</div>
                 <div>
-                  <div style={{ fontSize: 12, fontFamily: 'Sora, sans-serif', fontWeight: 700, color: D, marginBottom: 3 }}>{b.label}</div>
-                  <div style={{ fontSize: 11, fontFamily: 'DM Sans, sans-serif', color: '#aaa', lineHeight: 1.5 }}>{b.desc}</div>
+                  <div className="text-xs font-display font-bold text-[#111] mb-0.5">{b.label}</div>
+                  <div className="text-[11px] font-body text-[#aaa] leading-relaxed">{b.desc}</div>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Expert banner: padding = SP.card.padSm (24px) SP.card.pad (32px) */}
-          <div style={{ background: PL, borderRadius: 20, padding: `${SP.card.padSm} ${SP.card.pad}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: SP.gap.inner, border: `1px solid ${PB}` }} className="expert-banner">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{ width: 44, height: 44, background: `${P}18`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <HiOutlineSparkles style={{ color: P, fontSize: 20 }} />
+          <div className="bg-[#FDF4F8] rounded-[20px] px-8 py-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border border-[#EAC7D7]">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 bg-[#7A004B]/[0.09] rounded-full flex items-center justify-center shrink-0">
+                <HiOutlineSparkles className="text-[#7A004B] text-xl" />
               </div>
               <div>
-                <div style={{ fontSize: 14, fontFamily: 'Sora, sans-serif', fontWeight: 700, color: D }}>Not sure which plan is right for you?</div>
-                <div style={{ fontSize: 12, fontFamily: 'DM Sans, sans-serif', color: '#aaa' }}>Our experts can help you choose the perfect plan based on your requirements.</div>
+                <div className="text-sm font-display font-bold text-[#111]">Not sure which plan is right for you?</div>
+                <div className="text-xs font-body text-[#aaa]">Our experts can help you choose the perfect plan based on your requirements.</div>
               </div>
             </div>
-            <a href="#expert" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: P, color: '#fff', fontSize: 13, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 700, padding: '12px 24px', borderRadius: 50, textDecoration: 'none', whiteSpace: 'nowrap', transition: 'background .2s' }}
-              onMouseEnter={e => e.currentTarget.style.background = PH}
-              onMouseLeave={e => e.currentTarget.style.background = P}>
+            <a
+              href="#expert"
+              className="inline-flex items-center gap-2 bg-[#7A004B] text-white text-[13px] font-ui font-bold px-6 py-3 rounded-full no-underline whitespace-nowrap transition-colors hover:bg-[#5a0033]"
+            >
               Talk to an Expert <FiArrowRight />
             </a>
           </div>
@@ -1125,231 +823,98 @@ function Pricing() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ██ TESTIMONIALS
-
+// ─────────────────────────────────────────────────────────────────────────────
 function Testimonials() {
   const [startIndex, setStartIndex] = useState(0)
-  const avatarGradients = [
-    'linear-gradient(135deg, #740042)',
-    'linear-gradient(135deg, #740042)',
-    'linear-gradient(135deg, #740022)',
-    'linear-gradient(135deg, #740022)',
-    'linear-gradient(135deg, #740032)',
-  ]
   const testimonials = [
-    { quote: 'TorchX has completely transformed our hiring process. The AI recruitment feature helps us find the right talent faster and with better accuracy.', name: 'Alexa', role: 'HR Manager', co: 'LOGOIPSUM', initials: 'AL', grad: avatarGradients[0] },
-    { quote: 'The employee portal is a game changer! Our team loves the easy access to documents, requests, and updates all in one place.', name: 'Anaya Varma', role: 'HR Director', co: 'LOGOIPSUM', initials: 'AV', grad: avatarGradients[1] },
-    { quote: 'Performance reviews are now simple, transparent, and data-driven. TorchX helps us build a culture of continuous feedback and growth.', name: 'Rohan Sharma', role: 'People Operations Lead', co: 'LOGOIPSUM', initials: 'RS', grad: avatarGradients[2] },
-  {
-  quote: 'TorchX has significantly improved our workforce management. From onboarding to performance tracking, everything is streamlined and easy to manage.',
-  name: 'Karan Malhotra',
-  role: 'Head of Human Resources',
-  co: 'LOGOIPSUM',
-  initials: 'KM',
-  grad: avatarGradients[0]
-},
-{
-  quote: 'TorchX has helped us centralize all HR operations in one platform. The automation features save countless hours every week and improve team productivity.',
-  name: 'Meera Patel',
-  role: 'Chief People Officer',
-  co: 'LOGOIPSUM',
-  initials: 'MP',
-  grad: avatarGradients[1]
-}
+    { quote: 'TorchX has completely transformed our hiring process. The AI recruitment feature helps us find the right talent faster and with better accuracy.', name: 'Alexa', role: 'HR Manager', co: 'LOGOIPSUM', initials: 'AL' },
+    { quote: 'The employee portal is a game changer! Our team loves the easy access to documents, requests, and updates all in one place.', name: 'Anaya Varma', role: 'HR Director', co: 'LOGOIPSUM', initials: 'AV' },
+    { quote: 'Performance reviews are now simple, transparent, and data-driven. TorchX helps us build a culture of continuous feedback and growth.', name: 'Rohan Sharma', role: 'People Operations Lead', co: 'LOGOIPSUM', initials: 'RS' },
+    { quote: 'TorchX has significantly improved our workforce management. From onboarding to performance tracking, everything is streamlined and easy to manage.', name: 'Karan Malhotra', role: 'Head of Human Resources', co: 'LOGOIPSUM', initials: 'KM' },
+    { quote: 'TorchX has helped us centralize all HR operations in one platform. The automation features save countless hours every week and improve team productivity.', name: 'Meera Patel', role: 'Chief People Officer', co: 'LOGOIPSUM', initials: 'MP' },
   ]
-  const visibleTestimonials = testimonials.slice(
-  startIndex,
-  startIndex + 3
-)
+  const visibleTestimonials = testimonials.slice(startIndex, startIndex + 3)
 
   return (
-    <section id="testimonials" 
-    className="scroll-anchor" style={{
-      background: '#F6EDF2',
-      fontFamily: 'DM Sans, sans-serif',
-      paddingTop: '30px',  
-      paddingBottom: '40px',
-    }}>
+    <section id="testimonials" className="scroll-anchor bg-[#F6EDF2] font-body pt-8 pb-10">
       <Wrap>
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
-
-          {/* Heading: mb = SP.headingGap (64px) */}
-          <div style={{ textAlign: 'center', marginBottom: SP.headingGap }}>
-            <h2 style={{
-              fontSize: 'clamp(26px,3.2vw,40px)',
-              fontFamily: 'Roboto, sans-serif', fontWeight: 500,
-              color: '#111111', margin: `0 0 ${SP.section.xs}`, lineHeight: 1.2,
-            }}>
-              Loved by <span style={{ color: P }}>Teams</span>, Trusted by <span style={{ color: P }}>Leaders</span>
+          <div className="text-center mb-16">
+            <h2 className="font-hero font-medium text-[#111] mb-6 text-[clamp(26px,3.2vw,40px)] leading-tight">
+              Loved by <span className="text-[#7A004B]">Teams</span>, Trusted by <span className="text-[#7A004B]">Leaders</span>
             </h2>
-            <p style={{ fontSize: 18, color: '#555555', maxWidth: 440, margin: '0 auto', lineHeight: 1.7 }}>
+            <p className="text-lg text-[#555] max-w-[440px] mx-auto leading-relaxed">
               See how organizations like yours are using TorchX to streamline HR and achieve more every day.
             </p>
           </div>
 
-          {/* Testimonial cards: gap = SP.gap.card (28px), mb = SP.section.sm (48px) */}
-          
-          <div style={{ display: 'grid', gap: SP.gap.card, marginBottom: SP.section.sm }} className="testi-grid">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 mb-12">
             {visibleTestimonials.map((t, i) => (
-              <motion.div key={t.name}
+              <motion.div
+                key={t.name}
                 initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.45, delay: i * 0.1 }} viewport={{ once: true }}
-                className="testi-card"
-                style={{
-                  background: '#ffffff', border: '1px solid #DDB7CB', borderRadius: 14,
-                  padding: SP.card.padSm, /* 24px — replaces '26px' */
-                  boxShadow: '0 6px 18px rgba(122,0,75,0.08)',transform: 'none',
-                  display: 'flex', flexDirection: 'column'
-                }}>
-                <div style={{ fontSize: 48, fontFamily: 'Sora, sans-serif', fontWeight: 900, color: P, lineHeight: 0.7, marginBottom: 14 }}>"</div>
-                <p style={{ fontSize: 13, color: '#333333', lineHeight: 1.75, flex: 1, margin: `0 0 ${SP.gap.stat}` }}>{t.quote}</p> {/* 20px */}
-                <hr style={{ border: 'none', borderTop: '1px solid #E6D6DF', marginBottom: SP.gap.inner }} /> {/* 16px */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: t.grad, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 10px rgba(122,0,75,0.25)' }}>
-                    <span style={{ color: '#fff', fontSize: 12, fontFamily: 'Sora, sans-serif', fontWeight: 700 }}>{t.initials}</span>
+                className="testi-card bg-white border border-[#DDB7CB] rounded-[14px] p-6 shadow-[0_6px_18px_rgba(122,0,75,0.08)] flex flex-col transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_60px_rgba(90,0,51,0.18)] hover:border-[#5a0033]"
+              >
+                <div className="text-5xl font-display font-black text-[#7A004B] leading-[0.7] mb-3.5">"</div>
+                <p className="text-[13px] text-[#333] leading-[1.75] flex-1 mb-5">{t.quote}</p>
+                <hr className="border-none border-t border-[#E6D6DF] mb-4" />
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#740042] to-[#740022] flex items-center justify-center shrink-0 shadow-[0_4px_10px_rgba(122,0,75,0.25)]">
+                    <span className="text-white text-xs font-display font-bold">{t.initials}</span>
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontFamily: 'Sora, sans-serif', fontWeight: 700, color: P }}>{t.name}</div>
-                    <div style={{ fontSize: 11, color: '#777777', marginTop: 2 }}>{t.role}</div>
+                  <div className="flex-1">
+                    <div className="text-[13px] font-display font-bold text-[#7A004B]">{t.name}</div>
+                    <div className="text-[11px] text-[#777] mt-0.5">{t.role}</div>
                   </div>
-                  <div style={{ fontSize: 9, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 700, color: '#888', letterSpacing: 1, textTransform: 'uppercase', borderLeft: '1px solid #E6D6DF', paddingLeft: 10 }}>{t.co}</div>
+                  <div className="text-[9px] font-ui font-bold text-[#888] tracking-widest uppercase border-l border-[#E6D6DF] pl-2.5">{t.co}</div>
                 </div>
               </motion.div>
             ))}
           </div>
 
-          {/* Pagination dots: mb = SP.section.sm (48px) */}
-<div
-  style={{
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: '20px',
-    marginBottom: SP.section.sm,
-  }}
->
-  <button
-  onClick={() =>
-    setStartIndex(prev => Math.max(prev - 1, 0))
-  }
-  style={{
-    width: '42px',
-    height: '42px',
-    minWidth: '42px',
-    borderRadius: '50%',
-    border: '1.5px solid #DDB7CB',
-    background: '#fff',
-    color: '#730042',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '18px',
-    fontWeight: '400',
-    transition: 'all .3s ease',
-    boxShadow: '0 4px 12px rgba(115,0,66,0.08)'
-  }}
-  onMouseEnter={e => {
-    e.currentTarget.style.background = '#730042';
-    e.currentTarget.style.color = '#fff';
-    e.currentTarget.style.transform = 'translateY(-2px)';
-  }}
-  onMouseLeave={e => {
-    e.currentTarget.style.background = '#fff';
-    e.currentTarget.style.color = '#730042';
-    e.currentTarget.style.transform = 'translateY(0)';
-  }}
->
-  ←
-</button>
+          <div className="flex justify-center items-center gap-5 mb-12">
+            <button
+              onClick={() => setStartIndex(prev => Math.max(prev - 1, 0))}
+              className="w-[42px] h-[42px] min-w-[42px] rounded-full border-[1.5px] border-[#DDB7CB] bg-white text-[#730042] cursor-pointer flex items-center justify-center text-lg transition-all shadow-[0_4px_12px_rgba(115,0,66,0.08)] hover:bg-[#730042] hover:text-white hover:-translate-y-0.5"
+            >
+              ←
+            </button>
 
-  <div
-  style={{
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-  }}
->{[0,1,2].map(i => (
-  <button
-    key={i}
-    onClick={() => setStartIndex(i)}
-    style={{
-      width: startIndex === i ? '40px' : '25px',
-      height: startIndex === i ? '15px' : '8px',
-      borderRadius: '50%',
-      border: 'none',
-      cursor: 'pointer',
-      background: startIndex === i ? '#730042' : '#DDB7CB',
-      transition: 'all 0.3s ease',
-      padding: 0,
-    }}
-  />
-))}
-</div>
-<button
-  onClick={() =>
-    setStartIndex(prev =>
-      Math.min(prev + 1, testimonials.length - 3)
-    )
-  }
-  style={{
-    width: '42px',
-    height: '42px',
-    minWidth: '42px',
-    borderRadius: '50%',
-    border: '1.5px solid #DDB7CB',
-    background: '#fff',
-    color: '#730042',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '18px',
-    fontWeight: '400',
-    transition: 'all .3s ease',
-    boxShadow: '0 4px 12px rgba(115,0,66,0.08)'
-  }}
-  onMouseEnter={e => {
-    e.currentTarget.style.background = '#730042';
-    e.currentTarget.style.color = '#fff';
-    e.currentTarget.style.transform = 'translateY(-2px)';
-  }}
-  onMouseLeave={e => {
-    e.currentTarget.style.background = '#fff';
-    e.currentTarget.style.color = '#730042';
-    e.currentTarget.style.transform = 'translateY(0)';
-  }}
->
-  →
-</button>
-</div>
-          {/* CTA banner: padding SP.section.sm (48px) SP.card.pad (32px) */}
-          <div className="testimonial-cta"
-            style={{
-              flexWrap: 'wrap', width: '100%',
-              background: 'linear-gradient(135deg, #FFF7FA 0%, #F9EAF2 100%)',
-              border: '1px solid #E7CCD9', borderRadius: 22,
-              /* 48px top/bottom, 32px left/right — generous but proportional */
-              padding: `${SP.section.sm} ${SP.card.pad}`,
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              gap: SP.gap.stat, /* 20px */
-              boxShadow: '0 10px 30px rgba(122,0,75,0.08)',
-              transition: 'all .35s ease'
-            }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-6px)'; e.currentTarget.style.boxShadow = '0 20px 40px rgba(122,0,75,0.15)' }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 10px 30px rgba(122,0,75,0.08)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: SP.gap.inner }}>
-              <div style={{ width: 48, height: 48, background: 'linear-gradient(135deg, #7A004B, #B00068)', boxShadow: '0 8px 20px rgba(122,0,75,0.25)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <HiOutlineSparkles style={{ color: '#fff', fontSize: 22 }} />
+            <div className="flex items-center gap-1.5">
+              {[0, 1, 2].map(i => (
+                <button
+                  key={i}
+                  onClick={() => setStartIndex(i)}
+                  className={`rounded-full border-none cursor-pointer p-0 transition-all duration-300 ${
+                    startIndex === i ? 'w-10 h-[15px] bg-[#730042]' : 'w-[25px] h-2 bg-[#DDB7CB]'
+                  }`}
+                />
+              ))}
+            </div>
+
+            <button
+              onClick={() => setStartIndex(prev => Math.min(prev + 1, testimonials.length - 3))}
+              className="w-[42px] h-[42px] min-w-[42px] rounded-full border-[1.5px] border-[#DDB7CB] bg-white text-[#730042] cursor-pointer flex items-center justify-center text-lg transition-all shadow-[0_4px_12px_rgba(115,0,66,0.08)] hover:bg-[#730042] hover:text-white hover:-translate-y-0.5"
+            >
+              →
+            </button>
+          </div>
+
+          <div className="testimonial-cta flex flex-col md:flex-row flex-wrap w-full bg-gradient-to-br from-[#FFF7FA] to-[#F9EAF2] border border-[#E7CCD9] rounded-[22px] px-8 py-12 justify-between items-start md:items-center gap-5 shadow-[0_10px_30px_rgba(122,0,75,0.08)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_20px_40px_rgba(122,0,75,0.15)]">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-[#7A004B] to-[#B00068] shadow-[0_8px_20px_rgba(122,0,75,0.25)] rounded-full flex items-center justify-center shrink-0">
+                <HiOutlineSparkles className="text-white text-xl" />
               </div>
               <div>
-                <div style={{ fontSize: 18, fontFamily: 'Sora, sans-serif', fontWeight: 800, color: '#2A1120', marginBottom: 4 }}>Join 100+ companies growing with TorchX</div>
-                <div style={{ fontSize: 13, color: '#666666' }}>Powerful HR tools. Happy teams. Better results.</div>
+                <div className="text-lg font-display font-extrabold text-[#2A1120] mb-1">Join 100+ companies growing with TorchX</div>
+                <div className="text-[13px] text-[#666]">Powerful HR tools. Happy teams. Better results.</div>
               </div>
             </div>
-            <a href="#trial"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg, #7A004B, #A60062)', color: '#fff', fontSize: 13, fontFamily: 'Instrument Sans, sans-serif', fontWeight: 700, padding: '14px 26px', borderRadius: 12, textDecoration: 'none', whiteSpace: 'nowrap', transition: 'all .3s ease', boxShadow: '0 8px 20px rgba(122,0,75,0.25)' }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 14px 30px rgba(122,0,75,0.35)' }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(122,0,75,0.25)' }}>
+            <a
+              href="#trial"
+              className="inline-flex items-center gap-2 bg-gradient-to-br from-[#7A004B] to-[#A60062] text-white text-[13px] font-ui font-bold px-6.5 py-3.5 rounded-xl no-underline whitespace-nowrap transition-all shadow-[0_8px_20px_rgba(122,0,75,0.25)] hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(122,0,75,0.35)]"
+            >
               Book For Free Trial <FiArrowRight />
             </a>
           </div>
@@ -1360,7 +925,7 @@ function Testimonials() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ██ LEGAL MODAL — unchanged content, padding uses SP tokens
+// ██ LEGAL MODAL
 // ─────────────────────────────────────────────────────────────────────────────
 const legalDocs = {
   privacy: {
@@ -1402,21 +967,6 @@ const legalDocs = {
   },
 }
 
-const modalStyles = `
-  .torchx-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:9999; display:flex; align-items:center; justify-content:center; padding:20px; }
-  .torchx-modal { background:#fff; border-radius:14px; width:100%; max-width:720px; max-height:88vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 24px 64px rgba(0,0,0,0.18); }
-  .torchx-modal-header { display:flex; align-items:center; justify-content:space-between; padding:20px 24px 16px; border-bottom:1px solid #f0e6ec; }
-  .torchx-modal-title { font-family:'DM Sans',sans-serif; font-size:16px; font-weight:600; color:#730042; margin:0; }
-  .torchx-modal-close { width:32px; height:32px; border-radius:50%; border:none; background:#f5f5f5; color:#555; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:background 0.15s; }
-  .torchx-modal-close:hover { background:#ececec; }
-  .torchx-modal-body { overflow-y:auto; padding:24px; flex:1; }
-  .torchx-modal-eff { font-family:'DM Sans',sans-serif; font-size:12px; color:#aaa; margin-bottom:20px; }
-  .torchx-modal-section { margin-bottom:20px; }
-  .torchx-modal-section-head { font-family:'DM Sans',sans-serif; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.6px; color:#730042; margin-bottom:10px; }
-  .torchx-modal-item { display:flex; gap:10px; margin-bottom:8px; font-family:'DM Sans',sans-serif; font-size:13.5px; color:#444; line-height:1.6; }
-  .torchx-modal-dot { width:5px; height:5px; background:#730042; border-radius:50%; margin-top:8px; flex-shrink:0; opacity:0.5; }
-`
-
 function LegalModal({ docKey, onClose }) {
   const doc = legalDocs[docKey]
   useEffect(() => {
@@ -1425,20 +975,28 @@ function LegalModal({ docKey, onClose }) {
     return () => document.removeEventListener('keydown', handleKey)
   }, [onClose])
   return (
-    <div className="torchx-modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="torchx-modal">
-        <div className="torchx-modal-header">
-          <p className="torchx-modal-title">{doc.title}</p>
-          <button className="torchx-modal-close" onClick={onClose}>×</button>
+    <div
+      className="fixed inset-0 bg-black/55 z-[9999] flex items-center justify-center p-5"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="bg-white rounded-[14px] w-full max-w-[720px] max-h-[88vh] flex flex-col overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.18)]">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[#f0e6ec]">
+          <p className="font-body text-base font-semibold text-[#730042] m-0">{doc.title}</p>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full border-none bg-[#f5f5f5] text-[#555] text-lg cursor-pointer flex items-center justify-center shrink-0 transition-colors hover:bg-[#ececec]"
+          >
+            ×
+          </button>
         </div>
-        <div className="torchx-modal-body">
-          <p className="torchx-modal-eff">Effective Date: {doc.effective}</p>
-          {doc.sections.map((sec,i) => (
-            <div key={i} className="torchx-modal-section">
-              <p className="torchx-modal-section-head">{sec.heading}</p>
-              {sec.items.map((item,j) => (
-                <div key={j} className="torchx-modal-item">
-                  <span className="torchx-modal-dot"/>
+        <div className="overflow-y-auto p-6 flex-1">
+          <p className="font-body text-xs text-[#aaa] mb-5">Effective Date: {doc.effective}</p>
+          {doc.sections.map((sec, i) => (
+            <div key={i} className="mb-5">
+              <p className="font-body text-xs font-semibold uppercase tracking-wide text-[#730042] mb-2.5">{sec.heading}</p>
+              {sec.items.map((item, j) => (
+                <div key={j} className="flex gap-2.5 mb-2 font-body text-[13.5px] text-[#444] leading-relaxed">
+                  <span className="w-[5px] h-[5px] bg-[#730042] rounded-full mt-2 shrink-0 opacity-50" />
                   <span>{item}</span>
                 </div>
               ))}
@@ -1451,77 +1009,68 @@ function LegalModal({ docKey, onClose }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ██ FOOTER
-// Layout changes vs original:
-//   - maxWidth: was 1100px → SP.maxW (1280px) via Wrap
-//     This is the BIGGEST alignment bug in the original: footer was 180px
-//     narrower than all other sections, creating a visible indent mismatch
-//   - padding: was '60px 40px 0' → Wrap handles gutter, paddingTop: SP.section.sm (48px)
-//   - footer-grid gap: was 40px → SP.gap.card + 12 = 40px (same, now via CSS class)
-//   - bottom bar: padding '18px 40px' → Wrap with paddingTop: SP.gap.stat (20px)
+// ██ FOOTER — links point to real destinations for internal/external link SEO
 // ─────────────────────────────────────────────────────────────────────────────
 function Footer() {
-  const FOOTER_BORDER = '#E2C9D6'
-  const FOOTER_MUTED  = '#888888'
   const cols = [
-    { title: 'Product',   links: ['Features', 'Pricing', 'Security', 'Roadmap', 'Status'] },
-    { title: 'Solutions', links: ['Talent', 'Engage', 'Finance', 'Inventory', 'Pay'] },
-    { title: 'Resources', links: ['Documentation', 'Api Reference', 'Guides', 'Blog', 'Community'] },
+    { title: 'Product', links: [
+      { label: 'Features', href: '#features' },
+      { label: 'Pricing', href: '#pricing' },
+    ] },
+    { title: 'Solutions', links: [
+      { label: 'Talent', href: 'https://torchxsuite.com/talent/' },
+      { label: 'Engage', href: 'https://torchxsuite.com/engage/' },
+      { label: 'Finance', href: 'https://torchxsuite.com/finance/' },
+      { label: 'Inventory', href: 'https://torchxsuite.com/inventory/' },
+      { label: 'Pay', href: 'https://torchxsuite.com/pay/' },
+    ] },
+    { title: 'Resources', links: [
+      { label: 'Documentation', href: 'https://torchxsuite.com/docs/' },
+    ] },
   ]
   const socials = [
-    { icon: <FiLinkedin />, href: "https://www.linkedin.com/company/103362190/admin/dashboard/", label: 'LinkedIn' },
+    { icon: <FiLinkedin />, href: 'https://www.linkedin.com/company/103362190/admin/dashboard/', label: 'LinkedIn' },
     { icon: <FiInstagram />, href: '#', label: 'Instagram' },
     { icon: <FiTwitter />, href: '#', label: 'Twitter' },
     { icon: <FiMail />, href: '#', label: 'Email' },
   ]
-  const clickableLinks = { Features: '#features', Pricing: '#pricing' }
   const [activeDoc, setActiveDoc] = useState(null)
 
   return (
     <>
-      <style>{modalStyles}</style>
-      <footer style={{ background: '#F6EDF2', borderTop: `1px solid ${FOOTER_BORDER}`, fontFamily: 'DM Sans, sans-serif' }}>
-
-      
-        <Wrap style={{ paddingTop: '30px', paddingBottom: 0 }}>
-          <div style={{ display: 'grid', gap: '40px' }} className="footer-grid">
-
-            {/* Logo + description */}
+      <footer className="bg-[#F6EDF2] border-t border-[#E2C9D6] font-body">
+        <Wrap className="pt-8 pb-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1fr] gap-10">
             <div>
-              <img src={logo} alt="TorchX"
-                style={{ height: 'clamp(36px,4vw,48px)', width: 'auto', objectFit: 'contain', display: 'block', marginBottom: 6 }} />
-              <p style={{ fontSize: 15, color: '#444444', lineHeight: 1.75, margin: `0 0 ${SP.gap.stat}` }}>
+              <img src={logo} alt="TorchX" className="h-9 sm:h-11 w-auto object-contain block mb-1.5" />
+              <p className="text-[15px] text-[#444] leading-[1.75] mb-5">
                 Hire smarter, faster, and with confidence using AI-powered talent solutions.
                 Streamline recruitment, discover top candidates, and build high-performing teams effortlessly.
               </p>
-              <div style={{ display: 'flex', gap: '10px' }}>
+              <div className="flex gap-2.5">
                 {socials.map((s, i) => (
-                  <a key={i} href={s.href} aria-label={s.label}
-                    style={{ color: P, fontSize: 18, textDecoration: 'none', width: 34, height: 34, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform .2s, color .2s' }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.color = PH }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.color = P }}>
+                  <a
+                    key={i} href={s.href} aria-label={s.label}
+                    className="text-[#7A004B] text-lg no-underline w-[34px] h-[34px] rounded-full flex items-center justify-center transition-all hover:-translate-y-0.5 hover:text-[#5a0033]"
+                  >
                     {s.icon}
                   </a>
                 ))}
               </div>
             </div>
 
-            {/* Link columns */}
             {cols.map(col => (
               <div key={col.title}>
-                <div style={{ fontSize: 24, fontFamily: 'Sora, sans-serif', fontWeight: 700, color: P, marginBottom: SP.gap.inner }}>
-                  {col.title}
-                </div>
-                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="text-2xl font-display font-bold text-[#7A004B] mb-4">{col.title}</div>
+                <ul className="list-none p-0 m-0 flex flex-col gap-3">
                   {col.links.map(l => (
-                    <li key={l}>
-                      {clickableLinks[l] ? (
-                        <a href={clickableLinks[l]} style={{ fontSize: 16, color: P, textDecoration: 'none', transition: 'color .2s' }}
-                          onMouseEnter={e => e.currentTarget.style.color = PH}
-                          onMouseLeave={e => e.currentTarget.style.color = P}>{l}</a>
-                      ) : (
-                        <span style={{ fontSize: 16, color: P, cursor: 'default' }}>{l}</span>
-                      )}
+                    <li key={l.label}>
+                      <a
+                        href={l.href}
+                        className="text-base text-[#7A004B] no-underline transition-colors hover:text-[#5a0033]"
+                      >
+                        {l.label}
+                      </a>
                     </li>
                   ))}
                 </ul>
@@ -1530,23 +1079,23 @@ function Footer() {
           </div>
         </Wrap>
 
-        {/* Bottom bar: inside Wrap for gutter alignment, mt = SP.section.xs (24px) */}
-        <Wrap style={{ paddingTop: '35px', paddingBottom: SP.gap.stat }}>
-          <div style={{ borderTop: `1px solid ${FOOTER_BORDER}`, paddingTop: SP.gap.stat, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-            <p style={{ fontSize: 14, color: '#555555', margin: 0 }}>
+        <Wrap className="pt-9 pb-5">
+          <div className="border-t border-[#E2C9D6] pt-5 flex flex-wrap justify-between items-center gap-3">
+            <p className="text-sm text-[#555] m-0">
               TorchX™ — A Product of Techtorch Solutions Private Limited.
             </p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px' }}>
+            <div className="flex flex-wrap gap-4.5">
               {[
                 { label: 'Privacy Policy', key: 'privacy' },
                 { label: 'Terms of Service', key: 'terms' },
                 { label: 'Cookie Policy', key: 'cookie' },
                 { label: 'Refund Policy', key: 'refund' },
               ].map(item => (
-                <span key={item.key} onClick={() => setActiveDoc(item.key)}
-                  style={{ fontSize: 14, color: FOOTER_MUTED, cursor: 'pointer', transition: 'color .2s' }}
-                  onMouseEnter={e => e.currentTarget.style.color = P}
-                  onMouseLeave={e => e.currentTarget.style.color = FOOTER_MUTED}>
+                <span
+                  key={item.key}
+                  onClick={() => setActiveDoc(item.key)}
+                  className="text-sm text-[#888] cursor-pointer transition-colors hover:text-[#7A004B]"
+                >
                   {item.label}
                 </span>
               ))}
@@ -1554,8 +1103,7 @@ function Footer() {
           </div>
         </Wrap>
 
-        {/* Final breath: SP.section.xs / 2 = 12px bottom padding */}
-        <div style={{ height: '12px' }} />
+        <div className="h-3" />
       </footer>
 
       {activeDoc && <LegalModal docKey={activeDoc} onClose={() => setActiveDoc(null)} />}
@@ -1569,7 +1117,7 @@ function Footer() {
 export default function LandingPage() {
   return (
     <>
-      <style>{globalStyles}</style>
+      <style>{fontStyles}</style>
       <Navbar />
       <Hero />
       <Stats />
