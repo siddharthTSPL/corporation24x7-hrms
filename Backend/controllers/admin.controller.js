@@ -928,6 +928,11 @@ const promoteEmployeeToManager = async (req, res, next) => {
 
     await session.commitTransaction();
 
+    if (user.working_status === "working") {
+      await decrementActiveUserCount(organisation_id);
+    }
+    await incrementActiveUserCount(organisation_id);
+
     return res.status(200).json({
       success: true,
       message: `${user.f_name} ${user.l_name} has been promoted from Employee to Manager`,
@@ -3038,7 +3043,7 @@ const setEmployeeWorkingStatus = async (req, res, next) => {
     }
 
     let asset_return_check = null;
-    if (willBeWorking === false && wasWorking) {
+    if (!willBeWorking && wasWorking) {
       const pendingAssets = await AssetModel.find({
         organisation_id,
         assigned_to: id,
