@@ -2142,14 +2142,35 @@ const setAdminWorkingStatus = async (req, res, next) => {
       );
 
     const existingAdmin = await AdminModel.findOne({ _id: id, organisation_id })
-      .select("working_status")
+      .select("_id f_name l_name work_email")
       .lean();
 
     if (!existingAdmin)
       return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
 
-    const wasWorking = existingAdmin.working_status === "working";
-    const willBeWorking = working_status === "working";
+    if (working_status !== "working") {
+      const pendingAssets = await AssetModel.find({
+        organisation_id,
+        assigned_to: id,
+        assigned_to_model: "Admin",
+        status: "assigned",
+      })
+        .select("_id asset_id asset_name asset_type serial_number brand assigned_date")
+        .lean();
+
+      if (pendingAssets.length > 0) {
+        return res.status(409).json({
+          success: false,
+          message: `Cannot mark ${existingAdmin.f_name} ${existingAdmin.l_name} as '${working_status}'. Please revoke all assigned assets first.`,
+          asset_return_check: {
+            has_pending_assets: true,
+            pending_asset_count: pendingAssets.length,
+            assets: pendingAssets,
+            message: `⚠️ Warning: ${pendingAssets.length} asset(s) are still assigned to this admin and must be returned before offboarding.`,
+          },
+        });
+      }
+    }
 
     const admin = await AdminModel.findOneAndUpdate(
       { _id: id, organisation_id },
@@ -2165,52 +2186,21 @@ const setAdminWorkingStatus = async (req, res, next) => {
       .select("_id uid f_name l_name work_email role department designation working_status status")
       .lean();
 
-    if (!admin)
-      return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
-
-    // Only touch the counter when the transition actually crosses the
-    // working <-> not-working boundary. e.g. resigned -> fired must NOT
-    // decrement again since the admin was already excluded from the count.
-    if (wasWorking && !willBeWorking) {
-      await decrementActiveUserCount(organisation_id);
-    } else if (!wasWorking && willBeWorking) {
-      await incrementActiveUserCount(organisation_id);
-    }
-
-    // ── Asset return check ──────────────────────────────────────────────────
-    let asset_return_check = null;
     if (working_status !== "working") {
-      const pendingAssets = await AssetModel.find({
-        organisation_id,
-        assigned_to: id,
-        assigned_to_model: "Admin",
-        status: "assigned",
-      })
-        .select("_id asset_id asset_name asset_type serial_number brand assigned_date")
-        .lean();
-
-      asset_return_check = {
-        has_pending_assets: pendingAssets.length > 0,
-        pending_asset_count: pendingAssets.length,
-        assets: pendingAssets,
-        message:
-          pendingAssets.length > 0
-            ? `⚠️ Warning: ${pendingAssets.length} asset(s) are still assigned to this admin and must be returned before offboarding.`
-            : "✅ No pending assets. All clear.",
-      };
+      await decrementActiveUserCount(organisation_id);
+    } else {
+      await incrementActiveUserCount(organisation_id);
     }
 
     return res.status(200).json({
       success: true,
       message: `Admin working status updated to '${working_status}' successfully`,
       admin,
-      ...(asset_return_check && { asset_return_check }),
     });
   } catch (error) {
     next(error);
   }
 };
-
 const getInactiveUsers = async (req, res, next) => {
   try {
     if (!req.superAdmin)
