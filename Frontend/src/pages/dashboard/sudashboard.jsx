@@ -12,6 +12,7 @@ import {
 } from "react-icons/fa";
 
 import { useGetMeSuperAdmin } from "../../auth/server-state/superadmin/auth/suauth.hook";
+import { SuperAdminAssetReturnWarning } from "../asset/superadminasset";
 import {
   useGetTodayCheckins, useGetNoOfEmployees, useGetAllEmployees,
   useDeleteEmployee, useAddEmployee, useAddManager, useEditEmployee,
@@ -1170,6 +1171,7 @@ function SuperAdminDashboard() {
   const [reviewModal, setReviewModal] = useState(false);
   const [permModal, setPermModal] = useState({ open: false, user: null });
   const [workingStatusModal, setWorkingStatusModal] = useState({ open: false, admin: null });
+  const [assetWarning, setAssetWarning] = useState({ open: false, data: null });
   const [leaveTab, setLeaveTab] = useState("admin");
   const [empExpand, setEmpExpand] = useState(false);
   const [empSearch, setEmpSearch] = useState("");
@@ -1293,11 +1295,17 @@ function SuperAdminDashboard() {
     updatePermissions(payload, { onSuccess: () => setPermModal({ open: false, user: null }) });
   };
 
-  const handleWorkingStatusConfirm = (payload) => {
-    setAdminWorkingStatus(payload, {
-      onSuccess: () => setWorkingStatusModal({ open: false, admin: null }),
-    });
-  };
+ const handleWorkingStatusConfirm = (payload) => {
+  setAdminWorkingStatus(payload, {
+    onSuccess: () => setWorkingStatusModal({ open: false, admin: null }),
+    onError: (err) => {
+      if (err?.asset_return_check?.has_pending_assets) {
+        setWorkingStatusModal({ open: false, admin: null });
+        setAssetWarning({ open: true, data: err });
+      }
+    },
+  });
+};
 
   const isAdminNonWorking = (admin) => {
     const ws = (admin.working_status || "working").toLowerCase();
@@ -1782,6 +1790,11 @@ function SuperAdminDashboard() {
         admin={workingStatusModal.admin}
         onConfirm={handleWorkingStatusConfirm}
         loading={settingWorkingStatus}
+      />
+
+      <SuperAdminAssetReturnWarning
+        data={assetWarning.data}
+        onClose={() => setAssetWarning({ open: false, data: null })}
       />
     </div>
   );
