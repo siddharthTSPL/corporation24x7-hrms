@@ -2133,6 +2133,16 @@ const setAdminWorkingStatus = async (req, res, next) => {
         )
       );
 
+    const existingAdmin = await AdminModel.findOne({ _id: id, organisation_id })
+      .select("working_status")
+      .lean();
+
+    if (!existingAdmin)
+      return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
+
+    const wasWorking = existingAdmin.working_status === "working";
+    const willBeWorking = working_status === "working";
+
     const admin = await AdminModel.findOneAndUpdate(
       { _id: id, organisation_id },
       {
@@ -2150,9 +2160,12 @@ const setAdminWorkingStatus = async (req, res, next) => {
     if (!admin)
       return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
 
-    if (working_status !== "working") {
+    // Only touch the counter when the transition actually crosses the
+    // working <-> not-working boundary. e.g. resigned -> fired must NOT
+    // decrement again since the admin was already excluded from the count.
+    if (wasWorking && !willBeWorking) {
       await decrementActiveUserCount(organisation_id);
-    } else {
+    } else if (!wasWorking && willBeWorking) {
       await incrementActiveUserCount(organisation_id);
     }
 
