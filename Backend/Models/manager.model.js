@@ -101,7 +101,7 @@ const managerSchema = new mongoose.Schema(
     },
     working_status:{
       type:String,
-      enum:["working","resigned","terminated"],
+      enum:["working","resigned","terminated","fired"],
       default:"working"
     },
 
