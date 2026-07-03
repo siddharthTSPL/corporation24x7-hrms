@@ -24,7 +24,7 @@ const verifyManagerEmail = async (req, res, next) => {
     decoded = jwt.verify(token, process.env.JWT_SECRET);
   } catch (err) {
     return res.status(400).send(
-      `<!DOCTYPE html><html><body style="margin:0;font-family:Segoe UI;background:#F9F8F2;display:flex;align-items:center;justify-content:center;height:100vh;"><div style="background:white;padding:40px;border-radius:14px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.1);max-width:420px;"><h1 style="color:#CD166E;">❌ Invalid Link</h1><p style="color:#555;">This verification link is expired or invalid.</p><a href="http://localhost:3000/login" style="display:inline-block;margin-top:20px;padding:12px 25px;background:#730042;color:white;text-decoration:none;border-radius:8px;">Go to Login</a></div></body></html>`,
+      `<!DOCTYPE html><html><body style="margin:0;font-family:Segoe UI;background:#F9F8F2;display:flex;align-items:center;justify-content:center;height:100vh;"><div style="background:white;padding:40px;border-radius:14px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.1);max-width:420px;"><h1 style="color:#CD166E;">❌ Invalid Link</h1><p style="color:#555;">This verification link is expired or invalid.</p><a href="https://torchxsuite.com/talent/login" style="display:inline-block;margin-top:20px;padding:12px 25px;background:#730042;color:white;text-decoration:none;border-radius:8px;">Go to Login</a></div></body></html>`,
     );
   }
 
@@ -36,7 +36,7 @@ const verifyManagerEmail = async (req, res, next) => {
     );
 
   res.status(200).send(
-    `<!DOCTYPE html><html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/></head><body style="margin:0;font-family:Segoe UI,sans-serif;background:linear-gradient(135deg,#730042,#CD166E);height:100vh;display:flex;align-items:center;justify-content:center;"><div style="background:white;padding:50px 40px;border-radius:16px;text-align:center;box-shadow:0 15px 40px rgba(0,0,0,0.2);max-width:420px;width:90%;"><div style="width:70px;height:70px;margin:0 auto 20px;background:#F9F8F2;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;">🎉</div><h1 style="color:#730042;margin-bottom:10px;">Manager Verified!</h1><p style="color:#555;font-size:15px;line-height:1.6;">Your manager account has been successfully verified.</p><a href="http://localhost:3000/login" style="margin-top:25px;display:inline-block;padding:14px 30px;background:#CD166E;color:white;text-decoration:none;border-radius:10px;font-weight:600;">Go to Dashboard →</a><p style="margin-top:20px;font-size:12px;color:#999;">Secure • Scalable • Modern SaaS</p></div></body></html>`,
+    `<!DOCTYPE html><html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/></head><body style="margin:0;font-family:Segoe UI,sans-serif;background:linear-gradient(135deg,#730042,#CD166E);height:100vh;display:flex;align-items:center;justify-content:center;"><div style="background:white;padding:50px 40px;border-radius:16px;text-align:center;box-shadow:0 15px 40px rgba(0,0,0,0.2);max-width:420px;width:90%;"><div style="width:70px;height:70px;margin:0 auto 20px;background:#F9F8F2;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;">🎉</div><h1 style="color:#730042;margin-bottom:10px;">Manager Verified!</h1><p style="color:#555;font-size:15px;line-height:1.6;">Your manager account has been successfully verified.</p><a href="https://torchxsuite.com/talent/login" style="margin-top:25px;display:inline-block;padding:14px 30px;background:#CD166E;color:white;text-decoration:none;border-radius:10px;font-weight:600;">Go to Dashboard →</a><p style="margin-top:20px;font-size:12px;color:#999;">Secure • Scalable • Modern SaaS</p></div></body></html>`,
   );
 };
 
@@ -59,6 +59,10 @@ const managerlogin = async (req, res, next) => {
 
   if (!manager.isVerified) {
     return next(Object.assign(new Error("Please verify your email before login"), { statusCode: 400 }));
+  }
+
+  if (manager.working_status !== "working") {
+    return next(Object.assign(new Error("Your account is not active. Please contact administrator."), { statusCode: 403 }));
   }
 
   let organisationId = manager.organisation_id;
