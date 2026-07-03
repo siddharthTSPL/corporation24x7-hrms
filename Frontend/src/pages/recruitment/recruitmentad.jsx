@@ -17,7 +17,7 @@ import {
   FaBriefcase, FaClock, FaCheckCircle, FaTimesCircle,
   FaSearch, FaPlus, FaTimes, FaUsers,
   FaExclamationTriangle, FaChevronRight,
-  FaCalendarAlt, FaLock,
+  FaCalendarAlt,
   FaEdit, FaArrowRight,
   FaUserCheck, FaBuilding, FaChartLine,
 } from "react-icons/fa";
@@ -117,24 +117,6 @@ const PriorityPill = ({ priority }) => (
   </span>
 );
 
-const PermissionDeniedOverlay = ({ feature = "this feature", onClose }) => (
-  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
-    <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-8 flex flex-col items-center text-center">
-      <div className="w-16 h-16 rounded-full bg-[#f7edf3] flex items-center justify-center mb-5">
-        <FaLock size={24} className="text-[#730042]" />
-      </div>
-      <h2 className="text-xl font-bold text-gray-800 mb-2">Access Restricted</h2>
-      <p className="text-sm text-gray-500 max-w-xs leading-relaxed mb-6">
-        You don't have permission to use <strong>{feature}</strong>. Contact your SuperAdmin to request access.
-      </p>
-      <button onClick={onClose} className="px-6 py-2.5 bg-[#730042] text-white rounded-xl text-sm font-semibold hover:bg-[#4a0029] transition-colors">
-        Got it
-      </button>
-    </div>
-  </div>
-);
-
-// ─── Candidate Stage Timeline ─────────────────────────────────────────────────
 const CandidateTimeline = ({ currentStage }) => {
   if (currentStage === "REJECTED") {
     return (
@@ -153,7 +135,6 @@ const CandidateTimeline = ({ currentStage }) => {
   return (
     <div className="w-full">
       <div className="relative flex items-center justify-between">
-        {/* connector line */}
         <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-100 z-0" />
         <div
           className="absolute top-4 left-0 h-0.5 z-0 transition-all duration-500"
@@ -166,7 +147,6 @@ const CandidateTimeline = ({ currentStage }) => {
           const meta = STAGE_TIMELINE_META[stage];
           const isDone = idx < currentIdx;
           const isCurrent = idx === currentIdx;
-          const isFuture = idx > currentIdx;
           return (
             <div key={stage} className="relative z-10 flex flex-col items-center gap-1.5" style={{ flex: "0 0 auto" }}>
               <div
@@ -208,7 +188,6 @@ const CandidateTimeline = ({ currentStage }) => {
   );
 };
 
-// ─── Department Progress Header ───────────────────────────────────────────────
 const RequisitionProgressHeader = ({ requisition, candidates }) => {
   const filledCount = candidates.filter((c) =>
     ["SELECTED", "OFFER_RELEASED", "JOINED"].includes(c.current_stage)
@@ -219,20 +198,17 @@ const RequisitionProgressHeader = ({ requisition, candidates }) => {
 
   return (
     <div
-      className="mx-6 mt-5 mb-1 rounded-2xl p-5 relative overflow-hidden"
+      className="mx-4 sm:mx-6 mt-5 mb-1 rounded-2xl p-4 sm:p-5 relative overflow-hidden"
       style={{ background: "linear-gradient(135deg, #1a000d 0%, #2e0019 50%, #4a0029 100%)" }}
     >
-      {/* decorative circles */}
       <div className="absolute w-40 h-40 rounded-full -top-20 -right-10 bg-white/5 pointer-events-none" />
       <div className="absolute w-24 h-24 rounded-full bottom-0 right-24 bg-white/5 pointer-events-none" />
 
       <div className="relative z-10 flex flex-col sm:flex-row sm:items-center gap-5">
-        {/* dept icon */}
         <div className="w-14 h-14 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center flex-shrink-0">
           <FaBuilding size={22} className="text-white/80" />
         </div>
 
-        {/* info block */}
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <span className="text-[10px] font-bold tracking-[2.5px] uppercase text-white/40">{deptLabel}</span>
@@ -245,7 +221,6 @@ const RequisitionProgressHeader = ({ requisition, candidates }) => {
             {requisition.job_title}
           </h3>
 
-          {/* progress bar */}
           <div className="flex items-center gap-3">
             <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
               <div
@@ -262,7 +237,6 @@ const RequisitionProgressHeader = ({ requisition, candidates }) => {
           </div>
         </div>
 
-        {/* seat counters */}
         <div className="flex sm:flex-col items-center sm:items-end gap-4 sm:gap-2 flex-shrink-0">
           <div className="text-center sm:text-right">
             <div
@@ -302,7 +276,6 @@ const RequisitionProgressHeader = ({ requisition, candidates }) => {
   );
 };
 
-// ─── Add Candidate Modal ──────────────────────────────────────────────────────
 const AddCandidateModal = ({ requisitionId, onClose }) => {
   const addMut = useAddCandidate();
   const [form, setForm] = useState({
@@ -324,13 +297,13 @@ const AddCandidateModal = ({ requisitionId, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl my-4">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-5 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
           <h2 className="text-xl font-bold text-gray-900" style={{ fontFamily: "'Cormorant Garamond', serif" }}>Add Candidate</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-lg transition-colors">
             <FaTimes size={14} />
           </button>
         </div>
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
               { label: "Full Name", key: "full_name", placeholder: "John Doe", type: "text" },
@@ -385,7 +358,7 @@ const AddCandidateModal = ({ requisitionId, onClose }) => {
             <p className="text-xs text-red-500 mt-3">{addMut.error?.message || "Failed to add candidate."}</p>
           )}
         </div>
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 sticky bottom-0 bg-white rounded-b-2xl">
+        <div className="flex items-center justify-end gap-3 px-4 sm:px-6 py-4 border-t border-gray-100 sticky bottom-0 bg-white rounded-b-2xl">
           <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-xl hover:border-[#730042] hover:text-[#730042] transition-colors">Cancel</button>
           <button
             onClick={handleSubmit}
@@ -401,7 +374,6 @@ const AddCandidateModal = ({ requisitionId, onClose }) => {
   );
 };
 
-// ─── Schedule Interview Modal ─────────────────────────────────────────────────
 const ScheduleInterviewModal = ({ candidateId, onClose }) => {
   const schMut = useScheduleInterview();
   const [form, setForm] = useState({ round_type: "Screening", scheduled_at: "" });
@@ -445,8 +417,7 @@ const ScheduleInterviewModal = ({ candidateId, onClose }) => {
   );
 };
 
-// ─── Candidate Detail Modal (with timeline) ───────────────────────────────────
-const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback }) => {
+const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback, canAddCandidate }) => {
   const [tab, setTab] = useState("info");
   const [stageForm, setStageForm] = useState({ stage: "", rejection_reason: "", overall_feedback: "" });
   const [feedbackForm, setFeedbackForm] = useState({ feedback: "", score: "", outcome: "Pending" });
@@ -467,14 +438,13 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback })
     { key: "info", label: "Profile" },
     { key: "timeline", label: "Timeline" },
     { key: "rounds", label: `Rounds (${candidate.interview_rounds?.length || 0})` },
-    { key: "stage", label: "Move Stage" },
+    ...(canAddCandidate ? [{ key: "stage", label: "Move Stage" }] : []),
   ];
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1050] flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl my-4">
-        {/* header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-5 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#730042] to-[#CD166E] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
               {initials(candidate.full_name)}
@@ -491,22 +461,20 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback })
           <button onClick={onClose} className="text-gray-400 hover:bg-gray-100 p-2 rounded-lg transition-colors"><FaTimes size={13} /></button>
         </div>
 
-        {/* tabs */}
-        <div className="flex gap-0 px-6 border-b border-gray-100">
+        <div className="flex gap-0 px-4 sm:px-6 border-b border-gray-100 overflow-x-auto">
           {tabs.map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`py-3 px-4 text-xs font-semibold border-b-2 transition-all -mb-px ${tab === t.key ? "border-[#730042] text-[#730042]" : "border-transparent text-gray-500 hover:text-gray-800"}`}
+              className={`py-3 px-4 text-xs font-semibold border-b-2 transition-all -mb-px whitespace-nowrap ${tab === t.key ? "border-[#730042] text-[#730042]" : "border-transparent text-gray-500 hover:text-gray-800"}`}
             >
               {t.label}
             </button>
           ))}
         </div>
 
-        <div className="p-6 max-h-[60vh] overflow-y-auto">
+        <div className="p-4 sm:p-6 max-h-[60vh] overflow-y-auto">
 
-          {/* ── Profile tab ── */}
           {tab === "info" && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -547,7 +515,6 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback })
             </div>
           )}
 
-          {/* ── Timeline tab ── */}
           {tab === "timeline" && (
             <div className="space-y-5">
               <div>
@@ -559,7 +526,6 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback })
                 </div>
               </div>
 
-              {/* stage history detail cards */}
               <div className="space-y-2 mt-4">
                 <div className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-3">Stage Details</div>
                 {PIPELINE_STAGES.map((stage, idx) => {
@@ -625,14 +591,15 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback })
             </div>
           )}
 
-          {/* ── Rounds tab ── */}
           {tab === "rounds" && (
             <div>
-              <div className="flex justify-end mb-4">
-                <button onClick={() => setShowSchedule(true)} className="flex items-center gap-2 px-4 py-2 bg-[#730042] text-white text-xs font-semibold rounded-xl hover:bg-[#4a0029] transition-all">
-                  <FaCalendarAlt size={10} /> Schedule Round
-                </button>
-              </div>
+              {canAddCandidate && (
+                <div className="flex justify-end mb-4">
+                  <button onClick={() => setShowSchedule(true)} className="flex items-center gap-2 px-4 py-2 bg-[#730042] text-white text-xs font-semibold rounded-xl hover:bg-[#4a0029] transition-all">
+                    <FaCalendarAlt size={10} /> Schedule Round
+                  </button>
+                </div>
+              )}
               {!candidate.interview_rounds?.length ? (
                 <div className="text-center py-12 text-gray-400">
                   <FaCalendarAlt size={28} className="mx-auto mb-3 opacity-40" />
@@ -656,33 +623,35 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback })
                       </div>
                       {round.feedback && <p className="text-xs text-gray-500 mb-2 leading-relaxed">{round.feedback}</p>}
                       {round.score != null && <p className="text-xs text-gray-400">Score: <strong className="text-gray-700">{round.score}/10</strong></p>}
-                      {selectedRound === round._id ? (
-                        <div className="mt-3 p-4 bg-[#fdf5f9] rounded-xl space-y-3">
-                          <div>
-                            <label className="block text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-1.5">Outcome</label>
-                            <select className="w-full px-3 py-2 bg-white border border-[#eedde8] rounded-lg text-sm text-gray-800 outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 transition-all" value={feedbackForm.outcome} onChange={(e) => setFeedbackForm((f) => ({ ...f, outcome: e.target.value }))}>
-                              {["Pending", "Passed", "Failed", "No Show"].map((o) => <option key={o} value={o}>{o}</option>)}
-                            </select>
+                      {canAddCandidate && (
+                        selectedRound === round._id ? (
+                          <div className="mt-3 p-4 bg-[#fdf5f9] rounded-xl space-y-3">
+                            <div>
+                              <label className="block text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-1.5">Outcome</label>
+                              <select className="w-full px-3 py-2 bg-white border border-[#eedde8] rounded-lg text-sm text-gray-800 outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 transition-all" value={feedbackForm.outcome} onChange={(e) => setFeedbackForm((f) => ({ ...f, outcome: e.target.value }))}>
+                                {["Pending", "Passed", "Failed", "No Show"].map((o) => <option key={o} value={o}>{o}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-1.5">Score (0–10)</label>
+                              <input type="number" min="0" max="10" className="w-full px-3 py-2 bg-white border border-[#eedde8] rounded-lg text-sm text-gray-800 outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 transition-all" value={feedbackForm.score} onChange={(e) => setFeedbackForm((f) => ({ ...f, score: e.target.value }))} />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-1.5">Feedback</label>
+                              <textarea rows={3} className="w-full px-3 py-2 bg-white border border-[#eedde8] rounded-lg text-sm text-gray-800 outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 transition-all resize-y" value={feedbackForm.feedback} onChange={(e) => setFeedbackForm((f) => ({ ...f, feedback: e.target.value }))} />
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={() => handleFeedback(round._id)} disabled={fbMut.isPending} className="flex items-center gap-2 px-4 py-2 bg-[#730042] text-white text-xs font-semibold rounded-lg hover:bg-[#4a0029] disabled:opacity-60 transition-all">
+                                {fbMut.isPending ? "Saving…" : "Save Feedback"}
+                              </button>
+                              <button onClick={() => setSelectedRound(null)} className="px-4 py-2 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors">Cancel</button>
+                            </div>
                           </div>
-                          <div>
-                            <label className="block text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-1.5">Score (0–10)</label>
-                            <input type="number" min="0" max="10" className="w-full px-3 py-2 bg-white border border-[#eedde8] rounded-lg text-sm text-gray-800 outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 transition-all" value={feedbackForm.score} onChange={(e) => setFeedbackForm((f) => ({ ...f, score: e.target.value }))} />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-1.5">Feedback</label>
-                            <textarea rows={3} className="w-full px-3 py-2 bg-white border border-[#eedde8] rounded-lg text-sm text-gray-800 outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 transition-all resize-y" value={feedbackForm.feedback} onChange={(e) => setFeedbackForm((f) => ({ ...f, feedback: e.target.value }))} />
-                          </div>
-                          <div className="flex gap-2">
-                            <button onClick={() => handleFeedback(round._id)} disabled={fbMut.isPending} className="flex items-center gap-2 px-4 py-2 bg-[#730042] text-white text-xs font-semibold rounded-lg hover:bg-[#4a0029] disabled:opacity-60 transition-all">
-                              {fbMut.isPending ? "Saving…" : "Save Feedback"}
-                            </button>
-                            <button onClick={() => setSelectedRound(null)} className="px-4 py-2 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors">Cancel</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button onClick={() => setSelectedRound(round._id)} className="mt-2 flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 px-3 py-1.5 rounded-lg hover:border-[#730042] hover:text-[#730042] transition-colors">
-                          <FaEdit size={10} /> Add Feedback
-                        </button>
+                        ) : (
+                          <button onClick={() => setSelectedRound(round._id)} className="mt-2 flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 px-3 py-1.5 rounded-lg hover:border-[#730042] hover:text-[#730042] transition-colors">
+                            <FaEdit size={10} /> Add Feedback
+                          </button>
+                        )
                       )}
                     </div>
                   ))}
@@ -691,10 +660,8 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback })
             </div>
           )}
 
-          {/* ── Move Stage tab ── */}
-          {tab === "stage" && (
+          {tab === "stage" && canAddCandidate && (
             <div className="space-y-5">
-              {/* mini timeline inside move-stage */}
               <div className="p-4 bg-[#fdf5f9] rounded-xl border border-[#eedde8]">
                 <div className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-3">Current Position in Pipeline</div>
                 <div className="overflow-x-auto pb-1">
@@ -748,8 +715,8 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback })
           )}
         </div>
 
-        {tab === "stage" && allowed.length > 0 && (
-          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 sticky bottom-0 bg-white rounded-b-2xl">
+        {tab === "stage" && canAddCandidate && allowed.length > 0 && (
+          <div className="flex items-center justify-end gap-3 px-4 sm:px-6 py-4 border-t border-gray-100 sticky bottom-0 bg-white rounded-b-2xl">
             <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-xl hover:border-gray-400 transition-colors">Close</button>
             <button
               disabled={!stageForm.stage}
@@ -761,7 +728,7 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback })
           </div>
         )}
 
-        {showSchedule && (
+        {showSchedule && canAddCandidate && (
           <ScheduleInterviewModal candidateId={candidate._id} onClose={() => setShowSchedule(false)} />
         )}
       </div>
@@ -769,14 +736,11 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback })
   );
 };
 
-// ─── Open Hiring Panel (main panel) ──────────────────────────────────────────
-const OpenHiringPanel = ({ requisition, onClose }) => {
-  const can = usePermissionStore((s) => s.can);
+const OpenHiringPanel = ({ requisition, onClose, canAddCandidate }) => {
   const [showAddCandidate, setShowAddCandidate] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [stageFilter, setStageFilter] = useState("ALL");
   const [search, setSearch] = useState("");
-  const [permDenied, setPermDenied] = useState(null);
 
   const { data: candidateData, refetch } = useGetCandidatesByRequisition(requisition._id);
   const stageMut = useUpdateCandidateStage();
@@ -789,13 +753,8 @@ const OpenHiringPanel = ({ requisition, onClose }) => {
   );
   const remaining = Math.max(0, requisition.openings - filledCount);
 
-  const handleAddCandidateClick = () => {
-    if (!can("recruitment.can_add_candidate")) { setPermDenied("Add Candidate"); return; }
-    setShowAddCandidate(true);
-  };
-
   const handleStageUpdate = async (candidateId, form) => {
-    if (!can("recruitment.can_add_candidate")) { setPermDenied("Move Stage"); return; }
+    if (!canAddCandidate) return;
     await stageMut.mutateAsync({ id: candidateId, data: form });
     refetch();
   };
@@ -822,8 +781,7 @@ const OpenHiringPanel = ({ requisition, onClose }) => {
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl w-full max-w-5xl shadow-2xl my-4">
 
-        {/* top bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-5 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-6 py-5 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
               <FaUserCheck size={13} className="text-emerald-600" />
@@ -834,25 +792,23 @@ const OpenHiringPanel = ({ requisition, onClose }) => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {remaining > 0 ? (
-              <button onClick={handleAddCandidateClick} className="flex items-center gap-2 px-4 py-2.5 bg-[#730042] text-white text-xs font-semibold rounded-xl hover:bg-[#4a0029] transition-all shadow-sm whitespace-nowrap">
+            {canAddCandidate && remaining > 0 ? (
+              <button onClick={() => setShowAddCandidate(true)} className="flex items-center gap-2 px-4 py-2.5 bg-[#730042] text-white text-xs font-semibold rounded-xl hover:bg-[#4a0029] transition-all shadow-sm whitespace-nowrap">
                 <FaPlus size={9} /> Add Candidate
               </button>
-            ) : (
+            ) : remaining === 0 ? (
               <div className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl">
                 <FaCheckCircle size={11} className="text-emerald-600" />
                 <span className="text-xs font-semibold text-emerald-700">All Positions Filled</span>
               </div>
-            )}
+            ) : null}
             <button onClick={onClose} className="text-gray-400 hover:bg-gray-100 p-2.5 rounded-xl transition-colors"><FaTimes size={13} /></button>
           </div>
         </div>
 
-        {/* ── Department + Opening progress header ── */}
         <RequisitionProgressHeader requisition={requisition} candidates={candidates} />
 
-        {/* stats strip */}
-        <div className="px-6 py-4 border-b border-gray-100 bg-[#fdf5f9]">
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-100 bg-[#fdf5f9]">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: "Total", val: candidates.length, icon: <FaUsers size={12} />, color: "text-[#730042]", bg: "bg-[#f7edf3]" },
@@ -888,8 +844,7 @@ const OpenHiringPanel = ({ requisition, onClose }) => {
           )}
         </div>
 
-        {/* search + filter */}
-        <div className="px-6 pt-4 pb-2 flex flex-col sm:flex-row gap-3">
+        <div className="px-4 sm:px-6 pt-4 pb-2 flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={12} />
             <input
@@ -910,8 +865,7 @@ const OpenHiringPanel = ({ requisition, onClose }) => {
           </select>
         </div>
 
-        {/* candidate list */}
-        <div className="p-6 max-h-[50vh] overflow-y-auto space-y-2">
+        <div className="p-4 sm:p-6 max-h-[50vh] overflow-y-auto space-y-2">
           {!candidates.length ? (
             <div className="text-center py-16">
               <div className="w-16 h-16 rounded-full bg-[#f7edf3] flex items-center justify-center mx-auto mb-4">
@@ -919,9 +873,11 @@ const OpenHiringPanel = ({ requisition, onClose }) => {
               </div>
               <p className="text-sm font-semibold text-gray-500 mb-1">No candidates yet</p>
               <p className="text-xs text-gray-400">Add your first candidate to get started with the pipeline.</p>
-              <button onClick={handleAddCandidateClick} className="mt-4 flex items-center gap-2 px-5 py-2.5 bg-[#730042] text-white text-xs font-semibold rounded-xl hover:bg-[#4a0029] transition-all mx-auto">
-                <FaPlus size={9} /> Add First Candidate
-              </button>
+              {canAddCandidate && (
+                <button onClick={() => setShowAddCandidate(true)} className="mt-4 flex items-center gap-2 px-5 py-2.5 bg-[#730042] text-white text-xs font-semibold rounded-xl hover:bg-[#4a0029] transition-all mx-auto">
+                  <FaPlus size={9} /> Add First Candidate
+                </button>
+              )}
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
@@ -974,7 +930,7 @@ const OpenHiringPanel = ({ requisition, onClose }) => {
         </div>
       </div>
 
-      {showAddCandidate && (
+      {showAddCandidate && canAddCandidate && (
         <AddCandidateModal requisitionId={requisition._id} onClose={() => { setShowAddCandidate(false); refetch(); }} />
       )}
 
@@ -984,20 +940,18 @@ const OpenHiringPanel = ({ requisition, onClose }) => {
           onClose={() => setSelectedCandidate(null)}
           onStageUpdate={handleStageUpdate}
           onFeedback={refetch}
+          canAddCandidate={canAddCandidate}
         />
       )}
-
-      {permDenied && <PermissionDeniedOverlay feature={permDenied} onClose={() => setPermDenied(null)} />}
     </div>
   );
 };
 
-// ─── Requisition Detail Modal ─────────────────────────────────────────────────
 const RequisitionDetailModal = ({ requisition, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl my-4">
-        <div className="flex items-start justify-between px-6 py-5 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
+        <div className="flex items-start justify-between px-4 sm:px-6 py-5 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
           <div>
             <h2 className="text-xl font-bold text-gray-900" style={{ fontFamily: "'Cormorant Garamond', serif" }}>{requisition.job_title}</h2>
             <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400 mt-1">
@@ -1011,7 +965,7 @@ const RequisitionDetailModal = ({ requisition, onClose }) => {
           <button onClick={onClose} className="text-gray-400 hover:bg-gray-100 p-2 rounded-lg transition-colors mt-1"><FaTimes size={13} /></button>
         </div>
 
-        <div className="p-6 max-h-[80vh] overflow-y-auto space-y-5">
+        <div className="p-4 sm:p-6 max-h-[80vh] overflow-y-auto space-y-5">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {[
               { label: "Employment Type", val: requisition.employment_type },
@@ -1077,13 +1031,8 @@ const RequisitionDetailModal = ({ requisition, onClose }) => {
   );
 };
 
-// ─── Manage Modal ─────────────────────────────────────────────────────────────
-const ManageModal = ({ selected, onClose, approveMut, rejectMut, holdMut, revisionMut, canManage }) => {
+const ManageModal = ({ selected, onClose, approveMut, rejectMut, holdMut, revisionMut }) => {
   const [actionMessage, setActionMessage] = useState(selected.admin_comment || "");
-
-  if (!canManage) {
-    return <PermissionDeniedOverlay feature="Manage Requisitions" onClose={onClose} />;
-  }
 
   const handleApprove  = async () => { await approveMut.mutateAsync({ id: selected._id, data: { admin_comment: actionMessage } }); onClose(); };
   const handleReject   = async () => { await rejectMut.mutateAsync({ id: selected._id, data: { admin_comment: actionMessage } }); onClose(); };
@@ -1095,7 +1044,7 @@ const ManageModal = ({ selected, onClose, approveMut, rejectMut, holdMut, revisi
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl my-4">
-        <div className="flex items-start justify-between px-6 py-5 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
+        <div className="flex items-start justify-between px-4 sm:px-6 py-5 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
           <div>
             <h2 className="text-xl font-bold text-gray-900" style={{ fontFamily: "'Cormorant Garamond', serif" }}>Manage Requisition</h2>
             <p className="text-xs text-gray-400 mt-0.5">{selected.job_title} · {DEPT_LABELS[selected.department] || selected.department}</p>
@@ -1103,7 +1052,7 @@ const ManageModal = ({ selected, onClose, approveMut, rejectMut, holdMut, revisi
           <button onClick={onClose} className="text-gray-400 hover:bg-gray-100 p-2 rounded-lg transition-colors mt-1"><FaTimes size={13} /></button>
         </div>
 
-        <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+        <div className="p-4 sm:p-6 space-y-4 max-h-[70vh] overflow-y-auto">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: "Employment", val: selected.employment_type },
@@ -1152,7 +1101,7 @@ const ManageModal = ({ selected, onClose, approveMut, rejectMut, holdMut, revisi
           )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-2 px-6 py-4 border-t border-gray-100 sticky bottom-0 bg-white rounded-b-2xl">
+        <div className="flex flex-wrap items-center justify-end gap-2 px-4 sm:px-6 py-4 border-t border-gray-100 sticky bottom-0 bg-white rounded-b-2xl">
           <button onClick={onClose} disabled={anyPending} className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-xl hover:border-gray-400 transition-colors disabled:opacity-50">Cancel</button>
           <button onClick={handleRevision} disabled={revisionMut.isPending || !actionMessage} className="px-4 py-2 text-sm font-semibold bg-blue-50 text-blue-700 border border-blue-200 rounded-xl hover:bg-blue-600 hover:text-white hover:border-blue-600 disabled:opacity-50 transition-all">
             {revisionMut.isPending ? "…" : "Request Revision"}
@@ -1172,16 +1121,17 @@ const ManageModal = ({ selected, onClose, approveMut, rejectMut, holdMut, revisi
   );
 };
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
 const RecruitmentAdmin = () => {
   const can = usePermissionStore((s) => s.can);
+  const canViewRequisitions = can("recruitment.can_view_hiring_requisitions");
+  const canViewCandidates = can("recruitment.can_view_candidates");
+  const canAddCandidate = can("recruitment.can_add_candidate");
 
   const [search, setSearch]           = useState("");
   const [manageModal, setManageModal] = useState(null);
   const [detailModal, setDetailModal] = useState(null);
   const [hiringModal, setHiringModal] = useState(null);
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [permDenied, setPermDenied]   = useState(null);
 
   const { data: requisitionData, isLoading } = useGetAllRequisitions();
   const { data: pendingData }                 = useGetPendingRequisitions();
@@ -1212,21 +1162,22 @@ const RecruitmentAdmin = () => {
 
   const today = new Date().toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
-  const handleManageClick = (item) => {
-    if (!can("recruitment.can_view_hiring_requisitions")) { setPermDenied("Manage Requisitions"); return; }
-    setManageModal(item);
-  };
-
-  const handleHiringClick = (item) => {
-    if (!can("recruitment.can_view_candidates")) { setPermDenied("View Candidates"); return; }
-    setHiringModal(item);
-  };
+  if (!canViewRequisitions) {
+    return (
+      <div className="min-h-screen bg-[#fdf5f9] flex items-center justify-center p-4">
+        <div className="text-center text-gray-400 max-w-sm">
+          <FaBriefcase size={40} className="mx-auto mb-4 opacity-30" />
+          <p className="text-base font-semibold text-gray-500">Recruitment isn't available for your account</p>
+          <p className="text-sm mt-1">Contact your Super Admin if you need access to this feature.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#fdf5f9] p-4 sm:p-6 font-[Outfit,sans-serif]">
 
-      {/* hero */}
-      <div className="bg-gradient-to-br from-[#2e0019] via-[#4a0029] to-[#CD166E] rounded-2xl px-6 sm:px-8 py-7 mb-6 relative overflow-hidden shadow-xl">
+      <div className="bg-gradient-to-br from-[#2e0019] via-[#4a0029] to-[#CD166E] rounded-2xl px-4 sm:px-8 py-6 sm:py-7 mb-6 relative overflow-hidden shadow-xl">
         <div className="absolute w-72 h-72 rounded-full -top-36 -right-16 bg-white/5 pointer-events-none" />
         <div className="absolute w-48 h-48 rounded-full -bottom-24 right-32 bg-white/5 pointer-events-none" />
         <p className="text-[10px] tracking-[3px] uppercase text-white/50 mb-2 font-medium">{today}</p>
@@ -1244,7 +1195,6 @@ const RecruitmentAdmin = () => {
         </div>
       </div>
 
-      {/* stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
           { label: "Total Requisitions", val: stats.total,    icon: <FaBriefcase size={15} />, color: "#730042", bg: "#f7edf3", stripe: "#730042" },
@@ -1263,7 +1213,6 @@ const RecruitmentAdmin = () => {
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-5">
 
-        {/* main table */}
         <div>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-gray-100">
@@ -1332,9 +1281,9 @@ const RecruitmentAdmin = () => {
                             >
                               <FaChevronRight size={8} /> Details
                             </button>
-                            {item.status === "APPROVED" && (
+                            {canViewCandidates && item.status === "APPROVED" && (
                               <button
-                                onClick={() => handleHiringClick(item)}
+                                onClick={() => setHiringModal(item)}
                                 className="text-[11px] font-semibold px-2.5 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all flex items-center gap-1"
                               >
                                 <FaUsers size={9} /> Hiring
@@ -1342,7 +1291,7 @@ const RecruitmentAdmin = () => {
                             )}
                             {item.status === "PENDING" && (
                               <button
-                                onClick={() => handleManageClick(item)}
+                                onClick={() => setManageModal(item)}
                                 className="text-[11px] font-semibold px-2.5 py-1.5 bg-[#730042] text-white rounded-lg hover:bg-[#4a0029] transition-all"
                               >
                                 Manage
@@ -1359,7 +1308,6 @@ const RecruitmentAdmin = () => {
           </div>
         </div>
 
-        {/* sidebar */}
         <div className="flex flex-col gap-5">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
@@ -1397,7 +1345,7 @@ const RecruitmentAdmin = () => {
                     </div>
                     <div className="flex gap-2">
                       <button onClick={() => setDetailModal(item)} className="flex-1 text-xs font-semibold py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:border-[#730042] hover:text-[#730042] transition-colors">Details</button>
-                      <button onClick={() => handleManageClick(item)} className="flex-1 text-xs font-semibold py-1.5 bg-[#730042] text-white rounded-lg hover:bg-[#4a0029] transition-all">Manage</button>
+                      <button onClick={() => setManageModal(item)} className="flex-1 text-xs font-semibold py-1.5 bg-[#730042] text-white rounded-lg hover:bg-[#4a0029] transition-all">Manage</button>
                     </div>
                   </div>
                 ))
@@ -1431,7 +1379,6 @@ const RecruitmentAdmin = () => {
         </div>
       </div>
 
-      {/* modals */}
       {manageModal && (
         <ManageModal
           selected={manageModal}
@@ -1440,7 +1387,6 @@ const RecruitmentAdmin = () => {
           rejectMut={rejectMut}
           holdMut={holdMut}
           revisionMut={revisionMut}
-          canManage={can("recruitment.can_view_hiring_requisitions")}
         />
       )}
 
@@ -1448,12 +1394,8 @@ const RecruitmentAdmin = () => {
         <RequisitionDetailModal requisition={detailModal} onClose={() => setDetailModal(null)} />
       )}
 
-      {hiringModal && (
-        <OpenHiringPanel requisition={hiringModal} onClose={() => setHiringModal(null)} />
-      )}
-
-      {permDenied && (
-        <PermissionDeniedOverlay feature={permDenied} onClose={() => setPermDenied(null)} />
+      {hiringModal && canViewCandidates && (
+        <OpenHiringPanel requisition={hiringModal} onClose={() => setHiringModal(null)} canAddCandidate={canAddCandidate} />
       )}
     </div>
   );
