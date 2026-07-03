@@ -709,15 +709,9 @@ function Features() {
 // ─────────────────────────────────────────────────────────────────────────────
 function Pricing() {
   const plans = [
-<<<<<<< HEAD
     { name: 'Basic', desc: 'Perfect for small teams getting started', price: '₹109', features: ['Employee database','Attendance tracking','Leave management','Basic payroll','Employee self-service portal','Email support'] },
     { name: 'Advance', desc: 'For growing businesses that need more. Everything in Starter +', price: '₹249', popular: true, features: ['Recruitment / Applicant tracking','Performance management','Advanced payroll','Custom policies/workflows','Reports & analytics','Priority support'] },
     { name: 'Enterprise', desc: 'Ultimate power and flexibility. Everything in Growth +', price: '₹499', features: ['Multi-company support','Role-based permissions','SSO','API access','Custom integrations','Dedicated account manager'] },
-=======
-    { name: 'Basic',    desc: 'Perfect for small teams getting started',                       price: '₹49', features: ['Employee database','Attendance tracking','Leave management','Document Management','Employee self-service portal','Email support','Asset Management'] },
-    { name: 'Advance',   desc: 'For growing businesses that need more. Everything in Starter +', price: '₹119', popular: true, features: ['Recruitment / Applicant tracking','Performance management','Advanced payroll','TorchX Voice','Custom policies/workflows','Reports & analytics','Priority support'] },
-    { name: 'Enterprise', desc: 'Ultimate power and flexibility. Everything in Growth +',         price: '₹199', features: ['Multi-company support','API access','Custom integrations','Dedicated account manager','On site technical support'] },
->>>>>>> 37c4c1bc9a411b3915970d627c58a27f037b21dc
   ]
   const badges = [
     { icon: <FiShield size={20} />, label: 'Secure & Compliant', desc: 'Enterprise-grade security with regular backups.' },
