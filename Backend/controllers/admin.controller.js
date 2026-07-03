@@ -1418,6 +1418,11 @@ const demoteManagerToEmployee = async (req, res, next) => {
 
     await session.commitTransaction();
 
+    if (manager.working_status === "working") {
+      await decrementActiveUserCount(organisation_id);
+    }
+    await incrementActiveUserCount(organisation_id);
+
     return res.status(200).json({
       success: true,
       message: `${manager.f_name} ${manager.l_name} has been demoted from Manager to Employee`,
@@ -1556,6 +1561,11 @@ const demoteAdminToManager = async (req, res, next) => {
     ]);
 
     await session.commitTransaction();
+
+    if (adminToDemote.working_status === "working") {
+      await decrementActiveUserCount(organisation_id);
+    }
+    await incrementActiveUserCount(organisation_id);
 
     return res.status(200).json({
       success: true,
@@ -1699,6 +1709,11 @@ const demoteAdminToEmployee = async (req, res, next) => {
     ]);
 
     await session.commitTransaction();
+
+    if (adminToDemote.working_status === "working") {
+      await decrementActiveUserCount(organisation_id);
+    }
+    await incrementActiveUserCount(organisation_id);
 
     return res.status(200).json({
       success: true,
