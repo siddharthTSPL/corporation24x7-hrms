@@ -1024,6 +1024,9 @@ const deleteAdmin = async (req, res, next) => {
       Object.assign(new Error("Admin not found"), { statusCode: 404 }),
     );
   await AdminModel.findByIdAndDelete(id);
+  if (admin.working_status === "working") {
+    await decrementActiveUserCount(organisation_id);
+  }
   res
     .status(200)
     .json({ success: true, message: "Admin deleted successfully" });
@@ -1337,6 +1340,11 @@ const deleteemployee = async (req, res, next) => {
     return next(
       Object.assign(new Error("User not found"), { statusCode: 404 }),
     );
+
+  const deleted = user || manager;
+  if (deleted.working_status === "working") {
+    await decrementActiveUserCount(organisation_id);
+  }
 
   res.status(200).json({ message: "User deleted successfully" });
 };

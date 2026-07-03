@@ -3,6 +3,7 @@ const SuperAdminModel = require("../Models/superadmin.model");
 const AdminModel = require("../Models/Admin.model");
 const ManagerModel = require("../Models/manager.model");
 const UserModel = require("../Models/user.model");
+require("dotenv").config();
 
 const syncActiveUserCounts = async () => {
   const orgs = await SuperAdminModel.find({}).select("_id organisation_name active_user_count").lean();
