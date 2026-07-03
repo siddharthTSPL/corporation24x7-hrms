@@ -623,20 +623,20 @@ const findallmanagers = async (req, res, next) => {
 
     const organisation_id = req.admin.organisation_id;
 
-    const [managers, adminData] = await Promise.all([
+    const [managers, admins] = await Promise.all([
       Managermodel.find({ organisation_id, working_status: "working" })
         .select(EXCLUDE)
         .populate("reporting_manager", "f_name l_name work_email designation")
         .lean(),
-      Adminmodel.findById(req.admin._id)
+      Adminmodel.find({ organisation_id, working_status: "working" })
         .select("uid f_name l_name work_email designation department office_location role organisation_id")
         .lean(),
     ]);
 
-    const allManagers = [...managers];
-    if (adminData) {
-      allManagers.unshift({ ...adminData, isAdmin: true });
-    }
+    const allManagers = [
+      ...admins.map((admin) => ({ ...admin, isAdmin: true })),
+      ...managers,
+    ];
 
     return res.status(200).json({
       success: true,
