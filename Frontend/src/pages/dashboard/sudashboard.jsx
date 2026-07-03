@@ -371,7 +371,7 @@ function WorkingStatusModal({ open, onClose, admin, onConfirm, loading }) {
   return (
     <div
       className="fixed inset-0 z-[1100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[rgba(13,2,9,0.75)] backdrop-blur-md"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      
     >
       <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl animate-[modalUp_0.22s_ease-out]">
         <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-[#e8d5e2] flex items-center justify-between">
@@ -513,7 +513,7 @@ function EditPermissionsModal({ open, onClose, user, onSave, loading }) {
   return (
     <div
       className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[rgba(13,2,9,0.7)] backdrop-blur-md"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      
     >
       <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[90vh] animate-[modalUp_0.22s_ease-out]">
         <div className="sticky top-0 z-10 bg-white px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-[#e8d5e2] flex items-center justify-between rounded-t-2xl">
@@ -911,7 +911,7 @@ function AnnModal({ open, onClose, initial, onSave, loading }) {
   if (!open) return null;
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   return (
-    <div className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[rgba(13,2,9,0.7)] backdrop-blur-md" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[rgba(13,2,9,0.7)] backdrop-blur-md">
       <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl animate-[modalUp_0.22s_ease-out]">
         <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-[#e8d5e2] flex items-center justify-between">
           <h2 className="text-base sm:text-lg font-bold text-[#0d0209]">{initial ? "Edit Announcement" : "New Announcement"}</h2>
