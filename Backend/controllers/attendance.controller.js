@@ -20,6 +20,8 @@ const resolveOrganisationId = async (user) => {
   return null;
 };
 
+const displayMinutes = (mins) => Math.round(mins || 0);
+
 const checkin = async (req, res) => {
   try {
     const { latitude, longitude, selfie } = req.body;
@@ -122,7 +124,11 @@ const activity = async (req, res) => {
     attendance.lastUpdated = now;
     await attendance.save();
 
-    res.json({ message: "Activity updated", activeMinutes: Math.round(attendance.activeMinutes), idleMinutes: Math.round(attendance.idleMinutes) });
+    res.json({
+      message: "Activity updated",
+      activeMinutes: displayMinutes(attendance.activeMinutes),
+      idleMinutes: displayMinutes(attendance.idleMinutes),
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -152,7 +158,12 @@ const checkout = async (req, res) => {
     await attendance.save();
     await updateSummary(attendance);
 
-    res.json({ message: "Checkout successful", status, activeMinutes: attendance.activeMinutes, idleMinutes: attendance.idleMinutes });
+    res.json({
+      message: "Checkout successful",
+      status,
+      activeMinutes: displayMinutes(attendance.activeMinutes),
+      idleMinutes: displayMinutes(attendance.idleMinutes),
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -172,7 +183,15 @@ const getToday = async (req, res) => {
     if (!attendance)
       return res.json({ attendance: null, isCheckedIn: false, isCheckedOut: false });
 
-    res.json({ attendance, isCheckedIn: attendance.source === "manual" && !attendance.checkOut, isCheckedOut: !!attendance.checkOut });
+    res.json({
+      attendance: {
+        ...attendance,
+        activeMinutes: displayMinutes(attendance.activeMinutes),
+        idleMinutes: displayMinutes(attendance.idleMinutes),
+      },
+      isCheckedIn: attendance.source === "manual" && !attendance.checkOut,
+      isCheckedOut: !!attendance.checkOut,
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
