@@ -101,27 +101,28 @@ const activity = async (req, res) => {
         checkIn: new Date(),
         activeMinutes: 0,
         idleMinutes: 0,
-        lastUpdated: 0,
+        lastUpdated: Date.now(),
         source: "agent",
       });
+      return res.json({ message: "Activity started", activeMinutes: 0, idleMinutes: 0 });
     }
 
     if (attendance.checkOut)
       return res.status(400).json({ message: "Already checked out" });
 
     const now = Date.now();
-    if (attendance.lastUpdated && now - attendance.lastUpdated < 60000)
-      return res.status(429).json({ message: "Too many requests" });
+    const elapsedMs = now - (attendance.lastUpdated || now);
+    const elapsedMinutes = Math.min(elapsedMs / 60000, 3);
 
     if (attendance.source === "manual") {
-      if (status === "active") attendance.activeMinutes += 1;
-      else attendance.idleMinutes += 1;
+      if (status === "active") attendance.activeMinutes += elapsedMinutes;
+      else attendance.idleMinutes += elapsedMinutes;
     }
 
     attendance.lastUpdated = now;
     await attendance.save();
 
-    res.json({ message: "Activity updated", activeMinutes: attendance.activeMinutes, idleMinutes: attendance.idleMinutes });
+    res.json({ message: "Activity updated", activeMinutes: Math.round(attendance.activeMinutes), idleMinutes: Math.round(attendance.idleMinutes) });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
