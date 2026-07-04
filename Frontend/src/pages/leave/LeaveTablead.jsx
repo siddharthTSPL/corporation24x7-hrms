@@ -108,9 +108,9 @@ const avatarColor = (name = "") => AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COL
 const initials = (f = "", l = "") => `${f[0] || ""}${l[0] || ""}`.toUpperCase();
 
 const Spinner = () => (
-  <div className="flex flex-col items-center justify-center py-12 sm:py-16 gap-3">
+  <div className="flex flex-col items-center justify-center py-10 xs:py-12 sm:py-16 gap-3">
     <div
-      className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border-[3px] border-[#EDE6F5] animate-spin"
+      className="w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full border-[3px] border-[#EDE6F5] animate-spin"
       style={{ borderTopColor: "#8B3A8A" }}
     />
     <p className="text-xs sm:text-[13px] text-[#9B8BAE] font-medium font-[DM_Sans,sans-serif]">Loading…</p>
@@ -118,12 +118,12 @@ const Spinner = () => (
 );
 
 const EmptyState = ({ msg = "No records found" }) => (
-  <div className="flex flex-col items-center py-10 sm:py-14 gap-3">
+  <div className="flex flex-col items-center py-9 xs:py-10 sm:py-14 gap-3 px-3 text-center">
     <div
-      className="w-12 h-12 sm:w-14 sm:h-14 rounded-[16px] sm:rounded-[18px] flex items-center justify-center"
+      className="w-11 h-11 xs:w-12 xs:h-12 sm:w-14 sm:h-14 rounded-[16px] sm:rounded-[18px] flex items-center justify-center"
       style={{ background: "linear-gradient(135deg,#F4EEF9,#EDE4F5)" }}
     >
-      <svg width="24" height="24" viewBox="0 0 28 28" fill="none">
+      <svg width="22" height="22" viewBox="0 0 28 28" fill="none" className="sm:w-[24px] sm:h-[24px]">
         <rect x="4" y="5" width="20" height="19" rx="4" stroke="#C4AADA" strokeWidth="1.5" fill="none" />
         <path d="M4 11h20" stroke="#C4AADA" strokeWidth="1.5" />
         <path d="M9 8V5M19 8V5" stroke="#C4AADA" strokeWidth="1.5" strokeLinecap="round" />
@@ -143,7 +143,7 @@ const Toast = ({ toast }) => {
   const c = colors[toast.type] || colors.info;
   return (
     <div
-      className="fixed bottom-4 right-4 sm:bottom-7 sm:right-7 z-[9999] flex items-center gap-2 sm:gap-2.5 px-4 sm:px-5 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl text-xs sm:text-[13px] font-medium shadow-2xl backdrop-blur-md transition-all duration-300 max-w-[calc(100vw-2rem)]"
+      className="fixed bottom-3 left-3 right-3 xs:left-auto xs:right-4 sm:bottom-7 sm:right-7 z-[9999] flex items-center gap-2 sm:gap-2.5 px-4 sm:px-5 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl text-xs sm:text-[13px] font-medium shadow-2xl backdrop-blur-md transition-all duration-300 max-w-full xs:max-w-[calc(100vw-2rem)] sm:max-w-sm"
       style={{
         background: c.bg,
         color: c.color,
@@ -194,28 +194,28 @@ const TypeBadge = ({ type }) => {
 
 const SectionBox = ({ title, children, rightEl }) => (
   <div
-    className="rounded-[16px] sm:rounded-[20px] overflow-hidden mb-4 sm:mb-5"
+    className="rounded-[14px] xs:rounded-[16px] sm:rounded-[20px] overflow-hidden mb-4 sm:mb-5 w-full"
     style={{ background: "#fff", border: "1px solid rgba(200,185,220,0.3)", boxShadow: "0 2px 12px rgba(80,40,100,0.07)" }}
   >
     <div
-      className="flex items-center justify-between px-4 sm:px-5 py-3.5 sm:py-[18px]"
+      className="flex items-center justify-between gap-2 px-3.5 xs:px-4 sm:px-5 py-3 xs:py-3.5 sm:py-[18px]"
       style={{ borderBottom: "1px solid #F0EAF8" }}
     >
       <div className="flex items-center gap-2 min-w-0">
         <span
-          className="inline-block w-[3px] h-[16px] sm:h-[18px] rounded-sm flex-shrink-0"
+          className="inline-block w-[3px] h-[15px] xs:h-[16px] sm:h-[18px] rounded-sm flex-shrink-0"
           style={{ background: "linear-gradient(180deg,#6B1A4A,#A8295E)" }}
         />
-        <span className="text-[13px] sm:text-[14px] font-semibold text-[#1C1028] truncate">{title}</span>
+        <span className="text-[12.5px] xs:text-[13px] sm:text-[14px] font-semibold text-[#1C1028] truncate">{title}</span>
       </div>
-      {rightEl && <div className="flex-shrink-0 ml-2">{rightEl}</div>}
+      {rightEl && <div className="flex-shrink-0">{rightEl}</div>}
     </div>
-    <div className="px-4 sm:px-5 pt-4 sm:pt-5 pb-5 sm:pb-6">{children}</div>
+    <div className="px-3.5 xs:px-4 sm:px-5 pt-3.5 xs:pt-4 sm:pt-5 pb-4 xs:pb-5 sm:pb-6">{children}</div>
   </div>
 );
 
 const FormField = ({ label, error, children }) => (
-  <div className="flex flex-col gap-1.5">
+  <div className="flex flex-col gap-1.5 min-w-0">
     <label className="text-[10px] sm:text-[11px] font-semibold text-[#6B5080] uppercase tracking-[0.5px]">
       {label} <span className="text-[#CD166E]">*</span>
     </label>
@@ -310,49 +310,45 @@ const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, acce
 
   return (
     <div
-      className="relative rounded-[16px] sm:rounded-[20px] mb-3 sm:mb-3.5 overflow-hidden transition-all duration-[250ms] hover:-translate-y-px"
+      className="relative rounded-[14px] xs:rounded-[16px] sm:rounded-[20px] mb-3 sm:mb-3.5 overflow-hidden transition-all duration-[250ms] hover:-translate-y-px w-full"
       style={{
         background: "#fff",
         border: "1px solid rgba(200,185,220,0.3)",
-        padding: "16px 16px 16px 18px",
+        padding: "14px 14px 14px 16px",
         boxShadow: "0 2px 12px rgba(80,40,100,0.07),0 1px 3px rgba(0,0,0,0.04)",
         opacity: isProcessing ? 0.6 : 1,
         pointerEvents: isProcessing ? "none" : "auto",
       }}
     >
-      <div className="absolute top-0 left-0 bottom-0 w-[3px] rounded-l-[16px] sm:rounded-l-[20px]" style={{ background: accent }} />
+      <div className="absolute top-0 left-0 bottom-0 w-[3px] rounded-l-[14px] xs:rounded-l-[16px] sm:rounded-l-[20px]" style={{ background: accent }} />
 
-      {/* Main content — always stacked on mobile, row on sm+ when no actions, or always stacked on mobile with actions below */}
       <div className="pl-1.5">
-        {/* Top row: avatar + name + actions */}
-        <div className="flex items-start justify-between gap-3">
-          {/* Avatar + name */}
-          <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2 xs:gap-3">
+          <div className="flex items-center gap-2.5 xs:gap-3 min-w-0 flex-1">
             <div
-              className="w-9 h-9 sm:w-11 sm:h-11 rounded-[12px] sm:rounded-[14px] flex items-center justify-center flex-shrink-0 text-xs sm:text-[14px] font-bold text-white"
+              className="w-8 h-8 xs:w-9 xs:h-9 sm:w-11 sm:h-11 rounded-[10px] xs:rounded-[12px] sm:rounded-[14px] flex items-center justify-center flex-shrink-0 text-[11px] xs:text-xs sm:text-[14px] font-bold text-white"
               style={{ background: avatarColor(person.f_name || "A"), boxShadow: "0 3px 10px rgba(0,0,0,0.15)" }}
             >
               {initials(person.f_name, person.l_name)}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <div className="text-[13px] sm:text-[14px] font-semibold text-[#1C1028]">{person.f_name} {person.l_name}</div>
+                <div className="text-[12.5px] xs:text-[13px] sm:text-[14px] font-semibold text-[#1C1028] truncate max-w-[140px] xs:max-w-[180px] sm:max-w-none">{person.f_name} {person.l_name}</div>
                 {personLabel && (
                   <span className="text-[9px] sm:text-[10px] font-bold bg-[#F3E8FF] text-[#6B21A8] px-2 py-px rounded-[10px]">
                     {personLabel}
                   </span>
                 )}
               </div>
-              <div className="text-[10px] sm:text-[11px] text-[#9B8BAE] mt-0.5 truncate max-w-[160px] sm:max-w-none">{person.work_email}</div>
+              <div className="text-[10px] sm:text-[11px] text-[#9B8BAE] mt-0.5 truncate max-w-[130px] xs:max-w-[180px] sm:max-w-none">{person.work_email}</div>
             </div>
           </div>
 
-          {/* Action buttons — top right on sm+, hidden here on mobile (shown below) */}
           {showActions && (
             <div className="hidden sm:flex flex-col gap-1.5 flex-shrink-0">
               <button
                 onClick={onApprove}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-[12px] font-semibold cursor-pointer border-none transition-all duration-[180ms] hover:-translate-y-px min-h-[44px] sm:min-h-0"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-[12px] font-semibold cursor-pointer border-none transition-all duration-[180ms] hover:-translate-y-px min-h-[40px]"
                 style={{ background: "#F0FDF4", color: "#14803D", boxShadow: "0 2px 8px rgba(34,197,94,0.15)" }}
               >
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l2.5 2.5 5.5-5" stroke="#14803D" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -360,7 +356,7 @@ const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, acce
               </button>
               <button
                 onClick={onReject}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-[12px] font-semibold cursor-pointer border-none transition-all duration-[180ms] hover:-translate-y-px min-h-[44px] sm:min-h-0"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-[12px] font-semibold cursor-pointer border-none transition-all duration-[180ms] hover:-translate-y-px min-h-[40px]"
                 style={{ background: "#FFF1F2", color: "#991B1B", boxShadow: "0 2px 8px rgba(239,68,68,0.12)" }}
               >
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="#991B1B" strokeWidth="1.8" strokeLinecap="round" /></svg>
@@ -370,7 +366,6 @@ const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, acce
           )}
         </div>
 
-        {/* Badges */}
         <div className="flex gap-1 sm:gap-1.5 flex-wrap mt-2.5 sm:mt-3">
           <TypeBadge type={leave.leaveType} />
           <StatusBadge status={leave.status} />
@@ -382,7 +377,6 @@ const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, acce
           </span>
         </div>
 
-        {/* Date range */}
         <div className="flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-[12px] text-[#9B8BAE] mt-2 sm:mt-2.5 flex-wrap">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="2" width="11" height="10" rx="2.5" stroke="#C4AADA" strokeWidth="1" /><path d="M1 6h11" stroke="#C4AADA" strokeWidth="1" /><path d="M4 1v2M9 1v2" stroke="#C4AADA" strokeWidth="1" strokeLinecap="round" /></svg>
           <span className="font-medium text-[#4A3860]">{fmt(leave.startDate)}</span>
@@ -390,21 +384,19 @@ const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, acce
           <span className="font-medium text-[#4A3860]">{fmt(leave.endDate)}</span>
         </div>
 
-        {/* Reason */}
         {leave.reason && (
           <div
-            className="rounded-[10px] px-3 sm:px-3.5 py-2 sm:py-2.5 text-[11px] sm:text-[12px] text-[#4A3860] mt-2 sm:mt-2.5 leading-relaxed"
+            className="rounded-[10px] px-3 sm:px-3.5 py-2 sm:py-2.5 text-[11px] sm:text-[12px] text-[#4A3860] mt-2 sm:mt-2.5 leading-relaxed break-words"
             style={{ background: "#FAF7FD", borderLeft: "3px solid #D4AECB" }}
           >
             <span className="font-semibold text-[#6B1A4A]">Reason — </span>{leave.reason}
           </div>
         )}
 
-        {/* Timeline toggle */}
         {showTimeline && (
           <button
             onClick={() => setExpanded((p) => !p)}
-            className="mt-2 sm:mt-2.5 flex items-center gap-1.5 text-[11px] font-semibold text-[#8B3A8A] bg-transparent border-none cursor-pointer p-1 pl-0 min-h-[44px] sm:min-h-0"
+            className="mt-2 sm:mt-2.5 flex items-center gap-1.5 text-[11px] font-semibold text-[#8B3A8A] bg-transparent border-none cursor-pointer p-1 pl-0 min-h-[40px] sm:min-h-0"
           >
             <svg
               width="12" height="12" viewBox="0 0 12 12" fill="none"
@@ -418,7 +410,6 @@ const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, acce
         )}
         {showTimeline && expanded && <LeaveTimeline leave={leave} />}
 
-        {/* Mobile-only action buttons — full width row */}
         {showActions && (
           <div className="flex gap-2 mt-3 sm:hidden">
             <button
@@ -442,7 +433,7 @@ const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, acce
       </div>
 
       {isProcessing && (
-        <div className="absolute inset-0 rounded-[16px] sm:rounded-[20px] flex items-center justify-center" style={{ background: "rgba(255,255,255,0.7)", backdropFilter: "blur(2px)" }}>
+        <div className="absolute inset-0 rounded-[14px] xs:rounded-[16px] sm:rounded-[20px] flex items-center justify-center" style={{ background: "rgba(255,255,255,0.7)", backdropFilter: "blur(2px)" }}>
           <div className="w-[22px] h-[22px] rounded-full border-2 border-[#EDE6F5] animate-spin" style={{ borderTopColor: "#8B3A8A" }} />
         </div>
       )}
@@ -466,37 +457,37 @@ const MyBalancePanel = ({ admin, leaveBalance }) => {
   ];
 
   return (
-    <div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mb-5 sm:mb-6">
+    <div className="w-full">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 xs:gap-3 sm:gap-4 mb-5 sm:mb-6">
         {cards.map((s, i) => {
           const remaining = s.entitled - s.availed;
           const pct = s.entitled > 0 ? Math.min((s.availed / s.entitled) * 100, 100) : 0;
           return (
             <div
               key={s.key}
-              className="relative rounded-[16px] sm:rounded-[20px] overflow-hidden transition-all duration-[250ms] hover:-translate-y-0.5"
+              className="relative rounded-[14px] xs:rounded-[16px] sm:rounded-[20px] overflow-hidden transition-all duration-[250ms] hover:-translate-y-0.5 min-w-0"
               style={{
                 background: "#fff",
                 border: "1px solid rgba(200,185,220,0.3)",
-                padding: "16px 16px 14px",
+                padding: "12px 12px 10px",
                 boxShadow: "0 2px 12px rgba(80,40,100,0.07)",
                 animationDelay: `${i * 0.08}s`,
               }}
             >
-              <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-[16px] sm:rounded-t-[20px]" style={{ background: s.accent }} />
+              <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-[14px] xs:rounded-t-[16px] sm:rounded-t-[20px]" style={{ background: s.accent }} />
               <div
-                className="absolute right-[-6px] sm:right-[-8px] top-2.5 text-[40px] sm:text-[52px] font-extrabold leading-none select-none"
+                className="absolute right-[-6px] sm:right-[-8px] top-2 sm:top-2.5 text-[28px] xs:text-[36px] sm:text-[52px] font-extrabold leading-none select-none"
                 style={{ color: s.accent, opacity: 0.06, fontFamily: "Playfair Display, serif" }}
               >
                 {(LEAVE_META[s.key] || { short: s.key.toUpperCase().slice(0, 2) }).short}
               </div>
-              <div className="text-[9px] sm:text-[11px] text-[#9B8BAE] font-semibold uppercase tracking-[0.5px] mt-1.5 sm:mt-2">{s.label}</div>
-              <div className="text-[30px] sm:text-[38px] font-bold leading-none my-1 sm:my-1.5" style={{ color: s.accent, fontFamily: "Playfair Display, serif" }}>{remaining}</div>
-              <div className="text-[9px] sm:text-[10px] text-[#9B8BAE]">of {s.entitled} days</div>
-              <div className="h-[4px] sm:h-[5px] rounded-lg mt-3 sm:mt-3.5 overflow-hidden" style={{ background: "#F0EAF8" }}>
+              <div className="text-[8.5px] xs:text-[9px] sm:text-[11px] text-[#9B8BAE] font-semibold uppercase tracking-[0.5px] mt-1 sm:mt-2 truncate pr-4">{s.label}</div>
+              <div className="text-[22px] xs:text-[28px] sm:text-[38px] font-bold leading-none my-1 sm:my-1.5" style={{ color: s.accent, fontFamily: "Playfair Display, serif" }}>{remaining}</div>
+              <div className="text-[8.5px] xs:text-[9px] sm:text-[10px] text-[#9B8BAE]">of {s.entitled} days</div>
+              <div className="h-[4px] sm:h-[5px] rounded-lg mt-2.5 sm:mt-3.5 overflow-hidden" style={{ background: "#F0EAF8" }}>
                 <div className="h-full rounded-lg" style={{ width: `${Math.max(pct, 3)}%`, background: s.accent }} />
               </div>
-              <div className="flex justify-between mt-1 sm:mt-1.5 text-[9px] sm:text-[10px] text-[#9B8BAE]">
+              <div className="flex justify-between mt-1 sm:mt-1.5 text-[8.5px] xs:text-[9px] sm:text-[10px] text-[#9B8BAE]">
                 {s.accrued > 0 && <span>Accrued: {s.accrued}</span>}
                 <span className="ml-auto">{s.availed} used</span>
               </div>
@@ -506,14 +497,57 @@ const MyBalancePanel = ({ admin, leaveBalance }) => {
       </div>
 
       <SectionBox title="Leave Balance Summary">
-        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-          <table className="w-full min-w-[480px] sm:min-w-[540px]" style={{ borderCollapse: "collapse" }}>
+        <div className="sm:hidden flex flex-col gap-2.5">
+          {cards.map((s) => {
+            const rem = s.entitled - s.availed;
+            const pct = s.entitled > 0 ? Math.round((rem / s.entitled) * 100) : 0;
+            const m   = LEAVE_META[s.key] || { label: s.label, bg: "#F3F4F6", color: "#374151", dot: "#9CA3AF" };
+            return (
+              <div
+                key={s.key}
+                className="rounded-[14px] p-3"
+                style={{ background: "#fff", border: "1px solid #EDE6F5" }}
+              >
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: m.bg, color: m.color }}>
+                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: m.dot }} />
+                    {s.label}
+                  </span>
+                  <span className="font-bold text-[15px]" style={{ color: s.accent, fontFamily: "Playfair Display, serif" }}>{rem}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 mb-2.5">
+                  <div>
+                    <div className="text-[9px] text-[#9B8BAE] uppercase tracking-[0.5px]">Entitled</div>
+                    <div className="text-[13px] font-semibold text-[#1C1028]">{s.entitled}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-[#9B8BAE] uppercase tracking-[0.5px]">Accrued</div>
+                    <div className="text-[13px] text-[#1C1028]">{s.accrued || "—"}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-[#9B8BAE] uppercase tracking-[0.5px]">Used</div>
+                    <div className="text-[13px] text-[#1C1028]">{s.availed}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-[5px] rounded-lg overflow-hidden" style={{ background: "#F0EAF8" }}>
+                    <div className="h-full rounded-lg" style={{ width: `${pct}%`, background: s.accent }} />
+                  </div>
+                  <span className="text-[11px] text-[#9B8BAE]">{pct}%</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="hidden sm:block overflow-x-auto">
+          <table className="w-full min-w-[540px]" style={{ borderCollapse: "collapse" }}>
             <thead>
               <tr>
                 {["Leave Type", "Entitled", "Accrued", "Used", "Remaining", "Usage"].map((h) => (
                   <th
                     key={h}
-                    className="text-left px-2.5 sm:px-3.5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.7px]"
+                    className="text-left px-3.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.7px]"
                     style={{ color: "#9B8BAE", background: "#FAF7FD", borderBottom: "1px solid #EDE6F5" }}
                   >
                     {h}
@@ -528,22 +562,22 @@ const MyBalancePanel = ({ admin, leaveBalance }) => {
                 const m   = LEAVE_META[s.key] || { label: s.label, bg: "#F3F4F6", color: "#374151", dot: "#9CA3AF" };
                 return (
                   <tr key={s.key} className="hover:bg-[#FDFBFF] transition-colors">
-                    <td className="px-2.5 sm:px-3.5 py-2.5 sm:py-3" style={{ borderBottom: "1px solid #F5F0FA", color: "#1C1028", fontSize: 12 }}>
-                      <span className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold" style={{ background: m.bg, color: m.color }}>
+                    <td className="px-3.5 py-3" style={{ borderBottom: "1px solid #F5F0FA", color: "#1C1028", fontSize: 12 }}>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: m.bg, color: m.color }}>
                         <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: m.dot }} />
                         {s.label}
                       </span>
                     </td>
-                    <td className="px-2.5 sm:px-3.5 py-2.5 sm:py-3 font-semibold text-[12px] sm:text-[13px]" style={{ borderBottom: "1px solid #F5F0FA", color: "#1C1028" }}>{s.entitled}</td>
-                    <td className="px-2.5 sm:px-3.5 py-2.5 sm:py-3 text-[12px] sm:text-[13px]" style={{ borderBottom: "1px solid #F5F0FA", color: "#1C1028" }}>{s.accrued || "—"}</td>
-                    <td className="px-2.5 sm:px-3.5 py-2.5 sm:py-3 text-[12px] sm:text-[13px]" style={{ borderBottom: "1px solid #F5F0FA", color: "#1C1028" }}>{s.availed}</td>
-                    <td className="px-2.5 sm:px-3.5 py-2.5 sm:py-3 font-bold text-[13px] sm:text-[15px]" style={{ borderBottom: "1px solid #F5F0FA", color: s.accent, fontFamily: "Playfair Display, serif" }}>{rem}</td>
-                    <td className="px-2.5 sm:px-3.5 py-2.5 sm:py-3" style={{ borderBottom: "1px solid #F5F0FA" }}>
-                      <div className="flex items-center gap-1.5 sm:gap-2">
-                        <div className="w-10 sm:w-14 h-[4px] sm:h-[5px] rounded-lg overflow-hidden" style={{ background: "#F0EAF8" }}>
+                    <td className="px-3.5 py-3 font-semibold text-[13px]" style={{ borderBottom: "1px solid #F5F0FA", color: "#1C1028" }}>{s.entitled}</td>
+                    <td className="px-3.5 py-3 text-[13px]" style={{ borderBottom: "1px solid #F5F0FA", color: "#1C1028" }}>{s.accrued || "—"}</td>
+                    <td className="px-3.5 py-3 text-[13px]" style={{ borderBottom: "1px solid #F5F0FA", color: "#1C1028" }}>{s.availed}</td>
+                    <td className="px-3.5 py-3 font-bold text-[15px]" style={{ borderBottom: "1px solid #F5F0FA", color: s.accent, fontFamily: "Playfair Display, serif" }}>{rem}</td>
+                    <td className="px-3.5 py-3" style={{ borderBottom: "1px solid #F5F0FA" }}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-14 h-[5px] rounded-lg overflow-hidden" style={{ background: "#F0EAF8" }}>
                           <div className="h-full rounded-lg" style={{ width: `${pct}%`, background: s.accent }} />
                         </div>
-                        <span className="text-[10px] sm:text-[11px] text-[#9B8BAE]">{pct}%</span>
+                        <span className="text-[11px] text-[#9B8BAE]">{pct}%</span>
                       </div>
                     </td>
                   </tr>
@@ -605,9 +639,9 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
   const ib   = (k) => errors[k] ? "#FCA5A5" : "#E2D8EE";
 
   return (
-    <div>
+    <div className="w-full">
       <SectionBox title="New Leave Request">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-4">
           <FormField label="Leave Type" error={errors.leaveType}>
             <select
               value={form.leaveType}
@@ -637,7 +671,7 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
         </div>
         {days > 0 && (
           <div
-            className="flex items-center gap-2 rounded-[12px] px-3.5 sm:px-4 py-2.5 sm:py-3 text-[12px] sm:text-[13px] font-semibold text-[#6B1A4A] mb-4"
+            className="flex items-center gap-2 rounded-[12px] px-3.5 sm:px-4 py-2.5 sm:py-3 text-[12px] sm:text-[13px] font-semibold text-[#6B1A4A] mb-4 flex-wrap"
             style={{ background: "linear-gradient(135deg,#F9EFF5,#F2E8F5)", border: "1px solid #DFD0EC" }}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="11" rx="3" stroke="#9B2458" strokeWidth="1.3" /><path d="M1 6h12" stroke="#9B2458" strokeWidth="1.3" /><path d="M4 1v2M10 1v2" stroke="#9B2458" strokeWidth="1.3" strokeLinecap="round" /></svg>
@@ -678,7 +712,7 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
         title="My Leave History"
         rightEl={
           history.length > 0 ? (
-            <span className="text-[10px] sm:text-[11px] font-bold px-2.5 py-0.5 rounded-full text-[#6B1A4A]"
+            <span className="text-[10px] sm:text-[11px] font-bold px-2.5 py-0.5 rounded-full text-[#6B1A4A] whitespace-nowrap"
               style={{ background: "linear-gradient(135deg,#F9EFF5,#F4E6F0)" }}>
               {history.length} record{history.length !== 1 ? "s" : ""}
             </span>
@@ -693,18 +727,18 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
               return (
                 <div
                   key={leave._id || idx}
-                  className="relative rounded-[14px] sm:rounded-[16px] mb-2 sm:mb-2.5 overflow-hidden transition-all duration-[220ms] hover:-translate-y-px"
+                  className="relative rounded-[12px] xs:rounded-[14px] sm:rounded-[16px] mb-2 sm:mb-2.5 overflow-hidden transition-all duration-[220ms] hover:-translate-y-px"
                   style={{
                     background: "#fff",
                     border: "1px solid rgba(200,185,220,0.28)",
-                    padding: "14px 14px 14px 16px",
+                    padding: "12px 12px 12px 14px",
                     boxShadow: "0 2px 10px rgba(80,40,100,0.06)",
                     animationDelay: `${idx * 0.05}s`,
                   }}
                 >
-                  <div className="absolute top-0 left-0 bottom-0 w-[3px] rounded-l-[14px] sm:rounded-l-[16px]" style={{ background: accent }} />
-                  <div className="flex justify-between items-start gap-3 pl-2">
-                    <div className="flex-1 min-w-0">
+                  <div className="absolute top-0 left-0 bottom-0 w-[3px] rounded-l-[12px] xs:rounded-l-[14px] sm:rounded-l-[16px]" style={{ background: accent }} />
+                  <div className="flex flex-col xs:flex-row justify-between items-start gap-2 xs:gap-3 pl-2">
+                    <div className="flex-1 min-w-0 w-full">
                       <div className="flex gap-1 sm:gap-1.5 flex-wrap mb-2 sm:mb-2.5">
                         <TypeBadge type={leave.leaveType} />
                         <StatusBadge status={leave.status} />
@@ -719,14 +753,14 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
                         <span className="font-medium text-[#4A3860]">{fmt(leave.endDate)}</span>
                       </div>
                       {leave.reason && (
-                        <div className="rounded-[10px] px-3 sm:px-3.5 py-2 text-[11px] sm:text-[12px] text-[#4A3860] mt-2 sm:mt-2.5 leading-relaxed" style={{ background: "#FAF7FD", borderLeft: "3px solid #D4AECB" }}>
+                        <div className="rounded-[10px] px-3 sm:px-3.5 py-2 text-[11px] sm:text-[12px] text-[#4A3860] mt-2 sm:mt-2.5 leading-relaxed break-words" style={{ background: "#FAF7FD", borderLeft: "3px solid #D4AECB" }}>
                           <span className="font-semibold text-[#6B1A4A]">Reason — </span>{leave.reason}
                         </div>
                       )}
                       <LeaveTimeline leave={leave} />
                     </div>
                     {leave.createdAt && (
-                      <div className="text-[9px] sm:text-[10px] text-[#9B8BAE] text-right leading-relaxed flex-shrink-0">
+                      <div className="text-[9px] sm:text-[10px] text-[#9B8BAE] text-left xs:text-right leading-relaxed flex-shrink-0">
                         Applied<br /><span className="font-semibold text-[#7B6890]">{fmt(leave.createdAt)}</span>
                       </div>
                     )}
@@ -780,23 +814,21 @@ const AllLeavesPanel = ({ showToast }) => {
   if (isLoading) return <Spinner />;
 
   return (
-    <div>
-      {/* Stats row */}
-      <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-3 mb-4 sm:mb-5">
+    <div className="w-full">
+      <div className="grid grid-cols-2 lg:flex lg:flex-wrap gap-2 sm:gap-3 mb-4 sm:mb-5">
         {[
           { label: "Total",    val: employeeLeaves.length,                                    color: "#6B1A4A", bg: "linear-gradient(135deg,#F9EFF5,#F4E6F0)" },
           { label: "Pending",  val: employeeLeaves.filter((l) => isStatus(l,"pending")).length,  color: "#92400E", bg: "linear-gradient(135deg,#FFFBEB,#FEF3C7)" },
           { label: "Approved", val: employeeLeaves.filter((l) => isStatus(l,"approved")).length, color: "#14803D", bg: "linear-gradient(135deg,#F0FDF4,#DCFCE7)" },
           { label: "Forwarded",val: employeeLeaves.filter((l) => isStatus(l,"forwarded")).length,color: "#1D4ED8", bg: "linear-gradient(135deg,#EFF6FF,#DBEAFE)" },
         ].map((s) => (
-          <div key={s.label} className="flex items-center gap-2 sm:gap-3 rounded-[12px] sm:rounded-[14px] px-4 sm:px-5 py-2.5 sm:py-3" style={{ background: s.bg, border: "1px solid rgba(0,0,0,0.05)", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
-            <span className="text-[22px] sm:text-[26px] font-extrabold leading-none" style={{ color: s.color, fontFamily: "Playfair Display, serif" }}>{s.val}</span>
-            <span className="text-[10px] sm:text-[11px] font-semibold leading-tight opacity-80" style={{ color: s.color }}>{s.label}</span>
+          <div key={s.label} className="flex items-center gap-2 sm:gap-3 rounded-[12px] sm:rounded-[14px] px-3.5 xs:px-4 sm:px-5 py-2.5 sm:py-3 min-w-0" style={{ background: s.bg, border: "1px solid rgba(0,0,0,0.05)", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+            <span className="text-[20px] xs:text-[22px] sm:text-[26px] font-extrabold leading-none" style={{ color: s.color, fontFamily: "Playfair Display, serif" }}>{s.val}</span>
+            <span className="text-[10px] sm:text-[11px] font-semibold leading-tight opacity-80 truncate" style={{ color: s.color }}>{s.label}</span>
           </div>
         ))}
       </div>
 
-      {/* Filter pills */}
       <div className="flex gap-1.5 sm:gap-2 mb-4 sm:mb-5 flex-wrap">
         {LEAVE_FILTERS.map((f) => {
           const active = filter === f.key;
@@ -866,17 +898,17 @@ const ManagerLeavesPanel = ({ showToast }) => {
   if (isLoading) return <Spinner />;
 
   return (
-    <div>
-      <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-3 mb-4 sm:mb-5">
+    <div className="w-full">
+      <div className="grid grid-cols-2 lg:flex lg:flex-wrap gap-2 sm:gap-3 mb-4 sm:mb-5">
         {[
           { label: "Total",    val: managerLeaves.length,                                           color: "#6B1A4A", bg: "linear-gradient(135deg,#F9EFF5,#F4E6F0)" },
           { label: "Pending",  val: managerLeaves.filter((l) => l.status?.includes("pending")).length,  color: "#92400E", bg: "linear-gradient(135deg,#FFFBEB,#FEF3C7)" },
           { label: "Approved", val: managerLeaves.filter((l) => l.status?.includes("approved")).length, color: "#14803D", bg: "linear-gradient(135deg,#F0FDF4,#DCFCE7)" },
           { label: "Rejected", val: managerLeaves.filter((l) => l.status?.includes("rejected")).length, color: "#991B1B", bg: "linear-gradient(135deg,#FEF2F2,#FEE2E2)" },
         ].map((s) => (
-          <div key={s.label} className="flex items-center gap-2 sm:gap-3 rounded-[12px] sm:rounded-[14px] px-4 sm:px-5 py-2.5 sm:py-3" style={{ background: s.bg, border: "1px solid rgba(0,0,0,0.05)", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
-            <span className="text-[22px] sm:text-[26px] font-extrabold leading-none" style={{ color: s.color, fontFamily: "Playfair Display, serif" }}>{s.val}</span>
-            <span className="text-[10px] sm:text-[11px] font-semibold leading-tight opacity-80" style={{ color: s.color }}>{s.label}</span>
+          <div key={s.label} className="flex items-center gap-2 sm:gap-3 rounded-[12px] sm:rounded-[14px] px-3.5 xs:px-4 sm:px-5 py-2.5 sm:py-3 min-w-0" style={{ background: s.bg, border: "1px solid rgba(0,0,0,0.05)", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+            <span className="text-[20px] xs:text-[22px] sm:text-[26px] font-extrabold leading-none" style={{ color: s.color, fontFamily: "Playfair Display, serif" }}>{s.val}</span>
+            <span className="text-[10px] sm:text-[11px] font-semibold leading-tight opacity-80 truncate" style={{ color: s.color }}>{s.label}</span>
           </div>
         ))}
       </div>
@@ -936,7 +968,7 @@ const MyWFHPanel = ({ showToast }) => {
   const ib   = (k) => errors[k] ? "#FCA5A5" : "#E2D8EE";
 
   return (
-    <div>
+    <div className="w-full">
       <SectionBox title="Apply Work From Home">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
           <FormField label="Start Date" error={errors.startDate}>
@@ -951,7 +983,7 @@ const MyWFHPanel = ({ showToast }) => {
           </FormField>
         </div>
         {days > 0 && (
-          <div className="flex items-center gap-2 rounded-[12px] px-3.5 sm:px-4 py-2.5 sm:py-3 text-[12px] sm:text-[13px] font-semibold text-[#1D4ED8] mb-4"
+          <div className="flex items-center gap-2 rounded-[12px] px-3.5 sm:px-4 py-2.5 sm:py-3 text-[12px] sm:text-[13px] font-semibold text-[#1D4ED8] mb-4 flex-wrap"
             style={{ background: "linear-gradient(135deg,#EFF6FF,#DBEAFE)", border: "1px solid #BFDBFE" }}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="12" height="12" rx="3" stroke="#3B82F6" strokeWidth="1.3" /><path d="M4 7h2v4M8 4v7" stroke="#3B82F6" strokeWidth="1.2" strokeLinecap="round" /></svg>
             <strong style={{ fontFamily: "Playfair Display, serif", fontSize: 14 }}>{days}</strong>&nbsp;day{days > 1 ? "s" : ""} · Work From Home
@@ -979,7 +1011,7 @@ const MyWFHPanel = ({ showToast }) => {
 
       <SectionBox title="My WFH History" rightEl={
         wfhList.length > 0 ? (
-          <span className="text-[10px] sm:text-[11px] font-bold px-2.5 py-0.5 rounded-full text-[#1D4ED8]"
+          <span className="text-[10px] sm:text-[11px] font-bold px-2.5 py-0.5 rounded-full text-[#1D4ED8] whitespace-nowrap"
             style={{ background: "linear-gradient(135deg,#EFF6FF,#DBEAFE)" }}>
             {wfhList.length} record{wfhList.length !== 1 ? "s" : ""}
           </span>
@@ -991,11 +1023,11 @@ const MyWFHPanel = ({ showToast }) => {
               const d = wfh.days || daysDiff(wfh.startDate, wfh.endDate);
               return (
                 <div key={wfh._id || idx}
-                  className="relative rounded-[14px] sm:rounded-[16px] mb-2 sm:mb-2.5 overflow-hidden transition-all duration-[220ms] hover:-translate-y-px"
-                  style={{ background: "#fff", border: "1px solid rgba(200,185,220,0.28)", padding: "14px 14px 14px 16px", boxShadow: "0 2px 10px rgba(80,40,100,0.06)", animationDelay: `${idx * 0.05}s` }}>
-                  <div className="absolute top-0 left-0 bottom-0 w-[3px] rounded-l-[14px] sm:rounded-l-[16px] bg-[#3B82F6]" />
-                  <div className="flex justify-between items-start gap-3 pl-2">
-                    <div className="flex-1 min-w-0">
+                  className="relative rounded-[12px] xs:rounded-[14px] sm:rounded-[16px] mb-2 sm:mb-2.5 overflow-hidden transition-all duration-[220ms] hover:-translate-y-px"
+                  style={{ background: "#fff", border: "1px solid rgba(200,185,220,0.28)", padding: "12px 12px 12px 14px", boxShadow: "0 2px 10px rgba(80,40,100,0.06)", animationDelay: `${idx * 0.05}s` }}>
+                  <div className="absolute top-0 left-0 bottom-0 w-[3px] rounded-l-[12px] xs:rounded-l-[14px] sm:rounded-l-[16px] bg-[#3B82F6]" />
+                  <div className="flex flex-col xs:flex-row justify-between items-start gap-2 xs:gap-3 pl-2">
+                    <div className="flex-1 min-w-0 w-full">
                       <div className="flex gap-1 sm:gap-1.5 flex-wrap mb-2 sm:mb-2.5">
                         <span className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold" style={{ background: "#DBEAFE", color: "#1D4ED8" }}>
                           <span className="w-1.5 h-1.5 rounded-full bg-[#3B82F6] flex-shrink-0" />WFH
@@ -1010,13 +1042,13 @@ const MyWFHPanel = ({ showToast }) => {
                         <span className="font-medium text-[#4A3860]">{fmt(wfh.endDate)}</span>
                       </div>
                       {wfh.reason && (
-                        <div className="rounded-[10px] px-3 sm:px-3.5 py-2 text-[11px] sm:text-[12px] text-[#1E3A5F] mt-2 sm:mt-2.5 leading-relaxed" style={{ background: "#F0F9FF", borderLeft: "3px solid #93C5FD" }}>
+                        <div className="rounded-[10px] px-3 sm:px-3.5 py-2 text-[11px] sm:text-[12px] text-[#1E3A5F] mt-2 sm:mt-2.5 leading-relaxed break-words" style={{ background: "#F0F9FF", borderLeft: "3px solid #93C5FD" }}>
                           <span className="font-semibold text-[#1D4ED8]">Reason — </span>{wfh.reason}
                         </div>
                       )}
                     </div>
                     {wfh.createdAt && (
-                      <div className="text-[9px] sm:text-[10px] text-[#9B8BAE] text-right leading-relaxed flex-shrink-0">
+                      <div className="text-[9px] sm:text-[10px] text-[#9B8BAE] text-left xs:text-right leading-relaxed flex-shrink-0">
                         Applied<br /><span className="font-semibold text-[#7B6890]">{fmt(wfh.createdAt)}</span>
                       </div>
                     )}
@@ -1067,17 +1099,17 @@ const TeamWFHPanel = ({ showToast }) => {
   if (isLoading) return <Spinner />;
 
   return (
-    <div>
-      <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-3 mb-4 sm:mb-5">
+    <div className="w-full">
+      <div className="grid grid-cols-2 lg:flex lg:flex-wrap gap-2 sm:gap-3 mb-4 sm:mb-5">
         {[
           { label: "Total",    val: allList.length,                                          color: "#1D4ED8", bg: "linear-gradient(135deg,#EFF6FF,#DBEAFE)" },
           { label: "Pending",  val: allList.filter((w) => isWfhStatus(w,"pending")).length,  color: "#92400E", bg: "linear-gradient(135deg,#FFFBEB,#FEF3C7)" },
           { label: "Approved", val: allList.filter((w) => isWfhStatus(w,"approved")).length, color: "#14803D", bg: "linear-gradient(135deg,#F0FDF4,#DCFCE7)" },
           { label: "Rejected", val: allList.filter((w) => isWfhStatus(w,"rejected")).length, color: "#991B1B", bg: "linear-gradient(135deg,#FEF2F2,#FEE2E2)" },
         ].map((s) => (
-          <div key={s.label} className="flex items-center gap-2 sm:gap-3 rounded-[12px] sm:rounded-[14px] px-4 sm:px-5 py-2.5 sm:py-3" style={{ background: s.bg, border: "1px solid rgba(0,0,0,0.05)", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
-            <span className="text-[22px] sm:text-[26px] font-extrabold leading-none" style={{ color: s.color, fontFamily: "Playfair Display, serif" }}>{s.val}</span>
-            <span className="text-[10px] sm:text-[11px] font-semibold leading-tight opacity-80" style={{ color: s.color }}>{s.label}</span>
+          <div key={s.label} className="flex items-center gap-2 sm:gap-3 rounded-[12px] sm:rounded-[14px] px-3.5 xs:px-4 sm:px-5 py-2.5 sm:py-3 min-w-0" style={{ background: s.bg, border: "1px solid rgba(0,0,0,0.05)", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+            <span className="text-[20px] xs:text-[22px] sm:text-[26px] font-extrabold leading-none" style={{ color: s.color, fontFamily: "Playfair Display, serif" }}>{s.val}</span>
+            <span className="text-[10px] sm:text-[11px] font-semibold leading-tight opacity-80 truncate" style={{ color: s.color }}>{s.label}</span>
           </div>
         ))}
       </div>
@@ -1111,42 +1143,40 @@ const TeamWFHPanel = ({ showToast }) => {
         const actionable   = isActionable(wfh.status);
         return (
           <div key={wfh._id}
-            className="relative rounded-[16px] sm:rounded-[20px] mb-3 sm:mb-3.5 overflow-hidden transition-all duration-[250ms] hover:-translate-y-px"
+            className="relative rounded-[14px] xs:rounded-[16px] sm:rounded-[20px] mb-3 sm:mb-3.5 overflow-hidden transition-all duration-[250ms] hover:-translate-y-px w-full"
             style={{
               background: "#fff",
               border: "1px solid rgba(200,185,220,0.3)",
-              padding: "16px 16px 16px 18px",
+              padding: "14px 14px 14px 16px",
               boxShadow: "0 2px 12px rgba(80,40,100,0.07),0 1px 3px rgba(0,0,0,0.04)",
               opacity: isProcessing ? 0.6 : 1,
               pointerEvents: isProcessing ? "none" : "auto",
             }}>
-            <div className="absolute top-0 left-0 bottom-0 w-[3px] rounded-l-[16px] sm:rounded-l-[20px] bg-[#3B82F6]" />
+            <div className="absolute top-0 left-0 bottom-0 w-[3px] rounded-l-[14px] xs:rounded-l-[16px] sm:rounded-l-[20px] bg-[#3B82F6]" />
 
             <div className="pl-1.5">
-              {/* Top row: avatar + name + desktop actions */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-[12px] sm:rounded-[14px] flex items-center justify-center flex-shrink-0 text-xs sm:text-[14px] font-bold text-white"
+              <div className="flex items-start justify-between gap-2 xs:gap-3">
+                <div className="flex items-center gap-2.5 xs:gap-3 min-w-0 flex-1">
+                  <div className="w-8 h-8 xs:w-9 xs:h-9 sm:w-11 sm:h-11 rounded-[10px] xs:rounded-[12px] sm:rounded-[14px] flex items-center justify-center flex-shrink-0 text-[11px] xs:text-xs sm:text-[14px] font-bold text-white"
                     style={{ background: avatarColor(requester.f_name || "A"), boxShadow: "0 3px 10px rgba(0,0,0,0.15)" }}>
                     {initials(requester.f_name, requester.l_name)}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[13px] sm:text-[14px] font-semibold text-[#1C1028]">{requester.f_name} {requester.l_name}</div>
-                    <div className="text-[10px] sm:text-[11px] text-[#9B8BAE] mt-0.5 truncate max-w-[140px] sm:max-w-none">{requester.designation || requester.work_email}</div>
+                    <div className="text-[12.5px] xs:text-[13px] sm:text-[14px] font-semibold text-[#1C1028] truncate max-w-[140px] xs:max-w-[180px] sm:max-w-none">{requester.f_name} {requester.l_name}</div>
+                    <div className="text-[10px] sm:text-[11px] text-[#9B8BAE] mt-0.5 truncate max-w-[130px] xs:max-w-[180px] sm:max-w-none">{requester.designation || requester.work_email}</div>
                   </div>
                 </div>
 
-                {/* Desktop action buttons */}
                 {actionable && (
                   <div className="hidden sm:flex flex-col gap-1.5 flex-shrink-0">
                     <button onClick={() => handleAction(wfh._id, "approve")}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-[12px] font-semibold cursor-pointer border-none transition-all duration-[180ms] hover:-translate-y-px"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-[12px] font-semibold cursor-pointer border-none transition-all duration-[180ms] hover:-translate-y-px min-h-[40px]"
                       style={{ background: "#F0FDF4", color: "#14803D", boxShadow: "0 2px 8px rgba(34,197,94,0.15)" }}>
                       <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l2.5 2.5 5.5-5" stroke="#14803D" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
                       Approve
                     </button>
                     <button onClick={() => handleAction(wfh._id, "reject")}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-[12px] font-semibold cursor-pointer border-none transition-all duration-[180ms] hover:-translate-y-px"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-[12px] font-semibold cursor-pointer border-none transition-all duration-[180ms] hover:-translate-y-px min-h-[40px]"
                       style={{ background: "#FFF1F2", color: "#991B1B", boxShadow: "0 2px 8px rgba(239,68,68,0.12)" }}>
                       <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="#991B1B" strokeWidth="1.8" strokeLinecap="round" /></svg>
                       Reject
@@ -1155,7 +1185,6 @@ const TeamWFHPanel = ({ showToast }) => {
                 )}
               </div>
 
-              {/* Badges */}
               <div className="flex gap-1 sm:gap-1.5 flex-wrap mt-2.5 sm:mt-3">
                 <span className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold" style={{ background: "#DBEAFE", color: "#1D4ED8" }}>
                   <span className="w-1.5 h-1.5 rounded-full bg-[#3B82F6] flex-shrink-0" />WFH
@@ -1164,7 +1193,6 @@ const TeamWFHPanel = ({ showToast }) => {
                 <span className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold" style={{ background: "#F0F9FF", color: "#0369A1" }}>{d} day{d > 1 ? "s" : ""}</span>
               </div>
 
-              {/* Date range */}
               <div className="flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-[12px] text-[#9B8BAE] mt-2 sm:mt-2.5 flex-wrap">
                 <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="2" width="11" height="10" rx="2.5" stroke="#C4AADA" strokeWidth="1" /><path d="M1 6h11" stroke="#C4AADA" strokeWidth="1" /><path d="M4 1v2M9 1v2" stroke="#C4AADA" strokeWidth="1" strokeLinecap="round" /></svg>
                 <span className="font-medium text-[#4A3860]">{fmt(wfh.startDate)}</span>
@@ -1172,16 +1200,14 @@ const TeamWFHPanel = ({ showToast }) => {
                 <span className="font-medium text-[#4A3860]">{fmt(wfh.endDate)}</span>
               </div>
 
-              {/* Reason */}
               {wfh.reason && (
-                <div className="rounded-[10px] px-3 sm:px-3.5 py-2 sm:py-2.5 text-[11px] sm:text-[12px] text-[#1E3A5F] mt-2 sm:mt-2.5 leading-relaxed" style={{ background: "#F0F9FF", borderLeft: "3px solid #93C5FD" }}>
+                <div className="rounded-[10px] px-3 sm:px-3.5 py-2 sm:py-2.5 text-[11px] sm:text-[12px] text-[#1E3A5F] mt-2 sm:mt-2.5 leading-relaxed break-words" style={{ background: "#F0F9FF", borderLeft: "3px solid #93C5FD" }}>
                   <span className="font-semibold text-[#1D4ED8]">Reason — </span>{wfh.reason}
                 </div>
               )}
 
               {wfh.createdAt && <div className="text-[9px] sm:text-[10px] text-[#C4AADA] mt-2">Applied {fmtDateTime(wfh.createdAt)}</div>}
 
-              {/* Mobile action buttons */}
               {actionable && (
                 <div className="flex gap-2 mt-3 sm:hidden">
                   <button onClick={() => handleAction(wfh._id, "approve")}
@@ -1201,7 +1227,7 @@ const TeamWFHPanel = ({ showToast }) => {
             </div>
 
             {isProcessing && (
-              <div className="absolute inset-0 rounded-[16px] sm:rounded-[20px] flex items-center justify-center" style={{ background: "rgba(255,255,255,0.7)", backdropFilter: "blur(2px)" }}>
+              <div className="absolute inset-0 rounded-[14px] xs:rounded-[16px] sm:rounded-[20px] flex items-center justify-center" style={{ background: "rgba(255,255,255,0.7)", backdropFilter: "blur(2px)" }}>
                 <div className="w-[22px] h-[22px] rounded-full border-2 border-[#EDE6F5] animate-spin" style={{ borderTopColor: "#8B3A8A" }} />
               </div>
             )}
@@ -1236,66 +1262,60 @@ const AdminLeaveWFH = () => {
 
   return (
     <div
-      className="min-h-screen relative"
+      className="min-h-screen w-full overflow-x-hidden relative"
       style={{ background: "linear-gradient(160deg,#F7F3FC 0%,#F0EBF8 50%,#F4F0FA 100%)", fontFamily: "DM Sans, sans-serif" }}
     >
-      {/* Decorative blobs */}
-      <div className="fixed top-[-80px] right-[-80px] w-[240px] h-[240px] sm:w-[360px] sm:h-[360px] rounded-full pointer-events-none z-0"
+      <div className="fixed top-[-80px] right-[-80px] w-[200px] h-[200px] xs:w-[240px] xs:h-[240px] sm:w-[360px] sm:h-[360px] rounded-full pointer-events-none z-0"
         style={{ background: "radial-gradient(circle,rgba(168,41,94,0.07) 0%,transparent 70%)" }} />
-      <div className="fixed bottom-[-60px] left-[-60px] w-[180px] h-[180px] sm:w-[280px] sm:h-[280px] rounded-full pointer-events-none z-0"
+      <div className="fixed bottom-[-60px] left-[-60px] w-[150px] h-[150px] xs:w-[180px] xs:h-[180px] sm:w-[280px] sm:h-[280px] rounded-full pointer-events-none z-0"
         style={{ background: "radial-gradient(circle,rgba(107,26,74,0.06) 0%,transparent 70%)" }} />
 
-      <div className="relative z-10 w-full max-w-[1100px] mx-auto px-3 sm:px-5 lg:px-8 py-5 sm:py-7 lg:py-8">
+      <div className="relative z-10 w-full max-w-[1100px] mx-auto px-3 xs:px-4 sm:px-5 md:px-6 lg:px-8 py-4 xs:py-5 sm:py-7 lg:py-8">
 
-        {/* Page header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-5 sm:mb-7">
-          <div className="flex items-center gap-3 sm:gap-4">
+          <div className="flex items-center gap-2.5 xs:gap-3 sm:gap-4 min-w-0">
             <div
-              className="w-11 h-11 sm:w-[50px] sm:h-[50px] rounded-[14px] sm:rounded-[16px] flex items-center justify-center flex-shrink-0"
+              className="w-10 h-10 xs:w-11 xs:h-11 sm:w-[50px] sm:h-[50px] rounded-[12px] xs:rounded-[14px] sm:rounded-[16px] flex items-center justify-center flex-shrink-0"
               style={{ background: "linear-gradient(135deg,#6B1A4A,#A8295E)", boxShadow: "0 6px 20px rgba(107,26,74,0.38)" }}
             >
-              <svg width="20" height="20" viewBox="0 0 22 22" fill="none">
+              <svg width="18" height="18" viewBox="0 0 22 22" fill="none" className="xs:w-[20px] xs:h-[20px]">
                 <rect x="3" y="4" width="16" height="15" rx="3" stroke="white" strokeWidth="1.5" />
                 <path d="M3 9h16" stroke="white" strokeWidth="1.5" />
                 <path d="M7 2v4M15 2v4" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
                 <path d="M7 13h4M7 16h8" stroke="white" strokeWidth="1.2" strokeLinecap="round" />
               </svg>
             </div>
-            <div>
-              <h1 className="text-[18px] sm:text-[22px] font-bold text-[#1C1028] m-0 tracking-[-0.3px]" style={{ fontFamily: "Playfair Display, serif" }}>Leave & WFH</h1>
-              <p className="text-[11px] sm:text-[12px] text-[#9B8BAE] mt-0.5 font-normal">Manage leaves · Track balance · Work from home</p>
+            <div className="min-w-0">
+              <h1 className="text-[16px] xs:text-[18px] sm:text-[22px] font-bold text-[#1C1028] m-0 tracking-[-0.3px] truncate" style={{ fontFamily: "Playfair Display, serif" }}>Leave & WFH</h1>
+              <p className="text-[10px] xs:text-[11px] sm:text-[12px] text-[#9B8BAE] mt-0.5 font-normal truncate">Manage leaves · Track balance · Work from home</p>
             </div>
           </div>
           {admin && (
             <div
-              className="flex items-center gap-2.5 rounded-[12px] sm:rounded-[14px] px-3.5 sm:px-4 py-2 sm:py-2.5 self-start sm:self-auto"
+              className="flex items-center gap-2.5 rounded-[12px] sm:rounded-[14px] px-3 xs:px-3.5 sm:px-4 py-2 sm:py-2.5 self-start sm:self-auto w-full sm:w-auto"
               style={{ background: "#fff", border: "1px solid rgba(200,185,220,0.4)", boxShadow: "0 2px 12px rgba(80,40,100,0.08)" }}
             >
               <div
-                className="w-8 h-8 sm:w-[34px] sm:h-[34px] rounded-[8px] sm:rounded-[10px] flex items-center justify-center text-[11px] sm:text-[12px] font-bold text-white flex-shrink-0"
+                className="w-7 h-7 xs:w-8 xs:h-8 sm:w-[34px] sm:h-[34px] rounded-[8px] sm:rounded-[10px] flex items-center justify-center text-[10px] xs:text-[11px] sm:text-[12px] font-bold text-white flex-shrink-0"
                 style={{ background: "linear-gradient(135deg,#6B1A4A,#A8295E)" }}
               >
                 {(admin.f_name?.[0] || "")}{(admin.l_name?.[0] || "")}
               </div>
-              <div>
-                <div className="font-semibold text-[12px] text-[#1C1028]">{admin.f_name} {admin.l_name}</div>
-                <div className="text-[10px] text-[#9B8BAE] mt-px">{admin.designation || admin.role}</div>
+              <div className="min-w-0">
+                <div className="font-semibold text-[11px] xs:text-[12px] text-[#1C1028] truncate">{admin.f_name} {admin.l_name}</div>
+                <div className="text-[9px] xs:text-[10px] text-[#9B8BAE] mt-px truncate">{admin.designation || admin.role}</div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Tab bar — horizontally scrollable on mobile */}
         <div
-          className="flex gap-1 rounded-[12px] sm:rounded-[14px] p-1 mb-5 sm:mb-7 overflow-x-auto flex-nowrap"
+          className="grid grid-cols-2 xs:grid-cols-3 sm:flex sm:flex-wrap gap-1 rounded-[12px] sm:rounded-[14px] p-1 mb-5 sm:mb-7"
           style={{
             background: "rgba(235,228,245,0.7)",
             backdropFilter: "blur(8px)",
             border: "1px solid rgba(200,185,220,0.3)",
             boxShadow: "0 2px 8px rgba(80,40,100,0.06)",
-            scrollbarWidth: "none",
-            msOverflowStyle: "none",
-            WebkitOverflowScrolling: "touch",
           }}
         >
           {TABS.map((t) => {
@@ -1304,7 +1324,7 @@ const AdminLeaveWFH = () => {
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className="px-3.5 sm:px-5 py-2 sm:py-2 rounded-[8px] sm:rounded-[10px] text-[12px] sm:text-[13px] font-medium cursor-pointer border-none whitespace-nowrap transition-all duration-200 flex-shrink-0 min-h-[36px] sm:min-h-0"
+                className="px-2.5 xs:px-3 sm:px-5 py-2.5 xs:py-2 sm:py-2 rounded-[8px] sm:rounded-[10px] text-[11px] xs:text-[12px] sm:text-[13px] font-medium cursor-pointer border-none whitespace-nowrap transition-all duration-200 min-h-[40px] sm:min-h-0 text-center"
                 style={{
                   color: active ? "#fff" : "#9B8BAE",
                   background: active ? "linear-gradient(135deg,#6B1A4A,#9B2458)" : "transparent",
@@ -1318,7 +1338,6 @@ const AdminLeaveWFH = () => {
           })}
         </div>
 
-        {/* Panel content */}
         {meLoading && (tab === "myBalance" || tab === "applyLeave") ? <Spinner /> : (
           <>
             {tab === "allLeaves"     && <AllLeavesPanel showToast={showToast} />}

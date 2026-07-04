@@ -23,6 +23,7 @@ const Document = require("../Models/document.model");
 const OtpModel = require("../Models/otpbasedlogin.model");
 const AdminLeave = require("../Models/adleave.model");
 const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = require("../utils/licenseCheck");
+const AssetModel = require("../Models/asset.model");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
@@ -1022,7 +1023,15 @@ const deleteAdmin = async (req, res, next) => {
     return next(
       Object.assign(new Error("Admin not found"), { statusCode: 404 }),
     );
+
+  const wasWorking = admin.working_status === "working";
+
   await AdminModel.findByIdAndDelete(id);
+
+  if (wasWorking) {
+    await decrementActiveUserCount(organisation_id);
+  }
+
   res
     .status(200)
     .json({ success: true, message: "Admin deleted successfully" });
@@ -1336,6 +1345,11 @@ const deleteemployee = async (req, res, next) => {
     return next(
       Object.assign(new Error("User not found"), { statusCode: 404 }),
     );
+
+  const deleted = user || manager;
+  if (deleted.working_status === "working") {
+    await decrementActiveUserCount(organisation_id);
+  }
 
   res.status(200).json({ message: "User deleted successfully" });
 };
@@ -2132,6 +2146,37 @@ const setAdminWorkingStatus = async (req, res, next) => {
         )
       );
 
+    const existingAdmin = await AdminModel.findOne({ _id: id, organisation_id })
+      .select("_id f_name l_name work_email")
+      .lean();
+
+    if (!existingAdmin)
+      return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
+
+    if (working_status !== "working") {
+      const pendingAssets = await AssetModel.find({
+        organisation_id,
+        assigned_to: id,
+        assigned_to_model: "Admin",
+        status: "assigned",
+      })
+        .select("_id asset_id asset_name asset_type serial_number brand assigned_date")
+        .lean();
+
+      if (pendingAssets.length > 0) {
+        return res.status(409).json({
+          success: false,
+          message: `Cannot mark ${existingAdmin.f_name} ${existingAdmin.l_name} as '${working_status}'. Please revoke all assigned assets first.`,
+          asset_return_check: {
+            has_pending_assets: true,
+            pending_asset_count: pendingAssets.length,
+            assets: pendingAssets,
+            message: `⚠️ Warning: ${pendingAssets.length} asset(s) are still assigned to this admin and must be returned before offboarding.`,
+          },
+        });
+      }
+    }
+
     const admin = await AdminModel.findOneAndUpdate(
       { _id: id, organisation_id },
       {
@@ -2145,9 +2190,6 @@ const setAdminWorkingStatus = async (req, res, next) => {
     )
       .select("_id uid f_name l_name work_email role department designation working_status status")
       .lean();
-
-    if (!admin)
-      return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
 
     if (working_status !== "working") {
       await decrementActiveUserCount(organisation_id);
@@ -2164,7 +2206,6 @@ const setAdminWorkingStatus = async (req, res, next) => {
     next(error);
   }
 };
-
 const getInactiveUsers = async (req, res, next) => {
   try {
     if (!req.superAdmin)

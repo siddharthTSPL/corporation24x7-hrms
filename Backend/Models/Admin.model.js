@@ -187,10 +187,11 @@ const adminSchema = new mongoose.Schema(
       enum: ["active", "inactive", "suspended"],
       default: "active",
     },
-     working_status:{
-      type:String,
-      enum:["working","resigned","fired","terminated"],
-      default:"working"
+    working_status: {
+      type: String,
+      enum: ["working", "resigned", "fired", "terminated"],
+      default: "working",
+      trim: true,
     },
 
     isVerified: {
@@ -249,6 +250,10 @@ adminSchema.pre(
 
     if ("reporting_manager_model" in set && !set.reporting_manager_model) {
       set.reporting_manager = null;
+    }
+
+    if ("working_status" in set && typeof set.working_status === "string") {
+      set.working_status = set.working_status.trim();
     }
 
     if (update.$set) {

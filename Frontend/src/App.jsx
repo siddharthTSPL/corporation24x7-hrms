@@ -2,10 +2,10 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { lazy, Suspense, useState, useEffect } from "react";
 import { Player } from "@lottiefiles/react-lottie-player";
 import { useAuth } from "./auth/store/getmeauth/getmeauth";
+import LandingPage from "./pages/announcement/landingpage";
 
 const Login = lazy(() => import("./pages/auth/Login"));
 const Signup = lazy(() => import("./pages/auth/Signup"));
-const LandingPage = lazy(() => import("./pages/announcement/landingpage"));
 
 const MainLayout = lazy(() => import("./layout/MainLayout"));
 const ProtectedRoute = lazy(() => import("./components/Protectedroute"));
@@ -66,6 +66,8 @@ const Managertimesheet = lazy(() => import("./pages/timesheet/matimesheet"));
 const Employeetimesheet = lazy(() => import("./pages/timesheet/emtimesheet"));
 const SuperAdmintimesheet = lazy(() => import("./pages/timesheet/sutimesheet"));
 const Pagenotfound = lazy(() => import("./pages/pagenotfound/pagenotfound"));
+const Adminasset = lazy(() => import("./pages/asset/adminasset"));
+const Superadminasset = lazy(() => import("./pages/asset/superadminasset"));
 
 function PageSkeleton() {
   const [animationData, setAnimationData] = useState(null);
@@ -176,29 +178,30 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route path="/dashboard"           element={<Dashboard />} />
-            <Route path="/employee-dashboard"  element={<EmployeeDashboard />} />
-            <Route path="/manager-dashboard"   element={<Managerdashboard />} />
-            <Route path="/employee"            element={<EmployeeTable />} />
-            <Route path="/leave-manager"       element={<LeaveTablema />} />
-            <Route path="/leave-employee"      element={<LeaveTableem />} />
-            <Route path="/leave-admin"         element={<LeaveTablead />} />
-            <Route path="/leave"               element={<LeaveTable />} />
-            <Route path="/file"                element={<File />} />
-            <Route path="/file-employee"       element={<Fileem />} />
-            <Route path="/file-manager"        element={<Filema />} />
-            <Route path="/settings"            element={<Set />} />
-            <Route path="/settings-employee"   element={<Setem />} />
-            <Route path="/settings-manager"    element={<Setma />} />
-            <Route path="/organisation"        element={<Organisation />} />
-            <Route path="/organisation-employee" element={<Organisationem />} />
-            <Route path="/organisation-manager"  element={<Organisationma />} />
-            <Route path="/review-admin"        element={<Reviewad />} />
-            <Route path="/review-manager"      element={<Reviewma />} />
-            <Route path="/mark-attendance"     element={<Attendancepage />} />
-            <Route path="/admin-timesheet"     element={<Adminrimesheet />} />
-            <Route path="/manager-timesheet"   element={<Managertimesheet />} />
-            <Route path="/employee-timesheet"  element={<Employeetimesheet />} />
+            <Route path="/dashboard"                element={<Dashboard />} />
+            <Route path="/employee-dashboard"       element={<EmployeeDashboard />} />
+            <Route path="/manager-dashboard"        element={<Managerdashboard />} />
+            <Route path="/employee"                 element={<EmployeeTable />} />
+            <Route path="/leave-manager"            element={<LeaveTablema />} />
+            <Route path="/leave-employee"           element={<LeaveTableem />} />
+            <Route path="/leave-admin"              element={<LeaveTablead />} />
+            <Route path="/leave"                    element={<LeaveTable />} />
+            <Route path="/file"                     element={<File />} />
+            <Route path="/file-employee"            element={<Fileem />} />
+            <Route path="/file-manager"             element={<Filema />} />
+            <Route path="/settings"                 element={<Set />} />
+            <Route path="/settings-employee"        element={<Setem />} />
+            <Route path="/settings-manager"         element={<Setma />} />
+            <Route path="/organisation"             element={<Organisation />} />
+            <Route path="/organisation-employee"    element={<Organisationem />} />
+            <Route path="/organisation-manager"     element={<Organisationma />} />
+            <Route path="/review-admin"             element={<Reviewad />} />
+            <Route path="/review-manager"           element={<Reviewma />} />
+            <Route path="/mark-attendance"          element={<Attendancepage />} />
+            <Route path="/admin-timesheet"          element={<Adminrimesheet />} />
+            <Route path="/manager-timesheet"        element={<Managertimesheet />} />
+            <Route path="/employee-timesheet"       element={<Employeetimesheet />} />
+            <Route path="/admin-asset-management"   element={<Adminasset />} />
 
             <Route
               path="/announcement"
@@ -342,15 +345,16 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route path="/superadmin-dashboard"     element={<SuperAdminDashboard />} />
-            <Route path="/superadmin-organisations" element={<SuperAdminOrganisations />} />
-            <Route path="/superadmin-announcements" element={<SuperAdminAnnouncements />} />
-            <Route path="/superadmin-leaves"        element={<SuperAdminLeaves />} />
-            <Route path="/superadmin-reviews"       element={<SuperAdminReviews />} />
-            <Route path="/superadmin-settings"      element={<SuperAdminSettings />} />
-            <Route path="/superadmin-documents"     element={<SuperAdminDocuments />} />
-            <Route path="/superadmin-complaints"    element={<SuperAdminComplaints />} />
-            <Route path="/superadmin-timesheet"     element={<SuperAdmintimesheet />} />
+            <Route path="/superadmin-dashboard"          element={<SuperAdminDashboard />} />
+            <Route path="/superadmin-organisations"      element={<SuperAdminOrganisations />} />
+            <Route path="/superadmin-announcements"      element={<SuperAdminAnnouncements />} />
+            <Route path="/superadmin-leaves"             element={<SuperAdminLeaves />} />
+            <Route path="/superadmin-reviews"            element={<SuperAdminReviews />} />
+            <Route path="/superadmin-settings"           element={<SuperAdminSettings />} />
+            <Route path="/superadmin-documents"          element={<SuperAdminDocuments />} />
+            <Route path="/superadmin-complaints"         element={<SuperAdminComplaints />} />
+            <Route path="/superadmin-timesheet"          element={<SuperAdmintimesheet />} />
+            <Route path="/superadmin-asset-management"   element={<Superadminasset />} />
           </Route>
 
           <Route path="*" element={<Pagenotfound />} />

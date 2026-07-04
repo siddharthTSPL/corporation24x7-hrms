@@ -6,10 +6,13 @@ import {
   getJobById, updateJobStatus, updateJob, toggleWorkItem, archiveJob,
   getJobTimeLogs, logTime, getMyDayLog, getMyWeekLog, updateTimeLog, deleteTimeLog,
   startTimer, heartbeatTimer, pauseTimer, resumeTimer, stopTimer, getActiveTimer, discardTimer,
-  submitTimesheet, getMyTimesheets, getPendingApprovals, approveTimesheet, rejectTimesheet, forwardTimesheet,
+  submitTimesheet, recallTimesheet, getMyTimesheets, getPendingApprovals,
+  approveTimesheet, rejectTimesheet, forwardTimesheet,
   getTeamWorkloadHeatmap, getOverrunRiskJobs, getIdleJobs, getMyProductivitySummary,
-  getOrgAllTimeLogs, getOrgAllTimesheets,
+  getOrgAllTimeLogs, getOrgAllTimesheets, getOrgAllJobs, getJobTimeline,
 } from "../../api/timesheet/timesheet.api";
+
+// ─── Projects ─────────────────────────────────────────────────────────────────
 
 export const useCreateProject = () => {
   const queryClient = useQueryClient();
@@ -78,11 +81,16 @@ export const useArchiveProject = () => {
   });
 };
 
+// ─── Jobs ─────────────────────────────────────────────────────────────────────
+
+// Each target: { id, model, name, email, role }
+// Render in dropdown as: `${t.name} (${t.role})`
 export const useAssignableTargets = () =>
   useQuery({
     queryKey: ["tsAssignableTargets"],
     queryFn: getAssignableTargets,
     staleTime: 60000,
+    refetchOnMount: true,
   });
 
 export const useCreateJob = () => {
@@ -91,10 +99,12 @@ export const useCreateJob = () => {
     mutationFn: createJob,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tsJobsCreatedByMe"] });
+      queryClient.invalidateQueries({ queryKey: ["tsOrgAllJobs"] });
     },
   });
 };
 
+// Jobs assigned TO the current user — the source for the timer job dropdown
 export const useMyAssignedJobs = (params) =>
   useQuery({
     queryKey: ["tsJobsAssignedToMe", params],
@@ -118,15 +128,19 @@ export const useJobById = (id) =>
     queryKey: ["tsJob", id],
     queryFn: () => getJobById(id),
     enabled: !!id,
+    staleTime: 0,
+    refetchOnMount: true,
   });
 
 export const useUpdateJobStatus = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: updateJobStatus,
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["tsJobsAssignedToMe"] });
       queryClient.invalidateQueries({ queryKey: ["tsJobsCreatedByMe"] });
+      queryClient.invalidateQueries({ queryKey: ["tsJob", variables.id] });
+      queryClient.invalidateQueries({ queryKey: ["tsOrgAllJobs"] });
     },
   });
 };
@@ -138,6 +152,7 @@ export const useUpdateJob = () => {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["tsJobsCreatedByMe"] });
       queryClient.invalidateQueries({ queryKey: ["tsJob", variables.id] });
+      queryClient.invalidateQueries({ queryKey: ["tsOrgAllJobs"] });
     },
   });
 };
@@ -159,6 +174,7 @@ export const useArchiveJob = () => {
     mutationFn: archiveJob,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tsJobsCreatedByMe"] });
+      queryClient.invalidateQueries({ queryKey: ["tsOrgAllJobs"] });
     },
   });
 };
@@ -168,7 +184,11 @@ export const useJobTimeLogs = (jobId) =>
     queryKey: ["tsJobTimeLogs", jobId],
     queryFn: () => getJobTimeLogs(jobId),
     enabled: !!jobId,
+    staleTime: 0,
+    refetchOnMount: true,
   });
+
+// ─── Time logs ────────────────────────────────────────────────────────────────
 
 export const useLogTime = () => {
   const queryClient = useQueryClient();
@@ -178,6 +198,7 @@ export const useLogTime = () => {
       queryClient.invalidateQueries({ queryKey: ["tsDayLog"] });
       queryClient.invalidateQueries({ queryKey: ["tsWeekLog"] });
       queryClient.invalidateQueries({ queryKey: ["tsJobsAssignedToMe"] });
+      queryClient.invalidateQueries({ queryKey: ["tsOrgAllTimeLogs"] });
     },
   });
 };
@@ -187,6 +208,8 @@ export const useMyDayLog = (date) =>
     queryKey: ["tsDayLog", date],
     queryFn: () => getMyDayLog(date),
     enabled: !!date,
+    staleTime: 0,
+    refetchOnMount: true,
   });
 
 export const useMyWeekLog = (weekStart) =>
@@ -194,6 +217,8 @@ export const useMyWeekLog = (weekStart) =>
     queryKey: ["tsWeekLog", weekStart],
     queryFn: () => getMyWeekLog(weekStart),
     enabled: !!weekStart,
+    staleTime: 0,
+    refetchOnMount: true,
   });
 
 export const useUpdateTimeLog = () => {
@@ -203,6 +228,7 @@ export const useUpdateTimeLog = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tsDayLog"] });
       queryClient.invalidateQueries({ queryKey: ["tsWeekLog"] });
+      queryClient.invalidateQueries({ queryKey: ["tsOrgAllTimeLogs"] });
     },
   });
 };
@@ -214,9 +240,12 @@ export const useDeleteTimeLog = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tsDayLog"] });
       queryClient.invalidateQueries({ queryKey: ["tsWeekLog"] });
+      queryClient.invalidateQueries({ queryKey: ["tsOrgAllTimeLogs"] });
     },
   });
 };
+
+// ─── Timer ────────────────────────────────────────────────────────────────────
 
 export const useStartTimer = () => {
   const queryClient = useQueryClient();
@@ -228,6 +257,7 @@ export const useStartTimer = () => {
   });
 };
 
+// Fire this in a useEffect with setInterval(mutate, 60000) — exactly 60 000 ms
 export const useHeartbeatTimer = () =>
   useMutation({ mutationFn: heartbeatTimer });
 
@@ -260,16 +290,20 @@ export const useStopTimer = () => {
       queryClient.invalidateQueries({ queryKey: ["tsDayLog"] });
       queryClient.invalidateQueries({ queryKey: ["tsWeekLog"] });
       queryClient.invalidateQueries({ queryKey: ["tsJobsAssignedToMe"] });
+      queryClient.invalidateQueries({ queryKey: ["tsOrgAllTimeLogs"] });
     },
   });
 };
 
+// Polls every 30 s to keep the timer widget in sync.
+// Pass refetchInterval: false when the timer page is not mounted.
 export const useActiveTimer = (options = {}) =>
   useQuery({
     queryKey: ["tsActiveTimer"],
     queryFn: getActiveTimer,
     refetchInterval: options.refetchInterval ?? 30000,
     refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 
 export const useDiscardTimer = () => {
@@ -282,10 +316,25 @@ export const useDiscardTimer = () => {
   });
 };
 
+// ─── Timesheets ───────────────────────────────────────────────────────────────
+
 export const useSubmitTimesheet = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: submitTimesheet,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tsMyTimesheets"] });
+      queryClient.invalidateQueries({ queryKey: ["tsWeekLog"] });
+      queryClient.invalidateQueries({ queryKey: ["tsOrgAllTimesheets"] });
+    },
+  });
+};
+
+// Recall a submitted-but-not-approved timesheet back to draft so the user can edit
+export const useRecallTimesheet = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: recallTimesheet,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tsMyTimesheets"] });
       queryClient.invalidateQueries({ queryKey: ["tsWeekLog"] });
@@ -299,6 +348,7 @@ export const useMyTimesheets = () =>
     queryFn: getMyTimesheets,
     staleTime: 0,
     refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
 export const usePendingApprovals = () =>
@@ -316,6 +366,7 @@ export const useApproveTimesheet = () => {
     mutationFn: approveTimesheet,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tsPendingApprovals"] });
+      queryClient.invalidateQueries({ queryKey: ["tsOrgAllTimesheets"] });
     },
   });
 };
@@ -326,6 +377,7 @@ export const useRejectTimesheet = () => {
     mutationFn: rejectTimesheet,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tsPendingApprovals"] });
+      queryClient.invalidateQueries({ queryKey: ["tsOrgAllTimesheets"] });
     },
   });
 };
@@ -336,9 +388,12 @@ export const useForwardTimesheet = () => {
     mutationFn: forwardTimesheet,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tsPendingApprovals"] });
+      queryClient.invalidateQueries({ queryKey: ["tsOrgAllTimesheets"] });
     },
   });
 };
+
+// ─── Insights ─────────────────────────────────────────────────────────────────
 
 export const useTeamWorkloadHeatmap = (weekStart) =>
   useQuery({
@@ -366,7 +421,9 @@ export const useMyProductivitySummary = (weekStart) =>
     enabled: !!weekStart,
   });
 
-// ─── SA / Admin: org-wide visibility ─────────────────────────────────────────
+// ─── Admin / SuperAdmin: org-wide visibility ──────────────────────────────────
+
+// params: { date?, week_start?, user_id?, job_id?, status? }
 export const useOrgAllTimeLogs = (params = {}) =>
   useQuery({
     queryKey: ["tsOrgAllTimeLogs", params],
@@ -376,6 +433,7 @@ export const useOrgAllTimeLogs = (params = {}) =>
     refetchOnWindowFocus: true,
   });
 
+// params: { status?, owner_model?, week_start? }
 export const useOrgAllTimesheets = (params = {}) =>
   useQuery({
     queryKey: ["tsOrgAllTimesheets", params],
@@ -383,4 +441,25 @@ export const useOrgAllTimesheets = (params = {}) =>
     staleTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+  });
+
+// All jobs org-wide with enriched assigned_to_info / assigned_by_info
+// params: { status?, assigned_to?, assigned_to_model?, project?, priority? }
+export const useOrgAllJobs = (params = {}) =>
+  useQuery({
+    queryKey: ["tsOrgAllJobs", params],
+    queryFn: () => getOrgAllJobs(params),
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
+
+// Full timeline for one job — { job, total_minutes, contributor_summary, logs }
+export const useJobTimeline = (id) =>
+  useQuery({
+    queryKey: ["tsJobTimeline", id],
+    queryFn: () => getJobTimeline(id),
+    enabled: !!id,
+    staleTime: 0,
+    refetchOnMount: true,
   });

@@ -16,12 +16,10 @@ const FRONTEND_URL = IS_DEV
 
 const AGENT_PORT     = 47821;
 const PING_INTERVAL  = 60_000;
-const IDLE_THRESHOLD = 120_000;
 
 const store = new Store();
 
 let tray                = null;
-let lastActivityAt      = Date.now();
 let wasActiveThisMinute = false;
 let pingInterval        = null;
 let autoCheckoutTimer   = null;
@@ -87,14 +85,11 @@ function stopGlobalHook() {
 }
 
 function onActivity() {
-  lastActivityAt      = Date.now();
   wasActiveThisMinute = true;
 }
 
 async function sendPing() {
-  const now    = Date.now();
-  const isIdle = now - lastActivityAt > IDLE_THRESHOLD;
-  const status = wasActiveThisMinute && !isIdle ? "active" : "idle";
+  const status = wasActiveThisMinute ? "active" : "idle";
   wasActiveThisMinute = false;
 
   console.log(`[Agent] Sending ping: ${status}`);
@@ -113,9 +108,7 @@ async function sendPing() {
     console.log(`[Agent] Ping sent: ${status} at ${new Date().toLocaleTimeString()}`);
 
   } catch (err) {
-    if (err?.response?.status === 429) {
-      console.log("[Agent] Rate limited, skipping");
-    } else if (err?.response?.status === 401) {
+    if (err?.response?.status === 401) {
       console.log("[Agent] Token expired, clearing...");
       store.delete("token");
       stopTracking();
@@ -133,7 +126,6 @@ async function sendPing() {
 function startTracking() {
   if (isTracking) return;
   isTracking          = true;
-  lastActivityAt      = Date.now();
   wasActiveThisMinute = true;
 
   startGlobalHook();

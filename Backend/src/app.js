@@ -17,6 +17,7 @@ app.use((req, res, next) => {
     req.hostname === "localhost" ||
     req.hostname === "146.101.46.205" ||
     req.method === "OPTIONS" ||
+    
     req.secure
   ) {
     return next();
@@ -59,10 +60,12 @@ const recruitmentroute = require('../routes/Recruitment.route');
 const wfhroute = require('../routes/wfh.routes');
 const permissionroute = require('../routes/permission.route');
 const timesheetroute = require('../routes/timesheet.route');
+const kioskrouter = require('../routes/kiosk.routes');
+const faceattendancerouter = require('../routes/faceattendance.routes');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 // DEBUG — remove after fix
-const routes = { adminrouter, managerrouter, userrouter, attendancerouter, superadminrouter, ticketroute, recruitmentroute, wfhroute, permissionroute, timesheetroute };
+const routes = { adminrouter, managerrouter, userrouter, attendancerouter, superadminrouter, ticketroute, recruitmentroute, wfhroute, permissionroute, timesheetroute, kioskrouter, faceattendancerouter };
 Object.entries(routes).forEach(([name, r]) => {
   if (!r) console.error(`❌ UNDEFINED: ${name}`);
   else if (typeof r !== 'function') console.error(`❌ NOT A FUNCTION: ${name} — type: ${typeof r}, value:`, r);
@@ -79,6 +82,8 @@ app.use('/recruitment', recruitmentroute);
 app.use('/wfh', wfhroute);
 app.use('/permission', permissionroute);
 app.use('/timesheet', timesheetroute);
+app.use('/kiosk', kioskrouter);
+app.use('/faceattendance', faceattendancerouter);
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 

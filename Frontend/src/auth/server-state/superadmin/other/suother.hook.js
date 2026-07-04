@@ -340,11 +340,19 @@ export const useSuperAdminInactiveUsers = () => {
 export const useSetAdminWorkingStatus = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, working_status }) => setAdminWorkingStatus(id, working_status),
+    mutationFn: async ({ id, working_status }) => {
+      try {
+        return await setAdminWorkingStatus(id, working_status);
+      } catch (err) {
+        const payload = err?.response?.data || err?.data || err;
+        throw payload;
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["superadmin", "inactive-users"] });
       queryClient.invalidateQueries({ queryKey: ["superadmin", "all-employees"] });
       queryClient.invalidateQueries({ queryKey: ["superadmin", "all-admins"] });
+      queryClient.invalidateQueries({ queryKey: ["admins"] });
     },
   });
 };
