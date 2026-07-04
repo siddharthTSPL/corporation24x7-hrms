@@ -5,12 +5,12 @@ const ManagerLeave = require("../Models/maleave.model");
 const AdminLeave = require("../Models/adleave.model");
 const mongoose = require("mongoose");
 
-const calculateStatus = (activeMinutes) => {
+function calculateStatus(activeMinutes) {
   const hours = activeMinutes / 60;
-  if (hours >= 5)   return "present";
-  if (hours >= 3.5) return "half_day";
-  return "absent";
-};
+  if (hours < 2) return "absent";
+  if (hours <= 3) return "half_day";
+  return "present";
+}
 
 const hasApprovedLeave = async (employeeId, date, role) => {
   const checkDate = new Date(date);
