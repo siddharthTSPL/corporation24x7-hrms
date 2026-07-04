@@ -2,6 +2,41 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { visualizer } from "rollup-plugin-visualizer";
+import { writeFileSync } from "fs";
+import { resolve } from "path";
+
+const PROTECTED_PATHS = [
+  "/dashboard", "/employee-dashboard", "/manager-dashboard",
+  "/employee", "/leave*", "/file*", "/settings*", "/organisation*",
+  "/review-admin", "/review-manager", "/mark-attendance",
+  "/admin-timesheet", "/manager-timesheet", "/employee-timesheet",
+  "/admin-asset-management", "/announcement*", "/document*",
+  "/admin-complaints", "/manager-complaints", "/employee-complaints",
+  "/recruitment-admin", "/recruitment-manager", "/manager/recruitment",
+  "/superadmin*", "/redirect", "/unauthorized",
+];
+
+function robotsTxtPlugin() {
+  return {
+    name: "generate-robots-txt",
+    closeBundle() {
+      const disallowLines = PROTECTED_PATHS
+        .map((p) => `Disallow: /talent${p}`)
+        .join("\n");
+
+      const content = `User-agent: *
+Allow: /talent/$
+Allow: /talent/login
+Allow: /talent/signup
+${disallowLines}
+
+Sitemap: https://torchxsuite.com/talent/sitemap.xml
+`;
+
+      writeFileSync(resolve(__dirname, "dist/robots.txt"), content, "utf-8");
+    },
+  };
+}
 
 export default defineConfig(({ mode }) => ({
   base: '/talent/',
@@ -11,6 +46,7 @@ export default defineConfig(({ mode }) => ({
       babel: false,
     }),
     tailwindcss(),
+    robotsTxtPlugin(),
     mode === "analyze" &&
       visualizer({
         open: true,
@@ -115,7 +151,6 @@ export default defineConfig(({ mode }) => ({
       overlay: true,
     },
 
-    // ✅ Dev proxy — forwards /api/* to your backend
     proxy: {
       '/api': {
         target: 'http://146.101.46.205:5001',

@@ -8,6 +8,8 @@ import {
   useArchiveJob,
   useMyWeekLog,
   useLogTime,
+  useUpdateTimeLog,
+  useDeleteTimeLog,
   useActiveTimer,
   useStartTimer,
   usePauseTimer,
@@ -17,12 +19,16 @@ import {
   useHeartbeatTimer,
   useMyTimesheets,
   useSubmitTimesheet,
+  useRecallTimesheet,
   usePendingApprovals,
   useApproveTimesheet,
   useRejectTimesheet,
   useForwardTimesheet,
   useTeamWorkloadHeatmap,
   useOverrunRiskJobs,
+  useIdleJobs,
+  useMyProductivitySummary,
+  useJobById,
 } from "../../auth/server-state/timesheet/timesheet.hook";
 
 const getMonday = (d = new Date()) => {
@@ -36,126 +42,131 @@ const getMonday = (d = new Date()) => {
 
 const fmtDate = (d) =>
   new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+const fmtShort = (d) =>
+  new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 const fmtDuration = (mins) => {
   if (!mins && mins !== 0) return "—";
-  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+  const h = Math.floor(mins / 60), m = mins % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
 };
 const fmtSeconds = (s) => {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
 };
 
-const STATUS_STYLE = {
-  draft: { text: "text-gray-400", bg: "bg-gray-50", label: "Draft" },
-  pending_manager: { text: "text-amber-600", bg: "bg-amber-50", label: "Pending Manager" },
-  pending_reporting_manager: { text: "text-amber-600", bg: "bg-amber-50", label: "Pending Review" },
-  pending_admin: { text: "text-blue-600", bg: "bg-blue-50", label: "Pending Admin" },
-  approved: { text: "text-emerald-600", bg: "bg-emerald-50", label: "Approved" },
-  rejected: { text: "text-red-600", bg: "bg-red-50", label: "Rejected" },
+const DAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+const STATUS_META = {
+  draft:                     { label: "Draft",           color: "text-gray-500",   bg: "bg-gray-100",   dot: "bg-gray-400"    },
+  pending_manager:           { label: "Pending Manager", color: "text-amber-600",  bg: "bg-amber-50",   dot: "bg-amber-500"   },
+  pending_reporting_manager: { label: "Pending Review",  color: "text-amber-600",  bg: "bg-amber-50",   dot: "bg-amber-500"   },
+  pending_admin:             { label: "Pending Admin",   color: "text-blue-600",   bg: "bg-blue-50",    dot: "bg-blue-500"    },
+  pending_superadmin:        { label: "Pending SA",      color: "text-purple-600", bg: "bg-purple-50",  dot: "bg-purple-500"  },
+  approved:                  { label: "Approved",        color: "text-emerald-600",bg: "bg-emerald-50", dot: "bg-emerald-500" },
+  rejected:                  { label: "Rejected",        color: "text-red-600",    bg: "bg-red-50",     dot: "bg-red-500"     },
 };
 
-const PRIORITY_CHIP = {
-  low: "text-gray-400 bg-gray-100",
-  medium: "text-amber-600 bg-amber-50",
-  high: "text-red-600 bg-red-50",
-  urgent: "text-[#730042] bg-[#730042]/10",
+const JOB_STATUS_META = {
+  not_started: { label: "Not Started", color: "text-gray-500",    bg: "bg-gray-100"   },
+  in_progress:  { label: "In Progress", color: "text-blue-600",    bg: "bg-blue-50"    },
+  on_hold:      { label: "On Hold",     color: "text-amber-600",   bg: "bg-amber-50"   },
+  completed:    { label: "Completed",   color: "text-emerald-600", bg: "bg-emerald-50" },
+  cancelled:    { label: "Cancelled",   color: "text-red-600",     bg: "bg-red-50"     },
 };
 
-const JOB_STATUS_DOT = {
-  not_started: "bg-gray-400",
-  in_progress: "bg-blue-600",
-  on_hold: "bg-amber-600",
-  completed: "bg-emerald-600",
-  cancelled: "bg-red-600",
+const PRIORITY_META = {
+  low:    { label: "Low",    color: "text-gray-500",  bg: "bg-gray-100"      },
+  medium: { label: "Medium", color: "text-amber-600", bg: "bg-amber-50"      },
+  high:   { label: "High",   color: "text-red-600",   bg: "bg-red-50"        },
+  urgent: { label: "Urgent", color: "text-[#730042]", bg: "bg-[#730042]/10"  },
 };
 
-const JOB_STATUS_CHIP = {
-  not_started: "text-gray-400 bg-gray-100",
-  in_progress: "text-blue-600 bg-blue-50",
-  on_hold: "text-amber-600 bg-amber-50",
-  completed: "text-emerald-600 bg-emerald-50",
-  cancelled: "text-red-600 bg-red-50",
-};
-
-const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-// Mobile-first priority order: Approvals (urgent action) and My Work (daily driver)
-// surface before the passive Overview dashboard. Desktop keeps the original order.
 const TABS = [
-  { id: "overview", label: "Overview", mobileOrder: 4 },
-  { id: "team", label: "Team Jobs", mobileOrder: 3 },
-  { id: "my-work", label: "My Work", mobileOrder: 1 },
-  { id: "approvals", label: "Approvals", mobileOrder: 0 },
-  { id: "timesheets", label: "Timesheets", mobileOrder: 2 },
+  { id: "work",      label: "My Work",    icon: "◷" },
+  { id: "team",      label: "Team Jobs",  icon: "⬡" },
+  { id: "approvals", label: "Approvals",  icon: "◈" },
+  { id: "insights",  label: "Insights",   icon: "◎" },
+  { id: "sheets",    label: "Timesheets", icon: "▦" },
 ];
 
-function TorchXLogo() {
-  return (
-    <div className="flex items-center gap-2.5 flex-shrink-0">
-      <div className="w-8 h-8 sm:w-[34px] sm:h-[34px] rounded-[10px] bg-gradient-to-br from-[#730042] to-[#CD166E] flex items-center justify-center shadow-[0_2px_8px_rgba(115,0,66,0.15)] flex-shrink-0">
-        <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-          <path d="M10 2L3 7v11h5v-6h4v6h5V7L10 2z" fill="white" fillOpacity="0.9" />
-          <circle cx="10" cy="8" r="2" fill="white" />
-        </svg>
-      </div>
-      <div className="hidden sm:block">
-        <div className="font-extrabold text-sm text-gray-900 tracking-tight leading-none">TorchX</div>
-        <div className="text-[10px] text-gray-400 font-medium tracking-wide">TIMESHEET</div>
-      </div>
-    </div>
-  );
-}
+function cn(...a) { return a.filter(Boolean).join(" "); }
 
-function Badge({ status }) {
-  const s = STATUS_STYLE[status] || { text: "text-gray-400", bg: "bg-gray-50", label: status };
+function StatusBadge({ status }) {
+  const m = STATUS_META[status] || STATUS_META.draft;
   return (
-    <span className={`${s.text} ${s.bg} rounded-md text-[10px] font-bold tracking-wide px-2 py-1 uppercase whitespace-nowrap`}>
-      {s.label}
+    <span className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold", m.color, m.bg)}>
+      <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", m.dot)} />
+      {m.label}
     </span>
   );
 }
 
-function Chip({ color = "brand", children }) {
+function Chip({ children, color = "gray", size = "sm" }) {
   const map = {
-    brand: "text-[#730042] bg-[#730042]/10",
-    green: "text-emerald-600 bg-emerald-50",
+    gray:  "text-gray-500 bg-gray-100",
     amber: "text-amber-600 bg-amber-50",
-    red: "text-red-600 bg-red-50",
-    blue: "text-blue-600 bg-blue-50",
-    gray: "text-gray-400 bg-gray-100",
+    red:   "text-red-600 bg-red-50",
+    green: "text-emerald-600 bg-emerald-50",
+    blue:  "text-blue-600 bg-blue-50",
+    brand: "text-[#730042] bg-[#730042]/10",
+    purple:"text-purple-600 bg-purple-50",
   };
   return (
-    <span className={`${map[color] || map.brand} rounded-md text-[10px] font-bold px-2 py-1 uppercase tracking-wide whitespace-nowrap`}>
+    <span className={cn(
+      "inline-flex items-center rounded-md font-semibold whitespace-nowrap",
+      size === "xs" ? "text-[10px] px-1.5 py-0.5" : "text-[11px] px-2 py-0.5",
+      map[color] || map.gray
+    )}>{children}</span>
+  );
+}
+
+function Btn({ children, variant = "primary", onClick, disabled, type = "button", size = "md", className = "" }) {
+  const base = cn(
+    "inline-flex items-center justify-center gap-1.5 rounded-lg font-semibold transition-all whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed",
+    size === "sm" ? "text-[12px] px-3 py-1.5" : "text-[13px] px-4 py-2"
+  );
+  const v = {
+    primary: "bg-[#730042] text-white hover:bg-[#5a0033]",
+    ghost:   "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50",
+    danger:  "bg-red-50 text-red-600 border border-red-200 hover:bg-red-100",
+    success: "bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100",
+    amber:   "bg-amber-50 text-amber-600 border border-amber-200 hover:bg-amber-100",
+  };
+  return (
+    <button type={type} onClick={onClick} disabled={disabled} className={cn(base, v[variant], className)}>
       {children}
-    </span>
+    </button>
   );
 }
 
-function PriorityChip({ priority }) {
+function Input({ label, error, className = "", ...props }) {
   return (
-    <span className={`${PRIORITY_CHIP[priority] || PRIORITY_CHIP.low} rounded-md text-[10px] font-bold px-2 py-1 uppercase tracking-wide whitespace-nowrap`}>
-      {priority}
-    </span>
-  );
-}
-
-function JobChip({ status }) {
-  return (
-    <span className={`${JOB_STATUS_CHIP[status] || "text-gray-400 bg-gray-100"} rounded-md text-[10px] font-bold px-2 py-1 uppercase tracking-wide whitespace-nowrap`}>
-      {status.replace(/_/g, " ")}
-    </span>
-  );
-}
-
-function Card({ children, className = "" }) {
-  return (
-    <div className={`bg-white border border-gray-200 rounded-2xl shadow-sm ${className}`}>
-      {children}
+    <div className="flex flex-col gap-1">
+      {label && <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{label}</label>}
+      <input {...props} className={cn(
+        "bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-[13px] text-gray-900 outline-none w-full",
+        "focus:border-[#730042] focus:ring-1 focus:ring-[#730042]/20 transition-all placeholder:text-gray-300",
+        error && "border-red-300", className
+      )} />
+      {error && <span className="text-[11px] text-red-500">{error}</span>}
     </div>
   );
 }
 
-function Modal({ open, onClose, title, children }) {
+function Sel({ label, children, ...props }) {
+  return (
+    <div className="flex flex-col gap-1">
+      {label && <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{label}</label>}
+      <select {...props} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-[13px] text-gray-900 outline-none w-full focus:border-[#730042] focus:ring-1 focus:ring-[#730042]/20 transition-all appearance-none cursor-pointer">
+        {children}
+      </select>
+    </div>
+  );
+}
+
+function Modal({ open, onClose, title, children, width = "max-w-[500px]" }) {
   useEffect(() => {
     if (open) document.body.style.overflow = "hidden";
     else document.body.style.overflow = "";
@@ -163,82 +174,98 @@ function Modal({ open, onClose, title, children }) {
   }, [open]);
   if (!open) return null;
   return (
-    <div
-      className="fixed inset-0 z-[200] bg-gray-900/55 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div className="bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-[540px] shadow-2xl max-h-[88vh] sm:max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-200 flex-shrink-0">
-          <span className="font-bold text-[14px] sm:text-[15px] text-gray-900">{title}</span>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center text-gray-400 text-lg bg-gray-50 border-none rounded-lg cursor-pointer flex-shrink-0"
-          >×</button>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className={cn("bg-white rounded-t-2xl sm:rounded-2xl w-full shadow-2xl flex flex-col max-h-[90vh]", width)}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+          <span className="font-bold text-[15px] text-gray-900">{title}</span>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors text-lg">×</button>
         </div>
-        <div className="px-4 sm:px-6 py-4 sm:py-6 overflow-y-auto flex-1 min-h-0">{children}</div>
+        <div className="p-5 overflow-y-auto">{children}</div>
       </div>
     </div>
   );
 }
 
-function Field({ label, children }) {
+function JobDetailModal({ jobId, open, onClose }) {
+  const { data, isLoading } = useJobById(jobId);
+  const job = data?.job;
+  if (!open) return null;
   return (
-    <div className="flex flex-col gap-1.5">
-      {label && <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wide">{label}</label>}
-      {children}
-    </div>
+    <Modal open={open} onClose={onClose} title="Job Details" width="max-w-[560px]">
+      {isLoading ? (
+        <div className="py-8 text-center text-gray-400 text-[13px]">Loading…</div>
+      ) : !job ? (
+        <div className="py-8 text-center text-gray-400 text-[13px]">Job not found</div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          <div>
+            <div className="font-bold text-[17px] text-gray-900 mb-1">{job.title}</div>
+            {job.description && <div className="text-[13px] text-gray-500 leading-relaxed">{job.description}</div>}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: "Status", node: <Chip color={job.status === "in_progress" ? "blue" : job.status === "completed" ? "green" : job.status === "on_hold" ? "amber" : job.status === "cancelled" ? "red" : "gray"}>{JOB_STATUS_META[job.status]?.label || job.status}</Chip> },
+              { label: "Priority", node: <Chip color={job.priority === "urgent" ? "brand" : job.priority === "high" ? "red" : job.priority === "medium" ? "amber" : "gray"}>{PRIORITY_META[job.priority]?.label || job.priority}</Chip> },
+              { label: "Logged", node: <div className="text-[15px] font-bold text-[#730042]">{job.logged_hours_cache?.toFixed(1) || 0}h</div> },
+              { label: "Estimated", node: <div className="text-[15px] font-bold text-gray-900">{job.estimated_hours || 0}h</div> },
+            ].map((r, i) => (
+              <div key={i} className="bg-gray-50 rounded-xl p-3">
+                <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">{r.label}</div>
+                {r.node}
+              </div>
+            ))}
+          </div>
+          {job.estimated_hours > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] text-gray-400">Progress</span>
+                <span className={cn("text-[11px] font-bold", job.overrun_flagged ? "text-red-600" : "text-gray-600")}>
+                  {Math.round((job.logged_hours_cache / job.estimated_hours) * 100)}%
+                </span>
+              </div>
+              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className={cn("h-full rounded-full", job.overrun_flagged ? "bg-red-500" : "bg-[#730042]")}
+                  style={{ width: `${Math.min(100, (job.logged_hours_cache / job.estimated_hours) * 100)}%` }} />
+              </div>
+            </div>
+          )}
+          {job.due_date && (
+            <div className="text-[12px] text-gray-500">Due: <span className="font-semibold text-gray-700">{fmtDate(job.due_date)}</span></div>
+          )}
+          {job.work_items?.length > 0 && (
+            <div>
+              <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Work Items</div>
+              <div className="flex flex-col gap-1.5">
+                {job.work_items.map((wi, i) => (
+                  <div key={i} className="flex items-center gap-2 text-[13px]">
+                    <span className={cn("w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 text-[10px]",
+                      wi.is_completed ? "bg-emerald-500 border-emerald-500 text-white" : "border-gray-300")}>{wi.is_completed && "✓"}</span>
+                    <span className={wi.is_completed ? "line-through text-gray-400" : "text-gray-700"}>{wi.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {job.billable && (
+            <div className="flex items-center gap-2 text-[12px]">
+              <Chip color="green">Billable</Chip>
+              {job.hourly_rate > 0 && <span className="text-gray-500">₹{job.hourly_rate}/hr · {job.currency}</span>}
+            </div>
+          )}
+          {job.overrun_flagged && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 text-[12px] text-red-600">
+              <span>⚠</span><span className="font-semibold">Exceeded estimated hours</span>
+            </div>
+          )}
+        </div>
+      )}
+    </Modal>
   );
 }
 
-const inputClass = "bg-gray-50 border-[1.5px] border-gray-200 rounded-[10px] px-3.5 py-2.5 text-[16px] sm:text-[13px] text-gray-900 outline-none w-full box-border font-inherit focus:border-[#730042] transition-colors";
-
-function Input({ label, ...props }) {
-  return (
-    <Field label={label}>
-      <input {...props} className={inputClass} />
-    </Field>
-  );
-}
-
-function Sel({ label, children, ...props }) {
-  return (
-    <Field label={label}>
-      <select {...props} className={`${inputClass} appearance-none cursor-pointer`}>
-        {children}
-      </select>
-    </Field>
-  );
-}
-
-function Btn({ children, variant = "primary", onClick, disabled, className = "" }) {
-  const variants = {
-    primary: "bg-[#730042] text-white border border-transparent",
-    ghost: "bg-transparent text-gray-700 border-[1.5px] border-gray-200",
-    danger: "bg-red-50 text-red-600 border-[1.5px] border-red-200",
-    success: "bg-emerald-50 text-emerald-600 border-[1.5px] border-emerald-200",
-    amber: "bg-amber-50 text-amber-600 border-[1.5px] border-amber-200",
-  };
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`${variants[variant]} rounded-[10px] px-4 py-2.5 text-[13px] font-semibold whitespace-nowrap transition-all inline-flex items-center justify-center gap-1.5 font-inherit ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${className}`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function ModalFooter({ children }) {
-  return (
-    <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-1">
-      {children}
-    </div>
-  );
-}
-
-function TimerWidget({ jobs }) {
-  const { data: timerData, refetch: refetchTimer } = useActiveTimer({ refetchInterval: 10000 });
+function TimerBlock({ assignedJobs, onTimerLog }) {
+  const { data: timerData, refetch } = useActiveTimer({ refetchInterval: 10000 });
   const timer = timerData?.timer;
   const startTimer = useStartTimer();
   const pauseTimer = usePauseTimer();
@@ -248,17 +275,13 @@ function TimerWidget({ jobs }) {
   const heartbeat = useHeartbeatTimer();
   const [elapsed, setElapsed] = useState(0);
   const [startModal, setStartModal] = useState(false);
-  const [startForm, setStartForm] = useState({ job: "", note: "" });
   const [stopModal, setStopModal] = useState(false);
+  const [startForm, setStartForm] = useState({ job: "", note: "" });
   const [stopNote, setStopNote] = useState("");
 
   useEffect(() => {
     if (!timer || timer.status !== "running") { setElapsed(timer?.accumulated_seconds || 0); return; }
-    const tick = () => {
-      const base = timer.accumulated_seconds || 0;
-      const since = Math.floor((Date.now() - new Date(timer.last_heartbeat_at)) / 1000);
-      setElapsed(base + Math.max(0, since));
-    };
+    const tick = () => setElapsed((timer.accumulated_seconds || 0) + Math.max(0, Math.floor((Date.now() - new Date(timer.last_heartbeat_at)) / 1000)));
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
@@ -268,175 +291,204 @@ function TimerWidget({ jobs }) {
     if (!timer || timer.status !== "running") return;
     const id = setInterval(() => heartbeat.mutate(), 60000);
     return () => clearInterval(id);
-  }, [timer]);
+  }, [timer?.status]);
 
   const isRunning = timer?.status === "running";
   const isPaused = timer?.status === "paused";
   const displaySecs = isRunning ? elapsed : (timer?.accumulated_seconds || 0);
+  const activeJobs = (assignedJobs || []).filter((j) => !["completed", "cancelled"].includes(j.status));
 
   return (
     <>
-      <Card className="overflow-hidden">
-        <div
-          className={`px-4 sm:px-5 py-3.5 flex items-center gap-2.5 ${isRunning ? "bg-gradient-to-br from-[#730042] to-[#CD166E]" : "bg-gray-50"}`}
-        >
+      <div className={cn("rounded-2xl overflow-hidden border transition-all",
+        isRunning ? "border-[#730042]/20 bg-gradient-to-br from-[#730042] to-[#9a0058]"
+        : isPaused ? "border-amber-200 bg-amber-50"
+        : "border-gray-200 bg-white")}>
+        <div className="px-4 py-3 flex items-center gap-2.5">
           {isRunning && (
-            <div className="w-2 h-2 rounded-full bg-white/90 animate-[timerPulse_1.4s_ease-in-out_infinite] flex-shrink-0" />
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/60" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+            </span>
           )}
-          <span className={`${isRunning ? "text-white/90" : "text-gray-400"} text-[11px] font-bold uppercase tracking-wide`}>
+          <span className={cn("text-[11px] font-bold uppercase tracking-wide",
+            isRunning ? "text-white/80" : isPaused ? "text-amber-600" : "text-gray-400")}>
             {isRunning ? "Timer Running" : isPaused ? "Timer Paused" : "No Active Timer"}
           </span>
           {timer?.job?.title && (
-            <span className={`${isRunning ? "text-white/75" : "text-gray-400"} ml-auto text-xs overflow-hidden text-ellipsis whitespace-nowrap max-w-[110px] sm:max-w-[130px]`}>
-              {timer.job.title}
-            </span>
+            <span className={cn("ml-auto text-[11px] truncate max-w-[130px]",
+              isRunning ? "text-white/60" : "text-gray-400")}>{timer.job.title}</span>
           )}
         </div>
-        <div className="px-5 sm:px-6 py-5">
-          <div className={`font-mono text-3xl sm:text-[42px] font-extrabold tracking-wider leading-none mb-4 select-none ${isRunning ? "text-[#730042]" : isPaused ? "text-amber-600" : "text-gray-200"}`}>
+        <div className="px-5 py-4 flex items-center justify-between gap-4">
+          <div className={cn("font-mono text-4xl font-extrabold tracking-widest tabular-nums select-none",
+            isRunning ? "text-white" : isPaused ? "text-amber-600" : "text-gray-200")}>
             {fmtSeconds(displaySecs)}
           </div>
-          {!timer ? (
-            <Btn onClick={() => setStartModal(true)} className="w-full sm:w-auto">▶ Start Timer</Btn>
-          ) : (
-            <div className="grid grid-cols-2 sm:flex gap-2 sm:flex-wrap">
-              {isRunning && <Btn variant="amber" onClick={() => pauseTimer.mutate({}, { onSuccess: refetchTimer })}>⏸ Pause</Btn>}
-              {isPaused && <Btn onClick={() => resumeTimer.mutate({}, { onSuccess: refetchTimer })}>▶ Resume</Btn>}
-              <Btn variant="success" onClick={() => setStopModal(true)}>■ Stop & Log</Btn>
-              <Btn variant="danger" onClick={() => discardTimer.mutate({}, { onSuccess: refetchTimer })}>Discard</Btn>
-            </div>
-          )}
+          <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+            {!timer ? (
+              <Btn onClick={() => setStartModal(true)} className="bg-[#730042] text-white hover:bg-[#5a0033]">▶ Start</Btn>
+            ) : (
+              <>
+                {isRunning && (
+                  <Btn variant="ghost" onClick={() => pauseTimer.mutate({}, { onSuccess: refetch })}
+                    className="bg-white/20 text-white border-white/30 hover:bg-white/30">⏸</Btn>
+                )}
+                {isPaused && <Btn variant="ghost" onClick={() => resumeTimer.mutate({}, { onSuccess: refetch })}>▶</Btn>}
+                <Btn variant="ghost" onClick={() => setStopModal(true)}
+                  className={isRunning ? "bg-white/20 text-white border-white/30 hover:bg-white/30" : ""}>■ Log</Btn>
+                <Btn variant="ghost" onClick={() => discardTimer.mutate({}, { onSuccess: refetch })}
+                  className={isRunning ? "bg-white/10 text-white/70 border-white/20 hover:bg-white/20" : "text-red-500 border-red-200 hover:bg-red-50"}>Discard</Btn>
+              </>
+            )}
+          </div>
         </div>
-      </Card>
-
+      </div>
       <Modal open={startModal} onClose={() => setStartModal(false)} title="Start Timer">
-        <div className="flex flex-col gap-4">
-          <Sel label="Job (assigned to me)" value={startForm.job} onChange={(e) => setStartForm((p) => ({ ...p, job: e.target.value }))}>
+        <div className="flex flex-col gap-3.5">
+          <Sel label="Job" value={startForm.job} onChange={(e) => setStartForm((p) => ({ ...p, job: e.target.value }))}>
             <option value="">Select a job…</option>
-            {(jobs || []).filter((j) => !["completed", "cancelled"].includes(j.status)).map((j) => (
-              <option key={j._id} value={j._id}>{j.title}</option>
-            ))}
+            {activeJobs.map((j) => <option key={j._id} value={j._id}>{j.title}</option>)}
           </Sel>
           <Input label="Note (optional)" placeholder="What are you working on?" value={startForm.note} onChange={(e) => setStartForm((p) => ({ ...p, note: e.target.value }))} />
-          <ModalFooter>
-            <Btn variant="ghost" onClick={() => setStartModal(false)} className="w-full sm:w-auto">Cancel</Btn>
-            <Btn onClick={() => startTimer.mutate({ job: startForm.job, note: startForm.note }, { onSuccess: () => { setStartModal(false); setStartForm({ job: "", note: "" }); refetchTimer(); } })} disabled={!startForm.job || startTimer.isPending} className="w-full sm:w-auto">▶ Start</Btn>
-          </ModalFooter>
-        </div>
-      </Modal>
-
-      <Modal open={stopModal} onClose={() => setStopModal(false)} title="Stop & Log Time">
-        <div className="flex flex-col gap-4">
-          <div className="bg-[#730042]/[0.07] border-[1.5px] border-[#730042]/15 rounded-xl px-4 sm:px-[18px] py-3.5 flex justify-between items-center gap-3">
-            <span className="text-xs text-[#730042] font-semibold">Elapsed Time</span>
-            <span className="font-mono font-extrabold text-lg sm:text-xl text-[#730042]">{fmtSeconds(displaySecs)}</span>
+          <div className="flex gap-2 justify-end">
+            <Btn variant="ghost" onClick={() => setStartModal(false)}>Cancel</Btn>
+            <Btn onClick={() => startTimer.mutate({ job: startForm.job, note: startForm.note }, { onSuccess: () => { setStartModal(false); setStartForm({ job: "", note: "" }); refetch(); } })}
+              disabled={!startForm.job || startTimer.isPending}>
+              {startTimer.isPending ? "Starting…" : "▶ Start"}
+            </Btn>
           </div>
-          <Input label="Note (optional)" placeholder="Brief description…" value={stopNote} onChange={(e) => setStopNote(e.target.value)} />
-          <ModalFooter>
-            <Btn variant="ghost" onClick={() => setStopModal(false)} className="w-full sm:w-auto">Cancel</Btn>
-            <Btn variant="success" onClick={() => stopTimer.mutate({ note: stopNote }, { onSuccess: () => { setStopModal(false); setStopNote(""); refetchTimer(); } })} disabled={stopTimer.isPending} className="w-full sm:w-auto">{stopTimer.isPending ? "Logging…" : "■ Log Time"}</Btn>
-          </ModalFooter>
         </div>
       </Modal>
-      <style>{`@keyframes timerPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.5)}}`}</style>
+      <Modal open={stopModal} onClose={() => setStopModal(false)} title="Log Time">
+        <div className="flex flex-col gap-3.5">
+          <div className="bg-[#730042]/[0.07] border border-[#730042]/20 rounded-xl px-4 py-3 flex items-center justify-between">
+            <span className="text-[12px] text-[#730042] font-semibold">Elapsed</span>
+            <span className="font-mono font-extrabold text-xl text-[#730042]">{fmtSeconds(displaySecs)}</span>
+          </div>
+          <Input label="Note (optional)" placeholder="Brief summary…" value={stopNote} onChange={(e) => setStopNote(e.target.value)} />
+          <div className="flex gap-2 justify-end">
+            <Btn variant="ghost" onClick={() => setStopModal(false)}>Cancel</Btn>
+            <Btn variant="success" onClick={() => stopTimer.mutate({ note: stopNote }, { onSuccess: () => { setStopModal(false); setStopNote(""); refetch(); onTimerLog?.(); } })} disabled={stopTimer.isPending}>
+              {stopTimer.isPending ? "Logging…" : "■ Log Time"}
+            </Btn>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 }
 
-function CalendarWeekGrid({ weekStart, weekDays, onAddLog }) {
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + i);
-    return d;
-  });
-  const today = new Date().toISOString().slice(0, 10);
-
+function WeekGrid({ weekStart, weekDays, onAddLog, onEditLog, onDeleteLog }) {
+  const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(weekStart); d.setDate(d.getDate() + i); return d; });
+  const todayISO = new Date().toISOString().slice(0, 10);
   return (
-    <Card className="overflow-hidden">
-      <div className="overflow-x-auto">
-        <div className="grid grid-cols-7 border-b border-gray-200 min-w-[560px]">
-          {days.map((d, i) => {
-            const iso = d.toISOString().slice(0, 10);
-            const isToday = iso === today;
-            const mins = weekDays[iso]?.totalMinutes || 0;
-            return (
-              <div key={iso} className={`px-1.5 sm:px-2 pt-2.5 sm:pt-3 pb-2.5 text-center ${i < 6 ? "border-r border-gray-200" : ""} ${isToday ? "bg-[#730042]/[0.07]" : ""}`}>
-                <div className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wide">{DAY_NAMES[i]}</div>
-                <div className={`text-base sm:text-xl font-extrabold mt-1 ${isToday ? "text-[#730042]" : "text-gray-900"}`}>{d.getDate()}</div>
-                {mins > 0
-                  ? <div className="mt-1.5 text-[9px] sm:text-[10px] font-bold text-[#730042] bg-[#730042]/[0.07] rounded px-1 py-0.5 whitespace-nowrap">{fmtDuration(mins)}</div>
-                  : <div className="mt-1.5 h-[18px]" />
-                }
-              </div>
-            );
-          })}
-        </div>
-        <div className="grid grid-cols-7 min-w-[560px] min-h-[140px]">
-          {days.map((d, i) => {
-            const iso = d.toISOString().slice(0, 10);
-            const logs = weekDays[iso]?.logs || [];
-            const isToday = iso === today;
-            return (
-              <div key={iso} className={`${i < 6 ? "border-r border-gray-200" : ""} ${isToday ? "bg-[#730042]/[0.02]" : ""} px-1.5 py-2 flex flex-col gap-1`}>
-                {logs.map((log) => (
-                  <div key={log._id} title={`${log.job?.title || "—"} · ${fmtDuration(log.duration_minutes)}`} className={`${log.billable ? "bg-emerald-50 border-emerald-200" : "bg-[#730042]/[0.07] border-[#730042]/20"} border rounded-md px-[7px] py-1.5 ${log.billable ? "border-l-[3px] border-l-emerald-600" : "border-l-[3px] border-l-[#730042]"}`}>
-                    <div className="text-[11px] font-bold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">{log.job?.title || "—"}</div>
-                    <div className={`text-[10px] font-semibold mt-0.5 ${log.billable ? "text-emerald-600" : "text-[#730042]"}`}>{fmtDuration(log.duration_minutes)}</div>
-                  </div>
-                ))}
-                <button
-                  onClick={() => onAddLog(iso)}
-                  className="mt-auto bg-transparent border-[1.5px] border-dashed border-gray-200 rounded-md py-1 px-1 cursor-pointer text-gray-400 text-[11px] font-semibold w-full transition-colors hover:border-[#730042] hover:text-[#730042]"
-                >+ Add</button>
-              </div>
-            );
-          })}
-        </div>
+    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+      <div className="grid grid-cols-7 border-b border-gray-100 min-w-[560px]">
+        {days.map((d, i) => {
+          const iso = d.toISOString().slice(0, 10);
+          const isToday = iso === todayISO;
+          const mins = weekDays[iso]?.totalMinutes || 0;
+          return (
+            <div key={iso} className={cn("px-2 pt-3 pb-2 text-center", i < 6 ? "border-r border-gray-100" : "", isToday ? "bg-[#730042]/[0.05]" : "")}>
+              <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{DAY_KEYS[i]}</div>
+              <div className={cn("text-lg font-extrabold mt-0.5", isToday ? "text-[#730042]" : "text-gray-800")}>{d.getDate()}</div>
+              {mins > 0
+                ? <div className="mt-1 text-[10px] font-bold text-[#730042] bg-[#730042]/[0.08] rounded px-1 py-0.5">{fmtDuration(mins)}</div>
+                : <div className="mt-1 h-[18px]" />}
+            </div>
+          );
+        })}
       </div>
-    </Card>
+      <div className="grid grid-cols-7 min-w-[560px]" style={{ minHeight: 100 }}>
+        {days.map((d, i) => {
+          const iso = d.toISOString().slice(0, 10);
+          const logs = weekDays[iso]?.logs || [];
+          const isToday = iso === todayISO;
+          return (
+            <div key={iso} className={cn("px-1.5 py-2 flex flex-col gap-1", i < 6 ? "border-r border-gray-100" : "", isToday ? "bg-[#730042]/[0.02]" : "")}>
+              {logs.map((log) => (
+                <div key={log._id} className={cn("border rounded-lg px-2 py-1.5 cursor-default group",
+                  log.billable ? "bg-emerald-50 border-emerald-200 border-l-[3px] border-l-emerald-500"
+                    : "bg-[#730042]/[0.06] border-[#730042]/20 border-l-[3px] border-l-[#730042]")}
+                  title={`${log.job?.title || "—"} · ${fmtDuration(log.duration_minutes)}`}>
+                  <div className="text-[11px] font-semibold text-gray-900 truncate leading-tight">{log.job?.title || "—"}</div>
+                  <div className="flex items-center justify-between mt-0.5">
+                    <span className={cn("text-[10px] font-bold", log.billable ? "text-emerald-600" : "text-[#730042]")}>{fmtDuration(log.duration_minutes)}</span>
+                    {log.status === "draft" && (
+                      <div className="hidden group-hover:flex gap-0.5">
+                        <button onClick={(e) => { e.stopPropagation(); onEditLog?.(log); }} className="text-[10px] text-gray-400 hover:text-blue-600 px-1">✎</button>
+                        <button onClick={(e) => { e.stopPropagation(); onDeleteLog?.(log._id); }} className="text-[10px] text-gray-400 hover:text-red-500 px-1">×</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <button onClick={() => onAddLog(iso)} className="mt-auto w-full border border-dashed border-gray-200 rounded-lg py-1 text-[11px] text-gray-300 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors">+ Add</button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ label, value, sub, valueColor = "text-[#730042]" }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-2xl px-4 py-4">
+      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">{label}</div>
+      <div className={cn("text-2xl font-extrabold leading-none", valueColor)}>{value}</div>
+      {sub && <div className="text-[11px] text-gray-400 mt-1">{sub}</div>}
+    </div>
   );
 }
 
 export default function ManagerTimesheet() {
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState("work");
   const [weekStart, setWeekStart] = useState(getMonday());
-  const [jobModal, setJobModal] = useState(false);
   const [logModal, setLogModal] = useState(false);
-  const [rejectModal, setRejectModal] = useState({ open: false, ts: null });
+  const [logForm, setLogForm] = useState({ job: "", log_date: "", duration_minutes: "", note: "" });
+  const [editLog, setEditLog] = useState(null);
+  const [editForm, setEditForm] = useState({ duration_minutes: "", note: "", reason: "" });
+  const [jobModal, setJobModal] = useState(false);
+  const [jobForm, setJobForm] = useState({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: false, hourly_rate: "", due_date: "" });
+  const [rejectModal, setRejectModal] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
-  const [jobForm, setJobForm] = useState({ title: "", description: "", assigned_to: "", assigned_to_model: "User", priority: "medium", estimated_hours: "", billable: false, hourly_rate: "", due_date: "" });
-  const [logForm, setLogForm] = useState({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" });
+  const [selectedJobId, setSelectedJobId] = useState(null);
+  const [jobDetailOpen, setJobDetailOpen] = useState(false);
 
-  const { data: assignedJobsData } = useMyAssignedJobs();
-  const assignedJobs = assignedJobsData?.jobs || [];
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
 
-  const { data: createdJobsData, refetch: refetchCreated } = useJobsCreatedByMe();
-  const createdJobs = createdJobsData?.jobs || [];
-
+  const { data: assignedData } = useMyAssignedJobs();
+  const assignedJobs = assignedData?.jobs || [];
+  const { data: createdData, refetch: refetchCreated } = useJobsCreatedByMe();
+  const createdJobs = createdData?.jobs || [];
   const { data: targetsData } = useAssignableTargets();
   const targets = targetsData?.targets || [];
-
   const { data: weekData, refetch: refetchWeek } = useMyWeekLog(weekStart);
   const weekDays = weekData?.days || {};
-  const totalWeekMins = Object.values(weekDays).reduce((s, d) => s + (d.totalMinutes || 0), 0);
-
+  const totalWeekMins = weekData?.totalMinutes || 0;
   const { data: tsData, refetch: refetchTS } = useMyTimesheets();
   const timesheets = tsData?.timesheets || [];
-
   const { data: approvalsData, refetch: refetchApprovals } = usePendingApprovals();
   const approvals = approvalsData?.timesheets || [];
-
   const { data: heatmapData } = useTeamWorkloadHeatmap(weekStart);
   const heatmap = heatmapData?.heatmap || [];
-
   const { data: overrunData } = useOverrunRiskJobs();
   const overrunJobs = overrunData?.jobs || [];
+  const { data: idleData } = useIdleJobs(7);
+  const idleJobs = idleData?.jobs || [];
+  const { data: prodData } = useMyProductivitySummary(weekStart);
 
+  const logTime = useLogTime();
+  const updateTimeLog = useUpdateTimeLog();
+  const deleteTimeLog = useDeleteTimeLog();
   const createJob = useCreateJob();
   const updateJobStatus = useUpdateJobStatus();
   const archiveJob = useArchiveJob();
-  const logTime = useLogTime();
   const submitTS = useSubmitTimesheet();
+  const recallTS = useRecallTimesheet();
   const approveTS = useApproveTimesheet();
   const rejectTS = useRejectTimesheet();
   const forwardTS = useForwardTimesheet();
@@ -447,8 +499,24 @@ export default function ManagerTimesheet() {
     setWeekStart(d.toISOString().slice(0, 10));
   }, [weekStart]);
 
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekEnd.getDate() + 6);
+  const handleLogTime = () => {
+    if (!logForm.job || !logForm.duration_minutes) return;
+    logTime.mutate({ job: logForm.job, log_date: logForm.log_date, duration_minutes: Number(logForm.duration_minutes), note: logForm.note }, {
+      onSuccess: () => { setLogModal(false); setLogForm({ job: "", log_date: "", duration_minutes: "", note: "" }); refetchWeek(); }
+    });
+  };
+
+  const handleUpdateLog = () => {
+    if (!editLog) return;
+    updateTimeLog.mutate({ id: editLog._id, data: { duration_minutes: Number(editForm.duration_minutes), note: editForm.note, reason: editForm.reason } }, {
+      onSuccess: () => { setEditLog(null); refetchWeek(); }
+    });
+  };
+
+  const handleDeleteLog = (id) => {
+    if (!window.confirm("Delete this time log?")) return;
+    deleteTimeLog.mutate(id, { onSuccess: refetchWeek });
+  };
 
   const handleCreateJob = () => {
     if (!jobForm.title || !jobForm.assigned_to) return;
@@ -460,138 +528,258 @@ export default function ManagerTimesheet() {
       billable: jobForm.billable, hourly_rate: Number(jobForm.hourly_rate) || 0,
       due_date: jobForm.due_date || null,
     }, {
-      onSuccess: () => {
-        setJobModal(false);
-        setJobForm({ title: "", description: "", assigned_to: "", assigned_to_model: "User", priority: "medium", estimated_hours: "", billable: false, hourly_rate: "", due_date: "" });
-        refetchCreated();
-      },
+      onSuccess: () => { setJobModal(false); setJobForm({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: false, hourly_rate: "", due_date: "" }); refetchCreated(); }
     });
   };
 
-  const handleLogTime = () => {
-    logTime.mutate({ ...logForm, duration_minutes: Number(logForm.duration_minutes) }, {
-      onSuccess: () => {
-        setLogModal(false);
-        setLogForm({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" });
-        refetchWeek();
-      },
-    });
-  };
-
-  const mobileTabs = [...TABS].sort((a, b) => a.mobileOrder - b.mobileOrder);
+  const currentWeekSheet = timesheets.find((ts) => {
+    const ws = new Date(ts.week_start), wss = new Date(weekStart);
+    return ws.getFullYear() === wss.getFullYear() && ws.getMonth() === wss.getMonth() && ws.getDate() === wss.getDate();
+  });
+  const canSubmit = !currentWeekSheet || ["draft", "rejected"].includes(currentWeekSheet?.status);
+  const canRecall = currentWeekSheet && ["pending_manager", "pending_reporting_manager", "pending_admin", "pending_superadmin"].includes(currentWeekSheet?.status);
 
   return (
-    <div className="min-h-screen bg-[#F4F5F9] font-sans">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-[1280px] mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between h-14 sm:h-[60px] gap-3">
-            <div className="flex items-center gap-3 sm:gap-5 min-w-0">
-              <TorchXLogo />
-              <div className="hidden sm:block w-px h-7 bg-gray-200 flex-shrink-0" />
-              <nav className="hidden sm:flex gap-0.5 overflow-x-auto no-scrollbar">
-                {TABS.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => setTab(t.id)}
-                    className={`relative rounded-lg px-3.5 py-1.5 text-[13px] cursor-pointer transition-all whitespace-nowrap border-b-2 flex-shrink-0 ${
-                      tab === t.id
-                        ? "bg-[#730042]/10 text-[#730042] font-bold border-[#730042]"
-                        : "bg-transparent text-gray-700 font-medium border-transparent"
-                    }`}
-                  >
-                    {t.label}
-                    {t.id === "approvals" && approvals.length > 0 && (
-                      <span className="absolute top-1 right-1 bg-red-600 text-white rounded-full text-[8px] font-extrabold w-3.5 h-3.5 flex items-center justify-center">
-                        {approvals.length}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </nav>
+    <div className="min-h-screen bg-[#F5F6FA]" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
+        <div className="max-w-[1100px] mx-auto px-4">
+          <div className="flex items-center h-14 gap-3">
+            <div className="flex items-center gap-2.5 shrink-0">
+              <div className="w-7 h-7 rounded-lg bg-[#730042] flex items-center justify-center">
+                <span className="text-white text-[11px] font-black">T</span>
+              </div>
+              <span className="font-bold text-[14px] text-gray-900 hidden sm:block">TorchX</span>
+              <span className="hidden sm:inline text-[11px] font-semibold text-[#730042] bg-[#730042]/10 px-1.5 py-0.5 rounded-md">Manager</span>
             </div>
-            <Btn onClick={() => setJobModal(true)} className="hidden sm:inline-flex flex-shrink-0">+ Create Job</Btn>
-            <button
-              onClick={() => setJobModal(true)}
-              className="sm:hidden flex-shrink-0 w-9 h-9 rounded-lg bg-[#730042] text-white flex items-center justify-center text-lg font-bold"
-            >+</button>
+            <nav className="flex items-center gap-0.5 flex-1 overflow-x-auto no-scrollbar">
+              {TABS.map((t) => (
+                <button key={t.id} onClick={() => setTab(t.id)}
+                  className={cn("relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] sm:text-[13px] font-medium transition-all whitespace-nowrap shrink-0",
+                    tab === t.id ? "bg-[#730042]/10 text-[#730042] font-semibold" : "text-gray-600 hover:bg-gray-100")}>
+                  <span className="text-[11px]">{t.icon}</span>
+                  <span className="hidden sm:inline">{t.label}</span>
+                  <span className="sm:hidden">{t.label.split(" ")[1] || t.label.split(" ")[0]}</span>
+                  {t.id === "approvals" && approvals.length > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] font-black flex items-center justify-center">{approvals.length}</span>
+                  )}
+                </button>
+              ))}
+            </nav>
+            <div className="flex gap-2 shrink-0">
+              <Btn size="sm" variant="ghost" onClick={() => setJobModal(true)} className="hidden sm:inline-flex">+ Job</Btn>
+              <Btn size="sm" onClick={() => { setLogForm({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" }); setLogModal(true); }}>+ Log</Btn>
+            </div>
           </div>
-
-          <nav className="sm:hidden flex gap-1.5 overflow-x-auto no-scrollbar pb-2.5 -mt-0.5">
-            {mobileTabs.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`relative rounded-lg px-3 py-1.5 text-xs cursor-pointer transition-all whitespace-nowrap border flex-shrink-0 flex items-center gap-1.5 ${
-                  tab === t.id
-                    ? "bg-[#730042]/10 text-[#730042] font-bold border-[#730042]/30"
-                    : "bg-gray-50 text-gray-700 font-medium border-gray-200"
-                }`}
-              >
-                {t.label}
-                {t.id === "approvals" && approvals.length > 0 && (
-                  <span className="bg-red-600 text-white rounded-full text-[9px] font-extrabold w-4 h-4 flex items-center justify-center flex-shrink-0">
-                    {approvals.length}
-                  </span>
-                )}
-              </button>
-            ))}
-          </nav>
         </div>
       </header>
 
-      <main className="max-w-[1280px] mx-auto px-4 sm:px-6 py-6 sm:py-7">
+      <main className="max-w-[1100px] mx-auto px-4 py-5">
 
-        {tab === "overview" && (
-          <div className="flex flex-col gap-5">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5">
-              {[
-                { label: "Jobs Created", value: createdJobs.length, color: "text-[#730042]" },
-                { label: "Pending Approvals", value: approvals.length, color: "text-amber-600" },
-                { label: "Overrun Risk", value: overrunJobs.length, color: "text-red-600" },
-                { label: "My Hours This Week", value: fmtDuration(totalWeekMins), color: "text-emerald-600" },
-              ].map((s) => (
-                <Card key={s.label} className="px-4 sm:px-[22px] py-4 sm:py-5">
-                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2.5">{s.label}</div>
-                  <div className={`text-xl sm:text-[28px] font-black ${s.color}`}>{s.value}</div>
-                </Card>
-              ))}
+        {tab === "work" && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2">
+              <button onClick={() => shiftWeek(-1)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-500 hover:text-gray-900 text-[14px]">‹</button>
+              <span className="text-[13px] font-semibold text-gray-700 flex-1 text-center sm:text-left">{fmtShort(weekStart)} – {fmtShort(weekEnd)}</span>
+              <button onClick={() => shiftWeek(1)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-500 hover:text-gray-900 text-[14px]">›</button>
             </div>
-
-            <Card>
-              <div className="px-4 sm:px-[22px] py-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-bold text-gray-900">Team Workload</div>
-                  <div className="text-[11px] text-gray-400">Weekly capacity per person</div>
-                </div>
-                <div className="flex items-center gap-2 self-start sm:self-auto">
-                  <button onClick={() => shiftWeek(-1)} className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1 cursor-pointer text-gray-700">‹</button>
-                  <span className="text-xs text-gray-700 font-semibold whitespace-nowrap">
-                    {new Date(weekStart).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} – {weekEnd.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                  </span>
-                  <button onClick={() => shiftWeek(1)} className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1 cursor-pointer text-gray-700">›</button>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <StatCard label="This Week" value={fmtDuration(totalWeekMins)} sub={`${prodData?.capacityPercent || Math.round((totalWeekMins / 2400) * 100)}% capacity`} />
+              <StatCard label="Billable" value={fmtDuration(prodData?.billableMinutes || 0)} valueColor="text-emerald-600" />
+              <StatCard label="Team Jobs" value={createdJobs.length} valueColor="text-blue-600" />
+              <StatCard label="Pending Approvals" value={approvals.length} valueColor={approvals.length > 0 ? "text-red-500" : "text-gray-400"} />
+            </div>
+            <TimerBlock assignedJobs={assignedJobs} onTimerLog={refetchWeek} />
+            <div className="overflow-x-auto -mx-4 px-4">
+              <div className="min-w-[560px]">
+                <WeekGrid weekStart={weekStart} weekDays={weekDays}
+                  onAddLog={(date) => { setLogForm({ job: "", log_date: date, duration_minutes: "", note: "" }); setLogModal(true); }}
+                  onEditLog={(log) => { setEditLog(log); setEditForm({ duration_minutes: String(log.duration_minutes), note: log.note || "", reason: "" }); }}
+                  onDeleteLog={handleDeleteLog} />
+              </div>
+            </div>
+            {prodData?.byJob?.length > 0 && (
+              <div className="bg-white border border-gray-200 rounded-2xl p-4">
+                <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-3">Time by Job</div>
+                <div className="flex flex-col gap-2">
+                  {prodData.byJob.map((b, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="text-[13px] text-gray-700 flex-1 truncate">{b.title}</div>
+                      <div className="text-[12px] font-semibold text-[#730042] shrink-0">{fmtDuration(b.minutes)}</div>
+                      <div className="w-20 h-1.5 bg-gray-100 rounded-full shrink-0">
+                        <div className="h-full bg-[#730042] rounded-full" style={{ width: `${totalWeekMins > 0 ? Math.round((b.minutes / totalWeekMins) * 100) : 0}%` }} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <div className="px-3 sm:px-[22px] py-4 overflow-x-auto">
+            )}
+            <div className="bg-white border border-gray-200 rounded-2xl p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[13px] font-semibold text-gray-900">Week of {fmtShort(weekStart)} – {fmtShort(weekEnd)}</div>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    {currentWeekSheet ? <StatusBadge status={currentWeekSheet.status} /> : <span className="text-[12px] text-gray-400">Not submitted</span>}
+                    {currentWeekSheet?.remarks && <span className="text-[12px] text-gray-500 italic">"{currentWeekSheet.remarks}"</span>}
+                  </div>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  {canRecall && (
+                    <Btn size="sm" variant="ghost" onClick={() => recallTS.mutate({ timesheetId: currentWeekSheet._id }, { onSuccess: () => { refetchTS(); refetchWeek(); } })} disabled={recallTS.isPending}>Recall</Btn>
+                  )}
+                  {canSubmit && (
+                    <Btn size="sm" onClick={() => submitTS.mutate({ week_start: weekStart }, { onSuccess: () => { refetchTS(); refetchWeek(); } })} disabled={submitTS.isPending || totalWeekMins === 0}>
+                      {submitTS.isPending ? "Submitting…" : "Submit Week"}
+                    </Btn>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === "team" && (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-bold text-[17px] text-gray-900">Team Jobs</div>
+                <div className="text-[12px] text-gray-400 mt-0.5">{createdJobs.length} jobs assigned by you</div>
+              </div>
+              <Btn size="sm" onClick={() => setJobModal(true)}>+ Create Job</Btn>
+            </div>
+            {createdJobs.length === 0 ? (
+              <div className="bg-white border border-gray-200 rounded-2xl py-12 text-center">
+                <div className="text-3xl mb-2">⬡</div>
+                <div className="font-semibold text-gray-700 mb-3">No jobs created yet</div>
+                <Btn size="sm" onClick={() => setJobModal(true)}>+ Create Job</Btn>
+              </div>
+            ) : createdJobs.map((j) => {
+              const pct = j.estimated_hours > 0 ? Math.round((j.logged_hours_cache / j.estimated_hours) * 100) : 0;
+              return (
+                <div key={j._id} className="bg-white border border-gray-200 rounded-2xl p-4 hover:border-[#730042]/20 transition-colors">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                        <button className="font-semibold text-[14px] text-gray-900 hover:text-[#730042] transition-colors text-left" onClick={() => { setSelectedJobId(j._id); setJobDetailOpen(true); }}>{j.title}</button>
+                        {j.overrun_flagged && <Chip color="red" size="xs">Overrun ⚠</Chip>}
+                      </div>
+                      {j.assigned_to_name && (
+                        <div className="text-[11px] text-gray-400 mb-1.5">
+                          Assigned to <span className="font-semibold text-gray-700">{j.assigned_to_name}</span>
+                          {j.assigned_to_model && <span className="text-[#730042]"> · {j.assigned_to_model}</span>}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Chip size="xs" color={j.status === "in_progress" ? "blue" : j.status === "completed" ? "green" : j.status === "on_hold" ? "amber" : j.status === "cancelled" ? "red" : "gray"}>
+                          {JOB_STATUS_META[j.status]?.label || j.status}
+                        </Chip>
+                        <Chip size="xs" color={j.priority === "urgent" ? "brand" : j.priority === "high" ? "red" : j.priority === "medium" ? "amber" : "gray"}>{j.priority}</Chip>
+                        {j.billable && <Chip size="xs" color="green">Billable</Chip>}
+                        {j.estimated_hours > 0 && <Chip size="xs" color="blue">{j.logged_hours_cache?.toFixed(1)}h / {j.estimated_hours}h</Chip>}
+                        {j.due_date && <span className="text-[11px] text-gray-400">Due {fmtDate(j.due_date)}</span>}
+                      </div>
+                      {j.estimated_hours > 0 && (
+                        <div className="mt-2">
+                          <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                            <div className={cn("h-full rounded-full", j.overrun_flagged ? "bg-red-500" : "bg-[#730042]")} style={{ width: `${Math.min(100, pct)}%` }} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-1.5 shrink-0">
+                      <Sel value={j.status} onChange={(e) => updateJobStatus.mutate({ id: j._id, status: e.target.value }, { onSuccess: refetchCreated })}
+                        className="text-[11px] py-1 px-2 min-w-[100px]">
+                        {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map((s) => (
+                          <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
+                        ))}
+                      </Sel>
+                      <Btn size="sm" variant="ghost" onClick={() => { if (window.confirm("Archive this job?")) archiveJob.mutate(j._id, { onSuccess: refetchCreated }); }}>Archive</Btn>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {tab === "approvals" && (
+          <div className="flex flex-col gap-3">
+            <div>
+              <div className="font-bold text-[17px] text-gray-900">Pending Approvals</div>
+              <div className="text-[12px] text-gray-400 mt-0.5">{approvals.length} timesheet{approvals.length !== 1 ? "s" : ""} in your queue</div>
+            </div>
+            {approvals.length === 0 ? (
+              <div className="bg-white border border-gray-200 rounded-2xl py-12 text-center">
+                <div className="text-3xl mb-2">✓</div>
+                <div className="font-semibold text-gray-700">All clear — no pending approvals</div>
+              </div>
+            ) : approvals.map((ts) => (
+              <div key={ts._id} className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                  <div className="flex gap-3.5">
+                    <div className="w-10 h-10 bg-[#730042]/[0.08] rounded-xl flex items-center justify-center text-[14px] font-extrabold text-[#730042] shrink-0">
+                      {ts.owner?.f_name?.[0] || "?"}
+                    </div>
+                    <div>
+                      <div className="font-bold text-[15px] text-gray-900">{ts.owner?.f_name} {ts.owner?.l_name}</div>
+                      <div className="text-[11px] text-gray-400 mt-0.5">{ts.owner?.work_email}</div>
+                      <div className="text-[11px] text-gray-400">Week: {fmtDate(ts.week_start)} – {fmtDate(ts.week_end)}</div>
+                      <div className="flex gap-2 mt-2 flex-wrap">
+                        <Chip color="brand">{fmtDuration(ts.total_minutes)}</Chip>
+                        {ts.billable_minutes > 0 && <Chip color="green">{fmtDuration(ts.billable_minutes)} billable</Chip>}
+                        <StatusBadge status={ts.status} />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 flex-wrap shrink-0">
+                    <Btn size="sm" variant="success" onClick={() => approveTS.mutate({ timesheetId: ts._id, remarks: "Approved" }, { onSuccess: refetchApprovals })}>Approve</Btn>
+                    <Btn size="sm" variant="amber" onClick={() => forwardTS.mutate({ timesheetId: ts._id, remarks: "Forwarded to reporting manager" }, { onSuccess: refetchApprovals })}>Forward</Btn>
+                    <Btn size="sm" variant="danger" onClick={() => { setRejectModal(ts); setRejectReason(""); }}>Reject</Btn>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tab === "insights" && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2">
+              <div className="font-bold text-[17px] text-gray-900 flex-1">Team Insights</div>
+              <button onClick={() => shiftWeek(-1)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-500 hover:text-gray-900 text-[14px]">‹</button>
+              <span className="text-[12px] font-semibold text-gray-700 whitespace-nowrap">{fmtShort(weekStart)} – {fmtShort(weekEnd)}</span>
+              <button onClick={() => shiftWeek(1)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-500 hover:text-gray-900 text-[14px]">›</button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <StatCard label="Team Members" value={heatmap.length} valueColor="text-blue-600" />
+              <StatCard label="Overrun Risk" value={overrunJobs.length} valueColor={overrunJobs.length > 0 ? "text-red-500" : "text-gray-400"} sub="≥75% estimate used" />
+              <StatCard label="Idle Jobs" value={idleJobs.length} valueColor={idleJobs.length > 0 ? "text-amber-600" : "text-gray-400"} sub="7+ days no activity" />
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+              <div className="px-4 py-3.5 border-b border-gray-100">
+                <div className="font-semibold text-[14px] text-gray-900">Workload Heatmap</div>
+                <div className="text-[11px] text-gray-400 mt-0.5">Daily capacity (8h = 100%)</div>
+              </div>
+              <div className="p-4 overflow-x-auto">
                 {heatmap.length === 0 ? (
-                  <div className="text-center text-gray-400 text-[13px] py-6">No team data for this week</div>
+                  <div className="text-center text-gray-400 text-[13px] py-4">No team data for this week</div>
                 ) : (
-                  <div className="flex flex-col gap-2.5 min-w-[480px]">
-                    <div className="flex gap-1.5 pl-11">
-                      {DAY_NAMES.map((d) => <div key={d} className="flex-1 text-center text-[10px] text-gray-400 font-bold">{d}</div>)}
+                  <div className="min-w-[480px]">
+                    <div className="flex items-center gap-2 mb-2 pl-10">
+                      {DAY_KEYS.map((d) => <div key={d} className="flex-1 text-center text-[10px] text-gray-400 font-bold">{d}</div>)}
                     </div>
                     {heatmap.map((row, i) => {
                       const dayKeys = Array.from({ length: 7 }, (_, d) => { const dt = new Date(weekStart); dt.setDate(dt.getDate() + d); return dt.toISOString().slice(0, 10); });
+                      const label = row.name ? row.name.slice(0, 2).toUpperCase() : String(row.person).slice(-2).toUpperCase();
                       return (
-                        <div key={i} className="flex items-center gap-1.5">
-                          <div className="w-8 h-8 bg-[#730042]/[0.07] rounded-full flex items-center justify-center text-[11px] font-extrabold text-[#730042] flex-shrink-0">
-                            {row.name ? row.name.slice(0, 2).toUpperCase() : String(row.person).slice(-2).toUpperCase()}
-                          </div>
+                        <div key={i} className="flex items-center gap-2 mb-1.5">
+                          <div className="w-8 h-8 bg-[#730042]/[0.08] rounded-full flex items-center justify-center text-[11px] font-extrabold text-[#730042] shrink-0">{label}</div>
                           {dayKeys.map((dk) => {
                             const pct = row.days[dk]?.loadPercent || 0;
                             const bg = pct === 0 ? "bg-gray-50" : pct < 60 ? "bg-emerald-100" : pct < 90 ? "bg-amber-100" : "bg-red-100";
-                            const col = pct === 0 ? "text-gray-400" : pct < 60 ? "text-emerald-600" : pct < 90 ? "text-amber-600" : "text-red-600";
+                            const col = pct === 0 ? "text-gray-300" : pct < 60 ? "text-emerald-600" : pct < 90 ? "text-amber-600" : "text-red-600";
                             return (
-                              <div key={dk} title={`${pct}%`} className={`flex-1 h-8 ${bg} rounded-lg flex items-center justify-center text-[10px] font-bold ${col}`}>
+                              <div key={dk} className={cn("flex-1 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold", bg, col)}>
                                 {pct > 0 ? `${pct}%` : "—"}
                               </div>
                             );
@@ -602,290 +790,172 @@ export default function ManagerTimesheet() {
                   </div>
                 )}
               </div>
-            </Card>
-
-            {overrunJobs.length > 0 && (
-              <Card>
-                <div className="px-4 sm:px-[22px] py-3.5 border-b border-gray-200 flex items-center gap-2">
-                  <span className="text-sm font-bold text-red-600">⚠ Overrun Risk</span>
-                  <Chip color="red">{overrunJobs.length}</Chip>
-                </div>
-                {overrunJobs.map((j) => (
-                  <div key={j._id} className="px-4 sm:px-[22px] py-3 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[13px] font-semibold text-gray-900 truncate">{j.title}</div>
-                      <div className="text-[11px] text-gray-400">{j.logged_hours_cache}h logged / {j.estimated_hours}h estimated</div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-20 h-[5px] bg-gray-50 rounded-full">
-                        <div className={`h-full rounded-full ${j.riskPercent >= 100 ? "bg-red-600" : "bg-amber-600"}`} style={{ width: `${Math.min(100, j.riskPercent)}%` }} />
-                      </div>
-                      <span className={`text-xs font-bold ${j.riskPercent >= 100 ? "text-red-600" : "text-amber-600"}`}>{j.riskPercent}%</span>
-                    </div>
-                  </div>
-                ))}
-              </Card>
-            )}
-          </div>
-        )}
-
-        {tab === "team" && (
-          <div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
-              <div>
-                <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">Team Jobs</h1>
-                <p className="text-[13px] text-gray-400 mt-1 mb-0">{createdJobs.length} jobs assigned to your team</p>
-              </div>
-              <Btn onClick={() => setJobModal(true)} className="w-full sm:w-auto">+ Create Job</Btn>
             </div>
-            <div className="flex flex-col gap-2.5">
-              {createdJobs.length === 0 ? (
-                <Card className="px-6 sm:px-8 py-12 sm:py-16 text-center">
-                  <div className="text-4xl mb-3">📋</div>
-                  <div className="font-bold text-base text-gray-900 mb-3">No jobs created yet</div>
-                  <Btn onClick={() => setJobModal(true)}>+ Create Job</Btn>
-                </Card>
-              ) : (
-                createdJobs.map((j) => (
-                  <Card key={j._id} className="px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-start gap-3.5">
-                    <div className="flex gap-3.5">
-                      <div className={`w-1 rounded ${JOB_STATUS_DOT[j.status] || "bg-gray-400"} flex-shrink-0`} />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+                  <span className="font-semibold text-[14px] text-red-600">⚠ Overrun Risk</span>
+                  <Chip color="red" size="xs">{overrunJobs.length}</Chip>
+                </div>
+                {overrunJobs.length === 0
+                  ? <div className="px-4 py-5 text-[13px] text-gray-400">No jobs at risk</div>
+                  : overrunJobs.map((j) => (
+                    <div key={j._id} className="px-4 py-3 border-b border-gray-100 flex items-center gap-3 last:border-b-0">
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-bold text-gray-900 mb-1.5">{j.title}</div>
-                        {j.assigned_to_name && (
-                          <div className="text-[11px] text-gray-400 mb-1.5">
-                            Assigned to <span className="font-semibold text-gray-700">{j.assigned_to_name}</span>
-                            {j.assigned_to_model && <span className="text-[#730042] font-semibold"> · {j.assigned_to_model}</span>}
-                          </div>
-                        )}
-                        <div className="flex gap-2 flex-wrap">
-                          <PriorityChip priority={j.priority} />
-                          <JobChip status={j.status} />
-                          {j.billable && <Chip color="green">Billable</Chip>}
-                          {j.estimated_hours > 0 && <Chip color="blue">{j.logged_hours_cache}h / {j.estimated_hours}h</Chip>}
-                          {j.due_date && <Chip color="gray">Due {fmtDate(j.due_date)}</Chip>}
-                        </div>
-                        {j.estimated_hours > 0 && (
-                          <div className="mt-2 flex items-center gap-2">
-                            <div className="w-24 sm:w-[120px] h-1 bg-gray-50 rounded-full">
-                              <div className={`h-full rounded-full ${j.overrun_flagged ? "bg-red-600" : "bg-[#730042]"}`} style={{ width: `${Math.min(100, (j.logged_hours_cache / j.estimated_hours) * 100)}%` }} />
-                            </div>
-                            <span className={`text-[10px] ${j.overrun_flagged ? "text-red-600" : "text-gray-400"}`}>{Math.round((j.logged_hours_cache / j.estimated_hours) * 100)}% logged</span>
-                          </div>
-                        )}
+                        <div className="text-[13px] font-semibold text-gray-900 truncate">{j.title}</div>
+                        <div className="text-[11px] text-gray-400">{j.logged_hours_cache}h / {j.estimated_hours}h</div>
                       </div>
-                    </div>
-                    <div className="flex gap-1.5 flex-shrink-0 flex-wrap sm:self-start">
-                      {!["completed", "cancelled"].includes(j.status) && (
-                        <>
-                          <button onClick={() => updateJobStatus.mutate({ id: j._id, status: "completed" }, { onSuccess: refetchCreated })} className="bg-emerald-50 text-emerald-600 border-none rounded-lg px-3 py-1.5 text-[11px] font-semibold cursor-pointer flex-1 sm:flex-none">Complete</button>
-                          <button onClick={() => archiveJob.mutate(j._id, { onSuccess: refetchCreated })} className="bg-gray-50 text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 text-[11px] font-semibold cursor-pointer flex-1 sm:flex-none">Archive</button>
-                        </>
-                      )}
-                    </div>
-                  </Card>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-
-        {tab === "my-work" && (
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">My Work</h1>
-              <div className="flex gap-2 items-center flex-wrap">
-                <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-[10px] px-2.5 py-1.5">
-                  <button onClick={() => shiftWeek(-1)} className="bg-transparent border-none cursor-pointer text-gray-700 text-base flex">‹</button>
-                  <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">
-                    {new Date(weekStart).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} – {weekEnd.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                  </span>
-                  <button onClick={() => shiftWeek(1)} className="bg-transparent border-none cursor-pointer text-gray-700 text-base flex">›</button>
-                </div>
-                <Btn onClick={() => setLogModal(true)}>+ Log Time</Btn>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 sm:gap-5">
-              <div className="flex flex-col gap-3.5">
-                <TimerWidget jobs={assignedJobs} />
-                <Card className="px-3.5 sm:px-4 py-3.5">
-                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2.5">My Assigned Jobs</div>
-                  {assignedJobs.length === 0 ? (
-                    <div className="text-[13px] text-gray-400">No jobs assigned to you</div>
-                  ) : assignedJobs.slice(0, 6).map((j) => (
-                    <div key={j._id} className="py-2 border-b border-gray-200 flex items-center justify-between gap-2 last:border-b-0">
-                      <div className="text-[13px] font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">{j.title}</div>
-                      <JobChip status={j.status} />
+                      <span className={cn("text-[13px] font-extrabold", j.riskPercent >= 100 ? "text-red-600" : "text-amber-600")}>{j.riskPercent}%</span>
                     </div>
                   ))}
-                </Card>
               </div>
-              <div className="flex flex-col gap-3.5">
-                <div className="grid grid-cols-2 gap-3">
-                  <Card className="px-4 sm:px-[18px] py-4">
-                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">Total This Week</div>
-                    <div className="text-lg sm:text-[22px] font-black text-[#730042]">{fmtDuration(totalWeekMins)}</div>
-                  </Card>
-                  <Card className="px-4 sm:px-[18px] py-4">
-                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">Capacity</div>
-                    <div className="text-lg sm:text-[22px] font-black text-emerald-600">{Math.round((totalWeekMins / 2400) * 100)}%</div>
-                  </Card>
+              <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+                  <span className="font-semibold text-[14px] text-gray-700">💤 Idle Jobs</span>
+                  <Chip color="gray" size="xs">{idleJobs.length}</Chip>
                 </div>
-                <CalendarWeekGrid
-                  weekStart={weekStart}
-                  weekDays={weekDays}
-                  onAddLog={(date) => { setLogForm((p) => ({ ...p, log_date: date })); setLogModal(true); }}
-                />
-                <div className="flex justify-end">
-                  <Btn onClick={() => submitTS.mutate({ week_start: weekStart }, { onSuccess: () => { refetchTS(); refetchWeek(); } })} disabled={submitTS.isPending} className="w-full sm:w-auto">
-                    {submitTS.isPending ? "Submitting…" : "Submit Week for Approval"}
-                  </Btn>
-                </div>
+                {idleJobs.length === 0
+                  ? <div className="px-4 py-5 text-[13px] text-gray-400">No idle jobs</div>
+                  : idleJobs.map((j) => (
+                    <div key={j._id} className="px-4 py-3 border-b border-gray-100 flex items-center gap-3 last:border-b-0">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[13px] font-semibold text-gray-900 truncate">{j.title}</div>
+                        <div className="text-[11px] text-gray-400">Last updated {fmtDate(j.updatedAt)}</div>
+                      </div>
+                      <Chip size="xs" color={j.status === "in_progress" ? "blue" : j.status === "on_hold" ? "amber" : "gray"}>{JOB_STATUS_META[j.status]?.label || j.status}</Chip>
+                    </div>
+                  ))}
               </div>
             </div>
           </div>
         )}
 
-        {tab === "approvals" && (
-          <div>
-            <div className="mb-5">
-              <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">Pending Approvals</h1>
-              <p className="text-[13px] text-gray-400 mt-1 mb-0">{approvals.length} timesheet{approvals.length !== 1 ? "s" : ""} in your queue</p>
-            </div>
-            {approvals.length === 0 ? (
-              <Card className="px-6 sm:px-8 py-12 sm:py-16 text-center">
-                <div className="text-4xl mb-3">✅</div>
-                <div className="font-bold text-base text-gray-900 mb-1.5">All clear!</div>
-                <div className="text-[13px] text-gray-400">No timesheets pending your review</div>
-              </Card>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {approvals.map((ts) => (
-                  <Card key={ts._id} className="px-4 sm:px-6 py-5">
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                      <div className="flex gap-3.5">
-                        <div className="w-10 h-10 sm:w-[42px] sm:h-[42px] bg-[#730042]/[0.07] rounded-xl flex items-center justify-center text-base font-extrabold text-[#730042] flex-shrink-0">
-                          {ts.owner?.f_name?.[0] || "?"}
-                        </div>
-                        <div>
-                          <div className="text-[15px] font-bold text-gray-900">{ts.owner?.f_name} {ts.owner?.l_name}</div>
-                          <div className="text-xs text-gray-400 mt-0.5">{ts.owner?.work_email}</div>
-                          <div className="text-xs text-gray-400 mt-0.5">Week: {fmtDate(ts.week_start)} – {fmtDate(ts.week_end)}</div>
-                          <div className="flex gap-2 mt-2.5 flex-wrap">
-                            <Chip color="brand">{fmtDuration(ts.total_minutes)} total</Chip>
-                            {ts.billable_minutes > 0 && <Chip color="green">{fmtDuration(ts.billable_minutes)} billable</Chip>}
-                            <Badge status={ts.status} />
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 flex-wrap">
-                        <Btn variant="success" onClick={() => approveTS.mutate({ timesheetId: ts._id, remarks: "Approved" }, { onSuccess: refetchApprovals })} className="flex-1 sm:flex-none">Approve</Btn>
-                        <Btn variant="amber" onClick={() => forwardTS.mutate({ timesheetId: ts._id, remarks: "Forwarded to reporting manager" }, { onSuccess: refetchApprovals })} className="flex-1 sm:flex-none">Forward</Btn>
-                        <Btn variant="danger" onClick={() => setRejectModal({ open: true, ts })} className="flex-1 sm:flex-none">Reject</Btn>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
+        {tab === "sheets" && (
+          <div className="flex flex-col gap-3">
+            <div className="font-bold text-[17px] text-gray-900">My Timesheets</div>
+            {timesheets.length === 0 ? (
+              <div className="bg-white border border-gray-200 rounded-2xl py-12 text-center">
+                <div className="text-3xl mb-2">▦</div>
+                <div className="font-semibold text-gray-700 mb-3">No timesheets yet</div>
+                <Btn size="sm" onClick={() => setTab("work")}>Go to My Work</Btn>
               </div>
-            )}
-          </div>
-        )}
-
-        {tab === "timesheets" && (
-          <div>
-            <div className="mb-5">
-              <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">My Timesheets</h1>
-            </div>
-            <div className="flex flex-col gap-2.5">
-              {timesheets.length === 0 ? (
-                <Card className="px-6 sm:px-8 py-12 sm:py-16 text-center">
-                  <div className="font-bold text-base text-gray-900 mb-1.5">No timesheets yet</div>
-                  <Btn onClick={() => setTab("my-work")}>Go to My Work</Btn>
-                </Card>
-              ) : timesheets.map((ts) => (
-                <Card key={ts._id} className="px-4 sm:px-6 py-4 sm:py-[18px] flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-                  <div className="flex-1">
-                    <div className="text-sm font-bold text-gray-900 mb-1.5">Week of {fmtDate(ts.week_start)}</div>
-                    <div className="flex gap-2 flex-wrap">
-                      <Badge status={ts.status} />
-                      <Chip color="brand">{fmtDuration(ts.total_minutes)}</Chip>
-                      {ts.billable_minutes > 0 && <Chip color="green">{fmtDuration(ts.billable_minutes)} billable</Chip>}
+            ) : timesheets.map((ts) => {
+              const isPending = ["pending_manager", "pending_reporting_manager", "pending_admin", "pending_superadmin"].includes(ts.status);
+              return (
+                <div key={ts._id} className="bg-white border border-gray-200 rounded-2xl p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                        <span className="font-semibold text-[14px] text-gray-900">Week of {fmtDate(ts.week_start)}</span>
+                        <StatusBadge status={ts.status} />
+                      </div>
+                      <div className="flex gap-3 text-[12px] flex-wrap">
+                        <span className="font-semibold text-[#730042]">{fmtDuration(ts.total_minutes)}</span>
+                        {ts.billable_minutes > 0 && <span className="text-emerald-600">{fmtDuration(ts.billable_minutes)} billable</span>}
+                        <span className="text-gray-400">{fmtDate(ts.week_start)} – {fmtDate(ts.week_end)}</span>
+                      </div>
+                      {ts.remarks && <div className="mt-1.5 text-[12px] text-gray-500 italic bg-gray-50 rounded-lg px-3 py-2">"{ts.remarks}"</div>}
                     </div>
+                    {isPending && (
+                      <Btn size="sm" variant="ghost" onClick={() => recallTS.mutate({ timesheetId: ts._id }, { onSuccess: refetchTS })} disabled={recallTS.isPending}>Recall</Btn>
+                    )}
                   </div>
-                  {ts.remarks && <div className="text-xs text-gray-700 italic">"{ts.remarks}"</div>}
-                </Card>
-              ))}
-            </div>
+                  {ts.status === "rejected" && (
+                    <div className="mt-3 flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-[12px] text-red-600">
+                      <span>✕</span><span>Rejected — recall and revise, then resubmit</span>
+                      <button className="ml-auto font-semibold underline" onClick={() => { setWeekStart(getMonday(ts.week_start)); setTab("work"); }}>Go to week →</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </main>
 
+      <Modal open={logModal} onClose={() => setLogModal(false)} title="Log Time">
+        <div className="flex flex-col gap-3.5">
+          <Sel label="Job" value={logForm.job} onChange={(e) => setLogForm((p) => ({ ...p, job: e.target.value }))}>
+            <option value="">Select job…</option>
+            {assignedJobs.map((j) => <option key={j._id} value={j._id}>{j.title}</option>)}
+          </Sel>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Date" type="date" value={logForm.log_date} onChange={(e) => setLogForm((p) => ({ ...p, log_date: e.target.value }))} />
+            <Input label="Duration (minutes)" type="number" placeholder="e.g. 90" min="1" max="1440" value={logForm.duration_minutes} onChange={(e) => setLogForm((p) => ({ ...p, duration_minutes: e.target.value }))} />
+          </div>
+          <Input label="Note (optional)" placeholder="What did you work on?" value={logForm.note} onChange={(e) => setLogForm((p) => ({ ...p, note: e.target.value }))} />
+          <div className="flex gap-2 justify-end">
+            <Btn variant="ghost" onClick={() => setLogModal(false)}>Cancel</Btn>
+            <Btn onClick={handleLogTime} disabled={!logForm.job || !logForm.log_date || !logForm.duration_minutes || logTime.isPending}>
+              {logTime.isPending ? "Saving…" : "Save Entry"}
+            </Btn>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={!!editLog} onClose={() => setEditLog(null)} title="Edit Time Log">
+        <div className="flex flex-col gap-3.5">
+          <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-[12px] text-gray-500">
+            <span className="font-semibold text-gray-700">{editLog?.job?.title || "—"}</span> · {fmtDate(editLog?.log_date)}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Duration (minutes)" type="number" min="1" max="1440" value={editForm.duration_minutes} onChange={(e) => setEditForm((p) => ({ ...p, duration_minutes: e.target.value }))} />
+            <Input label="Note" placeholder="Update note…" value={editForm.note} onChange={(e) => setEditForm((p) => ({ ...p, note: e.target.value }))} />
+          </div>
+          <Input label="Reason for edit" placeholder="Why are you editing this log?" value={editForm.reason} onChange={(e) => setEditForm((p) => ({ ...p, reason: e.target.value }))} />
+          <div className="flex gap-2 justify-end">
+            <Btn variant="ghost" onClick={() => setEditLog(null)}>Cancel</Btn>
+            <Btn onClick={handleUpdateLog} disabled={!editForm.duration_minutes || updateTimeLog.isPending}>{updateTimeLog.isPending ? "Saving…" : "Save Changes"}</Btn>
+          </div>
+        </div>
+      </Modal>
+
       <Modal open={jobModal} onClose={() => setJobModal(false)} title="Create Job">
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3.5">
           <Input label="Job Title *" placeholder="e.g. Design Login Page" value={jobForm.title} onChange={(e) => setJobForm((p) => ({ ...p, title: e.target.value }))} />
-          <Input label="Description" placeholder="Job details…" value={jobForm.description} onChange={(e) => setJobForm((p) => ({ ...p, description: e.target.value }))} />
+          <Input label="Description" placeholder="Details…" value={jobForm.description} onChange={(e) => setJobForm((p) => ({ ...p, description: e.target.value }))} />
           <Sel label="Assign To *" value={jobForm.assigned_to} onChange={(e) => setJobForm((p) => ({ ...p, assigned_to: e.target.value }))}>
             <option value="">Select team member…</option>
             {targets.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name || t.full_name || `${t.f_name || ""} ${t.l_name || ""}`.trim() || t.id} — {t.role || t.model}
-              </option>
+              <option key={t.id} value={t.id}>{t.name || `${t.f_name || ""} ${t.l_name || ""}`.trim() || t.id} — {t.role || t.model}</option>
             ))}
           </Sel>
           <div className="grid grid-cols-2 gap-3">
             <Sel label="Priority" value={jobForm.priority} onChange={(e) => setJobForm((p) => ({ ...p, priority: e.target.value }))}>
               <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="urgent">Urgent</option>
             </Sel>
-            <Input label="Estimated Hours" type="number" placeholder="0" value={jobForm.estimated_hours} onChange={(e) => setJobForm((p) => ({ ...p, estimated_hours: e.target.value }))} />
+            <Input label="Est. Hours" type="number" placeholder="0" value={jobForm.estimated_hours} onChange={(e) => setJobForm((p) => ({ ...p, estimated_hours: e.target.value }))} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Input label="Hourly Rate (₹)" type="number" placeholder="0" value={jobForm.hourly_rate} onChange={(e) => setJobForm((p) => ({ ...p, hourly_rate: e.target.value }))} />
             <Input label="Due Date" type="date" value={jobForm.due_date} onChange={(e) => setJobForm((p) => ({ ...p, due_date: e.target.value }))} />
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={jobForm.billable} onChange={(e) => setJobForm((p) => ({ ...p, billable: e.target.checked }))} className="w-[15px] h-[15px] accent-[#730042]" />
+            <input type="checkbox" checked={jobForm.billable} onChange={(e) => setJobForm((p) => ({ ...p, billable: e.target.checked }))} className="w-4 h-4 accent-[#730042]" />
             <span className="text-[13px] text-gray-700">Billable job</span>
           </label>
-          <ModalFooter>
-            <Btn variant="ghost" onClick={() => setJobModal(false)} className="w-full sm:w-auto">Cancel</Btn>
-            <Btn onClick={handleCreateJob} disabled={!jobForm.title || !jobForm.assigned_to || createJob.isPending} className="w-full sm:w-auto">{createJob.isPending ? "Creating…" : "Create Job"}</Btn>
-          </ModalFooter>
+          <div className="flex gap-2 justify-end">
+            <Btn variant="ghost" onClick={() => setJobModal(false)}>Cancel</Btn>
+            <Btn onClick={handleCreateJob} disabled={!jobForm.title || !jobForm.assigned_to || createJob.isPending}>{createJob.isPending ? "Creating…" : "Create Job"}</Btn>
+          </div>
         </div>
       </Modal>
 
-      <Modal open={logModal} onClose={() => setLogModal(false)} title="Log Time">
-        <div className="flex flex-col gap-4">
-          <Sel label="Job" value={logForm.job} onChange={(e) => setLogForm((p) => ({ ...p, job: e.target.value }))}>
-            <option value="">Select job…</option>
-            {assignedJobs.map((j) => <option key={j._id} value={j._id}>{j.title}</option>)}
-          </Sel>
-          <Input label="Date" type="date" value={logForm.log_date} onChange={(e) => setLogForm((p) => ({ ...p, log_date: e.target.value }))} />
-          <Input label="Duration (minutes)" type="number" placeholder="e.g. 90" value={logForm.duration_minutes} onChange={(e) => setLogForm((p) => ({ ...p, duration_minutes: e.target.value }))} />
-          <Input label="Note" placeholder="What did you work on?" value={logForm.note} onChange={(e) => setLogForm((p) => ({ ...p, note: e.target.value }))} />
-          <ModalFooter>
-            <Btn variant="ghost" onClick={() => setLogModal(false)} className="w-full sm:w-auto">Cancel</Btn>
-            <Btn onClick={handleLogTime} disabled={!logForm.job || !logForm.duration_minutes || logTime.isPending} className="w-full sm:w-auto">{logTime.isPending ? "Logging…" : "Save Entry"}</Btn>
-          </ModalFooter>
+      <Modal open={!!rejectModal} onClose={() => setRejectModal(null)} title="Reject Timesheet">
+        <div className="flex flex-col gap-3.5">
+          <div className="text-[13px] text-gray-600">Rejecting timesheet for <strong className="text-gray-900">{rejectModal?.owner?.f_name} {rejectModal?.owner?.l_name}</strong></div>
+          <Input label="Reason *" placeholder="Explain the issue…" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
+          <div className="flex gap-2 justify-end">
+            <Btn variant="ghost" onClick={() => setRejectModal(null)}>Cancel</Btn>
+            <Btn variant="danger" onClick={() => rejectTS.mutate({ timesheetId: rejectModal._id, remarks: rejectReason }, { onSuccess: () => { setRejectModal(null); setRejectReason(""); refetchApprovals(); } })}
+              disabled={!rejectReason.trim() || rejectTS.isPending}>{rejectTS.isPending ? "Rejecting…" : "Reject"}</Btn>
+          </div>
         </div>
       </Modal>
 
-      <Modal open={rejectModal.open} onClose={() => setRejectModal({ open: false, ts: null })} title="Reject Timesheet">
-        <div className="flex flex-col gap-4">
-          <p className="text-[13px] text-gray-700 m-0">Provide a reason for rejection. This will be sent to the submitter.</p>
-          <Input label="Reason *" placeholder="Enter reason for rejection…" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
-          <ModalFooter>
-            <Btn variant="ghost" onClick={() => setRejectModal({ open: false, ts: null })} className="w-full sm:w-auto">Cancel</Btn>
-            <Btn variant="danger" onClick={() => { rejectTS.mutate({ timesheetId: rejectModal.ts._id, remarks: rejectReason }, { onSuccess: () => { setRejectModal({ open: false, ts: null }); setRejectReason(""); refetchApprovals(); } }); }} disabled={!rejectReason || rejectTS.isPending} className="w-full sm:w-auto">
-              {rejectTS.isPending ? "Rejecting…" : "Reject"}
-            </Btn>
-          </ModalFooter>
-        </div>
-      </Modal>
-
-      <style>{`
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
+      <JobDetailModal jobId={selectedJobId} open={jobDetailOpen} onClose={() => setJobDetailOpen(false)} />
+      <style>{`.no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}`}</style>
     </div>
   );
 }

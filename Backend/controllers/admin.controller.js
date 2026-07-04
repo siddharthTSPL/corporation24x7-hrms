@@ -26,6 +26,7 @@ const { processLeaveDeduction } = require("../automatic/calculateleave");
 const AttendanceSummary = require("../Models/attendancesummary.model");
 const WFH = require("../Models/wfh.model");
 const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = require("../utils/licenseCheck");
+const AssetModel = require("../Models/asset.model");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
@@ -36,16 +37,142 @@ const verifyAdmin = async (req, res, next) => {
   try {
     decoded = jwt.verify(token, process.env.JWT_SECRET);
   } catch (err) {
-    return next(Object.assign(new Error(err.message), { statusCode: 400 }));
+    return res.status(400).send(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Verification Failed</title>
+</head>
+<body style="margin:0;padding:0;background:#F4F6F9;font-family:Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="padding:40px 0;">
+<tr><td align="center">
+<table width="500" cellpadding="0" cellspacing="0" border="0"
+style="background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.08);">
+<tr>
+<td style="background:linear-gradient(135deg,#730042,#CD166E);padding:35px;text-align:center;color:#ffffff;">
+<h1 style="margin:0;font-size:26px;">Verification Failed</h1>
+</td>
+</tr>
+<tr>
+<td style="padding:40px;text-align:center;color:#333333;">
+<div style="font-size:60px;">❌</div>
+<h2 style="color:#730042;margin-top:20px;">Link Expired or Invalid</h2>
+<p style="font-size:15px;line-height:1.8;color:#555;">
+Your verification link has expired or is no longer valid.<br/>Please contact your administrator to resend the verification email.
+</p>
+</td>
+</tr>
+<tr>
+<td style="background:#F4F6F9;padding:20px;text-align:center;font-size:12px;color:#888888;">
+© 2026 HRMS Platform. All rights reserved.
+</td>
+</tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`);
   }
+
   const admin = await Adminmodel.findByIdAndUpdate(
     decoded.adminid,
     { isVerified: true },
-    { new: true }
+    { returnDocument: "after" }
   ).lean();
-  if (!admin)
-    return next(Object.assign(new Error("Invalid token"), { statusCode: 400 }));
-  res.status(200).json({ message: "Admin verified successfully" });
+
+  if (!admin) {
+    return res.status(400).send(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Verification Failed</title>
+</head>
+<body style="margin:0;padding:0;background:#F4F6F9;font-family:Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="padding:40px 0;">
+<tr><td align="center">
+<table width="500" cellpadding="0" cellspacing="0" border="0"
+style="background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.08);">
+<tr>
+<td style="background:linear-gradient(135deg,#730042,#CD166E);padding:35px;text-align:center;color:#ffffff;">
+<h1 style="margin:0;font-size:26px;">Verification Failed</h1>
+</td>
+</tr>
+<tr>
+<td style="padding:40px;text-align:center;color:#333333;">
+<div style="font-size:60px;">⚠️</div>
+<h2 style="color:#730042;margin-top:20px;">Account Not Found</h2>
+<p style="font-size:15px;line-height:1.8;color:#555;">
+We could not find an account associated with this verification link.<br/>Please contact your administrator for assistance.
+</p>
+</td>
+</tr>
+<tr>
+<td style="background:#F4F6F9;padding:20px;text-align:center;font-size:12px;color:#888888;">
+© 2026 HRMS Platform. All rights reserved.
+</td>
+</tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`);
+  }
+
+  return res.status(200).send(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Account Verified</title>
+</head>
+<body style="margin:0;padding:0;background:#F4F6F9;font-family:Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="padding:40px 0;">
+<tr><td align="center">
+<table width="500" cellpadding="0" cellspacing="0" border="0"
+style="background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.08);">
+<tr>
+<td style="background:linear-gradient(135deg,#730042,#CD166E);padding:35px;text-align:center;color:#ffffff;">
+<h1 style="margin:0;font-size:26px;">Account Activated!</h1>
+<p style="margin-top:10px;font-size:15px;opacity:0.9;">Your admin account is now active</p>
+</td>
+</tr>
+<tr>
+<td style="padding:40px;text-align:center;color:#333333;">
+<div style="font-size:60px;">✅</div>
+<h2 style="color:#730042;margin-top:20px;">Hello ${admin.f_name} ${admin.l_name},</h2>
+<p style="font-size:15px;line-height:1.8;color:#555;">
+Your email has been verified successfully.<br/>You can now log in to your HRMS dashboard.
+</p>
+<table width="100%" cellpadding="0" cellspacing="0"
+style="margin:25px 0;background:#F9F8F2;border-radius:10px;padding:20px;text-align:left;">
+<tr><td style="padding:6px 0;font-size:14px;color:#555;"><strong>UID:</strong> ${admin.uid}</td></tr>
+<tr><td style="padding:6px 0;font-size:14px;color:#555;"><strong>Role:</strong> ${admin.role}</td></tr>
+<tr><td style="padding:6px 0;font-size:14px;color:#555;"><strong>Email:</strong> ${admin.work_email}</td></tr>
+<tr><td style="padding:6px 0;font-size:14px;color:#555;"><strong>Department:</strong> ${admin.department}</td></tr>
+</table>
+<div style="margin:30px 0;">
+<a href="http://torchxsuite.com/talent/login"
+style="background:#CD166E;color:#ffffff;padding:14px 35px;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600;display:inline-block;">
+Go to Login
+</a>
+</div>
+</td>
+</tr>
+<tr>
+<td style="background:#F4F6F9;padding:20px;text-align:center;font-size:12px;color:#888888;">
+© 2026 HRMS Platform. All rights reserved.
+</td>
+</tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`);
 };
 
 const adminlogin = async (req, res, next) => {
@@ -63,6 +190,9 @@ const adminlogin = async (req, res, next) => {
   if (admin.status === "suspended")
     return next(Object.assign(new Error("Your account has been suspended. Contact super admin."), { statusCode: 403 }));
 
+  if (admin.working_status !== "working")
+    return next(Object.assign(new Error("Your account is not active. Please contact super admin."), { statusCode: 403 }));
+
   const isMatch = await admin.isValidPassword(password);
   if (!isMatch)
     return next(Object.assign(new Error("Invalid credentials"), { statusCode: 401 }));
@@ -71,19 +201,19 @@ const adminlogin = async (req, res, next) => {
     company_domain: identifier.split("@")[1].toLowerCase().trim(),
   });
 
-  // if (superAdmin) {
-  //   const trialValid = superAdmin.isTrialValid();
-  //   const hasTalentLicense = superAdmin.licenses.some(
-  //     (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
-  //   );
-  //   if (!trialValid && !hasTalentLicense)
-  //     return next(
-  //       Object.assign(
-  //         new Error("Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."),
-  //         { statusCode: 403, code: "SERVICE_STOPPED" }
-  //       )
-  //     );
-  // }
+  if (superAdmin) {
+    const trialValid = superAdmin.isTrialValid();
+    const hasTalentLicense = superAdmin.licenses.some(
+      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
+    );
+    if (!trialValid && !hasTalentLicense)
+      return next(
+        Object.assign(
+          new Error("Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."),
+          { statusCode: 403, code: "SERVICE_STOPPED" }
+        )
+      );
+  }
 
   const isProduction = process.env.NODE_ENV === "production";
   const cookieOpts = {
@@ -493,20 +623,20 @@ const findallmanagers = async (req, res, next) => {
 
     const organisation_id = req.admin.organisation_id;
 
-    const [managers, adminData] = await Promise.all([
+    const [managers, admins] = await Promise.all([
       Managermodel.find({ organisation_id, working_status: "working" })
         .select(EXCLUDE)
         .populate("reporting_manager", "f_name l_name work_email designation")
         .lean(),
-      Adminmodel.findById(req.admin._id)
+      Adminmodel.find({ organisation_id, working_status: "working" })
         .select("uid f_name l_name work_email designation department office_location role organisation_id")
         .lean(),
     ]);
 
-    const allManagers = [...managers];
-    if (adminData) {
-      allManagers.unshift({ ...adminData, isAdmin: true });
-    }
+    const allManagers = [
+      ...admins.map((admin) => ({ ...admin, isAdmin: true })),
+      ...managers,
+    ];
 
     return res.status(200).json({
       success: true,
@@ -798,6 +928,11 @@ const promoteEmployeeToManager = async (req, res, next) => {
 
     await session.commitTransaction();
 
+    if (user.working_status === "working") {
+      await decrementActiveUserCount(organisation_id);
+    }
+    await incrementActiveUserCount(organisation_id);
+
     return res.status(200).json({
       success: true,
       message: `${user.f_name} ${user.l_name} has been promoted from Employee to Manager`,
@@ -966,6 +1101,11 @@ const promoteManagerToAdmin = async (req, res, next) => {
 
     await session.commitTransaction();
 
+    if (manager.working_status === "working") {
+      await decrementActiveUserCount(organisation_id);
+    }
+    await incrementActiveUserCount(organisation_id);
+
     return res.status(200).json({
       success: true,
       message: `${manager.f_name} ${manager.l_name} has been promoted from Manager to Admin`,
@@ -1121,6 +1261,11 @@ const promoteEmployeeToAdmin = async (req, res, next) => {
 
     await session.commitTransaction();
 
+    if (user.working_status === "working") {
+      await decrementActiveUserCount(organisation_id);
+    }
+    await incrementActiveUserCount(organisation_id);
+
     return res.status(200).json({
       success: true,
       message: `${user.f_name} ${user.l_name} has been promoted from Employee directly to Admin`,
@@ -1273,6 +1418,11 @@ const demoteManagerToEmployee = async (req, res, next) => {
 
     await session.commitTransaction();
 
+    if (manager.working_status === "working") {
+      await decrementActiveUserCount(organisation_id);
+    }
+    await incrementActiveUserCount(organisation_id);
+
     return res.status(200).json({
       success: true,
       message: `${manager.f_name} ${manager.l_name} has been demoted from Manager to Employee`,
@@ -1411,6 +1561,11 @@ const demoteAdminToManager = async (req, res, next) => {
     ]);
 
     await session.commitTransaction();
+
+    if (adminToDemote.working_status === "working") {
+      await decrementActiveUserCount(organisation_id);
+    }
+    await incrementActiveUserCount(organisation_id);
 
     return res.status(200).json({
       success: true,
@@ -1555,6 +1710,11 @@ const demoteAdminToEmployee = async (req, res, next) => {
 
     await session.commitTransaction();
 
+    if (adminToDemote.working_status === "working") {
+      await decrementActiveUserCount(organisation_id);
+    }
+    await incrementActiveUserCount(organisation_id);
+
     return res.status(200).json({
       success: true,
       message: `${adminToDemote.f_name} ${adminToDemote.l_name} has been demoted from Admin directly to Employee`,
@@ -1683,12 +1843,20 @@ const deleteemployee = async (req, res, next) => {
   const organisation_id = req.admin.organisation_id;
 
   const [user, manager] = await Promise.all([
-    Usermodel.findOneAndDelete({ _id: id, organisation_id }),
-    Managermodel.findOneAndDelete({ _id: id, organisation_id }),
+    Usermodel.findOne({ _id: id, organisation_id }).lean(),
+    Managermodel.findOne({ _id: id, organisation_id }).lean(),
   ]);
 
   if (!user && !manager)
     return next(Object.assign(new Error("User not found"), { statusCode: 404 }));
+
+  const target = user || manager;
+  const wasWorking = target.working_status === "working";
+
+  await Promise.all([
+    user && Usermodel.findByIdAndDelete(id),
+    manager && Managermodel.findByIdAndDelete(id),
+  ]);
 
   if (manager) {
     await Promise.all([
@@ -1698,6 +1866,10 @@ const deleteemployee = async (req, res, next) => {
         { reporting_manager: null, reporting_manager_model: null }
       ),
     ]);
+  }
+
+  if (wasWorking) {
+    await decrementActiveUserCount(organisation_id);
   }
 
   res.status(200).json({ message: "User deleted successfully" });
@@ -2866,13 +3038,22 @@ const setEmployeeWorkingStatus = async (req, res, next) => {
         )
       );
 
+    const existingUser = await Usermodel.findOne({ _id: id, organisation_id })
+      .select("_id working_status")
+      .lean();
+
+    if (!existingUser)
+      return next(Object.assign(new Error("Employee not found"), { statusCode: 404 }));
+
+    const wasWorking = existingUser.working_status === "working";
+    const willBeWorking = working_status === "working";
+
     const user = await Usermodel.findOneAndUpdate(
       { _id: id, organisation_id },
       {
         $set: {
           working_status,
-          ...(working_status !== "working" && { status: "inactive" }),
-          ...(working_status === "working" && { status: "active" }),
+          ...(willBeWorking ? { status: "active" } : { status: "inactive" }),
         },
       },
       { new: true, runValidators: true }
@@ -2880,19 +3061,39 @@ const setEmployeeWorkingStatus = async (req, res, next) => {
       .select("_id uid f_name l_name work_email role department designation working_status status")
       .lean();
 
-    if (!user)
-      return next(Object.assign(new Error("Employee not found"), { statusCode: 404 }));
-
-    if (working_status !== "working") {
-      await decrementActiveUserCount(organisation_id);
-    } else {
+    if (!wasWorking && willBeWorking) {
       await incrementActiveUserCount(organisation_id);
+    } else if (wasWorking && !willBeWorking) {
+      await decrementActiveUserCount(organisation_id);
+    }
+
+    let asset_return_check = null;
+    if (!willBeWorking && wasWorking) {
+      const pendingAssets = await AssetModel.find({
+        organisation_id,
+        assigned_to: id,
+        assigned_to_model: "User",
+        status: "assigned",
+      })
+        .select("_id asset_id asset_name asset_type serial_number brand assigned_date")
+        .lean();
+
+      asset_return_check = {
+        has_pending_assets: pendingAssets.length > 0,
+        pending_asset_count: pendingAssets.length,
+        assets: pendingAssets,
+        message:
+          pendingAssets.length > 0
+            ? `⚠️ Warning: ${pendingAssets.length} asset(s) are still assigned to this employee and must be returned before offboarding.`
+            : "✅ No pending assets. All clear.",
+      };
     }
 
     return res.status(200).json({
       success: true,
       message: `Employee working status updated to '${working_status}' successfully`,
       employee: user,
+      ...(asset_return_check && { asset_return_check }),
     });
   } catch (error) {
     next(error);
@@ -2921,13 +3122,22 @@ const setManagerWorkingStatus = async (req, res, next) => {
         )
       );
 
+    const existingManager = await Managermodel.findOne({ _id: id, organisation_id })
+      .select("_id working_status")
+      .lean();
+
+    if (!existingManager)
+      return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
+
+    const wasWorking = existingManager.working_status === "working";
+    const willBeWorking = working_status === "working";
+
     const manager = await Managermodel.findOneAndUpdate(
       { _id: id, organisation_id },
       {
         $set: {
           working_status,
-          ...(working_status !== "working" && { status: "inactive" }),
-          ...(working_status === "working" && { status: "active" }),
+          ...(willBeWorking ? { status: "active" } : { status: "inactive" }),
         },
       },
       { new: true, runValidators: true }
@@ -2935,19 +3145,39 @@ const setManagerWorkingStatus = async (req, res, next) => {
       .select("_id uid f_name l_name work_email role department designation working_status status")
       .lean();
 
-    if (!manager)
-      return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
-
-    if (working_status !== "working") {
-      await decrementActiveUserCount(organisation_id);
-    } else {
+    if (!wasWorking && willBeWorking) {
       await incrementActiveUserCount(organisation_id);
+    } else if (wasWorking && !willBeWorking) {
+      await decrementActiveUserCount(organisation_id);
+    }
+
+    let asset_return_check = null;
+    if (!willBeWorking && wasWorking) {
+      const pendingAssets = await AssetModel.find({
+        organisation_id,
+        assigned_to: id,
+        assigned_to_model: "Manager",
+        status: "assigned",
+      })
+        .select("_id asset_id asset_name asset_type serial_number brand assigned_date")
+        .lean();
+
+      asset_return_check = {
+        has_pending_assets: pendingAssets.length > 0,
+        pending_asset_count: pendingAssets.length,
+        assets: pendingAssets,
+        message:
+          pendingAssets.length > 0
+            ? `⚠️ Warning: ${pendingAssets.length} asset(s) are still assigned to this manager and must be returned before offboarding.`
+            : "✅ No pending assets. All clear.",
+      };
     }
 
     return res.status(200).json({
       success: true,
       message: `Manager working status updated to '${working_status}' successfully`,
       manager,
+      ...(asset_return_check && { asset_return_check }),
     });
   } catch (error) {
     next(error);

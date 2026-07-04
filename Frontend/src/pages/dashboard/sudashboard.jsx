@@ -12,6 +12,7 @@ import {
 } from "react-icons/fa";
 
 import { useGetMeSuperAdmin } from "../../auth/server-state/superadmin/auth/suauth.hook";
+import { SuperAdminAssetReturnWarning } from "../asset/superadminasset";
 import {
   useGetTodayCheckins, useGetNoOfEmployees, useGetAllEmployees,
   useDeleteEmployee, useAddEmployee, useAddManager, useEditEmployee,
@@ -153,6 +154,12 @@ const BLANK_FORM = {
 
 const validateForm = (form, isEdit) => {
   const e = {};
+ if (form.account_number) {
+  if (!/^\d{9,18}$/.test(form.account_number)) {
+    errors.account_number =
+      "Account number must contain only digits (9-18 characters).";
+  }
+}
   if (!form.f_name.trim()) e.f_name = "First name is required";
   if (!form.l_name.trim()) e.l_name = "Last name is required";
   if (!form.work_email.trim()) e.work_email = "Work email is required";
@@ -365,7 +372,7 @@ function WorkingStatusModal({ open, onClose, admin, onConfirm, loading }) {
   return (
     <div
       className="fixed inset-0 z-[1100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[rgba(13,2,9,0.75)] backdrop-blur-md"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      
     >
       <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl animate-[modalUp_0.22s_ease-out]">
         <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-[#e8d5e2] flex items-center justify-between">
@@ -507,7 +514,7 @@ function EditPermissionsModal({ open, onClose, user, onSave, loading }) {
   return (
     <div
       className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[rgba(13,2,9,0.7)] backdrop-blur-md"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      
     >
       <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[90vh] animate-[modalUp_0.22s_ease-out]">
         <div className="sticky top-0 z-10 bg-white px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-[#e8d5e2] flex items-center justify-between rounded-t-2xl">
@@ -626,10 +633,10 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[rgba(13,2,9,0.7)] backdrop-blur-md"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
+   <div
+  className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[rgba(13,2,9,0.7)] backdrop-blur-md"
+>
+    
       <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl shadow-2xl flex flex-col max-h-[94vh] animate-[modalUp_0.22s_ease-out]">
         <div className="sticky top-0 z-10 bg-white px-4 sm:px-7 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-[#e8d5e2] flex items-center justify-between rounded-t-2xl">
           <div className="min-w-0 mr-3">
@@ -850,10 +857,20 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-3 sm:mt-4">
-            <div>
-              <FLabel>Account Number</FLabel>
-              <FInput placeholder="Account number" value={form.account_number} onChange={set("account_number")} />
-            </div>
+<div>
+  <FLabel>Account Number</FLabel>
+
+  <FInput
+    placeholder="Account number"
+    value={form.account_number}
+    onChange={set("account_number")}
+    onBlur={blur("account_number")}
+    err={showErr("account_number")}
+    maxLength={18}
+  />
+
+  <FieldErr msg={showErr("account_number")} />
+</div>
             <div>
               <FLabel>IFSC Code</FLabel>
               <FInput placeholder="e.g. HDFC0001234" value={form.ifsc_code} onChange={setUpper("ifsc_code")} onBlur={blur("ifsc_code")} err={showErr("ifsc_code")} maxLength={11} />
@@ -895,7 +912,7 @@ function AnnModal({ open, onClose, initial, onSave, loading }) {
   if (!open) return null;
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   return (
-    <div className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[rgba(13,2,9,0.7)] backdrop-blur-md" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[rgba(13,2,9,0.7)] backdrop-blur-md">
       <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl animate-[modalUp_0.22s_ease-out]">
         <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-[#e8d5e2] flex items-center justify-between">
           <h2 className="text-base sm:text-lg font-bold text-[#0d0209]">{initial ? "Edit Announcement" : "New Announcement"}</h2>
@@ -952,7 +969,9 @@ function ReviewModal({ open, onClose, admins, onSave, loading }) {
   useEffect(() => { if (open) setForm({ adminid: "", rating: 0, comment: "" }); }, [open]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[rgba(13,2,9,0.7)] backdrop-blur-md" onClick={(e) => e.target === e.currentTarget && onClose()}>
+   <div
+  className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[rgba(13,2,9,0.7)] backdrop-blur-md"
+>
       <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl animate-[modalUp_0.22s_ease-out]">
         <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-[#e8d5e2] flex items-center justify-between">
           <h2 className="text-base sm:text-lg font-bold text-[#0d0209]">Review Admin</h2>
@@ -1152,6 +1171,7 @@ function SuperAdminDashboard() {
   const [reviewModal, setReviewModal] = useState(false);
   const [permModal, setPermModal] = useState({ open: false, user: null });
   const [workingStatusModal, setWorkingStatusModal] = useState({ open: false, admin: null });
+  const [assetWarning, setAssetWarning] = useState({ open: false, data: null });
   const [leaveTab, setLeaveTab] = useState("admin");
   const [empExpand, setEmpExpand] = useState(false);
   const [empSearch, setEmpSearch] = useState("");
@@ -1275,11 +1295,17 @@ function SuperAdminDashboard() {
     updatePermissions(payload, { onSuccess: () => setPermModal({ open: false, user: null }) });
   };
 
-  const handleWorkingStatusConfirm = (payload) => {
-    setAdminWorkingStatus(payload, {
-      onSuccess: () => setWorkingStatusModal({ open: false, admin: null }),
-    });
-  };
+ const handleWorkingStatusConfirm = (payload) => {
+  setAdminWorkingStatus(payload, {
+    onSuccess: () => setWorkingStatusModal({ open: false, admin: null }),
+    onError: (err) => {
+      if (err?.asset_return_check?.has_pending_assets) {
+        setWorkingStatusModal({ open: false, admin: null });
+        setAssetWarning({ open: true, data: err });
+      }
+    },
+  });
+};
 
   const isAdminNonWorking = (admin) => {
     const ws = (admin.working_status || "working").toLowerCase();
@@ -1764,6 +1790,11 @@ function SuperAdminDashboard() {
         admin={workingStatusModal.admin}
         onConfirm={handleWorkingStatusConfirm}
         loading={settingWorkingStatus}
+      />
+
+      <SuperAdminAssetReturnWarning
+        data={assetWarning.data}
+        onClose={() => setAssetWarning({ open: false, data: null })}
       />
     </div>
   );

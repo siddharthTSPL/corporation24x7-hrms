@@ -20,6 +20,8 @@ const resolveOrganisationId = async (user) => {
   return null;
 };
 
+const displayMinutes = (mins) => Math.round(mins || 0);
+
 const checkin = async (req, res) => {
   try {
     const { latitude, longitude, selfie } = req.body;
@@ -101,27 +103,32 @@ const activity = async (req, res) => {
         checkIn: new Date(),
         activeMinutes: 0,
         idleMinutes: 0,
-        lastUpdated: 0,
+        lastUpdated: Date.now(),
         source: "agent",
       });
+      return res.json({ message: "Activity started", activeMinutes: 0, idleMinutes: 0 });
     }
 
     if (attendance.checkOut)
       return res.status(400).json({ message: "Already checked out" });
 
     const now = Date.now();
-    if (attendance.lastUpdated && now - attendance.lastUpdated < 60000)
-      return res.status(429).json({ message: "Too many requests" });
+    const elapsedMs = now - (attendance.lastUpdated || now);
+    const elapsedMinutes = Math.min(elapsedMs / 60000, 3);
 
     if (attendance.source === "manual") {
-      if (status === "active") attendance.activeMinutes += 1;
-      else attendance.idleMinutes += 1;
+      if (status === "active") attendance.activeMinutes += elapsedMinutes;
+      else attendance.idleMinutes += elapsedMinutes;
     }
 
     attendance.lastUpdated = now;
     await attendance.save();
 
-    res.json({ message: "Activity updated", activeMinutes: attendance.activeMinutes, idleMinutes: attendance.idleMinutes });
+    res.json({
+      message: "Activity updated",
+      activeMinutes: displayMinutes(attendance.activeMinutes),
+      idleMinutes: displayMinutes(attendance.idleMinutes),
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -151,7 +158,12 @@ const checkout = async (req, res) => {
     await attendance.save();
     await updateSummary(attendance);
 
-    res.json({ message: "Checkout successful", status, activeMinutes: attendance.activeMinutes, idleMinutes: attendance.idleMinutes });
+    res.json({
+      message: "Checkout successful",
+      status,
+      activeMinutes: displayMinutes(attendance.activeMinutes),
+      idleMinutes: displayMinutes(attendance.idleMinutes),
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -171,7 +183,15 @@ const getToday = async (req, res) => {
     if (!attendance)
       return res.json({ attendance: null, isCheckedIn: false, isCheckedOut: false });
 
-    res.json({ attendance, isCheckedIn: attendance.source === "manual" && !attendance.checkOut, isCheckedOut: !!attendance.checkOut });
+    res.json({
+      attendance: {
+        ...attendance,
+        activeMinutes: displayMinutes(attendance.activeMinutes),
+        idleMinutes: displayMinutes(attendance.idleMinutes),
+      },
+      isCheckedIn: attendance.source === "manual" && !attendance.checkOut,
+      isCheckedOut: !!attendance.checkOut,
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

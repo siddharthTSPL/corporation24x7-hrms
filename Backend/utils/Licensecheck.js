@@ -54,10 +54,18 @@ const incrementActiveUserCount = async (organisation_id) => {
   });
 };
 
+// Only decrements when the count is currently > 0 — this is an atomic,
+// query-filter-based guard against going negative. Deliberately avoids
+// the aggregation-pipeline update syntax ($set with $max/$subtract inside
+// an array passed to findByIdAndUpdate), because that requires an explicit
+// opt-in on this Mongoose version and was throwing MongooseError:
+// "Cannot pass an array to query updates unless the `updatePipeline`
+// option is set." — which silently broke every previous decrement call.
 const decrementActiveUserCount = async (organisation_id) => {
-  await SuperAdminModel.findByIdAndUpdate(organisation_id, {
-    $inc: { active_user_count: -1 },
-  });
+  await SuperAdminModel.updateOne(
+    { _id: organisation_id, active_user_count: { $gt: 0 } },
+    { $inc: { active_user_count: -1 } }
+  );
 };
 
 module.exports = { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount };
