@@ -226,12 +226,11 @@ adminSchema.pre("save", async function () {
     this.password = await bcrypt.hash(this.password, 10);
   }
 
-  if (!this.reporting_manager) {
-    this.reporting_manager_model = null;
-  }
-
-  if (!this.reporting_manager_model) {
-    this.reporting_manager = null;
+  if (this.isModified("reporting_manager") || this.isModified("reporting_manager_model")) {
+    if (!this.reporting_manager || !this.reporting_manager_model) {
+      this.reporting_manager = null;
+      this.reporting_manager_model = null;
+    }
   }
 });
 
@@ -244,12 +243,19 @@ adminSchema.pre(
 
     const set = update.$set || update;
 
-    if ("reporting_manager" in set && !set.reporting_manager) {
-      set.reporting_manager_model = null;
-    }
+    const touchesManager = "reporting_manager" in set || "reporting_manager_model" in set;
 
-    if ("reporting_manager_model" in set && !set.reporting_manager_model) {
-      set.reporting_manager = null;
+    if (touchesManager) {
+      const nextManager = "reporting_manager" in set ? set.reporting_manager : undefined;
+      const nextModel = "reporting_manager_model" in set ? set.reporting_manager_model : undefined;
+
+      const managerMissing = "reporting_manager" in set ? !nextManager : false;
+      const modelMissing = "reporting_manager_model" in set ? !nextModel : false;
+
+      if (managerMissing || modelMissing) {
+        set.reporting_manager = null;
+        set.reporting_manager_model = null;
+      }
     }
 
     if ("working_status" in set && typeof set.working_status === "string") {
