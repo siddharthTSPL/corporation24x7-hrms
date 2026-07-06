@@ -276,4 +276,24 @@ const autoCheckoutAll = async () => {
   }
 };
 
-module.exports = { checkin, activity, checkout, getToday, autoCheckoutAll };
+const getMyShift = async (req, res) => {
+  try {
+    const user = req.user;
+    const organisation_id = await resolveOrganisationId(user);
+    const shift = await resolveEmployeeShift(user, organisation_id);
+
+    res.json({
+      shift: {
+        name: shift.name,
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+        graceMinutes: shift.graceMinutes ?? 15,
+        earlyBufferMinutes: shift.earlyBufferMinutes ?? 60,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+module.exports = { checkin, activity, checkout, getToday, autoCheckoutAll, getMyShift };
