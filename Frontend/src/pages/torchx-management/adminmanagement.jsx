@@ -14,6 +14,7 @@ import {
   Loader2,
   UserPlus,
   ShieldCheck,
+  History,
 } from 'lucide-react';
 
 import {
@@ -23,6 +24,9 @@ import {
   useSetDefaultShift,
   useDeleteShift,
   useAssignShiftToUser,
+  useGetShiftHistory,
+  useEditShiftAssignment,
+  useDeleteShiftAssignment,
 } from '../../auth/server-state/shift/shift.hook';
 
 import {
@@ -240,6 +244,140 @@ const emptyShiftForm = {
   halfDayBelowMinutes: 180,
 };
 
+function formatDateTime(d) {
+  if (!d) return '';
+  return new Date(d).toLocaleString(undefined, {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function shiftLabel(shift) {
+  if (!shift) return 'Org default';
+  return `${shift.name} (${shift.startTime}–${shift.endTime})`;
+}
+
+function actorLabel(actor, model) {
+  if (!actor) return model || 'Unknown';
+  const name = `${actor.f_name || ''} ${actor.l_name || ''}`.trim();
+  return name || actor.email || model;
+}
+
+function ShiftHistoryModal({ open, onClose, employeeId, role, personName, shifts, notify }) {
+  const { data, isLoading } = useGetShiftHistory(employeeId, role);
+  const editMutation = useEditShiftAssignment();
+  const deleteMutation = useDeleteShiftAssignment();
+  const [editingId, setEditingId] = useState(null);
+  const [editShiftId, setEditShiftId] = useState('');
+
+  const history = data?.history || [];
+
+  const startEdit = (entry) => {
+    setEditingId(entry._id);
+    setEditShiftId(entry.shift?._id || '');
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditShiftId('');
+  };
+
+  const saveEdit = (entry) => {
+    editMutation.mutate(
+      { historyId: entry._id, data: { shift_id: editShiftId || null } },
+      {
+        onSuccess: () => {
+          notify('success', 'History entry updated');
+          cancelEdit();
+        },
+        onError: (e) => notify('error', errMsg(e, 'Could not update history entry')),
+      }
+    );
+  };
+
+  const removeEntry = (entry) => {
+    deleteMutation.mutate(entry._id, {
+      onSuccess: () => notify('success', 'History entry deleted'),
+      onError: (e) => notify('error', errMsg(e, 'Could not delete history entry')),
+    });
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title={personName ? `Shift history — ${personName}` : 'Shift history'} wide>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-10 text-slate-400">
+          <Loader2 className="w-5 h-5 animate-spin" />
+        </div>
+      ) : history.length === 0 ? (
+        <EmptyRow text="No shift assignments recorded yet for this person." />
+      ) : (
+        <div className="flex flex-col divide-y divide-slate-100">
+          {history.map((entry) => {
+            const isEditing = editingId === entry._id;
+            return (
+              <div key={entry._id} className="py-3 flex flex-col gap-2">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm text-slate-800">
+                      <span className="text-slate-400">{shiftLabel(entry.previous_shift)}</span>
+                      <span className="mx-1.5 text-slate-300">→</span>
+                      <span className="font-medium">{shiftLabel(entry.shift)}</span>
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      {formatDateTime(entry.createdAt)} · by {actorLabel(entry.assigned_by, entry.assigned_by_model)}
+                    </p>
+                    {entry.note && <p className="text-xs text-slate-500 mt-1 italic">"{entry.note}"</p>}
+                  </div>
+                  {!isEditing && (
+                    <div className="flex gap-1.5 shrink-0">
+                      <button
+                        onClick={() => startEdit(entry)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                        title="Edit this entry"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => removeEntry(entry)}
+                        disabled={deleteMutation.isPending}
+                        className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-50 hover:text-rose-600"
+                        title="Delete this entry"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {isEditing && (
+                  <div className="flex flex-wrap items-center gap-2 bg-slate-50 rounded-lg p-3">
+                    <select className={`${inputCls} w-auto flex-1 min-w-[160px]`} value={editShiftId} onChange={(e) => setEditShiftId(e.target.value)}>
+                      <option value="">Org default</option>
+                      {shifts.map((s) => (
+                        <option key={s._id} value={s._id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                    <Button onClick={() => saveEdit(entry)} disabled={editMutation.isPending} className="text-xs py-1.5">
+                      {editMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
+                    </Button>
+                    <Button variant="ghost" onClick={cancelEdit} className="text-xs py-1.5">
+                      Cancel
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 function ShiftsPanel({ notify }) {
   const { data: shiftsData, isLoading: loading } = useGetAllShifts();
   const shifts = shiftsData?.shifts || [];
@@ -250,6 +388,7 @@ function ShiftsPanel({ notify }) {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyShiftForm);
   const [assignForm, setAssignForm] = useState({ employee_id: '', role: 'employee', shift_id: '' });
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
 
   const createShiftMutation = useCreateShift();
   const updateShiftMutation = useUpdateShift();
@@ -259,6 +398,9 @@ function ShiftsPanel({ notify }) {
 
   const saving = createShiftMutation.isPending || updateShiftMutation.isPending;
   const assigning = assignShiftMutation.isPending;
+
+  const selectedPerson = (people?.[assignForm.role] || []).find((p) => p._id === assignForm.employee_id);
+  const selectedPersonName = selectedPerson ? personLabel(selectedPerson) : '';
 
   const openCreate = () => {
     setEditing(null);
@@ -465,7 +607,32 @@ function ShiftsPanel({ notify }) {
             {assigning ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Assign'}
           </Button>
         </div>
+        <div className="pt-3">
+          <Button
+            variant="ghost"
+            onClick={() => {
+              if (!assignForm.employee_id) {
+                notify('error', 'Select a person above first');
+                return;
+              }
+              setHistoryModalOpen(true);
+            }}
+            className="text-xs"
+          >
+            <History className="w-3.5 h-3.5" /> View shift history
+          </Button>
+        </div>
       </SectionCard>
+
+      <ShiftHistoryModal
+        open={historyModalOpen}
+        onClose={() => setHistoryModalOpen(false)}
+        employeeId={assignForm.employee_id}
+        role={assignForm.role}
+        personName={selectedPersonName}
+        shifts={shifts}
+        notify={notify}
+      />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit shift' : 'New shift'}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
