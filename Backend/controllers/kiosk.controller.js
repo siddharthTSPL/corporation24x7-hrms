@@ -1,47 +1,60 @@
 const jwt = require("jsonwebtoken");
-const Admin = require("../Models/Admin.model");
 const Kiosk = require("../Models/kiosk.model");
 const SuperAdmin = require("../Models/superadmin.model");
 
-// An admin of an organisation logs the tablet in ONCE using their normal
-// work_email + password, plus a name for the device. From then on the
-// tablet holds a long-lived token that identifies its organisation —
-// employees never see a login screen.
+// The tablet logs in ONCE using the organisation's own Organisation ID
+// plus a dedicated kiosk password (set by the superadmin from Settings —
+// see setKioskPassword), plus a name for the device. This is a
+// deliberately separate credential from any person's own login: nobody's
+// personal superadmin/admin password ever needs to touch a shared
+// reception tablet. From then on the tablet holds a long-lived token
+// that identifies its organisation — employees never see a login screen.
 const kioskLogin = async (req, res) => {
   try {
-    const { work_email, password, device_name } = req.body;
-    if (!work_email || !password || !device_name)
+    const { organisation_id, password, device_name } = req.body;
+    if (!organisation_id || !password || !device_name)
       return res
         .status(400)
-        .json({ message: "work_email, password and device_name are required" });
+        .json({ message: "organisation_id, password and device_name are required" });
 
-    const admin = await Admin.findOne({ work_email: work_email.toLowerCase().trim() });
-    if (!admin) return res.status(404).json({ message: "Admin not found" });
+    const superAdmin = await SuperAdmin.findOne({
+      organisation_id: organisation_id.trim(),
+    }).select("+kiosk_password");
 
-    const isMatch = await admin.isValidPassword(password);
-    if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
+    if (!superAdmin)
+      return res.status(404).json({ message: "No organisation found with that Organisation ID" });
+
+    if (!superAdmin.kiosk_password)
+      return res.status(400).json({
+        message:
+          "Kiosk sign-in hasn't been set up for this organisation yet. Ask your admin to set a kiosk password from Settings.",
+        reason: "kiosk_password_not_set",
+      });
+
+    const isMatch = await superAdmin.isValidKioskPassword(password);
+    if (!isMatch) return res.status(401).json({ message: "Invalid Organisation ID or kiosk password" });
 
     let kiosk = await Kiosk.findOne({
-      organisation_id: admin.organisation_id,
+      organisation_id: superAdmin._id,
       device_name: device_name.trim(),
     });
 
     if (kiosk) {
       kiosk.isActive = true;
-      kiosk.registeredBy = admin._id;
+      kiosk.registeredBy = superAdmin._id;
       await kiosk.save();
     } else {
       kiosk = await Kiosk.create({
-        organisation_id: admin.organisation_id,
+        organisation_id: superAdmin._id,
         device_name: device_name.trim(),
-        registeredBy: admin._id,
+        registeredBy: superAdmin._id,
       });
     }
 
     // 90-day token — the tablet stays "logged in" as this organisation
     // until someone explicitly logs it out or an admin deactivates it.
     const token = jwt.sign(
-      { kiosk_id: kiosk._id, organisation_id: admin.organisation_id, type: "kiosk" },
+      { kiosk_id: kiosk._id, organisation_id: superAdmin._id, type: "kiosk" },
       process.env.JWT_SECRET,
       { expiresIn: "90d" }
     );
@@ -52,7 +65,8 @@ const kioskLogin = async (req, res) => {
       kiosk: {
         id: kiosk._id,
         device_name: kiosk.device_name,
-        organisation_id: kiosk.organisation_id,
+        organisation_id: superAdmin.organisation_id,
+        organisation_name: superAdmin.organisation_name,
       },
     });
   } catch (error) {
@@ -69,12 +83,12 @@ const kioskMe = async (req, res) => {
       return res.status(401).json({ message: "Kiosk session revoked, please log in again" });
 
     const org = await SuperAdmin.findById(kiosk.organisation_id)
-      .select("organisation_name")
+      .select("organisation_id organisation_name")
       .lean();
 
     res.json({
       device_name: kiosk.device_name,
-      organisation_id: kiosk.organisation_id,
+      organisation_id: org?.organisation_id || null,
       organisation_name: org?.organisation_name || null,
     });
   } catch (error) {
