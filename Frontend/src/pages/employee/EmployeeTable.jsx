@@ -435,6 +435,44 @@ function WorkingStatusBadge({status}){
   return <Badge label={status} type="inactive"/>;
 }
 
+function AssetReturnBlockedModal({ data, onClose }) {
+  if (!data) return null;
+  const { pending_asset_count, assets, message } = data;
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: "rgba(115,0,66,0.55)", backdropFilter: "blur(3px)" }}>
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6">
+        <div className="flex items-start gap-3 p-3 bg-[#FFF5F5] border border-[#FCA5A5] rounded-xl mb-4">
+          <FaExclamationTriangle size={18} className="text-[#DC2626] flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-[13px] font-bold text-[#991B1B]">Cannot change working status</p>
+            <p className="text-[12px] text-[#7F1D1D] mt-1 leading-relaxed">{message}</p>
+          </div>
+        </div>
+        <p className="text-[12px] font-semibold text-[#993556] mb-3">
+          {pending_asset_count} asset{pending_asset_count !== 1 ? "s" : ""} still assigned:
+        </p>
+        <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
+          {assets.map((a) => (
+            <div key={a._id} className="flex items-center gap-3 p-2.5 rounded-xl border border-[#F4C0D1] bg-[#F9F8F2]">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#FBEAF0] text-[#730042] text-sm flex-shrink-0">📦</div>
+              <div>
+                <p className="text-[12px] font-semibold text-[#730042]">{a.asset_name}</p>
+                <p className="text-[10px] text-[#993556]">{a.asset_id} · {a.brand || a.asset_type}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="text-[11px] text-[#993556] mb-4">
+          Please revoke the asset(s) above from the Asset Management page before changing this person's employment status.
+        </p>
+        <button onClick={onClose} className="w-full px-4 py-2.5 rounded-xl bg-[#730042] text-white text-[13px] font-semibold hover:bg-[#4a0029] transition">
+          Understood
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function WorkingStatusSelector({currentStatus,onSave,loading}){
   const [selected,setSelected]=useState(currentStatus||"working");
   const [awaitingConfirm,setAwaitingConfirm]=useState(false);
@@ -448,17 +486,19 @@ function WorkingStatusSelector({currentStatus,onSave,loading}){
     setAwaitingConfirm(false);
   };
 
-  const handleUpdateClick=()=>{
+  const handleUpdateClick=async ()=>{
     if(isIrreversible){
       setAwaitingConfirm(true);
     } else {
-      onSave(selected);
+      const ok = await onSave(selected);
+      if(!ok) setSelected(currentStatus||"working");
     }
   };
 
-  const handleConfirm=()=>{
+  const handleConfirm=async ()=>{
     setAwaitingConfirm(false);
-    onSave(selected);
+    const ok = await onSave(selected);
+    if(!ok) setSelected(currentStatus||"working");
   };
 
   const handleCancel=()=>{
@@ -552,6 +592,7 @@ function AccountSummaryDrawer({
   const [tab,setTab]=useState("info");
   const [showPermissions,setShowPermissions]=useState(false);
   const [wsLoading,setWsLoading]=useState(false);
+  const [assetBlock,setAssetBlock]=useState(null); 
 
   const setEmpWS=useSetEmployeeWorkingStatus(userId);
   const setMgrWS=useSetManagerWorkingStatus(userId);
@@ -573,8 +614,15 @@ function AccountSummaryDrawer({
       onRefresh&&onRefresh();
       if(isManager) mgrQuery.refetch();
       else empQuery.refetch();
+      return true;
     }catch(e){
-      console.error(e);
+      const assetCheck = e?.response?.data?.asset_return_check;
+      if(e?.response?.status===409 && assetCheck?.has_pending_assets){
+        setAssetBlock(assetCheck);
+      } else {
+        console.error(e);
+      }
+      return false;
     }finally{setWsLoading(false);}
   };
 
@@ -788,6 +836,10 @@ function AccountSummaryDrawer({
           )}
         </div>
       </div>
+
+    {assetBlock && (
+  <AssetReturnBlockedModal data={assetBlock} onClose={()=>setAssetBlock(null)} />)}  
+
       {showPermissions&&person&&(
         <PermissionsDrawer
           userId={person._id}
