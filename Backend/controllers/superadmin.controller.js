@@ -24,6 +24,7 @@ const OtpModel = require("../Models/otpbasedlogin.model");
 const AdminLeave = require("../Models/adleave.model");
 const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = require("../utils/licenseCheck");
 const AssetModel = require("../Models/asset.model");
+const { isEmailTaken } = require("../utils/emailAvailability.utils");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
@@ -199,6 +200,14 @@ const registerSuperAdmin = async (req, res, next) => {
     }
 
     await SuperAdminModel.checkDomainAvailable(email);
+
+    const emailCheck = await isEmailTaken(email);
+    if (emailCheck.taken)
+      return next(
+        Object.assign(new Error("An account with this email already exists"), {
+          statusCode: 400,
+        }),
+      );
 
     const superAdmin = await SuperAdminModel.create({
       f_name,
@@ -840,11 +849,10 @@ const createAdmin = async (req, res, next) => {
     const email = work_email.toLowerCase().trim();
     const organisation_id = req.superAdmin._id;
 
-    const existing = await AdminModel.findOne({ work_email: email, organisation_id })
-      .select("_id").lean();
-    if (existing)
+    const emailCheck = await isEmailTaken(email);
+    if (emailCheck.taken)
       return next(Object.assign(
-        new Error("An admin with this email already exists in your organization"),
+        new Error("An account with this email already exists"),
         { statusCode: 400 }
       ));
 
@@ -998,12 +1006,10 @@ const addmanager = async (req, res, next) => {
  
     const organisation_id = req.superAdmin._id;
  
-    const existingManager = await Managermodel.findOne({
-      work_email: work_email.toLowerCase().trim(), organisation_id,
-    }).select("_id").lean();
-    if (existingManager)
+    const emailCheck = await isEmailTaken(work_email);
+    if (emailCheck.taken)
       return next(Object.assign(
-        new Error("Manager with this email already exists in your organization"),
+        new Error("An account with this email already exists"),
         { statusCode: 400 }
       ));
  
@@ -1147,12 +1153,10 @@ const addemployee = async (req, res, next) => {
  
     const organisation_id = req.superAdmin._id;
  
-    const existingUser = await Usermodel.findOne({
-      work_email: work_email.toLowerCase().trim(), organisation_id,
-    }).select("_id").lean();
-    if (existingUser)
+    const emailCheck = await isEmailTaken(work_email);
+    if (emailCheck.taken)
       return next(Object.assign(
-        new Error("Employee with this email already exists in your organization"),
+        new Error("An account with this email already exists"),
         { statusCode: 400 }
       ));
  
