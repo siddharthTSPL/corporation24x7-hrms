@@ -2,8 +2,8 @@ const Shift = require("../Models/shift.model");
 const { ensureDefaultShift, getShiftDurationMinutes } = require("../utils/shift.utils");
 
 
-const User = require("../Models/User.model");
-const Manager = require("../Models/Manager.model");
+const User = require("../Models/user.model");
+const Manager = require("../Models/manager.model");
 const AdminUser = require("../Models/Admin.model");
 
 const ROLE_MODEL_MAP = {
