@@ -14,7 +14,18 @@ async function processLeaveDeduction(leave) {
 
   const days = leave.days || calculateLeaveDays(leave.startDate, leave.endDate);
 
-  if (isSandwichLeave(leave.startDate, leave.endDate)) {
+  const employeeModel = leave.manager ? "Manager" : leave.admin ? "Admin" : "User";
+
+  const sandwich = await isSandwichLeave(
+    leave.startDate,
+    leave.endDate,
+    leave.organisation_id,
+    empId,
+    employeeModel,
+    leave.nextLeaveDate
+  );
+
+  if (sandwich) {
     return LeaveBalance.findOneAndUpdate(
       { employee: empId },
       { $inc: { lwp: days } },
