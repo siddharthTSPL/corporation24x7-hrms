@@ -6,6 +6,9 @@ import {
   setDefaultShiftSuperAdmin,
   deleteShiftSuperAdmin,
   assignShiftToUserSuperAdmin,
+  getShiftHistorySuperAdmin,
+  editShiftAssignmentSuperAdmin,
+  deleteShiftAssignmentSuperAdmin,
 } from "../../../api/superadmin/shift/Sushift.api";
 
 export const useGetAllShiftsSuperAdmin = () => {
@@ -62,11 +65,51 @@ export const useAssignShiftToUserSuperAdmin = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: assignShiftToUserSuperAdmin,
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["superadmin-shifts"] });
       // also invalidate wherever you list employees/managers/admins
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["managers"] });
+      if (variables?.employee_id) {
+        queryClient.invalidateQueries({ queryKey: ["superadmin-shift-history", variables.employee_id] });
+      }
+    },
+  });
+};
+
+// History of every assign/reassign made to one person. Pass role
+// ("employee" | "manager" | "admin") alongside their id.
+export const useGetShiftHistorySuperAdmin = (employee_id, role) => {
+  return useQuery({
+    queryKey: ["superadmin-shift-history", employee_id, role],
+    queryFn: () => getShiftHistorySuperAdmin(employee_id, role),
+    enabled: Boolean(employee_id && role),
+    staleTime: 0,
+  });
+};
+
+export const useEditShiftAssignmentSuperAdmin = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ historyId, data }) => editShiftAssignmentSuperAdmin(historyId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["superadmin-shifts"] });
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["managers"] });
+      queryClient.invalidateQueries({ queryKey: ["superadmin-shift-history"] });
+    },
+  });
+};
+
+export const useDeleteShiftAssignmentSuperAdmin = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (historyId) => deleteShiftAssignmentSuperAdmin(historyId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["superadmin-shifts"] });
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["managers"] });
+      queryClient.invalidateQueries({ queryKey: ["superadmin-shift-history"] });
     },
   });
 };
