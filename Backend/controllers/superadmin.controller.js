@@ -616,6 +616,58 @@ const changePassword = async (req, res, next) => {
     .json({ success: true, message: "Password updated successfully" });
 };
 
+// ---------------------------------------------------------------------
+// Kiosk password — a separate, org-level credential used only by
+// face-attendance tablets to sign in as the organisation. Deliberately
+// decoupled from the superadmin's own login password: this is what gets
+// typed into a shared device sitting at reception, so it should never be
+// the same secret that unlocks the full superadmin account.
+// ---------------------------------------------------------------------
+const setKioskPassword = async (req, res, next) => {
+  const { currentPassword, kioskPassword } = req.body;
+  if (!currentPassword || !kioskPassword)
+    return next(
+      Object.assign(
+        new Error("Your account password and a new kiosk password are required"),
+        { statusCode: 400 },
+      ),
+    );
+  if (kioskPassword.length < 6)
+    return next(
+      Object.assign(new Error("Kiosk password must be at least 6 characters"), {
+        statusCode: 400,
+      }),
+    );
+
+  const superAdmin = await SuperAdminModel.findById(req.superAdmin._id);
+  const isValid = await superAdmin.isValidPassword(currentPassword);
+  if (!isValid)
+    return next(
+      Object.assign(new Error("Your account password is incorrect"), {
+        statusCode: 400,
+      }),
+    );
+
+  superAdmin.kiosk_password = kioskPassword;
+  await superAdmin.save();
+  res.status(200).json({
+    success: true,
+    message: "Kiosk password saved. Use your Organisation ID and this password to sign in kiosk devices.",
+  });
+};
+
+const getKioskPasswordStatus = async (req, res, next) => {
+  const superAdmin = await SuperAdminModel.findById(req.superAdmin._id).select(
+    "organisation_id organisation_name kiosk_password",
+  );
+  res.status(200).json({
+    success: true,
+    organisation_id: superAdmin.organisation_id,
+    organisation_name: superAdmin.organisation_name,
+    kiosk_password_set: !!superAdmin.kiosk_password,
+  });
+};
+
 const forgotPassword = async (req, res, next) => {
   const { email } = req.body;
   if (!email)
@@ -768,7 +820,7 @@ const createAdmin = async (req, res, next) => {
   try {
     if (!req.superAdmin)
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
- 
+
     const {
       f_name, l_name, work_email, password, gender, designation, department,
       office_location, personal_contact, e_contact, role, marital_status,
@@ -777,17 +829,17 @@ const createAdmin = async (req, res, next) => {
       reporting_manager, reporting_manager_model, bank_name,
       account_holder_name, account_number, ifsc_code, country, permissions,
     } = req.body;
- 
+
     if (!f_name || !l_name || !work_email || !password || !gender || !designation ||
         !department || !office_location || !personal_contact || !e_contact)
       return next(Object.assign(
         new Error("f_name, l_name, work_email, password, gender, designation, department, office_location, personal_contact and e_contact are required"),
         { statusCode: 400 }
       ));
- 
+
     const email = work_email.toLowerCase().trim();
     const organisation_id = req.superAdmin._id;
- 
+
     const existing = await AdminModel.findOne({ work_email: email, organisation_id })
       .select("_id").lean();
     if (existing)
@@ -795,13 +847,28 @@ const createAdmin = async (req, res, next) => {
         new Error("An admin with this email already exists in your organization"),
         { statusCode: 400 }
       ));
- 
+
     const licenseCheck = await canOnboardUser(organisation_id);
     if (!licenseCheck.allowed)
       return next(Object.assign(new Error(licenseCheck.message), { statusCode: 403 }));
- 
+
     const uid = await generateUID(department, organisation_id);
- 
+
+    let resolvedReportingManager = reporting_manager || undefined;
+    let resolvedReportingManagerModel = reporting_manager_model || undefined;
+
+    if (resolvedReportingManager && !resolvedReportingManagerModel) {
+      resolvedReportingManagerModel =
+        resolvedReportingManager.toString() === organisation_id.toString()
+          ? "SuperAdmin"
+          : undefined;
+    }
+
+    if (!resolvedReportingManager || !resolvedReportingManagerModel) {
+      resolvedReportingManager = undefined;
+      resolvedReportingManagerModel = undefined;
+    }
+
     const admin = await AdminModel.create({
       organisation_id, uid, f_name, l_name, work_email: email, password, gender,
       designation, department, office_location, personal_contact, e_contact,
@@ -818,22 +885,22 @@ const createAdmin = async (req, res, next) => {
       state: state || undefined,
       country: country || undefined,
       pincode: pincode || undefined,
-      reporting_manager: reporting_manager || undefined,
-      reporting_manager_model: reporting_manager_model || undefined,
+      reporting_manager: resolvedReportingManager,
+      reporting_manager_model: resolvedReportingManagerModel,
       bank_name: bank_name || undefined,
       account_holder_name: account_holder_name || undefined,
       account_number: account_number || undefined,
       ifsc_code: ifsc_code || undefined,
       created_by: req.superAdmin._id,
     });
- 
+
     await incrementActiveUserCount(organisation_id);
- 
+
     await assignDefaultLeave({ ...admin.toObject(), role: "admin" });
- 
+
     const verifyToken = jwt.sign({ adminid: admin._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
     const verifyLink = `${process.env.BASE_URL}/talent/api/admin/verify/${verifyToken}`;
- 
+
     await sendEmail({
       to: email,
       subject: "Activate Your Admin Account",
@@ -896,9 +963,9 @@ Verify &amp; Activate Account
 </body>
 </html>`,
     });
- 
+
     await assignPermissions(admin._id, admin.role || "admin", organisation_id, req.superAdmin._id, "SuperAdmin", permissions);
- 
+
     res.status(201).json({
       success: true,
       message: "Admin created successfully. Verification email sent.",
@@ -2206,6 +2273,7 @@ const setAdminWorkingStatus = async (req, res, next) => {
     next(error);
   }
 };
+
 const getInactiveUsers = async (req, res, next) => {
   try {
     if (!req.superAdmin)
@@ -2297,6 +2365,8 @@ module.exports = {
   logoutSuperAdmin,
   updateSuperAdmin,
   changePassword,
+  setKioskPassword,
+  getKioskPasswordStatus,
   forgotPassword,
   verifyOtp,
   resetPassword,

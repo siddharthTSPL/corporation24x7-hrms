@@ -68,6 +68,11 @@ const managerSchema = new mongoose.Schema(
       enum: ["Noida", "Bareilly", "Delhi", "Mumbai"],
       required: true,
     },
+     shift: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Shift",
+      default: null, // null = falls back to org's default shift
+    },
 
     reporting_manager: {
       type: mongoose.Schema.Types.ObjectId,

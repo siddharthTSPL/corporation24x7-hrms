@@ -1,8 +1,20 @@
 const multer = require("multer");
 const FaceProfile = require("../Models/faceprofile.model");
 const Attendance = require("../Models/attendance.model");
+const User = require("../Models/user.model");
+const Manager = require("../Models/manager.model");
+const AdminUser = require("../Models/Admin.model");
 const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
 const { getEmbedding, cosineSimilarity } = require("../utils/faceService");
+const {
+  resolveEmployeeShift,
+  evaluateCheckinWindow,
+  evaluateCheckoutWindow,
+  getShiftThresholds,
+} = require("../utils/shift.utils");
+
+// Which mongoose model a FaceProfile.onModel value points at.
+const MODEL_BY_ONMODEL = { User, Manager, Admin: AdminUser };
 
 // Accepts the enrollment photo in memory (not saved to disk) — we only need
 // it long enough to send to the face service and get back an embedding.
@@ -17,12 +29,23 @@ const upload = multer({
 // lower it if real employees keep getting rejected.
 const SIMILARITY_THRESHOLD = 0.62;
 
+const minutesToLabel = (mins) => {
+  const m = Math.round(mins);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem ? `${h}h ${rem}m` : `${h}h`;
+};
+
 // ---------------------------------------------------------------------
-// ENROLLMENT — this is the "training" step.
-// An admin uploads one clear, front-facing photo per employee. We don't
-// store the photo for matching — we convert it into a 512-number
-// embedding (the face's numeric fingerprint) and store THAT, tagged
-// with organisation_id so it's only ever compared within that org.
+// ENROLLMENT — this is the "training" step, in the loosest sense.
+// There is no per-employee model training here: an admin uploads one
+// clear, front-facing photo, and a general-purpose pretrained face model
+// (already trained by its authors on millions of unrelated faces) turns
+// it into a 512-number embedding — a numeric fingerprint of THIS face.
+// We store that fingerprint, tagged with organisation_id so it's only
+// ever compared within that org. Recognizing someone later is just
+// "whose stored fingerprint is closest to this live one", not training.
 // ---------------------------------------------------------------------
 const enrollFace = async (req, res) => {
   try {
@@ -92,7 +115,8 @@ const removeFace = async (req, res) => {
 // ---------------------------------------------------------------------
 // LIVE SCAN — called by the kiosk, authenticated as a device (not a
 // person). It only ever compares against faces belonging to the kiosk's
-// own organisation_id.
+// own organisation_id, and every checkin/checkout is evaluated against
+// the matched employee's own shift timing.
 // ---------------------------------------------------------------------
 const scanFace = async (req, res) => {
   try {
@@ -105,9 +129,10 @@ const scanFace = async (req, res) => {
 
     const profiles = await FaceProfile.find({ organisation_id }).lean();
     if (!profiles.length)
-      return res
-        .status(404)
-        .json({ message: "No employees enrolled for this organisation yet" });
+      return res.status(404).json({
+        message: "No employees are registered for face attendance yet. Please register first.",
+        reason: "not_registered",
+      });
 
     let best = null;
     let bestScore = 0;
@@ -120,8 +145,23 @@ const scanFace = async (req, res) => {
     }
 
     if (!best || bestScore < SIMILARITY_THRESHOLD)
-      return res.status(404).json({ message: "Face not recognized, please try again" });
+      return res.status(404).json({
+        message: "Face not recognized. If you're new here, please register first.",
+        reason: "not_registered",
+      });
 
+    const EmployeeModel = MODEL_BY_ONMODEL[best.onModel];
+    const employeeDoc = await EmployeeModel.findById(best.employee)
+      .select("f_name l_name shift")
+      .lean();
+
+    if (!employeeDoc)
+      return res.status(404).json({ message: "Matched employee record no longer exists" });
+
+    const employeeName = `${employeeDoc.f_name || ""} ${employeeDoc.l_name || ""}`.trim();
+    const shift = await resolveEmployeeShift(employeeDoc, organisation_id);
+
+    const now = new Date();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -132,45 +172,85 @@ const scanFace = async (req, res) => {
       organisation_id,
     });
 
-    // First scan today -> check in.
+    // -----------------------------------------------------------------
+    // FIRST SCAN TODAY -> CHECK-IN
+    // -----------------------------------------------------------------
     if (!attendance) {
+      const { allowed, isLate } = evaluateCheckinWindow(shift, now);
+
+      if (!allowed) {
+        const earlyBuffer = shift.earlyBufferMinutes ?? 60;
+        return res.status(403).json({
+          message: `Not allowed. ${employeeName || "Your"} shift starts at ${shift.startTime}. Check-in opens ${earlyBuffer} minute(s) before that.`,
+          reason: "shift_not_started",
+          employeeName,
+          shift: { name: shift.name, startTime: shift.startTime, endTime: shift.endTime },
+        });
+      }
+
       attendance = await Attendance.create({
         organisation_id,
         employee: best.employee,
         onModel: best.onModel,
         role: best.role,
         date: today,
-        checkIn: new Date(),
+        checkIn: now,
+        shift: shift._id,
+        isLate,
         source: "face",
       });
 
+      const grace = shift.graceMinutes ?? 15;
       return res.json({
-        message: "Check-in successful",
+        message: isLate
+          ? `Checked in — late (grace period was ${shift.startTime} to +${grace} min)`
+          : "Checked in on time",
         action: "checkin",
+        employeeName,
         matchConfidence: Number(bestScore.toFixed(3)),
         time: attendance.checkIn,
+        isLate,
+        shift: { name: shift.name, startTime: shift.startTime, endTime: shift.endTime },
       });
     }
 
     if (attendance.checkOut)
-      return res.status(400).json({ message: "Attendance already completed for today" });
+      return res.status(400).json({
+        message: `${employeeName || "This employee"} has already completed attendance for today.`,
+        employeeName,
+      });
 
-    // Second scan today -> check out, and compute status from actual
-    // time spent between the two scans (not activity pings, since a
-    // kiosk only sees entry/exit, not continuous activity).
-    attendance.checkOut = new Date();
+    // -----------------------------------------------------------------
+    // SECOND SCAN TODAY -> CHECK-OUT
+    // -----------------------------------------------------------------
+    const { remark, isOvertime, overtimeMinutes } = evaluateCheckoutWindow(shift, now);
+
+    attendance.checkOut = now;
     const durationMinutes = Math.round((attendance.checkOut - attendance.checkIn) / 60000);
     attendance.activeMinutes = durationMinutes;
-    attendance.status = calculateStatus(durationMinutes);
+    attendance.status = calculateStatus(durationMinutes, getShiftThresholds(shift));
+    attendance.checkoutRemark = remark;
+    attendance.overtimeMinutes = isOvertime ? overtimeMinutes : 0;
     await attendance.save();
     await updateSummary(attendance);
 
+    const remarkMessage = {
+      on_time: "Checked out on time",
+      overtime: `Checked out — overtime of ${minutesToLabel(overtimeMinutes)}`,
+      early_checkout: "Checked out early, before your shift ended",
+    }[remark];
+
     return res.json({
-      message: "Checkout successful",
+      message: remarkMessage,
       action: "checkout",
+      employeeName,
       matchConfidence: Number(bestScore.toFixed(3)),
       status: attendance.status,
+      checkoutRemark: remark,
+      overtimeMinutes: attendance.overtimeMinutes,
       time: attendance.checkOut,
+      workedMinutes: durationMinutes,
+      shift: { name: shift.name, startTime: shift.startTime, endTime: shift.endTime },
     });
   } catch (error) {
     res.status(error.statusCode || 500).json({ message: error.message });
