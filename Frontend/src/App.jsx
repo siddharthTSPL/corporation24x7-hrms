@@ -69,6 +69,12 @@ const Pagenotfound = lazy(() => import("./pages/pagenotfound/pagenotfound"));
 const Adminasset = lazy(() => import("./pages/asset/adminasset"));
 const Superadminasset = lazy(() => import("./pages/asset/superadminasset"));
 
+// NOTE: renamed to PascalCase — lowercase-first identifiers are
+// interpreted by JSX as native DOM tags (e.g. <adminmanagement />
+// would render as an unrecognized custom element, not your component).
+const AdminManagement = lazy(() => import("./pages/torchx-management/adminmanagement"));
+const SuperAdminManagement = lazy(() => import("./pages/torchx-management/superadminmanagement"));
+
 function PageSkeleton() {
   const [animationData, setAnimationData] = useState(null);
 
@@ -202,6 +208,17 @@ function App() {
             <Route path="/manager-timesheet"        element={<Managertimesheet />} />
             <Route path="/employee-timesheet"       element={<Employeetimesheet />} />
             <Route path="/admin-asset-management"   element={<Adminasset />} />
+
+            {/* Restricted via ProtectedRoute so managers/employees can't hit it
+                directly even though they share this layout block */}
+            <Route
+              path="/admin-management"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <AdminManagement />
+                </ProtectedRoute>
+              }
+            />
 
             <Route
               path="/announcement"
@@ -348,13 +365,14 @@ function App() {
             <Route path="/superadmin-dashboard"          element={<SuperAdminDashboard />} />
             <Route path="/superadmin-organisations"      element={<SuperAdminOrganisations />} />
             <Route path="/superadmin-announcements"      element={<SuperAdminAnnouncements />} />
-            <Route path="/superadmin-leaves"             element={<SuperAdminLeaves />} />
-            <Route path="/superadmin-reviews"            element={<SuperAdminReviews />} />
-            <Route path="/superadmin-settings"           element={<SuperAdminSettings />} />
-            <Route path="/superadmin-documents"          element={<SuperAdminDocuments />} />
-            <Route path="/superadmin-complaints"         element={<SuperAdminComplaints />} />
-            <Route path="/superadmin-timesheet"          element={<SuperAdmintimesheet />} />
-            <Route path="/superadmin-asset-management"   element={<Superadminasset />} />
+            <Route path="/superadmin-leaves"              element={<SuperAdminLeaves />} />
+            <Route path="/superadmin-reviews"             element={<SuperAdminReviews />} />
+            <Route path="/superadmin-settings"            element={<SuperAdminSettings />} />
+            <Route path="/superadmin-documents"           element={<SuperAdminDocuments />} />
+            <Route path="/superadmin-complaints"          element={<SuperAdminComplaints />} />
+            <Route path="/superadmin-timesheet"           element={<SuperAdmintimesheet />} />
+            <Route path="/superadmin-asset-management"    element={<Superadminasset />} />
+            <Route path="/superadmin-management"          element={<SuperAdminManagement />} />
           </Route>
 
           <Route path="*" element={<Pagenotfound />} />

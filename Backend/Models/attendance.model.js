@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const attendanceSchema = new mongoose.Schema(
   {
-     organisation_id: {
+    organisation_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SuperAdmin",
       required: true,
@@ -28,6 +28,14 @@ const attendanceSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
+    shift: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Shift",
+    },
+    isLate: {
+      type: Boolean,
+      default: false,
+    },
     checkIn: Date,
     checkOut: Date,
     latitude: Number,
@@ -52,8 +60,19 @@ const attendanceSchema = new mongoose.Schema(
     },
     source: {
       type: String,
-      enum: ["manual", "agent"],
+      enum: ["manual", "agent", "face"],
       default: "manual",
+    },
+    // How the checkout itself landed relative to shift end — only set
+    // for face-kiosk checkouts, shown on the kiosk screen and in reports.
+    checkoutRemark: {
+      type: String,
+      enum: ["on_time", "overtime", "early_checkout", null],
+      default: null,
+    },
+    overtimeMinutes: {
+      type: Number,
+      default: 0,
     },
   },
   { timestamps: true }

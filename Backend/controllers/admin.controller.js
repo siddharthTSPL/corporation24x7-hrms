@@ -3016,7 +3016,6 @@ const adminGetTicketDetail = async (req, res, next) => {
 };
 
 
-
 const setEmployeeWorkingStatus = async (req, res, next) => {
   try {
     if (!req.admin)
@@ -3039,7 +3038,7 @@ const setEmployeeWorkingStatus = async (req, res, next) => {
       );
 
     const existingUser = await Usermodel.findOne({ _id: id, organisation_id })
-      .select("_id working_status")
+      .select("_id f_name l_name working_status")
       .lean();
 
     if (!existingUser)
@@ -3047,6 +3046,37 @@ const setEmployeeWorkingStatus = async (req, res, next) => {
 
     const wasWorking = existingUser.working_status === "working";
     const willBeWorking = working_status === "working";
+
+    // 🔒 HARD BLOCK: check pending assets BEFORE updating status
+    if (wasWorking && !willBeWorking) {
+      const pendingAssets = await AssetModel.find({
+        organisation_id,
+        assigned_to: id,
+        assigned_to_model: "User",
+        status: "assigned",
+      })
+        .select("_id asset_id asset_name asset_type serial_number brand assigned_date")
+        .lean();
+
+      if (pendingAssets.length > 0) {
+        return next(
+          Object.assign(
+            new Error(
+              `Cannot offboard ${existingUser.f_name} ${existingUser.l_name}. ${pendingAssets.length} asset(s) must be revoked first.`
+            ),
+            {
+              statusCode: 409,
+              asset_return_check: {
+                has_pending_assets: true,
+                pending_asset_count: pendingAssets.length,
+                assets: pendingAssets,
+                message: `⚠️ ${pendingAssets.length} asset(s) are still assigned to this employee. Please revoke them before changing working status.`,
+              },
+            }
+          )
+        );
+      }
+    }
 
     const user = await Usermodel.findOneAndUpdate(
       { _id: id, organisation_id },
@@ -3067,33 +3097,10 @@ const setEmployeeWorkingStatus = async (req, res, next) => {
       await decrementActiveUserCount(organisation_id);
     }
 
-    let asset_return_check = null;
-    if (!willBeWorking && wasWorking) {
-      const pendingAssets = await AssetModel.find({
-        organisation_id,
-        assigned_to: id,
-        assigned_to_model: "User",
-        status: "assigned",
-      })
-        .select("_id asset_id asset_name asset_type serial_number brand assigned_date")
-        .lean();
-
-      asset_return_check = {
-        has_pending_assets: pendingAssets.length > 0,
-        pending_asset_count: pendingAssets.length,
-        assets: pendingAssets,
-        message:
-          pendingAssets.length > 0
-            ? `⚠️ Warning: ${pendingAssets.length} asset(s) are still assigned to this employee and must be returned before offboarding.`
-            : "✅ No pending assets. All clear.",
-      };
-    }
-
     return res.status(200).json({
       success: true,
       message: `Employee working status updated to '${working_status}' successfully`,
       employee: user,
-      ...(asset_return_check && { asset_return_check }),
     });
   } catch (error) {
     next(error);
@@ -3123,7 +3130,7 @@ const setManagerWorkingStatus = async (req, res, next) => {
       );
 
     const existingManager = await Managermodel.findOne({ _id: id, organisation_id })
-      .select("_id working_status")
+      .select("_id f_name l_name working_status")
       .lean();
 
     if (!existingManager)
@@ -3131,6 +3138,37 @@ const setManagerWorkingStatus = async (req, res, next) => {
 
     const wasWorking = existingManager.working_status === "working";
     const willBeWorking = working_status === "working";
+
+    // 🔒 HARD BLOCK: check pending assets BEFORE updating status
+    if (wasWorking && !willBeWorking) {
+      const pendingAssets = await AssetModel.find({
+        organisation_id,
+        assigned_to: id,
+        assigned_to_model: "Manager",
+        status: "assigned",
+      })
+        .select("_id asset_id asset_name asset_type serial_number brand assigned_date")
+        .lean();
+
+      if (pendingAssets.length > 0) {
+        return next(
+          Object.assign(
+            new Error(
+              `Cannot offboard ${existingManager.f_name} ${existingManager.l_name}. ${pendingAssets.length} asset(s) must be revoked first.`
+            ),
+            {
+              statusCode: 409,
+              asset_return_check: {
+                has_pending_assets: true,
+                pending_asset_count: pendingAssets.length,
+                assets: pendingAssets,
+                message: `⚠️ ${pendingAssets.length} asset(s) are still assigned to this manager. Please revoke them before changing working status.`,
+              },
+            }
+          )
+        );
+      }
+    }
 
     const manager = await Managermodel.findOneAndUpdate(
       { _id: id, organisation_id },
@@ -3151,33 +3189,10 @@ const setManagerWorkingStatus = async (req, res, next) => {
       await decrementActiveUserCount(organisation_id);
     }
 
-    let asset_return_check = null;
-    if (!willBeWorking && wasWorking) {
-      const pendingAssets = await AssetModel.find({
-        organisation_id,
-        assigned_to: id,
-        assigned_to_model: "Manager",
-        status: "assigned",
-      })
-        .select("_id asset_id asset_name asset_type serial_number brand assigned_date")
-        .lean();
-
-      asset_return_check = {
-        has_pending_assets: pendingAssets.length > 0,
-        pending_asset_count: pendingAssets.length,
-        assets: pendingAssets,
-        message:
-          pendingAssets.length > 0
-            ? `⚠️ Warning: ${pendingAssets.length} asset(s) are still assigned to this manager and must be returned before offboarding.`
-            : "✅ No pending assets. All clear.",
-      };
-    }
-
     return res.status(200).json({
       success: true,
       message: `Manager working status updated to '${working_status}' successfully`,
       manager,
-      ...(asset_return_check && { asset_return_check }),
     });
   } catch (error) {
     next(error);

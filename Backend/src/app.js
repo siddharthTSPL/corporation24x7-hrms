@@ -62,10 +62,27 @@ const permissionroute = require('../routes/permission.route');
 const timesheetroute = require('../routes/timesheet.route');
 const kioskrouter = require('../routes/kiosk.routes');
 const faceattendancerouter = require('../routes/faceattendance.routes');
+const shiftrouter = require('../routes/shift.routes');
+const holidaypolicyrouter = require('../routes/holidaypolicy.route');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 // DEBUG — remove after fix
-const routes = { adminrouter, managerrouter, userrouter, attendancerouter, superadminrouter, ticketroute, recruitmentroute, wfhroute, permissionroute, timesheetroute, kioskrouter, faceattendancerouter };
+const routes = {
+  adminrouter,
+  managerrouter,
+  userrouter,
+  attendancerouter,
+  superadminrouter,
+  ticketroute,
+  recruitmentroute,
+  wfhroute,
+  permissionroute,
+  timesheetroute,
+  kioskrouter,
+  faceattendancerouter,
+  shiftrouter,
+  holidaypolicyrouter,
+};
 Object.entries(routes).forEach(([name, r]) => {
   if (!r) console.error(`❌ UNDEFINED: ${name}`);
   else if (typeof r !== 'function') console.error(`❌ NOT A FUNCTION: ${name} — type: ${typeof r}, value:`, r);
@@ -84,6 +101,10 @@ app.use('/permission', permissionroute);
 app.use('/timesheet', timesheetroute);
 app.use('/kiosk', kioskrouter);
 app.use('/faceattendance', faceattendancerouter);
+app.use('/admin', shiftrouter);
+app.use('/admin/holiday-policy', holidaypolicyrouter);   // was: app.use('/admin', holidaypolicyrouter);
+app.use('/superadmin', shiftrouter);
+app.use('/superadmin/', holidaypolicyrouter); // was: app.use('/superadmin', holidaypolicyrouter);
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 

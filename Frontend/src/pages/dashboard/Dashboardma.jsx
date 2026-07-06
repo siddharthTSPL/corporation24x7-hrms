@@ -5,6 +5,7 @@ import { useGetMeManager } from "../../auth/server-state/manager/managerauth/man
 import { useGetAllManagerLeaves } from "../../auth/server-state/manager/managerleave/managerleave.hook";
 import { useGetAttendance } from "../../auth/server-state/manager/managgerother/managerother.hook";
 import { useGetMyLeavesManager } from "../../auth/server-state/manager/managerleave/managerleave.hook";
+import { useCalendarMeta } from "../../auth/server-state/attendance/attendance.hook";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS   = ["S","M","T","W","T","F","S"];
@@ -331,7 +332,7 @@ function SegBar({ segments }) {
   );
 }
 
-function Calendar({ month, joiningDate, attendanceMap = new Map(), myApprovedLeaves = [] }) {
+function Calendar({ month, joiningDate, attendanceMap = new Map(), myApprovedLeaves = [], holidays = [], weekOffDates = [] }) {
   const year     = new Date().getFullYear();
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMo = new Date(year, month + 1, 0).getDate();
@@ -354,6 +355,24 @@ function Calendar({ month, joiningDate, attendanceMap = new Map(), myApprovedLea
     return set;
   }, [myApprovedLeaves, month, year]);
 
+  const holidayMap = useMemo(() => {
+    const map = new Map();
+    holidays.forEach(h => {
+      const d = new Date(h.date);
+      if (d.getFullYear() === year && d.getMonth() === month) map.set(d.getDate(), h.name);
+    });
+    return map;
+  }, [holidays, month, year]);
+
+  const weekOffSet = useMemo(() => {
+    const set = new Set();
+    weekOffDates.forEach(ds => {
+      const d = new Date(ds);
+      if (d.getFullYear() === year && d.getMonth() === month) set.add(d.getDate());
+    });
+    return set;
+  }, [weekOffDates, month, year]);
+
   const cells = [];
   for (let i = 0; i < firstDay; i++) cells.push(null);
 
@@ -366,11 +385,18 @@ function Calendar({ month, joiningDate, attendanceMap = new Map(), myApprovedLea
     const isBeforeJoin = joiningMidnight && date < joiningMidnight;
 
     const key = date.toISOString().slice(0, 10);
+    const holidayName = holidayMap.get(d);
 
     let status = "future";
+    let label  = null;
 
     if (isBeforeJoin) {
       status = "before_joining";
+    } else if (holidayName) {
+      status = "holiday";
+      label  = holidayName;
+    } else if (weekOffSet.has(d)) {
+      status = "weekoff";
     } else if (leaveDaySet.has(d)) {
       status = "leave";
     } else if (!isFuture) {
@@ -378,7 +404,7 @@ function Calendar({ month, joiningDate, attendanceMap = new Map(), myApprovedLea
       status = resolveAttendanceStatus(record) ?? "absent";
     }
 
-    cells.push({ day: d, status, isToday });
+    cells.push({ day: d, status, isToday, label });
   }
 
   const calStyle = {
@@ -388,6 +414,8 @@ function Calendar({ month, joiningDate, attendanceMap = new Map(), myApprovedLea
     late:           { background: "#fff3e0", color: "#e65100", fontWeight: 500 },
     leave:          { background: "#e8eaf6", color: "#283593", fontWeight: 600 },
     checkedin:      { background: "rgba(29,158,117,0.12)", color: "#1D9E75", fontWeight: 600 },
+    holiday:        { background: "#fdecea", color: "#c2410c", fontWeight: 600 },
+    weekoff:        { background: "#f1f5f9", color: "#64748b", fontWeight: 500 },
     future:         { color: "#d4c8c4", fontWeight: 400 },
     before_joining: { color: "#ede5e0", fontWeight: 400, background: "transparent" },
   };
@@ -404,11 +432,12 @@ function Calendar({ month, joiningDate, attendanceMap = new Map(), myApprovedLea
           <div
             key={i}
             className="md-cal-day"
-            title={cell ? cell.status.replace("_", " ") : ""}
+            title={cell ? (cell.label ? `Holiday: ${cell.label}` : cell.status.replace("_", " ")) : ""}
             style={{
               outline: cell?.isToday ? "1.5px solid #730042" : "none",
               outlineOffset: -1.5,
               opacity: cell?.status === "before_joining" ? 0.3 : 1,
+              position: "relative",
               ...(cell ? calStyle[cell.status] ?? {} : {}),
             }}
           >
@@ -500,7 +529,7 @@ function AnnouncementItem({ ann }) {
   );
 }
 
-function TodayBanner({ isOnLeave, leaveType, onCheckIn, onRecruitment }) {
+function TodayBanner({ isOnLeave, leaveType, checkinGate, onCheckIn, onRecruitment }) {
   const today = new Date();
   const day   = today.toLocaleDateString("en-IN", { weekday:"long" });
   const date  = today.toLocaleDateString("en-IN", { day:"numeric", month:"long", year:"numeric" });
@@ -510,32 +539,74 @@ function TodayBanner({ isOnLeave, leaveType, onCheckIn, onRecruitment }) {
     ml: "Maternity Leave", cl: "Casual Leave", lwp: "Leave Without Pay",
   };
 
+  const reason = isOnLeave ? "leave" : (checkinGate?.reason ?? null);
+  const isBlocked = isOnLeave || !checkinGate?.canCheckIn;
+
+  const REASON_META = {
+    leave:         { theme:"indigo", icon:"🏖️", label: `On Leave — ${leaveLabel[leaveType] || "Approved Leave"}` },
+    holiday:       { theme:"amber",  icon:"🎉", label: `Holiday — ${checkinGate?.holidayName || "Company Holiday"}` },
+    weekoff:       { theme:"slate",  icon:"🛋️", label: "Week Off" },
+    outside_shift: { theme:"slate",  icon:"⏰", label: checkinGate?.shift
+      ? `Shift window: ${checkinGate.shift.startTime} – ${checkinGate.shift.endTime}`
+      : "Outside shift window" },
+    loading:       { theme:"slate",  icon:"⏳", label: "Checking today's status…" },
+  };
+  const meta = REASON_META[reason] || null;
+
+  const themeBg = {
+    indigo: "linear-gradient(135deg,#e8eaf6,#c5cae9)",
+    amber:  "linear-gradient(135deg,#fdf1e0,#f6dcb8)",
+    slate:  "linear-gradient(135deg,#eef1f4,#dbe1e8)",
+  };
+  const themeText = { indigo:"#283593", amber:"#92400E", slate:"#334155" };
+  const themePill = {
+    indigo: { color:"#3949AB", background:"rgba(57,73,171,0.12)" },
+    amber:  { color:"#92400E", background:"rgba(146,64,14,0.12)" },
+    slate:  { color:"#334155", background:"rgba(51,65,85,0.1)" },
+  };
+
+  const background = isBlocked && meta
+    ? themeBg[meta.theme]
+    : "linear-gradient(135deg,#730042,#a0004a)";
+  const headingColor = isBlocked && meta ? themeText[meta.theme] : "#f9f8f2";
+  const subColor = isBlocked && meta ? `${themeText[meta.theme]}b3` : "rgba(249,248,242,0.65)";
+
+  let buttonLabel = "Check In";
+  if (reason === "leave") buttonLabel = "🚫 Check-in Disabled";
+  else if (reason === "holiday") buttonLabel = "🎉 Holiday Today";
+  else if (reason === "weekoff") buttonLabel = "🛋️ Week Off";
+  else if (reason === "outside_shift") buttonLabel = "⏰ Outside Shift";
+  else if (reason === "loading") buttonLabel = "Please wait…";
+
   return (
     <div style={{
-      background: isOnLeave
-        ? "linear-gradient(135deg,#e8eaf6,#c5cae9)"
-        : "linear-gradient(135deg,#730042,#a0004a)",
+      background,
       borderRadius:14, padding:"18px 22px",
       display:"flex", alignItems:"center", justifyContent:"space-between",
       marginBottom:14, flexWrap:"wrap", gap:12,
-      boxShadow: isOnLeave ? "0 4px 16px rgba(40,53,147,0.15)" : "0 4px 20px rgba(115,0,66,0.28)",
+      boxShadow: isBlocked ? "0 4px 16px rgba(40,53,147,0.12)" : "0 4px 20px rgba(115,0,66,0.28)",
       animation: "fadeUp .3s ease both",
     }}>
       <div>
         <div style={{ fontSize:11, fontWeight:500, fontFamily:"'DM Sans',sans-serif",
-          color: isOnLeave ? "rgba(40,53,147,0.7)" : "rgba(249,248,242,0.65)", letterSpacing:".4px", textTransform:"uppercase" }}>
+          color: subColor, letterSpacing:".4px", textTransform:"uppercase" }}>
           {day}
         </div>
         <div style={{ fontSize:18, fontWeight:700, fontFamily:"'Lora',serif",
-          color: isOnLeave ? "#283593" : "#f9f8f2", marginTop:2 }}>
+          color: headingColor, marginTop:2 }}>
           {date}
         </div>
-        {isOnLeave && (
+        {isBlocked && meta && (
           <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:6 }}>
-            <span style={{ fontSize:11, color:"#3949AB", fontFamily:"'DM Sans',sans-serif",
-              background:"rgba(57,73,171,0.12)", padding:"3px 10px", borderRadius:20, fontWeight:600 }}>
-              🏖️ On Leave — {leaveLabel[leaveType] || "Approved Leave"}
+            <span style={{ fontSize:11, fontFamily:"'DM Sans',sans-serif",
+              padding:"3px 10px", borderRadius:20, fontWeight:600, ...themePill[meta.theme] }}>
+              {meta.icon} {meta.label}
             </span>
+          </div>
+        )}
+        {!isBlocked && checkinGate?.shift && (
+          <div style={{ marginTop:6, fontSize:11, color:"rgba(249,248,242,0.6)", fontFamily:"'DM Sans',sans-serif" }}>
+            Shift: {checkinGate.shift.name} · {checkinGate.shift.startTime} – {checkinGate.shift.endTime}
           </div>
         )}
       </div>
@@ -549,17 +620,17 @@ function TodayBanner({ isOnLeave, leaveType, onCheckIn, onRecruitment }) {
         </button> */}
         <button
           className="md-checkin-btn"
-          disabled={isOnLeave}
+          disabled={isBlocked}
           onClick={onCheckIn}
           style={{
-            background: isOnLeave ? "rgba(255,255,255,0.3)" : "#fff",
-            color:      isOnLeave ? "rgba(40,53,147,0.5)"   : "#730042",
-            cursor:     isOnLeave ? "not-allowed"            : "pointer",
-            opacity:    isOnLeave ? .7 : 1,
-            boxShadow:  isOnLeave ? "none" : "0 2px 10px rgba(0,0,0,0.1)",
+            background: isBlocked ? "rgba(255,255,255,0.4)" : "#fff",
+            color:      isBlocked ? headingColor              : "#730042",
+            cursor:     isBlocked ? "not-allowed"             : "pointer",
+            opacity:    isBlocked ? .75 : 1,
+            boxShadow:  isBlocked ? "none" : "0 2px 10px rgba(0,0,0,0.1)",
           }}
         >
-          {isOnLeave ? "🚫 Check-in Disabled" : "Check In"}
+          {buttonLabel}
         </button>
       </div>
     </div>
@@ -714,6 +785,7 @@ export default function ManagerDashboard() {
   const { data: histData, isLoading: histLoading                    } = useGetAllManagerLeaves();
   const { data: attData,  isLoading: attLoading                     } = useGetAttendance();
   const { data: myLeaveData                                         } = useGetMyLeavesManager();
+  const { data: calMeta                                             } = useCalendarMeta(selectedMonth, new Date().getFullYear());
 
   const manager   = meData?.manager      ?? null;
   const lb        = meData?.leavebalance?.[0] ?? null;
@@ -724,6 +796,17 @@ export default function ManagerDashboard() {
     const raw = Array.isArray(myLeaveData) ? myLeaveData : [];
     return raw.filter(lv => APPROVED_STATUSES.includes(lv.status));
   }, [myLeaveData]);
+
+  const checkinGate = useMemo(() => {
+    if (!calMeta?.today) return { canCheckIn: false, reason: "loading" };
+    const t = calMeta.today;
+    return {
+      canCheckIn: t.canCheckIn,
+      reason: t.disabledReason,
+      holidayName: t.holidayName,
+      shift: t.shift,
+    };
+  }, [calMeta]);
 
   const attendanceMap = useMemo(() => {
     const records = Array.isArray(attData)
@@ -875,6 +958,7 @@ export default function ManagerDashboard() {
       <TodayBanner
         isOnLeave={isOnLeaveToday}
         leaveType={todayLeave?.leaveType}
+        checkinGate={checkinGate}
         onCheckIn={() => navigate("/mark-attendance")}
         onRecruitment={() => navigate("/manager/recruitment")}
       />
@@ -1027,6 +1111,8 @@ export default function ManagerDashboard() {
               joiningDate={joiningDate}
               attendanceMap={attendanceMap}
               myApprovedLeaves={myOwnAppliedLeaves}
+              holidays={calMeta?.holidays ?? []}
+              weekOffDates={calMeta?.weekOffDates ?? []}
             />
           </div>
 
@@ -1053,6 +1139,8 @@ export default function ManagerDashboard() {
               ["#e65100", "Late"],
               ["#1D9E75", "Checked in"],
               ["#283593", "My leave"],
+              ["#c2410c", "Holiday"],
+              ["#64748b", "Week off"],
               ["#ede5e0", "Before joining"],
             ].map(([c, l]) => (
               <div key={l} style={{ display:"flex", alignItems:"center", gap:4, fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>
