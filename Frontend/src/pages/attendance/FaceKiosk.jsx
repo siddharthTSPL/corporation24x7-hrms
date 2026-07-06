@@ -70,7 +70,7 @@ export default function FaceKiosk() {
 
   const [stage, setStage] = useState("checking"); // checking | login | ready | scanning
   const [kioskInfo, setKioskInfo] = useState(null);
-  const [loginForm, setLoginForm] = useState({ work_email: "", password: "", device_name: "" });
+  const [loginForm, setLoginForm] = useState({ organisation_id: "", password: "", device_name: "" });
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
 
@@ -198,7 +198,7 @@ export default function FaceKiosk() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoginError("");
-    if (!loginForm.work_email || !loginForm.password || !loginForm.device_name) {
+    if (!loginForm.organisation_id || !loginForm.password || !loginForm.device_name) {
       setLoginError("All fields are required.");
       return;
     }
@@ -245,13 +245,13 @@ export default function FaceKiosk() {
           </div>
 
           <label className="text-sm font-semibold text-gray-700">
-            Admin work email (organisation login)
+            Organisation ID
             <input
-              type="email"
+              type="text"
               className="mt-1 w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E]/30"
-              value={loginForm.work_email}
-              onChange={(e) => setLoginForm((f) => ({ ...f, work_email: e.target.value }))}
-              placeholder="admin@yourcompany.com"
+              value={loginForm.organisation_id}
+              onChange={(e) => setLoginForm((f) => ({ ...f, organisation_id: e.target.value }))}
+              placeholder="e.g. TECHTORCH01"
               autoComplete="username"
             />
           </label>
