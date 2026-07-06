@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Clock,
   CalendarDays,
@@ -22,7 +22,7 @@ import {
   useSetDefaultShiftSuperAdmin,
   useDeleteShiftSuperAdmin,
   useAssignShiftToUserSuperAdmin,
-} from '../hooks/superadmin/useShiftSuperAdmin';
+} from '../../auth/server-state/superadmin/shift/sushift.hook';
 import {
   useGetPolicySuperAdmin,
   useSetPolicySuperAdmin,
@@ -33,13 +33,18 @@ import {
   useSetWeekScheduleSuperAdmin,
   useSetWeekScheduleForMonthSuperAdmin,
   useGetWeekSchedulesSuperAdmin,
-  useAddHolidaySuperAdmin,
   useBulkAddHolidaysSuperAdmin,
+  useBulkEditHolidaysSuperAdmin,
   useDeleteHolidaySuperAdmin,
   useListHolidaysSuperAdmin,
   useSetEmployeeOverrideSuperAdmin,
   useRemoveEmployeeOverrideSuperAdmin,
-} from '../hooks/superadmin/useHolidayPolicySuperAdmin';
+} from '../../auth/server-state/superadmin/holidaypolicy/suholidaypolicy.hook';
+import {
+  useGetAllEmployees,
+  useGetAllManagers,
+  useGetAllAdmins,
+} from '../../auth/server-state/superadmin/other/suother.hook';
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const DAY_LABEL = { monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun' };
@@ -169,7 +174,7 @@ function DayPicker({ value, onChange }) {
 function SectionCard({ icon: Icon, title, subtitle, action, children }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm">
-      <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-5 py-4 border-b border-slate-100">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-violet-50 text-violet-700 flex items-center justify-center shrink-0">
             <Icon className="w-4.5 h-4.5" />
@@ -181,13 +186,59 @@ function SectionCard({ icon: Icon, title, subtitle, action, children }) {
         </div>
         {action}
       </div>
-      <div className="p-5">{children}</div>
+      <div className="p-4 sm:p-5">{children}</div>
     </div>
   );
 }
 
 function EmptyRow({ text }) {
   return <div className="text-sm text-slate-400 text-center py-8 border border-dashed border-slate-200 rounded-xl">{text}</div>;
+}
+
+function personLabel(p) {
+  const name = `${p?.f_name || ''} ${p?.l_name || ''}`.trim() || p?.uid || 'Unnamed';
+  const extra = p?.designation || p?.department || p?.work_email || p?.email;
+  return extra ? `${name} — ${extra}` : name;
+}
+
+function usePeopleByRole() {
+  const employeesQuery = useGetAllEmployees();
+  const managersQuery = useGetAllManagers();
+  const adminsQuery = useGetAllAdmins();
+
+  const employees = useMemo(() => {
+    const raw = employeesQuery.data?.users || employeesQuery.data?.employees || employeesQuery.data || [];
+    return Array.isArray(raw) ? raw : [];
+  }, [employeesQuery.data]);
+
+  const managers = useMemo(() => {
+    const raw = managersQuery.data?.managers || managersQuery.data || [];
+    return Array.isArray(raw) ? raw : [];
+  }, [managersQuery.data]);
+
+  const admins = useMemo(() => {
+    const raw = adminsQuery.data?.admins || adminsQuery.data || [];
+    return Array.isArray(raw) ? raw : [];
+  }, [adminsQuery.data]);
+
+  return {
+    byRole: { employee: employees, manager: managers, admin: admins },
+    isLoading: employeesQuery.isLoading || managersQuery.isLoading || adminsQuery.isLoading,
+  };
+}
+
+function PersonSelect({ role, value, onChange, people, loading, className, placeholder = 'Select a person' }) {
+  const list = people?.[role] || [];
+  return (
+    <select className={className || inputCls} value={value} onChange={(e) => onChange(e.target.value)} disabled={loading}>
+      <option value="">{loading ? 'Loading…' : list.length ? placeholder : 'No one found'}</option>
+      {list.map((p) => (
+        <option key={p._id} value={p._id}>
+          {personLabel(p)}
+        </option>
+      ))}
+    </select>
+  );
 }
 
 const emptyShiftForm = {
@@ -203,6 +254,8 @@ const emptyShiftForm = {
 function ShiftsPanel({ notify }) {
   const shiftsQuery = useGetAllShiftsSuperAdmin();
   const shifts = shiftsQuery.data?.shifts || [];
+
+  const { byRole: people, isLoading: peopleLoading } = usePeopleByRole();
 
   const createShift = useCreateShiftSuperAdmin();
   const updateShift = useUpdateShiftSuperAdmin();
@@ -282,7 +335,7 @@ function ShiftsPanel({ notify }) {
 
   const submitAssign = () => {
     if (!assignForm.employee_id) {
-      notify('error', 'Employee ID is required');
+      notify('error', 'Please select a person');
       return;
     }
     assignShift.mutate(
@@ -304,7 +357,7 @@ function ShiftsPanel({ notify }) {
         title="Shifts"
         subtitle="Working hours, grace period and attendance thresholds"
         action={
-          <Button onClick={openCreate}>
+          <Button onClick={openCreate} className="w-full sm:w-auto">
             <Plus className="w-4 h-4" /> New shift
           </Button>
         }
@@ -367,22 +420,27 @@ function ShiftsPanel({ notify }) {
 
       <SectionCard icon={UserPlus} title="Assign shift to a person" subtitle="Choose who follows which shift; leave shift empty to use the org default">
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
-          <Field label="Employee ID">
-            <input
-              className={inputCls}
-              value={assignForm.employee_id}
-              onChange={(e) => setAssignForm((f) => ({ ...f, employee_id: e.target.value }))}
-              placeholder="Paste employee _id"
-            />
-          </Field>
           <Field label="Role">
-            <select className={inputCls} value={assignForm.role} onChange={(e) => setAssignForm((f) => ({ ...f, role: e.target.value }))}>
+            <select
+              className={inputCls}
+              value={assignForm.role}
+              onChange={(e) => setAssignForm((f) => ({ ...f, role: e.target.value, employee_id: '' }))}
+            >
               {ROLE_OPTIONS.map((r) => (
                 <option key={r.role} value={r.role}>
                   {r.label}
                 </option>
               ))}
             </select>
+          </Field>
+          <Field label="Person">
+            <PersonSelect
+              role={assignForm.role}
+              value={assignForm.employee_id}
+              onChange={(v) => setAssignForm((f) => ({ ...f, employee_id: v }))}
+              people={people}
+              loading={peopleLoading}
+            />
           </Field>
           <Field label="Shift">
             <select className={inputCls} value={assignForm.shift_id} onChange={(e) => setAssignForm((f) => ({ ...f, shift_id: e.target.value }))}>
@@ -459,78 +517,242 @@ function ShiftsPanel({ notify }) {
   );
 }
 
+function pad2(n) {
+  return String(n).padStart(2, '0');
+}
+
+function ymd(year, month, day) {
+  return `${year}-${pad2(month)}-${pad2(day)}`;
+}
+
+function startOfGridMonday(year, month) {
+  const jsDay = new Date(year, month - 1, 1).getDay();
+  return (jsDay + 6) % 7;
+}
+
+function daysInMonth(year, month) {
+  return new Date(year, month, 0).getDate();
+}
+
+function dateRangeInclusive(startStr, endStr) {
+  const start = new Date(startStr);
+  const end = new Date(endStr);
+  const [lo, hi] = start <= end ? [start, end] : [end, start];
+  const out = [];
+  const cur = new Date(lo);
+  while (cur <= hi) {
+    out.push(toISODate(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
+}
+
+function HolidayCalendar({ month, year, holidays, onAddRange, onEditHoliday, onDeleteHoliday, adding, editing, deleting }) {
+  const holidaysByDate = useMemo(() => {
+    const map = {};
+    holidays.forEach((h) => {
+      map[toISODate(h.date)] = h;
+    });
+    return map;
+  }, [holidays]);
+
+  const [rangeStart, setRangeStart] = useState(null);
+  const [rangeEnd, setRangeEnd] = useState(null);
+  const [rangeName, setRangeName] = useState('');
+
+  const [editingHoliday, setEditingHoliday] = useState(null);
+  const [editName, setEditName] = useState('');
+
+  const blanks = startOfGridMonday(year, month);
+  const totalDays = daysInMonth(year, month);
+  const cells = [];
+  for (let i = 0; i < blanks; i++) cells.push(null);
+  for (let d = 1; d <= totalDays; d++) cells.push(d);
+
+  const selectedDates = rangeStart ? dateRangeInclusive(rangeStart, rangeEnd || rangeStart) : [];
+
+  const clearSelection = () => {
+    setRangeStart(null);
+    setRangeEnd(null);
+    setRangeName('');
+  };
+
+  const handleDayClick = (dateStr) => {
+    const existing = holidaysByDate[dateStr];
+    if (existing) {
+      clearSelection();
+      setEditingHoliday(existing);
+      setEditName(existing.name);
+      return;
+    }
+    setEditingHoliday(null);
+    if (!rangeStart || (rangeStart && rangeEnd && rangeStart !== rangeEnd)) {
+      setRangeStart(dateStr);
+      setRangeEnd(dateStr);
+    } else {
+      setRangeEnd(dateStr);
+    }
+  };
+
+  const submitRange = () => {
+    if (!rangeName.trim() || !selectedDates.length) return;
+    onAddRange(selectedDates, rangeName.trim(), clearSelection);
+  };
+
+  const submitEdit = () => {
+    if (!editName.trim() || !editingHoliday) return;
+    onEditHoliday(editingHoliday, editName.trim(), () => setEditingHoliday(null));
+  };
+
+  const submitDelete = () => {
+    if (!editingHoliday) return;
+    onDeleteHoliday(editingHoliday._id, () => setEditingHoliday(null));
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+        {DAYS.map((d) => (
+          <div key={d} className="text-[10px] sm:text-[11px] font-semibold uppercase text-slate-400 text-center py-1">
+            {DAY_LABEL[d]}
+          </div>
+        ))}
+        {cells.map((day, idx) => {
+          if (day === null) return <div key={`b-${idx}`} />;
+          const dateStr = ymd(year, month, day);
+          const holiday = holidaysByDate[dateStr];
+          const inSelection = selectedDates.includes(dateStr);
+          const isEditingThis = editingHoliday && toISODate(editingHoliday.date) === dateStr;
+          return (
+            <button
+              key={dateStr}
+              type="button"
+              onClick={() => handleDayClick(dateStr)}
+              title={holiday ? holiday.name : 'Click to add a holiday'}
+              className={`aspect-square rounded-lg text-[11px] sm:text-xs font-medium flex flex-col items-center justify-center gap-0.5 border transition-colors ${
+                holiday
+                  ? isEditingThis
+                    ? 'bg-violet-600 border-violet-600 text-white'
+                    : 'bg-amber-50 border-amber-200 text-amber-700 hover:border-amber-400'
+                  : inSelection
+                  ? 'bg-violet-100 border-violet-400 text-violet-700'
+                  : 'bg-white border-slate-200 text-slate-600 hover:border-violet-300'
+              }`}
+            >
+              <span>{day}</span>
+              {holiday && <span className="w-1 h-1 rounded-full bg-current" />}
+            </button>
+          );
+        })}
+      </div>
+
+      {rangeStart && !editingHoliday && (
+        <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4 flex flex-col sm:flex-row gap-3 sm:items-end">
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-violet-700 uppercase tracking-wide mb-1.5">
+              {selectedDates.length > 1 ? `${selectedDates.length} days selected` : '1 day selected'}
+            </p>
+            <p className="text-xs text-slate-500 mb-2">
+              {selectedDates[0]}
+              {selectedDates.length > 1 ? ` – ${selectedDates[selectedDates.length - 1]}` : ''}
+            </p>
+            <input
+              className={inputCls}
+              placeholder="Holiday name, e.g. Diwali"
+              value={rangeName}
+              onChange={(e) => setRangeName(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={clearSelection}>
+              Cancel
+            </Button>
+            <Button onClick={submitRange} disabled={adding || !rangeName.trim()}>
+              {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add holiday'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {editingHoliday && (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 flex flex-col sm:flex-row gap-3 sm:items-end">
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">{toISODate(editingHoliday.date)}</p>
+            <input className={inputCls} value={editName} onChange={(e) => setEditName(e.target.value)} />
+          </div>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => setEditingHoliday(null)}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={submitDelete} disabled={deleting}>
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : (
+                <>
+                  <Trash2 className="w-3.5 h-3.5" /> Delete
+                </>
+              )}
+            </Button>
+            <Button onClick={submitEdit} disabled={editing || !editName.trim()}>
+              {editing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <p className="text-xs text-slate-400">
+        Click an empty day to add a holiday. Click a second day to span a range, for a multi-day holiday. Click an existing holiday to edit or delete it.
+      </p>
+    </div>
+  );
+}
+
 function HolidaysPanel({ notify }) {
   const [filter, setFilter] = useState(today());
   const holidaysQuery = useListHolidaysSuperAdmin(filter);
   const holidays = holidaysQuery.data?.holidays || [];
 
-  const addHoliday = useAddHolidaySuperAdmin();
   const bulkAddHolidays = useBulkAddHolidaysSuperAdmin();
+  const bulkEditHolidays = useBulkEditHolidaysSuperAdmin();
   const deleteHoliday = useDeleteHolidaySuperAdmin();
 
-  const [modalOpen, setModalOpen] = useState(false);
-  const [form, setForm] = useState({ date: '', name: '' });
-  const [bulkOpen, setBulkOpen] = useState(false);
-  const [bulkRows, setBulkRows] = useState([{ date: '', name: '' }]);
-
-  const submitHoliday = () => {
-    if (!form.date || !form.name) {
-      notify('error', 'Date and name are required');
-      return;
-    }
-    addHoliday.mutate(form, {
-      onSuccess: () => {
-        notify('success', 'Holiday added');
-        setModalOpen(false);
-        setForm({ date: '', name: '' });
-      },
-      onError: (e) => notify('error', errMsg(e, 'Could not add holiday')),
-    });
-  };
-
-  const submitBulk = () => {
-    const rows = bulkRows.filter((r) => r.date && r.name);
-    if (!rows.length) {
-      notify('error', 'Add at least one valid row');
-      return;
-    }
+  const addRange = (dates, name, onDone) => {
     bulkAddHolidays.mutate(
-      { holidays: rows },
+      { holidays: dates.map((date) => ({ date, name })) },
       {
-        onSuccess: (res) => {
-          notify('success', `${res.inserted || 0} added, ${res.updated || 0} updated${res.rejected?.length ? `, ${res.rejected.length} skipped` : ''}`);
-          setBulkOpen(false);
-          setBulkRows([{ date: '', name: '' }]);
+        onSuccess: () => {
+          notify('success', dates.length > 1 ? `Holiday added for ${dates.length} days` : 'Holiday added');
+          onDone();
         },
-        onError: (e) => notify('error', errMsg(e, 'Bulk add failed')),
+        onError: (e) => notify('error', errMsg(e, 'Could not add holiday')),
       }
     );
   };
 
-  const removeHoliday = (id) => {
+  const editHoliday = (holiday, name, onDone) => {
+    bulkEditHolidays.mutate(
+      { holidays: [{ id: holiday._id, name }] },
+      {
+        onSuccess: () => {
+          notify('success', 'Holiday updated');
+          onDone();
+        },
+        onError: (e) => notify('error', errMsg(e, 'Could not update holiday')),
+      }
+    );
+  };
+
+  const deleteHolidayById = (id, onDone) => {
     deleteHoliday.mutate(id, {
-      onSuccess: () => notify('success', 'Holiday removed'),
-      onError: () => notify('error', 'Could not remove holiday'),
+      onSuccess: () => {
+        notify('success', 'Holiday removed');
+        onDone();
+      },
+      onError: (e) => notify('error', errMsg(e, 'Could not remove holiday')),
     });
   };
 
   return (
     <div className="flex flex-col gap-6">
-      <SectionCard
-        icon={CalendarDays}
-        title="Holiday calendar"
-        subtitle="Dates the whole organisation gets off, regardless of week-off policy"
-        action={
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={() => setBulkOpen(true)}>
-              Bulk add
-            </Button>
-            <Button onClick={() => setModalOpen(true)}>
-              <Plus className="w-4 h-4" /> Add holiday
-            </Button>
-          </div>
-        }
-      >
+      <SectionCard icon={CalendarDays} title="Holiday calendar" subtitle="Dates the whole organisation gets off, regardless of week-off policy">
         <div className="flex items-center gap-3 mb-4">
           <select className={`${inputCls} w-auto`} value={filter.month} onChange={(e) => setFilter((f) => ({ ...f, month: Number(e.target.value) }))}>
             {MONTH_NAMES.map((m, i) => (
@@ -552,92 +774,27 @@ function HolidaysPanel({ notify }) {
           <div className="flex items-center justify-center py-10 text-slate-400">
             <Loader2 className="w-5 h-5 animate-spin" />
           </div>
-        ) : holidays.length === 0 ? (
-          <EmptyRow text="No holidays set for this month" />
         ) : (
-          <div className="flex flex-col divide-y divide-slate-100">
-            {holidays.map((h) => (
-              <div key={h._id} className="flex items-center justify-between py-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-700 flex flex-col items-center justify-center text-xs font-bold leading-none shrink-0">
-                    <span>{new Date(h.date).getDate()}</span>
-                    <span className="text-[9px] font-medium uppercase">{MONTH_NAMES[new Date(h.date).getMonth()].slice(0, 3)}</span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-800">{h.name}</p>
-                    <p className="text-xs text-slate-400">{new Date(h.date).toLocaleDateString(undefined, { weekday: 'long' })}</p>
-                  </div>
-                </div>
-                <button onClick={() => removeHoliday(h._id)} className="p-2 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-colors">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-          </div>
+          <HolidayCalendar
+            month={filter.month}
+            year={filter.year}
+            holidays={holidays}
+            onAddRange={addRange}
+            onEditHoliday={editHoliday}
+            onDeleteHoliday={deleteHolidayById}
+            adding={bulkAddHolidays.isPending}
+            editing={bulkEditHolidays.isPending}
+            deleting={deleteHoliday.isPending}
+          />
         )}
       </SectionCard>
-
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add holiday">
-        <div className="flex flex-col gap-4">
-          <Field label="Date">
-            <input type="date" className={inputCls} value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
-          </Field>
-          <Field label="Name">
-            <input className={inputCls} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Diwali" />
-          </Field>
-        </div>
-        <div className="flex justify-end gap-2 pt-5">
-          <Button variant="ghost" onClick={() => setModalOpen(false)}>
-            Cancel
-          </Button>
-          <Button onClick={submitHoliday} disabled={addHoliday.isPending}>
-            {addHoliday.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add'}
-          </Button>
-        </div>
-      </Modal>
-
-      <Modal open={bulkOpen} onClose={() => setBulkOpen(false)} title="Bulk add holidays" wide>
-        <div className="flex flex-col gap-3">
-          {bulkRows.map((row, i) => (
-            <div key={i} className="grid grid-cols-[1fr_1.4fr_auto] gap-2">
-              <input
-                type="date"
-                className={inputCls}
-                value={row.date}
-                onChange={(e) => setBulkRows((rows) => rows.map((r, idx) => (idx === i ? { ...r, date: e.target.value } : r)))}
-              />
-              <input
-                className={inputCls}
-                placeholder="Holiday name"
-                value={row.name}
-                onChange={(e) => setBulkRows((rows) => rows.map((r, idx) => (idx === i ? { ...r, name: e.target.value } : r)))}
-              />
-              <button
-                onClick={() => setBulkRows((rows) => rows.filter((_, idx) => idx !== i))}
-                className="p-2 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-500"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
-          <Button variant="ghost" className="self-start" onClick={() => setBulkRows((rows) => [...rows, { date: '', name: '' }])}>
-            <Plus className="w-4 h-4" /> Add row
-          </Button>
-        </div>
-        <div className="flex justify-end gap-2 pt-5">
-          <Button variant="ghost" onClick={() => setBulkOpen(false)}>
-            Cancel
-          </Button>
-          <Button onClick={submitBulk} disabled={bulkAddHolidays.isPending}>
-            {bulkAddHolidays.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save all'}
-          </Button>
-        </div>
-      </Modal>
     </div>
   );
 }
 
 function WeekOffPanel({ notify }) {
+  const { byRole: people, isLoading: peopleLoading } = usePeopleByRole();
+
   const policyQuery = useGetPolicySuperAdmin();
   const policy = policyQuery.data?.policy?.weekOffType || 'sunday';
   const setPolicy = useSetPolicySuperAdmin();
@@ -666,6 +823,7 @@ function WeekOffPanel({ notify }) {
 
   const [overrideForm, setOverrideForm] = useState({ employee: '', role: 'employee', weekOffType: 'sunday', fixedOffDays: [] });
   const [removeEmployeeId, setRemoveEmployeeId] = useState('');
+  const [removeRole, setRemoveRole] = useState('employee');
 
   const savePolicy = (value) => {
     setPolicy.mutate(
@@ -697,7 +855,7 @@ function WeekOffPanel({ notify }) {
   const addMember = (groupId) => {
     const draft = memberDraft[groupId];
     if (!draft?.employee) {
-      notify('error', 'Employee ID is required');
+      notify('error', 'Please select a person');
       return;
     }
     const roleInfo = ROLE_OPTIONS.find((r) => r.role === (draft.role || 'employee'));
@@ -756,7 +914,7 @@ function WeekOffPanel({ notify }) {
 
   const submitOverride = () => {
     if (!overrideForm.employee) {
-      notify('error', 'Employee ID is required');
+      notify('error', 'Please select a person');
       return;
     }
     const roleInfo = ROLE_OPTIONS.find((r) => r.role === overrideForm.role);
@@ -779,7 +937,7 @@ function WeekOffPanel({ notify }) {
 
   const submitRemoveOverride = () => {
     if (!removeEmployeeId) {
-      notify('error', 'Employee ID is required');
+      notify('error', 'Please select a person');
       return;
     }
     removeEmployeeOverride.mutate(removeEmployeeId, {
@@ -827,9 +985,9 @@ function WeekOffPanel({ notify }) {
       {isRotational && (
         <>
           <SectionCard icon={Users} title="Week-off groups" subtitle="Teams that can be given a different off-day in the same week">
-            <div className="flex gap-2 mb-4">
+            <div className="flex flex-col sm:flex-row gap-2 mb-4">
               <input className={inputCls} placeholder="New group name, e.g. Group A" value={groupName} onChange={(e) => setGroupName(e.target.value)} />
-              <Button onClick={createGroupSubmit} disabled={createGroup.isPending}>
+              <Button onClick={createGroupSubmit} disabled={createGroup.isPending} className="sm:w-auto">
                 <Plus className="w-4 h-4" /> Create
               </Button>
             </div>
@@ -853,17 +1011,13 @@ function WeekOffPanel({ notify }) {
                         </div>
                       ))}
                     </div>
-                    <div className="flex gap-2">
-                      <input
-                        className={`${inputCls} text-xs py-1.5`}
-                        placeholder="Employee ID"
-                        value={memberDraft[g._id]?.employee || ''}
-                        onChange={(e) => setMemberDraft((d) => ({ ...d, [g._id]: { ...d[g._id], employee: e.target.value } }))}
-                      />
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <select
-                        className={`${inputCls} text-xs py-1.5 w-28`}
+                        className={`${inputCls} text-xs py-1.5 sm:w-28`}
                         value={memberDraft[g._id]?.role || 'employee'}
-                        onChange={(e) => setMemberDraft((d) => ({ ...d, [g._id]: { ...d[g._id], role: e.target.value } }))}
+                        onChange={(e) =>
+                          setMemberDraft((d) => ({ ...d, [g._id]: { ...d[g._id], role: e.target.value, employee: '' } }))
+                        }
                       >
                         {ROLE_OPTIONS.map((r) => (
                           <option key={r.role} value={r.role}>
@@ -871,6 +1025,15 @@ function WeekOffPanel({ notify }) {
                           </option>
                         ))}
                       </select>
+                      <PersonSelect
+                        className={`${inputCls} text-xs py-1.5`}
+                        role={memberDraft[g._id]?.role || 'employee'}
+                        value={memberDraft[g._id]?.employee || ''}
+                        onChange={(v) => setMemberDraft((d) => ({ ...d, [g._id]: { ...d[g._id], employee: v } }))}
+                        people={people}
+                        loading={peopleLoading}
+                        placeholder="Choose person"
+                      />
                       <Button variant="subtle" className="py-1.5 px-2.5" onClick={() => addMember(g._id)}>
                         <Plus className="w-3.5 h-3.5" />
                       </Button>
@@ -1007,19 +1170,24 @@ function WeekOffPanel({ notify }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div className="flex flex-col gap-3">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Set an override</p>
-            <input
+            <select
               className={inputCls}
-              placeholder="Employee ID"
-              value={overrideForm.employee}
-              onChange={(e) => setOverrideForm((f) => ({ ...f, employee: e.target.value }))}
-            />
-            <select className={inputCls} value={overrideForm.role} onChange={(e) => setOverrideForm((f) => ({ ...f, role: e.target.value }))}>
+              value={overrideForm.role}
+              onChange={(e) => setOverrideForm((f) => ({ ...f, role: e.target.value, employee: '' }))}
+            >
               {ROLE_OPTIONS.map((r) => (
                 <option key={r.role} value={r.role}>
                   {r.label}
                 </option>
               ))}
             </select>
+            <PersonSelect
+              role={overrideForm.role}
+              value={overrideForm.employee}
+              onChange={(v) => setOverrideForm((f) => ({ ...f, employee: v }))}
+              people={people}
+              loading={peopleLoading}
+            />
             <select
               className={inputCls}
               value={overrideForm.weekOffType}
@@ -1039,7 +1207,14 @@ function WeekOffPanel({ notify }) {
           </div>
           <div className="flex flex-col gap-3">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Remove an override</p>
-            <input className={inputCls} placeholder="Employee ID" value={removeEmployeeId} onChange={(e) => setRemoveEmployeeId(e.target.value)} />
+            <select className={inputCls} value={removeRole} onChange={(e) => { setRemoveRole(e.target.value); setRemoveEmployeeId(''); }}>
+              {ROLE_OPTIONS.map((r) => (
+                <option key={r.role} value={r.role}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+            <PersonSelect role={removeRole} value={removeEmployeeId} onChange={setRemoveEmployeeId} people={people} loading={peopleLoading} />
             <Button variant="danger" onClick={submitRemoveOverride} disabled={removeEmployeeOverride.isPending} className="self-start">
               Remove override
             </Button>
@@ -1075,7 +1250,7 @@ export default function SuperAdminManagement() {
           </p>
         </div>
 
-        <div className="flex gap-1.5 p-1 bg-white border border-slate-200 rounded-xl w-fit mb-6 overflow-x-auto max-w-full">
+        <div className="flex gap-1.5 p-1 bg-white border border-slate-200 rounded-xl w-full sm:w-fit mb-6 overflow-x-auto max-w-full">
           {TABS.map((t) => {
             const Icon = t.icon;
             const active = tab === t.key;
