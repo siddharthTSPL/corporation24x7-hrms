@@ -3270,6 +3270,33 @@ const getActiveUserCount = async (req, res, next) => {
     next(error);
   }
 };
+
+const getAllAdminsForOrg = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const organisation_id = req.admin.organisation_id;
+
+    const admins = await Adminmodel.find({
+      organisation_id,
+      working_status: "working",
+      isVerified: true, // sirf verified admins hi face-enroll list mein aayenge
+    })
+      .select("uid f_name l_name work_email role designation office_location department organisation_id isVerified")
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      organisation_id,
+      count: admins.length,
+      admins: admins.map((a) => ({ type: "admin", ...a })),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   verifyAdmin,
   adminlogin,
@@ -3321,5 +3348,6 @@ module.exports = {
   setEmployeeWorkingStatus,
   setManagerWorkingStatus,
   getInactiveUsers,
-  getActiveUserCount
+  getActiveUserCount,
+  getAllAdminsForOrg,
 };

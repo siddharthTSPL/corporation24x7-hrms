@@ -155,3 +155,7 @@ export const getActiveUserCount = async () => {
   const res = await api.get("/admin/active-user-count");
   return res.data;
 };
+export const getAllAdmins = async () => {
+  const res = await api.get("/admin/all-admins");
+  return res.data;
+};
