@@ -435,37 +435,62 @@ function WorkingStatusBadge({status}){
   return <Badge label={status} type="inactive"/>;
 }
 
-function AssetReturnBlockedModal({ data, onClose }) {
+function AssetReturnBlockedModal({ data, personName, onClose }) {
   if (!data) return null;
   const { pending_asset_count, assets, message } = data;
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: "rgba(115,0,66,0.55)", backdropFilter: "blur(3px)" }}>
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6">
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      style={{ background: "rgba(115,0,66,0.55)", backdropFilter: "blur(3px)" }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6 animate-[modalPop_.2s_ease-out]">
+        <style>{`@keyframes modalPop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}`}</style>
+
         <div className="flex items-start gap-3 p-3 bg-[#FFF5F5] border border-[#FCA5A5] rounded-xl mb-4">
           <FaExclamationTriangle size={18} className="text-[#DC2626] flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-[13px] font-bold text-[#991B1B]">Cannot change working status</p>
+            <p className="text-[13px] font-bold text-[#991B1B]">
+              Cannot offboard {personName || "this person"}
+            </p>
             <p className="text-[12px] text-[#7F1D1D] mt-1 leading-relaxed">{message}</p>
           </div>
         </div>
+
         <p className="text-[12px] font-semibold text-[#993556] mb-3">
           {pending_asset_count} asset{pending_asset_count !== 1 ? "s" : ""} still assigned:
         </p>
-        <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
+
+        <div className="space-y-2 mb-4 max-h-56 overflow-y-auto">
           {assets.map((a) => (
-            <div key={a._id} className="flex items-center gap-3 p-2.5 rounded-xl border border-[#F4C0D1] bg-[#F9F8F2]">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#FBEAF0] text-[#730042] text-sm flex-shrink-0">📦</div>
-              <div>
-                <p className="text-[12px] font-semibold text-[#730042]">{a.asset_name}</p>
-                <p className="text-[10px] text-[#993556]">{a.asset_id} · {a.brand || a.asset_type}</p>
+            <div
+              key={a._id}
+              className="flex items-center gap-3 p-2.5 rounded-xl border border-[#F4C0D1] bg-[#F9F8F2]"
+            >
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#FBEAF0] text-[#730042] text-sm flex-shrink-0">
+                📦
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[12px] font-semibold text-[#730042] truncate">{a.asset_name}</p>
+                <p className="text-[10px] text-[#993556] font-mono">{a.asset_id}</p>
+                <p className="text-[10px] text-[#993556]">
+                  {a.brand ? `${a.brand} · ` : ""}{a.asset_type}
+                  {a.serial_number ? ` · S/N: ${a.serial_number}` : ""}
+                </p>
               </div>
             </div>
           ))}
         </div>
-        <p className="text-[11px] text-[#993556] mb-4">
-          Please revoke the asset(s) above from the Asset Management page before changing this person's employment status.
+
+        <p className="text-[11px] text-[#993556] mb-4 leading-relaxed">
+          Please go to <strong>Asset Management</strong> and revoke the asset(s) listed above
+          before changing this person's employment status.
         </p>
-        <button onClick={onClose} className="w-full px-4 py-2.5 rounded-xl bg-[#730042] text-white text-[13px] font-semibold hover:bg-[#4a0029] transition">
+
+        <button
+          onClick={onClose}
+          className="w-full px-4 py-2.5 rounded-xl bg-[#730042] text-white text-[13px] font-semibold hover:bg-[#4a0029] transition"
+        >
           Understood
         </button>
       </div>
@@ -473,7 +498,7 @@ function AssetReturnBlockedModal({ data, onClose }) {
   );
 }
 
-function WorkingStatusSelector({currentStatus,onSave,loading}){
+function WorkingStatusSelector({currentStatus,onSave,loading,blockedInfo,onDismissBlock}){
   const [selected,setSelected]=useState(currentStatus||"working");
   const [awaitingConfirm,setAwaitingConfirm]=useState(false);
 
@@ -484,9 +509,11 @@ function WorkingStatusSelector({currentStatus,onSave,loading}){
   const handleSelectChange=(e)=>{
     setSelected(e.target.value);
     setAwaitingConfirm(false);
+    onDismissBlock&&onDismissBlock();
   };
 
   const handleUpdateClick=async ()=>{
+    onDismissBlock&&onDismissBlock();
     if(isIrreversible){
       setAwaitingConfirm(true);
     } else {
@@ -511,6 +538,35 @@ function WorkingStatusSelector({currentStatus,onSave,loading}){
   return(
     <div className="mt-3 p-3 rounded-xl border border-[#F4C0D1] bg-[#F9F8F2]">
       <p className="text-[10px] font-bold uppercase tracking-wider text-[#993556] mb-2">Employment Status</p>
+
+      {/* 🔴 Inline asset-block message — shows right here after clicking */}
+      {blockedInfo&&(
+        <div className="mb-3 rounded-xl border border-[#FCA5A5] bg-[#FFF5F5] p-3">
+          <div className="flex items-start gap-2 mb-2">
+            <FaExclamationTriangle size={14} className="text-[#DC2626] flex-shrink-0 mt-0.5"/>
+            <p className="text-[12px] text-[#7F1D1D] leading-relaxed font-medium">
+              {blockedInfo.message}
+            </p>
+          </div>
+          <div className="space-y-1.5 mb-2">
+            {blockedInfo.assets.map((a)=>(
+              <div key={a._id} className="flex items-center gap-2 p-2 rounded-lg bg-white border border-[#FCA5A5]">
+                <span className="text-sm">📦</span>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold text-[#730042] truncate">{a.asset_name}</p>
+                  <p className="text-[10px] text-[#993556]">
+                    {a.asset_id}{a.brand?` · ${a.brand}`:""}{a.serial_number?` · S/N: ${a.serial_number}`:""}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <button onClick={onDismissBlock} className="text-[11px] font-semibold text-[#730042] hover:underline">
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {awaitingConfirm ? (
         <div className="rounded-xl border border-[#FCA5A5] bg-[#FFF5F5] p-3">
           <div className="flex items-start gap-2 mb-3">
@@ -592,7 +648,7 @@ function AccountSummaryDrawer({
   const [tab,setTab]=useState("info");
   const [showPermissions,setShowPermissions]=useState(false);
   const [wsLoading,setWsLoading]=useState(false);
-  const [assetBlock,setAssetBlock]=useState(null); 
+  const [assetBlock,setAssetBlock]=useState(null); // 👈 naya state
 
   const setEmpWS=useSetEmployeeWorkingStatus(userId);
   const setMgrWS=useSetManagerWorkingStatus(userId);
@@ -603,7 +659,7 @@ function AccountSummaryDrawer({
 
   const roleType = isAdmin?"admin":isManager?"manager":"employee";
 
-  const handleWorkingStatusSave=async(ws)=>{
+ const handleWorkingStatusSave=async(ws)=>{
     setWsLoading(true);
     try{
       if(isManager){
@@ -625,7 +681,6 @@ function AccountSummaryDrawer({
       return false;
     }finally{setWsLoading(false);}
   };
-
   const roleBadgeEl=(r)=>{
     if(r==="manager")return<Badge label="Manager" type="manager"/>;
     if(r==="senior_manager")return<Badge label="Sr. Manager" type="smgr"/>;
@@ -738,13 +793,15 @@ function AccountSummaryDrawer({
                         </div>
                       </div>
                     )}
-                    {!isAdmin&&(
-                      <WorkingStatusSelector
-                        currentStatus={person.working_status||"working"}
-                        onSave={handleWorkingStatusSave}
-                        loading={wsLoading}
-                      />
-                    )}
+                   {!isAdmin&&(
+  <WorkingStatusSelector
+    currentStatus={person.working_status||"working"}
+    onSave={handleWorkingStatusSave}
+    loading={wsLoading}
+    blockedInfo={assetBlock}
+    onDismissBlock={()=>setAssetBlock(null)}
+  />
+)}
                   </div>
                 )}
                 {tab==="leave"&&(
@@ -836,10 +893,6 @@ function AccountSummaryDrawer({
           )}
         </div>
       </div>
-
-    {assetBlock && (
-  <AssetReturnBlockedModal data={assetBlock} onClose={()=>setAssetBlock(null)} />)}  
-
       {showPermissions&&person&&(
         <PermissionsDrawer
           userId={person._id}
@@ -848,10 +901,16 @@ function AccountSummaryDrawer({
           onClose={()=>setShowPermissions(false)}
         />
       )}
+      {assetBlock&&(
+        <AssetReturnBlockedModal
+          data={assetBlock}
+          personName={person?`${person.f_name} ${person.l_name}`:""}
+          onClose={()=>setAssetBlock(null)}
+        />
+      )}
     </>
   );
 }
-
 function StepModal({title,icon,onClose,onSubmit,steps,currentStep,setCurrentStep,children,accentColor="#CD166E"}){
   const totalSteps=steps.length;
   const isLast=currentStep===totalSteps-1;
