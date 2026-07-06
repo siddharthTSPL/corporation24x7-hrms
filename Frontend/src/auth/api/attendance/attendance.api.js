@@ -24,3 +24,8 @@ export const getTodayAttendance = async () => {
   const res = await api.get("attendance/today");
   return res.data;
 };
+
+export const getMyShift = async () => {
+  const res = await api.get('attendance/my-shift');
+  return res.data;
+};

@@ -5,10 +5,10 @@ const ManagerLeave = require("../Models/maleave.model");
 const AdminLeave = require("../Models/adleave.model");
 const mongoose = require("mongoose");
 
-function calculateStatus(activeMinutes) {
-  const hours = activeMinutes / 60;
-  if (hours < 2) return "absent";
-  if (hours <= 3) return "half_day";
+function calculateStatus(activeMinutes, thresholds) {
+  const { absentBelowMinutes, halfDayBelowMinutes } = thresholds;
+  if (activeMinutes < absentBelowMinutes) return "absent";
+  if (activeMinutes < halfDayBelowMinutes) return "half_day";
   return "present";
 }
 
@@ -36,7 +36,6 @@ const hasApprovedLeave = async (employeeId, date, role) => {
     return !!leave;
   }
 
-  // employee
   const leave = await Leave.findOne({
     employee: id,
     status: { $in: ["approved_manager", "approved_admin"] },
