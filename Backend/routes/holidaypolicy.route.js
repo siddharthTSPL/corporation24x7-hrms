@@ -1,7 +1,7 @@
 const express = require("express");
 const holidaypolicyrouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
-const adminauthmiddleware = require("../middleware/auth/admin.middleware");
+const adminauthmiddleware = require("../middleware/auth/adminOrSuperadmin.middleware");
 
 const {
   getPolicy,
