@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Clock,
   CalendarDays,
@@ -14,10 +14,34 @@ import {
   Loader2,
   UserPlus,
   ShieldCheck,
-  ChevronDown,
 } from 'lucide-react';
-import * as shiftApi from '../api/shift.api';
-import * as holidayApi from '../api/holidaypolicy.api';
+
+import {
+  useGetAllShifts,
+  useCreateShift,
+  useUpdateShift,
+  useSetDefaultShift,
+  useDeleteShift,
+  useAssignShiftToUser,
+} from '../../auth/server-state/shift/shift.hook';
+
+import {
+  useGetPolicy,
+  useSetPolicy,
+  useListGroups,
+  useCreateGroup,
+  useAddGroupMembers,
+  useRemoveGroupMember,
+  useGetWeekSchedules,
+  useSetWeekSchedule,
+  useSetWeekScheduleForMonth,
+  useListHolidays,
+  useAddHoliday,
+  useBulkAddHolidays,
+  useDeleteHoliday,
+  useSetEmployeeOverride,
+  useRemoveEmployeeOverride,
+} from '../../auth/server-state/holidaypolicy/holidaypolicy.hook';
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const DAY_LABEL = { monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun' };
@@ -41,11 +65,11 @@ function toISODate(d) {
 
 function useToasts() {
   const [toasts, setToasts] = useState([]);
-  const push = useCallback((type, message) => {
+  const push = (type, message) => {
     const id = Math.random().toString(36).slice(2);
     setToasts((t) => [...t, { id, type, message }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3800);
-  }, []);
+  };
   return { toasts, notify: push };
 }
 
@@ -175,30 +199,22 @@ const emptyShiftForm = {
 };
 
 function ShiftsPanel({ notify }) {
-  const [shifts, setShifts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { data: shiftsData, isLoading: loading } = useGetAllShifts();
+  const shifts = shiftsData?.shifts || [];
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyShiftForm);
-  const [saving, setSaving] = useState(false);
   const [assignForm, setAssignForm] = useState({ employee_id: '', role: 'employee', shift_id: '' });
-  const [assigning, setAssigning] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await shiftApi.getAllShifts();
-      setShifts(data.shifts || []);
-    } catch (e) {
-      notify('error', e?.response?.data?.message || 'Could not load shifts');
-    } finally {
-      setLoading(false);
-    }
-  }, [notify]);
+  const createShiftMutation = useCreateShift();
+  const updateShiftMutation = useUpdateShift();
+  const setDefaultMutation = useSetDefaultShift();
+  const deleteShiftMutation = useDeleteShift();
+  const assignShiftMutation = useAssignShiftToUser();
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const saving = createShiftMutation.isPending || updateShiftMutation.isPending;
+  const assigning = assignShiftMutation.isPending;
 
   const openCreate = () => {
     setEditing(null);
@@ -220,72 +236,73 @@ function ShiftsPanel({ notify }) {
     setModalOpen(true);
   };
 
-  const submitShift = async () => {
+  const submitShift = () => {
     if (!form.name || !form.startTime || !form.endTime) {
       notify('error', 'Name, start time and end time are required');
       return;
     }
-    setSaving(true);
-    try {
-      if (editing) {
-        await shiftApi.updateShift(editing._id, form);
-        notify('success', 'Shift updated');
-      } else {
-        await shiftApi.createShift(form);
-        notify('success', 'Shift created');
-      }
-      setModalOpen(false);
-      load();
-    } catch (e) {
-      notify('error', e?.response?.data?.message || 'Could not save shift');
-    } finally {
-      setSaving(false);
+
+    const onError = (e) => notify('error', e?.response?.data?.message || 'Could not save shift');
+
+    if (editing) {
+      updateShiftMutation.mutate(
+        { id: editing._id, data: form },
+        {
+          onSuccess: () => {
+            notify('success', 'Shift updated');
+            setModalOpen(false);
+          },
+          onError,
+        }
+      );
+    } else {
+      createShiftMutation.mutate(form, {
+        onSuccess: () => {
+          notify('success', 'Shift created');
+          setModalOpen(false);
+        },
+        onError,
+      });
     }
   };
 
-  const makeDefault = async (id) => {
-    try {
-      await shiftApi.setDefaultShift(id);
-      notify('success', 'Default shift updated');
-      load();
-    } catch (e) {
-      notify('error', e?.response?.data?.message || 'Could not set default');
-    }
+  const makeDefault = (id) => {
+    setDefaultMutation.mutate(id, {
+      onSuccess: () => notify('success', 'Default shift updated'),
+      onError: (e) => notify('error', e?.response?.data?.message || 'Could not set default'),
+    });
   };
 
-  const removeShift = async (shift) => {
+  const removeShift = (shift) => {
     if (shift.isDefault) {
       notify('error', 'Set another shift as default before deactivating this one');
       return;
     }
-    try {
-      await shiftApi.deleteShift(shift._id);
-      notify('success', 'Shift deactivated');
-      load();
-    } catch (e) {
-      notify('error', e?.response?.data?.message || 'Could not deactivate shift');
-    }
+    deleteShiftMutation.mutate(shift._id, {
+      onSuccess: () => notify('success', 'Shift deactivated'),
+      onError: (e) => notify('error', e?.response?.data?.message || 'Could not deactivate shift'),
+    });
   };
 
-  const submitAssign = async () => {
+  const submitAssign = () => {
     if (!assignForm.employee_id) {
       notify('error', 'Employee ID is required');
       return;
     }
-    setAssigning(true);
-    try {
-      await shiftApi.assignShiftToUser({
+    assignShiftMutation.mutate(
+      {
         employee_id: assignForm.employee_id,
         role: assignForm.role,
         shift_id: assignForm.shift_id || null,
-      });
-      notify('success', 'Shift assigned');
-      setAssignForm({ employee_id: '', role: 'employee', shift_id: '' });
-    } catch (e) {
-      notify('error', e?.response?.data?.message || 'Could not assign shift');
-    } finally {
-      setAssigning(false);
-    }
+      },
+      {
+        onSuccess: () => {
+          notify('success', 'Shift assigned');
+          setAssignForm({ employee_id: '', role: 'employee', shift_id: '' });
+        },
+        onError: (e) => notify('error', e?.response?.data?.message || 'Could not assign shift'),
+      }
+    );
   };
 
   return (
@@ -342,11 +359,21 @@ function ShiftsPanel({ notify }) {
                 </div>
                 <div className="flex gap-2 pt-1">
                   {!s.isDefault && (
-                    <Button variant="subtle" className="flex-1 text-xs py-1.5" onClick={() => makeDefault(s._id)}>
+                    <Button
+                      variant="subtle"
+                      className="flex-1 text-xs py-1.5"
+                      onClick={() => makeDefault(s._id)}
+                      disabled={setDefaultMutation.isPending}
+                    >
                       Set default
                     </Button>
                   )}
-                  <Button variant="danger" className="flex-1 text-xs py-1.5" onClick={() => removeShift(s)}>
+                  <Button
+                    variant="danger"
+                    className="flex-1 text-xs py-1.5"
+                    onClick={() => removeShift(s)}
+                    disabled={deleteShiftMutation.isPending}
+                  >
                     <Trash2 className="w-3.5 h-3.5" /> Deactivate
                   </Button>
                 </div>
@@ -451,79 +478,58 @@ function ShiftsPanel({ notify }) {
 }
 
 function HolidaysPanel({ notify }) {
-  const [holidays, setHolidays] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState(today());
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState({ date: '', name: '' });
-  const [saving, setSaving] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkRows, setBulkRows] = useState([{ date: '', name: '' }]);
-  const [bulkSaving, setBulkSaving] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await holidayApi.listHolidays({ month: filter.month, year: filter.year });
-      setHolidays(data.holidays || []);
-    } catch (e) {
-      notify('error', e?.response?.data?.message || 'Could not load holidays');
-    } finally {
-      setLoading(false);
-    }
-  }, [filter, notify]);
+  const { data: holidaysData, isLoading: loading } = useListHolidays(filter);
+  const holidays = holidaysData?.holidays || [];
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const addHolidayMutation = useAddHoliday();
+  const bulkAddMutation = useBulkAddHolidays();
+  const deleteHolidayMutation = useDeleteHoliday();
 
-  const submitHoliday = async () => {
+  const submitHoliday = () => {
     if (!form.date || !form.name) {
       notify('error', 'Date and name are required');
       return;
     }
-    setSaving(true);
-    try {
-      await holidayApi.addHoliday(form);
-      notify('success', 'Holiday added');
-      setModalOpen(false);
-      setForm({ date: '', name: '' });
-      load();
-    } catch (e) {
-      notify('error', e?.response?.data?.message || 'Could not add holiday');
-    } finally {
-      setSaving(false);
-    }
+    addHolidayMutation.mutate(form, {
+      onSuccess: () => {
+        notify('success', 'Holiday added');
+        setModalOpen(false);
+        setForm({ date: '', name: '' });
+      },
+      onError: (e) => notify('error', e?.response?.data?.message || 'Could not add holiday'),
+    });
   };
 
-  const submitBulk = async () => {
+  const submitBulk = () => {
     const rows = bulkRows.filter((r) => r.date && r.name);
     if (!rows.length) {
       notify('error', 'Add at least one valid row');
       return;
     }
-    setBulkSaving(true);
-    try {
-      const res = await holidayApi.bulkAddHolidays({ holidays: rows });
-      notify('success', `${res.inserted || 0} added, ${res.updated || 0} updated${res.rejected?.length ? `, ${res.rejected.length} skipped` : ''}`);
-      setBulkOpen(false);
-      setBulkRows([{ date: '', name: '' }]);
-      load();
-    } catch (e) {
-      notify('error', e?.response?.data?.message || 'Bulk add failed');
-    } finally {
-      setBulkSaving(false);
-    }
+    bulkAddMutation.mutate(
+      { holidays: rows },
+      {
+        onSuccess: (res) => {
+          notify('success', `${res.inserted || 0} added, ${res.updated || 0} updated${res.rejected?.length ? `, ${res.rejected.length} skipped` : ''}`);
+          setBulkOpen(false);
+          setBulkRows([{ date: '', name: '' }]);
+        },
+        onError: (e) => notify('error', e?.response?.data?.message || 'Bulk add failed'),
+      }
+    );
   };
 
-  const removeHoliday = async (id) => {
-    try {
-      await holidayApi.deleteHoliday(id);
-      notify('success', 'Holiday removed');
-      load();
-    } catch (e) {
-      notify('error', e?.response?.data?.message || 'Could not remove holiday');
-    }
+  const removeHoliday = (id) => {
+    deleteHolidayMutation.mutate(id, {
+      onSuccess: () => notify('success', 'Holiday removed'),
+      onError: () => notify('error', 'Could not remove holiday'),
+    });
   };
 
   return (
@@ -602,8 +608,8 @@ function HolidaysPanel({ notify }) {
           <Button variant="ghost" onClick={() => setModalOpen(false)}>
             Cancel
           </Button>
-          <Button onClick={submitHoliday} disabled={saving}>
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add'}
+          <Button onClick={submitHoliday} disabled={addHolidayMutation.isPending}>
+            {addHolidayMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add'}
           </Button>
         </div>
       </Modal>
@@ -640,8 +646,8 @@ function HolidaysPanel({ notify }) {
           <Button variant="ghost" onClick={() => setBulkOpen(false)}>
             Cancel
           </Button>
-          <Button onClick={submitBulk} disabled={bulkSaving}>
-            {bulkSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save all'}
+          <Button onClick={submitBulk} disabled={bulkAddMutation.isPending}>
+            {bulkAddMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save all'}
           </Button>
         </div>
       </Modal>
@@ -650,199 +656,155 @@ function HolidaysPanel({ notify }) {
 }
 
 function WeekOffPanel({ notify }) {
-  const [policy, setPolicyState] = useState('sunday');
-  const [policyLoading, setPolicyLoading] = useState(true);
-  const [savingPolicy, setSavingPolicy] = useState(false);
+  const { data: policyData, isLoading: policyLoading } = useGetPolicy();
+  const policy = policyData?.policy?.weekOffType || 'sunday';
+  const setPolicyMutation = useSetPolicy();
 
-  const [groups, setGroups] = useState([]);
+  const { data: groupsData } = useListGroups();
+  const groups = groupsData?.groups || [];
+  const createGroupMutation = useCreateGroup();
+  const addGroupMembersMutation = useAddGroupMembers();
+  const removeGroupMemberMutation = useRemoveGroupMember();
+
   const [groupName, setGroupName] = useState('');
   const [memberDraft, setMemberDraft] = useState({});
 
   const [scheduleFilter, setScheduleFilter] = useState(today());
-  const [schedules, setSchedules] = useState([]);
+  const { data: schedulesData } = useGetWeekSchedules(scheduleFilter);
+  const schedules = schedulesData?.schedules || [];
 
   const [weekForm, setWeekForm] = useState({ weekStartDate: '', offDays: [], group: '' });
   const [monthForm, setMonthForm] = useState({ month: today().month, year: today().year, offDays: [], group: '' });
-  const [savingWeek, setSavingWeek] = useState(false);
-  const [savingMonth, setSavingMonth] = useState(false);
+  const setWeekScheduleMutation = useSetWeekSchedule();
+  const setMonthScheduleMutation = useSetWeekScheduleForMonth();
 
   const [overrideForm, setOverrideForm] = useState({ employee: '', role: 'employee', weekOffType: 'sunday', fixedOffDays: [] });
-  const [savingOverride, setSavingOverride] = useState(false);
   const [removeEmployeeId, setRemoveEmployeeId] = useState('');
+  const setOverrideMutation = useSetEmployeeOverride();
+  const removeOverrideMutation = useRemoveEmployeeOverride();
 
-  const loadPolicy = useCallback(async () => {
-    setPolicyLoading(true);
-    try {
-      const data = await holidayApi.getPolicy();
-      setPolicyState(data.policy?.weekOffType || 'sunday');
-    } catch (e) {
-      notify('error', 'Could not load week-off policy');
-    } finally {
-      setPolicyLoading(false);
-    }
-  }, [notify]);
-
-  const loadGroups = useCallback(async () => {
-    try {
-      const data = await holidayApi.listGroups();
-      setGroups(data.groups || []);
-    } catch (e) {
-      notify('error', 'Could not load groups');
-    }
-  }, [notify]);
-
-  const loadSchedules = useCallback(async () => {
-    try {
-      const data = await holidayApi.getWeekSchedules({ month: scheduleFilter.month, year: scheduleFilter.year });
-      setSchedules(data.schedules || []);
-    } catch (e) {
-      notify('error', 'Could not load week schedules');
-    }
-  }, [scheduleFilter, notify]);
-
-  useEffect(() => {
-    loadPolicy();
-    loadGroups();
-  }, [loadPolicy, loadGroups]);
-
-  useEffect(() => {
-    loadSchedules();
-  }, [loadSchedules]);
-
-  const savePolicy = async (value) => {
-    setSavingPolicy(true);
-    try {
-      await holidayApi.setPolicy({ weekOffType: value });
-      setPolicyState(value);
-      notify('success', 'Week-off policy updated');
-    } catch (e) {
-      notify('error', e?.response?.data?.message || 'Could not update policy');
-    } finally {
-      setSavingPolicy(false);
-    }
+  const savePolicy = (value) => {
+    setPolicyMutation.mutate(
+      { weekOffType: value },
+      {
+        onSuccess: () => notify('success', 'Week-off policy updated'),
+        onError: (e) => notify('error', e?.response?.data?.message || 'Could not update policy'),
+      }
+    );
   };
 
-  const createGroup = async () => {
+  const createGroup = () => {
     if (!groupName.trim()) {
       notify('error', 'Group name is required');
       return;
     }
-    try {
-      await holidayApi.createGroup({ name: groupName.trim(), members: [] });
-      notify('success', 'Group created');
-      setGroupName('');
-      loadGroups();
-    } catch (e) {
-      notify('error', e?.response?.data?.message || 'Could not create group');
-    }
+    createGroupMutation.mutate(
+      { name: groupName.trim(), members: [] },
+      {
+        onSuccess: () => {
+          notify('success', 'Group created');
+          setGroupName('');
+        },
+        onError: (e) => notify('error', e?.response?.data?.message || 'Could not create group'),
+      }
+    );
   };
 
-  const addMember = async (groupId) => {
+  const addMember = (groupId) => {
     const draft = memberDraft[groupId];
     if (!draft?.employee) {
       notify('error', 'Employee ID is required');
       return;
     }
     const roleInfo = ROLE_OPTIONS.find((r) => r.role === (draft.role || 'employee'));
-    try {
-      await holidayApi.addGroupMembers(groupId, { members: [{ employee: draft.employee, employeeModel: roleInfo.model }] });
-      notify('success', 'Member added');
-      setMemberDraft((d) => ({ ...d, [groupId]: { employee: '', role: 'employee' } }));
-      loadGroups();
-    } catch (e) {
-      notify('error', e?.response?.data?.message || 'Could not add member');
-    }
+    addGroupMembersMutation.mutate(
+      { groupId, data: { members: [{ employee: draft.employee, employeeModel: roleInfo.model }] } },
+      {
+        onSuccess: () => {
+          notify('success', 'Member added');
+          setMemberDraft((d) => ({ ...d, [groupId]: { employee: '', role: 'employee' } }));
+        },
+        onError: (e) => notify('error', e?.response?.data?.message || 'Could not add member'),
+      }
+    );
   };
 
-  const removeMember = async (groupId, employeeId) => {
-    try {
-      await holidayApi.removeGroupMember(groupId, employeeId);
-      notify('success', 'Member removed');
-      loadGroups();
-    } catch (e) {
-      notify('error', 'Could not remove member');
-    }
+  const removeMember = (groupId, employeeId) => {
+    removeGroupMemberMutation.mutate(
+      { groupId, employee: employeeId },
+      {
+        onSuccess: () => notify('success', 'Member removed'),
+        onError: () => notify('error', 'Could not remove member'),
+      }
+    );
   };
 
-  const submitWeekForm = async () => {
+  const submitWeekForm = () => {
     if (!weekForm.weekStartDate || weekForm.offDays.length === 0) {
       notify('error', 'Pick a week and at least one off day');
       return;
     }
-    setSavingWeek(true);
-    try {
-      await holidayApi.setWeekSchedule({
-        weekStartDate: weekForm.weekStartDate,
-        offDays: weekForm.offDays,
-        group: weekForm.group || null,
-      });
-      notify('success', 'Week schedule saved');
-      setWeekForm({ weekStartDate: '', offDays: [], group: '' });
-      loadSchedules();
-    } catch (e) {
-      notify('error', e?.response?.data?.message || 'Could not save week schedule');
-    } finally {
-      setSavingWeek(false);
-    }
+    setWeekScheduleMutation.mutate(
+      { weekStartDate: weekForm.weekStartDate, offDays: weekForm.offDays, group: weekForm.group || null },
+      {
+        onSuccess: () => {
+          notify('success', 'Week schedule saved');
+          setWeekForm({ weekStartDate: '', offDays: [], group: '' });
+        },
+        onError: (e) => notify('error', e?.response?.data?.message || 'Could not save week schedule'),
+      }
+    );
   };
 
-  const submitMonthForm = async () => {
+  const submitMonthForm = () => {
     if (monthForm.offDays.length === 0) {
       notify('error', 'Pick at least one off day');
       return;
     }
-    setSavingMonth(true);
-    try {
-      const res = await holidayApi.setWeekScheduleForMonth({
-        month: monthForm.month,
-        year: monthForm.year,
-        offDays: monthForm.offDays,
-        group: monthForm.group || null,
-      });
-      notify('success', `Applied to ${res.weeksSet?.length || 0} week(s)`);
-      loadSchedules();
-    } catch (e) {
-      notify('error', e?.response?.data?.message || 'Could not save month schedule');
-    } finally {
-      setSavingMonth(false);
-    }
+    setMonthScheduleMutation.mutate(
+      { month: monthForm.month, year: monthForm.year, offDays: monthForm.offDays, group: monthForm.group || null },
+      {
+        onSuccess: (res) => notify('success', `Applied to ${res.weeksSet?.length || 0} week(s)`),
+        onError: (e) => notify('error', e?.response?.data?.message || 'Could not save month schedule'),
+      }
+    );
   };
 
-  const submitOverride = async () => {
+  const submitOverride = () => {
     if (!overrideForm.employee) {
       notify('error', 'Employee ID is required');
       return;
     }
     const roleInfo = ROLE_OPTIONS.find((r) => r.role === overrideForm.role);
-    setSavingOverride(true);
-    try {
-      await holidayApi.setEmployeeOverride({
+    setOverrideMutation.mutate(
+      {
         employee: overrideForm.employee,
         employeeModel: roleInfo.model,
         weekOffType: overrideForm.weekOffType,
         fixedOffDays: overrideForm.weekOffType === 'custom_fixed_days' ? overrideForm.fixedOffDays : undefined,
-      });
-      notify('success', 'Override saved');
-      setOverrideForm({ employee: '', role: 'employee', weekOffType: 'sunday', fixedOffDays: [] });
-    } catch (e) {
-      notify('error', e?.response?.data?.message || 'Could not save override');
-    } finally {
-      setSavingOverride(false);
-    }
+      },
+      {
+        onSuccess: () => {
+          notify('success', 'Override saved');
+          setOverrideForm({ employee: '', role: 'employee', weekOffType: 'sunday', fixedOffDays: [] });
+        },
+        onError: (e) => notify('error', e?.response?.data?.message || 'Could not save override'),
+      }
+    );
   };
 
-  const submitRemoveOverride = async () => {
+  const submitRemoveOverride = () => {
     if (!removeEmployeeId) {
       notify('error', 'Employee ID is required');
       return;
     }
-    try {
-      await holidayApi.removeEmployeeOverride(removeEmployeeId);
-      notify('success', 'Override removed, employee now follows org policy');
-      setRemoveEmployeeId('');
-    } catch (e) {
-      notify('error', 'Could not remove override');
-    }
+    removeOverrideMutation.mutate(removeEmployeeId, {
+      onSuccess: () => {
+        notify('success', 'Override removed, employee now follows org policy');
+        setRemoveEmployeeId('');
+      },
+      onError: () => notify('error', 'Could not remove override'),
+    });
   };
 
   const isRotational = policy === 'rotational';
@@ -862,7 +824,7 @@ function WeekOffPanel({ notify }) {
               <button
                 key={opt.v}
                 onClick={() => savePolicy(opt.v)}
-                disabled={savingPolicy}
+                disabled={setPolicyMutation.isPending}
                 className={`text-left p-4 rounded-xl border transition-colors ${
                   policy === opt.v ? 'border-teal-600 bg-teal-50/60 ring-1 ring-teal-600' : 'border-slate-200 hover:border-teal-300'
                 }`}
@@ -883,7 +845,7 @@ function WeekOffPanel({ notify }) {
           <SectionCard icon={Users} title="Week-off groups" subtitle="Teams that can be given a different off-day in the same week">
             <div className="flex gap-2 mb-4">
               <input className={inputCls} placeholder="New group name, e.g. Group A" value={groupName} onChange={(e) => setGroupName(e.target.value)} />
-              <Button onClick={createGroup}>
+              <Button onClick={createGroup} disabled={createGroupMutation.isPending}>
                 <Plus className="w-4 h-4" /> Create
               </Button>
             </div>
@@ -925,7 +887,7 @@ function WeekOffPanel({ notify }) {
                           </option>
                         ))}
                       </select>
-                      <Button variant="subtle" className="py-1.5 px-2.5" onClick={() => addMember(g._id)}>
+                      <Button variant="subtle" className="py-1.5 px-2.5" onClick={() => addMember(g._id)} disabled={addGroupMembersMutation.isPending}>
                         <Plus className="w-3.5 h-3.5" />
                       </Button>
                     </div>
@@ -956,8 +918,8 @@ function WeekOffPanel({ notify }) {
                 </select>
               </Field>
               <div className="flex items-end">
-                <Button onClick={submitWeekForm} disabled={savingWeek} className="w-full h-[38px]">
-                  {savingWeek ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save week'}
+                <Button onClick={submitWeekForm} disabled={setWeekScheduleMutation.isPending} className="w-full h-[38px]">
+                  {setWeekScheduleMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save week'}
                 </Button>
               </div>
             </div>
@@ -993,8 +955,8 @@ function WeekOffPanel({ notify }) {
                 </select>
               </Field>
               <div className="flex items-end">
-                <Button onClick={submitMonthForm} disabled={savingMonth} className="w-full h-[38px]">
-                  {savingMonth ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Apply to month'}
+                <Button onClick={submitMonthForm} disabled={setMonthScheduleMutation.isPending} className="w-full h-[38px]">
+                  {setMonthScheduleMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Apply to month'}
                 </Button>
               </div>
             </div>
@@ -1087,14 +1049,14 @@ function WeekOffPanel({ notify }) {
             {overrideForm.weekOffType === 'custom_fixed_days' && (
               <DayPicker value={overrideForm.fixedOffDays} onChange={(v) => setOverrideForm((f) => ({ ...f, fixedOffDays: v }))} />
             )}
-            <Button onClick={submitOverride} disabled={savingOverride} className="self-start">
-              {savingOverride ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save override'}
+            <Button onClick={submitOverride} disabled={setOverrideMutation.isPending} className="self-start">
+              {setOverrideMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save override'}
             </Button>
           </div>
           <div className="flex flex-col gap-3">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Remove an override</p>
             <input className={inputCls} placeholder="Employee ID" value={removeEmployeeId} onChange={(e) => setRemoveEmployeeId(e.target.value)} />
-            <Button variant="danger" onClick={submitRemoveOverride} className="self-start">
+            <Button variant="danger" onClick={submitRemoveOverride} className="self-start" disabled={removeOverrideMutation.isPending}>
               Remove override
             </Button>
           </div>

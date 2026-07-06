@@ -102,9 +102,9 @@ app.use('/timesheet', timesheetroute);
 app.use('/kiosk', kioskrouter);
 app.use('/faceattendance', faceattendancerouter);
 app.use('/admin', shiftrouter);
-app.use('/admin', holidaypolicyrouter);
+app.use('/admin/holiday-policy', holidaypolicyrouter);   // was: app.use('/admin', holidaypolicyrouter);
 app.use('/superadmin', shiftrouter);
-app.use('/superadmin', holidaypolicyrouter);
+app.use('/superadmin/holiday-policy', holidaypolicyrouter); // was: app.use('/superadmin', holidaypolicyrouter);
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 
