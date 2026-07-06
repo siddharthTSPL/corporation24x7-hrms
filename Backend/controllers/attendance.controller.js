@@ -1,6 +1,8 @@
 const Attendance = require("../Models/attendance.model");
 const AdminModel = require("../Models/Admin.model");
+const Shift = require("../Models/shift.model");
 const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
+const { resolveEmployeeShift, evaluateCheckinWindow, getShiftThresholds } = require("../utils/shift.utils");
 
 const getUserId = (user) => user._id || user.id;
 
@@ -32,6 +34,16 @@ const checkin = async (req, res) => {
     if (!latitude || !longitude)
       return res.status(400).json({ message: "Location required" });
 
+    const shift = await resolveEmployeeShift(user, organisation_id);
+    const { allowed, isLate } = evaluateCheckinWindow(shift, new Date());
+
+    if (!allowed) {
+      return res.status(400).json({
+        message: `Check-in is only allowed between ${shift.earlyBufferMinutes ?? 60} minutes before your shift (${shift.startTime}) and your shift end (${shift.endTime}).`,
+        shift: { name: shift.name, startTime: shift.startTime, endTime: shift.endTime },
+      });
+    }
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -47,11 +59,13 @@ const checkin = async (req, res) => {
         attendance.checkIn = new Date();
         attendance.source = "manual";
         attendance.onModel = getOnModel(user.role);
+        attendance.shift = shift._id;
+        attendance.isLate = isLate;
         attendance.activeMinutes = 0;
         attendance.idleMinutes = 0;
         attendance.lastUpdated = Date.now();
         await attendance.save();
-        return res.json({ message: "Check-in successful", attendance });
+        return res.json({ message: "Check-in successful", attendance, isLate });
       }
       return res.status(400).json({ message: "Already checked in" });
     }
@@ -66,13 +80,15 @@ const checkin = async (req, res) => {
       latitude,
       longitude,
       selfie,
+      shift: shift._id,
+      isLate,
       activeMinutes: 0,
       idleMinutes: 0,
       lastUpdated: Date.now(),
       source: "manual",
     });
 
-    res.json({ message: "Check-in successful", attendance: newAttendance });
+    res.json({ message: "Check-in successful", attendance: newAttendance, isLate });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -94,6 +110,7 @@ const activity = async (req, res) => {
     let attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
 
     if (!attendance) {
+      const shift = await resolveEmployeeShift(user, organisation_id);
       attendance = await Attendance.create({
         organisation_id,
         employee: userId,
@@ -101,6 +118,7 @@ const activity = async (req, res) => {
         role: user.role,
         date: today,
         checkIn: new Date(),
+        shift: shift._id,
         activeMinutes: 0,
         idleMinutes: 0,
         lastUpdated: Date.now(),
@@ -152,8 +170,16 @@ const checkout = async (req, res) => {
     if (attendance.checkOut)
       return res.status(400).json({ message: "Already checked out" });
 
+    // Use the shift stamped at checkin so a later shift change doesn't
+    // retroactively alter today's thresholds; fall back if it's missing
+    // (e.g. old records created before this feature existed).
+    const shiftDoc = attendance.shift
+      ? await Shift.findById(attendance.shift).lean()
+      : await resolveEmployeeShift(user, organisation_id);
+    const thresholds = getShiftThresholds(shiftDoc);
+
     attendance.checkOut = new Date();
-    const status = calculateStatus(attendance.activeMinutes);
+    const status = calculateStatus(attendance.activeMinutes, thresholds);
     attendance.status = status;
     await attendance.save();
     await updateSummary(attendance);
@@ -207,27 +233,67 @@ const autoCheckoutAll = async () => {
       source: "manual",
       checkIn: { $exists: true },
       checkOut: { $exists: false },
-    }).select("_id activeMinutes organisation_id").lean();
+    }).select("_id activeMinutes organisation_id shift employee role").lean();
 
     if (!openSessions.length) return;
 
+    // Resolve thresholds per session (per shift), defaulting to the org's
+    // default shift for any legacy records missing a `shift` reference.
+    const shiftCache = new Map();
+    const getThresholdsFor = async (session) => {
+      if (session.shift) {
+        if (!shiftCache.has(String(session.shift))) {
+          const shift = await Shift.findById(session.shift).lean();
+          shiftCache.set(String(session.shift), shift);
+        }
+        const shift = shiftCache.get(String(session.shift));
+        if (shift) return getShiftThresholds(shift);
+      }
+      const fallback = await resolveEmployeeShift({}, session.organisation_id);
+      return getShiftThresholds(fallback);
+    };
+
     const now = new Date();
-    const ops = openSessions.map((a) => ({
-      updateOne: {
-        filter: { _id: a._id, organisation_id: a.organisation_id },
-        update: { $set: { checkOut: now, status: calculateStatus(a.activeMinutes) } },
-      },
-    }));
+    const ops = [];
+    const summaryPayloads = [];
+
+    for (const a of openSessions) {
+      const thresholds = await getThresholdsFor(a);
+      const status = calculateStatus(a.activeMinutes, thresholds);
+      ops.push({
+        updateOne: {
+          filter: { _id: a._id, organisation_id: a.organisation_id },
+          update: { $set: { checkOut: now, status } },
+        },
+      });
+      summaryPayloads.push({ ...a, checkOut: now, status });
+    }
 
     await Attendance.bulkWrite(ops, { ordered: false });
-    await Promise.all(openSessions.map((a) => {
-      a.checkOut = now;
-      a.status = calculateStatus(a.activeMinutes);
-      return updateSummary(a);
-    }));
+    await Promise.all(summaryPayloads.map((a) => updateSummary(a)));
   } catch (error) {
     console.error("[Cron] Auto checkout failed:", error.message);
   }
 };
 
-module.exports = { checkin, activity, checkout, getToday, autoCheckoutAll };
+const getMyShift = async (req, res) => {
+  try {
+    const user = req.user;
+    const organisation_id = await resolveOrganisationId(user);
+    const shift = await resolveEmployeeShift(user, organisation_id);
+
+    res.json({
+      shift: {
+        name: shift.name,
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+        graceMinutes: shift.graceMinutes ?? 15,
+        earlyBufferMinutes: shift.earlyBufferMinutes ?? 60,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+module.exports = { checkin, activity, checkout, getToday, autoCheckoutAll, getMyShift };

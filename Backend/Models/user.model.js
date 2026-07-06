@@ -96,7 +96,11 @@ const userSchema = new mongoose.Schema(
       enum: ["Noida", "Bareilly", "Delhi", "Mumbai"],
       required: [true, "Office location is required"],
     },
-
+  shift: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Shift",
+      default: null,
+    },
     is_fresher: { type: Boolean, default: true },
     total_experience: { type: Number, default: 0 },
     previous_company: { type: String },

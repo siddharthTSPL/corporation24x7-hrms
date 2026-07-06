@@ -1,4 +1,4 @@
-import { activity, checkin, checkout, getTodayAttendance } from "../../api/attendance/attendance.api";
+import { activity, checkin, checkout, getTodayAttendance, getMyShift } from "../../api/attendance/attendance.api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const useTodayAttendance = () => {
@@ -37,5 +37,13 @@ export const useCheckout = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attendance"] });
     },
+  });
+};
+// hooks
+export const useGetMyShift = () => {
+  return useQuery({
+    queryKey: ["my-shift"],
+    queryFn: getMyShift,
+    staleTime: 5 * 60 * 1000, // shift rarely changes mid-day
   });
 };
