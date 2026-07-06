@@ -4,7 +4,11 @@ import {
   useGetMeSuperAdmin,
   useUpdateSuperAdminProfile,
 } from "../../auth/server-state/superadmin/auth/suauth.hook";
-import { useChangeSuperAdminPassword } from "../../auth/server-state/superadmin/other/suother.hook";
+import {
+  useChangeSuperAdminPassword,
+  useKioskPasswordStatus,
+  useSetKioskPassword,
+} from "../../auth/server-state/superadmin/other/suother.hook";
 import { useQueryClient } from "@tanstack/react-query";
 
 const AVATAR_STYLES = [
@@ -233,6 +237,11 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
     {
       key: "password", label: "Password", icon: (
         <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none"><rect x="4" y="7" width="8" height="6" rx="2" stroke="currentColor" strokeWidth="1.4" /><path d="M6 7V5a2 2 0 0 1 4 0v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
+      )
+    },
+    {
+      key: "kiosk", label: "Kiosk", icon: (
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.4" /><path d="M6 14h4M8 11v3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
       )
     },
     {
@@ -558,6 +567,79 @@ function PasswordTab({ onSuccess, onError }) {
   );
 }
 
+function KioskTab({ superAdmin, onSuccess, onError }) {
+  const { data: statusData, isLoading: statusLoading } = useKioskPasswordStatus();
+  const setKiosk = useSetKioskPassword();
+  const [show, setShow] = useState(false);
+  const [form, setForm] = useState({ currentPassword: "", kioskPassword: "", confirm: "" });
+
+  const EyeIcon = ({ open }) => open
+    ? <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3" /><circle cx="8" cy="8" r="2" stroke={C.muted} strokeWidth="1.3" /></svg>
+    : <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3" /><line x1="2" y1="2" x2="14" y2="14" stroke={C.muted} strokeWidth="1.3" strokeLinecap="round" /></svg>;
+
+  const eyeToggle = (
+    <button type="button" onClick={() => setShow(s => !s)} className="bg-none border-none cursor-pointer flex p-0">
+      <EyeIcon open={show} />
+    </button>
+  );
+
+  const handleSave = () => {
+    if (!form.currentPassword || !form.kioskPassword) { onError("All fields are required"); return; }
+    if (form.kioskPassword !== form.confirm) { onError("Kiosk passwords do not match"); return; }
+    if (form.kioskPassword.length < 6) { onError("Kiosk password must be at least 6 characters"); return; }
+    setKiosk.mutate(
+      { currentPassword: form.currentPassword, kioskPassword: form.kioskPassword },
+      {
+        onSuccess: () => { setForm({ currentPassword: "", kioskPassword: "", confirm: "" }); onSuccess("Kiosk password saved!"); },
+        onError: (err) => onError(getErrorMessage(err)),
+      }
+    );
+  };
+
+  return (
+    <SectionCard title="Kiosk password" subtitle="Shared credential used by attendance kiosk devices" accent={C.blue}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-0">
+        <ReadonlyField label="Organisation ID" value={statusLoading ? "Loading..." : statusData?.organisation_id} />
+        <div className="mb-4">
+          <FieldLabel>Kiosk password status</FieldLabel>
+          <div className="px-3.5 py-2.5 rounded-lg bg-[#f9f4f2] border border-[#ede5e0] flex items-center">
+            {statusLoading
+              ? <span className="text-sm text-[#b0948a]">Loading...</span>
+              : <Badge color={statusData?.kiosk_password_set ? "#1a5c3a" : C.amber} bg={statusData?.kiosk_password_set ? C.greenBg : C.amberBg}>
+                  {statusData?.kiosk_password_set ? "Set" : "Not set"}
+                </Badge>
+            }
+          </div>
+        </div>
+      </div>
+
+      <div className="w-full max-w-md">
+        <InputField label="Your account password *" type={show ? "text" : "password"} name="currentPassword"
+          value={form.currentPassword} onChange={e => setForm(p => ({ ...p, currentPassword: e.target.value }))}
+          placeholder="Enter your account password" rightEl={eyeToggle} />
+
+        <InputField label="New kiosk password *" type={show ? "text" : "password"} name="kioskPassword"
+          value={form.kioskPassword} onChange={e => setForm(p => ({ ...p, kioskPassword: e.target.value }))}
+          placeholder="Enter new kiosk password" rightEl={eyeToggle} />
+
+        <InputField label="Confirm kiosk password *" type={show ? "text" : "password"} name="confirm"
+          value={form.confirm} onChange={e => setForm(p => ({ ...p, confirm: e.target.value }))}
+          placeholder="Confirm kiosk password"
+          hint={form.confirm && form.kioskPassword !== form.confirm ? "Passwords do not match" : ""}
+        />
+
+        <PrimaryButton onClick={handleSave} loading={setKiosk.isPending} color={C.blue}>
+          Save kiosk password
+        </PrimaryButton>
+
+        <div className="mt-4 p-3.5 rounded-lg text-xs leading-relaxed" style={{ background: C.blueBg, color: C.blue }}>
+          Use your Organisation ID and this kiosk password to sign in on shared attendance devices. This password is separate from your own account password.
+        </div>
+      </div>
+    </SectionCard>
+  );
+}
+
 function AvatarTab({ superAdmin, onSuccess, onError }) {
   const queryClient = useQueryClient();
   const updateProfile = useUpdateSuperAdminProfile();
@@ -707,6 +789,7 @@ export default function SuperAdminSettingsPage() {
           {tab === "profile" && <ProfileTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
           {tab === "organisation" && <OrganisationTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
           {tab === "password" && <PasswordTab onSuccess={showSuccess} onError={showError} />}
+          {tab === "kiosk" && <KioskTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
           {tab === "avatar" && <AvatarTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
 
           <div className="text-center text-xs text-[#c9bab5] mt-2">
