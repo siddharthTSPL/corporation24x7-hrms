@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useGetMeUser } from "../../auth/server-state/employee/employeeauth/employeeauth.hook";
 import { useGetAllLeaveHistory } from "../../auth/server-state/employee/employeeleave/employeeleave.hook";
 import { useGetAttendance } from "../../auth/server-state/employee/employeeother/employeeother.hook";
+import { useCalendarMeta } from "../../auth/server-state/attendance/attendance.hook";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS = ["S","M","T","W","T","F","S"];
@@ -175,7 +176,7 @@ function SegBar({ segments }) {
   );
 }
 
-function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=[] }) {
+function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=[], holidays=[], weekOffDates=[] }) {
   const year=new Date().getFullYear();
   const firstDay=new Date(year,month,1).getDay();
   const daysInMo=new Date(year,month+1,0).getDate();
@@ -196,6 +197,24 @@ function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=
     return set;
   },[approvedLeaves,month,year]);
 
+  const holidayMap=useMemo(()=>{
+    const map=new Map();
+    holidays.forEach(h=>{
+      const d=new Date(h.date);
+      if (d.getFullYear()===year && d.getMonth()===month) map.set(d.getDate(), h.name);
+    });
+    return map;
+  },[holidays,month,year]);
+
+  const weekOffSet=useMemo(()=>{
+    const set=new Set();
+    weekOffDates.forEach(ds=>{
+      const d=new Date(ds);
+      if (d.getFullYear()===year && d.getMonth()===month) set.add(d.getDate());
+    });
+    return set;
+  },[weekOffDates,month,year]);
+
   const cells=[];
   for (let i=0; i<firstDay; i++) cells.push(null);
   for (let d=1; d<=daysInMo; d++) {
@@ -203,15 +222,19 @@ function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=
     const isToday=date.toDateString()===today.toDateString();
     const isFuture=date>today;
     const isBeforeJoining=joiningMidnight && date<joiningMidnight;
+    const holidayName=holidayMap.get(d);
     let status="future";
+    let label=null;
     if (isBeforeJoining) { status="before_joining"; }
+    else if (holidayName) { status="holiday"; label=holidayName; }
+    else if (weekOffSet.has(d)) { status="weekoff"; }
     else if (leaveDaySet.has(d)) { status="leave"; }
     else if (!isFuture) {
       const key=date.toISOString().slice(0,10);
       const record=attendanceMap.get(key);
       status=resolveAttendanceStatus(record)??"absent";
     }
-    cells.push({ day:d, status, isToday });
+    cells.push({ day:d, status, isToday, label });
   }
 
   const calStyle={
@@ -221,6 +244,8 @@ function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=
     late:{ bg:"bg-orange-50", text:"text-orange-700 font-medium" },
     leave:{ bg:"bg-indigo-50", text:"text-indigo-700 font-semibold" },
     checkedin:{ bg:"bg-[rgba(29,158,117,0.12)]", text:"text-[#1D9E75] font-semibold" },
+    holiday:{ bg:"bg-orange-50", text:"text-orange-700 font-semibold" },
+    weekoff:{ bg:"bg-slate-100", text:"text-slate-500 font-medium" },
     future:{ bg:"", text:"text-[#d4c8c4]" },
     before_joining:{ bg:"", text:"text-[#cfc6c1] opacity-35" },
   };
@@ -238,7 +263,7 @@ function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=
           return (
             <div
               key={i}
-              title={cell ? (cell.status==="before_joining"?"Before joining":cell.status.replace(/_/g," ")) : ""}
+              title={cell ? (cell.label ? `Holiday: ${cell.label}` : cell.status.replace(/_/g," ")) : ""}
               className={`aspect-square flex items-center justify-center rounded text-[10px] font-sans transition-transform hover:scale-110 cursor-default ${s.bg} ${s.text} ${cell?.isToday?"outline outline-[1.5px] outline-[#730042] outline-offset-[-1.5px]":""}`}
             >
               {cell?.day}
@@ -294,38 +319,70 @@ function DOJCard({ joiningDate }) {
   );
 }
 
-function TodayBanner({ isOnLeave, leaveType, onCheckIn }) {
+function TodayBanner({ isOnLeave, leaveType, checkinGate, onCheckIn }) {
   const today=new Date();
   const day=today.toLocaleDateString("en-IN",{weekday:"long"});
   const date=today.toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"});
   const leaveLabel={ el:"Earned Leave",sl:"Sick Leave",pl:"Paternity Leave",ml:"Maternity Leave",cl:"Casual Leave",lwp:"Leave Without Pay" };
+
+  const reason = isOnLeave ? "leave" : (checkinGate?.reason ?? null);
+  const isBlocked = isOnLeave || !checkinGate?.canCheckIn;
+
+  const REASON_META = {
+    leave:         { theme:"indigo", icon:"🏖️", label:`On Leave — ${leaveLabel[leaveType]||"Approved Leave"}` },
+    holiday:       { theme:"amber",  icon:"🎉", label:`Holiday — ${checkinGate?.holidayName || "Company Holiday"}` },
+    weekoff:       { theme:"slate",  icon:"🛋️", label:"Week Off" },
+    outside_shift: { theme:"slate",  icon:"⏰", label: checkinGate?.shift
+      ? `Shift window: ${checkinGate.shift.startTime} – ${checkinGate.shift.endTime}`
+      : "Outside shift window" },
+    loading:       { theme:"slate",  icon:"⏳", label:"Checking today's status…" },
+  };
+  const meta = REASON_META[reason] || null;
+
+  const THEME = {
+    indigo: { bg:"bg-gradient-to-br from-indigo-100 to-indigo-200 shadow-indigo-100 shadow-lg", head:"text-indigo-800", sub:"text-indigo-500", pill:"text-indigo-700 bg-indigo-200/60" },
+    amber:  { bg:"bg-gradient-to-br from-amber-50 to-amber-200 shadow-amber-100 shadow-lg",     head:"text-amber-900", sub:"text-amber-600", pill:"text-amber-800 bg-amber-200/60" },
+    slate:  { bg:"bg-gradient-to-br from-slate-100 to-slate-200 shadow-slate-100 shadow-lg",    head:"text-slate-700", sub:"text-slate-500", pill:"text-slate-700 bg-slate-300/50" },
+  };
+  const active = isBlocked && meta ? THEME[meta.theme] : null;
+
+  let buttonLabel = "Check In";
+  if (reason === "leave") buttonLabel = "🚫 Check-in Disabled";
+  else if (reason === "holiday") buttonLabel = "🎉 Holiday Today";
+  else if (reason === "weekoff") buttonLabel = "🛋️ Week Off";
+  else if (reason === "outside_shift") buttonLabel = "⏰ Outside Shift";
+  else if (reason === "loading") buttonLabel = "Please wait…";
+
   return (
     <div className={`rounded-2xl p-4 sm:p-5 flex items-center justify-between mb-4 flex-wrap gap-3 ${
-      isOnLeave
-        ? "bg-gradient-to-br from-indigo-100 to-indigo-200 shadow-indigo-100 shadow-lg"
-        : "bg-gradient-to-br from-[#730042] to-[#a0004a] shadow-[0_4px_20px_rgba(115,0,66,0.28)]"
+      active ? active.bg : "bg-gradient-to-br from-[#730042] to-[#a0004a] shadow-[0_4px_20px_rgba(115,0,66,0.28)]"
     }`}>
       <div>
-        <div className={`text-[11px] font-medium tracking-wide uppercase font-sans ${isOnLeave?"text-indigo-500":"text-[rgba(249,248,242,0.65)]"}`}>{day}</div>
-        <div className={`text-lg sm:text-xl font-bold mt-0.5 ${isOnLeave?"text-indigo-800":"text-[#f9f8f2]"}`} style={{ fontFamily:"'Lora',serif" }}>{date}</div>
-        {isOnLeave && (
+        <div className={`text-[11px] font-medium tracking-wide uppercase font-sans ${active?active.sub:"text-[rgba(249,248,242,0.65)]"}`}>{day}</div>
+        <div className={`text-lg sm:text-xl font-bold mt-0.5 ${active?active.head:"text-[#f9f8f2]"}`} style={{ fontFamily:"'Lora',serif" }}>{date}</div>
+        {isBlocked && meta && (
           <div className="flex items-center gap-1.5 mt-2">
-            <span className="text-[11px] text-indigo-700 font-semibold bg-indigo-200/60 px-2.5 py-1 rounded-full font-sans">
-              🏖️ On Leave — {leaveLabel[leaveType]||"Approved Leave"}
+            <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full font-sans ${active.pill}`}>
+              {meta.icon} {meta.label}
             </span>
+          </div>
+        )}
+        {!isBlocked && checkinGate?.shift && (
+          <div className="mt-1.5 text-[11px] text-white/60 font-sans">
+            Shift: {checkinGate.shift.name} · {checkinGate.shift.startTime} – {checkinGate.shift.endTime}
           </div>
         )}
       </div>
       <button
-        disabled={isOnLeave}
+        disabled={isBlocked}
         onClick={onCheckIn}
         className={`text-[13px] font-semibold px-5 py-2.5 rounded-xl border-none transition-all font-sans ${
-          isOnLeave
-            ? "bg-white/30 text-indigo-400 cursor-not-allowed opacity-70"
+          isBlocked
+            ? `bg-white/40 ${active?active.head:"text-indigo-400"} cursor-not-allowed opacity-80`
             : "bg-white text-[#730042] cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(115,0,66,0.35)] active:translate-y-0 shadow-md"
         }`}
       >
-        {isOnLeave?"🚫 Check-in Disabled":"Check In"}
+        {buttonLabel}
       </button>
     </div>
   );
@@ -477,6 +534,7 @@ export default function EmployeeDashboard() {
   const { data:meData, isLoading:meLoading, isError:meError }=useGetMeUser();
   const { data:histData, isLoading:histLoading }=useGetAllLeaveHistory();
   const { data:attData, isLoading:attLoading }=useGetAttendance();
+  const { data:calMeta }=useCalendarMeta(selectedMonth, new Date().getFullYear());
 
   const employee=meData?.employee??null;
   const lb=meData?.leavebalance??null;
@@ -484,6 +542,17 @@ export default function EmployeeDashboard() {
   const reviews=meData?.reviews??meData?.review??[];
 
   const joiningDate=employee?.date_of_joining??employee?.createdAt??null;
+
+  const checkinGate = useMemo(() => {
+    if (!calMeta?.today) return { canCheckIn: false, reason: "loading" };
+    const t = calMeta.today;
+    return {
+      canCheckIn: t.canCheckIn,
+      reason: t.disabledReason,
+      holidayName: t.holidayName,
+      shift: t.shift,
+    };
+  }, [calMeta]);
 
   const attendanceMap=useMemo(()=>{
     const records=Array.isArray(attData)?attData:Array.isArray(attData?.attendance)?attData.attendance:[];
@@ -599,7 +668,7 @@ export default function EmployeeDashboard() {
           </div>
         </div>
 
-        <TodayBanner isOnLeave={isOnLeaveToday} leaveType={todayLeave?.leaveType} onCheckIn={()=>navigate("/mark-attendance")} />
+        <TodayBanner isOnLeave={isOnLeaveToday} leaveType={todayLeave?.leaveType} checkinGate={checkinGate} onCheckIn={()=>navigate("/mark-attendance")} />
 
         {/* Top 4 Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 mb-3.5">
@@ -734,7 +803,7 @@ export default function EmployeeDashboard() {
               )}
               {/* Calendar: constrained width on large screens so it doesn't stretch too wide */}
               <div className="max-w-2xl mx-auto">
-                <Calendar month={selectedMonth} joiningDate={joiningDate} attendanceMap={attendanceMap} approvedLeaves={approvedLeaves} />
+                <Calendar month={selectedMonth} joiningDate={joiningDate} attendanceMap={attendanceMap} approvedLeaves={approvedLeaves} holidays={calMeta?.holidays ?? []} weekOffDates={calMeta?.weekOffDates ?? []} />
               </div>
             </div>
             <div className="grid grid-cols-5 border-t border-[#f0e8e4] mt-3">
@@ -746,7 +815,7 @@ export default function EmployeeDashboard() {
               ))}
             </div>
             <div className="flex flex-wrap gap-2 px-4 py-3 border-t border-[#f0e8e4]">
-              {[["#730042","Present"],["#E24B4A","Absent"],["#f57f17","Half day"],["#e65100","Late"],["#1D9E75","Checked in"],["#283593","On leave"]].map(([c,l]) => (
+              {[["#730042","Present"],["#E24B4A","Absent"],["#f57f17","Half day"],["#e65100","Late"],["#1D9E75","Checked in"],["#283593","On leave"],["#c2410c","Holiday"],["#64748b","Week off"]].map(([c,l]) => (
                 <div key={l} className="flex items-center gap-1 text-[10px] text-[#b0948a] font-sans">
                   <div className="w-2 h-2 rounded-sm" style={{ background:c }} />{l}
                 </div>
