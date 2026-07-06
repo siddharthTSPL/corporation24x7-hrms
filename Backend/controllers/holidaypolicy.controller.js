@@ -27,7 +27,7 @@ const setPolicy = async (req, res) => {
       $set: {
         weekOffType,
         updatedBy: req.admin._id,
-        updatedByModel: "Admin",
+        updatedByModel: req.actorModel || "Admin",
       },
     },
     { upsert: true, new: true }
@@ -57,7 +57,7 @@ const setWeekSchedule = async (req, res) => {
         weekEndDate: normalisedEnd,
         offDays,
         setBy: req.admin._id,
-        setByModel: "Admin",
+        setByModel: req.actorModel || "Admin",
       },
     },
     { upsert: true, new: true }
@@ -92,7 +92,7 @@ const bulkSetWeekSchedule = async (req, res) => {
             weekEndDate: normalisedEnd,
             offDays: w.offDays,
             setBy: req.admin._id,
-            setByModel: "Admin",
+            setByModel: req.actorModel || "Admin",
           },
         },
         upsert: true,
@@ -142,7 +142,7 @@ const setWeekScheduleForMonth = async (req, res) => {
             weekEndDate,
             offDays,
             setBy: req.admin._id,
-            setByModel: "Admin",
+            setByModel: req.actorModel || "Admin",
           },
         },
         upsert: true,
@@ -176,7 +176,7 @@ const createGroup = async (req, res) => {
         members: members || [],
         isActive: true,
         createdBy: req.admin._id,
-        createdByModel: "Admin",
+        createdByModel: req.actorModel || "Admin",
       },
     },
     { upsert: true, new: true }
@@ -260,7 +260,7 @@ const addHoliday = async (req, res) => {
 
   const holiday = await Holiday.findOneAndUpdate(
     { organisation_id, date: normalisedDate },
-    { $set: { name, createdBy: req.admin._id, createdByModel: "Admin" } },
+    { $set: { name, createdBy: req.admin._id, createdByModel: req.actorModel || "Admin" } },
     { upsert: true, new: true }
   );
 
@@ -296,7 +296,7 @@ const bulkAddHolidays = async (req, res) => {
           $set: {
             name: h.name,
             createdBy: req.admin._id,
-            createdByModel: "Admin",
+            createdByModel: req.actorModel || "Admin",
           },
         },
         upsert: true,
@@ -430,7 +430,7 @@ const setEmployeeOverride = async (req, res) => {
         fixedOffDays: weekOffType === "custom_fixed_days" ? fixedOffDays : undefined,
         isActive: true,
         setBy: req.admin._id,
-        setByModel: "Admin",
+        setByModel: req.actorModel || "Admin",
       },
     },
     { upsert: true, new: true }
