@@ -68,6 +68,8 @@ const SuperAdmintimesheet = lazy(() => import("./pages/timesheet/sutimesheet"));
 const Pagenotfound = lazy(() => import("./pages/pagenotfound/pagenotfound"));
 const Adminasset = lazy(() => import("./pages/asset/adminasset"));
 const Superadminasset = lazy(() => import("./pages/asset/superadminasset"));
+const adminmanagement= lazy(() => import("./pages/torchx-management/adminmanagement"));
+const superadminmanagement = lazy(() => import("./pages/torchx-management/superadminmanagement"));
 
 function PageSkeleton() {
   const [animationData, setAnimationData] = useState(null);
