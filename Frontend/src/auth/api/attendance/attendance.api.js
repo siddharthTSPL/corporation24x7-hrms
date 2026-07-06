@@ -29,3 +29,8 @@ export const getMyShift = async () => {
   const res = await api.get('attendance/my-shift');
   return res.data;
 };
+
+export const getCalendarMeta = async ({ month, year } = {}) => {
+  const res = await api.get('attendance/calendar-meta', { params: { month, year } });
+  return res.data;
+};
