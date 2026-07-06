@@ -6,7 +6,7 @@ import {
   setDefaultShiftSuperAdmin,
   deleteShiftSuperAdmin,
   assignShiftToUserSuperAdmin,
-} from "../../../api/superadmin/shift/su.shift.api";
+} from "../../../api/superadmin/shift/Sushift.api";
 
 export const useGetAllShiftsSuperAdmin = () => {
   return useQuery({
