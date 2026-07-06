@@ -616,6 +616,58 @@ const changePassword = async (req, res, next) => {
     .json({ success: true, message: "Password updated successfully" });
 };
 
+// ---------------------------------------------------------------------
+// Kiosk password — a separate, org-level credential used only by
+// face-attendance tablets to sign in as the organisation. Deliberately
+// decoupled from the superadmin's own login password: this is what gets
+// typed into a shared device sitting at reception, so it should never be
+// the same secret that unlocks the full superadmin account.
+// ---------------------------------------------------------------------
+const setKioskPassword = async (req, res, next) => {
+  const { currentPassword, kioskPassword } = req.body;
+  if (!currentPassword || !kioskPassword)
+    return next(
+      Object.assign(
+        new Error("Your account password and a new kiosk password are required"),
+        { statusCode: 400 },
+      ),
+    );
+  if (kioskPassword.length < 6)
+    return next(
+      Object.assign(new Error("Kiosk password must be at least 6 characters"), {
+        statusCode: 400,
+      }),
+    );
+
+  const superAdmin = await SuperAdminModel.findById(req.superAdmin._id);
+  const isValid = await superAdmin.isValidPassword(currentPassword);
+  if (!isValid)
+    return next(
+      Object.assign(new Error("Your account password is incorrect"), {
+        statusCode: 400,
+      }),
+    );
+
+  superAdmin.kiosk_password = kioskPassword;
+  await superAdmin.save();
+  res.status(200).json({
+    success: true,
+    message: "Kiosk password saved. Use your Organisation ID and this password to sign in kiosk devices.",
+  });
+};
+
+const getKioskPasswordStatus = async (req, res, next) => {
+  const superAdmin = await SuperAdminModel.findById(req.superAdmin._id).select(
+    "organisation_id organisation_name kiosk_password",
+  );
+  res.status(200).json({
+    success: true,
+    organisation_id: superAdmin.organisation_id,
+    organisation_name: superAdmin.organisation_name,
+    kiosk_password_set: !!superAdmin.kiosk_password,
+  });
+};
+
 const forgotPassword = async (req, res, next) => {
   const { email } = req.body;
   if (!email)
@@ -2313,6 +2365,8 @@ module.exports = {
   logoutSuperAdmin,
   updateSuperAdmin,
   changePassword,
+  setKioskPassword,
+  getKioskPasswordStatus,
   forgotPassword,
   verifyOtp,
   resetPassword,

@@ -15,7 +15,7 @@ const kioskSchema = new mongoose.Schema(
     },
     registeredBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Admin",
+      ref: "SuperAdmin",
     },
     isActive: {
       type: Boolean,

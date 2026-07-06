@@ -10,6 +10,8 @@ const {
   logoutSuperAdmin,
   updateSuperAdmin,
   changePassword,
+  setKioskPassword,
+  getKioskPasswordStatus,
   forgotPassword,
   verifyOtp,
   resetPassword,
@@ -76,6 +78,16 @@ superAdminRouter.post(
   "/logout",
   superAdminAuth,
   asyncHandler(logoutSuperAdmin),
+);
+superAdminRouter.put(
+  "/kiosk-password",
+  superAdminAuth,
+  asyncHandler(setKioskPassword),
+);
+superAdminRouter.get(
+  "/kiosk-password/status",
+  superAdminAuth,
+  asyncHandler(getKioskPasswordStatus),
 );
 superAdminRouter.get("/getorginfo", superAdminAuth, asyncHandler(getOrgInfo));
 

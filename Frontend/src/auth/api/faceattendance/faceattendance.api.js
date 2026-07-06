@@ -62,8 +62,8 @@ kioskApi.interceptors.response.use(
   }
 );
 
-export const kioskLogin = async ({ work_email, password, device_name }) => {
-  const res = await kioskApi.post("kiosk/login", { work_email, password, device_name });
+export const kioskLogin = async ({ organisation_id, password, device_name }) => {
+  const res = await kioskApi.post("kiosk/login", { organisation_id, password, device_name });
   return res.data;
 };
 
