@@ -8,7 +8,7 @@ import {
   useAdminGetMyLeaveHistory,
 } from "../../auth/server-state/adminleave/adminleave.hook";
 import { useAdminGetMyWFH } from "../../auth/server-state/adminwfh/adminwfh.hook";
-import { useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
+import { useTodayAttendance, useCalendarMeta } from "../../auth/server-state/attendance/attendance.hook";
 import AttendanceModal from "./AttendanceModal";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -179,7 +179,7 @@ function SegBar({ segments }) {
   );
 }
 
-function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=[], approvedWFH=[] }) {
+function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=[], approvedWFH=[], holidayMap=new Map(), weekOffSet=new Set() }) {
   const year=new Date().getFullYear();
   const firstDay=new Date(year,month,1).getDay();
   const daysInMo=new Date(year,month+1,0).getDate();
@@ -220,8 +220,12 @@ function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=
     const isToday=date.toDateString()===today.toDateString();
     const isFuture=date>today;
     const isBeforeJoining=joiningMidnight && date<joiningMidnight;
+    const holidayName=holidayMap.get(d);
+    const isWeekOffDay=weekOffSet.has(d);
     let status="future";
     if (isBeforeJoining) { status="before_joining"; }
+    else if (holidayName) { status="holiday"; }
+    else if (isWeekOffDay) { status="weekoff"; }
     else if (leaveDaySet.has(d)) { status="leave"; }
     else if (wfhDaySet.has(d)) { status="wfh"; }
     else if (!isFuture) {
@@ -229,7 +233,7 @@ function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=
       const record=attendanceMap.get(key);
       status=resolveAttendanceStatus(record)??"absent";
     }
-    cells.push({ day:d, status, isToday });
+    cells.push({ day:d, status, isToday, holidayName });
   }
 
   const calStyle={
@@ -239,6 +243,8 @@ function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=
     late:{ bg:"bg-orange-50", text:"text-orange-700 font-medium" },
     leave:{ bg:"bg-indigo-50", text:"text-indigo-700 font-semibold" },
     wfh:{ bg:"bg-teal-50", text:"text-teal-700 font-semibold" },
+    holiday:{ bg:"bg-[#fff1e0]", text:"text-[#b5590a] font-semibold" },
+    weekoff:{ bg:"bg-slate-100", text:"text-slate-500 font-semibold" },
     checkedin:{ bg:"bg-[rgba(29,158,117,0.12)]", text:"text-[#1D9E75] font-semibold" },
     future:{ bg:"", text:"text-[#d4c8c4]" },
     before_joining:{ bg:"", text:"text-[#cfc6c1] opacity-35" },
@@ -254,13 +260,21 @@ function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=
       <div className="grid grid-cols-7 gap-0.5">
         {cells.map((cell,i) => {
           const s=cell?calStyle[cell.status]??calStyle.future:{bg:"",text:""};
+          const title=cell
+            ? (cell.status==="before_joining" ? "Before joining"
+              : cell.status==="holiday" ? `Holiday — ${cell.holidayName}`
+              : cell.status==="weekoff" ? "Week off"
+              : cell.status.replace(/_/g," "))
+            : "";
           return (
             <div
               key={i}
-              title={cell ? (cell.status==="before_joining"?"Before joining":cell.status.replace(/_/g," ")) : ""}
-              className={`aspect-square flex items-center justify-center rounded text-[10px] font-sans transition-transform hover:scale-110 cursor-default ${s.bg} ${s.text} ${cell?.isToday?"outline outline-[1.5px] outline-[#730042] outline-offset-[-1.5px]":""}`}
+              title={title}
+              className={`relative aspect-square flex items-center justify-center rounded text-[10px] font-sans transition-transform hover:scale-110 cursor-default ${s.bg} ${s.text} ${cell?.isToday?"outline outline-[1.5px] outline-[#730042] outline-offset-[-1.5px]":""}`}
             >
               {cell?.day}
+              {cell?.status==="holiday" && <span className="absolute -top-0.5 -right-0.5 text-[7px]">🎉</span>}
+              {cell?.status==="weekoff" && <span className="absolute -top-0.5 -right-0.5 text-[7px]">🌙</span>}
             </div>
           );
         })}
@@ -313,11 +327,16 @@ function DOJCard({ joiningDate }) {
   );
 }
 
-function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, onOpenAttendance }) {
+function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, onOpenAttendance, isHolidayToday, holidayName, isWeekOffToday, withinShiftWindow, shiftMeta }) {
   const today=new Date();
   const day=today.toLocaleDateString("en-IN",{weekday:"long"});
   const date=today.toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"});
   const leaveLabel={ el:"Earned Leave",sl:"Sick Leave",pl:"Paternity Leave",ml:"Maternity Leave",cl:"Casual Leave",lwp:"Leave Without Pay" };
+
+  // Once checked in / checked out, the day-off restrictions no longer
+  // matter for the button — only for a fresh check-in attempt.
+  const freshCheckinBlocked = !isCheckedIn && !isCheckedOut && (isHolidayToday || isWeekOffToday || withinShiftWindow===false);
+  const isSpecialDayOff = !isCheckedIn && !isCheckedOut && (isHolidayToday || isWeekOffToday);
 
   let buttonLabel = "Check In";
   if (isOnLeave) {
@@ -326,23 +345,51 @@ function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, o
     buttonLabel = "✅ Completed";
   } else if (isCheckedIn) {
     buttonLabel = "🔴 Check Out";
+  } else if (isHolidayToday) {
+    buttonLabel = "🎉 Holiday";
+  } else if (isWeekOffToday) {
+    buttonLabel = "🌙 Week Off";
+  } else if (withinShiftWindow===false) {
+    buttonLabel = "⏰ Outside Shift";
   }
 
-  const buttonDisabled = isOnLeave;
+  const buttonDisabled = isOnLeave || freshCheckinBlocked;
+  const bannerIsOff = isOnLeave || isSpecialDayOff;
 
   return (
     <div className={`rounded-2xl p-4 sm:p-5 flex items-center justify-between mb-4 flex-wrap gap-3 ${
-      isOnLeave
+      bannerIsOff
         ? "bg-gradient-to-br from-indigo-100 to-indigo-200 shadow-indigo-100 shadow-lg"
         : "bg-gradient-to-br from-[#730042] to-[#a0004a] shadow-[0_4px_20px_rgba(115,0,66,0.28)]"
     }`}>
       <div>
-        <div className={`text-[11px] font-medium tracking-wide uppercase font-sans ${isOnLeave?"text-indigo-500":"text-[rgba(249,248,242,0.65)]"}`}>{day}</div>
-        <div className={`text-lg sm:text-xl font-bold mt-0.5 ${isOnLeave?"text-indigo-800":"text-[#f9f8f2]"}`} style={{ fontFamily:"'Lora',serif" }}>{date}</div>
+        <div className={`text-[11px] font-medium tracking-wide uppercase font-sans ${bannerIsOff?"text-indigo-500":"text-[rgba(249,248,242,0.65)]"}`}>{day}</div>
+        <div className={`text-lg sm:text-xl font-bold mt-0.5 ${bannerIsOff?"text-indigo-800":"text-[#f9f8f2]"}`} style={{ fontFamily:"'Lora',serif" }}>{date}</div>
         {isOnLeave && (
           <div className="flex items-center gap-1.5 mt-2">
             <span className="text-[11px] text-indigo-700 font-semibold bg-indigo-200/60 px-2.5 py-1 rounded-full font-sans">
               🏖️ On Leave — {leaveLabel[leaveType]||"Approved Leave"}
+            </span>
+          </div>
+        )}
+        {!isOnLeave && isHolidayToday && (
+          <div className="flex items-center gap-1.5 mt-2">
+            <span className="text-[11px] text-indigo-700 font-semibold bg-indigo-200/60 px-2.5 py-1 rounded-full font-sans">
+              🎉 Holiday — {holidayName || "Company Holiday"}
+            </span>
+          </div>
+        )}
+        {!isOnLeave && !isHolidayToday && isWeekOffToday && (
+          <div className="flex items-center gap-1.5 mt-2">
+            <span className="text-[11px] text-indigo-700 font-semibold bg-indigo-200/60 px-2.5 py-1 rounded-full font-sans">
+              🌙 Week Off Today
+            </span>
+          </div>
+        )}
+        {!bannerIsOff && !isCheckedIn && !isCheckedOut && withinShiftWindow===false && shiftMeta && (
+          <div className="flex items-center gap-1.5 mt-2">
+            <span className="text-[11px] text-amber-100 font-semibold bg-white/15 px-2.5 py-1 rounded-full font-sans">
+              ⏰ Shift: {shiftMeta.startTime} – {shiftMeta.endTime}
             </span>
           </div>
         )}
@@ -357,7 +404,7 @@ function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, o
         disabled={buttonDisabled || isCheckedOut}
         onClick={onOpenAttendance}
         className={`text-[13px] font-semibold px-5 py-2.5 rounded-xl border-none transition-all font-sans ${
-          isOnLeave || isCheckedOut
+          bannerIsOff || isCheckedOut
             ? "bg-white/30 text-indigo-400 cursor-not-allowed opacity-70"
             : "bg-white text-[#730042] cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(115,0,66,0.35)] active:translate-y-0 shadow-md"
         }`}
@@ -715,6 +762,7 @@ export default function Dashboard() {
   const { data:empData, isLoading:empLoading }=useGetAllEmployee();
   const { data:checkinData, isLoading:mapLoading }=useGetTodayCheckins();
   const { data:leaveReqData, isLoading:leaveReqLoading }=useGetForwardedLeaves();
+  const { data:calendarMetaData }=useCalendarMeta(selectedMonth, new Date().getFullYear());
 
   const { mutate:acceptLeave, isPending:accepting }=useAcceptLeave();
   const { mutate:rejectLeave, isPending:rejecting }=useRejectLeave();
@@ -755,6 +803,30 @@ export default function Dashboard() {
   const wfhList = Array.isArray(wfhData?.wfh) ? wfhData.wfh : Array.isArray(wfhData?.requests) ? wfhData.requests : Array.isArray(wfhData) ? wfhData : [];
   const approvedWFH = useMemo(()=>wfhList.filter(w=>APPROVED_WFH_STATUSES.includes((w.status||"").toLowerCase())),[wfhList]);
 
+  const currentYear = new Date().getFullYear();
+  const holidayMap = useMemo(()=>{
+    const map = new Map();
+    (calendarMetaData?.holidays||[]).forEach(h=>{
+      const d = new Date(h.date);
+      if (d.getFullYear()===currentYear && d.getMonth()===selectedMonth) map.set(d.getDate(), h.name);
+    });
+    return map;
+  },[calendarMetaData, selectedMonth, currentYear]);
+
+  const weekOffSet = useMemo(()=>{
+    const set = new Set();
+    (calendarMetaData?.weekOffDates||[]).forEach(dt=>{
+      const d = new Date(dt);
+      if (d.getFullYear()===currentYear && d.getMonth()===selectedMonth) set.add(d.getDate());
+    });
+    return set;
+  },[calendarMetaData, selectedMonth, currentYear]);
+
+  const todayMeta = calendarMetaData?.today || null;
+  const isHolidayToday = todayMeta?.isHoliday || false;
+  const isWeekOffToday = todayMeta?.isWeekOff || false;
+  const withinShiftWindow = todayMeta ? todayMeta.withinShiftWindow : undefined;
+
   const todayLeave=useMemo(()=>{
     const today=new Date();
     return approvedLeaves.find(lv=>isDateInRange(today,lv.startDate,lv.endDate))??null;
@@ -779,6 +851,7 @@ export default function Dashboard() {
       if (date>today) break;
       if (joiningMidnight && date<joiningMidnight) continue;
       if (approvedLeaves.some(lv=>isDateInRange(date,lv.startDate,lv.endDate))) continue;
+      if (holidayMap.has(d) || weekOffSet.has(d)) continue;
       counted++;
       const key=date.toISOString().slice(0,10);
       const rec=attendanceMap.get(key);
@@ -790,7 +863,7 @@ export default function Dashboard() {
     }
     const rate=counted>0?Math.round(((present+checkedIn)/counted)*100):0;
     return { presentCount:present, absentCount:absent, halfCount:half, checkedInCount:checkedIn, attendanceRate:rate };
-  },[attendanceMap,selectedMonth,approvedLeaves,joiningMidnight]);
+  },[attendanceMap,selectedMonth,approvedLeaves,joiningMidnight,holidayMap,weekOffSet]);
 
   const elRemaining=(lb?.EL?.entitled??0)-(lb?.EL?.availed??0);
   const slRemaining=(lb?.SL?.entitled??0)-(lb?.SL?.availed??0);
@@ -864,6 +937,11 @@ export default function Dashboard() {
           isCheckedOut={isCheckedOut}
           myAtt={myAtt}
           onOpenAttendance={()=>setShowAttendanceModal(true)}
+          isHolidayToday={isHolidayToday}
+          holidayName={todayMeta?.holidayName}
+          isWeekOffToday={isWeekOffToday}
+          withinShiftWindow={withinShiftWindow}
+          shiftMeta={todayMeta?.shift}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 mb-3.5">
@@ -1025,7 +1103,7 @@ export default function Dashboard() {
                 </div>
               )}
               <div className="max-w-2xl mx-auto">
-                <Calendar month={selectedMonth} joiningDate={joiningDate} attendanceMap={attendanceMap} approvedLeaves={approvedLeaves} approvedWFH={approvedWFH} />
+                <Calendar month={selectedMonth} joiningDate={joiningDate} attendanceMap={attendanceMap} approvedLeaves={approvedLeaves} approvedWFH={approvedWFH} holidayMap={holidayMap} weekOffSet={weekOffSet} />
               </div>
             </div>
             <div className="grid grid-cols-5 border-t border-[#f0e8e4] mt-3">
@@ -1037,7 +1115,7 @@ export default function Dashboard() {
               ))}
             </div>
             <div className="flex flex-wrap gap-2 px-4 py-3 border-t border-[#f0e8e4]">
-              {[["#730042","Present"],["#E24B4A","Absent"],["#f57f17","Half day"],["#e65100","Late"],["#1D9E75","Checked in"],["#283593","On leave"],["#0f766e","WFH"]].map(([c,l]) => (
+              {[["#730042","Present"],["#E24B4A","Absent"],["#f57f17","Half day"],["#e65100","Late"],["#1D9E75","Checked in"],["#283593","On leave"],["#0f766e","WFH"],["#b5590a","Holiday"],["#64748b","Week off"]].map(([c,l]) => (
                 <div key={l} className="flex items-center gap-1 text-[10px] text-[#b0948a] font-sans">
                   <div className="w-2 h-2 rounded-sm" style={{ background:c }} />{l}
                 </div>

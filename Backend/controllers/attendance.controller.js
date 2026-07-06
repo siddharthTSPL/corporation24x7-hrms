@@ -3,6 +3,7 @@ const AdminModel = require("../Models/Admin.model");
 const Shift = require("../Models/shift.model");
 const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
 const { resolveEmployeeShift, evaluateCheckinWindow, getShiftThresholds } = require("../utils/shift.utils");
+const { isHoliday, isWeekOff, startOfDay } = require("../automatic/weekoffcalendar");
 
 const getUserId = (user) => user._id || user.id;
 
@@ -34,12 +35,33 @@ const checkin = async (req, res) => {
     if (!latitude || !longitude)
       return res.status(400).json({ message: "Location required" });
 
+    const employeeModel = getOnModel(user.role);
+    const today0 = startOfDay(new Date());
+
+    const holidayCheck = await isHoliday(today0, organisation_id);
+    if (holidayCheck.isHoliday) {
+      return res.status(400).json({
+        message: `Today is a holiday (${holidayCheck.name}). Check-in is disabled.`,
+        reason: "holiday",
+        holidayName: holidayCheck.name,
+      });
+    }
+
+    const weekOffCheck = await isWeekOff(today0, organisation_id, userId, employeeModel);
+    if (weekOffCheck.isOff) {
+      return res.status(400).json({
+        message: "Today is your week off. Check-in is disabled.",
+        reason: "weekoff",
+      });
+    }
+
     const shift = await resolveEmployeeShift(user, organisation_id);
     const { allowed, isLate } = evaluateCheckinWindow(shift, new Date());
 
     if (!allowed) {
       return res.status(400).json({
         message: `Check-in is only allowed between ${shift.earlyBufferMinutes ?? 60} minutes before your shift (${shift.startTime}) and your shift end (${shift.endTime}).`,
+        reason: "outside_shift",
         shift: { name: shift.name, startTime: shift.startTime, endTime: shift.endTime },
       });
     }
@@ -296,4 +318,82 @@ const getMyShift = async (req, res) => {
   }
 };
 
-module.exports = { checkin, activity, checkout, getToday, autoCheckoutAll, getMyShift };
+// Returns holiday list + week-off dates for a given month, plus a rich
+// "today" block combining holiday / week-off / shift-window so the
+// frontend can grey out Check-in proactively instead of waiting for a
+// 400 from /checkin.
+const getCalendarMeta = async (req, res) => {
+  try {
+    const user = req.user;
+    const userId = getUserId(user);
+    const organisation_id = await resolveOrganisationId(user);
+    const employeeModel = getOnModel(user.role);
+
+    const now = new Date();
+    const month = req.query.month ? Number(req.query.month) : now.getMonth() + 1; // 1-12
+    const year = req.query.year ? Number(req.query.year) : now.getFullYear();
+
+    const monthStart = new Date(year, month - 1, 1);
+    const monthEnd = new Date(year, month, 0);
+
+    // Only look as far into the month as today, plus the rest of the
+    // month for holidays (holidays are known in advance; week-off status
+    // for far-future rotational weeks may be "unconfigured" and that's fine).
+    const Holiday = require("../Models/holiday.model");
+    const holidayDocs = await Holiday.find({
+      organisation_id,
+      date: { $gte: monthStart, $lte: monthEnd },
+    }).sort({ date: 1 }).lean();
+
+    const toKey = (d) => new Date(d).toISOString().slice(0, 10);
+
+    const holidays = holidayDocs.map((h) => ({ date: toKey(h.date), name: h.name }));
+
+    const weekOffDates = [];
+    const daysInMonth = monthEnd.getDate();
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(year, month - 1, d);
+      const result = await isWeekOff(date, organisation_id, userId, employeeModel);
+      if (result.isOff) weekOffDates.push(toKey(date));
+    }
+
+    // ---- Today block ----
+    const today0 = startOfDay(now);
+    const todayKey = toKey(today0);
+    const todayHoliday = await isHoliday(today0, organisation_id);
+    const todayWeekOff = await isWeekOff(today0, organisation_id, userId, employeeModel);
+    const shift = await resolveEmployeeShift(user, organisation_id);
+    const { allowed: withinShiftWindow } = evaluateCheckinWindow(shift, now);
+
+    let disabledReason = null;
+    if (todayHoliday.isHoliday) disabledReason = "holiday";
+    else if (todayWeekOff.isOff) disabledReason = "weekoff";
+    else if (!withinShiftWindow) disabledReason = "outside_shift";
+
+    res.json({
+      success: true,
+      holidays,
+      weekOffDates,
+      today: {
+        date: todayKey,
+        isHoliday: todayHoliday.isHoliday,
+        holidayName: todayHoliday.name || null,
+        isWeekOff: todayWeekOff.isOff,
+        weekOffReason: todayWeekOff.reason,
+        shift: {
+          name: shift.name,
+          startTime: shift.startTime,
+          endTime: shift.endTime,
+          earlyBufferMinutes: shift.earlyBufferMinutes ?? 60,
+        },
+        withinShiftWindow,
+        canCheckIn: !todayHoliday.isHoliday && !todayWeekOff.isOff && withinShiftWindow,
+        disabledReason,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+module.exports = { checkin, activity, checkout, getToday, autoCheckoutAll, getMyShift, getCalendarMeta };
