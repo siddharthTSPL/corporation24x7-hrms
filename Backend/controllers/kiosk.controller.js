@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 const Admin = require("../Models/Admin.model");
 const Kiosk = require("../Models/kiosk.model");
+const SuperAdmin = require("../Models/superadmin.model");
 
 // An admin of an organisation logs the tablet in ONCE using their normal
 // work_email + password, plus a name for the device. From then on the
@@ -59,6 +60,28 @@ const kioskLogin = async (req, res) => {
   }
 };
 
+// Lets the kiosk screen show "Logged in as: <Org Name> — <Device Name>"
+// after a refresh, using only the long-lived kiosk token (no re-login).
+const kioskMe = async (req, res) => {
+  try {
+    const kiosk = await Kiosk.findById(req.kiosk.kiosk_id).lean();
+    if (!kiosk || !kiosk.isActive)
+      return res.status(401).json({ message: "Kiosk session revoked, please log in again" });
+
+    const org = await SuperAdmin.findById(kiosk.organisation_id)
+      .select("organisation_name")
+      .lean();
+
+    res.json({
+      device_name: kiosk.device_name,
+      organisation_id: kiosk.organisation_id,
+      organisation_name: org?.organisation_name || null,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 const kioskLogout = async (req, res) => {
   try {
     await Kiosk.findByIdAndUpdate(req.kiosk.kiosk_id, { isActive: false });
@@ -68,4 +91,4 @@ const kioskLogout = async (req, res) => {
   }
 };
 
-module.exports = { kioskLogin, kioskLogout };
+module.exports = { kioskLogin, kioskLogout, kioskMe };

@@ -60,8 +60,19 @@ const attendanceSchema = new mongoose.Schema(
     },
     source: {
       type: String,
-      enum: ["manual", "agent"],
+      enum: ["manual", "agent", "face"],
       default: "manual",
+    },
+    // How the checkout itself landed relative to shift end — only set
+    // for face-kiosk checkouts, shown on the kiosk screen and in reports.
+    checkoutRemark: {
+      type: String,
+      enum: ["on_time", "overtime", "early_checkout", null],
+      default: null,
+    },
+    overtimeMinutes: {
+      type: Number,
+      default: 0,
     },
   },
   { timestamps: true }
