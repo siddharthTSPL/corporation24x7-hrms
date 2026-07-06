@@ -2221,6 +2221,7 @@ const setAdminWorkingStatus = async (req, res, next) => {
     next(error);
   }
 };
+
 const getInactiveUsers = async (req, res, next) => {
   try {
     if (!req.superAdmin)
