@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const attendanceSchema = new mongoose.Schema(
   {
-     organisation_id: {
+    organisation_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SuperAdmin",
       required: true,
@@ -27,6 +27,14 @@ const attendanceSchema = new mongoose.Schema(
     date: {
       type: Date,
       required: true,
+    },
+    shift: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Shift",
+    },
+    isLate: {
+      type: Boolean,
+      default: false,
     },
     checkIn: Date,
     checkOut: Date,
