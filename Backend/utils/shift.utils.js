@@ -4,24 +4,17 @@ const DEFAULT_SHIFT_NAME = "General Shift";
 const DEFAULT_START = "10:00";
 const DEFAULT_END = "19:00";
 
-// Shift times (startTime/endTime) are always entered in IST. The server's
-// OS clock may be in any timezone (UTC on most hosts), so .getHours()/
-// .getMinutes() on a Date object cannot be trusted - they reflect whatever
-// timezone the machine is set to, not IST. Deriving IST from UTC + a fixed
-// +5:30 offset works correctly no matter what timezone the server runs in.
 const IST_OFFSET_MINUTES = 5 * 60 + 30;
 const getISTMinutesOfDay = (date) => {
   const utcMinutes = date.getUTCHours() * 60 + date.getUTCMinutes();
   return (utcMinutes + IST_OFFSET_MINUTES) % 1440;
 };
 
-// Converts "HH:mm" -> minutes since midnight
 const toMinutes = (hhmm) => {
   const [h, m] = hhmm.split(":").map(Number);
   return h * 60 + m;
 };
 
-// Handles overnight shifts (e.g. 22:00 -> 06:00)
 const getShiftDurationMinutes = (shift) => {
   const start = toMinutes(shift.startTime);
   const end = toMinutes(shift.endTime);
@@ -37,7 +30,9 @@ const getShiftThresholds = (shift) => {
   };
 };
 
-
+// Late is measured from (shift start + graceMinutes). Anyone inside the
+// grace window is "on time"; lateMinutes is how far past the grace edge
+// they are, not how far past the raw shift start.
 const evaluateCheckinWindow = (shift, now = new Date()) => {
   const nowMinutes = getISTMinutesOfDay(now);
   const start = toMinutes(shift.startTime);
@@ -61,19 +56,13 @@ const evaluateCheckinWindow = (shift, now = new Date()) => {
   }
 
   const allowed = effectiveNow >= windowStart && effectiveNow <= windowEnd;
-  const isLate = effectiveNow > start + grace;
+  const lateEdge = start + grace;
+  const isLate = effectiveNow > lateEdge;
+  const lateMinutes = isLate ? effectiveNow - lateEdge : 0;
 
-  return { allowed, isLate, windowStart, windowEnd };
+  return { allowed, isLate, lateMinutes, windowStart, windowEnd };
 };
 
-
-// Same idea as evaluateCheckinWindow but for the checkout scan:
-//   before shift end            -> "early_checkout"
-//   end .. end+graceMinutes     -> "on_time"
-//   after end+graceMinutes      -> "overtime" (+ how many minutes over)
-// graceMinutes is reused for both edges (e.g. 10 min grace on a 10:00-19:00
-// shift means checkin window 10:00-10:10 and checkout on-time window
-// 19:00-19:10), which is what the kiosk flow asks for.
 const evaluateCheckoutWindow = (shift, now = new Date()) => {
   const start = toMinutes(shift.startTime);
   const end = toMinutes(shift.endTime);
@@ -129,7 +118,6 @@ const ensureDefaultShift = async (organisation_id) => {
   });
   return defaultShift;
 };
-
 
 const resolveEmployeeShift = async (userDoc, organisation_id) => {
   if (userDoc?.shift) {
