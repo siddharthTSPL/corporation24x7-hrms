@@ -27,6 +27,8 @@ const RESULT_STYLES = {
   checkout_early: { bg: "bg-amber-50", border: "border-amber-300", text: "text-amber-800", icon: "⚠️" },
   blocked: { bg: "bg-red-50", border: "border-red-300", text: "text-red-800", icon: "⛔" },
   not_registered: { bg: "bg-gray-100", border: "border-gray-300", text: "text-gray-700", icon: "🙈" },
+  checkin_already_done: { bg: "bg-blue-50", border: "border-blue-300", text: "text-blue-800", icon: "🕒" },
+  attendance_completed: { bg: "bg-gray-100", border: "border-gray-300", text: "text-gray-700", icon: "✅" },
   already_done: { bg: "bg-gray-100", border: "border-gray-300", text: "text-gray-700", icon: "ℹ️" },
   error: { bg: "bg-red-50", border: "border-red-300", text: "text-red-800", icon: "⚠️" },
 };
