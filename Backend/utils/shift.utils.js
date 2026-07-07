@@ -56,6 +56,55 @@ const evaluateCheckinWindow = (shift, now = new Date()) => {
 };
 
 
+// Same idea as evaluateCheckinWindow but for the checkout scan:
+//   before shift end            -> "early_checkout"
+//   end .. end+graceMinutes     -> "on_time"
+//   after end+graceMinutes      -> "overtime" (+ how many minutes over)
+// graceMinutes is reused for both edges (e.g. 10 min grace on a 10:00-19:00
+// shift means checkin window 10:00-10:10 and checkout on-time window
+// 19:00-19:10), which is what the kiosk flow asks for.
+const evaluateCheckoutWindow = (shift, now = new Date()) => {
+  const start = toMinutes(shift.startTime);
+  const end = toMinutes(shift.endTime);
+  const overnight = end <= start;
+  const grace = shift.graceMinutes ?? 15;
+
+  let nowMinutes = now.getHours() * 60 + now.getMinutes();
+  let effectiveEnd = end;
+  if (overnight) {
+    if (nowMinutes <= end) nowMinutes += 1440;
+    effectiveEnd += 1440;
+  }
+
+  const diffMinutes = nowMinutes - effectiveEnd;
+
+  if (diffMinutes < 0) {
+    return {
+      remark: "early_checkout",
+      isOvertime: false,
+      overtimeMinutes: 0,
+      earlyMinutes: Math.abs(diffMinutes),
+      onTimeWindowEnd: effectiveEnd + grace,
+    };
+  }
+  if (diffMinutes <= grace) {
+    return {
+      remark: "on_time",
+      isOvertime: false,
+      overtimeMinutes: 0,
+      earlyMinutes: 0,
+      onTimeWindowEnd: effectiveEnd + grace,
+    };
+  }
+  return {
+    remark: "overtime",
+    isOvertime: true,
+    overtimeMinutes: diffMinutes - grace,
+    earlyMinutes: 0,
+    onTimeWindowEnd: effectiveEnd + grace,
+  };
+};
+
 const ensureDefaultShift = async (organisation_id) => {
   let defaultShift = await Shift.findOne({ organisation_id, isDefault: true });
   if (defaultShift) return defaultShift;
@@ -89,6 +138,7 @@ module.exports = {
   getShiftDurationMinutes,
   getShiftThresholds,
   evaluateCheckinWindow,
+  evaluateCheckoutWindow,
   ensureDefaultShift,
   resolveEmployeeShift,
 };

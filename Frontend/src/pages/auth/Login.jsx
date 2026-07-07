@@ -312,6 +312,24 @@ function Login() {
                     Sign Up
                   </p>
                 </div>
+
+                <div className="flex items-center gap-3 my-4">
+                  <div className="h-px flex-1 bg-gray-200" />
+                  <span className="text-xs text-gray-400 font-medium">OR</span>
+                  <div className="h-px flex-1 bg-gray-200" />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => navigate("/live-attendance")}
+                  className="w-full flex items-center justify-center gap-2 border-2 border-[#730042]/20 text-[#730042] font-semibold py-3 rounded-lg hover:bg-[#730042]/5 transition"
+                >
+                  <span>🪪</span>
+                  Live Attendance (Face Check-in)
+                </button>
+                <p className="text-xs text-gray-400 text-center mt-2">
+                  For office kiosk/tablet devices — employees check in/out with their face, no password needed.
+                </p>
               </>
             )}
 

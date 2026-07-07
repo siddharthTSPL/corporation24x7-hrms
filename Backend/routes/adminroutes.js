@@ -58,7 +58,9 @@ const {
   setEmployeeWorkingStatus,
   setManagerWorkingStatus,
   getInactiveUsers,
-  getActiveUserCount
+  getActiveUserCount,
+  getAllAdminsForOrg
+
 } = require("../controllers/admin.controller");
 
 const {
@@ -335,6 +337,7 @@ adminrouter.put(
   adminauthmiddleware,
   asyncHandler(setManagerWorkingStatus)
 );
+adminrouter.get("/all-admins", adminauthmiddleware, asyncHandler(getAllAdminsForOrg));
 
 adminrouter.get("/inactive-users", adminauthmiddleware, asyncHandler(getInactiveUsers));
 adminrouter.get("/active-user-count", adminauthmiddleware, getActiveUserCount);

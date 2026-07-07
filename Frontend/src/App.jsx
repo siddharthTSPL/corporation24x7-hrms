@@ -7,6 +7,9 @@ import LandingPage from "./pages/announcement/landingpage";
 const Login = lazy(() => import("./pages/auth/Login"));
 const Signup = lazy(() => import("./pages/auth/Signup"));
 
+const FaceKiosk = lazy(() => import("./pages/attendance/FaceKiosk"));
+const FaceEnrollment = lazy(() => import("./pages/attendance/FaceEnrollment"));
+
 const MainLayout = lazy(() => import("./layout/MainLayout"));
 const ProtectedRoute = lazy(() => import("./components/Protectedroute"));
 
@@ -161,6 +164,11 @@ function App() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/redirect" element={<RoleBasedRedirect />} />
 
+          {/* Public — this is a shared kiosk device, not a logged-in person.
+              It authenticates itself with its own long-lived kiosk token,
+              so it deliberately lives outside ProtectedRoute. */}
+          <Route path="/live-attendance" element={<FaceKiosk />} />
+
           <Route
             path="/unauthorized"
             element={
@@ -208,6 +216,17 @@ function App() {
             <Route path="/manager-timesheet"        element={<Managertimesheet />} />
             <Route path="/employee-timesheet"       element={<Employeetimesheet />} />
             <Route path="/admin-asset-management"   element={<Adminasset />} />
+
+            {/* Restricted to admins only — enrolling faces is a sensitive
+                per-employee action, same pattern as /admin-management */}
+            <Route
+              path="/face-enrollment"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <FaceEnrollment />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Restricted via ProtectedRoute so managers/employees can't hit it
                 directly even though they share this layout block */}

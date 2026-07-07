@@ -171,6 +171,16 @@ const superAdminSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
+    // Dedicated credential for face-attendance kiosk devices. Kept
+    // completely separate from the superadmin's own login password so a
+    // tablet sitting at reception never holds (or needs) the actual
+    // account password — only whoever knows this org-level kiosk
+    // password can sign a device in.
+    kiosk_password: {
+      type: String,
+      select: false,
+    },
   },
   {
     timestamps: true,
@@ -191,8 +201,18 @@ superAdminSchema.pre("save", async function () {
   this.password = await bcrypt.hash(this.password, 10);
 });
 
+superAdminSchema.pre("save", async function () {
+  if (!this.isModified("kiosk_password") || !this.kiosk_password) return;
+  this.kiosk_password = await bcrypt.hash(this.kiosk_password, 10);
+});
+
 superAdminSchema.methods.isValidPassword = async function (password) {
   return bcrypt.compare(password, this.password);
+};
+
+superAdminSchema.methods.isValidKioskPassword = async function (password) {
+  if (!this.kiosk_password) return false;
+  return bcrypt.compare(password, this.kiosk_password);
 };
 
 superAdminSchema.methods.isTrialValid = function () {

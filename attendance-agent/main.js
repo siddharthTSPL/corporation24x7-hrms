@@ -81,13 +81,17 @@ async function triggerAutoCheckout() {
     const token = store.get("token");
     if (!token) return;
 
-    await axios.post(
+    const res = await axios.post(
       `${API_BASE}/checkout`,
       {},
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
-    console.log("[Agent] Auto checkout successful");
+    const { status, checkoutRemark, overtimeMinutes } = res.data;
+    console.log(
+      `[Agent] Auto checkout successful — status: ${status}, remark: ${checkoutRemark}` +
+      (overtimeMinutes ? `, overtime: ${overtimeMinutes}m` : "")
+    );
     stopTracking();
     updateTray("stopped");
 
