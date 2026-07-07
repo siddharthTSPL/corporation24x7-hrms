@@ -130,14 +130,14 @@ function Field({ label, children }) {
 }
 
 const inputCls =
-  'w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500 transition-colors';
+  'w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#730042]/30 focus:border-[#730042] transition-colors';
 
 function Button({ children, onClick, variant = 'primary', className = '', disabled, type = 'button' }) {
   const styles = {
-    primary: 'bg-teal-700 text-white hover:bg-teal-800 shadow-sm shadow-teal-900/10',
-    ghost: 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50',
+    primary: 'bg-[#730042] text-white hover:bg-[#5A0033] shadow-sm shadow-[#730042]/10',
+    ghost: 'bg-white text-[#730042] border border-[#730042] hover:bg-[#F9F0F5]',
     danger: 'bg-white text-rose-600 border border-rose-200 hover:bg-rose-50',
-    subtle: 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+    subtle: 'bg-[#F9F0F5] text-[#730042] hover:bg-[#F3D9E7]',
   };
   return (
     <button
@@ -162,7 +162,7 @@ function DayPicker({ value, onChange }) {
             type="button"
             onClick={() => onChange(active ? value.filter((x) => x !== d) : [...value, d])}
             className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-              active ? 'bg-teal-700 border-teal-700 text-white' : 'bg-white border-slate-200 text-slate-500 hover:border-teal-300'
+              active ? 'bg-[#730042] border-[#730042] text-white' : 'bg-white border-slate-200 text-slate-500 hover:border-[#730042]'
             }`}
           >
             {DAY_LABEL[d]}
@@ -178,7 +178,7 @@ function SectionCard({ icon: Icon, title, subtitle, action, children }) {
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-5 py-4 border-b border-slate-100">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-[#F9F0F5] text-[#730042] flex items-center justify-center shrink-0">
             <Icon className="w-4.5 h-4.5" />
           </div>
           <div>
@@ -512,7 +512,7 @@ function ShiftsPanel({ notify }) {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {shifts.map((s) => (
-              <div key={s._id} className="rounded-xl border border-slate-200 p-4 flex flex-col gap-3 hover:border-teal-300 transition-colors">
+              <div key={s._id} className="rounded-xl border border-slate-200 p-4 flex flex-col gap-3 hover:border-[#730042] transition-colors">
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="flex items-center gap-1.5">
@@ -808,11 +808,11 @@ function HolidayCalendar({ month, year, holidays, onAddRange, onEditHoliday, onD
               className={`aspect-square rounded-lg text-[11px] sm:text-xs font-medium flex flex-col items-center justify-center gap-0.5 border transition-colors ${
                 holiday
                   ? isEditingThis
-                    ? 'bg-teal-600 border-teal-600 text-white'
+                    ? 'bg-[#730042] border-[#730042] text-white'
                     : 'bg-amber-50 border-amber-200 text-amber-700 hover:border-amber-400'
                   : inSelection
-                  ? 'bg-teal-100 border-teal-400 text-teal-700'
-                  : 'bg-white border-slate-200 text-slate-600 hover:border-teal-300'
+                  ? 'bg-[#F3D9E7] border-[#730042] text-[#730042]'
+                  : 'bg-white border-slate-200 text-slate-600 hover:border-[#730042]'
               }`}
             >
               <span>{day}</span>
@@ -823,9 +823,9 @@ function HolidayCalendar({ month, year, holidays, onAddRange, onEditHoliday, onD
       </div>
 
       {rangeStart && !editingHoliday && (
-        <div className="rounded-xl border border-teal-200 bg-teal-50/60 p-4 flex flex-col sm:flex-row gap-3 sm:items-end">
+        <div className="rounded-xl border border-[#E8D5E2] bg-[#F9F0F5] p-4 flex flex-col sm:flex-row gap-3 sm:items-end">
           <div className="flex-1">
-            <p className="text-xs font-semibold text-teal-700 uppercase tracking-wide mb-1.5">
+            <p className="text-xs font-semibold text-[#730042] uppercase tracking-wide mb-1.5">
               {selectedDates.length > 1 ? `${selectedDates.length} days selected` : '1 day selected'}
             </p>
             <p className="text-xs text-slate-500 mb-2">
@@ -1142,12 +1142,12 @@ function WeekOffPanel({ notify }) {
                 onClick={() => savePolicy(opt.v)}
                 disabled={setPolicyMutation.isPending}
                 className={`text-left p-4 rounded-xl border transition-colors ${
-                  policy === opt.v ? 'border-teal-600 bg-teal-50/60 ring-1 ring-teal-600' : 'border-slate-200 hover:border-teal-300'
+                  policy === opt.v ? 'border-[#730042] bg-[#F9F0F5] ring-1 ring-[#730042]' : 'border-slate-200 hover:border-[#730042]'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-slate-800">{opt.label}</span>
-                  {policy === opt.v && <Check className="w-4 h-4 text-teal-600" />}
+                  {policy === opt.v && <Check className="w-4 h-4 text-[#730042]" />}
                 </div>
                 <p className="text-xs text-slate-500 mt-1">{opt.desc}</p>
               </button>
@@ -1327,7 +1327,7 @@ function WeekOffPanel({ notify }) {
                     </div>
                     <div className="flex gap-1.5">
                       {s.offDays.map((d) => (
-                        <span key={d} className="text-[10px] font-semibold uppercase bg-teal-50 text-teal-700 px-2 py-1 rounded-md">
+                        <span key={d} className="text-[10px] font-semibold uppercase bg-[#F9F0F5] text-[#730042] px-2 py-1 rounded-md">
                           {DAY_LABEL[d]}
                         </span>
                       ))}
@@ -1430,7 +1430,7 @@ export default function AdminManagement() {
                 key={t.key}
                 onClick={() => setTab(t.key)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                  active ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                  active ? 'bg-[#730042] text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                 }`}
               >
                 <Icon className="w-4 h-4" />
