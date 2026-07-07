@@ -1176,6 +1176,69 @@ function SuperAdminDashboard() {
   const [empExpand, setEmpExpand] = useState(false);
   const [empSearch, setEmpSearch] = useState("");
 
+  // ==========================================================================
+  // ONE-TIME AUTO-REFRESH ON FIRST DASHBOARD LOAD
+  // ==========================================================================
+  // WHY sessionStorage (and not localStorage or a plain in-memory flag):
+  //   - sessionStorage is scoped to a single browser tab and is automatically
+  //     wiped the moment that tab is closed. That maps exactly onto the
+  //     requirement "refresh once per browser tab/session" — a brand new tab
+  //     or a fresh login (new session) should always get exactly one reload,
+  //     while simply navigating around the app inside the same tab should not
+  //     trigger the reload again.
+  //   - localStorage would persist across tabs/sessions indefinitely, which
+  //     would mean the dashboard only ever auto-refreshes once for the whole
+  //     browser (not once per session) — not what's being asked for here.
+  //   - Component/React state can't be used for this because a full page
+  //     reload wipes all in-memory state; we need a flag that survives the
+  //     reload itself, which only Web Storage (session/local) can do.
+  //
+  // HOW the infinite refresh loop is prevented:
+  //   - Before calling window.location.reload(), we immediately write the
+  //     flag to sessionStorage. When the reloaded page mounts the Dashboard
+  //     again, this same effect runs, reads the flag, sees it is already set,
+  //     and simply does nothing — so the reload can only ever fire once.
+  //   - The effect has an empty dependency array ([]), so it runs exactly one
+  //     time when this component first mounts (i.e. right after login or on
+  //     first navigation to the Dashboard), and never again on subsequent
+  //     re-renders caused by state updates (search typing, modal open/close,
+  //     data refetching, etc.) — this is what stops "reload on every render".
+  //
+  // HOW sidebar state is preserved across this one-time reload:
+  //   - The active/highlighted sidebar menu item is normally derived from the
+  //     current route (URL), and window.location.reload() does not change the
+  //     URL — so whichever route-matching logic the Sidebar already uses to
+  //     highlight the active item will naturally resolve to the same item
+  //     immediately after reload, with no extra code needed here.
+  //   - If the Sidebar's expanded/collapsed state is (or gets) persisted in
+  //     localStorage (as opposed to component state), it will automatically
+  //     survive this reload too, since localStorage is untouched by a reload.
+  //     No changes to the Sidebar's business logic/UI were made here — this
+  //     is purely a note on why the existing pattern keeps working.
+  useEffect(() => {
+    const REFRESH_FLAG_KEY = "dashboardAutoRefreshed";
+
+    // Guard: only refresh if we have NOT already done so in this tab/session.
+    const hasAlreadyRefreshedThisSession = sessionStorage.getItem(REFRESH_FLAG_KEY);
+
+    if (!hasAlreadyRefreshedThisSession) {
+      // Set the flag BEFORE reloading so that, after the reload completes and
+      // this effect runs again, we see the flag and skip reloading — this is
+      // what prevents an infinite refresh loop.
+      sessionStorage.setItem(REFRESH_FLAG_KEY, "true");
+
+      // Full browser reload. This re-fetches the HTML/JS bundle and re-runs
+      // every data hook on the page from scratch (profile, notifications,
+      // dashboard cards, recent activity, permissions/roles, etc.), which is
+      // exactly the "load fresh data from backend" behavior requested.
+      window.location.reload();
+    }
+
+    // No cleanup necessary: this effect only ever reads/writes a storage key
+    // and optionally triggers a reload; it does not create subscriptions,
+    // timers, or listeners that would need to be torn down.
+  }, []); // Empty deps => runs once on mount only, never on re-render.
+
   const { data: meData } = useGetMeSuperAdmin();
   const { data: checkinData, isLoading: mapLoading } = useGetTodayCheckins();
   const { data: adminsData, isLoading: adminsLoading } = useGetAllAdmins();

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
 import { useGetAllEmployee, useGetTodayCheckins } from "../../auth/server-state/adminother/adminother.hook";
 import {
@@ -756,9 +757,27 @@ function LeaveRequestsPanel({ leaves, loading, onAccept, onReject, accepting, re
 }
 
 export default function Dashboard() {
+  const location = useLocation();
   const [selectedMonth, setSelectedMonth]=useState(new Date().getMonth());
   const [empExpand, setEmpExpand]=useState(false);
   const [showAttendanceModal, setShowAttendanceModal]=useState(false);
+
+   useEffect(() => {
+    const refreshKey = "dashboard_auto_refreshed";
+
+    if (!sessionStorage.getItem(refreshKey)) {
+      sessionStorage.setItem(refreshKey, "true");
+
+      const timer = setTimeout(() => {
+        window.location.reload();
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }, [location.pathname]);
+
+  
+
 
   const { data:meData, isLoading:meLoading, isError:meError }=useGetMeAdmin();
   const { data:histData, isLoading:histLoading }=useAdminGetMyLeaveHistory();
