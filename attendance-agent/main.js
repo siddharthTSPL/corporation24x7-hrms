@@ -17,93 +17,12 @@ const FRONTEND_URL = IS_DEV
 const AGENT_PORT     = 47821;
 const PING_INTERVAL  = 60_000;
 
-// Fallback only used if /my-shift can't be reached (network blip, server down, etc.)
-const FALLBACK_CHECKOUT_HOUR   = 19;
-const FALLBACK_CHECKOUT_MINUTE = 0;
-
 const store = new Store();
 
 let tray                = null;
 let wasActiveThisMinute = false;
 let pingInterval        = null;
-let autoCheckoutTimer   = null;
 let isTracking          = false;
-
-function computeNextCheckoutDate(hour, minute) {
-  const now      = new Date();
-  const checkout = new Date();
-  checkout.setHours(hour, minute, 0, 0);
-
-  if (now >= checkout) {
-    checkout.setDate(checkout.getDate() + 1);
-  }
-
-  return checkout;
-}
-
-async function scheduleShiftCheckout() {
-  clearTimeout(autoCheckoutTimer);
-
-  const token = store.get("token");
-  if (!token) return;
-
-  let hour = FALLBACK_CHECKOUT_HOUR;
-  let minute = FALLBACK_CHECKOUT_MINUTE;
-  let source = "fallback (7 PM)";
-
-  try {
-    const res = await axios.get(`${API_BASE}/my-shift`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const { endTime } = res.data.shift; // "HH:mm" e.g. "19:00"
-    const [h, m] = endTime.split(":").map(Number);
-    hour = h;
-    minute = m;
-    source = `shift end (${endTime})`;
-  } catch (err) {
-    console.error("[Agent] Failed to fetch shift, using fallback checkout time:", err.message);
-  }
-
-  const checkout = computeNextCheckoutDate(hour, minute);
-  const msUntilCheckout = checkout.getTime() - Date.now();
-
-  console.log(`[Agent] Auto checkout scheduled at ${source} (in ${Math.round(msUntilCheckout / 60000)} minutes)`);
-
-  autoCheckoutTimer = setTimeout(async () => {
-    console.log(`[Agent] ${source} reached — triggering auto checkout`);
-    await triggerAutoCheckout();
-    scheduleShiftCheckout();
-  }, msUntilCheckout);
-}
-
-async function triggerAutoCheckout() {
-  try {
-    const token = store.get("token");
-    if (!token) return;
-
-    const res = await axios.post(
-      `${API_BASE}/checkout`,
-      {},
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    const { status, checkoutRemark, overtimeMinutes } = res.data;
-    console.log(
-      `[Agent] Auto checkout successful — status: ${status}, remark: ${checkoutRemark}` +
-      (overtimeMinutes ? `, overtime: ${overtimeMinutes}m` : "")
-    );
-    stopTracking();
-    updateTray("stopped");
-
-  } catch (err) {
-    if (err?.response?.status === 400 || err?.response?.status === 404) {
-      console.log("[Agent] Already checked out or no record, skipping");
-    } else {
-      console.error("[Agent] Auto checkout failed:", err.message);
-    }
-    stopTracking();
-  }
-}
 
 function startGlobalHook() {
   uIOhook.on("mousemove", onActivity);
@@ -241,7 +160,6 @@ function startTokenServer() {
           if (token) {
             store.set("token", token);
             startTracking();
-            scheduleShiftCheckout();
             console.log("[Agent] Token received, tracking started");
             res.writeHead(200);
             res.end(JSON.stringify({ ok: true }));
@@ -260,7 +178,6 @@ function startTokenServer() {
     if (req.url === "/clear-token") {
       store.delete("token");
       stopTracking();
-      clearTimeout(autoCheckoutTimer);
       console.log("[Agent] Token cleared, tracking stopped");
       res.writeHead(200);
       res.end(JSON.stringify({ ok: true }));
@@ -303,7 +220,6 @@ app.whenReady().then(() => {
   if (savedToken) {
     console.log("[Agent] Saved token found, resuming tracking");
     startTracking();
-    scheduleShiftCheckout();
   } else {
     console.log("[Agent] No token, waiting for login...");
     updateTray("stopped");
