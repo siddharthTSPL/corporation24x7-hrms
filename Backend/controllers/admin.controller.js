@@ -27,6 +27,7 @@ const AttendanceSummary = require("../Models/attendancesummary.model");
 const WFH = require("../Models/wfh.model");
 const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = require("../utils/licenseCheck");
 const AssetModel = require("../Models/asset.model");
+const { isEmailTaken } = require("../utils/emailAvailability.utils");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
@@ -472,11 +473,9 @@ const addmanager = async (req, res, next) => {
 
     const organisation_id = superAdmin._id;
 
-    const existingManager = await Managermodel.findOne({ work_email, organisation_id })
-      .select("_id")
-      .lean();
-    if (existingManager)
-      return next(Object.assign(new Error("Manager already exists"), { statusCode: 400 }));
+    const emailCheck = await isEmailTaken(work_email);
+    if (emailCheck.taken)
+      return next(Object.assign(new Error("An account with this email already exists"), { statusCode: 400 }));
 
     const licenseCheck = await canOnboardUser(organisation_id);
     if (!licenseCheck.allowed)
@@ -560,9 +559,9 @@ const addemployee = async (req, res, next) => {
 
     const organisation_id = req.admin.organisation_id;
 
-    const existingUser = await Usermodel.findOne({ work_email, organisation_id }).select("_id").lean();
-    if (existingUser)
-      return next(Object.assign(new Error("User already exists"), { statusCode: 400 }));
+    const emailCheck = await isEmailTaken(work_email);
+    if (emailCheck.taken)
+      return next(Object.assign(new Error("An account with this email already exists"), { statusCode: 400 }));
 
     const licenseCheck = await canOnboardUser(organisation_id);
     if (!licenseCheck.allowed)

@@ -154,3 +154,18 @@ export const getActiveUserCount = async () => {
   const res = await api.get("superadmin/active-user-count");
   return res.data;
 };
+
+// ---------------------------------------------------------------------
+// Kiosk password — the credential (separate from the superadmin's own
+// login password) that face-attendance tablets sign in with, alongside
+// the organisation's Organisation ID.
+// ---------------------------------------------------------------------
+export const getKioskPasswordStatus = async () => {
+  const res = await api.get("superadmin/kiosk-password/status");
+  return res.data;
+};
+
+export const setKioskPassword = async (data) => {
+  const res = await api.put("superadmin/kiosk-password", data);
+  return res.data;
+};

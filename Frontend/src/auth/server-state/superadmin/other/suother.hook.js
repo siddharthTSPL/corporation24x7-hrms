@@ -32,7 +32,9 @@ import {
   getPermissions,
   getInactiveUsers,
   setAdminWorkingStatus,
-  getActiveUserCount
+  getActiveUserCount,
+  getKioskPasswordStatus,
+  setKioskPassword,
 } from "../../../api/superadmin/other/su.other";
 
 
@@ -75,6 +77,23 @@ export const useChangeSuperAdminPassword = () => {
 };
 
 
+
+export const useKioskPasswordStatus = () => {
+  return useQuery({
+    queryKey: ["superadmin", "kiosk-password-status"],
+    queryFn: getKioskPasswordStatus,
+  });
+};
+
+export const useSetKioskPassword = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: setKioskPassword,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["superadmin", "kiosk-password-status"] });
+    },
+  });
+};
 
 export const useForgotPasswordSuperAdmin = () => {
   return useMutation({
