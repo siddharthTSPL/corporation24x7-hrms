@@ -56,18 +56,21 @@ const evaluateCheckinWindow = (shift, now = new Date()) => {
 };
 
 
-// Same idea as evaluateCheckinWindow but for the checkout scan:
-//   before shift end            -> "early_checkout"
-//   end .. end+graceMinutes     -> "on_time"
-//   after end+graceMinutes      -> "overtime" (+ how many minutes over)
-// graceMinutes is reused for both edges (e.g. 10 min grace on a 10:00-19:00
-// shift means checkin window 10:00-10:10 and checkout on-time window
-// 19:00-19:10), which is what the kiosk flow asks for.
-const evaluateCheckoutWindow = (shift, now = new Date()) => {
+// Same idea as evaluateCheckinWindow but for the checkout scan.
+//   allowed:  now is within `checkoutBufferMinutes` of shift end,
+//             OR at least `minHoursBeforeCheckout` have passed since checkin.
+//             (guards against an accidental double-scan seconds after
+//             checkin being treated as a real checkout)
+//   remark:   before shift end            -> "early_checkout"
+//             end .. end+graceMinutes      -> "on_time"
+//             after end+graceMinutes       -> "overtime" (+ how many minutes over)
+const evaluateCheckoutWindow = (shift, now = new Date(), checkinTime = null) => {
   const start = toMinutes(shift.startTime);
   const end = toMinutes(shift.endTime);
   const overnight = end <= start;
   const grace = shift.graceMinutes ?? 15;
+  const checkoutBuffer = shift.checkoutBufferMinutes ?? 10;
+  const minMinutesSinceCheckin = (shift.minHoursBeforeCheckout ?? 3) * 60;
 
   let nowMinutes = now.getHours() * 60 + now.getMinutes();
   let effectiveEnd = end;
@@ -78,8 +81,23 @@ const evaluateCheckoutWindow = (shift, now = new Date()) => {
 
   const diffMinutes = nowMinutes - effectiveEnd;
 
+  const elapsedSinceCheckin = checkinTime
+    ? (now.getTime() - checkinTime.getTime()) / 60000
+    : Infinity;
+  const nearShiftEnd = nowMinutes >= effectiveEnd - checkoutBuffer;
+  const allowed = nearShiftEnd || elapsedSinceCheckin >= minMinutesSinceCheckin;
+
+  const minutesUntilAllowed = allowed
+    ? 0
+    : Math.min(
+        effectiveEnd - checkoutBuffer - nowMinutes,
+        minMinutesSinceCheckin - elapsedSinceCheckin
+      );
+
   if (diffMinutes < 0) {
     return {
+      allowed,
+      minutesUntilAllowed,
       remark: "early_checkout",
       isOvertime: false,
       overtimeMinutes: 0,
@@ -89,6 +107,8 @@ const evaluateCheckoutWindow = (shift, now = new Date()) => {
   }
   if (diffMinutes <= grace) {
     return {
+      allowed,
+      minutesUntilAllowed,
       remark: "on_time",
       isOvertime: false,
       overtimeMinutes: 0,
@@ -97,6 +117,8 @@ const evaluateCheckoutWindow = (shift, now = new Date()) => {
     };
   }
   return {
+    allowed,
+    minutesUntilAllowed,
     remark: "overtime",
     isOvertime: true,
     overtimeMinutes: diffMinutes - grace,

@@ -216,14 +216,29 @@ const scanFace = async (req, res) => {
 
     if (attendance.checkOut)
       return res.status(400).json({
-        message: `${employeeName || "This employee"} has already completed attendance for today.`,
+        message: `Today's attendance is already done for ${employeeName || "this employee"} — checked in and checked out.`,
+        reason: "attendance_completed",
         employeeName,
       });
 
     // -----------------------------------------------------------------
-    // SECOND SCAN TODAY -> CHECK-OUT
+    // SECOND SCAN TODAY -> CHECKOUT (only once the checkout window is
+    // actually open — otherwise this is just a stray re-scan of someone
+    // who already checked in today, not a real attempt to leave)
     // -----------------------------------------------------------------
-    const { remark, isOvertime, overtimeMinutes } = evaluateCheckoutWindow(shift, now);
+    const checkoutWindow = evaluateCheckoutWindow(shift, now, attendance.checkIn);
+
+    if (!checkoutWindow.allowed) {
+      const who = employeeName || "You";
+      const verb = employeeName ? "is" : "are";
+      return res.status(400).json({
+        message: `${who} ${verb} already checked in for today. Checkout opens ${shift.minHoursBeforeCheckout ?? 3} hour(s) after check-in, or shortly before your shift ends.`,
+        reason: "checkin_already_done",
+        employeeName,
+      });
+    }
+
+    const { remark, isOvertime, overtimeMinutes } = checkoutWindow;
 
     attendance.checkOut = now;
     const durationMinutes = Math.round((attendance.checkOut - attendance.checkIn) / 60000);
@@ -235,7 +250,7 @@ const scanFace = async (req, res) => {
     await updateSummary(attendance);
 
     const remarkMessage = {
-      on_time: "Checked out on time",
+      on_time: "Checked out on time. Have a good day!",
       overtime: `Checked out — overtime of ${minutesToLabel(overtimeMinutes)}`,
       early_checkout: "Checked out early, before your shift ended",
     }[remark];
