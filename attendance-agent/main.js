@@ -2,6 +2,8 @@ const { app, Tray, Menu, BrowserWindow, nativeImage, powerSaveBlocker } = requir
 const { uIOhook } = require("uiohook-napi");
 const axios  = require("axios");
 const http   = require("http");
+const fs     = require("fs");
+const path   = require("path");
 const Store  = require("electron-store");
 
 const IS_DEV = process.env.NODE_ENV === "development";
@@ -16,8 +18,33 @@ const FRONTEND_URL = IS_DEV
 
 const AGENT_PORT     = 47821;
 const PING_INTERVAL  = 60_000;
+const MAX_LOG_BYTES  = 5 * 1024 * 1024;
 
 const store = new Store();
+
+const logDir  = path.join(app.getPath("userData"), "logs");
+const logFile = path.join(logDir, "main.log");
+
+function ensureLogFile() {
+  try {
+    if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+    if (fs.existsSync(logFile) && fs.statSync(logFile).size > MAX_LOG_BYTES) {
+      fs.renameSync(logFile, path.join(logDir, `main.${Date.now()}.log`));
+    }
+  } catch (err) {
+    console.error("[Agent] Failed to prepare log file:", err.message);
+  }
+}
+
+function log(...args) {
+  const line = `[${new Date().toISOString()}] ${args.join(" ")}`;
+  console.log(line);
+  try {
+    fs.appendFileSync(logFile, line + "\n");
+  } catch (err) {
+    console.error("[Agent] Failed to write log:", err.message);
+  }
+}
 
 let tray                = null;
 let wasActiveThisMinute = false;
@@ -29,12 +56,12 @@ function startGlobalHook() {
   uIOhook.on("mousedown", onActivity);
   uIOhook.on("keydown",   onActivity);
   uIOhook.start();
-  console.log("[Agent] Global activity hook started");
+  log("[Agent] Global activity hook started");
 }
 
 function stopGlobalHook() {
   try { uIOhook.stop(); } catch (_) {}
-  console.log("[Agent] Global activity hook stopped");
+  log("[Agent] Global activity hook stopped");
 }
 
 function onActivity() {
@@ -45,7 +72,7 @@ async function sendPing() {
   const status = wasActiveThisMinute ? "active" : "idle";
   wasActiveThisMinute = false;
 
-  console.log(`[Agent] Sending ping: ${status}`);
+  log(`[Agent] Sending ping: ${status}`);
 
   try {
     const token = store.get("token");
@@ -58,20 +85,20 @@ async function sendPing() {
     );
 
     updateTray(status);
-    console.log(`[Agent] Ping sent: ${status} at ${new Date().toLocaleTimeString()}`);
+    log(`[Agent] Ping sent: ${status} at ${new Date().toLocaleTimeString()}`);
 
   } catch (err) {
     if (err?.response?.status === 401) {
-      console.log("[Agent] Token expired, clearing...");
+      log("[Agent] Token expired, clearing...");
       store.delete("token");
       stopTracking();
       updateTray("stopped");
     } else if (err?.response?.status === 400) {
-      console.log("[Agent] Session ended, stopping pings");
+      log("[Agent] Session ended, stopping pings");
       stopTracking();
       updateTray("stopped");
     } else {
-      console.error("[Agent] Ping failed:", err.message);
+      log("[Agent] Ping failed:", err.message);
     }
   }
 }
@@ -84,7 +111,7 @@ function startTracking() {
   startGlobalHook();
   pingInterval = setInterval(sendPing, PING_INTERVAL);
   updateTray("active");
-  console.log("[Agent] Tracking started");
+  log("[Agent] Tracking started");
 }
 
 function stopTracking() {
@@ -96,7 +123,7 @@ function stopTracking() {
 
   stopGlobalHook();
   updateTray("stopped");
-  console.log("[Agent] Tracking stopped");
+  log("[Agent] Tracking stopped");
 }
 
 function updateTray(status) {
@@ -160,7 +187,7 @@ function startTokenServer() {
           if (token) {
             store.set("token", token);
             startTracking();
-            console.log("[Agent] Token received, tracking started");
+            log("[Agent] Token received, tracking started");
             res.writeHead(200);
             res.end(JSON.stringify({ ok: true }));
           } else {
@@ -178,7 +205,7 @@ function startTokenServer() {
     if (req.url === "/clear-token") {
       store.delete("token");
       stopTracking();
-      console.log("[Agent] Token cleared, tracking stopped");
+      log("[Agent] Token cleared, tracking stopped");
       res.writeHead(200);
       res.end(JSON.stringify({ ok: true }));
       return;
@@ -198,15 +225,18 @@ function startTokenServer() {
   });
 
   server.listen(AGENT_PORT, "127.0.0.1", () => {
-    console.log(`[Agent] Token server listening on port ${AGENT_PORT}`);
+    log(`[Agent] Token server listening on port ${AGENT_PORT}`);
   });
 
   server.on("error", (err) => {
-    console.error("[Agent] Server error:", err.message);
+    log("[Agent] Server error:", err.message);
   });
 }
 
 app.whenReady().then(() => {
+  ensureLogFile();
+  log(`[Agent] Started - version ${app.getVersion()}`);
+
   powerSaveBlocker.start("prevent-app-suspension");
   app.setLoginItemSettings({ openAtLogin: true });
 
@@ -218,10 +248,10 @@ app.whenReady().then(() => {
 
   const savedToken = store.get("token");
   if (savedToken) {
-    console.log("[Agent] Saved token found, resuming tracking");
+    log("[Agent] Saved token found, resuming tracking");
     startTracking();
   } else {
-    console.log("[Agent] No token, waiting for login...");
+    log("[Agent] No token, waiting for login...");
     updateTray("stopped");
   }
 });
