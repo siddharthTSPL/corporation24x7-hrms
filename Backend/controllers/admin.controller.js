@@ -622,7 +622,6 @@ const addemployee = async (req, res, next) => {
   }
 };
 
-
 const findallmanagers = async (req, res, next) => {
   try {
     if (!req.admin) {
