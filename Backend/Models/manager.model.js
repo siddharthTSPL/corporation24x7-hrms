@@ -3,6 +3,12 @@ const bcrypt = require("bcrypt");
 
 const managerSchema = new mongoose.Schema(
   {
+    empid:{
+      type: String,
+      required: true,
+      unique: true,
+  },
+
     organisation_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SuperAdmin",
