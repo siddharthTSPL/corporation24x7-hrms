@@ -126,8 +126,19 @@ export const useCreateAdmin = () => {
   return useMutation({
     mutationFn: createAdmin,
 
-    onSuccess: () => {
-      toast.success("Admin added successfully.");
+    onSuccess: (response) => {
+      toast.success(response.message, {
+        position: "top-right",
+        duration: 5000,
+        style: {
+          background: "#FFFFFF",
+          color: "#16A34A",
+          borderRadius: "10px",
+          padding: "14px 16px",
+          fontSize: "14px",
+          fontWeight: "500",
+        },
+      });
 
       queryClient.invalidateQueries({
         queryKey: ["admins"],
@@ -136,7 +147,20 @@ export const useCreateAdmin = () => {
 
     onError: (error) => {
       toast.error(
-        error?.response?.data?.message || "Failed to add admin."
+        error?.response?.data?.message || "Something went wrong",
+        {
+          position: "top-right",
+          duration: 5000,
+          icon: "❌",
+          style: {
+            background: "#FFFFFF",
+            color:  "#16A34A",
+            borderRadius: "10px",
+            padding: "14px 16px",
+            fontSize: "14px",
+            fontWeight: "500",
+          },
+        }
       );
     },
   });
