@@ -880,8 +880,9 @@ const createAdmin = async (req, res, next) => {
     }
 
     if (!resolvedReportingManager || !resolvedReportingManagerModel) {
-      resolvedReportingManager = undefined;
-      resolvedReportingManagerModel = undefined;
+      // Default to the SuperAdmin as the reporting manager when none is provided
+      resolvedReportingManager = organisation_id;
+      resolvedReportingManagerModel = "SuperAdmin";
     }
 
     const admin = await AdminModel.create({
@@ -998,6 +999,8 @@ Verify &amp; Activate Account
     next(error);
   }
 };
+
+
  
 const addmanager = async (req, res, next) => {
   try {
