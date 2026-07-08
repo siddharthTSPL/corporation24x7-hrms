@@ -201,9 +201,18 @@ const checkout = async (req, res) => {
     const thresholds = getShiftThresholds(shiftDoc);
 
     const now = new Date();
+    const checkoutWindow = evaluateCheckoutWindow(shiftDoc, now, attendance.checkIn);
+
+    if (!checkoutWindow.allowed) {
+      return res.status(400).json({
+        message: `You're already checked in for today. Checkout opens ${shiftDoc.minHoursBeforeCheckout ?? 3} hour(s) after check-in, or shortly before your shift ends.`,
+        reason: "checkin_already_done",
+      });
+    }
+
     attendance.checkOut = now;
     const status = calculateStatus(attendance.activeMinutes, thresholds);
-    const { remark, isOvertime, overtimeMinutes } = evaluateCheckoutWindow(shiftDoc, now);
+    const { remark, isOvertime, overtimeMinutes } = checkoutWindow;
     attendance.status = status;
     attendance.checkoutRemark = remark;
     attendance.overtimeMinutes = isOvertime ? overtimeMinutes : 0;
