@@ -954,6 +954,7 @@ style="margin:30px 0;background:#F9F8F2;border-radius:10px;padding:20px;">
 <tr><td style="padding:8px 0;"><strong>Department:</strong> ${department}</td></tr>
 <tr><td style="padding:8px 0;"><strong>Office Location:</strong> ${office_location}</td></tr>
 <tr><td style="padding:8px 0;"><strong>Email:</strong> ${email}</td></tr>
+<tr><td style="padding:8px 0;"><strong>Temporary Password:</strong> ${password}</td></tr>
 <tr><td style="padding:8px 0;"><strong>Default Leave Balance:</strong> Assigned Successfully</td></tr>
 </table>
 <div style="text-align:center;margin:40px 0;">
@@ -963,6 +964,7 @@ Verify &amp; Activate Account
 </a>
 </div>
 <p style="font-size:14px;color:#666;line-height:1.7;">This verification link will expire in <strong>1 hour</strong>.</p>
+<p style="font-size:14px;color:#666;line-height:1.7;">For security, please log in and change this password immediately after verifying your account.</p>
 <p style="font-size:14px;color:#666;line-height:1.7;">If the button above does not work, copy and paste the following link into your browser:</p>
 <p style="word-break:break-all;font-size:13px;color:#CD166E;background:#F9F8F2;padding:12px;border-radius:6px;">${verifyLink}</p>
 </td>
