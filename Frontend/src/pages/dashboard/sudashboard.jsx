@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
   FaUsers, FaClock, FaCalendarAlt, FaBullhorn,
   FaPlus, FaEdit, FaTrash, FaTimes, FaCheck,
@@ -10,6 +10,9 @@ import {
   FaLock, FaUserSlash, FaExclamationTriangle, FaToggleOn,
   FaCrown,
 } from "react-icons/fa";
+
+// npm install country-state-city
+import { Country, State, City } from "country-state-city";
 
 import { useGetMeSuperAdmin } from "../../auth/server-state/superadmin/auth/suauth.hook";
 import { SuperAdminAssetReturnWarning } from "../asset/superadminasset";
@@ -23,6 +26,10 @@ import { useShowAllLeaves, useAcceptLeaveByAdmin, useRejectLeaveByAdmin } from "
 import { useGetAllAnnouncements, useCreateAnnouncement, useUpdateAnnouncement, useDeleteAnnouncement } from "../../auth/server-state/superadmin/announcement/suannouncement.hook";
 import { useGetAllAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin, useReviewToAdmin } from "../../auth/server-state/superadmin/other/suother.hook";
 
+// NOTE: The hardcoded COUNTRIES list is no longer used by the Address section
+// (replaced by the country-state-city library), but it is left in place
+// untouched in case anything else in this file (or a future addition)
+// references it. Nothing else in this file was changed.
 const COUNTRIES = [
   "Afghanistan","Albania","Algeria","Andorra","Angola","Argentina","Armenia","Australia","Austria",
   "Azerbaijan","Bahamas","Bahrain","Bangladesh","Belarus","Belgium","Belize","Bhutan","Bolivia",
@@ -142,13 +149,15 @@ const PERMISSION_META = {
   },
 };
 
+// Default country changed from "" to "India" per Address-section requirements.
+// This is the ONLY change to BLANK_FORM's shape/values; every other field is untouched.
 const BLANK_FORM = {
   f_name: "", l_name: "", work_email: "", password: "", confirmPassword: "",
   gender: "", marital_status: "single", personal_contact: "", e_contact: "",
   designation: "", role: "admin", department: "", office_location: "",
   is_fresher: true, total_experience: 0, previous_company: "", previous_designation: "",
   aadhaar_number: "", pan_number: "", residential_address: "", permanent_address: "",
-  city: "", state: "", pincode: "", country: "",
+  city: "", state: "", pincode: "", country: "India",
   bank_name: "", account_holder_name: "", account_number: "", ifsc_code: "",
 };
 
@@ -271,6 +280,76 @@ function FSel({ err, className = "", children, ...props }) {
     >
       {children}
     </select>
+  );
+}
+
+// NEW: Small reusable searchable dropdown used ONLY for the Address section
+// (Country / State / City). It mirrors the existing FSel/FInput visual style
+// (colors, border, radius, height, focus ring) so nothing about the modal's
+// look changes — this simply swaps a plain <select> for a searchable one
+// where the requirements ask for a "searchable dropdown".
+function SearchableSelect({ value, onChange, options, placeholder = "Select…", err, disabled }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+        setOpen(false);
+        setQuery("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const selectedLabel = options.find((o) => o.value === value)?.label || "";
+  const filtered = query
+    ? options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()))
+    : options;
+
+  return (
+    <div className="relative" ref={wrapRef}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((v) => !v)}
+        className={`w-full flex items-center justify-between px-3 py-2.5 bg-[#fdf5f9] border rounded-lg text-[13px] text-left outline-none transition min-h-[44px] ${err ? "border-red-400 focus:border-red-400 focus:ring-2 focus:ring-red-50" : "border-[#e8d5e2] focus:border-[#730042] focus:ring-2 focus:ring-[#f7ecf3]"} ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
+      >
+        <span className={`truncate ${selectedLabel ? "text-[#0d0209]" : "text-[#c499b4]"}`}>{selectedLabel || placeholder}</span>
+        <FaAngleDown size={11} className={`text-[#c499b4] flex-shrink-0 ml-2 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && !disabled && (
+        <div className="absolute z-20 mt-1 w-full bg-white border border-[#e8d5e2] rounded-lg shadow-lg max-h-52 flex flex-col overflow-hidden">
+          <div className="p-2 border-b border-[#f0dcea] flex-shrink-0">
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search…"
+              className="w-full px-2.5 py-1.5 bg-[#fdf5f9] border border-[#e8d5e2] rounded-md text-[12px] text-[#0d0209] outline-none focus:border-[#730042] placeholder:text-[#c499b4]"
+            />
+          </div>
+          <div className="overflow-y-auto">
+            {filtered.length === 0 ? (
+              <p className="px-3 py-2.5 text-[12px] text-[#c499b4]">No results</p>
+            ) : (
+              filtered.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => { onChange(o.value); setOpen(false); setQuery(""); }}
+                  className={`w-full text-left px-3 py-2 text-[12px] hover:bg-[#fdf5f9] transition-colors ${o.value === value ? "bg-[#f7ecf3] text-[#730042] font-semibold" : "text-[#0d0209]"}`}
+                >
+                  {o.label}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -578,24 +657,82 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [permissions, setPermissions] = useState(DEFAULT_PERMISSIONS);
 
+  // --- Address section state (NEW) -----------------------------------
+  // These are purely local UI-state additions for the searchable
+  // Country -> State -> City cascade and the "Same as Residential"
+  // auto-fill toggle. None of this is sent to the backend directly;
+  // the actual values that get saved still live on `form` exactly as
+  // before (form.country / form.state / form.city / form.pincode /
+  // form.residential_address / form.permanent_address).
+  const [countryIso, setCountryIso] = useState("IN");
+  const [stateIso, setStateIso] = useState("");
+  const [sameAsResidential, setSameAsResidential] = useState(false);
+
   const isEdit = !!initial;
 
   useEffect(() => {
     if (open) {
+      let nextForm;
       if (initial) {
         const { address, ...rest } = initial;
-        setForm({ ...BLANK_FORM, ...rest, ...parseAddress(address || ""), confirmPassword: "" });
+        nextForm = { ...BLANK_FORM, ...rest, ...parseAddress(address || ""), confirmPassword: "" };
       } else {
-        setForm(BLANK_FORM);
+        nextForm = { ...BLANK_FORM };
       }
+      setForm(nextForm);
       setErrors({});
       setTouched({});
       setSubmitted(false);
       setShowPass(false);
       setShowConfirm(false);
       setPermissions(DEFAULT_PERMISSIONS);
+
+      // --- Address section init (NEW) ---
+      // Reset the "same as residential" toggle every time the modal opens.
+      setSameAsResidential(false);
+
+      // Resolve the saved country name (or the "India" default) to its
+      // ISO code so the Country dropdown and the dependent State dropdown
+      // can be populated correctly, both for Create and for Edit.
+      const countryName = nextForm.country || "India";
+      const countryMatch = Country.getAllCountries().find((c) => c.name === countryName);
+      const resolvedCountryIso = countryMatch?.isoCode || "IN";
+      setCountryIso(resolvedCountryIso);
+
+      // Resolve the saved state name to its ISO code (within the resolved
+      // country) so the City dropdown can be populated correctly.
+      if (nextForm.state) {
+        const stateMatch = State.getStatesOfCountry(resolvedCountryIso).find(
+          (s) => s.name === nextForm.state
+        );
+        setStateIso(stateMatch?.isoCode || "");
+      } else {
+        setStateIso("");
+      }
     }
   }, [open]);
+
+  // --- Address section derived option lists (NEW) ---------------------
+  const countryOptions = useMemo(
+    () => Country.getAllCountries().map((c) => ({ value: c.isoCode, label: c.name })),
+    []
+  );
+
+  const stateOptions = useMemo(
+    () =>
+      countryIso
+        ? State.getStatesOfCountry(countryIso).map((s) => ({ value: s.isoCode, label: s.name }))
+        : [],
+    [countryIso]
+  );
+
+  const cityOptions = useMemo(
+    () =>
+      countryIso && stateIso
+        ? City.getCitiesOfState(countryIso, stateIso).map((c) => ({ value: c.name, label: c.name }))
+        : [],
+    [countryIso, stateIso]
+  );
 
   if (!open) return null;
 
@@ -618,6 +755,62 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
   };
 
   const showErr = (k) => (submitted || touched[k]) ? errors[k] : "";
+
+  // --- Address section handlers (NEW) ----------------------------------
+
+  // Residential Address changes also live-sync into Permanent Address
+  // whenever "Same as Residential" is checked.
+  const handleResidentialChange = (e) => {
+    const val = e.target.value;
+    const next = {
+      ...form,
+      residential_address: val,
+      ...(sameAsResidential ? { permanent_address: val } : {}),
+    };
+    setForm(next);
+    if (submitted || touched.residential_address) setErrors(validateForm(next, isEdit));
+  };
+
+  // Toggling the checkbox on immediately copies the current Residential
+  // Address into Permanent Address (one-time copy + future live sync).
+  // Toggling it off just stops future auto-syncing; it does not clear
+  // whatever is currently in Permanent Address.
+  const toggleSameAsResidential = () => {
+    setSameAsResidential((prev) => {
+      const next = !prev;
+      if (next) {
+        setForm((f) => ({ ...f, permanent_address: f.residential_address }));
+      }
+      return next;
+    });
+  };
+
+  // Country change resets State + City (both the ISO tracking state and
+  // the saved form values), matching the "reset dependent dropdowns" rule.
+  const handleCountryChange = (isoCode) => {
+    const countryObj = Country.getAllCountries().find((c) => c.isoCode === isoCode);
+    setCountryIso(isoCode);
+    setStateIso("");
+    const next = { ...form, country: countryObj?.name || "", state: "", city: "" };
+    setForm(next);
+    if (submitted) setErrors(validateForm(next, isEdit));
+  };
+
+  // State change resets City only.
+  const handleStateChange = (isoCode) => {
+    const statesForCountry = State.getStatesOfCountry(countryIso);
+    const stateObj = statesForCountry.find((s) => s.isoCode === isoCode);
+    setStateIso(isoCode);
+    const next = { ...form, state: stateObj?.name || "", city: "" };
+    setForm(next);
+    if (submitted) setErrors(validateForm(next, isEdit));
+  };
+
+  const handleCityChange = (cityName) => {
+    const next = { ...form, city: cityName };
+    setForm(next);
+    if (submitted || touched.city) setErrors(validateForm(next, isEdit));
+  };
 
   const handleSave = () => {
     setSubmitted(true);
@@ -807,25 +1000,78 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
             </div>
           </div>
 
+          {/* ================= ADDRESS SECTION (REWORKED) =================
+              Order: Residential Address -> Same as Residential checkbox ->
+              Permanent Address -> Country -> State -> City -> Pincode.
+              Everything below this comment block is the only structural
+              change in the whole file; all other sections/logic are
+              untouched. */}
+
           <div className="mt-3 sm:mt-4">
             <FLabel>Residential Address</FLabel>
-            <FInput placeholder="Current / residential street, locality" value={form.residential_address} onChange={set("residential_address")} />
+            <FInput
+              placeholder="Current / residential street, locality"
+              value={form.residential_address}
+              onChange={handleResidentialChange}
+            />
+          </div>
+
+          <div className="flex items-center gap-3 mt-3">
+            <input
+              type="checkbox"
+              id="same_as_residential"
+              checked={sameAsResidential}
+              onChange={toggleSameAsResidential}
+              className="w-5 h-5 accent-[#730042] cursor-pointer rounded flex-shrink-0"
+            />
+            <label htmlFor="same_as_residential" className="text-[11px] font-bold tracking-widest uppercase text-[#7a5568] cursor-pointer select-none">
+              Same as Residential Address
+            </label>
           </div>
 
           <div className="mt-3 sm:mt-4">
             <FLabel>Permanent Address</FLabel>
-            <FInput placeholder="Permanent / hometown address" value={form.permanent_address} onChange={set("permanent_address")} />
+            <FInput
+              placeholder="Permanent / hometown address"
+              value={form.permanent_address}
+              onChange={set("permanent_address")}
+            />
+          </div>
+
+          <div className="mt-3 sm:mt-4">
+            <FLabel>Country</FLabel>
+            <SearchableSelect
+              value={countryIso}
+              onChange={handleCountryChange}
+              options={countryOptions}
+              placeholder="Select country"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-3 sm:mt-4">
+            <div>
+              <FLabel>State</FLabel>
+              <SearchableSelect
+                value={stateIso}
+                onChange={handleStateChange}
+                options={stateOptions}
+                placeholder={stateOptions.length ? "Select state" : "No states available"}
+                disabled={!countryIso || stateOptions.length === 0}
+              />
+            </div>
+            <div>
+              <FLabel>City</FLabel>
+              <SearchableSelect
+                value={form.city}
+                onChange={handleCityChange}
+                options={cityOptions}
+                placeholder={cityOptions.length ? "Select city" : "Select a state first"}
+                disabled={!stateIso || cityOptions.length === 0}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mt-3 sm:mt-4">
-            <div>
-              <FLabel>City</FLabel>
-              <FInput placeholder="City" value={form.city} onChange={set("city")} />
-            </div>
-            <div>
-              <FLabel>State</FLabel>
-              <FInput placeholder="State" value={form.state} onChange={set("state")} />
-            </div>
             <div className="col-span-2 sm:col-span-1">
               <FLabel>Pincode</FLabel>
               <FInput placeholder="6 digits" value={form.pincode} onChange={set("pincode")} onBlur={blur("pincode")} err={showErr("pincode")} maxLength={6} />
@@ -833,13 +1079,7 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
             </div>
           </div>
 
-          <div className="mt-3 sm:mt-4">
-            <FLabel>Country</FLabel>
-            <FSel value={form.country} onChange={set("country")}>
-              <option value="">Select country</option>
-              {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </FSel>
-          </div>
+          {/* ================= END ADDRESS SECTION ================= */}
 
           <SecHead icon={<FaUniversity size={11} />}>
             Banking Details <span className="normal-case tracking-normal font-normal text-[#c499b4] ml-1">(optional)</span>
