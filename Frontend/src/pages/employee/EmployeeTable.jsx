@@ -460,6 +460,12 @@ function AddressFields({ form, onChange, errors }) {
   const resStates = form.country ? State.getStatesOfCountry(form.country) : [];
   const permStates = form.permanent_country ? State.getStatesOfCountry(form.permanent_country) : [];
 
+  const resStateIso = resStates.find((s) => s.name === form.state)?.isoCode;
+  const permStateIso = permStates.find((s) => s.name === form.permanent_state)?.isoCode;
+
+  const resCities = form.country && resStateIso ? City.getCitiesOfState(form.country, resStateIso) : [];
+  const permCities = form.permanent_country && permStateIso ? City.getCitiesOfState(form.permanent_country, permStateIso) : [];
+
   const handleSameAsResidential = (e) => {
     const checked = e.target.checked;
     onChange({ target: { name: "same_as_residential", value: checked } });
@@ -516,13 +522,22 @@ function AddressFields({ form, onChange, errors }) {
   </Field>
 
   <Field label="City" required error={errors.city}>
-    <input
+    <select
       name="city"
-      placeholder="City"
       value={form.city}
       onChange={onChange}
       className={inputCls}
-    />
+      disabled={!form.state}
+    >
+      <option value="">
+        {form.state ? (resCities.length ? "Select City" : "No cities found") : "Select state first"}
+      </option>
+      {resCities.map((c) => (
+        <option key={c.name} value={c.name}>
+          {c.name}
+        </option>
+      ))}
+    </select>
   </Field>
 
   <Field label="Pincode" required error={errors.pincode}>
@@ -604,13 +619,22 @@ function AddressFields({ form, onChange, errors }) {
   </Field>
 
   <Field label="City" error={errors.permanent_city}>
-    <input
+    <select
       name="permanent_city"
-      placeholder="City"
       value={form.permanent_city}
       onChange={onChange}
       className={inputCls}
-    />
+      disabled={!form.permanent_state}
+    >
+      <option value="">
+        {form.permanent_state ? (permCities.length ? "Select City" : "No cities found") : "Select state first"}
+      </option>
+      {permCities.map((c) => (
+        <option key={c.name} value={c.name}>
+          {c.name}
+        </option>
+      ))}
+    </select>
   </Field>
 
   <Field label="Pincode" error={errors.permanent_pincode}>
@@ -688,7 +712,7 @@ function EmpStepFields({ step, form, onChange, errors, managersWithoutAdmin }) {
       <Field label="Role">
         <select name="role" value={form.role} onChange={onChange} className={inputCls}>
           <option value="employee">Employee</option>
-          <option value="official">Official</option>
+          
         </select>
       </Field>
       <OfficeLocationFields form={form} onChange={onChange} errors={errors} />
@@ -806,8 +830,7 @@ function MgrStepFields({ step, form, onChange, errors, managers }) {
       <Field label="Role">
         <select name="role" value={form.role} onChange={onChange} className={inputCls}>
           <option value="manager">Manager</option>
-          <option value="senior_manager">Senior Manager</option>
-          <option value="official">Official</option>
+         <option value="official">Official</option>
         </select>
       </Field>
       <OfficeLocationFields form={form} onChange={onChange} errors={errors} />
@@ -951,28 +974,28 @@ export default function EmployeeTable() {
       onError: (err) => { showPopup("error", err?.response?.data?.message || err?.message || "Delete failed"); setDeleteTarget(null); },
     });
   };
-
-  const makeChangeHandler = (setter) => (e) => {
-    const { name, value } = e.target;
-    let nextValue = value;
-    if (["personal_contact", "e_contact", "aadhaar_number", "pincode", "permanent_pincode"].includes(name)) {
-      nextValue = numericOnly(value);
-    }
-    if (["f_name", "l_name"].includes(name) && value && !/^[A-Za-z\s.'-]*$/.test(value)) {
-      return;
-    }
-    setter((prev) => {
-      const next = { ...prev, [name]: nextValue };
-      if (name === "country") next.state = "";
-      if (name === "state") { /* city stays editable */ }
-      if (name === "permanent_country") next.permanent_state = "";
-      if (name === "office_location_country") { next.office_location_state = ""; next.office_location = ""; next.office_location_custom = ""; }
-      if (name === "office_location_state") { next.office_location = ""; next.office_location_custom = ""; }
-      if (name === "office_location" && nextValue !== "Other") next.office_location_custom = "";
-      if (name === "same_as_residential") next.same_as_residential = nextValue;
-      return next;
-    });
-  };
+const makeChangeHandler = (setter) => (e) => {
+  const { name, value } = e.target;
+  let nextValue = value;
+  if (["personal_contact", "e_contact", "aadhaar_number", "pincode", "permanent_pincode"].includes(name)) {
+    nextValue = numericOnly(value);
+  }
+  if (["f_name", "l_name"].includes(name) && value && !/^[A-Za-z\s.'-]*$/.test(value)) {
+    return;
+  }
+  setter((prev) => {
+    const next = { ...prev, [name]: nextValue };
+    if (name === "country") next.state = "";
+    if (name === "state") next.city = "";
+    if (name === "permanent_country") next.permanent_state = "";
+    if (name === "permanent_state") next.permanent_city = "";
+    if (name === "office_location_country") { next.office_location_state = ""; next.office_location = ""; next.office_location_custom = ""; }
+    if (name === "office_location_state") { next.office_location = ""; next.office_location_custom = ""; }
+    if (name === "office_location" && nextValue !== "Other") next.office_location_custom = "";
+    if (name === "same_as_residential") next.same_as_residential = nextValue;
+    return next;
+  });
+};
 
   const handleEmpChange = makeChangeHandler(setEmpForm);
   const handleMgrChange = makeChangeHandler(setMgrForm);
