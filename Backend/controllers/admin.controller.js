@@ -456,7 +456,7 @@ const addmanager = async (req, res, next) => {
     const {
       empid, profile_image, f_name, l_name, work_email, gender, marital_status, password,
       personal_contact, e_contact, aadhaar_number, pan_number, address, city, state,
-      pincode, role, office_location, designation, department, reporting_manager,
+      pincode, country, role, office_location, designation, department, reporting_manager,
       is_fresher, total_experience, previous_company, previous_designation, bank_name,
       account_holder_name, account_number, ifsc_code, resume, aadhaar_card, pan_card,
       experience_letter, permissions,
@@ -494,7 +494,7 @@ const addmanager = async (req, res, next) => {
     const newmanager = await Managermodel.create({
       organisation_id, empid, profile_image, uid, department, f_name, l_name, work_email, password,
       gender, marital_status, personal_contact, e_contact, aadhaar_number, pan_number,
-      address, city, state, pincode, role, designation, office_location,
+      address, city, state, pincode, country, role, designation, office_location,
       reporting_manager: reportingManagerId,
       reporting_manager_model: reportingManagerModel,
       is_fresher, total_experience, previous_company, previous_designation, bank_name,
@@ -554,7 +554,7 @@ const addemployee = async (req, res, next) => {
     const {
       empid, profile_image, f_name, l_name, work_email, password, gender, marital_status,
       personal_contact, e_contact, aadhaar_number, pan_number, address, city, state,
-      pincode, role, office_location, designation, department, Under_manager, is_fresher,
+      pincode, country, role, office_location, designation, department, Under_manager, is_fresher,
       total_experience, previous_company, previous_designation, bank_name, account_holder_name,
       account_number, ifsc_code, resume, aadhaar_card, pan_card, experience_letter, permissions,
     } = req.body;
@@ -589,7 +589,7 @@ const addemployee = async (req, res, next) => {
     const newuser = await Usermodel.create({
       organisation_id, empid, profile_image, uid, department, Under_manager: Under_manager || null,
       f_name, l_name, work_email, password, gender, marital_status, personal_contact, e_contact,
-      aadhaar_number, pan_number, address, city, state, pincode, role, designation, office_location,
+      aadhaar_number, pan_number, address, city, state, pincode, country, role, designation, office_location,
       is_fresher, total_experience, previous_company, previous_designation, bank_name,
       account_holder_name, account_number, ifsc_code, resume, aadhaar_card, pan_card, experience_letter,
     });
@@ -621,7 +621,6 @@ const addemployee = async (req, res, next) => {
     next(error);
   }
 };
-
 
 const findallmanagers = async (req, res, next) => {
   try {
