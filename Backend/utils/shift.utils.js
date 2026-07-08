@@ -63,11 +63,17 @@ const evaluateCheckinWindow = (shift, now = new Date()) => {
   return { allowed, isLate, lateMinutes, windowStart, windowEnd };
 };
 
-const evaluateCheckoutWindow = (shift, now = new Date()) => {
+// checkInTime is required to gate the checkout scan: the scan is only
+// accepted once minMinutesBeforeCheckout has passed since check-in. Once
+// that gate is open, checkout is allowed at ANY time after — the remark
+// below only describes when it happened relative to shift end, it never
+// blocks the scan.
+const evaluateCheckoutWindow = (shift, now = new Date(), checkInTime = null) => {
   const start = toMinutes(shift.startTime);
   const end = toMinutes(shift.endTime);
   const overnight = end <= start;
   const grace = shift.graceMinutes ?? 15;
+  const minMinutesBeforeCheckout = shift.minMinutesBeforeCheckout ?? 10;
 
   let nowMinutes = getISTMinutesOfDay(now);
   let effectiveEnd = end;
@@ -78,8 +84,27 @@ const evaluateCheckoutWindow = (shift, now = new Date()) => {
 
   const diffMinutes = nowMinutes - effectiveEnd;
 
+  const minutesSinceCheckin = checkInTime
+    ? (now.getTime() - new Date(checkInTime).getTime()) / 60000
+    : 0;
+
+  const allowed = minutesSinceCheckin >= minMinutesBeforeCheckout;
+
+  if (!allowed) {
+    return {
+      allowed,
+      remark: null,
+      isOvertime: false,
+      overtimeMinutes: 0,
+      earlyMinutes: 0,
+      minutesUntilCheckoutOpens: Math.ceil(minMinutesBeforeCheckout - minutesSinceCheckin),
+      onTimeWindowEnd: effectiveEnd + grace,
+    };
+  }
+
   if (diffMinutes < 0) {
     return {
+      allowed,
       remark: "early_checkout",
       isOvertime: false,
       overtimeMinutes: 0,
@@ -89,6 +114,7 @@ const evaluateCheckoutWindow = (shift, now = new Date()) => {
   }
   if (diffMinutes <= grace) {
     return {
+      allowed,
       remark: "on_time",
       isOvertime: false,
       overtimeMinutes: 0,
@@ -97,6 +123,7 @@ const evaluateCheckoutWindow = (shift, now = new Date()) => {
     };
   }
   return {
+    allowed,
     remark: "overtime",
     isOvertime: true,
     overtimeMinutes: diffMinutes - grace,

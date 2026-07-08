@@ -206,11 +206,12 @@ const scanFace = async (req, res) => {
       const who = employeeName || "You";
       const verb = employeeName ? "is" : "are";
       return res.status(400).json({
-        message: `${who} ${verb} already checked in for today. Checkout opens ${shift.minHoursBeforeCheckout ?? 3} hour(s) after check-in, or shortly before your shift ends.`,
+        message: `${who} ${verb} already checked in for today. Checkout opens in ${checkoutWindow.minutesUntilCheckoutOpens} minute(s).`,
         reason: "checkin_already_done",
         employeeName,
         shift: shiftInfo,
         checkIn: attendance.checkIn,
+        minutesUntilCheckoutOpens: checkoutWindow.minutesUntilCheckoutOpens,
       });
     }
 
