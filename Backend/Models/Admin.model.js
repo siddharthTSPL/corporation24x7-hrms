@@ -2,11 +2,13 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 
 const adminSchema = new mongoose.Schema(
-  { empid:{
+  {
+    empid: {
       type: String,
       required: true,
       unique: true,
-  },
+    },
+
     organisation_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SuperAdmin",
@@ -114,10 +116,17 @@ const adminSchema = new mongoose.Schema(
 
     office_location: {
       type: String,
-      enum: ["Noida", "Bareilly", "Delhi", "Mumbai"],
       required: true,
+      trim: true,
+      validate: {
+        validator: function (value) {
+          return typeof value === "string" && value.trim().length > 0 && value.length <= 100;
+        },
+        message: "Office location must be a valid, non-empty location name (max 100 characters)",
+      },
     },
-      shift: {
+
+    shift: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Shift",
       default: null,
@@ -196,6 +205,7 @@ const adminSchema = new mongoose.Schema(
       enum: ["active", "inactive", "suspended"],
       default: "active",
     },
+
     working_status: {
       type: String,
       enum: ["working", "resigned", "fired", "terminated"],
@@ -229,6 +239,7 @@ adminSchema.index({ department: 1, status: 1 });
 adminSchema.index({ status: 1 });
 adminSchema.index({ reporting_manager: 1 });
 adminSchema.index({ organisation_id: 1 });
+adminSchema.index({ office_location: 1 });
 
 adminSchema.pre("save", async function () {
   if (this.isModified("password")) {
@@ -269,6 +280,10 @@ adminSchema.pre(
 
     if ("working_status" in set && typeof set.working_status === "string") {
       set.working_status = set.working_status.trim();
+    }
+
+    if ("office_location" in set && typeof set.office_location === "string") {
+      set.office_location = set.office_location.trim();
     }
 
     if (update.$set) {
