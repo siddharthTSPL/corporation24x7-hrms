@@ -24,7 +24,7 @@ const OtpModel = require("../Models/otpbasedlogin.model");
 const AdminLeave = require("../Models/adleave.model");
 const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = require("../utils/licenseCheck");
 const AssetModel = require("../Models/asset.model");
-const { isEmailTaken } = require("../utils/emailAvailability.utils");
+const { isEmailTaken , isEmpidTaken} = require("../utils/emailAvailability.utils");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
@@ -831,7 +831,7 @@ const createAdmin = async (req, res, next) => {
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
     const {
-      f_name, l_name, work_email, password, gender, designation, department,
+      empid, f_name, l_name, work_email, password, gender, designation, department,
       office_location, personal_contact, e_contact, role, marital_status,
       is_fresher, total_experience, previous_company, previous_designation,
       aadhaar_number, pan_number, address, city, state, pincode,
@@ -839,10 +839,10 @@ const createAdmin = async (req, res, next) => {
       account_holder_name, account_number, ifsc_code, country, permissions,
     } = req.body;
 
-    if (!f_name || !l_name || !work_email || !password || !gender || !designation ||
+    if (!empid || !f_name || !l_name || !work_email || !password || !gender || !designation ||
         !department || !office_location || !personal_contact || !e_contact)
       return next(Object.assign(
-        new Error("f_name, l_name, work_email, password, gender, designation, department, office_location, personal_contact and e_contact are required"),
+        new Error("empid, f_name, l_name, work_email, password, gender, designation, department, office_location, personal_contact and e_contact are required"),
         { statusCode: 400 }
       ));
 
@@ -853,6 +853,13 @@ const createAdmin = async (req, res, next) => {
     if (emailCheck.taken)
       return next(Object.assign(
         new Error("An account with this email already exists"),
+        { statusCode: 400 }
+      ));
+
+    const empidTaken = await isEmpidTaken(empid);
+    if (empidTaken)
+      return next(Object.assign(
+        new Error("This Employee ID is already in use"),
         { statusCode: 400 }
       ));
 
@@ -878,7 +885,7 @@ const createAdmin = async (req, res, next) => {
     }
 
     const admin = await AdminModel.create({
-      organisation_id, uid, f_name, l_name, work_email: email, password, gender,
+      organisation_id, empid, uid, f_name, l_name, work_email: email, password, gender,
       designation, department, office_location, personal_contact, e_contact,
       role: role || "admin",
       marital_status: marital_status || "single",
@@ -940,6 +947,7 @@ Your admin account is now ready. Please verify your email address to activate yo
 </p>
 <table width="100%" cellpadding="0" cellspacing="0"
 style="margin:30px 0;background:#F9F8F2;border-radius:10px;padding:20px;">
+<tr><td style="padding:8px 0;"><strong>Employee ID:</strong> ${empid}</td></tr>
 <tr><td style="padding:8px 0;"><strong>UID:</strong> ${uid}</td></tr>
 <tr><td style="padding:8px 0;"><strong>Role:</strong> ${role || "Admin"}</td></tr>
 <tr><td style="padding:8px 0;"><strong>Designation:</strong> ${designation}</td></tr>
@@ -978,7 +986,7 @@ Verify &amp; Activate Account
       success: true,
       message: "Admin created successfully. Verification email sent.",
       admin: {
-        id: admin._id, uid: admin.uid, f_name: admin.f_name, l_name: admin.l_name,
+        id: admin._id, empid: admin.empid, uid: admin.uid, f_name: admin.f_name, l_name: admin.l_name,
         work_email: admin.work_email, designation: admin.designation,
         department: admin.department, office_location: admin.office_location,
         role: admin.role, status: admin.status,
