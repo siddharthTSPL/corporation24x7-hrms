@@ -1000,8 +1000,6 @@ Verify &amp; Activate Account
   }
 };
 
-
- 
 const addmanager = async (req, res, next) => {
   try {
     if (!req.superAdmin)
