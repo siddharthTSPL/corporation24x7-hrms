@@ -205,8 +205,9 @@ const checkout = async (req, res) => {
 
     if (!checkoutWindow.allowed) {
       return res.status(400).json({
-        message: `You're already checked in for today. Checkout opens ${shiftDoc.minHoursBeforeCheckout ?? 3} hour(s) after check-in, or shortly before your shift ends.`,
+        message: `You're already checked in for today. Checkout opens in ${checkoutWindow.minutesUntilCheckoutOpens} minute(s).`,
         reason: "checkin_already_done",
+        minutesUntilCheckoutOpens: checkoutWindow.minutesUntilCheckoutOpens,
       });
     }
 
