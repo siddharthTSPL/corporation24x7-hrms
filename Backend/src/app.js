@@ -15,9 +15,9 @@ app.enable("trust proxy");
 app.use((req, res, next) => {
   if (
     req.hostname === "localhost" ||
+    req.hostname === "127.0.0.1" ||
     req.hostname === "146.101.46.205" ||
     req.method === "OPTIONS" ||
-    
     req.secure
   ) {
     return next();
@@ -40,8 +40,8 @@ const corsOptions = {
     "http://talent.techtorch.solutions",
     "https://talent.techtorch.solutions",
     "https://corporation24x7-hrms.onrender.com",
-    "https://torchxsuite.com/talent",
-    "http://torchxsuite.com/talent/",
+    "https://torchxsuite.com",
+    "http://torchxsuite.com",
   ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -66,7 +66,6 @@ const shiftrouter = require('../routes/shift.routes');
 const holidaypolicyrouter = require('../routes/holidaypolicy.route');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
-// DEBUG — remove after fix
 const routes = {
   adminrouter,
   managerrouter,
@@ -102,9 +101,9 @@ app.use('/timesheet', timesheetroute);
 app.use('/kiosk', kioskrouter);
 app.use('/faceattendance', faceattendancerouter);
 app.use('/admin', shiftrouter);
-app.use('/admin/holiday-policy', holidaypolicyrouter);   // was: app.use('/admin', holidaypolicyrouter);
+app.use('/admin/holiday-policy', holidaypolicyrouter);
 app.use('/superadmin', shiftrouter);
-app.use('/superadmin/', holidaypolicyrouter); // was: app.use('/superadmin', holidaypolicyrouter);
+app.use('/superadmin/', holidaypolicyrouter);
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 

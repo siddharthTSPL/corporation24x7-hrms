@@ -13,20 +13,13 @@ const {
   getShiftThresholds,
 } = require("../utils/shift.utils");
 
-// Which mongoose model a FaceProfile.onModel value points at.
 const MODEL_BY_ONMODEL = { User, Manager, Admin: AdminUser };
 
-// Accepts the enrollment photo in memory (not saved to disk) — we only need
-// it long enough to send to the face service and get back an embedding.
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: { fileSize: 5 * 1024 * 1024 },
 });
 
-// How close a live scan must be to a stored face to count as a match.
-// 1.0 = identical, 0 = unrelated. Start at 0.62 and tune after testing
-// with your own kiosk/camera — raise it if random people get matched,
-// lower it if real employees keep getting rejected.
 const SIMILARITY_THRESHOLD = 0.62;
 
 const minutesToLabel = (mins) => {
@@ -37,16 +30,6 @@ const minutesToLabel = (mins) => {
   return rem ? `${h}h ${rem}m` : `${h}h`;
 };
 
-// ---------------------------------------------------------------------
-// ENROLLMENT — this is the "training" step, in the loosest sense.
-// There is no per-employee model training here: an admin uploads one
-// clear, front-facing photo, and a general-purpose pretrained face model
-// (already trained by its authors on millions of unrelated faces) turns
-// it into a 512-number embedding — a numeric fingerprint of THIS face.
-// We store that fingerprint, tagged with organisation_id so it's only
-// ever compared within that org. Recognizing someone later is just
-// "whose stored fingerprint is closest to this live one", not training.
-// ---------------------------------------------------------------------
 const enrollFace = async (req, res) => {
   try {
     const { employeeId, onModel, role } = req.body;
@@ -89,7 +72,6 @@ const enrollFace = async (req, res) => {
   }
 };
 
-// List who has/hasn't been enrolled yet, for an admin dashboard.
 const listEnrolled = async (req, res) => {
   try {
     const organisation_id = req.admin.organisation_id;
@@ -112,15 +94,9 @@ const removeFace = async (req, res) => {
   }
 };
 
-// ---------------------------------------------------------------------
-// LIVE SCAN — called by the kiosk, authenticated as a device (not a
-// person). It only ever compares against faces belonging to the kiosk's
-// own organisation_id, and every checkin/checkout is evaluated against
-// the matched employee's own shift timing.
-// ---------------------------------------------------------------------
 const scanFace = async (req, res) => {
   try {
-    const { image } = req.body; // base64 frame captured by the tablet camera
+    const { image } = req.body;
     if (!image) return res.status(400).json({ message: "image (base64) is required" });
 
     const { organisation_id } = req.kiosk;
@@ -160,6 +136,7 @@ const scanFace = async (req, res) => {
 
     const employeeName = `${employeeDoc.f_name || ""} ${employeeDoc.l_name || ""}`.trim();
     const shift = await resolveEmployeeShift(employeeDoc, organisation_id);
+    const shiftInfo = { name: shift.name, startTime: shift.startTime, endTime: shift.endTime };
 
     const now = new Date();
     const today = new Date();
@@ -172,11 +149,8 @@ const scanFace = async (req, res) => {
       organisation_id,
     });
 
-    // -----------------------------------------------------------------
-    // FIRST SCAN TODAY -> CHECK-IN
-    // -----------------------------------------------------------------
     if (!attendance) {
-      const { allowed, isLate } = evaluateCheckinWindow(shift, now);
+      const { allowed, isLate, lateMinutes } = evaluateCheckinWindow(shift, now);
 
       if (!allowed) {
         const earlyBuffer = shift.earlyBufferMinutes ?? 60;
@@ -184,7 +158,7 @@ const scanFace = async (req, res) => {
           message: `Not allowed. ${employeeName || "Your"} shift starts at ${shift.startTime}. Check-in opens ${earlyBuffer} minute(s) before that.`,
           reason: "shift_not_started",
           employeeName,
-          shift: { name: shift.name, startTime: shift.startTime, endTime: shift.endTime },
+          shift: shiftInfo,
         });
       }
 
@@ -197,33 +171,50 @@ const scanFace = async (req, res) => {
         checkIn: now,
         shift: shift._id,
         isLate,
+        lateMinutes,
         source: "face",
       });
 
       const grace = shift.graceMinutes ?? 15;
       return res.json({
         message: isLate
-          ? `Checked in — late (grace period was ${shift.startTime} to +${grace} min)`
+          ? `Checked in — late by ${minutesToLabel(lateMinutes)} (grace period was ${shift.startTime} to +${grace} min)`
           : "Checked in on time",
         action: "checkin",
         employeeName,
         matchConfidence: Number(bestScore.toFixed(3)),
         time: attendance.checkIn,
         isLate,
-        shift: { name: shift.name, startTime: shift.startTime, endTime: shift.endTime },
+        lateMinutes,
+        shift: shiftInfo,
       });
     }
 
     if (attendance.checkOut)
       return res.status(400).json({
-        message: `${employeeName || "This employee"} has already completed attendance for today.`,
+        message: `Today's attendance is already done for ${employeeName || "this employee"} — checked in and checked out.`,
+        reason: "attendance_completed",
         employeeName,
+        shift: shiftInfo,
+        checkIn: attendance.checkIn,
+        checkOut: attendance.checkOut,
       });
 
-    // -----------------------------------------------------------------
-    // SECOND SCAN TODAY -> CHECK-OUT
-    // -----------------------------------------------------------------
-    const { remark, isOvertime, overtimeMinutes } = evaluateCheckoutWindow(shift, now);
+    const checkoutWindow = evaluateCheckoutWindow(shift, now, attendance.checkIn);
+
+    if (!checkoutWindow.allowed) {
+      const who = employeeName || "You";
+      const verb = employeeName ? "is" : "are";
+      return res.status(400).json({
+        message: `${who} ${verb} already checked in for today. Checkout opens ${shift.minHoursBeforeCheckout ?? 3} hour(s) after check-in, or shortly before your shift ends.`,
+        reason: "checkin_already_done",
+        employeeName,
+        shift: shiftInfo,
+        checkIn: attendance.checkIn,
+      });
+    }
+
+    const { remark, isOvertime, overtimeMinutes } = checkoutWindow;
 
     attendance.checkOut = now;
     const durationMinutes = Math.round((attendance.checkOut - attendance.checkIn) / 60000);
@@ -235,7 +226,7 @@ const scanFace = async (req, res) => {
     await updateSummary(attendance);
 
     const remarkMessage = {
-      on_time: "Checked out on time",
+      on_time: "Checked out on time. Have a good day!",
       overtime: `Checked out — overtime of ${minutesToLabel(overtimeMinutes)}`,
       early_checkout: "Checked out early, before your shift ended",
     }[remark];
@@ -250,7 +241,7 @@ const scanFace = async (req, res) => {
       overtimeMinutes: attendance.overtimeMinutes,
       time: attendance.checkOut,
       workedMinutes: durationMinutes,
-      shift: { name: shift.name, startTime: shift.startTime, endTime: shift.endTime },
+      shift: shiftInfo,
     });
   } catch (error) {
     res.status(error.statusCode || 500).json({ message: error.message });
