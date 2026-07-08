@@ -8,7 +8,7 @@ import {
   FaShieldAlt, FaBuilding, FaPhone, FaEnvelope,
   FaIdCard, FaUniversity, FaGlobe, FaBriefcase,
   FaLock, FaUserSlash, FaExclamationTriangle, FaToggleOn,
-  FaCrown,
+  FaCrown, FaMagic,
 } from "react-icons/fa";
 
 import { Country, State, City } from "country-state-city";
@@ -26,7 +26,6 @@ import { useGetAllAnnouncements, useCreateAnnouncement, useUpdateAnnouncement, u
 import { useGetAllAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin, useReviewToAdmin } from "../../auth/server-state/superadmin/other/suother.hook";
 
 const DEPT_OPTIONS = ["OPR", "BPO", "ENG", "HR", "MGMT"];
-const OFFICE_OPTIONS = ["Noida", "Bareilly", "Delhi", "Mumbai", "Other"];
 const ROLE_LABEL = { admin: "Admin", senior_admin: "Senior Admin", official: "Official" };
 
 const WORKING_STATUS_OPTIONS = [
@@ -123,9 +122,9 @@ const PERMISSION_META = {
 };
 
 const BLANK_FORM = {
-  f_name: "", l_name: "", work_email: "", password: "", confirmPassword: "",
+  empid: "", f_name: "", l_name: "", work_email: "", password: "", confirmPassword: "",
   gender: "", marital_status: "single", personal_contact: "", e_contact: "",
-  designation: "", role: "admin", department: "", office_location: "", office_location_other: "",
+  designation: "", role: "admin", department: "", office_location: "",
   is_fresher: true, total_experience: 0, previous_company: "", previous_designation: "",
   aadhaar_number: "", pan_number: "", residential_address: "", permanent_address: "",
   city: "", state: "", pincode: "", country: "India",
@@ -135,9 +134,12 @@ const BLANK_FORM = {
 const NAME_REGEX = /^[A-Za-z\s]*$/;
 const NAME_REGEX_NONEMPTY = /^[A-Za-z\s]+$/;
 const DIGITS_ONLY_REGEX = /^\d*$/;
+const EMP_ID_REGEX = /^[A-Za-z0-9_-]*$/;
 
 const validateForm = (form, isEdit) => {
   const e = {};
+
+  if (!form.empid.trim()) e.empid = "Employee ID is required";
 
   if (!form.f_name.trim()) e.f_name = "First name is required";
   else if (!NAME_REGEX_NONEMPTY.test(form.f_name.trim())) e.f_name = "Only letters and spaces are allowed";
@@ -165,10 +167,7 @@ const validateForm = (form, isEdit) => {
 
   if (!form.designation.trim()) e.designation = "Designation is required";
   if (!form.department) e.department = "Department is required";
-
   if (!form.office_location) e.office_location = "Office location is required";
-  if (form.office_location === "Other" && !form.office_location_other.trim())
-    e.office_location_other = "Please enter your office location";
 
   if (!form.is_fresher && (!form.total_experience || Number(form.total_experience) <= 0))
     e.total_experience = "Enter total experience in years";
@@ -269,7 +268,7 @@ function FInput({ err, className = "", ...props }) {
 function FSel({ err, className = "", children, ...props }) {
   return (
     <select
-      className={`w-full px-3 py-2.5 bg-[#fdf5f9] border rounded-lg text-[13px] text-[#0d0209] outline-none transition min-h-[44px] ${err ? "border-red-400 focus:border-red-400 focus:ring-2 focus:ring-red-50" : "border-[#e8d5e2] focus:border-[#730042] focus:ring-2 focus:ring-[#f7ecf3]"} ${className}`}
+      className={`w-full px-3 py-2.5 bg-[#fdf5f9] border rounded-lg text-[13px] text-[#0d0209] outline-none transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed ${err ? "border-red-400 focus:border-red-400 focus:ring-2 focus:ring-red-50" : "border-[#e8d5e2] focus:border-[#730042] focus:ring-2 focus:ring-[#f7ecf3]"} ${className}`}
       {...props}
     >
       {children}
@@ -644,6 +643,9 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
   const [stateIso, setStateIso] = useState("");
   const [sameAsResidential, setSameAsResidential] = useState(false);
 
+  const [officeCountryIso, setOfficeCountryIso] = useState("IN");
+  const [officeStateIso, setOfficeStateIso] = useState("");
+
   const isEdit = !!initial;
 
   useEffect(() => {
@@ -651,14 +653,11 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
       let nextForm;
       if (initial) {
         const { address, ...rest } = initial;
-        const officeIsKnown = OFFICE_OPTIONS.includes(rest.office_location);
         nextForm = {
           ...BLANK_FORM,
           ...rest,
           ...parseAddress(address || ""),
           confirmPassword: "",
-          office_location: officeIsKnown ? rest.office_location : (rest.office_location ? "Other" : ""),
-          office_location_other: officeIsKnown ? "" : (rest.office_location || ""),
           role: "admin",
         };
       } else {
@@ -672,6 +671,8 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
       setShowConfirm(false);
       setPermissions(DEFAULT_PERMISSIONS);
       setSameAsResidential(false);
+      setOfficeCountryIso("IN");
+      setOfficeStateIso("");
 
       const countryName = nextForm.country || "India";
       const countryMatch = Country.getAllCountries().find((c) => c.name === countryName);
@@ -710,6 +711,22 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
     [countryIso, stateIso]
   );
 
+  const officeStateOptions = useMemo(
+    () =>
+      officeCountryIso
+        ? State.getStatesOfCountry(officeCountryIso).map((s) => ({ value: s.isoCode, label: s.name }))
+        : [],
+    [officeCountryIso]
+  );
+
+  const officeCityOptions = useMemo(
+    () =>
+      officeCountryIso && officeStateIso
+        ? City.getCitiesOfState(officeCountryIso, officeStateIso).map((c) => c.name)
+        : [],
+    [officeCountryIso, officeStateIso]
+  );
+
   if (!open) return null;
 
   const set = (k) => (e) => {
@@ -722,14 +739,17 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
 
   const setFiltered = (k, regex) => (e) => {
     const raw = e.target.value;
-    if (!regex.test(raw)) {
+
+    if (regex && !regex.test(raw)) {
       setTouched((t) => ({ ...t, [k]: true }));
-      setErrors((prev) => ({
-        ...prev,
-        [k]: regex === NAME_REGEX ? "Only letters and spaces are allowed" : "Only digits are allowed",
-      }));
+      let message = "Invalid input";
+      if (regex === NAME_REGEX) message = "Only letters and spaces are allowed";
+      else if (regex === DIGITS_ONLY_REGEX) message = "Only digits are allowed";
+      else if (regex === EMP_ID_REGEX) message = "Only letters, numbers, hyphen (-) and underscore (_) are allowed";
+      setErrors((prev) => ({ ...prev, [k]: message }));
       return;
     }
+
     const next = { ...form, [k]: raw };
     setForm(next);
     setTouched((t) => ({ ...t, [k]: true }));
@@ -749,6 +769,24 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
   };
 
   const showErr = (k) => (submitted || touched[k]) ? errors[k] : "";
+
+  const generatePassword = () => {
+    const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+    const lower = "abcdefghijkmnopqrstuvwxyz";
+    const digits = "23456789";
+    const symbols = "!@#$%^&*";
+    const all = upper + lower + digits + symbols;
+    const pick = (str) => str[Math.floor(Math.random() * str.length)];
+    let pwd = pick(upper) + pick(lower) + pick(digits) + pick(symbols);
+    for (let i = 0; i < 8; i++) pwd += pick(all);
+    pwd = pwd.split("").sort(() => Math.random() - 0.5).join("");
+    const next = { ...form, password: pwd, confirmPassword: pwd };
+    setForm(next);
+    setTouched((t) => ({ ...t, password: true, confirmPassword: true }));
+    setErrors(validateForm(next, isEdit));
+    setShowPass(true);
+    setShowConfirm(true);
+  };
 
   const handleResidentialChange = (e) => {
     const val = e.target.value;
@@ -795,18 +833,29 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
     if (submitted || touched.city) setErrors(validateForm(next, isEdit));
   };
 
-  const handleOfficeLocationChange = (e) => {
-    const val = e.target.value;
-    const next = { ...form, office_location: val, office_location_other: val === "Other" ? form.office_location_other : "" };
+  const handleOfficeCountryChange = (e) => {
+    const iso = e.target.value;
+    setOfficeCountryIso(iso);
+    setOfficeStateIso("");
+    const next = { ...form, office_location: "" };
     setForm(next);
     setTouched((t) => ({ ...t, office_location: true }));
     setErrors(validateForm(next, isEdit));
   };
 
-  const handleOfficeLocationOtherChange = (e) => {
-    const next = { ...form, office_location_other: e.target.value };
+  const handleOfficeStateChange = (e) => {
+    const iso = e.target.value;
+    setOfficeStateIso(iso);
+    const next = { ...form, office_location: "" };
     setForm(next);
-    setTouched((t) => ({ ...t, office_location_other: true }));
+    setTouched((t) => ({ ...t, office_location: true }));
+    setErrors(validateForm(next, isEdit));
+  };
+
+  const handleOfficeLocationChange = (e) => {
+    const next = { ...form, office_location: e.target.value };
+    setForm(next);
+    setTouched((t) => ({ ...t, office_location: true }));
     setErrors(validateForm(next, isEdit));
   };
 
@@ -815,13 +864,12 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
     const e = validateForm(form, isEdit);
     setErrors(e);
     if (hasErrors(e)) return;
-    const { confirmPassword, residential_address, permanent_address, office_location, office_location_other, ...rest } = form;
+    const { confirmPassword, residential_address, permanent_address, ...rest } = form;
     const address = [
       residential_address ? `Residential: ${residential_address}` : "",
       permanent_address ? `Permanent: ${permanent_address}` : "",
     ].filter(Boolean).join(" | ");
-    const finalOfficeLocation = office_location === "Other" ? office_location_other.trim() : office_location;
-    onSave({ ...rest, office_location: finalOfficeLocation, address, permissions });
+    onSave({ ...rest, address, permissions });
   };
 
   return (
@@ -842,7 +890,19 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
         <div className="overflow-y-auto flex-1 px-4 sm:px-7 py-4 sm:py-5">
           <SecHead icon={<FaUsers size={11} />}>Basic Information</SecHead>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          <div>
+            <FLabel required>Emp ID</FLabel>
+            <FInput
+              placeholder="e.g. EMP001"
+              value={form.empid}
+              onChange={setFiltered("empid", EMP_ID_REGEX)}
+              onBlur={blur("empid")}
+              err={showErr("empid")}
+            />
+            <FieldErr msg={showErr("empid")} />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 sm:gap-4">
             <div>
               <FLabel required>First Name</FLabel>
               <FInput placeholder="e.g. Rahul" value={form.f_name} onChange={setFiltered("f_name", NAME_REGEX)} onBlur={blur("f_name")} err={showErr("f_name")} />
@@ -864,7 +924,18 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
           {!isEdit && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-3 sm:mt-4">
               <div>
-                <FLabel required>Password</FLabel>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[10px] font-bold tracking-widest uppercase text-[#7a5568]">
+                    Password<span className="text-red-500 ml-0.5">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={generatePassword}
+                    className="flex items-center gap-1 text-[10px] font-bold text-[#730042] hover:text-[#4a0029] uppercase tracking-wide transition-colors"
+                  >
+                    <FaMagic size={9} /> Auto-generate
+                  </button>
+                </div>
                 <div className="relative">
                   <FInput type={showPass ? "text" : "password"} placeholder="Minimum 8 characters" value={form.password} onChange={set("password")} onBlur={blur("password")} err={showErr("password")} className="pr-11" />
                   <button type="button" onClick={() => setShowPass((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#c499b4] hover:text-[#730042] transition-colors min-w-[28px] min-h-[28px] flex items-center justify-center">
@@ -936,35 +1007,38 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-3 sm:mt-4">
-            <div>
-              <FLabel required>Department</FLabel>
-              <FSel value={form.department} onChange={set("department")} onBlur={blur("department")} err={showErr("department")}>
-                <option value="">Select department</option>
-                {DEPT_OPTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
-              </FSel>
-              <FieldErr msg={showErr("department")} />
+          <div className="mt-3 sm:mt-4">
+            <FLabel required>Department</FLabel>
+            <FSel value={form.department} onChange={set("department")} onBlur={blur("department")} err={showErr("department")}>
+              <option value="">Select department</option>
+              {DEPT_OPTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
+            </FSel>
+            <FieldErr msg={showErr("department")} />
+          </div>
+
+          <div className="mt-3 sm:mt-4">
+            <FLabel required>Office Location</FLabel>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <FSel value={officeCountryIso} onChange={handleOfficeCountryChange}>
+                  <option value="">Select country</option>
+                  {countryOptions.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                </FSel>
+              </div>
+              <div>
+                <FSel value={officeStateIso} onChange={handleOfficeStateChange} disabled={!officeCountryIso || officeStateOptions.length === 0}>
+                  <option value="">{officeStateOptions.length ? "Select state" : "No states available"}</option>
+                  {officeStateOptions.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </FSel>
+              </div>
+              <div>
+                <FSel value={form.office_location} onChange={handleOfficeLocationChange} err={showErr("office_location")} disabled={!officeStateIso || officeCityOptions.length === 0}>
+                  <option value="">{officeCityOptions.length ? "Select city" : "Select state first"}</option>
+                  {officeCityOptions.map((city) => <option key={city} value={city}>{city}</option>)}
+                </FSel>
+              </div>
             </div>
-            <div>
-              <FLabel required>Office Location</FLabel>
-              <FSel value={form.office_location} onChange={handleOfficeLocationChange} onBlur={blur("office_location")} err={showErr("office_location")}>
-                <option value="">Select location</option>
-                {OFFICE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-              </FSel>
-              <FieldErr msg={showErr("office_location")} />
-              {form.office_location === "Other" && (
-                <div className="mt-2">
-                  <FInput
-                    placeholder="Type your office location"
-                    value={form.office_location_other}
-                    onChange={handleOfficeLocationOtherChange}
-                    onBlur={blur("office_location_other")}
-                    err={showErr("office_location_other")}
-                  />
-                  <FieldErr msg={showErr("office_location_other")} />
-                </div>
-              )}
-            </div>
+            <FieldErr msg={showErr("office_location")} />
           </div>
 
           <SecHead icon={<FaUserShield size={11} />}>Experience</SecHead>
