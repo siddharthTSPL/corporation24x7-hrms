@@ -523,7 +523,7 @@ const addmanager = async (req, res, next) => {
       sendEmail({
         to: work_email,
         subject: "Activate Your Manager Account",
-        html: `<div style="font-family:Arial,sans-serif;padding:20px"><h2>Hello ${f_name},</h2><p>Your manager account has been created successfully.</p><p><strong>Employee ID:</strong> ${empid}</p><p><strong>UID:</strong> ${uid}</p><p><strong>Department:</strong> ${department}</p><p><strong>Designation:</strong> ${designation}</p><p>Please verify your account by clicking below:</p><a href="${verifyLink}" style="background:#730042;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block;">Verify Account</a><p>This link will expire in 1 hour.</p><p>Regards,<br/>HR Team</p></div>`,
+        html: `<div style="font-family:Arial,sans-serif;padding:20px"><h2>Hello ${f_name},</h2><p>Your manager account has been created successfully.</p><p><strong>Employee ID:</strong> ${empid}</p><p><strong>UID:</strong> ${uid}</p><p><strong>Department:</strong> ${department}</p><p><strong>Designation:</strong> ${designation}</p><p><strong>Temporary Password:</strong> ${password}</p><p>Please verify your account by clicking below:</p><a href="${verifyLink}" style="background:#730042;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block;">Verify Account</a><p>This link will expire in 1 hour.</p><p>For security, please log in and change this password immediately after verifying your account.</p><p>Regards,<br/>HR Team</p></div>`,
       }),
       incrementActiveUserCount(organisation_id),
     ]);
@@ -611,7 +611,7 @@ const addemployee = async (req, res, next) => {
       sendEmail({
         to: work_email,
         subject: "Welcome! Verify Your Employee Account",
-        html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F9F8F2;font-family:Segoe UI,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center"><table width="600" style="background:#fff;border-radius:14px;overflow:hidden;"><tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h1>Welcome Aboard</h1></td></tr><tr><td style="padding:40px;"><h2>Hello ${f_name}</h2><p>Your employee account has been created.</p><p><strong>Employee ID:</strong> ${empid}</p><p><strong>Department:</strong> ${department}</p><p><strong>Location:</strong> ${office_location}</p><a href="${verifyLink}" style="background:#730042;color:white;padding:14px 30px;text-decoration:none;border-radius:8px;">Verify Account</a></td></tr></table></td></tr></table></body></html>`,
+        html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F9F8F2;font-family:Segoe UI,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center"><table width="600" style="background:#fff;border-radius:14px;overflow:hidden;"><tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h1>Welcome Aboard</h1></td></tr><tr><td style="padding:40px;"><h2>Hello ${f_name}</h2><p>Your employee account has been created.</p><p><strong>Employee ID:</strong> ${empid}</p><p><strong>Department:</strong> ${department}</p><p><strong>Location:</strong> ${office_location}</p><p><strong>Temporary Password:</strong> ${password}</p><a href="${verifyLink}" style="background:#730042;color:white;padding:14px 30px;text-decoration:none;border-radius:8px;">Verify Account</a><p>For security, please log in and change this password immediately after verifying your account.</p></td></tr></table></td></tr></table></body></html>`,
       }),
       incrementActiveUserCount(organisation_id),
     ]);
@@ -3278,6 +3278,28 @@ const getActiveUserCount = async (req, res, next) => {
     next(error);
   }
 };
+
+const getAllAdminsForOrg = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const organisation_id = req.admin.organisation_id;
+
+    const admins = await Adminmodel.find({ organisation_id, working_status: "working" })
+      .select("uid f_name l_name work_email role department designation office_location organisation_id")
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      organisation_id,
+      count: admins.length,
+      admins: admins.map((admin) => ({ type: "admin", ...admin })),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 module.exports = {
   verifyAdmin,
   adminlogin,
@@ -3329,5 +3351,6 @@ module.exports = {
   setEmployeeWorkingStatus,
   setManagerWorkingStatus,
   getInactiveUsers,
-  getActiveUserCount
+  getActiveUserCount,
+  getAllAdminsForOrg
 };
