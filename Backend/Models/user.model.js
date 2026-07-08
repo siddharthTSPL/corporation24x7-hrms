@@ -98,8 +98,14 @@ const userSchema = new mongoose.Schema(
 
     office_location: {
       type: String,
-      enum: ["Noida", "Bareilly", "Delhi", "Mumbai"],
       required: [true, "Office location is required"],
+      trim: true,
+      validate: {
+        validator: function (value) {
+          return typeof value === "string" && value.trim().length > 0 && value.length <= 100;
+        },
+        message: "Office location must be a valid, non-empty location name (max 100 characters)",
+      },
     },
   shift: {
       type: mongoose.Schema.Types.ObjectId,
@@ -143,6 +149,7 @@ userSchema.index({ Under_manager: 1, status: 1 });
 userSchema.index({ department: 1, status: 1 });
 userSchema.index({ status: 1 });
 userSchema.index({ organisation_id: 1 });
+userSchema.index({ office_location: 1 });
 
 userSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
