@@ -129,8 +129,8 @@ const unifiedLogin = async (req, res, next) => {
         { statusCode: 403, code: "PLAN_EXPIRED" }
       ));
 
-    if (superAdmin.isFirstLogin)
-      return next(Object.assign(new Error("First login detected. Check your email to set password."), { statusCode: 403 }));
+    // if (superAdmin.isFirstLogin)
+    //   return next(Object.assign(new Error("First login detected. Check your email to set password."), { statusCode: 403 }));
 
     const token = jwt.sign(
       { superadminid: superAdmin._id, role: superAdmin.role, email: superAdmin.email, company_domain: superAdmin.company_domain },
@@ -157,8 +157,8 @@ const unifiedLogin = async (req, res, next) => {
     if (!isMatch)
       return next(Object.assign(new Error("Invalid credentials"), { statusCode: 401 }));
 
-    if (admin.isFirstLogin)
-      return next(Object.assign(new Error("First login detected. Check your email to set password."), { statusCode: 403 }));
+    // if (admin.isFirstLogin)
+    //   return next(Object.assign(new Error("First login detected. Check your email to set password."), { statusCode: 403 }));
 
     const token = jwt.sign(
       { adminid: admin._id, role: admin.role, email: admin.work_email, created_by: admin.created_by, organisation_id: admin.organisation_id },
@@ -181,8 +181,8 @@ const unifiedLogin = async (req, res, next) => {
     if (!isMatch)
       return next(Object.assign(new Error("Invalid credentials"), { statusCode: 401 }));
 
-    if (manager.isFirstLogin)
-      return next(Object.assign(new Error("First login detected. Check your email to set password."), { statusCode: 403 }));
+    // if (manager.isFirstLogin)
+    //   return next(Object.assign(new Error("First login detected. Check your email to set password."), { statusCode: 403 }));
 
     let organisationId = manager.organisation_id;
     let orgSuperAdmin = await SuperAdminModel.findById(organisationId);
@@ -225,8 +225,8 @@ const unifiedLogin = async (req, res, next) => {
     if (!isMatch)
       return next(Object.assign(new Error("Invalid credentials"), { statusCode: 401 }));
 
-    if (user.isFirstLogin)
-      return next(Object.assign(new Error("First login detected. Check your email to set password."), { statusCode: 403 }));
+    // if (user.isFirstLogin)
+    //   return next(Object.assign(new Error("First login detected. Check your email to set password."), { statusCode: 403 }));
 
     const token = jwt.sign(
       {
