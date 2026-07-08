@@ -44,6 +44,9 @@ const minutesToLabel = (mins) => {
 // Builds the small secondary line shown under the main result message —
 // shift time range, plus late/overtime minutes when relevant.
 function buildSubDetail(data) {
+  if (data?.reason === "checkin_already_done" && data?.minutesUntilCheckoutOpens) {
+    return `Checkout opens in ${data.minutesUntilCheckoutOpens} minute(s)`;
+  }
   if (!data?.shift?.startTime || !data?.shift?.endTime) return "";
   const range = `Shift ${data.shift.startTime} – ${data.shift.endTime}`;
 
