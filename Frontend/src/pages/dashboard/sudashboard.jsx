@@ -123,7 +123,7 @@ const PERMISSION_META = {
 };
 
 const BLANK_FORM = {
-  f_name: "", l_name: "", work_email: "", password: "", confirmPassword: "",
+  empid: "", f_name: "", l_name: "", work_email: "", password: "", confirmPassword: "",
   gender: "", marital_status: "single", personal_contact: "", e_contact: "",
   designation: "", role: "admin", department: "", office_location: "", office_location_other: "",
   is_fresher: true, total_experience: 0, previous_company: "", previous_designation: "",
@@ -135,9 +135,13 @@ const BLANK_FORM = {
 const NAME_REGEX = /^[A-Za-z\s]*$/;
 const NAME_REGEX_NONEMPTY = /^[A-Za-z\s]+$/;
 const DIGITS_ONLY_REGEX = /^\d*$/;
+const EMP_ID_REGEX = /^[A-Za-z0-9_-]*$/;
 
 const validateForm = (form, isEdit) => {
   const e = {};
+
+  if (!form.empid.trim()) {
+  e.empid = "Employee ID is required"; }
 
   if (!form.f_name.trim()) e.f_name = "First name is required";
   else if (!NAME_REGEX_NONEMPTY.test(form.f_name.trim())) e.f_name = "Only letters and spaces are allowed";
@@ -672,7 +676,7 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
       setShowConfirm(false);
       setPermissions(DEFAULT_PERMISSIONS);
       setSameAsResidential(false);
-
+      
       const countryName = nextForm.country || "India";
       const countryMatch = Country.getAllCountries().find((c) => c.name === countryName);
       const resolvedCountryIso = countryMatch?.isoCode || "IN";
@@ -720,21 +724,36 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
     setErrors(validateForm(next, isEdit));
   };
 
-  const setFiltered = (k, regex) => (e) => {
-    const raw = e.target.value;
-    if (!regex.test(raw)) {
-      setTouched((t) => ({ ...t, [k]: true }));
-      setErrors((prev) => ({
-        ...prev,
-        [k]: regex === NAME_REGEX ? "Only letters and spaces are allowed" : "Only digits are allowed",
-      }));
-      return;
-    }
-    const next = { ...form, [k]: raw };
-    setForm(next);
+ const setFiltered = (k, regex) => (e) => {
+  const raw = e.target.value;
+
+  if (regex && !regex.test(raw)) {
     setTouched((t) => ({ ...t, [k]: true }));
-    setErrors(validateForm(next, isEdit));
-  };
+
+    let message = "Invalid input";
+
+    if (regex === NAME_REGEX) {
+      message = "Only letters and spaces are allowed";
+    } else if (regex === DIGIT_REGEX) {
+      message = "Only digits are allowed";
+    } else if (regex === EMP_ID_REGEX) {
+      message =
+        "Only letters, numbers, hyphen (-) and underscore (_) are allowed";
+    }
+
+    setErrors((prev) => ({
+      ...prev,
+      [k]: message,
+    }));
+
+    return;
+  }
+
+  const next = { ...form, [k]: raw };
+  setForm(next);
+  setTouched((t) => ({ ...t, [k]: true }));
+  setErrors(validateForm(next, isEdit));
+};
 
   const setUpper = (k) => (e) => {
     const next = { ...form, [k]: e.target.value.toUpperCase() };
@@ -841,20 +860,43 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
 
         <div className="overflow-y-auto flex-1 px-4 sm:px-7 py-4 sm:py-5">
           <SecHead icon={<FaUsers size={11} />}>Basic Information</SecHead>
+<div>
+  <FLabel required>Emp ID</FLabel>
+  <FInput
+    placeholder="e.g. EMP001"
+    value={form.empid}
+    onChange={setFiltered("empid", EMP_ID_REGEX)}
+    onBlur={blur("empid")}
+    err={showErr("empid")}
+  />
+  <FieldErr msg={showErr("empid")} />
+</div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <div>
-              <FLabel required>First Name</FLabel>
-              <FInput placeholder="e.g. Rahul" value={form.f_name} onChange={setFiltered("f_name", NAME_REGEX)} onBlur={blur("f_name")} err={showErr("f_name")} />
-              <FieldErr msg={showErr("f_name")} />
-            </div>
-            <div>
-              <FLabel required>Last Name</FLabel>
-              <FInput placeholder="e.g. Sharma" value={form.l_name} onChange={setFiltered("l_name", NAME_REGEX)} onBlur={blur("l_name")} err={showErr("l_name")} />
-              <FieldErr msg={showErr("l_name")} />
-            </div>
-          </div>
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 sm:gap-4">
+  <div>
+    <FLabel required>First Name</FLabel>
+    <FInput
+      placeholder="e.g. Rahul"
+      value={form.f_name}
+      onChange={setFiltered("f_name", NAME_REGEX)}
+      onBlur={blur("f_name")}
+      err={showErr("f_name")}
+    />
+    <FieldErr msg={showErr("f_name")} />
+  </div>
 
+  <div>
+    <FLabel required>Last Name</FLabel>
+    <FInput
+      placeholder="e.g. Sharma"
+      value={form.l_name}
+      onChange={setFiltered("l_name", NAME_REGEX)}
+      onBlur={blur("l_name")}
+      err={showErr("l_name")}
+    />
+    <FieldErr msg={showErr("l_name")} />
+  </div>
+</div>
           <div className="mt-3 sm:mt-4">
             <FLabel required>Work Email</FLabel>
             <FInput type="email" placeholder="e.g. rahul.sharma@company.com" value={form.work_email} onChange={set("work_email")} onBlur={blur("work_email")} err={showErr("work_email")} disabled={isEdit} className={isEdit ? "opacity-60 cursor-not-allowed" : ""} />
@@ -1525,13 +1567,30 @@ function SuperAdminDashboard() {
     }
   };
 
-  const saveAdmin = (form) => {
-    if (adminModal.editing) {
-      updateAdmin({ id: adminModal.editing._id, data: form }, { onSuccess: () => setAdminModal({ open: false, editing: null }) });
-    } else {
-      createAdmin(form, { onSuccess: () => setAdminModal({ open: false, editing: null }) });
-    }
-  };
+const saveAdmin = (form) => {
+  if (adminModal.editing) {
+    updateAdmin(
+      { id: adminModal.editing._id, data: form },
+      {
+        onSuccess: () => {
+          setAdminModal({
+            open: false,
+            editing: null,
+          });
+        },
+      }
+    );
+  } else {
+    createAdmin(form, {
+      onSuccess: () => {
+        setAdminModal({
+          open: false,
+          editing: null,
+        });
+      },
+    });
+  }
+};
 
   const handleAcceptLeave = (leave) => acceptLeave({ id: leave._id, leaveFor: "admin" });
   const handleRejectLeave = (leave) => rejectLeave({ id: leave._id, leaveFor: "admin" });
