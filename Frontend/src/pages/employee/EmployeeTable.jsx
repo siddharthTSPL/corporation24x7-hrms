@@ -688,7 +688,7 @@ function EmpStepFields({ step, form, onChange, errors, managersWithoutAdmin }) {
       <Field label="Role">
         <select name="role" value={form.role} onChange={onChange} className={inputCls}>
           <option value="employee">Employee</option>
-          <option value="official">Official</option>
+          
         </select>
       </Field>
       <OfficeLocationFields form={form} onChange={onChange} errors={errors} />
@@ -806,8 +806,7 @@ function MgrStepFields({ step, form, onChange, errors, managers }) {
       <Field label="Role">
         <select name="role" value={form.role} onChange={onChange} className={inputCls}>
           <option value="manager">Manager</option>
-          <option value="senior_manager">Senior Manager</option>
-          <option value="official">Official</option>
+         <option value="official">Official</option>
         </select>
       </Field>
       <OfficeLocationFields form={form} onChange={onChange} errors={errors} />
