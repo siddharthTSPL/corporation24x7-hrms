@@ -1088,7 +1088,7 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
               <FLabel>Bank Name</FLabel>
-              <FInput placeholder="e.g. HDFC Bank" value={form.bank_name} onChange={set("bank_name")} />
+              <FInput placeholder="Bank Name" value={form.bank_name} onChange={set("bank_name")} />
             </div>
             <div>
               <FLabel>Account Holder Name</FLabel>
@@ -1113,7 +1113,7 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
             </div>
             <div>
               <FLabel>IFSC Code</FLabel>
-              <FInput placeholder="e.g. HDFC0001234" value={form.ifsc_code} onChange={setUpper("ifsc_code")} onBlur={blur("ifsc_code")} err={showErr("ifsc_code")} maxLength={11} />
+              <FInput placeholder="Enter IFSC code" value={form.ifsc_code} onChange={setUpper("ifsc_code")} onBlur={blur("ifsc_code")} err={showErr("ifsc_code")} maxLength={11} />
               <FieldErr msg={showErr("ifsc_code")} />
             </div>
           </div>
