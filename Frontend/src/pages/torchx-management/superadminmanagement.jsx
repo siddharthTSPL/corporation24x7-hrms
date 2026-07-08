@@ -251,6 +251,7 @@ const emptyShiftForm = {
   endTime: '18:00',
   graceMinutes: 15,
   earlyBufferMinutes: 60,
+  minMinutesBeforeCheckout: 10,
   absentBelowMinutes: 120,
   halfDayBelowMinutes: 180,
 };
@@ -424,6 +425,7 @@ function ShiftsPanel({ notify }) {
       endTime: shift.endTime,
       graceMinutes: shift.graceMinutes,
       earlyBufferMinutes: shift.earlyBufferMinutes,
+      minMinutesBeforeCheckout: shift.minMinutesBeforeCheckout ?? 10,
       absentBelowMinutes: shift.absentBelowMinutes,
       halfDayBelowMinutes: shift.halfDayBelowMinutes,
     });
@@ -539,6 +541,8 @@ function ShiftsPanel({ notify }) {
                   <span className="text-slate-700 font-medium text-right">{s.graceMinutes} min</span>
                   <span>Early check-in</span>
                   <span className="text-slate-700 font-medium text-right">{s.earlyBufferMinutes} min</span>
+                  <span>Checkout opens after</span>
+                  <span className="text-slate-700 font-medium text-right">{s.minMinutesBeforeCheckout ?? 10} min</span>
                   <span>Absent below</span>
                   <span className="text-slate-700 font-medium text-right">{s.absentBelowMinutes} min</span>
                   <span>Half-day below</span>
@@ -652,6 +656,14 @@ function ShiftsPanel({ notify }) {
               className={inputCls}
               value={form.earlyBufferMinutes}
               onChange={(e) => setForm((f) => ({ ...f, earlyBufferMinutes: Number(e.target.value) }))}
+            />
+          </Field>
+          <Field label="Checkout opens after (minutes)">
+            <input
+              type="number"
+              className={inputCls}
+              value={form.minMinutesBeforeCheckout}
+              onChange={(e) => setForm((f) => ({ ...f, minMinutesBeforeCheckout: Number(e.target.value) }))}
             />
           </Field>
           <Field label="Absent below (minutes)">
