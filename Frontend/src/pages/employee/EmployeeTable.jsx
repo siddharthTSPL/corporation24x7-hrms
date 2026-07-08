@@ -1,35 +1,45 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Country, State, City } from "country-state-city";
+import axios from "axios";
 import {
   FaEdit, FaTrash, FaSearch, FaFilter, FaTimes, FaUserTie, FaUserPlus,
-  FaChevronLeft, FaChevronRight, FaBars, FaEye, FaEyeSlash,
+  FaChevronLeft, FaChevronRight, FaEye, FaEyeSlash, FaKey, FaToggleOn, FaToggleOff,
 } from "react-icons/fa";
 import {
-  useAddManager, useAddEmployee, useFindAllManagers, useFindAllManagerswithoutAdmin,
+  useAddManager, useAddEmployee, useFindAllManagers,
 } from "../../auth/server-state/adminauth/adminauth.hook";
 import {
   useGetAllEmployee, useDeleteUser, useEditEmployee,
 } from "../../auth/server-state/adminother/adminother.hook";
 import EmployeeDetailModal from "./EmployeeDetailModal";
 
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/",
+  withCredentials: true,
+});
+
 const DEPARTMENTS = [
-  { code: "OPR",  label: "Operations (OPR)" },
-  { code: "BPO",  label: "Business Process Outsourcing (BPO)" },
-  { code: "ENG",  label: "Engineering (ENG)" },
+  { code: "OPR", label: "Operations (OPR)" },
+  { code: "BPO", label: "Business Process Outsourcing (BPO)" },
+  { code: "ENG", label: "Engineering (ENG)" },
   { code: "MGMT", label: "Management (MGMT)" },
-  { code: "HR",   label: "Human Resources (HR)" },
+  { code: "HR", label: "Human Resources (HR)" },
+];
+
+const OFFICE_LOCATIONS = [
+  { name: "Noida" }, { name: "Bareilly" }, { name: "Delhi" }, { name: "Mumbai" },
 ];
 
 const ALL_COUNTRIES = Country.getAllCountries();
 
-const NAME_REGEX     = /^[A-Za-z\s.'-]{2,50}$/;
-const EMAIL_REGEX    = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MOBILE_REGEX   = /^[6-9]\d{9}$/;
-const PINCODE_REGEX  = /^\d{6}$/;
-const AADHAAR_REGEX  = /^\d{12}$/;
-const PAN_REGEX      = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
-const IFSC_REGEX     = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+const NAME_REGEX = /^[A-Za-z\s.'-]{2,50}$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MOBILE_REGEX = /^[6-9]\d{9}$/;
+const PINCODE_REGEX = /^\d{6}$/;
+const AADHAAR_REGEX = /^\d{12}$/;
+const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 
 function generatePassword() {
@@ -50,11 +60,11 @@ function generatePassword() {
 const numericOnly = (value) => value.replace(/\D/g, "");
 
 const EMP_STEPS = [
-  { label: "Basic Info",  icon: "👤" },
-  { label: "Work",        icon: "💼" },
-  { label: "Address",     icon: "🏠" },
-  { label: "Identity",    icon: "🪪" },
-  { label: "Experience",  icon: "📋" },
+  { label: "Basic Info", icon: "👤" },
+  { label: "Work", icon: "💼" },
+  { label: "Address", icon: "🏠" },
+  { label: "Identity", icon: "🪪" },
+  { label: "Experience", icon: "📋" },
   { label: "Bank & Docs", icon: "🏦" },
 ];
 
@@ -86,6 +96,27 @@ const EMPTY_MGR = {
   account_number: "", ifsc_code: "", resume: "", aadhaar_card: "", pan_card: "", experience_letter: "",
 };
 
+const EMP_DEFAULT_PERMISSIONS = {
+  announcements: { can_view_announcements: true, can_create_announcement: false, can_edit_announcement: false, can_delete_announcement: false },
+  documents: { can_upload_documents: true, can_view_all_documents: false },
+  tickets: { can_raise_ticket: true, can_view_all_tickets: false, can_resolve_ticket: false, can_rate_ticket: true },
+  recruitment: { can_view_hiring_requisitions: false, can_create_hiring_requisition: false, can_view_candidates: false, can_add_candidate: false },
+};
+
+const MGR_DEFAULT_PERMISSIONS = {
+  announcements: { can_view_announcements: true, can_create_announcement: false, can_edit_announcement: false, can_delete_announcement: false },
+  documents: { can_upload_documents: true, can_view_all_documents: true },
+  tickets: { can_raise_ticket: true, can_view_all_tickets: true, can_resolve_ticket: true, can_rate_ticket: true },
+  recruitment: { can_view_hiring_requisitions: true, can_create_hiring_requisition: true, can_view_candidates: false, can_add_candidate: false },
+};
+
+const ADMIN_PERMISSIONS = {
+  announcements: { can_view_announcements: true, can_create_announcement: true, can_edit_announcement: true, can_delete_announcement: true },
+  documents: { can_upload_documents: true, can_view_all_documents: true },
+  tickets: { can_raise_ticket: true, can_view_all_tickets: true, can_resolve_ticket: true, can_rate_ticket: true },
+  recruitment: { can_view_hiring_requisitions: true, can_create_hiring_requisition: true, can_view_candidates: true, can_add_candidate: true },
+};
+
 const inputCls =
   "w-full px-3 py-2.5 rounded-lg border border-[#F4C0D1] bg-[#F9F8F2] text-sm text-[#730042] " +
   "focus:outline-none focus:border-[#CD166E] focus:ring-2 focus:ring-[#CD166E]/20 transition-all placeholder-[#993556]/50 " +
@@ -105,7 +136,7 @@ function Field({ label, error, children, required, span2 }) {
 
 function StepModal({ title, icon, onClose, onSubmit, steps, currentStep, setCurrentStep, children, accentColor = "#CD166E" }) {
   const totalSteps = steps.length;
-  const isLast  = currentStep === totalSteps - 1;
+  const isLast = currentStep === totalSteps - 1;
   const isFirst = currentStep === 0;
 
   return (
@@ -226,10 +257,10 @@ function Avatar({ name }) {
 
 function Badge({ label, type = "dept" }) {
   const styles = {
-    dept:    "bg-[#FBEAF0] text-[#730042]",
-    role:    "bg-[#FEF3E8] text-[#7A3500]",
+    dept: "bg-[#FBEAF0] text-[#730042]",
+    role: "bg-[#FEF3E8] text-[#7A3500]",
     manager: "bg-[#EEEDFE] text-[#3C3489]",
-    smgr:    "bg-[#E1F5EE] text-[#085041]",
+    smgr: "bg-[#E1F5EE] text-[#085041]",
   };
   return (
     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap max-w-full truncate ${styles[type] ?? styles.dept}`}>
@@ -238,7 +269,182 @@ function Badge({ label, type = "dept" }) {
   );
 }
 
-function MobileCard({ u, onView, onEdit, onDelete }) {
+function PermissionToggle({ label, value, onChange, disabled }) {
+  return (
+    <div className="flex items-center justify-between py-1.5 gap-2">
+      <span className={`text-xs font-medium ${disabled ? "text-[#993556]/40" : "text-[#730042]"}`}>{label}</span>
+      <button
+        type="button"
+        onClick={() => !disabled && onChange(!value)}
+        className={`flex-shrink-0 transition-colors ${disabled ? "cursor-not-allowed opacity-40" : ""}`}
+        title={disabled ? "This permission cannot be changed for this role" : ""}
+      >
+        {value
+          ? <FaToggleOn size={22} className={disabled ? "text-[#F4C0D1]" : "text-[#CD166E]"} />
+          : <FaToggleOff size={22} className="text-[#F4C0D1]" />}
+      </button>
+    </div>
+  );
+}
+
+function getDisabledKeys(roleType) {
+  if (roleType === "employee") {
+    return {
+      announcements: ["can_create_announcement", "can_edit_announcement", "can_delete_announcement"],
+      documents: ["can_view_all_documents"],
+      tickets: ["can_resolve_ticket", "can_rate_ticket"],
+      recruitment: ["can_view_hiring_requisitions", "can_create_hiring_requisition", "can_view_candidates", "can_add_candidate"],
+    };
+  }
+  if (roleType === "manager") {
+    return {
+      announcements: ["can_create_announcement", "can_edit_announcement", "can_delete_announcement"],
+      documents: ["can_view_all_documents"],
+      tickets: ["can_resolve_ticket", "can_rate_ticket"],
+      recruitment: ["can_view_candidates", "can_add_candidate"],
+    };
+  }
+  return {};
+}
+
+function PermissionsPanel({ perms, onChange, roleType = "employee" }) {
+  const disabledKeys = getDisabledKeys(roleType);
+  const sections = [
+    { key: "announcements", label: "Announcements", fields: [
+      { k: "can_view_announcements", label: "View" },
+      { k: "can_create_announcement", label: "Create" },
+      { k: "can_edit_announcement", label: "Edit" },
+      { k: "can_delete_announcement", label: "Delete" },
+    ] },
+    { key: "documents", label: "Documents", fields: [
+      { k: "can_upload_documents", label: "Upload" },
+      { k: "can_view_all_documents", label: "View All" },
+    ] },
+    { key: "tickets", label: "Tickets", fields: [
+      { k: "can_raise_ticket", label: "Raise" },
+      { k: "can_view_all_tickets", label: "View All" },
+      { k: "can_resolve_ticket", label: "Resolve" },
+      { k: "can_rate_ticket", label: "Rate" },
+    ] },
+    { key: "recruitment", label: "Recruitment", fields: [
+      { k: "can_view_hiring_requisitions", label: "View Requisitions" },
+      { k: "can_create_hiring_requisition", label: "Create Requisition" },
+      { k: "can_view_candidates", label: "View Candidates" },
+      { k: "can_add_candidate", label: "Add Candidate" },
+    ] },
+  ];
+  return (
+    <div className="space-y-3 min-w-0">
+      {sections.map((sec) => (
+        <div key={sec.key} className="rounded-xl border border-[#F4C0D1] overflow-hidden">
+          <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[#993556]" style={{ background: "#FBEAF0" }}>
+            {sec.label}
+          </div>
+          <div className="px-3 divide-y divide-[#F4C0D1]/50">
+            {sec.fields.map((f) => {
+              const isDisabled = (disabledKeys[sec.key] || []).includes(f.k);
+              return (
+                <PermissionToggle
+                  key={f.k}
+                  label={f.label}
+                  value={perms?.[sec.key]?.[f.k] ?? false}
+                  onChange={(v) => onChange(sec.key, f.k, v)}
+                  disabled={isDisabled}
+                />
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PermissionsDrawer({ userId, userModel, userRole, onClose }) {
+  const [perms, setPerms] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const roleType = ["admin", "senior_admin", "official"].includes(userRole)
+    ? "admin"
+    : ["manager", "senior_manager"].includes(userRole)
+    ? "manager"
+    : "employee";
+
+  const defaultPerms = roleType === "admin"
+    ? ADMIN_PERMISSIONS
+    : roleType === "manager"
+    ? MGR_DEFAULT_PERMISSIONS
+    : EMP_DEFAULT_PERMISSIONS;
+
+  useEffect(() => {
+    api.get(`permission/admin/${userModel}/${userId}`)
+      .then((r) => setPerms(r.data.data || r.data))
+      .catch(() => setPerms({ ...defaultPerms }))
+      .finally(() => setLoading(false));
+  }, [userId, userModel]);
+
+  const handleToggle = (section, key, val) => {
+    const disabled = getDisabledKeys(roleType);
+    if ((disabled[section] || []).includes(key)) return;
+    setPerms((p) => ({ ...p, [section]: { ...p[section], [key]: val } }));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.post("permission/assign/admin", { user_id: userId, user_model: userModel, permissions: perms });
+      setMsg("Permissions saved successfully");
+      setTimeout(() => setMsg(""), 2500);
+    } catch (e) {
+      setMsg(e?.response?.data?.message || "Failed to save permissions");
+      setTimeout(() => setMsg(""), 2500);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="flex-1" onClick={onClose} />
+      <div className="w-full max-w-xs bg-white shadow-2xl flex flex-col border-l border-[#F4C0D1] h-full overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#F4C0D1] flex-shrink-0" style={{ background: "#F9F8F2" }}>
+          <div className="flex items-center gap-2 min-w-0">
+            <FaKey size={12} className="text-[#CD166E] flex-shrink-0" />
+            <p className="text-sm font-bold text-[#730042] truncate">Manage Permissions</p>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-[#993556] hover:bg-[#FBEAF0] flex-shrink-0">
+            <FaTimes size={12} />
+          </button>
+        </div>
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full border-2 border-[#CD166E] border-t-transparent animate-spin" />
+          </div>
+        ) : (
+          <>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 min-w-0">
+              <div className="flex gap-2 mb-3">
+                <button onClick={() => setPerms({ ...ADMIN_PERMISSIONS })} className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-[#F4C0D1] text-[#730042] hover:bg-[#FBEAF0]">Set All On</button>
+                <button onClick={() => setPerms({ ...defaultPerms })} className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-[#F4C0D1] text-[#730042] hover:bg-[#FBEAF0]">Reset Default</button>
+              </div>
+              {perms && <PermissionsPanel perms={perms} onChange={handleToggle} roleType={roleType} />}
+            </div>
+            <div className="px-4 py-3 border-t border-[#F4C0D1] flex-shrink-0 bg-[#F9F8F2]">
+              {msg && <p className={`text-xs mb-2 text-center font-medium ${msg.includes("success") ? "text-[#065F46]" : "text-[#A32D2D]"}`}>{msg}</p>}
+              <button onClick={handleSave} disabled={saving} className="w-full py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-60 hover:opacity-90" style={{ background: "#730042" }}>
+                {saving ? "Saving…" : "Save Permissions"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MobileCard({ u, onView, onEdit, onDelete, onPermissions }) {
   const roleBadgeType = u.role === "manager" ? "manager" : u.role === "senior_manager" ? "smgr" : "role";
   const roleLabel = u.role === "senior_manager" ? "Sr. Manager" : u.role === "employee" ? "Employee" : u.role?.replace("_", " ") || "—";
   return (
@@ -277,6 +483,9 @@ function MobileCard({ u, onView, onEdit, onDelete }) {
           <div className="flex gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
             <button onClick={() => onView(u._id, u.role)} className="w-7 h-7 rounded-lg flex items-center justify-center text-[#993556] border border-[#F4C0D1] bg-[#F9F8F2]">
               <FaEye size={11} />
+            </button>
+            <button onClick={() => onPermissions(u)} className="w-7 h-7 rounded-lg flex items-center justify-center text-[#993556] border border-[#F4C0D1] bg-[#F9F8F2]">
+              <FaKey size={10} />
             </button>
             <button onClick={() => onEdit(u)} className="w-7 h-7 rounded-lg flex items-center justify-center text-[#993556] border border-[#F4C0D1] bg-[#F9F8F2]">
               <FaEdit size={11} />
@@ -479,185 +688,84 @@ function AddressFields({ form, onChange, errors }) {
   };
 
   return (
-   <>
-  <div className="col-span-1 sm:col-span-2">
-    <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-1">
-      Residential Address
-    </p>
-  </div>
+    <>
+      <div className="col-span-1 sm:col-span-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-1">
+          Residential Address
+        </p>
+      </div>
 
-  <Field label="Country" required error={errors.country}>
-    <select
-      name="country"
-      value={form.country}
-      onChange={onChange}
-      className={inputCls}
-    >
-      <option value="">Select Country</option>
-      {ALL_COUNTRIES.map((c) => (
-        <option key={c.isoCode} value={c.isoCode}>
-          {c.name}
-        </option>
-      ))}
-    </select>
-  </Field>
+      <Field label="Country" required error={errors.country}>
+        <select name="country" value={form.country} onChange={onChange} className={inputCls}>
+          <option value="">Select Country</option>
+          {ALL_COUNTRIES.map((c) => <option key={c.isoCode} value={c.isoCode}>{c.name}</option>)}
+        </select>
+      </Field>
 
-  <Field label="State" required error={errors.state}>
-    <select
-      name="state"
-      value={form.state}
-      onChange={onChange}
-      className={inputCls}
-      disabled={!form.country}
-    >
-      <option value="">
-        {form.country ? "Select State" : "Select country first"}
-      </option>
-      {resStates.map((s) => (
-        <option key={s.isoCode} value={s.name}>
-          {s.name}
-        </option>
-      ))}
-    </select>
-  </Field>
+      <Field label="State" required error={errors.state}>
+        <select name="state" value={form.state} onChange={onChange} className={inputCls} disabled={!form.country}>
+          <option value="">{form.country ? "Select State" : "Select country first"}</option>
+          {resStates.map((s) => <option key={s.isoCode} value={s.name}>{s.name}</option>)}
+        </select>
+      </Field>
 
-  <Field label="City" required error={errors.city}>
-    <select
-      name="city"
-      value={form.city}
-      onChange={onChange}
-      className={inputCls}
-      disabled={!form.state}
-    >
-      <option value="">
-        {form.state ? (resCities.length ? "Select City" : "No cities found") : "Select state first"}
-      </option>
-      {resCities.map((c) => (
-        <option key={c.name} value={c.name}>
-          {c.name}
-        </option>
-      ))}
-    </select>
-  </Field>
+      <Field label="City" required error={errors.city}>
+        <select name="city" value={form.city} onChange={onChange} className={inputCls} disabled={!form.state}>
+          <option value="">{form.state ? (resCities.length ? "Select City" : "No cities found") : "Select state first"}</option>
+          {resCities.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+        </select>
+      </Field>
 
-  <Field label="Pincode" required error={errors.pincode}>
-    <input
-      name="pincode"
-      placeholder="6-digit pincode"
-      maxLength={6}
-      value={form.pincode}
-      onChange={onChange}
-      className={inputCls}
-    />
-  </Field>
+      <Field label="Pincode" required error={errors.pincode}>
+        <input name="pincode" placeholder="6-digit pincode" maxLength={6} value={form.pincode} onChange={onChange} className={inputCls} />
+      </Field>
 
-  <Field label="Address" required error={errors.address} span2>
-    <input
-      name="address"
-      placeholder="Street address"
-      value={form.address}
-      onChange={onChange}
-      className={inputCls}
-    />
-  </Field>
+      <Field label="Address" required error={errors.address} span2>
+        <input name="address" placeholder="Street address" value={form.address} onChange={onChange} className={inputCls} />
+      </Field>
 
-  <div className="col-span-1 sm:col-span-2 flex items-center gap-2 mt-1">
-    <input
-      type="checkbox"
-      id="same_as_residential"
-      checked={form.same_as_residential}
-      onChange={handleSameAsResidential}
-      className="w-4 h-4 accent-[#CD166E]"
-    />
-    <label
-      htmlFor="same_as_residential"
-      className="text-xs font-medium text-[#730042]"
-    >
-      Permanent address same as residential
-    </label>
-  </div>
+      <div className="col-span-1 sm:col-span-2 flex items-center gap-2 mt-1">
+        <input type="checkbox" id="same_as_residential" checked={form.same_as_residential} onChange={handleSameAsResidential} className="w-4 h-4 accent-[#CD166E]" />
+        <label htmlFor="same_as_residential" className="text-xs font-medium text-[#730042]">
+          Permanent address same as residential
+        </label>
+      </div>
 
-  <div className="col-span-1 sm:col-span-2">
-    <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-1 mt-2">
-      Permanent Address
-    </p>
-  </div>
+      <div className="col-span-1 sm:col-span-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-1 mt-2">
+          Permanent Address
+        </p>
+      </div>
 
-  <Field label="Country" error={errors.permanent_country}>
-    <select
-      name="permanent_country"
-      value={form.permanent_country}
-      onChange={onChange}
-      className={inputCls}
-    >
-      <option value="">Select Country</option>
-      {ALL_COUNTRIES.map((c) => (
-        <option key={c.isoCode} value={c.isoCode}>
-          {c.name}
-        </option>
-      ))}
-    </select>
-  </Field>
+      <Field label="Country" error={errors.permanent_country}>
+        <select name="permanent_country" value={form.permanent_country} onChange={onChange} className={inputCls}>
+          <option value="">Select Country</option>
+          {ALL_COUNTRIES.map((c) => <option key={c.isoCode} value={c.isoCode}>{c.name}</option>)}
+        </select>
+      </Field>
 
-  <Field label="State" error={errors.permanent_state}>
-    <select
-      name="permanent_state"
-      value={form.permanent_state}
-      onChange={onChange}
-      className={inputCls}
-      disabled={!form.permanent_country}
-    >
-      <option value="">
-        {form.permanent_country ? "Select State" : "Select country first"}
-      </option>
-      {permStates.map((s) => (
-        <option key={s.isoCode} value={s.name}>
-          {s.name}
-        </option>
-      ))}
-    </select>
-  </Field>
+      <Field label="State" error={errors.permanent_state}>
+        <select name="permanent_state" value={form.permanent_state} onChange={onChange} className={inputCls} disabled={!form.permanent_country}>
+          <option value="">{form.permanent_country ? "Select State" : "Select country first"}</option>
+          {permStates.map((s) => <option key={s.isoCode} value={s.name}>{s.name}</option>)}
+        </select>
+      </Field>
 
-  <Field label="City" error={errors.permanent_city}>
-    <select
-      name="permanent_city"
-      value={form.permanent_city}
-      onChange={onChange}
-      className={inputCls}
-      disabled={!form.permanent_state}
-    >
-      <option value="">
-        {form.permanent_state ? (permCities.length ? "Select City" : "No cities found") : "Select state first"}
-      </option>
-      {permCities.map((c) => (
-        <option key={c.name} value={c.name}>
-          {c.name}
-        </option>
-      ))}
-    </select>
-  </Field>
+      <Field label="City" error={errors.permanent_city}>
+        <select name="permanent_city" value={form.permanent_city} onChange={onChange} className={inputCls} disabled={!form.permanent_state}>
+          <option value="">{form.permanent_state ? (permCities.length ? "Select City" : "No cities found") : "Select state first"}</option>
+          {permCities.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+        </select>
+      </Field>
 
-  <Field label="Pincode" error={errors.permanent_pincode}>
-    <input
-      name="permanent_pincode"
-      placeholder="6-digit pincode"
-      maxLength={6}
-      value={form.permanent_pincode}
-      onChange={onChange}
-      className={inputCls}
-    />
-  </Field>
+      <Field label="Pincode" error={errors.permanent_pincode}>
+        <input name="permanent_pincode" placeholder="6-digit pincode" maxLength={6} value={form.permanent_pincode} onChange={onChange} className={inputCls} />
+      </Field>
 
-  <Field label="Address" error={errors.permanent_address} span2>
-    <input
-      name="permanent_address"
-      placeholder="Street address"
-      value={form.permanent_address}
-      onChange={onChange}
-      className={inputCls}
-    />
-  </Field>
-</>
+      <Field label="Address" error={errors.permanent_address} span2>
+        <input name="permanent_address" placeholder="Street address" value={form.permanent_address} onChange={onChange} className={inputCls} />
+      </Field>
+    </>
   );
 }
 
@@ -712,7 +820,6 @@ function EmpStepFields({ step, form, onChange, errors, managersWithoutAdmin }) {
       <Field label="Role">
         <select name="role" value={form.role} onChange={onChange} className={inputCls}>
           <option value="employee">Employee</option>
-          
         </select>
       </Field>
       <OfficeLocationFields form={form} onChange={onChange} errors={errors} />
@@ -830,7 +937,7 @@ function MgrStepFields({ step, form, onChange, errors, managers }) {
       <Field label="Role">
         <select name="role" value={form.role} onChange={onChange} className={inputCls}>
           <option value="manager">Manager</option>
-         <option value="official">Official</option>
+          <option value="official">Official</option>
         </select>
       </Field>
       <OfficeLocationFields form={form} onChange={onChange} errors={errors} />
@@ -894,44 +1001,47 @@ function MgrStepFields({ step, form, onChange, errors, managers }) {
 }
 
 export default function EmployeeTable() {
-  const [open,        setOpen]        = useState(false);
+  const [open, setOpen] = useState(false);
   const [openManager, setOpenManager] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [popup,       setPopup]       = useState({ show: false, type: "success", message: "" });
-  const [viewMode,    setViewMode]    = useState("table");
+  const [popup, setPopup] = useState({ show: false, type: "success", message: "" });
 
-  const [selectedEmployeeId,   setSelectedEmployeeId]   = useState(null);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
   const [selectedEmployeeRole, setSelectedEmployeeRole] = useState(null);
+  const [permissionsTarget, setPermissionsTarget] = useState(null);
 
   const [empStep, setEmpStep] = useState(0);
   const [mgrStep, setMgrStep] = useState(0);
 
-  const [empForm,   setEmpForm]   = useState(EMPTY_EMP);
-  const [mgrForm,   setMgrForm]   = useState(EMPTY_MGR);
+  const [empForm, setEmpForm] = useState(EMPTY_EMP);
+  const [mgrForm, setMgrForm] = useState(EMPTY_MGR);
   const [empErrors, setEmpErrors] = useState({});
   const [mgrErrors, setMgrErrors] = useState({});
 
   const [editTarget, setEditTarget] = useState(null);
-  const [editForm,   setEditForm]   = useState({});
+  const [editForm, setEditForm] = useState({});
   const [editErrors, setEditErrors] = useState({});
-  const [openEdit,   setOpenEdit]   = useState(false);
+  const [openEdit, setOpenEdit] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [filters, setFilters] = useState({ search: "", department: "", role: "", location: "", gender: "" });
 
   const { mutate: addEmployeeApi } = useAddEmployee();
-  const { mutate: addManagerApi  } = useAddManager();
-  const { data: managers         } = useFindAllManagers();
+  const { mutate: addManagerApi } = useAddManager();
+  const { data: managers } = useFindAllManagers();
   const { data: employeeData, isLoading: listLoading, refetch: refetchList } = useGetAllEmployee();
   const allUsers = employeeData?.users ?? [];
 
-  const { mutate: editUserApi   } = useEditEmployee(editTarget?._id);
+  const { mutate: editUserApi } = useEditEmployee(editTarget?._id);
   const { mutate: deleteUserApi } = useDeleteUser();
 
   const showPopup = (type, message) => {
     setPopup({ show: true, type, message });
     setTimeout(() => setPopup({ show: false, type: "", message: "" }), 3000);
   };
+
+  const permissionsUserModel = (role) =>
+    ["manager", "senior_manager", "official"].includes(role) ? "Manager" : "User";
 
   const handleOpenEdit = (user) => {
     setEditTarget(user);
@@ -951,10 +1061,10 @@ export default function EmployeeTable() {
 
   const validateEdit = () => {
     const err = {};
-    if (!editForm.f_name)      err.f_name      = "Required";
-    if (!editForm.l_name)      err.l_name      = "Required";
-    if (!editForm.work_email)  err.work_email  = "Required";
-    if (!editForm.department)  err.department  = "Required";
+    if (!editForm.f_name) err.f_name = "Required";
+    if (!editForm.l_name) err.l_name = "Required";
+    if (!editForm.work_email) err.work_email = "Required";
+    if (!editForm.department) err.department = "Required";
     if (!editForm.designation) err.designation = "Required";
     setEditErrors(err);
     return Object.keys(err).length === 0;
@@ -974,28 +1084,29 @@ export default function EmployeeTable() {
       onError: (err) => { showPopup("error", err?.response?.data?.message || err?.message || "Delete failed"); setDeleteTarget(null); },
     });
   };
-const makeChangeHandler = (setter) => (e) => {
-  const { name, value } = e.target;
-  let nextValue = value;
-  if (["personal_contact", "e_contact", "aadhaar_number", "pincode", "permanent_pincode"].includes(name)) {
-    nextValue = numericOnly(value);
-  }
-  if (["f_name", "l_name"].includes(name) && value && !/^[A-Za-z\s.'-]*$/.test(value)) {
-    return;
-  }
-  setter((prev) => {
-    const next = { ...prev, [name]: nextValue };
-    if (name === "country") next.state = "";
-    if (name === "state") next.city = "";
-    if (name === "permanent_country") next.permanent_state = "";
-    if (name === "permanent_state") next.permanent_city = "";
-    if (name === "office_location_country") { next.office_location_state = ""; next.office_location = ""; next.office_location_custom = ""; }
-    if (name === "office_location_state") { next.office_location = ""; next.office_location_custom = ""; }
-    if (name === "office_location" && nextValue !== "Other") next.office_location_custom = "";
-    if (name === "same_as_residential") next.same_as_residential = nextValue;
-    return next;
-  });
-};
+
+  const makeChangeHandler = (setter) => (e) => {
+    const { name, value } = e.target;
+    let nextValue = value;
+    if (["personal_contact", "e_contact", "aadhaar_number", "pincode", "permanent_pincode"].includes(name)) {
+      nextValue = numericOnly(value);
+    }
+    if (["f_name", "l_name"].includes(name) && value && !/^[A-Za-z\s.'-]*$/.test(value)) {
+      return;
+    }
+    setter((prev) => {
+      const next = { ...prev, [name]: nextValue };
+      if (name === "country") next.state = "";
+      if (name === "state") next.city = "";
+      if (name === "permanent_country") next.permanent_state = "";
+      if (name === "permanent_state") next.permanent_city = "";
+      if (name === "office_location_country") { next.office_location_state = ""; next.office_location = ""; next.office_location_custom = ""; }
+      if (name === "office_location_state") { next.office_location = ""; next.office_location_custom = ""; }
+      if (name === "office_location" && nextValue !== "Other") next.office_location_custom = "";
+      if (name === "same_as_residential") next.same_as_residential = nextValue;
+      return next;
+    });
+  };
 
   const handleEmpChange = makeChangeHandler(setEmpForm);
   const handleMgrChange = makeChangeHandler(setMgrForm);
@@ -1143,10 +1254,10 @@ const makeChangeHandler = (setter) => (e) => {
     const q = filters.search.toLowerCase();
     return (
       (name.includes(q) || (u.work_email ?? "").toLowerCase().includes(q)) &&
-      (filters.department ? u.department      === filters.department : true) &&
-      (filters.role       ? u.role            === filters.role       : true) &&
-      (filters.location   ? u.office_location === filters.location   : true) &&
-      (filters.gender     ? u.gender          === filters.gender     : true)
+      (filters.department ? u.department === filters.department : true) &&
+      (filters.role ? u.role === filters.role : true) &&
+      (filters.location ? u.office_location === filters.location : true) &&
+      (filters.gender ? u.gender === filters.gender : true)
     );
   });
 
@@ -1154,9 +1265,9 @@ const makeChangeHandler = (setter) => (e) => {
   const activeFilterCount = [filters.department, filters.role, filters.location, filters.gender].filter(Boolean).length;
 
   function roleBadge(role) {
-    if (role === "employee")       return <Badge label="Employee"       type="role" />;
-    if (role === "manager")        return <Badge label="Manager"        type="manager" />;
-    if (role === "senior_manager") return <Badge label="Sr. Manager"    type="smgr" />;
+    if (role === "employee") return <Badge label="Employee" type="role" />;
+    if (role === "manager") return <Badge label="Manager" type="manager" />;
+    if (role === "senior_manager") return <Badge label="Sr. Manager" type="smgr" />;
     return <Badge label={role?.replace("_", " ") || "—"} type="manager" />;
   }
 
@@ -1267,9 +1378,9 @@ const makeChangeHandler = (setter) => (e) => {
                 {activeFilterCount > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-2 items-center">
                     {filters.department && <FilterChip label={`Dept: ${filters.department}`} onRemove={() => setFilters({ ...filters, department: "" })} />}
-                    {filters.role       && <FilterChip label={`Role: ${filters.role}`}       onRemove={() => setFilters({ ...filters, role: "" })} />}
-                    {filters.location   && <FilterChip label={`Loc: ${filters.location}`}    onRemove={() => setFilters({ ...filters, location: "" })} />}
-                    {filters.gender     && <FilterChip label={`Gender: ${filters.gender}`}   onRemove={() => setFilters({ ...filters, gender: "" })} />}
+                    {filters.role && <FilterChip label={`Role: ${filters.role}`} onRemove={() => setFilters({ ...filters, role: "" })} />}
+                    {filters.location && <FilterChip label={`Loc: ${filters.location}`} onRemove={() => setFilters({ ...filters, location: "" })} />}
+                    {filters.gender && <FilterChip label={`Gender: ${filters.gender}`} onRemove={() => setFilters({ ...filters, gender: "" })} />}
                     <button onClick={clearFilters} className="text-xs text-[#A32D2D] font-semibold hover:underline ml-1">Clear All</button>
                   </div>
                 )}
@@ -1297,6 +1408,7 @@ const makeChangeHandler = (setter) => (e) => {
                   onView={(id, role) => { setSelectedEmployeeId(id); setSelectedEmployeeRole(role); }}
                   onEdit={handleOpenEdit}
                   onDelete={setDeleteTarget}
+                  onPermissions={setPermissionsTarget}
                 />
               ))
             )}
@@ -1348,6 +1460,9 @@ const makeChangeHandler = (setter) => (e) => {
                       <td className="px-3 lg:px-4 py-3">{roleBadge(u.role)}</td>
                       <td className="px-3 lg:px-4 py-3">
                         <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                          <button onClick={() => setPermissionsTarget(u)} className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center text-[#993556] border border-[#F4C0D1] hover:text-[#CD166E] hover:bg-[#FBEAF0] transition-colors" style={{ background: "#F9F8F2" }}>
+                            <FaKey size={10} />
+                          </button>
                           <button onClick={() => handleOpenEdit(u)} className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center text-[#993556] border border-[#F4C0D1] hover:text-[#CD166E] hover:bg-[#FBEAF0] transition-colors" style={{ background: "#F9F8F2" }}>
                             <FaEdit size={11} />
                           </button>
@@ -1466,6 +1581,15 @@ const makeChangeHandler = (setter) => (e) => {
           employeeId={selectedEmployeeId}
           employeeRole={selectedEmployeeRole}
           onClose={() => { setSelectedEmployeeId(null); setSelectedEmployeeRole(null); }}
+        />
+      )}
+
+      {permissionsTarget && (
+        <PermissionsDrawer
+          userId={permissionsTarget._id}
+          userModel={permissionsUserModel(permissionsTarget.role)}
+          userRole={permissionsTarget.role}
+          onClose={() => setPermissionsTarget(null)}
         />
       )}
 
