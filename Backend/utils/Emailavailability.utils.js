@@ -21,4 +21,13 @@ const isEmailTaken = async (email) => {
   return { taken: false, role: null };
 };
 
-module.exports = { isEmailTaken };
+const isEmpidTaken = async (empid) => {
+  const [admin, manager, user] = await Promise.all([
+    AdminModel.findOne({ empid }).select("_id").lean(),
+    Managermodel.findOne({ empid }).select("_id").lean(),
+    Usermodel.findOne({ empid }).select("_id").lean(),
+  ]);
+  return !!(admin || manager || user);
+};
+
+module.exports = { isEmailTaken, isEmpidTaken };
