@@ -3,6 +3,7 @@ import {
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
+import { toast } from "react-hot-toast";
 
 import {
   reviewToAdmin,
@@ -125,10 +126,42 @@ export const useCreateAdmin = () => {
   return useMutation({
     mutationFn: createAdmin,
 
-    onSuccess: () => {
+    onSuccess: (response) => {
+      toast.success(response.message, {
+        position: "top-right",
+        duration: 5000,
+        style: {
+          background: "#FFFFFF",
+          color: "#16A34A",
+          borderRadius: "10px",
+          padding: "14px 16px",
+          fontSize: "14px",
+          fontWeight: "500",
+        },
+      });
+
       queryClient.invalidateQueries({
         queryKey: ["admins"],
       });
+    },
+
+    onError: (error) => {
+      toast.error(
+        error?.response?.data?.message || "Something went wrong",
+        {
+          position: "top-right",
+          duration: 5000,
+          icon: "❌",
+          style: {
+            background: "#FFFFFF",
+            color:  "#16A34A",
+            borderRadius: "10px",
+            padding: "14px 16px",
+            fontSize: "14px",
+            fontWeight: "500",
+          },
+        }
+      );
     },
   });
 };

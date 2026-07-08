@@ -1,44 +1,53 @@
 "use client";
 import { useState } from "react";
+import { Country, State, City } from "country-state-city";
 import {
   FaEdit, FaTrash, FaSearch, FaFilter, FaTimes, FaUserTie, FaUserPlus,
-  FaChevronLeft, FaChevronRight, FaBars, FaEye,
+  FaChevronLeft, FaChevronRight, FaBars, FaEye, FaEyeSlash,
 } from "react-icons/fa";
 import {
-  useAddManager, useAddEmployee, useFindAllManagers,
+  useAddManager, useAddEmployee, useFindAllManagers, useFindAllManagerswithoutAdmin,
 } from "../../auth/server-state/adminauth/adminauth.hook";
 import {
   useGetAllEmployee, useDeleteUser, useEditEmployee,
 } from "../../auth/server-state/adminother/adminother.hook";
 import EmployeeDetailModal from "./EmployeeDetailModal";
 
-const DEPARTMENTS = ["OPR", "BPO", "ENG", "MGMT", "HR"];
-const LOCATIONS   = ["Noida", "Bareilly", "Delhi", "Mumbai"];
-const INDIAN_STATES = [
-  "Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat",
-  "Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala","Madhya Pradesh",
-  "Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab",
-  "Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh",
-  "Uttarakhand","West Bengal","Delhi","Jammu and Kashmir","Ladakh",
+const DEPARTMENTS = [
+  { code: "OPR",  label: "Operations (OPR)" },
+  { code: "BPO",  label: "Business Process Outsourcing (BPO)" },
+  { code: "ENG",  label: "Engineering (ENG)" },
+  { code: "MGMT", label: "Management (MGMT)" },
+  { code: "HR",   label: "Human Resources (HR)" },
 ];
 
-const EMPTY_EMP = {
-  f_name: "", l_name: "", work_email: "", password: "", gender: "", marital_status: "single",
-  personal_contact: "", e_contact: "", department: "", designation: "", role: "employee",
-  office_location: "", Under_manager: "", address: "", city: "", state: "", pincode: "",
-  aadhaar_number: "", pan_number: "", is_fresher: true, total_experience: "",
-  previous_company: "", previous_designation: "", bank_name: "", account_holder_name: "",
-  account_number: "", ifsc_code: "", resume: "", aadhaar_card: "", pan_card: "", experience_letter: "",
-};
+const ALL_COUNTRIES = Country.getAllCountries();
 
-const EMPTY_MGR = {
-  f_name: "", l_name: "", work_email: "", password: "", confirm_password: "", gender: "", marital_status: "single",
-  personal_contact: "", e_contact: "", department: "", designation: "", role: "manager",
-  office_location: "", reporting_manager: "", address: "", city: "", state: "", pincode: "",
-  aadhaar_number: "", pan_number: "", is_fresher: true, total_experience: "",
-  previous_company: "", previous_designation: "", bank_name: "", account_holder_name: "",
-  account_number: "", ifsc_code: "", resume: "", aadhaar_card: "", pan_card: "", experience_letter: "",
-};
+const NAME_REGEX     = /^[A-Za-z\s.'-]{2,50}$/;
+const EMAIL_REGEX    = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MOBILE_REGEX   = /^[6-9]\d{9}$/;
+const PINCODE_REGEX  = /^\d{6}$/;
+const AADHAAR_REGEX  = /^\d{12}$/;
+const PAN_REGEX      = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+const IFSC_REGEX     = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+
+function generatePassword() {
+  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const lower = "abcdefghijklmnopqrstuvwxyz";
+  const digits = "0123456789";
+  const special = "@$!%*?&";
+  const all = upper + lower + digits + special;
+  let pwd =
+    upper[Math.floor(Math.random() * upper.length)] +
+    lower[Math.floor(Math.random() * lower.length)] +
+    digits[Math.floor(Math.random() * digits.length)] +
+    special[Math.floor(Math.random() * special.length)];
+  for (let i = 0; i < 8; i++) pwd += all[Math.floor(Math.random() * all.length)];
+  return pwd.split("").sort(() => Math.random() - 0.5).join("");
+}
+
+const numericOnly = (value) => value.replace(/\D/g, "");
 
 const EMP_STEPS = [
   { label: "Basic Info",  icon: "👤" },
@@ -49,10 +58,38 @@ const EMP_STEPS = [
   { label: "Bank & Docs", icon: "🏦" },
 ];
 
+const EMPTY_EMP = {
+  f_name: "", l_name: "", work_email: "", password: "", confirm_password: "",
+  gender: "", marital_status: "single", personal_contact: "", e_contact: "",
+  department: "", designation: "", role: "employee",
+  office_location_country: "IN", office_location_state: "", office_location: "",
+  Under_manager: "",
+  address: "", city: "", state: "", pincode: "", country: "IN",
+  same_as_residential: false,
+  permanent_address: "", permanent_city: "", permanent_state: "", permanent_pincode: "", permanent_country: "IN",
+  aadhaar_number: "", pan_number: "", is_fresher: true, total_experience: "",
+  previous_company: "", previous_designation: "", bank_name: "", account_holder_name: "",
+  account_number: "", ifsc_code: "", resume: "", aadhaar_card: "", pan_card: "", experience_letter: "",
+};
+
+const EMPTY_MGR = {
+  f_name: "", l_name: "", work_email: "", password: "", confirm_password: "",
+  gender: "", marital_status: "single", personal_contact: "", e_contact: "",
+  department: "", designation: "", role: "manager",
+  office_location_country: "IN", office_location_state: "", office_location: "",
+  reporting_manager: "",
+  address: "", city: "", state: "", pincode: "", country: "IN",
+  same_as_residential: false,
+  permanent_address: "", permanent_city: "", permanent_state: "", permanent_pincode: "", permanent_country: "IN",
+  aadhaar_number: "", pan_number: "", is_fresher: true, total_experience: "",
+  previous_company: "", previous_designation: "", bank_name: "", account_holder_name: "",
+  account_number: "", ifsc_code: "", resume: "", aadhaar_card: "", pan_card: "", experience_letter: "",
+};
+
 const inputCls =
   "w-full px-3 py-2.5 rounded-lg border border-[#F4C0D1] bg-[#F9F8F2] text-sm text-[#730042] " +
   "focus:outline-none focus:border-[#CD166E] focus:ring-2 focus:ring-[#CD166E]/20 transition-all placeholder-[#993556]/50 " +
-  "font-['DM_Sans',system-ui,sans-serif]";
+  "font-['DM_Sans',system-ui,sans-serif] disabled:opacity-50 disabled:cursor-not-allowed";
 
 function Field({ label, error, children, required, span2 }) {
   return (
@@ -341,13 +378,284 @@ function DeleteConfirm({ user, onConfirm, onCancel }) {
   );
 }
 
-function EmpStepFields({ step, form, onChange, errors, managers }) {
+function PasswordField({ label, name, value, onChange, error, required = true, onGenerate }) {
+  const [show, setShow] = useState(false);
+  return (
+    <Field label={label} required={required} error={error}>
+      <div className="relative">
+        <input
+          name={name}
+          type={show ? "text" : "password"}
+          placeholder={label}
+          value={value}
+          onChange={onChange}
+          className={inputCls}
+        />
+        <button
+          type="button"
+          onClick={() => setShow(!show)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#993556]"
+        >
+          {show ? <FaEyeSlash size={13} /> : <FaEye size={13} />}
+        </button>
+      </div>
+      {onGenerate && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={onGenerate}
+            className="text-xs font-semibold text-[#CD166E] hover:underline mt-1"
+          >
+            Generate Password
+          </button>
+        </div>
+      )}
+    </Field>
+  );
+}
+
+function OfficeLocationFields({ form, onChange, errors }) {
+  const states = form.office_location_country ? State.getStatesOfCountry(form.office_location_country) : [];
+  const cities = form.office_location_country && form.office_location_state
+    ? City.getCitiesOfState(form.office_location_country, form.office_location_state)
+    : [];
+
+  return (
+    <>
+      <Field label="Country" required error={errors.office_location_country}>
+        <select name="office_location_country" value={form.office_location_country} onChange={onChange} className={inputCls}>
+          <option value="">Select Country</option>
+          {ALL_COUNTRIES.map((c) => <option key={c.isoCode} value={c.isoCode}>{c.name}</option>)}
+        </select>
+      </Field>
+      <Field label="State" required error={errors.office_location_state}>
+        <select
+          name="office_location_state"
+          value={form.office_location_state}
+          onChange={onChange}
+          className={inputCls}
+          disabled={!form.office_location_country}
+        >
+          <option value="">{form.office_location_country ? "Select State" : "Select country first"}</option>
+          {states.map((s) => <option key={s.isoCode} value={s.isoCode}>{s.name}</option>)}
+        </select>
+      </Field>
+      <Field label="Office Location" required error={errors.office_location} span2>
+        <select
+          name="office_location"
+          value={form.office_location}
+          onChange={onChange}
+          className={inputCls}
+          disabled={!form.office_location_state}
+        >
+          <option value="">{form.office_location_state ? "Select City" : "Select state first"}</option>
+          {cities.map((c) => <option key={`${c.name}-${c.latitude}-${c.longitude}`} value={c.name}>{c.name}</option>)}
+        </select>
+      </Field>
+    </>
+  );
+}
+
+function AddressFields({ form, onChange, errors }) {
+  const resStates = form.country ? State.getStatesOfCountry(form.country) : [];
+  const permStates = form.permanent_country ? State.getStatesOfCountry(form.permanent_country) : [];
+
+  const handleSameAsResidential = (e) => {
+    const checked = e.target.checked;
+    onChange({ target: { name: "same_as_residential", value: checked } });
+    if (checked) {
+      onChange({ target: { name: "permanent_address", value: form.address } });
+      onChange({ target: { name: "permanent_country", value: form.country } });
+      onChange({ target: { name: "permanent_state", value: form.state } });
+      onChange({ target: { name: "permanent_city", value: form.city } });
+      onChange({ target: { name: "permanent_pincode", value: form.pincode } });
+    }
+  };
+
+  return (
+   <>
+  <div className="col-span-1 sm:col-span-2">
+    <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-1">
+      Residential Address
+    </p>
+  </div>
+
+  <Field label="Country" required error={errors.country}>
+    <select
+      name="country"
+      value={form.country}
+      onChange={onChange}
+      className={inputCls}
+    >
+      <option value="">Select Country</option>
+      {ALL_COUNTRIES.map((c) => (
+        <option key={c.isoCode} value={c.isoCode}>
+          {c.name}
+        </option>
+      ))}
+    </select>
+  </Field>
+
+  <Field label="State" required error={errors.state}>
+    <select
+      name="state"
+      value={form.state}
+      onChange={onChange}
+      className={inputCls}
+      disabled={!form.country}
+    >
+      <option value="">
+        {form.country ? "Select State" : "Select country first"}
+      </option>
+      {resStates.map((s) => (
+        <option key={s.isoCode} value={s.name}>
+          {s.name}
+        </option>
+      ))}
+    </select>
+  </Field>
+
+  <Field label="City" required error={errors.city}>
+    <input
+      name="city"
+      placeholder="City"
+      value={form.city}
+      onChange={onChange}
+      className={inputCls}
+    />
+  </Field>
+
+  <Field label="Pincode" required error={errors.pincode}>
+    <input
+      name="pincode"
+      placeholder="6-digit pincode"
+      maxLength={6}
+      value={form.pincode}
+      onChange={onChange}
+      className={inputCls}
+    />
+  </Field>
+
+  <Field label="Address" required error={errors.address} span2>
+    <input
+      name="address"
+      placeholder="Street address"
+      value={form.address}
+      onChange={onChange}
+      className={inputCls}
+    />
+  </Field>
+
+  <div className="col-span-1 sm:col-span-2 flex items-center gap-2 mt-1">
+    <input
+      type="checkbox"
+      id="same_as_residential"
+      checked={form.same_as_residential}
+      onChange={handleSameAsResidential}
+      className="w-4 h-4 accent-[#CD166E]"
+    />
+    <label
+      htmlFor="same_as_residential"
+      className="text-xs font-medium text-[#730042]"
+    >
+      Permanent address same as residential
+    </label>
+  </div>
+
+  <div className="col-span-1 sm:col-span-2">
+    <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-1 mt-2">
+      Permanent Address
+    </p>
+  </div>
+
+  <Field label="Country" error={errors.permanent_country}>
+    <select
+      name="permanent_country"
+      value={form.permanent_country}
+      onChange={onChange}
+      className={inputCls}
+    >
+      <option value="">Select Country</option>
+      {ALL_COUNTRIES.map((c) => (
+        <option key={c.isoCode} value={c.isoCode}>
+          {c.name}
+        </option>
+      ))}
+    </select>
+  </Field>
+
+  <Field label="State" error={errors.permanent_state}>
+    <select
+      name="permanent_state"
+      value={form.permanent_state}
+      onChange={onChange}
+      className={inputCls}
+      disabled={!form.permanent_country}
+    >
+      <option value="">
+        {form.permanent_country ? "Select State" : "Select country first"}
+      </option>
+      {permStates.map((s) => (
+        <option key={s.isoCode} value={s.name}>
+          {s.name}
+        </option>
+      ))}
+    </select>
+  </Field>
+
+  <Field label="City" error={errors.permanent_city}>
+    <input
+      name="permanent_city"
+      placeholder="City"
+      value={form.permanent_city}
+      onChange={onChange}
+      className={inputCls}
+    />
+  </Field>
+
+  <Field label="Pincode" error={errors.permanent_pincode}>
+    <input
+      name="permanent_pincode"
+      placeholder="6-digit pincode"
+      maxLength={6}
+      value={form.permanent_pincode}
+      onChange={onChange}
+      className={inputCls}
+    />
+  </Field>
+
+  <Field label="Address" error={errors.permanent_address} span2>
+    <input
+      name="permanent_address"
+      placeholder="Street address"
+      value={form.permanent_address}
+      onChange={onChange}
+      className={inputCls}
+    />
+  </Field>
+</>
+  );
+}
+
+function EmpStepFields({ step, form, onChange, errors, managersWithoutAdmin }) {
   if (step === 0) return (
     <>
       <Field label="First Name" required error={errors.f_name}><input name="f_name" placeholder="First name" value={form.f_name} onChange={onChange} className={inputCls} /></Field>
       <Field label="Last Name" required error={errors.l_name}><input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls} /></Field>
       <Field label="Work Email" required error={errors.work_email}><input name="work_email" type="email" placeholder="name@company.com" value={form.work_email} onChange={onChange} className={inputCls} /></Field>
-      <Field label="Password" required error={errors.password}><input name="password" type="password" placeholder="Set password" value={form.password} onChange={onChange} className={inputCls} /></Field>
+      <PasswordField
+        label="Password"
+        name="password"
+        value={form.password}
+        onChange={onChange}
+        error={errors.password}
+        onGenerate={() => {
+          const pwd = generatePassword();
+          onChange({ target: { name: "password", value: pwd } });
+          onChange({ target: { name: "confirm_password", value: pwd } });
+        }}
+      />
+      <PasswordField label="Confirm Password" name="confirm_password" value={form.confirm_password} onChange={onChange} error={errors.confirm_password} />
       <Field label="Gender" required error={errors.gender}>
         <select name="gender" value={form.gender} onChange={onChange} className={inputCls}>
           <option value="">Select Gender</option>
@@ -363,8 +671,8 @@ function EmpStepFields({ step, form, onChange, errors, managers }) {
           <option value="divorced">Divorced</option>
         </select>
       </Field>
-      <Field label="Personal Contact" required error={errors.personal_contact}><input name="personal_contact" placeholder="+91 XXXXX XXXXX" value={form.personal_contact} onChange={onChange} className={inputCls} /></Field>
-      <Field label="Emergency Contact" required error={errors.e_contact}><input name="e_contact" placeholder="Emergency contact" value={form.e_contact} onChange={onChange} className={inputCls} /></Field>
+      <Field label="Personal Contact" required error={errors.personal_contact}><input name="personal_contact" placeholder="10-digit mobile number" maxLength={10} value={form.personal_contact} onChange={onChange} className={inputCls} /></Field>
+      <Field label="Emergency Contact" required error={errors.e_contact}><input name="e_contact" placeholder="10-digit mobile number" maxLength={10} value={form.e_contact} onChange={onChange} className={inputCls} /></Field>
     </>
   );
 
@@ -373,7 +681,7 @@ function EmpStepFields({ step, form, onChange, errors, managers }) {
       <Field label="Department" required error={errors.department}>
         <select name="department" value={form.department} onChange={onChange} className={inputCls}>
           <option value="">Select Department</option>
-          {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+          {DEPARTMENTS.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
         </select>
       </Field>
       <Field label="Designation" required error={errors.designation}><input name="designation" placeholder="e.g. Software Engineer" value={form.designation} onChange={onChange} className={inputCls} /></Field>
@@ -383,16 +691,11 @@ function EmpStepFields({ step, form, onChange, errors, managers }) {
           <option value="official">Official</option>
         </select>
       </Field>
-      <Field label="Office Location" required error={errors.office_location}>
-        <select name="office_location" value={form.office_location} onChange={onChange} className={inputCls}>
-          <option value="">Select Location</option>
-          {LOCATIONS.map((l) => <option key={l} value={l}>{l}</option>)}
-        </select>
-      </Field>
+      <OfficeLocationFields form={form} onChange={onChange} errors={errors} />
       <Field label="Under Manager" span2>
         <select name="Under_manager" value={form.Under_manager} onChange={onChange} className={inputCls}>
           <option value="">Select Manager (optional)</option>
-          {managers?.managers?.map((mgr) => (
+          {managersWithoutAdmin?.managers?.map((mgr) => (
             <option key={mgr._id} value={mgr._id}>{mgr.f_name} {mgr.l_name} ({mgr.uid})</option>
           ))}
         </select>
@@ -400,33 +703,26 @@ function EmpStepFields({ step, form, onChange, errors, managers }) {
     </>
   );
 
-  if (step === 2) return (
-    <>
-      <Field label="Address" span2><input name="address" placeholder="Street address" value={form.address} onChange={onChange} className={inputCls} /></Field>
-      <Field label="City"><input name="city" placeholder="City" value={form.city} onChange={onChange} className={inputCls} /></Field>
-      <Field label="State">
-        <select name="state" value={form.state} onChange={onChange} className={inputCls}>
-          <option value="">Select State</option>
-          {INDIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-      </Field>
-      <Field label="Pincode"><input name="pincode" placeholder="6-digit pincode" maxLength={6} value={form.pincode} onChange={onChange} className={inputCls} /></Field>
-    </>
-  );
+  if (step === 2) return <AddressFields form={form} onChange={onChange} errors={errors} />;
 
   if (step === 3) return (
     <>
-      <Field label="Aadhaar Number"><input name="aadhaar_number" placeholder="XXXX XXXX XXXX" maxLength={12} value={form.aadhaar_number} onChange={onChange} className={inputCls} /></Field>
-      <Field label="PAN Number"><input name="pan_number" placeholder="ABCDE1234F" maxLength={10} value={form.pan_number} onChange={onChange} className={inputCls} /></Field>
+      <Field label="Aadhaar Number" error={errors.aadhaar_number}><input name="aadhaar_number" placeholder="12-digit Aadhaar number" maxLength={12} value={form.aadhaar_number} onChange={onChange} className={inputCls} /></Field>
+      <Field label="PAN Number" error={errors.pan_number}><input name="pan_number" placeholder="ABCDE1234F" maxLength={10} value={form.pan_number} onChange={(e) => onChange({ target: { name: "pan_number", value: e.target.value.toUpperCase() } })} className={inputCls} /></Field>
     </>
   );
 
   if (step === 4) return (
     <>
-      <Field label="Is Fresher?" span2>
-        <select name="is_fresher" value={form.is_fresher ? "true" : "false"} onChange={(e) => onChange({ target: { name: "is_fresher", value: e.target.value === "true" } })} className={inputCls}>
-          <option value="true">Yes — Fresher</option>
-          <option value="false">No — Experienced</option>
+      <Field label="Employment Type" span2>
+        <select
+          name="is_fresher"
+          value={form.is_fresher ? "fresher" : "experienced"}
+          onChange={(e) => onChange({ target: { name: "is_fresher", value: e.target.value === "fresher" } })}
+          className={inputCls}
+        >
+          <option value="fresher">Fresher</option>
+          <option value="experienced">Experienced</option>
         </select>
       </Field>
       {!form.is_fresher && (
@@ -441,10 +737,10 @@ function EmpStepFields({ step, form, onChange, errors, managers }) {
 
   if (step === 5) return (
     <>
-      <Field label="Bank Name"><input name="bank_name" placeholder="e.g. State Bank of India" value={form.bank_name} onChange={onChange} className={inputCls} /></Field>
+      <Field label="Bank Name"><input name="bank_name" placeholder="e.g. Bank Name" value={form.bank_name} onChange={onChange} className={inputCls} /></Field>
       <Field label="Account Holder Name"><input name="account_holder_name" placeholder="Name as per bank" value={form.account_holder_name} onChange={onChange} className={inputCls} /></Field>
       <Field label="Account Number"><input name="account_number" placeholder="Account number" value={form.account_number} onChange={onChange} className={inputCls} /></Field>
-      <Field label="IFSC Code"><input name="ifsc_code" placeholder="e.g. SBIN0001234" value={form.ifsc_code} onChange={onChange} className={inputCls} /></Field>
+      <Field label="IFSC Code" error={errors.ifsc_code}><input name="ifsc_code" placeholder="e.g. SBIN0001234" value={form.ifsc_code} onChange={(e) => onChange({ target: { name: "ifsc_code", value: e.target.value.toUpperCase() } })} className={inputCls} /></Field>
       <div className="col-span-1 sm:col-span-2">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-3">Document URLs</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -461,100 +757,23 @@ function EmpStepFields({ step, form, onChange, errors, managers }) {
 }
 
 function MgrStepFields({ step, form, onChange, errors, managers }) {
-const [showPassword, setShowPassword] = useState(false);
-const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-const newErrors = {};
-const passwordRegex =
-  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-
-  const passwordError =
-    form.password && !passwordRegex.test(form.password)
-      ? "Password must contain at least 8 characters, 1 uppercase letter, 1 lowercase letter, 1 number and 1 special character."
-      : "";
-
-  const confirmPasswordError =
-    form.confirm_password &&
-    form.password !== form.confirm_password
-      ? "Passwords do not match."
-      : "";
- if (step === 0)
-    return (
-      <>
-        <Field label="First Name" required error={errors.f_name}>
-          <input
-            name="f_name"
-            placeholder="First name"
-            value={form.f_name}
-            onChange={onChange}
-            className={inputCls}
-          />
-        </Field>
-
-        <Field label="Last Name" required error={errors.l_name}>
-          <input
-            name="l_name"
-            placeholder="Last name"
-            value={form.l_name}
-            onChange={onChange}
-            className={inputCls}
-          />
-        </Field>
-
-        <Field
-          label="Password"
-          required
-          error={passwordError || errors.password}
-        >
-          <div className="relative">
-            <input
-              name="password"
-              type={showPassword ? "text" : "password"}
-              placeholder="Set password"
-              value={form.password}
-              onChange={onChange}
-              className={inputCls}
-            />
-
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm"
-            >
-              {showPassword ? "Hide" : "Show"}
-            </button>
-          </div>
-
-         
-        </Field>
-
-        <Field
-          label="Confirm Password"
-          required
-          error={confirmPasswordError || errors.confirm_password}
-        >
-          <div className="relative">
-            <input
-              name="confirm_password"
-              type={showConfirmPassword ? "text" : "password"}
-              placeholder="Confirm password"
-              value={form.confirm_password}
-              onChange={onChange}
-              className={inputCls}
-            />
-
-            <button
-              type="button"
-              onClick={() =>
-                setShowConfirmPassword(!showConfirmPassword)
-              }
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm"
-            >
-              {showConfirmPassword ? "Hide" : "Show"}
-            </button>
-          </div>
-        </Field>
-    
-  
+  if (step === 0) return (
+    <>
+      <Field label="First Name" required error={errors.f_name}><input name="f_name" placeholder="First name" value={form.f_name} onChange={onChange} className={inputCls} /></Field>
+      <Field label="Last Name" required error={errors.l_name}><input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls} /></Field>
+      <PasswordField
+        label="Password"
+        name="password"
+        value={form.password}
+        onChange={onChange}
+        error={errors.password}
+        onGenerate={() => {
+          const pwd = generatePassword();
+          onChange({ target: { name: "password", value: pwd } });
+          onChange({ target: { name: "confirm_password", value: pwd } });
+        }}
+      />
+      <PasswordField label="Confirm Password" name="confirm_password" value={form.confirm_password} onChange={onChange} error={errors.confirm_password} />
       <Field label="Gender" required error={errors.gender}>
         <select name="gender" value={form.gender} onChange={onChange} className={inputCls}>
           <option value="">Select Gender</option>
@@ -570,8 +789,8 @@ const passwordRegex =
           <option value="divorced">Divorced</option>
         </select>
       </Field>
-      <Field label="Personal Contact" required error={errors.personal_contact}><input name="personal_contact" placeholder="+91 XXXXX XXXXX" value={form.personal_contact} onChange={onChange} className={inputCls} /></Field>
-      <Field label="Emergency Contact" required error={errors.e_contact}><input name="e_contact" placeholder="Emergency contact" value={form.e_contact} onChange={onChange} className={inputCls} /></Field>
+      <Field label="Personal Contact" required error={errors.personal_contact}><input name="personal_contact" placeholder="10-digit mobile number" maxLength={10} value={form.personal_contact} onChange={onChange} className={inputCls} /></Field>
+      <Field label="Emergency Contact" required error={errors.e_contact}><input name="e_contact" placeholder="10-digit mobile number" maxLength={10} value={form.e_contact} onChange={onChange} className={inputCls} /></Field>
     </>
   );
 
@@ -580,7 +799,7 @@ const passwordRegex =
       <Field label="Department" required error={errors.department}>
         <select name="department" value={form.department} onChange={onChange} className={inputCls}>
           <option value="">Select Department</option>
-          {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+          {DEPARTMENTS.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
         </select>
       </Field>
       <Field label="Designation" required error={errors.designation}><input name="designation" placeholder="e.g. Head of Engineering" value={form.designation} onChange={onChange} className={inputCls} /></Field>
@@ -591,12 +810,7 @@ const passwordRegex =
           <option value="official">Official</option>
         </select>
       </Field>
-      <Field label="Office Location" required error={errors.office_location}>
-        <select name="office_location" value={form.office_location} onChange={onChange} className={inputCls}>
-          <option value="">Select Location</option>
-          {LOCATIONS.map((l) => <option key={l} value={l}>{l}</option>)}
-        </select>
-      </Field>
+      <OfficeLocationFields form={form} onChange={onChange} errors={errors} />
       <Field label="Reporting Manager" span2>
         <select name="reporting_manager" value={form.reporting_manager} onChange={onChange} className={inputCls}>
           <option value="">Select Reporting Manager (optional)</option>
@@ -608,24 +822,12 @@ const passwordRegex =
     </>
   );
 
-  if (step === 2) return (
-    <>
-      <Field label="Address" span2><input name="address" placeholder="Street address" value={form.address} onChange={onChange} className={inputCls} /></Field>
-      <Field label="City"><input name="city" placeholder="City" value={form.city} onChange={onChange} className={inputCls} /></Field>
-      <Field label="State">
-        <select name="state" value={form.state} onChange={onChange} className={inputCls}>
-          <option value="">Select State</option>
-          {INDIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-      </Field>
-      <Field label="Pincode"><input name="pincode" placeholder="6-digit pincode" maxLength={6} value={form.pincode} onChange={onChange} className={inputCls} /></Field>
-    </>
-  );
+  if (step === 2) return <AddressFields form={form} onChange={onChange} errors={errors} />;
 
   if (step === 3) return (
     <>
-      <Field label="Aadhaar Number"><input name="aadhaar_number" placeholder="XXXX XXXX XXXX" maxLength={12} value={form.aadhaar_number} onChange={onChange} className={inputCls} /></Field>
-      <Field label="PAN Number"><input name="pan_number" placeholder="ABCDE1234F" maxLength={10} value={form.pan_number} onChange={onChange} className={inputCls} /></Field>
+      <Field label="Aadhaar Number" error={errors.aadhaar_number}><input name="aadhaar_number" placeholder="12-digit Aadhaar number" maxLength={12} value={form.aadhaar_number} onChange={onChange} className={inputCls} /></Field>
+      <Field label="PAN Number" error={errors.pan_number}><input name="pan_number" placeholder="ABCDE1234F" maxLength={10} value={form.pan_number} onChange={(e) => onChange({ target: { name: "pan_number", value: e.target.value.toUpperCase() } })} className={inputCls} /></Field>
     </>
   );
 
@@ -633,8 +835,8 @@ const passwordRegex =
     <>
       <Field label="Is Fresher?" span2>
         <select name="is_fresher" value={form.is_fresher ? "true" : "false"} onChange={(e) => onChange({ target: { name: "is_fresher", value: e.target.value === "true" } })} className={inputCls}>
-          <option value="true">Yes — Fresher</option>
-          <option value="false">No — Experienced</option>
+          <option value="true">Fresher</option>
+          <option value="false">Experienced</option>
         </select>
       </Field>
       {!form.is_fresher && (
@@ -652,7 +854,7 @@ const passwordRegex =
       <Field label="Bank Name"><input name="bank_name" placeholder="e.g. State Bank of India" value={form.bank_name} onChange={onChange} className={inputCls} /></Field>
       <Field label="Account Holder Name"><input name="account_holder_name" placeholder="Name as per bank" value={form.account_holder_name} onChange={onChange} className={inputCls} /></Field>
       <Field label="Account Number"><input name="account_number" placeholder="Account number" value={form.account_number} onChange={onChange} className={inputCls} /></Field>
-      <Field label="IFSC Code"><input name="ifsc_code" placeholder="e.g. SBIN0001234" value={form.ifsc_code} onChange={onChange} className={inputCls} /></Field>
+      <Field label="IFSC Code" error={errors.ifsc_code}><input name="ifsc_code" placeholder="e.g. SBIN0001234" value={form.ifsc_code} onChange={(e) => onChange({ target: { name: "ifsc_code", value: e.target.value.toUpperCase() } })} className={inputCls} /></Field>
       <div className="col-span-1 sm:col-span-2">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-3">Document URLs</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -750,35 +952,114 @@ export default function EmployeeTable() {
     });
   };
 
-  const handleEmpChange = (e) => setEmpForm({ ...empForm, [e.target.name]: e.target.value });
+  const makeChangeHandler = (setter) => (e) => {
+    const { name, value } = e.target;
+    let nextValue = value;
+    if (["personal_contact", "e_contact", "aadhaar_number", "pincode", "permanent_pincode"].includes(name)) {
+      nextValue = numericOnly(value);
+    }
+    if (["f_name", "l_name"].includes(name) && value && !/^[A-Za-z\s.'-]*$/.test(value)) {
+      return;
+    }
+    setter((prev) => {
+      const next = { ...prev, [name]: nextValue };
+      if (name === "country") next.state = "";
+      if (name === "state") { /* city stays editable */ }
+      if (name === "permanent_country") next.permanent_state = "";
+      if (name === "office_location_country") { next.office_location_state = ""; next.office_location = ""; next.office_location_custom = ""; }
+      if (name === "office_location_state") { next.office_location = ""; next.office_location_custom = ""; }
+      if (name === "office_location" && nextValue !== "Other") next.office_location_custom = "";
+      if (name === "same_as_residential") next.same_as_residential = nextValue;
+      return next;
+    });
+  };
+
+  const handleEmpChange = makeChangeHandler(setEmpForm);
+  const handleMgrChange = makeChangeHandler(setMgrForm);
+
+  const validateContactInfo = (form) => {
+    const err = {};
+    if (!form.f_name) err.f_name = "Required";
+    else if (!NAME_REGEX.test(form.f_name)) err.f_name = "Enter a valid name";
+    if (!form.l_name) err.l_name = "Required";
+    else if (!NAME_REGEX.test(form.l_name)) err.l_name = "Enter a valid name";
+    if (!form.work_email) err.work_email = "Required";
+    else if (!EMAIL_REGEX.test(form.work_email)) err.work_email = "Enter a valid email";
+    if (!form.password) err.password = "Required";
+    else if (!PASSWORD_REGEX.test(form.password)) err.password = "Min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special character";
+    if (!form.confirm_password) err.confirm_password = "Required";
+    else if (form.confirm_password !== form.password) err.confirm_password = "Passwords do not match";
+    if (!form.gender) err.gender = "Required";
+    if (!form.personal_contact) err.personal_contact = "Required";
+    else if (!MOBILE_REGEX.test(form.personal_contact)) err.personal_contact = "Enter a valid 10-digit mobile number";
+    if (!form.e_contact) err.e_contact = "Required";
+    else if (!MOBILE_REGEX.test(form.e_contact)) err.e_contact = "Enter a valid 10-digit mobile number";
+    return err;
+  };
+
+  const validateWorkInfo = (form) => {
+    const err = {};
+    if (!form.department) err.department = "Required";
+    if (!form.designation) err.designation = "Required";
+    if (!form.office_location_country) err.office_location_country = "Required";
+    if (!form.office_location_state) err.office_location_state = "Required";
+    if (!form.office_location) err.office_location = "Required";
+    else if (form.office_location === "Other" && !form.office_location_custom) err.office_location_custom = "Please specify the office location";
+    return err;
+  };
+
+  const validateAddressInfo = (form) => {
+    const err = {};
+    if (!form.address) err.address = "Required";
+    if (!form.country) err.country = "Required";
+    if (!form.state) err.state = "Required";
+    if (!form.city) err.city = "Required";
+    if (!form.pincode) err.pincode = "Required";
+    else if (!PINCODE_REGEX.test(form.pincode)) err.pincode = "Enter a valid 6-digit pincode";
+    if (form.permanent_pincode && !PINCODE_REGEX.test(form.permanent_pincode)) err.permanent_pincode = "Enter a valid 6-digit pincode";
+    return err;
+  };
+
+  const validateIdentityInfo = (form) => {
+    const err = {};
+    if (form.aadhaar_number && !AADHAAR_REGEX.test(form.aadhaar_number)) err.aadhaar_number = "Enter a valid 12-digit Aadhaar number";
+    if (form.pan_number && !PAN_REGEX.test(form.pan_number)) err.pan_number = "Enter a valid PAN (e.g. ABCDE1234F)";
+    return err;
+  };
+
+  const validateBankInfo = (form) => {
+    const err = {};
+    if (form.ifsc_code && !IFSC_REGEX.test(form.ifsc_code)) err.ifsc_code = "Enter a valid IFSC code";
+    return err;
+  };
+
+  const resolveOfficeLocation = (form) => (form.office_location === "Other" ? form.office_location_custom : form.office_location);
 
   const validateEmp = () => {
-    const err = {};
-    if (!empForm.f_name)           err.f_name           = "Required";
-    if (!empForm.l_name)           err.l_name           = "Required";
-    if (!empForm.work_email)       err.work_email       = "Required";
-    if (!empForm.password)         err.password         = "Required";
-    if (!empForm.gender)           err.gender           = "Required";
-    if (!empForm.personal_contact) err.personal_contact = "Required";
-    if (!empForm.e_contact)        err.e_contact        = "Required";
-    if (!empForm.department)       err.department       = "Required";
-    if (!empForm.designation)      err.designation      = "Required";
-    if (!empForm.office_location)  err.office_location  = "Required";
+    const err = {
+      ...validateContactInfo(empForm),
+      ...validateWorkInfo(empForm),
+      ...validateAddressInfo(empForm),
+      ...validateIdentityInfo(empForm),
+      ...validateBankInfo(empForm),
+    };
     setEmpErrors(err);
     return Object.keys(err).length === 0;
   };
 
   const handleEmpSubmit = () => {
-    if (!validateEmp()) { showPopup("error", "Please fill all required fields before submitting"); setEmpStep(0); return; }
+    if (!validateEmp()) { showPopup("error", "Please fill all required fields correctly"); setEmpStep(0); return; }
     addEmployeeApi({
       f_name: empForm.f_name, l_name: empForm.l_name, work_email: empForm.work_email,
       password: empForm.password, gender: empForm.gender, marital_status: empForm.marital_status,
       personal_contact: empForm.personal_contact, e_contact: empForm.e_contact,
-      role: empForm.role, office_location: empForm.office_location,
+      role: empForm.role, office_location: resolveOfficeLocation(empForm),
       designation: empForm.designation, department: empForm.department,
       Under_manager: empForm.Under_manager || undefined,
-      address: empForm.address || undefined, city: empForm.city || undefined,
-      state: empForm.state || undefined, pincode: empForm.pincode || undefined,
+      address: empForm.address, city: empForm.city, state: empForm.state, pincode: empForm.pincode, country: empForm.country,
+      permanent_address: empForm.permanent_address || undefined, permanent_city: empForm.permanent_city || undefined,
+      permanent_state: empForm.permanent_state || undefined, permanent_pincode: empForm.permanent_pincode || undefined,
+      permanent_country: empForm.permanent_country || undefined,
       aadhaar_number: empForm.aadhaar_number || undefined, pan_number: empForm.pan_number || undefined,
       is_fresher: empForm.is_fresher,
       total_experience: empForm.is_fresher ? undefined : empForm.total_experience || undefined,
@@ -794,35 +1075,31 @@ export default function EmployeeTable() {
     });
   };
 
-  const handleMgrChange = (e) => setMgrForm({ ...mgrForm, [e.target.name]: e.target.value });
-
   const validateMgr = () => {
-    const err = {};
-    if (!mgrForm.f_name)           err.f_name           = "Required";
-    if (!mgrForm.l_name)           err.l_name           = "Required";
-    if (!mgrForm.work_email)       err.work_email       = "Required";
-    if (!mgrForm.password)         err.password         = "Required";
-    if (!mgrForm.gender)           err.gender           = "Required";
-    if (!mgrForm.personal_contact) err.personal_contact = "Required";
-    if (!mgrForm.e_contact)        err.e_contact        = "Required";
-    if (!mgrForm.department)       err.department       = "Required";
-    if (!mgrForm.designation)      err.designation      = "Required";
-    if (!mgrForm.office_location)  err.office_location  = "Required";
+    const err = {
+      ...validateContactInfo(mgrForm),
+      ...validateWorkInfo(mgrForm),
+      ...validateAddressInfo(mgrForm),
+      ...validateIdentityInfo(mgrForm),
+      ...validateBankInfo(mgrForm),
+    };
     setMgrErrors(err);
     return Object.keys(err).length === 0;
   };
 
   const handleMgrSubmit = () => {
-    if (!validateMgr()) { showPopup("error", "Please fill all required fields before submitting"); setMgrStep(0); return; }
+    if (!validateMgr()) { showPopup("error", "Please fill all required fields correctly"); setMgrStep(0); return; }
     addManagerApi({
       f_name: mgrForm.f_name, l_name: mgrForm.l_name, work_email: mgrForm.work_email,
       password: mgrForm.password, gender: mgrForm.gender, marital_status: mgrForm.marital_status,
       personal_contact: mgrForm.personal_contact, e_contact: mgrForm.e_contact,
-      role: mgrForm.role, office_location: mgrForm.office_location,
+      role: mgrForm.role, office_location: resolveOfficeLocation(mgrForm),
       designation: mgrForm.designation, department: mgrForm.department,
       reporting_manager: mgrForm.reporting_manager || undefined,
-      address: mgrForm.address || undefined, city: mgrForm.city || undefined,
-      state: mgrForm.state || undefined, pincode: mgrForm.pincode || undefined,
+      address: mgrForm.address, city: mgrForm.city, state: mgrForm.state, pincode: mgrForm.pincode, country: mgrForm.country,
+      permanent_address: mgrForm.permanent_address || undefined, permanent_city: mgrForm.permanent_city || undefined,
+      permanent_state: mgrForm.permanent_state || undefined, permanent_pincode: mgrForm.permanent_pincode || undefined,
+      permanent_country: mgrForm.permanent_country || undefined,
       aadhaar_number: mgrForm.aadhaar_number || undefined, pan_number: mgrForm.pan_number || undefined,
       is_fresher: mgrForm.is_fresher,
       total_experience: mgrForm.is_fresher ? undefined : mgrForm.total_experience || undefined,
@@ -927,7 +1204,7 @@ export default function EmployeeTable() {
               <div className="hidden sm:flex flex-wrap gap-2">
                 <select className={`${inputCls} flex-1 min-w-[140px]`} value={filters.department} onChange={(e) => setFilters({ ...filters, department: e.target.value })}>
                   <option value="">All Departments</option>
-                  {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+                  {DEPARTMENTS.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
                 </select>
                 <select className={`${inputCls} flex-1 min-w-[140px]`} value={filters.role} onChange={(e) => setFilters({ ...filters, role: e.target.value })}>
                   <option value="">All Roles</option>
@@ -944,7 +1221,7 @@ export default function EmployeeTable() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                   <select className={inputCls} value={filters.department} onChange={(e) => setFilters({ ...filters, department: e.target.value })}>
                     <option value="">All Depts</option>
-                    {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+                    {DEPARTMENTS.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
                   </select>
                   <select className={inputCls} value={filters.role} onChange={(e) => setFilters({ ...filters, role: e.target.value })}>
                     <option value="">All Roles</option>
@@ -955,7 +1232,7 @@ export default function EmployeeTable() {
                   </select>
                   <select className={inputCls} value={filters.location} onChange={(e) => setFilters({ ...filters, location: e.target.value })}>
                     <option value="">All Locations</option>
-                    {LOCATIONS.map((l) => <option key={l} value={l}>{l}</option>)}
+                    {OFFICE_LOCATIONS.map((l) => <option key={l.name} value={l.name}>{l.name}</option>)}
                   </select>
                   <select className={inputCls} value={filters.gender} onChange={(e) => setFilters({ ...filters, gender: e.target.value })}>
                     <option value="">All Genders</option>
@@ -1115,7 +1392,7 @@ export default function EmployeeTable() {
           <Field label="Work Email" required error={editErrors.work_email}><input name="work_email" type="email" value={editForm.work_email} onChange={handleEditChange} className={inputCls} /></Field>
           <Field label="Department" required error={editErrors.department}>
             <select name="department" value={editForm.department} onChange={handleEditChange} className={inputCls}>
-              <option value="">Select Department</option>{DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+              <option value="">Select Department</option>{DEPARTMENTS.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
             </select>
           </Field>
           <Field label="Designation" required error={editErrors.designation}><input name="designation" value={editForm.designation} onChange={handleEditChange} className={inputCls} /></Field>
@@ -1151,7 +1428,7 @@ export default function EmployeeTable() {
           <Field label="Emergency Contact"><input name="e_contact" value={editForm.e_contact} onChange={handleEditChange} className={inputCls} /></Field>
           <Field label="Office Location">
             <select name="office_location" value={editForm.office_location} onChange={handleEditChange} className={inputCls}>
-              <option value="">Select Location</option>{LOCATIONS.map((l) => <option key={l} value={l}>{l}</option>)}
+              <option value="">Select Location</option>{OFFICE_LOCATIONS.map((l) => <option key={l.name} value={l.name}>{l.name}</option>)}
             </select>
           </Field>
         </Modal>
