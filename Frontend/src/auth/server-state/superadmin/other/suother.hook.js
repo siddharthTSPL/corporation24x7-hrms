@@ -3,6 +3,7 @@ import {
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
+import { toast } from "react-hot-toast";
 
 import {
   reviewToAdmin,
@@ -126,9 +127,17 @@ export const useCreateAdmin = () => {
     mutationFn: createAdmin,
 
     onSuccess: () => {
+      toast.success("Admin added successfully.");
+
       queryClient.invalidateQueries({
         queryKey: ["admins"],
       });
+    },
+
+    onError: (error) => {
+      toast.error(
+        error?.response?.data?.message || "Failed to add admin."
+      );
     },
   });
 };
