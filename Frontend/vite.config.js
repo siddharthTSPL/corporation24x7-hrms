@@ -56,8 +56,6 @@ export default defineConfig(({ mode }) => ({
       }),
   ].filter(Boolean),
 
-  assetsInclude: ["**/*.json"],
-
   resolve: {
     alias: {
       "@": "/src",
