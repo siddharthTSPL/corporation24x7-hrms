@@ -1091,6 +1091,39 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
               onChange={handleResidentialChange}
             />
           </div>
+          
+          <div className="mt-3 sm:mt-4">
+            <FLabel>Country</FLabel>
+            <SearchableSelect
+              value={countryIso}
+              onChange={handleCountryChange}
+              options={countryOptions}
+              placeholder="Select country"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-3 sm:mt-4">
+            <div>
+              <FLabel>State</FLabel>
+              <SearchableSelect
+                value={stateIso}
+                onChange={handleStateChange}
+                options={stateOptions}
+                placeholder={stateOptions.length ? "Select state" : "No states available"}
+                disabled={!countryIso || stateOptions.length === 0}
+              />
+            </div>
+            <div>
+              <FLabel>City</FLabel>
+              <SearchableSelect
+                value={form.city}
+                onChange={handleCityChange}
+                options={cityOptions}
+                placeholder={cityOptions.length ? "Select city" : "Select a state first"}
+                disabled={!stateIso || cityOptions.length === 0}
+              />
+            </div>
+          </div>
 
           <div className="flex items-center gap-3 mt-3">
             <input
@@ -1104,6 +1137,8 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
               Same as Residential Address
             </label>
           </div>
+          
+          
 
           <div className="mt-3 sm:mt-4">
             <FLabel>Permanent Address</FLabel>
