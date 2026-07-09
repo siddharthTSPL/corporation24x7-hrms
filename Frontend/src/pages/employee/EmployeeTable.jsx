@@ -27,7 +27,14 @@ const api = axios.create({
   withCredentials: true,
 });
 
-const DEPARTMENTS = [ "OPR","BPO", "ENG", "MGMT", "HR"];
+const DEPT_OPTIONS = [ "OPR","BPO", "ENG", "HR", "MGMT"];
+const DEPT_FULL_FORMS = {
+  OPR: "OPR — Operations",
+  BPO: "BPO — Business Process Outsourcing",
+  ENG: "ENG — Engineering",
+  HR: "HR — Human Resources",
+  MGMT: "MGMT — Management",
+};
 const LOCATIONS = ["Noida", "Bareilly", "Delhi", "Mumbai"];
 
 const WORKING_STATUSES = ["working", "resigned", "fired", "terminated"];
@@ -1467,7 +1474,7 @@ function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChang
     <>
       <Field label="Department" required error={errors.department}>
         <select name="department" value={form.department} onChange={onChange} className={inputCls}>
-          <option value="">Select Department</option>{DEPARTMENTS.map((d)=><option key={d} value={d}>{d}</option>)}
+          <option value="">Select Department</option>{DEPT_OPTIONS.map((d)=><option key={d} value={d}>{DEPT_FULL_FORMS[d] || d}</option>)}
         </select>
       </Field>
       <Field label="Designation" required error={errors.designation}><input name="designation" placeholder="e.g. Software Engineer" value={form.designation} onChange={onChange} className={inputCls}/></Field>
@@ -1570,7 +1577,7 @@ function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin
     <>
       <Field label="Department" required error={errors.department}>
         <select name="department" value={form.department} onChange={onChange} className={inputCls}>
-          <option value="">Select Department</option>{DEPARTMENTS.map((d)=><option key={d} value={d}>{d}</option>)}
+          <option value="">Select Department</option>{DEPT_OPTIONS.map((d)=><option key={d} value={d}>{DEPT_FULL_FORMS[d] || d}</option>)}
         </select>
       </Field>
       <Field label="Designation" required error={errors.designation}><input name="designation" placeholder="e.g. Head of Engineering" value={form.designation} onChange={onChange} className={inputCls}/></Field>
@@ -2134,7 +2141,7 @@ export default function EmployeeTable(){
                 <option value="">All Types</option><option value="employee">Employees</option><option value="manager">Managers</option>
               </select>
               <select className={`${inputCls} flex-1`} value={filters.department} onChange={(e)=>setFilters({...filters,department:e.target.value})}>
-                <option value="">All Departments</option>{DEPARTMENTS.map((d)=><option key={d} value={d}>{d}</option>)}
+                <option value="">All Departments</option>{DEPT_OPTIONS.map((d)=><option key={d} value={d}>{DEPT_FULL_FORMS[d] || d}</option>)}
               </select>
               <select className={`${inputCls} flex-1`} value={filters.role} onChange={(e)=>setFilters({...filters,role:e.target.value})}>
                 <option value="">All Roles</option>
@@ -2307,7 +2314,7 @@ export default function EmployeeTable(){
           <Field label="Work Email" required error={editErrors.work_email}><input name="work_email" type="email" value={editForm.work_email} onChange={handleEditChange} className={inputCls}/></Field>
           <Field label="Department" required error={editErrors.department}>
             <select name="department" value={editForm.department} onChange={handleEditChange} className={inputCls}>
-              <option value="">Select Department</option>{DEPARTMENTS.map((d)=><option key={d} value={d}>{d}</option>)}
+              <option value="">Select Department</option>{DEPT_OPTIONS.map((d)=><option key={d} value={d}>{DEPT_FULL_FORMS[d] || d}</option>)}
             </select>
           </Field>
           <Field label="Designation" required error={editErrors.designation}><input name="designation" value={editForm.designation} onChange={handleEditChange} className={inputCls}/></Field>
