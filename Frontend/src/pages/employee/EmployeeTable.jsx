@@ -27,7 +27,7 @@ const api = axios.create({
   withCredentials: true,
 });
 
-const DEPARTMENTS = ["OPR", "BPO", "ENG", "MGMT", "HR"];
+const DEPARTMENTS = [ "Business Process Outsourcing", "Engineering", "Management", "Human Resources", "Operator"];
 const LOCATIONS = ["Noida", "Bareilly", "Delhi", "Mumbai"];
 
 const WORKING_STATUSES = ["working", "resigned", "fired", "terminated"];
@@ -1470,7 +1470,7 @@ function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChang
       <Field label="Designation" required error={errors.designation}><input name="designation" placeholder="e.g. Software Engineer" value={form.designation} onChange={onChange} className={inputCls}/></Field>
       <Field label="Role">
         <select name="role" value={form.role} onChange={onChange} className={inputCls}>
-          <option value="employee">Employee</option><option value="official">Official</option>
+          <option value="employee">Employee</option>
         </select>
       </Field>
       <OfficeLocationFields form={form} onChange={onChange} errors={errors}/>
@@ -1490,7 +1490,7 @@ function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChang
     <>
       <Field label="Is Fresher?" span2>
         <select name="is_fresher" value={form.is_fresher?"true":"false"} onChange={(e)=>onChange({target:{name:"is_fresher",value:e.target.value==="true"}})} className={inputCls}>
-          <option value="true">Yes — Fresher</option><option value="false">No — Experienced</option>
+          <option value="true">Fresher</option><option value="false">Experienced</option>
         </select>
       </Field>
       {!form.is_fresher&&(
@@ -1572,7 +1572,7 @@ function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin
       <Field label="Designation" required error={errors.designation}><input name="designation" placeholder="e.g. Head of Engineering" value={form.designation} onChange={onChange} className={inputCls}/></Field>
       <Field label="Role">
         <select name="role" value={form.role} onChange={onChange} className={inputCls}>
-          <option value="manager">Manager</option><option value="senior_manager">Senior Manager</option><option value="official">Official</option>
+          <option value="manager">Manager</option><option value="official">Official</option>
         </select>
       </Field>
       <OfficeLocationFields form={form} onChange={onChange} errors={errors}/>
@@ -1599,7 +1599,7 @@ function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin
     <>
       <Field label="Is Fresher?" span2>
         <select name="is_fresher" value={form.is_fresher?"true":"false"} onChange={(e)=>onChange({target:{name:"is_fresher",value:e.target.value==="true"}})} className={inputCls}>
-          <option value="true">Yes — Fresher</option><option value="false">No — Experienced</option>
+          <option value="true">Fresher</option><option value="false">Experienced</option>
         </select>
       </Field>
       {!form.is_fresher&&(
@@ -1613,7 +1613,7 @@ function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin
   );
   if(step===5)return(
     <>
-      <Field label="Bank Name" error={errors.bank_group}><input name="bank_name" placeholder="e.g. State Bank of India" value={form.bank_name} onChange={onChange} className={inputCls}/></Field>
+      <Field label="Bank Name" error={errors.bank_group}><input name="bank_name" placeholder="Bank Name" value={form.bank_name} onChange={onChange} className={inputCls}/></Field>
       <Field label="Account Holder Name"><input name="account_holder_name" placeholder="Name as per bank" value={form.account_holder_name} onChange={onChange} className={inputCls}/></Field>
       <Field label="Account Number" error={errors.account_number}><input name="account_number" placeholder="9-18 digit account number" maxLength={18} value={form.account_number} onChange={onChange} className={inputCls}/></Field>
       <Field label="IFSC Code" error={errors.ifsc_code}><input name="ifsc_code" placeholder="e.g. SBIN0001234" maxLength={11} value={form.ifsc_code} onChange={(e)=>onChange({target:{name:"ifsc_code",value:e.target.value.toUpperCase()}})} className={inputCls}/></Field>
