@@ -30,3 +30,8 @@ export const unifiedVerifyForgotPasswordOtp = async ({ email, otp }) => {
   const res = await api.post('auth/forgot-password/verify-otp', { email, otp });
   return res.data;
 };
+
+export const unifiedResetPassword = async ({ newPassword, confirmPassword }) => {
+  const res = await api.post('auth/forgot-password/reset-password', { newPassword, confirmPassword });
+  return res.data;
+};

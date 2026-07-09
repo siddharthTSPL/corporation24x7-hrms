@@ -308,8 +308,23 @@ const unifiedVerifyForgotPasswordOtp = async (req, res, next) => {
     return next(err);
   }
 
+  // Short-lived token that authorizes setting a new password, independent of
+  // the login/session token above. Without this, verify-otp had no way to
+  // hand the client anything it could use to actually change the password.
+  const resetToken = jwt.sign(
+    { accountType, accountId: account._id, purpose: "password_reset" },
+    process.env.JWT_SECRET,
+    { expiresIn: "15m" }
+  );
+
   await OtpModel.deleteOne({ email: normalizedEmail });
   res.cookie("token", token, cookieOpts());
+  res.cookie("resetToken", resetToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    maxAge: 15 * 60 * 1000,
+  });
 
   return res.status(200).json({
     success: true,
@@ -317,7 +332,66 @@ const unifiedVerifyForgotPasswordOtp = async (req, res, next) => {
     role: account.role,
     accountType,
     token,
+    passwordResetAvailable: true,
   });
 };
 
-module.exports = { unifiedLogin, unifiedSendForgotPasswordOtp, unifiedVerifyForgotPasswordOtp };
+const MODEL_BY_ACCOUNT_TYPE = {
+  superadmin: SuperAdminModel,
+  admin: AdminModel,
+  manager: Managermodel,
+  employee: Usermodel,
+};
+
+// --- Forgot password: set a new password using the resetToken from verify-otp ---
+const unifiedResetPassword = async (req, res, next) => {
+  const { newPassword, confirmPassword } = req.body;
+
+  if (!newPassword || !confirmPassword)
+    return next(Object.assign(new Error("Both password fields are required"), { statusCode: 400 }));
+  if (newPassword !== confirmPassword)
+    return next(Object.assign(new Error("Passwords do not match"), { statusCode: 400 }));
+  if (newPassword.length < 8)
+    return next(Object.assign(new Error("Password must be at least 8 characters"), { statusCode: 400 }));
+
+  const resetToken = req.cookies?.resetToken;
+  if (!resetToken)
+    return next(Object.assign(new Error("Reset session expired. Please verify OTP again."), { statusCode: 401 }));
+
+  let decoded;
+  try {
+    decoded = jwt.verify(resetToken, process.env.JWT_SECRET);
+  } catch (err) {
+    return next(Object.assign(new Error("Invalid or expired reset token"), { statusCode: 401 }));
+  }
+
+  if (decoded.purpose !== "password_reset")
+    return next(Object.assign(new Error("Invalid reset token"), { statusCode: 401 }));
+
+  const Model = MODEL_BY_ACCOUNT_TYPE[decoded.accountType];
+  if (!Model)
+    return next(Object.assign(new Error("Invalid account type in reset token"), { statusCode: 400 }));
+
+  const account = await Model.findById(decoded.accountId);
+  if (!account)
+    return next(Object.assign(new Error("Account not found"), { statusCode: 404 }));
+
+  account.password = newPassword;
+  if ("isFirstLogin" in account) account.isFirstLogin = false;
+  await account.save();
+
+  res.clearCookie("resetToken", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  });
+
+  return res.status(200).json({ success: true, message: "Password updated successfully" });
+};
+
+module.exports = {
+  unifiedLogin,
+  unifiedSendForgotPasswordOtp,
+  unifiedVerifyForgotPasswordOtp,
+  unifiedResetPassword,
+};

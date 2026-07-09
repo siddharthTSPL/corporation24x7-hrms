@@ -5,6 +5,7 @@ const {
   unifiedLogin,
   unifiedSendForgotPasswordOtp,
   unifiedVerifyForgotPasswordOtp,
+  unifiedResetPassword,
 } = require("../controllers/Unified.auth.controller");
 
 // POST /auth/login  — auto-detects role from email
@@ -15,5 +16,8 @@ router.post("/forgot-password/send-otp", asyncHandler(unifiedSendForgotPasswordO
 
 // POST /auth/forgot-password/verify-otp — auto-detects role from email
 router.post("/forgot-password/verify-otp", asyncHandler(unifiedVerifyForgotPasswordOtp));
+
+// POST /auth/forgot-password/reset-password — uses the resetToken cookie set by verify-otp
+router.post("/forgot-password/reset-password", asyncHandler(unifiedResetPassword));
 
 module.exports = router;
