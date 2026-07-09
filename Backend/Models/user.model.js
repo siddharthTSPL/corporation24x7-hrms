@@ -25,7 +25,7 @@ const userSchema = new mongoose.Schema(
 
     department: {
       type: String,
-      enum: ["OPR", "BPO", "ENG"],
+      enum: ["OPR", "BPO", "ENG", "HR", "MGMT"],
       required: [true, "Department is required"],
     },
 
