@@ -8,6 +8,32 @@ const AVATAR_STYLES = [
   "micah", "open-peeps", "big-ears", "croodles",
 ];
 
+const PHONE_REGEX = /^[0-9]{10}$/;
+const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+const ACCOUNT_REGEX = /^[0-9]{9,18}$/;
+
+const LOCATION_DATA = {
+  India: {
+    "Uttar Pradesh": ["Bareilly", "Noida", "Lucknow", "Kanpur", "Agra"],
+    "Delhi": ["Delhi"],
+    "Maharashtra": ["Mumbai", "Pune", "Nagpur"],
+    "Karnataka": ["Bengaluru", "Mysuru"],
+    "Telangana": ["Hyderabad"],
+    "Tamil Nadu": ["Chennai", "Coimbatore"],
+    "West Bengal": ["Kolkata"],
+    "Gujarat": ["Ahmedabad", "Surat"],
+  },
+  "United States": {
+    California: ["San Francisco", "Los Angeles", "San Jose"],
+    "New York": ["New York City", "Buffalo"],
+    Texas: ["Austin", "Dallas"],
+  },
+  "United Arab Emirates": {
+    Dubai: ["Dubai"],
+    "Abu Dhabi": ["Abu Dhabi"],
+  },
+};
+
 const C = {
   brand:      "#CD166E",
   brandDark:  "#730042",
@@ -32,7 +58,8 @@ const TABS = [
   { key: "profile",   label: "Profile" },
   { key: "contact",   label: "Contact" },
   { key: "address",   label: "Address" },
-  { key: "documents", label: "Documents" },
+  { key: "identity",  label: "Identity" },
+  { key: "documents", label: "Documents & Banking" },
   { key: "leave",     label: "Leave Balance" },
   { key: "reviews",   label: "Reviews" },
   { key: "password",  label: "Password" },
@@ -50,6 +77,15 @@ function getErrorMessage(err) {
 function fmtDate(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function findLocation(city) {
+  for (const country of Object.keys(LOCATION_DATA)) {
+    for (const state of Object.keys(LOCATION_DATA[country])) {
+      if (LOCATION_DATA[country][state].includes(city)) return { country, state };
+    }
+  }
+  return null;
 }
 
 function Spinner({ size = 16, color = "#fff" }) {
@@ -182,33 +218,6 @@ function SelectField({ label, value, onChange, options }) {
   );
 }
 
-function ToggleGroup({ label, value, onChange, options }) {
-  return (
-    <div style={{ marginBottom: 14 }}>
-      <FieldLabel>{label}</FieldLabel>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {options.map(opt => {
-          const active = value === opt;
-          return (
-            <button key={opt} onClick={() => onChange(opt)}
-              style={{
-                flex: 1, minWidth: 60, padding: "8px 12px",
-                borderRadius: 8, border: `1px solid ${active ? C.brand : C.border}`,
-                background: active ? C.brandLight : C.surface,
-                color: active ? C.brand : C.muted,
-                fontSize: 12, fontWeight: active ? 600 : 400,
-                cursor: "pointer", fontFamily: "inherit",
-                textTransform: "capitalize", transition: "all 0.15s",
-              }}>
-              {opt}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 function PrimaryButton({ onClick, disabled, loading, children, color = C.brand, fullWidth = true }) {
   return (
     <button onClick={onClick} disabled={disabled || loading}
@@ -227,9 +236,21 @@ function PrimaryButton({ onClick, disabled, loading, children, color = C.brand, 
   );
 }
 
-function Grid({ cols = 2, children }) {
+function Badge({ children, color = C.brand, bg }) {
   return (
-    <div style={{
+    <span style={{
+      display: "inline-block", padding: "2px 10px", borderRadius: 20,
+      fontSize: 10, fontWeight: 600, color, background: bg || `${color}15`,
+      textTransform: "capitalize",
+    }}>
+      {children}
+    </span>
+  );
+}
+
+function Grid({ cols = 2, children, className }) {
+  return (
+    <div className={className} style={{
       display: "grid",
       gridTemplateColumns: `repeat(${cols}, 1fr)`,
       gap: "0 16px",
@@ -261,10 +282,9 @@ function ProfileTab({ adminData }) {
           <ReadonlyField label="Designation" value={adminData?.designation} />
           <ReadonlyField label="Department" value={adminData?.department} />
           <ReadonlyField label="Office location" value={adminData?.office_location} />
-          <ReadonlyField label="Date of joining" value={fmtDate(adminData?.createdAt)} />
+          <ReadonlyField label="Working status" value={adminData?.working_status} />
           <ReadonlyField label="Last login" value={fmtDate(adminData?.last_login)} />
           <ReadonlyField label="Email verified" value={adminData?.isVerified ? "✓ Verified" : "Not verified"} />
-          <ReadonlyField label="Reporting manager" value={adminData?.reporting_manager ? adminData.reporting_manager : "—"} />
         </Grid>
       </SectionCard>
 
@@ -276,15 +296,6 @@ function ProfileTab({ adminData }) {
           <ReadonlyField label="Previous designation" value={adminData?.previous_designation} />
         </Grid>
       </SectionCard>
-
-      <SectionCard title="Banking details" accent={C.green}>
-        <Grid>
-          <ReadonlyField label="Bank name" value={adminData?.bank_name} />
-          <ReadonlyField label="Account holder" value={adminData?.account_holder_name} />
-          <ReadonlyField label="Account number" value={adminData?.account_number} />
-          <ReadonlyField label="IFSC code" value={adminData?.ifsc_code} />
-        </Grid>
-      </SectionCard>
     </>
   );
 }
@@ -293,29 +304,48 @@ function ContactTab({ adminData, onSuccess, onError }) {
   const queryClient = useQueryClient();
   const { mutate, isPending } = useEditAdminProfile();
   const [form, setForm] = useState({
-    phone: "", e_contact: "", designation: "", office_location: "Bareilly",
-    gender: "male", marital_status: "single",
+    personal_contact: "", e_contact: "",
+    country: "India", state: "Uttar Pradesh", city: "Bareilly",
   });
 
   useEffect(() => {
     if (adminData) {
+      const match = findLocation(adminData.office_location);
+      const country = match?.country || "India";
+      const state = match?.state || Object.keys(LOCATION_DATA[country])[0];
+      const city = adminData.office_location || LOCATION_DATA[country][state][0];
       setForm({
-        phone: adminData.phone || adminData.personal_contact || "",
+        personal_contact: adminData.personal_contact || "",
         e_contact: adminData.e_contact || "",
-        designation: adminData.designation || "",
-        office_location: adminData.office_location || "Bareilly",
-        gender: adminData.gender || "male",
-        marital_status: adminData.marital_status || "single",
+        country, state, city,
       });
     }
   }, [adminData]);
 
-  const set = (key) => (e) => setForm(p => ({ ...p, [key]: typeof e === "string" ? e : e.target.value }));
+  const setPhone = (key) => (e) => setForm(p => ({ ...p, [key]: e.target.value }));
+
+  const setCountry = (e) => {
+    const country = e.target.value;
+    const state = Object.keys(LOCATION_DATA[country])[0];
+    const city = LOCATION_DATA[country][state][0];
+    setForm(p => ({ ...p, country, state, city }));
+  };
+
+  const setState = (e) => {
+    const state = e.target.value;
+    const city = LOCATION_DATA[form.country][state][0];
+    setForm(p => ({ ...p, state, city }));
+  };
+
+  const setCity = (e) => setForm(p => ({ ...p, city: e.target.value }));
+
+  const cityOptions = LOCATION_DATA[form.country]?.[form.state] || (form.city ? [form.city] : []);
 
   const handleSave = () => {
-    if (!form.phone) { onError("Phone number is required"); return; }
+    if (!PHONE_REGEX.test(form.personal_contact)) { onError("Phone number must be a valid 10-digit number"); return; }
+    if (form.e_contact && !PHONE_REGEX.test(form.e_contact)) { onError("Emergency contact must be a valid 10-digit number"); return; }
     mutate(
-      { phone: form.phone, profile_image: adminData?.profile_image || "" },
+      { personal_contact: form.personal_contact, e_contact: form.e_contact, office_location: form.city },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["auth"] });
@@ -328,42 +358,104 @@ function ContactTab({ adminData, onSuccess, onError }) {
 
   return (
     <SectionCard title="Contact & office" subtitle="Fields you can update" accent={C.green}>
-      <InputField label="Phone number" type="tel" value={form.phone} onChange={set("phone")} placeholder="Enter phone number" />
-      <InputField label="Emergency contact" type="tel" value={form.e_contact} onChange={set("e_contact")} placeholder="Emergency contact" hint="Reached in case of emergency" />
-      <InputField label="Designation" value={form.designation} onChange={set("designation")} placeholder="Your designation" />
-      <SelectField label="Office location" value={form.office_location} onChange={set("office_location")} options={["Noida","Bareilly","Delhi","Mumbai"]} />
-      <ToggleGroup label="Gender" value={form.gender} onChange={set("gender")} options={["male","female"]} />
-      <ToggleGroup label="Marital status" value={form.marital_status} onChange={set("marital_status")} options={["single","married","divorced"]} />
+      <InputField label="Phone number" type="tel" value={form.personal_contact} onChange={setPhone("personal_contact")} placeholder="10-digit phone number" />
+      <InputField label="Emergency contact" type="tel" value={form.e_contact} onChange={setPhone("e_contact")} placeholder="Emergency contact" hint="Reached in case of emergency" />
+      <Grid cols={3} className="contact-location-grid">
+        <SelectField label="Country" value={form.country} onChange={setCountry} options={Object.keys(LOCATION_DATA)} />
+        <SelectField label="State" value={form.state} onChange={setState} options={Object.keys(LOCATION_DATA[form.country] || {})} />
+        <SelectField label="City (office location)" value={form.city} onChange={setCity} options={cityOptions} />
+      </Grid>
       <PrimaryButton onClick={handleSave} loading={isPending}>Save contact info</PrimaryButton>
     </SectionCard>
   );
 }
 
-function AddressTab({ adminData, onSuccess, onError }) {
+function AddressTab({ adminData }) {
+  return (
+    <SectionCard title="Address information" subtitle="On record, contact HR to update" accent={C.amber}>
+      <ReadonlyField label="Address" value={adminData?.address} />
+      <Grid>
+        <ReadonlyField label="City" value={adminData?.city} />
+        <ReadonlyField label="State" value={adminData?.state} />
+      </Grid>
+      <Grid>
+        <ReadonlyField label="Pincode" value={adminData?.pincode} />
+        <ReadonlyField label="Country" value={adminData?.country} />
+      </Grid>
+    </SectionCard>
+  );
+}
+
+function IdentityTab({ adminData }) {
+  return (
+    <SectionCard title="Identity numbers" subtitle="Government ID records on file" accent={C.brand}>
+      <Grid>
+        <ReadonlyField label="Aadhaar number" value={adminData?.aadhaar_number} />
+        <ReadonlyField label="PAN number" value={adminData?.pan_number} />
+      </Grid>
+    </SectionCard>
+  );
+}
+
+function DocumentsBankingTab({ adminData, onSuccess, onError }) {
   const queryClient = useQueryClient();
   const { mutate, isPending } = useEditAdminProfile();
-  const [form, setForm] = useState({ address: "", city: "", state: "", pincode: "" });
+  const [form, setForm] = useState({
+    resume: "", aadhaar_card: "", pan_card: "", experience_letter: "",
+    bank_name: "", account_holder_name: "", account_number: "", ifsc_code: "",
+  });
 
   useEffect(() => {
     if (adminData) {
       setForm({
-        address: adminData.address || "",
-        city: adminData.city || "",
-        state: adminData.state || "",
-        pincode: adminData.pincode || "",
+        resume: adminData.resume || "",
+        aadhaar_card: adminData.aadhaar_card || "",
+        pan_card: adminData.pan_card || "",
+        experience_letter: adminData.experience_letter || "",
+        bank_name: adminData.bank_name || "",
+        account_holder_name: adminData.account_holder_name || "",
+        account_number: adminData.account_number || "",
+        ifsc_code: adminData.ifsc_code || "",
       });
     }
   }, [adminData]);
 
   const set = (key) => (e) => setForm(p => ({ ...p, [key]: e.target.value }));
 
-  const handleSave = () => {
+  const handleSaveDocs = () => {
     mutate(
-      { ...form, phone: adminData?.phone || adminData?.personal_contact || "", profile_image: adminData?.profile_image || "" },
+      {
+        resume: form.resume,
+        aadhaar_card: form.aadhaar_card,
+        pan_card: form.pan_card,
+        experience_letter: form.experience_letter,
+      },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["auth"] });
-          onSuccess("Address updated!");
+          onSuccess("Documents updated!");
+        },
+        onError: (err) => onError(getErrorMessage(err)),
+      }
+    );
+  };
+
+  const handleSaveBanking = () => {
+    if (form.bank_name && form.bank_name.length > 100) { onError("Bank name is too long"); return; }
+    if (!form.account_holder_name.trim()) { onError("Account holder name is required"); return; }
+    if (!ACCOUNT_REGEX.test(form.account_number)) { onError("Account number must be 9-18 digits"); return; }
+    if (!IFSC_REGEX.test(form.ifsc_code.toUpperCase())) { onError("Invalid IFSC code"); return; }
+    mutate(
+      {
+        bank_name: form.bank_name,
+        account_holder_name: form.account_holder_name,
+        account_number: form.account_number,
+        ifsc_code: form.ifsc_code.toUpperCase(),
+      },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ["auth"] });
+          onSuccess("Banking details updated!");
         },
         onError: (err) => onError(getErrorMessage(err)),
       }
@@ -371,60 +463,23 @@ function AddressTab({ adminData, onSuccess, onError }) {
   };
 
   return (
-    <SectionCard title="Address information" accent={C.amber}>
-      <InputField label="Address" value={form.address} onChange={set("address")} placeholder="Residential address" />
-      <Grid>
-        <InputField label="City" value={form.city} onChange={set("city")} placeholder="City" />
-        <InputField label="State" value={form.state} onChange={set("state")} placeholder="State" />
-      </Grid>
-      <InputField label="Pincode" value={form.pincode} onChange={set("pincode")} placeholder="Pincode" />
-      <PrimaryButton onClick={handleSave} loading={isPending}>Save address</PrimaryButton>
-    </SectionCard>
-  );
-}
-
-function DocumentsTab({ adminData }) {
-  const idFields = [
-    { label: "Aadhaar number", value: adminData?.aadhaar_number },
-    { label: "PAN number", value: adminData?.pan_number },
-    { label: "Bank name", value: adminData?.bank_name },
-    { label: "Account holder", value: adminData?.account_holder_name },
-    { label: "Account number", value: adminData?.account_number },
-    { label: "IFSC code", value: adminData?.ifsc_code },
-  ];
-  const fileFields = [
-    { label: "Resume", value: adminData?.resume },
-    { label: "Aadhaar card", value: adminData?.aadhaar_card },
-    { label: "PAN card", value: adminData?.pan_card },
-    { label: "Experience letter", value: adminData?.experience_letter },
-  ];
-  return (
     <>
-      <SectionCard title="Identity & banking" accent={C.brand}>
-        <Grid>
-          {idFields.map(f => <ReadonlyField key={f.label} label={f.label} value={f.value} />)}
-        </Grid>
+      <SectionCard title="Documents" subtitle="Paste a link to each uploaded file" accent={C.blue}>
+        <InputField label="Resume" value={form.resume} onChange={set("resume")} placeholder="https://…" />
+        <InputField label="Aadhaar card" value={form.aadhaar_card} onChange={set("aadhaar_card")} placeholder="https://…" />
+        <InputField label="PAN card" value={form.pan_card} onChange={set("pan_card")} placeholder="https://…" />
+        <InputField label="Experience letter" value={form.experience_letter} onChange={set("experience_letter")} placeholder="https://…" />
+        <PrimaryButton onClick={handleSaveDocs} loading={isPending}>Save documents</PrimaryButton>
       </SectionCard>
-      <SectionCard title="Uploaded documents" subtitle="Files submitted during onboarding" accent={C.blue}>
+
+      <SectionCard title="Banking details" subtitle="Used for salary disbursement" accent={C.green}>
+        <InputField label="Bank name" value={form.bank_name} onChange={set("bank_name")} placeholder="Bank name" />
+        <InputField label="Account holder name" value={form.account_holder_name} onChange={set("account_holder_name")} placeholder="As per bank records" />
         <Grid>
-          {fileFields.map(f => (
-            <div key={f.label} style={{ marginBottom: 14 }}>
-              <FieldLabel>{f.label}</FieldLabel>
-              <div style={{
-                padding: "9px 12px", borderRadius: 8,
-                background: "#f7f3f1", border: `1px solid ${C.border}`,
-                fontSize: 13, fontWeight: 500,
-                display: "flex", alignItems: "center", gap: 8,
-                color: f.value ? C.blue : C.muted,
-              }}>
-                {f.value
-                  ? <><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><rect x="2" y="1" width="10" height="12" rx="2" stroke={C.blue} strokeWidth="1.3"/><path d="M4.5 4.5h5M4.5 7h5M4.5 9.5h3" stroke={C.blue} strokeWidth="1.2" strokeLinecap="round"/></svg>Uploaded</>
-                  : "Not uploaded"
-                }
-              </div>
-            </div>
-          ))}
+          <InputField label="Account number" value={form.account_number} onChange={set("account_number")} placeholder="9-18 digit account number" />
+          <InputField label="IFSC code" value={form.ifsc_code} onChange={(e) => setForm(p => ({ ...p, ifsc_code: e.target.value.toUpperCase() }))} placeholder="ABCD0123456" />
         </Grid>
+        <PrimaryButton onClick={handleSaveBanking} loading={isPending} color={C.green}>Save banking details</PrimaryButton>
       </SectionCard>
     </>
   );
@@ -450,7 +505,7 @@ function LeaveTab({ leaveBalance }) {
 
   return (
     <SectionCard title="Leave Balance" subtitle="Your current leave entitlements" accent={C.green}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginBottom: 16 }}>
+      <div className="leave-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginBottom: 16 }}>
         {leaves.map(l => {
           const entitled = l.entitled ?? 0;
           const availed = l.availed ?? 0;
@@ -648,7 +703,7 @@ function AvatarTab({ adminData, onSuccess, onError }) {
     setPending(url);
     setCurrentImg(url);
     mutate(
-      { phone: adminData?.phone || adminData?.personal_contact || "", profile_image: url },
+      { profile_image: url },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["auth"] });
@@ -697,7 +752,7 @@ function AvatarTab({ adminData, onSuccess, onError }) {
       </div>
 
       <FieldLabel>Choose a style</FieldLabel>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+      <div className="settings-avatar-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
         {AVATAR_STYLES.map(style => {
           const url = `https://api.dicebear.com/7.x/${style}/svg?seed=${seed}`;
           const isActive = currentImg?.includes(style);
@@ -804,12 +859,17 @@ export default function AdminSettingsPage() {
         * { box-sizing: border-box; }
         input::placeholder { color: #c9bab5; }
         select option { color: #2a1a16; }
+        .mobile-menu-btn { display: none; }
         @media (max-width: 768px) {
           .settings-layout { flex-direction: column !important; }
           .settings-sidebar { display: none !important; }
+          .mobile-menu-btn { display: flex !important; }
           .settings-grid-2 { grid-template-columns: 1fr !important; }
           .settings-avatar-grid { grid-template-columns: repeat(4, 1fr) !important; }
           .leave-grid { grid-template-columns: 1fr !important; }
+        }
+        @media (max-width: 640px) {
+          .contact-location-grid { grid-template-columns: 1fr !important; }
         }
         @media (max-width: 480px) {
           .settings-avatar-grid { grid-template-columns: repeat(3, 1fr) !important; }
@@ -829,15 +889,14 @@ export default function AdminSettingsPage() {
             </div>
             <button
               onClick={() => setMobileMenuOpen(true)}
+              className="mobile-menu-btn"
               style={{
-                display: "none",
                 padding: "8px 14px", borderRadius: 9,
                 border: `1px solid ${C.border}`, background: C.surface,
                 cursor: "pointer", fontSize: 13, fontWeight: 600,
                 color: C.brand, fontFamily: "inherit",
                 alignItems: "center", gap: 6,
               }}
-              className="mobile-menu-btn"
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><line x1="1" y1="3.5" x2="13" y2="3.5" stroke={C.brand} strokeWidth="1.5" strokeLinecap="round"/><line x1="1" y1="7" x2="13" y2="7" stroke={C.brand} strokeWidth="1.5" strokeLinecap="round"/><line x1="1" y1="10.5" x2="13" y2="10.5" stroke={C.brand} strokeWidth="1.5" strokeLinecap="round"/></svg>
               {currentTabLabel}
@@ -868,8 +927,9 @@ export default function AdminSettingsPage() {
                   <div style={{ textAlign: "center" }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{displayName}</div>
                     <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{adminData?.work_email || "—"}</div>
-                    <div style={{ marginTop: 7, display: "inline-block", padding: "2px 10px", borderRadius: 20, fontSize: 10, fontWeight: 600, color: C.brand, background: C.brandLight }}>
-                      {adminData?.role || "admin"}
+                    <div style={{ marginTop: 7, display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
+                      <Badge color={C.brand}>{adminData?.role || "admin"}</Badge>
+                      {adminData?.department && <Badge color={C.blue}>{adminData.department}</Badge>}
                     </div>
                   </div>
                 </div>
@@ -900,18 +960,11 @@ export default function AdminSettingsPage() {
             </div>
 
             <div style={{ flex: 1, minWidth: 0 }}>
-              <style>{`
-                @media (max-width: 768px) {
-                  .mobile-menu-btn { display: flex !important; }
-                  .settings-grid-2 { grid-template-columns: 1fr !important; }
-                  .leave-grid { grid-template-columns: 1fr !important; }
-                }
-              `}</style>
-
               {tab === "profile"   && <ProfileTab adminData={adminData} />}
               {tab === "contact"   && <ContactTab adminData={adminData} onSuccess={showSuccess} onError={showError} />}
-              {tab === "address"   && <AddressTab adminData={adminData} onSuccess={showSuccess} onError={showError} />}
-              {tab === "documents" && <DocumentsTab adminData={adminData} />}
+              {tab === "address"   && <AddressTab adminData={adminData} />}
+              {tab === "identity"  && <IdentityTab adminData={adminData} />}
+              {tab === "documents" && <DocumentsBankingTab adminData={adminData} onSuccess={showSuccess} onError={showError} />}
               {tab === "leave"     && <LeaveTab leaveBalance={leaveBalance} />}
               {tab === "reviews"   && <ReviewsTab reviews={reviews} />}
               {tab === "password"  && <PasswordTab onSuccess={showSuccess} onError={showError} />}
