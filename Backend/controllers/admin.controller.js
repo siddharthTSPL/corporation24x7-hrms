@@ -2440,19 +2440,55 @@ const getme = async (req, res, next) => {
   res.status(200).json({ success: true, user: admin, leaveBalance: leaveBalance || null, reviews: reviews || [] });
 };
 
+const PHONE_REGEX = /^[0-9]{10}$/;
+const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+
 const editadminprofile = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
   const admin = req.admin;
-  const { phone, profile_image, f_name, l_name } = req.body;
-  if (f_name !== undefined) admin.f_name = f_name;
-  if (l_name !== undefined) admin.l_name = l_name;
-  if (phone !== undefined) {
-    if (typeof phone !== "string")
-      return next(Object.assign(new Error("Phone must be a string"), { statusCode: 400 }));
-    admin.phone = phone;
+  const {
+    f_name,
+    l_name,
+    personal_contact,
+    e_contact,
+    profile_image,
+    office_location,
+    resume,
+    aadhaar_card,
+    pan_card,
+    experience_letter,
+    bank_name,
+    account_holder_name,
+    account_number,
+    ifsc_code,
+  } = req.body;
+
+  if (f_name !== undefined) {
+    if (typeof f_name !== "string" || !f_name.trim() || f_name.length > 50)
+      return next(Object.assign(new Error("Invalid first name"), { statusCode: 400 }));
+    admin.f_name = f_name.trim();
   }
+
+  if (l_name !== undefined) {
+    if (typeof l_name !== "string" || !l_name.trim() || l_name.length > 50)
+      return next(Object.assign(new Error("Invalid last name"), { statusCode: 400 }));
+    admin.l_name = l_name.trim();
+  }
+
+  if (personal_contact !== undefined) {
+    if (typeof personal_contact !== "string" || !PHONE_REGEX.test(personal_contact))
+      return next(Object.assign(new Error("Phone number must be a valid 10-digit number"), { statusCode: 400 }));
+    admin.personal_contact = personal_contact;
+  }
+
+  if (e_contact !== undefined) {
+    if (typeof e_contact !== "string" || !PHONE_REGEX.test(e_contact))
+      return next(Object.assign(new Error("Emergency contact must be a valid 10-digit number"), { statusCode: 400 }));
+    admin.e_contact = e_contact;
+  }
+
   if (profile_image !== undefined) {
     if (typeof profile_image !== "string")
       return next(Object.assign(new Error("Profile image must be a string"), { statusCode: 400 }));
@@ -2463,7 +2499,62 @@ const editadminprofile = async (req, res, next) => {
     }
   }
 
+  if (office_location !== undefined) {
+    if (typeof office_location !== "string" || !office_location.trim() || office_location.length > 100)
+      return next(Object.assign(new Error("Office location must be a valid, non-empty location name (max 100 characters)"), { statusCode: 400 }));
+    admin.office_location = office_location.trim();
+  }
+
+  if (resume !== undefined) {
+    if (typeof resume !== "string")
+      return next(Object.assign(new Error("Resume must be a string"), { statusCode: 400 }));
+    admin.resume = resume;
+  }
+
+  if (aadhaar_card !== undefined) {
+    if (typeof aadhaar_card !== "string")
+      return next(Object.assign(new Error("Aadhaar card must be a string"), { statusCode: 400 }));
+    admin.aadhaar_card = aadhaar_card;
+  }
+
+  if (pan_card !== undefined) {
+    if (typeof pan_card !== "string")
+      return next(Object.assign(new Error("PAN card must be a string"), { statusCode: 400 }));
+    admin.pan_card = pan_card;
+  }
+
+  if (experience_letter !== undefined) {
+    if (typeof experience_letter !== "string")
+      return next(Object.assign(new Error("Experience letter must be a string"), { statusCode: 400 }));
+    admin.experience_letter = experience_letter;
+  }
+
+  if (bank_name !== undefined) {
+    if (typeof bank_name !== "string" || bank_name.length > 100)
+      return next(Object.assign(new Error("Invalid bank name"), { statusCode: 400 }));
+    admin.bank_name = bank_name.trim();
+  }
+
+  if (account_holder_name !== undefined) {
+    if (typeof account_holder_name !== "string" || !account_holder_name.trim() || account_holder_name.length > 100)
+      return next(Object.assign(new Error("Invalid account holder name"), { statusCode: 400 }));
+    admin.account_holder_name = account_holder_name.trim();
+  }
+
+  if (account_number !== undefined) {
+    if (typeof account_number !== "string" || !/^[0-9]{9,18}$/.test(account_number))
+      return next(Object.assign(new Error("Invalid account number"), { statusCode: 400 }));
+    admin.account_number = account_number;
+  }
+
+  if (ifsc_code !== undefined) {
+    if (typeof ifsc_code !== "string" || !IFSC_REGEX.test(ifsc_code.toUpperCase()))
+      return next(Object.assign(new Error("Invalid IFSC code"), { statusCode: 400 }));
+    admin.ifsc_code = ifsc_code.toUpperCase();
+  }
+
   await admin.save();
+
   res.status(200).json({
     success: true,
     message: "Admin profile updated successfully",
@@ -2472,8 +2563,18 @@ const editadminprofile = async (req, res, next) => {
       f_name: admin.f_name,
       l_name: admin.l_name,
       work_email: admin.work_email,
-      phone: admin.phone,
+      personal_contact: admin.personal_contact,
+      e_contact: admin.e_contact,
       profile_image: admin.profile_image,
+      office_location: admin.office_location,
+      resume: admin.resume,
+      aadhaar_card: admin.aadhaar_card,
+      pan_card: admin.pan_card,
+      experience_letter: admin.experience_letter,
+      bank_name: admin.bank_name,
+      account_holder_name: admin.account_holder_name,
+      account_number: admin.account_number,
+      ifsc_code: admin.ifsc_code,
     },
   });
 };
