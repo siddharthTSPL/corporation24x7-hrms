@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from "react";
+import { Country, State, City } from "country-state-city";
 import {
   FaEdit, FaTrash, FaSearch, FaFilter, FaTimes, FaUserTie, FaUserPlus,
   FaChevronLeft, FaChevronRight, FaFileExcel, FaArrowUp, FaArrowDown,
   FaEllipsisV, FaEnvelope, FaPhone, FaBuilding, FaMapMarkerAlt, FaIdCard,
   FaStar, FaUser, FaBriefcase, FaUniversity, FaFileAlt, FaShieldAlt,
   FaToggleOn, FaToggleOff, FaKey, FaBan, FaCheck, FaExclamationTriangle,
+  FaEye, FaEyeSlash,
 } from "react-icons/fa";
 import {
   useAddManager, useAddEmployee, useFindAllManagers, useFindAllManagerswithoutAdmin,
@@ -27,21 +29,20 @@ const api = axios.create({
 
 const DEPARTMENTS = ["OPR", "BPO", "ENG", "MGMT", "HR"];
 const LOCATIONS = ["Noida", "Bareilly", "Delhi", "Mumbai"];
-const INDIAN_STATES = [
-  "Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat",
-  "Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala","Madhya Pradesh",
-  "Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab",
-  "Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh",
-  "Uttarakhand","West Bengal","Delhi","Jammu and Kashmir","Ladakh",
-];
 
 const WORKING_STATUSES = ["working", "resigned", "fired", "terminated"];
 const IRREVERSIBLE_STATUSES = ["resigned", "terminated"];
 
+const ALL_COUNTRIES = Country.getAllCountries();
+
 const EMPTY_EMP = {
   f_name:"",l_name:"",work_email:"",password:"",confirm_password:"",gender:"",marital_status:"single",
   personal_contact:"",e_contact:"",department:"",designation:"",role:"employee",
-  office_location:"",Under_manager:"",address:"",city:"",state:"",pincode:"",
+  office_location_country:"IN",office_location_state:"",office_location:"",
+  Under_manager:"",
+  address:"",city:"",state:"",pincode:"",country:"IN",
+  same_as_residential:false,
+  permanent_address:"",permanent_city:"",permanent_state:"",permanent_pincode:"",permanent_country:"IN",
   aadhaar_number:"",pan_number:"",is_fresher:true,total_experience:"",
   previous_company:"",previous_designation:"",bank_name:"",account_holder_name:"",
   account_number:"",ifsc_code:"",resume:"",aadhaar_card:"",pan_card:"",experience_letter:"",
@@ -50,7 +51,11 @@ const EMPTY_EMP = {
 const EMPTY_MGR = {
   f_name:"",l_name:"",work_email:"",password:"",confirm_password:"",gender:"",marital_status:"single",
   personal_contact:"",e_contact:"",department:"",designation:"",role:"manager",
-  office_location:"",reporting_manager:"",address:"",city:"",state:"",pincode:"",
+  office_location_country:"IN",office_location_state:"",office_location:"",
+  reporting_manager:"",
+  address:"",city:"",state:"",pincode:"",country:"IN",
+  same_as_residential:false,
+  permanent_address:"",permanent_city:"",permanent_state:"",permanent_pincode:"",permanent_country:"IN",
   aadhaar_number:"",pan_number:"",is_fresher:true,total_experience:"",
   previous_company:"",previous_designation:"",bank_name:"",account_holder_name:"",
   account_number:"",ifsc_code:"",resume:"",aadhaar_card:"",pan_card:"",experience_letter:"",
@@ -90,7 +95,7 @@ const EMP_STEPS = [
 const inputCls =
   "w-full px-3 py-2.5 rounded-lg border border-[#F4C0D1] bg-[#F9F8F2] text-sm text-[#730042] " +
   "focus:outline-none focus:border-[#CD166E] focus:ring-2 focus:ring-[#CD166E]/20 transition-all placeholder-[#993556]/50 " +
-  "font-['DM_Sans',system-ui,sans-serif]";
+  "font-['DM_Sans',system-ui,sans-serif] disabled:opacity-50 disabled:cursor-not-allowed";
 
 const PWD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -101,6 +106,24 @@ const PINCODE_REGEX = /^\d{6}$/;
 const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 const ACCOUNT_REGEX = /^\d{9,18}$/;
 const URL_REGEX = /^https?:\/\/.+/;
+const NAME_REGEX = /^[A-Za-z\s.'-]{2,50}$/;
+
+function generatePassword() {
+  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const lower = "abcdefghijklmnopqrstuvwxyz";
+  const digits = "0123456789";
+  const special = "@$!%*?&";
+  const all = upper + lower + digits + special;
+  let pwd =
+    upper[Math.floor(Math.random() * upper.length)] +
+    lower[Math.floor(Math.random() * lower.length)] +
+    digits[Math.floor(Math.random() * digits.length)] +
+    special[Math.floor(Math.random() * special.length)];
+  for (let i = 0; i < 8; i++) pwd += all[Math.floor(Math.random() * all.length)];
+  return pwd.split("").sort(() => Math.random() - 0.5).join("");
+}
+
+const numericOnly = (value) => value.replace(/\D/g, "");
 
 function exportToCSV(data) {
   const headers = [
@@ -152,6 +175,186 @@ function Field({label,error,children,required,span2}){
       {children}
       {error&&<span className="text-[11px] text-[#A32D2D] flex items-center gap-1">⚠ {error}</span>}
     </div>
+  );
+}
+
+function PasswordField({label,name,value,onChange,error,required=true,onGenerate}){
+  const [show,setShow]=useState(false);
+  return(
+    <Field label={label} required={required} error={error}>
+      <div className="relative">
+        <input
+          name={name}
+          type={show?"text":"password"}
+          placeholder={label}
+          value={value}
+          onChange={onChange}
+          className={inputCls}
+        />
+        <button
+          type="button"
+          onClick={()=>setShow(!show)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#993556]"
+        >
+          {show?<FaEyeSlash size={13}/>:<FaEye size={13}/>}
+        </button>
+      </div>
+      {onGenerate&&(
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={onGenerate}
+            className="text-xs font-semibold text-[#CD166E] hover:underline mt-1"
+          >
+            Generate Password
+          </button>
+        </div>
+      )}
+    </Field>
+  );
+}
+
+function OfficeLocationFields({form,onChange,errors}){
+  const states = form.office_location_country ? State.getStatesOfCountry(form.office_location_country) : [];
+  const cities = form.office_location_country && form.office_location_state
+    ? City.getCitiesOfState(form.office_location_country, form.office_location_state)
+    : [];
+
+  return(
+    <>
+      <Field label="Country" required error={errors.office_location_country}>
+        <select name="office_location_country" value={form.office_location_country} onChange={onChange} className={inputCls}>
+          <option value="">Select Country</option>
+          {ALL_COUNTRIES.map((c)=><option key={c.isoCode} value={c.isoCode}>{c.name}</option>)}
+        </select>
+      </Field>
+      <Field label="State" required error={errors.office_location_state}>
+        <select
+          name="office_location_state"
+          value={form.office_location_state}
+          onChange={onChange}
+          className={inputCls}
+          disabled={!form.office_location_country}
+        >
+          <option value="">{form.office_location_country?"Select State":"Select country first"}</option>
+          {states.map((s)=><option key={s.isoCode} value={s.isoCode}>{s.name}</option>)}
+        </select>
+      </Field>
+      <div className="col-span-2">
+        <Field label="Office Location (City)" required error={errors.office_location}>
+          <select
+            name="office_location"
+            value={form.office_location}
+            onChange={onChange}
+            className={inputCls}
+            disabled={!form.office_location_state}
+          >
+            <option value="">{form.office_location_state?"Select City":"Select state first"}</option>
+            {cities.map((c)=><option key={`${c.name}-${c.latitude}-${c.longitude}`} value={c.name}>{c.name}</option>)}
+          </select>
+        </Field>
+      </div>
+    </>
+  );
+}
+
+function AddressFields({form,onChange,errors}){
+  const resStates = form.country ? State.getStatesOfCountry(form.country) : [];
+  const permStates = form.permanent_country ? State.getStatesOfCountry(form.permanent_country) : [];
+
+  const resStateIso = resStates.find((s)=>s.name===form.state)?.isoCode;
+  const permStateIso = permStates.find((s)=>s.name===form.permanent_state)?.isoCode;
+
+  const resCities = form.country && resStateIso ? City.getCitiesOfState(form.country, resStateIso) : [];
+  const permCities = form.permanent_country && permStateIso ? City.getCitiesOfState(form.permanent_country, permStateIso) : [];
+
+  const handleSameAsResidential=(e)=>{
+    const checked=e.target.checked;
+    onChange({target:{name:"same_as_residential",value:checked}});
+    if(checked){
+      onChange({target:{name:"permanent_address",value:form.address}});
+      onChange({target:{name:"permanent_country",value:form.country}});
+      onChange({target:{name:"permanent_state",value:form.state}});
+      onChange({target:{name:"permanent_city",value:form.city}});
+      onChange({target:{name:"permanent_pincode",value:form.pincode}});
+    }
+  };
+
+  return(
+    <>
+      <div className="col-span-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-1">Residential Address</p>
+      </div>
+
+      <Field label="Country" required error={errors.country}>
+        <select name="country" value={form.country} onChange={onChange} className={inputCls}>
+          <option value="">Select Country</option>
+          {ALL_COUNTRIES.map((c)=><option key={c.isoCode} value={c.isoCode}>{c.name}</option>)}
+        </select>
+      </Field>
+
+      <Field label="State" required error={errors.state}>
+        <select name="state" value={form.state} onChange={onChange} className={inputCls} disabled={!form.country}>
+          <option value="">{form.country?"Select State":"Select country first"}</option>
+          {resStates.map((s)=><option key={s.isoCode} value={s.name}>{s.name}</option>)}
+        </select>
+      </Field>
+
+      <Field label="City" required error={errors.city}>
+        <select name="city" value={form.city} onChange={onChange} className={inputCls} disabled={!form.state}>
+          <option value="">{form.state?(resCities.length?"Select City":"No cities found"):"Select state first"}</option>
+          {resCities.map((c)=><option key={c.name} value={c.name}>{c.name}</option>)}
+        </select>
+      </Field>
+
+      <Field label="Pincode" required error={errors.pincode}>
+        <input name="pincode" placeholder="6-digit pincode" maxLength={6} value={form.pincode} onChange={onChange} className={inputCls}/>
+      </Field>
+
+      <Field label="Address" required error={errors.address} span2>
+        <input name="address" placeholder="Street address" value={form.address} onChange={onChange} className={inputCls}/>
+      </Field>
+
+      <div className="col-span-2 flex items-center gap-2 mt-1">
+        <input type="checkbox" id="same_as_residential" checked={form.same_as_residential} onChange={handleSameAsResidential} className="w-4 h-4 accent-[#CD166E]"/>
+        <label htmlFor="same_as_residential" className="text-xs font-medium text-[#730042]">
+          Permanent address same as residential
+        </label>
+      </div>
+
+      <div className="col-span-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-1 mt-2">Permanent Address</p>
+      </div>
+
+      <Field label="Country" error={errors.permanent_country}>
+        <select name="permanent_country" value={form.permanent_country} onChange={onChange} className={inputCls}>
+          <option value="">Select Country</option>
+          {ALL_COUNTRIES.map((c)=><option key={c.isoCode} value={c.isoCode}>{c.name}</option>)}
+        </select>
+      </Field>
+
+      <Field label="State" error={errors.permanent_state}>
+        <select name="permanent_state" value={form.permanent_state} onChange={onChange} className={inputCls} disabled={!form.permanent_country}>
+          <option value="">{form.permanent_country?"Select State":"Select country first"}</option>
+          {permStates.map((s)=><option key={s.isoCode} value={s.name}>{s.name}</option>)}
+        </select>
+      </Field>
+
+      <Field label="City" error={errors.permanent_city}>
+        <select name="permanent_city" value={form.permanent_city} onChange={onChange} className={inputCls} disabled={!form.permanent_state}>
+          <option value="">{form.permanent_state?(permCities.length?"Select City":"No cities found"):"Select state first"}</option>
+          {permCities.map((c)=><option key={c.name} value={c.name}>{c.name}</option>)}
+        </select>
+      </Field>
+
+      <Field label="Pincode" error={errors.permanent_pincode}>
+        <input name="permanent_pincode" placeholder="6-digit pincode" maxLength={6} value={form.permanent_pincode} onChange={onChange} className={inputCls}/>
+      </Field>
+
+      <Field label="Address" error={errors.permanent_address} span2>
+        <input name="permanent_address" placeholder="Street address" value={form.permanent_address} onChange={onChange} className={inputCls}/>
+      </Field>
+    </>
   );
 }
 
@@ -539,7 +742,6 @@ function WorkingStatusSelector({currentStatus,onSave,loading,blockedInfo,onDismi
     <div className="mt-3 p-3 rounded-xl border border-[#F4C0D1] bg-[#F9F8F2]">
       <p className="text-[10px] font-bold uppercase tracking-wider text-[#993556] mb-2">Employment Status</p>
 
-      {/* 🔴 Inline asset-block message — shows right here after clicking */}
       {blockedInfo&&(
         <div className="mb-3 rounded-xl border border-[#FCA5A5] bg-[#FFF5F5] p-3">
           <div className="flex items-start gap-2 mb-2">
@@ -648,7 +850,7 @@ function AccountSummaryDrawer({
   const [tab,setTab]=useState("info");
   const [showPermissions,setShowPermissions]=useState(false);
   const [wsLoading,setWsLoading]=useState(false);
-  const [assetBlock,setAssetBlock]=useState(null); // 👈 naya state
+  const [assetBlock,setAssetBlock]=useState(null);
 
   const setEmpWS=useSetEmployeeWorkingStatus(userId);
   const setMgrWS=useSetManagerWorkingStatus(userId);
@@ -1226,28 +1428,24 @@ function MobileCard({u,onView,onEdit,onDelete,onPromoteToManager,onPromoteToAdmi
 }
 
 function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChange}){
-  const [showPwd,setShowPwd]=useState(false);
-  const [showCPwd,setShowCPwd]=useState(false);
-  const pwdErr=form.password&&!PWD_REGEX.test(form.password)?"Min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special character.":"";
-  const cpwdErr=form.confirm_password&&form.password!==form.confirm_password?"Passwords do not match.":"";
-
   if(step===0)return(
     <>
       <Field label="First Name" required error={errors.f_name}><input name="f_name" placeholder="First name" value={form.f_name} onChange={onChange} className={inputCls}/></Field>
       <Field label="Last Name" required error={errors.l_name}><input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls}/></Field>
       <Field label="Work Email" required error={errors.work_email}><input name="work_email" type="email" placeholder="name@company.com" value={form.work_email} onChange={onChange} className={inputCls}/></Field>
-      <Field label="Password" required error={pwdErr||errors.password}>
-        <div className="relative">
-          <input name="password" type={showPwd?"text":"password"} placeholder="Min 8 chars, uppercase, number, special" value={form.password} onChange={onChange} className={inputCls}/>
-          <button type="button" onClick={()=>setShowPwd(!showPwd)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#993556] text-xs font-medium">{showPwd?"Hide":"Show"}</button>
-        </div>
-      </Field>
-      <Field label="Confirm Password" required error={cpwdErr||errors.confirm_password}>
-        <div className="relative">
-          <input name="confirm_password" type={showCPwd?"text":"password"} placeholder="Confirm password" value={form.confirm_password} onChange={onChange} className={inputCls}/>
-          <button type="button" onClick={()=>setShowCPwd(!showCPwd)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#993556] text-xs font-medium">{showCPwd?"Hide":"Show"}</button>
-        </div>
-      </Field>
+      <PasswordField
+        label="Password"
+        name="password"
+        value={form.password}
+        onChange={onChange}
+        error={errors.password}
+        onGenerate={()=>{
+          const pwd=generatePassword();
+          onChange({target:{name:"password",value:pwd}});
+          onChange({target:{name:"confirm_password",value:pwd}});
+        }}
+      />
+      <PasswordField label="Confirm Password" name="confirm_password" value={form.confirm_password} onChange={onChange} error={errors.confirm_password}/>
       <Field label="Gender" required error={errors.gender}>
         <select name="gender" value={form.gender} onChange={onChange} className={inputCls}>
           <option value="">Select Gender</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
@@ -1275,28 +1473,13 @@ function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChang
           <option value="employee">Employee</option><option value="official">Official</option>
         </select>
       </Field>
-      <Field label="Office Location" required error={errors.office_location}>
-        <select name="office_location" value={form.office_location} onChange={onChange} className={inputCls}>
-          <option value="">Select Location</option>{LOCATIONS.map((l)=><option key={l} value={l}>{l}</option>)}
-        </select>
-      </Field>
+      <OfficeLocationFields form={form} onChange={onChange} errors={errors}/>
       <div className="col-span-1 sm:col-span-2">
         <UnderManagerSelect value={form.Under_manager} onChange={onChange} managersOnly={managersOnly}/>
       </div>
     </>
   );
-  if(step===2)return(
-    <>
-      <Field label="Address" span2><input name="address" placeholder="Street address" value={form.address} onChange={onChange} className={inputCls}/></Field>
-      <Field label="City"><input name="city" placeholder="City" value={form.city} onChange={onChange} className={inputCls}/></Field>
-      <Field label="State">
-        <select name="state" value={form.state} onChange={onChange} className={inputCls}>
-          <option value="">Select State</option>{INDIAN_STATES.map((s)=><option key={s} value={s}>{s}</option>)}
-        </select>
-      </Field>
-      <Field label="Pincode" error={errors.pincode}><input name="pincode" placeholder="6-digit pincode" maxLength={6} value={form.pincode} onChange={onChange} className={inputCls}/></Field>
-    </>
-  );
+  if(step===2)return <AddressFields form={form} onChange={onChange} errors={errors}/>;
   if(step===3)return(
     <>
       <Field label="Aadhaar Number" error={errors.aadhaar_number}><input name="aadhaar_number" placeholder="12-digit Aadhaar number" maxLength={12} value={form.aadhaar_number} onChange={onChange} className={inputCls}/></Field>
@@ -1347,27 +1530,24 @@ function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChang
 }
 
 function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin,perms,onPermChange}){
-  const [showPwd,setShowPwd]=useState(false);
-  const [showCPwd,setShowCPwd]=useState(false);
-  const pwdErr=form.password&&!PWD_REGEX.test(form.password)?"Min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special character.":"";
-  const cpwdErr=form.confirm_password&&form.password!==form.confirm_password?"Passwords do not match.":"";
   if(step===0)return(
     <>
       <Field label="First Name" required error={errors.f_name}><input name="f_name" placeholder="First name" value={form.f_name} onChange={onChange} className={inputCls}/></Field>
       <Field label="Last Name" required error={errors.l_name}><input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls}/></Field>
       <Field label="Work Email" required error={errors.work_email}><input name="work_email" type="email" placeholder="name@company.com" value={form.work_email} onChange={onChange} className={inputCls}/></Field>
-      <Field label="Password" required error={pwdErr||errors.password}>
-        <div className="relative">
-          <input name="password" type={showPwd?"text":"password"} placeholder="Min 8 chars, uppercase, number, special" value={form.password} onChange={onChange} className={inputCls}/>
-          <button type="button" onClick={()=>setShowPwd(!showPwd)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#993556] text-xs font-medium">{showPwd?"Hide":"Show"}</button>
-        </div>
-      </Field>
-      <Field label="Confirm Password" required error={cpwdErr||errors.confirm_password}>
-        <div className="relative">
-          <input name="confirm_password" type={showCPwd?"text":"password"} placeholder="Confirm password" value={form.confirm_password} onChange={onChange} className={inputCls}/>
-          <button type="button" onClick={()=>setShowCPwd(!showCPwd)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#993556] text-xs font-medium">{showCPwd?"Hide":"Show"}</button>
-        </div>
-      </Field>
+      <PasswordField
+        label="Password"
+        name="password"
+        value={form.password}
+        onChange={onChange}
+        error={errors.password}
+        onGenerate={()=>{
+          const pwd=generatePassword();
+          onChange({target:{name:"password",value:pwd}});
+          onChange({target:{name:"confirm_password",value:pwd}});
+        }}
+      />
+      <PasswordField label="Confirm Password" name="confirm_password" value={form.confirm_password} onChange={onChange} error={errors.confirm_password}/>
       <Field label="Gender" required error={errors.gender}>
         <select name="gender" value={form.gender} onChange={onChange} className={inputCls}>
           <option value="">Select Gender</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
@@ -1395,11 +1575,7 @@ function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin
           <option value="manager">Manager</option><option value="senior_manager">Senior Manager</option><option value="official">Official</option>
         </select>
       </Field>
-      <Field label="Office Location" required error={errors.office_location}>
-        <select name="office_location" value={form.office_location} onChange={onChange} className={inputCls}>
-          <option value="">Select Location</option>{LOCATIONS.map((l)=><option key={l} value={l}>{l}</option>)}
-        </select>
-      </Field>
+      <OfficeLocationFields form={form} onChange={onChange} errors={errors}/>
       <div className="col-span-1 sm:col-span-2">
         <ReportingManagerSelect
           value={form.reporting_manager}
@@ -1412,18 +1588,7 @@ function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin
       </div>
     </>
   );
-  if(step===2)return(
-    <>
-      <Field label="Address" span2><input name="address" placeholder="Street address" value={form.address} onChange={onChange} className={inputCls}/></Field>
-      <Field label="City"><input name="city" placeholder="City" value={form.city} onChange={onChange} className={inputCls}/></Field>
-      <Field label="State">
-        <select name="state" value={form.state} onChange={onChange} className={inputCls}>
-          <option value="">Select State</option>{INDIAN_STATES.map((s)=><option key={s} value={s}>{s}</option>)}
-        </select>
-      </Field>
-      <Field label="Pincode" error={errors.pincode}><input name="pincode" placeholder="6-digit pincode" maxLength={6} value={form.pincode} onChange={onChange} className={inputCls}/></Field>
-    </>
-  );
+  if(step===2)return <AddressFields form={form} onChange={onChange} errors={errors}/>;
   if(step===3)return(
     <>
       <Field label="Aadhaar Number" error={errors.aadhaar_number}><input name="aadhaar_number" placeholder="12-digit Aadhaar number" maxLength={12} value={form.aadhaar_number} onChange={onChange} className={inputCls}/></Field>
@@ -1473,30 +1638,66 @@ function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin
   return null;
 }
 
-function validateFormFields(form,isManager=false){
+function validateContactInfo(form){
   const err={};
-  if(!form.f_name?.trim())err.f_name="Required";
-  if(!form.l_name?.trim())err.l_name="Required";
-  if(!form.work_email?.trim())err.work_email="Required";
+  if(!form.f_name)err.f_name="Required";
+  else if(!NAME_REGEX.test(form.f_name))err.f_name="Enter a valid name";
+  if(!form.l_name)err.l_name="Required";
+  else if(!NAME_REGEX.test(form.l_name))err.l_name="Enter a valid name";
+  if(!form.work_email)err.work_email="Required";
   else if(!EMAIL_REGEX.test(form.work_email))err.work_email="Invalid email address";
   if(!form.password)err.password="Required";
   else if(!PWD_REGEX.test(form.password))err.password="Min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special character";
-  if(form.confirm_password!==form.password)err.confirm_password="Passwords do not match";
+  if(!form.confirm_password)err.confirm_password="Required";
+  else if(form.confirm_password!==form.password)err.confirm_password="Passwords do not match";
   if(!form.gender)err.gender="Required";
-  if(!form.personal_contact?.trim())err.personal_contact="Required";
+  if(!form.personal_contact)err.personal_contact="Required";
   else if(!PHONE_REGEX.test(form.personal_contact))err.personal_contact="Must be a valid 10-digit Indian mobile number";
-  if(!form.e_contact?.trim())err.e_contact="Required";
+  if(!form.e_contact)err.e_contact="Required";
   else if(!PHONE_REGEX.test(form.e_contact))err.e_contact="Must be a valid 10-digit Indian mobile number";
+  return err;
+}
+
+function validateWorkInfo(form){
+  const err={};
   if(!form.department)err.department="Required";
   if(!form.designation?.trim())err.designation="Required";
+  if(!form.office_location_country)err.office_location_country="Required";
+  if(!form.office_location_state)err.office_location_state="Required";
   if(!form.office_location)err.office_location="Required";
-  if(form.pincode&&!PINCODE_REGEX.test(form.pincode))err.pincode="Must be a valid 6-digit pincode";
+  return err;
+}
+
+function validateAddressInfo(form){
+  const err={};
+  if(!form.address?.trim())err.address="Required";
+  if(!form.country)err.country="Required";
+  if(!form.state)err.state="Required";
+  if(!form.city)err.city="Required";
+  if(!form.pincode)err.pincode="Required";
+  else if(!PINCODE_REGEX.test(form.pincode))err.pincode="Must be a valid 6-digit pincode";
+  if(form.permanent_pincode&&!PINCODE_REGEX.test(form.permanent_pincode))err.permanent_pincode="Must be a valid 6-digit pincode";
+  return err;
+}
+
+function validateIdentityInfo(form){
+  const err={};
   if(form.aadhaar_number&&!AADHAAR_REGEX.test(form.aadhaar_number))err.aadhaar_number="Must be exactly 12 digits";
   if(form.pan_number&&!PAN_REGEX.test(form.pan_number))err.pan_number="Invalid PAN format (e.g. ABCDE1234F)";
+  return err;
+}
+
+function validateExperienceInfo(form){
+  const err={};
   if(!form.is_fresher&&form.total_experience){
     const exp=parseFloat(form.total_experience);
     if(isNaN(exp)||exp<0||exp>50)err.total_experience="Enter a valid experience (0-50 years)";
   }
+  return err;
+}
+
+function validateBankInfo(form){
+  const err={};
   const hasBankPartial=[form.bank_name,form.account_holder_name,form.account_number,form.ifsc_code].some(Boolean);
   const hasBankFull=[form.bank_name,form.account_holder_name,form.account_number,form.ifsc_code].every(Boolean);
   if(hasBankPartial&&!hasBankFull)err.bank_group="Fill all bank details together or leave all blank";
@@ -1670,8 +1871,30 @@ export default function EmployeeTable(){
     });
   };
 
-  const handleEmpChange=(e)=>setEmpForm({...empForm,[e.target.name]:e.target.value});
-  const handleMgrChange=(e)=>setMgrForm({...mgrForm,[e.target.name]:e.target.value});
+  const makeChangeHandler=(setter)=>(e)=>{
+    const {name,value}=e.target;
+    let nextValue=value;
+    if(["personal_contact","e_contact","aadhaar_number","pincode","permanent_pincode"].includes(name)){
+      nextValue=numericOnly(value);
+    }
+    if(["f_name","l_name"].includes(name)&&value&&!/^[A-Za-z\s.'-]*$/.test(value)){
+      return;
+    }
+    setter((prev)=>{
+      const next={...prev,[name]:nextValue};
+      if(name==="country") next.state="";
+      if(name==="state") next.city="";
+      if(name==="permanent_country") next.permanent_state="";
+      if(name==="permanent_state") next.permanent_city="";
+      if(name==="office_location_country"){next.office_location_state="";next.office_location="";}
+      if(name==="office_location_state"){next.office_location="";}
+      if(name==="same_as_residential") next.same_as_residential=nextValue;
+      return next;
+    });
+  };
+
+  const handleEmpChange=makeChangeHandler(setEmpForm);
+  const handleMgrChange=makeChangeHandler(setMgrForm);
 
   const handleEmpPermChange=(section,key,val)=>{
     const disabled=getDisabledKeys("employee");
@@ -1685,9 +1908,21 @@ export default function EmployeeTable(){
     setMgrPerms((p)=>({...p,[section]:{...p[section],[key]:val}}));
   };
 
+  const validateEmp=()=>{
+    const err={
+      ...validateContactInfo(empForm),
+      ...validateWorkInfo(empForm),
+      ...validateAddressInfo(empForm),
+      ...validateIdentityInfo(empForm),
+      ...validateExperienceInfo(empForm),
+      ...validateBankInfo(empForm),
+    };
+    setEmpErrors(err);
+    return Object.keys(err).length===0;
+  };
+
   const handleEmpSubmit=()=>{
-    const errs=validateFormFields(empForm,false);
-    if(Object.keys(errs).length>0){setEmpErrors(errs);showPopup("error","Please fix the errors in the form");setEmpStep(0);return;}
+    if(!validateEmp()){showPopup("error","Please fix the errors in the form");setEmpStep(0);return;}
     addEmployeeApi({
       f_name:empForm.f_name,l_name:empForm.l_name,work_email:empForm.work_email,
       password:empForm.password,gender:empForm.gender,marital_status:empForm.marital_status,
@@ -1695,8 +1930,10 @@ export default function EmployeeTable(){
       role:empForm.role,office_location:empForm.office_location,
       designation:empForm.designation,department:empForm.department,
       Under_manager:empForm.Under_manager||undefined,
-      address:empForm.address||undefined,city:empForm.city||undefined,
-      state:empForm.state||undefined,pincode:empForm.pincode||undefined,
+      address:empForm.address,city:empForm.city,state:empForm.state,pincode:empForm.pincode,country:empForm.country,
+      permanent_address:empForm.permanent_address||undefined,permanent_city:empForm.permanent_city||undefined,
+      permanent_state:empForm.permanent_state||undefined,permanent_pincode:empForm.permanent_pincode||undefined,
+      permanent_country:empForm.permanent_country||undefined,
       aadhaar_number:empForm.aadhaar_number||undefined,pan_number:empForm.pan_number||undefined,
       is_fresher:empForm.is_fresher,
       total_experience:empForm.is_fresher?undefined:empForm.total_experience||undefined,
@@ -1713,9 +1950,21 @@ export default function EmployeeTable(){
     });
   };
 
+  const validateMgr=()=>{
+    const err={
+      ...validateContactInfo(mgrForm),
+      ...validateWorkInfo(mgrForm),
+      ...validateAddressInfo(mgrForm),
+      ...validateIdentityInfo(mgrForm),
+      ...validateExperienceInfo(mgrForm),
+      ...validateBankInfo(mgrForm),
+    };
+    setMgrErrors(err);
+    return Object.keys(err).length===0;
+  };
+
   const handleMgrSubmit=()=>{
-    const errs=validateFormFields(mgrForm,true);
-    if(Object.keys(errs).length>0){setMgrErrors(errs);showPopup("error","Please fix the errors in the form");setMgrStep(0);return;}
+    if(!validateMgr()){showPopup("error","Please fix the errors in the form");setMgrStep(0);return;}
     addManagerApi({
       f_name:mgrForm.f_name,l_name:mgrForm.l_name,work_email:mgrForm.work_email,
       password:mgrForm.password,gender:mgrForm.gender,marital_status:mgrForm.marital_status,
@@ -1723,8 +1972,10 @@ export default function EmployeeTable(){
       role:mgrForm.role,office_location:mgrForm.office_location,
       designation:mgrForm.designation,department:mgrForm.department,
       reporting_manager:mgrForm.reporting_manager||undefined,
-      address:mgrForm.address||undefined,city:mgrForm.city||undefined,
-      state:mgrForm.state||undefined,pincode:mgrForm.pincode||undefined,
+      address:mgrForm.address,city:mgrForm.city,state:mgrForm.state,pincode:mgrForm.pincode,country:mgrForm.country,
+      permanent_address:mgrForm.permanent_address||undefined,permanent_city:mgrForm.permanent_city||undefined,
+      permanent_state:mgrForm.permanent_state||undefined,permanent_pincode:mgrForm.permanent_pincode||undefined,
+      permanent_country:mgrForm.permanent_country||undefined,
       aadhaar_number:mgrForm.aadhaar_number||undefined,pan_number:mgrForm.pan_number||undefined,
       is_fresher:mgrForm.is_fresher,
       total_experience:mgrForm.is_fresher?undefined:mgrForm.total_experience||undefined,
