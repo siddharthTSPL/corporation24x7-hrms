@@ -1994,7 +1994,7 @@ export default function EmployeeTable(){
       pan_card:mgrForm.pan_card||undefined,experience_letter:mgrForm.experience_letter||undefined,
       permissions:mgrPerms,
     },{
-      onSuccess:(res)=>{showPopup("success",res?.message||"Manager added & verification email sent");setOpenManager(false);setMgrForm(EMPTY_MGR);setMgrErrors({});setMgrStep(0);setMgrPerms({...MGR_DEFAULT_PERMISSIONS});refetchList();},
+      onSuccess:(res)=>{showPopup("success",res?.message||"Manager added Successfully & verification email sent");setOpenManager(false);setMgrForm(EMPTY_MGR);setMgrErrors({});setMgrStep(0);setMgrPerms({...MGR_DEFAULT_PERMISSIONS});refetchList();},
       onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Something went wrong"),
     });
   };
