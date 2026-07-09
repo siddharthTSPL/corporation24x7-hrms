@@ -38,6 +38,13 @@ const findAccountByEmail = async (email) => {
 
 const buildLoginToken = async (role, account) => {
   if (role === "superadmin") {
+    // Mirror unifiedLogin: logout sets status to "inactive", so the OTP
+    // path must reactivate the account too, or the very next authenticated
+    // request (e.g. getme) gets rejected by the auth middleware.
+    if (account.status !== "active") {
+      account.status = "active";
+      await account.save();
+    }
     return jwt.sign(
       { superadminid: account._id, role: account.role, email: account.email, company_domain: account.company_domain },
       process.env.JWT_SECRET,
@@ -45,6 +52,9 @@ const buildLoginToken = async (role, account) => {
     );
   }
   if (role === "admin") {
+    if (account.status !== "active") {
+      await AdminModel.findByIdAndUpdate(account._id, { status: "active" });
+    }
     return jwt.sign(
       { adminid: account._id, role: account.role, email: account.work_email, created_by: account.created_by, organisation_id: account.organisation_id },
       process.env.JWT_SECRET,

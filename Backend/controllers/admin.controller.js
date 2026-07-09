@@ -505,7 +505,7 @@ const addmanager = async (req, res, next) => {
     const token = jwt.sign(
       { managerid: newmanager._id, work_email: newmanager.work_email },
       process.env.JWT_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: "7d" }
     );
     const verifyLink = `${process.env.BASE_URL}talent/api/manager/verify/${token}`;
 
@@ -523,7 +523,7 @@ const addmanager = async (req, res, next) => {
       sendEmail({
         to: work_email,
         subject: "Activate Your Manager Account",
-        html: `<div style="font-family:Arial,sans-serif;padding:20px"><h2>Hello ${f_name},</h2><p>Your manager account has been created successfully.</p><p><strong>Employee ID:</strong> ${empid}</p><p><strong>UID:</strong> ${uid}</p><p><strong>Department:</strong> ${department}</p><p><strong>Designation:</strong> ${designation}</p><p><strong>Temporary Password:</strong> ${password}</p><p>Please verify your account by clicking below:</p><a href="${verifyLink}" style="background:#730042;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block;">Verify Account</a><p>This link will expire in 1 hour.</p><p>For security, please log in and change this password immediately after verifying your account.</p><p>Regards,<br/>HR Team</p></div>`,
+        html: `<div style="font-family:Arial,sans-serif;padding:20px"><h2>Hello ${f_name},</h2><p>Your manager account has been created successfully.</p><p><strong>Employee ID:</strong> ${empid}</p><p><strong>UID:</strong> ${uid}</p><p><strong>Department:</strong> ${department}</p><p><strong>Designation:</strong> ${designation}</p><p><strong>Temporary Password:</strong> ${password}</p><p>Please verify your account by clicking below:</p><a href="${verifyLink}" style="background:#730042;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block;">Verify Account</a><p>This link will expire in 7 days.</p><p>For security, please log in and change this password immediately after verifying your account.</p><p>Regards,<br/>HR Team</p></div>`,
       }),
       incrementActiveUserCount(organisation_id),
     ]);
@@ -594,7 +594,7 @@ const addemployee = async (req, res, next) => {
       account_holder_name, account_number, ifsc_code, resume, aadhaar_card, pan_card, experience_letter,
     });
 
-    const token = jwt.sign({ userid: newuser._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    const token = jwt.sign({ userid: newuser._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
     const verifyLink = `${process.env.BASE_URL}talent/api/user/verify/${token}`;
 
     await Promise.all([
