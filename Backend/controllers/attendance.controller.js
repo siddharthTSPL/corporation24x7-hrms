@@ -2,7 +2,7 @@ const Attendance = require("../Models/attendance.model");
 const AdminModel = require("../Models/Admin.model");
 const Shift = require("../Models/shift.model");
 const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
-const { resolveEmployeeShift, evaluateCheckinWindow, getShiftThresholds } = require("../utils/shift.utils");
+const { resolveEmployeeShift, evaluateCheckinWindow, evaluateCheckoutWindow, getShiftThresholds } = require("../utils/shift.utils");
 const { isHoliday, isWeekOff, startOfDay } = require("../automatic/weekoffcalendar");
 
 const getUserId = (user) => user._id || user.id;
@@ -200,15 +200,31 @@ const checkout = async (req, res) => {
       : await resolveEmployeeShift(user, organisation_id);
     const thresholds = getShiftThresholds(shiftDoc);
 
-    attendance.checkOut = new Date();
+    const now = new Date();
+    const checkoutWindow = evaluateCheckoutWindow(shiftDoc, now, attendance.checkIn);
+
+    if (!checkoutWindow.allowed) {
+      return res.status(400).json({
+        message: `You're already checked in for today. Checkout opens in ${checkoutWindow.minutesUntilCheckoutOpens} minute(s).`,
+        reason: "checkin_already_done",
+        minutesUntilCheckoutOpens: checkoutWindow.minutesUntilCheckoutOpens,
+      });
+    }
+
+    attendance.checkOut = now;
     const status = calculateStatus(attendance.activeMinutes, thresholds);
+    const { remark, isOvertime, overtimeMinutes } = checkoutWindow;
     attendance.status = status;
+    attendance.checkoutRemark = remark;
+    attendance.overtimeMinutes = isOvertime ? overtimeMinutes : 0;
     await attendance.save();
     await updateSummary(attendance);
 
     res.json({
       message: "Checkout successful",
       status,
+      checkoutRemark: remark,
+      overtimeMinutes: attendance.overtimeMinutes,
       activeMinutes: displayMinutes(attendance.activeMinutes),
       idleMinutes: displayMinutes(attendance.idleMinutes),
     });

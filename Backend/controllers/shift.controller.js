@@ -33,6 +33,7 @@ const createShift = async (req, res) => {
       endTime,
       graceMinutes,
       earlyBufferMinutes,
+      minMinutesBeforeCheckout,
       absentBelowMinutes,
       halfDayBelowMinutes,
     } = req.body;
@@ -47,6 +48,7 @@ const createShift = async (req, res) => {
       endTime,
       graceMinutes,
       earlyBufferMinutes,
+      minMinutesBeforeCheckout,
       absentBelowMinutes,
       halfDayBelowMinutes,
     });

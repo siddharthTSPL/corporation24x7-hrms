@@ -27,18 +27,46 @@ const RESULT_STYLES = {
   checkout_early: { bg: "bg-amber-50", border: "border-amber-300", text: "text-amber-800", icon: "⚠️" },
   blocked: { bg: "bg-red-50", border: "border-red-300", text: "text-red-800", icon: "⛔" },
   not_registered: { bg: "bg-gray-100", border: "border-gray-300", text: "text-gray-700", icon: "🙈" },
+  checkin_already_done: { bg: "bg-blue-50", border: "border-blue-300", text: "text-blue-800", icon: "🕒" },
+  attendance_completed: { bg: "bg-gray-100", border: "border-gray-300", text: "text-gray-700", icon: "✅" },
   already_done: { bg: "bg-gray-100", border: "border-gray-300", text: "text-gray-700", icon: "ℹ️" },
   error: { bg: "bg-red-50", border: "border-red-300", text: "text-red-800", icon: "⚠️" },
 };
+
+const minutesToLabel = (mins) => {
+  const m = Math.round(mins);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem ? `${h}h ${rem}m` : `${h}h`;
+};
+
+// Builds the small secondary line shown under the main result message —
+// shift time range, plus late/overtime minutes when relevant.
+function buildSubDetail(data) {
+  if (data?.reason === "checkin_already_done" && data?.minutesUntilCheckoutOpens) {
+    return `Checkout opens in ${data.minutesUntilCheckoutOpens} minute(s)`;
+  }
+  if (!data?.shift?.startTime || !data?.shift?.endTime) return "";
+  const range = `Shift ${data.shift.startTime} – ${data.shift.endTime}`;
+
+  if (data.action === "checkin" && data.isLate && data.lateMinutes > 0)
+    return `${range} · Late by ${minutesToLabel(data.lateMinutes)}`;
+
+  if (data.action === "checkout" && data.checkoutRemark === "overtime" && data.overtimeMinutes > 0)
+    return `${range} · Overtime of ${minutesToLabel(data.overtimeMinutes)}`;
+
+  return range;
+}
 
 function classifyResult(data, err) {
   if (err) {
     if (err.reason === "not_registered")
       return { kind: "not_registered", title: "Not registered", detail: "This face isn't registered yet. Please ask your admin to register you first, then try again." };
     if (err.reason === "shift_not_started")
-      return { kind: "blocked", title: "Not allowed", detail: err.message };
+      return { kind: "blocked", title: "Not allowed", detail: err.message, subDetail: buildSubDetail(err) };
     if (err.status === 400)
-      return { kind: "already_done", title: "Already done", detail: err.message };
+      return { kind: "already_done", title: "Already done", detail: err.message, subDetail: buildSubDetail(err) };
     return { kind: "error", title: "Scan failed", detail: err.message };
   }
   if (data.action === "checkin") {
@@ -46,6 +74,7 @@ function classifyResult(data, err) {
       kind: data.isLate ? "checkin_late" : "checkin_on_time",
       title: data.employeeName ? `Welcome, ${data.employeeName}` : "Checked in",
       detail: data.message,
+      subDetail: buildSubDetail(data),
     };
   }
   if (data.action === "checkout") {
@@ -57,6 +86,7 @@ function classifyResult(data, err) {
       kind,
       title: data.employeeName ? `Bye, ${data.employeeName}` : "Checked out",
       detail: data.message,
+      subDetail: buildSubDetail(data),
     };
   }
   return { kind: "error", title: "Unrecognised response", detail: data.message || "" };
@@ -70,11 +100,11 @@ export default function FaceKiosk() {
 
   const [stage, setStage] = useState("checking"); // checking | login | ready | scanning
   const [kioskInfo, setKioskInfo] = useState(null);
-  const [loginForm, setLoginForm] = useState({ work_email: "", password: "", device_name: "" });
+  const [loginForm, setLoginForm] = useState({ organisation_id: "", password: "", device_name: "" });
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
 
-  const [result, setResult] = useState(null); // { kind, title, detail }
+  const [result, setResult] = useState(null); // { kind, title, detail, subDetail }
   const [recentScans, setRecentScans] = useState([]);
   const [cameraError, setCameraError] = useState("");
 
@@ -198,7 +228,7 @@ export default function FaceKiosk() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoginError("");
-    if (!loginForm.work_email || !loginForm.password || !loginForm.device_name) {
+    if (!loginForm.organisation_id || !loginForm.password || !loginForm.device_name) {
       setLoginError("All fields are required.");
       return;
     }
@@ -245,13 +275,13 @@ export default function FaceKiosk() {
           </div>
 
           <label className="text-sm font-semibold text-gray-700">
-            Admin work email (organisation login)
+            Organisation ID
             <input
-              type="email"
+              type="text"
               className="mt-1 w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E]/30"
-              value={loginForm.work_email}
-              onChange={(e) => setLoginForm((f) => ({ ...f, work_email: e.target.value }))}
-              placeholder="admin@yourcompany.com"
+              value={loginForm.organisation_id}
+              onChange={(e) => setLoginForm((f) => ({ ...f, organisation_id: e.target.value }))}
+              placeholder="e.g. TECHTORCH01"
               autoComplete="username"
             />
           </label>
@@ -339,6 +369,9 @@ export default function FaceKiosk() {
               {RESULT_STYLES[result.kind]?.icon} {result.title}
             </p>
             <p className={`text-sm mt-1 ${RESULT_STYLES[result.kind]?.text}`}>{result.detail}</p>
+            {result.subDetail && (
+              <p className={`text-xs mt-1 opacity-75 ${RESULT_STYLES[result.kind]?.text}`}>{result.subDetail}</p>
+            )}
           </div>
         )}
 

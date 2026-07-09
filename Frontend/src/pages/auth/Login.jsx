@@ -3,24 +3,13 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Player } from "@lottiefiles/react-lottie-player";
-import { useLogin } from "../../auth/store/getmeauth/getmeauth";
-import {
-  useSendForgetPasswordOtp,
-  useVerifyAdminOtp,
-} from "../../auth/server-state/adminauth/adminauth.hook";
-import {
-  useForgotPasswordSuperAdmin,
-  useVerifySuperAdminOtp,
-} from "../../auth/server-state/superadmin/other/suother.hook";
-import {
-  useForgetPasswordManager,
-  useVerifyManagerOtpApi,
-} from "../../auth/server-state/manager/managgerother/managerother.hook";
-import {
-  useForgetPassword,
-  useVerifyOtp,
-} from "../../auth/server-state/employee/employeeauth/employeeauth.hook";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
+import {
+  useUnifiedLogin,
+  useUnifiedSendForgotPasswordOtp,
+  useUnifiedVerifyForgotPasswordOtp,
+  useUnifiedResetPassword,
+} from "../../auth/store/unifiedauth/unifiedauth.hook";
 import slide1 from "../../assets/slide1.png";
 import slide2 from "../../assets/slide2.png";
 import slide3 from "../../assets/slide3.png";
@@ -31,6 +20,17 @@ import { getMeUser } from "../../auth/api/employeeapi/auth/em.auth.api";
 import { getMeSuperAdmin } from "../../auth/api/superadmin/auth/su.auth";
 import { fetchMyPermissions } from "../../auth/api/permission/permission.api";
 import { usePermissionStore } from "../../auth/store/permission/permissionStore";
+
+// Prefer the backend's explicit account-type bucket (superadmin/admin/manager/employee).
+// Falls back to normalizing the raw role string for older responses that don't send accountType.
+const normalizeRole = (data) => {
+  if (data?.accountType) return data.accountType;
+  const role = data?.role;
+  if (role === "super_admin") return "superadmin";
+  if (role === "senior_admin" || role === "official") return "admin";
+  if (role === "senior_manager") return "manager";
+  return role;
+};
 
 async function fetchFullProfile(role) {
   if (role === "admin") return getMeAdmin();
@@ -44,21 +44,14 @@ function Login() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: authData, isLoading: authLoading } = useAuth();
-  const { mutate: loginFn, isPending: isLoggingIn } = useLogin();
 
-  const { mutate: sendAdminOtpFn, isPending: sendingAdminOtp } = useSendForgetPasswordOtp();
-  const { mutate: verifyAdminOtpFn, isPending: verifyingAdminOtp } = useVerifyAdminOtp();
+  const { mutate: loginFn, isPending: isLoggingIn } = useUnifiedLogin();
+  const { mutate: sendOtpFn, isPending: isSendingOtp } = useUnifiedSendForgotPasswordOtp();
+  const { mutate: verifyOtpFn, isPending: isVerifyingOtp } = useUnifiedVerifyForgotPasswordOtp();
+  const { mutate: resetPasswordFn, isPending: isResettingPassword } = useUnifiedResetPassword();
 
-  const { mutate: sendSuperAdminOtpFn, isPending: sendingSuperAdminOtp } = useForgotPasswordSuperAdmin();
-  const { mutate: verifySuperAdminOtpFn, isPending: verifyingSuperAdminOtp } = useVerifySuperAdminOtp();
-
-  const { mutate: sendManagerOtpFn, isPending: sendingManagerOtp } = useForgetPasswordManager();
-  const { mutate: verifyManagerOtpFn, isPending: verifyingManagerOtp } = useVerifyManagerOtpApi();
-
-  const { mutate: sendEmployeeOtpFn, isPending: sendingEmployeeOtp } = useForgetPassword();
-  const { mutate: verifyEmployeeOtpFn, isPending: verifyingEmployeeOtp } = useVerifyOtp();
-
-  const [form, setForm] = useState({ email: "", password: "", otp: "", role: "admin" });
+  const [form, setForm] = useState({ email: "", password: "", otp: "", newPassword: "", confirmPassword: "" });
+  const [verifiedAuthPayload, setVerifiedAuthPayload] = useState(null);
   const [errors, setErrors] = useState({});
   const [step, setStep] = useState("login");
   const [showPassword, setShowPassword] = useState(false);
@@ -115,8 +108,8 @@ function Login() {
       const authPayload = { role, data: fullData ?? fallbackData };
       queryClient.setQueryData(["auth"], authPayload);
       try {
-        const permissions = await fetchMyPermissions();
-        usePermissionStore.getState().setPermissions(permissions);
+        const permissions = await fetchMyPermissions(role);
+        usePermissionStore.getState().setPermissions(role, permissions);
       } catch (_) {}
       return authPayload;
     } catch {
@@ -130,53 +123,43 @@ function Login() {
     if (!validate()) return;
     setShowLoader(true);
 
-    const payload =
-      form.role === "manager"
-        ? { role: form.role, work_email: form.email, password: form.password }
-        : { role: form.role, identifier: form.email, password: form.password };
-
-    loginFn(payload, {
-      onSuccess: async (data) => {
-        if (data?.token) {
-          try {
-            await fetch("http://localhost:47821/set-token", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ token: data.token }),
-            });
-          } catch (_) {}
-        }
-        await syncProfileToCache(form.role, data);
-        setShowLoader(false);
-        navigateByRole(form.role);
-      },
-      onError: (err) => {
-        setShowLoader(false);
-        setErrors({ general: getErrorMessage(err) });
-      },
-    });
+    loginFn(
+      { email: form.email, password: form.password },
+      {
+        onSuccess: (data) => finishPostAuth(data),
+        onError: (err) => {
+          setShowLoader(false);
+          setErrors({ general: getErrorMessage(err) });
+        },
+      }
+    );
   };
-
-  const isSendingOtp = sendingAdminOtp || sendingSuperAdminOtp || sendingManagerOtp || sendingEmployeeOtp;
-  const isVerifyingOtp = verifyingAdminOtp || verifyingSuperAdminOtp || verifyingManagerOtp || verifyingEmployeeOtp;
 
   const handleSendOtp = () => {
     if (!form.email) {
       setErrors({ email: "Email is required" });
       return;
     }
-    const onSuccess = () => setStep("otp");
-    const onError = (err) => setErrors({ email: getErrorMessage(err) });
+    sendOtpFn(form.email, {
+      onSuccess: () => setStep("otp"),
+      onError: (err) => setErrors({ email: getErrorMessage(err) }),
+    });
+  };
 
-    if (form.role === "admin") {
-      sendAdminOtpFn(form.email, { onSuccess, onError });
-    } else if (form.role === "superadmin") {
-      sendSuperAdminOtpFn({ email: form.email }, { onSuccess, onError });
-    } else if (form.role === "manager") {
-      sendManagerOtpFn({ work_email: form.email }, { onSuccess, onError });
-    } else if (form.role === "employee") {
-      sendEmployeeOtpFn({ work_email: form.email }, { onSuccess, onError });
+  const finishPostAuth = async (data) => {
+    const role = normalizeRole(data);
+    if (data?.token) {
+      try {
+        await fetch("http://localhost:47821/set-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: data.token }),
+        });
+      } catch (_) {}
     }
+    await syncProfileToCache(role, data);
+    setShowLoader(false);
+    navigateByRole(role);
   };
 
   const handleVerifyOtp = () => {
@@ -185,36 +168,54 @@ function Login() {
       return;
     }
 
-    const onError = (err) => setErrors({ otp: getErrorMessage(err) });
-
-    const onSuccess = async (data) => {
-      const rawRole = data?.role ?? form.role;
-      const role = rawRole === "super_admin" ? "superadmin" : rawRole;
-
-      if (data?.token) {
-        try {
-          await fetch("http://localhost:47821/set-token", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token: data.token }),
-          });
-        } catch (_) {}
+    verifyOtpFn(
+      { email: form.email, otp: form.otp },
+      {
+        onSuccess: (data) => {
+          // OTP is verified and the server already logged the account in
+          // (token cookie set) — it also issued a resetToken cookie so the
+          // person can optionally set a brand new password here.
+          setVerifiedAuthPayload(data);
+          setErrors({});
+          setStep("reset");
+        },
+        onError: (err) => setErrors({ otp: getErrorMessage(err) }),
       }
+    );
+  };
 
-      await syncProfileToCache(role, data);
-      setShowLoader(false);
-      navigateByRole(role);
-    };
-
-    if (form.role === "admin") {
-      verifyAdminOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
-    } else if (form.role === "superadmin") {
-      verifySuperAdminOtpFn({ email: form.email, otp: form.otp }, { onSuccess, onError });
-    } else if (form.role === "manager") {
-      verifyManagerOtpFn({ work_email: form.email, otp: form.otp }, { onSuccess, onError });
-    } else if (form.role === "employee") {
-      verifyEmployeeOtpFn({ work_email: form.email, otp: form.otp }, { onSuccess, onError });
+  const handleSetNewPassword = () => {
+    if (!form.newPassword || !form.confirmPassword) {
+      setErrors({ newPassword: "Both password fields are required" });
+      return;
     }
+    if (form.newPassword !== form.confirmPassword) {
+      setErrors({ newPassword: "Passwords do not match" });
+      return;
+    }
+    if (form.newPassword.length < 8) {
+      setErrors({ newPassword: "Password must be at least 8 characters" });
+      return;
+    }
+
+    setShowLoader(true);
+    resetPasswordFn(
+      { newPassword: form.newPassword, confirmPassword: form.confirmPassword },
+      {
+        onSuccess: async () => {
+          await finishPostAuth(verifiedAuthPayload);
+        },
+        onError: (err) => {
+          setShowLoader(false);
+          setErrors({ newPassword: getErrorMessage(err) });
+        },
+      }
+    );
+  };
+
+  const handleSkipPasswordReset = async () => {
+    setShowLoader(true);
+    await finishPostAuth(verifiedAuthPayload);
   };
 
   return (
@@ -237,27 +238,6 @@ function Login() {
               <>
                 <h2 className="text-2xl font-bold text-[#730042] mb-1">Sign in</h2>
                 <p className="text-gray-500 text-sm mb-4">Access your Talent account</p>
-
-                <select
-                  name="role"
-                  value={form.role}
-                  onChange={handleChange}
-                  className="w-full mb-3 p-3 border rounded-lg bg-white text-gray-700"
-                >
-                  <option value="superadmin">Super Admin</option>
-                  <option value="admin">Admin</option>
-                  <option value="manager">Manager</option>
-                  <option value="employee">Employee</option>
-                </select>
-
-                {form.role === "superadmin" && (
-                  <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-[#730042]/8 border border-[#730042]/20 rounded-lg">
-                    <span className="text-sm">🛡️</span>
-                    <p className="text-xs text-[#730042] font-medium">
-                      Super Admin — use your company work email
-                    </p>
-                  </div>
-                )}
 
                 {errors.general && (
                   <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -312,6 +292,24 @@ function Login() {
                     Sign Up
                   </p>
                 </div>
+
+                <div className="flex items-center gap-3 my-4">
+                  <div className="h-px flex-1 bg-gray-200" />
+                  <span className="text-xs text-gray-400 font-medium">OR</span>
+                  <div className="h-px flex-1 bg-gray-200" />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => navigate("/live-attendance")}
+                  className="w-full flex items-center justify-center gap-2 border-2 border-[#730042]/20 text-[#730042] font-semibold py-3 rounded-lg hover:bg-[#730042]/5 transition"
+                >
+                  <span>🪪</span>
+                  Live Attendance (Face Check-in)
+                </button>
+                <p className="text-xs text-gray-400 text-center mt-2">
+                  For office kiosk/tablet devices — employees check in/out with their face, no password needed.
+                </p>
               </>
             )}
 
@@ -367,6 +365,45 @@ function Login() {
                   className="text-sm text-gray-500 mt-3 cursor-pointer hover:text-[#730042]"
                 >
                   ← Back to login
+                </p>
+              </>
+            )}
+
+            {step === "reset" && (
+              <>
+                <h2 className="text-xl font-bold text-[#730042] mb-1">Set a New Password</h2>
+                <p className="text-gray-500 text-sm mb-4">
+                  Optional — you're already signed in. Set a new password now, or skip and do it later.
+                </p>
+                <input
+                  type="password"
+                  name="newPassword"
+                  placeholder="New password"
+                  value={form.newPassword}
+                  onChange={handleChange}
+                  className="w-full mb-1 p-3 border rounded-lg"
+                />
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  placeholder="Confirm new password"
+                  value={form.confirmPassword}
+                  onChange={handleChange}
+                  className="w-full mt-2 mb-1 p-3 border rounded-lg"
+                />
+                {errors.newPassword && <p className="text-red-500 text-sm mb-2">{errors.newPassword}</p>}
+                <button
+                  onClick={handleSetNewPassword}
+                  disabled={isResettingPassword}
+                  className="w-full bg-[#730042] text-white py-3 rounded-lg mt-3 disabled:opacity-60"
+                >
+                  {isResettingPassword ? "Updating..." : "Set New Password"}
+                </button>
+                <p
+                  onClick={handleSkipPasswordReset}
+                  className="text-sm text-gray-500 mt-3 cursor-pointer hover:text-[#730042] text-center"
+                >
+                  Skip for now, continue to dashboard →
                 </p>
               </>
             )}

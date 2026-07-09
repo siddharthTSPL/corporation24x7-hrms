@@ -64,6 +64,7 @@ const kioskrouter = require('../routes/kiosk.routes');
 const faceattendancerouter = require('../routes/faceattendance.routes');
 const shiftrouter = require('../routes/shift.routes');
 const holidaypolicyrouter = require('../routes/holidaypolicy.route');
+const unifiedauthrouter = require('../routes/Unified.auth.route');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 // DEBUG — remove after fix
@@ -82,6 +83,7 @@ const routes = {
   faceattendancerouter,
   shiftrouter,
   holidaypolicyrouter,
+  unifiedauthrouter,
 };
 Object.entries(routes).forEach(([name, r]) => {
   if (!r) console.error(`❌ UNDEFINED: ${name}`);
@@ -89,6 +91,7 @@ Object.entries(routes).forEach(([name, r]) => {
   else console.log(`✅ ${name} loaded`);
 });
 
+app.use('/auth', unifiedauthrouter);
 app.use('/admin', adminrouter);
 app.use('/manager', managerrouter);
 app.use('/user', userrouter);

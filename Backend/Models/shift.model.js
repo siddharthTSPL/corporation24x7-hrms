@@ -34,6 +34,11 @@ const shiftSchema = new mongoose.Schema(
       type: Number,
       default: 60,
     },
+    // minutes AFTER checkin before a checkout scan is accepted
+    minMinutesBeforeCheckout: {
+      type: Number,
+      default: 10,
+    },
     // activeMinutes below this -> absent
     absentBelowMinutes: {
       type: Number,

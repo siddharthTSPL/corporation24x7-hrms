@@ -3,6 +3,12 @@ const bcrypt = require("bcrypt");
 
 const managerSchema = new mongoose.Schema(
   {
+    empid:{
+      type: String,
+      required: true,
+      unique: true,
+  },
+
     organisation_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SuperAdmin",
@@ -54,6 +60,7 @@ const managerSchema = new mongoose.Schema(
     city: { type: String },
     state: { type: String },
     pincode: { type: String },
+    country: { type: String },
 
     role: {
       type: String,
@@ -65,13 +72,19 @@ const managerSchema = new mongoose.Schema(
 
     office_location: {
       type: String,
-      enum: ["Noida", "Bareilly", "Delhi", "Mumbai"],
       required: true,
+      trim: true,
+      validate: {
+        validator: function (value) {
+          return typeof value === "string" && value.trim().length > 0 && value.length <= 100;
+        },
+        message: "Office location must be a valid, non-empty location name (max 100 characters)",
+      },
     },
      shift: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Shift",
-      default: null, // null = falls back to org's default shift
+      default: null,
     },
 
     reporting_manager: {
@@ -122,6 +135,7 @@ managerSchema.index({ department: 1, status: 1 });
 managerSchema.index({ status: 1 });
 managerSchema.index({ reporting_manager: 1 });
 managerSchema.index({ organisation_id: 1 });
+managerSchema.index({ office_location: 1 });
 
 managerSchema.pre("save", async function () {
   if (this.isModified("password")) {

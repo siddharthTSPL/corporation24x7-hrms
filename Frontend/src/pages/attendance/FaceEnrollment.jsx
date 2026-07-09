@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { useGetAllEmployee } from "../../auth/server-state/adminother/adminother.hook";
+import {
+  useGetAllEmployee,
+  useGetAllAdmins,
+} from "../../auth/server-state/adminother/adminother.hook";
 import {
   useEnrolledFaces,
   useEnrollFace,
@@ -8,10 +11,6 @@ import {
 
 const MAROON = "#7B1C3E";
 
-// Small self-contained webcam capture modal — captures a still frame and
-// hands back a JPEG Blob (not base64) since the enroll endpoint takes a
-// real file upload (multipart), unlike the kiosk scan endpoint which
-// takes base64 JSON.
 function CaptureModal({ onCapture, onCancel }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -113,20 +112,25 @@ function CaptureModal({ onCapture, onCancel }) {
 
 export default function FaceEnrollment() {
   const { data: employeeData, isLoading: employeesLoading } = useGetAllEmployee();
+  const { data: adminData, isLoading: adminsLoading, error: adminsError } = useGetAllAdmins();
   const { data: faceData, isLoading: facesLoading } = useEnrolledFaces();
   const enrollMutation = useEnrollFace();
   const removeMutation = useRemoveFace();
 
   const [search, setSearch] = useState("");
-  const [captureTarget, setCaptureTarget] = useState(null); // employee being enrolled
+  const [captureTarget, setCaptureTarget] = useState(null);
   const [toast, setToast] = useState(null);
 
-  const employees = employeeData?.users || [];
+  const employees = useMemo(
+    () => [...(employeeData?.users || []), ...(adminData?.admins || [])],
+    [employeeData, adminData]
+  );
+
   const enrolledIds = useMemo(
     () => new Set((faceData?.profiles || []).map((p) => String(p.employee))),
     [faceData]
   );
-  const loading = employeesLoading || facesLoading;
+  const loading = employeesLoading || facesLoading || adminsLoading;
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -139,6 +143,8 @@ export default function FaceEnrollment() {
   const roleInfo = (emp) =>
     emp.type === "manager"
       ? { onModel: "Manager", role: "manager" }
+      : emp.type === "admin"
+      ? { onModel: "Admin", role: "admin" }
       : { onModel: "User", role: "employee" };
 
   const handleCaptured = (blob) => {
@@ -172,6 +178,12 @@ export default function FaceEnrollment() {
         photo is converted into a numeric face fingerprint that the kiosk compares live scans against.
         Anyone not registered will see "not registered" at the kiosk instead of being checked in.
       </p>
+
+      {adminsError && (
+        <div className="mb-4 rounded-xl px-4 py-2.5 text-sm bg-yellow-50 text-yellow-700 border border-yellow-200">
+          Could not load admins for this org — showing employees and managers only.
+        </div>
+      )}
 
       <input
         value={search}

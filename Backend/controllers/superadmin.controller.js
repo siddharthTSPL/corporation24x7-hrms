@@ -24,6 +24,7 @@ const OtpModel = require("../Models/otpbasedlogin.model");
 const AdminLeave = require("../Models/adleave.model");
 const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = require("../utils/licenseCheck");
 const AssetModel = require("../Models/asset.model");
+const { isEmailTaken , isEmpidTaken} = require("../utils/emailAvailability.utils");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
@@ -199,6 +200,14 @@ const registerSuperAdmin = async (req, res, next) => {
     }
 
     await SuperAdminModel.checkDomainAvailable(email);
+
+    const emailCheck = await isEmailTaken(email);
+    if (emailCheck.taken)
+      return next(
+        Object.assign(new Error("An account with this email already exists"), {
+          statusCode: 400,
+        }),
+      );
 
     const superAdmin = await SuperAdminModel.create({
       f_name,
@@ -822,7 +831,7 @@ const createAdmin = async (req, res, next) => {
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
     const {
-      f_name, l_name, work_email, password, gender, designation, department,
+      empid, f_name, l_name, work_email, password, gender, designation, department,
       office_location, personal_contact, e_contact, role, marital_status,
       is_fresher, total_experience, previous_company, previous_designation,
       aadhaar_number, pan_number, address, city, state, pincode,
@@ -830,21 +839,27 @@ const createAdmin = async (req, res, next) => {
       account_holder_name, account_number, ifsc_code, country, permissions,
     } = req.body;
 
-    if (!f_name || !l_name || !work_email || !password || !gender || !designation ||
+    if (!empid || !f_name || !l_name || !work_email || !password || !gender || !designation ||
         !department || !office_location || !personal_contact || !e_contact)
       return next(Object.assign(
-        new Error("f_name, l_name, work_email, password, gender, designation, department, office_location, personal_contact and e_contact are required"),
+        new Error("empid, f_name, l_name, work_email, password, gender, designation, department, office_location, personal_contact and e_contact are required"),
         { statusCode: 400 }
       ));
 
     const email = work_email.toLowerCase().trim();
     const organisation_id = req.superAdmin._id;
 
-    const existing = await AdminModel.findOne({ work_email: email, organisation_id })
-      .select("_id").lean();
-    if (existing)
+    const emailCheck = await isEmailTaken(email);
+    if (emailCheck.taken)
       return next(Object.assign(
-        new Error("An admin with this email already exists in your organization"),
+        new Error("An account with this email already exists"),
+        { statusCode: 400 }
+      ));
+
+    const empidTaken = await isEmpidTaken(empid);
+    if (empidTaken)
+      return next(Object.assign(
+        new Error("This Employee ID is already in use"),
         { statusCode: 400 }
       ));
 
@@ -865,12 +880,13 @@ const createAdmin = async (req, res, next) => {
     }
 
     if (!resolvedReportingManager || !resolvedReportingManagerModel) {
-      resolvedReportingManager = undefined;
-      resolvedReportingManagerModel = undefined;
+      // Default to the SuperAdmin as the reporting manager when none is provided
+      resolvedReportingManager = organisation_id;
+      resolvedReportingManagerModel = "SuperAdmin";
     }
 
     const admin = await AdminModel.create({
-      organisation_id, uid, f_name, l_name, work_email: email, password, gender,
+      organisation_id, empid, uid, f_name, l_name, work_email: email, password, gender,
       designation, department, office_location, personal_contact, e_contact,
       role: role || "admin",
       marital_status: marital_status || "single",
@@ -898,7 +914,7 @@ const createAdmin = async (req, res, next) => {
 
     await assignDefaultLeave({ ...admin.toObject(), role: "admin" });
 
-    const verifyToken = jwt.sign({ adminid: admin._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    const verifyToken = jwt.sign({ adminid: admin._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
     const verifyLink = `${process.env.BASE_URL}/talent/api/admin/verify/${verifyToken}`;
 
     await sendEmail({
@@ -932,12 +948,14 @@ Your admin account is now ready. Please verify your email address to activate yo
 </p>
 <table width="100%" cellpadding="0" cellspacing="0"
 style="margin:30px 0;background:#F9F8F2;border-radius:10px;padding:20px;">
+<tr><td style="padding:8px 0;"><strong>Employee ID:</strong> ${empid}</td></tr>
 <tr><td style="padding:8px 0;"><strong>UID:</strong> ${uid}</td></tr>
 <tr><td style="padding:8px 0;"><strong>Role:</strong> ${role || "Admin"}</td></tr>
 <tr><td style="padding:8px 0;"><strong>Designation:</strong> ${designation}</td></tr>
 <tr><td style="padding:8px 0;"><strong>Department:</strong> ${department}</td></tr>
 <tr><td style="padding:8px 0;"><strong>Office Location:</strong> ${office_location}</td></tr>
 <tr><td style="padding:8px 0;"><strong>Email:</strong> ${email}</td></tr>
+<tr><td style="padding:8px 0;"><strong>Temporary Password:</strong> ${password}</td></tr>
 <tr><td style="padding:8px 0;"><strong>Default Leave Balance:</strong> Assigned Successfully</td></tr>
 </table>
 <div style="text-align:center;margin:40px 0;">
@@ -946,7 +964,8 @@ style="background:#CD166E;color:#ffffff;padding:15px 35px;text-decoration:none;b
 Verify &amp; Activate Account
 </a>
 </div>
-<p style="font-size:14px;color:#666;line-height:1.7;">This verification link will expire in <strong>1 hour</strong>.</p>
+<p style="font-size:14px;color:#666;line-height:1.7;">This verification link will expire in <strong>7 days</strong>.</p>
+<p style="font-size:14px;color:#666;line-height:1.7;">For security, please log in and change this password immediately after verifying your account.</p>
 <p style="font-size:14px;color:#666;line-height:1.7;">If the button above does not work, copy and paste the following link into your browser:</p>
 <p style="word-break:break-all;font-size:13px;color:#CD166E;background:#F9F8F2;padding:12px;border-radius:6px;">${verifyLink}</p>
 </td>
@@ -970,7 +989,7 @@ Verify &amp; Activate Account
       success: true,
       message: "Admin created successfully. Verification email sent.",
       admin: {
-        id: admin._id, uid: admin.uid, f_name: admin.f_name, l_name: admin.l_name,
+        id: admin._id, empid: admin.empid, uid: admin.uid, f_name: admin.f_name, l_name: admin.l_name,
         work_email: admin.work_email, designation: admin.designation,
         department: admin.department, office_location: admin.office_location,
         role: admin.role, status: admin.status,
@@ -980,7 +999,7 @@ Verify &amp; Activate Account
     next(error);
   }
 };
- 
+
 const addmanager = async (req, res, next) => {
   try {
     if (!req.superAdmin)
@@ -998,12 +1017,10 @@ const addmanager = async (req, res, next) => {
  
     const organisation_id = req.superAdmin._id;
  
-    const existingManager = await Managermodel.findOne({
-      work_email: work_email.toLowerCase().trim(), organisation_id,
-    }).select("_id").lean();
-    if (existingManager)
+    const emailCheck = await isEmailTaken(work_email);
+    if (emailCheck.taken)
       return next(Object.assign(
-        new Error("Manager with this email already exists in your organization"),
+        new Error("An account with this email already exists"),
         { statusCode: 400 }
       ));
  
@@ -1022,7 +1039,7 @@ const addmanager = async (req, res, next) => {
  
     await incrementActiveUserCount(organisation_id);
  
-    const token = jwt.sign({ managerid: newmanager._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    const token = jwt.sign({ managerid: newmanager._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
     const verifyLink = `${process.env.BASE_URL}talent/api/manager/verify/${token}`;
  
     await Promise.all([
@@ -1031,7 +1048,7 @@ const addmanager = async (req, res, next) => {
       sendEmail({
         to: work_email,
         subject: "Activate Your Manager Account",
-        html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F9F8F2;font-family:Segoe UI,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center"><table width="600" style="background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.08);"><tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h1 style="margin:0;">Manager Onboarding</h1></td></tr><tr><td style="padding:40px;color:#333;"><h2 style="color:#730042;">Hi ${f_name},</h2><p>Your <strong>Manager Account</strong> has been successfully created.</p><div style="background:#F9F8F2;padding:15px;border-radius:8px;margin:20px 0;"><p style="margin:0;"><strong>Role:</strong> ${designation}</p><p style="margin:5px 0;"><strong>Department:</strong> ${department}</p><p style="margin:0;"><strong>Location:</strong> ${office_location}</p></div><div style="text-align:center;margin:30px 0;"><a href="${verifyLink}" style="background:#CD166E;color:white;padding:14px 30px;text-decoration:none;border-radius:8px;font-weight:600;display:inline-block;">Verify & Activate</a></div><p style="font-size:13px;color:#777;">Or copy: <span style="color:#CD166E;">${verifyLink}</span></p><p style="font-size:13px;color:#777;">Link expires in 1 hour.</p></td></tr><tr><td style="background:#F9F8F2;padding:20px;text-align:center;font-size:12px;color:#888;">© 2026 Your Company</td></tr></table></td></tr></table></body></html>`,
+        html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F9F8F2;font-family:Segoe UI,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center"><table width="600" style="background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.08);"><tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h1 style="margin:0;">Manager Onboarding</h1></td></tr><tr><td style="padding:40px;color:#333;"><h2 style="color:#730042;">Hi ${f_name},</h2><p>Your <strong>Manager Account</strong> has been successfully created.</p><div style="background:#F9F8F2;padding:15px;border-radius:8px;margin:20px 0;"><p style="margin:0;"><strong>Role:</strong> ${designation}</p><p style="margin:5px 0;"><strong>Department:</strong> ${department}</p><p style="margin:0;"><strong>Location:</strong> ${office_location}</p></div><div style="text-align:center;margin:30px 0;"><a href="${verifyLink}" style="background:#CD166E;color:white;padding:14px 30px;text-decoration:none;border-radius:8px;font-weight:600;display:inline-block;">Verify & Activate</a></div><p style="font-size:13px;color:#777;">Or copy: <span style="color:#CD166E;">${verifyLink}</span></p><p style="font-size:13px;color:#777;">Link expires in 7 days.</p></td></tr><tr><td style="background:#F9F8F2;padding:20px;text-align:center;font-size:12px;color:#888;">© 2026 Your Company</td></tr></table></td></tr></table></body></html>`,
       }),
     ]);
  
@@ -1147,12 +1164,10 @@ const addemployee = async (req, res, next) => {
  
     const organisation_id = req.superAdmin._id;
  
-    const existingUser = await Usermodel.findOne({
-      work_email: work_email.toLowerCase().trim(), organisation_id,
-    }).select("_id").lean();
-    if (existingUser)
+    const emailCheck = await isEmailTaken(work_email);
+    if (emailCheck.taken)
       return next(Object.assign(
-        new Error("Employee with this email already exists in your organization"),
+        new Error("An account with this email already exists"),
         { statusCode: 400 }
       ));
  
@@ -1172,7 +1187,7 @@ const addemployee = async (req, res, next) => {
  
     await incrementActiveUserCount(organisation_id);
  
-    const token = jwt.sign({ userid: newuser._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    const token = jwt.sign({ userid: newuser._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
     const verifyLink = `${process.env.BASE_URL}talent/api/user/verify/${token}`;
  
     await Promise.all([

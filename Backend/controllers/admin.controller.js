@@ -27,6 +27,7 @@ const AttendanceSummary = require("../Models/attendancesummary.model");
 const WFH = require("../Models/wfh.model");
 const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = require("../utils/licenseCheck");
 const AssetModel = require("../Models/asset.model");
+const { isEmailTaken, isEmpidTaken } = require("../utils/emailAvailability.utils");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
@@ -453,16 +454,16 @@ const addmanager = async (req, res, next) => {
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
     const {
-      profile_image, f_name, l_name, work_email, gender, marital_status, password,
+      empid, profile_image, f_name, l_name, work_email, gender, marital_status, password,
       personal_contact, e_contact, aadhaar_number, pan_number, address, city, state,
-      pincode, role, office_location, designation, department, reporting_manager,
+      pincode, country, role, office_location, designation, department, reporting_manager,
       is_fresher, total_experience, previous_company, previous_designation, bank_name,
       account_holder_name, account_number, ifsc_code, resume, aadhaar_card, pan_card,
       experience_letter, permissions,
     } = req.body;
 
-    if (!f_name || !l_name || !work_email || !password || !department || !designation || !office_location || !gender || !personal_contact || !e_contact)
-      return next(Object.assign(new Error("Required fields missing"), { statusCode: 400 }));
+    if (!empid || !f_name || !l_name || !work_email || !password || !department || !designation || !office_location || !gender || !personal_contact || !e_contact)
+      return next(Object.assign(new Error("empid and other required fields are missing"), { statusCode: 400 }));
 
     const superAdmin = await SuperAdminModel.findById(req.admin.organisation_id)
       .select("_id organisation_name")
@@ -472,11 +473,13 @@ const addmanager = async (req, res, next) => {
 
     const organisation_id = superAdmin._id;
 
-    const existingManager = await Managermodel.findOne({ work_email, organisation_id })
-      .select("_id")
-      .lean();
-    if (existingManager)
-      return next(Object.assign(new Error("Manager already exists"), { statusCode: 400 }));
+    const emailCheck = await isEmailTaken(work_email);
+    if (emailCheck.taken)
+      return next(Object.assign(new Error("An account with this email already exists"), { statusCode: 400 }));
+
+    const empidTaken = await isEmpidTaken(empid); // see helper below
+    if (empidTaken)
+      return next(Object.assign(new Error("This Employee ID is already in use"), { statusCode: 400 }));
 
     const licenseCheck = await canOnboardUser(organisation_id);
     if (!licenseCheck.allowed)
@@ -489,9 +492,9 @@ const addmanager = async (req, res, next) => {
     );
 
     const newmanager = await Managermodel.create({
-      organisation_id, profile_image, uid, department, f_name, l_name, work_email, password,
+      organisation_id, empid, profile_image, uid, department, f_name, l_name, work_email, password,
       gender, marital_status, personal_contact, e_contact, aadhaar_number, pan_number,
-      address, city, state, pincode, role, designation, office_location,
+      address, city, state, pincode, country, role, designation, office_location,
       reporting_manager: reportingManagerId,
       reporting_manager_model: reportingManagerModel,
       is_fresher, total_experience, previous_company, previous_designation, bank_name,
@@ -502,7 +505,7 @@ const addmanager = async (req, res, next) => {
     const token = jwt.sign(
       { managerid: newmanager._id, work_email: newmanager.work_email },
       process.env.JWT_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: "7d" }
     );
     const verifyLink = `${process.env.BASE_URL}talent/api/manager/verify/${token}`;
 
@@ -520,7 +523,7 @@ const addmanager = async (req, res, next) => {
       sendEmail({
         to: work_email,
         subject: "Activate Your Manager Account",
-        html: `<div style="font-family:Arial,sans-serif;padding:20px"><h2>Hello ${f_name},</h2><p>Your manager account has been created successfully.</p><p><strong>UID:</strong> ${uid}</p><p><strong>Department:</strong> ${department}</p><p><strong>Designation:</strong> ${designation}</p><p>Please verify your account by clicking below:</p><a href="${verifyLink}" style="background:#730042;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block;">Verify Account</a><p>This link will expire in 1 hour.</p><p>Regards,<br/>HR Team</p></div>`,
+        html: `<div style="font-family:Arial,sans-serif;padding:20px"><h2>Hello ${f_name},</h2><p>Your manager account has been created successfully.</p><p><strong>Employee ID:</strong> ${empid}</p><p><strong>UID:</strong> ${uid}</p><p><strong>Department:</strong> ${department}</p><p><strong>Designation:</strong> ${designation}</p><p><strong>Temporary Password:</strong> ${password}</p><p>Please verify your account by clicking below:</p><a href="${verifyLink}" style="background:#730042;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block;">Verify Account</a><p>This link will expire in 7 days.</p><p>For security, please log in and change this password immediately after verifying your account.</p><p>Regards,<br/>HR Team</p></div>`,
       }),
       incrementActiveUserCount(organisation_id),
     ]);
@@ -530,6 +533,7 @@ const addmanager = async (req, res, next) => {
       message: "Manager added successfully. Verification email sent.",
       manager: {
         _id: newmanager._id,
+        empid: newmanager.empid,
         uid: newmanager.uid,
         work_email: newmanager.work_email,
         organisation_id: newmanager.organisation_id,
@@ -548,21 +552,25 @@ const addemployee = async (req, res, next) => {
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
     const {
-      profile_image, f_name, l_name, work_email, password, gender, marital_status,
+      empid, profile_image, f_name, l_name, work_email, password, gender, marital_status,
       personal_contact, e_contact, aadhaar_number, pan_number, address, city, state,
-      pincode, role, office_location, designation, department, Under_manager, is_fresher,
+      pincode, country, role, office_location, designation, department, Under_manager, is_fresher,
       total_experience, previous_company, previous_designation, bank_name, account_holder_name,
       account_number, ifsc_code, resume, aadhaar_card, pan_card, experience_letter, permissions,
     } = req.body;
 
-    if (!f_name || !l_name || !work_email || !password || !department || !designation || !office_location || !gender || !personal_contact || !e_contact)
-      return next(Object.assign(new Error("Required fields missing"), { statusCode: 400 }));
+    if (!empid || !f_name || !l_name || !work_email || !password || !department || !designation || !office_location || !gender || !personal_contact || !e_contact)
+      return next(Object.assign(new Error("empid and other required fields are missing"), { statusCode: 400 }));
 
     const organisation_id = req.admin.organisation_id;
 
-    const existingUser = await Usermodel.findOne({ work_email, organisation_id }).select("_id").lean();
-    if (existingUser)
-      return next(Object.assign(new Error("User already exists"), { statusCode: 400 }));
+    const emailCheck = await isEmailTaken(work_email);
+    if (emailCheck.taken)
+      return next(Object.assign(new Error("An account with this email already exists"), { statusCode: 400 }));
+
+    const empidTaken = await isEmpidTaken(empid);
+    if (empidTaken)
+      return next(Object.assign(new Error("This Employee ID is already in use"), { statusCode: 400 }));
 
     const licenseCheck = await canOnboardUser(organisation_id);
     if (!licenseCheck.allowed)
@@ -579,14 +587,14 @@ const addemployee = async (req, res, next) => {
     const uid = await generateUID(department, organisation_id);
 
     const newuser = await Usermodel.create({
-      organisation_id, profile_image, uid, department, Under_manager: Under_manager || null,
+      organisation_id, empid, profile_image, uid, department, Under_manager: Under_manager || null,
       f_name, l_name, work_email, password, gender, marital_status, personal_contact, e_contact,
-      aadhaar_number, pan_number, address, city, state, pincode, role, designation, office_location,
+      aadhaar_number, pan_number, address, city, state, pincode, country, role, designation, office_location,
       is_fresher, total_experience, previous_company, previous_designation, bank_name,
       account_holder_name, account_number, ifsc_code, resume, aadhaar_card, pan_card, experience_letter,
     });
 
-    const token = jwt.sign({ userid: newuser._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    const token = jwt.sign({ userid: newuser._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
     const verifyLink = `${process.env.BASE_URL}talent/api/user/verify/${token}`;
 
     await Promise.all([
@@ -603,17 +611,16 @@ const addemployee = async (req, res, next) => {
       sendEmail({
         to: work_email,
         subject: "Welcome! Verify Your Employee Account",
-        html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F9F8F2;font-family:Segoe UI,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center"><table width="600" style="background:#fff;border-radius:14px;overflow:hidden;"><tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h1>Welcome Aboard</h1></td></tr><tr><td style="padding:40px;"><h2>Hello ${f_name}</h2><p>Your employee account has been created.</p><p><strong>Department:</strong> ${department}</p><p><strong>Location:</strong> ${office_location}</p><a href="${verifyLink}" style="background:#730042;color:white;padding:14px 30px;text-decoration:none;border-radius:8px;">Verify Account</a></td></tr></table></td></tr></table></body></html>`,
+        html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F9F8F2;font-family:Segoe UI,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center"><table width="600" style="background:#fff;border-radius:14px;overflow:hidden;"><tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h1>Welcome Aboard</h1></td></tr><tr><td style="padding:40px;"><h2>Hello ${f_name}</h2><p>Your employee account has been created.</p><p><strong>Employee ID:</strong> ${empid}</p><p><strong>Department:</strong> ${department}</p><p><strong>Location:</strong> ${office_location}</p><p><strong>Temporary Password:</strong> ${password}</p><a href="${verifyLink}" style="background:#730042;color:white;padding:14px 30px;text-decoration:none;border-radius:8px;">Verify Account</a><p>For security, please log in and change this password immediately after verifying your account.</p></td></tr></table></td></tr></table></body></html>`,
       }),
       incrementActiveUserCount(organisation_id),
     ]);
 
-    return res.status(201).json({ success: true, message: "User added successfully. Verification email sent." });
+    return res.status(201).json({ success: true, message: "User added successfully. Verification email sent.", empid: newuser.empid });
   } catch (error) {
     next(error);
   }
 };
-
 
 const findallmanagers = async (req, res, next) => {
   try {
@@ -2433,19 +2440,55 @@ const getme = async (req, res, next) => {
   res.status(200).json({ success: true, user: admin, leaveBalance: leaveBalance || null, reviews: reviews || [] });
 };
 
+const PHONE_REGEX = /^[0-9]{10}$/;
+const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+
 const editadminprofile = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
   const admin = req.admin;
-  const { phone, profile_image, f_name, l_name } = req.body;
-  if (f_name !== undefined) admin.f_name = f_name;
-  if (l_name !== undefined) admin.l_name = l_name;
-  if (phone !== undefined) {
-    if (typeof phone !== "string")
-      return next(Object.assign(new Error("Phone must be a string"), { statusCode: 400 }));
-    admin.phone = phone;
+  const {
+    f_name,
+    l_name,
+    personal_contact,
+    e_contact,
+    profile_image,
+    office_location,
+    resume,
+    aadhaar_card,
+    pan_card,
+    experience_letter,
+    bank_name,
+    account_holder_name,
+    account_number,
+    ifsc_code,
+  } = req.body;
+
+  if (f_name !== undefined) {
+    if (typeof f_name !== "string" || !f_name.trim() || f_name.length > 50)
+      return next(Object.assign(new Error("Invalid first name"), { statusCode: 400 }));
+    admin.f_name = f_name.trim();
   }
+
+  if (l_name !== undefined) {
+    if (typeof l_name !== "string" || !l_name.trim() || l_name.length > 50)
+      return next(Object.assign(new Error("Invalid last name"), { statusCode: 400 }));
+    admin.l_name = l_name.trim();
+  }
+
+  if (personal_contact !== undefined) {
+    if (typeof personal_contact !== "string" || !PHONE_REGEX.test(personal_contact))
+      return next(Object.assign(new Error("Phone number must be a valid 10-digit number"), { statusCode: 400 }));
+    admin.personal_contact = personal_contact;
+  }
+
+  if (e_contact !== undefined) {
+    if (typeof e_contact !== "string" || !PHONE_REGEX.test(e_contact))
+      return next(Object.assign(new Error("Emergency contact must be a valid 10-digit number"), { statusCode: 400 }));
+    admin.e_contact = e_contact;
+  }
+
   if (profile_image !== undefined) {
     if (typeof profile_image !== "string")
       return next(Object.assign(new Error("Profile image must be a string"), { statusCode: 400 }));
@@ -2456,7 +2499,62 @@ const editadminprofile = async (req, res, next) => {
     }
   }
 
+  if (office_location !== undefined) {
+    if (typeof office_location !== "string" || !office_location.trim() || office_location.length > 100)
+      return next(Object.assign(new Error("Office location must be a valid, non-empty location name (max 100 characters)"), { statusCode: 400 }));
+    admin.office_location = office_location.trim();
+  }
+
+  if (resume !== undefined) {
+    if (typeof resume !== "string")
+      return next(Object.assign(new Error("Resume must be a string"), { statusCode: 400 }));
+    admin.resume = resume;
+  }
+
+  if (aadhaar_card !== undefined) {
+    if (typeof aadhaar_card !== "string")
+      return next(Object.assign(new Error("Aadhaar card must be a string"), { statusCode: 400 }));
+    admin.aadhaar_card = aadhaar_card;
+  }
+
+  if (pan_card !== undefined) {
+    if (typeof pan_card !== "string")
+      return next(Object.assign(new Error("PAN card must be a string"), { statusCode: 400 }));
+    admin.pan_card = pan_card;
+  }
+
+  if (experience_letter !== undefined) {
+    if (typeof experience_letter !== "string")
+      return next(Object.assign(new Error("Experience letter must be a string"), { statusCode: 400 }));
+    admin.experience_letter = experience_letter;
+  }
+
+  if (bank_name !== undefined) {
+    if (typeof bank_name !== "string" || bank_name.length > 100)
+      return next(Object.assign(new Error("Invalid bank name"), { statusCode: 400 }));
+    admin.bank_name = bank_name.trim();
+  }
+
+  if (account_holder_name !== undefined) {
+    if (typeof account_holder_name !== "string" || !account_holder_name.trim() || account_holder_name.length > 100)
+      return next(Object.assign(new Error("Invalid account holder name"), { statusCode: 400 }));
+    admin.account_holder_name = account_holder_name.trim();
+  }
+
+  if (account_number !== undefined) {
+    if (typeof account_number !== "string" || !/^[0-9]{9,18}$/.test(account_number))
+      return next(Object.assign(new Error("Invalid account number"), { statusCode: 400 }));
+    admin.account_number = account_number;
+  }
+
+  if (ifsc_code !== undefined) {
+    if (typeof ifsc_code !== "string" || !IFSC_REGEX.test(ifsc_code.toUpperCase()))
+      return next(Object.assign(new Error("Invalid IFSC code"), { statusCode: 400 }));
+    admin.ifsc_code = ifsc_code.toUpperCase();
+  }
+
   await admin.save();
+
   res.status(200).json({
     success: true,
     message: "Admin profile updated successfully",
@@ -2465,8 +2563,18 @@ const editadminprofile = async (req, res, next) => {
       f_name: admin.f_name,
       l_name: admin.l_name,
       work_email: admin.work_email,
-      phone: admin.phone,
+      personal_contact: admin.personal_contact,
+      e_contact: admin.e_contact,
       profile_image: admin.profile_image,
+      office_location: admin.office_location,
+      resume: admin.resume,
+      aadhaar_card: admin.aadhaar_card,
+      pan_card: admin.pan_card,
+      experience_letter: admin.experience_letter,
+      bank_name: admin.bank_name,
+      account_holder_name: admin.account_holder_name,
+      account_number: admin.account_number,
+      ifsc_code: admin.ifsc_code,
     },
   });
 };
@@ -3270,6 +3378,28 @@ const getActiveUserCount = async (req, res, next) => {
     next(error);
   }
 };
+
+const getAllAdminsForOrg = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const organisation_id = req.admin.organisation_id;
+
+    const admins = await Adminmodel.find({ organisation_id, working_status: "working" })
+      .select("uid f_name l_name work_email role department designation office_location organisation_id")
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      organisation_id,
+      count: admins.length,
+      admins: admins.map((admin) => ({ type: "admin", ...admin })),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 module.exports = {
   verifyAdmin,
   adminlogin,
@@ -3321,5 +3451,6 @@ module.exports = {
   setEmployeeWorkingStatus,
   setManagerWorkingStatus,
   getInactiveUsers,
-  getActiveUserCount
+  getActiveUserCount,
+  getAllAdminsForOrg
 };
