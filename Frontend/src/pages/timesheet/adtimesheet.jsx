@@ -682,34 +682,70 @@ export default function AdminTimesheet() {
 
   return (
     <div className="min-h-screen w-full max-w-[100vw] bg-[#F4F5F9] font-sans overflow-x-hidden">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm w-full max-w-full overflow-hidden">
-        <div className="max-w-[1280px] mx-auto px-3 sm:px-6 w-full">
-          <div className="flex items-center h-14 sm:h-[60px] gap-2 sm:gap-5 min-w-0">
-            <TorchXLogo />
-            <div className="hidden sm:block w-px h-7 bg-gray-200 flex-shrink-0" />
-            <nav className="flex gap-0.5 flex-1 overflow-x-auto no-scrollbar min-w-0">
-              {TABS.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
-                  className={`relative rounded-lg px-2.5 sm:px-3.5 py-1.5 min-h-[36px] text-xs sm:text-[13px] cursor-pointer transition-all whitespace-nowrap border-b-2 flex-shrink-0 ${
-                    tab === t.id ? "bg-[#730042]/10 text-[#730042] font-bold border-[#730042]" : "bg-transparent text-gray-700 font-medium border-transparent"
-                  }`}
-                >
-                  {t.label}
-                  {t.id === "approvals" && approvals.length > 0 && (
-                    <span className="absolute top-1 right-1 bg-red-600 text-white rounded-full text-[8px] font-extrabold w-3.5 h-3.5 flex items-center justify-center">
-                      {approvals.length}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </nav>
-            <Btn onClick={() => setJobModal(true)} className="hidden sm:inline-flex flex-shrink-0">+ Create Job</Btn>
-            <button onClick={() => setJobModal(true)} className="sm:hidden flex-shrink-0 w-9 h-9 rounded-lg bg-[#730042] text-white flex items-center justify-center text-lg font-bold">+</button>
-          </div>
-        </div>
-      </header>
+    <header className="sticky top-0 z-25 w-full bg-white border-b border-gray-200 shadow-sm">
+  <div className="w-full max-w-screen-2xl mx-auto px-3 sm:px-6 lg:px-8">
+    <div className="flex items-center h-14 sm:h-16 gap-3">
+
+      {/* Logo */}
+      <div className="flex-shrink-0">
+        <TorchXLogo />
+      </div>
+
+      {/* Divider */}
+      <div className="hidden md:block w-px h-8 bg-gray-200 flex-shrink-0" />
+
+      {/* Navigation */}
+      <div className="flex-1 min-w-0 overflow-hidden">
+        <nav className="flex items-center gap-1 overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`relative flex-shrink-0 rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm transition-all border-b-2 ${
+                tab === t.id
+                  ? "bg-[#730042]/10 text-[#730042] font-semibold border-[#730042]"
+                  : "text-gray-700 border-transparent hover:bg-gray-100"
+              }`}
+            >
+              {t.label}
+
+              {t.id === "approvals" && approvals.length > 0 && (
+                <span className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 rounded-full bg-red-600 text-white text-[9px] font-bold">
+                  {approvals.length}
+                </span>
+              )}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+     
+     
+      {/* Create Job Button */}
+<div className="flex-shrink-0">
+  <button
+    onClick={() => setJobModal(true)}
+    className="
+      flex items-center justify-center gap-2
+      bg-[#730042] hover:bg-[#5b0034]
+      text-white font-medium
+      rounded-lg
+      px-3 py-2
+      sm:px-4 sm:py-2.5
+      text-xs sm:text-sm
+      whitespace-nowrap
+      transition-all
+      min-h-[40px]
+    "
+  >
+    <span className="text-base font-bold leading-none">+</span>
+    <span>Create Job</span>
+  </button>
+</div>
+
+    </div>
+  </div>
+</header>
 
       <main className="max-w-[1280px] mx-auto px-3 sm:px-6 py-5 sm:py-7 w-full min-w-0">
 
