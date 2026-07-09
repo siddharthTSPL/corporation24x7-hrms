@@ -47,7 +47,7 @@ const adminMenu = [
   { name: "Review",        path: "/review-admin",        icon: <FaBullhorn /> },
   { name: "Leave",         path: "/leave-admin",         icon: <FaCalendarAlt /> },
   { name: "Organisation",  path: "/organisation",        icon: <FaBuilding /> },
-  { name:"asset management", path: "/admin-asset-management", icon: <FaFolder /> },
+  { name:"Asset Management", path: "/admin-asset-management", icon: <FaFolder /> },
   { name: "Face Attendance", path: "/face-enrollment", icon: <FaShieldAlt /> },
   { name: "Recruitment",   path: "/recruitment-admin",   icon: <FaUsersCog />, 
     permissionGroup: ["recruitment.can_view_hiring_requisitions", "recruitment.can_create_hiring_requisition", "recruitment.can_view_candidates", "recruitment.can_add_candidate"] },
