@@ -1458,7 +1458,7 @@ function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChang
       <PasswordField label="Confirm Password" name="confirm_password" value={form.confirm_password} onChange={onChange} error={errors.confirm_password}/>
       <Field label="Gender" required error={errors.gender}>
         <select name="gender" value={form.gender} onChange={onChange} className={inputCls}>
-          <option value="">Select Gender</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
+          <option value="">Select Gender</option><option value="male">Male</option><option value="female">Female</option>
         </select>
       </Field>
       <Field label="Marital Status">
@@ -1561,7 +1561,7 @@ function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin
       <PasswordField label="Confirm Password" name="confirm_password" value={form.confirm_password} onChange={onChange} error={errors.confirm_password}/>
       <Field label="Gender" required error={errors.gender}>
         <select name="gender" value={form.gender} onChange={onChange} className={inputCls}>
-          <option value="">Select Gender</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
+          <option value="">Select Gender</option><option value="male">Male</option><option value="female">Female</option>
         </select>
       </Field>
       <Field label="Marital Status">
@@ -2157,7 +2157,7 @@ export default function EmployeeTable(){
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <select className={inputCls} value={filters.gender} onChange={(e)=>setFilters({...filters,gender:e.target.value})}>
                     <option value="">All Genders</option>
-                    <option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
+                    <option value="male">Male</option><option value="female">Female</option>
                   </select>
                   <select className={inputCls} value={filters.status} onChange={(e)=>setFilters({...filters,status:e.target.value})}>
                     <option value="">All Status</option>
