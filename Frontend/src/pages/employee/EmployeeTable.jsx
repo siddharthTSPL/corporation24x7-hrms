@@ -36,6 +36,7 @@ const IRREVERSIBLE_STATUSES = ["resigned", "terminated"];
 const ALL_COUNTRIES = Country.getAllCountries();
 
 const EMPTY_EMP = {
+  empid:"",
   f_name:"",l_name:"",work_email:"",password:"",confirm_password:"",gender:"",marital_status:"single",
   personal_contact:"",e_contact:"",department:"",designation:"",role:"employee",
   office_location_country:"IN",office_location_state:"",office_location:"",
@@ -49,6 +50,7 @@ const EMPTY_EMP = {
 };
 
 const EMPTY_MGR = {
+  empid:"",
   f_name:"",l_name:"",work_email:"",password:"",confirm_password:"",gender:"",marital_status:"single",
   personal_contact:"",e_contact:"",department:"",designation:"",role:"manager",
   office_location_country:"IN",office_location_state:"",office_location:"",
@@ -1430,6 +1432,7 @@ function MobileCard({u,onView,onEdit,onDelete,onPromoteToManager,onPromoteToAdmi
 function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChange}){
   if(step===0)return(
     <>
+      <Field label="Employee ID" required error={errors.empid}><input name="empid" placeholder="e.g. EMP-1024" value={form.empid} onChange={onChange} className={inputCls}/></Field>
       <Field label="First Name" required error={errors.f_name}><input name="f_name" placeholder="First name" value={form.f_name} onChange={onChange} className={inputCls}/></Field>
       <Field label="Last Name" required error={errors.l_name}><input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls}/></Field>
       <Field label="Work Email" required error={errors.work_email}><input name="work_email" type="email" placeholder="name@company.com" value={form.work_email} onChange={onChange} className={inputCls}/></Field>
@@ -1532,6 +1535,7 @@ function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChang
 function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin,perms,onPermChange}){
   if(step===0)return(
     <>
+      <Field label="Employee ID" required error={errors.empid}><input name="empid" placeholder="e.g. MGR-1024" value={form.empid} onChange={onChange} className={inputCls}/></Field>
       <Field label="First Name" required error={errors.f_name}><input name="f_name" placeholder="First name" value={form.f_name} onChange={onChange} className={inputCls}/></Field>
       <Field label="Last Name" required error={errors.l_name}><input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls}/></Field>
       <Field label="Work Email" required error={errors.work_email}><input name="work_email" type="email" placeholder="name@company.com" value={form.work_email} onChange={onChange} className={inputCls}/></Field>
@@ -1640,6 +1644,7 @@ function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin
 
 function validateContactInfo(form){
   const err={};
+  if(!form.empid?.trim())err.empid="Required";
   if(!form.f_name)err.f_name="Required";
   else if(!NAME_REGEX.test(form.f_name))err.f_name="Enter a valid name";
   if(!form.l_name)err.l_name="Required";
@@ -1924,6 +1929,7 @@ export default function EmployeeTable(){
   const handleEmpSubmit=()=>{
     if(!validateEmp()){showPopup("error","Please fix the errors in the form");setEmpStep(0);return;}
     addEmployeeApi({
+      empid:empForm.empid,
       f_name:empForm.f_name,l_name:empForm.l_name,work_email:empForm.work_email,
       password:empForm.password,gender:empForm.gender,marital_status:empForm.marital_status,
       personal_contact:empForm.personal_contact,e_contact:empForm.e_contact,
@@ -1966,6 +1972,7 @@ export default function EmployeeTable(){
   const handleMgrSubmit=()=>{
     if(!validateMgr()){showPopup("error","Please fix the errors in the form");setMgrStep(0);return;}
     addManagerApi({
+      empid:mgrForm.empid,
       f_name:mgrForm.f_name,l_name:mgrForm.l_name,work_email:mgrForm.work_email,
       password:mgrForm.password,gender:mgrForm.gender,marital_status:mgrForm.marital_status,
       personal_contact:mgrForm.personal_contact,e_contact:mgrForm.e_contact,
