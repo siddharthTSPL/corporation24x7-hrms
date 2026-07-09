@@ -25,7 +25,7 @@ import { useShowAllLeaves, useAcceptLeaveByAdmin, useRejectLeaveByAdmin } from "
 import { useGetAllAnnouncements, useCreateAnnouncement, useUpdateAnnouncement, useDeleteAnnouncement } from "../../auth/server-state/superadmin/announcement/suannouncement.hook";
 import { useGetAllAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin, useReviewToAdmin } from "../../auth/server-state/superadmin/other/suother.hook";
 
-const DEPT_OPTIONS = [ "Business Process Outsourcing", "Engineering", "Human Resources", "Management"];
+const DEPT_OPTIONS = [ "OPR","BPO", "ENG", "HR", "MGMT"];
 const ROLE_LABEL = { admin: "Admin",  official: "Official" };
 
 const WORKING_STATUS_OPTIONS = [
