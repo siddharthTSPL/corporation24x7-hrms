@@ -8,6 +8,7 @@ import {
   useUnifiedLogin,
   useUnifiedSendForgotPasswordOtp,
   useUnifiedVerifyForgotPasswordOtp,
+  useUnifiedResetPassword,
 } from "../../auth/store/unifiedauth/unifiedauth.hook";
 import slide1 from "../../assets/slide1.png";
 import slide2 from "../../assets/slide2.png";
@@ -47,8 +48,10 @@ function Login() {
   const { mutate: loginFn, isPending: isLoggingIn } = useUnifiedLogin();
   const { mutate: sendOtpFn, isPending: isSendingOtp } = useUnifiedSendForgotPasswordOtp();
   const { mutate: verifyOtpFn, isPending: isVerifyingOtp } = useUnifiedVerifyForgotPasswordOtp();
+  const { mutate: resetPasswordFn, isPending: isResettingPassword } = useUnifiedResetPassword();
 
-  const [form, setForm] = useState({ email: "", password: "", otp: "" });
+  const [form, setForm] = useState({ email: "", password: "", otp: "", newPassword: "", confirmPassword: "" });
+  const [verifiedAuthPayload, setVerifiedAuthPayload] = useState(null);
   const [errors, setErrors] = useState({});
   const [step, setStep] = useState("login");
   const [showPassword, setShowPassword] = useState(false);
@@ -123,21 +126,7 @@ function Login() {
     loginFn(
       { email: form.email, password: form.password },
       {
-        onSuccess: async (data) => {
-          const role = normalizeRole(data);
-          if (data?.token) {
-            try {
-              await fetch("http://localhost:47821/set-token", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ token: data.token }),
-              });
-            } catch (_) {}
-          }
-          await syncProfileToCache(role, data);
-          setShowLoader(false);
-          navigateByRole(role);
-        },
+        onSuccess: (data) => finishPostAuth(data),
         onError: (err) => {
           setShowLoader(false);
           setErrors({ general: getErrorMessage(err) });
@@ -157,6 +146,22 @@ function Login() {
     });
   };
 
+  const finishPostAuth = async (data) => {
+    const role = normalizeRole(data);
+    if (data?.token) {
+      try {
+        await fetch("http://localhost:47821/set-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: data.token }),
+        });
+      } catch (_) {}
+    }
+    await syncProfileToCache(role, data);
+    setShowLoader(false);
+    navigateByRole(role);
+  };
+
   const handleVerifyOtp = () => {
     if (!form.otp) {
       setErrors({ otp: "OTP is required" });
@@ -166,25 +171,51 @@ function Login() {
     verifyOtpFn(
       { email: form.email, otp: form.otp },
       {
-        onSuccess: async (data) => {
-          const role = normalizeRole(data);
-          if (data?.token) {
-            try {
-              await fetch("http://localhost:47821/set-token", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ token: data.token }),
-              });
-            } catch (_) {}
-          }
-
-          await syncProfileToCache(role, data);
-          setShowLoader(false);
-          navigateByRole(role);
+        onSuccess: (data) => {
+          // OTP is verified and the server already logged the account in
+          // (token cookie set) — it also issued a resetToken cookie so the
+          // person can optionally set a brand new password here.
+          setVerifiedAuthPayload(data);
+          setErrors({});
+          setStep("reset");
         },
         onError: (err) => setErrors({ otp: getErrorMessage(err) }),
       }
     );
+  };
+
+  const handleSetNewPassword = () => {
+    if (!form.newPassword || !form.confirmPassword) {
+      setErrors({ newPassword: "Both password fields are required" });
+      return;
+    }
+    if (form.newPassword !== form.confirmPassword) {
+      setErrors({ newPassword: "Passwords do not match" });
+      return;
+    }
+    if (form.newPassword.length < 8) {
+      setErrors({ newPassword: "Password must be at least 8 characters" });
+      return;
+    }
+
+    setShowLoader(true);
+    resetPasswordFn(
+      { newPassword: form.newPassword, confirmPassword: form.confirmPassword },
+      {
+        onSuccess: async () => {
+          await finishPostAuth(verifiedAuthPayload);
+        },
+        onError: (err) => {
+          setShowLoader(false);
+          setErrors({ newPassword: getErrorMessage(err) });
+        },
+      }
+    );
+  };
+
+  const handleSkipPasswordReset = async () => {
+    setShowLoader(true);
+    await finishPostAuth(verifiedAuthPayload);
   };
 
   return (
@@ -334,6 +365,45 @@ function Login() {
                   className="text-sm text-gray-500 mt-3 cursor-pointer hover:text-[#730042]"
                 >
                   ← Back to login
+                </p>
+              </>
+            )}
+
+            {step === "reset" && (
+              <>
+                <h2 className="text-xl font-bold text-[#730042] mb-1">Set a New Password</h2>
+                <p className="text-gray-500 text-sm mb-4">
+                  Optional — you're already signed in. Set a new password now, or skip and do it later.
+                </p>
+                <input
+                  type="password"
+                  name="newPassword"
+                  placeholder="New password"
+                  value={form.newPassword}
+                  onChange={handleChange}
+                  className="w-full mb-1 p-3 border rounded-lg"
+                />
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  placeholder="Confirm new password"
+                  value={form.confirmPassword}
+                  onChange={handleChange}
+                  className="w-full mt-2 mb-1 p-3 border rounded-lg"
+                />
+                {errors.newPassword && <p className="text-red-500 text-sm mb-2">{errors.newPassword}</p>}
+                <button
+                  onClick={handleSetNewPassword}
+                  disabled={isResettingPassword}
+                  className="w-full bg-[#730042] text-white py-3 rounded-lg mt-3 disabled:opacity-60"
+                >
+                  {isResettingPassword ? "Updating..." : "Set New Password"}
+                </button>
+                <p
+                  onClick={handleSkipPasswordReset}
+                  className="text-sm text-gray-500 mt-3 cursor-pointer hover:text-[#730042] text-center"
+                >
+                  Skip for now, continue to dashboard →
                 </p>
               </>
             )}
