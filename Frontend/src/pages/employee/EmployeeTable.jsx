@@ -27,7 +27,7 @@ const api = axios.create({
   withCredentials: true,
 });
 
-const DEPARTMENTS = [ "Business Process Outsourcing", "Engineering", "Management", "Human Resources", "Operator"];
+const DEPARTMENTS = [ "OPR","BPO", "ENG", "MGMT", "HR"];
 const LOCATIONS = ["Noida", "Bareilly", "Delhi", "Mumbai"];
 
 const WORKING_STATUSES = ["working", "resigned", "fired", "terminated"];
