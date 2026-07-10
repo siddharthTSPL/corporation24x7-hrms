@@ -31,6 +31,12 @@ const GlobalStyles = () => (
       100% { box-shadow: 0 0 0 0 rgba(115,0,66,0); }
     }
     @keyframes progressIn { from { width: 0; } }
+    html, body { overflow-x: hidden; max-width: 100%; }
+    .md-page-container {
+      overflow-x: hidden;
+      max-width: 100%;
+      padding: 24px 28px;
+    }
     .md-card {
       background: #fff;
       border-radius: 14px;
@@ -38,6 +44,7 @@ const GlobalStyles = () => (
       overflow: hidden;
       position: relative;
       animation: fadeUp .35s ease both;
+      min-width: 0;
     }
     .md-card:hover { box-shadow: 0 4px 20px rgba(42,26,22,0.08); }
     .md-checkin-btn {
@@ -50,6 +57,7 @@ const GlobalStyles = () => (
       border: none;
       transition: all .2s ease;
       letter-spacing: .2px;
+      white-space: nowrap;
     }
     .md-checkin-btn:not(:disabled):hover {
       transform: translateY(-1px);
@@ -111,8 +119,9 @@ const GlobalStyles = () => (
       font-size: 10px;
       font-weight: 500;
       font-family: 'DM Sans', sans-serif;
+      white-space: nowrap;
     }
-    .md-info-row { display: flex; flex-direction: column; gap: 3px; }
+    .md-info-row { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
     .md-info-label {
       font-size: 10px;
       color: #b0948a;
@@ -125,7 +134,7 @@ const GlobalStyles = () => (
       font-weight: 500;
       color: #2a1a16;
       font-family: 'DM Sans', sans-serif;
-      word-break: break-all;
+      word-break: break-word;
     }
     .md-history-row {
       display: flex;
@@ -134,8 +143,86 @@ const GlobalStyles = () => (
       padding: 10px 0;
       border-bottom: 0.5px solid #f5eeea;
       font-family: 'DM Sans', sans-serif;
+      flex-wrap: wrap;
     }
     .md-history-row:last-child { border-bottom: none; }
+
+    .md-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .md-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .md-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    .md-two-col-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    .md-three-col-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, .7fr);
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    .md-info-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      padding: 14px 18px;
+    }
+    .md-today-banner {
+      border-radius: 14px;
+      padding: 18px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+      gap: 12px;
+      animation: fadeUp .3s ease both;
+    }
+    .md-table-scroll {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    @media (max-width: 1200px) {
+      .md-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .md-three-col-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+      .md-three-col-grid > :nth-child(3) { grid-column: 1 / -1; }
+    }
+
+    @media (max-width: 900px) {
+      .md-two-col-grid { grid-template-columns: minmax(0, 1fr); }
+      .md-info-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 640px) {
+      .md-page-container { padding: 14px 12px; }
+      .md-stats-grid { grid-template-columns: minmax(0, 1fr); }
+      .md-three-col-grid { grid-template-columns: minmax(0, 1fr); }
+      .md-three-col-grid > :nth-child(3) { grid-column: auto; }
+      .md-info-grid { grid-template-columns: minmax(0, 1fr); padding: 12px 14px; }
+      .md-today-banner { padding: 14px 16px; }
+      .md-checkin-btn, .md-recruit-btn { width: 100%; text-align: center; }
+      .md-header-actions { width: 100%; justify-content: space-between; }
+    }
   `}</style>
 );
 
@@ -297,8 +384,8 @@ function LeaveRow({ label, availed, entitled, accrued, color }) {
   const remaining = Math.max(0, base - used);
   return (
     <div className="md-leave-row">
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
-        <div>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6, gap:8, flexWrap:"wrap" }}>
+        <div style={{ minWidth:0 }}>
           <div style={{ fontSize:12, fontWeight:500, color:"#2a1a16", fontFamily:"'DM Sans',sans-serif" }}>{label}</div>
           {accrued != null && <div style={{ fontSize:10, color:"#b0948a", marginTop:1 }}>Accrued: {accrued}</div>}
         </div>
@@ -466,7 +553,7 @@ function DOJCard({ joiningDate }) {
         <div style={{ fontSize:11, color:"#b0948a", fontWeight:500, letterSpacing:".3px", marginBottom:10, fontFamily:"'DM Sans',sans-serif" }}>
           Date of joining
         </div>
-        <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:14, flexWrap:"wrap" }}>
           <div style={{ position:"relative", width:88, height:88, flexShrink:0 }}>
             <svg width="88" height="88" viewBox="0 0 88 88">
               <circle cx="44" cy="44" r={R} fill="none" stroke="#ede5e0" strokeWidth="6"/>
@@ -478,7 +565,7 @@ function DOJCard({ joiningDate }) {
               <span style={{ fontSize:9, color:"#b0948a", marginTop:1, fontFamily:"'DM Sans',sans-serif" }}>yrs</span>
             </div>
           </div>
-          <div style={{ display:"flex", flexDirection:"column", gap:7, flex:1 }}>
+          <div style={{ display:"flex", flexDirection:"column", gap:7, flex:1, minWidth:120 }}>
             <InfoField label="Joined on" value={joiningDate ? fmtDate(joiningDate) : "—"} loading={false}/>
             <InfoField label="Experience" value={`${years} yr${years !== 1 ? "s" : ""} ${months} mo`} loading={false}/>
             <div className="md-info-row">
@@ -580,15 +667,11 @@ function TodayBanner({ isOnLeave, leaveType, checkinGate, onCheckIn, onRecruitme
   else if (reason === "loading") buttonLabel = "Please wait…";
 
   return (
-    <div style={{
+    <div className="md-today-banner" style={{
       background,
-      borderRadius:14, padding:"18px 22px",
-      display:"flex", alignItems:"center", justifyContent:"space-between",
-      marginBottom:14, flexWrap:"wrap", gap:12,
       boxShadow: isBlocked ? "0 4px 16px rgba(40,53,147,0.12)" : "0 4px 20px rgba(115,0,66,0.28)",
-      animation: "fadeUp .3s ease both",
     }}>
-      <div>
+      <div style={{ minWidth:0 }}>
         <div style={{ fontSize:11, fontWeight:500, fontFamily:"'DM Sans',sans-serif",
           color: subColor, letterSpacing:".4px", textTransform:"uppercase" }}>
           {day}
@@ -598,7 +681,7 @@ function TodayBanner({ isOnLeave, leaveType, checkinGate, onCheckIn, onRecruitme
           {date}
         </div>
         {isBlocked && meta && (
-          <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:6 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:6, flexWrap:"wrap" }}>
             <span style={{ fontSize:11, fontFamily:"'DM Sans',sans-serif",
               padding:"3px 10px", borderRadius:20, fontWeight:600, ...themePill[meta.theme] }}>
               {meta.icon} {meta.label}
@@ -686,7 +769,7 @@ function LeaveHistoryList({ leaves, loading }) {
               justifyContent:"center", fontSize:10, fontWeight:700, color:lm.color, flexShrink:0 }}>
               {labelText.slice(0, 2).toUpperCase()}
             </div>
-            <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ flex:1, minWidth:120 }}>
               <div style={{ fontSize:12, fontWeight:500, color:"#2a1a16" }}>{labelText}</div>
               <div style={{ fontSize:10, color:"#b0948a", marginTop:1 }}>
                 {fmtDate(lv.startDate)} → {fmtDate(lv.endDate)} · {days}d
@@ -721,7 +804,7 @@ function ReviewCard({ reviews = [], loading }) {
     <div style={{ padding:"14px 18px 16px" }}>
       {avg !== null ? (
         <>
-          <div style={{ display:"flex", alignItems:"flex-end", gap:10, marginBottom:10 }}>
+          <div style={{ display:"flex", alignItems:"flex-end", gap:10, marginBottom:10, flexWrap:"wrap" }}>
             <span style={{ fontSize:36, fontWeight:700, color:"#e8b84b", lineHeight:1, fontFamily:"'Lora',serif" }}>
               {avg.toFixed(1)}
             </span>
@@ -753,7 +836,7 @@ function ReviewCard({ reviews = [], loading }) {
           {latest?.comment && (
             <div style={{ background:"#faf8f2", borderRadius:8, padding:"9px 12px",
               borderLeft:"3px solid #e8b84b", fontSize:11, color:"#5a4030", lineHeight:1.6,
-              fontFamily:"'DM Sans',sans-serif" }}>
+              fontFamily:"'DM Sans',sans-serif", wordBreak:"break-word" }}>
               <span style={{ color:"#b0948a", fontSize:10, display:"block", marginBottom:4 }}>
                 Latest · {latest.monthYear}
               </span>
@@ -906,12 +989,12 @@ export default function ManagerDashboard() {
   );
 
   return (
-    <div style={{ fontFamily:"'DM Sans','Segoe UI',sans-serif", background:"#f9f8f2",
-      minHeight:"100vh", padding:"24px 28px", color:"#2a1a16" }}>
+    <div className="md-page-container" style={{ fontFamily:"'DM Sans','Segoe UI',sans-serif", background:"#f9f8f2",
+      minHeight:"100vh", color:"#2a1a16" }}>
       <GlobalStyles/>
 
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
-        <div>
+      <div className="md-header-row">
+        <div style={{ minWidth:0 }}>
           <h1 style={{ fontSize:20, fontWeight:700, margin:0, letterSpacing:"-.3px", fontFamily:"'Lora',serif" }}>
             Dashboard
           </h1>
@@ -920,16 +1003,16 @@ export default function ManagerDashboard() {
           </p>
         </div>
 
-        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+        <div className="md-header-actions">
           {manager?.office_location && (
             <div style={{ fontSize:11, color:"#b0948a", background:"#fff", border:"0.5px solid #ede5e0",
-              borderRadius:20, padding:"4px 12px", fontFamily:"'DM Sans',sans-serif" }}>
+              borderRadius:20, padding:"4px 12px", fontFamily:"'DM Sans',sans-serif", whiteSpace:"nowrap" }}>
               📍 {manager.office_location}
             </div>
           )}
 
           <div style={{ width:36, height:36, borderRadius:8, border:"0.5px solid #ede5e0", background:"#fff",
-            display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", position:"relative" }}>
+            display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", position:"relative", flexShrink:0 }}>
             <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
               <path d="M7.5 1.5a4 4 0 0 0-4 4V7L2 8.5V9.5h11V8.5L11.5 7V5.5a4 4 0 0 0-4-4zM7.5 13.5a1.5 1.5 0 0 1-1.5-1.5h3a1.5 1.5 0 0 1-1.5 1.5z" fill="#730042"/>
             </svg>
@@ -939,7 +1022,7 @@ export default function ManagerDashboard() {
             )}
           </div>
 
-          <div style={{ position:"relative" }}>
+          <div style={{ position:"relative", flexShrink:0 }}>
             <Avatar
               src={manager?.profile_image}
               initials={meLoading ? "—" : mgrInitials}
@@ -964,7 +1047,7 @@ export default function ManagerDashboard() {
         onRecruitment={() => navigate("/manager/recruitment")}
       />
 
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,minmax(0,1fr))", gap:14, marginBottom:14 }}>
+      <div className="md-stats-grid">
 
         <div className="md-card" style={{ animationDelay:".05s" }}>
           <CardAccent color="#730042"/>
@@ -983,7 +1066,7 @@ export default function ManagerDashboard() {
                 <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
                   <Avatar src={manager?.profile_image} initials={mgrInitials} size={44} radius={12}
                     style={{ boxShadow:"0 3px 10px rgba(115,0,66,0.22)" }}/>
-                  <div>
+                  <div style={{ minWidth:0 }}>
                     <div style={{ fontSize:14, fontWeight:600, lineHeight:1.25, fontFamily:"'Lora',serif" }}>{fullName}</div>
                     <div style={{ fontSize:11, color:"#b0948a", textTransform:"capitalize", marginTop:2 }}>{manager?.designation ?? "—"}</div>
                   </div>
@@ -994,7 +1077,7 @@ export default function ManagerDashboard() {
                   <Badge variant="blue">{manager?.department ?? "—"}</Badge>
                 </div>
                 <div style={{ marginTop:10, paddingTop:10, borderTop:"0.5px solid #ede5e0", display:"flex", flexDirection:"column", gap:3 }}>
-                  <div style={{ fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>📧 {manager?.work_email ?? "—"}</div>
+                  <div style={{ fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif", wordBreak:"break-word" }}>📧 {manager?.work_email ?? "—"}</div>
                   <div style={{ fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>📞 {manager?.personal_contact ?? "—"}</div>
                 </div>
               </>
@@ -1014,7 +1097,7 @@ export default function ManagerDashboard() {
               </div>
             ) : (
               <>
-                <div style={{ display:"flex", alignItems:"baseline", gap:6, marginBottom:4 }}>
+                <div style={{ display:"flex", alignItems:"baseline", gap:6, marginBottom:4, flexWrap:"wrap" }}>
                   <span style={{ fontSize:28, fontWeight:700, color:"#1D9E75", lineHeight:1, fontFamily:"'Lora',serif" }}>
                     {(lb?.EL?.entitled ?? 0) - (lb?.EL?.availed ?? 0)}
                   </span>
@@ -1054,7 +1137,7 @@ export default function ManagerDashboard() {
                 <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
                   <Avatar src={manager?.profile_image} initials={mgrInitials} size={42}
                     style={{ background:"rgba(249,248,242,0.15)" }}/>
-                  <div>
+                  <div style={{ minWidth:0 }}>
                     <div style={{ fontSize:14, fontWeight:600, color:"#f9f8f2", fontFamily:"'Lora',serif" }}>{fullName}</div>
                     <div style={{ fontSize:11, color:"rgba(249,248,242,0.6)", marginTop:2, fontFamily:"'DM Sans',sans-serif" }}>
                       {manager?.role ?? "Manager"}
@@ -1068,7 +1151,7 @@ export default function ManagerDashboard() {
                 </div>
                 <div style={{ marginTop:8 }}>
                   <div style={{ fontSize:10, color:"rgba(249,248,242,0.4)", fontFamily:"'DM Sans',sans-serif", marginBottom:2 }}>Work email</div>
-                  <div style={{ fontSize:11, fontWeight:500, color:"rgba(249,248,242,0.6)", wordBreak:"break-all", fontFamily:"'DM Sans',sans-serif" }}>
+                  <div style={{ fontSize:11, fontWeight:500, color:"rgba(249,248,242,0.6)", wordBreak:"break-word", fontFamily:"'DM Sans',sans-serif" }}>
                     {manager?.work_email ?? "—"}
                   </div>
                 </div>
@@ -1078,28 +1161,28 @@ export default function ManagerDashboard() {
         </div>
       </div>
 
-      <div style={{ display:"grid", gridTemplateColumns:"minmax(0,2fr) minmax(0,1fr)", gap:14, marginBottom:14 }}>
+      <div className="md-two-col-grid">
 
         <div className="md-card" style={{ animationDelay:".2s" }}>
           <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
-            borderBottom:"0.5px solid #ede5e0" }}>
+            borderBottom:"0.5px solid #ede5e0", flexWrap:"wrap", gap:8 }}>
             <span style={{ fontSize:12, fontWeight:600, fontFamily:"'DM Sans',sans-serif" }}>My Attendance</span>
-            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
               {attLoading && (
                 <span style={{ fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>Loading…</span>
               )}
               {isOnLeaveToday && <Badge variant="blue">On Leave Today</Badge>}
               <select value={selectedMonth} onChange={e => setSelectedMonth(Number(e.target.value))}
                 style={{ fontFamily:"'DM Sans',sans-serif", fontSize:11, color:"#b0948a", background:"#f9f8f2",
-                  border:"0.5px solid #ede5e0", borderRadius:6, padding:"3px 7px", cursor:"pointer" }}>
+                  border:"0.5px solid #ede5e0", borderRadius:6, padding:"3px 7px", cursor:"pointer", maxWidth:"100%" }}>
                 {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
               </select>
             </div>
           </div>
 
           {joiningDate && (
-            <div style={{ padding:"6px 14px 0", display:"flex", alignItems:"center", gap:6 }}>
-              <div style={{ width:7, height:7, borderRadius:2, background:"#378ADD" }}/>
+            <div style={{ padding:"6px 14px 0", display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
+              <div style={{ width:7, height:7, borderRadius:2, background:"#378ADD", flexShrink:0 }}/>
               <span style={{ fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>
                 Joined: {fmtDate(joiningDate)} · Days before this are not counted
               </span>
@@ -1125,7 +1208,7 @@ export default function ManagerDashboard() {
               [checkedInCount,      "#1D9E75", "Active Now"],
               [`${attendanceRate}%`,"#378ADD", "Rate"],
             ].map(([v, c, l]) => (
-              <div key={l} style={{ padding:"10px 0", textAlign:"center", borderRight:"0.5px solid #f0e8e4" }}>
+              <div key={l} style={{ padding:"10px 4px", textAlign:"center", borderRight:"0.5px solid #f0e8e4" }}>
                 <div style={{ fontSize:15, fontWeight:700, color:c, fontFamily:"'Lora',serif" }}>{v}</div>
                 <div style={{ fontSize:10, color:"#b0948a", marginTop:2, fontFamily:"'DM Sans',sans-serif" }}>{l}</div>
               </div>
@@ -1154,9 +1237,9 @@ export default function ManagerDashboard() {
         <div className="md-card" style={{ animationDelay:".25s" }}>
           <CardAccent color="#BA7517"/>
           <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
-            borderBottom:"0.5px solid #ede5e0" }}>
+            borderBottom:"0.5px solid #ede5e0", flexWrap:"wrap", gap:8 }}>
             <span style={{ fontSize:12, fontWeight:600, fontFamily:"'DM Sans',sans-serif" }}>Announcements</span>
-            <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
               {announcements.filter(a => a.priority === "high").length > 0 && (
                 <Badge variant="red">{announcements.filter(a => a.priority === "high").length} urgent</Badge>
               )}
@@ -1180,34 +1263,34 @@ export default function ManagerDashboard() {
         </div>
       </div>
 
-      <div style={{ display:"grid", gridTemplateColumns:"minmax(0,1.5fr) minmax(0,1fr) minmax(0,.7fr)", gap:14, marginBottom:14 }}>
+      <div className="md-three-col-grid">
 
         <div className="md-card" style={{ animationDelay:".3s" }}>
           <CardAccent color="#730042"/>
           <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
-            borderBottom:"0.5px solid #ede5e0" }}>
+            borderBottom:"0.5px solid #ede5e0", flexWrap:"wrap", gap:8 }}>
             <span style={{ fontSize:12, fontWeight:600, fontFamily:"'DM Sans',sans-serif" }}>Manager profile</span>
             <Badge variant="brand">{manager?.role ?? "manager"}</Badge>
           </div>
           <div style={{ padding:"14px 18px", display:"flex", alignItems:"center", gap:14,
-            borderBottom:"0.5px solid #ede5e0" }}>
+            borderBottom:"0.5px solid #ede5e0", flexWrap:"wrap" }}>
             <Avatar src={manager?.profile_image} initials={meLoading ? "—" : mgrInitials}
               size={52} radius={14} style={{ boxShadow:"0 4px 14px rgba(115,0,66,0.22)" }}/>
-            <div>
+            <div style={{ minWidth:0 }}>
               <div style={{ fontSize:16, fontWeight:700, fontFamily:"'Lora',serif" }}>
                 {meLoading ? <Skeleton w={120} h={18}/> : fullName}
               </div>
               <div style={{ fontSize:12, color:"#b0948a", textTransform:"capitalize", fontFamily:"'DM Sans',sans-serif" }}>
                 {meLoading ? <Skeleton w={90} h={14}/> : (manager?.designation ?? "—")}
               </div>
-              <div style={{ marginTop:5, display:"flex", gap:5 }}>
+              <div style={{ marginTop:5, display:"flex", gap:5, flexWrap:"wrap" }}>
                 <Badge variant="green">Active</Badge>
                 <Badge variant="blue">{manager?.uid ?? "—"}</Badge>
                 {reviews.length > 0 && <StarRating rating={reviews.reduce((s, r) => s + r.rating, 0) / reviews.length} size={12}/>}
               </div>
             </div>
           </div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:14, padding:"14px 18px" }}>
+          <div className="md-info-grid">
             <InfoField label="Work email"       value={manager?.work_email}      loading={meLoading}/>
             <InfoField label="Department"        value={manager?.department}       loading={meLoading}/>
             <InfoField label="Office"            value={manager?.office_location}  loading={meLoading}/>
@@ -1225,7 +1308,7 @@ export default function ManagerDashboard() {
         <div className="md-card" style={{ animationDelay:".35s" }}>
           <CardAccent color="#1D9E75"/>
           <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
-            borderBottom:"0.5px solid #ede5e0" }}>
+            borderBottom:"0.5px solid #ede5e0", flexWrap:"wrap", gap:8 }}>
             <span style={{ fontSize:12, fontWeight:600, fontFamily:"'DM Sans',sans-serif" }}>Leave balance</span>
             <span style={{ fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>FY 2025–26</span>
           </div>
@@ -1260,7 +1343,7 @@ export default function ManagerDashboard() {
         <div className="md-card" style={{ animationDelay:".4s" }}>
           <CardAccent color="#e8b84b"/>
           <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
-            borderBottom:"0.5px solid #ede5e0" }}>
+            borderBottom:"0.5px solid #ede5e0", flexWrap:"wrap", gap:8 }}>
             <span style={{ fontSize:12, fontWeight:600, fontFamily:"'DM Sans',sans-serif" }}>Reviews Given</span>
             {reviews.length > 0 && <Badge variant="amber">{reviews.length} total</Badge>}
           </div>
@@ -1271,14 +1354,16 @@ export default function ManagerDashboard() {
       <div className="md-card" style={{ animationDelay:".45s" }}>
         <CardAccent color="#378ADD"/>
         <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
-          borderBottom:"0.5px solid #ede5e0" }}>
+          borderBottom:"0.5px solid #ede5e0", flexWrap:"wrap", gap:8 }}>
           <span style={{ fontSize:12, fontWeight:600, fontFamily:"'DM Sans',sans-serif" }}>Team Leave History</span>
-          <div style={{ display:"flex", gap:6 }}>
+          <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
             <Badge variant="green">{allEmployeeLeaves.filter(l => APPROVED_STATUSES.includes(l.status)).length} approved</Badge>
             <Badge variant="amber">{allEmployeeLeaves.filter(l => l.status?.includes("pending")).length} pending</Badge>
           </div>
         </div>
-        <LeaveHistoryList leaves={allEmployeeLeaves} loading={histLoading}/>
+        <div className="md-table-scroll">
+          <LeaveHistoryList leaves={allEmployeeLeaves} loading={histLoading}/>
+        </div>
       </div>
 
     </div>
