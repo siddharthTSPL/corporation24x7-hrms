@@ -9,7 +9,7 @@ const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const { sendEmail } = require("../utils/nodemailer.utils");
 const assignDefaultLeave = require("../automatic/bydefaultleaveset");
-const LeavePolicy = require("../Models/leavepolicy.model");
+const LeavePolicy = require("../Models/Leavepolicy.model");
 const PermissionModel = require("../Models/permission.model");
 const Leave = require("../Models/leave.model");
 const Review = require("../Models/review.model");
