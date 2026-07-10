@@ -3,11 +3,7 @@ const Managermodel = require("../Models/manager.model");
 const AdminModel = require("../Models/Admin.model");
 const SuperAdminModel = require("../Models/superadmin.model");
 const { sendEmail } = require("./nodemailer.utils");
-const {
-  buildApprovalRequestEmail,
-  buildStatusDecisionEmail,
-  buildAssetAssignedEmail,
-} = require("./helpers/emailtemp");
+const emailtemp = require("./helpers/emailtemp");
 
 require("dotenv").config();
 
@@ -41,11 +37,21 @@ const safeSendMail = async ({ to, subject, html }) => {
   try {
     await sendEmail({ to, subject, html });
   } catch (err) {
-    console.error(`[notify] Email failed (${subject} -> ${to}):`, err.message);
+    console.error(`[notify] Email send failed (${subject} -> ${to}):`, err.message);
   }
 };
 
-const notifyLeaveApplied = async ({
+// Wraps every notify function so a template/lookup/send error can NEVER crash
+// the calling controller or the process. Any failure is just logged.
+const guarded = (fn, label) => async (payload) => {
+  try {
+    await fn(payload);
+  } catch (err) {
+    console.error(`[notify] ${label} failed:`, err && err.stack ? err.stack : err);
+  }
+};
+
+const _notifyLeaveApplied = async ({
   requesterName,
   handlerModel,
   handlerId,
@@ -58,7 +64,7 @@ const notifyLeaveApplied = async ({
   const handler = await resolvePerson(handlerModel, handlerId);
   if (!handler || !handler.email) return;
 
-  const html = buildApprovalRequestEmail({
+  const html = emailtemp.buildApprovalRequestEmail({
     recipientName: handler.name,
     requesterName,
     requestTypeLabel: "Leave Request",
@@ -73,7 +79,7 @@ const notifyLeaveApplied = async ({
   await safeSendMail({ to: handler.email, subject: `New Leave Request from ${requesterName}`, html });
 };
 
-const notifyLeaveForwarded = async ({
+const _notifyLeaveForwarded = async ({
   requesterName,
   forwardedByName,
   handlerModel,
@@ -87,7 +93,7 @@ const notifyLeaveForwarded = async ({
   const handler = await resolvePerson(handlerModel, handlerId);
   if (!handler || !handler.email) return;
 
-  const html = buildApprovalRequestEmail({
+  const html = emailtemp.buildApprovalRequestEmail({
     recipientName: handler.name,
     requesterName,
     requestTypeLabel: "Leave Request",
@@ -104,7 +110,7 @@ const notifyLeaveForwarded = async ({
   await safeSendMail({ to: handler.email, subject: `Leave Request Forwarded by ${forwardedByName}`, html });
 };
 
-const notifyLeaveDecision = async ({
+const _notifyLeaveDecision = async ({
   recipientModel,
   recipientId,
   leaveType,
@@ -118,7 +124,7 @@ const notifyLeaveDecision = async ({
   const recipient = await resolvePerson(recipientModel, recipientId);
   if (!recipient || !recipient.email) return;
 
-  const html = buildStatusDecisionEmail({
+  const html = emailtemp.buildStatusDecisionEmail({
     recipientName: recipient.name,
     requestTypeLabel: "Leave Request",
     leaveType,
@@ -138,11 +144,11 @@ const notifyLeaveDecision = async ({
   });
 };
 
-const notifyWFHApplied = async ({ requesterName, handlerModel, handlerId, startDate, endDate, days, reason }) => {
+const _notifyWFHApplied = async ({ requesterName, handlerModel, handlerId, startDate, endDate, days, reason }) => {
   const handler = await resolvePerson(handlerModel, handlerId);
   if (!handler || !handler.email) return;
 
-  const html = buildApprovalRequestEmail({
+  const html = emailtemp.buildApprovalRequestEmail({
     recipientName: handler.name,
     requesterName,
     requestTypeLabel: "Work From Home Request",
@@ -156,7 +162,7 @@ const notifyWFHApplied = async ({ requesterName, handlerModel, handlerId, startD
   await safeSendMail({ to: handler.email, subject: `New WFH Request from ${requesterName}`, html });
 };
 
-const notifyWFHForwarded = async ({
+const _notifyWFHForwarded = async ({
   requesterName,
   forwardedByName,
   handlerModel,
@@ -169,7 +175,7 @@ const notifyWFHForwarded = async ({
   const handler = await resolvePerson(handlerModel, handlerId);
   if (!handler || !handler.email) return;
 
-  const html = buildApprovalRequestEmail({
+  const html = emailtemp.buildApprovalRequestEmail({
     recipientName: handler.name,
     requesterName,
     requestTypeLabel: "Work From Home Request",
@@ -185,7 +191,7 @@ const notifyWFHForwarded = async ({
   await safeSendMail({ to: handler.email, subject: `WFH Request Forwarded by ${forwardedByName}`, html });
 };
 
-const notifyWFHDecision = async ({
+const _notifyWFHDecision = async ({
   recipientModel,
   recipientId,
   startDate,
@@ -198,7 +204,7 @@ const notifyWFHDecision = async ({
   const recipient = await resolvePerson(recipientModel, recipientId);
   if (!recipient || !recipient.email) return;
 
-  const html = buildStatusDecisionEmail({
+  const html = emailtemp.buildStatusDecisionEmail({
     recipientName: recipient.name,
     requestTypeLabel: "Work From Home Request",
     startDate,
@@ -217,11 +223,11 @@ const notifyWFHDecision = async ({
   });
 };
 
-const notifyAssetAssigned = async ({ recipientModel, recipientId, asset, assignedByName }) => {
+const _notifyAssetAssigned = async ({ recipientModel, recipientId, asset, assignedByName }) => {
   const recipient = await resolvePerson(recipientModel, recipientId);
   if (!recipient || !recipient.email) return;
 
-  const html = buildAssetAssignedEmail({
+  const html = emailtemp.buildAssetAssignedEmail({
     recipientName: recipient.name,
     asset,
     assignedByName,
@@ -237,11 +243,11 @@ const notifyAssetAssigned = async ({ recipientModel, recipientId, asset, assigne
 
 module.exports = {
   resolvePerson,
-  notifyLeaveApplied,
-  notifyLeaveForwarded,
-  notifyLeaveDecision,
-  notifyWFHApplied,
-  notifyWFHForwarded,
-  notifyWFHDecision,
-  notifyAssetAssigned,
+  notifyLeaveApplied: guarded(_notifyLeaveApplied, "notifyLeaveApplied"),
+  notifyLeaveForwarded: guarded(_notifyLeaveForwarded, "notifyLeaveForwarded"),
+  notifyLeaveDecision: guarded(_notifyLeaveDecision, "notifyLeaveDecision"),
+  notifyWFHApplied: guarded(_notifyWFHApplied, "notifyWFHApplied"),
+  notifyWFHForwarded: guarded(_notifyWFHForwarded, "notifyWFHForwarded"),
+  notifyWFHDecision: guarded(_notifyWFHDecision, "notifyWFHDecision"),
+  notifyAssetAssigned: guarded(_notifyAssetAssigned, "notifyAssetAssigned"),
 };
