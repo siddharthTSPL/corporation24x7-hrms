@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Clock,
   CalendarDays,
@@ -15,6 +15,8 @@ import {
   UserPlus,
   ShieldCheck,
   History,
+  Umbrella,
+  Lock,
 } from 'lucide-react';
 import {
   useGetAllShiftsSuperAdmin,
@@ -48,6 +50,8 @@ import {
   useGetAllEmployees,
   useGetAllManagers,
   useGetAllAdmins,
+  useGetLeavePolicy,
+  useSetLeavePolicy,
 } from '../../auth/server-state/superadmin/other/suother.hook';
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -1404,10 +1408,133 @@ function WeekOffPanel({ notify }) {
   );
 }
 
+function LeavePolicyPanel({ notify }) {
+  const policyQuery = useGetLeavePolicy();
+  const setLeavePolicy = useSetLeavePolicy();
+
+  const policy = policyQuery.data?.policy;
+  const locked = !!policy?.locked;
+
+  const [form, setForm] = useState({
+    EL: { admin: 18, default: 15 },
+    SL: { admin: 12, default: 12 },
+  });
+
+  useEffect(() => {
+    if (policy) {
+      setForm({
+        EL: { admin: policy.EL?.admin ?? 18, default: policy.EL?.default ?? 15 },
+        SL: { admin: policy.SL?.admin ?? 12, default: policy.SL?.default ?? 12 },
+      });
+    }
+  }, [policy]);
+
+  const updateField = (leaveType, tier, value) => {
+    setForm((f) => ({ ...f, [leaveType]: { ...f[leaveType], [tier]: value === '' ? '' : Number(value) } }));
+  };
+
+  const submit = () => {
+    setLeavePolicy.mutate(
+      {
+        EL: { admin: Number(form.EL.admin) || 0, default: Number(form.EL.default) || 0 },
+        SL: { admin: Number(form.SL.admin) || 0, default: Number(form.SL.default) || 0 },
+      },
+      {
+        onError: (e) => notify('error', errMsg(e, 'Could not update leave policy')),
+      }
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-6">
+      <SectionCard
+        icon={Umbrella}
+        title="Yearly leave entitlement"
+        subtitle="Earned Leave (EL) and Sick Leave (SL) granted per role tier, per year. Both accrue monthly and prorate automatically for anyone joining partway through the year."
+      >
+        {policyQuery.isLoading ? (
+          <div className="flex items-center justify-center py-10 text-slate-400">
+            <Loader2 className="w-5 h-5 animate-spin" />
+          </div>
+        ) : (
+          <>
+            {locked && (
+              <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 mb-5 text-sm text-amber-700">
+                <Lock className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>This policy is locked because your organisation already has at least one Admin, and can no longer be changed.</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="flex flex-col gap-4">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Earned Leave (EL) — per year</p>
+                <Field label="Admin">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    className={inputCls}
+                    value={form.EL.admin}
+                    disabled={locked}
+                    onChange={(e) => updateField('EL', 'admin', e.target.value)}
+                  />
+                </Field>
+                <Field label="Manager / Employee (default)">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    className={inputCls}
+                    value={form.EL.default}
+                    disabled={locked}
+                    onChange={(e) => updateField('EL', 'default', e.target.value)}
+                  />
+                </Field>
+              </div>
+              <div className="flex flex-col gap-4">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Sick Leave (SL) — per year</p>
+                <Field label="Admin">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    className={inputCls}
+                    value={form.SL.admin}
+                    disabled={locked}
+                    onChange={(e) => updateField('SL', 'admin', e.target.value)}
+                  />
+                </Field>
+                <Field label="Manager / Employee (default)">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    className={inputCls}
+                    value={form.SL.default}
+                    disabled={locked}
+                    onChange={(e) => updateField('SL', 'default', e.target.value)}
+                  />
+                </Field>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-5">
+              <Button onClick={submit} disabled={locked || setLeavePolicy.isPending}>
+                {setLeavePolicy.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save policy'}
+              </Button>
+            </div>
+          </>
+        )}
+      </SectionCard>
+    </div>
+  );
+}
+
 const TABS = [
   { key: 'shifts', label: 'Shifts', icon: Clock },
   { key: 'holidays', label: 'Holidays', icon: CalendarDays },
   { key: 'weekoff', label: 'Week-off policy', icon: Settings2 },
+  { key: 'leavepolicy', label: 'Leave policy', icon: Umbrella },
 ];
 
 export default function SuperAdminManagement() {
@@ -1451,6 +1578,7 @@ export default function SuperAdminManagement() {
         {tab === 'shifts' && <ShiftsPanel notify={notify} />}
         {tab === 'holidays' && <HolidaysPanel notify={notify} />}
         {tab === 'weekoff' && <WeekOffPanel notify={notify} />}
+        {tab === 'leavepolicy' && <LeavePolicyPanel notify={notify} />}
       </div>
     </div>
   );

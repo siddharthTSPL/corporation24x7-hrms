@@ -29,6 +29,10 @@ const leaveBalanceSchema = new mongoose.Schema(
         type: Number,
         default: 0,
       },
+      accrued: {
+        type: Number,
+        default: 0,
+      },
     },
     ML: Number,
     mlStartDate: Date,

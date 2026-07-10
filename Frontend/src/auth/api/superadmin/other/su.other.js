@@ -156,6 +156,21 @@ export const getActiveUserCount = async () => {
 };
 
 // ---------------------------------------------------------------------
+// Leave policy — lets a SuperAdmin customize yearly EL/SL entitlement
+// (per admin vs everyone-else tier) for their organisation. One-time:
+// the backend locks this the moment the org has its first Admin.
+// ---------------------------------------------------------------------
+export const getLeavePolicy = async () => {
+  const res = await api.get("superadmin/leave-policy");
+  return res.data;
+};
+
+export const setLeavePolicy = async (data) => {
+  const res = await api.post("superadmin/leave-policy", data);
+  return res.data;
+};
+
+// ---------------------------------------------------------------------
 // Kiosk password — the credential (separate from the superadmin's own
 // login password) that face-attendance tablets sign in with, alongside
 // the organisation's Organisation ID.
