@@ -13,7 +13,7 @@ const reviewModel = require("../Models/review.model");
 const Attendance = require("../Models/attendance.model");
 const generateUID = require("../automatic/uidgeneration");
 const assignDefaultLeave = require("../automatic/bydefaultleaveset");
-const LeavePolicy = require("../Models/leavepolicy.model");
+const LeavePolicy = require("../Models/Leavepolicy.model");
 const { processLeaveDeduction } = require("../automatic/calculateleave");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();

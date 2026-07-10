@@ -1,5 +1,5 @@
 const LeaveBalance = require("../Models/leavebalance.model");
-const LeavePolicy = require("../Models/leavepolicy.model");
+const LeavePolicy = require("../Models/Leavepolicy.model");
 
 // Fallback values used for any organisation that hasn't set a custom
 // LeavePolicy (or hasn't customized a particular field in it).
