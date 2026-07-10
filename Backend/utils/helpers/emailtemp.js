@@ -328,12 +328,54 @@ function buildAssetAssignedEmail({ recipientName, asset = {}, assignedByName, po
   });
 }
 
+// ---------------------------------------------------------------
+// OTP / password reset
+// ---------------------------------------------------------------
+
+function otpBlock(otp, expiresInMinutes) {
+  const digits = String(otp)
+    .split("")
+    .map(
+      (d) =>
+        `<td style="padding:0 4px;"><div style="width:38px;height:46px;line-height:46px;text-align:center;border:1px solid ${BRAND.border};border-radius:4px;background:${BRAND.bg};font-size:20px;font-weight:700;color:${BRAND.primary};">${escapeHtml(d)}</div></td>`
+    )
+    .join("");
+
+  return `
+    <table cellpadding="0" cellspacing="0" style="margin:22px 0;">
+      <tr>${digits}</tr>
+    </table>
+    <p style="margin:0;font-size:12px;color:${BRAND.muted};">This code expires in ${expiresInMinutes} minutes. Do not share it with anyone.</p>
+  `;
+}
+
+function buildForgotPasswordOtpEmail({ recipientName = "", otp, expiresInMinutes = 5 }) {
+  const greeting = recipientName ? `Hi ${escapeHtml(recipientName)},` : "Hello,";
+  const body = `
+    <p style="margin:0 0 20px;color:${BRAND.text};font-size:15px;line-height:1.6;">
+      ${greeting}<br/><br/>
+      We received a request to reset the password for your ${PRODUCT_NAME} account. Use the verification code below to continue.
+    </p>
+    ${otpBlock(otp, expiresInMinutes)}
+    <p style="margin:24px 0 0;color:${BRAND.muted};font-size:12px;line-height:1.6;">
+      If you did not request a password reset, you can safely ignore this email — your password will remain unchanged.
+    </p>
+  `;
+
+  return emailShell({
+    preheader: `Your ${PRODUCT_NAME} password reset code`,
+    headerTitle: "Password Reset Code",
+    bodyHtml: body,
+  });
+}
+
 module.exports = {
   buildManagerEmail,
   buildEmployeeEmail,
   buildApprovalRequestEmail,
   buildStatusDecisionEmail,
   buildAssetAssignedEmail,
+  buildForgotPasswordOtpEmail,
   leaveTypeLabel,
   formatDate,
 };
