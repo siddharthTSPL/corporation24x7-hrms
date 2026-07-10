@@ -19,7 +19,7 @@ const leaveSchema = new mongoose.Schema({
   },
   leaveType: {
     type: String,
-    enum: ["el", "sl", "ml", "pl", "half_day_el", "half_day_sl"],
+    enum: ["el", "sl", "ml", "pl", "half_day_el", "half_day_sl", "lwp"],
     required: true,
   },
   startDate: { type: Date, required: true },
