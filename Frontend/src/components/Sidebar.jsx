@@ -32,7 +32,7 @@ const superAdminMenu = [
   { name: "Announcements",  path: "/superadmin-announcements", icon: <FaBullhorn /> },
   { name: "Leaves",         path: "/superadmin-leaves",        icon: <FaCalendarAlt /> },
   { name: "Reviews",        path: "/superadmin-reviews",       icon: <FaBullhorn /> },
-  {name: "asset management", path: "/superadmin-asset-management", icon: <FaFolder /> },
+  {name: "Asset Management", path: "/superadmin-asset-management", icon: <FaFolder /> },
   { name: "Team Documents", path: "/superadmin-documents",     icon: <FaFileAlt /> },
   { name:"Timesheet",       path: "/superadmin-timesheet",     icon: <FaLock /> },
   { name: "TorchX Management", path: "/superadmin-management", icon: <FaUsersCog /> },
