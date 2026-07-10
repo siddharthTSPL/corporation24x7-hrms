@@ -35,6 +35,13 @@ cron.schedule("0 0 1 * *", async () => {
         );
       }
 
+      if (balance.SL.accrued < balance.SL.entitled) {
+        $set["SL.accrued"] = Math.min(
+          Number((balance.SL.accrued + balance.SL.entitled / 12).toFixed(2)),
+          balance.SL.entitled
+        );
+      }
+
       return { updateOne: { filter: { _id: balance._id }, update: { $set } } };
     });
 

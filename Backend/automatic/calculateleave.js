@@ -51,7 +51,7 @@ async function processLeaveDeduction(leave) {
     case "sl":
     case "half_day_sl": {
       const d = leave.leaveType === "half_day_sl" ? 0.5 : days;
-      const available = Number((balance.SL.entitled - balance.SL.availed).toFixed(2));
+      const available = Math.max(0, Number((balance.SL.accrued - balance.SL.availed).toFixed(2)));
       const deductable = Math.min(available, d);
       $set["SL.availed"] = Number((balance.SL.availed + deductable).toFixed(2));
       $set.pbc = Number(((balance.pbc || 0) + deductable).toFixed(2));
