@@ -2,7 +2,7 @@ const Attendance = require("../Models/attendance.model");
 const AdminModel = require("../Models/Admin.model");
 const Shift = require("../Models/shift.model");
 const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
-const { resolveEmployeeShift, evaluateCheckinWindow, evaluateCheckoutWindow, getShiftThresholds } = require("../utils/shift.utils");
+const { resolveEmployeeShift, evaluateCheckinWindow, evaluateCheckoutWindow, getShiftThresholds, getForceCheckoutInstant } = require("../utils/shift.utils");
 const { isHoliday, isWeekOff, startOfDay } = require("../automatic/weekoffcalendar");
 
 const getUserId = (user) => user._id || user.id;
@@ -56,18 +56,24 @@ const checkin = async (req, res) => {
     }
 
     const shift = await resolveEmployeeShift(user, organisation_id);
-    const { allowed, isLate } = evaluateCheckinWindow(shift, new Date());
+    const { allowed, isLate, tooLate } = evaluateCheckinWindow(shift, new Date());
 
     if (!allowed) {
+      if (tooLate) {
+        return res.status(400).json({
+          message: `Not allowed — you are too late. Check-in for ${shift.name} closes ${shift.lateCheckinCutoffMinutes ?? 60} minute(s) after shift start (${shift.startTime}).`,
+          reason: "too_late",
+          shift: { name: shift.name, startTime: shift.startTime, endTime: shift.endTime },
+        });
+      }
       return res.status(400).json({
-        message: `Check-in is only allowed between ${shift.earlyBufferMinutes ?? 60} minutes before your shift (${shift.startTime}) and your shift end (${shift.endTime}).`,
-        reason: "outside_shift",
+        message: `Check-in opens ${shift.earlyBufferMinutes ?? 60} minute(s) before your shift (${shift.startTime}).`,
+        reason: "too_early",
         shift: { name: shift.name, startTime: shift.startTime, endTime: shift.endTime },
       });
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = startOfDay(new Date()); // IST-based day boundary (see automatic/weekoffcalendar.js)
 
     const attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
 
@@ -89,7 +95,19 @@ const checkin = async (req, res) => {
         await attendance.save();
         return res.json({ message: "Check-in successful", attendance, isLate });
       }
-      return res.status(400).json({ message: "Already checked in" });
+      // One channel per day: whichever system checked you in owns the
+      // whole day, including checkout. The other channel must not act on
+      // this record - it should only report who already checked you in.
+      if (attendance.source === "face") {
+        return res.status(400).json({
+          message: "Already checked in by Face Attendance. Please use Face Attendance to check out too.",
+          reason: "checked_in_by_face",
+        });
+      }
+      return res.status(400).json({
+        message: "Already checked in by System. Please check out from here as well.",
+        reason: "checked_in_by_system",
+      });
     }
 
     const newAttendance = await Attendance.create({
@@ -126,8 +144,7 @@ const activity = async (req, res) => {
     if (!["active", "idle"].includes(status))
       return res.status(400).json({ message: "Invalid status" });
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = startOfDay(new Date()); // IST-based day boundary (see automatic/weekoffcalendar.js)
 
     let attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
 
@@ -180,8 +197,7 @@ const checkout = async (req, res) => {
     const userId = getUserId(user);
     const organisation_id = await resolveOrganisationId(user);
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = startOfDay(new Date()); // IST-based day boundary (see automatic/weekoffcalendar.js)
 
     const attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
 
@@ -189,6 +205,11 @@ const checkout = async (req, res) => {
       return res.status(404).json({ message: "Please check in first" });
     if (attendance.source === "agent")
       return res.status(400).json({ message: "Please check in first before checking out" });
+    if (attendance.source === "face")
+      return res.status(400).json({
+        message: "You checked in via Face Attendance. Please use Face Attendance to check out too.",
+        reason: "checked_in_by_face",
+      });
     if (attendance.checkOut)
       return res.status(400).json({ message: "Already checked out" });
 
@@ -220,8 +241,13 @@ const checkout = async (req, res) => {
     await attendance.save();
     await updateSummary(attendance);
 
+    const message =
+      remark === "auto_overtime"
+        ? `You are automatically checked out because you are overtime more than ${Math.floor((shiftDoc.maxOvertimeMinutes ?? 60) / 60)} hour(s).`
+        : "Checkout successful";
+
     res.json({
-      message: "Checkout successful",
+      message,
       status,
       checkoutRemark: remark,
       overtimeMinutes: attendance.overtimeMinutes,
@@ -239,8 +265,7 @@ const getToday = async (req, res) => {
     const userId = getUserId(user);
     const organisation_id = await resolveOrganisationId(user);
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = startOfDay(new Date()); // IST-based day boundary (see automatic/weekoffcalendar.js)
 
     const attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id }).lean();
 
@@ -261,34 +286,36 @@ const getToday = async (req, res) => {
   }
 };
 
+// Runs frequently (every 5 min, see automatic/autoelcredit.js) rather than
+// once a day, because "shift end + maxOvertimeMinutes" is a different
+// clock time for every shift - a single fixed daily run can't catch a
+// shift that ends at 9 PM if it only runs at 7 PM.
+//
+// Deliberately NOT scoped to `date: today` - an overnight shift's record
+// may still be dated "yesterday" (IST) when its overtime cutoff arrives.
+// Deliberately excludes source "agent": an agent-only ping was never a
+// real, window-validated check-in and must not be auto-completed as a
+// full attendance day (see faceattendance.controller.js).
 const autoCheckoutAll = async () => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     const openSessions = await Attendance.find({
-      date: today,
-      source: "manual",
+      source: { $in: ["manual", "face"] },
       checkIn: { $exists: true },
       checkOut: { $exists: false },
-    }).select("_id activeMinutes organisation_id shift employee role").lean();
+    }).select("_id activeMinutes organisation_id shift employee role date checkIn").lean();
 
     if (!openSessions.length) return;
 
-    // Resolve thresholds per session (per shift), defaulting to the org's
-    // default shift for any legacy records missing a `shift` reference.
     const shiftCache = new Map();
-    const getThresholdsFor = async (session) => {
+    const getShiftFor = async (session) => {
       if (session.shift) {
         if (!shiftCache.has(String(session.shift))) {
           const shift = await Shift.findById(session.shift).lean();
           shiftCache.set(String(session.shift), shift);
         }
-        const shift = shiftCache.get(String(session.shift));
-        if (shift) return getShiftThresholds(shift);
+        return shiftCache.get(String(session.shift));
       }
-      const fallback = await resolveEmployeeShift({}, session.organisation_id);
-      return getShiftThresholds(fallback);
+      return resolveEmployeeShift({}, session.organisation_id);
     };
 
     const now = new Date();
@@ -296,16 +323,34 @@ const autoCheckoutAll = async () => {
     const summaryPayloads = [];
 
     for (const a of openSessions) {
-      const thresholds = await getThresholdsFor(a);
+      const shift = await getShiftFor(a);
+      if (!shift) continue;
+
+      const forceCheckoutAt = getForceCheckoutInstant(shift, a.date);
+      if (now < forceCheckoutAt) continue; // overtime cutoff not reached yet
+
+      const thresholds = getShiftThresholds(shift);
       const status = calculateStatus(a.activeMinutes, thresholds);
+      const checkoutWindow = evaluateCheckoutWindow(shift, forceCheckoutAt, a.checkIn);
+
       ops.push({
         updateOne: {
-          filter: { _id: a._id, organisation_id: a.organisation_id },
-          update: { $set: { checkOut: now, status } },
+          filter: { _id: a._id, organisation_id: a.organisation_id, checkOut: { $exists: false } },
+          update: {
+            $set: {
+              checkOut: forceCheckoutAt,
+              status,
+              checkoutRemark: "auto_overtime",
+              overtimeMinutes: checkoutWindow.overtimeMinutes ?? 0,
+              autoCheckedOut: true,
+            },
+          },
         },
       });
-      summaryPayloads.push({ ...a, checkOut: now, status });
+      summaryPayloads.push({ ...a, checkOut: forceCheckoutAt, status });
     }
+
+    if (!ops.length) return;
 
     await Attendance.bulkWrite(ops, { ordered: false });
     await Promise.all(summaryPayloads.map((a) => updateSummary(a)));
@@ -397,12 +442,12 @@ const getCalendarMeta = async (req, res) => {
     const todayHoliday = await isHoliday(today0, organisation_id);
     const todayWeekOff = await isWeekOff(today0, organisation_id, userId, employeeModel);
     const shift = await resolveEmployeeShift(user, organisation_id);
-    const { allowed: withinShiftWindow } = evaluateCheckinWindow(shift, now);
+    const { allowed: withinShiftWindow, tooLate: checkinTooLate } = evaluateCheckinWindow(shift, now);
 
     let disabledReason = null;
     if (todayHoliday.isHoliday) disabledReason = "holiday";
     else if (todayWeekOff.isOff) disabledReason = "weekoff";
-    else if (!withinShiftWindow) disabledReason = "outside_shift";
+    else if (!withinShiftWindow) disabledReason = checkinTooLate ? "too_late" : "too_early";
 
     res.json({
       success: true,
