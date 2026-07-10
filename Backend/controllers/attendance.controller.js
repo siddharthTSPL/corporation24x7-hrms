@@ -444,9 +444,24 @@ const getCalendarMeta = async (req, res) => {
     const shift = await resolveEmployeeShift(user, organisation_id);
     const { allowed: withinShiftWindow, tooLate: checkinTooLate } = evaluateCheckinWindow(shift, now);
 
+    // Cross-channel check: if Face Attendance already checked this person
+    // in (and they haven't checked out), the System channel must not
+    // offer a fresh check-in - it should say who already did it. A
+    // "manual"-source record isn't blocked here since that's the normal
+    // "already checked in, show checkout" state handled elsewhere by
+    // isCheckedIn/isCheckedOut - this is specifically the cross-channel case.
+    const todayAttendance = await Attendance.findOne({
+      employee: userId,
+      role: user.role,
+      date: today0,
+      organisation_id,
+    }).select("source checkOut checkIn").lean();
+    const checkedInByFace = todayAttendance?.source === "face" && !todayAttendance?.checkOut;
+
     let disabledReason = null;
     if (todayHoliday.isHoliday) disabledReason = "holiday";
     else if (todayWeekOff.isOff) disabledReason = "weekoff";
+    else if (checkedInByFace) disabledReason = "checked_in_by_face";
     else if (!withinShiftWindow) disabledReason = checkinTooLate ? "too_late" : "too_early";
 
     res.json({
@@ -466,8 +481,10 @@ const getCalendarMeta = async (req, res) => {
           earlyBufferMinutes: shift.earlyBufferMinutes ?? 60,
         },
         withinShiftWindow,
-        canCheckIn: !todayHoliday.isHoliday && !todayWeekOff.isOff && withinShiftWindow,
+        canCheckIn: !todayHoliday.isHoliday && !todayWeekOff.isOff && !checkedInByFace && withinShiftWindow,
         disabledReason,
+        checkedInByFace,
+        faceCheckInTime: checkedInByFace ? todayAttendance.checkIn : null,
       },
     });
   } catch (error) {
