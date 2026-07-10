@@ -2,6 +2,7 @@ const AssetModel = require("../Models/Asset.model");
 const AdminModel = require("../Models/Admin.model");
 const Managermodel = require("../Models/manager.model");
 const Usermodel = require("../Models/user.model");
+const { notifyAssetAssigned } = require("../utils/notify.utils");
 
 const generateAssetId = () => {
   const ts = Date.now().toString(36).toUpperCase();
@@ -177,6 +178,13 @@ const assignAssetToAdminSuperAdmin = async (req, res, next) => {
     asset.return_notes = null;
 
     await asset.save();
+
+    notifyAssetAssigned({
+      recipientModel: "Admin",
+      recipientId: admin._id,
+      asset,
+      assignedByName: `${req.superAdmin.f_name || ""} ${req.superAdmin.l_name || ""}`.trim() || "SuperAdmin",
+    });
 
     return res.status(200).json({
       success: true,
@@ -456,6 +464,13 @@ const assignAssetToEmployee = async (req, res, next) => {
 
     await asset.save();
 
+    notifyAssetAssigned({
+      recipientModel: "User",
+      recipientId: employee._id,
+      asset,
+      assignedByName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+    });
+
     return res.status(200).json({
       success: true,
       message: `Asset assigned to ${employee.f_name} ${employee.l_name} successfully`,
@@ -519,6 +534,13 @@ const assignAssetToManager = async (req, res, next) => {
     asset.return_notes = null;
 
     await asset.save();
+
+    notifyAssetAssigned({
+      recipientModel: "Manager",
+      recipientId: manager._id,
+      asset,
+      assignedByName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+    });
 
     return res.status(200).json({
       success: true,

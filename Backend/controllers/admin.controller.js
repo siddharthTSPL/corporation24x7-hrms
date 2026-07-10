@@ -28,6 +28,7 @@ const AttendanceSummary = require("../Models/attendancesummary.model");
 const WFH = require("../Models/wfh.model");
 const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = require("../utils/licenseCheck");
 const AssetModel = require("../Models/asset.model");
+const { notifyLeaveDecision, notifyAssetAssigned, notifyLeaveApplied } = require("../utils/notify.utils");
 const { isEmailTaken, isEmpidTaken } = require("../utils/emailAvailability.utils");
 
 const EXCLUDE =
@@ -1982,6 +1983,18 @@ const acceptLeave = async (req, res, next) => {
         console.error("Leave approved but balance deduction failed:", deductionError.message);
       }
 
+      notifyLeaveDecision({
+        recipientModel: "User",
+        recipientId: leave.employee,
+        leaveType: leave.leaveType,
+        startDate: leave.startDate,
+        endDate: leave.endDate,
+        days: leave.days,
+        decision: "approved",
+        decidedByName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+        remarks: leave.remarks,
+      });
+
       return res.status(200).json({ success: true, message: "Employee leave approved successfully", leave });
     }
 
@@ -2008,6 +2021,18 @@ const acceptLeave = async (req, res, next) => {
       } catch (deductionError) {
         console.error("Leave approved but balance deduction failed:", deductionError.message);
       }
+
+      notifyLeaveDecision({
+        recipientModel: "Manager",
+        recipientId: leave.manager,
+        leaveType: leave.leaveType,
+        startDate: leave.startDate,
+        endDate: leave.endDate,
+        days: leave.days,
+        decision: "approved",
+        decidedByName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+        remarks: leave.remarks,
+      });
 
       return res.status(200).json({ success: true, message: "Manager leave approved successfully", leave });
     }
@@ -2049,6 +2074,18 @@ const rejectLeave = async (req, res, next) => {
       leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await leave.save();
 
+      notifyLeaveDecision({
+        recipientModel: "User",
+        recipientId: leave.employee,
+        leaveType: leave.leaveType,
+        startDate: leave.startDate,
+        endDate: leave.endDate,
+        days: leave.days,
+        decision: "rejected",
+        decidedByName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+        remarks: leave.remarks,
+      });
+
       return res.status(200).json({ success: true, message: "Employee leave rejected successfully", leave });
     }
 
@@ -2070,6 +2107,18 @@ const rejectLeave = async (req, res, next) => {
       leave.remarks = `Rejected by Admin (${req.admin.f_name})`;
       leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await leave.save();
+
+      notifyLeaveDecision({
+        recipientModel: "Manager",
+        recipientId: leave.manager,
+        leaveType: leave.leaveType,
+        startDate: leave.startDate,
+        endDate: leave.endDate,
+        days: leave.days,
+        decision: "rejected",
+        decidedByName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+        remarks: leave.remarks,
+      });
 
       return res.status(200).json({ success: true, message: "Manager leave rejected successfully", leave });
     }
@@ -2118,6 +2167,17 @@ const applyleave = async (req, res, next) => {
     days,
     reason,
     status: "pending_superadmin",
+  });
+
+  notifyLeaveApplied({
+    requesterName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+    handlerModel: "SuperAdmin",
+    handlerId: organisation_id,
+    leaveType,
+    startDate: start,
+    endDate: end,
+    days,
+    reason,
   });
 
   res.status(201).json({ success: true, message: "Leave request submitted to super admin", leave });
