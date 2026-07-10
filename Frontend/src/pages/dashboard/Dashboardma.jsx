@@ -5,7 +5,7 @@ import { useGetMeManager } from "../../auth/server-state/manager/managerauth/man
 import { useGetAllManagerLeaves } from "../../auth/server-state/manager/managerleave/managerleave.hook";
 import { useGetAttendance } from "../../auth/server-state/manager/managgerother/managerother.hook";
 import { useGetMyLeavesManager } from "../../auth/server-state/manager/managerleave/managerleave.hook";
-import { useCalendarMeta } from "../../auth/server-state/attendance/attendance.hook";
+import { useCalendarMeta, useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS   = ["S","M","T","W","T","F","S"];
@@ -617,26 +617,35 @@ function AnnouncementItem({ ann }) {
   );
 }
 
-function TodayBanner({ isOnLeave, leaveType, checkinGate, onCheckIn, onRecruitment }) {
+function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, checkinGate, onCheckIn, onRecruitment }) {
   const today = new Date();
   const day   = today.toLocaleDateString("en-IN", { weekday:"long" });
   const date  = today.toLocaleDateString("en-IN", { day:"numeric", month:"long", year:"numeric" });
+  const fmtTime = (d) => d ? new Date(d).toLocaleTimeString("en-IN", { hour:"2-digit", minute:"2-digit" }) : "—";
 
   const leaveLabel = {
     el: "Earned Leave", sl: "Sick Leave", pl: "Paternity Leave",
     ml: "Maternity Leave", cl: "Casual Leave", lwp: "Leave Without Pay",
   };
 
-  const reason = isOnLeave ? "leave" : (checkinGate?.reason ?? null);
-  const isBlocked = isOnLeave || !checkinGate?.canCheckIn;
+  // Once the day's session has started, always allow finishing it
+  // regardless of holiday/week-off/shift-window (those only gate the
+  // initial check-in).
+  const alreadyActedToday = isCheckedIn || isCheckedOut;
+  const reason = isOnLeave ? "leave" : (!alreadyActedToday ? (checkinGate?.reason ?? null) : null);
+  const isBlocked = isOnLeave || (!alreadyActedToday && !checkinGate?.canCheckIn);
 
   const REASON_META = {
     leave:         { theme:"indigo", icon:"🏖️", label: `On Leave — ${leaveLabel[leaveType] || "Approved Leave"}` },
     holiday:       { theme:"amber",  icon:"🎉", label: `Holiday — ${checkinGate?.holidayName || "Company Holiday"}` },
     weekoff:       { theme:"slate",  icon:"🛋️", label: "Week Off" },
-    outside_shift: { theme:"slate",  icon:"⏰", label: checkinGate?.shift
-      ? `Shift window: ${checkinGate.shift.startTime} – ${checkinGate.shift.endTime}`
-      : "Outside shift window" },
+    too_early:     { theme:"slate",  icon:"⏰", label: checkinGate?.shift
+      ? `Check-in opens closer to ${checkinGate.shift.startTime}`
+      : "Check-in not open yet" },
+    too_late:      { theme:"rose",   icon:"⛔", label: checkinGate?.shift
+      ? `Check-in closed — more than 1 hour past ${checkinGate.shift.startTime}`
+      : "Check-in window closed" },
+    checked_in_by_face: { theme:"pink", icon:"🤳", label: "Checked in via Face Attendance" },
     loading:       { theme:"slate",  icon:"⏳", label: "Checking today's status…" },
   };
   const meta = REASON_META[reason] || null;
@@ -645,26 +654,38 @@ function TodayBanner({ isOnLeave, leaveType, checkinGate, onCheckIn, onRecruitme
     indigo: "linear-gradient(135deg,#e8eaf6,#c5cae9)",
     amber:  "linear-gradient(135deg,#fdf1e0,#f6dcb8)",
     slate:  "linear-gradient(135deg,#eef1f4,#dbe1e8)",
+    rose:   "linear-gradient(135deg,#ffe4e6,#fecdd3)",
+    pink:   "linear-gradient(135deg,#fce7f3,#fbcfe8)",
   };
-  const themeText = { indigo:"#283593", amber:"#92400E", slate:"#334155" };
+  const themeText = { indigo:"#283593", amber:"#92400E", slate:"#334155", rose:"#9F1239", pink:"#9D174D" };
   const themePill = {
     indigo: { color:"#3949AB", background:"rgba(57,73,171,0.12)" },
     amber:  { color:"#92400E", background:"rgba(146,64,14,0.12)" },
     slate:  { color:"#334155", background:"rgba(51,65,85,0.1)" },
+    rose:   { color:"#9F1239", background:"rgba(159,18,57,0.1)" },
+    pink:   { color:"#9D174D", background:"rgba(157,23,77,0.1)" },
   };
 
-  const background = isBlocked && meta
-    ? themeBg[meta.theme]
-    : "linear-gradient(135deg,#730042,#a0004a)";
-  const headingColor = isBlocked && meta ? themeText[meta.theme] : "#f9f8f2";
-  const subColor = isBlocked && meta ? `${themeText[meta.theme]}b3` : "rgba(249,248,242,0.65)";
+  const active = isBlocked && meta
+    ? { bg: themeBg[meta.theme], head: themeText[meta.theme], sub: `${themeText[meta.theme]}b3`, pill: themePill[meta.theme] }
+    : null;
+
+  const background = active ? active.bg : "linear-gradient(135deg,#730042,#a0004a)";
+  const headingColor = active ? active.head : "#f9f8f2";
+  const subColor = active ? active.sub : "rgba(249,248,242,0.65)";
 
   let buttonLabel = "Check In";
-  if (reason === "leave") buttonLabel = "🚫 Check-in Disabled";
+  if (isOnLeave) buttonLabel = "🚫 Check-in Disabled";
+  else if (isCheckedOut) buttonLabel = "✅ Completed";
+  else if (isCheckedIn) buttonLabel = "🔴 Check Out";
   else if (reason === "holiday") buttonLabel = "🎉 Holiday Today";
   else if (reason === "weekoff") buttonLabel = "🛋️ Week Off";
-  else if (reason === "outside_shift") buttonLabel = "⏰ Outside Shift";
+  else if (reason === "too_early") buttonLabel = "⏰ Not Open Yet";
+  else if (reason === "too_late") buttonLabel = "⛔ Blocked";
+  else if (reason === "checked_in_by_face") buttonLabel = "🤳 Checked In (Face)";
   else if (reason === "loading") buttonLabel = "Please wait…";
+
+  const buttonDisabled = isBlocked || isCheckedOut;
 
   return (
     <div className="md-today-banner" style={{
@@ -688,9 +709,17 @@ function TodayBanner({ isOnLeave, leaveType, checkinGate, onCheckIn, onRecruitme
             </span>
           </div>
         )}
-        {!isBlocked && checkinGate?.shift && (
+        {!isBlocked && !alreadyActedToday && checkinGate?.shift && (
           <div style={{ marginTop:6, fontSize:11, color:"rgba(249,248,242,0.6)", fontFamily:"'DM Sans',sans-serif" }}>
             Shift: {checkinGate.shift.name} · {checkinGate.shift.startTime} – {checkinGate.shift.endTime}
+          </div>
+        )}
+        {!isOnLeave && (isCheckedIn || isCheckedOut) && (
+          <div style={{ display:"flex", alignItems:"center", gap:12, marginTop:6, fontSize:11, color:"rgba(249,248,242,0.7)", fontFamily:"'DM Sans',sans-serif" }}>
+            <span>In: <strong style={{ color:"#fff" }}>{fmtTime(myAtt?.checkIn)}</strong></span>
+            {isCheckedOut && <span>Out: <strong style={{ color:"#fff" }}>{fmtTime(myAtt?.checkOut)}</strong></span>}
+            {isCheckedOut && myAtt?.autoCheckedOut && <span>⏱️ Auto checked-out</span>}
+            {isCheckedOut && !myAtt?.autoCheckedOut && (myAtt?.checkoutRemark === "overtime") && <span>⏰ Overtime</span>}
           </div>
         )}
       </div>
@@ -704,14 +733,14 @@ function TodayBanner({ isOnLeave, leaveType, checkinGate, onCheckIn, onRecruitme
         </button> */}
         <button
           className="md-checkin-btn"
-          disabled={isBlocked}
+          disabled={buttonDisabled}
           onClick={onCheckIn}
           style={{
-            background: isBlocked ? "rgba(255,255,255,0.4)" : "#fff",
-            color:      isBlocked ? headingColor              : "#730042",
-            cursor:     isBlocked ? "not-allowed"             : "pointer",
-            opacity:    isBlocked ? .75 : 1,
-            boxShadow:  isBlocked ? "none" : "0 2px 10px rgba(0,0,0,0.1)",
+            background: buttonDisabled ? "rgba(255,255,255,0.4)" : "#fff",
+            color:      buttonDisabled ? headingColor              : "#730042",
+            cursor:     buttonDisabled ? "not-allowed"             : "pointer",
+            opacity:    buttonDisabled ? .75 : 1,
+            boxShadow:  buttonDisabled ? "none" : "0 2px 10px rgba(0,0,0,0.1)",
           }}
         >
           {buttonLabel}
@@ -870,6 +899,11 @@ export default function ManagerDashboard() {
   const { data: attData,  isLoading: attLoading                     } = useGetAttendance();
   const { data: myLeaveData                                         } = useGetMyLeavesManager();
   const { data: calMeta                                             } = useCalendarMeta(selectedMonth, new Date().getFullYear());
+  const { data: todayAttData                                        } = useTodayAttendance();
+
+  const myAtt = todayAttData?.attendance ?? null;
+  const isCheckedIn = todayAttData?.isCheckedIn ?? false;
+  const isCheckedOut = todayAttData?.isCheckedOut ?? false;
 
   const manager   = meData?.manager      ?? null;
   const lb        = meData?.leavebalance?.[0] ?? null;
@@ -1042,6 +1076,9 @@ export default function ManagerDashboard() {
       <TodayBanner
         isOnLeave={isOnLeaveToday}
         leaveType={todayLeave?.leaveType}
+        isCheckedIn={isCheckedIn}
+        isCheckedOut={isCheckedOut}
+        myAtt={myAtt}
         checkinGate={checkinGate}
         onCheckIn={() => navigate("/mark-attendance")}
         onRecruitment={() => navigate("/manager/recruitment")}

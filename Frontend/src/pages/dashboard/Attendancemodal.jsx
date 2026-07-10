@@ -92,6 +92,27 @@ function AlreadyDoneScreen({ attendance, onClose }) {
       )}
       {attendance && (
         <>
+          <div className="flex gap-1.5 justify-center flex-wrap w-full">
+            <span className="text-[10px] sm:text-[11px] font-semibold rounded-full px-2.5 sm:px-3 py-1 bg-gray-50 border border-gray-200 text-gray-500">
+              {attendance.source === "face" ? "🤳 Checked in via Face Attendance" : "📍 Checked in via System"}
+              {attendance.checkInGate ? ` · ${attendance.checkInGate}` : ""}
+            </span>
+            {attendance.checkOut && (
+              <span className="text-[10px] sm:text-[11px] font-semibold rounded-full px-2.5 sm:px-3 py-1 bg-gray-50 border border-gray-200 text-gray-500">
+                {attendance.autoCheckedOut
+                  ? "⏱️ Auto checked-out (overtime limit reached)"
+                  : attendance.source === "face"
+                    ? "🤳 Checked out via Face Attendance"
+                    : "📍 Checked out via System"}
+                {attendance.checkOutGate ? ` · ${attendance.checkOutGate}` : ""}
+              </span>
+            )}
+            {(attendance.checkoutRemark === "overtime" || attendance.checkoutRemark === "auto_overtime") && attendance.overtimeMinutes > 0 && (
+              <span className="text-[10px] sm:text-[11px] font-semibold rounded-full px-2.5 sm:px-3 py-1 bg-amber-50 border border-amber-200 text-amber-700">
+                ⏰ Overtime · {Math.floor(attendance.overtimeMinutes / 60) > 0 ? `${Math.floor(attendance.overtimeMinutes / 60)}h ` : ""}{attendance.overtimeMinutes % 60}m
+              </span>
+            )}
+          </div>
           <div className="flex gap-2 sm:gap-2.5 justify-center flex-wrap w-full">
             <div className="flex items-center gap-2 sm:gap-2.5 bg-green-50 border border-green-200 rounded-xl px-3 sm:px-4 py-2 sm:py-2.5">
               <span>🟢</span>
@@ -242,6 +263,20 @@ export default function AttendanceModal({ user, roleMeta, onClose }) {
                 </div>
               );
             })()
+          ) : todayData?.attendance?.source === "face" && !todayData?.isCheckedOut && !isCheckedIn ? (
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 flex flex-col items-center gap-2.5 sm:gap-3 shadow-sm text-center">
+              <div className="text-4xl sm:text-5xl">🤳</div>
+              <h2 className="m-0 text-lg sm:text-xl font-bold text-gray-900">Already Checked In via Face Attendance</h2>
+              <p className="m-0 text-xs sm:text-sm text-gray-500">
+                You checked in at {formatTime(todayData.attendance.checkIn)}{todayData.attendance.checkInGate ? ` · ${todayData.attendance.checkInGate}` : ""}. Please use the Face Kiosk to check out too — this app can't act on this record.
+              </p>
+              <button
+                onClick={onClose}
+                className="w-full bg-gray-50 text-gray-600 border border-gray-200 rounded-2xl py-3 font-semibold text-sm cursor-pointer hover:bg-gray-100 transition-colors"
+              >
+                Close
+              </button>
+            </div>
           ) : todayData?.isCheckedOut && !isCheckedIn ? (
             <AlreadyDoneScreen attendance={todayData?.attendance} onClose={onClose} />
           ) : (
