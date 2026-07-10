@@ -8,122 +8,77 @@ import {
 
 import { useGetOrgInfoManager } from "../../auth/server-state/manager/managgerother/managerother.hook";
 
+const FontLoader = () => (
+  <>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  </>
+);
+
 const initials = (name = "") =>
   name.split(" ").filter(Boolean).map(w => w[0]).join("").slice(0, 2).toUpperCase();
 
 const norm = (s = "") => s.toLowerCase().trim();
 
-const STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
-
-  .org-root, .org-root * { box-sizing: border-box; }
-  .org-root { font-family: 'DM Sans', sans-serif; }
-
-  @keyframes fadeUp    { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
-  @keyframes fadeIn    { from { opacity:0; } to { opacity:1; } }
-  @keyframes scaleIn   { from { opacity:0; transform:scale(0.94); } to { opacity:1; transform:scale(1); } }
-  @keyframes shimmer   { 0% { background-position:-600px 0; } 100% { background-position:600px 0; } }
-  @keyframes spin      { to { transform:rotate(360deg); } }
-  @keyframes slideDown { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
-  @keyframes pulseYou  {
-    0%,100% { box-shadow: 0 0 0 0 rgba(115,0,66,0.22), 0 4px 16px rgba(115,0,66,0.1); }
-    50%      { box-shadow: 0 0 0 8px rgba(115,0,66,0.05), 0 8px 28px rgba(115,0,66,0.18); }
-  }
-
-  .nd { transition: transform 0.16s ease, box-shadow 0.16s ease; cursor: default; }
-  .nd:hover { transform: translateY(-2px); }
-  .nd-hl  { outline: 2px solid #730042 !important; outline-offset: 2px; box-shadow: 0 0 0 5px rgba(115,0,66,0.1) !important; }
-  .nd-dim { opacity: 0.15; filter: grayscale(0.4); transition: opacity 0.2s, filter 0.2s; }
-  .nd-you { animation: pulseYou 2.8s ease-in-out infinite !important; }
-
-  .stat-h { transition: transform 0.14s ease; }
-  .stat-h:hover { transform: translateY(-2px); }
-
-  .sc::-webkit-scrollbar { height: 5px; width: 5px; }
-  .sc::-webkit-scrollbar-track { background: transparent; }
-  .sc::-webkit-scrollbar-thumb { background: #ddd0d8; border-radius: 4px; }
-
-  .hb {
-    display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;
-    border:1px solid #e8dde5;background:#fff;color:#4a3542;
-    font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;
-    transition:background .13s,border-color .13s,color .13s;white-space:nowrap;
-  }
-  .hb:hover { background:#fdf6fa;border-color:#c9afc0;color:#730042; }
-  .hb:disabled { opacity:.45;cursor:not-allowed; }
-  .hb-p { background:#730042;color:#fff;border-color:#730042; }
-  .hb-p:hover { background:#5a0033;border-color:#5a0033;color:#fff; }
-
-  .sw {
-    display:flex;align-items:center;gap:8px;
-    border:1px solid #730042;border-radius:8px;
-    padding:0 10px;background:#fff;height:36px;width:260px;
-    box-shadow:0 0 0 3px rgba(115,0,66,0.09);transition:box-shadow .15s;
-  }
-  .sw:focus-within { box-shadow:0 0 0 4px rgba(115,0,66,0.15); }
-  .si { border:none;outline:none;background:transparent;font-size:13px;color:#1e293b;font-family:'DM Sans',sans-serif;flex:1;min-width:0; }
-  .si::placeholder { color:#b89aad; }
-  .cb { background:none;border:none;cursor:pointer;color:#b89aad;display:flex;padding:0; }
-  .cb:hover { color:#730042; }
-
-  .mp { animation:slideDown .18s ease forwards;display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;background:#fdf0f7;color:#730042;font-size:11px;font-weight:600; }
-  .et { position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;align-items:center;gap:10px;padding:12px 18px;border-radius:10px;background:#1e0e17;color:#fff;font-size:13px;font-weight:500;box-shadow:0 8px 28px rgba(0,0,0,0.22);animation:slideDown .22s ease forwards;font-family:'DM Sans',sans-serif;pointer-events:none; }
-  .export-mode, .export-mode * { animation:none!important;opacity:1!important;transform:none!important; }
-`;
-
 function Sk({ w, h, r = 8 }) {
   return (
-    <div style={{ width: w, height: h, borderRadius: r, flexShrink: 0, background: "linear-gradient(90deg,#f5edf2 25%,#ecdce6 50%,#f5edf2 75%)", backgroundSize: "600px 100%", animation: "shimmer 1.4s infinite linear" }} />
+    <div className="shrink-0 animate-pulse bg-gradient-to-r from-[#f5edf2] via-[#ecdce6] to-[#f5edf2] bg-[length:600px_100%]" style={{ width: w, height: h, borderRadius: r }} />
   );
 }
 
 function Avatar({ name, size = 40, bg, color }) {
   return (
-    <div style={{ width: size, height: size, borderRadius: "50%", background: bg, color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0, fontFamily: "'Syne',sans-serif" }}>
+    <div className={`${bg} ${color} shrink-0 flex items-center justify-center rounded-full text-[13px] font-bold font-['Syne',sans-serif]`} style={{ width: size, height: size }}>
       {initials(name)}
     </div>
   );
 }
 
-function Hi({ text = "", q = "", style = {} }) {
-  if (!q) return <span style={style}>{text}</span>;
+function Hi({ text = "", q = "", className = "" }) {
+  if (!q) return <span className={className}>{text}</span>;
   const idx = norm(text).indexOf(q);
-  if (idx === -1) return <span style={style}>{text}</span>;
+  if (idx === -1) return <span className={className}>{text}</span>;
   return (
-    <span style={style}>
+    <span className={className}>
       {text.slice(0, idx)}
-      <mark style={{ background: "#fde68a", color: "#78350f", borderRadius: 2, padding: "0 1px" }}>{text.slice(idx, idx + q.length)}</mark>
+      <mark className="bg-[#fde68a] text-[#78350f] rounded-[2px] px-[1px]">{text.slice(idx, idx + q.length)}</mark>
       {text.slice(idx + q.length)}
     </span>
   );
 }
 
 const CFG = {
-  org:     { accent: "#1a0d14", avBg: "#1a0d14", avColor: "#f5edf2", badge: "Organisation", badgeBg: "#f5edf2", badgeColor: "#4a3542", tag: "ORG" },
-  admin:   { accent: "#5a2240", avBg: "#f0e4ec", avColor: "#5a2240", badge: "Admin",         badgeBg: "#f0e4ec", badgeColor: "#5a2240", tag: "ADM" },
-  manager: { accent: "#a8005c", avBg: "#fce7f3", avColor: "#a8005c", badge: "Manager",       badgeBg: "#fce7f3", badgeColor: "#a8005c", tag: "MGR" },
-  subMgr:  { accent: "#be185d", avBg: "#fce7f3", avColor: "#be185d", badge: "Reporting Mgr", badgeBg: "#fce7f3", badgeColor: "#be185d", tag: "MGR" },
-  emp:     { accent: "#7c1f4a", avBg: "#fce7f3", avColor: "#7c1f4a", badge: "Employee",      badgeBg: "#fce7f3", badgeColor: "#7c1f4a", tag: "EMP" },
+  org:     { accent: "bg-[#1a0d14]", avBg: "bg-[#1a0d14]", avColor: "text-[#f5edf2]", badge: "Organisation", badgeBg: "bg-[#f5edf2]", badgeColor: "text-[#4a3542]", tag: "ORG" },
+  admin:   { accent: "bg-[#5a2240]", avBg: "bg-[#f0e4ec]", avColor: "text-[#5a2240]", badge: "Admin",         badgeBg: "bg-[#f0e4ec]", badgeColor: "text-[#5a2240]", tag: "ADM" },
+  manager: { accent: "bg-[#a8005c]", avBg: "bg-[#fce7f3]", avColor: "text-[#a8005c]", badge: "Manager",       badgeBg: "bg-[#fce7f3]", badgeColor: "text-[#a8005c]", tag: "MGR" },
+  subMgr:  { accent: "bg-[#be185d]", avBg: "bg-[#fce7f3]", avColor: "text-[#be185d]", badge: "Reporting Mgr", badgeBg: "bg-[#fce7f3]", badgeColor: "text-[#be185d]", tag: "MGR" },
+  emp:     { accent: "bg-[#7c1f4a]", avBg: "bg-[#fce7f3]", avColor: "text-[#7c1f4a]", badge: "Employee",      badgeBg: "bg-[#fce7f3]", badgeColor: "text-[#7c1f4a]", tag: "EMP" },
 };
 
 function Card({ level, name, sub, width = 172, delay = 0, dim, hl, q, you = false, empCount }) {
   const c = CFG[level] || CFG.emp;
   return (
-    <div style={{ animation: `scaleIn 0.26s ease ${delay}ms forwards`, opacity: 0, flexShrink: 0 }}>
+    <div className="shrink-0">
       <div
-        className={["nd", hl ? "nd-hl" : "", dim ? "nd-dim" : "", you ? "nd-you" : ""].filter(Boolean).join(" ")}
-        style={{ width, background: "#fff", border: "1px solid #eedde8", borderRadius: 11, padding: "14px 12px 11px", boxShadow: "0 2px 8px rgba(115,0,66,0.04)", display: "flex", flexDirection: "column", alignItems: "center", position: "relative", overflow: "hidden" }}
+        className={[
+          "bg-white border border-[#eedde8] rounded-[11px] py-3.5 px-3 pb-[11px] shadow-[0_2px_8px_rgba(115,0,66,0.04)] flex flex-col items-center relative overflow-hidden transition-transform duration-150 ease hover:-translate-y-0.5 cursor-default",
+          hl ? "outline outline-2 outline-[#730042] outline-offset-2 shadow-[0_0_0_5px_rgba(115,0,66,0.1)]" : "",
+          dim ? "opacity-[0.15] grayscale" : "",
+          you ? "ring-4 ring-[#730042]/15" : "",
+        ].filter(Boolean).join(" ")}
+        style={{ width }}
       >
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: you ? "linear-gradient(90deg,#730042,#CD166E)" : c.accent, borderRadius: "11px 11px 0 0" }} />
-        <span style={{ position: "absolute", top: 8, right: 9, fontSize: 8, fontWeight: 600, letterSpacing: "0.1em", color: "#c8a8bb", fontFamily: "'DM Mono',monospace" }}>{c.tag}</span>
-        {you && <div style={{ position: "absolute", top: -7, left: "50%", transform: "translateX(-50%)", fontSize: 7, fontWeight: 700, letterSpacing: "0.1em", padding: "2px 8px", borderRadius: 8, background: "#730042", color: "#fff", whiteSpace: "nowrap", fontFamily: "'DM Mono',monospace" }}>YOU</div>}
-        <Avatar name={name} size={38} bg={you ? "#fce7f3" : c.avBg} color={you ? "#730042" : c.avColor} />
-        <div style={{ marginTop: 8, marginBottom: 6, textAlign: "center", width: "100%" }}>
-          <Hi text={name} q={q} style={{ fontSize: 12, fontWeight: 600, color: "#1a0d14", display: "block", lineHeight: 1.3, fontFamily: "'Syne',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />
-          {sub && <Hi text={sub} q={q} style={{ fontSize: 10, color: "#8a6878", display: "block", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />}
-          {empCount !== undefined && <span style={{ fontSize: 10, color: "#c8a8bb", display: "block", marginTop: 2 }}>{empCount} report{empCount !== 1 ? "s" : ""}</span>}
+        <div className={`absolute top-0 left-0 right-0 h-[3px] rounded-t-[11px] ${you ? "bg-gradient-to-r from-[#730042] to-[#CD166E]" : c.accent}`} />
+        <span className="absolute top-2 right-2.5 text-[8px] font-semibold tracking-[0.1em] text-[#c8a8bb] font-['DM_Mono',monospace]">{c.tag}</span>
+        {you && <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 text-[7px] font-bold tracking-[0.1em] px-2 py-0.5 rounded-lg bg-[#730042] text-white whitespace-nowrap font-['DM_Mono',monospace]">YOU</div>}
+        <Avatar name={name} size={38} bg={you ? "bg-[#fce7f3]" : c.avBg} color={you ? "text-[#730042]" : c.avColor} />
+        <div className="mt-2 mb-1.5 text-center w-full">
+          <Hi text={name} q={q} className="block text-xs font-semibold text-[#1a0d14] leading-[1.3] font-['Syne',sans-serif] truncate" />
+          {sub && <Hi text={sub} q={q} className="block text-[10px] text-[#8a6878] mt-0.5 truncate" />}
+          {empCount !== undefined && <span className="text-[10px] text-[#c8a8bb] block mt-0.5">{empCount} report{empCount !== 1 ? "s" : ""}</span>}
         </div>
-        <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 20, background: you ? "#fce7f3" : c.badgeBg, color: you ? "#730042" : c.badgeColor, fontWeight: 600, letterSpacing: "0.04em", border: you ? "1px solid #f9a8d4" : "none", fontFamily: "'DM Mono',monospace" }}>
+        <span className={`text-[9px] py-0.5 px-[7px] rounded-full font-semibold tracking-[0.04em] font-['DM_Mono',monospace] ${you ? "bg-[#fce7f3] text-[#730042] border border-[#f9a8d4]" : `${c.badgeBg} ${c.badgeColor} border-none`}`}>
           {you ? "You" : c.badge}
         </span>
       </div>
@@ -132,7 +87,7 @@ function Card({ level, name, sub, width = 172, delay = 0, dim, hl, q, you = fals
 }
 
 function VLine({ h = 24 }) {
-  return <div style={{ width: 1, height: h, background: "#dcc0d0", margin: "0 auto", flexShrink: 0 }} />;
+  return <div className="w-px bg-[#dcc0d0] mx-auto shrink-0" style={{ height: h }} />;
 }
 
 function ManagerTBar({ mgrW, empCount, empW, empGap }) {
@@ -141,7 +96,7 @@ function ManagerTBar({ mgrW, empCount, empW, empGap }) {
   const barY = 14;
   const offset = (total - (empCount * empW + (empCount - 1) * empGap)) / 2;
   return (
-    <svg width={total} height={barY + 4} style={{ display: "block", flexShrink: 0, overflow: "visible" }}>
+    <svg width={total} height={barY + 4} className="block shrink-0 overflow-visible">
       <line x1={total / 2} y1={0} x2={total / 2} y2={barY} stroke="#dcc0d0" strokeWidth={1} />
       {empCount > 1 && (
         <line x1={offset + empW / 2} y1={barY} x2={total - offset - empW / 2} y2={barY} stroke="#dcc0d0" strokeWidth={1} />
@@ -188,13 +143,12 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
   const key = `m-${mgr.id}`;
   const emps = mgr.employees || [];
   const subMgrs = mgr.subManagers || [];
-  const level = mgr.isCurrentManager ? "nd-you" : isSubMgr ? "subMgr" : "manager";
-  const cw = colWOf(mgr);
+
   const mDelay = delayRef.current;
   delayRef.current += 55;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: cw, flexShrink: 0 }}>
+    <div className="flex flex-col items-center shrink-0" style={{ width: colWOf(mgr) }}>
       <Card
         level={isSubMgr ? "subMgr" : "manager"}
         name={mgr.name}
@@ -214,7 +168,7 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
           {subMgrs.length > 1 && (() => {
             const totalSubW = subMgrs.reduce((s, sm) => s + colWOf(sm), 0) + (subMgrs.length - 1) * SUB_MGR_GAP;
             return (
-              <svg width={totalSubW} height={20} style={{ display: "block", flexShrink: 0, overflow: "visible" }}>
+              <svg width={totalSubW} height={20} className="block shrink-0 overflow-visible">
                 <line x1={totalSubW / 2} y1={0} x2={totalSubW / 2} y2={10} stroke="#dcc0d0" strokeWidth={1} />
                 <line x1={colWOf(subMgrs[0]) / 2} y1={10} x2={totalSubW - colWOf(subMgrs[subMgrs.length - 1]) / 2} y2={10} stroke="#dcc0d0" strokeWidth={1} />
                 {subMgrs.map((sm, i) => {
@@ -226,7 +180,7 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
               </svg>
             );
           })()}
-          <div style={{ display: "flex", gap: SUB_MGR_GAP, alignItems: "flex-start" }}>
+          <div className="flex items-start gap-[20px]">
             {subMgrs.map(sm => (
               <ManagerColumn key={sm.id} mgr={sm} q={q} matches={matches} dim={dim} delayRef={delayRef} isSubMgr />
             ))}
@@ -237,7 +191,7 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
       {emps.length > 0 && (
         <>
           <ManagerTBar mgrW={CARD_W} empCount={emps.length} empW={EMP_W} empGap={EMP_GAP} />
-          <div style={{ display: "flex", gap: EMP_GAP, alignItems: "flex-start" }}>
+          <div className="flex items-start gap-[10px]">
             {emps.map(emp => {
               const eKey = `e-${emp.id}`;
               const eDelay = delayRef.current;
@@ -265,17 +219,17 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
 
 function SkeletonTree() {
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+    <div className="flex flex-col items-center">
       <Sk w={172} h={104} r={11} />
-      <div style={{ width: 1, height: 24, background: "#eed8e5" }} />
+      <div className="w-px h-6 bg-[#eed8e5]" />
       <Sk w={172} h={96} r={11} />
-      <div style={{ width: 1, height: 20, background: "#eed8e5" }} />
-      <div style={{ display: "flex", gap: 28 }}>
+      <div className="w-px h-5 bg-[#eed8e5]" />
+      <div className="flex gap-7">
         {[1, 2].map(i => (
-          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+          <div key={i} className="flex flex-col items-center">
             <Sk w={172} h={96} r={11} />
-            <div style={{ width: 1, height: 16, background: "#eed8e5" }} />
-            <div style={{ display: "flex", gap: 10 }}>
+            <div className="w-px h-4 bg-[#eed8e5]" />
+            <div className="flex gap-2.5">
               <Sk w={152} h={92} r={11} />
               <Sk w={152} h={92} r={11} />
             </div>
@@ -319,8 +273,8 @@ function OrgTree({ data, loading, q }) {
   const delayRef = { current: 160 };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: "max-content" }}>
-      <div style={{ animation: `scaleIn 0.26s ease 40ms forwards`, opacity: 0 }}>
+    <div className="flex flex-col items-center min-w-max">
+      <div>
         <Card level="org" name={data.organisation_name || "Organisation"} sub={data.super_admin?.name} width={CARD_W} delay={0} dim={dim("org")} hl={matches.has("org")} q={q} />
       </div>
       <VLine h={22} />
@@ -333,7 +287,7 @@ function OrgTree({ data, loading, q }) {
       )}
 
       {managers.length > 1 && (
-        <svg width={topBarW} height={20} style={{ display: "block", flexShrink: 0, overflow: "visible" }}>
+        <svg width={topBarW} height={20} className="block shrink-0 overflow-visible">
           <line x1={topBarW / 2} y1={0} x2={topBarW / 2} y2={10} stroke="#dcc0d0" strokeWidth={1} />
           <line x1={colWOf(managers[0]) / 2} y1={10} x2={topBarW - colWOf(managers[managers.length - 1]) / 2} y2={10} stroke="#dcc0d0" strokeWidth={1} />
           {managers.map((mgr, i) => {
@@ -345,7 +299,7 @@ function OrgTree({ data, loading, q }) {
         </svg>
       )}
 
-      <div style={{ display: "flex", gap: MGR_GAP, alignItems: "flex-start" }}>
+      <div className="flex items-start gap-[28px]">
         {managers.map(mgr => (
           <ManagerColumn key={mgr.id} mgr={mgr} q={q} matches={matches} dim={dim} delayRef={delayRef} />
         ))}
@@ -354,16 +308,16 @@ function OrgTree({ data, loading, q }) {
   );
 }
 
-function StatCard({ label, text, icon: Icon, accent, delay = 0 }) {
+function StatCard({ label, text, icon: Icon, barBg, iconBg, iconColor, delay = 0 }) {
   return (
-    <div className="stat-h" style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards`, opacity: 0, background: "#fff", border: "1px solid #eedde8", borderRadius: 11, padding: "15px 16px", display: "flex", alignItems: "center", gap: 13, boxShadow: "0 1px 4px rgba(115,0,66,0.04)", position: "relative", overflow: "hidden" }}>
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: accent }} />
-      <div style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0, background: `${accent}18`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Icon size={15} style={{ color: accent }} />
+    <div className="bg-white border border-[#eedde8] rounded-[11px] p-4 flex items-center gap-[13px] shadow-[0_1px_4px_rgba(115,0,66,0.04)] relative overflow-hidden transition-transform duration-[140ms] hover:-translate-y-0.5">
+      <div className={`absolute top-0 left-0 right-0 h-[2px] ${barBg}`} />
+      <div className={`w-9 h-9 rounded-lg shrink-0 flex items-center justify-center ${iconBg}`}>
+        <Icon size={15} className={iconColor} />
       </div>
-      <div style={{ minWidth: 0 }}>
-        <p style={{ fontSize: 13, fontWeight: 600, color: "#1a0d14", lineHeight: 1.2, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Syne',sans-serif" }}>{text || "—"}</p>
-        <p style={{ fontSize: 11, color: "#b89aad", fontWeight: 500, margin: "3px 0 0" }}>{label}</p>
+      <div className="min-w-0">
+        <p className="text-[13px] font-semibold text-[#1a0d14] leading-[1.2] m-0 truncate font-['Syne',sans-serif]">{text || "—"}</p>
+        <p className="text-[11px] text-[#b89aad] font-medium mt-[3px] mb-0">{label}</p>
       </div>
     </div>
   );
@@ -441,11 +395,7 @@ export default function OrganizationPageManager() {
           document.head.appendChild(s);
         });
       }
-      const target = chartRef.current;
-      target.classList.add("export-mode");
-      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-      const canvas = await window.html2canvas(target, { backgroundColor: "#ffffff", scale: 2, useCORS: true, allowTaint: false, logging: false });
-      target.classList.remove("export-mode");
+      const canvas = await window.html2canvas(chartRef.current, { backgroundColor: "#ffffff", scale: 2, useCORS: true, allowTaint: false, logging: false });
       const link = document.createElement("a");
       link.download = `org-chart-${orgName.replace(/\s+/g, "-").toLowerCase()}.png`;
       link.href = canvas.toDataURL("image/png");
@@ -453,7 +403,6 @@ export default function OrganizationPageManager() {
       setExportStatus("done");
       setTimeout(() => setExportStatus(null), 2600);
     } catch {
-      chartRef.current?.classList.remove("export-mode");
       setExportStatus(null);
     }
   }, [exportStatus, orgName]);
@@ -461,100 +410,104 @@ export default function OrganizationPageManager() {
   const closeSearch = () => { setSearchOpen(false); setSearchQuery(""); };
 
   return (
-    <div className="org-root" style={{ minHeight: "100vh", background: "#faf5f8" }}>
-      <style>{STYLES}</style>
+    <div className="min-h-screen bg-[#faf5f8] font-['DM_Sans',sans-serif] overflow-x-hidden">
+      <FontLoader />
 
-      <div style={{ animation: "fadeIn 0.3s ease forwards", background: "#fff", borderBottom: "1px solid #eedde8", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 54, gap: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <span style={{ fontSize: 12, color: "#b89aad", fontWeight: 500 }}>{orgName}</span>
-          <span style={{ color: "#dcc0d0" }}>›</span>
-          <span style={{ fontSize: 13, color: "#1a0d14", fontWeight: 600, fontFamily: "'Syne',sans-serif" }}>Org Chart</span>
-          <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, background: "#fce7f3", color: "#730042", fontWeight: 600, marginLeft: 2 }}>Manager View</span>
+      <div className="bg-white border-b border-[#eedde8] px-4 sm:px-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 py-3 sm:py-0 sm:h-[54px]">
+        <div className="flex items-center gap-2 shrink-0 min-w-0">
+          <span className="text-xs text-[#b89aad] font-medium truncate">{orgName}</span>
+          <span className="text-[#dcc0d0] shrink-0">›</span>
+          <span className="text-[13px] text-[#1a0d14] font-semibold font-['Syne',sans-serif] whitespace-nowrap">Org Chart</span>
+          <span className="text-[10px] py-0.5 px-2 rounded-[10px] bg-[#fce7f3] text-[#730042] font-semibold ml-0.5 whitespace-nowrap">Manager View</span>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="flex flex-wrap items-center gap-2">
           {searchOpen ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, animation: "slideDown 0.2s ease forwards" }}>
-              <div className="sw">
-                <Search size={13} style={{ color: "#b89aad", flexShrink: 0 }} />
-                <input ref={inputRef} className="si" placeholder="Search name, role, department…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-                {searchQuery && <button className="cb" onClick={() => setSearchQuery("")}><X size={13} /></button>}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="flex items-center gap-2 border border-[#730042] rounded-lg px-2.5 bg-white h-9 w-full sm:w-[260px] shadow-[0_0_0_3px_rgba(115,0,66,0.09)] focus-within:shadow-[0_0_0_4px_rgba(115,0,66,0.15)] transition-shadow duration-150">
+                  <Search size={13} className="text-[#b89aad] shrink-0" />
+                  <input ref={inputRef} className="border-none outline-none bg-transparent text-[13px] text-[#1e293b] font-['DM_Sans',sans-serif] flex-1 min-w-0 placeholder:text-[#b89aad]" placeholder="Search name, role, department…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                  {searchQuery && <button className="bg-transparent border-none cursor-pointer text-[#b89aad] flex p-0 hover:text-[#730042] transition-colors" onClick={() => setSearchQuery("")}><X size={13} /></button>}
+                </div>
+                <button className="flex items-center gap-1.5 py-1.5 px-3.5 rounded-lg border border-[#e8dde5] bg-white text-[#4a3542] text-[13px] font-medium cursor-pointer font-['DM_Sans',sans-serif] transition-colors duration-[130ms] whitespace-nowrap hover:bg-[#fdf6fa] hover:border-[#c9afc0] hover:text-[#730042] shrink-0" onClick={closeSearch}><X size={13} /> Close</button>
               </div>
-              {searchQuery && <div className="mp">{matchCount} match{matchCount !== 1 ? "es" : ""}</div>}
-              <button className="hb" onClick={closeSearch}><X size={13} /> Close</button>
+              {searchQuery && <div className="flex items-center gap-1.5 py-1 px-2.5 rounded-full bg-[#fdf0f7] text-[#730042] text-[11px] font-semibold">{matchCount} match{matchCount !== 1 ? "es" : ""}</div>}
             </div>
           ) : (
-            <button className="hb" onClick={() => setSearchOpen(true)}><Search size={13} /> Search</button>
+            <>
+              <button className="flex items-center gap-1.5 py-1.5 px-3.5 rounded-lg border border-[#e8dde5] bg-white text-[#4a3542] text-[13px] font-medium cursor-pointer font-['DM_Sans',sans-serif] transition-colors duration-[130ms] whitespace-nowrap hover:bg-[#fdf6fa] hover:border-[#c9afc0] hover:text-[#730042]" onClick={() => setSearchOpen(true)}><Search size={13} /> Search</button>
+              <button className="flex items-center gap-1.5 py-1.5 px-3.5 rounded-lg border border-[#730042] bg-[#730042] text-white text-[13px] font-medium cursor-pointer font-['DM_Sans',sans-serif] transition-colors duration-[130ms] whitespace-nowrap hover:bg-[#5a0033] hover:border-[#5a0033] disabled:opacity-45 disabled:cursor-not-allowed" onClick={handleExport} disabled={loading || exportStatus === "loading"}>
+                {exportStatus === "loading"
+                  ? <><Loader2 size={13} className="animate-spin" /> Exporting…</>
+                  : <><Download size={13} /> Export PNG</>}
+              </button>
+            </>
           )}
-          <button className="hb hb-p" onClick={handleExport} disabled={loading || exportStatus === "loading"}>
-            {exportStatus === "loading"
-              ? <><Loader2 size={13} style={{ animation: "spin 0.8s linear infinite" }} /> Exporting…</>
-              : <><Download size={13} /> Export PNG</>}
-          </button>
         </div>
       </div>
 
-      <div style={{ maxWidth: 1600, margin: "0 auto", padding: "22px 24px 48px" }}>
-        <div style={{ animation: "fadeUp 0.3s ease 50ms forwards", opacity: 0, marginBottom: 18 }}>
-          <h1 style={{ fontSize: 19, fontWeight: 700, color: "#1a0d14", margin: 0, letterSpacing: "-0.3px", fontFamily: "'Syne',sans-serif" }}>Organisation Chart</h1>
-          <p style={{ fontSize: 12, color: "#b89aad", margin: "4px 0 0" }}>
+      <div className="max-w-[1600px] mx-auto py-5 px-4 sm:px-6 pb-12">
+        <div className="mb-4">
+          <h1 className="text-[19px] font-bold text-[#1a0d14] m-0 tracking-[-0.3px] font-['Syne',sans-serif]">Organisation Chart</h1>
+          <p className="text-xs text-[#b89aad] mt-1 mb-0">
             {loading ? "Loading…" : `${orgName} · ${totalNodes} nodes · You are highlighted`}
           </p>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 10, marginBottom: 22 }}>
-          <StatCard label="Organisation"  text={orgName}                        icon={Building2} accent="#1a0d14" delay={60}  />
-          <StatCard label="Your name"     text={myInfo?.name}                   icon={User}      accent="#730042" delay={95}  />
-          <StatCard label="Department"    text={myInfo?.department}             icon={Users}     accent="#CD166E" delay={130} />
-          <StatCard label="Designation"   text={myInfo?.designation}            icon={Crown}     accent="#a8005c" delay={165} />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mb-5">
+          <StatCard label="Organisation"  text={orgName}                        icon={Building2} barBg="bg-[#1a0d14]" iconBg="bg-[#1a0d14]/10" iconColor="text-[#1a0d14]" delay={60}  />
+          <StatCard label="Your name"     text={myInfo?.name}                   icon={User}      barBg="bg-[#730042]" iconBg="bg-[#730042]/10" iconColor="text-[#730042]" delay={95}  />
+          <StatCard label="Department"    text={myInfo?.department}             icon={Users}     barBg="bg-[#CD166E]" iconBg="bg-[#CD166E]/10" iconColor="text-[#CD166E]" delay={130} />
+          <StatCard label="Designation"   text={myInfo?.designation}            icon={Crown}     barBg="bg-[#a8005c]" iconBg="bg-[#a8005c]/10" iconColor="text-[#a8005c]" delay={165} />
         </div>
 
         {searchOpen && searchQuery && matchCount === 0 && (
-          <div style={{ marginBottom: 14, padding: "10px 14px", borderRadius: 8, background: "#fef9c3", border: "1px solid #fde68a", fontSize: 12, color: "#92400e", display: "flex", alignItems: "center", gap: 8, animation: "slideDown 0.2s ease forwards" }}>
-            <Search size={13} />No results for <strong style={{ marginLeft: 2 }}>"{searchQuery}"</strong>
+          <div className="mb-3.5 px-3.5 py-2.5 rounded-lg bg-[#fef9c3] border border-[#fde68a] text-xs text-[#92400e] flex items-center gap-2 break-words min-w-0">
+            <Search size={13} className="shrink-0" />No results for <strong className="ml-0.5">"{searchQuery}"</strong>
           </div>
         )}
 
-        <div style={{ animation: "fadeIn 0.3s ease 240ms forwards", opacity: 0, background: "#fff", border: "1px solid #eedde8", borderRadius: 14, boxShadow: "0 2px 10px rgba(115,0,66,0.05)", overflow: "hidden" }}>
-          <div style={{ padding: "11px 16px", borderBottom: "1px solid #f5edf2", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fdf8fb", flexWrap: "wrap", gap: 8 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <Crown size={13} style={{ color: "#b89aad" }} />
-              <span style={{ fontSize: 12, fontWeight: 600, color: "#4a3542", fontFamily: "'Syne',sans-serif" }}>Full hierarchy</span>
-              <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 20, background: "#f5edf2", color: "#b89aad", fontWeight: 600, fontFamily: "'DM Mono',monospace" }}>
+        <div className="bg-white border border-[#eedde8] rounded-[14px] shadow-[0_2px_10px_rgba(115,0,66,0.05)] overflow-hidden">
+          <div className="px-4 py-2.5 sm:px-4 sm:py-[11px] border-b border-[#f5edf2] flex flex-col sm:flex-row sm:items-center sm:justify-between bg-[#fdf8fb] gap-2">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <Crown size={13} className="text-[#b89aad]" />
+              <span className="text-xs font-semibold text-[#4a3542] font-['Syne',sans-serif]">Full hierarchy</span>
+              <span className="text-[10px] py-0.5 px-[7px] rounded-full bg-[#f5edf2] text-[#b89aad] font-semibold font-['DM_Mono',monospace]">
                 {loading ? "—" : `${totalNodes} nodes`}
               </span>
               {searchQuery && matchCount > 0 && (
-                <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 20, background: "#fce7f3", color: "#730042", fontWeight: 600 }}>{matchCount} highlighted</span>
+                <span className="text-[10px] py-0.5 px-[7px] rounded-full bg-[#fce7f3] text-[#730042] font-semibold">{matchCount} highlighted</span>
               )}
             </div>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <div className="flex flex-wrap gap-x-3 gap-y-1.5">
               {[
-                { dot: "#1a0d14", label: "Organisation" },
-                { dot: "#5a2240", label: "Admin" },
-                { dot: "#a8005c", label: "Manager" },
-                { dot: "#730042", label: "You", ring: true },
-                { dot: "#be185d", label: "Reporting Mgr" },
-                { dot: "#7c1f4a", label: "Employee" },
+                { dot: "bg-[#1a0d14]", label: "Organisation" },
+                { dot: "bg-[#5a2240]", label: "Admin" },
+                { dot: "bg-[#a8005c]", label: "Manager" },
+                { dot: "bg-[#730042]", label: "You", ring: true },
+                { dot: "bg-[#be185d]", label: "Reporting Mgr" },
+                { dot: "bg-[#7c1f4a]", label: "Employee" },
               ].map(({ dot, label, ring }) => (
-                <div key={label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#b89aad" }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: dot, flexShrink: 0, boxShadow: ring ? "0 0 0 2px rgba(115,0,66,0.2)" : "none" }} />
+                <div key={label} className="flex items-center gap-1.5 text-[11px] text-[#b89aad]">
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${dot} ${ring ? "shadow-[0_0_0_2px_rgba(115,0,66,0.2)]" : ""}`} />
                   {label}
                 </div>
               ))}
             </div>
           </div>
 
-          <div ref={chartRef} className="sc" style={{ overflowX: "auto", padding: "36px 40px 36px", background: "#fff" }}>
+          <div ref={chartRef} className="overflow-x-auto py-6 px-4 sm:p-9 bg-white">
             <OrgTree data={data} loading={loading} q={norm(searchQuery)} />
           </div>
         </div>
       </div>
 
       {exportStatus && (
-        <div className="et">
+        <div className="fixed bottom-4 right-4 left-4 sm:left-auto sm:max-w-[360px] z-[9999] flex items-center gap-2.5 px-4 py-3 rounded-[10px] bg-[#1e0e17] text-white text-[13px] font-medium shadow-[0_8px_28px_rgba(0,0,0,0.22)] font-['DM_Sans',sans-serif] pointer-events-none">
           {exportStatus === "loading"
-            ? <><Loader2 size={14} style={{ animation: "spin 0.8s linear infinite" }} /> Generating PNG…</>
-            : <><CheckCircle2 size={14} style={{ color: "#4ade80" }} /> Exported!</>}
+            ? <><Loader2 size={14} className="animate-spin" /> Generating PNG…</>
+            : <><CheckCircle2 size={14} className="text-[#4ade80]" /> Exported!</>}
         </div>
       )}
     </div>
