@@ -292,8 +292,9 @@ function InfoField({ label, value, loading }) {
 function LeaveRow({ label, availed, entitled, accrued, color }) {
   const used      = availed  ?? 0;
   const total     = entitled ?? 0;
+  const base      = accrued != null ? accrued : total;
   const pct       = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
-  const remaining = total - used;
+  const remaining = Math.max(0, base - used);
   return (
     <div className="md-leave-row">
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
@@ -888,8 +889,8 @@ export default function ManagerDashboard() {
 
   const leaveRows = [
     { label:"Earned Leave (EL)",    availed:lb?.EL?.availed,  entitled:lb?.EL?.entitled, accrued:lb?.EL?.accrued != null ? Number(lb.EL.accrued).toFixed(2) : null, color:"#730042" },
-    { label:"Sick Leave (SL)",      availed:lb?.SL?.availed,  entitled:lb?.SL?.entitled, accrued:null, color:"#1D9E75" },
-    { label:"Paternity Leave (PL)", availed:lb?.pbc ?? 0,     entitled:lb?.PL,           accrued:null, color:"#378ADD" },
+    { label:"Sick Leave (SL)",      availed:lb?.SL?.availed,  entitled:lb?.SL?.entitled, accrued:lb?.SL?.accrued != null ? Number(lb.SL.accrued).toFixed(2) : null, color:"#1D9E75" },
+    { label:"Paternity Leave (PL)", availed:0,                entitled:lb?.PL,           accrued:null, color:"#378ADD" },
     { label:"Maternity Leave (ML)", availed:0, entitled:lb?.ML ?? 0, accrued:null, color:"#BA7517" },
   ];
 

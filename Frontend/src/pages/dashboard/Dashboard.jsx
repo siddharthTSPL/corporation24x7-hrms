@@ -126,8 +126,9 @@ function CardAccent({ color }) {
 function LeaveRow({ label, availed, entitled, accrued, color }) {
   const used=availed??0;
   const total=entitled??0;
+  const base=accrued!=null?accrued:total;
   const pct=total>0?Math.min(100,Math.round((used/total)*100)):0;
-  const remaining=total-used;
+  const remaining=Math.max(0,base-used);
   return (
     <div className="py-3 border-b border-[#ede5e0] last:border-0">
       <div className="flex justify-between items-start mb-2">
@@ -1179,7 +1180,7 @@ export default function Dashboard() {
                 : (
                   <>
                     <LeaveRow label="Earned Leave (EL)" availed={lb?.EL?.availed??0} entitled={lb?.EL?.entitled??0} accrued={lb?.EL?.accrued??null} color="#0d9e6e" />
-                    <LeaveRow label="Sick Leave (SL)" availed={lb?.SL?.availed??0} entitled={lb?.SL?.entitled??0} accrued={null} color="#378ADD" />
+                    <LeaveRow label="Sick Leave (SL)" availed={lb?.SL?.availed??0} entitled={lb?.SL?.entitled??0} accrued={lb?.SL?.accrued??null} color="#378ADD" />
                     <FlatRow label="Paternity Leave (PL)" value={lb?.PL??0} color="#730042" />
                     <FlatRow label="Maternity Leave (ML)" value={lb?.ML??0} color="#9333EA" />
                     <FlatRow label="Paid by Company (PBC)" value={lb?.pbc??0} color="#BA7517" />
