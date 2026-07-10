@@ -1,6 +1,12 @@
 const WFH = require("../Models/wfh.model");
 const Manager = require("../Models/manager.model");
 const Admin = require("../Models/Admin.model");
+const {
+  notifyWFHApplied,
+  notifyWFHForwarded,
+  notifyWFHDecision,
+  resolvePerson,
+} = require("../utils/notify.utils");
 
 const applyWFH = async (req, res, next) => {
   const { startDate, endDate, reason } = req.body;
@@ -41,6 +47,16 @@ const applyWFH = async (req, res, next) => {
     days,
     reason,
     status: "pending_manager",
+  });
+
+  notifyWFHApplied({
+    requesterName: `${employee.f_name} ${employee.l_name}`,
+    handlerModel: "Manager",
+    handlerId: employee.Under_manager,
+    startDate: start,
+    endDate: end,
+    days,
+    reason,
   });
 
   res.status(201).json({ success: true, message: "WFH request submitted", wfh });
@@ -131,6 +147,18 @@ const approveWFH = async (req, res, next) => {
   wfh.approvedBy = req.manager._id;
   wfh.remarks = remarks || "";
   await wfh.save();
+
+  notifyWFHDecision({
+    recipientModel: wfh.requesterModel,
+    recipientId: wfh.requester,
+    startDate: wfh.startDate,
+    endDate: wfh.endDate,
+    days: wfh.days,
+    decision: "approved",
+    decidedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+    remarks: wfh.remarks,
+  });
+
   res.status(200).json({ success: true, message: "WFH request approved", wfh });
 };
 
@@ -152,6 +180,18 @@ const rejectWFH = async (req, res, next) => {
   wfh.remarks = remarks || "";
   wfh.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   await wfh.save();
+
+  notifyWFHDecision({
+    recipientModel: wfh.requesterModel,
+    recipientId: wfh.requester,
+    startDate: wfh.startDate,
+    endDate: wfh.endDate,
+    days: wfh.days,
+    decision: "rejected",
+    decidedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+    remarks: wfh.remarks,
+  });
+
   res.status(200).json({ success: true, message: "WFH request rejected", wfh });
 };
 
@@ -184,6 +224,19 @@ const forwardWFH = async (req, res, next) => {
   wfh.status = currentManager.reporting_manager_model === "Admin" ? "pending_admin" : "pending_reporting_manager";
 
   await wfh.save();
+
+  const wfhRequesterDoc = await resolvePerson(wfh.requesterModel, wfh.requester);
+  notifyWFHForwarded({
+    requesterName: wfhRequesterDoc ? wfhRequesterDoc.name : "An employee",
+    forwardedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+    handlerModel: currentManager.reporting_manager_model,
+    handlerId: currentManager.reporting_manager,
+    startDate: wfh.startDate,
+    endDate: wfh.endDate,
+    days: wfh.days,
+    reason: wfh.reason,
+  });
+
   res.status(200).json({ success: true, message: "WFH request forwarded", wfh });
 };
 
@@ -234,6 +287,16 @@ const managerApplyWFH = async (req, res, next) => {
     days,
     reason,
     status: initialStatus,
+  });
+
+  notifyWFHApplied({
+    requesterName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+    handlerModel: currentManager.reporting_manager_model,
+    handlerId: currentManager.reporting_manager,
+    startDate: start,
+    endDate: end,
+    days,
+    reason,
   });
 
   res.status(201).json({ success: true, message: "WFH request submitted successfully", wfh });
@@ -287,6 +350,18 @@ const adminApproveWFH = async (req, res, next) => {
   wfh.approvedBy = req.admin._id;
   wfh.remarks = remarks || "";
   await wfh.save();
+
+  notifyWFHDecision({
+    recipientModel: wfh.requesterModel,
+    recipientId: wfh.requester,
+    startDate: wfh.startDate,
+    endDate: wfh.endDate,
+    days: wfh.days,
+    decision: "approved",
+    decidedByName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+    remarks: wfh.remarks,
+  });
+
   res.status(200).json({ success: true, message: "WFH request approved by admin", wfh });
 };
 
@@ -311,6 +386,18 @@ const adminRejectWFH = async (req, res, next) => {
   wfh.remarks = remarks || "";
   wfh.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   await wfh.save();
+
+  notifyWFHDecision({
+    recipientModel: wfh.requesterModel,
+    recipientId: wfh.requester,
+    startDate: wfh.startDate,
+    endDate: wfh.endDate,
+    days: wfh.days,
+    decision: "rejected",
+    decidedByName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+    remarks: wfh.remarks,
+  });
+
   res.status(200).json({ success: true, message: "WFH request rejected by admin", wfh });
 };
 
@@ -357,6 +444,16 @@ const adminApplyWFH = async (req, res, next) => {
     days,
     reason,
     status: "pending_superadmin",
+  });
+
+  notifyWFHApplied({
+    requesterName: `${admin.f_name} ${admin.l_name || ""}`.trim(),
+    handlerModel: "SuperAdmin",
+    handlerId: organisation_id,
+    startDate: start,
+    endDate: end,
+    days,
+    reason,
   });
 
   res.status(201).json({ success: true, message: "WFH request submitted to superadmin", wfh });
@@ -410,6 +507,18 @@ const superadminApproveWFH = async (req, res, next) => {
   wfh.approvedBy = req.superAdmin._id;
   wfh.remarks = remarks || "";
   await wfh.save();
+
+  notifyWFHDecision({
+    recipientModel: wfh.requesterModel,
+    recipientId: wfh.requester,
+    startDate: wfh.startDate,
+    endDate: wfh.endDate,
+    days: wfh.days,
+    decision: "approved",
+    decidedByName: `${req.superAdmin.f_name || ""} ${req.superAdmin.l_name || ""}`.trim() || "SuperAdmin",
+    remarks: wfh.remarks,
+  });
+
   res.status(200).json({ success: true, message: "WFH request approved", wfh });
 };
 
@@ -432,6 +541,18 @@ const superadminRejectWFH = async (req, res, next) => {
   wfh.remarks = remarks || "";
   wfh.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   await wfh.save();
+
+  notifyWFHDecision({
+    recipientModel: wfh.requesterModel,
+    recipientId: wfh.requester,
+    startDate: wfh.startDate,
+    endDate: wfh.endDate,
+    days: wfh.days,
+    decision: "rejected",
+    decidedByName: `${req.superAdmin.f_name || ""} ${req.superAdmin.l_name || ""}`.trim() || "SuperAdmin",
+    remarks: wfh.remarks,
+  });
+
   res.status(200).json({ success: true, message: "WFH request rejected", wfh });
 };
 
@@ -466,6 +587,18 @@ const approveForwardedWFH = async (req, res, next) => {
   wfh.approvedBy = req.manager._id;
   wfh.remarks = remarks || "";
   await wfh.save();
+
+  notifyWFHDecision({
+    recipientModel: wfh.requesterModel,
+    recipientId: wfh.requester,
+    startDate: wfh.startDate,
+    endDate: wfh.endDate,
+    days: wfh.days,
+    decision: "approved",
+    decidedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+    remarks: wfh.remarks,
+  });
+
   res.status(200).json({ success: true, message: "WFH request approved", wfh });
 };
 
@@ -487,6 +620,18 @@ const rejectForwardedWFH = async (req, res, next) => {
   wfh.remarks = remarks || "";
   wfh.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   await wfh.save();
+
+  notifyWFHDecision({
+    recipientModel: wfh.requesterModel,
+    recipientId: wfh.requester,
+    startDate: wfh.startDate,
+    endDate: wfh.endDate,
+    days: wfh.days,
+    decision: "rejected",
+    decidedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+    remarks: wfh.remarks,
+  });
+
   res.status(200).json({ success: true, message: "WFH request rejected", wfh });
 };
 

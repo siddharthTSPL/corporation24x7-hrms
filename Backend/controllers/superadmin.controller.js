@@ -26,6 +26,7 @@ const AdminLeave = require("../Models/adleave.model");
 const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = require("../utils/licenseCheck");
 const AssetModel = require("../Models/asset.model");
 const { isEmailTaken , isEmpidTaken} = require("../utils/emailAvailability.utils");
+const { notifyLeaveDecision, notifyAssetAssigned } = require("../utils/notify.utils");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
@@ -1506,6 +1507,18 @@ const acceptleavebyadmin = async (req, res, next) => {
   leave.approvedBy = req.superAdmin._id;
   leave.approvedAt = new Date();
   await leave.save();
+
+  notifyLeaveDecision({
+    recipientModel: "Admin",
+    recipientId: leave.admin,
+    leaveType: leave.leaveType,
+    startDate: leave.startDate,
+    endDate: leave.endDate,
+    days: leave.days,
+    decision: "approved",
+    decidedByName: `${req.superAdmin.f_name || ""} ${req.superAdmin.l_name || ""}`.trim() || "SuperAdmin",
+    remarks: `Approved by SuperAdmin`,
+  });
  
   res.status(200).json({ message: "Leave approved", leave });
 };
@@ -1527,6 +1540,18 @@ const rejectleavebyadmin = async (req, res, next) => {
   leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   await leave.save();
  
+  notifyLeaveDecision({
+    recipientModel: "Admin",
+    recipientId: leave.admin,
+    leaveType: leave.leaveType,
+    startDate: leave.startDate,
+    endDate: leave.endDate,
+    days: leave.days,
+    decision: "rejected",
+    decidedByName: `${req.superAdmin.f_name || ""} ${req.superAdmin.l_name || ""}`.trim() || "SuperAdmin",
+    remarks: `Rejected by SuperAdmin`,
+  });
+
   res.status(200).json({ message: "Leave rejected successfully", leave });
 };
 

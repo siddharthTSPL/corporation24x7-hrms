@@ -15,6 +15,11 @@ const Attendance = require("../Models/attendance.model");
 const Ticket = require("../Models/ticket.model");
 const SuperAdminModel = require("../Models/superadmin.model");
 const AdminModel = require("../Models/Admin.model");
+const {
+  notifyLeaveForwarded,
+  notifyLeaveDecision,
+  notifyLeaveApplied,
+} = require("../utils/notify.utils");
 require("dotenv").config();
 
 const verifyManagerEmail = async (req, res, next) => {
@@ -265,6 +270,18 @@ await leave.save();
     console.error("Leave approved but balance deduction failed:", deductionError.message);
   }
 
+  notifyLeaveDecision({
+    recipientModel: "User",
+    recipientId: leave.employee,
+    leaveType: leave.leaveType,
+    startDate: leave.startDate,
+    endDate: leave.endDate,
+    days: leave.days,
+    decision: "approved",
+    decidedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+    remarks: leave.remarks,
+  });
+
   res.status(200).json({ message: "Leave approved successfully", leave });
 };
 
@@ -290,6 +307,19 @@ leave.remarks = `Rejected by Manager (${req.manager.f_name})`;
 leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
 await leave.save();
+
+  notifyLeaveDecision({
+    recipientModel: "User",
+    recipientId: leave.employee,
+    leaveType: leave.leaveType,
+    startDate: leave.startDate,
+    endDate: leave.endDate,
+    days: leave.days,
+    decision: "rejected",
+    decidedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+    remarks: leave.remarks,
+  });
+
   res.status(200).json({ message: "Leave rejected successfully", leave });
 };
 
@@ -324,6 +354,19 @@ const forwardedtoreportingmanager = async (req, res, next) => {
       : "forwarded_reporting_manager";
 
     await leave.save();
+
+    const employeeDoc = await usermodel.findById(leave.employee).select("f_name l_name").lean();
+    notifyLeaveForwarded({
+      requesterName: employeeDoc ? `${employeeDoc.f_name} ${employeeDoc.l_name}` : "An employee",
+      forwardedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+      handlerModel: currentManager.reporting_manager_model,
+      handlerId: currentManager.reporting_manager,
+      leaveType: leave.leaveType,
+      startDate: leave.startDate,
+      endDate: leave.endDate,
+      days: leave.days,
+      reason: leave.reason,
+    });
 
     res.status(200).json({ message: "Leave forwarded to reporting manager successfully", leave });
   } catch (error) {
@@ -370,6 +413,19 @@ const forwardEmployeeLeaveUpChain = async (req, res, next) => {
     : "forwarded_reporting_manager";
 
   await leave.save();
+
+  const employeeDocUpChain = await usermodel.findById(leave.employee).select("f_name l_name").lean();
+  notifyLeaveForwarded({
+    requesterName: employeeDocUpChain ? `${employeeDocUpChain.f_name} ${employeeDocUpChain.l_name}` : "An employee",
+    forwardedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+    handlerModel: currentManager.reporting_manager_model,
+    handlerId: currentManager.reporting_manager,
+    leaveType: leave.leaveType,
+    startDate: leave.startDate,
+    endDate: leave.endDate,
+    days: leave.days,
+    reason: leave.reason,
+  });
 
   return res.status(200).json({ success: true, message: "Leave forwarded successfully", leave });
 };
@@ -430,6 +486,17 @@ const applyleavem = async (req, res, next) => {
     status: initialStatus,
     directed_to: managerData.reporting_manager,
     directed_to_model: managerData.reporting_manager_model,
+  });
+
+  notifyLeaveApplied({
+    requesterName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+    handlerModel: managerData.reporting_manager_model,
+    handlerId: managerData.reporting_manager,
+    leaveType,
+    startDate: start,
+    endDate: end,
+    days,
+    reason,
   });
 
   res.status(200).json({ message: "Leave request submitted to your reporting manager", leave });
@@ -509,6 +576,19 @@ const forwardLeaveUpChain = async (req, res, next) => {
 
   await leave.save();
 
+  const originalManagerDoc = await managermodel.findById(leave.manager).select("f_name l_name").lean();
+  notifyLeaveForwarded({
+    requesterName: originalManagerDoc ? `${originalManagerDoc.f_name} ${originalManagerDoc.l_name}` : "A manager",
+    forwardedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+    handlerModel: currentManager.reporting_manager_model,
+    handlerId: currentManager.reporting_manager,
+    leaveType: leave.leaveType,
+    startDate: leave.startDate,
+    endDate: leave.endDate,
+    days: leave.days,
+    reason: leave.reason,
+  });
+
   return res.status(200).json({ success: true, message: "Leave forwarded successfully", leave });
 };
 
@@ -546,6 +626,18 @@ await leave.save();
     } catch (deductionError) {
       console.error("Leave approved but balance deduction failed:", deductionError.message);
     }
+
+    notifyLeaveDecision({
+      recipientModel: "Manager",
+      recipientId: leave.manager,
+      leaveType: leave.leaveType,
+      startDate: leave.startDate,
+      endDate: leave.endDate,
+      days: leave.days,
+      decision: "approved",
+      decidedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+      remarks: leave.remarks,
+    });
 
     return res.status(200).json({ message: "Manager leave approved successfully", leave });
   }
@@ -586,6 +678,18 @@ await leave.save();
       console.error("Leave approved but balance deduction failed:", deductionError.message);
     }
 
+    notifyLeaveDecision({
+      recipientModel: "User",
+      recipientId: leave.employee,
+      leaveType: leave.leaveType,
+      startDate: leave.startDate,
+      endDate: leave.endDate,
+      days: leave.days,
+      decision: "approved",
+      decidedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+      remarks: leave.remarks,
+    });
+
     return res.status(200).json({ message: "Employee leave approved successfully", leave });
   }
 
@@ -622,6 +726,18 @@ leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
 await leave.save();
 
+    notifyLeaveDecision({
+      recipientModel: "Manager",
+      recipientId: leave.manager,
+      leaveType: leave.leaveType,
+      startDate: leave.startDate,
+      endDate: leave.endDate,
+      days: leave.days,
+      decision: "rejected",
+      decidedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+      remarks: leave.remarks,
+    });
+
     return res.status(200).json({ message: "Manager leave rejected successfully", leave });
   }
 
@@ -644,6 +760,18 @@ leave.remarks = `Rejected by Manager (${req.manager.f_name})`;
 leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
 await leave.save();
+
+    notifyLeaveDecision({
+      recipientModel: "User",
+      recipientId: leave.employee,
+      leaveType: leave.leaveType,
+      startDate: leave.startDate,
+      endDate: leave.endDate,
+      days: leave.days,
+      decision: "rejected",
+      decidedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+      remarks: leave.remarks,
+    });
 
     return res.status(200).json({ message: "Employee leave rejected successfully", leave });
   }
