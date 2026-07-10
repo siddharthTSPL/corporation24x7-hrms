@@ -289,7 +289,7 @@ function ProfileTab({ employee }) {
   return (
     <>
       <SectionCard title="Personal details" subtitle="Your core information on record" accent={C.brand}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+        <div className="st-2col" style={{ display: "grid", gap: "0 20px" }}>
           <ReadonlyField label="First name" value={employee?.f_name} />
           <ReadonlyField label="Last name" value={employee?.l_name} />
           <ReadonlyField label="Work email" value={employee?.work_email} />
@@ -300,7 +300,7 @@ function ProfileTab({ employee }) {
       </SectionCard>
 
       <SectionCard title="Job information" subtitle="Your current role and team" accent={C.blue}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+        <div className="st-2col" style={{ display: "grid", gap: "0 20px" }}>
           <ReadonlyField label="Role" value={employee?.role} />
           <ReadonlyField label="Designation" value={employee?.designation} />
           <ReadonlyField label="Department" value={deptMap[employee?.department] || employee?.department} />
@@ -313,7 +313,7 @@ function ProfileTab({ employee }) {
       </SectionCard>
 
       <SectionCard title="Experience" subtitle="Your work background" accent={C.amber}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+        <div className="st-2col" style={{ display: "grid", gap: "0 20px" }}>
           <ReadonlyField label="Fresher" value={employee?.is_fresher ? "Yes" : "No"} />
           <ReadonlyField label="Total experience (years)" value={employee?.total_experience !== undefined ? String(employee.total_experience) : "—"} />
           {!employee?.is_fresher && (
@@ -326,7 +326,7 @@ function ProfileTab({ employee }) {
       </SectionCard>
 
       <SectionCard title="Reporting manager" subtitle="Your direct reporting line" accent={C.green}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+        <div className="st-2col" style={{ display: "grid", gap: "0 20px" }}>
           <ReadonlyField label="Manager name" value={employee?.Under_manager ? `${employee.Under_manager.f_name} ${employee.Under_manager.l_name}` : "—"} />
           <ReadonlyField label="Manager email" value={employee?.Under_manager?.work_email} />
           <ReadonlyField label="Manager role" value={employee?.Under_manager?.role} />
@@ -486,7 +486,7 @@ function AddressTab({ employee, onSuccess, onError }) {
         onChange={e => setForm(p => ({ ...p, address: e.target.value }))}
         placeholder="Enter your address"
       />
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}>
+      <div className="st-2col" style={{ display: "grid", gap: "0 16px" }}>
         <InputField
           label="City"
           value={form.city}
@@ -533,7 +533,7 @@ function DocumentsTab({ employee }) {
   return (
     <>
       <SectionCard title="Identity & banking" subtitle="Your identity and bank details on record" accent={C.brand}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+        <div className="st-2col" style={{ display: "grid", gap: "0 20px" }}>
           {docFields.map(f => (
             <ReadonlyField key={f.label} label={f.label} value={f.value} />
           ))}
@@ -541,7 +541,7 @@ function DocumentsTab({ employee }) {
       </SectionCard>
 
       <SectionCard title="Uploaded documents" subtitle="Files submitted during onboarding" accent={C.blue}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+        <div className="st-2col" style={{ display: "grid", gap: "0 20px" }}>
           {fileFields.map(f => (
             <div key={f.label} style={{ marginBottom: 16 }}>
               <FieldLabel>{f.label}</FieldLabel>
@@ -774,12 +774,17 @@ export default function EmployeeSettingsPage() {
   }
 
   return (
-    <div style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", background: C.page, minHeight: "100vh", padding: "28px 32px", color: C.text }}>
+    <div className="st-page" style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", background: C.page, minHeight: "100vh", padding: "28px 32px", color: C.text }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes slideIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
         input:focus { border-color: ${C.brand} !important; box-shadow: 0 0 0 3px ${C.brandLight}; }
         button:not([disabled]):hover { opacity: 0.88; }
+        .st-2col { grid-template-columns: 1fr 1fr; }
+        @media (max-width: 720px) {
+          .st-page { padding: 16px 14px !important; }
+          .st-2col { grid-template-columns: 1fr !important; gap: 16px 0 !important; }
+        }
       `}</style>
 
       <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: "", type: "" })} />
