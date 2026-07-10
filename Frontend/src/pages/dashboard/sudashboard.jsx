@@ -26,6 +26,13 @@ import { useGetAllAnnouncements, useCreateAnnouncement, useUpdateAnnouncement, u
 import { useGetAllAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin, useReviewToAdmin } from "../../auth/server-state/superadmin/other/suother.hook";
 
 const DEPT_OPTIONS = [ "OPR","BPO", "ENG", "HR", "MGMT"];
+const DEPT_FULL_FORMS = {
+  OPR: "OPR — Operations",
+  BPO: "BPO — Business Process Outsourcing",
+  ENG: "ENG — Engineering",
+  HR: "HR — Human Resources",
+  MGMT: "MGMT — Management",
+};
 const ROLE_LABEL = { admin: "Admin",  official: "Official" };
 
 const WORKING_STATUS_OPTIONS = [
@@ -1010,9 +1017,11 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
           <div className="mt-3 sm:mt-4">
             <FLabel required>Department</FLabel>
             <FSel value={form.department} onChange={set("department")} onBlur={blur("department")} err={showErr("department")}>
-              <option value="">Select department</option>
-              {DEPT_OPTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
-            </FSel>
+  <option value="">Select department</option>
+  {DEPT_OPTIONS.map((d) => (
+    <option key={d} value={d}>{DEPT_FULL_FORMS[d] || d}</option>
+  ))}
+</FSel>
             <FieldErr msg={showErr("department")} />
           </div>
 
