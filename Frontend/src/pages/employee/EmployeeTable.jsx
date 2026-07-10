@@ -249,20 +249,33 @@ function OfficeLocationFields({form,onChange,errors}){
           {states.map((s)=><option key={s.isoCode} value={s.isoCode}>{s.name}</option>)}
         </select>
       </Field>
-      <div className="col-span-2">
-        <Field label="Office Location (City)" required error={errors.office_location}>
-          <select
-            name="office_location"
-            value={form.office_location}
-            onChange={onChange}
-            className={inputCls}
-            disabled={!form.office_location_state}
-          >
-            <option value="">{form.office_location_state?"Select City":"Select state first"}</option>
-            {cities.map((c)=><option key={`${c.name}-${c.latitude}-${c.longitude}`} value={c.name}>{c.name}</option>)}
-          </select>
-        </Field>
-      </div>
+     <Field
+  label="Office Location (City)"
+  required
+  error={errors.office_location}
+>
+  <select
+    name="office_location"
+    value={form.office_location}
+    onChange={onChange}
+    className={inputCls}
+    disabled={!form.office_location_state}
+  >
+    <option value="">
+      {form.office_location_state
+        ? "Select City"
+        : "Select state first"}
+    </option>
+    {cities.map((c) => (
+      <option
+        key={`${c.name}-${c.latitude}-${c.longitude}`}
+        value={c.name}
+      >
+        {c.name}
+      </option>
+    ))}
+  </select>
+</Field>
     </>
   );
 }
