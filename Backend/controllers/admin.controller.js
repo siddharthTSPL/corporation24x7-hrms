@@ -9,6 +9,7 @@ const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const { sendEmail } = require("../utils/nodemailer.utils");
 const assignDefaultLeave = require("../automatic/bydefaultleaveset");
+const LeavePolicy = require("../Models/leavepolicy.model");
 const PermissionModel = require("../Models/permission.model");
 const Leave = require("../Models/leave.model");
 const Review = require("../Models/review.model");
@@ -510,7 +511,7 @@ const addmanager = async (req, res, next) => {
     const verifyLink = `${process.env.BASE_URL}talent/api/manager/verify/${token}`;
 
     await Promise.all([
-      assignDefaultLeave(newmanager),
+      assignDefaultLeave(newmanager, false),
       assignDefaultPermissions(
         newmanager._id,
         newmanager.role || "manager",
@@ -598,7 +599,7 @@ const addemployee = async (req, res, next) => {
     const verifyLink = `${process.env.BASE_URL}talent/api/user/verify/${token}`;
 
     await Promise.all([
-      assignDefaultLeave(newuser),
+      assignDefaultLeave(newuser, false),
       assignDefaultPermissions(
         newuser._id,
         newuser.role || "employee",
@@ -898,7 +899,7 @@ const promoteEmployeeToManager = async (req, res, next) => {
       { session }
     );
 
-    await assignDefaultLeave({ ...newManager.toObject(), _id: newManager._id });
+    await assignDefaultLeave({ ...newManager.toObject(), _id: newManager._id }, false);
 
     await Promise.all([
       Usermodel.findByIdAndDelete(id, { session }),
@@ -1059,7 +1060,13 @@ const promoteManagerToAdmin = async (req, res, next) => {
       { session }
     );
 
-    await assignDefaultLeave({ ...newAdmin.toObject(), _id: newAdmin._id });
+    await assignDefaultLeave({ ...newAdmin.toObject(), _id: newAdmin._id }, true);
+
+    await LeavePolicy.findOneAndUpdate(
+      { organisation_id: req.admin.organisation_id },
+      { $set: { locked: true } },
+      { upsert: true }
+    );
 
     await Promise.all([
       Managermodel.findByIdAndDelete(id, { session }),
@@ -1231,7 +1238,13 @@ const promoteEmployeeToAdmin = async (req, res, next) => {
       { session }
     );
 
-    await assignDefaultLeave({ ...newAdmin.toObject(), _id: newAdmin._id });
+    await assignDefaultLeave({ ...newAdmin.toObject(), _id: newAdmin._id }, true);
+
+    await LeavePolicy.findOneAndUpdate(
+      { organisation_id: req.admin.organisation_id },
+      { $set: { locked: true } },
+      { upsert: true }
+    );
 
     await Promise.all([
       Usermodel.findByIdAndDelete(id, { session }),
@@ -1376,7 +1389,7 @@ const demoteManagerToEmployee = async (req, res, next) => {
       { session }
     );
 
-    await assignDefaultLeave({ ...newEmployee.toObject(), _id: newEmployee._id });
+    await assignDefaultLeave({ ...newEmployee.toObject(), _id: newEmployee._id }, false);
 
     await Promise.all([
       Managermodel.findByIdAndDelete(id, { session }),
@@ -1532,7 +1545,7 @@ const demoteAdminToManager = async (req, res, next) => {
       { session }
     );
 
-    await assignDefaultLeave({ ...newManager.toObject(), _id: newManager._id });
+    await assignDefaultLeave({ ...newManager.toObject(), _id: newManager._id }, false);
 
     await Promise.all([
       Adminmodel.findByIdAndDelete(id, { session }),
@@ -1680,7 +1693,7 @@ const demoteAdminToEmployee = async (req, res, next) => {
       { session }
     );
 
-    await assignDefaultLeave({ ...newEmployee.toObject(), _id: newEmployee._id });
+    await assignDefaultLeave({ ...newEmployee.toObject(), _id: newEmployee._id }, false);
 
     await Promise.all([
       Adminmodel.findByIdAndDelete(id, { session }),

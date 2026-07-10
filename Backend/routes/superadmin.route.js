@@ -46,6 +46,8 @@ const {
   setAdminWorkingStatus,
   getInactiveUsers,
   getActiveUserCount,
+  getLeavePolicy,
+  setLeavePolicy,
 } = require("../controllers/superadmin.controller");
 
 
@@ -241,6 +243,17 @@ superAdminRouter.get(
   "/active-user-count",
   superAdminAuth,
   asyncHandler(getActiveUserCount),
+);
+
+superAdminRouter.get(
+  "/leave-policy",
+  superAdminAuth,
+  asyncHandler(getLeavePolicy),
+);
+superAdminRouter.post(
+  "/leave-policy",
+  superAdminAuth,
+  asyncHandler(setLeavePolicy),
 );
 
 

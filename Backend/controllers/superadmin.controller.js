@@ -13,6 +13,7 @@ const reviewModel = require("../Models/review.model");
 const Attendance = require("../Models/attendance.model");
 const generateUID = require("../automatic/uidgeneration");
 const assignDefaultLeave = require("../automatic/bydefaultleaveset");
+const LeavePolicy = require("../Models/leavepolicy.model");
 const { processLeaveDeduction } = require("../automatic/calculateleave");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
@@ -912,7 +913,17 @@ const createAdmin = async (req, res, next) => {
 
     await incrementActiveUserCount(organisation_id);
 
-    await assignDefaultLeave({ ...admin.toObject(), role: "admin" });
+    await assignDefaultLeave({ ...admin.toObject(), role: "admin" }, true);
+
+    // Once an Admin exists under this organisation, the leave policy is
+    // locked for good — whether or not the SuperAdmin ever customized it.
+    // If no policy document exists yet, this also creates one at the
+    // defaults so getLeavePolicy always has something to return.
+    await LeavePolicy.findOneAndUpdate(
+      { organisation_id },
+      { $set: { locked: true } },
+      { upsert: true }
+    );
 
     const verifyToken = jwt.sign({ adminid: admin._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
     const verifyLink = `${process.env.BASE_URL}/talent/api/admin/verify/${verifyToken}`;
@@ -1043,7 +1054,7 @@ const addmanager = async (req, res, next) => {
     const verifyLink = `${process.env.BASE_URL}talent/api/manager/verify/${token}`;
  
     await Promise.all([
-      assignDefaultLeave(newmanager),
+      assignDefaultLeave(newmanager, false),
       assignPermissions(newmanager._id, newmanager.role || "manager", organisation_id, req.superAdmin._id, "SuperAdmin", permissions),
       sendEmail({
         to: work_email,
@@ -1191,7 +1202,7 @@ const addemployee = async (req, res, next) => {
     const verifyLink = `${process.env.BASE_URL}talent/api/user/verify/${token}`;
  
     await Promise.all([
-      assignDefaultLeave(newuser),
+      assignDefaultLeave(newuser, false),
       assignPermissions(newuser._id, newuser.role || "employee", organisation_id, req.superAdmin._id, "SuperAdmin", permissions),
       sendEmail({
         to: work_email,
@@ -2372,6 +2383,57 @@ const getActiveUserCount = async (req, res, next) => {
   }
 };
 
+// --- Leave policy: view current org policy (falls back to defaults if never customized) ---
+const getLeavePolicy = async (req, res, next) => {
+  if (!req.superAdmin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const policy = await LeavePolicy.findOne({ organisation_id: req.superAdmin._id }).lean();
+
+  return res.status(200).json({
+    success: true,
+    policy: policy || {
+      EL: assignDefaultLeave.DEFAULT_POLICY.EL,
+      SL: assignDefaultLeave.DEFAULT_POLICY.SL,
+      locked: false,
+    },
+  });
+};
+
+// --- Leave policy: customize EL/SL per role tier. One-time — locked forever
+// once the org has an Admin. ---
+const setLeavePolicy = async (req, res, next) => {
+  if (!req.superAdmin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const { EL, SL } = req.body;
+  if (!EL && !SL)
+    return next(Object.assign(new Error("Provide EL and/or SL values to update"), { statusCode: 400 }));
+
+  const organisation_id = req.superAdmin._id;
+  const existing = await LeavePolicy.findOne({ organisation_id });
+
+  if (existing?.locked)
+    return next(Object.assign(
+      new Error("Leave policy is locked and can no longer be changed because this organisation already has an Admin."),
+      { statusCode: 403 }
+    ));
+
+  const $set = {};
+  if (EL?.admin != null) $set["EL.admin"] = EL.admin;
+  if (EL?.default != null) $set["EL.default"] = EL.default;
+  if (SL?.admin != null) $set["SL.admin"] = SL.admin;
+  if (SL?.default != null) $set["SL.default"] = SL.default;
+
+  const policy = await LeavePolicy.findOneAndUpdate(
+    { organisation_id },
+    { $set },
+    { upsert: true, new: true }
+  );
+
+  return res.status(200).json({ success: true, message: "Leave policy updated", policy });
+};
+
 module.exports = {
   registerSuperAdmin,
   verifySuperAdmin,
@@ -2415,5 +2477,7 @@ module.exports = {
   getPermissions,
   setAdminWorkingStatus,
   getInactiveUsers,
-  getActiveUserCount
+  getActiveUserCount,
+  getLeavePolicy,
+  setLeavePolicy
 };

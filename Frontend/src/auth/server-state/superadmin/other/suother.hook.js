@@ -36,6 +36,8 @@ import {
   getActiveUserCount,
   getKioskPasswordStatus,
   setKioskPassword,
+  getLeavePolicy,
+  setLeavePolicy,
 } from "../../../api/superadmin/other/su.other";
 
 
@@ -413,5 +415,58 @@ export const useSuperAdminActiveUserCount = () => {
   return useQuery({
     queryKey: ["superadmin", "active-user-count"],
     queryFn: getActiveUserCount,
+  });
+};
+
+export const useGetLeavePolicy = () => {
+  return useQuery({
+    queryKey: ["superadmin", "leave-policy"],
+    queryFn: getLeavePolicy,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useSetLeavePolicy = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: setLeavePolicy,
+
+    onSuccess: (response) => {
+      toast.success(response.message, {
+        position: "top-right",
+        duration: 5000,
+        style: {
+          background: "#FFFFFF",
+          color: "#16A34A",
+          borderRadius: "10px",
+          padding: "14px 16px",
+          fontSize: "14px",
+          fontWeight: "500",
+        },
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["superadmin", "leave-policy"] });
+    },
+
+    onError: (error) => {
+      toast.error(
+        error?.response?.data?.message || "Something went wrong",
+        {
+          position: "top-right",
+          duration: 5000,
+          icon: "❌",
+          style: {
+            background: "#FFFFFF",
+            color: "#16A34A",
+            borderRadius: "10px",
+            padding: "14px 16px",
+            fontSize: "14px",
+            fontWeight: "500",
+          },
+        }
+      );
+    },
   });
 };

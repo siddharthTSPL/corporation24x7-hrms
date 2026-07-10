@@ -613,8 +613,18 @@ const getallleave = async (req, res, next) => {
     return next(Object.assign(new Error("Leave balance not found"), { statusCode: 404 }));
   res.status(200).json({
     success: true,
-    EL: leaveBalance.EL?.entitled || 0,
-    SL: leaveBalance.SL?.entitled || 0,
+    EL: {
+      entitled: leaveBalance.EL?.entitled || 0,
+      accrued: leaveBalance.EL?.accrued || 0,
+      availed: leaveBalance.EL?.availed || 0,
+      available: Number(((leaveBalance.EL?.accrued || 0) - (leaveBalance.EL?.availed || 0)).toFixed(2)),
+    },
+    SL: {
+      entitled: leaveBalance.SL?.entitled || 0,
+      accrued: leaveBalance.SL?.accrued || 0,
+      availed: leaveBalance.SL?.availed || 0,
+      available: Number(((leaveBalance.SL?.accrued || 0) - (leaveBalance.SL?.availed || 0)).toFixed(2)),
+    },
     ML: leaveBalance.ML || 0,
     PL: leaveBalance.PL || 0,
     pbc: leaveBalance.pbc || 0,
