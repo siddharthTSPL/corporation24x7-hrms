@@ -356,9 +356,13 @@ function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, c
     leave:         { theme:"indigo", icon:"🏖️", label:`On Leave — ${leaveLabel[leaveType]||"Approved Leave"}` },
     holiday:       { theme:"amber",  icon:"🎉", label:`Holiday — ${checkinGate?.holidayName || "Company Holiday"}` },
     weekoff:       { theme:"slate",  icon:"🛋️", label:"Week Off" },
-    outside_shift: { theme:"slate",  icon:"⏰", label: checkinGate?.shift
-      ? `Shift window: ${checkinGate.shift.startTime} – ${checkinGate.shift.endTime}`
-      : "Outside shift window" },
+    too_early:     { theme:"slate",  icon:"⏰", label: checkinGate?.shift
+      ? `Check-in opens closer to ${checkinGate.shift.startTime}`
+      : "Check-in not open yet" },
+    too_late:      { theme:"rose",   icon:"⛔", label: checkinGate?.shift
+      ? `Check-in closed — more than 1 hour past ${checkinGate.shift.startTime}`
+      : "Check-in window closed" },
+    checked_in_by_face: { theme:"pink", icon:"🤳", label: "Checked in via Face Attendance" },
     loading:       { theme:"slate",  icon:"⏳", label:"Checking today's status…" },
   };
   const meta = REASON_META[reason] || null;
@@ -367,6 +371,8 @@ function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, c
     indigo: { bg:"bg-gradient-to-br from-indigo-100 to-indigo-200 shadow-indigo-100 shadow-lg", head:"text-indigo-800", sub:"text-indigo-500", pill:"text-indigo-700 bg-indigo-200/60" },
     amber:  { bg:"bg-gradient-to-br from-amber-50 to-amber-200 shadow-amber-100 shadow-lg",     head:"text-amber-900", sub:"text-amber-600", pill:"text-amber-800 bg-amber-200/60" },
     slate:  { bg:"bg-gradient-to-br from-slate-100 to-slate-200 shadow-slate-100 shadow-lg",    head:"text-slate-700", sub:"text-slate-500", pill:"text-slate-700 bg-slate-300/50" },
+    rose:   { bg:"bg-gradient-to-br from-rose-100 to-rose-200 shadow-rose-100 shadow-lg",       head:"text-rose-800",  sub:"text-rose-500",  pill:"text-rose-700 bg-rose-200/60" },
+    pink:   { bg:"bg-gradient-to-br from-pink-100 to-pink-200 shadow-pink-100 shadow-lg",       head:"text-pink-800",  sub:"text-pink-500",  pill:"text-pink-700 bg-pink-200/60" },
   };
   const active = preBlocked && meta ? THEME[meta.theme] : null;
 
@@ -376,7 +382,9 @@ function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, c
   else if (isCheckedIn) buttonLabel = "🔴 Check Out";
   else if (reason === "holiday") buttonLabel = "🎉 Holiday Today";
   else if (reason === "weekoff") buttonLabel = "🛋️ Week Off";
-  else if (reason === "outside_shift") buttonLabel = "⏰ Outside Shift";
+  else if (reason === "too_early") buttonLabel = "⏰ Not Open Yet";
+  else if (reason === "too_late") buttonLabel = "⛔ Blocked";
+  else if (reason === "checked_in_by_face") buttonLabel = "🤳 Checked In (Face)";
   else if (reason === "loading") buttonLabel = "Please wait…";
 
   const buttonDisabled = preBlocked || isCheckedOut;
