@@ -100,6 +100,7 @@ const LEAVE_META = {
   pl:          { label: "Paternity Leave", bg: "#FEF3C7", color: "#92400E", dot: "#D97706" },
   half_day_el: { label: "Half Day EL",     bg: "#ECFDF5", color: "#065F46", dot: "#059669" },
   half_day_sl: { label: "Half Day SL",     bg: "#EFF6FF", color: "#1E40AF", dot: "#3B82F6" },
+  lwp:         { label: "Leave Without Pay", bg: "#FCE7F3", color: "#9D174D", dot: "#DB2777" },
 };
 
 const LEAVE_STATUS_META = {
@@ -467,6 +468,7 @@ const LeaveApplyTab = ({ employee, showToast }) => {
     { value: "pl",          label: "Paternity Leave" },
     { value: "half_day_el", label: "Half Day EL"     },
     { value: "half_day_sl", label: "Half Day SL"     },
+    { value: "lwp",         label: "Leave Without Pay" },
   ].filter(t => {
     if (t.value === "ml") return isFemaleMarried;
     if (t.value === "pl") return isMaleMarried;
