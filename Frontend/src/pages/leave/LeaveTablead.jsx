@@ -448,19 +448,19 @@ const MyBalancePanel = ({ admin, leaveBalance }) => {
   const showML    = admin.gender === "female" && isMarried;
   const showPL    = admin.gender === "male"   && isMarried;
   const cards = [
-    { key: "el",  label: "Earned Leave",      entitled: balance.EL?.entitled || 0, availed: balance.EL?.availed || 0, accrued: balance.EL?.accrued || 0, accent: "#22C55E", bg: "linear-gradient(135deg,#F0FDF4,#DCFCE7)" },
-    { key: "sl",  label: "Sick Leave",         entitled: balance.SL?.entitled || 0, availed: balance.SL?.availed || 0, accrued: 0,                         accent: "#3B82F6", bg: "linear-gradient(135deg,#EFF6FF,#DBEAFE)" },
-    { key: "pbc", label: "Paid by Company",    entitled: balance.pbc || 0,          availed: 0,                         accrued: 0,                         accent: "#6B1A4A", bg: "linear-gradient(135deg,#F9EFF5,#F4E6F0)" },
-    { key: "lwp", label: "Leave Without Pay",  entitled: balance.lwp || 0,          availed: 0,                         accrued: 0,                         accent: "#CD166E", bg: "linear-gradient(135deg,#FDF2F8,#FCE7F3)" },
-    ...(showML ? [{ key: "ml", label: "Maternity Leave", entitled: balance.ML || 0, availed: 0, accrued: 0, accent: "#A855F7", bg: "linear-gradient(135deg,#FAF5FF,#F3E8FF)" }] : []),
-    ...(showPL ? [{ key: "pl", label: "Paternity Leave", entitled: balance.PL || 0, availed: 0, accrued: 0, accent: "#F59E0B", bg: "linear-gradient(135deg,#FFFBEB,#FEF3C7)" }] : []),
+    { key: "el",  label: "Earned Leave",      entitled: balance.EL?.entitled || 0, availed: balance.EL?.availed || 0, accrued: balance.EL?.accrued || 0, remaining: Math.max(0, (balance.EL?.accrued || 0) - (balance.EL?.availed || 0)), accent: "#22C55E", bg: "linear-gradient(135deg,#F0FDF4,#DCFCE7)" },
+    { key: "sl",  label: "Sick Leave",         entitled: balance.SL?.entitled || 0, availed: balance.SL?.availed || 0, accrued: balance.SL?.accrued || 0, remaining: Math.max(0, (balance.SL?.accrued || 0) - (balance.SL?.availed || 0)), accent: "#3B82F6", bg: "linear-gradient(135deg,#EFF6FF,#DBEAFE)" },
+    { key: "pbc", label: "Paid by Company",    entitled: balance.pbc || 0,          availed: 0,                         accrued: 0, remaining: balance.pbc || 0,                        accent: "#6B1A4A", bg: "linear-gradient(135deg,#F9EFF5,#F4E6F0)" },
+    { key: "lwp", label: "Leave Without Pay",  entitled: balance.lwp || 0,          availed: 0,                         accrued: 0, remaining: balance.lwp || 0,                        accent: "#CD166E", bg: "linear-gradient(135deg,#FDF2F8,#FCE7F3)" },
+    ...(showML ? [{ key: "ml", label: "Maternity Leave", entitled: balance.ML || 0, availed: 0, accrued: 0, remaining: balance.ML || 0, accent: "#A855F7", bg: "linear-gradient(135deg,#FAF5FF,#F3E8FF)" }] : []),
+    ...(showPL ? [{ key: "pl", label: "Paternity Leave", entitled: balance.PL || 0, availed: 0, accrued: 0, remaining: balance.PL || 0, accent: "#F59E0B", bg: "linear-gradient(135deg,#FFFBEB,#FEF3C7)" }] : []),
   ];
 
   return (
     <div className="w-full">
       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 xs:gap-3 sm:gap-4 mb-5 sm:mb-6">
         {cards.map((s, i) => {
-          const remaining = s.entitled - s.availed;
+          const remaining = s.remaining;
           const pct = s.entitled > 0 ? Math.min((s.availed / s.entitled) * 100, 100) : 0;
           return (
             <div
@@ -499,7 +499,7 @@ const MyBalancePanel = ({ admin, leaveBalance }) => {
       <SectionBox title="Leave Balance Summary">
         <div className="sm:hidden flex flex-col gap-2.5">
           {cards.map((s) => {
-            const rem = s.entitled - s.availed;
+            const rem = s.remaining;
             const pct = s.entitled > 0 ? Math.round((rem / s.entitled) * 100) : 0;
             const m   = LEAVE_META[s.key] || { label: s.label, bg: "#F3F4F6", color: "#374151", dot: "#9CA3AF" };
             return (
@@ -557,7 +557,7 @@ const MyBalancePanel = ({ admin, leaveBalance }) => {
             </thead>
             <tbody>
               {cards.map((s) => {
-                const rem = s.entitled - s.availed;
+                const rem = s.remaining;
                 const pct = s.entitled > 0 ? Math.round((rem / s.entitled) * 100) : 0;
                 const m   = LEAVE_META[s.key] || { label: s.label, bg: "#F3F4F6", color: "#374151", dot: "#9CA3AF" };
                 return (
