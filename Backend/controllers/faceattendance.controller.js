@@ -98,8 +98,13 @@ const removeFace = async (req, res) => {
 
 const scanFace = async (req, res) => {
   try {
-    const { image } = req.body;
+    const { image, gate } = req.body;
     if (!image) return res.status(400).json({ message: "image (base64) is required" });
+
+    // Kiosk sends a preset gate name (Gate 1..5) or a free-text "Other"
+    // value. Just cap length/sanitize - this is a location label, not a
+    // permission gate, so we don't hard-reject unrecognised values.
+    const gateName = typeof gate === "string" && gate.trim() ? gate.trim().slice(0, 40) : null;
 
     const { organisation_id } = req.kiosk;
 
@@ -200,6 +205,7 @@ const scanFace = async (req, res) => {
         attendance.shift = shift._id;
         attendance.activeMinutes = 0;
         attendance.idleMinutes = 0;
+        attendance.checkInGate = gateName;
         await attendance.save();
       } else {
         attendance = await Attendance.create({
@@ -213,6 +219,7 @@ const scanFace = async (req, res) => {
           isLate,
           lateMinutes,
           source: "face",
+          checkInGate: gateName,
         });
       }
 
@@ -227,6 +234,7 @@ const scanFace = async (req, res) => {
         time: attendance.checkIn,
         isLate,
         lateMinutes,
+        gate: gateName,
         shift: shiftInfo,
       });
     }
@@ -259,6 +267,7 @@ const scanFace = async (req, res) => {
     const { remark, isOvertime, overtimeMinutes } = checkoutWindow;
 
     attendance.checkOut = now;
+    attendance.checkOutGate = gateName;
     const durationMinutes = Math.round((attendance.checkOut - attendance.checkIn) / 60000);
     attendance.activeMinutes = durationMinutes;
 
@@ -302,6 +311,8 @@ const scanFace = async (req, res) => {
       overtimeMinutes: attendance.overtimeMinutes,
       time: attendance.checkOut,
       workedMinutes: durationMinutes,
+      gate: gateName,
+      isBelowHalfShift,
       shift: shiftInfo,
     });
   } catch (error) {
