@@ -335,13 +335,16 @@ export default function Docma() {
   );
 
   return (
-    <div style={{
+    <div className="doc-page" style={{
       fontFamily: "'DM Sans','Segoe UI',sans-serif",
       background: C.page, minHeight: "100vh",
       padding: "28px 32px", color: C.text,
     }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
+        @media (max-width: 640px) {
+          .doc-page { padding: 16px 14px !important; }
+        }
       `}</style>
 
       {/* Header */}
@@ -379,7 +382,7 @@ export default function Docma() {
         </div>
 
         {/* Search */}
-        <div style={{ marginLeft: "auto", position: "relative" }}>
+        <div style={{ marginLeft: "auto", position: "relative", width: "100%", maxWidth: 260 }}>
           <svg width="15" height="15" viewBox="0 0 15 15" fill="none"
             style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}>
             <circle cx="6.5" cy="6.5" r="4.5" stroke={C.muted} strokeWidth="1.3" />
@@ -394,7 +397,7 @@ export default function Docma() {
               padding: "10px 14px 10px 36px", borderRadius: 10,
               border: `0.5px solid ${C.border}`, fontSize: 13,
               color: C.text, background: C.surface,
-              outline: "none", width: 260, fontFamily: "inherit",
+              outline: "none", width: "100%", fontFamily: "inherit",
             }}
             onFocus={e => e.target.style.borderColor = C.brand}
             onBlur={e => e.target.style.borderColor = C.border}
