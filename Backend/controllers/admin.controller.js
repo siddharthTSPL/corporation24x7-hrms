@@ -479,7 +479,7 @@ const addmanager = async (req, res, next) => {
     if (emailCheck.taken)
       return next(Object.assign(new Error("An account with this email already exists"), { statusCode: 400 }));
 
-    const empidTaken = await isEmpidTaken(empid); // see helper below
+    const empidTaken = await isEmpidTaken(empid, organisation_id); // see helper below
     if (empidTaken)
       return next(Object.assign(new Error("This Employee ID is already in use"), { statusCode: 400 }));
 
@@ -570,7 +570,7 @@ const addemployee = async (req, res, next) => {
     if (emailCheck.taken)
       return next(Object.assign(new Error("An account with this email already exists"), { statusCode: 400 }));
 
-    const empidTaken = await isEmpidTaken(empid);
+    const empidTaken = await isEmpidTaken(empid, organisation_id);
     if (empidTaken)
       return next(Object.assign(new Error("This Employee ID is already in use"), { statusCode: 400 }));
 
