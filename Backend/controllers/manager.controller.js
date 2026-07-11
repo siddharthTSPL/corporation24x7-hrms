@@ -513,7 +513,6 @@ const getforwardedleaves = async (req, res, next) => {
     leavemodel
       .find({
         organisation_id,
-        status: "forwarded_reporting_manager",
         directed_to: req.manager._id,
         directed_to_model: "Manager",
       })
@@ -524,7 +523,6 @@ const getforwardedleaves = async (req, res, next) => {
     managerLeaveModel
       .find({
         organisation_id,
-        status: "pending_reporting_manager",
         directed_to: req.manager._id,
         directed_to_model: "Manager",
       })

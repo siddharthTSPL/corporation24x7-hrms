@@ -1453,13 +1453,13 @@ const showallleaves = async (req, res, next) => {
  
   const [employeeLeaves, managerLeaves, adminLeaves] = await Promise.all([
     Leave.find({ organisation_id })
-      .populate("employee", "f_name l_name work_email")
-      .populate("manager", "f_name l_name work_email")
+      .populate("employee", "f_name l_name work_email empid department designation")
+      .populate("manager", "f_name l_name work_email empid department designation")
       .sort({ createdAt: -1 })
       .lean(),
  
     ManagerLeave.find({ organisation_id })
-      .populate("manager", "f_name l_name work_email designation")
+      .populate("manager", "f_name l_name work_email empid department designation")
       .sort({ createdAt: -1 })
       .lean(),
  
