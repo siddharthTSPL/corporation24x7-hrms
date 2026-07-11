@@ -601,6 +601,11 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
   const applyMut = useAdminApplyLeave();
   const history  = Array.isArray(rawHistory?.leave) ? rawHistory.leave : Array.isArray(rawHistory) ? rawHistory : [];
 
+  const PAGE_SIZE = 5;
+  const [historyPage, setHistoryPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(history.length / PAGE_SIZE));
+  const pagedHistory = history.slice((historyPage - 1) * PAGE_SIZE, historyPage * PAGE_SIZE);
+
   const isMarried = admin?.marital_status === "married";
   const showML    = admin?.gender === "female" && isMarried;
   const showPL    = admin?.gender === "male"   && isMarried;
@@ -723,7 +728,7 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
       >
         {histLoading ? <Spinner /> : history.length === 0 ? <EmptyState msg="No leave records yet" /> : (
           <div>
-            {history.map((leave, idx) => {
+            {pagedHistory.map((leave, idx) => {
               const d      = leave.days || daysDiff(leave.startDate, leave.endDate);
               const accent = (LEAVE_META[leave.leaveType] || { accent: "#8B3A8A" }).accent;
               return (
@@ -770,6 +775,40 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
                 </div>
               );
             })}
+          </div>
+        )}
+        {history.length > PAGE_SIZE && (
+          <div className="flex items-center justify-center gap-2 mt-4 pt-3" style={{ borderTop: "1px solid rgba(200,185,220,0.28)" }}>
+            <button
+              onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+              disabled={historyPage === 1}
+              className="px-3 py-1.5 rounded-[10px] text-[12px] font-semibold cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: "#F4EEF9", color: "#6B1A4A" }}
+            >
+              ← Prev
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <button
+                key={p}
+                onClick={() => setHistoryPage(p)}
+                className="w-[30px] h-[30px] rounded-[10px] text-[12px] font-semibold cursor-pointer transition-all"
+                style={
+                  p === historyPage
+                    ? { background: "linear-gradient(135deg,#6B1A4A,#9B2458)", color: "#fff" }
+                    : { background: "#F4EEF9", color: "#6B1A4A" }
+                }
+              >
+                {p}
+              </button>
+            ))}
+            <button
+              onClick={() => setHistoryPage((p) => Math.min(totalPages, p + 1))}
+              disabled={historyPage === totalPages}
+              className="px-3 py-1.5 rounded-[10px] text-[12px] font-semibold cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: "#F4EEF9", color: "#6B1A4A" }}
+            >
+              Next →
+            </button>
           </div>
         )}
       </SectionBox>

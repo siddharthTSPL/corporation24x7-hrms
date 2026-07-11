@@ -75,6 +75,9 @@ const daysDiff = (s, e) => {
 const isTerminalStatus = (status) =>
   status?.startsWith("approved") || status?.startsWith("rejected");
 
+const humanizeStatus = (s = "") =>
+  s.split("_").filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+
 const Spinner = () => (
   <div className="flex flex-col items-center justify-center py-16 gap-3.5">
     <div className="w-9 h-9 border-[3px] border-purple-100 border-t-[#730042] rounded-full animate-spin-slow" />
@@ -103,6 +106,40 @@ const EmptyState = ({ msg = "No records found", icon = "calendar" }) => (
   </div>
 );
 
+const Pagination = ({ page, setPage, totalPages }) => {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex items-center justify-center gap-2 mt-5 pt-4 border-t border-purple-100">
+      <button
+        onClick={() => setPage(p => Math.max(1, p - 1))}
+        disabled={page === 1}
+        className="px-3 py-1.5 rounded-[10px] text-xs font-semibold text-[#730042] bg-purple-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:bg-purple-100"
+      >
+        ← Prev
+      </button>
+      {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+        <button
+          key={p}
+          onClick={() => setPage(p)}
+          className="w-[30px] h-[30px] rounded-[10px] text-xs font-semibold transition-all"
+          style={p === page
+            ? { background: "linear-gradient(135deg,#730042,#CD166E)", color: "#fff" }
+            : { background: "#FAF5FB", color: "#730042" }}
+        >
+          {p}
+        </button>
+      ))}
+      <button
+        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+        disabled={page === totalPages}
+        className="px-3 py-1.5 rounded-[10px] text-xs font-semibold text-[#730042] bg-purple-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:bg-purple-100"
+      >
+        Next →
+      </button>
+    </div>
+  );
+};
+
 const Toast = ({ toast }) => {
   const colors = {
     success: { bg: "bg-green-50/95", color: "text-green-700", border: "border-green-200", icon: "bg-green-500" },
@@ -128,7 +165,7 @@ const Toast = ({ toast }) => {
 };
 
 const TypeBadge = ({ type }) => {
-  const m = LEAVE_META[type] || { label: (type || "").toUpperCase(), bg: "#F3F4F6", color: "#374151", dot: "#9CA3AF" };
+  const m = LEAVE_META[type] || { label: humanizeStatus(type || "other"), bg: "#F3F4F6", color: "#374151", dot: "#9CA3AF" };
   return (
     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold shrink-0" style={{ background: m.bg, color: m.color }}>
       <span className="w-1.5 h-1.5 rounded-full" style={{ background: m.dot }} />
@@ -138,7 +175,7 @@ const TypeBadge = ({ type }) => {
 };
 
 const StatusBadge = ({ status }) => {
-  const m = STATUS_META[status] || { label: status, bg: "#F3F4F6", color: "#374151", dot: "#9CA3AF" };
+  const m = STATUS_META[status] || { label: humanizeStatus(status), bg: "#F3F4F6", color: "#374151", dot: "#9CA3AF" };
   return (
     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold shrink-0" style={{ background: m.bg, color: m.color }}>
       <span className="w-1.5 h-1.5 rounded-full" style={{ background: m.dot }} />
@@ -340,6 +377,8 @@ const WFHCard = ({ wfh, processingId, onAction, idx }) => {
 
 const EmployeeLeavesTab = ({ leaves, isLoading, processingId }) => {
   const [filter, setFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 5;
 
   const FILTERS = [
     { key: "all",                        label: "All" },
@@ -350,6 +389,8 @@ const EmployeeLeavesTab = ({ leaves, isLoading, processingId }) => {
 
   const count    = (key) => key === "all" ? leaves.length : leaves.filter(l => l.status === key).length;
   const filtered = filter === "all" ? leaves : leaves.filter(l => l.status === filter);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   if (isLoading) return <Spinner />;
 
@@ -369,7 +410,7 @@ const EmployeeLeavesTab = ({ leaves, isLoading, processingId }) => {
             <button key={f.key}
               className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all border-[1.5px] ${active ? "text-white shadow-md" : "bg-white text-gray-500 border-purple-100 hover:bg-gray-50"}`}
               style={active ? { background: "linear-gradient(135deg,#730042,#CD166E)", borderColor: "#730042" } : {}}
-              onClick={() => setFilter(f.key)}
+              onClick={() => { setFilter(f.key); setPage(1); }}
             >
               {f.label}
               <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${active ? "bg-white/25 text-white" : "bg-purple-50 text-gray-400"}`}>
@@ -382,7 +423,7 @@ const EmployeeLeavesTab = ({ leaves, isLoading, processingId }) => {
 
       {filtered.length === 0
         ? <EmptyState msg="No employee leave requests found" />
-        : filtered.map((leave, idx) => (
+        : paged.map((leave, idx) => (
           <LeaveCard
             key={leave._id}
             leave={leave}
@@ -394,12 +435,15 @@ const EmployeeLeavesTab = ({ leaves, isLoading, processingId }) => {
           />
         ))
       }
+      <Pagination page={page} setPage={setPage} totalPages={totalPages} />
     </div>
   );
 };
 
 const ManagerLeavesTab = ({ leaves, isLoading, processingId }) => {
   const [filter, setFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 5;
 
   const FILTERS = [
     { key: "all",                        label: "All" },
@@ -412,6 +456,8 @@ const ManagerLeavesTab = ({ leaves, isLoading, processingId }) => {
 
   const count    = (key) => key === "all" ? leaves.length : leaves.filter(l => l.status === key).length;
   const filtered = filter === "all" ? leaves : leaves.filter(l => l.status === filter);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   if (isLoading) return <Spinner />;
 
@@ -438,7 +484,7 @@ const ManagerLeavesTab = ({ leaves, isLoading, processingId }) => {
             <button key={f.key}
               className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all border-[1.5px] ${active ? "text-white shadow-md" : "bg-white text-gray-500 border-purple-100 hover:bg-gray-50"}`}
               style={active ? { background: "linear-gradient(135deg,#065F46,#10B981)", borderColor: "#065F46" } : {}}
-              onClick={() => setFilter(f.key)}
+              onClick={() => { setFilter(f.key); setPage(1); }}
             >
               {f.label}
               <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${active ? "bg-white/25 text-white" : "bg-purple-50 text-gray-400"}`}>
@@ -451,7 +497,7 @@ const ManagerLeavesTab = ({ leaves, isLoading, processingId }) => {
 
       {filtered.length === 0
         ? <EmptyState msg="No manager leave requests found" />
-        : filtered.map((leave, idx) => (
+        : paged.map((leave, idx) => (
           <LeaveCard
             key={leave._id}
             leave={leave}
@@ -463,12 +509,15 @@ const ManagerLeavesTab = ({ leaves, isLoading, processingId }) => {
           />
         ))
       }
+      <Pagination page={page} setPage={setPage} totalPages={totalPages} />
     </div>
   );
 };
 
 const AdminLeavesTab = ({ leaves, isLoading, processingId, onAction }) => {
   const [filter, setFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 5;
 
   const FILTERS = [
     { key: "all",                label: "All" },
@@ -479,6 +528,8 @@ const AdminLeavesTab = ({ leaves, isLoading, processingId, onAction }) => {
 
   const count    = (key) => key === "all" ? leaves.length : leaves.filter(l => l.status === key).length;
   const filtered = filter === "all" ? leaves : leaves.filter(l => l.status === filter);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   if (isLoading) return <Spinner />;
 
@@ -505,7 +556,7 @@ const AdminLeavesTab = ({ leaves, isLoading, processingId, onAction }) => {
             <button key={f.key}
               className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all border-[1.5px] ${active ? "text-white shadow-md" : "bg-white text-gray-500 border-purple-100 hover:bg-gray-50"}`}
               style={active ? { background: "linear-gradient(135deg,#730042,#CD166E)", borderColor: "#730042" } : {}}
-              onClick={() => setFilter(f.key)}
+              onClick={() => { setFilter(f.key); setPage(1); }}
             >
               {f.label}
               <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${active ? "bg-white/25 text-white" : "bg-purple-50 text-gray-400"}`}>
@@ -518,7 +569,7 @@ const AdminLeavesTab = ({ leaves, isLoading, processingId, onAction }) => {
 
       {filtered.length === 0
         ? <EmptyState msg="No admin leave requests found" />
-        : filtered.map((leave, idx) => (
+        : paged.map((leave, idx) => (
           <LeaveCard
             key={leave._id}
             leave={leave}
@@ -532,12 +583,15 @@ const AdminLeavesTab = ({ leaves, isLoading, processingId, onAction }) => {
           />
         ))
       }
+      <Pagination page={page} setPage={setPage} totalPages={totalPages} />
     </div>
   );
 };
 
 const WFHTab = ({ wfhList, isLoading, processingId, onAction }) => {
   const [filter, setFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 5;
 
   const FILTERS = [
     { key: "all",                label: "All" },
@@ -548,6 +602,8 @@ const WFHTab = ({ wfhList, isLoading, processingId, onAction }) => {
 
   const count    = (key) => key === "all" ? wfhList.length : wfhList.filter(w => w.status === key).length;
   const filtered = filter === "all" ? wfhList : wfhList.filter(w => w.status === filter);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   if (isLoading) return <Spinner />;
 
@@ -574,7 +630,7 @@ const WFHTab = ({ wfhList, isLoading, processingId, onAction }) => {
             <button key={f.key}
               className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all border-[1.5px] ${active ? "text-white shadow-md" : "bg-white text-gray-500 border-purple-100 hover:bg-gray-50"}`}
               style={active ? { background: "linear-gradient(135deg,#1D4ED8,#3B82F6)", borderColor: "#1D4ED8" } : {}}
-              onClick={() => setFilter(f.key)}
+              onClick={() => { setFilter(f.key); setPage(1); }}
             >
               {f.label}
               <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${active ? "bg-white/25 text-white" : "bg-purple-50 text-gray-400"}`}>
@@ -587,10 +643,11 @@ const WFHTab = ({ wfhList, isLoading, processingId, onAction }) => {
 
       {filtered.length === 0
         ? <EmptyState msg="No WFH requests found" icon="wfh" />
-        : filtered.map((wfh, idx) => (
+        : paged.map((wfh, idx) => (
           <WFHCard key={wfh._id} wfh={wfh} processingId={processingId} onAction={onAction} idx={idx} />
         ))
       }
+      <Pagination page={page} setPage={setPage} totalPages={totalPages} />
     </div>
   );
 };
