@@ -344,6 +344,44 @@ const AVATAR_COLORS = [
 const fmt = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"}) : "—";
 
+const humanizeStatus = (s = "") =>
+  s.split("_").filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+
+const csvEscape = (val) => `"${String(val ?? "").replace(/"/g, '""')}"`;
+
+const exportLeavesToCSV = (leaves, filename, personKey = "employee") => {
+  const headers = [
+    "Name", "Employee ID", "Email", "Leave Type", "Status",
+    "Start Date", "End Date", "Days", "Reason", "Remarks", "Applied On",
+  ];
+  const rows = leaves.map((l) => {
+    const person = l[personKey] || l.employee || l.manager || l.admin || {};
+    return [
+      csvEscape(`${person.f_name || ""} ${person.l_name || ""}`.trim() || "—"),
+      csvEscape(person.empid || "—"),
+      csvEscape(person.work_email || "—"),
+      csvEscape((LEAVE_META[l.leaveType] || {}).label || l.leaveType || "—"),
+      csvEscape((LEAVE_STATUS_META[l.status] || {}).label || humanizeStatus(l.status)),
+      csvEscape(fmt(l.startDate)),
+      csvEscape(fmt(l.endDate)),
+      l.days || daysDiff(l.startDate, l.endDate),
+      csvEscape(l.reason || ""),
+      csvEscape(l.remarks || ""),
+      csvEscape(fmt(l.createdAt)),
+    ].join(",");
+  });
+  const csvContent = [headers.join(","), ...rows].join("\n");
+  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 const daysDiff = (s,e) => {
   if (!s||!e) return 0;
   const n = Math.floor((new Date(e)-new Date(s))/86400000)+1;
@@ -399,6 +437,74 @@ const EmptyState = ({msg="No records found"}) => (
     <p style={{fontSize:13,color:"#9B8BAE",fontWeight:500,fontFamily:"'DM Sans',sans-serif",margin:0}}>{msg}</p>
   </div>
 );
+
+const FilterExportBar = ({ search, setSearch, dateFrom, setDateFrom, dateTo, setDateTo, onExport, exportDisabled }) => (
+  <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", alignItems: "flex-end" }}>
+    <div style={{ flex: 1, minWidth: 160 }}>
+      <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#9B8BAE", marginBottom: 4, textTransform: "uppercase", letterSpacing: ".03em" }}>Search</label>
+      <input
+        type="text"
+        placeholder="Name or reason…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        style={{ width: "100%", padding: "8px 12px", borderRadius: 10, fontSize: 13, border: "1.5px solid #E5DAF0", color: "#4A3860", outline: "none" }}
+      />
+    </div>
+    <div style={{ minWidth: 130 }}>
+      <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#9B8BAE", marginBottom: 4, textTransform: "uppercase", letterSpacing: ".03em" }}>From</label>
+      <input
+        type="date"
+        value={dateFrom}
+        onChange={(e) => setDateFrom(e.target.value)}
+        style={{ width: "100%", padding: "8px 12px", borderRadius: 10, fontSize: 13, border: "1.5px solid #E5DAF0", color: "#4A3860", outline: "none" }}
+      />
+    </div>
+    <div style={{ minWidth: 130 }}>
+      <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#9B8BAE", marginBottom: 4, textTransform: "uppercase", letterSpacing: ".03em" }}>To</label>
+      <input
+        type="date"
+        value={dateTo}
+        onChange={(e) => setDateTo(e.target.value)}
+        style={{ width: "100%", padding: "8px 12px", borderRadius: 10, fontSize: 13, border: "1.5px solid #E5DAF0", color: "#4A3860", outline: "none" }}
+      />
+    </div>
+    <button
+      onClick={onExport}
+      disabled={exportDisabled}
+      style={{
+        padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#fff", cursor: exportDisabled ? "not-allowed" : "pointer",
+        background: "linear-gradient(135deg,#6B1A4A,#9B2458)", boxShadow: "0 3px 12px rgba(107,26,74,0.3)",
+        opacity: exportDisabled ? 0.4 : 1, border: "none", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap",
+      }}
+    >
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v8M3.5 6l3 3 3-3M2 11.5h9" stroke="#fff" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      Export CSV
+    </button>
+  </div>
+);
+
+const Pagination = ({ page, setPage, totalPages }) => {
+  if (totalPages <= 1) return null;
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 18, paddingTop: 14, borderTop: "1px solid rgba(200,185,220,0.28)" }}>
+      <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+        style={{ padding: "6px 12px", borderRadius: 10, fontSize: 12, fontWeight: 700, background: "#F4EEF9", color: "#6B1A4A", border: "none", cursor: page === 1 ? "not-allowed" : "pointer", opacity: page === 1 ? 0.4 : 1 }}>
+        ← Prev
+      </button>
+      {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+        <button key={p} onClick={() => setPage(p)}
+          style={{ width: 30, height: 30, borderRadius: 10, fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer",
+            background: p === page ? "linear-gradient(135deg,#6B1A4A,#9B2458)" : "#F4EEF9", color: p === page ? "#fff" : "#6B1A4A" }}>
+          {p}
+        </button>
+      ))}
+      <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+        style={{ padding: "6px 12px", borderRadius: 10, fontSize: 12, fontWeight: 700, background: "#F4EEF9", color: "#6B1A4A", border: "none", cursor: page === totalPages ? "not-allowed" : "pointer", opacity: page === totalPages ? 0.4 : 1 }}>
+        Next →
+      </button>
+    </div>
+  );
+};
 
 const Toast = ({toast}) => {
   const colors = {
@@ -535,6 +641,11 @@ const EmployeeLeavesPanel = ({showToast}) => {
   const [filter,setFilter]         = useState("all");
   const [processingId,setProcessingId] = useState(null);
   const [localOverrides,setLocalOverrides] = useState({}); // leaveId -> status (optimistic)
+  const [search,setSearch]   = useState("");
+  const [dateFrom,setDateFrom] = useState("");
+  const [dateTo,setDateTo]     = useState("");
+  const [page,setPage]         = useState(1);
+  const PAGE_SIZE = 5;
 
   const {data:rawLeaves,isLoading,refetch} = useGetAllManagerLeaves();
   const acceptMut  = useAcceptLeaveRequest();
@@ -547,8 +658,22 @@ const EmployeeLeavesPanel = ({showToast}) => {
     localOverrides[l._id] ? { ...l, status: localOverrides[l._id] } : l
   );
 
-  const filtered = filter==="all" ? leaves : leaves.filter(l=>l.status===filter);
+  const statusFiltered = filter==="all" ? leaves : leaves.filter(l=>l.status===filter);
   const count    = (key) => key==="all" ? leaves.length : leaves.filter(l=>l.status===key).length;
+
+  const filtered = statusFiltered.filter((l) => {
+    const emp = l.employee || {};
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q ||
+      `${emp.f_name || ""} ${emp.l_name || ""}`.toLowerCase().includes(q) ||
+      (l.reason || "").toLowerCase().includes(q);
+    const start = l.startDate ? new Date(l.startDate) : null;
+    const matchesFrom = !dateFrom || (start && start >= new Date(dateFrom));
+    const matchesTo   = !dateTo   || (start && start <= new Date(dateTo));
+    return matchesSearch && matchesFrom && matchesTo;
+  });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const handleAction = async (leaveId,action) => {
     setProcessingId(leaveId);
@@ -574,6 +699,12 @@ const EmployeeLeavesPanel = ({showToast}) => {
     } finally { setProcessingId(null); }
   };
 
+  const handleExport = () => {
+    if (filtered.length === 0) { showToast("No records to export", "info"); return; }
+    exportLeavesToCSV(filtered, `team-leaves-${fmt(new Date()).replace(/\s/g, "-")}.csv`, "employee");
+    showToast("Export started", "success");
+  };
+
   if (isLoading) return <Spinner/>;
 
   return (
@@ -592,13 +723,21 @@ const EmployeeLeavesPanel = ({showToast}) => {
         ))}
       </div>
 
+      <FilterExportBar
+        search={search} setSearch={(v) => { setSearch(v); setPage(1); }}
+        dateFrom={dateFrom} setDateFrom={(v) => { setDateFrom(v); setPage(1); }}
+        dateTo={dateTo} setDateTo={(v) => { setDateTo(v); setPage(1); }}
+        onExport={handleExport}
+        exportDisabled={filtered.length === 0}
+      />
+
       <div style={{display:"flex",gap:7,marginBottom:20,flexWrap:"wrap"}}>
         {EMP_LEAVE_FILTERS.map(f=>{
           const active = filter===f.key;
           return (
             <button key={f.key} className="mlw-chip-btn"
               style={{border:active?"1.5px solid #8B3A8A":"1.5px solid #E5DAF0",background:active?"linear-gradient(135deg,#6B1A4A,#9B2458)":"#fff",color:active?"#fff":"#8B7FA0",boxShadow:active?"0 2px 9px rgba(107,26,74,0.28)":"none"}}
-              onClick={()=>setFilter(f.key)}>
+              onClick={()=>{setFilter(f.key);setPage(1);}}>
               {f.label}
               <span style={{background:active?"rgba(255,255,255,0.22)":"#EDE6F5",color:active?"#fff":"#9B8BAE",borderRadius:9,padding:"1px 7px",fontSize:10,fontWeight:700}}>
                 {count(f.key)}
@@ -610,7 +749,7 @@ const EmployeeLeavesPanel = ({showToast}) => {
 
       {filtered.length===0
         ? <EmptyState msg="No leave requests found"/>
-        : filtered.map((leave,idx)=>{
+        : paged.map((leave,idx)=>{
             const emp          = leave.employee||{};
             const isActionable = !NON_ACTIONABLE.includes(leave.status);
             const isProcessing = processingId===leave._id;
@@ -643,6 +782,7 @@ const EmployeeLeavesPanel = ({showToast}) => {
             );
           })
       }
+      <Pagination page={page} setPage={setPage} totalPages={totalPages} />
     </div>
   );
 };

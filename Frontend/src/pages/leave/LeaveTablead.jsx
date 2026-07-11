@@ -96,6 +96,41 @@ const AVATAR_COLORS = [
 const fmt = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
+const csvEscape = (val) => `"${String(val ?? "").replace(/"/g, '""')}"`;
+
+const exportLeavesToCSV = (leaves, filename, personKey = "employee") => {
+  const headers = [
+    "Employee Name", "Employee ID", "Email", "Leave Type", "Status",
+    "Start Date", "End Date", "Days", "Reason", "Remarks", "Applied On",
+  ];
+  const rows = leaves.map((l) => {
+    const person = l[personKey] || l.employee || l.manager || l.admin || {};
+    return [
+      csvEscape(`${person.f_name || ""} ${person.l_name || ""}`.trim() || "—"),
+      csvEscape(person.empid || "—"),
+      csvEscape(person.work_email || "—"),
+      csvEscape((LEAVE_META[l.leaveType] || {}).label || l.leaveType || "—"),
+      csvEscape(humanStatus(l.status)),
+      csvEscape(fmt(l.startDate)),
+      csvEscape(fmt(l.endDate)),
+      l.days || daysDiff(l.startDate, l.endDate),
+      csvEscape(l.reason || ""),
+      csvEscape(l.remarks || ""),
+      csvEscape(fmt(l.createdAt)),
+    ].join(",");
+  });
+  const csvContent = [headers.join(","), ...rows].join("\n");
+  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 const fmtDateTime = (d) =>
   d ? new Date(d).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 
@@ -135,6 +170,89 @@ const EmptyState = ({ msg = "No records found" }) => (
     <p className="text-xs sm:text-[13px] text-[#9B8BAE] font-medium">{msg}</p>
   </div>
 );
+
+const FilterExportBar = ({ search, setSearch, dateFrom, setDateFrom, dateTo, setDateTo, onExport, exportDisabled }) => (
+  <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 mb-4 sm:mb-5 items-stretch sm:items-end flex-wrap">
+    <div className="flex-1 min-w-[160px]">
+      <label className="block text-[10px] font-semibold text-[#9B8BAE] mb-1 uppercase tracking-wide">Search</label>
+      <input
+        type="text"
+        placeholder="Name or reason…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="w-full px-3 py-2 rounded-[10px] text-[13px] outline-none transition-all"
+        style={{ border: "1.5px solid #E5DAF0", color: "#4A3860" }}
+      />
+    </div>
+    <div className="min-w-[130px]">
+      <label className="block text-[10px] font-semibold text-[#9B8BAE] mb-1 uppercase tracking-wide">From</label>
+      <input
+        type="date"
+        value={dateFrom}
+        onChange={(e) => setDateFrom(e.target.value)}
+        className="w-full px-3 py-2 rounded-[10px] text-[13px] outline-none transition-all"
+        style={{ border: "1.5px solid #E5DAF0", color: "#4A3860" }}
+      />
+    </div>
+    <div className="min-w-[130px]">
+      <label className="block text-[10px] font-semibold text-[#9B8BAE] mb-1 uppercase tracking-wide">To</label>
+      <input
+        type="date"
+        value={dateTo}
+        onChange={(e) => setDateTo(e.target.value)}
+        className="w-full px-3 py-2 rounded-[10px] text-[13px] outline-none transition-all"
+        style={{ border: "1.5px solid #E5DAF0", color: "#4A3860" }}
+      />
+    </div>
+    <button
+      onClick={onExport}
+      disabled={exportDisabled}
+      className="px-4 py-2 rounded-[10px] text-[13px] font-semibold text-white cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap flex items-center justify-center gap-1.5"
+      style={{ background: "linear-gradient(135deg,#6B1A4A,#9B2458)", boxShadow: "0 3px 12px rgba(107,26,74,0.3)" }}
+    >
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v8M3.5 6l3 3 3-3M2 11.5h9" stroke="#fff" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      Export CSV
+    </button>
+  </div>
+);
+
+const Pagination = ({ page, setPage, totalPages }) => {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex items-center justify-center gap-2 mt-4 pt-3" style={{ borderTop: "1px solid rgba(200,185,220,0.28)" }}>
+      <button
+        onClick={() => setPage((p) => Math.max(1, p - 1))}
+        disabled={page === 1}
+        className="px-3 py-1.5 rounded-[10px] text-[12px] font-semibold cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+        style={{ background: "#F4EEF9", color: "#6B1A4A" }}
+      >
+        ← Prev
+      </button>
+      {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+        <button
+          key={p}
+          onClick={() => setPage(p)}
+          className="w-[30px] h-[30px] rounded-[10px] text-[12px] font-semibold cursor-pointer transition-all"
+          style={
+            p === page
+              ? { background: "linear-gradient(135deg,#6B1A4A,#9B2458)", color: "#fff" }
+              : { background: "#F4EEF9", color: "#6B1A4A" }
+          }
+        >
+          {p}
+        </button>
+      ))}
+      <button
+        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+        disabled={page === totalPages}
+        className="px-3 py-1.5 rounded-[10px] text-[12px] font-semibold cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+        style={{ background: "#F4EEF9", color: "#6B1A4A" }}
+      >
+        Next →
+      </button>
+    </div>
+  );
+};
 
 const Toast = ({ toast }) => {
   const colors = {
@@ -718,12 +836,26 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
       <SectionBox
         title="My Leave History"
         rightEl={
-          history.length > 0 ? (
-            <span className="text-[10px] sm:text-[11px] font-bold px-2.5 py-0.5 rounded-full text-[#6B1A4A] whitespace-nowrap"
-              style={{ background: "linear-gradient(135deg,#F9EFF5,#F4E6F0)" }}>
-              {history.length} record{history.length !== 1 ? "s" : ""}
-            </span>
-          ) : null
+          <div className="flex items-center gap-2">
+            {history.length > 0 && (
+              <span className="text-[10px] sm:text-[11px] font-bold px-2.5 py-0.5 rounded-full text-[#6B1A4A] whitespace-nowrap"
+                style={{ background: "linear-gradient(135deg,#F9EFF5,#F4E6F0)" }}>
+                {history.length} record{history.length !== 1 ? "s" : ""}
+              </span>
+            )}
+            {history.length > 0 && (
+              <button
+                onClick={() => {
+                  const personalized = history.map((l) => ({ ...l, employee: admin }));
+                  exportLeavesToCSV(personalized, `my-leave-history-${fmt(new Date()).replace(/\s/g, "-")}.csv`, "employee");
+                }}
+                className="text-[10px] sm:text-[11px] font-bold px-2.5 py-1 rounded-full text-white whitespace-nowrap cursor-pointer"
+                style={{ background: "linear-gradient(135deg,#6B1A4A,#9B2458)" }}
+              >
+                Export CSV
+              </button>
+            )}
+          </div>
         }
       >
         {histLoading ? <Spinner /> : history.length === 0 ? <EmptyState msg="No leave records yet" /> : (
@@ -819,6 +951,11 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
 const AllLeavesPanel = ({ showToast }) => {
   const [filter, setFilter]         = useState("all");
   const [processingId, setProcessingId] = useState(null);
+  const [search, setSearch]     = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo]     = useState("");
+  const [page, setPage]         = useState(1);
+  const PAGE_SIZE = 5;
 
   const { data: rawData, isLoading, refetch } = useGetForwardedLeaves();
   const acceptMut = useAcceptLeave();
@@ -834,12 +971,27 @@ const AllLeavesPanel = ({ showToast }) => {
     return true;
   };
 
-  const filtered     = filter === "all" ? employeeLeaves : employeeLeaves.filter((l) => isStatus(l, filter));
-  const count        = (key) => key === "all" ? employeeLeaves.length : employeeLeaves.filter((l) => isStatus(l, key)).length;
-  const isActionable = (status) =>
+  const statusFiltered = filter === "all" ? employeeLeaves : employeeLeaves.filter((l) => isStatus(l, filter));
+  const count          = (key) => key === "all" ? employeeLeaves.length : employeeLeaves.filter((l) => isStatus(l, key)).length;
+  const isActionable   = (status) =>
   status === "pending_admin" ||
   status === "forwarded_reporting_manager" ||
   status === "pending_manager";
+
+  const filtered = statusFiltered.filter((l) => {
+    const person = l.employee || {};
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q ||
+      `${person.f_name || ""} ${person.l_name || ""}`.toLowerCase().includes(q) ||
+      (l.reason || "").toLowerCase().includes(q);
+    const start = l.startDate ? new Date(l.startDate) : null;
+    const matchesFrom = !dateFrom || (start && start >= new Date(dateFrom));
+    const matchesTo   = !dateTo   || (start && start <= new Date(dateTo));
+    return matchesSearch && matchesFrom && matchesTo;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const handleAction = async (leave, action) => {
     setProcessingId(leave._id);
@@ -850,6 +1002,12 @@ const AllLeavesPanel = ({ showToast }) => {
     } catch (err) {
       showToast(err?.response?.data?.message || err?.message || "Something went wrong", "error");
     } finally { setProcessingId(null); }
+  };
+
+  const handleExport = () => {
+    if (filtered.length === 0) { showToast("No records to export", "info"); return; }
+    exportLeavesToCSV(filtered, `employee-leaves-${fmt(new Date()).replace(/\s/g, "-")}.csv`, "employee");
+    showToast("Export started", "success");
   };
 
   if (isLoading) return <Spinner />;
@@ -870,13 +1028,21 @@ const AllLeavesPanel = ({ showToast }) => {
         ))}
       </div>
 
+      <FilterExportBar
+        search={search} setSearch={(v) => { setSearch(v); setPage(1); }}
+        dateFrom={dateFrom} setDateFrom={(v) => { setDateFrom(v); setPage(1); }}
+        dateTo={dateTo} setDateTo={(v) => { setDateTo(v); setPage(1); }}
+        onExport={handleExport}
+        exportDisabled={filtered.length === 0}
+      />
+
       <div className="flex gap-1.5 sm:gap-2 mb-4 sm:mb-5 flex-wrap">
         {LEAVE_FILTERS.map((f) => {
           const active = filter === f.key;
           return (
             <button
               key={f.key}
-              onClick={() => setFilter(f.key)}
+              onClick={() => { setFilter(f.key); setPage(1); }}
               className="inline-flex items-center gap-1 sm:gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-full text-[11px] sm:text-[12px] font-medium cursor-pointer transition-all duration-[180ms] min-h-[36px]"
               style={{
                 border: active ? "1.5px solid #8B3A8A" : "1.5px solid #E5DAF0",
@@ -900,7 +1066,7 @@ const AllLeavesPanel = ({ showToast }) => {
         })}
       </div>
 
-      {filtered.length === 0 ? <EmptyState msg="No leave requests found" /> : filtered.map((leave) => (
+      {filtered.length === 0 ? <EmptyState msg="No leave requests found" /> : paged.map((leave) => (
         <LeaveCard
           key={leave._id}
           leave={leave}
@@ -911,12 +1077,18 @@ const AllLeavesPanel = ({ showToast }) => {
           showTimeline
         />
       ))}
+      <Pagination page={page} setPage={setPage} totalPages={totalPages} />
     </div>
   );
 };
 
 const ManagerLeavesPanel = ({ showToast }) => {
   const [processingId, setProcessingId] = useState(null);
+  const [search, setSearch]     = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo]     = useState("");
+  const [page, setPage]         = useState(1);
+  const PAGE_SIZE = 5;
 
   const { data: rawData, isLoading, refetch } = useGetForwardedLeaves();
   const acceptMut = useAcceptLeave();
@@ -924,6 +1096,20 @@ const ManagerLeavesPanel = ({ showToast }) => {
 
   const managerLeaves = Array.isArray(rawData?.managerLeaves?.leaves) ? rawData.managerLeaves.leaves : [];
   const isActionable  = (status) => status === "pending_reporting_manager" || status === "pending_admin";
+
+  const filtered = managerLeaves.filter((l) => {
+    const person = l.manager || {};
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q ||
+      `${person.f_name || ""} ${person.l_name || ""}`.toLowerCase().includes(q) ||
+      (l.reason || "").toLowerCase().includes(q);
+    const start = l.startDate ? new Date(l.startDate) : null;
+    const matchesFrom = !dateFrom || (start && start >= new Date(dateFrom));
+    const matchesTo   = !dateTo   || (start && start <= new Date(dateTo));
+    return matchesSearch && matchesFrom && matchesTo;
+  });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const handleAction = async (leave, action) => {
     setProcessingId(leave._id);
@@ -934,6 +1120,12 @@ const ManagerLeavesPanel = ({ showToast }) => {
     } catch (err) {
       showToast(err?.response?.data?.message || err?.message || "Something went wrong", "error");
     } finally { setProcessingId(null); }
+  };
+
+  const handleExport = () => {
+    if (filtered.length === 0) { showToast("No records to export", "info"); return; }
+    exportLeavesToCSV(filtered, `manager-leaves-${fmt(new Date()).replace(/\s/g, "-")}.csv`, "manager");
+    showToast("Export started", "success");
   };
 
   if (isLoading) return <Spinner />;
@@ -953,7 +1145,16 @@ const ManagerLeavesPanel = ({ showToast }) => {
           </div>
         ))}
       </div>
-      {managerLeaves.length === 0 ? <EmptyState msg="No manager leave requests" /> : managerLeaves.map((leave) => (
+
+      <FilterExportBar
+        search={search} setSearch={(v) => { setSearch(v); setPage(1); }}
+        dateFrom={dateFrom} setDateFrom={(v) => { setDateFrom(v); setPage(1); }}
+        dateTo={dateTo} setDateTo={(v) => { setDateTo(v); setPage(1); }}
+        onExport={handleExport}
+        exportDisabled={filtered.length === 0}
+      />
+
+      {filtered.length === 0 ? <EmptyState msg="No manager leave requests" /> : paged.map((leave) => (
         <LeaveCard
           key={leave._id}
           leave={leave}
@@ -966,6 +1167,7 @@ const ManagerLeavesPanel = ({ showToast }) => {
           showTimeline
         />
       ))}
+      <Pagination page={page} setPage={setPage} totalPages={totalPages} />
     </div>
   );
 };
