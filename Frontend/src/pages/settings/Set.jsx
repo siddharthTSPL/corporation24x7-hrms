@@ -268,7 +268,7 @@ function ProfileTab({ adminData }) {
           <ReadonlyField label="First name" value={adminData?.f_name} />
           <ReadonlyField label="Last name" value={adminData?.l_name} />
           <ReadonlyField label="Work email" value={adminData?.work_email} />
-          <ReadonlyField label="Employee ID" value={adminData?.uid} />
+          <ReadonlyField label="Employee ID" value={adminData?.empid} />
           <ReadonlyField label="Gender" value={adminData?.gender} />
           <ReadonlyField label="Marital status" value={adminData?.marital_status} />
           <ReadonlyField label="Country" value={adminData?.country} />

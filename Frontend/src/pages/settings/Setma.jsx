@@ -294,7 +294,7 @@ function ProfileTab({ manager }) {
           <ReadonlyField label="First name"     value={manager?.f_name} />
           <ReadonlyField label="Last name"      value={manager?.l_name} />
           <ReadonlyField label="Work email"     value={manager?.work_email} />
-          <ReadonlyField label="Employee ID"    value={manager?.uid} />
+          <ReadonlyField label="Employee ID"    value={manager?.empid} />
           <ReadonlyField label="Gender"         value={manager?.gender} />
           <ReadonlyField label="Marital status" value={manager?.marital_status} />
         </div>

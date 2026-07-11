@@ -293,7 +293,7 @@ function ProfileTab({ employee }) {
           <ReadonlyField label="First name" value={employee?.f_name} />
           <ReadonlyField label="Last name" value={employee?.l_name} />
           <ReadonlyField label="Work email" value={employee?.work_email} />
-          <ReadonlyField label="Employee ID" value={employee?.uid} />
+          <ReadonlyField label="Employee ID" value={employee?.empid} />
           <ReadonlyField label="Gender" value={employee?.gender} />
           <ReadonlyField label="Marital status" value={employee?.marital_status} />
         </div>
