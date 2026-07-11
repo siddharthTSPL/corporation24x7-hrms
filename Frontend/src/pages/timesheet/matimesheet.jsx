@@ -155,13 +155,14 @@ function Input({ label, error, className = "", ...props }) {
   );
 }
 
-function Sel({ label, children, ...props }) {
+function Sel({ label, children, className = "", ...props }) {
   return (
     <div className="flex flex-col gap-1">
       {label && <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{label}</label>}
-      <select {...props} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-[13px] text-gray-900 outline-none w-full focus:border-[#730042] focus:ring-1 focus:ring-[#730042]/20 transition-all appearance-none cursor-pointer">
-        {children}
-      </select>
+      <select {...props} className={cn(
+        "bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-[13px] text-gray-900 outline-none w-full focus:border-[#730042] focus:ring-1 focus:ring-[#730042]/20 transition-all appearance-none cursor-pointer",
+        className
+      )}>{children}</select>
     </div>
   );
 }
@@ -320,8 +321,8 @@ function TimerBlock({ assignedJobs, onTimerLog }) {
               isRunning ? "text-white/60" : "text-gray-400")}>{timer.job.title}</span>
           )}
         </div>
-        <div className="px-5 py-4 flex items-center justify-between gap-4">
-          <div className={cn("font-mono text-4xl font-extrabold tracking-widest tabular-nums select-none",
+        <div className="px-4 sm:px-5 py-4 flex items-center justify-between gap-4">
+          <div className={cn("font-mono text-3xl sm:text-4xl font-extrabold tracking-widest tabular-nums select-none",
             isRunning ? "text-white" : isPaused ? "text-amber-600" : "text-gray-200")}>
             {fmtSeconds(displaySecs)}
           </div>
@@ -400,7 +401,7 @@ function WeekGrid({ weekStart, weekDays, onAddLog, onEditLog, onDeleteLog }) {
           );
         })}
       </div>
-      <div className="grid grid-cols-7 min-w-[560px]" style={{ minHeight: 100 }}>
+      <div className="grid grid-cols-7 min-w-[560px] min-h-[100px]">
         {days.map((d, i) => {
           const iso = d.toISOString().slice(0, 10);
           const logs = weekDays[iso]?.logs || [];
@@ -540,8 +541,8 @@ export default function ManagerTimesheet() {
   const canRecall = currentWeekSheet && ["pending_manager", "pending_reporting_manager", "pending_admin", "pending_superadmin"].includes(currentWeekSheet?.status);
 
   return (
-    <div className="min-h-screen bg-[#F5F6FA]" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
+    <div className="min-h-screen bg-[#F5F6FA] font-['Inter',system-ui,sans-serif] overflow-x-hidden">
+      <header className="bg-white border-b border-gray-200">
         <div className="max-w-[1100px] mx-auto px-4">
           <div className="flex items-center h-14 gap-3">
             <div className="flex items-center gap-2.5 shrink-0">
@@ -551,14 +552,13 @@ export default function ManagerTimesheet() {
               <span className="font-bold text-[14px] text-gray-900 hidden sm:block">TorchX</span>
               <span className="hidden sm:inline text-[11px] font-semibold text-[#730042] bg-[#730042]/10 px-1.5 py-0.5 rounded-md">Manager</span>
             </div>
-            <nav className="flex items-center gap-0.5 flex-1 overflow-x-auto no-scrollbar">
+            <nav className="flex items-center gap-0.5 flex-1 overflow-x-auto">
               {TABS.map((t) => (
                 <button key={t.id} onClick={() => setTab(t.id)}
-                  className={cn("relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] sm:text-[13px] font-medium transition-all whitespace-nowrap shrink-0",
+                  className={cn("relative flex items-center gap-1.5 px-2 py-1.5 sm:px-3 rounded-lg text-[12px] sm:text-[13px] font-medium transition-all whitespace-nowrap shrink-0",
                     tab === t.id ? "bg-[#730042]/10 text-[#730042] font-semibold" : "text-gray-600 hover:bg-gray-100")}>
                   <span className="text-[11px]">{t.icon}</span>
                   <span className="hidden sm:inline">{t.label}</span>
-                  <span className="sm:hidden">{t.label.split(" ")[1] || t.label.split(" ")[0]}</span>
                   {t.id === "approvals" && approvals.length > 0 && (
                     <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] font-black flex items-center justify-center">{approvals.length}</span>
                   )}
@@ -567,7 +567,10 @@ export default function ManagerTimesheet() {
             </nav>
             <div className="flex gap-2 shrink-0">
               <Btn size="sm" variant="ghost" onClick={() => setJobModal(true)} className="hidden sm:inline-flex">+ Job</Btn>
-              <Btn size="sm" onClick={() => { setLogForm({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" }); setLogModal(true); }}>+ Log</Btn>
+              <Btn size="sm" onClick={() => { setLogForm({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" }); setLogModal(true); }}>
+                <span className="hidden sm:inline">+ Log</span>
+                <span className="sm:hidden">+</span>
+              </Btn>
             </div>
           </div>
         </div>
@@ -578,9 +581,9 @@ export default function ManagerTimesheet() {
         {tab === "work" && (
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2">
-              <button onClick={() => shiftWeek(-1)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-500 hover:text-gray-900 text-[14px]">‹</button>
-              <span className="text-[13px] font-semibold text-gray-700 flex-1 text-center sm:text-left">{fmtShort(weekStart)} – {fmtShort(weekEnd)}</span>
-              <button onClick={() => shiftWeek(1)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-500 hover:text-gray-900 text-[14px]">›</button>
+              <button onClick={() => shiftWeek(-1)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-500 hover:text-gray-900 text-[14px] shrink-0">‹</button>
+              <span className="text-[13px] font-semibold text-gray-700 flex-1 text-center sm:text-left min-w-0 truncate">{fmtShort(weekStart)} – {fmtShort(weekEnd)}</span>
+              <button onClick={() => shiftWeek(1)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-500 hover:text-gray-900 text-[14px] shrink-0">›</button>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <StatCard label="This Week" value={fmtDuration(totalWeekMins)} sub={`${prodData?.capacityPercent || Math.round((totalWeekMins / 2400) * 100)}% capacity`} />
@@ -603,7 +606,7 @@ export default function ManagerTimesheet() {
                 <div className="flex flex-col gap-2">
                   {prodData.byJob.map((b, i) => (
                     <div key={i} className="flex items-center gap-3">
-                      <div className="text-[13px] text-gray-700 flex-1 truncate">{b.title}</div>
+                      <div className="text-[13px] text-gray-700 flex-1 min-w-0 truncate">{b.title}</div>
                       <div className="text-[12px] font-semibold text-[#730042] shrink-0">{fmtDuration(b.minutes)}</div>
                       <div className="w-20 h-1.5 bg-gray-100 rounded-full shrink-0">
                         <div className="h-full bg-[#730042] rounded-full" style={{ width: `${totalWeekMins > 0 ? Math.round((b.minutes / totalWeekMins) * 100) : 0}%` }} />
@@ -614,7 +617,7 @@ export default function ManagerTimesheet() {
               </div>
             )}
             <div className="bg-white border border-gray-200 rounded-2xl p-4">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <div className="text-[13px] font-semibold text-gray-900">Week of {fmtShort(weekStart)} – {fmtShort(weekEnd)}</div>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -639,7 +642,7 @@ export default function ManagerTimesheet() {
 
         {tab === "team" && (
           <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <div className="font-bold text-[17px] text-gray-900">Team Jobs</div>
                 <div className="text-[12px] text-gray-400 mt-0.5">{createdJobs.length} jobs assigned by you</div>
@@ -656,7 +659,7 @@ export default function ManagerTimesheet() {
               const pct = j.estimated_hours > 0 ? Math.round((j.logged_hours_cache / j.estimated_hours) * 100) : 0;
               return (
                 <div key={j._id} className="bg-white border border-gray-200 rounded-2xl p-4 hover:border-[#730042]/20 transition-colors">
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1.5">
                         <button className="font-semibold text-[14px] text-gray-900 hover:text-[#730042] transition-colors text-left" onClick={() => { setSelectedJobId(j._id); setJobDetailOpen(true); }}>{j.title}</button>
@@ -685,9 +688,9 @@ export default function ManagerTimesheet() {
                         </div>
                       )}
                     </div>
-                    <div className="flex gap-1.5 shrink-0">
+                    <div className="flex flex-wrap gap-1.5 sm:shrink-0">
                       <Sel value={j.status} onChange={(e) => updateJobStatus.mutate({ id: j._id, status: e.target.value }, { onSuccess: refetchCreated })}
-                        className="text-[11px] py-1 px-2 min-w-[100px]">
+                        className="text-[11px] py-1 px-2 w-full sm:w-auto sm:min-w-[100px]">
                         {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map((s) => (
                           <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
                         ))}
@@ -719,9 +722,9 @@ export default function ManagerTimesheet() {
                     <div className="w-10 h-10 bg-[#730042]/[0.08] rounded-xl flex items-center justify-center text-[14px] font-extrabold text-[#730042] shrink-0">
                       {ts.owner?.f_name?.[0] || "?"}
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="font-bold text-[15px] text-gray-900">{ts.owner?.f_name} {ts.owner?.l_name}</div>
-                      <div className="text-[11px] text-gray-400 mt-0.5">{ts.owner?.work_email}</div>
+                      <div className="text-[11px] text-gray-400 mt-0.5 break-words">{ts.owner?.work_email}</div>
                       <div className="text-[11px] text-gray-400">Week: {fmtDate(ts.week_start)} – {fmtDate(ts.week_end)}</div>
                       <div className="flex gap-2 mt-2 flex-wrap">
                         <Chip color="brand">{fmtDuration(ts.total_minutes)}</Chip>
@@ -744,10 +747,10 @@ export default function ManagerTimesheet() {
         {tab === "insights" && (
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2">
-              <div className="font-bold text-[17px] text-gray-900 flex-1">Team Insights</div>
-              <button onClick={() => shiftWeek(-1)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-500 hover:text-gray-900 text-[14px]">‹</button>
+              <div className="font-bold text-[17px] text-gray-900 flex-1 min-w-0">Team Insights</div>
+              <button onClick={() => shiftWeek(-1)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-500 hover:text-gray-900 text-[14px] shrink-0">‹</button>
               <span className="text-[12px] font-semibold text-gray-700 whitespace-nowrap">{fmtShort(weekStart)} – {fmtShort(weekEnd)}</span>
-              <button onClick={() => shiftWeek(1)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-500 hover:text-gray-900 text-[14px]">›</button>
+              <button onClick={() => shiftWeek(1)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-500 hover:text-gray-900 text-[14px] shrink-0">›</button>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <StatCard label="Team Members" value={heatmap.length} valueColor="text-blue-600" />
@@ -806,7 +809,7 @@ export default function ManagerTimesheet() {
                         <div className="text-[13px] font-semibold text-gray-900 truncate">{j.title}</div>
                         <div className="text-[11px] text-gray-400">{j.logged_hours_cache}h / {j.estimated_hours}h</div>
                       </div>
-                      <span className={cn("text-[13px] font-extrabold", j.riskPercent >= 100 ? "text-red-600" : "text-amber-600")}>{j.riskPercent}%</span>
+                      <span className={cn("text-[13px] font-extrabold shrink-0", j.riskPercent >= 100 ? "text-red-600" : "text-amber-600")}>{j.riskPercent}%</span>
                     </div>
                   ))}
               </div>
@@ -823,7 +826,7 @@ export default function ManagerTimesheet() {
                         <div className="text-[13px] font-semibold text-gray-900 truncate">{j.title}</div>
                         <div className="text-[11px] text-gray-400">Last updated {fmtDate(j.updatedAt)}</div>
                       </div>
-                      <Chip size="xs" color={j.status === "in_progress" ? "blue" : j.status === "on_hold" ? "amber" : "gray"}>{JOB_STATUS_META[j.status]?.label || j.status}</Chip>
+                      <Chip size="xs" color={j.status === "in_progress" ? "blue" : j.status === "on_hold" ? "amber" : "gray"} shrink-0>{JOB_STATUS_META[j.status]?.label || j.status}</Chip>
                     </div>
                   ))}
               </div>
@@ -844,7 +847,7 @@ export default function ManagerTimesheet() {
               const isPending = ["pending_manager", "pending_reporting_manager", "pending_admin", "pending_superadmin"].includes(ts.status);
               return (
                 <div key={ts._id} className="bg-white border border-gray-200 rounded-2xl p-4">
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1.5">
                         <span className="font-semibold text-[14px] text-gray-900">Week of {fmtDate(ts.week_start)}</span>
@@ -855,18 +858,11 @@ export default function ManagerTimesheet() {
                         {ts.billable_minutes > 0 && <span className="text-emerald-600">{fmtDuration(ts.billable_minutes)} billable</span>}
                         <span className="text-gray-400">{fmtDate(ts.week_start)} – {fmtDate(ts.week_end)}</span>
                       </div>
-                      {ts.remarks && <div className="mt-1.5 text-[12px] text-gray-500 italic bg-gray-50 rounded-lg px-3 py-2">"{ts.remarks}"</div>}
                     </div>
                     {isPending && (
-                      <Btn size="sm" variant="ghost" onClick={() => recallTS.mutate({ timesheetId: ts._id }, { onSuccess: refetchTS })} disabled={recallTS.isPending}>Recall</Btn>
+                      <Btn size="sm" variant="ghost" onClick={() => recallTS.mutate({ timesheetId: ts._id }, { onSuccess: refetchTS })} disabled={recallTS.isPending} className="shrink-0">Recall</Btn>
                     )}
                   </div>
-                  {ts.status === "rejected" && (
-                    <div className="mt-3 flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-[12px] text-red-600">
-                      <span>✕</span><span>Rejected — recall and revise, then resubmit</span>
-                      <button className="ml-auto font-semibold underline" onClick={() => { setWeekStart(getMonday(ts.week_start)); setTab("work"); }}>Go to week →</button>
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -877,18 +873,16 @@ export default function ManagerTimesheet() {
       <Modal open={logModal} onClose={() => setLogModal(false)} title="Log Time">
         <div className="flex flex-col gap-3.5">
           <Sel label="Job" value={logForm.job} onChange={(e) => setLogForm((p) => ({ ...p, job: e.target.value }))}>
-            <option value="">Select job…</option>
+            <option value="">Select a job…</option>
             {assignedJobs.map((j) => <option key={j._id} value={j._id}>{j.title}</option>)}
           </Sel>
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Date" type="date" value={logForm.log_date} onChange={(e) => setLogForm((p) => ({ ...p, log_date: e.target.value }))} />
-            <Input label="Duration (minutes)" type="number" placeholder="e.g. 90" min="1" max="1440" value={logForm.duration_minutes} onChange={(e) => setLogForm((p) => ({ ...p, duration_minutes: e.target.value }))} />
-          </div>
+          <Input label="Date" type="date" value={logForm.log_date} onChange={(e) => setLogForm((p) => ({ ...p, log_date: e.target.value }))} />
+          <Input label="Duration (minutes)" type="number" placeholder="e.g. 60" value={logForm.duration_minutes} onChange={(e) => setLogForm((p) => ({ ...p, duration_minutes: e.target.value }))} />
           <Input label="Note (optional)" placeholder="What did you work on?" value={logForm.note} onChange={(e) => setLogForm((p) => ({ ...p, note: e.target.value }))} />
           <div className="flex gap-2 justify-end">
             <Btn variant="ghost" onClick={() => setLogModal(false)}>Cancel</Btn>
-            <Btn onClick={handleLogTime} disabled={!logForm.job || !logForm.log_date || !logForm.duration_minutes || logTime.isPending}>
-              {logTime.isPending ? "Saving…" : "Save Entry"}
+            <Btn onClick={handleLogTime} disabled={!logForm.job || !logForm.duration_minutes || logTime.isPending}>
+              {logTime.isPending ? "Logging…" : "Log Time"}
             </Btn>
           </div>
         </div>
@@ -896,66 +890,65 @@ export default function ManagerTimesheet() {
 
       <Modal open={!!editLog} onClose={() => setEditLog(null)} title="Edit Time Log">
         <div className="flex flex-col gap-3.5">
-          <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-[12px] text-gray-500">
-            <span className="font-semibold text-gray-700">{editLog?.job?.title || "—"}</span> · {fmtDate(editLog?.log_date)}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Duration (minutes)" type="number" min="1" max="1440" value={editForm.duration_minutes} onChange={(e) => setEditForm((p) => ({ ...p, duration_minutes: e.target.value }))} />
-            <Input label="Note" placeholder="Update note…" value={editForm.note} onChange={(e) => setEditForm((p) => ({ ...p, note: e.target.value }))} />
-          </div>
-          <Input label="Reason for edit" placeholder="Why are you editing this log?" value={editForm.reason} onChange={(e) => setEditForm((p) => ({ ...p, reason: e.target.value }))} />
+          <Input label="Duration (minutes)" type="number" value={editForm.duration_minutes} onChange={(e) => setEditForm((p) => ({ ...p, duration_minutes: e.target.value }))} />
+          <Input label="Note" value={editForm.note} onChange={(e) => setEditForm((p) => ({ ...p, note: e.target.value }))} />
+          <Input label="Reason for change" value={editForm.reason} onChange={(e) => setEditForm((p) => ({ ...p, reason: e.target.value }))} />
           <div className="flex gap-2 justify-end">
             <Btn variant="ghost" onClick={() => setEditLog(null)}>Cancel</Btn>
-            <Btn onClick={handleUpdateLog} disabled={!editForm.duration_minutes || updateTimeLog.isPending}>{updateTimeLog.isPending ? "Saving…" : "Save Changes"}</Btn>
+            <Btn onClick={handleUpdateLog} disabled={!editForm.duration_minutes || updateTimeLog.isPending}>
+              {updateTimeLog.isPending ? "Updating…" : "Update"}
+            </Btn>
           </div>
         </div>
       </Modal>
 
-      <Modal open={jobModal} onClose={() => setJobModal(false)} title="Create Job">
+      <Modal open={jobModal} onClose={() => setJobModal(false)} title="Create Job" width="max-w-[560px]">
         <div className="flex flex-col gap-3.5">
-          <Input label="Job Title *" placeholder="e.g. Design Login Page" value={jobForm.title} onChange={(e) => setJobForm((p) => ({ ...p, title: e.target.value }))} />
-          <Input label="Description" placeholder="Details…" value={jobForm.description} onChange={(e) => setJobForm((p) => ({ ...p, description: e.target.value }))} />
-          <Sel label="Assign To *" value={jobForm.assigned_to} onChange={(e) => setJobForm((p) => ({ ...p, assigned_to: e.target.value }))}>
-            <option value="">Select team member…</option>
-            {targets.map((t) => (
-              <option key={t.id} value={t.id}>{t.name || `${t.f_name || ""} ${t.l_name || ""}`.trim() || t.id} — {t.role || t.model}</option>
-            ))}
+          <Input label="Title" placeholder="Job title" value={jobForm.title} onChange={(e) => setJobForm((p) => ({ ...p, title: e.target.value }))} />
+          <Input label="Description" placeholder="Optional description" value={jobForm.description} onChange={(e) => setJobForm((p) => ({ ...p, description: e.target.value }))} />
+          <Sel label="Assign To" value={jobForm.assigned_to} onChange={(e) => setJobForm((p) => ({ ...p, assigned_to: e.target.value }))}>
+            <option value="">Select target…</option>
+            {targets.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.model})</option>)}
           </Sel>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Sel label="Priority" value={jobForm.priority} onChange={(e) => setJobForm((p) => ({ ...p, priority: e.target.value }))}>
-              <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="urgent">Urgent</option>
+              {["low", "medium", "high", "urgent"].map((p) => <option key={p} value={p}>{PRIORITY_META[p]?.label || p}</option>)}
             </Sel>
-            <Input label="Est. Hours" type="number" placeholder="0" value={jobForm.estimated_hours} onChange={(e) => setJobForm((p) => ({ ...p, estimated_hours: e.target.value }))} />
+            <Input label="Estimated Hours" type="number" placeholder="0" value={jobForm.estimated_hours} onChange={(e) => setJobForm((p) => ({ ...p, estimated_hours: e.target.value }))} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Hourly Rate (₹)" type="number" placeholder="0" value={jobForm.hourly_rate} onChange={(e) => setJobForm((p) => ({ ...p, hourly_rate: e.target.value }))} />
-            <Input label="Due Date" type="date" value={jobForm.due_date} onChange={(e) => setJobForm((p) => ({ ...p, due_date: e.target.value }))} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Billable</label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={jobForm.billable} onChange={(e) => setJobForm((p) => ({ ...p, billable: e.target.checked }))} className="rounded border-gray-300" />
+                <span className="text-[13px] text-gray-700">Yes</span>
+              </label>
+            </div>
+            <Input label="Hourly Rate" type="number" placeholder="0" value={jobForm.hourly_rate} onChange={(e) => setJobForm((p) => ({ ...p, hourly_rate: e.target.value }))} disabled={!jobForm.billable} />
           </div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={jobForm.billable} onChange={(e) => setJobForm((p) => ({ ...p, billable: e.target.checked }))} className="w-4 h-4 accent-[#730042]" />
-            <span className="text-[13px] text-gray-700">Billable job</span>
-          </label>
+          <Input label="Due Date" type="date" value={jobForm.due_date} onChange={(e) => setJobForm((p) => ({ ...p, due_date: e.target.value }))} />
           <div className="flex gap-2 justify-end">
             <Btn variant="ghost" onClick={() => setJobModal(false)}>Cancel</Btn>
-            <Btn onClick={handleCreateJob} disabled={!jobForm.title || !jobForm.assigned_to || createJob.isPending}>{createJob.isPending ? "Creating…" : "Create Job"}</Btn>
+            <Btn onClick={handleCreateJob} disabled={!jobForm.title || !jobForm.assigned_to || createJob.isPending}>
+              {createJob.isPending ? "Creating…" : "Create Job"}
+            </Btn>
           </div>
         </div>
       </Modal>
 
       <Modal open={!!rejectModal} onClose={() => setRejectModal(null)} title="Reject Timesheet">
         <div className="flex flex-col gap-3.5">
-          <div className="text-[13px] text-gray-600">Rejecting timesheet for <strong className="text-gray-900">{rejectModal?.owner?.f_name} {rejectModal?.owner?.l_name}</strong></div>
-          <Input label="Reason *" placeholder="Explain the issue…" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
+          <Input label="Reason" placeholder="Why are you rejecting this timesheet?" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
           <div className="flex gap-2 justify-end">
             <Btn variant="ghost" onClick={() => setRejectModal(null)}>Cancel</Btn>
-            <Btn variant="danger" onClick={() => rejectTS.mutate({ timesheetId: rejectModal._id, remarks: rejectReason }, { onSuccess: () => { setRejectModal(null); setRejectReason(""); refetchApprovals(); } })}
-              disabled={!rejectReason.trim() || rejectTS.isPending}>{rejectTS.isPending ? "Rejecting…" : "Reject"}</Btn>
+            <Btn variant="danger" onClick={() => rejectTS.mutate({ timesheetId: rejectModal._id, remarks: rejectReason }, { onSuccess: () => { setRejectModal(null); setRejectReason(""); refetchApprovals(); } })} disabled={!rejectReason || rejectTS.isPending}>
+              {rejectTS.isPending ? "Rejecting…" : "Reject"}
+            </Btn>
           </div>
         </div>
       </Modal>
 
       <JobDetailModal jobId={selectedJobId} open={jobDetailOpen} onClose={() => setJobDetailOpen(false)} />
-      <style>{`.no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}`}</style>
     </div>
   );
 }

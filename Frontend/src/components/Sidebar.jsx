@@ -163,12 +163,23 @@ function Sidebar({ collapsed, setCollapsed }) {
           </button>
         </div>
 
-        {role === "superadmin" && !collapsed && (
-          <div className="mx-3 mt-2 mb-1 flex items-center gap-2 rounded-md bg-[#730042]/10 px-3 py-1.5">
-            <FaShieldAlt className="text-[#730042] text-xs" />
-            <span className="text-xs font-semibold text-[#730042]">Super Admin</span>
-          </div>
-        )}
+       {!collapsed && role && (
+  <div className="mx-3 mt-2 mb-1 flex items-center gap-2 rounded-md bg-[#730042]/10 px-3 py-1.5">
+    <FaShieldAlt className="text-[#730042] text-xs" />
+
+    <span className="text-xs font-semibold text-[#730042]">
+      {role === "superadmin"
+        ? "Super Admin"
+        : role === "admin"
+        ? "Admin"
+        : role === "manager"
+        ? "Manager"
+        : role === "employee"
+        ? "Employee"
+        : role.charAt(0).toUpperCase() + role.slice(1)}
+    </span>
+  </div>
+)}
 
         <div
           className="flex items-center justify-between px-4 py-3 cursor-pointer"

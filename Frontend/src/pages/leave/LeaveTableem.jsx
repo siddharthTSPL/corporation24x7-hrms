@@ -299,8 +299,8 @@ const JourneyTracker = ({ item, statusMeta, getJourneyConfig, titleLabel, isWFH 
 
           return (
             <React.Fragment key={step.key}>
-              <div className="flex flex-col items-center gap-2 flex-1 min-w-[64px]">
-                <div className={`w-[38px] h-[38px] rounded-full flex items-center justify-center transition-all duration-250 border-[2.5px] ${circleBg} ${borderCol} ${current ? "shadow-[0_0_0_5px_rgba(205,22,110,0.15)]" : ""}`}>
+              <div className="flex flex-col items-center gap-2 flex-1 min-w-[48px] sm:min-w-[64px]">
+                <div className={`w-[32px] h-[32px] sm:w-[38px] sm:h-[38px] rounded-full flex items-center justify-center transition-all duration-250 border-[2.5px] ${circleBg} ${borderCol} shadow-[0_0_0_3px_rgba(205,22,110,0.15)] sm:shadow-[0_0_0_5px_rgba(205,22,110,0.15)]`}>
                   {(done || current) ? (
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       {isFinalStep && isRejected
@@ -311,12 +311,12 @@ const JourneyTracker = ({ item, statusMeta, getJourneyConfig, titleLabel, isWFH 
                     <div className="w-2 h-2 rounded-full bg-[rgba(115,0,66,0.25)]" />
                   )}
                 </div>
-                <span className={`text-[11px] text-center leading-[1.3] px-[2px] font-['DM_Sans'] ${current ? "font-semibold" : "font-normal"} ${labelColor}`}>
+                <span className={`text-[10px] sm:text-[11px] text-center leading-[1.3] px-[2px] font-['DM_Sans'] ${current ? "font-semibold" : "font-normal"} ${labelColor}`}>
                   {displayLabel}
                 </span>
               </div>
               {!isLast && (
-                <div className="flex-[2] h-[2.5px] mt-[18px] rounded-[4px] bg-[rgba(115,0,66,0.1)] relative overflow-hidden min-w-[24px]">
+                <div className="flex-[2] h-[2.5px] mt-[15px] sm:mt-[18px] rounded-[4px] bg-[rgba(115,0,66,0.1)] relative overflow-hidden min-w-[12px] sm:min-w-[24px]">
                   {i < activeIdx && (
                     <div className={`absolute inset-0 rounded-[4px] ${isRejected && i === activeIdx - 1 ? "bg-[#BE123C]" : "bg-[#730042]"}`} />
                   )}
@@ -338,9 +338,9 @@ const JourneyTracker = ({ item, statusMeta, getJourneyConfig, titleLabel, isWFH 
 };
 
 const BalCard = ({ label, value, accent }) => (
-  <div className="bg-white rounded-[20px] border border-[rgba(200,185,220,0.3)] px-[22px] pt-[22px] pb-[18px] relative overflow-hidden shadow-[0_2px_12px_rgba(80,40,100,0.07)] transition-all duration-300 hover:shadow-[0_8px_28px_rgba(80,40,100,0.12)] hover:-translate-y-[2px]">
+  <div className="min-w-0 bg-white rounded-[20px] border border-[rgba(200,185,220,0.3)] px-3 sm:px-[22px] pt-[22px] pb-[18px] relative overflow-hidden shadow-[0_2px_12px_rgba(80,40,100,0.07)] transition-all duration-300 hover:shadow-[0_8px_28px_rgba(80,40,100,0.12)] hover:-translate-y-[2px]">
     <div className={`absolute top-0 left-0 right-0 h-[3px] rounded-t-[20px] ${accent}`} />
-    <p className="text-[11px] text-[#9B8BAE] font-semibold uppercase tracking-[0.5px] mb-[6px] font-['DM_Sans']">{label}</p>
+    <p className="text-[11px] text-[#9B8BAE] font-semibold uppercase tracking-[0.5px] mb-[6px] font-['DM_Sans'] break-words">{label}</p>
     <p className="font-['Playfair_Display'] text-[32px] sm:text-[40px] font-bold text-[#1C1028] leading-none m-0 tracking-[-0.5px]">{value ?? 0}</p>
     <p className="text-[11px] text-[#9B8BAE] mt-1 font-['DM_Sans']">days available</p>
   </div>
@@ -658,7 +658,7 @@ const WFHTab = ({ showToast }) => {
               const canEdit = wfh.status === "pending_manager";
               const d       = wfh.days || daysBetween(wfh.startDate, wfh.endDate);
               return (
-                <div key={wfh._id || i} className={`bg-white rounded-[16px] border border-[rgba(200,185,220,0.28)] px-[18px] py-4 mb-[10px] shadow-[0_2px_10px_rgba(80,40,100,0.06)] transition-all duration-[220ms] hover:shadow-[0_6px_22px_rgba(80,40,100,0.11)] hover:-translate-y-px relative overflow-hidden ${DELAY_CLASSES[i % DELAY_CLASSES.length]}`}>
+                <div key={wfh._id || i} className={`bg-white rounded-[16px] border border-[rgba(200,185,220,0.28)] px-4 sm:px-[18px] py-4 mb-[10px] shadow-[0_2px_10px_rgba(80,40,100,0.06)] transition-all duration-[220ms] hover:shadow-[0_6px_22px_rgba(80,40,100,0.11)] hover:-translate-y-px relative overflow-hidden ${DELAY_CLASSES[i % DELAY_CLASSES.length]}`}>
                   <div className="absolute top-0 left-0 w-[3px] bottom-0 bg-[#3B82F6] rounded-l-[16px]" />
                   <div className="flex flex-col sm:flex-row justify-between items-start gap-[14px] pl-2">
                     <div className="flex-1 min-w-0 w-full">
@@ -720,7 +720,7 @@ const LeaveStatusTab = ({ histLoading, history, wfhLoading, wfhList }) => {
 
   return (
     <div>
-      <div className="flex gap-1 bg-[rgba(235,228,245,0.5)] rounded-[12px] p-1 mb-5 w-fit border border-[rgba(200,185,220,0.25)] flex-wrap">
+      <div className="flex gap-1 bg-[rgba(235,228,245,0.5)] rounded-[12px] p-1 mb-5 w-fit max-w-full border border-[rgba(200,185,220,0.25)] flex-wrap">
         {[{ key: "leave", label: "Leave Status" }, { key: "wfh", label: "WFH Status" }].map(t => {
           const active = activeTracker === t.key;
           return (
