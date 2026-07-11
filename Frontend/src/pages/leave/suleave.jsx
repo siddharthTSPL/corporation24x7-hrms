@@ -78,6 +78,140 @@ const isTerminalStatus = (status) =>
 const humanizeStatus = (s = "") =>
   s.split("_").filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 
+const csvEscape = (val) => `"${String(val ?? "").replace(/"/g, '""')}"`;
+
+const downloadCSV = (headers, rows, filename) => {
+  const csv = [headers.map(csvEscape).join(","), ...rows.map(r => r.join(","))].join("\r\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+const exportLeavesToCSV = (leaves, filename, personKey) => {
+  const headers = [
+    "Name", "Employee ID", "Email", "Department", "Designation", "Leave Type", "Status",
+    "Start Date", "End Date", "Days", "Reason", "Remarks", "Applied On", "Decided By", "Decision Remarks",
+  ];
+  const rows = leaves.map((l) => {
+    const person = l[personKey] || l.employee || l.manager || l.admin || {};
+    const decidedBy = l.approvedByModel || l.rejectedByModel || "—";
+    return [
+      csvEscape(`${person.f_name || ""} ${person.l_name || ""}`.trim() || "—"),
+      csvEscape(person.empid || "—"),
+      csvEscape(person.work_email || "—"),
+      csvEscape(person.department || "—"),
+      csvEscape(person.designation || "—"),
+      csvEscape((LEAVE_META[l.leaveType] || {}).label || l.leaveType || "—"),
+      csvEscape(humanizeStatus(l.status)),
+      csvEscape(formatDate(l.startDate)),
+      csvEscape(formatDate(l.endDate)),
+      l.days || daysDiff(l.startDate, l.endDate),
+      csvEscape(l.reason || ""),
+      csvEscape(l.remarks || ""),
+      csvEscape(formatDate(l.createdAt)),
+      csvEscape(decidedBy),
+      csvEscape(l.remarks || ""),
+    ];
+  });
+  downloadCSV(headers, rows, filename);
+};
+
+const exportWFHToCSV = (wfhList, filename) => {
+  const headers = [
+    "Name", "Requester Type", "Email", "Designation", "Status",
+    "Start Date", "End Date", "Days", "Reason", "Remarks", "Applied On",
+  ];
+  const rows = wfhList.map((w) => {
+    const person = w.requester || {};
+    return [
+      csvEscape(`${person.f_name || ""} ${person.l_name || ""}`.trim() || "—"),
+      csvEscape(w.requesterModel || "—"),
+      csvEscape(person.work_email || "—"),
+      csvEscape(person.designation || "—"),
+      csvEscape(humanizeStatus(w.status)),
+      csvEscape(formatDate(w.startDate)),
+      csvEscape(formatDate(w.endDate)),
+      w.days || daysDiff(w.startDate, w.endDate),
+      csvEscape(w.reason || ""),
+      csvEscape(w.remarks || ""),
+      csvEscape(formatDate(w.createdAt)),
+    ];
+  });
+  downloadCSV(headers, rows, `${filename}.csv`);
+};
+
+const ExportButton = ({ onClick, disabled }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all border-[1.5px] border-purple-100 bg-white text-[#730042] hover:bg-purple-50 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+  >
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+      <path d="M6 1v7M3.5 5.5L6 8l2.5-2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M1.5 9.5v1a1 1 0 001 1h7a1 1 0 001-1v-1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+    Export CSV
+  </button>
+);
+
+const FilterToolbar = ({ search, setSearch, typeFilter, setTypeFilter, dateFrom, setDateFrom, dateTo, setDateTo, onExport, exportDisabled, showType = true }) => (
+  <div className="flex flex-wrap items-center gap-2.5 mb-4 bg-white border border-purple-100 rounded-xl p-3">
+    <div className="relative flex-1 min-w-[160px]">
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none" className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+        <circle cx="5.5" cy="5.5" r="4" stroke="#C4AADA" strokeWidth="1.3" />
+        <path d="M8.5 8.5L11 11" stroke="#C4AADA" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+      <input
+        type="text"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search name, email, reason…"
+        className="w-full pl-8 pr-3 py-1.5 rounded-lg text-xs border border-purple-100 focus:outline-none focus:border-[#CD166E] text-gray-700 placeholder:text-gray-400"
+      />
+    </div>
+    {showType && (
+      <select
+        value={typeFilter}
+        onChange={(e) => setTypeFilter(e.target.value)}
+        className="px-3 py-1.5 rounded-lg text-xs border border-purple-100 text-gray-600 focus:outline-none focus:border-[#CD166E] bg-white"
+      >
+        <option value="all">All Leave Types</option>
+        {Object.entries(LEAVE_META).map(([key, m]) => (
+          <option key={key} value={key}>{m.label}</option>
+        ))}
+      </select>
+    )}
+    <input
+      type="date"
+      value={dateFrom}
+      onChange={(e) => setDateFrom(e.target.value)}
+      className="px-3 py-1.5 rounded-lg text-xs border border-purple-100 text-gray-600 focus:outline-none focus:border-[#CD166E]"
+    />
+    <span className="text-xs text-gray-300">to</span>
+    <input
+      type="date"
+      value={dateTo}
+      onChange={(e) => setDateTo(e.target.value)}
+      className="px-3 py-1.5 rounded-lg text-xs border border-purple-100 text-gray-600 focus:outline-none focus:border-[#CD166E]"
+    />
+    {(search || dateFrom || dateTo || (showType && typeFilter !== "all")) && (
+      <button
+        onClick={() => { setSearch(""); setDateFrom(""); setDateTo(""); if (showType) setTypeFilter("all"); }}
+        className="text-xs font-medium text-gray-400 hover:text-[#730042] px-2"
+      >
+        Clear
+      </button>
+    )}
+    <ExportButton onClick={onExport} disabled={exportDisabled} />
+  </div>
+);
+
 const Spinner = () => (
   <div className="flex flex-col items-center justify-center py-16 gap-3.5">
     <div className="w-9 h-9 border-[3px] border-purple-100 border-t-[#730042] rounded-full animate-spin-slow" />
@@ -377,6 +511,10 @@ const WFHCard = ({ wfh, processingId, onAction, idx }) => {
 
 const EmployeeLeavesTab = ({ leaves, isLoading, processingId }) => {
   const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 5;
 
@@ -388,9 +526,28 @@ const EmployeeLeavesTab = ({ leaves, isLoading, processingId }) => {
   ];
 
   const count    = (key) => key === "all" ? leaves.length : leaves.filter(l => l.status === key).length;
-  const filtered = filter === "all" ? leaves : leaves.filter(l => l.status === filter);
+  const statusFiltered = filter === "all" ? leaves : leaves.filter(l => l.status === filter);
+
+  const filtered = statusFiltered.filter((l) => {
+    const person = l.employee || {};
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q ||
+      `${person.f_name || ""} ${person.l_name || ""}`.toLowerCase().includes(q) ||
+      (person.work_email || "").toLowerCase().includes(q) ||
+      (l.reason || "").toLowerCase().includes(q);
+    const matchesType = typeFilter === "all" || l.leaveType === typeFilter;
+    const start = l.startDate ? new Date(l.startDate) : null;
+    const matchesFrom = !dateFrom || (start && start >= new Date(dateFrom));
+    const matchesTo   = !dateTo   || (start && start <= new Date(dateTo));
+    return matchesSearch && matchesType && matchesFrom && matchesTo;
+  });
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const handleExport = () => {
+    exportLeavesToCSV(filtered, `employee-leaves-${new Date().toISOString().slice(0, 10)}.csv`, "employee");
+  };
 
   if (isLoading) return <Spinner />;
 
@@ -402,6 +559,15 @@ const EmployeeLeavesTab = ({ leaves, isLoading, processingId }) => {
         { label: "Approved", val: leaves.filter(l => l.status === "approved_reporting_manager").length,  color: "#14803D", bg: "linear-gradient(135deg,#F0FDF4,#DCFCE7)" },
         { label: "Rejected", val: leaves.filter(l => l.status === "rejected_reporting_manager").length,  color: "#991B1B", bg: "linear-gradient(135deg,#FEF2F2,#FEE2E2)" },
       ]} />
+
+      <FilterToolbar
+        search={search} setSearch={(v) => { setSearch(v); setPage(1); }}
+        typeFilter={typeFilter} setTypeFilter={(v) => { setTypeFilter(v); setPage(1); }}
+        dateFrom={dateFrom} setDateFrom={(v) => { setDateFrom(v); setPage(1); }}
+        dateTo={dateTo} setDateTo={(v) => { setDateTo(v); setPage(1); }}
+        onExport={handleExport}
+        exportDisabled={filtered.length === 0}
+      />
 
       <div className="flex flex-wrap gap-2 mb-6">
         {FILTERS.map(f => {
@@ -442,6 +608,10 @@ const EmployeeLeavesTab = ({ leaves, isLoading, processingId }) => {
 
 const ManagerLeavesTab = ({ leaves, isLoading, processingId }) => {
   const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 5;
 
@@ -455,9 +625,28 @@ const ManagerLeavesTab = ({ leaves, isLoading, processingId }) => {
   ];
 
   const count    = (key) => key === "all" ? leaves.length : leaves.filter(l => l.status === key).length;
-  const filtered = filter === "all" ? leaves : leaves.filter(l => l.status === filter);
+  const statusFiltered = filter === "all" ? leaves : leaves.filter(l => l.status === filter);
+
+  const filtered = statusFiltered.filter((l) => {
+    const person = l.manager || {};
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q ||
+      `${person.f_name || ""} ${person.l_name || ""}`.toLowerCase().includes(q) ||
+      (person.work_email || "").toLowerCase().includes(q) ||
+      (l.reason || "").toLowerCase().includes(q);
+    const matchesType = typeFilter === "all" || l.leaveType === typeFilter;
+    const start = l.startDate ? new Date(l.startDate) : null;
+    const matchesFrom = !dateFrom || (start && start >= new Date(dateFrom));
+    const matchesTo   = !dateTo   || (start && start <= new Date(dateTo));
+    return matchesSearch && matchesType && matchesFrom && matchesTo;
+  });
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const handleExport = () => {
+    exportLeavesToCSV(filtered, `manager-leaves-${new Date().toISOString().slice(0, 10)}.csv`, "manager");
+  };
 
   if (isLoading) return <Spinner />;
 
@@ -476,6 +665,15 @@ const ManagerLeavesTab = ({ leaves, isLoading, processingId }) => {
         </div>
         <span><strong>Manager Leave Requests</strong> — Leave applications submitted by managers. These are handled by admins — shown here for your visibility.</span>
       </div>
+
+      <FilterToolbar
+        search={search} setSearch={(v) => { setSearch(v); setPage(1); }}
+        typeFilter={typeFilter} setTypeFilter={(v) => { setTypeFilter(v); setPage(1); }}
+        dateFrom={dateFrom} setDateFrom={(v) => { setDateFrom(v); setPage(1); }}
+        dateTo={dateTo} setDateTo={(v) => { setDateTo(v); setPage(1); }}
+        onExport={handleExport}
+        exportDisabled={filtered.length === 0}
+      />
 
       <div className="flex flex-wrap gap-2 mb-6">
         {FILTERS.map(f => {
@@ -516,6 +714,10 @@ const ManagerLeavesTab = ({ leaves, isLoading, processingId }) => {
 
 const AdminLeavesTab = ({ leaves, isLoading, processingId, onAction }) => {
   const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 5;
 
@@ -527,9 +729,28 @@ const AdminLeavesTab = ({ leaves, isLoading, processingId, onAction }) => {
   ];
 
   const count    = (key) => key === "all" ? leaves.length : leaves.filter(l => l.status === key).length;
-  const filtered = filter === "all" ? leaves : leaves.filter(l => l.status === filter);
+  const statusFiltered = filter === "all" ? leaves : leaves.filter(l => l.status === filter);
+
+  const filtered = statusFiltered.filter((l) => {
+    const person = l.admin || {};
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q ||
+      `${person.f_name || ""} ${person.l_name || ""}`.toLowerCase().includes(q) ||
+      (person.work_email || "").toLowerCase().includes(q) ||
+      (l.reason || "").toLowerCase().includes(q);
+    const matchesType = typeFilter === "all" || l.leaveType === typeFilter;
+    const start = l.startDate ? new Date(l.startDate) : null;
+    const matchesFrom = !dateFrom || (start && start >= new Date(dateFrom));
+    const matchesTo   = !dateTo   || (start && start <= new Date(dateTo));
+    return matchesSearch && matchesType && matchesFrom && matchesTo;
+  });
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const handleExport = () => {
+    exportLeavesToCSV(filtered, `admin-leaves-${new Date().toISOString().slice(0, 10)}.csv`, "admin");
+  };
 
   if (isLoading) return <Spinner />;
 
@@ -548,6 +769,15 @@ const AdminLeavesTab = ({ leaves, isLoading, processingId, onAction }) => {
         </div>
         <span><strong>Admin Leave Requests</strong> — Leave applications submitted by admins awaiting your final approval.</span>
       </div>
+
+      <FilterToolbar
+        search={search} setSearch={(v) => { setSearch(v); setPage(1); }}
+        typeFilter={typeFilter} setTypeFilter={(v) => { setTypeFilter(v); setPage(1); }}
+        dateFrom={dateFrom} setDateFrom={(v) => { setDateFrom(v); setPage(1); }}
+        dateTo={dateTo} setDateTo={(v) => { setDateTo(v); setPage(1); }}
+        onExport={handleExport}
+        exportDisabled={filtered.length === 0}
+      />
 
       <div className="flex flex-wrap gap-2 mb-6">
         {FILTERS.map(f => {
@@ -590,6 +820,9 @@ const AdminLeavesTab = ({ leaves, isLoading, processingId, onAction }) => {
 
 const WFHTab = ({ wfhList, isLoading, processingId, onAction }) => {
   const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 5;
 
@@ -601,9 +834,27 @@ const WFHTab = ({ wfhList, isLoading, processingId, onAction }) => {
   ];
 
   const count    = (key) => key === "all" ? wfhList.length : wfhList.filter(w => w.status === key).length;
-  const filtered = filter === "all" ? wfhList : wfhList.filter(w => w.status === filter);
+  const statusFiltered = filter === "all" ? wfhList : wfhList.filter(w => w.status === filter);
+
+  const filtered = statusFiltered.filter((w) => {
+    const person = w.requester || {};
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q ||
+      `${person.f_name || ""} ${person.l_name || ""}`.toLowerCase().includes(q) ||
+      (person.work_email || "").toLowerCase().includes(q) ||
+      (w.reason || "").toLowerCase().includes(q);
+    const start = w.startDate ? new Date(w.startDate) : null;
+    const matchesFrom = !dateFrom || (start && start >= new Date(dateFrom));
+    const matchesTo   = !dateTo   || (start && start <= new Date(dateTo));
+    return matchesSearch && matchesFrom && matchesTo;
+  });
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const handleExport = () => {
+    exportWFHToCSV(filtered, `wfh-requests-${new Date().toISOString().slice(0, 10)}`);
+  };
 
   if (isLoading) return <Spinner />;
 
@@ -622,6 +873,15 @@ const WFHTab = ({ wfhList, isLoading, processingId, onAction }) => {
         </div>
         <span><strong>WFH Requests</strong> — Work-from-home requests from admins, managers and employees requiring your final approval.</span>
       </div>
+
+      <FilterToolbar
+        search={search} setSearch={(v) => { setSearch(v); setPage(1); }}
+        showType={false}
+        dateFrom={dateFrom} setDateFrom={(v) => { setDateFrom(v); setPage(1); }}
+        dateTo={dateTo} setDateTo={(v) => { setDateTo(v); setPage(1); }}
+        onExport={handleExport}
+        exportDisabled={filtered.length === 0}
+      />
 
       <div className="flex flex-wrap gap-2 mb-6">
         {FILTERS.map(f => {
