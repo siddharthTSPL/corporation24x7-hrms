@@ -799,6 +799,11 @@ const ForwardedLeavesPanel = ({showToast}) => {
   const employeeLeaves = rawData?.employeeLeaves?.leaves || [];
   const managerLeaves  = rawData?.managerLeaves?.leaves  || [];
 
+  const isActionable = (leave, leaveFor) =>
+    leaveFor === "manager"
+      ? leave.status === "pending_reporting_manager"
+      : leave.status === "forwarded_reporting_manager";
+
   const handleAction = async (leaveId,leaveFor,action) => {
     setProcessingId(leaveId);
     try {
@@ -846,10 +851,16 @@ const ForwardedLeavesPanel = ({showToast}) => {
           </div>
 
           <div className="mlw-card-actions" style={{display:"flex",flexDirection:"column",gap:7,flexShrink:0}}>
-            <button className="mlw-action-btn" style={{background:"#F0FDF4",color:"#14803D",boxShadow:"0 2px 7px rgba(34,197,94,0.14)"}} onClick={()=>handleAction(leave._id,leaveFor,"accept")}><IconCheck/>Approve</button>
-            <button className="mlw-action-btn" style={{background:"#FFF1F2",color:"#991B1B",boxShadow:"0 2px 7px rgba(239,68,68,0.11)"}} onClick={()=>handleAction(leave._id,leaveFor,"reject")}><IconX/>Reject</button>
-            {isMgrLeave&&(
-              <button className="mlw-action-btn" style={{background:"#F5F3FF",color:"#6B21A8",boxShadow:"0 2px 7px rgba(107,33,168,0.11)"}} onClick={()=>handleAction(leave._id,leaveFor,"forwardChain")}><IconForwardChain/>Forward Up</button>
+            {isActionable(leave,leaveFor) ? (
+              <>
+                <button className="mlw-action-btn" style={{background:"#F0FDF4",color:"#14803D",boxShadow:"0 2px 7px rgba(34,197,94,0.14)"}} onClick={()=>handleAction(leave._id,leaveFor,"accept")}><IconCheck/>Approve</button>
+                <button className="mlw-action-btn" style={{background:"#FFF1F2",color:"#991B1B",boxShadow:"0 2px 7px rgba(239,68,68,0.11)"}} onClick={()=>handleAction(leave._id,leaveFor,"reject")}><IconX/>Reject</button>
+                {isMgrLeave&&(
+                  <button className="mlw-action-btn" style={{background:"#F5F3FF",color:"#6B21A8",boxShadow:"0 2px 7px rgba(107,33,168,0.11)"}} onClick={()=>handleAction(leave._id,leaveFor,"forwardChain")}><IconForwardChain/>Forward Up</button>
+                )}
+              </>
+            ) : (
+              <span style={{fontSize:11,fontWeight:600,color:"#9B8BAE",fontFamily:"'DM Sans',sans-serif",padding:"5px 9px"}}>Decided</span>
             )}
           </div>
         </div>

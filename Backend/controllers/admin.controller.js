@@ -1906,7 +1906,6 @@ const showallleaves = async (req, res, next) => {
     const [employeeLeaves, managerLeaves] = await Promise.all([
       Leave.find({
         organisation_id,
-        status: "pending_admin",
         directed_to: req.admin._id,
         directed_to_model: "Admin",
       })
@@ -1916,7 +1915,6 @@ const showallleaves = async (req, res, next) => {
         .lean(),
       ManagerLeave.find({
         organisation_id,
-        status: { $in: ["pending_admin", "pending_reporting_manager"] },
         directed_to: req.admin._id,
         directed_to_model: "Admin",
       })
