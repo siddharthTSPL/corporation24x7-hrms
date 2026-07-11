@@ -261,6 +261,8 @@ const unifiedLogin = async (req, res, next) => {
 };
 
 // --- Forgot password: send OTP (role auto-detected from email) ---
+const { buildForgotPasswordOtpEmail } = require("../utils/helpers/emailtemp");
+
 const unifiedSendForgotPasswordOtp = async (req, res, next) => {
   const { email } = req.body;
   if (!email)
@@ -272,16 +274,22 @@ const unifiedSendForgotPasswordOtp = async (req, res, next) => {
     return next(Object.assign(new Error("No account found with this email"), { statusCode: 404 }));
 
   const otp = generateOTP();
+  const expiresInMinutes = 5;
+
   await OtpModel.findOneAndUpdate(
     { email: normalizedEmail },
-    { otp: String(otp), expiresAt: new Date(Date.now() + 5 * 60 * 1000) },
+    { otp: String(otp), expiresAt: new Date(Date.now() + expiresInMinutes * 60 * 1000) },
     { upsert: true, new: true }
   );
 
   await sendEmail({
     to: normalizedEmail,
-    subject: "Password Reset OTP",
-    html: `<h2>Password Reset</h2><p>Your OTP is:</p><h1>${otp}</h1><p>Expires in 5 minutes.</p>`,
+    subject: "Password Reset OTP - TorchX Talent",
+    html: buildForgotPasswordOtpEmail({
+      recipientName: found.name,
+      otp,
+      expiresInMinutes,
+    }),
   });
 
   return res.status(200).json({ success: true, message: "OTP sent to your email" });

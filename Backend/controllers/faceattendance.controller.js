@@ -6,11 +6,13 @@ const Manager = require("../Models/manager.model");
 const AdminUser = require("../Models/Admin.model");
 const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
 const { getEmbedding, cosineSimilarity } = require("../utils/faceService");
+const { startOfISTDay } = require("../utils/istDate.utils");
 const {
   resolveEmployeeShift,
   evaluateCheckinWindow,
   evaluateCheckoutWindow,
   getShiftThresholds,
+  getShiftDurationMinutes,
 } = require("../utils/shift.utils");
 
 const MODEL_BY_ONMODEL = { User, Manager, Admin: AdminUser };
@@ -96,8 +98,13 @@ const removeFace = async (req, res) => {
 
 const scanFace = async (req, res) => {
   try {
-    const { image } = req.body;
+    const { image, gate } = req.body;
     if (!image) return res.status(400).json({ message: "image (base64) is required" });
+
+    // Kiosk sends a preset gate name (Gate 1..5) or a free-text "Other"
+    // value. Just cap length/sanitize - this is a location label, not a
+    // permission gate, so we don't hard-reject unrecognised values.
+    const gateName = typeof gate === "string" && gate.trim() ? gate.trim().slice(0, 40) : null;
 
     const { organisation_id } = req.kiosk;
 
@@ -139,8 +146,7 @@ const scanFace = async (req, res) => {
     const shiftInfo = { name: shift.name, startTime: shift.startTime, endTime: shift.endTime };
 
     const now = new Date();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = startOfISTDay(now); // IST-based day boundary, not server-local
 
     let attendance = await Attendance.findOne({
       employee: best.employee,
@@ -149,31 +155,73 @@ const scanFace = async (req, res) => {
       organisation_id,
     });
 
-    if (!attendance) {
-      const { allowed, isLate, lateMinutes } = evaluateCheckinWindow(shift, now);
+    // No record yet, OR only a background desktop-agent ping exists.
+    // An "agent" record was never a real, window-validated check-in, so
+    // it must be treated as "not checked in" here too - otherwise a face
+    // scan could silently close out a ping as a completed attendance day
+    // (this is how a stray agent ping + one scan produced a full day
+    // with no real check-in ever happening).
+    const needsRealCheckin = !attendance || attendance.source === "agent";
+
+    // One channel per day: a real System (manual/app) check-in owns the
+    // whole day. Face scan must not silently checkout a System-checked-in
+    // record - it should just report who already checked them in.
+    if (attendance && attendance.source === "manual" && !attendance.checkOut) {
+      return res.status(400).json({
+        message: `${employeeName || "This employee"} already checked in via System. Please check out from System (app) too.`,
+        reason: "checked_in_by_system",
+        employeeName,
+        shift: shiftInfo,
+        checkIn: attendance.checkIn,
+      });
+    }
+
+    if (needsRealCheckin) {
+      const { allowed, isLate, lateMinutes, tooLate } = evaluateCheckinWindow(shift, now);
 
       if (!allowed) {
+        if (tooLate) {
+          return res.status(403).json({
+            message: `Not allowed — ${employeeName || "you are"} too late. Check-in for ${employeeName || "this"} shift (${shift.startTime}) closed ${shift.lateCheckinCutoffMinutes ?? 60} minute(s) after it started.`,
+            reason: "too_late",
+            employeeName,
+            shift: shiftInfo,
+          });
+        }
         const earlyBuffer = shift.earlyBufferMinutes ?? 60;
         return res.status(403).json({
           message: `Not allowed. ${employeeName || "Your"} shift starts at ${shift.startTime}. Check-in opens ${earlyBuffer} minute(s) before that.`,
-          reason: "shift_not_started",
+          reason: "too_early",
           employeeName,
           shift: shiftInfo,
         });
       }
 
-      attendance = await Attendance.create({
-        organisation_id,
-        employee: best.employee,
-        onModel: best.onModel,
-        role: best.role,
-        date: today,
-        checkIn: now,
-        shift: shift._id,
-        isLate,
-        lateMinutes,
-        source: "face",
-      });
+      if (attendance) {
+        attendance.checkIn = now;
+        attendance.source = "face";
+        attendance.isLate = isLate;
+        attendance.lateMinutes = lateMinutes;
+        attendance.shift = shift._id;
+        attendance.activeMinutes = 0;
+        attendance.idleMinutes = 0;
+        attendance.checkInGate = gateName;
+        await attendance.save();
+      } else {
+        attendance = await Attendance.create({
+          organisation_id,
+          employee: best.employee,
+          onModel: best.onModel,
+          role: best.role,
+          date: today,
+          checkIn: now,
+          shift: shift._id,
+          isLate,
+          lateMinutes,
+          source: "face",
+          checkInGate: gateName,
+        });
+      }
 
       const grace = shift.graceMinutes ?? 15;
       return res.json({
@@ -186,6 +234,7 @@ const scanFace = async (req, res) => {
         time: attendance.checkIn,
         isLate,
         lateMinutes,
+        gate: gateName,
         shift: shiftInfo,
       });
     }
@@ -218,9 +267,24 @@ const scanFace = async (req, res) => {
     const { remark, isOvertime, overtimeMinutes } = checkoutWindow;
 
     attendance.checkOut = now;
+    attendance.checkOutGate = gateName;
     const durationMinutes = Math.round((attendance.checkOut - attendance.checkIn) / 60000);
     attendance.activeMinutes = durationMinutes;
-    attendance.status = calculateStatus(durationMinutes, getShiftThresholds(shift));
+
+    // Face attendance has no continuous activity-ping tracking like the
+    // manual/agent flow - all we know is the checkin-to-checkout span. So
+    // "presence" here is judged against the shift's own length, not the
+    // fixed absentBelowMinutes/halfDayBelowMinutes thresholds: checking
+    // out before half the shift has elapsed is always Absent, e.g. a
+    // 9-hour shift (540 min) checked out at 4h29m (< 270 min) -> Absent,
+    // no matter what the fixed thresholds say.
+    const shiftDurationMinutes = getShiftDurationMinutes(shift);
+    const halfShiftMinutes = shiftDurationMinutes / 2;
+    const isBelowHalfShift = durationMinutes < halfShiftMinutes;
+
+    attendance.status = isBelowHalfShift
+      ? "absent"
+      : calculateStatus(durationMinutes, getShiftThresholds(shift));
     attendance.checkoutRemark = remark;
     attendance.overtimeMinutes = isOvertime ? overtimeMinutes : 0;
     await attendance.save();
@@ -230,10 +294,15 @@ const scanFace = async (req, res) => {
       on_time: "Checked out on time. Have a good day!",
       overtime: `Checked out — overtime of ${minutesToLabel(overtimeMinutes)}`,
       early_checkout: "Checked out early, before your shift ended",
+      auto_overtime: `You are automatically checked out because you are overtime more than ${Math.floor((shift.maxOvertimeMinutes ?? 60) / 60)} hour(s).`,
     }[remark];
 
+    const finalMessage = isBelowHalfShift
+      ? `Checked out after only ${minutesToLabel(durationMinutes)} — less than half your ${minutesToLabel(shiftDurationMinutes)} shift, so today is marked Absent.`
+      : remarkMessage;
+
     return res.json({
-      message: remarkMessage,
+      message: finalMessage,
       action: "checkout",
       employeeName,
       matchConfidence: Number(bestScore.toFixed(3)),
@@ -242,6 +311,8 @@ const scanFace = async (req, res) => {
       overtimeMinutes: attendance.overtimeMinutes,
       time: attendance.checkOut,
       workedMinutes: durationMinutes,
+      gate: gateName,
+      isBelowHalfShift,
       shift: shiftInfo,
     });
   } catch (error) {

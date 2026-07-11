@@ -78,7 +78,7 @@ export const kioskMe = async () => {
   return res.data;
 };
 
-export const scanFace = async (imageBase64) => {
-  const res = await kioskApi.post("faceattendance/scan", { image: imageBase64 });
+export const scanFace = async ({ image, gate }) => {
+  const res = await kioskApi.post("faceattendance/scan", { image, gate });
   return res.data;
 };
