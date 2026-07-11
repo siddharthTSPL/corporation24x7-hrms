@@ -858,7 +858,7 @@ const createAdmin = async (req, res, next) => {
         { statusCode: 400 }
       ));
 
-    const empidTaken = await isEmpidTaken(empid);
+    const empidTaken = await isEmpidTaken(empid, organisation_id);
     if (empidTaken)
       return next(Object.assign(
         new Error("This Employee ID is already in use"),

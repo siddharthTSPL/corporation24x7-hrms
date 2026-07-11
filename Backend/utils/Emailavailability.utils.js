@@ -21,13 +21,17 @@ const isEmailTaken = async (email) => {
   return { taken: false, role: null };
 };
 
-const isEmpidTaken = async (empid) => {
-  const [admin, manager, user] = await Promise.all([
-    AdminModel.findOne({ empid }).select("_id").lean(),
-    Managermodel.findOne({ empid }).select("_id").lean(),
-    Usermodel.findOne({ empid }).select("_id").lean(),
+async function isEmpidTaken(empid, organisation_id) {
+  if (!empid || !organisation_id) return false;
+  const normalizedEmpid = empid.toString().trim();
+
+  const [user, manager, admin] = await Promise.all([
+    Usermodel.findOne({ empid: normalizedEmpid, organisation_id }).select("_id").lean(),
+    Managermodel.findOne({ empid: normalizedEmpid, organisation_id }).select("_id").lean(),
+    AdminModel.findOne({ empid: normalizedEmpid, organisation_id }).select("_id").lean(),
   ]);
-  return !!(admin || manager || user);
-};
+
+  return Boolean(user || manager || admin);
+}
 
 module.exports = { isEmailTaken, isEmpidTaken };
