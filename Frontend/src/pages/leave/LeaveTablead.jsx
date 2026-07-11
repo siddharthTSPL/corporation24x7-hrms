@@ -1354,7 +1354,7 @@ const AdminLeaveWFH = () => {
 
       <Toast toast={toast} />
     </div>
-  );
+  );  
 };
 
 export default AdminLeaveWFH;
