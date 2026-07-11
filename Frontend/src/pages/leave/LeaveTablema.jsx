@@ -8,6 +8,7 @@ import {
   useForwardLeaveToReportingManager,
   useGetMyLeavesManager,
   useApplyLeaveManager,
+  useGetLeaveHistory,
   useGetForwardedLeavesManager,
   useAcceptForwardedLeave,
   useRejectForwardedLeave,
@@ -850,7 +851,7 @@ const ApplyLeavePanel = ({manager,showToast}) => {
   const [form,setForm]     = useState({leaveType:"el",startDate:"",endDate:"",reason:""});
   const [errors,setErrors] = useState({});
 
-  const {data:rawHistory,isLoading:histLoading,refetch} = useGetMyLeavesManager();
+  const {data:rawHistory,isLoading:histLoading,refetch} = useGetLeaveHistory();
   const applyMut = useApplyLeaveManager();
 
   const isMarried = manager?.marital_status==="married";

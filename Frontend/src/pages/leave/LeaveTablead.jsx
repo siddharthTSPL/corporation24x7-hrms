@@ -599,7 +599,7 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
 
   const { data: rawHistory, isLoading: histLoading, refetch } = useAdminGetMyLeaveHistory();
   const applyMut = useAdminApplyLeave();
-  const history  = Array.isArray(rawHistory) ? rawHistory : [];
+  const history  = Array.isArray(rawHistory?.leave) ? rawHistory.leave : Array.isArray(rawHistory) ? rawHistory : [];
 
   const isMarried = admin?.marital_status === "married";
   const showML    = admin?.gender === "female" && isMarried;
@@ -1354,7 +1354,7 @@ const AdminLeaveWFH = () => {
 
       <Toast toast={toast} />
     </div>
-  );  
+  );
 };
 
 export default AdminLeaveWFH;
