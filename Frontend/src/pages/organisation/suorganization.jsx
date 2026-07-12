@@ -154,9 +154,6 @@ function SuperAdminNode({ name, role, initials, delay = 0, onClick }) {
         <Avatar initials={initials} size={48} bg={BRAND} fontSize={17} />
         <p className="text-sm sm:text-base font-bold text-slate-900 mt-3 text-center break-words">{name}</p>
         <p className="text-[11px] sm:text-xs text-gray-500 mt-1 text-center break-words">{role}</p>
-        <div className="mt-3 flex gap-1.5">
-          <Badge>Super Admin</Badge>
-        </div>
       </div>
     </div>
   );
@@ -174,10 +171,8 @@ function AdminNode({ admin, delay = 0, dimmed, highlighted, onClick }) {
         <span className="absolute top-2.5 right-3 text-[9px] font-bold text-indigo-300 uppercase" style={{ fontFamily: "'JetBrains Mono',monospace" }}>ADM</span>
         <Avatar initials={getInitials(admin.f_name, admin.l_name)} size={40} bg="#6366f1" fontSize={13} />
         <p className="text-xs sm:text-[13px] font-semibold text-slate-900 mt-2.5 text-center max-w-[120px] sm:max-w-[140px] truncate w-full">{name}</p>
-        <p className="text-[10px] sm:text-[11px] text-gray-400 mt-1 text-center max-w-[120px] sm:max-w-[140px] truncate w-full">{admin.designation || "Admin"}</p>
-        <div className="mt-2">
-          <span className="text-[9.5px] sm:text-[10px] px-2 py-1 rounded bg-indigo-50 text-indigo-700 font-semibold">Admin</span>
-        </div>
+        <p className="text-[10px] sm:text-[11px] text-gray-400 mt-1 text-center max-w-[120px] sm:max-w-[140px] truncate w-full">{admin.designation || "—"}</p>
+        <p className="text-[9.5px] sm:text-[10px] text-gray-400 mt-0.5 text-center max-w-[120px] sm:max-w-[140px] truncate w-full" style={{ fontFamily: "'JetBrains Mono',monospace" }}>{admin.empid || "—"}</p>
       </div>
     </div>
   );
@@ -194,10 +189,8 @@ function ManagerNode({ manager, delay = 0, dimmed, highlighted, onClick }) {
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-500 to-sky-400 rounded-t-lg" />
         <Avatar initials={getInitials(manager.f_name, manager.l_name)} size={34} bg="#0ea5e9" fontSize={12} />
         <p className="text-[11px] sm:text-xs font-semibold text-slate-800 mt-2 text-center max-w-[104px] sm:max-w-[120px] truncate w-full">{name}</p>
-        <p className="text-[9.5px] sm:text-[10.5px] text-slate-400 mt-0.5 text-center max-w-[104px] sm:max-w-[120px] truncate w-full">{manager.department || manager.designation || "Manager"}</p>
-        <div className="mt-1.5">
-          <span className="text-[9px] sm:text-[9.5px] px-2 py-0.5 rounded bg-sky-50 text-sky-700 font-semibold">Manager</span>
-        </div>
+        <p className="text-[9.5px] sm:text-[10.5px] text-slate-400 mt-0.5 text-center max-w-[104px] sm:max-w-[120px] truncate w-full">{manager.department || manager.designation || "—"}</p>
+        <p className="text-[9px] sm:text-[9.5px] text-slate-400 mt-0.5 text-center max-w-[104px] sm:max-w-[120px] truncate w-full" style={{ fontFamily: "'JetBrains Mono',monospace" }}>{manager.empid || "—"}</p>
       </div>
     </div>
   );
@@ -213,7 +206,8 @@ function EmployeeNode({ employee, delay = 0, dimmed, highlighted, onClick }) {
       >
         <Avatar initials={getInitials(employee.f_name, employee.l_name)} size={28} bg="#e2e8f0" fontSize={9} />
         <p className="text-[10px] sm:text-[11px] font-semibold text-slate-800 mt-1.5 text-center max-w-[88px] sm:max-w-[100px] truncate w-full">{name}</p>
-        <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 text-center max-w-[88px] sm:max-w-[100px] truncate w-full">{employee.department || employee.designation || "Employee"}</p>
+        <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 text-center max-w-[88px] sm:max-w-[100px] truncate w-full">{employee.department || employee.designation || "—"}</p>
+        <p className="text-[8.5px] sm:text-[9.5px] text-slate-400 mt-0.5 text-center max-w-[88px] sm:max-w-[100px] truncate w-full" style={{ fontFamily: "'JetBrains Mono',monospace" }}>{employee.empid || "—"}</p>
       </div>
     </div>
   );
@@ -271,6 +265,7 @@ function EmployeeDetailPanel({ person, type, onClose }) {
       ["Member since", fmtDate(person.createdAt)],
     ];
     if (isAdmin) return [
+      ["Emp ID",      person.empid || "—"],
       ["Email",       person.work_email],
       ["Phone",       person.phone || "—"],
       ["Gender",      person.gender || "—"],
@@ -278,6 +273,7 @@ function EmployeeDetailPanel({ person, type, onClose }) {
       ["Status",      person.status || "—"],
     ];
     if (isManager) return [
+      ["Emp ID",      person.empid || "—"],
       ["Email",       person.work_email],
       ["Phone",       person.personal_contact || "—"],
       ["Gender",      person.gender || "—"],
@@ -287,6 +283,7 @@ function EmployeeDetailPanel({ person, type, onClose }) {
       ["Location",    person.office_location || "—"],
     ];
     return [
+      ["Emp ID",      person.empid || "—"],
       ["Email",       person.work_email],
       ["Phone",       person.personal_contact || "—"],
       ["Gender",      person.gender || "—"],
@@ -740,14 +737,14 @@ export default function SuperAdminOrgChart() {
   }, [exportOpen]);
 
   function buildCsvRows() {
-    const rows = [["Role", "Name", "Email", "Phone", "Department", "Designation", "Office Location", "Reports To"]];
+    const rows = [["Role", "Emp ID", "Name", "Email", "Phone", "Department", "Designation", "Office Location", "Reports To"]];
 
     if (superAdmin) {
-      rows.push(["Super Admin", fullName(superAdmin), superAdmin.email || "", "", "", "", "", ""]);
+      rows.push(["Super Admin", "", fullName(superAdmin), superAdmin.email || "", "", "", "", "", ""]);
     }
 
     admins.forEach((a) => {
-      rows.push(["Admin", fullName(a), a.work_email || "", a.personal_contact || "", a.department || "", a.designation || "", a.office_location || "", "Super Admin"]);
+      rows.push(["Admin", a.empid || "", fullName(a), a.work_email || "", a.personal_contact || "", a.department || "", a.designation || "", a.office_location || "", "Super Admin"]);
     });
 
     managers.forEach((m) => {
@@ -756,12 +753,12 @@ export default function SuperAdminOrgChart() {
         : m.reporting_manager_model === "Manager"
           ? (managers.find((mm) => idStr(mm._id) === idStr(m.reporting_manager)) ? `Manager: ${fullName(managers.find((mm) => idStr(mm._id) === idStr(m.reporting_manager)))}` : "Unassigned")
           : "Unassigned";
-      rows.push(["Manager", fullName(m), m.work_email || "", m.personal_contact || "", m.department || "", m.designation || "", m.office_location || "", parentLabel]);
+      rows.push(["Manager", m.empid || "", fullName(m), m.work_email || "", m.personal_contact || "", m.department || "", m.designation || "", m.office_location || "", parentLabel]);
     });
 
     employees.forEach((e) => {
       const mgr = managers.find((m) => idStr(m._id) === idStr(e.Under_manager));
-      rows.push(["Employee", fullName(e), e.work_email || "", e.personal_contact || "", e.department || "", e.designation || "", e.office_location || "", mgr ? `Manager: ${fullName(mgr)}` : "Unassigned"]);
+      rows.push(["Employee", e.empid || "", fullName(e), e.work_email || "", e.personal_contact || "", e.department || "", e.designation || "", e.office_location || "", mgr ? `Manager: ${fullName(mgr)}` : "Unassigned"]);
     });
 
     return rows;
@@ -812,8 +809,6 @@ export default function SuperAdminOrgChart() {
 
       <header className="w-full max-w-full min-w-0 bg-white border-b border-gray-200 shadow-sm overflow-hidden">
         <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-4 min-w-0">
-          
-          {/* Left section */}
           <div className={`flex items-center gap-2 sm:gap-3 min-w-0 flex-1 ${searchOpen ? "hidden sm:flex" : "flex"}`}>
             <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-[#730042] shrink-0 shadow-[0_0_0_3px_rgba(115,0,66,0.15)]"></div>
             <span className="hidden md:inline text-sm text-gray-400 font-medium truncate min-w-0">{orgName}</span>
@@ -881,10 +876,8 @@ export default function SuperAdminOrgChart() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 min-w-0 flex-1">
 
-        {/* Title Area */}
         <div className="mb-6 lg:mb-8 min-w-0">
           <h2 className="text-lg sm:text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight truncate">
             Organisation Chart
@@ -894,7 +887,6 @@ export default function SuperAdminOrgChart() {
           </p>
         </div>
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 lg:mb-8 min-w-0 max-w-full">
           {statItems.map(({ label, value, color }, i) => (
             <div
@@ -923,7 +915,7 @@ export default function SuperAdminOrgChart() {
         </div>
 
         <div className="w-full max-w-full min-w-0 bg-white border border-gray-200 rounded-xl lg:rounded-2xl shadow-sm overflow-hidden flex flex-col">
-          
+
           <div className="w-full min-w-0 px-4 sm:px-5 py-3 border-b border-gray-100 flex flex-wrap items-center gap-2 bg-gradient-to-br from-gray-50 to-gray-100/50">
             <span className="text-sm font-semibold text-slate-700 truncate">Hierarchy</span>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-semibold shrink-0" style={{ fontFamily: "'JetBrains Mono',monospace" }}>
@@ -937,7 +929,6 @@ export default function SuperAdminOrgChart() {
             <span className="hidden sm:block ml-auto text-xs text-gray-400 truncate">Click any card for details</span>
           </div>
 
-          {/* Tree Scroll Container - overflow-x-auto allows internal scroll if tree is wider than the sidebar allows */}
           <div className="su-scroll w-full max-w-full min-w-0 overflow-x-auto bg-white p-4 sm:p-6 lg:p-8">
             <OrgTree
               superAdmin={superAdmin}
