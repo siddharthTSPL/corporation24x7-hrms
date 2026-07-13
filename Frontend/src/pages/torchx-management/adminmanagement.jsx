@@ -175,14 +175,14 @@ function DayPicker({ value, onChange }) {
 
 function SectionCard({ icon: Icon, title, subtitle, action, children }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm">
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm min-w-0">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-5 py-4 border-b border-slate-100">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-[#F9F0F5] text-[#730042] flex items-center justify-center shrink-0">
             <Icon className="w-4.5 h-4.5" />
           </div>
-          <div>
-            <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-slate-800 truncate">{title}</h2>
             {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
           </div>
         </div>
@@ -321,8 +321,8 @@ function ShiftHistoryModal({ open, onClose, employeeId, role, personName, shifts
             return (
               <div key={entry._id} className="py-3 flex flex-col gap-2">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <p className="text-sm text-slate-800">
+                  <div className="min-w-0">
+                    <p className="text-sm text-slate-800 break-words">
                       <span className="text-slate-400">{shiftLabel(entry.previous_shift)}</span>
                       <span className="mx-1.5 text-slate-300">→</span>
                       <span className="font-medium">{shiftLabel(entry.shift)}</span>
@@ -330,7 +330,7 @@ function ShiftHistoryModal({ open, onClose, employeeId, role, personName, shifts
                     <p className="text-xs text-slate-400 mt-1">
                       {formatDateTime(entry.createdAt)} · by {actorLabel(entry.assigned_by, entry.assigned_by_model)}
                     </p>
-                    {entry.note && <p className="text-xs text-slate-500 mt-1 italic">"{entry.note}"</p>}
+                    {entry.note && <p className="text-xs text-slate-500 mt-1 italic break-words">"{entry.note}"</p>}
                   </div>
                   {!isEditing && (
                     <div className="flex gap-1.5 shrink-0">
@@ -494,7 +494,7 @@ function ShiftsPanel({ notify }) {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 min-w-0">
       <SectionCard
         icon={Clock}
         title="Shifts"
@@ -514,13 +514,13 @@ function ShiftsPanel({ notify }) {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {shifts.map((s) => (
-              <div key={s._id} className="rounded-xl border border-slate-200 p-4 flex flex-col gap-3 hover:border-[#730042] transition-colors">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <h3 className="font-semibold text-slate-800 text-sm">{s.name}</h3>
+              <div key={s._id} className="rounded-xl border border-slate-200 p-4 flex flex-col gap-3 hover:border-[#730042] transition-colors min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <h3 className="font-semibold text-slate-800 text-sm truncate">{s.name}</h3>
                       {s.isDefault && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-md">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-md shrink-0">
                           <Star className="w-3 h-3 fill-amber-500 text-amber-500" /> Default
                         </span>
                       )}
@@ -531,7 +531,7 @@ function ShiftsPanel({ notify }) {
                       {s.durationMinutes ? `${Math.round((s.durationMinutes / 60) * 10) / 10}h` : ''}
                     </p>
                   </div>
-                  <button onClick={() => openEdit(s)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+                  <button onClick={() => openEdit(s)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 shrink-0">
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -547,7 +547,7 @@ function ShiftsPanel({ notify }) {
                   <span>Half-day below</span>
                   <span className="text-slate-700 font-medium text-right">{s.halfDayBelowMinutes} min</span>
                 </div>
-                <div className="flex gap-2 pt-1">
+                <div className="flex gap-2 pt-1 flex-wrap">
                   {!s.isDefault && (
                     <Button
                       variant="subtle"
@@ -798,7 +798,7 @@ function HolidayCalendar({ month, year, holidays, onAddRange, onEditHoliday, onD
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 min-w-0">
       <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
         {DAYS.map((d) => (
           <div key={d} className="text-[10px] sm:text-[11px] font-semibold uppercase text-slate-400 text-center py-1">
@@ -836,7 +836,7 @@ function HolidayCalendar({ month, year, holidays, onAddRange, onEditHoliday, onD
 
       {rangeStart && !editingHoliday && (
         <div className="rounded-xl border border-[#E8D5E2] bg-[#F9F0F5] p-4 flex flex-col sm:flex-row gap-3 sm:items-end">
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-[#730042] uppercase tracking-wide mb-1.5">
               {selectedDates.length > 1 ? `${selectedDates.length} days selected` : '1 day selected'}
             </p>
@@ -864,7 +864,7 @@ function HolidayCalendar({ month, year, holidays, onAddRange, onEditHoliday, onD
 
       {editingHoliday && (
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 flex flex-col sm:flex-row gap-3 sm:items-end">
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">{toISODate(editingHoliday.date)}</p>
             <input className={inputCls} value={editName} onChange={(e) => setEditName(e.target.value)} />
           </div>
@@ -939,9 +939,9 @@ function HolidaysPanel({ notify }) {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 min-w-0">
       <SectionCard icon={CalendarDays} title="Holiday calendar" subtitle="Dates the whole organisation gets off, regardless of week-off policy">
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
           <select className={`${inputCls} w-auto`} value={filter.month} onChange={(e) => setFilter((f) => ({ ...f, month: Number(e.target.value) }))}>
             {MONTH_NAMES.map((m, i) => (
               <option key={m} value={i + 1}>
@@ -1138,7 +1138,7 @@ function WeekOffPanel({ notify }) {
   const isRotational = policy === 'rotational';
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 min-w-0">
       <SectionCard icon={Settings2} title="Week-off policy" subtitle="Choose how weekly offs work across the organisation">
         {policyLoading ? (
           <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
@@ -1182,16 +1182,16 @@ function WeekOffPanel({ notify }) {
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {groups.map((g) => (
-                  <div key={g._id} className="rounded-xl border border-slate-200 p-4">
-                    <h4 className="text-sm font-semibold text-slate-800 mb-2">{g.name}</h4>
+                  <div key={g._id} className="rounded-xl border border-slate-200 p-4 min-w-0">
+                    <h4 className="text-sm font-semibold text-slate-800 mb-2 truncate">{g.name}</h4>
                     <div className="flex flex-col gap-1.5 mb-3 max-h-32 overflow-y-auto">
                       {(g.members || []).length === 0 && <p className="text-xs text-slate-400">No members yet</p>}
                       {(g.members || []).map((m) => (
-                        <div key={String(m.employee)} className="flex items-center justify-between text-xs bg-slate-50 rounded-lg px-2.5 py-1.5">
+                        <div key={String(m.employee)} className="flex items-center justify-between text-xs bg-slate-50 rounded-lg px-2.5 py-1.5 gap-2">
                           <span className="text-slate-600 truncate">
                             {m.employeeModel} · {String(m.employee).slice(-6)}
                           </span>
-                          <button onClick={() => removeMember(g._id, m.employee)} className="text-slate-400 hover:text-rose-500">
+                          <button onClick={() => removeMember(g._id, m.employee)} className="text-slate-400 hover:text-rose-500 shrink-0">
                             <X className="w-3.5 h-3.5" />
                           </button>
                         </div>
@@ -1301,7 +1301,7 @@ function WeekOffPanel({ notify }) {
           </SectionCard>
 
           <SectionCard icon={CalendarDays} title="Current rotational schedule">
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-3 mb-4 flex-wrap">
               <select
                 className={`${inputCls} w-auto`}
                 value={scheduleFilter.month}
@@ -1331,13 +1331,13 @@ function WeekOffPanel({ notify }) {
               <div className="flex flex-col divide-y divide-slate-100">
                 {schedules.map((s) => (
                   <div key={s._id} className="flex flex-wrap items-center justify-between gap-2 py-3">
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-sm font-medium text-slate-800">
                         {toISODate(s.weekStartDate)} – {toISODate(s.weekEndDate)}
                       </p>
                       <p className="text-xs text-slate-400">{groups.find((g) => g._id === s.group)?.name || 'Default group'}</p>
                     </div>
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-1.5 flex-wrap">
                       {s.offDays.map((d) => (
                         <span key={d} className="text-[10px] font-semibold uppercase bg-[#F9F0F5] text-[#730042] px-2 py-1 rounded-md">
                           {DAY_LABEL[d]}
@@ -1422,9 +1422,9 @@ export default function AdminManagement() {
   const { toasts, notify } = useToasts();
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 w-full max-w-full overflow-x-hidden">
       <ToastStack toasts={toasts} />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 min-w-0">
         <div className="mb-8">
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Shift &amp; holiday management</h1>
           <p className="text-sm text-slate-500 mt-1.5">
