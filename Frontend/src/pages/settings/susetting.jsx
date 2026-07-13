@@ -62,7 +62,7 @@ function daysLeft(dateStr) {
 function Badge({ children, color = C.brand, bg = C.brandLight }) {
   return (
     <span
-      className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-medium whitespace-nowrap"
+      className="inline-flex  items-center px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-medium whitespace-nowrap"
       style={{ color, background: bg }}
     >
       {children}
