@@ -1013,6 +1013,7 @@ const promoteManagerToAdmin = async (req, res, next) => {
     const newUid = await generateUID(manager.department, organisation_id);
 
     const [newAdmin] = await Adminmodel.create([{
+      empid: manager.empid,
       organisation_id,
       uid: newUid,
       profile_image: manager.profile_image || null,
