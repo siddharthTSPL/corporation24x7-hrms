@@ -2711,7 +2711,7 @@ const getOrgInfo = async (req, res, next) => {
  
     const admin = await Adminmodel.findById(req.admin._id)
       .select(
-        "f_name l_name work_email designation department office_location organisation_id"
+        "f_name l_name empid work_email designation department office_location organisation_id"
       )
       .lean();
  
@@ -2726,7 +2726,7 @@ const getOrgInfo = async (req, res, next) => {
  
     const managers = await Managermodel.find({ organisation_id })
       .select(
-        "f_name l_name work_email designation department office_location reporting_manager reporting_manager_model"
+        "f_name l_name empid work_email designation department office_location reporting_manager reporting_manager_model"
       )
       .lean();
  
@@ -2736,19 +2736,21 @@ const getOrgInfo = async (req, res, next) => {
         Under_manager: { $in: managers.map((m) => m._id) },
       })
       .select(
-        "f_name l_name work_email designation department office_location Under_manager"
+        "f_name l_name empid work_email designation department office_location Under_manager"
       )
       .lean();
  
     const topLevelManagers = managers
       .filter(
         (mgr) =>
-          !mgr.reporting_manager ||
+          mgr.reporting_manager &&
+          mgr.reporting_manager.toString() === admin._id.toString() &&
           mgr.reporting_manager_model === "Admin"
       )
       .map((mgr) => ({
         id: mgr._id,
         name: `${mgr.f_name} ${mgr.l_name}`,
+        empid: mgr.empid,
         email: mgr.work_email,
         designation: mgr.designation,
         department: mgr.department,
@@ -2758,6 +2760,7 @@ const getOrgInfo = async (req, res, next) => {
           .map((emp) => ({
             id: emp._id,
             name: `${emp.f_name} ${emp.l_name}`,
+            empid: emp.empid,
             email: emp.work_email,
             designation: emp.designation,
             department: emp.department,
@@ -2780,6 +2783,7 @@ const getOrgInfo = async (req, res, next) => {
       admin: {
         id: admin._id,
         name: `${admin.f_name} ${admin.l_name}`,
+        empid: admin.empid,
         email: admin.work_email,
         designation: admin.designation,
         department: admin.department,
@@ -2802,6 +2806,7 @@ const buildManagerTree = (managers, parentId, parentModel, employees) => {
     .map((mgr) => ({
       id: mgr._id,
       name: `${mgr.f_name} ${mgr.l_name}`,
+      empid: mgr.empid,
       email: mgr.work_email,
       designation: mgr.designation,
       department: mgr.department,
@@ -2812,6 +2817,7 @@ const buildManagerTree = (managers, parentId, parentModel, employees) => {
         .map((emp) => ({
           id: emp._id,
           name: `${emp.f_name} ${emp.l_name}`,
+          empid: emp.empid,
           email: emp.work_email,
           designation: emp.designation,
           department: emp.department,

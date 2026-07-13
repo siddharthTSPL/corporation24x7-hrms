@@ -48,39 +48,45 @@ function Hi({ text = "", q = "", className = "" }) {
   );
 }
 
+// Colour is only applied when a node sits on the viewer's own reporting line
+// (their manager chain above them + everyone who reports up to them below).
+// Everything else renders in a neutral black & white palette.
 const CFG = {
-  org:     { accent: "bg-[#1a0d14]", avBg: "bg-[#1a0d14]", avColor: "text-[#f5edf2]", badge: "Organisation", badgeBg: "bg-[#f5edf2]", badgeColor: "text-[#4a3542]", tag: "ORG" },
-  admin:   { accent: "bg-[#5a2240]", avBg: "bg-[#f0e4ec]", avColor: "text-[#5a2240]", badge: "Admin",         badgeBg: "bg-[#f0e4ec]", badgeColor: "text-[#5a2240]", tag: "ADM" },
-  manager: { accent: "bg-[#a8005c]", avBg: "bg-[#fce7f3]", avColor: "text-[#a8005c]", badge: "Manager",       badgeBg: "bg-[#fce7f3]", badgeColor: "text-[#a8005c]", tag: "MGR" },
-  subMgr:  { accent: "bg-[#be185d]", avBg: "bg-[#fce7f3]", avColor: "text-[#be185d]", badge: "Reporting Mgr", badgeBg: "bg-[#fce7f3]", badgeColor: "text-[#be185d]", tag: "MGR" },
-  emp:     { accent: "bg-[#7c1f4a]", avBg: "bg-[#fce7f3]", avColor: "text-[#7c1f4a]", badge: "Employee",      badgeBg: "bg-[#fce7f3]", badgeColor: "text-[#7c1f4a]", tag: "EMP" },
+  org:     { accentOn: "bg-[#1a0d14]", avBgOn: "bg-[#1a0d14]", avColorOn: "text-[#f5edf2]" },
+  admin:   { accentOn: "bg-[#5a2240]", avBgOn: "bg-[#f0e4ec]", avColorOn: "text-[#5a2240]" },
+  manager: { accentOn: "bg-[#a8005c]", avBgOn: "bg-[#fce7f3]", avColorOn: "text-[#a8005c]" },
+  subMgr:  { accentOn: "bg-[#be185d]", avBgOn: "bg-[#fce7f3]", avColorOn: "text-[#be185d]" },
+  emp:     { accentOn: "bg-[#7c1f4a]", avBgOn: "bg-[#fce7f3]", avColorOn: "text-[#7c1f4a]" },
 };
+const OFF = { accent: "bg-gray-300", avBg: "bg-gray-100", avColor: "text-gray-400" };
 
-function Card({ level, name, sub, width = 172, delay = 0, dim, hl, q, you = false, empCount }) {
+function Card({ level, name, sub, empid, width = 172, delay = 0, dim, hl, chain, q, you = false, empCount }) {
   const c = CFG[level] || CFG.emp;
+  const accentCls  = chain ? c.accentOn  : OFF.accent;
+  const avBgCls    = chain ? c.avBgOn    : OFF.avBg;
+  const avColorCls = chain ? c.avColorOn : OFF.avColor;
+
   return (
     <div className="shrink-0">
       <div
         className={[
-          "bg-white border border-[#eedde8] rounded-[11px] py-3.5 px-3 pb-[11px] shadow-[0_2px_8px_rgba(115,0,66,0.04)] flex flex-col items-center relative overflow-hidden transition-transform duration-150 ease hover:-translate-y-0.5 cursor-default",
+          "bg-white border rounded-[11px] py-3.5 px-3 pb-[11px] shadow-[0_2px_8px_rgba(115,0,66,0.04)] flex flex-col items-center relative overflow-hidden transition-transform duration-150 ease hover:-translate-y-0.5 cursor-default",
+          chain ? "border-[#eedde8]" : "border-gray-200",
           hl ? "outline outline-2 outline-[#730042] outline-offset-2 shadow-[0_0_0_5px_rgba(115,0,66,0.1)]" : "",
           dim ? "opacity-[0.15] grayscale" : "",
           you ? "ring-4 ring-[#730042]/15" : "",
         ].filter(Boolean).join(" ")}
         style={{ width }}
       >
-        <div className={`absolute top-0 left-0 right-0 h-[3px] rounded-t-[11px] ${you ? "bg-gradient-to-r from-[#730042] to-[#CD166E]" : c.accent}`} />
-        <span className="absolute top-2 right-2.5 text-[8px] font-semibold tracking-[0.1em] text-[#c8a8bb] font-['DM_Mono',monospace]">{c.tag}</span>
+        <div className={`absolute top-0 left-0 right-0 h-[3px] rounded-t-[11px] ${you ? "bg-gradient-to-r from-[#730042] to-[#CD166E]" : accentCls}`} />
         {you && <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 text-[7px] font-bold tracking-[0.1em] px-2 py-0.5 rounded-lg bg-[#730042] text-white whitespace-nowrap font-['DM_Mono',monospace]">YOU</div>}
-        <Avatar name={name} size={38} bg={you ? "bg-[#fce7f3]" : c.avBg} color={you ? "text-[#730042]" : c.avColor} />
+        <Avatar name={name} size={38} bg={you ? "bg-[#fce7f3]" : avBgCls} color={you ? "text-[#730042]" : avColorCls} />
         <div className="mt-2 mb-1.5 text-center w-full">
-          <Hi text={name} q={q} className="block text-xs font-semibold text-[#1a0d14] leading-[1.3] font-['Syne',sans-serif] truncate" />
-          {sub && <Hi text={sub} q={q} className="block text-[10px] text-[#8a6878] mt-0.5 truncate" />}
-          {empCount !== undefined && <span className="text-[10px] text-[#c8a8bb] block mt-0.5">{empCount} report{empCount !== 1 ? "s" : ""}</span>}
+          <Hi text={name} q={q} className={`block text-xs font-semibold leading-[1.3] font-['Syne',sans-serif] truncate ${chain ? "text-[#1a0d14]" : "text-gray-400"}`} />
+          {sub && <Hi text={sub} q={q} className={`block text-[10px] mt-0.5 truncate ${chain ? "text-[#8a6878]" : "text-gray-300"}`} />}
+          {empid && <span className={`block text-[9px] mt-0.5 font-['DM_Mono',monospace] truncate ${chain ? "text-[#c8a8bb]" : "text-gray-300"}`}>{empid}</span>}
+          {empCount !== undefined && <span className={`text-[10px] block mt-0.5 ${chain ? "text-[#c8a8bb]" : "text-gray-300"}`}>{empCount} report{empCount !== 1 ? "s" : ""}</span>}
         </div>
-        <span className={`text-[9px] py-0.5 px-[7px] rounded-full font-semibold tracking-[0.04em] font-['DM_Mono',monospace] ${you ? "bg-[#fce7f3] text-[#730042] border border-[#f9a8d4]" : `${c.badgeBg} ${c.badgeColor} border-none`}`}>
-          {you ? "You" : c.badge}
-        </span>
       </div>
     </div>
   );
@@ -139,7 +145,47 @@ function collectMatchKeys(nodes, q, matches) {
   });
 }
 
-function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
+// Walk the tree to find "me" (isCurrentManager), then collect:
+//  - path: every manager id between the org root and me (my own reporting line upward)
+//  - descendants: every manager/employee id that reports up to me (downward)
+function collectDescendants(mgr, set) {
+  (mgr.employees || []).forEach(e => set.add(`e-${e.id}`));
+  (mgr.subManagers || []).forEach(sm => {
+    set.add(`m-${sm.id}`);
+    collectDescendants(sm, set);
+  });
+}
+
+function findSelfChain(managers) {
+  for (const mgr of managers) {
+    if (mgr.isCurrentManager) {
+      const descendants = new Set();
+      collectDescendants(mgr, descendants);
+      return { path: new Set([`m-${mgr.id}`]), descendants };
+    }
+    if (mgr.subManagers?.length) {
+      const found = findSelfChain(mgr.subManagers);
+      if (found) {
+        found.path.add(`m-${mgr.id}`);
+        return found;
+      }
+    }
+  }
+  return null;
+}
+
+function buildChainIds(data) {
+  // org + admin are always on your line since they sit above everyone
+  const ids = new Set(["org", "admin"]);
+  const self = findSelfChain(data?.managers || []);
+  if (self) {
+    self.path.forEach(id => ids.add(id));
+    self.descendants.forEach(id => ids.add(id));
+  }
+  return ids;
+}
+
+function ManagerColumn({ mgr, q, matches, dim, delayRef, chainIds, isSubMgr = false }) {
   const key = `m-${mgr.id}`;
   const emps = mgr.employees || [];
   const subMgrs = mgr.subManagers || [];
@@ -153,10 +199,12 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
         level={isSubMgr ? "subMgr" : "manager"}
         name={mgr.name}
         sub={mgr.designation || mgr.department}
+        empid={mgr.empid}
         width={CARD_W}
         delay={mDelay}
         dim={dim(key)}
         hl={matches.has(key)}
+        chain={chainIds.has(key)}
         q={q}
         you={mgr.isCurrentManager}
         empCount={(emps.length + subMgrs.length) > 0 ? emps.length + subMgrs.length : undefined}
@@ -182,7 +230,7 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
           })()}
           <div className="flex items-start gap-[20px]">
             {subMgrs.map(sm => (
-              <ManagerColumn key={sm.id} mgr={sm} q={q} matches={matches} dim={dim} delayRef={delayRef} isSubMgr />
+              <ManagerColumn key={sm.id} mgr={sm} q={q} matches={matches} dim={dim} delayRef={delayRef} chainIds={chainIds} isSubMgr />
             ))}
           </div>
         </>
@@ -202,10 +250,12 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
                   level="emp"
                   name={emp.name}
                   sub={emp.designation || emp.department}
+                  empid={emp.empid}
                   width={EMP_W}
                   delay={eDelay}
                   dim={dim(eKey)}
                   hl={matches.has(eKey)}
+                  chain={chainIds.has(eKey)}
                   q={q}
                 />
               );
@@ -250,6 +300,8 @@ function countNodes(managers) {
 }
 
 function OrgTree({ data, loading, q }) {
+  const chainIds = useMemo(() => buildChainIds(data), [data]);
+
   if (loading) return <SkeletonTree />;
   if (!data) return null;
 
@@ -275,13 +327,13 @@ function OrgTree({ data, loading, q }) {
   return (
     <div className="flex flex-col items-center min-w-max">
       <div>
-        <Card level="org" name={data.organisation_name || "Organisation"} sub={data.super_admin?.name} width={CARD_W} delay={0} dim={dim("org")} hl={matches.has("org")} q={q} />
+        <Card level="org" name={data.organisation_name || "Organisation"} sub={data.super_admin?.name} width={CARD_W} delay={0} dim={dim("org")} hl={matches.has("org")} chain={chainIds.has("org")} q={q} />
       </div>
       <VLine h={22} />
 
       {data.admin && (
         <>
-          <Card level="admin" name={data.admin.name} sub={data.admin.designation} width={CARD_W} delay={80} dim={dim("admin")} hl={matches.has("admin")} q={q} />
+          <Card level="admin" name={data.admin.name} sub={data.admin.designation} empid={data.admin.empid} width={CARD_W} delay={80} dim={dim("admin")} hl={matches.has("admin")} chain={chainIds.has("admin")} q={q} />
           <VLine h={22} />
         </>
       )}
@@ -301,7 +353,7 @@ function OrgTree({ data, loading, q }) {
 
       <div className="flex items-start gap-[28px]">
         {managers.map(mgr => (
-          <ManagerColumn key={mgr.id} mgr={mgr} q={q} matches={matches} dim={dim} delayRef={delayRef} />
+          <ManagerColumn key={mgr.id} mgr={mgr} q={q} matches={matches} dim={dim} delayRef={delayRef} chainIds={chainIds} />
         ))}
       </div>
     </div>
@@ -418,7 +470,6 @@ export default function OrganizationPageManager() {
           <span className="text-xs text-[#b89aad] font-medium truncate">{orgName}</span>
           <span className="text-[#dcc0d0] shrink-0">›</span>
           <span className="text-[13px] text-[#1a0d14] font-semibold font-['Syne',sans-serif] whitespace-nowrap">Org Chart</span>
-          <span className="text-[10px] py-0.5 px-2 rounded-[10px] bg-[#fce7f3] text-[#730042] font-semibold ml-0.5 whitespace-nowrap">Manager View</span>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -451,7 +502,7 @@ export default function OrganizationPageManager() {
         <div className="mb-4">
           <h1 className="text-[19px] font-bold text-[#1a0d14] m-0 tracking-[-0.3px] font-['Syne',sans-serif]">Organisation Chart</h1>
           <p className="text-xs text-[#b89aad] mt-1 mb-0">
-            {loading ? "Loading…" : `${orgName} · ${totalNodes} nodes · You are highlighted`}
+            {loading ? "Loading…" : `${orgName} · ${totalNodes} nodes · your reporting line is highlighted`}
           </p>
         </div>
 
@@ -482,12 +533,9 @@ export default function OrganizationPageManager() {
             </div>
             <div className="flex flex-wrap gap-x-3 gap-y-1.5">
               {[
-                { dot: "bg-[#1a0d14]", label: "Organisation" },
-                { dot: "bg-[#5a2240]", label: "Admin" },
-                { dot: "bg-[#a8005c]", label: "Manager" },
                 { dot: "bg-[#730042]", label: "You", ring: true },
-                { dot: "bg-[#be185d]", label: "Reporting Mgr" },
-                { dot: "bg-[#7c1f4a]", label: "Employee" },
+                { dot: "bg-[#a8005c]", label: "In your reporting line" },
+                { dot: "bg-gray-300",  label: "Others" },
               ].map(({ dot, label, ring }) => (
                 <div key={label} className="flex items-center gap-1.5 text-[11px] text-[#b89aad]">
                   <span className={`w-2 h-2 rounded-full shrink-0 ${dot} ${ring ? "shadow-[0_0_0_2px_rgba(115,0,66,0.2)]" : ""}`} />
