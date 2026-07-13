@@ -576,7 +576,9 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
           const admDelay  = 340 + ai * 60;
           const adminId   = idStr(admin._id);
 
-          const admManagers = managers.filter(() => true);
+          const admManagers = managers.filter(
+            (m) => idStr(m.reporting_manager) === adminId && m.reporting_manager_model === "Admin"
+          );
           const MAN_GAP = 18;
           const MAN_W   = 152;
           const manTotal = admManagers.length > 1 ? (admManagers.length - 1) * (MAN_W + MAN_GAP) : 0;
@@ -600,60 +602,25 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
               )}
 
               <div className="flex gap-4 justify-center items-start min-w-0">
-                {admManagers.map((mgr, mi) => {
-                  const mgrMatch  = hasQ && matchName(mgr.f_name, mgr.l_name, mgr.department, mgr.designation);
-                  const mgrDimmed = hasQ && !mgrMatch && !admMatch;
-                  const mgrDelay  = admDelay + 200 + mi * 55;
-
-                  const mgrEmps = employees.filter(e =>
-                    e.Under_manager?._id?.toString() === mgr._id?.toString() ||
-                    e.Under_manager?.toString()      === mgr._id?.toString()
-                  );
-                  const EMP_GAP = 12;
-                  const EMP_W   = 132;
-                  const empTotal = mgrEmps.length > 1 ? (mgrEmps.length - 1) * (EMP_W + EMP_GAP) : 0;
-
-                  return (
-                    <div key={mgr._id} className="flex flex-col items-center min-w-0">
-                      <VLine h={18} delay={mgrDelay - 55} />
-                      <ManagerNode
-                        manager={mgr}
-                        delay={mgrDelay}
-                        highlighted={mgrMatch}
-                        dimmed={mgrDimmed}
-                        onClick={() => onNodeClick(mgr, "manager")}
-                      />
-
-                      {mgrEmps.length > 0 && (
-                        <>
-                          <VLine h={20} delay={mgrDelay + 100} />
-                          {mgrEmps.length > 1 && <HLine w={empTotal} delay={mgrDelay + 140} />}
-                        </>
-                      )}
-
-                      <div className="flex gap-3 justify-center items-start min-w-0">
-                        {mgrEmps.map((emp, ei) => {
-                          const empMatch  = hasQ && matchName(emp.f_name, emp.l_name, emp.department, emp.designation);
-                          const empDimmed = hasQ && !empMatch && !mgrMatch && !admMatch;
-                          const empDelay  = mgrDelay + 180 + ei * 45;
-                          return (
-                            <div key={emp._id} className="flex flex-col items-center min-w-0">
-                              <VLine h={16} delay={empDelay - 45} />
-                              <EmployeeNode
-                                employee={emp}
-                                delay={empDelay}
-                                highlighted={empMatch}
-                                dimmed={empDimmed}
-                                onClick={() => onNodeClick(emp, "employee")}
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
+                {admManagers.map((mgr, mi) => (
+                  <ManagerBranch
+                    key={mgr._id}
+                    manager={mgr}
+                    allManagers={managers}
+                    employees={employees}
+                    depth={0}
+                    delayBase={admDelay + 200 + mi * 55}
+                    matchName={matchName}
+                    hasQ={hasQ}
+                    parentMatched={admMatch}
+                    onNodeClick={onNodeClick}
+                  />
+                ))}
               </div>
+
+              {admManagers.length === 0 && (
+                <p className="mt-3 text-[10px] sm:text-[11px] text-gray-300 italic">No managers under this admin</p>
+              )}
             </div>
           );
         })}
