@@ -96,15 +96,17 @@ function Hi({ text = "", q = "", style = {} }) {
   );
 }
 
+// Admin sits at the root of their whole org, so every node is on their own line —
+// the palette here stays a simple grayscale ramp by depth rather than per-role colour.
 const CFG = {
-  org:     { accent: "#0f172a", avBg: "#0f172a", avColor: "#f8fafc", badge: "Organisation", badgeBg: "#f1f5f9", badgeColor: "#475569", tag: "ORG" },
-  admin:   { accent: "#334155", avBg: "#e2e8f0", avColor: "#334155", badge: "Admin",         badgeBg: "#e2e8f0", badgeColor: "#334155", tag: "ADM" },
-  manager: { accent: "#475569", avBg: "#f1f5f9", avColor: "#475569", badge: "Manager",       badgeBg: "#f1f5f9", badgeColor: "#475569", tag: "MGR" },
-  subMgr:  { accent: "#64748b", avBg: "#f8fafc", avColor: "#64748b", badge: "Reporting Mgr", badgeBg: "#f8fafc", badgeColor: "#64748b", tag: "MGR" },
-  emp:     { accent: "#94a3b8", avBg: "#f8fafc", avColor: "#64748b", badge: "Employee",      badgeBg: "#f8fafc", badgeColor: "#64748b", tag: "EMP" },
+  org:     { accent: "#0f172a", avBg: "#0f172a", avColor: "#f8fafc" },
+  admin:   { accent: "#334155", avBg: "#e2e8f0", avColor: "#334155" },
+  manager: { accent: "#475569", avBg: "#f1f5f9", avColor: "#475569" },
+  subMgr:  { accent: "#64748b", avBg: "#f8fafc", avColor: "#64748b" },
+  emp:     { accent: "#94a3b8", avBg: "#f8fafc", avColor: "#64748b" },
 };
 
-function Card({ level, name, sub, width = 172, delay = 0, dim, hl, q, empCount }) {
+function Card({ level, name, sub, empid, width = 172, delay = 0, dim, hl, q, empCount }) {
   const c = CFG[level] || CFG.emp;
   return (
     <div style={{ animation: `scaleIn 0.26s ease ${delay}ms forwards`, opacity: 0, flexShrink: 0 }}>
@@ -113,16 +115,13 @@ function Card({ level, name, sub, width = 172, delay = 0, dim, hl, q, empCount }
         style={{ width, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 11, padding: "14px 12px 11px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", display: "flex", flexDirection: "column", alignItems: "center", position: "relative", overflow: "hidden" }}
       >
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: c.accent, borderRadius: "11px 11px 0 0" }} />
-        <span style={{ position: "absolute", top: 8, right: 9, fontSize: 8, fontWeight: 600, letterSpacing: "0.1em", color: "#94a3b8", fontFamily: "'DM Mono',monospace" }}>{c.tag}</span>
         <Avatar name={name} size={38} bg={c.avBg} color={c.avColor} />
         <div style={{ marginTop: 8, marginBottom: 6, textAlign: "center", width: "100%" }}>
           <Hi text={name} q={q} style={{ fontSize: 12, fontWeight: 600, color: "#0f172a", display: "block", lineHeight: 1.3, fontFamily: "'Syne',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />
           {sub && <Hi text={sub} q={q} style={{ fontSize: 10, color: "#64748b", display: "block", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />}
+          {empid && <span style={{ fontSize: 9, color: "#94a3b8", display: "block", marginTop: 2, fontFamily: "'DM Mono',monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{empid}</span>}
           {empCount !== undefined && <span style={{ fontSize: 10, color: "#94a3b8", display: "block", marginTop: 2 }}>{empCount} report{empCount !== 1 ? "s" : ""}</span>}
         </div>
-        <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 20, background: c.badgeBg, color: c.badgeColor, fontWeight: 600, letterSpacing: "0.04em", fontFamily: "'DM Mono',monospace" }}>
-          {c.badge}
-        </span>
       </div>
     </div>
   );
@@ -199,6 +198,7 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
         level={level}
         name={mgr.name}
         sub={mgr.designation || mgr.department}
+        empid={mgr.empid}
         width={CARD_W}
         delay={mDelay}
         dim={dim(key)}
@@ -247,6 +247,7 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
                   level="emp"
                   name={emp.name}
                   sub={emp.designation || emp.department}
+                  empid={emp.empid}
                   width={EMP_W}
                   delay={eDelay}
                   dim={dim(eKey)}
@@ -323,7 +324,7 @@ function OrgTree({ data, loading, q }) {
 
       {data.admin && (
         <>
-          <Card level="admin" name={data.admin.name} sub={data.admin.designation || data.admin.department} width={CARD_W} delay={80} dim={dim("admin")} hl={matches.has("admin")} q={q} />
+          <Card level="admin" name={data.admin.name} sub={data.admin.designation || data.admin.department} empid={data.admin.empid} width={CARD_W} delay={80} dim={dim("admin")} hl={matches.has("admin")} q={q} />
           <VLine h={22} />
         </>
       )}
@@ -466,7 +467,6 @@ export default function OrganizationPageAdmin() {
           <span className="text-[11px] sm:text-xs text-slate-400 font-medium truncate">{orgName}</span>
           <span className="text-slate-200 flex-shrink-0">›</span>
           <span className="text-[12px] sm:text-[13px] text-slate-900 font-semibold flex-shrink-0" style={{ fontFamily: "'Syne',sans-serif" }}>Org Chart</span>
-          <span className="hidden xs:inline-block text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold ml-0.5 flex-shrink-0">Admin View</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -523,20 +523,6 @@ export default function OrganizationPageAdmin() {
               {searchQuery && matchCount > 0 && (
                 <span className="text-[10px] px-1.5 sm:px-[7px] py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold flex-shrink-0">{matchCount} highlighted</span>
               )}
-            </div>
-            <div className="flex gap-2 sm:gap-3 flex-wrap">
-              {[
-                { dot: "#0f172a", label: "Organisation" },
-                { dot: "#334155", label: "Admin" },
-                { dot: "#475569", label: "Manager" },
-                { dot: "#64748b", label: "Reporting Mgr" },
-                { dot: "#94a3b8", label: "Employee" },
-              ].map(({ dot, label }) => (
-                <div key={label} className="flex items-center gap-1 sm:gap-[5px] text-[10px] sm:text-[11px] text-slate-400">
-                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: dot }} />
-                  {label}
-                </div>
-              ))}
             </div>
           </div>
 

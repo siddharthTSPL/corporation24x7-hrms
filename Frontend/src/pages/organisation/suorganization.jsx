@@ -23,13 +23,13 @@ const STYLES = `
   @keyframes drawV     { from { transform:scaleY(0); } to { transform:scaleY(1); } }
   @keyframes slideR    { from { opacity:0; transform:translateX(28px); } to { opacity:1; transform:translateX(0); } }
   @keyframes ringPulse {
-    0%,100% { box-shadow: 0 0 0 0 rgba(115,0,66,0.25), 0 4px 20px rgba(115,0,66,0.1); }
-    50%      { box-shadow: 0 0 0 7px rgba(115,0,66,0.06), 0 8px 28px rgba(115,0,66,0.18); }
+    0%,100% { box-shadow: 0 0 0 0 rgba(15,23,42,0.2), 0 4px 20px rgba(15,23,42,0.08); }
+    50%      { box-shadow: 0 0 0 7px rgba(15,23,42,0.05), 0 8px 28px rgba(15,23,42,0.15); }
   }
 
   .su-card-hover { transition: transform 0.16s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.16s ease, border-color 0.14s ease; cursor: pointer; touch-action: manipulation; }
   .su-card-hover:hover { transform: translateY(-4px) scale(1.015); }
-  .su-card-highlight { outline: 2px solid #730042 !important; outline-offset: 3px; box-shadow: 0 0 0 6px rgba(115,0,66,0.1) !important; }
+  .su-card-highlight { outline: 2px solid #0f172a !important; outline-offset: 3px; box-shadow: 0 0 0 6px rgba(15,23,42,0.08) !important; }
   .su-card-dim { opacity: 0.15; filter: grayscale(0.5) blur(0.3px); transition: opacity 0.22s, filter 0.22s; }
   .su-card-sa  { animation: ringPulse 3s ease-in-out infinite !important; }
 
@@ -43,6 +43,11 @@ const BRAND       = "#730042";
 const BRAND_LIGHT = "rgba(115,0,66,0.07)";
 const REFRESH_MS  = 1000 * 60 * 2;
 const HTML_TO_IMAGE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js";
+
+// SuperAdmin sits at the root of the whole org — everyone reports up to them —
+// so the tree itself uses a single neutral grayscale ramp by depth instead of
+// per-role brand colours. Page chrome (header/buttons) keeps the brand colour.
+const NODE_COLOR = { sa: "#0f172a", admin: "#334155", manager: "#475569", employee: "#64748b" };
 
 const fmtDate = (iso) => {
   if (!iso) return "—";
@@ -149,9 +154,8 @@ function SuperAdminNode({ name, role, initials, delay = 0, onClick }) {
         className="su-card-hover su-card-sa w-[180px] sm:w-[210px] bg-white border-[1.5px] border-[#e8edf5] rounded-2xl p-3.5 sm:p-5 flex flex-col items-center relative overflow-hidden shadow-sm"
         onClick={onClick}
       >
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#730042] to-[#a8005a] rounded-t-2xl" />
-        <span className="absolute top-3 right-3 text-[9px] font-bold tracking-widest text-gray-400 uppercase" style={{ fontFamily: "'JetBrains Mono',monospace" }}>SA</span>
-        <Avatar initials={initials} size={48} bg={BRAND} fontSize={17} />
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#0f172a] to-[#334155] rounded-t-2xl" />
+        <Avatar initials={initials} size={48} bg={NODE_COLOR.sa} fontSize={17} />
         <p className="text-sm sm:text-base font-bold text-slate-900 mt-3 text-center break-words">{name}</p>
         <p className="text-[11px] sm:text-xs text-gray-500 mt-1 text-center break-words">{role}</p>
       </div>
@@ -167,9 +171,8 @@ function AdminNode({ admin, delay = 0, dimmed, highlighted, onClick }) {
         className={`su-card-hover w-[150px] sm:w-[174px] bg-white border-[1.5px] border-[#e8edf5] rounded-xl p-3 sm:p-4 flex flex-col items-center relative overflow-hidden shadow-sm ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
         onClick={onClick}
       >
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-indigo-400 rounded-t-xl" />
-        <span className="absolute top-2.5 right-3 text-[9px] font-bold text-indigo-300 uppercase" style={{ fontFamily: "'JetBrains Mono',monospace" }}>ADM</span>
-        <Avatar initials={getInitials(admin.f_name, admin.l_name)} size={40} bg="#6366f1" fontSize={13} />
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-slate-500 to-slate-400 rounded-t-xl" />
+        <Avatar initials={getInitials(admin.f_name, admin.l_name)} size={40} bg={NODE_COLOR.admin} fontSize={13} />
         <p className="text-xs sm:text-[13px] font-semibold text-slate-900 mt-2.5 text-center max-w-[120px] sm:max-w-[140px] truncate w-full">{name}</p>
         <p className="text-[10px] sm:text-[11px] text-gray-400 mt-1 text-center max-w-[120px] sm:max-w-[140px] truncate w-full">{admin.designation || "—"}</p>
         <p className="text-[9.5px] sm:text-[10px] text-gray-400 mt-0.5 text-center max-w-[120px] sm:max-w-[140px] truncate w-full" style={{ fontFamily: "'JetBrains Mono',monospace" }}>{admin.empid || "—"}</p>
@@ -186,8 +189,8 @@ function ManagerNode({ manager, delay = 0, dimmed, highlighted, onClick }) {
         className={`su-card-hover w-[132px] sm:w-[152px] bg-[#f9fbfe] border-[1.5px] border-[#e4edf6] rounded-lg p-2.5 sm:p-3 flex flex-col items-center relative overflow-hidden shadow-sm ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
         onClick={onClick}
       >
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-500 to-sky-400 rounded-t-lg" />
-        <Avatar initials={getInitials(manager.f_name, manager.l_name)} size={34} bg="#0ea5e9" fontSize={12} />
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-slate-400 to-slate-300 rounded-t-lg" />
+        <Avatar initials={getInitials(manager.f_name, manager.l_name)} size={34} bg={NODE_COLOR.manager} fontSize={12} />
         <p className="text-[11px] sm:text-xs font-semibold text-slate-800 mt-2 text-center max-w-[104px] sm:max-w-[120px] truncate w-full">{name}</p>
         <p className="text-[9.5px] sm:text-[10.5px] text-slate-400 mt-0.5 text-center max-w-[104px] sm:max-w-[120px] truncate w-full">{manager.department || manager.designation || "—"}</p>
         <p className="text-[9px] sm:text-[9.5px] text-slate-400 mt-0.5 text-center max-w-[104px] sm:max-w-[120px] truncate w-full" style={{ fontFamily: "'JetBrains Mono',monospace" }}>{manager.empid || "—"}</p>
@@ -204,7 +207,7 @@ function EmployeeNode({ employee, delay = 0, dimmed, highlighted, onClick }) {
         className={`su-card-hover w-[114px] sm:w-[132px] bg-[#fafbfc] border-[1.5px] border-[#e8edf5] rounded-lg p-2 sm:p-2.5 flex flex-col items-center relative ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
         onClick={onClick}
       >
-        <Avatar initials={getInitials(employee.f_name, employee.l_name)} size={28} bg="#e2e8f0" fontSize={9} />
+        <Avatar initials={getInitials(employee.f_name, employee.l_name)} size={28} bg={NODE_COLOR.employee} fontSize={9} />
         <p className="text-[10px] sm:text-[11px] font-semibold text-slate-800 mt-1.5 text-center max-w-[88px] sm:max-w-[100px] truncate w-full">{name}</p>
         <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 text-center max-w-[88px] sm:max-w-[100px] truncate w-full">{employee.department || employee.designation || "—"}</p>
         <p className="text-[8.5px] sm:text-[9.5px] text-slate-400 mt-0.5 text-center max-w-[88px] sm:max-w-[100px] truncate w-full" style={{ fontFamily: "'JetBrains Mono',monospace" }}>{employee.empid || "—"}</p>
@@ -247,7 +250,7 @@ function EmployeeDetailPanel({ person, type, onClose }) {
 
   const name = fullName(person);
 
-  const accentColor = isSA ? BRAND : isAdmin ? "#6366f1" : isManager ? "#0ea5e9" : "#64748b";
+  const accentColor = isSA ? NODE_COLOR.sa : isAdmin ? NODE_COLOR.admin : isManager ? NODE_COLOR.manager : NODE_COLOR.employee;
   const roleLabel   = isSA ? "Super Admin" : isAdmin ? "Admin" : isManager ? "Manager" : "Employee";
 
   const fields = useMemo(() => {
@@ -764,10 +767,10 @@ export default function SuperAdminOrgChart() {
   }
 
   const statItems = [
-    { label: "Admins",    value: admins.length,    color: "#6366f1" },
-    { label: "Managers",  value: managers.length,  color: "#0ea5e9" },
-    { label: "Employees", value: employees.length, color: "#10b981" },
-    { label: "Total",     value: totalNodes,       color: BRAND     },
+    { label: "Admins",    value: admins.length,    color: "#334155" },
+    { label: "Managers",  value: managers.length,  color: "#475569" },
+    { label: "Employees", value: employees.length, color: "#64748b" },
+    { label: "Total",     value: totalNodes,       color: "#0f172a" },
   ];
 
   return (
@@ -912,10 +915,10 @@ export default function SuperAdminOrgChart() {
         {!loading && (
           <div className="flex gap-2.5 sm:gap-4 lg:gap-6 mt-4 lg:mt-6 justify-center flex-wrap min-w-0 max-w-full">
             {[
-              { dot: BRAND,     label: "Super Admin", glow: true },
-              { dot: "#6366f1", label: "Admin"   },
-              { dot: "#0ea5e9", label: "Manager" },
-              { dot: "#cbd5e1", label: "Employee", border: "#b0b8c8" },
+              { dot: NODE_COLOR.sa,       label: "Super Admin", glow: true },
+              { dot: NODE_COLOR.admin,    label: "Admin"   },
+              { dot: NODE_COLOR.manager,  label: "Manager" },
+              { dot: NODE_COLOR.employee, label: "Employee", border: "#b0b8c8" },
             ].map(({ dot, label, border, glow }) => (
               <div key={label} className="flex items-center gap-1.5 text-[11px] sm:text-xs text-gray-400 shrink-0">
                 <span
