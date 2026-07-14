@@ -26,13 +26,17 @@ import { useGetAllAnnouncements, useCreateAnnouncement, useUpdateAnnouncement, u
 import { useGetAllAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin, useReviewToAdmin } from "../../auth/server-state/superadmin/other/suother.hook";
 
 const DEPT_OPTIONS = [ "OPR","BPO", "ENG", "HR", "MGMT"];
-const DEPT_FULL_FORMS = {
-  OPR: "OPR — Operations",
-  BPO: "BPO — Business Process Outsourcing",
-  ENG: "ENG — Engineering",
-  HR: "HR — Human Resources",
-  MGMT: "MGMT — Management",
+export const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+  
 };
+
+export const getDepartmentName = (dept) =>
+  DEPT_FULL_FORMS[dept] || dept || "—";
 const ROLE_LABEL = { admin: "Admin",  official: "Official" };
 
 const WORKING_STATUS_OPTIONS = [
@@ -506,7 +510,7 @@ function WorkingStatusModal({ open, onClose, admin, onConfirm, loading }) {
                 </div>
                 <div className="min-w-0">
                   <p className="text-[13px] font-bold text-[#0d0209] truncate">{name}</p>
-                  <p className="text-[11px] text-[#7a5568] truncate">{admin.designation} · {admin.department}</p>
+                  <p className="text-[11px] text-[#7a5568] truncate">{admin.designation} · {getDepartmentName(admin.department)}</p>
                   <span className="inline-flex items-center mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ color: meta.color, background: meta.bg, border: `1px solid ${meta.border}` }}>
                     → {meta.label}
                   </span>
@@ -1339,7 +1343,7 @@ function ReviewModal({ open, onClose, admins, onSave, loading }) {
             <FSel value={form.adminid} onChange={(e) => setForm((f) => ({ ...f, adminid: e.target.value }))}>
               <option value="">Choose admin…</option>
               {admins.map((a) => (
-                <option key={a._id} value={a._id}>{a.f_name} {a.l_name} – {a.designation} ({a.department})</option>
+                <option key={a._id} value={a._id}>{a.f_name} {a.l_name} – {a.designation} ({getDepartmentName(a.department)})</option>
               ))}
             </FSel>
           </div>
@@ -1925,7 +1929,7 @@ function SuperAdminDashboard() {
                   {admin.department && (
                     <p className="text-center mt-1 sm:mt-1.5 hidden sm:block">
                       <span className="text-[9px] sm:text-[10px] bg-gray-50 text-gray-500 border border-gray-200 px-2 py-0.5 rounded-full font-semibold">
-                        {admin.department} · {admin.office_location}
+                        {getDepartmentName(admin.department)} · {admin.office_location}
                       </span>
                     </p>
                   )}
@@ -1989,7 +1993,7 @@ function SuperAdminDashboard() {
             <div>
               {departments.map((dep) => (
                 <div key={dep.department} className="px-4 sm:px-5 py-2.5 sm:py-3 border-b border-[#f7ecf3] last:border-0 flex items-center gap-3 sm:gap-4">
-                  <p className="text-[11px] sm:text-[12px] font-semibold text-[#0d0209] w-12 sm:w-16 flex-shrink-0">{dep.department}</p>
+                  <p className="text-[11px] sm:text-[12px] font-semibold text-[#0d0209] w-24 sm:w-32 flex-shrink-0 truncate" title={getDepartmentName(dep.department)}>{getDepartmentName(dep.department)}</p>
                   <div className="flex-1 h-2 bg-[#e8d5e2] rounded-full overflow-hidden">
                     <div className="h-full rounded-full bg-gradient-to-r from-[#4a0029] to-[#cd166e] transition-all duration-1000" style={{ width: `${Math.round((dep.lastNumber / maxDept) * 100)}%` }} />
                   </div>
@@ -2101,7 +2105,7 @@ function SuperAdminDashboard() {
                     <p className="text-[11px] sm:text-[12px] font-semibold text-[#0d0209] truncate leading-tight">{name}</p>
                     {isManager && <span className="text-[9px] bg-[#f7ecf3] text-[#730042] px-1.5 py-0.5 rounded-full font-bold uppercase">MGR</span>}
                     {role && <p className="text-[10px] sm:text-[11px] text-[#7a5568] truncate mt-0.5">{role}</p>}
-                    {dept && <span className="text-[9px] sm:text-[10px] bg-[#f7ecf3] text-[#730042] px-1.5 py-0.5 rounded-full font-semibold inline-block mt-0.5 sm:mt-1">{dept}</span>}
+                    {dept && <span className="text-[9px] sm:text-[10px] bg-[#f7ecf3] text-[#730042] px-1.5 py-0.5 rounded-full font-semibold inline-block mt-0.5 sm:mt-1">{getDepartmentName(dept)}</span>}
                   </div>
                 </div>
               );
