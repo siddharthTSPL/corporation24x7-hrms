@@ -854,7 +854,6 @@ const promoteEmployeeToManager = async (req, res, next) => {
     const newUid = await generateUID(user.department, organisation_id);
 
     const [newManager] = await Managermodel.create([{
-      empid: user.empid,
       organisation_id,
       uid: newUid,
       profile_image: user.profile_image || null,
@@ -1014,7 +1013,6 @@ const promoteManagerToAdmin = async (req, res, next) => {
     const newUid = await generateUID(manager.department, organisation_id);
 
     const [newAdmin] = await Adminmodel.create([{
-      empid: manager.empid,
       organisation_id,
       uid: newUid,
       profile_image: manager.profile_image || null,
@@ -1193,7 +1191,6 @@ const promoteEmployeeToAdmin = async (req, res, next) => {
     const newUid = await generateUID(user.department, organisation_id);
 
     const [newAdmin] = await Adminmodel.create([{
-      empid: user.empid,
       organisation_id,
       uid: newUid,
       profile_image: user.profile_image || null,
@@ -1348,7 +1345,6 @@ const demoteManagerToEmployee = async (req, res, next) => {
     const newUid = await generateUID(manager.department, organisation_id);
 
     const [newEmployee] = await Usermodel.create([{
-      empid: manager.empid,
       organisation_id,
       uid: newUid,
       profile_image: manager.profile_image || null,
@@ -1504,7 +1500,6 @@ const demoteAdminToManager = async (req, res, next) => {
     const newUid = await generateUID(adminToDemote.department, organisation_id);
 
     const [newManager] = await Managermodel.create([{
-      empid: adminToDemote.empid,
       organisation_id,
       uid: newUid,
       profile_image: adminToDemote.profile_image || null,
@@ -1654,7 +1649,6 @@ const demoteAdminToEmployee = async (req, res, next) => {
     const newUid = await generateUID(adminToDemote.department, organisation_id);
 
     const [newEmployee] = await Usermodel.create([{
-      empid: adminToDemote.empid,
       organisation_id,
       uid: newUid,
       profile_image: adminToDemote.profile_image || null,
@@ -2717,7 +2711,7 @@ const getOrgInfo = async (req, res, next) => {
  
     const admin = await Adminmodel.findById(req.admin._id)
       .select(
-        "f_name l_name empid work_email designation department office_location organisation_id"
+        "f_name l_name work_email designation department office_location organisation_id"
       )
       .lean();
  
@@ -2732,7 +2726,7 @@ const getOrgInfo = async (req, res, next) => {
  
     const managers = await Managermodel.find({ organisation_id })
       .select(
-        "f_name l_name empid work_email designation department office_location reporting_manager reporting_manager_model"
+        "f_name l_name work_email designation department office_location reporting_manager reporting_manager_model"
       )
       .lean();
  
@@ -2742,21 +2736,19 @@ const getOrgInfo = async (req, res, next) => {
         Under_manager: { $in: managers.map((m) => m._id) },
       })
       .select(
-        "f_name l_name empid work_email designation department office_location Under_manager"
+        "f_name l_name work_email designation department office_location Under_manager"
       )
       .lean();
  
     const topLevelManagers = managers
       .filter(
         (mgr) =>
-          mgr.reporting_manager &&
-          mgr.reporting_manager.toString() === admin._id.toString() &&
+          !mgr.reporting_manager ||
           mgr.reporting_manager_model === "Admin"
       )
       .map((mgr) => ({
         id: mgr._id,
         name: `${mgr.f_name} ${mgr.l_name}`,
-        empid: mgr.empid,
         email: mgr.work_email,
         designation: mgr.designation,
         department: mgr.department,
@@ -2766,7 +2758,6 @@ const getOrgInfo = async (req, res, next) => {
           .map((emp) => ({
             id: emp._id,
             name: `${emp.f_name} ${emp.l_name}`,
-            empid: emp.empid,
             email: emp.work_email,
             designation: emp.designation,
             department: emp.department,
@@ -2789,7 +2780,6 @@ const getOrgInfo = async (req, res, next) => {
       admin: {
         id: admin._id,
         name: `${admin.f_name} ${admin.l_name}`,
-        empid: admin.empid,
         email: admin.work_email,
         designation: admin.designation,
         department: admin.department,
@@ -2812,7 +2802,6 @@ const buildManagerTree = (managers, parentId, parentModel, employees) => {
     .map((mgr) => ({
       id: mgr._id,
       name: `${mgr.f_name} ${mgr.l_name}`,
-      empid: mgr.empid,
       email: mgr.work_email,
       designation: mgr.designation,
       department: mgr.department,
@@ -2823,7 +2812,6 @@ const buildManagerTree = (managers, parentId, parentModel, employees) => {
         .map((emp) => ({
           id: emp._id,
           name: `${emp.f_name} ${emp.l_name}`,
-          empid: emp.empid,
           email: emp.work_email,
           designation: emp.designation,
           department: emp.department,
@@ -3242,11 +3230,11 @@ const setEmployeeWorkingStatus = async (req, res, next) => {
     if (wasWorking && !willBeWorking) {
       const pendingAssets = await AssetModel.find({
         organisation_id,
-        assigned_to: id,
-        assigned_to_model: "User",
-        status: "assigned",
+        assignments: {
+          $elemMatch: { assigned_to: id, assigned_to_model: "User", is_returned: false },
+        },
       })
-        .select("_id asset_id asset_name asset_type serial_number brand assigned_date")
+        .select("_id asset_id asset_name asset_type serial_number brand assignments")
         .lean();
 
       if (pendingAssets.length > 0) {
@@ -3334,11 +3322,11 @@ const setManagerWorkingStatus = async (req, res, next) => {
     if (wasWorking && !willBeWorking) {
       const pendingAssets = await AssetModel.find({
         organisation_id,
-        assigned_to: id,
-        assigned_to_model: "Manager",
-        status: "assigned",
+        assignments: {
+          $elemMatch: { assigned_to: id, assigned_to_model: "Manager", is_returned: false },
+        },
       })
-        .select("_id asset_id asset_name asset_type serial_number brand assigned_date")
+        .select("_id asset_id asset_name asset_type serial_number brand assignments")
         .lean();
 
       if (pendingAssets.length > 0) {
