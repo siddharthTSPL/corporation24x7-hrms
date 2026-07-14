@@ -73,7 +73,7 @@ export const useDeleteAssetAdmin = () => {
 export const useAssignAssetToEmployee = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, employee_id }) => assignAssetToEmployee(id, employee_id),
+    mutationFn: ({ id, employee_id, quantity }) => assignAssetToEmployee(id, employee_id, quantity),
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ["admin-assets"] });
       queryClient.invalidateQueries({ queryKey: ["admin-asset", id] });
@@ -84,7 +84,7 @@ export const useAssignAssetToEmployee = () => {
 export const useAssignAssetToManager = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, manager_id }) => assignAssetToManager(id, manager_id),
+    mutationFn: ({ id, manager_id, quantity }) => assignAssetToManager(id, manager_id, quantity),
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ["admin-assets"] });
       queryClient.invalidateQueries({ queryKey: ["admin-asset", id] });
