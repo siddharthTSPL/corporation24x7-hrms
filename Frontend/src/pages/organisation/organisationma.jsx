@@ -362,14 +362,14 @@ function OrgTree({ data, loading, q }) {
 
 function StatCard({ label, text, icon: Icon, barBg, iconBg, iconColor, delay = 0 }) {
   return (
-    <div className="bg-white border border-[#eedde8] rounded-[11px] p-4 flex items-center gap-[13px] shadow-[0_1px_4px_rgba(115,0,66,0.04)] relative overflow-hidden transition-transform duration-[140ms] hover:-translate-y-0.5">
+    <div className="bg-white border border-[#eedde8] rounded-[11px] p-3.5 sm:p-4 flex items-center gap-[11px] sm:gap-[13px] shadow-[0_1px_4px_rgba(115,0,66,0.04)] relative overflow-hidden transition-transform duration-[140ms] hover:-translate-y-0.5 min-w-0">
       <div className={`absolute top-0 left-0 right-0 h-[2px] ${barBg}`} />
-      <div className={`w-9 h-9 rounded-lg shrink-0 flex items-center justify-center ${iconBg}`}>
-        <Icon size={15} className={iconColor} />
+      <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg shrink-0 flex items-center justify-center ${iconBg}`}>
+        <Icon size={14} className={iconColor} />
       </div>
       <div className="min-w-0">
-        <p className="text-[13px] font-semibold text-[#1a0d14] leading-[1.2] m-0 truncate font-['Syne',sans-serif]">{text || "—"}</p>
-        <p className="text-[11px] text-[#b89aad] font-medium mt-[3px] mb-0">{label}</p>
+        <p className="text-[12px] sm:text-[13px] font-semibold text-[#1a0d14] leading-[1.2] m-0 truncate font-['Syne',sans-serif]">{text || "—"}</p>
+        <p className="text-[10px] sm:text-[11px] text-[#b89aad] font-medium mt-[3px] mb-0 truncate">{label}</p>
       </div>
     </div>
   );
@@ -465,7 +465,7 @@ export default function OrganizationPageManager() {
     <div className="min-h-screen bg-[#faf5f8] font-['DM_Sans',sans-serif] overflow-x-hidden">
       <FontLoader />
 
-      <div className="bg-white border-b border-[#eedde8] px-4 sm:px-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 py-3 sm:py-0 sm:h-[54px]">
+      <div className="bg-white border-b border-[#eedde8] px-3 sm:px-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 py-3 sm:py-0 sm:h-[54px]">
         <div className="flex items-center gap-2 shrink-0 min-w-0">
           <span className="text-xs text-[#b89aad] font-medium truncate">{orgName}</span>
           <span className="text-[#dcc0d0] shrink-0">›</span>
@@ -483,7 +483,7 @@ export default function OrganizationPageManager() {
                 </div>
                 <button className="flex items-center gap-1.5 py-1.5 px-3.5 rounded-lg border border-[#e8dde5] bg-white text-[#4a3542] text-[13px] font-medium cursor-pointer font-['DM_Sans',sans-serif] transition-colors duration-[130ms] whitespace-nowrap hover:bg-[#fdf6fa] hover:border-[#c9afc0] hover:text-[#730042] shrink-0" onClick={closeSearch}><X size={13} /> Close</button>
               </div>
-              {searchQuery && <div className="flex items-center gap-1.5 py-1 px-2.5 rounded-full bg-[#fdf0f7] text-[#730042] text-[11px] font-semibold">{matchCount} match{matchCount !== 1 ? "es" : ""}</div>}
+              {searchQuery && <div className="flex items-center gap-1.5 py-1 px-2.5 rounded-full bg-[#fdf0f7] text-[#730042] text-[11px] font-semibold w-fit">{matchCount} match{matchCount !== 1 ? "es" : ""}</div>}
             </div>
           ) : (
             <>
@@ -498,7 +498,7 @@ export default function OrganizationPageManager() {
         </div>
       </div>
 
-      <div className="max-w-[1600px] mx-auto py-5 px-4 sm:px-6 pb-12">
+      <div className="max-w-[1600px] mx-auto py-5 px-3 sm:px-6 pb-12">
         <div className="mb-4">
           <h1 className="text-[19px] font-bold text-[#1a0d14] m-0 tracking-[-0.3px] font-['Syne',sans-serif]">Organisation Chart</h1>
           <p className="text-xs text-[#b89aad] mt-1 mb-0">
@@ -506,7 +506,7 @@ export default function OrganizationPageManager() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mb-5">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-2.5 mb-5">
           <StatCard label="Organisation"  text={orgName}                        icon={Building2} barBg="bg-[#1a0d14]" iconBg="bg-[#1a0d14]/10" iconColor="text-[#1a0d14]" delay={60}  />
           <StatCard label="Your name"     text={myInfo?.name}                   icon={User}      barBg="bg-[#730042]" iconBg="bg-[#730042]/10" iconColor="text-[#730042]" delay={95}  />
           <StatCard label="Department"    text={myInfo?.department}             icon={Users}     barBg="bg-[#CD166E]" iconBg="bg-[#CD166E]/10" iconColor="text-[#CD166E]" delay={130} />
@@ -515,20 +515,20 @@ export default function OrganizationPageManager() {
 
         {searchOpen && searchQuery && matchCount === 0 && (
           <div className="mb-3.5 px-3.5 py-2.5 rounded-lg bg-[#fef9c3] border border-[#fde68a] text-xs text-[#92400e] flex items-center gap-2 break-words min-w-0">
-            <Search size={13} className="shrink-0" />No results for <strong className="ml-0.5">"{searchQuery}"</strong>
+            <Search size={13} className="shrink-0" />No results for <strong className="ml-0.5 break-all">"{searchQuery}"</strong>
           </div>
         )}
 
         <div className="bg-white border border-[#eedde8] rounded-[14px] shadow-[0_2px_10px_rgba(115,0,66,0.05)] overflow-hidden">
-          <div className="px-4 py-2.5 sm:px-4 sm:py-[11px] border-b border-[#f5edf2] flex flex-col sm:flex-row sm:items-center sm:justify-between bg-[#fdf8fb] gap-2">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <Crown size={13} className="text-[#b89aad]" />
-              <span className="text-xs font-semibold text-[#4a3542] font-['Syne',sans-serif]">Full hierarchy</span>
-              <span className="text-[10px] py-0.5 px-[7px] rounded-full bg-[#f5edf2] text-[#b89aad] font-semibold font-['DM_Mono',monospace]">
+          <div className="px-3 py-2.5 sm:px-4 sm:py-[11px] border-b border-[#f5edf2] flex flex-col sm:flex-row sm:items-center sm:justify-between bg-[#fdf8fb] gap-2">
+            <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+              <Crown size={13} className="text-[#b89aad] shrink-0" />
+              <span className="text-xs font-semibold text-[#4a3542] font-['Syne',sans-serif] whitespace-nowrap">Full hierarchy</span>
+              <span className="text-[10px] py-0.5 px-[7px] rounded-full bg-[#f5edf2] text-[#b89aad] font-semibold font-['DM_Mono',monospace] whitespace-nowrap">
                 {loading ? "—" : `${totalNodes} nodes`}
               </span>
               {searchQuery && matchCount > 0 && (
-                <span className="text-[10px] py-0.5 px-[7px] rounded-full bg-[#fce7f3] text-[#730042] font-semibold">{matchCount} highlighted</span>
+                <span className="text-[10px] py-0.5 px-[7px] rounded-full bg-[#fce7f3] text-[#730042] font-semibold whitespace-nowrap">{matchCount} highlighted</span>
               )}
             </div>
             <div className="flex flex-wrap gap-x-3 gap-y-1.5">
@@ -545,7 +545,11 @@ export default function OrganizationPageManager() {
             </div>
           </div>
 
-          <div ref={chartRef} className="overflow-x-auto py-6 px-4 sm:p-9 bg-white">
+          {/* The chart itself is always wider than a phone screen once an org
+              has more than 2-3 people, so this box scrolls horizontally on its
+              own. The page around it never does (root has overflow-x-hidden),
+              so nothing ever spills outside the layout. */}
+          <div ref={chartRef} className="overflow-x-auto overscroll-x-contain py-6 px-3 sm:p-9 bg-white max-w-full">
             <OrgTree data={data} loading={loading} q={norm(searchQuery)} />
           </div>
         </div>
