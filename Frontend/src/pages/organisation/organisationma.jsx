@@ -545,10 +545,7 @@ export default function OrganizationPageManager() {
             </div>
           </div>
 
-          {/* The chart itself is always wider than a phone screen once an org
-              has more than 2-3 people, so this box scrolls horizontally on its
-              own. The page around it never does (root has overflow-x-hidden),
-              so nothing ever spills outside the layout. */}
+         
           <div ref={chartRef} className="overflow-x-auto overscroll-x-contain py-6 px-3 sm:p-9 bg-white max-w-full">
             <OrgTree data={data} loading={loading} q={norm(searchQuery)} />
           </div>
