@@ -38,6 +38,7 @@ export const useAdminApplyLeave = () => {
     mutationFn: applyleave,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["AllLeaves"] });
+      queryClient.invalidateQueries({ queryKey: ["leaveHistory"] });
     },
   });
 };

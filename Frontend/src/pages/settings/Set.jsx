@@ -107,14 +107,13 @@ function Toast({ message, type, onClose }) {
   if (!message) return null;
   const ok = type === "success";
   return (
-    <div style={{
-      position: "fixed", top: 16, right: 16, zIndex: 999,
+    <div className="fixed top-3 right-3 sm:top-4 sm:right-4 z-[999] flex items-center gap-2.5 rounded-xl shadow-lg" style={{
       background: ok ? "#f0faf5" : "#fff5f5",
       border: `1px solid ${ok ? "#a8dfc3" : "#f5c6c6"}`,
-      borderRadius: 12, padding: "12px 16px",
-      display: "flex", alignItems: "center", gap: 10,
-      boxShadow: "0 4px 24px rgba(0,0,0,0.1)",
-      minWidth: 240, maxWidth: "calc(100vw - 32px)",
+      padding: "12px 16px",
+      minWidth: 0,
+      maxWidth: "calc(100vw - 24px)",
+      width: "min(360px, calc(100vw - 24px))",
       animation: "slideIn 0.25s ease",
     }}>
       <div style={{
@@ -127,25 +126,25 @@ function Toast({ message, type, onClose }) {
           : <svg width="13" height="13" viewBox="0 0 14 14"><line x1="3" y1="3" x2="11" y2="11" stroke={C.red} strokeWidth="2" strokeLinecap="round"/><line x1="11" y1="3" x2="3" y2="11" stroke={C.red} strokeWidth="2" strokeLinecap="round"/></svg>
         }
       </div>
-      <span style={{ fontSize: 13, fontWeight: 500, color: ok ? "#1a5c3a" : "#7a1a1a", flex: 1 }}>{message}</span>
-      <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: 18, lineHeight: 1, padding: 0 }}>×</button>
+      <span className="flex-1 min-w-0 break-words" style={{ fontSize: 13, fontWeight: 500, color: ok ? "#1a5c3a" : "#7a1a1a" }}>{message}</span>
+      <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: 18, lineHeight: 1, padding: 0, flexShrink: 0 }}>×</button>
     </div>
   );
 }
 
 function SectionCard({ title, subtitle, accent = C.brand, children }) {
   return (
-    <div style={{
+    <div className="min-w-0" style={{
       background: C.surface, borderRadius: 14,
       border: `1px solid ${C.border}`, overflow: "hidden",
       position: "relative", marginBottom: 16,
     }}>
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: accent }} />
-      <div style={{ padding: "18px 20px 14px", borderBottom: `1px solid ${C.border}` }}>
+      <div className="px-4 sm:px-5" style={{ paddingTop: 18, paddingBottom: 14, borderBottom: `1px solid ${C.border}` }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{title}</div>
         {subtitle && <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{subtitle}</div>}
       </div>
-      <div style={{ padding: "18px 20px" }}>{children}</div>
+      <div className="px-4 sm:px-5" style={{ paddingTop: 18, paddingBottom: 18 }}>{children}</div>
     </div>
   );
 }
@@ -156,9 +155,9 @@ function FieldLabel({ children }) {
 
 function ReadonlyField({ label, value }) {
   return (
-    <div style={{ marginBottom: 14 }}>
+    <div className="min-w-0" style={{ marginBottom: 14 }}>
       <FieldLabel>{label}</FieldLabel>
-      <div style={{
+      <div className="break-words" style={{
         padding: "9px 12px", borderRadius: 8,
         background: "#f7f3f1", border: `1px solid ${C.border}`,
         fontSize: 13, color: value ? C.text : C.muted, fontWeight: 500,
@@ -172,7 +171,7 @@ function ReadonlyField({ label, value }) {
 function InputField({ label, value, onChange, type = "text", placeholder, hint, rightEl, name }) {
   const [focused, setFocused] = useState(false);
   return (
-    <div style={{ marginBottom: 14 }}>
+    <div className="min-w-0" style={{ marginBottom: 14 }}>
       <FieldLabel>{label}</FieldLabel>
       <div style={{ position: "relative" }}>
         <input
@@ -201,7 +200,7 @@ function InputField({ label, value, onChange, type = "text", placeholder, hint, 
 
 function SelectField({ label, value, onChange, options }) {
   return (
-    <div style={{ marginBottom: 14 }}>
+    <div className="min-w-0" style={{ marginBottom: 14 }}>
       <FieldLabel>{label}</FieldLabel>
       <select
         value={value} onChange={onChange}
@@ -221,8 +220,8 @@ function SelectField({ label, value, onChange, options }) {
 function PrimaryButton({ onClick, disabled, loading, children, color = C.brand, fullWidth = true }) {
   return (
     <button onClick={onClick} disabled={disabled || loading}
+      className={fullWidth ? "w-full" : "w-auto"}
       style={{
-        width: fullWidth ? "100%" : "auto",
         padding: "10px 20px",
         background: disabled || loading ? `${color}80` : color,
         color: "#fff", border: "none", borderRadius: 9,
@@ -238,8 +237,8 @@ function PrimaryButton({ onClick, disabled, loading, children, color = C.brand, 
 
 function Badge({ children, color = C.brand, bg }) {
   return (
-    <span style={{
-      display: "inline-block", padding: "2px 10px", borderRadius: 20,
+    <span className="inline-block whitespace-nowrap" style={{
+      padding: "2px 10px", borderRadius: 20,
       fontSize: 10, fontWeight: 600, color, background: bg || `${color}15`,
       textTransform: "capitalize",
     }}>
@@ -249,12 +248,9 @@ function Badge({ children, color = C.brand, bg }) {
 }
 
 function Grid({ cols = 2, children, className }) {
+  const responsiveClass = cols === 3 ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2";
   return (
-    <div className={className} style={{
-      display: "grid",
-      gridTemplateColumns: `repeat(${cols}, 1fr)`,
-      gap: "0 16px",
-    }}>
+    <div className={`grid gap-x-0 sm:gap-x-4 gap-y-0 min-w-0 ${responsiveClass} ${className || ""}`}>
       {children}
     </div>
   );
@@ -268,7 +264,7 @@ function ProfileTab({ adminData }) {
           <ReadonlyField label="First name" value={adminData?.f_name} />
           <ReadonlyField label="Last name" value={adminData?.l_name} />
           <ReadonlyField label="Work email" value={adminData?.work_email} />
-          <ReadonlyField label="Employee ID" value={adminData?.uid} />
+          <ReadonlyField label="Employee ID" value={adminData?.empid} />
           <ReadonlyField label="Gender" value={adminData?.gender} />
           <ReadonlyField label="Marital status" value={adminData?.marital_status} />
           <ReadonlyField label="Country" value={adminData?.country} />
@@ -360,7 +356,7 @@ function ContactTab({ adminData, onSuccess, onError }) {
     <SectionCard title="Contact & office" subtitle="Fields you can update" accent={C.green}>
       <InputField label="Phone number" type="tel" value={form.personal_contact} onChange={setPhone("personal_contact")} placeholder="10-digit phone number" />
       <InputField label="Emergency contact" type="tel" value={form.e_contact} onChange={setPhone("e_contact")} placeholder="Emergency contact" hint="Reached in case of emergency" />
-      <Grid cols={3} className="contact-location-grid">
+      <Grid cols={3}>
         <SelectField label="Country" value={form.country} onChange={setCountry} options={Object.keys(LOCATION_DATA)} />
         <SelectField label="State" value={form.state} onChange={setState} options={Object.keys(LOCATION_DATA[form.country] || {})} />
         <SelectField label="City (office location)" value={form.city} onChange={setCity} options={cityOptions} />
@@ -505,22 +501,22 @@ function LeaveTab({ leaveBalance }) {
 
   return (
     <SectionCard title="Leave Balance" subtitle="Your current leave entitlements" accent={C.green}>
-      <div className="leave-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginBottom: 16 }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 min-w-0">
         {leaves.map(l => {
           const entitled = l.entitled ?? 0;
           const availed = l.availed ?? 0;
           const remaining = entitled - availed;
           const pct = entitled > 0 ? Math.max(0, Math.min(100, (remaining / entitled) * 100)) : 0;
           return (
-            <div key={l.key} style={{
+            <div key={l.key} className="min-w-0" style={{
               padding: "14px 16px", borderRadius: 12,
               border: `1px solid ${C.border}`, background: C.surface,
             }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 8 }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{l.label}</span>
                 <span style={{
                   fontSize: 11, fontWeight: 600, padding: "2px 8px",
-                  borderRadius: 20, background: `${l.color}15`, color: l.color,
+                  borderRadius: 20, background: `${l.color}15`, color: l.color, whiteSpace: "nowrap",
                 }}>
                   {remaining} left
                 </span>
@@ -528,7 +524,7 @@ function LeaveTab({ leaveBalance }) {
               <div style={{ height: 5, borderRadius: 4, background: C.border, marginBottom: 8 }}>
                 <div style={{ height: "100%", width: `${pct}%`, borderRadius: 4, background: l.color, transition: "width 0.4s" }} />
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: C.muted }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: C.muted, gap: 6 }}>
                 <span>Entitled: <b style={{ color: C.text }}>{entitled}</b></span>
                 <span>Availed: <b style={{ color: C.text }}>{availed}</b></span>
               </div>
@@ -541,13 +537,13 @@ function LeaveTab({ leaveBalance }) {
           );
         })}
       </div>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+      <div className="flex gap-3 flex-wrap">
         {[
           { label: "LWP (Loss of Pay)", value: leaveBalance.lwp ?? 0 },
           { label: "PBC (Public Holidays)", value: leaveBalance.pbc ?? 0 },
         ].map(item => (
-          <div key={item.label} style={{
-            flex: 1, minWidth: 140, padding: "12px 14px",
+          <div key={item.label} className="flex-1 min-w-[140px]" style={{
+            padding: "12px 14px",
             borderRadius: 10, border: `1px solid ${C.border}`,
             background: C.surface,
           }}>
@@ -580,18 +576,18 @@ function ReviewsTab({ reviews }) {
     <SectionCard title="My Reviews" subtitle={`${reviews.length} review${reviews.length !== 1 ? "s" : ""} · avg ${avg}/5`} accent={C.brand}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {reviews.map((r, i) => (
-          <div key={r._id || i} style={{
+          <div key={r._id || i} className="min-w-0" style={{
             padding: "14px 16px", borderRadius: 10,
             border: `1px solid ${C.border}`, background: C.surface,
           }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8, gap: 8 }}>
-              <div>
+            <div className="flex-wrap" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8, gap: 8 }}>
+              <div className="min-w-0">
                 <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>
                   {r.reviewer?.f_name ? `${r.reviewer.f_name} ${r.reviewer.l_name || ""}` : "Anonymous"}
                 </div>
                 <div style={{ fontSize: 11, color: C.muted }}>{r.reviewer?.role || ""} · {r.monthYear || fmtDate(r.createdAt)}</div>
               </div>
-              <div style={{ display: "flex", gap: 2 }}>
+              <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
                 {[1,2,3,4,5].map(s => (
                   <svg key={s} width="14" height="14" viewBox="0 0 24 24">
                     <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
@@ -602,7 +598,7 @@ function ReviewsTab({ reviews }) {
               </div>
             </div>
             {r.comment && (
-              <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, fontStyle: "italic" }}>
+              <div className="break-words" style={{ fontSize: 13, color: C.text, lineHeight: 1.6, fontStyle: "italic" }}>
                 "{r.comment}"
               </div>
             )}
@@ -660,7 +656,7 @@ function PasswordTab({ onSuccess, onError }) {
 
   return (
     <SectionCard title="Change password" subtitle="Keep your account secure" accent={C.brand}>
-      <div style={{ maxWidth: 420 }}>
+      <div className="max-w-full sm:max-w-[420px] min-w-0">
         <InputField label="Current password *" type={show ? "text" : "password"} value={form.currentPassword} onChange={set("currentPassword")} placeholder="Current password" rightEl={<EyeBtn />} />
         <InputField label="New password *" type={show ? "text" : "password"} value={form.newPassword} onChange={set("newPassword")} placeholder="New password" rightEl={<EyeBtn />} />
         {form.newPassword && (
@@ -721,8 +717,7 @@ function AvatarTab({ adminData, onSuccess, onError }) {
 
   return (
     <SectionCard title="Profile avatar" subtitle="Choose an avatar that represents you" accent={C.blue}>
-      <div style={{
-        display: "flex", alignItems: "center", gap: 16, marginBottom: 20,
+      <div className="flex flex-col xs:flex-row items-start xs:items-center gap-4 mb-5 min-w-0" style={{
         padding: "14px 16px", background: C.page, borderRadius: 11, border: `1px solid ${C.border}`,
       }}>
         <div style={{
@@ -737,7 +732,7 @@ function AvatarTab({ adminData, onSuccess, onError }) {
             : initials
           }
         </div>
-        <div>
+        <div className="min-w-0">
           <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 3 }}>Current avatar</div>
           <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>
             {currentImg ? "DiceBear avatar" : "Initials (default)"}
@@ -752,13 +747,14 @@ function AvatarTab({ adminData, onSuccess, onError }) {
       </div>
 
       <FieldLabel>Choose a style</FieldLabel>
-      <div className="settings-avatar-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+      <div className="grid grid-cols-3 xs:grid-cols-4 gap-2 min-w-0">
         {AVATAR_STYLES.map(style => {
           const url = `https://api.dicebear.com/7.x/${style}/svg?seed=${seed}`;
           const isActive = currentImg?.includes(style);
           const isLoading = pending === url;
           return (
             <button key={style} onClick={() => applyAvatar(url)} disabled={isPending}
+              className="min-w-0"
               style={{
                 padding: "10px 6px", borderRadius: 10,
                 border: `1px solid ${isActive ? C.brand : C.border}`,
@@ -773,7 +769,7 @@ function AvatarTab({ adminData, onSuccess, onError }) {
                 </div>
               )}
               <img src={url} alt={style} style={{ width: "100%", aspectRatio: "1", display: "block", borderRadius: 6 }} />
-              <div style={{ fontSize: 10, color: isActive ? C.brand : C.muted, marginTop: 5, textAlign: "center", fontWeight: isActive ? 600 : 400, textTransform: "capitalize" }}>
+              <div className="truncate" style={{ fontSize: 10, color: isActive ? C.brand : C.muted, marginTop: 5, textAlign: "center", fontWeight: isActive ? 600 : 400, textTransform: "capitalize" }}>
                 {style}
               </div>
             </button>
@@ -786,25 +782,22 @@ function AvatarTab({ adminData, onSuccess, onError }) {
 
 function MobileTabBar({ tab, setTab, onClose }) {
   return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 200,
+    <div className="fixed inset-0 z-[200]" style={{
       background: "rgba(42,26,22,0.45)", backdropFilter: "blur(2px)",
     }} onClick={onClose}>
-      <div style={{
-        position: "absolute", bottom: 0, left: 0, right: 0,
+      <div className="absolute bottom-0 left-0 right-0 max-h-[80vh] overflow-y-auto" style={{
         background: C.surface, borderRadius: "20px 20px 0 0",
         paddingBottom: "env(safe-area-inset-bottom, 16px)",
-        maxHeight: "80vh", overflowY: "auto",
       }} onClick={e => e.stopPropagation()}>
-        <div style={{ padding: "14px 20px 0", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div className="flex items-center justify-between px-5" style={{ paddingTop: 14, borderBottom: `1px solid ${C.border}` }}>
           <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Settings</span>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 22, color: C.muted, padding: 0 }}>×</button>
         </div>
         {TABS.map(t => (
           <button key={t.key} onClick={() => { setTab(t.key); onClose(); }}
+            className="w-full flex items-center justify-between px-5"
             style={{
-              width: "100%", padding: "14px 20px",
-              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "14px 20px",
               background: tab === t.key ? C.brandLight : "transparent",
               color: tab === t.key ? C.brand : C.text,
               border: "none", borderBottom: `1px solid ${C.border}`,
@@ -840,7 +833,7 @@ export default function AdminSettingsPage() {
 
   if (!adminData) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: C.page, fontFamily: "'DM Sans','Segoe UI',sans-serif" }}>
+      <div className="min-h-screen flex items-center justify-center overflow-x-hidden" style={{ background: C.page, fontFamily: "'DM Sans','Segoe UI',sans-serif" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
           <Spinner size={36} color={C.brand} />
           <div style={{ fontSize: 13, color: C.muted }}>Loading profile…</div>
@@ -852,7 +845,7 @@ export default function AdminSettingsPage() {
   const currentTabLabel = TABS.find(t => t.key === tab)?.label || "Settings";
 
   return (
-    <div style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", background: C.page, minHeight: "100vh", color: C.text }}>
+    <div className="w-full max-w-full min-h-screen overflow-x-hidden" style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", background: C.page, color: C.text }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes slideIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
@@ -864,38 +857,28 @@ export default function AdminSettingsPage() {
           .settings-layout { flex-direction: column !important; }
           .settings-sidebar { display: none !important; }
           .mobile-menu-btn { display: flex !important; }
-          .settings-grid-2 { grid-template-columns: 1fr !important; }
-          .settings-avatar-grid { grid-template-columns: repeat(4, 1fr) !important; }
-          .leave-grid { grid-template-columns: 1fr !important; }
-        }
-        @media (max-width: 640px) {
-          .contact-location-grid { grid-template-columns: 1fr !important; }
-        }
-        @media (max-width: 480px) {
-          .settings-avatar-grid { grid-template-columns: repeat(3, 1fr) !important; }
         }
       `}</style>
 
       <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: "", type: "" })} />
       {mobileMenuOpen && <MobileTabBar tab={tab} setTab={setTab} onClose={() => setMobileMenuOpen(false)} />}
 
-      <div style={{ padding: "clamp(16px, 4vw, 32px)" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+      <div className="p-4 sm:p-6 lg:p-8">
+        <div className="max-w-[1100px] mx-auto min-w-0">
 
-          <div style={{ marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-            <div>
-              <h1 style={{ fontSize: "clamp(18px, 3vw, 22px)", fontWeight: 700, margin: 0, color: C.text }}>Settings</h1>
+          <div className="mb-5 flex items-center justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-xl lg:text-[22px]" style={{ fontWeight: 700, margin: 0, color: C.text }}>Settings</h1>
               <p style={{ fontSize: 13, color: C.muted, marginTop: 3, marginBottom: 0 }}>Manage your profile and account preferences</p>
             </div>
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="mobile-menu-btn"
+              className="mobile-menu-btn items-center gap-1.5"
               style={{
                 padding: "8px 14px", borderRadius: 9,
                 border: `1px solid ${C.border}`, background: C.surface,
                 cursor: "pointer", fontSize: 13, fontWeight: 600,
                 color: C.brand, fontFamily: "inherit",
-                alignItems: "center", gap: 6,
               }}
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><line x1="1" y1="3.5" x2="13" y2="3.5" stroke={C.brand} strokeWidth="1.5" strokeLinecap="round"/><line x1="1" y1="7" x2="13" y2="7" stroke={C.brand} strokeWidth="1.5" strokeLinecap="round"/><line x1="1" y1="10.5" x2="13" y2="10.5" stroke={C.brand} strokeWidth="1.5" strokeLinecap="round"/></svg>
@@ -903,12 +886,12 @@ export default function AdminSettingsPage() {
             </button>
           </div>
 
-          <div className="settings-layout" style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+          <div className="settings-layout flex gap-4 items-start min-w-0">
 
-            <div className="settings-sidebar" style={{ width: 210, flexShrink: 0 }}>
-              <div style={{
+            <div className="settings-sidebar w-[210px] shrink-0">
+              <div className="relative overflow-hidden mb-3" style={{
                 background: C.surface, borderRadius: 14, border: `1px solid ${C.border}`,
-                padding: "18px 14px", marginBottom: 12, position: "relative", overflow: "hidden",
+                padding: "18px 14px",
               }}>
                 <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${C.brand}, ${C.brandDark})` }} />
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
@@ -924,9 +907,9 @@ export default function AdminSettingsPage() {
                       : initials
                     }
                   </div>
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{displayName}</div>
-                    <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{adminData?.work_email || "—"}</div>
+                  <div className="text-center min-w-0">
+                    <div className="truncate" style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{displayName}</div>
+                    <div className="truncate" style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{adminData?.work_email || "—"}</div>
                     <div style={{ marginTop: 7, display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
                       <Badge color={C.brand}>{adminData?.role || "admin"}</Badge>
                       {adminData?.department && <Badge color={C.blue}>{adminData.department}</Badge>}
@@ -940,9 +923,9 @@ export default function AdminSettingsPage() {
                   const active = tab === t.key;
                   return (
                     <button key={t.key} onClick={() => setTab(t.key)}
+                      className="w-full flex items-center justify-between px-3.5"
                       style={{
-                        width: "100%", padding: "12px 14px",
-                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "12px 14px",
                         background: active ? C.brandLight : "transparent",
                         color: active ? C.brand : C.muted,
                         border: "none",
@@ -952,14 +935,14 @@ export default function AdminSettingsPage() {
                         transition: "all 0.15s",
                       }}>
                       {t.label}
-                      {active && <div style={{ width: 5, height: 5, borderRadius: "50%", background: C.brand }} />}
+                      {active && <div style={{ width: 5, height: 5, borderRadius: "50%", background: C.brand, flexShrink: 0 }} />}
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="flex-1 min-w-0">
               {tab === "profile"   && <ProfileTab adminData={adminData} />}
               {tab === "contact"   && <ContactTab adminData={adminData} onSuccess={showSuccess} onError={showError} />}
               {tab === "address"   && <AddressTab adminData={adminData} />}

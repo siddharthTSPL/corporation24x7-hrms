@@ -62,7 +62,7 @@ function daysLeft(dateStr) {
 function Badge({ children, color = C.brand, bg = C.brandLight }) {
   return (
     <span
-      className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-medium whitespace-nowrap"
+      className="inline-flex  items-center px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-medium whitespace-nowrap"
       style={{ color, background: bg }}
     >
       {children}
@@ -274,7 +274,7 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
             <div className="text-sm font-semibold text-[#2a1a16] truncate">{superAdmin?.f_name} {superAdmin?.l_name}</div>
             <div className="text-[11px] text-[#b0948a] mt-0.5 truncate">{superAdmin?.organisation_name || "—"}</div>
             <div className="mt-2 flex flex-wrap gap-1.5 items-center justify-center">
-              <Badge color={C.brand} bg={C.brandLight}>{superAdmin?.role || "super_admin"}</Badge>
+              <Badge color={C.brand} bg={C.brandLight}>{(superAdmin?.role || "super_admin").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}</Badge>
               {superAdmin?.is_trial_active && <PlanBadge plan="free_trial" />}
             </div>
           </div>

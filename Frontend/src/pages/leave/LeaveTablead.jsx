@@ -22,6 +22,7 @@ const LEAVE_META = {
   pl:          { label: "Paternity Leave", short: "PL",  bg: "#FEF3C7", color: "#92400E", accent: "#F59E0B", dot: "#D97706" },
   half_day_el: { label: "Half Day EL",     short: "½EL", bg: "#ECFDF5", color: "#065F46", accent: "#10B981", dot: "#059669" },
   half_day_sl: { label: "Half Day SL",     short: "½SL", bg: "#EFF6FF", color: "#1E40AF", accent: "#60A5FA", dot: "#3B82F6" },
+  lwp:         { label: "Leave Without Pay", short: "LWP", bg: "#FCE7F3", color: "#9D174D", accent: "#DB2777", dot: "#DB2777" },
 };
 
 const STATUS_LABEL_MAP = {
@@ -81,6 +82,7 @@ const BASE_LEAVE_TYPES = [
   { value: "sl",          label: "Sick Leave"    },
   { value: "half_day_el", label: "Half Day EL"   },
   { value: "half_day_sl", label: "Half Day SL"   },
+  { value: "lwp",         label: "Leave Without Pay" },
 ];
 
 const AVATAR_COLORS = [
@@ -93,6 +95,41 @@ const AVATAR_COLORS = [
 
 const fmt = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+
+const csvEscape = (val) => `"${String(val ?? "").replace(/"/g, '""')}"`;
+
+const exportLeavesToCSV = (leaves, filename, personKey = "employee") => {
+  const headers = [
+    "Employee Name", "Employee ID", "Email", "Leave Type", "Status",
+    "Start Date", "End Date", "Days", "Reason", "Remarks", "Applied On",
+  ];
+  const rows = leaves.map((l) => {
+    const person = l[personKey] || l.employee || l.manager || l.admin || {};
+    return [
+      csvEscape(`${person.f_name || ""} ${person.l_name || ""}`.trim() || "—"),
+      csvEscape(person.empid || "—"),
+      csvEscape(person.work_email || "—"),
+      csvEscape((LEAVE_META[l.leaveType] || {}).label || l.leaveType || "—"),
+      csvEscape(humanStatus(l.status)),
+      csvEscape(fmt(l.startDate)),
+      csvEscape(fmt(l.endDate)),
+      l.days || daysDiff(l.startDate, l.endDate),
+      csvEscape(l.reason || ""),
+      csvEscape(l.remarks || ""),
+      csvEscape(fmt(l.createdAt)),
+    ].join(",");
+  });
+  const csvContent = [headers.join(","), ...rows].join("\n");
+  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
 
 const fmtDateTime = (d) =>
   d ? new Date(d).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
@@ -133,6 +170,89 @@ const EmptyState = ({ msg = "No records found" }) => (
     <p className="text-xs sm:text-[13px] text-[#9B8BAE] font-medium">{msg}</p>
   </div>
 );
+
+const FilterExportBar = ({ search, setSearch, dateFrom, setDateFrom, dateTo, setDateTo, onExport, exportDisabled }) => (
+  <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 mb-4 sm:mb-5 items-stretch sm:items-end flex-wrap">
+    <div className="flex-1 min-w-[160px]">
+      <label className="block text-[10px] font-semibold text-[#9B8BAE] mb-1 uppercase tracking-wide">Search</label>
+      <input
+        type="text"
+        placeholder="Name or reason…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="w-full px-3 py-2 rounded-[10px] text-[13px] outline-none transition-all"
+        style={{ border: "1.5px solid #E5DAF0", color: "#4A3860" }}
+      />
+    </div>
+    <div className="min-w-[130px]">
+      <label className="block text-[10px] font-semibold text-[#9B8BAE] mb-1 uppercase tracking-wide">From</label>
+      <input
+        type="date"
+        value={dateFrom}
+        onChange={(e) => setDateFrom(e.target.value)}
+        className="w-full px-3 py-2 rounded-[10px] text-[13px] outline-none transition-all"
+        style={{ border: "1.5px solid #E5DAF0", color: "#4A3860" }}
+      />
+    </div>
+    <div className="min-w-[130px]">
+      <label className="block text-[10px] font-semibold text-[#9B8BAE] mb-1 uppercase tracking-wide">To</label>
+      <input
+        type="date"
+        value={dateTo}
+        onChange={(e) => setDateTo(e.target.value)}
+        className="w-full px-3 py-2 rounded-[10px] text-[13px] outline-none transition-all"
+        style={{ border: "1.5px solid #E5DAF0", color: "#4A3860" }}
+      />
+    </div>
+    <button
+      onClick={onExport}
+      disabled={exportDisabled}
+      className="px-4 py-2 rounded-[10px] text-[13px] font-semibold text-white cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap flex items-center justify-center gap-1.5"
+      style={{ background: "linear-gradient(135deg,#6B1A4A,#9B2458)", boxShadow: "0 3px 12px rgba(107,26,74,0.3)" }}
+    >
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v8M3.5 6l3 3 3-3M2 11.5h9" stroke="#fff" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      Export CSV
+    </button>
+  </div>
+);
+
+const Pagination = ({ page, setPage, totalPages }) => {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex items-center justify-center gap-2 mt-4 pt-3" style={{ borderTop: "1px solid rgba(200,185,220,0.28)" }}>
+      <button
+        onClick={() => setPage((p) => Math.max(1, p - 1))}
+        disabled={page === 1}
+        className="px-3 py-1.5 rounded-[10px] text-[12px] font-semibold cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+        style={{ background: "#F4EEF9", color: "#6B1A4A" }}
+      >
+        ← Prev
+      </button>
+      {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+        <button
+          key={p}
+          onClick={() => setPage(p)}
+          className="w-[30px] h-[30px] rounded-[10px] text-[12px] font-semibold cursor-pointer transition-all"
+          style={
+            p === page
+              ? { background: "linear-gradient(135deg,#6B1A4A,#9B2458)", color: "#fff" }
+              : { background: "#F4EEF9", color: "#6B1A4A" }
+          }
+        >
+          {p}
+        </button>
+      ))}
+      <button
+        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+        disabled={page === totalPages}
+        className="px-3 py-1.5 rounded-[10px] text-[12px] font-semibold cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+        style={{ background: "#F4EEF9", color: "#6B1A4A" }}
+      >
+        Next →
+      </button>
+    </div>
+  );
+};
 
 const Toast = ({ toast }) => {
   const colors = {
@@ -447,20 +567,26 @@ const MyBalancePanel = ({ admin, leaveBalance }) => {
   const isMarried = admin.marital_status === "married";
   const showML    = admin.gender === "female" && isMarried;
   const showPL    = admin.gender === "male"   && isMarried;
+  const elEntitled = Number(balance.EL?.entitled ?? 0);
+  const elAvailed  = Number(balance.EL?.availed ?? 0);
+  const elAccrued  = Number(balance.EL?.accrued ?? 0);
+  const slEntitled = Number(balance.SL?.entitled ?? 0);
+  const slAvailed  = Number(balance.SL?.availed ?? 0);
+
   const cards = [
-    { key: "el",  label: "Earned Leave",      entitled: balance.EL?.entitled || 0, availed: balance.EL?.availed || 0, accrued: balance.EL?.accrued || 0, accent: "#22C55E", bg: "linear-gradient(135deg,#F0FDF4,#DCFCE7)" },
-    { key: "sl",  label: "Sick Leave",         entitled: balance.SL?.entitled || 0, availed: balance.SL?.availed || 0, accrued: 0,                         accent: "#3B82F6", bg: "linear-gradient(135deg,#EFF6FF,#DBEAFE)" },
-    { key: "pbc", label: "Paid by Company",    entitled: balance.pbc || 0,          availed: 0,                         accrued: 0,                         accent: "#6B1A4A", bg: "linear-gradient(135deg,#F9EFF5,#F4E6F0)" },
-    { key: "lwp", label: "Leave Without Pay",  entitled: balance.lwp || 0,          availed: 0,                         accrued: 0,                         accent: "#CD166E", bg: "linear-gradient(135deg,#FDF2F8,#FCE7F3)" },
-    ...(showML ? [{ key: "ml", label: "Maternity Leave", entitled: balance.ML || 0, availed: 0, accrued: 0, accent: "#A855F7", bg: "linear-gradient(135deg,#FAF5FF,#F3E8FF)" }] : []),
-    ...(showPL ? [{ key: "pl", label: "Paternity Leave", entitled: balance.PL || 0, availed: 0, accrued: 0, accent: "#F59E0B", bg: "linear-gradient(135deg,#FFFBEB,#FEF3C7)" }] : []),
+    { key: "el",  label: "Earned Leave",      entitled: elEntitled, availed: elAvailed, accrued: elAccrued, accrues: true,  remaining: Math.max(0, elAccrued - elAvailed), accent: "#22C55E", bg: "linear-gradient(135deg,#F0FDF4,#DCFCE7)" },
+    { key: "sl",  label: "Sick Leave",         entitled: slEntitled, availed: slAvailed, accrued: slEntitled, accrues: false, remaining: Math.max(0, slEntitled - slAvailed), accent: "#3B82F6", bg: "linear-gradient(135deg,#EFF6FF,#DBEAFE)" },
+    { key: "pbc", label: "Paid by Company",    entitled: balance.pbc || 0,          availed: 0, accrued: balance.pbc || 0, accrues: false, remaining: balance.pbc || 0,                        accent: "#6B1A4A", bg: "linear-gradient(135deg,#F9EFF5,#F4E6F0)" },
+    { key: "lwp", label: "Leave Without Pay",  entitled: balance.lwp || 0,          availed: 0, accrued: balance.lwp || 0, accrues: false, remaining: balance.lwp || 0,                        accent: "#CD166E", bg: "linear-gradient(135deg,#FDF2F8,#FCE7F3)" },
+    ...(showML ? [{ key: "ml", label: "Maternity Leave", entitled: balance.ML || 0, availed: 0, accrued: balance.ML || 0, accrues: false, remaining: balance.ML || 0, accent: "#A855F7", bg: "linear-gradient(135deg,#FAF5FF,#F3E8FF)" }] : []),
+    ...(showPL ? [{ key: "pl", label: "Paternity Leave", entitled: balance.PL || 0, availed: 0, accrued: balance.PL || 0, accrues: false, remaining: balance.PL || 0, accent: "#F59E0B", bg: "linear-gradient(135deg,#FFFBEB,#FEF3C7)" }] : []),
   ];
 
   return (
     <div className="w-full">
       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 xs:gap-3 sm:gap-4 mb-5 sm:mb-6">
         {cards.map((s, i) => {
-          const remaining = s.entitled - s.availed;
+          const remaining = s.remaining;
           const pct = s.entitled > 0 ? Math.min((s.availed / s.entitled) * 100, 100) : 0;
           return (
             <div
@@ -488,7 +614,7 @@ const MyBalancePanel = ({ admin, leaveBalance }) => {
                 <div className="h-full rounded-lg" style={{ width: `${Math.max(pct, 3)}%`, background: s.accent }} />
               </div>
               <div className="flex justify-between mt-1 sm:mt-1.5 text-[8.5px] xs:text-[9px] sm:text-[10px] text-[#9B8BAE]">
-                {s.accrued > 0 && <span>Accrued: {s.accrued}</span>}
+                {s.accrues && <span>Accrued: {s.accrued}</span>}
                 <span className="ml-auto">{s.availed} used</span>
               </div>
             </div>
@@ -499,7 +625,7 @@ const MyBalancePanel = ({ admin, leaveBalance }) => {
       <SectionBox title="Leave Balance Summary">
         <div className="sm:hidden flex flex-col gap-2.5">
           {cards.map((s) => {
-            const rem = s.entitled - s.availed;
+            const rem = s.remaining;
             const pct = s.entitled > 0 ? Math.round((rem / s.entitled) * 100) : 0;
             const m   = LEAVE_META[s.key] || { label: s.label, bg: "#F3F4F6", color: "#374151", dot: "#9CA3AF" };
             return (
@@ -522,7 +648,9 @@ const MyBalancePanel = ({ admin, leaveBalance }) => {
                   </div>
                   <div>
                     <div className="text-[9px] text-[#9B8BAE] uppercase tracking-[0.5px]">Accrued</div>
-                    <div className="text-[13px] text-[#1C1028]">{s.accrued || "—"}</div>
+                    <div className="text-[13px] text-[#1C1028]">
+                      {s.accrues ? s.accrued : <span className="text-[11px] text-[#B7A9CC] italic">Granted upfront</span>}
+                    </div>
                   </div>
                   <div>
                     <div className="text-[9px] text-[#9B8BAE] uppercase tracking-[0.5px]">Used</div>
@@ -557,7 +685,7 @@ const MyBalancePanel = ({ admin, leaveBalance }) => {
             </thead>
             <tbody>
               {cards.map((s) => {
-                const rem = s.entitled - s.availed;
+                const rem = s.remaining;
                 const pct = s.entitled > 0 ? Math.round((rem / s.entitled) * 100) : 0;
                 const m   = LEAVE_META[s.key] || { label: s.label, bg: "#F3F4F6", color: "#374151", dot: "#9CA3AF" };
                 return (
@@ -569,7 +697,9 @@ const MyBalancePanel = ({ admin, leaveBalance }) => {
                       </span>
                     </td>
                     <td className="px-3.5 py-3 font-semibold text-[13px]" style={{ borderBottom: "1px solid #F5F0FA", color: "#1C1028" }}>{s.entitled}</td>
-                    <td className="px-3.5 py-3 text-[13px]" style={{ borderBottom: "1px solid #F5F0FA", color: "#1C1028" }}>{s.accrued || "—"}</td>
+                    <td className="px-3.5 py-3 text-[13px]" style={{ borderBottom: "1px solid #F5F0FA", color: "#1C1028" }}>
+                      {s.accrues ? s.accrued : <span className="text-[11px] text-[#B7A9CC] italic">Granted upfront</span>}
+                    </td>
                     <td className="px-3.5 py-3 text-[13px]" style={{ borderBottom: "1px solid #F5F0FA", color: "#1C1028" }}>{s.availed}</td>
                     <td className="px-3.5 py-3 font-bold text-[15px]" style={{ borderBottom: "1px solid #F5F0FA", color: s.accent, fontFamily: "Playfair Display, serif" }}>{rem}</td>
                     <td className="px-3.5 py-3" style={{ borderBottom: "1px solid #F5F0FA" }}>
@@ -597,7 +727,12 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
 
   const { data: rawHistory, isLoading: histLoading, refetch } = useAdminGetMyLeaveHistory();
   const applyMut = useAdminApplyLeave();
-  const history  = Array.isArray(rawHistory) ? rawHistory : [];
+  const history  = Array.isArray(rawHistory?.leave) ? rawHistory.leave : Array.isArray(rawHistory) ? rawHistory : [];
+
+  const PAGE_SIZE = 5;
+  const [historyPage, setHistoryPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(history.length / PAGE_SIZE));
+  const pagedHistory = history.slice((historyPage - 1) * PAGE_SIZE, historyPage * PAGE_SIZE);
 
   const isMarried = admin?.marital_status === "married";
   const showML    = admin?.gender === "female" && isMarried;
@@ -711,17 +846,31 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
       <SectionBox
         title="My Leave History"
         rightEl={
-          history.length > 0 ? (
-            <span className="text-[10px] sm:text-[11px] font-bold px-2.5 py-0.5 rounded-full text-[#6B1A4A] whitespace-nowrap"
-              style={{ background: "linear-gradient(135deg,#F9EFF5,#F4E6F0)" }}>
-              {history.length} record{history.length !== 1 ? "s" : ""}
-            </span>
-          ) : null
+          <div className="flex items-center gap-2">
+            {history.length > 0 && (
+              <span className="text-[10px] sm:text-[11px] font-bold px-2.5 py-0.5 rounded-full text-[#6B1A4A] whitespace-nowrap"
+                style={{ background: "linear-gradient(135deg,#F9EFF5,#F4E6F0)" }}>
+                {history.length} record{history.length !== 1 ? "s" : ""}
+              </span>
+            )}
+            {history.length > 0 && (
+              <button
+                onClick={() => {
+                  const personalized = history.map((l) => ({ ...l, employee: admin }));
+                  exportLeavesToCSV(personalized, `my-leave-history-${fmt(new Date()).replace(/\s/g, "-")}.csv`, "employee");
+                }}
+                className="text-[10px] sm:text-[11px] font-bold px-2.5 py-1 rounded-full text-white whitespace-nowrap cursor-pointer"
+                style={{ background: "linear-gradient(135deg,#6B1A4A,#9B2458)" }}
+              >
+                Export CSV
+              </button>
+            )}
+          </div>
         }
       >
         {histLoading ? <Spinner /> : history.length === 0 ? <EmptyState msg="No leave records yet" /> : (
           <div>
-            {history.map((leave, idx) => {
+            {pagedHistory.map((leave, idx) => {
               const d      = leave.days || daysDiff(leave.startDate, leave.endDate);
               const accent = (LEAVE_META[leave.leaveType] || { accent: "#8B3A8A" }).accent;
               return (
@@ -770,6 +919,40 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
             })}
           </div>
         )}
+        {history.length > PAGE_SIZE && (
+          <div className="flex items-center justify-center gap-2 mt-4 pt-3" style={{ borderTop: "1px solid rgba(200,185,220,0.28)" }}>
+            <button
+              onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+              disabled={historyPage === 1}
+              className="px-3 py-1.5 rounded-[10px] text-[12px] font-semibold cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: "#F4EEF9", color: "#6B1A4A" }}
+            >
+              ← Prev
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <button
+                key={p}
+                onClick={() => setHistoryPage(p)}
+                className="w-[30px] h-[30px] rounded-[10px] text-[12px] font-semibold cursor-pointer transition-all"
+                style={
+                  p === historyPage
+                    ? { background: "linear-gradient(135deg,#6B1A4A,#9B2458)", color: "#fff" }
+                    : { background: "#F4EEF9", color: "#6B1A4A" }
+                }
+              >
+                {p}
+              </button>
+            ))}
+            <button
+              onClick={() => setHistoryPage((p) => Math.min(totalPages, p + 1))}
+              disabled={historyPage === totalPages}
+              className="px-3 py-1.5 rounded-[10px] text-[12px] font-semibold cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: "#F4EEF9", color: "#6B1A4A" }}
+            >
+              Next →
+            </button>
+          </div>
+        )}
       </SectionBox>
     </div>
   );
@@ -778,6 +961,11 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
 const AllLeavesPanel = ({ showToast }) => {
   const [filter, setFilter]         = useState("all");
   const [processingId, setProcessingId] = useState(null);
+  const [search, setSearch]     = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo]     = useState("");
+  const [page, setPage]         = useState(1);
+  const PAGE_SIZE = 5;
 
   const { data: rawData, isLoading, refetch } = useGetForwardedLeaves();
   const acceptMut = useAcceptLeave();
@@ -793,12 +981,27 @@ const AllLeavesPanel = ({ showToast }) => {
     return true;
   };
 
-  const filtered     = filter === "all" ? employeeLeaves : employeeLeaves.filter((l) => isStatus(l, filter));
-  const count        = (key) => key === "all" ? employeeLeaves.length : employeeLeaves.filter((l) => isStatus(l, key)).length;
-  const isActionable = (status) =>
+  const statusFiltered = filter === "all" ? employeeLeaves : employeeLeaves.filter((l) => isStatus(l, filter));
+  const count          = (key) => key === "all" ? employeeLeaves.length : employeeLeaves.filter((l) => isStatus(l, key)).length;
+  const isActionable   = (status) =>
   status === "pending_admin" ||
   status === "forwarded_reporting_manager" ||
   status === "pending_manager";
+
+  const filtered = statusFiltered.filter((l) => {
+    const person = l.employee || {};
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q ||
+      `${person.f_name || ""} ${person.l_name || ""}`.toLowerCase().includes(q) ||
+      (l.reason || "").toLowerCase().includes(q);
+    const start = l.startDate ? new Date(l.startDate) : null;
+    const matchesFrom = !dateFrom || (start && start >= new Date(dateFrom));
+    const matchesTo   = !dateTo   || (start && start <= new Date(dateTo));
+    return matchesSearch && matchesFrom && matchesTo;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const handleAction = async (leave, action) => {
     setProcessingId(leave._id);
@@ -809,6 +1012,12 @@ const AllLeavesPanel = ({ showToast }) => {
     } catch (err) {
       showToast(err?.response?.data?.message || err?.message || "Something went wrong", "error");
     } finally { setProcessingId(null); }
+  };
+
+  const handleExport = () => {
+    if (filtered.length === 0) { showToast("No records to export", "info"); return; }
+    exportLeavesToCSV(filtered, `employee-leaves-${fmt(new Date()).replace(/\s/g, "-")}.csv`, "employee");
+    showToast("Export started", "success");
   };
 
   if (isLoading) return <Spinner />;
@@ -829,13 +1038,21 @@ const AllLeavesPanel = ({ showToast }) => {
         ))}
       </div>
 
+      <FilterExportBar
+        search={search} setSearch={(v) => { setSearch(v); setPage(1); }}
+        dateFrom={dateFrom} setDateFrom={(v) => { setDateFrom(v); setPage(1); }}
+        dateTo={dateTo} setDateTo={(v) => { setDateTo(v); setPage(1); }}
+        onExport={handleExport}
+        exportDisabled={filtered.length === 0}
+      />
+
       <div className="flex gap-1.5 sm:gap-2 mb-4 sm:mb-5 flex-wrap">
         {LEAVE_FILTERS.map((f) => {
           const active = filter === f.key;
           return (
             <button
               key={f.key}
-              onClick={() => setFilter(f.key)}
+              onClick={() => { setFilter(f.key); setPage(1); }}
               className="inline-flex items-center gap-1 sm:gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-full text-[11px] sm:text-[12px] font-medium cursor-pointer transition-all duration-[180ms] min-h-[36px]"
               style={{
                 border: active ? "1.5px solid #8B3A8A" : "1.5px solid #E5DAF0",
@@ -859,7 +1076,7 @@ const AllLeavesPanel = ({ showToast }) => {
         })}
       </div>
 
-      {filtered.length === 0 ? <EmptyState msg="No leave requests found" /> : filtered.map((leave) => (
+      {filtered.length === 0 ? <EmptyState msg="No leave requests found" /> : paged.map((leave) => (
         <LeaveCard
           key={leave._id}
           leave={leave}
@@ -870,12 +1087,18 @@ const AllLeavesPanel = ({ showToast }) => {
           showTimeline
         />
       ))}
+      <Pagination page={page} setPage={setPage} totalPages={totalPages} />
     </div>
   );
 };
 
 const ManagerLeavesPanel = ({ showToast }) => {
   const [processingId, setProcessingId] = useState(null);
+  const [search, setSearch]     = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo]     = useState("");
+  const [page, setPage]         = useState(1);
+  const PAGE_SIZE = 5;
 
   const { data: rawData, isLoading, refetch } = useGetForwardedLeaves();
   const acceptMut = useAcceptLeave();
@@ -883,6 +1106,20 @@ const ManagerLeavesPanel = ({ showToast }) => {
 
   const managerLeaves = Array.isArray(rawData?.managerLeaves?.leaves) ? rawData.managerLeaves.leaves : [];
   const isActionable  = (status) => status === "pending_reporting_manager" || status === "pending_admin";
+
+  const filtered = managerLeaves.filter((l) => {
+    const person = l.manager || {};
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q ||
+      `${person.f_name || ""} ${person.l_name || ""}`.toLowerCase().includes(q) ||
+      (l.reason || "").toLowerCase().includes(q);
+    const start = l.startDate ? new Date(l.startDate) : null;
+    const matchesFrom = !dateFrom || (start && start >= new Date(dateFrom));
+    const matchesTo   = !dateTo   || (start && start <= new Date(dateTo));
+    return matchesSearch && matchesFrom && matchesTo;
+  });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const handleAction = async (leave, action) => {
     setProcessingId(leave._id);
@@ -893,6 +1130,12 @@ const ManagerLeavesPanel = ({ showToast }) => {
     } catch (err) {
       showToast(err?.response?.data?.message || err?.message || "Something went wrong", "error");
     } finally { setProcessingId(null); }
+  };
+
+  const handleExport = () => {
+    if (filtered.length === 0) { showToast("No records to export", "info"); return; }
+    exportLeavesToCSV(filtered, `manager-leaves-${fmt(new Date()).replace(/\s/g, "-")}.csv`, "manager");
+    showToast("Export started", "success");
   };
 
   if (isLoading) return <Spinner />;
@@ -912,7 +1155,16 @@ const ManagerLeavesPanel = ({ showToast }) => {
           </div>
         ))}
       </div>
-      {managerLeaves.length === 0 ? <EmptyState msg="No manager leave requests" /> : managerLeaves.map((leave) => (
+
+      <FilterExportBar
+        search={search} setSearch={(v) => { setSearch(v); setPage(1); }}
+        dateFrom={dateFrom} setDateFrom={(v) => { setDateFrom(v); setPage(1); }}
+        dateTo={dateTo} setDateTo={(v) => { setDateTo(v); setPage(1); }}
+        onExport={handleExport}
+        exportDisabled={filtered.length === 0}
+      />
+
+      {filtered.length === 0 ? <EmptyState msg="No manager leave requests" /> : paged.map((leave) => (
         <LeaveCard
           key={leave._id}
           leave={leave}
@@ -925,6 +1177,7 @@ const ManagerLeavesPanel = ({ showToast }) => {
           showTimeline
         />
       ))}
+      <Pagination page={page} setPage={setPage} totalPages={totalPages} />
     </div>
   );
 };

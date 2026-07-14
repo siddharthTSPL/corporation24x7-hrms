@@ -221,6 +221,11 @@ export default function NotFound404({ onLogin, onContact }) {
         .star-pulse { animation: shimmer 1.5s infinite alternate; }
         .err-btn:hover { color: #730042 !important; }
         .err-btn-active:hover { box-shadow: 0 0 14px rgba(115,0,66,0.5) !important; color: white !important; }
+        @media (max-width: 700px) {
+          .pnf-error { left: 24px !important; right: 24px !important; top: 45% !important; }
+          .pnf-error-title { font-size: 5em !important; }
+          .pnf-error-subtitle { font-size: 1.4em !important; }
+        }
       `}</style>
       <div style={styles.wrapper}>
         <div style={styles.moon} />
@@ -235,9 +240,9 @@ export default function NotFound404({ onLogin, onContact }) {
           />
         ))}
 
-        <div style={styles.error}>
-          <div style={styles.errorTitle}>404</div>
-          <div style={styles.errorSubtitle}>Hmmm...</div>
+        <div className="pnf-error" style={styles.error}>
+          <div className="pnf-error-title" style={styles.errorTitle}>404</div>
+          <div className="pnf-error-subtitle" style={styles.errorSubtitle}>Hmmm...</div>
           <div style={styles.errorDescription}>It looks like one of the developers fell asleep</div>
           <div style={styles.btnRow}>
             <button

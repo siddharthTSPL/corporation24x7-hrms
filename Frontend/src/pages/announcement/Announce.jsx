@@ -144,7 +144,7 @@ function IconMail({ size = 13, color = "currentColor" }) {
 }
 
 const inputCls =
-  "w-full px-3 py-2.5 border border-[#F4C0D1] rounded-[9px] bg-[#F9F8F2] text-[13px] text-[#730042] " +
+  "w-full px-3 py-2.5 min-h-11 border border-[#F4C0D1] rounded-[9px] bg-[#F9F8F2] text-[13px] text-[#730042] " +
   "outline-none focus:border-[#CD166E] focus:ring-2 focus:ring-[#CD166E]/20 transition-all placeholder-[#993556]/40 font-[inherit]";
 
 function Field({ label, optional, error, children }) {
@@ -217,12 +217,12 @@ function SkeletonMobileRows() {
     <div key={i} className="bg-white rounded-[14px] border border-[#F4C0D1] p-4 animate-pulse space-y-3">
       <div className="flex gap-3">
         <div className="w-12 h-12 rounded-[9px] bg-[#FBEAF0] flex-shrink-0" />
-        <div className="flex-1 space-y-2">
+        <div className="flex-1 min-w-0 space-y-2">
           <div className="h-3 w-3/4 bg-[#FBEAF0] rounded" />
           <div className="h-3 w-full bg-[#FBEAF0] rounded" />
         </div>
       </div>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <div className="h-6 w-16 bg-[#FBEAF0] rounded-full" />
         <div className="h-6 w-16 bg-[#FBEAF0] rounded-full" />
       </div>
@@ -254,7 +254,7 @@ function MobileAnnouncementCard({ item, idx, canEdit, canDelete, onEdit, onDelet
         />
         <div className="flex-1 min-w-0">
           <p className="text-[13px] font-semibold text-[#730042] truncate">{item.title}</p>
-          <p className="text-[11px] text-[#993556] mt-0.5 line-clamp-2 leading-relaxed">{item.message}</p>
+          <p className="text-[11px] text-[#993556] mt-0.5 line-clamp-2 leading-relaxed break-words">{item.message}</p>
         </div>
       </div>
 
@@ -276,7 +276,7 @@ function MobileAnnouncementCard({ item, idx, canEdit, canDelete, onEdit, onDelet
           {canEdit && (
             <button
               onClick={() => onEdit(item)}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-[8px] border border-[#F4C0D1] text-[12px] font-medium text-[#993556] hover:bg-[#FBEAF0] hover:text-[#CD166E] transition-all"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 min-h-11 rounded-[8px] border border-[#F4C0D1] text-[12px] font-medium text-[#993556] hover:bg-[#FBEAF0] hover:text-[#CD166E] transition-all"
               style={{ background: "#F9F8F2" }}
             >
               <IconEdit size={12} /> Edit
@@ -285,7 +285,7 @@ function MobileAnnouncementCard({ item, idx, canEdit, canDelete, onEdit, onDelet
           {canDelete && (
             <button
               onClick={() => onDelete(item)}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-[8px] border border-[#F4C0D1] text-[12px] font-medium text-[#993556] hover:bg-[#FCEBEB] hover:text-[#A32D2D] transition-all"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 min-h-11 rounded-[8px] border border-[#F4C0D1] text-[12px] font-medium text-[#993556] hover:bg-[#FCEBEB] hover:text-[#A32D2D] transition-all"
               style={{ background: "#F9F8F2" }}
             >
               <IconTrash size={12} /> Delete
@@ -311,7 +311,7 @@ function FullPageLockScreen() {
         You don't have permission to use any announcement features. Contact your super admin to request access.
       </p>
       <div
-        className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-semibold"
+        className="inline-flex items-center gap-2 px-4 py-2 min-h-11 rounded-full text-[11px] font-semibold"
         style={{ background: "#FBEAF0", color: "#730042" }}
       >
         <IconMail size={12} />
@@ -338,7 +338,7 @@ function ViewBlurOverlay() {
         You can't view announcement details. Contact your super admin for access.
       </p>
       <div
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-semibold"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-11 rounded-full text-[10px] font-semibold"
         style={{ background: "#fff", color: "#730042", border: "1px solid #F4C0D1" }}
       >
         <IconMail size={11} />
@@ -431,8 +431,8 @@ export default function AnnouncementPage() {
 
   if (allLocked) {
     return (
-      <div className="p-4 sm:p-6 md:p-8 min-h-screen" style={{ background: "#F9F8F2" }}>
-        <div className="bg-white rounded-[14px] border border-[#F4C0D1] overflow-hidden">
+      <div className="p-4 sm:p-6 md:p-8 min-h-screen overflow-x-hidden" style={{ background: "#F9F8F2" }}>
+        <div className="max-w-[1600px] mx-auto bg-white rounded-[14px] border border-[#F4C0D1] overflow-hidden">
           <FullPageLockScreen />
         </div>
       </div>
@@ -447,419 +447,421 @@ export default function AnnouncementPage() {
   ];
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 min-h-screen" style={{ background: "#F9F8F2" }}>
+    <div className="p-3 xs:p-4 sm:p-6 md:p-8 min-h-screen overflow-x-hidden" style={{ background: "#F9F8F2" }}>
+      <div className="max-w-[1600px] mx-auto">
 
-      <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-3 mb-6 sm:mb-8">
-        <div>
-          <h1 className="text-lg sm:text-xl font-semibold text-[#730042] tracking-tight">Announcements</h1>
-          <p className="text-[12px] text-[#993556] mt-1">Create and manage announcements for your team</p>
-        </div>
-
-        {canCreate ? (
-          <button
-            onClick={openCreate}
-            className="inline-flex items-center justify-center gap-2 w-full xs:w-auto px-5 py-2.5 rounded-xl text-[13px] font-medium text-white transition-opacity hover:opacity-88 flex-shrink-0"
-            style={{ background: "#730042" }}
-          >
-            <IconPlus size={14} />
-            New Announcement
-          </button>
-        ) : (
-          <div
-            className="inline-flex items-center justify-center gap-2 w-full xs:w-auto px-5 py-2.5 rounded-xl text-[13px] font-medium text-[#993556] border border-[#F4C0D1] opacity-60 flex-shrink-0 cursor-not-allowed select-none"
-            style={{ background: "#fff" }}
-            title="You don't have permission to create announcements"
-          >
-            <IconLock size={12} />
-            New Announcement
-          </div>
-        )}
-      </div>
-
-      <div className="relative">
-        {!canView && <ViewBlurOverlay />}
-
-        <div className={!canView ? "pointer-events-none select-none" : ""} aria-hidden={!canView}>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-6 sm:mb-8">
-            {stats.map((s) => (
-              <div key={s.label} className="bg-white rounded-xl border border-[#F4C0D1] p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
-                <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${s.bg}`}>
-                  {s.icon}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-lg sm:text-xl font-semibold text-[#730042]">
-                    {!canView ? "•••" : isLoading ? "—" : s.value}
-                  </div>
-                  <div className="text-[10px] sm:text-[11px] text-[#993556] mt-0.5 truncate">{s.label}</div>
-                </div>
-              </div>
-            ))}
+        <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-3 mb-6 sm:mb-8">
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl font-semibold text-[#730042] tracking-tight truncate">Announcements</h1>
+            <p className="text-[12px] text-[#993556] mt-1">Create and manage announcements for your team</p>
           </div>
 
-          {canView && !isLoading && announcements.length > 0 && (
-            <div className="mb-6 sm:mb-8">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-[#993556] mb-3">
-                Latest announcements
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                {announcements.slice(0, 3).map((item, idx) => (
-                  <div
-                    key={item._id}
-                    className="bg-white rounded-[14px] border border-[#F4C0D1] overflow-hidden hover:-translate-y-0.5 transition-transform duration-200"
-                  >
-                    <ImageOrPlaceholder
-                      src={item.notice_image}
-                      alt={item.title}
-                      className="w-full h-28 sm:h-32 object-cover"
-                      placeholderBg={AVATAR_BG[idx % AVATAR_BG.length]}
-                    />
-                    <div className="p-3 sm:p-4">
-                      <div className="flex items-center justify-between gap-2 mb-2.5 flex-wrap">
-                        <PriorityBadge priority={item.priority} />
-                        <AudienceBadge audience={item.audience} />
-                      </div>
-                      <p className="text-[13px] font-semibold text-[#730042] truncate mb-1">{item.title}</p>
-                      <p className="text-[11px] text-[#993556] line-clamp-2 leading-relaxed">{item.message}</p>
-                      {item.expiresAt && (
-                        <p className="text-[10px] text-[#B4B2A9] mt-2">
-                          Expires{" "}
-                          {new Date(item.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="bg-white rounded-[14px] border border-[#F4C0D1] overflow-hidden">
-            <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#F4C0D1] flex items-center justify-between gap-3">
-              <span className="text-[13px] font-semibold text-[#730042]">All announcements</span>
-              <span className="text-[11px] font-semibold px-3 py-1 rounded-full bg-[#FBEAF0] text-[#730042] flex-shrink-0">
-                {!canView ? "•••" : isLoading ? "—" : `${announcements.length} total`}
-              </span>
-            </div>
-
-            {!canView ? (
-              <>
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full min-w-[820px] text-sm">
-                    <thead>
-                      <tr className="border-b border-[#F4C0D1]" style={{ background: "#F9F8F2" }}>
-                        {["Image", "Title & Message", "Audience", "Priority", "Expiry", "Created", "Actions"].map((h) => (
-                          <th key={h} className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-[#993556]">
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#FBEAF0]"><SkeletonTableRows /></tbody>
-                  </table>
-                </div>
-                <div className="md:hidden p-4 space-y-3"><SkeletonMobileRows /></div>
-              </>
-            ) : isLoading ? (
-              <>
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full min-w-[820px] text-sm">
-                    <thead>
-                      <tr className="border-b border-[#F4C0D1]" style={{ background: "#F9F8F2" }}>
-                        {["Image", "Title & Message", "Audience", "Priority", "Expiry", "Created", "Actions"].map((h) => (
-                          <th key={h} className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-[#993556]"
-                            style={h === "Actions" ? { textAlign: "center" } : {}}>
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#FBEAF0]"><SkeletonTableRows /></tbody>
-                  </table>
-                </div>
-                <div className="md:hidden p-4 space-y-3"><SkeletonMobileRows /></div>
-              </>
-            ) : isError ? (
-              <div className="py-14 sm:py-16 text-center">
-                <div className="flex flex-col items-center gap-2">
-                  <IconAlert size={28} color="#A32D2D" />
-                  <p className="text-[13px] font-semibold text-[#730042]">Failed to load announcements</p>
-                  <p className="text-[11px] text-[#993556]">Check your network and try again</p>
-                </div>
-              </div>
-            ) : announcements.length === 0 ? (
-              <div className="py-16 sm:py-20 text-center">
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-[#FBEAF0] flex items-center justify-center">
-                    <IconMegaphone size={22} color="#CD166E" />
-                  </div>
-                  <p className="text-[13px] font-semibold text-[#730042]">No announcements yet</p>
-                  <p className="text-[11px] text-[#993556]">Click "New Announcement" to get started</p>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full min-w-[820px] text-sm">
-                    <thead>
-                      <tr className="border-b border-[#F4C0D1]" style={{ background: "#F9F8F2" }}>
-                        {["Image", "Title & Message", "Audience", "Priority", "Expiry", "Created", "Actions"].map((h) => (
-                          <th
-                            key={h}
-                            className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-[#993556]"
-                            style={h === "Actions" ? { textAlign: "center" } : {}}
-                          >
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#FBEAF0]">
-                      {announcements.map((item, idx) => (
-                        <tr
-                          key={item._id}
-                          className="transition-colors duration-100"
-                          onMouseEnter={(e) => (e.currentTarget.style.background = "#FEF4F9")}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                        >
-                          <td className="px-5 py-4">
-                            <ImageOrPlaceholder
-                              src={item.notice_image}
-                              alt="notice"
-                              className="w-10 h-10 object-cover rounded-[9px] border border-[#F4C0D1]"
-                              placeholderBg={AVATAR_BG[idx % AVATAR_BG.length]}
-                            />
-                          </td>
-                          <td className="px-5 py-4 max-w-[200px]">
-                            <p className="text-[13px] font-semibold text-[#730042] truncate">{item.title}</p>
-                            <p className="text-[11px] text-[#993556] truncate mt-0.5">{item.message}</p>
-                          </td>
-                          <td className="px-5 py-4"><AudienceBadge audience={item.audience} /></td>
-                          <td className="px-5 py-4"><PriorityBadge priority={item.priority} /></td>
-                          <td className="px-5 py-4 text-[11px] text-[#B4B2A9]">
-                            {item.expiresAt
-                              ? new Date(item.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
-                              : <span className="text-[#D3D1C7]">—</span>}
-                          </td>
-                          <td className="px-5 py-4 text-[11px] text-[#B4B2A9]">
-                            {new Date(item.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                          </td>
-                          <td className="px-5 py-4">
-                            {canEdit || canDelete ? (
-                              <div className="flex items-center justify-center gap-2">
-                                {canEdit && (
-                                  <button
-                                    onClick={() => openEdit(item)}
-                                    title="Edit"
-                                    className="w-8 h-8 rounded-[8px] border border-[#F4C0D1] flex items-center justify-center text-[#993556] transition-all hover:bg-[#FBEAF0] hover:text-[#CD166E]"
-                                    style={{ background: "#F9F8F2" }}
-                                  >
-                                    <IconEdit size={12} />
-                                  </button>
-                                )}
-                                {canDelete && (
-                                  <button
-                                    onClick={() => setDeleteTarget(item)}
-                                    title="Delete"
-                                    className="w-8 h-8 rounded-[8px] border border-[#F4C0D1] flex items-center justify-center text-[#993556] transition-all hover:bg-[#FCEBEB] hover:text-[#A32D2D]"
-                                    style={{ background: "#F9F8F2" }}
-                                  >
-                                    <IconTrash size={12} />
-                                  </button>
-                                )}
-                              </div>
-                            ) : (
-                              <div className="flex items-center justify-center text-[#D3D1C7]" title="No action permissions">
-                                <IconLock size={12} />
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="md:hidden p-4 space-y-3">
-                  {announcements.map((item, idx) => (
-                    <MobileAnnouncementCard
-                      key={item._id}
-                      item={item}
-                      idx={idx}
-                      canEdit={canEdit}
-                      canDelete={canDelete}
-                      onEdit={openEdit}
-                      onDelete={setDeleteTarget}
-                    />
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {modalMode && (canCreate || canEdit) && (
-        <ModalOverlay onClose={closeModal}>
-          <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[95vh] sm:max-h-[92vh] overflow-y-auto border border-[#F4C0D1] sm:border">
-            <div
-              className="sticky top-0 z-10 flex items-center justify-between px-5 sm:px-6 py-4 border-b border-[#F4C0D1] rounded-t-2xl"
+          {canCreate ? (
+            <button
+              onClick={openCreate}
+              className="inline-flex items-center justify-center gap-2 w-full xs:w-auto px-5 py-2.5 min-h-11 rounded-xl text-[13px] font-medium text-white transition-opacity hover:opacity-88 flex-shrink-0"
               style={{ background: "#730042" }}
             >
-              <div>
-                <h2 className="text-[15px] font-semibold text-white">
-                  {modalMode === "create" ? "New Announcement" : "Edit Announcement"}
-                </h2>
-                <p className="text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.55)" }}>Fill in the details below</p>
-              </div>
-              <button
-                onClick={closeModal}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-white transition-colors flex-shrink-0"
-                style={{ background: "rgba(255,255,255,0.18)" }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.28)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.18)")}
-              >
-                <IconClose size={13} />
-              </button>
-            </div>
-
-            <div className="px-5 sm:px-6 py-5 flex flex-col gap-4" style={{ background: "#F9F8F2" }}>
-              <Field label="Title" error={errors.title}>
-                <input
-                  name="title"
-                  placeholder="e.g. Office Holiday Notice"
-                  value={form.title}
-                  onChange={handleChange}
-                  className={inputCls}
-                  style={errors.title ? { borderColor: "#F09595", background: "#FCEBEB" } : {}}
-                />
-              </Field>
-
-              <Field label="Message" error={errors.message}>
-                <textarea
-                  name="message"
-                  placeholder="Write your announcement details here..."
-                  value={form.message}
-                  onChange={handleChange}
-                  rows={4}
-                  className={`${inputCls} resize-none`}
-                  style={errors.message ? { borderColor: "#F09595", background: "#FCEBEB" } : {}}
-                />
-              </Field>
-
-              <Field label="Image URL" optional error={errors.notice_image}>
-                <input
-                  name="notice_image"
-                  placeholder="https://example.com/image.jpg"
-                  value={form.notice_image}
-                  onChange={handleChange}
-                  className={inputCls}
-                  style={errors.notice_image ? { borderColor: "#F09595", background: "#FCEBEB" } : {}}
-                />
-                {form.notice_image && /^https?:\/\/.+/.test(form.notice_image) && (
-                  <div className="mt-2 rounded-xl overflow-hidden border border-[#F4C0D1]">
-                    <img
-                      src={form.notice_image}
-                      alt="preview"
-                      className="w-full h-28 object-cover"
-                      onError={(e) => (e.target.style.display = "none")}
-                    />
-                  </div>
-                )}
-              </Field>
-
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Audience">
-                  <select name="audience" value={form.audience} onChange={handleChange} className={inputCls}>
-                    <option value="all">All</option>
-                    <option value="employees">Employees</option>
-                    <option value="managers">Managers</option>
-                  </select>
-                </Field>
-                <Field label="Priority">
-                  <select name="priority" value={form.priority} onChange={handleChange} className={inputCls}>
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                  </select>
-                </Field>
-              </div>
-
-              <Field label="Expiry Date" optional>
-                <input
-                  type="date"
-                  name="expiresAt"
-                  value={form.expiresAt}
-                  onChange={handleChange}
-                  className={inputCls}
-                />
-              </Field>
-            </div>
-
+              <IconPlus size={14} />
+              New Announcement
+            </button>
+          ) : (
             <div
-              className="sticky bottom-0 flex flex-col sm:flex-row sm:justify-end gap-3 px-5 sm:px-6 py-4 border-t border-[#F4C0D1] rounded-b-2xl"
-              style={{ background: "#F9F8F2" }}
+              className="inline-flex items-center justify-center gap-2 w-full xs:w-auto px-5 py-2.5 min-h-11 rounded-xl text-[13px] font-medium text-[#993556] border border-[#F4C0D1] opacity-60 flex-shrink-0 cursor-not-allowed select-none"
+              style={{ background: "#fff" }}
+              title="You don't have permission to create announcements"
             >
-              <button
-                onClick={closeModal}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-[#F4C0D1] text-[13px] font-medium text-[#730042] transition-colors hover:bg-[#FBEAF0]"
-                style={{ background: "#fff" }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={isPending}
-                className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-[13px] font-medium text-white transition-opacity disabled:opacity-50 hover:opacity-88"
+              <IconLock size={12} />
+              New Announcement
+            </div>
+          )}
+        </div>
+
+        <div className="relative">
+          {!canView && <ViewBlurOverlay />}
+
+          <div className={!canView ? "pointer-events-none select-none" : ""} aria-hidden={!canView}>
+            <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-6 sm:mb-8">
+              {stats.map((s) => (
+                <div key={s.label} className="bg-white rounded-xl border border-[#F4C0D1] p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
+                  <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${s.bg}`}>
+                    {s.icon}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-lg sm:text-xl font-semibold text-[#730042]">
+                      {!canView ? "•••" : isLoading ? "—" : s.value}
+                    </div>
+                    <div className="text-[10px] sm:text-[11px] text-[#993556] mt-0.5 truncate">{s.label}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {canView && !isLoading && announcements.length > 0 && (
+              <div className="mb-6 sm:mb-8">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[#993556] mb-3">
+                  Latest announcements
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                  {announcements.slice(0, 3).map((item, idx) => (
+                    <div
+                      key={item._id}
+                      className="bg-white rounded-[14px] border border-[#F4C0D1] overflow-hidden hover:-translate-y-0.5 transition-transform duration-200"
+                    >
+                      <ImageOrPlaceholder
+                        src={item.notice_image}
+                        alt={item.title}
+                        className="w-full h-28 sm:h-32 object-cover"
+                        placeholderBg={AVATAR_BG[idx % AVATAR_BG.length]}
+                      />
+                      <div className="p-3 sm:p-4">
+                        <div className="flex items-center justify-between gap-2 mb-2.5 flex-wrap">
+                          <PriorityBadge priority={item.priority} />
+                          <AudienceBadge audience={item.audience} />
+                        </div>
+                        <p className="text-[13px] font-semibold text-[#730042] truncate mb-1">{item.title}</p>
+                        <p className="text-[11px] text-[#993556] line-clamp-2 leading-relaxed break-words">{item.message}</p>
+                        {item.expiresAt && (
+                          <p className="text-[10px] text-[#B4B2A9] mt-2">
+                            Expires{" "}
+                            {new Date(item.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white rounded-[14px] border border-[#F4C0D1] overflow-hidden">
+              <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#F4C0D1] flex items-center justify-between gap-3">
+                <span className="text-[13px] font-semibold text-[#730042]">All announcements</span>
+                <span className="text-[11px] font-semibold px-3 py-1 rounded-full bg-[#FBEAF0] text-[#730042] flex-shrink-0">
+                  {!canView ? "•••" : isLoading ? "—" : `${announcements.length} total`}
+                </span>
+              </div>
+
+              {!canView ? (
+                <>
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full table-fixed text-sm">
+                      <thead>
+                        <tr className="border-b border-[#F4C0D1]" style={{ background: "#F9F8F2" }}>
+                          {["Image", "Title & Message", "Audience", "Priority", "Expiry", "Created", "Actions"].map((h) => (
+                            <th key={h} className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-[#993556] whitespace-nowrap">
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#FBEAF0]"><SkeletonTableRows /></tbody>
+                    </table>
+                  </div>
+                  <div className="md:hidden p-4 space-y-3"><SkeletonMobileRows /></div>
+                </>
+              ) : isLoading ? (
+                <>
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full min-w-[820px] text-sm">
+                      <thead>
+                        <tr className="border-b border-[#F4C0D1]" style={{ background: "#F9F8F2" }}>
+                          {["Image", "Title & Message", "Audience", "Priority", "Expiry", "Created", "Actions"].map((h) => (
+                            <th key={h} className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-[#993556] whitespace-nowrap"
+                              style={h === "Actions" ? { textAlign: "center" } : {}}>
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#FBEAF0]"><SkeletonTableRows /></tbody>
+                    </table>
+                  </div>
+                  <div className="md:hidden p-4 space-y-3"><SkeletonMobileRows /></div>
+                </>
+              ) : isError ? (
+                <div className="py-14 sm:py-16 text-center px-4">
+                  <div className="flex flex-col items-center gap-2">
+                    <IconAlert size={28} color="#A32D2D" />
+                    <p className="text-[13px] font-semibold text-[#730042]">Failed to load announcements</p>
+                    <p className="text-[11px] text-[#993556]">Check your network and try again</p>
+                  </div>
+                </div>
+              ) : announcements.length === 0 ? (
+                <div className="py-16 sm:py-20 text-center px-4">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-[#FBEAF0] flex items-center justify-center">
+                      <IconMegaphone size={22} color="#CD166E" />
+                    </div>
+                    <p className="text-[13px] font-semibold text-[#730042]">No announcements yet</p>
+                    <p className="text-[11px] text-[#993556]">Click "New Announcement" to get started</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full min-w-[820px] text-sm">
+                      <thead>
+                        <tr className="border-b border-[#F4C0D1]" style={{ background: "#F9F8F2" }}>
+                          {["Image", "Title & Message", "Audience", "Priority", "Expiry", "Created", "Actions"].map((h) => (
+                            <th
+                              key={h}
+                              className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-[#993556] whitespace-nowrap"
+                              style={h === "Actions" ? { textAlign: "center" } : {}}
+                            >
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#FBEAF0]">
+                        {announcements.map((item, idx) => (
+                          <tr
+                            key={item._id}
+                            className="transition-colors duration-100"
+                            onMouseEnter={(e) => (e.currentTarget.style.background = "#FEF4F9")}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                          >
+                            <td className="px-5 py-4">
+                              <ImageOrPlaceholder
+                                src={item.notice_image}
+                                alt="notice"
+                                className="w-10 h-10 object-cover rounded-[9px] border border-[#F4C0D1]"
+                                placeholderBg={AVATAR_BG[idx % AVATAR_BG.length]}
+                              />
+                            </td>
+                            <td className="px-5 py-4 max-w-[200px]">
+                              <p className="text-[13px] font-semibold text-[#730042] truncate">{item.title}</p>
+                              <p className="text-[11px] text-[#993556] truncate mt-0.5">{item.message}</p>
+                            </td>
+                            <td className="px-5 py-4"><AudienceBadge audience={item.audience} /></td>
+                            <td className="px-5 py-4"><PriorityBadge priority={item.priority} /></td>
+                            <td className="px-5 py-4 text-[11px] text-[#B4B2A9] whitespace-nowrap">
+                              {item.expiresAt
+                                ? new Date(item.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                                : <span className="text-[#D3D1C7]">—</span>}
+                            </td>
+                            <td className="px-5 py-4 text-[11px] text-[#B4B2A9] whitespace-nowrap">
+                              {new Date(item.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                            </td>
+                            <td className="px-5 py-4">
+                              {canEdit || canDelete ? (
+                                <div className="flex items-center justify-center gap-2">
+                                  {canEdit && (
+                                    <button
+                                      onClick={() => openEdit(item)}
+                                      title="Edit"
+                                      className="w-11 h-11 rounded-[8px] border border-[#F4C0D1] flex items-center justify-center text-[#993556] transition-all hover:bg-[#FBEAF0] hover:text-[#CD166E]"
+                                      style={{ background: "#F9F8F2" }}
+                                    >
+                                      <IconEdit size={12} />
+                                    </button>
+                                  )}
+                                  {canDelete && (
+                                    <button
+                                      onClick={() => setDeleteTarget(item)}
+                                      title="Delete"
+                                      className="w-11 h-11 rounded-[8px] border border-[#F4C0D1] flex items-center justify-center text-[#993556] transition-all hover:bg-[#FCEBEB] hover:text-[#A32D2D]"
+                                      style={{ background: "#F9F8F2" }}
+                                    >
+                                      <IconTrash size={12} />
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="flex items-center justify-center text-[#D3D1C7]" title="No action permissions">
+                                  <IconLock size={12} />
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="md:hidden p-4 space-y-3">
+                    {announcements.map((item, idx) => (
+                      <MobileAnnouncementCard
+                        key={item._id}
+                        item={item}
+                        idx={idx}
+                        canEdit={canEdit}
+                        canDelete={canDelete}
+                        onEdit={openEdit}
+                        onDelete={setDeleteTarget}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {modalMode && (canCreate || canEdit) && (
+          <ModalOverlay onClose={closeModal}>
+            <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[95vh] sm:max-h-[92vh] overflow-y-auto overflow-x-hidden border border-[#F4C0D1] sm:border">
+              <div
+                className="sticky top-0 z-10 flex items-center justify-between gap-3 px-5 sm:px-6 py-4 border-b border-[#F4C0D1] rounded-t-2xl"
                 style={{ background: "#730042" }}
               >
-                {isPending
-                  ? modalMode === "create" ? "Creating..." : "Saving..."
-                  : modalMode === "create" ? "Create" : "Save Changes"}
-              </button>
-            </div>
-          </div>
-        </ModalOverlay>
-      )}
-
-      {deleteTarget && canDelete && (
-        <ModalOverlay onClose={() => setDeleteTarget(null)}>
-          <div className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl border border-[#F4C0D1] overflow-hidden">
-            <div className="px-6 pt-8 pb-5 text-center" style={{ background: "#FBEAF0" }}>
-              <div
-                className="w-12 h-12 rounded-full border border-[#F7C1C1] flex items-center justify-center mx-auto mb-3"
-                style={{ background: "#FCEBEB" }}
-              >
-                <IconTrash size={18} />
+                <div className="min-w-0">
+                  <h2 className="text-[15px] font-semibold text-white truncate">
+                    {modalMode === "create" ? "New Announcement" : "Edit Announcement"}
+                  </h2>
+                  <p className="text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.55)" }}>Fill in the details below</p>
+                </div>
+                <button
+                  onClick={closeModal}
+                  className="w-11 h-11 rounded-lg flex items-center justify-center text-white transition-colors flex-shrink-0"
+                  style={{ background: "rgba(255,255,255,0.18)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.28)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.18)")}
+                >
+                  <IconClose size={13} />
+                </button>
               </div>
-              <h3 className="text-[15px] font-semibold text-[#730042]">Delete announcement?</h3>
-            </div>
-            <div className="px-6 py-5 text-center">
-              <p className="text-[12px] text-[#993556] leading-relaxed">
-                You're about to delete{" "}
-                <span className="font-semibold text-[#730042]">"{deleteTarget.title}"</span>.
-                <br />This action cannot be undone.
-              </p>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3 px-6 pb-6">
-              <button
-                onClick={() => setDeleteTarget(null)}
-                className="flex-1 py-2.5 rounded-xl border border-[#F4C0D1] text-[12px] font-medium text-[#730042] transition-colors hover:bg-[#FBEAF0]"
-                style={{ background: "#fff" }}
+
+              <div className="px-5 sm:px-6 py-5 flex flex-col gap-4" style={{ background: "#F9F8F2" }}>
+                <Field label="Title" error={errors.title}>
+                  <input
+                    name="title"
+                    placeholder="e.g. Office Holiday Notice"
+                    value={form.title}
+                    onChange={handleChange}
+                    className={inputCls}
+                    style={errors.title ? { borderColor: "#F09595", background: "#FCEBEB" } : {}}
+                  />
+                </Field>
+
+                <Field label="Message" error={errors.message}>
+                  <textarea
+                    name="message"
+                    placeholder="Write your announcement details here..."
+                    value={form.message}
+                    onChange={handleChange}
+                    rows={4}
+                    className={`${inputCls} resize-none`}
+                    style={errors.message ? { borderColor: "#F09595", background: "#FCEBEB" } : {}}
+                  />
+                </Field>
+
+                <Field label="Image URL" optional error={errors.notice_image}>
+                  <input
+                    name="notice_image"
+                    placeholder="https://example.com/image.jpg"
+                    value={form.notice_image}
+                    onChange={handleChange}
+                    className={inputCls}
+                    style={errors.notice_image ? { borderColor: "#F09595", background: "#FCEBEB" } : {}}
+                  />
+                  {form.notice_image && /^https?:\/\/.+/.test(form.notice_image) && (
+                    <div className="mt-2 rounded-xl overflow-hidden border border-[#F4C0D1]">
+                      <img
+                        src={form.notice_image}
+                        alt="preview"
+                        className="w-full h-28 object-cover"
+                        onError={(e) => (e.target.style.display = "none")}
+                      />
+                    </div>
+                  )}
+                </Field>
+
+                <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
+                  <Field label="Audience">
+                    <select name="audience" value={form.audience} onChange={handleChange} className={inputCls}>
+                      <option value="all">All</option>
+                      <option value="employees">Employees</option>
+                      <option value="managers">Managers</option>
+                    </select>
+                  </Field>
+                  <Field label="Priority">
+                    <select name="priority" value={form.priority} onChange={handleChange} className={inputCls}>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                  </Field>
+                </div>
+
+                <Field label="Expiry Date" optional>
+                  <input
+                    type="date"
+                    name="expiresAt"
+                    value={form.expiresAt}
+                    onChange={handleChange}
+                    className={inputCls}
+                  />
+                </Field>
+              </div>
+
+              <div
+                className="sticky bottom-0 flex flex-col sm:flex-row sm:justify-end gap-3 px-5 sm:px-6 py-4 border-t border-[#F4C0D1] rounded-b-2xl"
+                style={{ background: "#F9F8F2" }}
               >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="flex-1 py-2.5 rounded-xl text-[12px] font-medium text-white transition-opacity disabled:opacity-50 hover:opacity-88"
-                style={{ background: "#A32D2D" }}
-              >
-                {isDeleting ? "Deleting..." : "Delete"}
-              </button>
+                <button
+                  onClick={closeModal}
+                  className="w-full sm:w-auto px-5 py-2.5 min-h-11 rounded-xl border border-[#F4C0D1] text-[13px] font-medium text-[#730042] transition-colors hover:bg-[#FBEAF0]"
+                  style={{ background: "#fff" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={isPending}
+                  className="w-full sm:w-auto px-6 py-2.5 min-h-11 rounded-xl text-[13px] font-medium text-white transition-opacity disabled:opacity-50 hover:opacity-88"
+                  style={{ background: "#730042" }}
+                >
+                  {isPending
+                    ? modalMode === "create" ? "Creating..." : "Saving..."
+                    : modalMode === "create" ? "Create" : "Save Changes"}
+                </button>
+              </div>
             </div>
-          </div>
-        </ModalOverlay>
-      )}
+          </ModalOverlay>
+        )}
+
+        {deleteTarget && canDelete && (
+          <ModalOverlay onClose={() => setDeleteTarget(null)}>
+            <div className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl border border-[#F4C0D1] overflow-hidden">
+              <div className="px-6 pt-8 pb-5 text-center" style={{ background: "#FBEAF0" }}>
+                <div
+                  className="w-12 h-12 rounded-full border border-[#F7C1C1] flex items-center justify-center mx-auto mb-3"
+                  style={{ background: "#FCEBEB" }}
+                >
+                  <IconTrash size={18} />
+                </div>
+                <h3 className="text-[15px] font-semibold text-[#730042]">Delete announcement?</h3>
+              </div>
+              <div className="px-6 py-5 text-center">
+                <p className="text-[12px] text-[#993556] leading-relaxed break-words">
+                  You're about to delete{" "}
+                  <span className="font-semibold text-[#730042]">"{deleteTarget.title}"</span>.
+                  <br />This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 px-6 pb-6">
+                <button
+                  onClick={() => setDeleteTarget(null)}
+                  className="flex-1 py-2.5 min-h-11 rounded-xl border border-[#F4C0D1] text-[12px] font-medium text-[#730042] transition-colors hover:bg-[#FBEAF0]"
+                  style={{ background: "#fff" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="flex-1 py-2.5 min-h-11 rounded-xl text-[12px] font-medium text-white transition-opacity disabled:opacity-50 hover:opacity-88"
+                  style={{ background: "#A32D2D" }}
+                >
+                  {isDeleting ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </div>
+          </ModalOverlay>
+        )}
+      </div>
     </div>
   );
 }

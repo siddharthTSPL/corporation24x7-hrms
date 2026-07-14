@@ -7,6 +7,7 @@ cron.schedule("0 0 1 * *", async () => {
     const today = new Date();
     const year = today.getFullYear();
     const month = today.getMonth();
+    const isJanuary = month === 0;
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const monthStart = new Date(year, month, 1);
     const monthEnd = new Date(year, month, daysInMonth);
@@ -28,43 +29,42 @@ cron.schedule("0 0 1 * *", async () => {
         $set.pbc = 0;
       }
 
-      if (balance.EL.accrued < balance.EL.entitled) {
-        $set["EL.accrued"] = Math.min(
-          Number((balance.EL.accrued + balance.EL.entitled / 12).toFixed(2)),
-          balance.EL.entitled
+      const elYearly = balance.EL.yearlyEntitled ?? balance.EL.entitled;
+      let elEntitled = balance.EL.entitled;
+      let elAccrued = balance.EL.accrued;
+
+      if (isJanuary) {
+        elAccrued = Number(((balance.EL.accrued - balance.EL.availed) * 0.5).toFixed(2));
+        elEntitled = elYearly;
+        $set["EL.availed"] = 0;
+        $set["EL.entitled"] = elEntitled;
+      }
+
+      if (elAccrued < elEntitled) {
+        elAccrued = Math.min(
+          Number((elAccrued + elYearly / 12).toFixed(2)),
+          elEntitled
         );
+      }
+      $set["EL.accrued"] = elAccrued;
+
+      if (isJanuary) {
+        const slYearly = balance.SL.yearlyEntitled ?? balance.SL.entitled;
+        $set["SL.entitled"] = slYearly;
+        $set["SL.availed"] = 0;
       }
 
       return { updateOne: { filter: { _id: balance._id }, update: { $set } } };
     });
 
     if (ops.length) await LeaveBalance.bulkWrite(ops, { ordered: false });
-    console.log("Monthly PBC + EL update done");
+    console.log(
+      isJanuary
+        ? "Yearly EL carry-forward + January accrual done"
+        : "Monthly PBC + EL accrual done"
+    );
   } catch (error) {
     console.error("Monthly cron error:", error.message);
-  }
-});
-
-cron.schedule("0 0 1 1 *", async () => {
-  try {
-    const balances = await LeaveBalance.find().lean();
-
-    const ops = balances.map((b) => ({
-      updateOne: {
-        filter: { _id: b._id },
-        update: {
-          $set: {
-            "EL.accrued": Number(((b.EL.accrued - b.EL.availed) * 0.5).toFixed(2)),
-            "EL.availed": 0,
-          },
-        },
-      },
-    }));
-
-    if (ops.length) await LeaveBalance.bulkWrite(ops, { ordered: false });
-    console.log("Yearly EL carry forward applied successfully");
-  } catch (error) {
-    console.error("Yearly carry forward error:", error.message);
   }
 });
 

@@ -42,6 +42,16 @@ const attendanceSchema = new mongoose.Schema(
     },
     checkIn: Date,
     checkOut: Date,
+    // Which physical gate/kiosk the scan happened at. Face-kiosk only -
+    // System (manual/app) checkins use latitude/longitude instead.
+    checkInGate: {
+      type: String,
+      default: null,
+    },
+    checkOutGate: {
+      type: String,
+      default: null,
+    },
     latitude: Number,
     longitude: Number,
     selfie: String,
@@ -69,12 +79,18 @@ const attendanceSchema = new mongoose.Schema(
     },
     checkoutRemark: {
       type: String,
-      enum: ["on_time", "overtime", "early_checkout", null],
+      enum: ["on_time", "overtime", "early_checkout", "auto_overtime", null],
       default: null,
     },
     overtimeMinutes: {
       type: Number,
       default: 0,
+    },
+    // true only when the system force-closed this session (shift end +
+    // maxOvertimeMinutes passed with no manual/face checkout).
+    autoCheckedOut: {
+      type: Boolean,
+      default: false,
     },
   },
   { timestamps: true }

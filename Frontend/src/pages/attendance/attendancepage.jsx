@@ -226,6 +226,27 @@ function AlreadyDoneScreen({ attendance }) {
       )}
       {attendance && (
         <>
+          <div className="flex gap-1.5 justify-center flex-wrap w-full">
+            <span className="text-[11px] font-semibold rounded-full px-3 py-1 bg-gray-50 border border-gray-200 text-gray-500">
+              {attendance.source === "face" ? "🤳 Checked in via Face Attendance" : "📍 Checked in via System"}
+              {attendance.checkInGate ? ` · ${attendance.checkInGate}` : ""}
+            </span>
+            {attendance.checkOut && (
+              <span className="text-[11px] font-semibold rounded-full px-3 py-1 bg-gray-50 border border-gray-200 text-gray-500">
+                {attendance.autoCheckedOut
+                  ? "⏱️ Auto checked-out (overtime limit reached)"
+                  : attendance.source === "face"
+                    ? "🤳 Checked out via Face Attendance"
+                    : "📍 Checked out via System"}
+                {attendance.checkOutGate ? ` · ${attendance.checkOutGate}` : ""}
+              </span>
+            )}
+            {(attendance.checkoutRemark === "overtime" || attendance.checkoutRemark === "auto_overtime") && attendance.overtimeMinutes > 0 && (
+              <span className="text-[11px] font-semibold rounded-full px-3 py-1 bg-amber-50 border border-amber-200 text-amber-700">
+                ⏰ Overtime · {Math.floor(attendance.overtimeMinutes / 60) > 0 ? `${Math.floor(attendance.overtimeMinutes / 60)}h ` : ""}{attendance.overtimeMinutes % 60}m
+              </span>
+            )}
+          </div>
           <div className="flex gap-2.5 justify-center flex-wrap w-full">
             <div className="flex items-center gap-2.5 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5">
               <span>🟢</span>
@@ -375,6 +396,36 @@ export default function AttendancePage() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+        <style>{fonts}</style>
+      </div>
+    );
+  }
+
+  if (todayData?.attendance?.source === "face" && !todayData?.isCheckedOut && !isCheckedIn) {
+    const att = todayData.attendance;
+    return (
+      <div className="min-h-screen bg-white" style={{ fontFamily: "'Sora', sans-serif" }}>
+        <div className="max-w-lg mx-auto px-4 py-6 flex flex-col gap-4">
+          <BrandStrip />
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <Avatar name={userName} src={user?.profile_image} dotColor={roleMeta.dot} size="w-11 h-11" onClick={() => setShowProfile(!showProfile)} />
+              <div>
+                <p className="m-0 text-base font-bold text-gray-900">{getGreeting()}, {userName.split(" ")[0]} 👋</p>
+                <p className="mt-0.5 text-[11px] text-gray-400">{today}</p>
+              </div>
+            </div>
+            <span className={`text-[11px] font-bold rounded-full px-2.5 py-0.5 border uppercase tracking-wide ${roleMeta.bg} ${roleMeta.color} ${roleMeta.border}`}>{roleMeta.label}</span>
+          </div>
+          {showProfile && <ProfilePanel user={user} userName={userName} userRole={userRole} roleMeta={roleMeta} />}
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 flex flex-col items-center gap-3 shadow-sm text-center">
+            <div className="text-5xl">🤳</div>
+            <h2 className="m-0 text-lg font-bold text-gray-900">Already Checked In via Face Attendance</h2>
+            <p className="m-0 text-[13px] text-gray-500">
+              You checked in at {formatTime(att.checkIn)}{att.checkInGate ? ` · ${att.checkInGate}` : ""}. Please use the Face Kiosk to check out too — System (this app) can't act on this record.
+            </p>
           </div>
         </div>
         <style>{fonts}</style>

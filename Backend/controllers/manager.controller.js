@@ -15,6 +15,11 @@ const Attendance = require("../Models/attendance.model");
 const Ticket = require("../Models/ticket.model");
 const SuperAdminModel = require("../Models/superadmin.model");
 const AdminModel = require("../Models/Admin.model");
+const {
+  notifyLeaveForwarded,
+  notifyLeaveDecision,
+  notifyLeaveApplied,
+} = require("../utils/notify.utils");
 require("dotenv").config();
 
 const verifyManagerEmail = async (req, res, next) => {
@@ -265,6 +270,18 @@ await leave.save();
     console.error("Leave approved but balance deduction failed:", deductionError.message);
   }
 
+  notifyLeaveDecision({
+    recipientModel: "User",
+    recipientId: leave.employee,
+    leaveType: leave.leaveType,
+    startDate: leave.startDate,
+    endDate: leave.endDate,
+    days: leave.days,
+    decision: "approved",
+    decidedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+    remarks: leave.remarks,
+  });
+
   res.status(200).json({ message: "Leave approved successfully", leave });
 };
 
@@ -290,6 +307,19 @@ leave.remarks = `Rejected by Manager (${req.manager.f_name})`;
 leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
 await leave.save();
+
+  notifyLeaveDecision({
+    recipientModel: "User",
+    recipientId: leave.employee,
+    leaveType: leave.leaveType,
+    startDate: leave.startDate,
+    endDate: leave.endDate,
+    days: leave.days,
+    decision: "rejected",
+    decidedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+    remarks: leave.remarks,
+  });
+
   res.status(200).json({ message: "Leave rejected successfully", leave });
 };
 
@@ -324,6 +354,19 @@ const forwardedtoreportingmanager = async (req, res, next) => {
       : "forwarded_reporting_manager";
 
     await leave.save();
+
+    const employeeDoc = await usermodel.findById(leave.employee).select("f_name l_name").lean();
+    notifyLeaveForwarded({
+      requesterName: employeeDoc ? `${employeeDoc.f_name} ${employeeDoc.l_name}` : "An employee",
+      forwardedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+      handlerModel: currentManager.reporting_manager_model,
+      handlerId: currentManager.reporting_manager,
+      leaveType: leave.leaveType,
+      startDate: leave.startDate,
+      endDate: leave.endDate,
+      days: leave.days,
+      reason: leave.reason,
+    });
 
     res.status(200).json({ message: "Leave forwarded to reporting manager successfully", leave });
   } catch (error) {
@@ -370,6 +413,19 @@ const forwardEmployeeLeaveUpChain = async (req, res, next) => {
     : "forwarded_reporting_manager";
 
   await leave.save();
+
+  const employeeDocUpChain = await usermodel.findById(leave.employee).select("f_name l_name").lean();
+  notifyLeaveForwarded({
+    requesterName: employeeDocUpChain ? `${employeeDocUpChain.f_name} ${employeeDocUpChain.l_name}` : "An employee",
+    forwardedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+    handlerModel: currentManager.reporting_manager_model,
+    handlerId: currentManager.reporting_manager,
+    leaveType: leave.leaveType,
+    startDate: leave.startDate,
+    endDate: leave.endDate,
+    days: leave.days,
+    reason: leave.reason,
+  });
 
   return res.status(200).json({ success: true, message: "Leave forwarded successfully", leave });
 };
@@ -432,6 +488,17 @@ const applyleavem = async (req, res, next) => {
     directed_to_model: managerData.reporting_manager_model,
   });
 
+  notifyLeaveApplied({
+    requesterName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+    handlerModel: managerData.reporting_manager_model,
+    handlerId: managerData.reporting_manager,
+    leaveType,
+    startDate: start,
+    endDate: end,
+    days,
+    reason,
+  });
+
   res.status(200).json({ message: "Leave request submitted to your reporting manager", leave });
 };
 
@@ -446,7 +513,6 @@ const getforwardedleaves = async (req, res, next) => {
     leavemodel
       .find({
         organisation_id,
-        status: "forwarded_reporting_manager",
         directed_to: req.manager._id,
         directed_to_model: "Manager",
       })
@@ -457,7 +523,6 @@ const getforwardedleaves = async (req, res, next) => {
     managerLeaveModel
       .find({
         organisation_id,
-        status: "pending_reporting_manager",
         directed_to: req.manager._id,
         directed_to_model: "Manager",
       })
@@ -509,6 +574,19 @@ const forwardLeaveUpChain = async (req, res, next) => {
 
   await leave.save();
 
+  const originalManagerDoc = await managermodel.findById(leave.manager).select("f_name l_name").lean();
+  notifyLeaveForwarded({
+    requesterName: originalManagerDoc ? `${originalManagerDoc.f_name} ${originalManagerDoc.l_name}` : "A manager",
+    forwardedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+    handlerModel: currentManager.reporting_manager_model,
+    handlerId: currentManager.reporting_manager,
+    leaveType: leave.leaveType,
+    startDate: leave.startDate,
+    endDate: leave.endDate,
+    days: leave.days,
+    reason: leave.reason,
+  });
+
   return res.status(200).json({ success: true, message: "Leave forwarded successfully", leave });
 };
 
@@ -546,6 +624,18 @@ await leave.save();
     } catch (deductionError) {
       console.error("Leave approved but balance deduction failed:", deductionError.message);
     }
+
+    notifyLeaveDecision({
+      recipientModel: "Manager",
+      recipientId: leave.manager,
+      leaveType: leave.leaveType,
+      startDate: leave.startDate,
+      endDate: leave.endDate,
+      days: leave.days,
+      decision: "approved",
+      decidedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+      remarks: leave.remarks,
+    });
 
     return res.status(200).json({ message: "Manager leave approved successfully", leave });
   }
@@ -586,6 +676,18 @@ await leave.save();
       console.error("Leave approved but balance deduction failed:", deductionError.message);
     }
 
+    notifyLeaveDecision({
+      recipientModel: "User",
+      recipientId: leave.employee,
+      leaveType: leave.leaveType,
+      startDate: leave.startDate,
+      endDate: leave.endDate,
+      days: leave.days,
+      decision: "approved",
+      decidedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+      remarks: leave.remarks,
+    });
+
     return res.status(200).json({ message: "Employee leave approved successfully", leave });
   }
 
@@ -622,6 +724,18 @@ leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
 await leave.save();
 
+    notifyLeaveDecision({
+      recipientModel: "Manager",
+      recipientId: leave.manager,
+      leaveType: leave.leaveType,
+      startDate: leave.startDate,
+      endDate: leave.endDate,
+      days: leave.days,
+      decision: "rejected",
+      decidedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+      remarks: leave.remarks,
+    });
+
     return res.status(200).json({ message: "Manager leave rejected successfully", leave });
   }
 
@@ -644,6 +758,18 @@ leave.remarks = `Rejected by Manager (${req.manager.f_name})`;
 leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
 await leave.save();
+
+    notifyLeaveDecision({
+      recipientModel: "User",
+      recipientId: leave.employee,
+      leaveType: leave.leaveType,
+      startDate: leave.startDate,
+      endDate: leave.endDate,
+      days: leave.days,
+      decision: "rejected",
+      decidedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+      remarks: leave.remarks,
+    });
 
     return res.status(200).json({ message: "Employee leave rejected successfully", leave });
   }
@@ -1160,6 +1286,31 @@ const managerGetTicketDetail = async (req, res, next) => {
   }
 };
 
+// Walks up a manager's reporting chain (manager -> manager -> ... -> admin)
+// to find the specific Admin they ultimately report to. Guards against cycles.
+const resolveManagerRootAdmin = (managers, admins, startManagerId) => {
+  let current = managers.find((m) => m._id.toString() === startManagerId.toString());
+  const visited = new Set();
+
+  while (current && current.reporting_manager) {
+    const key = current._id.toString();
+    if (visited.has(key)) return null; // cycle guard
+    visited.add(key);
+
+    if (current.reporting_manager_model === "Admin") {
+      return admins.find((a) => a._id.toString() === current.reporting_manager.toString()) || null;
+    }
+
+    if (current.reporting_manager_model === "Manager") {
+      current = managers.find((m) => m._id.toString() === current.reporting_manager.toString());
+    } else {
+      return null;
+    }
+  }
+
+  return null;
+};
+
 const getOrgInfoForManager = async (req, res, next) => {
   try {
     if (!req.manager) {
@@ -1171,7 +1322,7 @@ const getOrgInfoForManager = async (req, res, next) => {
 
     const manager = await managermodel.findById(req.manager._id)
       .select(
-        "f_name l_name work_email designation department office_location organisation_id"
+        "f_name l_name empid work_email designation department office_location organisation_id"
       )
       .lean();
 
@@ -1234,12 +1385,12 @@ const getOrgInfoForManager = async (req, res, next) => {
     }
 
     const admins = await AdminModel.find({ organisation_id, working_status: "working" })
-      .select("f_name l_name work_email designation department")
+      .select("f_name l_name empid work_email designation department")
       .lean();
 
     const managers = await managermodel.find({ organisation_id, working_status: "working" })
       .select(
-        "f_name l_name work_email designation department office_location reporting_manager reporting_manager_model"
+        "f_name l_name empid work_email designation department office_location reporting_manager reporting_manager_model"
       )
       .lean();
 
@@ -1251,19 +1402,25 @@ const getOrgInfoForManager = async (req, res, next) => {
       },
     })
       .select(
-        "f_name l_name work_email designation department office_location Under_manager"
+        "f_name l_name empid work_email designation department office_location Under_manager"
       )
       .lean();
+
+    const rootAdmin =
+      resolveManagerRootAdmin(managers, admins, manager._id) || admins[0] || null;
 
     const topLevelManagers = managers
       .filter(
         (mgr) =>
-          !mgr.reporting_manager ||
+          rootAdmin &&
+          mgr.reporting_manager &&
+          mgr.reporting_manager.toString() === rootAdmin._id.toString() &&
           mgr.reporting_manager_model === "Admin"
       )
       .map((mgr) => ({
         id: mgr._id,
         name: `${mgr.f_name} ${mgr.l_name}`,
+        empid: mgr.empid,
         email: mgr.work_email,
         designation: mgr.designation,
         department: mgr.department,
@@ -1279,6 +1436,7 @@ const getOrgInfoForManager = async (req, res, next) => {
           .map((emp) => ({
             id: emp._id,
             name: `${emp.f_name} ${emp.l_name}`,
+            empid: emp.empid,
             email: emp.work_email,
             designation: emp.designation,
             department: emp.department,
@@ -1309,19 +1467,21 @@ const getOrgInfoForManager = async (req, res, next) => {
       current_manager: {
         id: manager._id,
         name: `${manager.f_name} ${manager.l_name}`,
+        empid: manager.empid,
         email: manager.work_email,
         designation: manager.designation,
         department: manager.department,
         office_location: manager.office_location,
       },
 
-      admin: admins[0]
+      admin: rootAdmin
         ? {
-            id: admins[0]._id,
-            name: `${admins[0].f_name} ${admins[0].l_name}`,
-            email: admins[0].work_email,
-            designation: admins[0].designation,
-            department: admins[0].department,
+            id: rootAdmin._id,
+            name: `${rootAdmin.f_name} ${rootAdmin.l_name}`,
+            empid: rootAdmin.empid,
+            email: rootAdmin.work_email,
+            designation: rootAdmin.designation,
+            department: rootAdmin.department,
           }
         : null,
 
@@ -1381,6 +1541,7 @@ const buildManagerTreeWithCurrentFlags = (
     .map((mgr) => ({
       id: mgr._id,
       name: `${mgr.f_name} ${mgr.l_name}`,
+      empid: mgr.empid,
       email: mgr.work_email,
       designation: mgr.designation,
       department: mgr.department,
@@ -1400,6 +1561,7 @@ const buildManagerTreeWithCurrentFlags = (
         .map((emp) => ({
           id: emp._id,
           name: `${emp.f_name} ${emp.l_name}`,
+          empid: emp.empid,
           email: emp.work_email,
           designation: emp.designation,
           department: emp.department,

@@ -1,38 +1,53 @@
 const LeaveBalance = require("../Models/leavebalance.model");
+const LeavePolicy = require("../Models/Leavepolicy.model");
 
-const assignDefaultLeave = async (user) => {
-  let yearlyEL = 15;
+const DEFAULT_POLICY = {
+  EL: { admin: 18, default: 15 },
+  SL: { admin: 12, default: 12 },
+};
 
-  switch (user.role) {
-    case "manager":      yearlyEL = 18; break;
-    case "senior_manager": yearlyEL = 20; break;
-    case "official":     yearlyEL = 24; break;
+const assignDefaultLeave = async (user, isAdmin = false) => {
+  const tier = isAdmin ? "admin" : "default";
+
+  let policy = null;
+  if (user.organisation_id) {
+    policy = await LeavePolicy.findOne({ organisation_id: user.organisation_id }).lean();
   }
 
+  const yearlyEL = policy?.EL?.[tier] ?? DEFAULT_POLICY.EL[tier];
+  const yearlySL = policy?.SL?.[tier] ?? DEFAULT_POLICY.SL[tier];
+
+  const remainingMonths = 12 - new Date().getMonth();
+  const proratedEL = Number(((yearlyEL / 12) * remainingMonths).toFixed(2));
+  const proratedSL = Number(((yearlySL / 12) * remainingMonths).toFixed(2));
+
   const leaveBalance = await LeaveBalance.create({
-  organisation_id: user.organisation_id, 
-  employee: user._id,
+    organisation_id: user.organisation_id,
+    employee: user._id,
 
-  EL: {
-    entitled: yearlyEL,
-    availed: 0,
-    accrued: Number((yearlyEL / 12).toFixed(2)),
-  },
+    EL: {
+      entitled: proratedEL,
+      yearlyEntitled: yearlyEL,
+      availed: 0,
+      accrued: Number((yearlyEL / 12).toFixed(2)),
+    },
 
-  SL: {
-    entitled: 12,
-    availed: 0,
-  },
+    SL: {
+      entitled: proratedSL,
+      yearlyEntitled: yearlySL,
+      availed: 0,
+    },
 
-  ML: user.gender === "female" && user.marital_status === "married" ? 182 : 0,
-  PL: user.gender === "male" && user.marital_status === "married" ? 7 : 0,
+    ML: user.gender === "female" && user.marital_status === "married" ? 182 : 0,
+    PL: user.gender === "male" && user.marital_status === "married" ? 7 : 0,
 
-  pbc: 0,
-  lwp: 0,
-  lastAccrualDate: new Date(),
-});
+    pbc: 0,
+    lwp: 0,
+    lastAccrualDate: new Date(),
+  });
 
   return leaveBalance;
 };
 
 module.exports = assignDefaultLeave;
+module.exports.DEFAULT_POLICY = DEFAULT_POLICY;

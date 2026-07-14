@@ -26,6 +26,17 @@ import { useGetAllAnnouncements, useCreateAnnouncement, useUpdateAnnouncement, u
 import { useGetAllAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin, useReviewToAdmin } from "../../auth/server-state/superadmin/other/suother.hook";
 
 const DEPT_OPTIONS = [ "OPR","BPO", "ENG", "HR", "MGMT"];
+export const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+ 
+};
+
+export const getDepartmentName = (dept) =>
+  DEPT_FULL_FORMS[dept] || dept || "—";
 const ROLE_LABEL = { admin: "Admin",  official: "Official" };
 
 const WORKING_STATUS_OPTIONS = [
@@ -499,7 +510,7 @@ function WorkingStatusModal({ open, onClose, admin, onConfirm, loading }) {
                 </div>
                 <div className="min-w-0">
                   <p className="text-[13px] font-bold text-[#0d0209] truncate">{name}</p>
-                  <p className="text-[11px] text-[#7a5568] truncate">{admin.designation} · {admin.department}</p>
+                  <p className="text-[11px] text-[#7a5568] truncate">{admin.designation} · {getDepartmentName(admin.department)}</p>
                   <span className="inline-flex items-center mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ color: meta.color, background: meta.bg, border: `1px solid ${meta.border}` }}>
                     → {meta.label}
                   </span>
@@ -1010,9 +1021,11 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
           <div className="mt-3 sm:mt-4">
             <FLabel required>Department</FLabel>
             <FSel value={form.department} onChange={set("department")} onBlur={blur("department")} err={showErr("department")}>
-              <option value="">Select department</option>
-              {DEPT_OPTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
-            </FSel>
+  <option value="">Select department</option>
+  {DEPT_OPTIONS.map((d) => (
+    <option key={d} value={d}>{DEPT_FULL_FORMS[d] || d}</option>
+  ))}
+</FSel>
             <FieldErr msg={showErr("department")} />
           </div>
 
@@ -1091,7 +1104,7 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
               onChange={handleResidentialChange}
             />
           </div>
-          
+         
           <div className="mt-3 sm:mt-4">
             <FLabel>Country</FLabel>
             <SearchableSelect
@@ -1137,8 +1150,8 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
               Same as Residential Address
             </label>
           </div>
-          
-          
+         
+         
 
           <div className="mt-3 sm:mt-4">
             <FLabel>Permanent Address</FLabel>
@@ -1330,7 +1343,7 @@ function ReviewModal({ open, onClose, admins, onSave, loading }) {
             <FSel value={form.adminid} onChange={(e) => setForm((f) => ({ ...f, adminid: e.target.value }))}>
               <option value="">Choose admin…</option>
               {admins.map((a) => (
-                <option key={a._id} value={a._id}>{a.f_name} {a.l_name} – {a.designation} ({a.department})</option>
+                <option key={a._id} value={a._id}>{a.f_name} {a.l_name} – {a.designation} ({getDepartmentName(a.department)})</option>
               ))}
             </FSel>
           </div>
@@ -1610,7 +1623,7 @@ function SuperAdminDashboard() {
 
   const stats = [
     { icon: <FaUserShield />, label: "Total Admins", value: adminsLoading ? "—" : admins.length, sub: `${admins.filter((a) => a.status === "active").length} active`, color: "#730042", bgColor: "#f7ecf3", bar: null, badge: null },
-    { icon: <FaUsers />, label: "Total Employees", value: deptLoading || empLoading ? "—" : totalEmpCount, sub: `${departments.length} departments`, color: "#2563eb", bgColor: "#eff6ff", bar: null, badge: null },
+    { icon: <FaUsers />, label: "Total Employee", value: activeUserLoading ? "—" : (superAdmin?.active_user_count ?? activeUserCount), sub: `${departments.length} departments`, color: "#2563eb", bgColor: "#eff6ff", bar: null, badge: null },
     { icon: <FaClock />, label: "Present Today", value: mapLoading ? "—" : presentToday, sub: `${attendanceRate}% · ${stillOnDuty} on duty`, color: "#0d9e6e", bgColor: "#e8f7f1", bar: mapLoading ? null : attendanceRate, badge: null },
     { icon: <FaCalendarAlt />, label: "Admin Leaves", value: leaveLoading ? "—" : pendingAdminLeaves, sub: pendingAdminLeaves > 0 ? "Needs attention" : "All clear ✓", color: pendingAdminLeaves > 0 ? "#b8760a" : "#0d9e6e", bgColor: pendingAdminLeaves > 0 ? "#fff8e1" : "#e8f7f1", bar: null, badge: null },
     { icon: <FaBullhorn />, label: "Announcements", value: annLoading ? "—" : announcements.length, sub: "Active broadcasts", color: "#7c3aed", bgColor: "#f5f3ff", bar: null, badge: null },
@@ -1733,7 +1746,7 @@ function SuperAdminDashboard() {
 
           <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-3 sm:mb-0">
             <span className="bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-[11px] text-white/90 font-medium">🏢 {orgName}</span>
-            <span className="bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-[11px] text-white/90 font-medium">👥 {totalEmpCount} Employees</span>
+            <span className="bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-[11px] text-white/90 font-medium">👥 {superAdmin?.active_user_count ?? activeUserCount} Employees</span>
             {presentToday > 0 && <span className="bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-[11px] text-white/90 font-medium">✅ {presentToday} Present</span>}
             {pendingAdminLeaves > 0 && <span className="bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-[11px] text-white/90 font-medium">📋 {pendingAdminLeaves} Pending</span>}
             <span className="hidden md:inline-flex bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-[11px] text-white/90 font-medium">📆 {today}</span>
@@ -1916,7 +1929,7 @@ function SuperAdminDashboard() {
                   {admin.department && (
                     <p className="text-center mt-1 sm:mt-1.5 hidden sm:block">
                       <span className="text-[9px] sm:text-[10px] bg-gray-50 text-gray-500 border border-gray-200 px-2 py-0.5 rounded-full font-semibold">
-                        {admin.department} · {admin.office_location}
+                        {getDepartmentName(admin.department)} · {admin.office_location}
                       </span>
                     </p>
                   )}
@@ -1980,7 +1993,7 @@ function SuperAdminDashboard() {
             <div>
               {departments.map((dep) => (
                 <div key={dep.department} className="px-4 sm:px-5 py-2.5 sm:py-3 border-b border-[#f7ecf3] last:border-0 flex items-center gap-3 sm:gap-4">
-                  <p className="text-[11px] sm:text-[12px] font-semibold text-[#0d0209] w-12 sm:w-16 flex-shrink-0">{dep.department}</p>
+                  <p className="text-[11px] sm:text-[12px] font-semibold text-[#0d0209] w-24 sm:w-32 flex-shrink-0 truncate" title={getDepartmentName(dep.department)}>{getDepartmentName(dep.department)}</p>
                   <div className="flex-1 h-2 bg-[#e8d5e2] rounded-full overflow-hidden">
                     <div className="h-full rounded-full bg-gradient-to-r from-[#4a0029] to-[#cd166e] transition-all duration-1000" style={{ width: `${Math.round((dep.lastNumber / maxDept) * 100)}%` }} />
                   </div>
@@ -2092,7 +2105,7 @@ function SuperAdminDashboard() {
                     <p className="text-[11px] sm:text-[12px] font-semibold text-[#0d0209] truncate leading-tight">{name}</p>
                     {isManager && <span className="text-[9px] bg-[#f7ecf3] text-[#730042] px-1.5 py-0.5 rounded-full font-bold uppercase">MGR</span>}
                     {role && <p className="text-[10px] sm:text-[11px] text-[#7a5568] truncate mt-0.5">{role}</p>}
-                    {dept && <span className="text-[9px] sm:text-[10px] bg-[#f7ecf3] text-[#730042] px-1.5 py-0.5 rounded-full font-semibold inline-block mt-0.5 sm:mt-1">{dept}</span>}
+                    {dept && <span className="text-[9px] sm:text-[10px] bg-[#f7ecf3] text-[#730042] px-1.5 py-0.5 rounded-full font-semibold inline-block mt-0.5 sm:mt-1">{getDepartmentName(dept)}</span>}
                   </div>
                 </div>
               );

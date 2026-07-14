@@ -118,7 +118,7 @@ function Navbar() {
             href="https://torchxsuite.com/talent/login"
             className="bg-[#7A004B] text-white text-sm font-ui font-semibold px-7 py-2.5 rounded-full no-underline shadow-[0_4px_18px_rgba(122,0,75,0.25)] transition-all hover:bg-[#5a0033] hover:-translate-y-0.5"
           >
-            Login
+            Sign in
           </a>
         </div>
 
@@ -144,7 +144,7 @@ function Navbar() {
             </a>
           ))}
           <a
-            href="/login"
+            href="https://torchxsuite.com/talent/login"
             className="bg-[#7A004B] text-white text-sm font-ui font-semibold py-3 rounded-full no-underline text-center"
           >
             Login

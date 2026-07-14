@@ -8,6 +8,7 @@ import {
   useForwardLeaveToReportingManager,
   useGetMyLeavesManager,
   useApplyLeaveManager,
+  useGetLeaveHistory,
   useGetForwardedLeavesManager,
   useAcceptForwardedLeave,
   useRejectForwardedLeave,
@@ -282,6 +283,7 @@ const LEAVE_META = {
   pl:          { label:"Paternity Leave", short:"PL",  bg:"#FEF3C7", color:"#92400E", accent:"#F59E0B", dot:"#D97706" },
   half_day_el: { label:"Half Day EL",     short:"½EL", bg:"#ECFDF5", color:"#065F46", accent:"#10B981", dot:"#059669" },
   half_day_sl: { label:"Half Day SL",     short:"½SL", bg:"#EFF6FF", color:"#1E40AF", accent:"#60A5FA", dot:"#3B82F6" },
+  lwp:         { label:"Leave Without Pay", short:"LWP", bg:"#FCE7F3", color:"#9D174D", accent:"#DB2777", dot:"#DB2777" },
 };
 
 const LEAVE_STATUS_META = {
@@ -342,6 +344,44 @@ const AVATAR_COLORS = [
 const fmt = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"}) : "—";
 
+const humanizeStatus = (s = "") =>
+  s.split("_").filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+
+const csvEscape = (val) => `"${String(val ?? "").replace(/"/g, '""')}"`;
+
+const exportLeavesToCSV = (leaves, filename, personKey = "employee") => {
+  const headers = [
+    "Name", "Employee ID", "Email", "Leave Type", "Status",
+    "Start Date", "End Date", "Days", "Reason", "Remarks", "Applied On",
+  ];
+  const rows = leaves.map((l) => {
+    const person = l[personKey] || l.employee || l.manager || l.admin || {};
+    return [
+      csvEscape(`${person.f_name || ""} ${person.l_name || ""}`.trim() || "—"),
+      csvEscape(person.empid || "—"),
+      csvEscape(person.work_email || "—"),
+      csvEscape((LEAVE_META[l.leaveType] || {}).label || l.leaveType || "—"),
+      csvEscape((LEAVE_STATUS_META[l.status] || {}).label || humanizeStatus(l.status)),
+      csvEscape(fmt(l.startDate)),
+      csvEscape(fmt(l.endDate)),
+      l.days || daysDiff(l.startDate, l.endDate),
+      csvEscape(l.reason || ""),
+      csvEscape(l.remarks || ""),
+      csvEscape(fmt(l.createdAt)),
+    ].join(",");
+  });
+  const csvContent = [headers.join(","), ...rows].join("\n");
+  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 const daysDiff = (s,e) => {
   if (!s||!e) return 0;
   const n = Math.floor((new Date(e)-new Date(s))/86400000)+1;
@@ -397,6 +437,74 @@ const EmptyState = ({msg="No records found"}) => (
     <p style={{fontSize:13,color:"#9B8BAE",fontWeight:500,fontFamily:"'DM Sans',sans-serif",margin:0}}>{msg}</p>
   </div>
 );
+
+const FilterExportBar = ({ search, setSearch, dateFrom, setDateFrom, dateTo, setDateTo, onExport, exportDisabled }) => (
+  <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", alignItems: "flex-end" }}>
+    <div style={{ flex: 1, minWidth: 160 }}>
+      <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#9B8BAE", marginBottom: 4, textTransform: "uppercase", letterSpacing: ".03em" }}>Search</label>
+      <input
+        type="text"
+        placeholder="Name or reason…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        style={{ width: "100%", padding: "8px 12px", borderRadius: 10, fontSize: 13, border: "1.5px solid #E5DAF0", color: "#4A3860", outline: "none" }}
+      />
+    </div>
+    <div style={{ minWidth: 130 }}>
+      <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#9B8BAE", marginBottom: 4, textTransform: "uppercase", letterSpacing: ".03em" }}>From</label>
+      <input
+        type="date"
+        value={dateFrom}
+        onChange={(e) => setDateFrom(e.target.value)}
+        style={{ width: "100%", padding: "8px 12px", borderRadius: 10, fontSize: 13, border: "1.5px solid #E5DAF0", color: "#4A3860", outline: "none" }}
+      />
+    </div>
+    <div style={{ minWidth: 130 }}>
+      <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#9B8BAE", marginBottom: 4, textTransform: "uppercase", letterSpacing: ".03em" }}>To</label>
+      <input
+        type="date"
+        value={dateTo}
+        onChange={(e) => setDateTo(e.target.value)}
+        style={{ width: "100%", padding: "8px 12px", borderRadius: 10, fontSize: 13, border: "1.5px solid #E5DAF0", color: "#4A3860", outline: "none" }}
+      />
+    </div>
+    <button
+      onClick={onExport}
+      disabled={exportDisabled}
+      style={{
+        padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#fff", cursor: exportDisabled ? "not-allowed" : "pointer",
+        background: "linear-gradient(135deg,#6B1A4A,#9B2458)", boxShadow: "0 3px 12px rgba(107,26,74,0.3)",
+        opacity: exportDisabled ? 0.4 : 1, border: "none", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap",
+      }}
+    >
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v8M3.5 6l3 3 3-3M2 11.5h9" stroke="#fff" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      Export CSV
+    </button>
+  </div>
+);
+
+const Pagination = ({ page, setPage, totalPages }) => {
+  if (totalPages <= 1) return null;
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 18, paddingTop: 14, borderTop: "1px solid rgba(200,185,220,0.28)" }}>
+      <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+        style={{ padding: "6px 12px", borderRadius: 10, fontSize: 12, fontWeight: 700, background: "#F4EEF9", color: "#6B1A4A", border: "none", cursor: page === 1 ? "not-allowed" : "pointer", opacity: page === 1 ? 0.4 : 1 }}>
+        ← Prev
+      </button>
+      {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+        <button key={p} onClick={() => setPage(p)}
+          style={{ width: 30, height: 30, borderRadius: 10, fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer",
+            background: p === page ? "linear-gradient(135deg,#6B1A4A,#9B2458)" : "#F4EEF9", color: p === page ? "#fff" : "#6B1A4A" }}>
+          {p}
+        </button>
+      ))}
+      <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+        style={{ padding: "6px 12px", borderRadius: 10, fontSize: 12, fontWeight: 700, background: "#F4EEF9", color: "#6B1A4A", border: "none", cursor: page === totalPages ? "not-allowed" : "pointer", opacity: page === totalPages ? 0.4 : 1 }}>
+        Next →
+      </button>
+    </div>
+  );
+};
 
 const Toast = ({toast}) => {
   const colors = {
@@ -533,6 +641,11 @@ const EmployeeLeavesPanel = ({showToast}) => {
   const [filter,setFilter]         = useState("all");
   const [processingId,setProcessingId] = useState(null);
   const [localOverrides,setLocalOverrides] = useState({}); // leaveId -> status (optimistic)
+  const [search,setSearch]   = useState("");
+  const [dateFrom,setDateFrom] = useState("");
+  const [dateTo,setDateTo]     = useState("");
+  const [page,setPage]         = useState(1);
+  const PAGE_SIZE = 5;
 
   const {data:rawLeaves,isLoading,refetch} = useGetAllManagerLeaves();
   const acceptMut  = useAcceptLeaveRequest();
@@ -545,8 +658,22 @@ const EmployeeLeavesPanel = ({showToast}) => {
     localOverrides[l._id] ? { ...l, status: localOverrides[l._id] } : l
   );
 
-  const filtered = filter==="all" ? leaves : leaves.filter(l=>l.status===filter);
+  const statusFiltered = filter==="all" ? leaves : leaves.filter(l=>l.status===filter);
   const count    = (key) => key==="all" ? leaves.length : leaves.filter(l=>l.status===key).length;
+
+  const filtered = statusFiltered.filter((l) => {
+    const emp = l.employee || {};
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q ||
+      `${emp.f_name || ""} ${emp.l_name || ""}`.toLowerCase().includes(q) ||
+      (l.reason || "").toLowerCase().includes(q);
+    const start = l.startDate ? new Date(l.startDate) : null;
+    const matchesFrom = !dateFrom || (start && start >= new Date(dateFrom));
+    const matchesTo   = !dateTo   || (start && start <= new Date(dateTo));
+    return matchesSearch && matchesFrom && matchesTo;
+  });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const handleAction = async (leaveId,action) => {
     setProcessingId(leaveId);
@@ -572,6 +699,12 @@ const EmployeeLeavesPanel = ({showToast}) => {
     } finally { setProcessingId(null); }
   };
 
+  const handleExport = () => {
+    if (filtered.length === 0) { showToast("No records to export", "info"); return; }
+    exportLeavesToCSV(filtered, `team-leaves-${fmt(new Date()).replace(/\s/g, "-")}.csv`, "employee");
+    showToast("Export started", "success");
+  };
+
   if (isLoading) return <Spinner/>;
 
   return (
@@ -590,13 +723,21 @@ const EmployeeLeavesPanel = ({showToast}) => {
         ))}
       </div>
 
+      <FilterExportBar
+        search={search} setSearch={(v) => { setSearch(v); setPage(1); }}
+        dateFrom={dateFrom} setDateFrom={(v) => { setDateFrom(v); setPage(1); }}
+        dateTo={dateTo} setDateTo={(v) => { setDateTo(v); setPage(1); }}
+        onExport={handleExport}
+        exportDisabled={filtered.length === 0}
+      />
+
       <div style={{display:"flex",gap:7,marginBottom:20,flexWrap:"wrap"}}>
         {EMP_LEAVE_FILTERS.map(f=>{
           const active = filter===f.key;
           return (
             <button key={f.key} className="mlw-chip-btn"
               style={{border:active?"1.5px solid #8B3A8A":"1.5px solid #E5DAF0",background:active?"linear-gradient(135deg,#6B1A4A,#9B2458)":"#fff",color:active?"#fff":"#8B7FA0",boxShadow:active?"0 2px 9px rgba(107,26,74,0.28)":"none"}}
-              onClick={()=>setFilter(f.key)}>
+              onClick={()=>{setFilter(f.key);setPage(1);}}>
               {f.label}
               <span style={{background:active?"rgba(255,255,255,0.22)":"#EDE6F5",color:active?"#fff":"#9B8BAE",borderRadius:9,padding:"1px 7px",fontSize:10,fontWeight:700}}>
                 {count(f.key)}
@@ -608,7 +749,7 @@ const EmployeeLeavesPanel = ({showToast}) => {
 
       {filtered.length===0
         ? <EmptyState msg="No leave requests found"/>
-        : filtered.map((leave,idx)=>{
+        : paged.map((leave,idx)=>{
             const emp          = leave.employee||{};
             const isActionable = !NON_ACTIONABLE.includes(leave.status);
             const isProcessing = processingId===leave._id;
@@ -641,6 +782,7 @@ const EmployeeLeavesPanel = ({showToast}) => {
             );
           })
       }
+      <Pagination page={page} setPage={setPage} totalPages={totalPages} />
     </div>
   );
 };
@@ -656,6 +798,11 @@ const ForwardedLeavesPanel = ({showToast}) => {
 
   const employeeLeaves = rawData?.employeeLeaves?.leaves || [];
   const managerLeaves  = rawData?.managerLeaves?.leaves  || [];
+
+  const isActionable = (leave, leaveFor) =>
+    leaveFor === "manager"
+      ? leave.status === "pending_reporting_manager"
+      : leave.status === "forwarded_reporting_manager";
 
   const handleAction = async (leaveId,leaveFor,action) => {
     setProcessingId(leaveId);
@@ -704,10 +851,16 @@ const ForwardedLeavesPanel = ({showToast}) => {
           </div>
 
           <div className="mlw-card-actions" style={{display:"flex",flexDirection:"column",gap:7,flexShrink:0}}>
-            <button className="mlw-action-btn" style={{background:"#F0FDF4",color:"#14803D",boxShadow:"0 2px 7px rgba(34,197,94,0.14)"}} onClick={()=>handleAction(leave._id,leaveFor,"accept")}><IconCheck/>Approve</button>
-            <button className="mlw-action-btn" style={{background:"#FFF1F2",color:"#991B1B",boxShadow:"0 2px 7px rgba(239,68,68,0.11)"}} onClick={()=>handleAction(leave._id,leaveFor,"reject")}><IconX/>Reject</button>
-            {isMgrLeave&&(
-              <button className="mlw-action-btn" style={{background:"#F5F3FF",color:"#6B21A8",boxShadow:"0 2px 7px rgba(107,33,168,0.11)"}} onClick={()=>handleAction(leave._id,leaveFor,"forwardChain")}><IconForwardChain/>Forward Up</button>
+            {isActionable(leave,leaveFor) ? (
+              <>
+                <button className="mlw-action-btn" style={{background:"#F0FDF4",color:"#14803D",boxShadow:"0 2px 7px rgba(34,197,94,0.14)"}} onClick={()=>handleAction(leave._id,leaveFor,"accept")}><IconCheck/>Approve</button>
+                <button className="mlw-action-btn" style={{background:"#FFF1F2",color:"#991B1B",boxShadow:"0 2px 7px rgba(239,68,68,0.11)"}} onClick={()=>handleAction(leave._id,leaveFor,"reject")}><IconX/>Reject</button>
+                {isMgrLeave&&(
+                  <button className="mlw-action-btn" style={{background:"#F5F3FF",color:"#6B21A8",boxShadow:"0 2px 7px rgba(107,33,168,0.11)"}} onClick={()=>handleAction(leave._id,leaveFor,"forwardChain")}><IconForwardChain/>Forward Up</button>
+                )}
+              </>
+            ) : (
+              <span style={{fontSize:11,fontWeight:600,color:"#9B8BAE",fontFamily:"'DM Sans',sans-serif",padding:"5px 9px"}}>Decided</span>
             )}
           </div>
         </div>
@@ -761,26 +914,26 @@ const MyBalancePanel = ({manager,leavebalance}) => {
   const showML    = manager?.gender==="female" && isMarried;
   const showPL    = manager?.gender==="male"   && isMarried;
 
-  const elEntitled = balance.EL?.entitled || 0;
-  const elAvailed  = balance.EL?.availed  || 0;
-  const elAccrued  = balance.EL?.accrued  || 0;
-  const slEntitled = balance.SL?.entitled || 0;
-  const slAvailed  = balance.SL?.availed  || 0;
+  const elEntitled = Number(balance.EL?.entitled ?? 0);
+  const elAvailed  = Number(balance.EL?.availed  ?? 0);
+  const elAccrued  = Number(balance.EL?.accrued  ?? 0);
+  const slEntitled = Number(balance.SL?.entitled ?? 0);
+  const slAvailed  = Number(balance.SL?.availed  ?? 0);
 
   const cards = [
-    {key:"el",  label:"Earned Leave",      entitled:elEntitled, availed:elAvailed, accrued:elAccrued, accent:"#22C55E", bg:"linear-gradient(135deg,#F0FDF4,#DCFCE7)"},
-    {key:"sl",  label:"Sick Leave",        entitled:slEntitled, availed:slAvailed, accrued:0,         accent:"#3B82F6", bg:"linear-gradient(135deg,#EFF6FF,#DBEAFE)"},
-    {key:"pbc", label:"Paid by Company",   entitled:balance.pbc||0, availed:0, accrued:0,             accent:"#6B1A4A", bg:"linear-gradient(135deg,#F9EFF5,#F4E6F0)"},
-    {key:"lwp", label:"Leave Without Pay", entitled:balance.lwp||0, availed:0, accrued:0,             accent:"#CD166E", bg:"linear-gradient(135deg,#FDF2F8,#FCE7F3)"},
-    ...(showML?[{key:"ml",label:"Maternity Leave",entitled:balance.ML||0,availed:0,accrued:0,accent:"#A855F7",bg:"linear-gradient(135deg,#FAF5FF,#F3E8FF)"}]:[]),
-    ...(showPL?[{key:"pl",label:"Paternity Leave",entitled:balance.PL||0,availed:0,accrued:0,accent:"#F59E0B",bg:"linear-gradient(135deg,#FFFBEB,#FEF3C7)"}]:[]),
+    {key:"el",  label:"Earned Leave",      entitled:elEntitled, availed:elAvailed, accrued:elAccrued, accrues:true,  remaining:Math.max(0, elAccrued - elAvailed), accent:"#22C55E", bg:"linear-gradient(135deg,#F0FDF4,#DCFCE7)"},
+    {key:"sl",  label:"Sick Leave",        entitled:slEntitled, availed:slAvailed, accrued:slEntitled, accrues:false, remaining:Math.max(0, slEntitled - slAvailed), accent:"#3B82F6", bg:"linear-gradient(135deg,#EFF6FF,#DBEAFE)"},
+    {key:"pbc", label:"Paid by Company",   entitled:balance.pbc||0, availed:0, accrued:balance.pbc||0, accrues:false, remaining:balance.pbc||0,             accent:"#6B1A4A", bg:"linear-gradient(135deg,#F9EFF5,#F4E6F0)"},
+    {key:"lwp", label:"Leave Without Pay", entitled:balance.lwp||0, availed:0, accrued:balance.lwp||0, accrues:false, remaining:balance.lwp||0,             accent:"#CD166E", bg:"linear-gradient(135deg,#FDF2F8,#FCE7F3)"},
+    ...(showML?[{key:"ml",label:"Maternity Leave",entitled:balance.ML||0,availed:0,accrued:balance.ML||0,accrues:false,remaining:balance.ML||0,accent:"#A855F7",bg:"linear-gradient(135deg,#FAF5FF,#F3E8FF)"}]:[]),
+    ...(showPL?[{key:"pl",label:"Paternity Leave",entitled:balance.PL||0,availed:0,accrued:balance.PL||0,accrues:false,remaining:balance.PL||0,accent:"#F59E0B",bg:"linear-gradient(135deg,#FFFBEB,#FEF3C7)"}]:[]),
   ];
 
   return (
     <div>
       <div className="mlw-stat-grid">
         {cards.map((s,i)=>{
-          const remaining = s.entitled-s.availed;
+          const remaining = s.remaining;
           const pct       = s.entitled>0 ? Math.min((s.availed/s.entitled)*100,100) : 0;
           return (
             <div key={s.key} className="mlw-stat-card" style={{animationDelay:`${i*.07}s`}}>
@@ -795,7 +948,7 @@ const MyBalancePanel = ({manager,leavebalance}) => {
                 <div className="mlw-progress-fill" style={{width:`${Math.max(pct,3)}%`,background:s.accent,animationDelay:`${i*.09+.3}s`}}/>
               </div>
               <div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:10,color:"#9B8BAE",fontFamily:"'DM Sans',sans-serif"}}>
-                {s.accrued>0&&<span>Accrued: {s.accrued}</span>}
+                {s.accrues&&<span>Accrued: {s.accrued}</span>}
                 <span style={{marginLeft:"auto"}}>{s.availed} used</span>
               </div>
             </div>
@@ -811,7 +964,7 @@ const MyBalancePanel = ({manager,leavebalance}) => {
             </thead>
             <tbody>
               {cards.map(s=>{
-                const rem = s.entitled-s.availed;
+                const rem = s.remaining;
                 const pct = s.entitled>0 ? Math.round((rem/s.entitled)*100) : 0;
                 const m   = LEAVE_META[s.key]||{label:s.label,bg:"#F3F4F6",color:"#374151",dot:"#9CA3AF"};
                 return (
@@ -822,7 +975,7 @@ const MyBalancePanel = ({manager,leavebalance}) => {
                       </span>
                     </td>
                     <td style={{fontWeight:600}}>{s.entitled}</td>
-                    <td>{s.accrued||"—"}</td>
+                    <td>{s.accrues ? s.accrued : <span style={{fontSize:11,color:"#B7A9CC",fontStyle:"italic"}}>Granted upfront</span>}</td>
                     <td>{s.availed}</td>
                     <td style={{fontWeight:700,color:s.accent,fontFamily:"'Playfair Display',serif",fontSize:15}}>{rem}</td>
                     <td>
@@ -848,7 +1001,7 @@ const ApplyLeavePanel = ({manager,showToast}) => {
   const [form,setForm]     = useState({leaveType:"el",startDate:"",endDate:"",reason:""});
   const [errors,setErrors] = useState({});
 
-  const {data:rawHistory,isLoading:histLoading,refetch} = useGetMyLeavesManager();
+  const {data:rawHistory,isLoading:histLoading,refetch} = useGetLeaveHistory();
   const applyMut = useApplyLeaveManager();
 
   const isMarried = manager?.marital_status==="married";
@@ -863,6 +1016,7 @@ const ApplyLeavePanel = ({manager,showToast}) => {
     {value:"sl",          label:"Sick Leave"},
     {value:"half_day_el", label:"Half Day EL"},
     {value:"half_day_sl", label:"Half Day SL"},
+    {value:"lwp",         label:"Leave Without Pay"},
     ...(showML?[{value:"ml",label:"Maternity Leave"}]:[]),
     ...(showPL?[{value:"pl",label:"Paternity Leave"}]:[]),
   ];

@@ -15,6 +15,8 @@ import {
 const MAROON = "#7B1C3E";
 const SCAN_INTERVAL_MS = 2200; // how often a frame is sent while scanning
 const RESULT_HOLD_MS = 4000; // how long a result banner stays up before scanning resumes
+const GATE_OPTIONS = ["Gate 1", "Gate 2", "Gate 3", "Gate 4", "Gate 5", "Other"];
+const GATE_STORAGE_KEY = "kiosk_gate";
 
 // Visual theme per outcome, kept separate from the scan logic so the
 // backend can add new "reason"/"action" values without breaking the UI —
@@ -24,8 +26,12 @@ const RESULT_STYLES = {
   checkin_late: { bg: "bg-amber-50", border: "border-amber-300", text: "text-amber-800", icon: "⏰" },
   checkout_on_time: { bg: "bg-blue-50", border: "border-blue-300", text: "text-blue-800", icon: "✅" },
   checkout_overtime: { bg: "bg-purple-50", border: "border-purple-300", text: "text-purple-800", icon: "🌙" },
+  checkout_auto_overtime: { bg: "bg-red-50", border: "border-red-300", text: "text-red-800", icon: "⏱️" },
   checkout_early: { bg: "bg-amber-50", border: "border-amber-300", text: "text-amber-800", icon: "⚠️" },
+  checkout_absent: { bg: "bg-red-50", border: "border-red-300", text: "text-red-800", icon: "🚫" },
   blocked: { bg: "bg-red-50", border: "border-red-300", text: "text-red-800", icon: "⛔" },
+  too_early: { bg: "bg-gray-100", border: "border-gray-300", text: "text-gray-700", icon: "⏳" },
+  cross_channel: { bg: "bg-indigo-50", border: "border-indigo-300", text: "text-indigo-800", icon: "🔀" },
   not_registered: { bg: "bg-gray-100", border: "border-gray-300", text: "text-gray-700", icon: "🙈" },
   checkin_already_done: { bg: "bg-blue-50", border: "border-blue-300", text: "text-blue-800", icon: "🕒" },
   attendance_completed: { bg: "bg-gray-100", border: "border-gray-300", text: "text-gray-700", icon: "✅" },
@@ -47,13 +53,19 @@ function buildSubDetail(data) {
   if (data?.reason === "checkin_already_done" && data?.minutesUntilCheckoutOpens) {
     return `Checkout opens in ${data.minutesUntilCheckoutOpens} minute(s)`;
   }
+  if (data?.reason === "checked_in_by_system" && data?.checkIn) {
+    return `Checked in at ${new Date(data.checkIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} via System`;
+  }
+  if (data?.action === "checkout" && data?.isBelowHalfShift && data?.workedMinutes != null) {
+    return `Worked only ${minutesToLabel(data.workedMinutes)}`;
+  }
   if (!data?.shift?.startTime || !data?.shift?.endTime) return "";
   const range = `Shift ${data.shift.startTime} – ${data.shift.endTime}`;
 
   if (data.action === "checkin" && data.isLate && data.lateMinutes > 0)
     return `${range} · Late by ${minutesToLabel(data.lateMinutes)}`;
 
-  if (data.action === "checkout" && data.checkoutRemark === "overtime" && data.overtimeMinutes > 0)
+  if (data.action === "checkout" && (data.checkoutRemark === "overtime" || data.checkoutRemark === "auto_overtime") && data.overtimeMinutes > 0)
     return `${range} · Overtime of ${minutesToLabel(data.overtimeMinutes)}`;
 
   return range;
@@ -63,10 +75,14 @@ function classifyResult(data, err) {
   if (err) {
     if (err.reason === "not_registered")
       return { kind: "not_registered", title: "Not registered", detail: "This face isn't registered yet. Please ask your admin to register you first, then try again." };
-    if (err.reason === "shift_not_started")
-      return { kind: "blocked", title: "Not allowed", detail: err.message, subDetail: buildSubDetail(err) };
+    if (err.reason === "too_late")
+      return { kind: "blocked", title: "Too late", detail: err.message, subDetail: buildSubDetail(err.data) };
+    if (err.reason === "too_early")
+      return { kind: "too_early", title: "Too early", detail: err.message, subDetail: buildSubDetail(err.data) };
+    if (err.reason === "checked_in_by_system")
+      return { kind: "cross_channel", title: "Checked in via System", detail: err.message, subDetail: buildSubDetail(err.data) };
     if (err.status === 400)
-      return { kind: "already_done", title: "Already done", detail: err.message, subDetail: buildSubDetail(err) };
+      return { kind: "already_done", title: "Already done", detail: err.message, subDetail: buildSubDetail(err.data) };
     return { kind: "error", title: "Scan failed", detail: err.message };
   }
   if (data.action === "checkin") {
@@ -79,6 +95,8 @@ function classifyResult(data, err) {
   }
   if (data.action === "checkout") {
     const kind =
+      data.status === "absent" ? "checkout_absent" :
+      data.checkoutRemark === "auto_overtime" ? "checkout_auto_overtime" :
       data.checkoutRemark === "overtime" ? "checkout_overtime" :
       data.checkoutRemark === "early_checkout" ? "checkout_early" :
       "checkout_on_time";
@@ -107,6 +125,20 @@ export default function FaceKiosk() {
   const [result, setResult] = useState(null); // { kind, title, detail, subDetail }
   const [recentScans, setRecentScans] = useState([]);
   const [cameraError, setCameraError] = useState("");
+
+  const [gateChoice, setGateChoice] = useState("Gate 1");
+  const [customGate, setCustomGate] = useState("");
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(GATE_STORAGE_KEY) || "null");
+      if (saved?.gateChoice) setGateChoice(saved.gateChoice);
+      if (saved?.customGate) setCustomGate(saved.customGate);
+    } catch { /* ignore malformed storage */ }
+  }, []);
+  useEffect(() => {
+    localStorage.setItem(GATE_STORAGE_KEY, JSON.stringify({ gateChoice, customGate }));
+  }, [gateChoice, customGate]);
+  const resolvedGate = gateChoice === "Other" ? (customGate.trim() || "Other") : gateChoice;
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -181,11 +213,11 @@ export default function FaceKiosk() {
 
     busyRef.current = true;
     try {
-      const data = await scanMutation.mutateAsync(frame);
+      const data = await scanMutation.mutateAsync({ image: frame, gate: resolvedGate });
       const classified = classifyResult(data, null);
       setResult(classified);
       setRecentScans((prev) => [
-        { time: new Date(), name: data.employeeName || "—", message: data.message, kind: classified.kind },
+        { time: new Date(), name: data.employeeName || "—", message: data.message, kind: classified.kind, gate: data.gate },
         ...prev.slice(0, 6),
       ]);
     } catch (err) {
@@ -203,7 +235,7 @@ export default function FaceKiosk() {
         busyRef.current = false;
       }, RESULT_HOLD_MS);
     }
-  }, [captureFrame]);
+  }, [captureFrame, resolvedGate]);
 
   const startScanning = useCallback(async () => {
     await startCamera();
@@ -338,6 +370,39 @@ export default function FaceKiosk() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-3xl shadow-xl p-6 w-full max-w-md flex flex-col items-center gap-4">
+        {stage === "ready" ? (
+          <div className="w-full flex flex-col gap-2">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Gate</label>
+            <div className="flex gap-2">
+              <select
+                value={gateChoice}
+                onChange={(e) => setGateChoice(e.target.value)}
+                className="flex-1 border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E]/30 bg-white"
+              >
+                {GATE_OPTIONS.map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+              {gateChoice === "Other" && (
+                <input
+                  type="text"
+                  value={customGate}
+                  onChange={(e) => setCustomGate(e.target.value)}
+                  placeholder="Gate name"
+                  maxLength={40}
+                  className="flex-1 border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#7B1C3E]/30"
+                />
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="w-full flex items-center justify-center">
+            <span className="bg-gray-100 text-gray-600 text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-200">
+              📍 Scanning at {resolvedGate}
+            </span>
+          </div>
+        )}
+
         <div className="relative w-64 h-64 rounded-full overflow-hidden bg-gray-100 border-[3px] border-gray-200">
           <video
             ref={videoRef}
@@ -405,7 +470,10 @@ export default function FaceKiosk() {
             {recentScans.map((s, i) => (
               <div key={i} className="flex items-center justify-between text-sm">
                 <span className="text-gray-700 font-medium truncate">{s.name}</span>
-                <span className="text-gray-400 text-xs">{s.time.toLocaleTimeString()}</span>
+                <span className="flex items-center gap-2 flex-shrink-0">
+                  {s.gate && <span className="text-gray-400 text-[11px] bg-gray-50 border border-gray-200 rounded-full px-2 py-0.5">{s.gate}</span>}
+                  <span className="text-gray-400 text-xs">{s.time.toLocaleTimeString()}</span>
+                </span>
               </div>
             ))}
           </div>

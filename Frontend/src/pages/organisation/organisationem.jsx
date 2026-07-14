@@ -99,35 +99,42 @@ function Hi({ text = "", q = "", style = {} }) {
   );
 }
 
+// Colour is only applied when a node is on the viewer's own line: their manager
+// chain going up to the org root, and themselves. Everyone else is black & white.
 const CFG = {
-  org:     { accent: "#1a0d14", avBg: "#1a0d14", avColor: "#f5edf2", badge: "Organisation",  badgeBg: "#f5edf2", badgeColor: "#4a3542", tag: "ORG" },
-  admin:   { accent: "#5a2240", avBg: "#f0e4ec", avColor: "#5a2240", badge: "Admin",          badgeBg: "#f0e4ec", badgeColor: "#5a2240", tag: "ADM" },
-  manager: { accent: "#a8005c", avBg: "#fce7f3", avColor: "#a8005c", badge: "Manager",        badgeBg: "#fce7f3", badgeColor: "#a8005c", tag: "MGR" },
-  myMgr:   { accent: "#CD166E", avBg: "#fce7f3", avColor: "#CD166E", badge: "Your Manager",   badgeBg: "#fdf2f8", badgeColor: "#CD166E", tag: "MGR" },
-  subMgr:  { accent: "#be185d", avBg: "#fce7f3", avColor: "#be185d", badge: "Reporting Mgr",  badgeBg: "#fce7f3", badgeColor: "#be185d", tag: "MGR" },
-  emp:     { accent: "#7c1f4a", avBg: "#fce7f3", avColor: "#7c1f4a", badge: "Employee",       badgeBg: "#fce7f3", badgeColor: "#7c1f4a", tag: "EMP" },
+  org:     { accentOn: "#1a0d14", avBgOn: "#1a0d14", avColorOn: "#f5edf2" },
+  admin:   { accentOn: "#5a2240", avBgOn: "#f0e4ec", avColorOn: "#5a2240" },
+  manager: { accentOn: "#a8005c", avBgOn: "#fce7f3", avColorOn: "#a8005c" },
+  myMgr:   { accentOn: "#CD166E", avBgOn: "#fce7f3", avColorOn: "#CD166E" },
+  subMgr:  { accentOn: "#be185d", avBgOn: "#fce7f3", avColorOn: "#be185d" },
+  emp:     { accentOn: "#7c1f4a", avBgOn: "#fce7f3", avColorOn: "#7c1f4a" },
 };
+const OFF = { accent: "#d4d4d8", avBg: "#f1f5f9", avColor: "#94a3b8", text: "#94a3b8", sub: "#c2c2c8" };
 
-function Card({ level, name, sub, width = 172, delay = 0, dim, hl, q, you = false, empCount }) {
+function Card({ level, name, sub, empid, width = 172, delay = 0, dim, hl, chain, q, you = false, empCount }) {
   const c = CFG[level] || CFG.emp;
+  const accent  = chain ? c.accentOn  : OFF.accent;
+  const avBg    = chain ? c.avBgOn    : OFF.avBg;
+  const avColor = chain ? c.avColorOn : OFF.avColor;
+  const nameColor = chain ? "#1a0d14" : OFF.text;
+  const subColor  = chain ? "#8a6878" : OFF.sub;
+  const idColor   = chain ? "#c8a8bb" : OFF.sub;
+
   return (
     <div style={{ animation: `scaleIn 0.26s ease ${delay}ms forwards`, opacity: 0, flexShrink: 0 }}>
       <div
         className={["nd", hl ? "nd-hl" : "", dim ? "nd-dim" : "", you ? "nd-you" : ""].filter(Boolean).join(" ")}
-        style={{ width, background: "#fff", border: "1px solid #eedde8", borderRadius: 11, padding: "14px 12px 11px", boxShadow: "0 2px 8px rgba(115,0,66,0.04)", display: "flex", flexDirection: "column", alignItems: "center", position: "relative", overflow: "hidden" }}
+        style={{ width, background: "#fff", border: `1px solid ${chain ? "#eedde8" : "#e5e7eb"}`, borderRadius: 11, padding: "14px 12px 11px", boxShadow: "0 2px 8px rgba(115,0,66,0.04)", display: "flex", flexDirection: "column", alignItems: "center", position: "relative", overflow: "hidden" }}
       >
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: you ? "linear-gradient(90deg,#730042,#CD166E)" : c.accent, borderRadius: "11px 11px 0 0" }} />
-        <span style={{ position: "absolute", top: 8, right: 9, fontSize: 8, fontWeight: 600, letterSpacing: "0.1em", color: "#c8a8bb", fontFamily: "'DM Mono',monospace" }}>{c.tag}</span>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: you ? "linear-gradient(90deg,#730042,#CD166E)" : accent, borderRadius: "11px 11px 0 0" }} />
         {you && <div style={{ position: "absolute", top: -7, left: "50%", transform: "translateX(-50%)", fontSize: 7, fontWeight: 700, letterSpacing: "0.1em", padding: "2px 8px", borderRadius: 8, background: "#730042", color: "#fff", whiteSpace: "nowrap", fontFamily: "'DM Mono',monospace" }}>YOU</div>}
-        <Avatar name={name} size={38} bg={you ? "#fce7f3" : c.avBg} color={you ? "#730042" : c.avColor} />
+        <Avatar name={name} size={38} bg={you ? "#fce7f3" : avBg} color={you ? "#730042" : avColor} />
         <div style={{ marginTop: 8, marginBottom: 6, textAlign: "center", width: "100%" }}>
-          <Hi text={name} q={q} style={{ fontSize: 12, fontWeight: 600, color: "#1a0d14", display: "block", lineHeight: 1.3, fontFamily: "'Syne',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />
-          {sub && <Hi text={sub} q={q} style={{ fontSize: 10, color: "#8a6878", display: "block", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />}
-          {empCount !== undefined && <span style={{ fontSize: 10, color: "#c8a8bb", display: "block", marginTop: 2 }}>{empCount} report{empCount !== 1 ? "s" : ""}</span>}
+          <Hi text={name} q={q} style={{ fontSize: 12, fontWeight: 600, color: nameColor, display: "block", lineHeight: 1.3, fontFamily: "'Syne',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />
+          {sub && <Hi text={sub} q={q} style={{ fontSize: 10, color: subColor, display: "block", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />}
+          {empid && <span style={{ fontSize: 9, color: idColor, display: "block", marginTop: 2, fontFamily: "'DM Mono',monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{empid}</span>}
+          {empCount !== undefined && <span style={{ fontSize: 10, color: idColor, display: "block", marginTop: 2 }}>{empCount} report{empCount !== 1 ? "s" : ""}</span>}
         </div>
-        <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 20, background: you ? "#fce7f3" : c.badgeBg, color: you ? "#730042" : c.badgeColor, fontWeight: 600, letterSpacing: "0.04em", border: you ? "1px solid #f9a8d4" : "none", fontFamily: "'DM Mono',monospace" }}>
-          {you ? "You" : c.badge}
-        </span>
       </div>
     </div>
   );
@@ -186,7 +193,36 @@ function collectMatchKeys(nodes, q, matches) {
   });
 }
 
-function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
+// Walk the tree to find "me" (isCurrentUser employee), then collect every manager
+// id on the path from the org root down to my direct manager, plus my own id.
+function findEmployeeChain(managers) {
+  for (const mgr of managers) {
+    const emp = (mgr.employees || []).find(e => e.isCurrentUser);
+    if (emp) {
+      return { path: new Set([`m-${mgr.id}`]), employeeId: `e-${emp.id}` };
+    }
+    if (mgr.subManagers?.length) {
+      const found = findEmployeeChain(mgr.subManagers);
+      if (found) {
+        found.path.add(`m-${mgr.id}`);
+        return found;
+      }
+    }
+  }
+  return null;
+}
+
+function buildChainIds(data) {
+  const ids = new Set(["org", "admin"]);
+  const found = findEmployeeChain(data?.managers || []);
+  if (found) {
+    found.path.forEach(id => ids.add(id));
+    ids.add(found.employeeId);
+  }
+  return ids;
+}
+
+function ManagerColumn({ mgr, q, matches, dim, delayRef, chainIds, isSubMgr = false }) {
   const key = `m-${mgr.id}`;
   const emps = mgr.employees || [];
   const subMgrs = mgr.subManagers || [];
@@ -205,10 +241,12 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
         level={level}
         name={mgr.name}
         sub={mgr.designation || mgr.department}
+        empid={mgr.empid}
         width={CARD_W}
         delay={mDelay}
         dim={dim(key)}
         hl={matches.has(key)}
+        chain={chainIds.has(key)}
         q={q}
         empCount={(emps.length + subMgrs.length) > 0 ? emps.length + subMgrs.length : undefined}
       />
@@ -233,7 +271,7 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
           })()}
           <div style={{ display: "flex", gap: SUB_MGR_GAP, alignItems: "flex-start" }}>
             {subMgrs.map(sm => (
-              <ManagerColumn key={sm.id} mgr={sm} q={q} matches={matches} dim={dim} delayRef={delayRef} isSubMgr />
+              <ManagerColumn key={sm.id} mgr={sm} q={q} matches={matches} dim={dim} delayRef={delayRef} chainIds={chainIds} isSubMgr />
             ))}
           </div>
         </>
@@ -253,10 +291,12 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
                   level="emp"
                   name={emp.name}
                   sub={emp.designation || emp.department}
+                  empid={emp.empid}
                   width={EMP_W}
                   delay={eDelay}
                   dim={dim(eKey)}
                   hl={matches.has(eKey)}
+                  chain={chainIds.has(eKey)}
                   q={q}
                   you={emp.isCurrentUser}
                 />
@@ -302,6 +342,8 @@ function countNodes(managers) {
 }
 
 function OrgTree({ data, loading, q }) {
+  const chainIds = useMemo(() => buildChainIds(data), [data]);
+
   if (loading) return <SkeletonTree />;
   if (!data) return null;
 
@@ -327,13 +369,13 @@ function OrgTree({ data, loading, q }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: "max-content" }}>
       <div style={{ animation: `scaleIn 0.26s ease 40ms forwards`, opacity: 0 }}>
-        <Card level="org" name={data.organisation_name || "Organisation"} sub={data.super_admin?.name} width={CARD_W} delay={0} dim={dim("org")} hl={matches.has("org")} q={q} />
+        <Card level="org" name={data.organisation_name || "Organisation"} sub={data.super_admin?.name} width={CARD_W} delay={0} dim={dim("org")} hl={matches.has("org")} chain={chainIds.has("org")} q={q} />
       </div>
       <VLine h={22} />
 
       {data.admin && (
         <>
-          <Card level="admin" name={data.admin.name} sub={data.admin.designation} width={CARD_W} delay={80} dim={dim("admin")} hl={matches.has("admin")} q={q} />
+          <Card level="admin" name={data.admin.name} sub={data.admin.designation} empid={data.admin.empid} width={CARD_W} delay={80} dim={dim("admin")} hl={matches.has("admin")} chain={chainIds.has("admin")} q={q} />
           <VLine h={22} />
         </>
       )}
@@ -353,7 +395,7 @@ function OrgTree({ data, loading, q }) {
 
       <div style={{ display: "flex", gap: MGR_GAP, alignItems: "flex-start" }}>
         {managers.map(mgr => (
-          <ManagerColumn key={mgr.id} mgr={mgr} q={q} matches={matches} dim={dim} delayRef={delayRef} />
+          <ManagerColumn key={mgr.id} mgr={mgr} q={q} matches={matches} dim={dim} delayRef={delayRef} chainIds={chainIds} />
         ))}
       </div>
     </div>
@@ -476,7 +518,6 @@ export default function OrganizationPageEmployee() {
           <span style={{ fontSize: 12, color: "#b89aad", fontWeight: 500 }}>{orgName}</span>
           <span style={{ color: "#dcc0d0" }}>›</span>
           <span style={{ fontSize: 13, color: "#1a0d14", fontWeight: 600, fontFamily: "'Syne',sans-serif" }}>Org Chart</span>
-          <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, background: "#fce7f3", color: "#730042", fontWeight: 600, marginLeft: 2 }}>Full View</span>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -505,7 +546,7 @@ export default function OrganizationPageEmployee() {
         <div style={{ animation: "fadeUp 0.3s ease 50ms forwards", opacity: 0, marginBottom: 18 }}>
           <h1 style={{ fontSize: 19, fontWeight: 700, color: "#1a0d14", margin: 0, letterSpacing: "-0.3px", fontFamily: "'Syne',sans-serif" }}>Organisation Chart</h1>
           <p style={{ fontSize: 12, color: "#b89aad", margin: "4px 0 0" }}>
-            {loading ? "Loading…" : `${orgName} · ${totalNodes} nodes · You are highlighted`}
+            {loading ? "Loading…" : `${orgName} · ${totalNodes} nodes · your reporting line is highlighted`}
           </p>
         </div>
 
@@ -536,12 +577,10 @@ export default function OrganizationPageEmployee() {
             </div>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               {[
-                { dot: "#1a0d14", label: "Organisation" },
-                { dot: "#5a2240", label: "Admin" },
-                { dot: "#a8005c", label: "Manager" },
-                { dot: "#CD166E", label: "Your manager" },
-                { dot: "#be185d", label: "Reporting Mgr" },
                 { dot: "#730042", label: "You", ring: true },
+                { dot: "#CD166E", label: "Your manager" },
+                { dot: "#a8005c", label: "In your line" },
+                { dot: "#d4d4d8", label: "Others" },
               ].map(({ dot, label, ring }) => (
                 <div key={label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#b89aad" }}>
                   <span style={{ width: 8, height: 8, borderRadius: "50%", background: dot, flexShrink: 0, boxShadow: ring ? "0 0 0 2px rgba(115,0,66,0.2)" : "none" }} />

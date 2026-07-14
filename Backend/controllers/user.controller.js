@@ -13,6 +13,7 @@ const Ticket = require("../Models/ticket.model");
 const Adminmodel = require("../Models/Admin.model");
 const SuperAdminModel = require("../Models/superadmin.model");
 const Managermodel = require("../Models/manager.model");
+const { notifyLeaveApplied, notifyWFHApplied } = require("../utils/notify.utils");
 
 const verifyUserEmail = async (req, res, next) => {
   const { token } = req.params;
@@ -465,7 +466,7 @@ const applyleave = async (req, res, next) => {
 
   const user = await usermodel
     .findOne({ _id: req.employee._id, organisation_id })
-    .select("gender marital_status Under_manager")
+    .select("gender marital_status Under_manager f_name l_name")
     .lean();
   if (!user)
     return next(Object.assign(new Error("User not found"), { statusCode: 404 }));
@@ -526,6 +527,17 @@ const applyleave = async (req, res, next) => {
     days,
     reason,
     status: "pending_manager",
+  });
+
+  notifyLeaveApplied({
+    requesterName: `${user.f_name} ${user.l_name}`,
+    handlerModel: "Manager",
+    handlerId: user.Under_manager,
+    leaveType,
+    startDate: start,
+    endDate: end,
+    days,
+    reason,
   });
 
   res.status(201).json({
@@ -613,8 +625,17 @@ const getallleave = async (req, res, next) => {
     return next(Object.assign(new Error("Leave balance not found"), { statusCode: 404 }));
   res.status(200).json({
     success: true,
-    EL: leaveBalance.EL?.entitled || 0,
-    SL: leaveBalance.SL?.entitled || 0,
+    EL: {
+      entitled: leaveBalance.EL?.entitled || 0,
+      accrued: leaveBalance.EL?.accrued || 0,
+      availed: leaveBalance.EL?.availed || 0,
+      available: Number(((leaveBalance.EL?.accrued || 0) - (leaveBalance.EL?.availed || 0)).toFixed(2)),
+    },
+    SL: {
+      entitled: leaveBalance.SL?.entitled || 0,
+      availed: leaveBalance.SL?.availed || 0,
+      available: Number(((leaveBalance.SL?.entitled || 0) - (leaveBalance.SL?.availed || 0)).toFixed(2)),
+    },
     ML: leaveBalance.ML || 0,
     PL: leaveBalance.PL || 0,
     pbc: leaveBalance.pbc || 0,

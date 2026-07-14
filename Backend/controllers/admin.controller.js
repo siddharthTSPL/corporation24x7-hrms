@@ -9,6 +9,7 @@ const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const { sendEmail } = require("../utils/nodemailer.utils");
 const assignDefaultLeave = require("../automatic/bydefaultleaveset");
+const LeavePolicy = require("../Models/Leavepolicy.model");
 const PermissionModel = require("../Models/permission.model");
 const Leave = require("../Models/leave.model");
 const Review = require("../Models/review.model");
@@ -27,6 +28,7 @@ const AttendanceSummary = require("../Models/attendancesummary.model");
 const WFH = require("../Models/wfh.model");
 const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = require("../utils/licenseCheck");
 const AssetModel = require("../Models/asset.model");
+const { notifyLeaveDecision, notifyAssetAssigned, notifyLeaveApplied } = require("../utils/notify.utils");
 const { isEmailTaken, isEmpidTaken } = require("../utils/emailAvailability.utils");
 
 const EXCLUDE =
@@ -477,7 +479,7 @@ const addmanager = async (req, res, next) => {
     if (emailCheck.taken)
       return next(Object.assign(new Error("An account with this email already exists"), { statusCode: 400 }));
 
-    const empidTaken = await isEmpidTaken(empid); // see helper below
+    const empidTaken = await isEmpidTaken(empid, organisation_id); // see helper below
     if (empidTaken)
       return next(Object.assign(new Error("This Employee ID is already in use"), { statusCode: 400 }));
 
@@ -510,7 +512,7 @@ const addmanager = async (req, res, next) => {
     const verifyLink = `${process.env.BASE_URL}talent/api/manager/verify/${token}`;
 
     await Promise.all([
-      assignDefaultLeave(newmanager),
+      assignDefaultLeave(newmanager, false),
       assignDefaultPermissions(
         newmanager._id,
         newmanager.role || "manager",
@@ -568,7 +570,7 @@ const addemployee = async (req, res, next) => {
     if (emailCheck.taken)
       return next(Object.assign(new Error("An account with this email already exists"), { statusCode: 400 }));
 
-    const empidTaken = await isEmpidTaken(empid);
+    const empidTaken = await isEmpidTaken(empid, organisation_id);
     if (empidTaken)
       return next(Object.assign(new Error("This Employee ID is already in use"), { statusCode: 400 }));
 
@@ -598,7 +600,7 @@ const addemployee = async (req, res, next) => {
     const verifyLink = `${process.env.BASE_URL}talent/api/user/verify/${token}`;
 
     await Promise.all([
-      assignDefaultLeave(newuser),
+      assignDefaultLeave(newuser, false),
       assignDefaultPermissions(
         newuser._id,
         newuser.role || "employee",
@@ -898,7 +900,7 @@ const promoteEmployeeToManager = async (req, res, next) => {
       { session }
     );
 
-    await assignDefaultLeave({ ...newManager.toObject(), _id: newManager._id });
+    await assignDefaultLeave({ ...newManager.toObject(), _id: newManager._id }, false);
 
     await Promise.all([
       Usermodel.findByIdAndDelete(id, { session }),
@@ -1059,7 +1061,13 @@ const promoteManagerToAdmin = async (req, res, next) => {
       { session }
     );
 
-    await assignDefaultLeave({ ...newAdmin.toObject(), _id: newAdmin._id });
+    await assignDefaultLeave({ ...newAdmin.toObject(), _id: newAdmin._id }, true);
+
+    await LeavePolicy.findOneAndUpdate(
+      { organisation_id: req.admin.organisation_id },
+      { $set: { locked: true } },
+      { upsert: true }
+    );
 
     await Promise.all([
       Managermodel.findByIdAndDelete(id, { session }),
@@ -1231,7 +1239,13 @@ const promoteEmployeeToAdmin = async (req, res, next) => {
       { session }
     );
 
-    await assignDefaultLeave({ ...newAdmin.toObject(), _id: newAdmin._id });
+    await assignDefaultLeave({ ...newAdmin.toObject(), _id: newAdmin._id }, true);
+
+    await LeavePolicy.findOneAndUpdate(
+      { organisation_id: req.admin.organisation_id },
+      { $set: { locked: true } },
+      { upsert: true }
+    );
 
     await Promise.all([
       Usermodel.findByIdAndDelete(id, { session }),
@@ -1376,7 +1390,7 @@ const demoteManagerToEmployee = async (req, res, next) => {
       { session }
     );
 
-    await assignDefaultLeave({ ...newEmployee.toObject(), _id: newEmployee._id });
+    await assignDefaultLeave({ ...newEmployee.toObject(), _id: newEmployee._id }, false);
 
     await Promise.all([
       Managermodel.findByIdAndDelete(id, { session }),
@@ -1532,7 +1546,7 @@ const demoteAdminToManager = async (req, res, next) => {
       { session }
     );
 
-    await assignDefaultLeave({ ...newManager.toObject(), _id: newManager._id });
+    await assignDefaultLeave({ ...newManager.toObject(), _id: newManager._id }, false);
 
     await Promise.all([
       Adminmodel.findByIdAndDelete(id, { session }),
@@ -1680,7 +1694,7 @@ const demoteAdminToEmployee = async (req, res, next) => {
       { session }
     );
 
-    await assignDefaultLeave({ ...newEmployee.toObject(), _id: newEmployee._id });
+    await assignDefaultLeave({ ...newEmployee.toObject(), _id: newEmployee._id }, false);
 
     await Promise.all([
       Adminmodel.findByIdAndDelete(id, { session }),
@@ -1892,7 +1906,6 @@ const showallleaves = async (req, res, next) => {
     const [employeeLeaves, managerLeaves] = await Promise.all([
       Leave.find({
         organisation_id,
-        status: "pending_admin",
         directed_to: req.admin._id,
         directed_to_model: "Admin",
       })
@@ -1902,7 +1915,6 @@ const showallleaves = async (req, res, next) => {
         .lean(),
       ManagerLeave.find({
         organisation_id,
-        status: { $in: ["pending_admin", "pending_reporting_manager"] },
         directed_to: req.admin._id,
         directed_to_model: "Admin",
       })
@@ -1969,6 +1981,18 @@ const acceptLeave = async (req, res, next) => {
         console.error("Leave approved but balance deduction failed:", deductionError.message);
       }
 
+      notifyLeaveDecision({
+        recipientModel: "User",
+        recipientId: leave.employee,
+        leaveType: leave.leaveType,
+        startDate: leave.startDate,
+        endDate: leave.endDate,
+        days: leave.days,
+        decision: "approved",
+        decidedByName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+        remarks: leave.remarks,
+      });
+
       return res.status(200).json({ success: true, message: "Employee leave approved successfully", leave });
     }
 
@@ -1995,6 +2019,18 @@ const acceptLeave = async (req, res, next) => {
       } catch (deductionError) {
         console.error("Leave approved but balance deduction failed:", deductionError.message);
       }
+
+      notifyLeaveDecision({
+        recipientModel: "Manager",
+        recipientId: leave.manager,
+        leaveType: leave.leaveType,
+        startDate: leave.startDate,
+        endDate: leave.endDate,
+        days: leave.days,
+        decision: "approved",
+        decidedByName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+        remarks: leave.remarks,
+      });
 
       return res.status(200).json({ success: true, message: "Manager leave approved successfully", leave });
     }
@@ -2036,6 +2072,18 @@ const rejectLeave = async (req, res, next) => {
       leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await leave.save();
 
+      notifyLeaveDecision({
+        recipientModel: "User",
+        recipientId: leave.employee,
+        leaveType: leave.leaveType,
+        startDate: leave.startDate,
+        endDate: leave.endDate,
+        days: leave.days,
+        decision: "rejected",
+        decidedByName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+        remarks: leave.remarks,
+      });
+
       return res.status(200).json({ success: true, message: "Employee leave rejected successfully", leave });
     }
 
@@ -2057,6 +2105,18 @@ const rejectLeave = async (req, res, next) => {
       leave.remarks = `Rejected by Admin (${req.admin.f_name})`;
       leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await leave.save();
+
+      notifyLeaveDecision({
+        recipientModel: "Manager",
+        recipientId: leave.manager,
+        leaveType: leave.leaveType,
+        startDate: leave.startDate,
+        endDate: leave.endDate,
+        days: leave.days,
+        decision: "rejected",
+        decidedByName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+        remarks: leave.remarks,
+      });
 
       return res.status(200).json({ success: true, message: "Manager leave rejected successfully", leave });
     }
@@ -2105,6 +2165,17 @@ const applyleave = async (req, res, next) => {
     days,
     reason,
     status: "pending_superadmin",
+  });
+
+  notifyLeaveApplied({
+    requesterName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+    handlerModel: "SuperAdmin",
+    handlerId: organisation_id,
+    leaveType,
+    startDate: start,
+    endDate: end,
+    days,
+    reason,
   });
 
   res.status(201).json({ success: true, message: "Leave request submitted to super admin", leave });
@@ -3159,11 +3230,11 @@ const setEmployeeWorkingStatus = async (req, res, next) => {
     if (wasWorking && !willBeWorking) {
       const pendingAssets = await AssetModel.find({
         organisation_id,
-        assigned_to: id,
-        assigned_to_model: "User",
-        status: "assigned",
+        assignments: {
+          $elemMatch: { assigned_to: id, assigned_to_model: "User", is_returned: false },
+        },
       })
-        .select("_id asset_id asset_name asset_type serial_number brand assigned_date")
+        .select("_id asset_id asset_name asset_type serial_number brand assignments")
         .lean();
 
       if (pendingAssets.length > 0) {
@@ -3251,11 +3322,11 @@ const setManagerWorkingStatus = async (req, res, next) => {
     if (wasWorking && !willBeWorking) {
       const pendingAssets = await AssetModel.find({
         organisation_id,
-        assigned_to: id,
-        assigned_to_model: "Manager",
-        status: "assigned",
+        assignments: {
+          $elemMatch: { assigned_to: id, assigned_to_model: "Manager", is_returned: false },
+        },
       })
-        .select("_id asset_id asset_name asset_type serial_number brand assigned_date")
+        .select("_id asset_id asset_name asset_type serial_number brand assignments")
         .lean();
 
       if (pendingAssets.length > 0) {
