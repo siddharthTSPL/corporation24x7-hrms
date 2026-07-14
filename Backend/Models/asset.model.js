@@ -1,5 +1,55 @@
 const mongoose = require("mongoose");
 
+const assignmentSchema = new mongoose.Schema(
+  {
+    assigned_to: {
+      type: mongoose.Schema.Types.ObjectId,
+      refPath: "assignments.assigned_to_model",
+      required: true,
+    },
+
+    assigned_to_model: {
+      type: String,
+      enum: ["Admin", "Manager", "User"],
+      required: true,
+    },
+
+    quantity: {
+      type: Number,
+      required: true,
+      min: 1,
+      default: 1,
+    },
+
+    assigned_date: {
+      type: Date,
+      default: Date.now,
+    },
+
+    returned_date: {
+      type: Date,
+      default: null,
+    },
+
+    is_returned: {
+      type: Boolean,
+      default: false,
+    },
+
+    return_condition: {
+      type: String,
+      enum: ["good", "damaged", "lost", null],
+      default: null,
+    },
+
+    return_notes: {
+      type: String,
+      trim: true,
+    },
+  },
+  { timestamps: true }
+);
+
 const assetSchema = new mongoose.Schema(
   {
     organisation_id: {
@@ -60,42 +110,18 @@ const assetSchema = new mongoose.Schema(
       default: "available",
     },
 
-    assigned_to: {
-      type: mongoose.Schema.Types.ObjectId,
-      refPath: "assigned_to_model",
-      default: null,
+    total_quantity: {
+      type: Number,
+      required: true,
+      min: 1,
+      default: 1,
     },
 
-    assigned_to_model: {
-      type: String,
-      enum: ["Admin", "Manager", "User"],
-      default: null,
-    },
-
-    assigned_date: {
-      type: Date,
-      default: null,
-    },
-
-    returned_date: {
-      type: Date,
-      default: null,
-    },
-
-    is_returned: {
-      type: Boolean,
-      default: false,
-    },
-
-    return_condition: {
-      type: String,
-      enum: ["good", "damaged", "lost", null],
-      default: null,
-    },
-
-    return_notes: {
-      type: String,
-      trim: true,
+    available_quantity: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 1,
     },
 
     notes: {
@@ -115,27 +141,7 @@ const assetSchema = new mongoose.Schema(
       required: true,
     },
 
-    assignment_history: [
-      {
-        assigned_to: {
-          type: mongoose.Schema.Types.ObjectId,
-          refPath: "assignment_history.assigned_to_model",
-        },
-        assigned_to_model: {
-          type: String,
-          enum: ["Admin", "Manager", "User"],
-        },
-        assigned_date: { type: Date },
-        returned_date: { type: Date },
-        return_condition: {
-          type: String,
-          enum: ["good", "damaged", "lost", null],
-          default: null,
-        },
-        return_notes: { type: String },
-        _id: false,
-      },
-    ],
+    assignments: [assignmentSchema],
   },
   {
     timestamps: true,
@@ -144,7 +150,7 @@ const assetSchema = new mongoose.Schema(
 
 assetSchema.index({ organisation_id: 1 });
 assetSchema.index({ asset_id: 1, organisation_id: 1 }, { unique: true });
-assetSchema.index({ assigned_to: 1 });
+assetSchema.index({ "assignments.assigned_to": 1 });
 assetSchema.index({ status: 1 });
 
 const AssetModel = mongoose.models.Asset || mongoose.model("Asset", assetSchema);
