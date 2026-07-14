@@ -2,21 +2,11 @@ const cron = require("node-cron");
 const LeaveBalance = require("../Models/leavebalance.model");
 const { autoCheckoutAll } = require("../controllers/attendance.controller");
 
-// Runs on the 1st of every month, midnight. On January 1st specifically,
-// this single handler does BOTH steps in a guaranteed order:
-//   1. Yearly EL carry-forward (50% of Dec 31's leftover accrued-availed)
-//   2. January's own monthly accrual, applied on top of the carried-forward
-//      number.
-// These used to be two separate cron.schedule() calls that both matched
-// "Jan 1, 00:00" and could fire in either order — if the monthly accrual
-// ran first, the carry-forward would wrongly include January's freshly
-// accrued EL in its 50% cut. Merging them into one handler removes the
-// race entirely.
 cron.schedule("0 0 1 * *", async () => {
   try {
     const today = new Date();
     const year = today.getFullYear();
-    const month = today.getMonth(); // 0 = January
+    const month = today.getMonth();
     const isJanuary = month === 0;
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const monthStart = new Date(year, month, 1);
@@ -39,28 +29,29 @@ cron.schedule("0 0 1 * *", async () => {
         $set.pbc = 0;
       }
 
-      // --- EL: carry-forward first (Jan only), then this month's accrual ---
+      const elYearly = balance.EL.yearlyEntitled ?? balance.EL.entitled;
+      let elEntitled = balance.EL.entitled;
       let elAccrued = balance.EL.accrued;
 
       if (isJanuary) {
         elAccrued = Number(((balance.EL.accrued - balance.EL.availed) * 0.5).toFixed(2));
+        elEntitled = elYearly;
         $set["EL.availed"] = 0;
+        $set["EL.entitled"] = elEntitled;
       }
 
-      if (elAccrued < balance.EL.entitled) {
+      if (elAccrued < elEntitled) {
         elAccrued = Math.min(
-          Number((elAccrued + balance.EL.entitled / 12).toFixed(2)),
-          balance.EL.entitled
+          Number((elAccrued + elYearly / 12).toFixed(2)),
+          elEntitled
         );
       }
       $set["EL.accrued"] = elAccrued;
 
-      // --- SL: plain monthly accrual every month, no carry-forward ---
-      if (balance.SL.accrued < balance.SL.entitled) {
-        $set["SL.accrued"] = Math.min(
-          Number((balance.SL.accrued + balance.SL.entitled / 12).toFixed(2)),
-          balance.SL.entitled
-        );
+      if (isJanuary) {
+        const slYearly = balance.SL.yearlyEntitled ?? balance.SL.entitled;
+        $set["SL.entitled"] = slYearly;
+        $set["SL.availed"] = 0;
       }
 
       return { updateOne: { filter: { _id: balance._id }, update: { $set } } };
@@ -70,7 +61,7 @@ cron.schedule("0 0 1 * *", async () => {
     console.log(
       isJanuary
         ? "Yearly EL carry-forward + January accrual done"
-        : "Monthly PBC + EL/SL accrual done"
+        : "Monthly PBC + EL accrual done"
     );
   } catch (error) {
     console.error("Monthly cron error:", error.message);

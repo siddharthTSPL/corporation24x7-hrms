@@ -854,6 +854,7 @@ const promoteEmployeeToManager = async (req, res, next) => {
     const newUid = await generateUID(user.department, organisation_id);
 
     const [newManager] = await Managermodel.create([{
+      empid: user.empid,
       organisation_id,
       uid: newUid,
       profile_image: user.profile_image || null,
@@ -1013,6 +1014,7 @@ const promoteManagerToAdmin = async (req, res, next) => {
     const newUid = await generateUID(manager.department, organisation_id);
 
     const [newAdmin] = await Adminmodel.create([{
+      empid: manager.empid,
       organisation_id,
       uid: newUid,
       profile_image: manager.profile_image || null,
@@ -1191,6 +1193,7 @@ const promoteEmployeeToAdmin = async (req, res, next) => {
     const newUid = await generateUID(user.department, organisation_id);
 
     const [newAdmin] = await Adminmodel.create([{
+      empid: user.empid,
       organisation_id,
       uid: newUid,
       profile_image: user.profile_image || null,
@@ -1345,6 +1348,7 @@ const demoteManagerToEmployee = async (req, res, next) => {
     const newUid = await generateUID(manager.department, organisation_id);
 
     const [newEmployee] = await Usermodel.create([{
+      empid: manager.empid,
       organisation_id,
       uid: newUid,
       profile_image: manager.profile_image || null,
@@ -1500,6 +1504,7 @@ const demoteAdminToManager = async (req, res, next) => {
     const newUid = await generateUID(adminToDemote.department, organisation_id);
 
     const [newManager] = await Managermodel.create([{
+      empid: adminToDemote.empid,
       organisation_id,
       uid: newUid,
       profile_image: adminToDemote.profile_image || null,
@@ -1649,6 +1654,7 @@ const demoteAdminToEmployee = async (req, res, next) => {
     const newUid = await generateUID(adminToDemote.department, organisation_id);
 
     const [newEmployee] = await Usermodel.create([{
+      empid: adminToDemote.empid,
       organisation_id,
       uid: newUid,
       profile_image: adminToDemote.profile_image || null,

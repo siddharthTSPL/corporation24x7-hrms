@@ -352,9 +352,11 @@ const LeaveBalanceTab = ({ employee, balance, isLoading }) => {
   const isFemaleMarried = employee?.gender === "female" && employee?.marital_status === "married";
   const isMaleMarried   = employee?.gender === "male"   && employee?.marital_status === "married";
 
+  const slRemaining = balance.SL?.available ?? Math.max(0, Number(balance.SL?.entitled ?? 0) - Number(balance.SL?.availed ?? 0));
+
   const cards = [
     { label: "Earned Leave",      value: balance.EL?.available ?? 0, accent: "bg-[#22C55E]" },
-    { label: "Sick Leave",        value: balance.SL?.available ?? 0, accent: "bg-[#3B82F6]" },
+    { label: "Sick Leave",        value: slRemaining, accent: "bg-[#3B82F6]" },
     ...(isFemaleMarried ? [{ label: "Maternity Leave", value: balance.ML, accent: "bg-[#A855F7]" }] : []),
     ...(isMaleMarried   ? [{ label: "Paternity Leave", value: balance.PL, accent: "bg-[#F59E0B]" }] : []),
     { label: "Paid Balance",      value: balance.pbc, accent: "bg-[#6B1A4A]" },

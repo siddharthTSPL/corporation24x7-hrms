@@ -144,7 +144,7 @@ function Navbar() {
             </a>
           ))}
           <a
-            href="/login"
+            href="https://torchxsuite.com/talent/login"
             className="bg-[#7A004B] text-white text-sm font-ui font-semibold py-3 rounded-full no-underline text-center"
           >
             Login
