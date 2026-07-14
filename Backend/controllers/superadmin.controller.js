@@ -2274,11 +2274,11 @@ const setAdminWorkingStatus = async (req, res, next) => {
     if (working_status !== "working") {
       const pendingAssets = await AssetModel.find({
         organisation_id,
-        assigned_to: id,
-        assigned_to_model: "Admin",
-        status: "assigned",
+        assignments: {
+          $elemMatch: { assigned_to: id, assigned_to_model: "Admin", is_returned: false },
+        },
       })
-        .select("_id asset_id asset_name asset_type serial_number brand assigned_date")
+        .select("_id asset_id asset_name asset_type serial_number brand assignments")
         .lean();
 
       if (pendingAssets.length > 0) {
