@@ -633,9 +633,8 @@ const getallleave = async (req, res, next) => {
     },
     SL: {
       entitled: leaveBalance.SL?.entitled || 0,
-      accrued: leaveBalance.SL?.accrued || 0,
       availed: leaveBalance.SL?.availed || 0,
-      available: Number(((leaveBalance.SL?.accrued || 0) - (leaveBalance.SL?.availed || 0)).toFixed(2)),
+      available: Number(((leaveBalance.SL?.entitled || 0) - (leaveBalance.SL?.availed || 0)).toFixed(2)),
     },
     ML: leaveBalance.ML || 0,
     PL: leaveBalance.PL || 0,
@@ -993,33 +992,6 @@ const employeeGetTicketDetail = async (req, res, next) => {
 };
 
 
-// Walks up a manager's reporting chain (manager -> manager -> ... -> admin)
-// to find the specific Admin an employee's manager-chain ultimately reports to.
-// Guards against cycles.
-const resolveManagerRootAdmin = (managers, admins, startManagerId) => {
-  if (!startManagerId) return null;
-  let current = managers.find((m) => m._id.toString() === startManagerId.toString());
-  const visited = new Set();
-
-  while (current && current.reporting_manager) {
-    const key = current._id.toString();
-    if (visited.has(key)) return null; // cycle guard
-    visited.add(key);
-
-    if (current.reporting_manager_model === "Admin") {
-      return admins.find((a) => a._id.toString() === current.reporting_manager.toString()) || null;
-    }
-
-    if (current.reporting_manager_model === "Manager") {
-      current = managers.find((m) => m._id.toString() === current.reporting_manager.toString());
-    } else {
-      return null;
-    }
-  }
-
-  return null;
-};
-
 const getOrgInfo = async (req, res, next) => {
   try {
     if (!req.employee)
@@ -1032,12 +1004,12 @@ const getOrgInfo = async (req, res, next) => {
       .lean();
  
     const admins = await Adminmodel.find({ organisation_id, working_status: "working" })
-      .select("f_name l_name empid work_email designation")
+      .select("f_name l_name work_email designation")
       .lean();
  
     const managers = await Managermodel.find({ organisation_id, working_status: "working" })
       .select(
-        "f_name l_name empid work_email designation department office_location reporting_manager reporting_manager_model"
+        "f_name l_name work_email designation department office_location reporting_manager reporting_manager_model"
       )
       .lean();
  
@@ -1049,28 +1021,20 @@ const getOrgInfo = async (req, res, next) => {
             working_status: "working",
           })
           .select(
-            "f_name l_name empid work_email designation department office_location Under_manager"
+            "f_name l_name work_email designation department office_location Under_manager"
           )
           .lean()
       : [];
  
-    const rootAdmin =
-      resolveManagerRootAdmin(managers, admins, req.employee.Under_manager) ||
-      admins[0] ||
-      null;
-
     const topLevelManagers = managers
       .filter(
         (mgr) =>
-          rootAdmin &&
-          mgr.reporting_manager &&
-          mgr.reporting_manager.toString() === rootAdmin._id.toString() &&
+          !mgr.reporting_manager ||
           mgr.reporting_manager_model === "Admin"
       )
       .map((mgr) => ({
         id: mgr._id,
         name: `${mgr.f_name} ${mgr.l_name}`,
-        empid: mgr.empid,
         email: mgr.work_email,
         designation: mgr.designation,
         department: mgr.department,
@@ -1081,7 +1045,6 @@ const getOrgInfo = async (req, res, next) => {
           .map((emp) => ({
             id: emp._id,
             name: `${emp.f_name} ${emp.l_name}`,
-            empid: emp.empid,
             email: emp.work_email,
             designation: emp.designation,
             department: emp.department,
@@ -1109,13 +1072,12 @@ const getOrgInfo = async (req, res, next) => {
             email: superAdmin.email,
           }
         : null,
-      admin: rootAdmin
+      admin: admins[0]
         ? {
-            id: rootAdmin._id,
-            name: `${rootAdmin.f_name} ${rootAdmin.l_name}`,
-            empid: rootAdmin.empid,
-            email: rootAdmin.work_email,
-            designation: rootAdmin.designation,
+            id: admins[0]._id,
+            name: `${admins[0].f_name} ${admins[0].l_name}`,
+            email: admins[0].work_email,
+            designation: admins[0].designation,
           }
         : null,
       managers: topLevelManagers,
@@ -1174,7 +1136,6 @@ const buildManagerTreeWithCurrentFlags = (
     .map((mgr) => ({
       id: mgr._id,
       name: `${mgr.f_name} ${mgr.l_name}`,
-      empid: mgr.empid,
       email: mgr.work_email,
       designation: mgr.designation,
       department: mgr.department,
@@ -1194,7 +1155,6 @@ const buildManagerTreeWithCurrentFlags = (
         .map((emp) => ({
           id: emp._id,
           name: `${emp.f_name} ${emp.l_name}`,
-          empid: emp.empid,
           email: emp.work_email,
           designation: emp.designation,
           department: emp.department,

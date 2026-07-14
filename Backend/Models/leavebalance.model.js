@@ -14,6 +14,7 @@ const leaveBalanceSchema = new mongoose.Schema(
     },
     EL: {
       entitled: Number,
+      yearlyEntitled: Number,
       availed: {
         type: Number,
         default: 0,
@@ -25,6 +26,7 @@ const leaveBalanceSchema = new mongoose.Schema(
     },
     SL: {
       entitled: Number,
+      yearlyEntitled: Number,
       availed: {
         type: Number,
         default: 0,

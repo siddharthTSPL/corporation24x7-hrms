@@ -29,20 +29,30 @@ cron.schedule("0 0 1 * *", async () => {
         $set.pbc = 0;
       }
 
+      const elYearly = balance.EL.yearlyEntitled ?? balance.EL.entitled;
+      let elEntitled = balance.EL.entitled;
       let elAccrued = balance.EL.accrued;
 
       if (isJanuary) {
         elAccrued = Number(((balance.EL.accrued - balance.EL.availed) * 0.5).toFixed(2));
+        elEntitled = elYearly;
         $set["EL.availed"] = 0;
+        $set["EL.entitled"] = elEntitled;
       }
 
-      if (elAccrued < balance.EL.entitled) {
+      if (elAccrued < elEntitled) {
         elAccrued = Math.min(
-          Number((elAccrued + balance.EL.entitled / 12).toFixed(2)),
-          balance.EL.entitled
+          Number((elAccrued + elYearly / 12).toFixed(2)),
+          elEntitled
         );
       }
       $set["EL.accrued"] = elAccrued;
+
+      if (isJanuary) {
+        const slYearly = balance.SL.yearlyEntitled ?? balance.SL.entitled;
+        $set["SL.entitled"] = slYearly;
+        $set["SL.availed"] = 0;
+      }
 
       return { updateOne: { filter: { _id: balance._id }, update: { $set } } };
     });
