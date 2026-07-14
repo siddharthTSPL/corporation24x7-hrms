@@ -71,7 +71,7 @@ export const useDeleteAssetSuperAdmin = () => {
 export const useAssignAssetToAdmin = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, admin_id }) => assignAssetToAdmin(id, admin_id),
+    mutationFn: ({ id, admin_id, quantity }) => assignAssetToAdmin(id, admin_id, quantity),
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ["superadmin-assets"] });
       queryClient.invalidateQueries({ queryKey: ["superadmin-asset", id] });

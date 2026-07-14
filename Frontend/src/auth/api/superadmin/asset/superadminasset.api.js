@@ -32,8 +32,8 @@ export const deleteAssetSuperAdmin = async (id) => {
   return res.data;
 };
 
-export const assignAssetToAdmin = async (id, admin_id) => {
-  const res = await api.patch(`superadmin/assets/${id}/assign-admin`, { admin_id });
+export const assignAssetToAdmin = async (id, admin_id, quantity = 1) => {
+  const res = await api.patch(`superadmin/assets/${id}/assign-admin`, { admin_id, quantity });
   return res.data;
 };
 
