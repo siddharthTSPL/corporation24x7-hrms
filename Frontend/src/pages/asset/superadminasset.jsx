@@ -564,6 +564,44 @@ function DeleteConfirmModal({ open, onClose, asset, onConfirm, loading }) {
   );
 }
 
+export function SuperAdminAssetReturnWarning({ data, onClose }) {
+  if (!data?.asset_return_check?.has_pending_assets) return null;
+  const { pending_asset_count, assets, message } = data.asset_return_check;
+  return (
+    <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-[rgba(13,2,9,0.75)] backdrop-blur-md">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6 animate-[modalUp_0.22s_ease-out]">
+        <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl mb-4">
+          <FaExclamationTriangle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-[13px] font-bold text-amber-800">Assets Not Returned</p>
+            <p className="text-[12px] text-amber-700 mt-1 leading-relaxed">{message}</p>
+          </div>
+        </div>
+        <p className="text-[12px] font-semibold text-[#7a5568] mb-3">
+          {pending_asset_count} asset{pending_asset_count !== 1 ? "s" : ""} still assigned:
+        </p>
+        <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
+          {assets.map((a) => (
+            <div key={a._id} className="flex items-center gap-3 p-2.5 rounded-xl border border-[#e8d5e2] bg-[#fdf5f9]">
+              <AssetIcon type={a.asset_type} />
+              <div>
+                <p className="text-[12px] font-semibold text-[#0d0209]">{a.asset_name}</p>
+                <p className="text-[10px] text-[#7a5568]">{a.asset_id} · {a.brand || a.asset_type}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="text-[11px] text-[#c499b4] mb-4">
+          The working status has been updated. Please revoke the assets listed above before completing offboarding.
+        </p>
+        <button onClick={onClose} className="w-full px-4 py-2.5 rounded-xl bg-[#730042] text-white text-[13px] font-semibold hover:bg-[#4a0029] transition min-h-[44px]">
+          Understood
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function SuperAdminAssets() {
   const [formModal, setFormModal] = useState({ open: false, editing: null });
   const [assignModal, setAssignModal] = useState({ open: false, asset: null });
