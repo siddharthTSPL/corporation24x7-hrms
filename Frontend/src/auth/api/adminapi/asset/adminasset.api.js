@@ -32,13 +32,13 @@ export const deleteAssetAdmin = async (id) => {
   return res.data;
 };
 
-export const assignAssetToEmployee = async (id, employee_id) => {
-  const res = await api.patch(`admin/assets/${id}/assign-employee`, { employee_id });
+export const assignAssetToEmployee = async (id, employee_id, quantity = 1) => {
+  const res = await api.patch(`admin/assets/${id}/assign-employee`, { employee_id, quantity });
   return res.data;
 };
 
-export const assignAssetToManager = async (id, manager_id) => {
-  const res = await api.patch(`admin/assets/${id}/assign-manager`, { manager_id });
+export const assignAssetToManager = async (id, manager_id, quantity = 1) => {
+  const res = await api.patch(`admin/assets/${id}/assign-manager`, { manager_id, quantity });
   return res.data;
 };
 
