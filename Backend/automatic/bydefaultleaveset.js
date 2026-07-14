@@ -17,18 +17,24 @@ const assignDefaultLeave = async (user, isAdmin = false) => {
   const yearlyEL = policy?.EL?.[tier] ?? DEFAULT_POLICY.EL[tier];
   const yearlySL = policy?.SL?.[tier] ?? DEFAULT_POLICY.SL[tier];
 
+  const remainingMonths = 12 - new Date().getMonth();
+  const proratedEL = Number(((yearlyEL / 12) * remainingMonths).toFixed(2));
+  const proratedSL = Number(((yearlySL / 12) * remainingMonths).toFixed(2));
+
   const leaveBalance = await LeaveBalance.create({
     organisation_id: user.organisation_id,
     employee: user._id,
 
     EL: {
-      entitled: yearlyEL,
+      entitled: proratedEL,
+      yearlyEntitled: yearlyEL,
       availed: 0,
       accrued: Number((yearlyEL / 12).toFixed(2)),
     },
 
     SL: {
-      entitled: yearlySL,
+      entitled: proratedSL,
+      yearlyEntitled: yearlySL,
       availed: 0,
     },
 

@@ -914,20 +914,19 @@ const MyBalancePanel = ({manager,leavebalance}) => {
   const showML    = manager?.gender==="female" && isMarried;
   const showPL    = manager?.gender==="male"   && isMarried;
 
-  const elEntitled = balance.EL?.entitled || 0;
-  const elAvailed  = balance.EL?.availed  || 0;
-  const elAccrued  = balance.EL?.accrued  || 0;
-  const slEntitled = balance.SL?.entitled || 0;
-  const slAvailed  = balance.SL?.availed  || 0;
-  const slAccrued  = balance.SL?.accrued  || 0;
+  const elEntitled = Number(balance.EL?.entitled ?? 0);
+  const elAvailed  = Number(balance.EL?.availed  ?? 0);
+  const elAccrued  = Number(balance.EL?.accrued  ?? 0);
+  const slEntitled = Number(balance.SL?.entitled ?? 0);
+  const slAvailed  = Number(balance.SL?.availed  ?? 0);
 
   const cards = [
-    {key:"el",  label:"Earned Leave",      entitled:elEntitled, availed:elAvailed, accrued:elAccrued, remaining:Math.max(0, elAccrued - elAvailed), accent:"#22C55E", bg:"linear-gradient(135deg,#F0FDF4,#DCFCE7)"},
-    {key:"sl",  label:"Sick Leave",        entitled:slEntitled, availed:slAvailed, accrued:slAccrued, remaining:Math.max(0, slAccrued - slAvailed), accent:"#3B82F6", bg:"linear-gradient(135deg,#EFF6FF,#DBEAFE)"},
-    {key:"pbc", label:"Paid by Company",   entitled:balance.pbc||0, availed:0, accrued:0, remaining:balance.pbc||0,             accent:"#6B1A4A", bg:"linear-gradient(135deg,#F9EFF5,#F4E6F0)"},
-    {key:"lwp", label:"Leave Without Pay", entitled:balance.lwp||0, availed:0, accrued:0, remaining:balance.lwp||0,             accent:"#CD166E", bg:"linear-gradient(135deg,#FDF2F8,#FCE7F3)"},
-    ...(showML?[{key:"ml",label:"Maternity Leave",entitled:balance.ML||0,availed:0,accrued:0,remaining:balance.ML||0,accent:"#A855F7",bg:"linear-gradient(135deg,#FAF5FF,#F3E8FF)"}]:[]),
-    ...(showPL?[{key:"pl",label:"Paternity Leave",entitled:balance.PL||0,availed:0,accrued:0,remaining:balance.PL||0,accent:"#F59E0B",bg:"linear-gradient(135deg,#FFFBEB,#FEF3C7)"}]:[]),
+    {key:"el",  label:"Earned Leave",      entitled:elEntitled, availed:elAvailed, accrued:elAccrued, accrues:true,  remaining:Math.max(0, elAccrued - elAvailed), accent:"#22C55E", bg:"linear-gradient(135deg,#F0FDF4,#DCFCE7)"},
+    {key:"sl",  label:"Sick Leave",        entitled:slEntitled, availed:slAvailed, accrued:slEntitled, accrues:false, remaining:Math.max(0, slEntitled - slAvailed), accent:"#3B82F6", bg:"linear-gradient(135deg,#EFF6FF,#DBEAFE)"},
+    {key:"pbc", label:"Paid by Company",   entitled:balance.pbc||0, availed:0, accrued:balance.pbc||0, accrues:false, remaining:balance.pbc||0,             accent:"#6B1A4A", bg:"linear-gradient(135deg,#F9EFF5,#F4E6F0)"},
+    {key:"lwp", label:"Leave Without Pay", entitled:balance.lwp||0, availed:0, accrued:balance.lwp||0, accrues:false, remaining:balance.lwp||0,             accent:"#CD166E", bg:"linear-gradient(135deg,#FDF2F8,#FCE7F3)"},
+    ...(showML?[{key:"ml",label:"Maternity Leave",entitled:balance.ML||0,availed:0,accrued:balance.ML||0,accrues:false,remaining:balance.ML||0,accent:"#A855F7",bg:"linear-gradient(135deg,#FAF5FF,#F3E8FF)"}]:[]),
+    ...(showPL?[{key:"pl",label:"Paternity Leave",entitled:balance.PL||0,availed:0,accrued:balance.PL||0,accrues:false,remaining:balance.PL||0,accent:"#F59E0B",bg:"linear-gradient(135deg,#FFFBEB,#FEF3C7)"}]:[]),
   ];
 
   return (
@@ -949,7 +948,7 @@ const MyBalancePanel = ({manager,leavebalance}) => {
                 <div className="mlw-progress-fill" style={{width:`${Math.max(pct,3)}%`,background:s.accent,animationDelay:`${i*.09+.3}s`}}/>
               </div>
               <div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:10,color:"#9B8BAE",fontFamily:"'DM Sans',sans-serif"}}>
-                {s.accrued>0&&<span>Accrued: {s.accrued}</span>}
+                {s.accrues&&<span>Accrued: {s.accrued}</span>}
                 <span style={{marginLeft:"auto"}}>{s.availed} used</span>
               </div>
             </div>
@@ -976,7 +975,7 @@ const MyBalancePanel = ({manager,leavebalance}) => {
                       </span>
                     </td>
                     <td style={{fontWeight:600}}>{s.entitled}</td>
-                    <td>{s.accrued||"—"}</td>
+                    <td>{s.accrues ? s.accrued : <span style={{fontSize:11,color:"#B7A9CC",fontStyle:"italic"}}>Granted upfront</span>}</td>
                     <td>{s.availed}</td>
                     <td style={{fontWeight:700,color:s.accent,fontFamily:"'Playfair Display',serif",fontSize:15}}>{rem}</td>
                     <td>

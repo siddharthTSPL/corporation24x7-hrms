@@ -567,13 +567,19 @@ const MyBalancePanel = ({ admin, leaveBalance }) => {
   const isMarried = admin.marital_status === "married";
   const showML    = admin.gender === "female" && isMarried;
   const showPL    = admin.gender === "male"   && isMarried;
+  const elEntitled = Number(balance.EL?.entitled ?? 0);
+  const elAvailed  = Number(balance.EL?.availed ?? 0);
+  const elAccrued  = Number(balance.EL?.accrued ?? 0);
+  const slEntitled = Number(balance.SL?.entitled ?? 0);
+  const slAvailed  = Number(balance.SL?.availed ?? 0);
+
   const cards = [
-    { key: "el",  label: "Earned Leave",      entitled: balance.EL?.entitled || 0, availed: balance.EL?.availed || 0, accrued: balance.EL?.accrued || 0, remaining: Math.max(0, (balance.EL?.accrued || 0) - (balance.EL?.availed || 0)), accent: "#22C55E", bg: "linear-gradient(135deg,#F0FDF4,#DCFCE7)" },
-    { key: "sl",  label: "Sick Leave",         entitled: balance.SL?.entitled || 0, availed: balance.SL?.availed || 0, accrued: balance.SL?.accrued || 0, remaining: Math.max(0, (balance.SL?.accrued || 0) - (balance.SL?.availed || 0)), accent: "#3B82F6", bg: "linear-gradient(135deg,#EFF6FF,#DBEAFE)" },
-    { key: "pbc", label: "Paid by Company",    entitled: balance.pbc || 0,          availed: 0,                         accrued: 0, remaining: balance.pbc || 0,                        accent: "#6B1A4A", bg: "linear-gradient(135deg,#F9EFF5,#F4E6F0)" },
-    { key: "lwp", label: "Leave Without Pay",  entitled: balance.lwp || 0,          availed: 0,                         accrued: 0, remaining: balance.lwp || 0,                        accent: "#CD166E", bg: "linear-gradient(135deg,#FDF2F8,#FCE7F3)" },
-    ...(showML ? [{ key: "ml", label: "Maternity Leave", entitled: balance.ML || 0, availed: 0, accrued: 0, remaining: balance.ML || 0, accent: "#A855F7", bg: "linear-gradient(135deg,#FAF5FF,#F3E8FF)" }] : []),
-    ...(showPL ? [{ key: "pl", label: "Paternity Leave", entitled: balance.PL || 0, availed: 0, accrued: 0, remaining: balance.PL || 0, accent: "#F59E0B", bg: "linear-gradient(135deg,#FFFBEB,#FEF3C7)" }] : []),
+    { key: "el",  label: "Earned Leave",      entitled: elEntitled, availed: elAvailed, accrued: elAccrued, accrues: true,  remaining: Math.max(0, elAccrued - elAvailed), accent: "#22C55E", bg: "linear-gradient(135deg,#F0FDF4,#DCFCE7)" },
+    { key: "sl",  label: "Sick Leave",         entitled: slEntitled, availed: slAvailed, accrued: slEntitled, accrues: false, remaining: Math.max(0, slEntitled - slAvailed), accent: "#3B82F6", bg: "linear-gradient(135deg,#EFF6FF,#DBEAFE)" },
+    { key: "pbc", label: "Paid by Company",    entitled: balance.pbc || 0,          availed: 0, accrued: balance.pbc || 0, accrues: false, remaining: balance.pbc || 0,                        accent: "#6B1A4A", bg: "linear-gradient(135deg,#F9EFF5,#F4E6F0)" },
+    { key: "lwp", label: "Leave Without Pay",  entitled: balance.lwp || 0,          availed: 0, accrued: balance.lwp || 0, accrues: false, remaining: balance.lwp || 0,                        accent: "#CD166E", bg: "linear-gradient(135deg,#FDF2F8,#FCE7F3)" },
+    ...(showML ? [{ key: "ml", label: "Maternity Leave", entitled: balance.ML || 0, availed: 0, accrued: balance.ML || 0, accrues: false, remaining: balance.ML || 0, accent: "#A855F7", bg: "linear-gradient(135deg,#FAF5FF,#F3E8FF)" }] : []),
+    ...(showPL ? [{ key: "pl", label: "Paternity Leave", entitled: balance.PL || 0, availed: 0, accrued: balance.PL || 0, accrues: false, remaining: balance.PL || 0, accent: "#F59E0B", bg: "linear-gradient(135deg,#FFFBEB,#FEF3C7)" }] : []),
   ];
 
   return (
@@ -608,7 +614,7 @@ const MyBalancePanel = ({ admin, leaveBalance }) => {
                 <div className="h-full rounded-lg" style={{ width: `${Math.max(pct, 3)}%`, background: s.accent }} />
               </div>
               <div className="flex justify-between mt-1 sm:mt-1.5 text-[8.5px] xs:text-[9px] sm:text-[10px] text-[#9B8BAE]">
-                {s.accrued > 0 && <span>Accrued: {s.accrued}</span>}
+                {s.accrues && <span>Accrued: {s.accrued}</span>}
                 <span className="ml-auto">{s.availed} used</span>
               </div>
             </div>
@@ -642,7 +648,9 @@ const MyBalancePanel = ({ admin, leaveBalance }) => {
                   </div>
                   <div>
                     <div className="text-[9px] text-[#9B8BAE] uppercase tracking-[0.5px]">Accrued</div>
-                    <div className="text-[13px] text-[#1C1028]">{s.accrued || "—"}</div>
+                    <div className="text-[13px] text-[#1C1028]">
+                      {s.accrues ? s.accrued : <span className="text-[11px] text-[#B7A9CC] italic">Granted upfront</span>}
+                    </div>
                   </div>
                   <div>
                     <div className="text-[9px] text-[#9B8BAE] uppercase tracking-[0.5px]">Used</div>
@@ -689,7 +697,9 @@ const MyBalancePanel = ({ admin, leaveBalance }) => {
                       </span>
                     </td>
                     <td className="px-3.5 py-3 font-semibold text-[13px]" style={{ borderBottom: "1px solid #F5F0FA", color: "#1C1028" }}>{s.entitled}</td>
-                    <td className="px-3.5 py-3 text-[13px]" style={{ borderBottom: "1px solid #F5F0FA", color: "#1C1028" }}>{s.accrued || "—"}</td>
+                    <td className="px-3.5 py-3 text-[13px]" style={{ borderBottom: "1px solid #F5F0FA", color: "#1C1028" }}>
+                      {s.accrues ? s.accrued : <span className="text-[11px] text-[#B7A9CC] italic">Granted upfront</span>}
+                    </td>
                     <td className="px-3.5 py-3 text-[13px]" style={{ borderBottom: "1px solid #F5F0FA", color: "#1C1028" }}>{s.availed}</td>
                     <td className="px-3.5 py-3 font-bold text-[15px]" style={{ borderBottom: "1px solid #F5F0FA", color: s.accent, fontFamily: "Playfair Display, serif" }}>{rem}</td>
                     <td className="px-3.5 py-3" style={{ borderBottom: "1px solid #F5F0FA" }}>
