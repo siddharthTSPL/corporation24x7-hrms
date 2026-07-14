@@ -10,26 +10,104 @@ const generateAssetId = () => {
   return `AST-${ts}-${rand}`;
 };
 
-const resolveAssignee = async (assigned_to, assigned_to_model, organisation_id) => {
-  if (!assigned_to || !assigned_to_model) return null;
+const ASSIGNEE_SELECT = "_id f_name l_name uid work_email designation";
 
-  const modelMap = {
-    Admin: AdminModel,
-    Manager: Managermodel,
-    User: Usermodel,
-  };
+const populateAssignments = (query) =>
+  query.populate("assignments.assigned_to", ASSIGNEE_SELECT);
 
-  const Model = modelMap[assigned_to_model];
-  if (!Model) return null;
+const parseQuantity = (value, fallback = 1) => {
+  const n = Number(value);
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) return null;
+  return n;
+};
 
-  const query = { _id: assigned_to };
-  if (assigned_to_model !== "Admin") {
-    query.organisation_id = organisation_id;
-  } else {
-    query.organisation_id = organisation_id;
+const recomputeStatus = (asset) => {
+  if (asset.status === "under_maintenance" || asset.status === "retired") return;
+  asset.status = asset.available_quantity > 0 ? "available" : "assigned";
+};
+
+const doAssign = async ({
+  asset,
+  organisation_id,
+  assignee_id,
+  assignee_model,
+  Model,
+  quantity,
+  assignedByName,
+  notifyModel,
+  next,
+}) => {
+  if (asset.status === "retired" || asset.status === "under_maintenance") {
+    return next(
+      Object.assign(new Error(`Asset cannot be assigned while in '${asset.status}' status`), {
+        statusCode: 400,
+      })
+    );
   }
 
-  return Model.findOne(query).select("_id f_name l_name uid work_email designation").lean();
+  if (asset.available_quantity < quantity) {
+    return next(
+      Object.assign(
+        new Error(`Only ${asset.available_quantity} unit(s) of this asset are available`),
+        { statusCode: 409 }
+      )
+    );
+  }
+
+  const person = await Model.findOne({ _id: assignee_id, organisation_id }).select(
+    "_id f_name l_name uid working_status"
+  );
+  if (!person) return next(Object.assign(new Error(`${assignee_model} not found`), { statusCode: 404 }));
+
+  if (person.working_status !== "working")
+    return next(
+      Object.assign(new Error(`Cannot assign asset to a ${assignee_model.toLowerCase()} who is not actively working`), {
+        statusCode: 400,
+      })
+    );
+
+  asset.assignments.push({
+    assigned_to: person._id,
+    assigned_to_model: assignee_model,
+    quantity,
+    assigned_date: new Date(),
+    is_returned: false,
+  });
+
+  asset.available_quantity -= quantity;
+  recomputeStatus(asset);
+
+  await asset.save();
+
+  notifyAssetAssigned({
+    recipientModel: notifyModel,
+    recipientId: person._id,
+    asset,
+    assignedByName,
+  });
+
+  return person;
+};
+
+const doRevoke = async ({ asset, assignment_id, return_condition, return_notes, next }) => {
+  const assignment = asset.assignments.id(assignment_id);
+
+  if (!assignment || assignment.is_returned) {
+    return next(
+      Object.assign(new Error("Assignment not found or already returned"), { statusCode: 404 })
+    );
+  }
+
+  assignment.is_returned = true;
+  assignment.returned_date = new Date();
+  assignment.return_condition = return_condition || null;
+  assignment.return_notes = return_notes || null;
+
+  asset.available_quantity += assignment.quantity;
+  recomputeStatus(asset);
+
+  await asset.save();
+  return assignment;
 };
 
 const createAssetSuperAdmin = async (req, res, next) => {
@@ -48,12 +126,17 @@ const createAssetSuperAdmin = async (req, res, next) => {
       purchase_price,
       condition,
       notes,
+      quantity,
     } = req.body;
 
     if (!asset_name || !asset_type)
       return next(
         Object.assign(new Error("asset_name and asset_type are required"), { statusCode: 400 })
       );
+
+    const qty = parseQuantity(quantity, 1);
+    if (qty === null)
+      return next(Object.assign(new Error("quantity must be a whole number of at least 1"), { statusCode: 400 }));
 
     const asset = await AssetModel.create({
       organisation_id,
@@ -67,6 +150,8 @@ const createAssetSuperAdmin = async (req, res, next) => {
       purchase_price,
       condition,
       notes,
+      total_quantity: qty,
+      available_quantity: qty,
       created_by: req.superAdmin._id,
       created_by_model: "SuperAdmin",
     });
@@ -89,6 +174,9 @@ const updateAssetSuperAdmin = async (req, res, next) => {
     const { id } = req.params;
     const organisation_id = req.superAdmin._id;
 
+    const asset = await AssetModel.findOne({ _id: id, organisation_id });
+    if (!asset) return next(Object.assign(new Error("Asset not found"), { statusCode: 404 }));
+
     const allowedFields = [
       "asset_name",
       "asset_type",
@@ -99,21 +187,33 @@ const updateAssetSuperAdmin = async (req, res, next) => {
       "purchase_price",
       "condition",
       "notes",
+      "status",
     ];
 
-    const updateData = {};
     allowedFields.forEach((field) => {
-      if (req.body[field] !== undefined) updateData[field] = req.body[field];
+      if (req.body[field] !== undefined) asset[field] = req.body[field];
     });
 
-    const asset = await AssetModel.findOneAndUpdate(
-      { _id: id, organisation_id },
-      { $set: updateData },
-      { new: true, runValidators: true }
-    ).lean();
+    if (req.body.total_quantity !== undefined) {
+      const newTotal = parseQuantity(req.body.total_quantity, null);
+      if (newTotal === null)
+        return next(Object.assign(new Error("total_quantity must be a whole number of at least 1"), { statusCode: 400 }));
 
-    if (!asset)
-      return next(Object.assign(new Error("Asset not found"), { statusCode: 404 }));
+      const assignedCount = asset.total_quantity - asset.available_quantity;
+      if (newTotal < assignedCount)
+        return next(
+          Object.assign(
+            new Error(`Cannot set quantity below ${assignedCount}, the number of units currently assigned`),
+            { statusCode: 400 }
+          )
+        );
+
+      asset.available_quantity += newTotal - asset.total_quantity;
+      asset.total_quantity = newTotal;
+    }
+
+    recomputeStatus(asset);
+    await asset.save();
 
     return res.status(200).json({
       success: true,
@@ -132,63 +232,34 @@ const assignAssetToAdminSuperAdmin = async (req, res, next) => {
 
     const { id } = req.params;
     const organisation_id = req.superAdmin._id;
-    const { admin_id } = req.body;
+    const { admin_id, quantity } = req.body;
 
     if (!admin_id)
       return next(Object.assign(new Error("admin_id is required"), { statusCode: 400 }));
 
+    const qty = parseQuantity(quantity, 1);
+    if (qty === null)
+      return next(Object.assign(new Error("quantity must be a whole number of at least 1"), { statusCode: 400 }));
+
     const asset = await AssetModel.findOne({ _id: id, organisation_id });
-    if (!asset)
-      return next(Object.assign(new Error("Asset not found"), { statusCode: 404 }));
+    if (!asset) return next(Object.assign(new Error("Asset not found"), { statusCode: 404 }));
 
-    if (asset.status === "assigned")
-      return next(
-        Object.assign(new Error("Asset is already assigned. Revoke first."), { statusCode: 409 })
-      );
-
-    if (asset.status === "retired" || asset.status === "under_maintenance")
-      return next(
-        Object.assign(
-          new Error(`Asset cannot be assigned while in '${asset.status}' status`),
-          { statusCode: 400 }
-        )
-      );
-
-    const admin = await AdminModel.findOne({ _id: admin_id, organisation_id }).select(
-      "_id f_name l_name uid working_status"
-    );
-    if (!admin)
-      return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
-
-    if (admin.working_status !== "working")
-      return next(
-        Object.assign(
-          new Error("Cannot assign asset to an admin who is not actively working"),
-          { statusCode: 400 }
-        )
-      );
-
-    asset.assigned_to = admin._id;
-    asset.assigned_to_model = "Admin";
-    asset.assigned_date = new Date();
-    asset.status = "assigned";
-    asset.is_returned = false;
-    asset.returned_date = null;
-    asset.return_condition = null;
-    asset.return_notes = null;
-
-    await asset.save();
-
-    notifyAssetAssigned({
-      recipientModel: "Admin",
-      recipientId: admin._id,
+    const admin = await doAssign({
       asset,
+      organisation_id,
+      assignee_id: admin_id,
+      assignee_model: "Admin",
+      Model: AdminModel,
+      quantity: qty,
       assignedByName: `${req.superAdmin.f_name || ""} ${req.superAdmin.l_name || ""}`.trim() || "SuperAdmin",
+      notifyModel: "Admin",
+      next,
     });
+    if (!admin) return;
 
     return res.status(200).json({
       success: true,
-      message: `Asset assigned to ${admin.f_name} ${admin.l_name} successfully`,
+      message: `${qty} unit(s) of asset assigned to ${admin.f_name} ${admin.l_name} successfully`,
       asset,
     });
   } catch (error) {
@@ -203,37 +274,20 @@ const revokeAssetFromAdminSuperAdmin = async (req, res, next) => {
 
     const { id } = req.params;
     const organisation_id = req.superAdmin._id;
-    const { return_condition, return_notes } = req.body;
+    const { assignment_id, return_condition, return_notes } = req.body;
+
+    if (!assignment_id)
+      return next(Object.assign(new Error("assignment_id is required"), { statusCode: 400 }));
 
     const asset = await AssetModel.findOne({ _id: id, organisation_id });
-    if (!asset)
-      return next(Object.assign(new Error("Asset not found"), { statusCode: 404 }));
+    if (!asset) return next(Object.assign(new Error("Asset not found"), { statusCode: 404 }));
 
-    if (asset.status !== "assigned" || !asset.assigned_to)
-      return next(Object.assign(new Error("Asset is not currently assigned"), { statusCode: 400 }));
-
-    asset.assignment_history.push({
-      assigned_to: asset.assigned_to,
-      assigned_to_model: asset.assigned_to_model,
-      assigned_date: asset.assigned_date,
-      returned_date: new Date(),
-      return_condition: return_condition || null,
-      return_notes: return_notes || null,
-    });
-
-    asset.assigned_to = null;
-    asset.assigned_to_model = null;
-    asset.returned_date = new Date();
-    asset.is_returned = true;
-    asset.return_condition = return_condition || null;
-    asset.return_notes = return_notes || null;
-    asset.status = "available";
-
-    await asset.save();
+    const assignment = await doRevoke({ asset, assignment_id, return_condition, return_notes, next });
+    if (!assignment) return;
 
     return res.status(200).json({
       success: true,
-      message: "Asset revoked and marked as returned",
+      message: "Asset unit revoked and marked as returned",
       asset,
     });
   } catch (error) {
@@ -247,17 +301,15 @@ const getAllAssetsSuperAdmin = async (req, res, next) => {
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
     const organisation_id = req.superAdmin._id;
-    const { status, asset_type, assigned_to_model } = req.query;
+    const { status, asset_type } = req.query;
 
     const filter = { organisation_id };
     if (status) filter.status = status;
     if (asset_type) filter.asset_type = asset_type;
-    if (assigned_to_model) filter.assigned_to_model = assigned_to_model;
 
-    const assets = await AssetModel.find(filter)
-      .populate("assigned_to", "f_name l_name uid work_email designation")
-      .sort({ createdAt: -1 })
-      .lean();
+    const assets = await populateAssignments(
+      AssetModel.find(filter).sort({ createdAt: -1 })
+    ).lean();
 
     return res.status(200).json({
       success: true,
@@ -277,9 +329,7 @@ const getAssetByIdSuperAdmin = async (req, res, next) => {
     const { id } = req.params;
     const organisation_id = req.superAdmin._id;
 
-    const asset = await AssetModel.findOne({ _id: id, organisation_id })
-      .populate("assigned_to", "f_name l_name uid work_email designation")
-      .lean();
+    const asset = await populateAssignments(AssetModel.findOne({ _id: id, organisation_id })).lean();
 
     if (!asset)
       return next(Object.assign(new Error("Asset not found"), { statusCode: 404 }));
@@ -302,9 +352,9 @@ const deleteAssetSuperAdmin = async (req, res, next) => {
     if (!asset)
       return next(Object.assign(new Error("Asset not found"), { statusCode: 404 }));
 
-    if (asset.status === "assigned")
+    if (asset.available_quantity !== asset.total_quantity)
       return next(
-        Object.assign(new Error("Cannot delete an assigned asset. Revoke it first."), {
+        Object.assign(new Error("Cannot delete an asset with units still assigned. Revoke them first."), {
           statusCode: 409,
         })
       );
@@ -333,12 +383,17 @@ const createAssetAdmin = async (req, res, next) => {
       purchase_price,
       condition,
       notes,
+      quantity,
     } = req.body;
 
     if (!asset_name || !asset_type)
       return next(
         Object.assign(new Error("asset_name and asset_type are required"), { statusCode: 400 })
       );
+
+    const qty = parseQuantity(quantity, 1);
+    if (qty === null)
+      return next(Object.assign(new Error("quantity must be a whole number of at least 1"), { statusCode: 400 }));
 
     const asset = await AssetModel.create({
       organisation_id,
@@ -352,6 +407,8 @@ const createAssetAdmin = async (req, res, next) => {
       purchase_price,
       condition,
       notes,
+      total_quantity: qty,
+      available_quantity: qty,
       created_by: req.admin._id,
       created_by_model: "Admin",
     });
@@ -374,6 +431,9 @@ const updateAssetAdmin = async (req, res, next) => {
     const { id } = req.params;
     const organisation_id = req.admin.organisation_id;
 
+    const asset = await AssetModel.findOne({ _id: id, organisation_id });
+    if (!asset) return next(Object.assign(new Error("Asset not found"), { statusCode: 404 }));
+
     const allowedFields = [
       "asset_name",
       "asset_type",
@@ -384,21 +444,33 @@ const updateAssetAdmin = async (req, res, next) => {
       "purchase_price",
       "condition",
       "notes",
+      "status",
     ];
 
-    const updateData = {};
     allowedFields.forEach((field) => {
-      if (req.body[field] !== undefined) updateData[field] = req.body[field];
+      if (req.body[field] !== undefined) asset[field] = req.body[field];
     });
 
-    const asset = await AssetModel.findOneAndUpdate(
-      { _id: id, organisation_id },
-      { $set: updateData },
-      { new: true, runValidators: true }
-    ).lean();
+    if (req.body.total_quantity !== undefined) {
+      const newTotal = parseQuantity(req.body.total_quantity, null);
+      if (newTotal === null)
+        return next(Object.assign(new Error("total_quantity must be a whole number of at least 1"), { statusCode: 400 }));
 
-    if (!asset)
-      return next(Object.assign(new Error("Asset not found"), { statusCode: 404 }));
+      const assignedCount = asset.total_quantity - asset.available_quantity;
+      if (newTotal < assignedCount)
+        return next(
+          Object.assign(
+            new Error(`Cannot set quantity below ${assignedCount}, the number of units currently assigned`),
+            { statusCode: 400 }
+          )
+        );
+
+      asset.available_quantity += newTotal - asset.total_quantity;
+      asset.total_quantity = newTotal;
+    }
+
+    recomputeStatus(asset);
+    await asset.save();
 
     return res.status(200).json({
       success: true,
@@ -417,63 +489,34 @@ const assignAssetToEmployee = async (req, res, next) => {
 
     const { id } = req.params;
     const organisation_id = req.admin.organisation_id;
-    const { employee_id } = req.body;
+    const { employee_id, quantity } = req.body;
 
     if (!employee_id)
       return next(Object.assign(new Error("employee_id is required"), { statusCode: 400 }));
 
+    const qty = parseQuantity(quantity, 1);
+    if (qty === null)
+      return next(Object.assign(new Error("quantity must be a whole number of at least 1"), { statusCode: 400 }));
+
     const asset = await AssetModel.findOne({ _id: id, organisation_id });
-    if (!asset)
-      return next(Object.assign(new Error("Asset not found"), { statusCode: 404 }));
+    if (!asset) return next(Object.assign(new Error("Asset not found"), { statusCode: 404 }));
 
-    if (asset.status === "assigned")
-      return next(
-        Object.assign(new Error("Asset is already assigned. Revoke first."), { statusCode: 409 })
-      );
-
-    if (asset.status === "retired" || asset.status === "under_maintenance")
-      return next(
-        Object.assign(
-          new Error(`Asset cannot be assigned while in '${asset.status}' status`),
-          { statusCode: 400 }
-        )
-      );
-
-    const employee = await Usermodel.findOne({ _id: employee_id, organisation_id }).select(
-      "_id f_name l_name uid working_status"
-    );
-    if (!employee)
-      return next(Object.assign(new Error("Employee not found"), { statusCode: 404 }));
-
-    if (employee.working_status !== "working")
-      return next(
-        Object.assign(
-          new Error("Cannot assign asset to an employee who is not actively working"),
-          { statusCode: 400 }
-        )
-      );
-
-    asset.assigned_to = employee._id;
-    asset.assigned_to_model = "User";
-    asset.assigned_date = new Date();
-    asset.status = "assigned";
-    asset.is_returned = false;
-    asset.returned_date = null;
-    asset.return_condition = null;
-    asset.return_notes = null;
-
-    await asset.save();
-
-    notifyAssetAssigned({
-      recipientModel: "User",
-      recipientId: employee._id,
+    const employee = await doAssign({
       asset,
+      organisation_id,
+      assignee_id: employee_id,
+      assignee_model: "User",
+      Model: Usermodel,
+      quantity: qty,
       assignedByName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+      notifyModel: "User",
+      next,
     });
+    if (!employee) return;
 
     return res.status(200).json({
       success: true,
-      message: `Asset assigned to ${employee.f_name} ${employee.l_name} successfully`,
+      message: `${qty} unit(s) of asset assigned to ${employee.f_name} ${employee.l_name} successfully`,
       asset,
     });
   } catch (error) {
@@ -488,63 +531,34 @@ const assignAssetToManager = async (req, res, next) => {
 
     const { id } = req.params;
     const organisation_id = req.admin.organisation_id;
-    const { manager_id } = req.body;
+    const { manager_id, quantity } = req.body;
 
     if (!manager_id)
       return next(Object.assign(new Error("manager_id is required"), { statusCode: 400 }));
 
+    const qty = parseQuantity(quantity, 1);
+    if (qty === null)
+      return next(Object.assign(new Error("quantity must be a whole number of at least 1"), { statusCode: 400 }));
+
     const asset = await AssetModel.findOne({ _id: id, organisation_id });
-    if (!asset)
-      return next(Object.assign(new Error("Asset not found"), { statusCode: 404 }));
+    if (!asset) return next(Object.assign(new Error("Asset not found"), { statusCode: 404 }));
 
-    if (asset.status === "assigned")
-      return next(
-        Object.assign(new Error("Asset is already assigned. Revoke first."), { statusCode: 409 })
-      );
-
-    if (asset.status === "retired" || asset.status === "under_maintenance")
-      return next(
-        Object.assign(
-          new Error(`Asset cannot be assigned while in '${asset.status}' status`),
-          { statusCode: 400 }
-        )
-      );
-
-    const manager = await Managermodel.findOne({ _id: manager_id, organisation_id }).select(
-      "_id f_name l_name uid working_status"
-    );
-    if (!manager)
-      return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
-
-    if (manager.working_status !== "working")
-      return next(
-        Object.assign(
-          new Error("Cannot assign asset to a manager who is not actively working"),
-          { statusCode: 400 }
-        )
-      );
-
-    asset.assigned_to = manager._id;
-    asset.assigned_to_model = "Manager";
-    asset.assigned_date = new Date();
-    asset.status = "assigned";
-    asset.is_returned = false;
-    asset.returned_date = null;
-    asset.return_condition = null;
-    asset.return_notes = null;
-
-    await asset.save();
-
-    notifyAssetAssigned({
-      recipientModel: "Manager",
-      recipientId: manager._id,
+    const manager = await doAssign({
       asset,
+      organisation_id,
+      assignee_id: manager_id,
+      assignee_model: "Manager",
+      Model: Managermodel,
+      quantity: qty,
       assignedByName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+      notifyModel: "Manager",
+      next,
     });
+    if (!manager) return;
 
     return res.status(200).json({
       success: true,
-      message: `Asset assigned to ${manager.f_name} ${manager.l_name} successfully`,
+      message: `${qty} unit(s) of asset assigned to ${manager.f_name} ${manager.l_name} successfully`,
       asset,
     });
   } catch (error) {
@@ -559,37 +573,20 @@ const revokeAssetAdmin = async (req, res, next) => {
 
     const { id } = req.params;
     const organisation_id = req.admin.organisation_id;
-    const { return_condition, return_notes } = req.body;
+    const { assignment_id, return_condition, return_notes } = req.body;
+
+    if (!assignment_id)
+      return next(Object.assign(new Error("assignment_id is required"), { statusCode: 400 }));
 
     const asset = await AssetModel.findOne({ _id: id, organisation_id });
-    if (!asset)
-      return next(Object.assign(new Error("Asset not found"), { statusCode: 404 }));
+    if (!asset) return next(Object.assign(new Error("Asset not found"), { statusCode: 404 }));
 
-    if (asset.status !== "assigned" || !asset.assigned_to)
-      return next(Object.assign(new Error("Asset is not currently assigned"), { statusCode: 400 }));
-
-    asset.assignment_history.push({
-      assigned_to: asset.assigned_to,
-      assigned_to_model: asset.assigned_to_model,
-      assigned_date: asset.assigned_date,
-      returned_date: new Date(),
-      return_condition: return_condition || null,
-      return_notes: return_notes || null,
-    });
-
-    asset.assigned_to = null;
-    asset.assigned_to_model = null;
-    asset.returned_date = new Date();
-    asset.is_returned = true;
-    asset.return_condition = return_condition || null;
-    asset.return_notes = return_notes || null;
-    asset.status = "available";
-
-    await asset.save();
+    const assignment = await doRevoke({ asset, assignment_id, return_condition, return_notes, next });
+    if (!assignment) return;
 
     return res.status(200).json({
       success: true,
-      message: "Asset revoked and marked as returned",
+      message: "Asset unit revoked and marked as returned",
       asset,
     });
   } catch (error) {
@@ -603,17 +600,15 @@ const getAllAssetsAdmin = async (req, res, next) => {
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
     const organisation_id = req.admin.organisation_id;
-    const { status, asset_type, assigned_to_model } = req.query;
+    const { status, asset_type } = req.query;
 
     const filter = { organisation_id };
     if (status) filter.status = status;
     if (asset_type) filter.asset_type = asset_type;
-    if (assigned_to_model) filter.assigned_to_model = assigned_to_model;
 
-    const assets = await AssetModel.find(filter)
-      .populate("assigned_to", "f_name l_name uid work_email designation")
-      .sort({ createdAt: -1 })
-      .lean();
+    const assets = await populateAssignments(
+      AssetModel.find(filter).sort({ createdAt: -1 })
+    ).lean();
 
     return res.status(200).json({
       success: true,
@@ -633,9 +628,7 @@ const getAssetByIdAdmin = async (req, res, next) => {
     const { id } = req.params;
     const organisation_id = req.admin.organisation_id;
 
-    const asset = await AssetModel.findOne({ _id: id, organisation_id })
-      .populate("assigned_to", "f_name l_name uid work_email designation")
-      .lean();
+    const asset = await populateAssignments(AssetModel.findOne({ _id: id, organisation_id })).lean();
 
     if (!asset)
       return next(Object.assign(new Error("Asset not found"), { statusCode: 404 }));
@@ -658,9 +651,9 @@ const deleteAssetAdmin = async (req, res, next) => {
     if (!asset)
       return next(Object.assign(new Error("Asset not found"), { statusCode: 404 }));
 
-    if (asset.status === "assigned")
+    if (asset.available_quantity !== asset.total_quantity)
       return next(
-        Object.assign(new Error("Cannot delete an assigned asset. Revoke it first."), {
+        Object.assign(new Error("Cannot delete an asset with units still assigned. Revoke them first."), {
           statusCode: 409,
         })
       );
@@ -688,16 +681,32 @@ const getAssetsOfPerson = async (req, res, next) => {
 
     const assets = await AssetModel.find({
       organisation_id,
-      assigned_to: person_id,
-      assigned_to_model: person_model,
+      assignments: {
+        $elemMatch: { assigned_to: person_id, assigned_to_model: person_model, is_returned: false },
+      },
     })
-      .select("asset_id asset_name asset_type status assigned_date serial_number brand")
+      .select("asset_id asset_name asset_type status serial_number brand assignments")
       .lean();
+
+    const result = assets.map((a) => {
+      const myAssignments = (a.assignments || []).filter(
+        (x) =>
+          String(x.assigned_to) === String(person_id) &&
+          x.assigned_to_model === person_model &&
+          !x.is_returned
+      );
+      const { assignments, ...rest } = a;
+      return {
+        ...rest,
+        quantity: myAssignments.reduce((sum, x) => sum + x.quantity, 0),
+        assigned_date: myAssignments[0]?.assigned_date || null,
+      };
+    });
 
     return res.status(200).json({
       success: true,
-      total: assets.length,
-      assets,
+      total: result.length,
+      assets: result,
     });
   } catch (error) {
     next(error);
