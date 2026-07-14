@@ -27,14 +27,22 @@ const api = axios.create({
   withCredentials: true,
 });
 
-const DEPT_OPTIONS = [ "OPR","BPO", "ENG", "HR", "MGMT"];
-const DEPT_FULL_FORMS = {
-  OPR: "OPR — Operations",
-  BPO: "BPO — Business Process Outsourcing",
-  ENG: "ENG — Engineering",
-  HR: "HR — Human Resources",
-  MGMT: "MGMT — Management",
+export const DEPT_OPTIONS = [
+  "OPR",
+  "BPO",
+  "ENG",
+  "HR",
+  "MGMT",
+];
+
+export const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
 };
+
 const LOCATIONS = ["Noida", "Bareilly", "Delhi", "Mumbai"];
 
 const WORKING_STATUSES = ["working", "resigned", "fired", "terminated"];
@@ -143,7 +151,7 @@ function exportToCSV(data) {
   ];
   const rows = data.map((u) => [
     u.uid??"",u.f_name??"",u.l_name??"",u.work_email??"",u.role??"",
-    u.department??"",u.designation??"",u.office_location??"",u.gender??"",
+    DEPT_FULL_FORMS[u.department]??u.department??"",u.designation??"",u.office_location??"",u.gender??"",
     u.marital_status??"",u.personal_contact??"",u.e_contact??"",
     u.city??"",u.state??"",u.pincode??"",
     u.Under_manager
@@ -947,7 +955,7 @@ function AccountSummaryDrawer({
                     <p className="text-xs text-[#993556] truncate mt-0.5">{person.work_email}</p>
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {roleBadgeEl(person.role)}
-                      {person.department&&<Badge label={person.department} type="dept"/>}
+                      {person.department&&<Badge label={DEPT_FULL_FORMS[person.department]||person.department} type="dept"/>}
                       {person.status&&<Badge label={person.status} type={person.status==="active"?"active":person.status==="suspended"?"suspended":"inactive"}/>}
                     </div>
                     <div className="flex flex-wrap gap-1.5 mt-1.5">
@@ -980,7 +988,7 @@ function AccountSummaryDrawer({
                     <InfoRow icon={<FaPhone size={10}/>} label="Personal Contact" value={person.personal_contact}/>
                     <InfoRow icon={<FaPhone size={10}/>} label="Emergency Contact" value={person.e_contact}/>
                     <InfoRow icon={<FaBriefcase size={10}/>} label="Designation" value={person.designation}/>
-                    <InfoRow icon={<FaBuilding size={10}/>} label="Department" value={person.department}/>
+                    <InfoRow icon={<FaBuilding size={10}/>} label="Department" value={DEPT_FULL_FORMS[person.department]||person.department}/>
                     <InfoRow icon={<FaMapMarkerAlt size={10}/>} label="Office Location" value={person.office_location}/>
                     <InfoRow icon={<FaUser size={10}/>} label="Gender" value={person.gender?person.gender.charAt(0).toUpperCase()+person.gender.slice(1):null}/>
                     <InfoRow icon={<FaUser size={10}/>} label="Marital Status" value={person.marital_status?person.marital_status.charAt(0).toUpperCase()+person.marital_status.slice(1):null}/>
@@ -1427,7 +1435,7 @@ function MobileCard({u,onView,onEdit,onDelete,onPromoteToManager,onPromoteToAdmi
           <Badge label={roleLabel} type={roleType}/>
         </div>
         <div className="flex flex-wrap gap-1.5 mt-2">
-          {u.department&&<Badge label={u.department} type="dept"/>}
+          {u.department&&<Badge label={DEPT_FULL_FORMS[u.department]||u.department} type="dept"/>}
           {u.office_location&&<span className="px-2 py-0.5 rounded-full text-xs bg-[#F9F8F2] text-[#993556] border border-[#F4C0D1]">📍 {u.office_location}</span>}
           <WorkingStatusBadge status={u.working_status}/>
         </div>
@@ -1486,8 +1494,18 @@ function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChang
   if(step===1)return(
     <>
       <Field label="Department" required error={errors.department}>
-        <select name="department" value={form.department} onChange={onChange} className={inputCls}>
-          <option value="">Select Department</option>{DEPT_OPTIONS.map((d)=><option key={d} value={d}>{DEPT_FULL_FORMS[d] || d}</option>)}
+        <select
+          name="department"
+          value={form.department}
+          onChange={onChange}
+          className={inputCls}
+        >
+          <option value="">Select Department</option>
+          {DEPT_OPTIONS.map((dept) => (
+            <option key={dept} value={dept}>
+              {DEPT_FULL_FORMS[dept]}
+            </option>
+          ))}
         </select>
       </Field>
       <Field label="Designation" required error={errors.designation}><input name="designation" placeholder="e.g. Software Engineer" value={form.designation} onChange={onChange} className={inputCls}/></Field>
@@ -1590,7 +1608,12 @@ function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin
     <>
       <Field label="Department" required error={errors.department}>
         <select name="department" value={form.department} onChange={onChange} className={inputCls}>
-          <option value="">Select Department</option>{DEPT_OPTIONS.map((d)=><option key={d} value={d}>{DEPT_FULL_FORMS[d] || d}</option>)}
+          <option value="">Select Department</option>
+          {DEPT_OPTIONS.map((dept) => (
+            <option key={dept} value={dept}>
+              {DEPT_FULL_FORMS[dept]}
+            </option>
+          ))}
         </select>
       </Field>
       <Field label="Designation" required error={errors.designation}><input name="designation" placeholder="e.g. Head of Engineering" value={form.designation} onChange={onChange} className={inputCls}/></Field>
@@ -2154,7 +2177,12 @@ export default function EmployeeTable(){
                 <option value="">All Types</option><option value="employee">Employees</option><option value="manager">Managers</option>
               </select>
               <select className={`${inputCls} flex-1`} value={filters.department} onChange={(e)=>setFilters({...filters,department:e.target.value})}>
-                <option value="">All Departments</option>{DEPT_OPTIONS.map((d)=><option key={d} value={d}>{DEPT_FULL_FORMS[d] || d}</option>)}
+                <option value="">All Departments</option>
+                {DEPT_OPTIONS.map((dept)=>(
+                  <option key={dept} value={dept}>
+                    {DEPT_FULL_FORMS[dept]}
+                  </option>
+                ))}
               </select>
               <select className={`${inputCls} flex-1`} value={filters.role} onChange={(e)=>setFilters({...filters,role:e.target.value})}>
                 <option value="">All Roles</option>
@@ -2184,7 +2212,7 @@ export default function EmployeeTable(){
                 {activeFilterCount>0&&(
                   <div className="flex flex-wrap gap-1.5 mt-2 items-center">
                     {filters.type&&<FilterChip label={`Type: ${filters.type}`} onRemove={()=>setFilters({...filters,type:""})}/>}
-                    {filters.department&&<FilterChip label={`Dept: ${filters.department}`} onRemove={()=>setFilters({...filters,department:""})}/>}
+                    {filters.department&&<FilterChip label={`Dept: ${DEPT_FULL_FORMS[filters.department]||filters.department}`} onRemove={()=>setFilters({...filters,department:""})}/>}
                     {filters.role&&<FilterChip label={`Role: ${filters.role}`} onRemove={()=>setFilters({...filters,role:""})}/>}
                     {filters.location&&<FilterChip label={`Loc: ${filters.location}`} onRemove={()=>setFilters({...filters,location:""})}/>}
                     {filters.gender&&<FilterChip label={`Gender: ${filters.gender}`} onRemove={()=>setFilters({...filters,gender:""})}/>}
@@ -2244,7 +2272,7 @@ export default function EmployeeTable(){
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 lg:px-4 py-3"><Badge label={u.department||"—"} type="dept"/></td>
+                      <td className="px-3 lg:px-4 py-3"><Badge label={DEPT_FULL_FORMS[u.department]||u.department} type="dept"/></td>
                       <td className="px-3 lg:px-4 py-3 text-[#730042] text-xs lg:text-sm max-w-[100px] lg:max-w-none truncate">{u.designation||"—"}</td>
                       <td className="px-3 lg:px-4 py-3 text-[#730042] text-xs lg:text-sm whitespace-nowrap">{u.office_location||"—"}</td>
                       <td className="px-3 lg:px-4 py-3">
@@ -2327,7 +2355,12 @@ export default function EmployeeTable(){
           <Field label="Work Email" required error={editErrors.work_email}><input name="work_email" type="email" value={editForm.work_email} onChange={handleEditChange} className={inputCls}/></Field>
           <Field label="Department" required error={editErrors.department}>
             <select name="department" value={editForm.department} onChange={handleEditChange} className={inputCls}>
-              <option value="">Select Department</option>{DEPT_OPTIONS.map((d)=><option key={d} value={d}>{DEPT_FULL_FORMS[d] || d}</option>)}
+              <option value="">Select Department</option>
+              {DEPT_OPTIONS.map((dept) => (
+                <option key={dept} value={dept}>
+                  {DEPT_FULL_FORMS[dept]}
+                </option>
+              ))}
             </select>
           </Field>
           <Field label="Designation" required error={editErrors.designation}><input name="designation" value={editForm.designation} onChange={handleEditChange} className={inputCls}/></Field>
