@@ -13,6 +13,16 @@ const initials = (name = "") =>
 
 const norm = (s = "") => s.toLowerCase().trim();
 
+const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+};
+
+const getDepartmentName = (dept) => DEPT_FULL_FORMS[dept] || dept || "—";
+
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
@@ -96,8 +106,6 @@ function Hi({ text = "", q = "", style = {} }) {
   );
 }
 
-// Admin sits at the root of their whole org, so every node is on their own line —
-// the palette here stays a simple grayscale ramp by depth rather than per-role colour.
 const CFG = {
   org:     { accent: "#0f172a", avBg: "#0f172a", avColor: "#f8fafc" },
   admin:   { accent: "#334155", avBg: "#e2e8f0", avColor: "#334155" },
@@ -106,8 +114,9 @@ const CFG = {
   emp:     { accent: "#94a3b8", avBg: "#f8fafc", avColor: "#64748b" },
 };
 
-function Card({ level, name, sub, empid, width = 172, delay = 0, dim, hl, q, empCount }) {
+function Card({ level, name, sub, department, designation, empid, width = 172, delay = 0, dim, hl, q, empCount }) {
   const c = CFG[level] || CFG.emp;
+  const useRoleLayout = department !== undefined || designation !== undefined;
   return (
     <div style={{ animation: `scaleIn 0.26s ease ${delay}ms forwards`, opacity: 0, flexShrink: 0 }}>
       <div
@@ -118,8 +127,18 @@ function Card({ level, name, sub, empid, width = 172, delay = 0, dim, hl, q, emp
         <Avatar name={name} size={38} bg={c.avBg} color={c.avColor} />
         <div style={{ marginTop: 8, marginBottom: 6, textAlign: "center", width: "100%" }}>
           <Hi text={name} q={q} style={{ fontSize: 12, fontWeight: 600, color: "#0f172a", display: "block", lineHeight: 1.3, fontFamily: "'Syne',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />
-          {sub && <Hi text={sub} q={q} style={{ fontSize: 10, color: "#64748b", display: "block", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />}
-          {empid && <span style={{ fontSize: 9, color: "#94a3b8", display: "block", marginTop: 2, fontFamily: "'DM Mono',monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{empid}</span>}
+          {useRoleLayout ? (
+            <>
+              <Hi text={department || "—"} q={q} style={{ fontSize: 10, color: "#64748b", display: "block", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />
+              <Hi text={designation || "—"} q={q} style={{ fontSize: 10, color: "#64748b", display: "block", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />
+              <span style={{ fontSize: 9, color: "#94a3b8", display: "block", marginTop: 2, fontFamily: "'DM Mono',monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{empid || "—"}</span>
+            </>
+          ) : (
+            <>
+              {sub && <Hi text={sub} q={q} style={{ fontSize: 10, color: "#64748b", display: "block", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />}
+              {empid && <span style={{ fontSize: 9, color: "#94a3b8", display: "block", marginTop: 2, fontFamily: "'DM Mono',monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{empid}</span>}
+            </>
+          )}
           {empCount !== undefined && <span style={{ fontSize: 10, color: "#94a3b8", display: "block", marginTop: 2 }}>{empCount} report{empCount !== 1 ? "s" : ""}</span>}
         </div>
       </div>
@@ -197,7 +216,8 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
       <Card
         level={level}
         name={mgr.name}
-        sub={mgr.designation || mgr.department}
+        department={mgr.department ? getDepartmentName(mgr.department) : "—"}
+        designation={mgr.designation || "—"}
         empid={mgr.empid}
         width={CARD_W}
         delay={mDelay}
@@ -246,7 +266,8 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
                   key={emp.id}
                   level="emp"
                   name={emp.name}
-                  sub={emp.designation || emp.department}
+                  department={emp.department ? getDepartmentName(emp.department) : "—"}
+                  designation={emp.designation || "—"}
                   empid={emp.empid}
                   width={EMP_W}
                   delay={eDelay}
@@ -324,7 +345,7 @@ function OrgTree({ data, loading, q }) {
 
       {data.admin && (
         <>
-          <Card level="admin" name={data.admin.name} sub={data.admin.designation || data.admin.department} empid={data.admin.empid} width={CARD_W} delay={80} dim={dim("admin")} hl={matches.has("admin")} q={q} />
+          <Card level="admin" name={data.admin.name} department={data.admin.department ? getDepartmentName(data.admin.department) : "—"} designation={data.admin.designation || "—"} empid={data.admin.empid} width={CARD_W} delay={80} dim={dim("admin")} hl={matches.has("admin")} q={q} />
           <VLine h={22} />
         </>
       )}
@@ -500,10 +521,10 @@ export default function OrganizationPageAdmin() {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5 mb-5 sm:mb-[22px]">
-          <StatCard label="Organisation"  text={orgName}                    icon={Building2} accent="#0f172a" delay={60}  />
-          <StatCard label="Admin name"    text={adminInfo?.name}            icon={User}      accent="#334155" delay={95}  />
-          <StatCard label="Department"    text={adminInfo?.department}      icon={Users}     accent="#475569" delay={130} />
-          <StatCard label="Designation"   text={adminInfo?.designation}     icon={Crown}     accent="#64748b" delay={165} />
+          <StatCard label="Organisation"  text={orgName}                                icon={Building2} accent="#0f172a" delay={60}  />
+          <StatCard label="Admin name"    text={adminInfo?.name}                        icon={User}      accent="#334155" delay={95}  />
+          <StatCard label="Department"    text={adminInfo?.department ? getDepartmentName(adminInfo.department) : undefined} icon={Users}     accent="#475569" delay={130} />
+          <StatCard label="Designation"   text={adminInfo?.designation}                 icon={Crown}     accent="#64748b" delay={165} />
         </div>
 
         {searchOpen && searchQuery && matchCount === 0 && (
