@@ -132,6 +132,26 @@ const evaluateCheckoutWindow = (shift, now = new Date(), checkInTime = null) => 
   };
 };
 
+// Returns the UTC instant at which an open session for this shift must be
+// force-checked-out: shift end + maxOvertimeMinutes, on the IST calendar
+// day the attendance record is dated. `attendanceDate` is expected to be
+// an IST-midnight instant (i.e. produced by startOfISTDay, which is what
+// every `date` field in this app is), so pure ms arithmetic on top of it
+// is timezone-independent - no local Date getters/setters involved.
+const getForceCheckoutInstant = (shift, attendanceDate) => {
+  const start = toMinutes(shift.startTime);
+  const end = toMinutes(shift.endTime);
+  const overnight = end <= start;
+  const maxOvertimeMinutes = shift.maxOvertimeMinutes ?? 60;
+
+  // If the shift runs past midnight, shift end actually falls on the next
+  // IST calendar day relative to the record's `date`.
+  const endOffsetMinutes = overnight ? end + 1440 : end;
+  const totalOffsetMinutes = endOffsetMinutes + maxOvertimeMinutes;
+
+  return new Date(new Date(attendanceDate).getTime() + totalOffsetMinutes * 60000);
+};
+
 const ensureDefaultShift = async (organisation_id) => {
   let defaultShift = await Shift.findOne({ organisation_id, isDefault: true });
   if (defaultShift) return defaultShift;
@@ -165,6 +185,7 @@ module.exports = {
   getShiftThresholds,
   evaluateCheckinWindow,
   evaluateCheckoutWindow,
+  getForceCheckoutInstant,
   ensureDefaultShift,
   resolveEmployeeShift,
 };
