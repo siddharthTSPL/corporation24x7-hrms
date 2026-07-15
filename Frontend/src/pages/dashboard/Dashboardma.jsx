@@ -6,6 +6,7 @@ import { useGetAllManagerLeaves } from "../../auth/server-state/manager/managerl
 import { useGetAttendance } from "../../auth/server-state/manager/managgerother/managerother.hook";
 import { useGetMyLeavesManager } from "../../auth/server-state/manager/managerleave/managerleave.hook";
 import { useCalendarMeta, useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
+import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus } from "../../pages/utils/attendance";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS   = ["S","M","T","W","T","F","S"];
@@ -271,19 +272,6 @@ function isDateInRange(date, start, end) {
   return d >= s && d <= e;
 }
 
-function resolveAttendanceStatus(record) {
-  if (!record) return null;
-  if (record.checkIn && !record.checkOut) return "checkedin";
-  const s = (record.status || "").toLowerCase();
-  if (s.includes("half")) return "halfday";
-  if (s === "present")    return "present";
-  if (s === "absent")     return "absent";
-  if (s === "late")       return "late";
-  if (s === "lwp")        return "absent";
-  if (record.checkIn && record.checkOut) return "present";
-  return "absent";
-}
-
 function Avatar({ src, initials, size = 36, radius = "50%", fontSize = 13, style = {} }) {
   const [imgError, setImgError] = useState(false);
   const showImg = src && !imgError;
@@ -472,7 +460,7 @@ function Calendar({ month, joiningDate, attendanceMap = new Map(), myApprovedLea
     const isFuture     = date > today;
     const isBeforeJoin = joiningMidnight && date < joiningMidnight;
 
-    const key = date.toISOString().slice(0, 10);
+    const key = getISTDayKey(date);
     const holidayName = holidayMap.get(d);
 
     let status = "future";
@@ -489,7 +477,7 @@ function Calendar({ month, joiningDate, attendanceMap = new Map(), myApprovedLea
       status = "leave";
     } else if (!isFuture) {
       const record = attendanceMap.get(key);
-      status = resolveAttendanceStatus(record) ?? "absent";
+      status = resolveAttendanceStatus(record, { isToday }) ?? "absent";
     }
 
     cells.push({ day: d, status, isToday, label });
@@ -933,13 +921,7 @@ export default function ManagerDashboard() {
         ? attData.attendance
         : [];
 
-    const map = new Map();
-    records.forEach(rec => {
-      if (!rec.date) return;
-      const key = new Date(rec.date).toISOString().slice(0, 10);
-      map.set(key, rec);
-    });
-    return map;
+    return buildAttendanceMap(records);
   }, [attData]);
 
   const joiningDate = manager?.date_of_joining ?? manager?.createdAt ?? null;
@@ -984,9 +966,10 @@ export default function ManagerDashboard() {
       if (isOwnLeave) continue;
 
       counted++;
-      const key = date.toISOString().slice(0, 10);
+      const key = getISTDayKey(date);
       const rec = attendanceMap.get(key);
-      const status = resolveAttendanceStatus(rec);
+      const isTodayCell = date.toDateString() === today.toDateString();
+      const status = resolveAttendanceStatus(rec, { isToday: isTodayCell });
 
       if (status === "present")   present++;
       else if (status === "absent" || !status) absent++;

@@ -279,7 +279,7 @@ const getToday = async (req, res) => {
         activeMinutes: displayMinutes(attendance.activeMinutes),
         idleMinutes: displayMinutes(attendance.idleMinutes),
       },
-      isCheckedIn: attendance.source === "manual" && !attendance.checkOut,
+      isCheckedIn: !attendance.checkOut && !!attendance.checkIn && attendance.source !== "agent",
       isCheckedOut: !!attendance.checkOut,
     });
   } catch (error) {

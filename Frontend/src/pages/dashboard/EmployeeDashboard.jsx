@@ -4,6 +4,7 @@ import { useGetMeUser } from "../../auth/server-state/employee/employeeauth/empl
 import { useGetAllLeaveHistory } from "../../auth/server-state/employee/employeeleave/employeeleave.hook";
 import { useGetAttendance } from "../../auth/server-state/employee/employeeother/employeeother.hook";
 import { useCalendarMeta, useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
+import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus } from "../../pages/utils/attendance";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS = ["S","M","T","W","T","F","S"];
@@ -48,19 +49,6 @@ function isDateInRange(date,start,end) {
   const s=new Date(start); s.setHours(0,0,0,0);
   const e=new Date(end); e.setHours(0,0,0,0);
   return d>=s && d<=e;
-}
-
-function resolveAttendanceStatus(record) {
-  if (!record) return null;
-  if (record.checkIn && !record.checkOut) return "checkedin";
-  const s=(record.status||"").toLowerCase();
-  if (s.includes("half")) return "halfday";
-  if (s==="present") return "present";
-  if (s==="absent") return "absent";
-  if (s==="late") return "late";
-  if (s==="lwp") return "absent";
-  if (record.checkIn && record.checkOut) return "present";
-  return "absent";
 }
 
 function Avatar({ src, initials, size=36, className="", style={} }) {
@@ -231,9 +219,9 @@ function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=
     else if (weekOffSet.has(d)) { status="weekoff"; }
     else if (leaveDaySet.has(d)) { status="leave"; }
     else if (!isFuture) {
-      const key=date.toISOString().slice(0,10);
+      const key=getISTDayKey(date);
       const record=attendanceMap.get(key);
-      status=resolveAttendanceStatus(record)??"absent";
+      status=resolveAttendanceStatus(record, { isToday })??"absent";
     }
     cells.push({ day:d, status, isToday, label });
   }
@@ -587,14 +575,7 @@ export default function EmployeeDashboard() {
 
   const attendanceMap=useMemo(()=>{
     const records=Array.isArray(attData)?attData:Array.isArray(attData?.attendance)?attData.attendance:[];
-    const IST_OFFSET_MS=5.5*60*60*1000;
-    const map=new Map();
-    records.forEach(rec=>{
-      if (!rec.date) return;
-      const istKey=new Date(new Date(rec.date).getTime()+IST_OFFSET_MS).toISOString().slice(0,10);
-      map.set(istKey,rec);
-    });
-    return map;
+    return buildAttendanceMap(records);
   },[attData]);
 
   const approvedLeaves=useMemo(()=>allLeaves.filter(lv=>APPROVED_STATUSES.includes(lv.status)),[allLeaves]);
@@ -625,9 +606,10 @@ export default function EmployeeDashboard() {
       if (joiningMidnight && date<joiningMidnight) continue;
       if (approvedLeaves.some(lv=>isDateInRange(date,lv.startDate,lv.endDate))) continue;
       counted++;
-      const key=date.toISOString().slice(0,10);
+      const key=getISTDayKey(date);
       const rec=attendanceMap.get(key);
-      const status=resolveAttendanceStatus(rec);
+      const isTodayCell=date.toDateString()===today.toDateString();
+      const status=resolveAttendanceStatus(rec, { isToday: isTodayCell });
       if (status==="present") present++;
       else if (status==="absent"||!status) absent++;
       else if (status==="halfday"||status==="late") half++;
