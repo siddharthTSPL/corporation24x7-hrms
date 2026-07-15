@@ -10,23 +10,17 @@ import {
   useGetParticularEmployee,
   useGetParticularManager,
 } from "../../auth/server-state/superadmin/other/suother.hook";
-
+ 
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-
+ 
   .su-org *, .su-org { font-family: 'Inter', sans-serif; box-sizing: border-box; }
-
-  /* --- Mobile viewport-height fix ---------------------------------------
-     100vh on mobile Safari/Chrome includes space behind the collapsing
-     address bar, which creates a few extra px of scroll below the real
-     content ("dead scroll" after the hierarchy). 100dvh tracks the actual
-     visible viewport, so we upgrade to it wherever it's supported and keep
-     100vh only as the pre-support fallback. */
+ 
   .su-shell { min-height: 100vh; }
   @supports (height: 100dvh) {
     .su-shell { min-height: 100dvh; }
   }
-
+ 
   @keyframes fadeUp    { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
   @keyframes fadeIn    { from { opacity:0; } to { opacity:1; } }
   @keyframes scaleIn   { from { opacity:0; transform:scale(0.93); } to { opacity:1; transform:scale(1); } }
@@ -37,20 +31,13 @@ const STYLES = `
     0%,100% { box-shadow: 0 0 0 0 rgba(15,23,42,0.2), 0 4px 20px rgba(15,23,42,0.08); }
     50%      { box-shadow: 0 0 0 7px rgba(15,23,42,0.05), 0 8px 28px rgba(15,23,42,0.15); }
   }
-
+ 
   .su-card-hover { transition: transform 0.16s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.16s ease, border-color 0.14s ease; cursor: pointer; touch-action: manipulation; }
   .su-card-hover:hover { transform: translateY(-4px) scale(1.015); }
   .su-card-highlight { outline: 2px solid #0f172a !important; outline-offset: 3px; box-shadow: 0 0 0 6px rgba(15,23,42,0.08) !important; }
   .su-card-dim { opacity: 0.15; filter: grayscale(0.5) blur(0.3px); transition: opacity 0.22s, filter 0.22s; }
   .su-card-sa  { animation: ringPulse 3s ease-in-out infinite !important; }
-
-  /* --- Hierarchy scroller -------------------------------------------------
-     Only the tree itself scrolls sideways. touch-action:pan-x means a
-     horizontal drag that starts on a card is handled here, while a vertical
-     drag is left for the page to scroll normally instead of getting
-     "captured" by this container. overscroll-behavior-x:contain stops the
-     iOS/Android rubber-band bounce at the edges of the chart from chaining
-     into a bounce of the whole page. */
+ 
   .su-scroll {
     touch-action: pan-x;
     overscroll-behavior-x: contain;
@@ -60,21 +47,14 @@ const STYLES = `
   .su-scroll::-webkit-scrollbar-thumb { background:#dde3ec; border-radius:6px; }
   .su-scroll { -webkit-overflow-scrolling: touch; }
 `;
-
+ 
 const BRAND       = "#730042";
 const BRAND_LIGHT = "rgba(115,0,66,0.07)";
 const REFRESH_MS  = 1000 * 60 * 2;
 const HTML_TO_IMAGE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js";
-
-// SuperAdmin sits at the root of the whole org — everyone reports up to them —
-// so the tree itself uses a single neutral grayscale ramp by depth instead of
-// per-role brand colours. Page chrome (header/buttons) keeps the brand colour.
+ 
 const NODE_COLOR = { sa: "#0f172a", admin: "#334155", manager: "#475569", employee: "#64748b" };
-
-// Backend stores short department codes (OPR, BPO, ENG, HR, MGMT). The UI
-// should always show the full department name — for every current node and
-// any new admin/manager/employee added later — so this is a lookup keyed by
-// the short code rather than anything hardcoded per-node.
+ 
 const DEPT_FULL_FORMS = {
   OPR: "Operations",
   BPO: "Business Process Outsourcing",
@@ -82,24 +62,24 @@ const DEPT_FULL_FORMS = {
   HR: "Human Resources",
   MGMT: "Management",
 };
-
+ 
 const getDepartmentName = (dept) => DEPT_FULL_FORMS[dept] || dept || "—";
-
+ 
 const fmtDate = (iso) => {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 };
-
+ 
 const getInitials = (f = "", l = "") => `${f[0] || ""}${l[0] || ""}`.toUpperCase();
 const normalize   = (s = "") => s.toLowerCase().trim();
 const fullName    = (p) => `${p?.f_name || ""} ${p?.l_name || ""}`.trim();
-
+ 
 function idStr(v) {
   if (!v) return "";
   if (typeof v === "string") return v;
   return v._id ? v._id.toString() : v.toString();
 }
-
+ 
 function loadScript(src) {
   return new Promise((resolve, reject) => {
     if (document.querySelector(`script[src="${src}"]`)) return resolve();
@@ -110,12 +90,12 @@ function loadScript(src) {
     document.body.appendChild(s);
   });
 }
-
+ 
 function csvCell(v) {
   const s = v === null || v === undefined ? "" : String(v);
   return `"${s.replace(/"/g, '""')}"`;
 }
-
+ 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -124,7 +104,7 @@ function downloadBlob(blob, filename) {
   a.click();
   URL.revokeObjectURL(url);
 }
-
+ 
 function Skeleton({ w, h, r = 8 }) {
   return (
     <div
@@ -133,7 +113,7 @@ function Skeleton({ w, h, r = 8 }) {
     />
   );
 }
-
+ 
 function VLine({ h = 32, delay = 0 }) {
   return (
     <div
@@ -142,7 +122,7 @@ function VLine({ h = 32, delay = 0 }) {
     />
   );
 }
-
+ 
 function HLine({ w, delay = 0 }) {
   return (
     <div
@@ -151,10 +131,7 @@ function HLine({ w, delay = 0 }) {
     />
   );
 }
-
-// Avatar now takes responsive Tailwind classes instead of a fixed px size so
-// it can scale smoothly across phone / tablet / laptop / desktop instead of
-// jumping at a single breakpoint.
+ 
 function Avatar({ initials, sizeClass = "w-11 h-11 sm:w-12 sm:h-12", textClass = "text-sm sm:text-base", bg = BRAND }) {
   return (
     <div
@@ -165,7 +142,7 @@ function Avatar({ initials, sizeClass = "w-11 h-11 sm:w-12 sm:h-12", textClass =
     </div>
   );
 }
-
+ 
 function Badge({ children, color = BRAND, bg = BRAND_LIGHT }) {
   return (
     <span
@@ -176,7 +153,7 @@ function Badge({ children, color = BRAND, bg = BRAND_LIGHT }) {
     </span>
   );
 }
-
+ 
 function LiveDot() {
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 shrink-0">
@@ -185,6 +162,7 @@ function LiveDot() {
     </span>
   );
 }
+
 
 function SuperAdminNode({ name, role, initials, delay = 0, onClick }) {
   return (
@@ -223,13 +201,14 @@ function AdminNode({ admin, delay = 0, dimmed, highlighted, onClick }) {
           bg={NODE_COLOR.admin}
         />
         <p className="text-[11px] sm:text-xs md:text-[13px] font-semibold text-slate-900 mt-2 sm:mt-2.5 text-center max-w-[108px] sm:max-w-[130px] md:max-w-[140px] truncate w-full">{name}</p>
-        <p className="text-[9.5px] sm:text-[10px] md:text-[11px] text-gray-400 mt-1 text-center max-w-[108px] sm:max-w-[130px] md:max-w-[140px] truncate w-full">{admin.designation || "—"}</p>
+        <p className="text-[9.5px] sm:text-[10px] md:text-[11px] text-gray-400 mt-1 text-center max-w-[108px] sm:max-w-[130px] md:max-w-[140px] truncate w-full">{getDepartmentName(admin.department)}</p>
+        <p className="text-[9.5px] sm:text-[10px] md:text-[11px] text-gray-400 mt-0.5 text-center max-w-[108px] sm:max-w-[130px] md:max-w-[140px] truncate w-full">{admin.designation || "—"}</p>
         <p className="text-[9px] sm:text-[9.5px] md:text-[10px] text-gray-400 mt-0.5 text-center max-w-[108px] sm:max-w-[130px] md:max-w-[140px] truncate w-full" style={{ fontFamily: "'JetBrains Mono',monospace" }}>{admin.empid || "—"}</p>
       </div>
     </div>
   );
 }
-
+ 
 function ManagerNode({ manager, delay = 0, dimmed, highlighted, onClick }) {
   const name = fullName(manager);
   return (
@@ -246,13 +225,14 @@ function ManagerNode({ manager, delay = 0, dimmed, highlighted, onClick }) {
           bg={NODE_COLOR.manager}
         />
         <p className="text-[10px] sm:text-[11px] md:text-xs font-semibold text-slate-800 mt-1.5 sm:mt-2 text-center max-w-[94px] sm:max-w-[110px] md:max-w-[120px] truncate w-full">{name}</p>
-        <p className="text-[9px] sm:text-[9.5px] md:text-[10.5px] text-slate-400 mt-0.5 text-center max-w-[94px] sm:max-w-[110px] md:max-w-[120px] truncate w-full">{manager.department ? getDepartmentName(manager.department) : (manager.designation || "—")}</p>
+        <p className="text-[9px] sm:text-[9.5px] md:text-[10.5px] text-slate-400 mt-0.5 text-center max-w-[94px] sm:max-w-[110px] md:max-w-[120px] truncate w-full">{manager.department ? getDepartmentName(manager.department) : "—"}</p>
+        <p className="text-[9px] sm:text-[9.5px] md:text-[10.5px] text-slate-400 mt-0.5 text-center max-w-[94px] sm:max-w-[110px] md:max-w-[120px] truncate w-full">{manager.designation || "—"}</p>
         <p className="text-[8.5px] sm:text-[9px] md:text-[9.5px] text-slate-400 mt-0.5 text-center max-w-[94px] sm:max-w-[110px] md:max-w-[120px] truncate w-full" style={{ fontFamily: "'JetBrains Mono',monospace" }}>{manager.empid || "—"}</p>
       </div>
     </div>
   );
 }
-
+ 
 function EmployeeNode({ employee, delay = 0, dimmed, highlighted, onClick }) {
   const name = fullName(employee);
   return (
@@ -268,12 +248,14 @@ function EmployeeNode({ employee, delay = 0, dimmed, highlighted, onClick }) {
           bg={NODE_COLOR.employee}
         />
         <p className="text-[9px] sm:text-[10px] md:text-[11px] font-semibold text-slate-800 mt-1 sm:mt-1.5 text-center max-w-[80px] sm:max-w-[92px] md:max-w-[100px] truncate w-full">{name}</p>
-        <p className="text-[8.5px] sm:text-[9px] md:text-[10px] text-slate-400 mt-0.5 text-center max-w-[80px] sm:max-w-[92px] md:max-w-[100px] truncate w-full">{employee.department ? getDepartmentName(employee.department) : (employee.designation || "—")}</p>
+        <p className="text-[8.5px] sm:text-[9px] md:text-[10px] text-slate-400 mt-0.5 text-center max-w-[80px] sm:max-w-[92px] md:max-w-[100px] truncate w-full">{employee.department ? getDepartmentName(employee.department) : "—"}</p>
+        <p className="text-[8.5px] sm:text-[9px] md:text-[10px] text-slate-400 mt-0.5 text-center max-w-[80px] sm:max-w-[92px] md:max-w-[100px] truncate w-full">{employee.designation || "—"}</p>
         <p className="text-[8px] sm:text-[8.5px] md:text-[9.5px] text-slate-400 mt-0.5 text-center max-w-[80px] sm:max-w-[92px] md:max-w-[100px] truncate w-full" style={{ fontFamily: "'JetBrains Mono',monospace" }}>{employee.empid || "—"}</p>
       </div>
     </div>
   );
 }
+ 
 
 function SkeletonTree() {
   return (
