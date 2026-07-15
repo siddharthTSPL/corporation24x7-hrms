@@ -4,6 +4,7 @@ const Shift = require("../Models/shift.model");
 const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
 const { resolveEmployeeShift, evaluateCheckinWindow, evaluateCheckoutWindow, getShiftThresholds, getForceCheckoutInstant } = require("../utils/shift.utils");
 const { isHoliday, isWeekOff, startOfDay } = require("../automatic/weekoffcalendar");
+const { getISTDateParts, istDateFromYMD, toISTKey } = require("../utils/Istdate.utils");
 
 const getUserId = (user) => user._id || user.id;
 
@@ -391,11 +392,17 @@ const getCalendarMeta = async (req, res) => {
     const employeeModel = getOnModel(user.role);
 
     const now = new Date();
-    const month = req.query.month ? Number(req.query.month) : now.getMonth() + 1; // 1-12
-    const year = req.query.year ? Number(req.query.year) : now.getFullYear();
+    // Default month/year must reflect the IST calendar day, not whatever
+    // the server process's OS timezone happens to be (see Istdate.utils.js).
+    const nowIST = getISTDateParts(now);
+    const month = req.query.month ? Number(req.query.month) : nowIST.month; // 1-12
+    const year = req.query.year ? Number(req.query.year) : nowIST.year;
 
-    const monthStart = new Date(year, month - 1, 1);
-    const monthEnd = new Date(year, month, 0);
+    // Days in month is pure UTC calendar arithmetic (Date.UTC/getUTCDate),
+    // not timezone-sensitive, so this is safe as-is.
+    const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const monthStart = istDateFromYMD(year, month, 1);
+    const monthEnd = istDateFromYMD(year, month, daysInMonth);
 
     // Only look as far into the month as today, plus the rest of the
     // month for holidays (holidays are known in advance; week-off status
@@ -406,33 +413,22 @@ const getCalendarMeta = async (req, res) => {
       date: { $gte: monthStart, $lte: monthEnd },
     }).sort({ date: 1 }).lean();
 
-    // BUG FIX: this used to be `new Date(d).toISOString().slice(0, 10)`,
-    // which formats in UTC. Holiday/shift dates in this codebase are all
-    // stored and constructed using LOCAL (server) midnight - e.g.
-    // `new Date(year, month - 1, day)` or `date.setHours(0, 0, 0, 0)`.
-    // Converting one of those to an ISO string and slicing rolls the date
-    // back by one day whenever the server's local timezone is ahead of
-    // UTC (e.g. IST, UTC+5:30), because UTC midnight of that instant falls
-    // on the *previous* calendar day. Reading the LOCAL Y/M/D components
-    // instead keeps the key matching the calendar day everyone intended,
+    // toKey used to read dt.getFullYear()/getMonth()/getDate() directly -
+    // those are LOCAL (server-process-timezone) getters. On a host running
+    // UTC, a `date` field stored as IST-midnight (e.g. the UTC instant
+    // "2026-07-14T18:30:00Z", which IS calendar day 2026-07-15 in IST)
+    // reads back as "2026-07-14" - exactly the off-by-one-day seen in
+    // production. toISTKey shifts into IST first, so it's correct
     // regardless of what timezone the server happens to run in.
     const pad2 = (n) => String(n).padStart(2, "0");
-    const toKey = (d) => {
-      const dt = new Date(d);
-      return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
-    };
+    const toKey = (d) => toISTKey(d);
 
     const holidays = holidayDocs.map((h) => ({ date: toKey(h.date), name: h.name }));
 
     const weekOffDates = [];
-    const daysInMonth = monthEnd.getDate();
     for (let d = 1; d <= daysInMonth; d++) {
-      const date = new Date(year, month - 1, d);
+      const date = istDateFromYMD(year, month, d);
       const result = await isWeekOff(date, organisation_id, userId, employeeModel);
-      // Build the key directly from the loop's own year/month/d instead of
-      // re-deriving it from `date` - this sidesteps any Date serialization
-      // entirely for this one, since we already know exactly which
-      // calendar day we're evaluating.
       if (result.isOff) weekOffDates.push(`${year}-${pad2(month)}-${pad2(d)}`);
     }
 
