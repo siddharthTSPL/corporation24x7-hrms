@@ -4,7 +4,8 @@ const Holiday = require("../Models/holiday.model");
 const EmployeeWeekOffOverride = require("../Models/employeeweekoffoverride.model");
 const WeekOffGroup = require("../Models/weekoffgroup.model");
 const { generateMonthlyReport } = require("../automatic/monthlyreport");
-const { getWeekStart, getWeekEnd } = require("../automatic/weekoffcalendar");
+const { getWeekStart, getWeekEnd, startOfDay } = require("../automatic/weekoffcalendar");
+const { istDateFromYMD, toISTKey } = require("../utils/Istdate.utils");
 
 // ---------- HolidayPolicy (org-wide mode: sunday / sat_sun / rotational) ----------
 
@@ -121,15 +122,15 @@ const setWeekScheduleForMonth = async (req, res) => {
   if (!month || !year || !Array.isArray(offDays) || offDays.length === 0)
     return res.status(400).json({ success: false, message: "month, year and at least one offDay are required" });
 
-  const monthStart = new Date(Number(year), Number(month) - 1, 1);
-  const monthEnd = new Date(Number(year), Number(month), 0);
-
+  const daysInMonth = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate();
+  const monthStart = istDateFromYMD(Number(year), Number(month), 1);
+  const monthEnd = istDateFromYMD(Number(year), Number(month), daysInMonth);
+  const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
   const weekStarts = [];
   let cursor = getWeekStart(monthStart);
   while (cursor <= monthEnd) {
     weekStarts.push(new Date(cursor));
-    cursor = new Date(cursor);
-    cursor.setDate(cursor.getDate() + 7);
+    cursor = new Date(cursor.getTime() + ONE_WEEK_MS);
   }
 
   const ops = weekStarts.map((weekStartDate) => {
@@ -154,7 +155,7 @@ const setWeekScheduleForMonth = async (req, res) => {
 
   res.status(200).json({
     success: true,
-    weeksSet: weekStarts.map((d) => d.toISOString().slice(0, 10)),
+    weeksSet: weekStarts.map((d) => toISTKey(d)),
     inserted: result.upsertedCount || 0,
     updated: result.modifiedCount || 0,
   });
@@ -232,8 +233,9 @@ const getWeekSchedules = async (req, res) => {
   if (!month || !year)
     return res.status(400).json({ success: false, message: "month and year are required" });
 
-  const monthStart = new Date(Number(year), Number(month) - 1, 1);
-  const monthEnd = new Date(Number(year), Number(month), 0);
+  const daysInMonth = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate();
+  const monthStart = istDateFromYMD(Number(year), Number(month), 1);
+  const monthEnd = istDateFromYMD(Number(year), Number(month), daysInMonth);
 
   const schedules = await WeeklyOffSchedule.find({
     organisation_id,
@@ -255,8 +257,7 @@ const addHoliday = async (req, res) => {
   if (!date || !name)
     return res.status(400).json({ success: false, message: "date and name are required" });
 
-  const normalisedDate = new Date(date);
-  normalisedDate.setHours(0, 0, 0, 0);
+  const normalisedDate = startOfDay(new Date(date));
 
   const holiday = await Holiday.findOneAndUpdate(
     { organisation_id, date: normalisedDate },
@@ -287,11 +288,11 @@ const bulkAddHolidays = async (req, res) => {
       rejected.push({ ...h, reason: "invalid date" });
       continue;
     }
-    normalisedDate.setHours(0, 0, 0, 0);
+    const normalised = startOfDay(normalisedDate);
 
     ops.push({
       updateOne: {
-        filter: { organisation_id, date: normalisedDate },
+        filter: { organisation_id, date: normalised },
         update: {
           $set: {
             name: h.name,
@@ -342,8 +343,7 @@ const bulkEditHolidays = async (req, res) => {
         rejected.push({ ...h, reason: "invalid date" });
         continue;
       }
-      normalisedDate.setHours(0, 0, 0, 0);
-      setFields.date = normalisedDate;
+      setFields.date = startOfDay(normalisedDate);
     }
 
     ops.push({
@@ -375,11 +375,7 @@ const bulkDeleteHolidays = async (req, res) => {
   const filter = { organisation_id, $or: [] };
   if (Array.isArray(ids) && ids.length) filter.$or.push({ _id: { $in: ids } });
   if (Array.isArray(dates) && dates.length) {
-    const normalisedDates = dates.map((d) => {
-      const nd = new Date(d);
-      nd.setHours(0, 0, 0, 0);
-      return nd;
-    });
+    const normalisedDates = dates.map((d) => startOfDay(new Date(d)));
     filter.$or.push({ date: { $in: normalisedDates } });
   }
 
@@ -402,9 +398,10 @@ const listHolidays = async (req, res) => {
 
   const filter = { organisation_id };
   if (month && year) {
+    const daysInMonth = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate();
     filter.date = {
-      $gte: new Date(Number(year), Number(month) - 1, 1),
-      $lte: new Date(Number(year), Number(month), 0),
+      $gte: istDateFromYMD(Number(year), Number(month), 1),
+      $lte: istDateFromYMD(Number(year), Number(month), daysInMonth),
     };
   }
 
