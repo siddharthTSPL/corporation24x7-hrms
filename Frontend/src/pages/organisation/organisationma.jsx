@@ -21,6 +21,20 @@ const initials = (name = "") =>
 
 const norm = (s = "") => s.toLowerCase().trim();
 
+// Backend stores short department codes (OPR, BPO, ENG, HR, MGMT). The UI
+// should always show the full department name — for every current node and
+// any new manager/employee added later — so this is a lookup keyed by the
+// short code rather than anything hardcoded per-node.
+const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+};
+
+const getDepartmentName = (dept) => DEPT_FULL_FORMS[dept] || dept || "—";
+
 function Sk({ w, h, r = 8 }) {
   return (
     <div className="shrink-0 animate-pulse bg-gradient-to-r from-[#f5edf2] via-[#ecdce6] to-[#f5edf2] bg-[length:600px_100%]" style={{ width: w, height: h, borderRadius: r }} />
@@ -190,6 +204,10 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, chainIds, isSubMgr = fa
   const emps = mgr.employees || [];
   const subMgrs = mgr.subManagers || [];
 
+  let level = "manager";
+  if (isSubMgr) level = mgr.isCurrentUserManager ? "myMgr" : "subMgr";
+  else level = mgr.isCurrentUserManager ? "myMgr" : "manager";
+
   const mDelay = delayRef.current;
   delayRef.current += 55;
 
@@ -198,7 +216,7 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, chainIds, isSubMgr = fa
       <Card
         level={isSubMgr ? "subMgr" : "manager"}
         name={mgr.name}
-        sub={mgr.designation || mgr.department}
+        sub={mgr.designation || (mgr.department ? getDepartmentName(mgr.department) : undefined)}
         empid={mgr.empid}
         width={CARD_W}
         delay={mDelay}
@@ -249,7 +267,7 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, chainIds, isSubMgr = fa
                   key={emp.id}
                   level="emp"
                   name={emp.name}
-                  sub={emp.designation || emp.department}
+                  sub={emp.designation || (emp.department ? getDepartmentName(emp.department) : undefined)}
                   empid={emp.empid}
                   width={EMP_W}
                   delay={eDelay}
@@ -509,7 +527,7 @@ export default function OrganizationPageManager() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-2.5 mb-5">
           <StatCard label="Organisation"  text={orgName}                        icon={Building2} barBg="bg-[#1a0d14]" iconBg="bg-[#1a0d14]/10" iconColor="text-[#1a0d14]" delay={60}  />
           <StatCard label="Your name"     text={myInfo?.name}                   icon={User}      barBg="bg-[#730042]" iconBg="bg-[#730042]/10" iconColor="text-[#730042]" delay={95}  />
-          <StatCard label="Department"    text={myInfo?.department}             icon={Users}     barBg="bg-[#CD166E]" iconBg="bg-[#CD166E]/10" iconColor="text-[#CD166E]" delay={130} />
+          <StatCard label="Department"    text={myInfo?.department ? getDepartmentName(myInfo.department) : undefined} icon={Users}     barBg="bg-[#CD166E]" iconBg="bg-[#CD166E]/10" iconColor="text-[#CD166E]" delay={130} />
           <StatCard label="Designation"   text={myInfo?.designation}            icon={Crown}     barBg="bg-[#a8005c]" iconBg="bg-[#a8005c]/10" iconColor="text-[#a8005c]" delay={165} />
         </div>
 

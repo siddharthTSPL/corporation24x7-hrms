@@ -71,6 +71,20 @@ const HTML_TO_IMAGE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/html-to-image/
 // per-role brand colours. Page chrome (header/buttons) keeps the brand colour.
 const NODE_COLOR = { sa: "#0f172a", admin: "#334155", manager: "#475569", employee: "#64748b" };
 
+// Backend stores short department codes (OPR, BPO, ENG, HR, MGMT). The UI
+// should always show the full department name — for every current node and
+// any new admin/manager/employee added later — so this is a lookup keyed by
+// the short code rather than anything hardcoded per-node.
+const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+};
+
+const getDepartmentName = (dept) => DEPT_FULL_FORMS[dept] || dept || "—";
+
 const fmtDate = (iso) => {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
@@ -232,7 +246,7 @@ function ManagerNode({ manager, delay = 0, dimmed, highlighted, onClick }) {
           bg={NODE_COLOR.manager}
         />
         <p className="text-[10px] sm:text-[11px] md:text-xs font-semibold text-slate-800 mt-1.5 sm:mt-2 text-center max-w-[94px] sm:max-w-[110px] md:max-w-[120px] truncate w-full">{name}</p>
-        <p className="text-[9px] sm:text-[9.5px] md:text-[10.5px] text-slate-400 mt-0.5 text-center max-w-[94px] sm:max-w-[110px] md:max-w-[120px] truncate w-full">{manager.department || manager.designation || "—"}</p>
+        <p className="text-[9px] sm:text-[9.5px] md:text-[10.5px] text-slate-400 mt-0.5 text-center max-w-[94px] sm:max-w-[110px] md:max-w-[120px] truncate w-full">{manager.department ? getDepartmentName(manager.department) : (manager.designation || "—")}</p>
         <p className="text-[8.5px] sm:text-[9px] md:text-[9.5px] text-slate-400 mt-0.5 text-center max-w-[94px] sm:max-w-[110px] md:max-w-[120px] truncate w-full" style={{ fontFamily: "'JetBrains Mono',monospace" }}>{manager.empid || "—"}</p>
       </div>
     </div>
@@ -254,7 +268,7 @@ function EmployeeNode({ employee, delay = 0, dimmed, highlighted, onClick }) {
           bg={NODE_COLOR.employee}
         />
         <p className="text-[9px] sm:text-[10px] md:text-[11px] font-semibold text-slate-800 mt-1 sm:mt-1.5 text-center max-w-[80px] sm:max-w-[92px] md:max-w-[100px] truncate w-full">{name}</p>
-        <p className="text-[8.5px] sm:text-[9px] md:text-[10px] text-slate-400 mt-0.5 text-center max-w-[80px] sm:max-w-[92px] md:max-w-[100px] truncate w-full">{employee.department || employee.designation || "—"}</p>
+        <p className="text-[8.5px] sm:text-[9px] md:text-[10px] text-slate-400 mt-0.5 text-center max-w-[80px] sm:max-w-[92px] md:max-w-[100px] truncate w-full">{employee.department ? getDepartmentName(employee.department) : (employee.designation || "—")}</p>
         <p className="text-[8px] sm:text-[8.5px] md:text-[9.5px] text-slate-400 mt-0.5 text-center max-w-[80px] sm:max-w-[92px] md:max-w-[100px] truncate w-full" style={{ fontFamily: "'JetBrains Mono',monospace" }}>{employee.empid || "—"}</p>
       </div>
     </div>
@@ -326,7 +340,7 @@ function EmployeeDetailPanel({ person, type, onClose }) {
       ["Phone",       person.personal_contact || "—"],
       ["Gender",      person.gender || "—"],
       ["Marital",     person.marital_status || "—"],
-      ["Department",  person.department || "—"],
+      ["Department",  getDepartmentName(person.department)],
       ["Designation", person.designation || "—"],
       ["Location",    person.office_location || "—"],
     ];
@@ -336,7 +350,7 @@ function EmployeeDetailPanel({ person, type, onClose }) {
       ["Phone",       person.personal_contact || "—"],
       ["Gender",      person.gender || "—"],
       ["Marital",     person.marital_status || "—"],
-      ["Department",  person.department || "—"],
+      ["Department",  getDepartmentName(person.department)],
       ["Designation", person.designation || "—"],
       ["Location",    person.office_location || "—"],
     ];
@@ -379,7 +393,7 @@ function EmployeeDetailPanel({ person, type, onClose }) {
             <div className="flex gap-1.5 flex-wrap justify-center mt-1">
               <Badge color={accentColor} bg={`${accentColor}15`}>{roleLabel}</Badge>
               {(person.department || person.designation) && (
-                <Badge color="#374151" bg="#f3f4f6">{person.department || person.designation}</Badge>
+                <Badge color="#374151" bg="#f3f4f6">{person.department ? getDepartmentName(person.department) : person.designation}</Badge>
               )}
             </div>
           </div>
@@ -759,7 +773,7 @@ export default function SuperAdminOrgChart() {
     }
 
     admins.forEach((a) => {
-      rows.push(["Admin", a.empid || "", fullName(a), a.work_email || "", a.personal_contact || "", a.department || "", a.designation || "", a.office_location || "", "Super Admin"]);
+      rows.push(["Admin", a.empid || "", fullName(a), a.work_email || "", a.personal_contact || "", a.department ? getDepartmentName(a.department) : "", a.designation || "", a.office_location || "", "Super Admin"]);
     });
 
     managers.forEach((m) => {
@@ -768,12 +782,12 @@ export default function SuperAdminOrgChart() {
         : m.reporting_manager_model === "Manager"
           ? (managers.find((mm) => idStr(mm._id) === idStr(m.reporting_manager)) ? `Manager: ${fullName(managers.find((mm) => idStr(mm._id) === idStr(m.reporting_manager)))}` : "Unassigned")
           : "Unassigned";
-      rows.push(["Manager", m.empid || "", fullName(m), m.work_email || "", m.personal_contact || "", m.department || "", m.designation || "", m.office_location || "", parentLabel]);
+      rows.push(["Manager", m.empid || "", fullName(m), m.work_email || "", m.personal_contact || "", m.department ? getDepartmentName(m.department) : "", m.designation || "", m.office_location || "", parentLabel]);
     });
 
     employees.forEach((e) => {
       const mgr = managers.find((m) => idStr(m._id) === idStr(e.Under_manager));
-      rows.push(["Employee", e.empid || "", fullName(e), e.work_email || "", e.personal_contact || "", e.department || "", e.designation || "", e.office_location || "", mgr ? `Manager: ${fullName(mgr)}` : "Unassigned"]);
+      rows.push(["Employee", e.empid || "", fullName(e), e.work_email || "", e.personal_contact || "", e.department ? getDepartmentName(e.department) : "", e.designation || "", e.office_location || "", mgr ? `Manager: ${fullName(mgr)}` : "Unassigned"]);
     });
 
     return rows;

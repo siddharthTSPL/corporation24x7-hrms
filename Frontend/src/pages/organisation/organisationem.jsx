@@ -14,6 +14,20 @@ const initials = (name = "") =>
 
 const norm = (s = "") => s.toLowerCase().trim();
 
+// Backend stores short department codes (OPR, BPO, ENG, HR, MGMT). The UI
+// should always show the full department name — for every current node and
+// any new manager/employee added later — so this is a lookup keyed by the
+// short code rather than anything hardcoded per-node.
+const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+};
+
+const getDepartmentName = (dept) => DEPT_FULL_FORMS[dept] || dept || "—";
+
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
@@ -45,9 +59,9 @@ const STYLES = `
   .sc::-webkit-scrollbar-thumb { background: #ddd0d8; border-radius: 4px; }
 
   .hb {
-    display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;
+    display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;
     border:1px solid #e8dde5;background:#fff;color:#4a3542;
-    font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;
+    font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;
     transition:background .13s,border-color .13s,color .13s;white-space:nowrap;
   }
   .hb:hover { background:#fdf6fa;border-color:#c9afc0;color:#730042; }
@@ -58,17 +72,20 @@ const STYLES = `
   .sw {
     display:flex;align-items:center;gap:8px;
     border:1px solid #730042;border-radius:8px;
-    padding:0 10px;background:#fff;height:36px;width:260px;
+    padding:0 10px;background:#fff;height:36px;
     box-shadow:0 0 0 3px rgba(115,0,66,0.09);transition:box-shadow .15s;
+    width:100%;
   }
+  @media (min-width: 640px) { .sw { width:260px; } }
   .sw:focus-within { box-shadow:0 0 0 4px rgba(115,0,66,0.15); }
   .si { border:none;outline:none;background:transparent;font-size:13px;color:#1e293b;font-family:'DM Sans',sans-serif;flex:1;min-width:0; }
   .si::placeholder { color:#b89aad; }
   .cb { background:none;border:none;cursor:pointer;color:#b89aad;display:flex;padding:0; }
   .cb:hover { color:#730042; }
 
-  .mp { animation:slideDown .18s ease forwards;display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;background:#fdf0f7;color:#730042;font-size:11px;font-weight:600; }
-  .et { position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;align-items:center;gap:10px;padding:12px 18px;border-radius:10px;background:#1e0e17;color:#fff;font-size:13px;font-weight:500;box-shadow:0 8px 28px rgba(0,0,0,0.22);animation:slideDown .22s ease forwards;font-family:'DM Sans',sans-serif;pointer-events:none; }
+  .mp { animation:slideDown .18s ease forwards;display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;background:#fdf0f7;color:#730042;font-size:11px;font-weight:600;white-space:nowrap; }
+  .et { position:fixed;bottom:16px;right:16px;left:16px;z-index:9999;display:flex;align-items:center;gap:10px;padding:12px 18px;border-radius:10px;background:#1e0e17;color:#fff;font-size:13px;font-weight:500;box-shadow:0 8px 28px rgba(0,0,0,0.22);animation:slideDown .22s ease forwards;font-family:'DM Sans',sans-serif;pointer-events:none;justify-content:center; }
+  @media (min-width: 640px) { .et { left:auto;right:24px;bottom:24px;justify-content:flex-start; } }
   .export-mode, .export-mode * { animation:none!important;opacity:1!important;transform:none!important; }
 `;
 
@@ -240,7 +257,7 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, chainIds, isSubMgr = fa
       <Card
         level={level}
         name={mgr.name}
-        sub={mgr.designation || mgr.department}
+        sub={mgr.designation || (mgr.department ? getDepartmentName(mgr.department) : undefined)}
         empid={mgr.empid}
         width={CARD_W}
         delay={mDelay}
@@ -290,7 +307,7 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, chainIds, isSubMgr = fa
                   key={emp.id}
                   level="emp"
                   name={emp.name}
-                  sub={emp.designation || emp.department}
+                  sub={emp.designation || (emp.department ? getDepartmentName(emp.department) : undefined)}
                   empid={emp.empid}
                   width={EMP_W}
                   delay={eDelay}
@@ -404,14 +421,14 @@ function OrgTree({ data, loading, q }) {
 
 function StatCard({ label, text, icon: Icon, accent, delay = 0 }) {
   return (
-    <div className="stat-h" style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards`, opacity: 0, background: "#fff", border: "1px solid #eedde8", borderRadius: 11, padding: "15px 16px", display: "flex", alignItems: "center", gap: 13, boxShadow: "0 1px 4px rgba(115,0,66,0.04)", position: "relative", overflow: "hidden" }}>
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: accent }} />
-      <div style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0, background: `${accent}18`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Icon size={15} style={{ color: accent }} />
+    <div className="stat-h relative overflow-hidden bg-white border border-[#eedde8] rounded-[11px] p-3.5 sm:p-4 flex items-center gap-2.5 sm:gap-[13px] shadow-[0_1px_4px_rgba(115,0,66,0.04)] min-w-0" style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards`, opacity: 0 }}>
+      <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: accent }} />
+      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg shrink-0 flex items-center justify-center" style={{ background: `${accent}18` }}>
+        <Icon size={14} style={{ color: accent }} />
       </div>
-      <div style={{ minWidth: 0 }}>
-        <p style={{ fontSize: 13, fontWeight: 600, color: "#1a0d14", lineHeight: 1.2, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Syne',sans-serif" }}>{text || "—"}</p>
-        <p style={{ fontSize: 11, color: "#b89aad", fontWeight: 500, margin: "3px 0 0" }}>{label}</p>
+      <div className="min-w-0">
+        <p className="text-[12px] sm:text-[13px] font-semibold text-[#1a0d14] leading-[1.2] m-0 truncate" style={{ fontFamily: "'Syne',sans-serif" }}>{text || "—"}</p>
+        <p className="text-[10px] sm:text-[11px] text-[#b89aad] font-medium mt-[3px] mb-0 truncate">{label}</p>
       </div>
     </div>
   );
@@ -510,19 +527,19 @@ export default function OrganizationPageEmployee() {
   const closeSearch = () => { setSearchOpen(false); setSearchQuery(""); };
 
   return (
-    <div className="org-root" style={{ minHeight: "100vh", background: "#faf5f8" }}>
+    <div className="org-root min-h-screen bg-[#faf5f8] overflow-x-hidden">
       <style>{STYLES}</style>
 
-      <div style={{ animation: "fadeIn 0.3s ease forwards", background: "#fff", borderBottom: "1px solid #eedde8", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 54, gap: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <span style={{ fontSize: 12, color: "#b89aad", fontWeight: 500 }}>{orgName}</span>
-          <span style={{ color: "#dcc0d0" }}>›</span>
-          <span style={{ fontSize: 13, color: "#1a0d14", fontWeight: 600, fontFamily: "'Syne',sans-serif" }}>Org Chart</span>
+      <div className="bg-white border-b border-[#eedde8] px-3 sm:px-6 py-2.5 sm:py-0 sm:h-[54px] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-4" style={{ animation: "fadeIn 0.3s ease forwards" }}>
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink min-w-0 overflow-hidden">
+          <span className="text-[11px] sm:text-xs text-[#b89aad] font-medium truncate">{orgName}</span>
+          <span className="text-[#dcc0d0] flex-shrink-0">›</span>
+          <span className="text-[12px] sm:text-[13px] text-[#1a0d14] font-semibold flex-shrink-0" style={{ fontFamily: "'Syne',sans-serif" }}>Org Chart</span>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="flex items-center gap-2">
           {searchOpen ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, animation: "slideDown 0.2s ease forwards" }}>
+            <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap" style={{ animation: "slideDown 0.2s ease forwards" }}>
               <div className="sw">
                 <Search size={13} style={{ color: "#b89aad", flexShrink: 0 }} />
                 <input ref={inputRef} className="si" placeholder="Search name, role, department…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
@@ -536,61 +553,61 @@ export default function OrganizationPageEmployee() {
           )}
           <button className="hb hb-p" onClick={handleExport} disabled={loading || exportStatus === "loading"}>
             {exportStatus === "loading"
-              ? <><Loader2 size={13} style={{ animation: "spin 0.8s linear infinite" }} /> Exporting…</>
-              : <><Download size={13} /> Export PNG</>}
+              ? <><Loader2 size={13} style={{ animation: "spin 0.8s linear infinite" }} /> <span className="hidden xs:inline">Exporting…</span></>
+              : <><Download size={13} /> <span className="hidden xs:inline">Export PNG</span></>}
           </button>
         </div>
       </div>
 
-      <div style={{ maxWidth: 1600, margin: "0 auto", padding: "22px 24px 48px" }}>
-        <div style={{ animation: "fadeUp 0.3s ease 50ms forwards", opacity: 0, marginBottom: 18 }}>
-          <h1 style={{ fontSize: 19, fontWeight: 700, color: "#1a0d14", margin: 0, letterSpacing: "-0.3px", fontFamily: "'Syne',sans-serif" }}>Organisation Chart</h1>
-          <p style={{ fontSize: 12, color: "#b89aad", margin: "4px 0 0" }}>
+      <div className="max-w-[1600px] mx-auto px-3 sm:px-6 pt-4 sm:pt-[22px] pb-8 sm:pb-12">
+        <div className="mb-4 sm:mb-[18px]" style={{ animation: "fadeUp 0.3s ease 50ms forwards", opacity: 0 }}>
+          <h1 className="text-[17px] sm:text-[19px] font-bold text-[#1a0d14] m-0 tracking-[-0.3px]" style={{ fontFamily: "'Syne',sans-serif" }}>Organisation Chart</h1>
+          <p className="text-[11px] sm:text-xs text-[#b89aad] mt-1 mb-0">
             {loading ? "Loading…" : `${orgName} · ${totalNodes} nodes · your reporting line is highlighted`}
           </p>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 10, marginBottom: 22 }}>
-          <StatCard label="Organisation"  text={orgName}              icon={Building2} accent="#1a0d14" delay={60}  />
-          <StatCard label="Your name"     text={myInfo?.name}         icon={User}      accent="#730042" delay={95}  />
-          <StatCard label="Reporting to"  text={myInfo?.managerName}  icon={Users}     accent="#CD166E" delay={130} />
-          <StatCard label="Designation"   text={myInfo?.designation}  icon={Crown}     accent="#a8005c" delay={165} />
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5 mb-5 sm:mb-[22px]">
+          <StatCard label="Organisation"  text={orgName}                                                          icon={Building2} accent="#1a0d14" delay={60}  />
+          <StatCard label="Your name"     text={myInfo?.name}                                                    icon={User}      accent="#730042" delay={95}  />
+          <StatCard label="Reporting to"  text={myInfo?.managerName}                                             icon={Users}     accent="#CD166E" delay={130} />
+          <StatCard label="Designation"   text={myInfo?.designation}                                             icon={Crown}     accent="#a8005c" delay={165} />
         </div>
 
         {searchOpen && searchQuery && matchCount === 0 && (
-          <div style={{ marginBottom: 14, padding: "10px 14px", borderRadius: 8, background: "#fef9c3", border: "1px solid #fde68a", fontSize: 12, color: "#92400e", display: "flex", alignItems: "center", gap: 8, animation: "slideDown 0.2s ease forwards" }}>
-            <Search size={13} />No results for <strong style={{ marginLeft: 2 }}>"{searchQuery}"</strong>
+          <div className="mb-3.5 px-3 sm:px-3.5 py-2.5 rounded-lg bg-[#fef9c3] border border-[#fde68a] text-[12px] text-[#92400e] flex items-center gap-2 flex-wrap" style={{ animation: "slideDown 0.2s ease forwards" }}>
+            <Search size={13} className="flex-shrink-0" />No results for <strong className="ml-0.5 break-all">"{searchQuery}"</strong>
           </div>
         )}
 
-        <div style={{ animation: "fadeIn 0.3s ease 240ms forwards", opacity: 0, background: "#fff", border: "1px solid #eedde8", borderRadius: 14, boxShadow: "0 2px 10px rgba(115,0,66,0.05)", overflow: "hidden" }}>
-          <div style={{ padding: "11px 16px", borderBottom: "1px solid #f5edf2", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fdf8fb", flexWrap: "wrap", gap: 8 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <Crown size={13} style={{ color: "#b89aad" }} />
-              <span style={{ fontSize: 12, fontWeight: 600, color: "#4a3542", fontFamily: "'Syne',sans-serif" }}>Full hierarchy</span>
-              <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 20, background: "#f5edf2", color: "#b89aad", fontWeight: 600, fontFamily: "'DM Mono',monospace" }}>
+        <div className="bg-white border border-[#eedde8] rounded-2xl shadow-[0_2px_10px_rgba(115,0,66,0.05)] overflow-hidden" style={{ animation: "fadeIn 0.3s ease 240ms forwards", opacity: 0 }}>
+          <div className="px-3 sm:px-4 py-2.5 sm:py-[11px] border-b border-[#f5edf2] flex flex-col sm:flex-row sm:items-center sm:justify-between bg-[#fdf8fb] flex-wrap gap-2">
+            <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap min-w-0">
+              <Crown size={13} style={{ color: "#b89aad" }} className="flex-shrink-0" />
+              <span className="text-[12px] font-semibold text-[#4a3542] flex-shrink-0" style={{ fontFamily: "'Syne',sans-serif" }}>Full hierarchy</span>
+              <span className="text-[10px] px-1.5 sm:px-[7px] py-0.5 rounded-full bg-[#f5edf2] text-[#b89aad] font-semibold flex-shrink-0" style={{ fontFamily: "'DM Mono',monospace" }}>
                 {loading ? "—" : `${totalNodes} nodes`}
               </span>
               {searchQuery && matchCount > 0 && (
-                <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 20, background: "#fce7f3", color: "#730042", fontWeight: 600 }}>{matchCount} highlighted</span>
+                <span className="text-[10px] px-1.5 sm:px-[7px] py-0.5 rounded-full bg-[#fce7f3] text-[#730042] font-semibold flex-shrink-0">{matchCount} highlighted</span>
               )}
             </div>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-2 sm:mt-0">
               {[
                 { dot: "#730042", label: "You", ring: true },
                 { dot: "#CD166E", label: "Your manager" },
                 { dot: "#a8005c", label: "In your line" },
                 { dot: "#d4d4d8", label: "Others" },
               ].map(({ dot, label, ring }) => (
-                <div key={label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#b89aad" }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: dot, flexShrink: 0, boxShadow: ring ? "0 0 0 2px rgba(115,0,66,0.2)" : "none" }} />
+                <div key={label} className="flex items-center gap-1.5 text-[11px] text-[#b89aad]">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: dot, boxShadow: ring ? "0 0 0 2px rgba(115,0,66,0.2)" : "none" }} />
                   {label}
                 </div>
               ))}
             </div>
           </div>
 
-          <div ref={chartRef} className="sc" style={{ overflowX: "auto", padding: "36px 40px 36px", background: "#fff" }}>
+          <div ref={chartRef} className="sc bg-white px-4 sm:px-10 py-7 sm:py-9" style={{ overflowX: "auto" }}>
             <OrgTree data={data} loading={loading} q={norm(searchQuery)} />
           </div>
         </div>
