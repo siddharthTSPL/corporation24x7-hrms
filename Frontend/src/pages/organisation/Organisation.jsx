@@ -13,6 +13,20 @@ const initials = (name = "") =>
 
 const norm = (s = "") => s.toLowerCase().trim();
 
+// Backend stores short department codes (OPR, BPO, ENG, HR, MGMT). The UI
+// should always show the full department name — for every current node and
+// any new manager/employee added later — so this is a lookup keyed by the
+// short code rather than anything hardcoded per-node.
+const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+};
+
+const getDepartmentName = (dept) => DEPT_FULL_FORMS[dept] || dept || "—";
+
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
@@ -197,7 +211,7 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
       <Card
         level={level}
         name={mgr.name}
-        sub={mgr.designation || mgr.department}
+        sub={mgr.designation || (mgr.department ? getDepartmentName(mgr.department) : undefined)}
         empid={mgr.empid}
         width={CARD_W}
         delay={mDelay}
@@ -246,7 +260,7 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
                   key={emp.id}
                   level="emp"
                   name={emp.name}
-                  sub={emp.designation || emp.department}
+                  sub={emp.designation || (emp.department ? getDepartmentName(emp.department) : undefined)}
                   empid={emp.empid}
                   width={EMP_W}
                   delay={eDelay}
@@ -324,7 +338,7 @@ function OrgTree({ data, loading, q }) {
 
       {data.admin && (
         <>
-          <Card level="admin" name={data.admin.name} sub={data.admin.designation || data.admin.department} empid={data.admin.empid} width={CARD_W} delay={80} dim={dim("admin")} hl={matches.has("admin")} q={q} />
+          <Card level="admin" name={data.admin.name} sub={data.admin.designation || (data.admin.department ? getDepartmentName(data.admin.department) : undefined)} empid={data.admin.empid} width={CARD_W} delay={80} dim={dim("admin")} hl={matches.has("admin")} q={q} />
           <VLine h={22} />
         </>
       )}
@@ -500,10 +514,10 @@ export default function OrganizationPageAdmin() {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5 mb-5 sm:mb-[22px]">
-          <StatCard label="Organisation"  text={orgName}                    icon={Building2} accent="#0f172a" delay={60}  />
-          <StatCard label="Admin name"    text={adminInfo?.name}            icon={User}      accent="#334155" delay={95}  />
-          <StatCard label="Department"    text={adminInfo?.department}      icon={Users}     accent="#475569" delay={130} />
-          <StatCard label="Designation"   text={adminInfo?.designation}     icon={Crown}     accent="#64748b" delay={165} />
+          <StatCard label="Organisation"  text={orgName}                                icon={Building2} accent="#0f172a" delay={60}  />
+          <StatCard label="Admin name"    text={adminInfo?.name}                        icon={User}      accent="#334155" delay={95}  />
+          <StatCard label="Department"    text={adminInfo?.department ? getDepartmentName(adminInfo.department) : undefined} icon={Users}     accent="#475569" delay={130} />
+          <StatCard label="Designation"   text={adminInfo?.designation}                 icon={Crown}     accent="#64748b" delay={165} />
         </div>
 
         {searchOpen && searchQuery && matchCount === 0 && (
