@@ -3,40 +3,38 @@ const WeeklyOffSchedule = require("../Models/weeklyoffschedule.model");
 const Holiday = require("../Models/holiday.model");
 const EmployeeWeekOffOverride = require("../Models/employeeweekoffoverride.model");
 const WeekOffGroup = require("../Models/weekoffgroup.model");
+const { startOfISTDay, dayNameIST, IST_OFFSET_MS } = require("../utils/Istdate.utils");
 
-const DAY_NAMES = [
-  "sunday",
-  "monday",
-  "tuesday",
-  "wednesday",
-  "thursday",
-  "friday",
-  "saturday",
-];
-
+// startOfDay/dayName used to call Date's local setHours(0,0,0,0)/getDay(),
+// which read the SERVER PROCESS's OS timezone. On a dev machine set to IST
+// that happened to be correct by accident; on a production host (which
+// defaults to UTC on almost every cloud/Docker image) it silently computed
+// "today" as up to ~5.5 hours into the wrong calendar day. Everything here
+// now goes through the fixed +5:30 IST helpers in utils/Istdate.utils.js,
+// so it gives the same answer no matter what timezone the box is set to.
 function dayName(date) {
-  return DAY_NAMES[new Date(date).getDay()];
+  return dayNameIST(date);
 }
 
 function startOfDay(date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  return startOfISTDay(date);
 }
 
-/** Monday 00:00:00 of the week that `date` falls in. */
+/** Monday 00:00:00 (IST) of the week that `date` falls in. */
 function getWeekStart(date) {
-  const d = startOfDay(date);
-  const day = d.getDay(); // 0 = Sunday
+  // Do the weekday arithmetic in the "IST-shifted-UTC" frame (UTC getters
+  // on a time already offset by +5:30) so it's independent of the server's
+  // local timezone, then shift back to a real UTC instant before returning.
+  const istMidnight = startOfISTDay(date);
+  const shifted = new Date(istMidnight.getTime() + IST_OFFSET_MS);
+  const day = shifted.getUTCDay(); // 0 = Sunday
   const diffToMonday = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diffToMonday);
-  return d;
+  shifted.setUTCDate(shifted.getUTCDate() + diffToMonday);
+  return new Date(shifted.getTime() - IST_OFFSET_MS);
 }
 
 function getWeekEnd(weekStart) {
-  const d = new Date(weekStart);
-  d.setDate(d.getDate() + 6);
-  return d;
+  return new Date(new Date(weekStart).getTime() + 6 * 24 * 60 * 60 * 1000);
 }
 
 /**
