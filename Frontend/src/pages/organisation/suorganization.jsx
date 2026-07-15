@@ -10,17 +10,17 @@ import {
   useGetParticularEmployee,
   useGetParticularManager,
 } from "../../auth/server-state/superadmin/other/suother.hook";
- 
+
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
- 
+
   .su-org *, .su-org { font-family: 'Inter', sans-serif; box-sizing: border-box; }
- 
+
   .su-shell { min-height: 100vh; }
   @supports (height: 100dvh) {
     .su-shell { min-height: 100dvh; }
   }
- 
+
   @keyframes fadeUp    { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
   @keyframes fadeIn    { from { opacity:0; } to { opacity:1; } }
   @keyframes scaleIn   { from { opacity:0; transform:scale(0.93); } to { opacity:1; transform:scale(1); } }
@@ -31,13 +31,36 @@ const STYLES = `
     0%,100% { box-shadow: 0 0 0 0 rgba(15,23,42,0.2), 0 4px 20px rgba(15,23,42,0.08); }
     50%      { box-shadow: 0 0 0 7px rgba(15,23,42,0.05), 0 8px 28px rgba(15,23,42,0.15); }
   }
- 
+  @keyframes pulseYou {
+    0%,100% { box-shadow: 0 0 0 0 rgba(115,0,66,0.25); }
+    50%      { box-shadow: 0 0 0 6px rgba(115,0,66,0.06); }
+  }
+
   .su-card-hover { transition: transform 0.16s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.16s ease, border-color 0.14s ease; cursor: pointer; touch-action: manipulation; }
   .su-card-hover:hover { transform: translateY(-4px) scale(1.015); }
   .su-card-highlight { outline: 2px solid #0f172a !important; outline-offset: 3px; box-shadow: 0 0 0 6px rgba(15,23,42,0.08) !important; }
   .su-card-dim { opacity: 0.15; filter: grayscale(0.5) blur(0.3px); transition: opacity 0.22s, filter 0.22s; }
   .su-card-sa  { animation: ringPulse 3s ease-in-out infinite !important; }
- 
+
+  .su-you-pill {
+    position: absolute;
+    top: -9px;
+    right: -9px;
+    z-index: 30;
+    background: #730042;
+    color: #ffffff;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(115,0,66,0.45), 0 0 0 2px #ffffff;
+    white-space: nowrap;
+    animation: pulseYou 2.6s ease-in-out infinite;
+    pointer-events: none;
+  }
+
   .su-scroll {
     touch-action: pan-x;
     overscroll-behavior-x: contain;
@@ -47,14 +70,14 @@ const STYLES = `
   .su-scroll::-webkit-scrollbar-thumb { background:#dde3ec; border-radius:6px; }
   .su-scroll { -webkit-overflow-scrolling: touch; }
 `;
- 
+
 const BRAND       = "#730042";
 const BRAND_LIGHT = "rgba(115,0,66,0.07)";
 const REFRESH_MS  = 1000 * 60 * 2;
 const HTML_TO_IMAGE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js";
- 
+
 const NODE_COLOR = { sa: "#0f172a", admin: "#334155", manager: "#475569", employee: "#64748b" };
- 
+
 const DEPT_FULL_FORMS = {
   OPR: "Operations",
   BPO: "Business Process Outsourcing",
@@ -62,24 +85,24 @@ const DEPT_FULL_FORMS = {
   HR: "Human Resources",
   MGMT: "Management",
 };
- 
+
 const getDepartmentName = (dept) => DEPT_FULL_FORMS[dept] || dept || "—";
- 
+
 const fmtDate = (iso) => {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 };
- 
+
 const getInitials = (f = "", l = "") => `${f[0] || ""}${l[0] || ""}`.toUpperCase();
 const normalize   = (s = "") => s.toLowerCase().trim();
 const fullName    = (p) => `${p?.f_name || ""} ${p?.l_name || ""}`.trim();
- 
+
 function idStr(v) {
   if (!v) return "";
   if (typeof v === "string") return v;
   return v._id ? v._id.toString() : v.toString();
 }
- 
+
 function loadScript(src) {
   return new Promise((resolve, reject) => {
     if (document.querySelector(`script[src="${src}"]`)) return resolve();
@@ -90,12 +113,12 @@ function loadScript(src) {
     document.body.appendChild(s);
   });
 }
- 
+
 function csvCell(v) {
   const s = v === null || v === undefined ? "" : String(v);
   return `"${s.replace(/"/g, '""')}"`;
 }
- 
+
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -104,7 +127,7 @@ function downloadBlob(blob, filename) {
   a.click();
   URL.revokeObjectURL(url);
 }
- 
+
 function Skeleton({ w, h, r = 8 }) {
   return (
     <div
@@ -113,7 +136,7 @@ function Skeleton({ w, h, r = 8 }) {
     />
   );
 }
- 
+
 function VLine({ h = 32, delay = 0 }) {
   return (
     <div
@@ -122,7 +145,7 @@ function VLine({ h = 32, delay = 0 }) {
     />
   );
 }
- 
+
 function HLine({ w, delay = 0 }) {
   return (
     <div
@@ -131,7 +154,7 @@ function HLine({ w, delay = 0 }) {
     />
   );
 }
- 
+
 function Avatar({ initials, sizeClass = "w-11 h-11 sm:w-12 sm:h-12", textClass = "text-sm sm:text-base", bg = BRAND }) {
   return (
     <div
@@ -142,7 +165,7 @@ function Avatar({ initials, sizeClass = "w-11 h-11 sm:w-12 sm:h-12", textClass =
     </div>
   );
 }
- 
+
 function Badge({ children, color = BRAND, bg = BRAND_LIGHT }) {
   return (
     <span
@@ -153,7 +176,7 @@ function Badge({ children, color = BRAND, bg = BRAND_LIGHT }) {
     </span>
   );
 }
- 
+
 function LiveDot() {
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 shrink-0">
@@ -163,14 +186,18 @@ function LiveDot() {
   );
 }
 
+function YouPill() {
+  return <span className="su-you-pill"></span>;
+}
 
-function SuperAdminNode({ name, role, initials, delay = 0, onClick }) {
+function SuperAdminNode({ name, role, initials, delay = 0, onClick, isYou }) {
   return (
     <div className="opacity-0 shrink-0" style={{ animation: `scaleIn 0.4s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms forwards` }}>
       <div
         className="su-card-hover su-card-sa w-[164px] sm:w-[190px] md:w-[210px] lg:w-[225px] bg-white border-[1.5px] border-[#e8edf5] rounded-2xl p-3 sm:p-4 md:p-5 flex flex-col items-center relative overflow-hidden shadow-sm"
         onClick={onClick}
       >
+        {isYou && <YouPill />}
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#0f172a] to-[#334155] rounded-t-2xl" />
         <Avatar
           initials={initials}
@@ -208,7 +235,7 @@ function AdminNode({ admin, delay = 0, dimmed, highlighted, onClick }) {
     </div>
   );
 }
- 
+
 function ManagerNode({ manager, delay = 0, dimmed, highlighted, onClick }) {
   const name = fullName(manager);
   return (
@@ -232,7 +259,7 @@ function ManagerNode({ manager, delay = 0, dimmed, highlighted, onClick }) {
     </div>
   );
 }
- 
+
 function EmployeeNode({ employee, delay = 0, dimmed, highlighted, onClick }) {
   const name = fullName(employee);
   return (
@@ -255,7 +282,6 @@ function EmployeeNode({ employee, delay = 0, dimmed, highlighted, onClick }) {
     </div>
   );
 }
- 
 
 function SkeletonTree() {
   return (
@@ -348,8 +374,8 @@ function EmployeeDetailPanel({ person, type, onClose }) {
             <h2 className="text-base sm:text-lg font-bold text-slate-900 truncate">Profile details</h2>
             <p className="text-xs text-gray-400 mt-0.5 truncate">{roleLabel} · {name}</p>
           </div>
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={onClose}
             className="flex items-center justify-center w-10 h-10 sm:w-8 sm:h-8 rounded-lg border border-gray-200 text-gray-500 text-xl hover:bg-gray-50 transition-colors shrink-0"
           >
             ×
@@ -603,6 +629,7 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
         role={superAdmin?.organisation_name || "Super Admin"}
         initials={getInitials(superAdmin?.f_name, superAdmin?.l_name)}
         delay={60}
+        isYou
         onClick={() => onNodeClick(superAdmin, "superadmin")}
       />
 
@@ -940,11 +967,6 @@ export default function SuperAdminOrgChart() {
             <span className="hidden sm:block ml-auto text-xs text-gray-400 truncate">Click any card for details</span>
           </div>
 
-          {/* Only this element scrolls sideways — see .su-scroll in STYLES for
-              the touch-action / overscroll-behavior rules that stop it from
-              fighting with the page's vertical scroll on mobile. Growing the
-              tree (more admins/managers/employees) just makes this wider and
-              taller; there's no max-height here to clip it. */}
           <div
             ref={treeRef}
             className="su-scroll w-full max-w-full min-w-0 overflow-x-auto overflow-y-visible bg-white p-3 sm:p-6 lg:p-8"
