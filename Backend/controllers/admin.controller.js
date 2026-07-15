@@ -2711,7 +2711,7 @@ const getOrgInfo = async (req, res, next) => {
  
     const admin = await Adminmodel.findById(req.admin._id)
       .select(
-        "f_name l_name work_email designation department office_location organisation_id"
+        "empid f_name l_name work_email designation department office_location organisation_id"
       )
       .lean();
  
@@ -2736,7 +2736,7 @@ const getOrgInfo = async (req, res, next) => {
         Under_manager: { $in: managers.map((m) => m._id) },
       })
       .select(
-        "f_name l_name work_email designation department office_location Under_manager"
+        "empid f_name l_name work_email designation department office_location Under_manager"
       )
       .lean();
  
@@ -2757,6 +2757,7 @@ const getOrgInfo = async (req, res, next) => {
           .filter((emp) => emp.Under_manager?.toString() === mgr._id.toString())
           .map((emp) => ({
             id: emp._id,
+            empid: emp.empid,
             name: `${emp.f_name} ${emp.l_name}`,
             email: emp.work_email,
             designation: emp.designation,
@@ -2779,6 +2780,7 @@ const getOrgInfo = async (req, res, next) => {
         : null,
       admin: {
         id: admin._id,
+        empid: admin.empid,
         name: `${admin.f_name} ${admin.l_name}`,
         email: admin.work_email,
         designation: admin.designation,
@@ -2801,6 +2803,7 @@ const buildManagerTree = (managers, parentId, parentModel, employees) => {
     })
     .map((mgr) => ({
       id: mgr._id,
+      empid: mgr.empid,
       name: `${mgr.f_name} ${mgr.l_name}`,
       email: mgr.work_email,
       designation: mgr.designation,
@@ -3309,7 +3312,7 @@ const setManagerWorkingStatus = async (req, res, next) => {
       );
 
     const existingManager = await Managermodel.findOne({ _id: id, organisation_id })
-      .select("_id f_name l_name working_status")
+      .select("empid _id f_name l_name working_status")
       .lean();
 
     if (!existingManager)
