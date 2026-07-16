@@ -159,3 +159,8 @@ export const getAllAdmins = async () => {
   const res = await api.get("/admin/all-admins");
   return res.data;
 };
+
+export const getAttendanceHistory = async () => {
+  const res = await api.get("admin/getattendance");
+  return res.data;
+};
