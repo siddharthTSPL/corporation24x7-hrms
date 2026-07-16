@@ -12,7 +12,6 @@ const {
   evaluateCheckinWindow,
   evaluateCheckoutWindow,
   getShiftThresholds,
-  getShiftDurationMinutes,
 } = require("../utils/shift.utils");
 
 const MODEL_BY_ONMODEL = { User, Manager, Admin: AdminUser };
@@ -180,14 +179,6 @@ const scanFace = async (req, res) => {
       const { allowed, isLate, lateMinutes, tooLate } = evaluateCheckinWindow(shift, now);
 
       if (!allowed) {
-        if (tooLate) {
-          return res.status(403).json({
-            message: `Not allowed — ${employeeName || "you are"} too late. Check-in for ${employeeName || "this"} shift (${shift.startTime}) closed ${shift.lateCheckinCutoffMinutes ?? 60} minute(s) after it started.`,
-            reason: "too_late",
-            employeeName,
-            shift: shiftInfo,
-          });
-        }
         const earlyBuffer = shift.earlyBufferMinutes ?? 60;
         return res.status(403).json({
           message: `Not allowed. ${employeeName || "Your"} shift starts at ${shift.startTime}. Check-in opens ${earlyBuffer} minute(s) before that.`,
@@ -224,10 +215,14 @@ const scanFace = async (req, res) => {
       }
 
       const grace = shift.graceMinutes ?? 15;
+      const checkinMessage = !isLate
+        ? "Checked in on time"
+        : tooLate
+          ? `You are quite late (by ${minutesToLabel(lateMinutes)}), but welcome! Checked in.`
+          : `Checked in — late by ${minutesToLabel(lateMinutes)} (grace period was ${shift.startTime} to +${grace} min)`;
+
       return res.json({
-        message: isLate
-          ? `Checked in — late by ${minutesToLabel(lateMinutes)} (grace period was ${shift.startTime} to +${grace} min)`
-          : "Checked in on time",
+        message: checkinMessage,
         action: "checkin",
         employeeName,
         matchConfidence: Number(bestScore.toFixed(3)),
@@ -271,20 +266,12 @@ const scanFace = async (req, res) => {
     const durationMinutes = Math.round((attendance.checkOut - attendance.checkIn) / 60000);
     attendance.activeMinutes = durationMinutes;
 
-    // Face attendance has no continuous activity-ping tracking like the
-    // manual/agent flow - all we know is the checkin-to-checkout span. So
-    // "presence" here is judged against the shift's own length, not the
-    // fixed absentBelowMinutes/halfDayBelowMinutes thresholds: checking
-    // out before half the shift has elapsed is always Absent, e.g. a
-    // 9-hour shift (540 min) checked out at 4h29m (< 270 min) -> Absent,
-    // no matter what the fixed thresholds say.
-    const shiftDurationMinutes = getShiftDurationMinutes(shift);
-    const halfShiftMinutes = shiftDurationMinutes / 2;
-    const isBelowHalfShift = durationMinutes < halfShiftMinutes;
-
-    attendance.status = isBelowHalfShift
-      ? "absent"
-      : calculateStatus(durationMinutes, getShiftThresholds(shift));
+    // Presence is judged the same way as the manual/agent flow: purely
+    // against the shift's own configurable absentBelowMinutes /
+    // halfDayBelowMinutes (set per-shift by the SuperAdmin), not a
+    // hardcoded percentage of the shift length.
+    const thresholds = getShiftThresholds(shift);
+    attendance.status = calculateStatus(durationMinutes, thresholds);
     attendance.checkoutRemark = remark;
     attendance.overtimeMinutes = isOvertime ? overtimeMinutes : 0;
     await attendance.save();
@@ -297,9 +284,11 @@ const scanFace = async (req, res) => {
       auto_overtime: `You are automatically checked out because you are overtime more than ${Math.floor((shift.maxOvertimeMinutes ?? 60) / 60)} hour(s).`,
     }[remark];
 
-    const finalMessage = isBelowHalfShift
-      ? `Checked out after only ${minutesToLabel(durationMinutes)} — less than half your ${minutesToLabel(shiftDurationMinutes)} shift, so today is marked Absent.`
-      : remarkMessage;
+    const finalMessage = attendance.status === "absent"
+      ? `Checked out after only ${minutesToLabel(durationMinutes)} — marked Absent as per your shift's attendance rules.`
+      : attendance.status === "half_day"
+        ? `Checked out after ${minutesToLabel(durationMinutes)} — marked Half Day as per your shift's attendance rules.`
+        : remarkMessage;
 
     return res.json({
       message: finalMessage,
@@ -312,7 +301,6 @@ const scanFace = async (req, res) => {
       time: attendance.checkOut,
       workedMinutes: durationMinutes,
       gate: gateName,
-      isBelowHalfShift,
       shift: shiftInfo,
     });
   } catch (error) {

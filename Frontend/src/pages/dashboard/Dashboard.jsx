@@ -354,9 +354,6 @@ function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, c
     too_early:     { theme:"slate",  icon:"⏰", label: checkinGate?.shift
       ? `Check-in opens closer to ${checkinGate.shift.startTime}`
       : "Check-in not open yet" },
-    too_late:      { theme:"rose",   icon:"⛔", label: checkinGate?.shift
-      ? `Check-in closed — more than 1 hour past ${checkinGate.shift.startTime}`
-      : "Check-in window closed" },
     checked_in_by_face: { theme:"pink", icon:"🤳", label: "Checked in via Face Attendance" },
     loading:       { theme:"slate",  icon:"⏳", label:"Checking today's status…" },
   };
@@ -379,7 +376,6 @@ function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, c
   else if (reason === "holiday") buttonLabel = "🎉 Holiday Today";
   else if (reason === "weekoff") buttonLabel = "🛋️ Week Off";
   else if (reason === "too_early") buttonLabel = "⏰ Not Open Yet";
-  else if (reason === "too_late") buttonLabel = "⛔ Blocked";
   else if (reason === "loading") buttonLabel = "Please wait…";
 
   const buttonDisabled = preBlocked || isCheckedOut;
