@@ -6,7 +6,7 @@ import { useGetAllManagerLeaves } from "../../auth/server-state/manager/managerl
 import { useGetAttendance } from "../../auth/server-state/manager/managgerother/managerother.hook";
 import { useGetMyLeavesManager } from "../../auth/server-state/manager/managerleave/managerleave.hook";
 import { useCalendarMeta, useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
-import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus } from "../../utils/attendance";
+import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus } from "../../pages/utils/attendance";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS   = ["S","M","T","W","T","F","S"];

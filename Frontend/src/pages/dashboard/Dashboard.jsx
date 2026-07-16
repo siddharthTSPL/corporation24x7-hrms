@@ -11,7 +11,7 @@ import {
 import { useAdminGetMyWFH } from "../../auth/server-state/adminwfh/adminwfh.hook";
 import { useTodayAttendance, useCalendarMeta } from "../../auth/server-state/attendance/attendance.hook";
 import AttendanceModal from "./AttendanceModal";
-import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus } from "../../utils/attendance";
+import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus } from "../../pages/utils/attendance";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS = ["S","M","T","W","T","F","S"];
