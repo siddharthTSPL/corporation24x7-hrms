@@ -103,6 +103,15 @@ attendanceSchema.index(
   { date: 1, checkIn: 1, latitude: 1, longitude: 1 },
   { sparse: true }
 );
+// Guards against the race where two near-simultaneous requests (e.g. the
+// desktop agent's activity ping and a manual/face check-in landing at the
+// same moment) both find no existing record and both call .create() -
+// producing two documents for the same real day. Callers must catch the
+// E11000 duplicate-key error and re-fetch instead of failing the request.
+// NOTE: run scripts/mergeDuplicateAttendance.js --apply BEFORE deploying
+// this index - Mongo will refuse to build a unique index while duplicate
+// (employee, role, date) combinations already exist in the collection.
+attendanceSchema.index({ employee: 1, role: 1, date: 1 }, { unique: true });
 
 const Attendance = mongoose.model("Attendance", attendanceSchema);
 module.exports = Attendance;
