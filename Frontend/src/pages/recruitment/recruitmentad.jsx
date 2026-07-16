@@ -20,6 +20,7 @@ import {
   FaCalendarAlt,
   FaEdit, FaArrowRight,
   FaUserCheck, FaBuilding, FaChartLine,
+  FaFileExcel,
 } from "react-icons/fa";
 
 const initials = (name = "") =>
@@ -94,6 +95,39 @@ const PRIORITY_META = {
 const DEPT_LABELS = {
   OPR: "Operations", BPO: "BPO", ENG: "Engineering",
   HR: "Human Resources", MGMT: "Management",
+};
+
+const csvEscape = (v) => {
+  const s = String(v ?? "");
+  return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
+};
+
+const exportCSV = (requisitions) => {
+  const headers = [
+    "Job Title", "Department", "Employment Type", "Work Mode", "Experience Required",
+    "Priority", "Hiring Reason", "Status", "Openings", "Filled Count", "Remaining",
+    "Salary Min", "Salary Max", "Expected Joining Date", "Skills Required",
+    "Job Description", "Requested By", "Requester Designation", "Requester Department",
+    "Admin Comment", "Created At",
+  ];
+  const rows = (requisitions || []).map((r) => [
+    r.job_title ?? "", DEPT_LABELS[r.department] || r.department || "", r.employment_type ?? "",
+    r.work_mode ?? "", r.experience_required ?? "", r.priority ?? "", r.hiring_reason ?? "",
+    r.status ?? "", r.openings ?? "", r.filled_count ?? 0, Math.max(0, (r.openings || 0) - (r.filled_count || 0)),
+    r.salary_range?.min ?? "", r.salary_range?.max ?? "", fmtDate(r.expected_joining_date),
+    (r.skills_required || []).join("; "), r.job_description ?? "",
+    `${r.requested_by?.f_name ?? ""} ${r.requested_by?.l_name ?? ""}`.trim(),
+    r.requested_by?.designation ?? "", r.requested_by?.department ?? "",
+    r.admin_comment ?? "", fmtDate(r.createdAt),
+  ]);
+  const csv = [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `recruitment_requisitions_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 };
 
 const StatusPill = ({ status }) => (
@@ -1212,9 +1246,19 @@ const RecruitmentAdmin = () => {
       <div className="bg-gradient-to-br from-[#2e0019] via-[#4a0029] to-[#CD166E] rounded-2xl px-4 sm:px-8 py-6 sm:py-7 mb-6 relative overflow-hidden shadow-xl">
         <div className="absolute w-72 h-72 rounded-full -top-36 -right-16 bg-white/5 pointer-events-none" />
         <div className="absolute w-48 h-48 rounded-full -bottom-24 right-32 bg-white/5 pointer-events-none" />
-        <p className="text-[10px] tracking-[3px] uppercase text-white/50 mb-2 font-medium">{today}</p>
-        <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1" style={{ fontFamily: "'Cormorant Garamond', serif" }}>Recruitment Management</h1>
-        <p className="text-xs text-white/60 font-light">Review hiring requisitions, manage candidates and track recruitment pipeline.</p>
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div>
+            <p className="text-[10px] tracking-[3px] uppercase text-white/50 mb-2 font-medium">{today}</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1" style={{ fontFamily: "'Cormorant Garamond', serif" }}>Recruitment Management</h1>
+            <p className="text-xs text-white/60 font-light">Review hiring requisitions, manage candidates and track recruitment pipeline.</p>
+          </div>
+          <button
+            onClick={() => exportCSV(requisitions)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white/10 border border-white/20 text-white text-xs font-semibold rounded-xl hover:bg-white/20 transition-all whitespace-nowrap flex-shrink-0"
+          >
+            <FaFileExcel size={13} /> Export CSV
+          </button>
+        </div>
         <div className="flex flex-wrap gap-2 mt-4">
           {[
             `📋 ${stats.total} Requisitions`,
@@ -1274,6 +1318,12 @@ const RecruitmentAdmin = () => {
                     onChange={(e) => setSearch(e.target.value)}
                   />
                 </div>
+                <button
+                  onClick={() => exportCSV(filtered)}
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 bg-[#e8f7f1] border border-[#b7e3d1] text-[#0d9e6e] text-xs font-semibold rounded-xl hover:bg-[#0d9e6e] hover:text-white hover:border-[#0d9e6e] transition-all whitespace-nowrap"
+                >
+                  <FaFileExcel size={11} /> Export CSV
+                </button>
               </div>
             </div>
 
