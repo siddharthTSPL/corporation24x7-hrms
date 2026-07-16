@@ -59,7 +59,7 @@ export const useGetMeManager = () => {
     select: (data) => ({
       manager: data.manager,
       leavebalance: data.leavebalance,
-      review: data.review,
+      reviews: data.reviews,
     }),
   });
 };

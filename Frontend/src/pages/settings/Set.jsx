@@ -912,7 +912,7 @@ export default function AdminSettingsPage() {
                     <div className="truncate" style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{adminData?.work_email || "—"}</div>
                     <div style={{ marginTop: 7, display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
                       <Badge color={C.brand}>{adminData?.role || "admin"}</Badge>
-                      {adminData?.department && <Badge color={C.blue}>{adminData.department}</Badge>}
+                      {adminData?.designation && <Badge color={C.blue}>{adminData.designation}</Badge>}
                     </div>
                   </div>
                 </div>
