@@ -2708,28 +2708,28 @@ const getOrgInfo = async (req, res, next) => {
   try {
     if (!req.admin)
       return res.status(401).json({ success: false, message: "Unauthorized" });
- 
+
     const admin = await Adminmodel.findById(req.admin._id)
       .select(
         "empid f_name l_name work_email designation department office_location organisation_id"
       )
       .lean();
- 
+
     if (!admin)
       return res.status(404).json({ success: false, message: "Admin not found" });
- 
+
     const organisation_id = admin.organisation_id;
- 
+
     const superAdmin = await SuperAdminModel.findById(organisation_id)
       .select("f_name l_name email organisation_name profile_image")
       .lean();
- 
+
     const managers = await Managermodel.find({ organisation_id })
       .select(
-        "f_name l_name work_email designation department office_location reporting_manager reporting_manager_model"
+        "empid f_name l_name work_email designation department office_location reporting_manager reporting_manager_model"
       )
       .lean();
- 
+
     const employees = await Usermodel
       .find({
         organisation_id,
@@ -2739,7 +2739,7 @@ const getOrgInfo = async (req, res, next) => {
         "empid f_name l_name work_email designation department office_location Under_manager"
       )
       .lean();
- 
+
     const topLevelManagers = managers
       .filter(
         (mgr) =>
@@ -2748,6 +2748,7 @@ const getOrgInfo = async (req, res, next) => {
       )
       .map((mgr) => ({
         id: mgr._id,
+        empid: mgr.empid,
         name: `${mgr.f_name} ${mgr.l_name}`,
         email: mgr.work_email,
         designation: mgr.designation,
@@ -2765,7 +2766,7 @@ const getOrgInfo = async (req, res, next) => {
           })),
         subManagers: buildManagerTree(managers, mgr._id, "Manager", employees),
       }));
- 
+
     return res.status(200).json({
       success: true,
       organisation_id,
@@ -2814,6 +2815,7 @@ const buildManagerTree = (managers, parentId, parentModel, employees) => {
         .filter((emp) => emp.Under_manager?.toString() === mgr._id.toString())
         .map((emp) => ({
           id: emp._id,
+          empid: emp.empid,
           name: `${emp.f_name} ${emp.l_name}`,
           email: emp.work_email,
           designation: emp.designation,
