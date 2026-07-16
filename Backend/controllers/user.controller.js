@@ -744,13 +744,31 @@ const editprofile = async (req, res, next) => {
       Object.assign(new Error("User not found"), { statusCode: 404 }),
     );
 
-  const { personal_contact, e_contact, marital_status, profile_image, gender } =
-    req.body;
+  const PHONE_REGEX = /^[0-9]{10}$/;
+  const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+  const ACCOUNT_REGEX = /^[0-9]{9,18}$/;
+
+  const {
+    personal_contact, e_contact, marital_status, profile_image, gender, office_location,
+    resume, aadhaar_card, pan_card, experience_letter,
+    bank_name, account_holder_name, account_number, ifsc_code,
+  } = req.body;
   let leaveUpdateRequired = false;
 
-  if (personal_contact !== undefined)
+  if (personal_contact !== undefined) {
+    if (typeof personal_contact !== "string" || !PHONE_REGEX.test(personal_contact))
+      return next(
+        Object.assign(new Error("Phone number must be a valid 10-digit number"), { statusCode: 400 }),
+      );
     employee.personal_contact = personal_contact;
-  if (e_contact !== undefined) employee.e_contact = e_contact;
+  }
+  if (e_contact !== undefined) {
+    if (typeof e_contact !== "string" || !PHONE_REGEX.test(e_contact))
+      return next(
+        Object.assign(new Error("Emergency contact must be a valid 10-digit number"), { statusCode: 400 }),
+      );
+    employee.e_contact = e_contact;
+  }
   if (gender !== undefined) {
     if (!["male", "female"].includes(gender))
       return next(
@@ -771,6 +789,11 @@ const editprofile = async (req, res, next) => {
       employee.marital_status = marital_status;
     }
   }
+  if (office_location !== undefined) {
+    if (!["Noida", "Bareilly", "Delhi", "Mumbai"].includes(office_location))
+      return next(Object.assign(new Error("Invalid office location"), { statusCode: 400 }));
+    employee.office_location = office_location;
+  }
   if (profile_image !== undefined) {
     if (typeof profile_image !== "string")
       return next(
@@ -783,6 +806,46 @@ const editprofile = async (req, res, next) => {
         Object.assign(new Error("Invalid avatar format"), { statusCode: 400 }),
       );
     employee.profile_image = profile_image;
+  }
+  if (resume !== undefined) {
+    if (typeof resume !== "string")
+      return next(Object.assign(new Error("Resume must be a string"), { statusCode: 400 }));
+    employee.resume = resume;
+  }
+  if (aadhaar_card !== undefined) {
+    if (typeof aadhaar_card !== "string")
+      return next(Object.assign(new Error("Aadhaar card must be a string"), { statusCode: 400 }));
+    employee.aadhaar_card = aadhaar_card;
+  }
+  if (pan_card !== undefined) {
+    if (typeof pan_card !== "string")
+      return next(Object.assign(new Error("PAN card must be a string"), { statusCode: 400 }));
+    employee.pan_card = pan_card;
+  }
+  if (experience_letter !== undefined) {
+    if (typeof experience_letter !== "string")
+      return next(Object.assign(new Error("Experience letter must be a string"), { statusCode: 400 }));
+    employee.experience_letter = experience_letter;
+  }
+  if (bank_name !== undefined) {
+    if (typeof bank_name !== "string" || bank_name.length > 100)
+      return next(Object.assign(new Error("Invalid bank name"), { statusCode: 400 }));
+    employee.bank_name = bank_name.trim();
+  }
+  if (account_holder_name !== undefined) {
+    if (typeof account_holder_name !== "string" || !account_holder_name.trim() || account_holder_name.length > 100)
+      return next(Object.assign(new Error("Invalid account holder name"), { statusCode: 400 }));
+    employee.account_holder_name = account_holder_name.trim();
+  }
+  if (account_number !== undefined) {
+    if (typeof account_number !== "string" || !ACCOUNT_REGEX.test(account_number))
+      return next(Object.assign(new Error("Invalid account number"), { statusCode: 400 }));
+    employee.account_number = account_number;
+  }
+  if (ifsc_code !== undefined) {
+    if (typeof ifsc_code !== "string" || !IFSC_REGEX.test(ifsc_code.toUpperCase()))
+      return next(Object.assign(new Error("Invalid IFSC code"), { statusCode: 400 }));
+    employee.ifsc_code = ifsc_code.toUpperCase();
   }
 
   employee.updatedAt = Date.now();
@@ -819,6 +882,15 @@ const editprofile = async (req, res, next) => {
       gender: employee.gender,
       marital_status: employee.marital_status,
       profile_image: employee.profile_image,
+      office_location: employee.office_location,
+      resume: employee.resume,
+      aadhaar_card: employee.aadhaar_card,
+      pan_card: employee.pan_card,
+      experience_letter: employee.experience_letter,
+      bank_name: employee.bank_name,
+      account_holder_name: employee.account_holder_name,
+      account_number: employee.account_number,
+      ifsc_code: employee.ifsc_code,
     },
   });
 };
