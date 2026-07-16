@@ -4,7 +4,7 @@ import { useGetMeUser } from "../../auth/server-state/employee/employeeauth/empl
 import { useGetAllLeaveHistory } from "../../auth/server-state/employee/employeeleave/employeeleave.hook";
 import { useGetAttendance } from "../../auth/server-state/employee/employeeother/employeeother.hook";
 import { useCalendarMeta, useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
-import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus } from "../../utils/attendance";
+import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus } from "../../pages/utils/attendance";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS = ["S","M","T","W","T","F","S"];
