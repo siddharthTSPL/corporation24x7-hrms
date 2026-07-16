@@ -620,8 +620,15 @@ function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, c
   // regardless of holiday/week-off/shift-window (those only gate the
   // initial check-in).
   const alreadyActedToday = isCheckedIn || isCheckedOut;
-  const reason = isOnLeave ? "leave" : (!alreadyActedToday ? (checkinGate?.reason ?? null) : null);
-  const isBlocked = isOnLeave || (!alreadyActedToday && !checkinGate?.canCheckIn);
+  // A face check-in owns the whole day — this app can't check them out,
+  // so treat an open face session as "blocked" the same way holiday/leave is.
+  const isFaceSession = myAtt?.source === "face" && !isCheckedOut;
+  const reason = isOnLeave
+    ? "leave"
+    : isFaceSession
+      ? "checked_in_by_face"
+      : (!alreadyActedToday ? (checkinGate?.reason ?? null) : null);
+  const isBlocked = isOnLeave || isFaceSession || (!alreadyActedToday && !checkinGate?.canCheckIn);
 
   const REASON_META = {
     leave:         { theme:"indigo", icon:"🏖️", label: `On Leave — ${leaveLabel[leaveType] || "Approved Leave"}` },
@@ -665,12 +672,12 @@ function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, c
   let buttonLabel = "Check In";
   if (isOnLeave) buttonLabel = "🚫 Check-in Disabled";
   else if (isCheckedOut) buttonLabel = "✅ Completed";
+  else if (reason === "checked_in_by_face") buttonLabel = "🤳 Checked In (Face)";
   else if (isCheckedIn) buttonLabel = "🔴 Check Out";
   else if (reason === "holiday") buttonLabel = "🎉 Holiday Today";
   else if (reason === "weekoff") buttonLabel = "🛋️ Week Off";
   else if (reason === "too_early") buttonLabel = "⏰ Not Open Yet";
   else if (reason === "too_late") buttonLabel = "⛔ Blocked";
-  else if (reason === "checked_in_by_face") buttonLabel = "🤳 Checked In (Face)";
   else if (reason === "loading") buttonLabel = "Please wait…";
 
   const buttonDisabled = isBlocked || isCheckedOut;
