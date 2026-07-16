@@ -41,26 +41,35 @@ const evaluateCheckinWindow = (shift, now = new Date()) => {
 
   const earlyBuffer = shift.earlyBufferMinutes ?? 60;
   const grace = shift.graceMinutes ?? 15;
+  // Check-in closes this many minutes after shift start - it must NOT stay
+  // open for the whole shift. Using shift end (`end`) here was the bug:
+  // it let check-in stay "open" until 7 PM for a 10 AM shift, and this
+  // function never returned `tooLate` at all so the too-late message the
+  // controllers already had could never fire.
+  const lateCutoff = shift.lateCheckinCutoffMinutes ?? 60;
 
   let windowStart = start - earlyBuffer;
-  let windowEnd = end;
+  let windowEnd = start + lateCutoff;
   let effectiveNow = nowMinutes;
 
-  if (overnight) {
-    if (nowMinutes <= end) effectiveNow = nowMinutes + 1440;
-    windowEnd = end + 1440;
-  }
+  // Shift starts late at night and crosses midnight (e.g. 23:00-07:00): if
+  // "now" is in the early-morning hours, it's really a continuation of
+  // yesterday's shift-start window, so shift it forward a day to compare.
+  if (overnight && nowMinutes <= end) effectiveNow = nowMinutes + 1440;
+
   if (windowStart < 0) {
     windowStart += 1440;
+    windowEnd += 1440;
     if (effectiveNow < windowStart) effectiveNow += 1440;
   }
 
   const allowed = effectiveNow >= windowStart && effectiveNow <= windowEnd;
+  const tooLate = effectiveNow > windowEnd;
   const lateEdge = start + grace;
   const isLate = effectiveNow > lateEdge;
   const lateMinutes = isLate ? effectiveNow - lateEdge : 0;
 
-  return { allowed, isLate, lateMinutes, windowStart, windowEnd };
+  return { allowed, isLate, lateMinutes, tooLate, windowStart, windowEnd };
 };
 
 // checkInTime is required to gate the checkout scan: the scan is only

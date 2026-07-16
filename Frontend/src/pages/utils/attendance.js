@@ -38,7 +38,13 @@ export function resolveAttendanceStatus(record, { isToday = false } = {}) {
     return "absent";
   }
 
-  if (isToday && record.checkIn) return "checkedin";
+  // An "agent" record is just a background activity ping from the desktop
+  // app - it is NOT a real, window-validated check-in (see
+  // attendance.controller.js getToday(), which excludes source "agent"
+  // from isCheckedIn the same way). Without this check, the calendar was
+  // marking today green as soon as the desktop app sent its first ping,
+  // even though the person never actually checked in.
+  if (isToday && record.checkIn && record.source !== "agent") return "checkedin";
 
   return "absent";
 }
