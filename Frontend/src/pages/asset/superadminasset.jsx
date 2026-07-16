@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import {
   FaPlus, FaTimes, FaCheck, FaEdit, FaTrash, FaSearch, FaFilter,
   FaLaptop, FaDesktop, FaMobileAlt, FaKeyboard, FaMouse, FaHeadphones,
-  FaTabletAlt, FaBox, FaExclamationTriangle, FaUndo,
+  FaTabletAlt, FaBox, FaExclamationTriangle, FaUndo, FaDownload,
   FaHistory, FaUserShield, FaEllipsisV, FaCubes,
 } from "react-icons/fa";
 import {
@@ -18,6 +18,28 @@ import { useGetAllAdmins } from "../../auth/server-state/superadmin/other/suothe
 const ASSET_TYPES = ["laptop","desktop","monitor","keyboard","mouse","headset","mobile","tablet","other"];
 const CONDITIONS   = ["new","good","fair","poor"];
 const STATUSES     = ["available","assigned","under_maintenance","retired"];
+
+const HTML_TO_IMAGE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js";
+
+function loadImageScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) return resolve();
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.body.appendChild(s);
+  });
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 const TYPE_ICON = {
   laptop:    <FaLaptop />,
@@ -611,6 +633,8 @@ export default function SuperAdminAssets() {
   const [filters, setFilters] = useState({ status: "", asset_type: "" });
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [exportDone, setExportDone] = useState(false);
+  const pageRef = useRef(null);
 
   const { data, isLoading } = useGetAllAssetsSuperAdmin(
     Object.fromEntries(Object.entries(filters).filter(([, v]) => v))
@@ -674,11 +698,36 @@ export default function SuperAdminAssets() {
     ? rawAssets.find((a) => a._id === assignmentsDrawer.asset._id) || assignmentsDrawer.asset
     : null;
 
+  function exportCsv() {
+    const headers = ["Asset ID","Name","Type","Brand","Model Number","Serial Number","Condition","Total Quantity","Available Quantity","Assigned Units","Status","Purchase Date","Purchase Price"];
+    const rows = rawAssets.map((a) => [
+      a.asset_id ?? "",
+      a.asset_name ?? "",
+      a.asset_type ?? "",
+      a.brand ?? "",
+      a.model_number ?? "",
+      a.serial_number ?? "",
+      a.condition ?? "",
+      a.total_quantity ?? 1,
+      a.available_quantity ?? 0,
+      (a.total_quantity ?? 1) - (a.available_quantity ?? 0),
+      STATUS_META[a.status]?.label ?? a.status ?? "",
+      a.purchase_date ? new Date(a.purchase_date).toLocaleDateString("en-IN") : "",
+      a.purchase_price ?? "",
+    ]);
+    const escape = (v) => { const s = String(v ?? ""); return s.includes(",")||s.includes('"')||s.includes("\n") ? `"${s.replace(/"/g,'""')}"` : s; };
+    const csv = [headers, ...rows].map((r) => r.map(escape).join(",")).join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    downloadBlob(blob, `asset-management-${Date.now()}.csv`);
+    setExportDone(true);
+    setTimeout(() => setExportDone(false), 2600);
+  }
+
   return (
     <div className="min-h-screen bg-[#F9F8F2] p-3 sm:p-4 md:p-6 font-['DM_Sans',system-ui,sans-serif] text-[#0d0209]">
       <style>{`@keyframes modalUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}`}</style>
 
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl mx-auto" ref={pageRef}>
         <div className="flex items-center justify-between mb-4 sm:mb-6 flex-wrap gap-3">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-[#730042] tracking-tight">Asset Management</h1>
@@ -686,13 +735,21 @@ export default function SuperAdminAssets() {
               {stats.totalTypes} asset types · {stats.totalUnits} units · {stats.assignedUnits} assigned · {stats.availableUnits} available
             </p>
           </div>
-          <button
-            onClick={() => setFormModal({ open: true, editing: null })}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-[13px] font-semibold hover:opacity-90 active:scale-95 transition min-h-[44px]"
-            style={{ background: "#730042" }}
-          >
-            <FaPlus size={10} /> Add Asset
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={exportCsv}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#730042] text-[#730042] text-[13px] font-semibold hover:bg-[#f7ecf3] active:scale-95 transition min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <FaDownload size={10} /> Export CSV
+            </button>
+            <button
+              onClick={() => setFormModal({ open: true, editing: null })}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-[13px] font-semibold hover:opacity-90 active:scale-95 transition min-h-[44px]"
+              style={{ background: "#730042" }}
+            >
+              <FaPlus size={10} /> Add Asset
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
@@ -908,6 +965,12 @@ export default function SuperAdminAssets() {
         onConfirm={handleDelete}
         loading={deleting}
       />
+
+      {exportDone && (
+        <div className="fixed bottom-4 right-4 left-4 sm:left-auto z-[9999] flex items-center justify-center sm:justify-start gap-2 px-4 py-3 rounded-xl bg-[#0d0209] text-white text-[13px] font-medium shadow-2xl">
+          <FaCheck size={11} className="text-emerald-400" /> CSV exported!
+        </div>
+      )}
     </div>
   );
 }
