@@ -843,12 +843,33 @@ export default function Dashboard() {
   const { presentCount, absentCount, halfCount, checkedInCount, attendanceRate }=useMemo(()=>{
     const year=new Date().getFullYear();
     const today=new Date(); today.setHours(0,0,0,0);
+    const weekOffSet = new Set(
+      (calMeta?.weekOffDates ?? [])
+        .map(ds => new Date(ds))
+        .filter(d => d.getFullYear() === year && d.getMonth() === selectedMonth)
+        .map(d => d.getDate())
+    );
+    const holidaySet = new Set(
+      (calMeta?.holidays ?? [])
+        .map(h => new Date(h.date))
+        .filter(d => d.getFullYear() === year && d.getMonth() === selectedMonth)
+        .map(d => d.getDate())
+    );
+    const wfhSet = new Set(
+      approvedWFH
+        .filter(w => {
+          const d = new Date(w.date || w.startDate);
+          return d.getFullYear() === year && d.getMonth() === selectedMonth;
+        })
+        .map(w => new Date(w.date || w.startDate).getDate())
+    );
     let present=0,absent=0,half=0,checkedIn=0,counted=0;
     const daysInMonth=new Date(year,selectedMonth+1,0).getDate();
     for (let d=1; d<=daysInMonth; d++) {
       const date=new Date(year,selectedMonth,d); date.setHours(0,0,0,0);
       if (date>today) break;
       if (joiningMidnight && date<joiningMidnight) continue;
+      if (weekOffSet.has(d) || holidaySet.has(d) || wfhSet.has(d)) continue;
       if (approvedLeaves.some(lv=>isDateInRange(date,lv.startDate,lv.endDate))) continue;
       counted++;
       const key=getISTDayKey(date);
@@ -862,7 +883,7 @@ export default function Dashboard() {
     }
     const rate=counted>0?Math.round(((present+checkedIn)/counted)*100):0;
     return { presentCount:present, absentCount:absent, halfCount:half, checkedInCount:checkedIn, attendanceRate:rate };
-  },[attendanceMap,selectedMonth,approvedLeaves,joiningMidnight]);
+  },[attendanceMap,selectedMonth,approvedLeaves,joiningMidnight,calMeta,approvedWFH]);
 
   const elRemaining=(lb?.EL?.entitled??0)-(lb?.EL?.availed??0);
   const slRemaining=(lb?.SL?.entitled??0)-(lb?.SL?.availed??0);
