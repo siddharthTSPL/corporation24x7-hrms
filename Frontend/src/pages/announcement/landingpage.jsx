@@ -102,7 +102,7 @@ function Navbar() {
       }`}
     >
       <div className="max-w-[1500px] mx-auto px-5 sm:px-10 lg:px-16 h-[72px] flex items-center justify-between">
-        <img src={logo} alt="TorchX Logo" className="h-9 sm:h-11 w-auto object-contain block" />
+        <img src={logo} alt="TorchX Talent logo" className="h-9 sm:h-11 w-auto object-contain block" />
 
         <div className="hidden lg:flex items-center gap-9">
           {links.map(l => (
@@ -412,6 +412,10 @@ function Hero() {
             variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
             className="max-w-[520px]"
           >
+            <p className="font-ui font-semibold text-[#7A004B] tracking-[1px] uppercase text-[13px] mb-3">
+              TorchX Talent — HRMS Software
+            </p>
+
             <h1 className="font-hero font-medium text-[#111] leading-[1.08] mb-5 text-[clamp(1.8rem,5vw,4rem)] tracking-[-1px]">
               Manage Your Workforce
               <br />
@@ -419,8 +423,7 @@ function Hero() {
             </h1>
 
             <p className="font-hero font-normal text-[#555] leading-[1.75] mb-8 text-[clamp(0.9rem,1.8vw,1.1rem)] max-w-[480px]">
-              Optimize every stage of the employee lifecycle with a robust and
-              reliable Human Resource Management System.
+              TorchX Talent is a complete Human Resource Management System (HRMS) that helps you optimize every stage of the employee lifecycle — from hiring to performance to payroll — with a robust and reliable platform.
             </p>
 
             <div className="flex flex-wrap gap-3.5">
@@ -457,7 +460,7 @@ function Hero() {
 // ─────────────────────────────────────────────────────────────────────────────
 function Stats() {
   const stats = [
-    { icon: <BsPeopleFill size={22} />, num: '100+', label: 'Happy customers of TorchX' },
+    { icon: <BsPeopleFill size={22} />, num: '100+', label: 'Happy customers of TorchX Talent' },
     { icon: <FiBarChart2 size={22} />, num: '1000+', label: 'No. of live demos' },
     { icon: <FiUsers size={22} />, num: '10+', label: 'Partners to collaborate' },
     { icon: <FiStar size={22} />, num: '98%', label: 'Customer satisfaction' },
@@ -686,7 +689,7 @@ function Features() {
               Powerful <span className="text-[#7A004B]">Features</span><br />Built for <span className="text-[#7A004B]">Modern</span> Teams
             </h2>
             <p className="text-xl text-[#555] leading-relaxed max-w-[700px] mx-auto font-body">
-              Everything you need to hire smarter, evaluate better, and empower your employees.
+              Everything TorchX Talent offers to help you hire smarter, evaluate better, and empower your employees.
             </p>
           </div>
 
@@ -728,7 +731,7 @@ function Pricing() {
               Simple, Transparent <span className="text-[#7A004B]">Pricing</span><br />That Grows With You
             </h2>
             <p className="text-lg font-body text-[#5C5C5C] max-w-[440px] mx-auto leading-relaxed">
-              Choose the perfect plan for your team. Upgrade or downgrade anytime as your needs change.
+              Choose the perfect TorchX Talent plan for your team. Upgrade or downgrade anytime as your needs change.
             </p>
           </div>
 
@@ -827,11 +830,11 @@ function Pricing() {
 function Testimonials() {
   const [startIndex, setStartIndex] = useState(0)
   const testimonials = [
-    { quote: 'TorchX has completely transformed our hiring process. The AI recruitment feature helps us find the right talent faster and with better accuracy.', name: 'Alexa', role: 'HR Manager', co: 'LOGOIPSUM', initials: 'AL' },
+    { quote: 'TorchX Talent has completely transformed our hiring process. The AI recruitment feature helps us find the right talent faster and with better accuracy.', name: 'Alexa', role: 'HR Manager', co: 'LOGOIPSUM', initials: 'AL' },
     { quote: 'The employee portal is a game changer! Our team loves the easy access to documents, requests, and updates all in one place.', name: 'Anaya Varma', role: 'HR Director', co: 'LOGOIPSUM', initials: 'AV' },
-    { quote: 'Performance reviews are now simple, transparent, and data-driven. TorchX helps us build a culture of continuous feedback and growth.', name: 'Rohan Sharma', role: 'People Operations Lead', co: 'LOGOIPSUM', initials: 'RS' },
-    { quote: 'TorchX has significantly improved our workforce management. From onboarding to performance tracking, everything is streamlined and easy to manage.', name: 'Karan Malhotra', role: 'Head of Human Resources', co: 'LOGOIPSUM', initials: 'KM' },
-    { quote: 'TorchX has helped us centralize all HR operations in one platform. The automation features save countless hours every week and improve team productivity.', name: 'Meera Patel', role: 'Chief People Officer', co: 'LOGOIPSUM', initials: 'MP' },
+    { quote: 'Performance reviews are now simple, transparent, and data-driven. TorchX Talent helps us build a culture of continuous feedback and growth.', name: 'Rohan Sharma', role: 'People Operations Lead', co: 'LOGOIPSUM', initials: 'RS' },
+    { quote: 'TorchX Talent has significantly improved our workforce management. From onboarding to performance tracking, everything is streamlined and easy to manage.', name: 'Karan Malhotra', role: 'Head of Human Resources', co: 'LOGOIPSUM', initials: 'KM' },
+    { quote: 'TorchX Talent has helped us centralize all HR operations in one platform. The automation features save countless hours every week and improve team productivity.', name: 'Meera Patel', role: 'Chief People Officer', co: 'LOGOIPSUM', initials: 'MP' },
   ]
   const visibleTestimonials = testimonials.slice(startIndex, startIndex + 3)
 
@@ -844,7 +847,7 @@ function Testimonials() {
               Loved by <span className="text-[#7A004B]">Teams</span>, Trusted by <span className="text-[#7A004B]">Leaders</span>
             </h2>
             <p className="text-lg text-[#555] max-w-[440px] mx-auto leading-relaxed">
-              See how organizations like yours are using TorchX to streamline HR and achieve more every day.
+              See how organizations like yours are using TorchX Talent to streamline HR and achieve more every day.
             </p>
           </div>
 
@@ -907,7 +910,7 @@ function Testimonials() {
                 <HiOutlineSparkles className="text-white text-xl" />
               </div>
               <div>
-                <div className="text-lg font-display font-extrabold text-[#2A1120] mb-1">Join 100+ companies growing with TorchX</div>
+                <div className="text-lg font-display font-extrabold text-[#2A1120] mb-1">Join 100+ companies growing with TorchX Talent</div>
                 <div className="text-[13px] text-[#666]">Powerful HR tools. Happy teams. Better results.</div>
               </div>
             </div>
@@ -1042,9 +1045,9 @@ function Footer() {
         <Wrap className="pt-8 pb-0">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1fr] gap-10">
             <div>
-              <img src={logo} alt="TorchX" className="h-9 sm:h-11 w-auto object-contain block mb-1.5" />
+              <img src={logo} alt="TorchX Talent" className="h-9 sm:h-11 w-auto object-contain block mb-1.5" />
               <p className="text-[15px] text-[#444] leading-[1.75] mb-5">
-                Hire smarter, faster, and with confidence using AI-powered talent solutions.
+                TorchX Talent helps you hire smarter, faster, and with confidence using AI-powered talent solutions.
                 Streamline recruitment, discover top candidates, and build high-performing teams effortlessly.
               </p>
               <div className="flex gap-2.5">
@@ -1082,7 +1085,7 @@ function Footer() {
         <Wrap className="pt-9 pb-5">
           <div className="border-t border-[#E2C9D6] pt-5 flex flex-wrap justify-between items-center gap-3">
             <p className="text-sm text-[#555] m-0">
-              TorchX™ — A Product of Techtorch Solutions Private Limited.
+              TorchX Talent™ — A Product of Techtorch Solutions Private Limited.
             </p>
             <div className="flex flex-wrap gap-4.5">
               {[

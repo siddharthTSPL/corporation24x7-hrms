@@ -78,6 +78,7 @@ const STAGE_TIMELINE_META = {
 const STATUS_META = {
   PENDING:           { color: "bg-amber-50 text-amber-700 border border-amber-200" },
   APPROVED:          { color: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
+  FILLED:            { color: "bg-teal-50 text-teal-700 border border-teal-200" },
   REJECTED:          { color: "bg-red-50 text-red-600 border border-red-200" },
   ON_HOLD:           { color: "bg-orange-50 text-orange-700 border border-orange-200" },
   REVISION_REQUIRED: { color: "bg-blue-50 text-blue-700 border border-blue-200" },
@@ -108,6 +109,34 @@ const StageBadge = ({ stage }) => {
       <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${meta.dot}`} />
       {(stage || "").replace(/_/g, " ")}
     </span>
+  );
+};
+
+const OpeningsBadge = ({ requisition }) => {
+  const total = requisition.openings || 0;
+  const filled = Math.min(requisition.filled_count || 0, total);
+  const remaining = Math.max(0, total - filled);
+  const pct = total > 0 ? Math.round((filled / total) * 100) : 0;
+  const isFull = remaining === 0;
+
+  return (
+    <div className="flex flex-col items-center gap-1 min-w-[70px]">
+      <span className={`text-sm font-bold ${isFull ? "text-emerald-600" : "text-gray-800"}`}>
+        {filled}<span className="text-gray-300 font-medium">/{total}</span>
+      </span>
+      <div className="w-14 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all"
+          style={{
+            width: `${pct}%`,
+            background: isFull ? "#059669" : "linear-gradient(90deg, #730042, #CD166E)",
+          }}
+        />
+      </div>
+      <span className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">
+        {isFull ? "Filled" : `${remaining} left`}
+      </span>
+    </div>
   );
 };
 
@@ -957,7 +986,7 @@ const RequisitionDetailModal = ({ requisition, onClose }) => {
             <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400 mt-1">
               <span>{DEPT_LABELS[requisition.department] || requisition.department}</span>
               <span>·</span>
-              <span>{requisition.openings} opening{requisition.openings !== 1 ? "s" : ""}</span>
+              <span>{Math.min(requisition.filled_count || 0, requisition.openings)}/{requisition.openings} opening{requisition.openings !== 1 ? "s" : ""} filled</span>
               <span>·</span>
               <StatusPill status={requisition.status} />
             </div>
@@ -1148,7 +1177,10 @@ const RecruitmentAdmin = () => {
     total:    requisitions.length,
     pending:  requisitions.filter((r) => r.status === "PENDING").length,
     approved: requisitions.filter((r) => r.status === "APPROVED").length,
+    filled:   requisitions.filter((r) => r.status === "FILLED").length,
     rejected: requisitions.filter((r) => r.status === "REJECTED").length,
+    openPositions: requisitions.reduce((sum, r) => sum + (r.openings || 0), 0),
+    filledPositions: requisitions.reduce((sum, r) => sum + Math.min(r.filled_count || 0, r.openings || 0), 0),
   }), [requisitions]);
 
   const filtered = useMemo(() => {
@@ -1188,6 +1220,7 @@ const RecruitmentAdmin = () => {
             `📋 ${stats.total} Requisitions`,
             `⏳ ${stats.pending} Pending`,
             `✅ ${stats.approved} Approved`,
+            `🧑‍🤝‍🧑 ${stats.filledPositions}/${stats.openPositions} Positions Filled`,
             ...(stats.rejected > 0 ? [`❌ ${stats.rejected} Rejected`] : []),
           ].map((chip) => (
             <span key={chip} className="bg-white/10 border border-white/15 rounded-full px-3.5 py-1 text-[11px] text-white/85 font-medium">{chip}</span>
@@ -1195,11 +1228,12 @@ const RecruitmentAdmin = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         {[
           { label: "Total Requisitions", val: stats.total,    icon: <FaBriefcase size={15} />, color: "#730042", bg: "#f7edf3", stripe: "#730042" },
           { label: "Pending Review",     val: stats.pending,  icon: <FaClock size={15} />,     color: "#b8760a", bg: "#fff8e1", stripe: "#b8760a" },
           { label: "Approved",           val: stats.approved, icon: <FaCheckCircle size={15} />,color: "#0d9e6e", bg: "#e8f7f1", stripe: "#0d9e6e" },
+          { label: "Positions Filled",   val: `${stats.filledPositions}/${stats.openPositions}`, icon: <FaUsers size={15} />, color: "#0f766e", bg: "#f0fdfa", stripe: "#0f766e" },
           { label: "Rejected",           val: stats.rejected, icon: <FaTimesCircle size={15} />,color: "#d93025", bg: "#fbeaea", stripe: "#d93025" },
         ].map((s, i) => (
           <div key={i} className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm relative overflow-hidden hover:-translate-y-0.5 hover:shadow-md transition-all">
@@ -1227,7 +1261,7 @@ const RecruitmentAdmin = () => {
                   onChange={(e) => setStatusFilter(e.target.value)}
                 >
                   <option value="ALL">All Status</option>
-                  {["PENDING", "APPROVED", "REJECTED", "ON_HOLD", "REVISION_REQUIRED"].map((s) => (
+                  {["PENDING", "APPROVED", "FILLED", "REJECTED", "ON_HOLD", "REVISION_REQUIRED"].map((s) => (
                     <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
                   ))}
                 </select>
@@ -1247,7 +1281,7 @@ const RecruitmentAdmin = () => {
               <table className="w-full min-w-[700px]">
                 <thead>
                   <tr className="bg-[#fdf5f9]">
-                    {["Job Role", "Department", "Openings", "Priority", "Status", "Requested By", "Date", "Actions"].map((h) => (
+                    {["Job Role", "Department", "Openings (Filled/Total)", "Priority", "Status", "Requested By", "Date", "Actions"].map((h) => (
                       <th key={h} className="text-left px-4 py-3 text-[10px] font-semibold tracking-widest text-gray-400 uppercase border-b border-gray-100">{h}</th>
                     ))}
                   </tr>
@@ -1262,10 +1296,23 @@ const RecruitmentAdmin = () => {
                       <tr key={item._id} className="border-b border-gray-50 hover:bg-[#fdf5f9] transition-colors">
                         <td className="px-4 py-3.5">
                           <div className="text-sm font-semibold text-gray-800">{item.job_title}</div>
-                          <div className="text-[11px] text-gray-400 mt-0.5">{item.employment_type}</div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[11px] text-gray-400">{item.employment_type}</span>
+                            <span className="text-gray-200">·</span>
+                            <button
+                              onClick={() => setDetailModal(item)}
+                              className="text-[11px] font-semibold text-gray-400 hover:text-[#730042] transition-colors underline-offset-2 hover:underline"
+                            >
+                              Details
+                            </button>
+                          </div>
                         </td>
                         <td className="px-4 py-3.5 text-xs text-gray-600">{DEPT_LABELS[item.department] || item.department}</td>
-                        <td className="px-4 py-3.5 text-center font-bold text-gray-800 text-sm">{item.openings}</td>
+                        <td className="px-4 py-3.5">
+                          <div className="flex justify-center">
+                            <OpeningsBadge requisition={item} />
+                          </div>
+                        </td>
                         <td className="px-4 py-3.5"><PriorityPill priority={item.priority} /></td>
                         <td className="px-4 py-3.5"><StatusPill status={item.status} /></td>
                         <td className="px-4 py-3.5">
@@ -1274,30 +1321,28 @@ const RecruitmentAdmin = () => {
                         </td>
                         <td className="px-4 py-3.5 text-xs text-gray-400">{fmtDate(item.createdAt)}</td>
                         <td className="px-4 py-3.5">
-                          <div className="flex gap-1.5 flex-wrap">
+                          {item.status === "PENDING" ? (
+                            <button
+                              onClick={() => setManageModal(item)}
+                              className="w-full text-[11px] font-semibold px-3 py-1.5 bg-[#730042] text-white rounded-lg hover:bg-[#4a0029] transition-all whitespace-nowrap"
+                            >
+                              Manage
+                            </button>
+                          ) : canViewCandidates && (item.status === "APPROVED" || item.status === "FILLED") ? (
+                            <button
+                              onClick={() => setHiringModal(item)}
+                              className="w-full flex items-center justify-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all whitespace-nowrap"
+                            >
+                              <FaUsers size={9} /> {item.status === "FILLED" ? "View Hiring" : "Manage Hiring"}
+                            </button>
+                          ) : (
                             <button
                               onClick={() => setDetailModal(item)}
-                              className="text-[11px] font-semibold px-2.5 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:border-[#730042] hover:text-[#730042] transition-colors flex items-center gap-1"
+                              className="w-full flex items-center justify-center gap-1 text-[11px] font-semibold px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:border-[#730042] hover:text-[#730042] transition-colors whitespace-nowrap"
                             >
                               <FaChevronRight size={8} /> Details
                             </button>
-                            {canViewCandidates && item.status === "APPROVED" && (
-                              <button
-                                onClick={() => setHiringModal(item)}
-                                className="text-[11px] font-semibold px-2.5 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all flex items-center gap-1"
-                              >
-                                <FaUsers size={9} /> Hiring
-                              </button>
-                            )}
-                            {item.status === "PENDING" && (
-                              <button
-                                onClick={() => setManageModal(item)}
-                                className="text-[11px] font-semibold px-2.5 py-1.5 bg-[#730042] text-white rounded-lg hover:bg-[#4a0029] transition-all"
-                              >
-                                Manage
-                              </button>
-                            )}
-                          </div>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -1362,6 +1407,7 @@ const RecruitmentAdmin = () => {
               {[
                 { step: "PENDING",           color: "bg-amber-400",  desc: "Submitted by manager, awaits admin review" },
                 { step: "APPROVED",          color: "bg-emerald-500", desc: "Approved — candidates can be added" },
+                { step: "FILLED",            color: "bg-teal-500",   desc: "All openings filled — auto-closes hiring" },
                 { step: "ON HOLD",           color: "bg-orange-400", desc: "Temporarily paused by admin" },
                 { step: "REVISION REQUIRED", color: "bg-blue-500",   desc: "Manager must revise and resubmit" },
                 { step: "REJECTED",          color: "bg-red-500",    desc: "Closed — requisition not accepted" },
