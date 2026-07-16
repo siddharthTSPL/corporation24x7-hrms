@@ -34,8 +34,7 @@ export function resolveAttendanceStatus(record, { isToday = false } = {}) {
   if (record.checkOut) {
     const s = (record.status || "").toLowerCase();
     if (s.includes("half")) return "halfday";
-    if (s === "present") return "present";
-    if (s === "late") return "late";
+    if (s === "present") return record.isLate ? "late" : "present";
     return "absent";
   }
 
