@@ -718,10 +718,9 @@ export default function SuperAdminOrgChart() {
   const [searchOpen,  setSearchOpen]  = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selected,    setSelected]    = useState(null);
-  const [exportOpen,  setExportOpen]  = useState(false);
   const [exporting,   setExporting]   = useState(false);
+  const [exportDone,  setExportDone]  = useState(false);
   const inputRef = useRef(null);
-  const exportBtnRef = useRef(null);
   const treeRef = useRef(null);
 
   const superAdmin = saData?.superAdmin || saData;
@@ -755,7 +754,7 @@ export default function SuperAdminOrgChart() {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); setSelected(null); setExportOpen(false); }
+      if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); setSelected(null); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -764,15 +763,6 @@ export default function SuperAdminOrgChart() {
   useEffect(() => {
     if (searchOpen) setTimeout(() => inputRef.current?.focus(), 40);
   }, [searchOpen]);
-
-  useEffect(() => {
-    if (!exportOpen) return;
-    const onClickAway = (e) => {
-      if (exportBtnRef.current && !exportBtnRef.current.contains(e.target)) setExportOpen(false);
-    };
-    document.addEventListener("mousedown", onClickAway);
-    return () => document.removeEventListener("mousedown", onClickAway);
-  }, [exportOpen]);
 
   function buildCsvRows() {
     const rows = [["Role", "Emp ID", "Name", "Email", "Phone", "Department", "Designation", "Office Location", "Reports To"]];
@@ -807,11 +797,10 @@ export default function SuperAdminOrgChart() {
     const csv = rows.map((r) => r.map(csvCell).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     downloadBlob(blob, `${normalize(orgName).replace(/\s+/g, "-") || "organisation"}-org-chart-${Date.now()}.csv`);
-    setExportOpen(false);
   }
 
   async function exportPng() {
-    if (!treeRef.current) return;
+    if (!treeRef.current || exporting) return;
     setExporting(true);
     try {
       await loadScript(HTML_TO_IMAGE_CDN);
@@ -825,12 +814,13 @@ export default function SuperAdminOrgChart() {
       const res = await fetch(dataUrl);
       const blob = await res.blob();
       downloadBlob(blob, `${normalize(orgName).replace(/\s+/g, "-") || "organisation"}-org-chart-${Date.now()}.png`);
+      setExportDone(true);
+      setTimeout(() => setExportDone(false), 2600);
     } catch (err) {
       treeRef.current?.classList.remove("su-export-flat");
       window.alert("Could not generate the image export. Please try again.");
     } finally {
       setExporting(false);
-      setExportOpen(false);
     }
   }
 
@@ -899,16 +889,66 @@ export default function SuperAdminOrgChart() {
                 </button>
               </div>
             ) : (
-              <button
-                className="flex items-center gap-1.5 px-3 sm:px-4 h-10 sm:h-9 rounded-lg border border-gray-200 bg-white text-gray-600 text-xs font-medium hover:bg-gray-50 shrink-0 min-w-[44px]"
-                onClick={() => setSearchOpen(true)}
-              >
-                <svg className="w-3 h-3" viewBox="0 0 13 13" fill="none">
-                  <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.3" />
-                  <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                </svg>
-                <span>Search</span>
-              </button>
+              <>
+                <button
+                  className="flex items-center gap-1.5 px-3 sm:px-4 h-10 sm:h-9 rounded-lg border border-gray-200 bg-white text-gray-600 text-xs font-medium hover:bg-gray-50 shrink-0 min-w-[44px]"
+                  onClick={() => setSearchOpen(true)}
+                >
+                  <svg className="w-3 h-3" viewBox="0 0 13 13" fill="none">
+                    <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.3" />
+                    <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                  </svg>
+                  <span>Search</span>
+                </button>
+                <button
+  className="flex items-center gap-1.5 px-3 sm:px-4 h-10 sm:h-9 rounded-lg border border-black bg-black/10 text-black text-xs font-medium transition-all duration-300 hover:bg-black hover:text-white hover:border-black shrink-0 min-w-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
+  onClick={exportPng}
+  disabled={loading || exporting}
+>
+  {exporting ? (
+    <>
+      <svg
+        className="w-3.5 h-3.5 animate-spin"
+        viewBox="0 0 24 24"
+        fill="none"
+      >
+        <circle
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          strokeWidth="3"
+          opacity="0.25"
+        />
+        <path
+          d="M12 2a10 10 0 0 1 10 10"
+          stroke="currentColor"
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+      </svg>
+      <span className="hidden sm:inline">Exporting…</span>
+    </>
+  ) : (
+    <>
+      <svg
+        className="w-3.5 h-3.5"
+        viewBox="0 0 16 16"
+        fill="none"
+      >
+        <path
+          d="M8 2v8m0 0L5 7m3 3l3-3M3 12.5h10"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <span className="hidden sm:inline">Export PNG</span>
+    </>
+  )}
+</button>
+              </>
             )}
           </div>
         </div>
@@ -1013,6 +1053,18 @@ export default function SuperAdminOrgChart() {
           type={selected.type}
           onClose={() => setSelected(null)}
         />
+      )}
+
+      {exportDone && (
+        <div
+          className="fixed bottom-4 right-4 left-4 sm:left-auto z-[9999] flex items-center justify-center sm:justify-start gap-2 px-4 py-3 rounded-lg bg-slate-900 text-white text-sm font-medium shadow-2xl"
+          style={{ animation: "fadeIn 0.2s ease forwards" }}
+        >
+          <svg className="w-4 h-4 text-green-400 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z" clipRule="evenodd" />
+          </svg>
+          PNG exported!
+        </div>
       )}
     </div>
   );
