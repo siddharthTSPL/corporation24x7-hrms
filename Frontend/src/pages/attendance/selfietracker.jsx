@@ -9,6 +9,7 @@ export default function SelfieCapture({ onCapture, onCancel }) {
   const [snapshot, setSnapshot] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [timer,    setTimer]    = useState(null);
+  const countdownRef = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -74,13 +75,17 @@ export default function SelfieCapture({ onCapture, onCancel }) {
       count -= 1;
       if (count <= 0) {
         clearInterval(id);
+        countdownRef.current = null;
         setTimer(null);
         doCapture();
       } else {
         setTimer(count);
       }
     }, 1000);
+    countdownRef.current = id;
   }, [doCapture]);
+
+  useEffect(() => () => { if (countdownRef.current) clearInterval(countdownRef.current); }, []);
 
   const retake = useCallback(async () => {
     setSnapshot(null);
