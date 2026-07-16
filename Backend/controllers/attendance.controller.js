@@ -111,23 +111,35 @@ const checkin = async (req, res) => {
       });
     }
 
-    const newAttendance = await Attendance.create({
-      organisation_id,
-      employee: userId,
-      onModel: getOnModel(user.role),
-      role: user.role,
-      date: today,
-      checkIn: new Date(),
-      latitude,
-      longitude,
-      selfie,
-      shift: shift._id,
-      isLate,
-      activeMinutes: 0,
-      idleMinutes: 0,
-      lastUpdated: Date.now(),
-      source: "manual",
-    });
+    let newAttendance;
+    try {
+      newAttendance = await Attendance.create({
+        organisation_id,
+        employee: userId,
+        onModel: getOnModel(user.role),
+        role: user.role,
+        date: today,
+        checkIn: new Date(),
+        latitude,
+        longitude,
+        selfie,
+        shift: shift._id,
+        isLate,
+        activeMinutes: 0,
+        idleMinutes: 0,
+        lastUpdated: Date.now(),
+        source: "manual",
+      });
+    } catch (createErr) {
+      // Another request (e.g. the desktop agent's ping) created today's
+      // record in the tiny window between our findOne above and this
+      // create() - re-fetch instead of failing the check-in.
+      if (createErr.code === 11000) {
+        newAttendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
+      } else {
+        throw createErr;
+      }
+    }
 
     res.json({ message: "Check-in successful", attendance: newAttendance, isLate });
   } catch (error) {
@@ -151,19 +163,29 @@ const activity = async (req, res) => {
 
     if (!attendance) {
       const shift = await resolveEmployeeShift(user, organisation_id);
-      attendance = await Attendance.create({
-        organisation_id,
-        employee: userId,
-        onModel: getOnModel(user.role),
-        role: user.role,
-        date: today,
-        checkIn: new Date(),
-        shift: shift._id,
-        activeMinutes: 0,
-        idleMinutes: 0,
-        lastUpdated: Date.now(),
-        source: "agent",
-      });
+      try {
+        attendance = await Attendance.create({
+          organisation_id,
+          employee: userId,
+          onModel: getOnModel(user.role),
+          role: user.role,
+          date: today,
+          checkIn: new Date(),
+          shift: shift._id,
+          activeMinutes: 0,
+          idleMinutes: 0,
+          lastUpdated: Date.now(),
+          source: "agent",
+        });
+      } catch (createErr) {
+        if (createErr.code === 11000) {
+          // Someone else (manual/face check-in) created today's record a
+          // moment ago - fine, today already has a real record; nothing
+          // for this background ping to do.
+          return res.json({ message: "Activity started", activeMinutes: 0, idleMinutes: 0 });
+        }
+        throw createErr;
+      }
       return res.json({ message: "Activity started", activeMinutes: 0, idleMinutes: 0 });
     }
 
