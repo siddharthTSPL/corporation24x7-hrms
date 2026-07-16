@@ -783,6 +783,9 @@ const editmanager = async (req, res, next) => {
       role, office_location, designation, department, reporting_manager,
     } = req.body;
 
+    if (reporting_manager && reporting_manager.toString() === id.toString())
+      return next(Object.assign(new Error("A manager cannot report to themselves"), { statusCode: 400 }));
+
     const { reportingManagerId, reportingManagerModel } = await resolveReportingManager(
       reporting_manager,
       organisation_id
@@ -855,6 +858,7 @@ const promoteEmployeeToManager = async (req, res, next) => {
 
     const [newManager] = await Managermodel.create([{
       organisation_id,
+      empid: user.empid,
       uid: newUid,
       profile_image: user.profile_image || null,
       department: user.department,
@@ -990,8 +994,13 @@ const promoteManagerToAdmin = async (req, res, next) => {
     if (!superAdmin)
       return next(Object.assign(new Error("Organisation not found"), { statusCode: 404 }));
 
-    let resolvedReportingManagerId = null;
-    let resolvedReportingManagerModel = null;
+    if (reporting_manager && reporting_manager.toString() === id.toString())
+      return next(Object.assign(new Error("A manager cannot report to themselves"), { statusCode: 400 }));
+
+    // Default: a newly promoted Admin reports directly to the Super Admin unless
+    // a specific reporting manager/admin was explicitly chosen.
+    let resolvedReportingManagerId = superAdmin._id;
+    let resolvedReportingManagerModel = "SuperAdmin";
     if (reporting_manager) {
       const superAdminDoc = await SuperAdminModel.findById(reporting_manager).select("_id").lean();
       if (superAdminDoc) {
@@ -1014,6 +1023,7 @@ const promoteManagerToAdmin = async (req, res, next) => {
 
     const [newAdmin] = await Adminmodel.create([{
       organisation_id,
+      empid: manager.empid,
       uid: newUid,
       profile_image: manager.profile_image || null,
       department: manager.department,
@@ -1168,8 +1178,10 @@ const promoteEmployeeToAdmin = async (req, res, next) => {
     if (!superAdmin)
       return next(Object.assign(new Error("Organisation not found"), { statusCode: 404 }));
 
-    let resolvedReportingManagerId = null;
-    let resolvedReportingManagerModel = null;
+    // Default: a newly promoted Admin reports directly to the Super Admin unless
+    // a specific reporting manager/admin was explicitly chosen.
+    let resolvedReportingManagerId = superAdmin._id;
+    let resolvedReportingManagerModel = "SuperAdmin";
     if (reporting_manager) {
       const superAdminDoc = await SuperAdminModel.findById(reporting_manager).select("_id").lean();
       if (superAdminDoc) {
@@ -1192,6 +1204,7 @@ const promoteEmployeeToAdmin = async (req, res, next) => {
 
     const [newAdmin] = await Adminmodel.create([{
       organisation_id,
+      empid: user.empid,
       uid: newUid,
       profile_image: user.profile_image || null,
       department: user.department,
@@ -1346,6 +1359,7 @@ const demoteManagerToEmployee = async (req, res, next) => {
 
     const [newEmployee] = await Usermodel.create([{
       organisation_id,
+      empid: manager.empid,
       uid: newUid,
       profile_image: manager.profile_image || null,
       department: manager.department,
@@ -1489,6 +1503,9 @@ const demoteAdminToManager = async (req, res, next) => {
     if (existing)
       return next(Object.assign(new Error("A manager with this email already exists"), { statusCode: 400 }));
 
+    if (reporting_manager && reporting_manager.toString() === id.toString())
+      return next(Object.assign(new Error("A manager cannot report to themselves"), { statusCode: 400 }));
+
     const { reportingManagerId, reportingManagerModel } = await resolveReportingManager(
       reporting_manager, organisation_id
     );
@@ -1501,6 +1518,7 @@ const demoteAdminToManager = async (req, res, next) => {
 
     const [newManager] = await Managermodel.create([{
       organisation_id,
+      empid: adminToDemote.empid,
       uid: newUid,
       profile_image: adminToDemote.profile_image || null,
       department: adminToDemote.department,
@@ -1650,6 +1668,7 @@ const demoteAdminToEmployee = async (req, res, next) => {
 
     const [newEmployee] = await Usermodel.create([{
       organisation_id,
+      empid: adminToDemote.empid,
       uid: newUid,
       profile_image: adminToDemote.profile_image || null,
       department: adminToDemote.department,
