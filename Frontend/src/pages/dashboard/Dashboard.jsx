@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
-import { useGetAllEmployee, useGetTodayCheckins } from "../../auth/server-state/adminother/adminother.hook";
+import { useGetAllEmployee, useGetTodayCheckins, useGetAttendanceHistory } from "../../auth/server-state/adminother/adminother.hook";
 import {
   useGetForwardedLeaves,
   useAcceptLeave,
@@ -11,7 +11,7 @@ import {
 import { useAdminGetMyWFH } from "../../auth/server-state/adminwfh/adminwfh.hook";
 import { useTodayAttendance, useCalendarMeta } from "../../auth/server-state/attendance/attendance.hook";
 import AttendanceModal from "./AttendanceModal";
-import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus } from "../../pages/utils/attendance";
+import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus } from "../../utils/attendance";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS = ["S","M","T","W","T","F","S"];
@@ -779,6 +779,7 @@ export default function Dashboard() {
   const { data:meData, isLoading:meLoading, isError:meError }=useGetMeAdmin();
   const { data:histData, isLoading:histLoading }=useAdminGetMyLeaveHistory();
   const { data:attData, isLoading:attLoading }=useTodayAttendance();
+  const { data:attHistoryData }=useGetAttendanceHistory();
   const { data:wfhData, isLoading:wfhLoading }=useAdminGetMyWFH();
   const { data:empData, isLoading:empLoading }=useGetAllEmployee();
   const { data:checkinData, isLoading:mapLoading }=useGetTodayCheckins();
@@ -815,10 +816,10 @@ export default function Dashboard() {
   const isCheckedOut = attData?.isCheckedOut ?? false;
 
   const attendanceMap=useMemo(()=>{
-    const records=Array.isArray(attData?.history)?attData.history:Array.isArray(attData)?attData:[];
+    const records=Array.isArray(attHistoryData?.attendance)?attHistoryData.attendance:[];
     const all = myAtt?.date ? [...records, myAtt] : records;
     return buildAttendanceMap(all);
-  },[attData, myAtt]);
+  },[attHistoryData, myAtt]);
 
   const approvedLeaves=useMemo(()=>allLeaves.filter(lv=>APPROVED_STATUSES.includes(lv.status)),[allLeaves]);
 
