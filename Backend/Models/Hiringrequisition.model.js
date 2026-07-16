@@ -31,6 +31,12 @@ const hiringRequisitionSchema = new mongoose.Schema(
       min: 1,
     },
 
+    filled_count: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
     employment_type: {
       type: String,
       enum: ["Full Time", "Part Time", "Contract", "Internship"],
@@ -87,7 +93,7 @@ const hiringRequisitionSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["PENDING", "APPROVED", "REJECTED", "ON_HOLD", "REVISION_REQUIRED"],
+      enum: ["PENDING", "APPROVED", "REJECTED", "ON_HOLD", "REVISION_REQUIRED", "FILLED"],
       default: "PENDING",
     },
 
