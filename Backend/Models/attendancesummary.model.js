@@ -33,6 +33,6 @@ const summarySchema = new mongoose.Schema({
   },
 });
 
-summarySchema.index({ employee: 1, year: 1, month: 1 }, { unique: true });
+summarySchema.index({ employee: 1, role: 1, year: 1, month: 1 }, { unique: true });
 
 module.exports = mongoose.model("AttendanceSummary", summarySchema);

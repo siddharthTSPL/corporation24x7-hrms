@@ -11,6 +11,7 @@ const {
   verifyAdmin,
   adminlogin,
   adminlogout,
+  getMyAttendanceHistory,
   addmanager,
   addemployee,
   findallmanagers,
@@ -91,6 +92,7 @@ adminrouter.post("/resetpassword", asyncHandler(resetAdminPassword));
 
 adminrouter.post("/logout", adminauthmiddleware, asyncHandler(adminlogout));
 adminrouter.get("/getme", adminauthmiddleware, asyncHandler(getme));
+adminrouter.get("/getattendance", adminauthmiddleware, asyncHandler(getMyAttendanceHistory));
 adminrouter.put(
   "/editadminprofile",
   adminauthmiddleware,

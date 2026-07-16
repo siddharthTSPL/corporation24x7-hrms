@@ -6,7 +6,7 @@ import { useGetAllManagerLeaves } from "../../auth/server-state/manager/managerl
 import { useGetAttendance } from "../../auth/server-state/manager/managgerother/managerother.hook";
 import { useGetMyLeavesManager } from "../../auth/server-state/manager/managerleave/managerleave.hook";
 import { useCalendarMeta, useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
-import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus } from "../../pages/utils/attendance";
+import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus } from "../../utils/attendance";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS   = ["S","M","T","W","T","F","S"];
@@ -948,6 +948,19 @@ export default function ManagerDashboard() {
       ? (() => { const d = new Date(joiningDate); d.setHours(0,0,0,0); return d; })()
       : null;
 
+    const weekOffSet = new Set(
+      (calMeta?.weekOffDates ?? [])
+        .map(ds => new Date(ds))
+        .filter(d => d.getFullYear() === year && d.getMonth() === selectedMonth)
+        .map(d => d.getDate())
+    );
+    const holidaySet = new Set(
+      (calMeta?.holidays ?? [])
+        .map(h => new Date(h.date))
+        .filter(d => d.getFullYear() === year && d.getMonth() === selectedMonth)
+        .map(d => d.getDate())
+    );
+
     let present = 0, absent = 0, half = 0, checkedIn = 0, counted = 0;
 
     const daysInMonth = new Date(year, selectedMonth + 1, 0).getDate();
@@ -957,6 +970,7 @@ export default function ManagerDashboard() {
       date.setHours(0,0,0,0);
       if (date > today) break;
       if (joiningMidnight && date < joiningMidnight) continue;
+      if (weekOffSet.has(d) || holidaySet.has(d)) continue;
 
       const isOwnLeave = myOwnAppliedLeaves.some(lv => {
         const start = lv.startDate || lv.start_date;
@@ -979,7 +993,7 @@ export default function ManagerDashboard() {
 
     const rate = counted > 0 ? Math.round(((present + checkedIn) / counted) * 100) : 0;
     return { presentCount: present, absentCount: absent, halfCount: half, checkedInCount: checkedIn, attendanceRate: rate };
-  }, [attendanceMap, selectedMonth, myOwnAppliedLeaves, joiningDate]);
+  }, [attendanceMap, selectedMonth, myOwnAppliedLeaves, joiningDate, calMeta]);
 
   const allEmployeeLeaves = useMemo(() => {
     if (Array.isArray(histData)) return histData;

@@ -7,7 +7,7 @@ import {
   promoteEmployeeToAdmin, promoteManagerToAdmin, getTodayLeaves,
   getAllPersonalDocuments, getAllExpenseDocuments, getDocumentDetails,
   adminActionOnLeave, setEmployeeWorkingStatus, setManagerWorkingStatus,
-  getInactiveUsers, getActiveUserCount, getAllAdmins
+  getInactiveUsers, getActiveUserCount, getAllAdmins, getAttendanceHistory
 } from "../../api/adminapi/other/ad.other.api";
 
 export const useGetAllEmployee = () => {
@@ -309,5 +309,13 @@ export const useGetAllAdmins = () => {
     staleTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+  });
+};
+
+export const useGetAttendanceHistory = () => {
+  return useQuery({
+    queryKey: ["attendance", "admin-history"],
+    queryFn: getAttendanceHistory,
+    staleTime: 2 * 60 * 1000,
   });
 };

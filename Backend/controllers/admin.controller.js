@@ -3474,10 +3474,27 @@ const getAllAdminsForOrg = async (req, res, next) => {
     next(error);
   }
 };
+const getMyAttendanceHistory = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+    const attendance = await Attendance.find({
+      employee: req.admin._id,
+      organisation_id: req.admin.organisation_id,
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+    res.status(200).json({ success: true, count: attendance.length, attendance });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   verifyAdmin,
   adminlogin,
   adminlogout,
+  getMyAttendanceHistory,
   addmanager,
   addemployee,
   findallmanagers,

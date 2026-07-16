@@ -3,7 +3,7 @@ const AdminModel = require("../Models/Admin.model");
 const Shift = require("../Models/shift.model");
 const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
 const { resolveEmployeeShift, evaluateCheckinWindow, evaluateCheckoutWindow, getShiftThresholds, getForceCheckoutInstant } = require("../utils/shift.utils");
-const { isHoliday, isWeekOff, startOfDay } = require("../automatic/weekoffcalendar");
+const { isHoliday, isWeekOff, startOfDay, getWeekOffMapForRange } = require("../automatic/weekoffcalendar");
 const { getISTDateParts, istDateFromYMD, toISTKey } = require("../utils/Istdate.utils");
 
 const getUserId = (user) => user._id || user.id;
@@ -111,23 +111,35 @@ const checkin = async (req, res) => {
       });
     }
 
-    const newAttendance = await Attendance.create({
-      organisation_id,
-      employee: userId,
-      onModel: getOnModel(user.role),
-      role: user.role,
-      date: today,
-      checkIn: new Date(),
-      latitude,
-      longitude,
-      selfie,
-      shift: shift._id,
-      isLate,
-      activeMinutes: 0,
-      idleMinutes: 0,
-      lastUpdated: Date.now(),
-      source: "manual",
-    });
+    let newAttendance;
+    try {
+      newAttendance = await Attendance.create({
+        organisation_id,
+        employee: userId,
+        onModel: getOnModel(user.role),
+        role: user.role,
+        date: today,
+        checkIn: new Date(),
+        latitude,
+        longitude,
+        selfie,
+        shift: shift._id,
+        isLate,
+        activeMinutes: 0,
+        idleMinutes: 0,
+        lastUpdated: Date.now(),
+        source: "manual",
+      });
+    } catch (createErr) {
+      // Another request (e.g. the desktop agent's ping) created today's
+      // record in the tiny window between our findOne above and this
+      // create() - re-fetch instead of failing the check-in.
+      if (createErr.code === 11000) {
+        newAttendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
+      } else {
+        throw createErr;
+      }
+    }
 
     res.json({ message: "Check-in successful", attendance: newAttendance, isLate });
   } catch (error) {
@@ -151,19 +163,29 @@ const activity = async (req, res) => {
 
     if (!attendance) {
       const shift = await resolveEmployeeShift(user, organisation_id);
-      attendance = await Attendance.create({
-        organisation_id,
-        employee: userId,
-        onModel: getOnModel(user.role),
-        role: user.role,
-        date: today,
-        checkIn: new Date(),
-        shift: shift._id,
-        activeMinutes: 0,
-        idleMinutes: 0,
-        lastUpdated: Date.now(),
-        source: "agent",
-      });
+      try {
+        attendance = await Attendance.create({
+          organisation_id,
+          employee: userId,
+          onModel: getOnModel(user.role),
+          role: user.role,
+          date: today,
+          checkIn: new Date(),
+          shift: shift._id,
+          activeMinutes: 0,
+          idleMinutes: 0,
+          lastUpdated: Date.now(),
+          source: "agent",
+        });
+      } catch (createErr) {
+        if (createErr.code === 11000) {
+          // Someone else (manual/face check-in) created today's record a
+          // moment ago - fine, today already has a real record; nothing
+          // for this background ping to do.
+          return res.json({ message: "Activity started", activeMinutes: 0, idleMinutes: 0 });
+        }
+        throw createErr;
+      }
       return res.json({ message: "Activity started", activeMinutes: 0, idleMinutes: 0 });
     }
 
@@ -426,17 +448,20 @@ const getCalendarMeta = async (req, res) => {
     const holidays = holidayDocs.map((h) => ({ date: toKey(h.date), name: h.name }));
 
     const weekOffDates = [];
+    const weekOffMap = await getWeekOffMapForRange(monthStart, monthEnd, organisation_id, userId, employeeModel);
     for (let d = 1; d <= daysInMonth; d++) {
-      const date = istDateFromYMD(year, month, d);
-      const result = await isWeekOff(date, organisation_id, userId, employeeModel);
-      if (result.isOff) weekOffDates.push(`${year}-${pad2(month)}-${pad2(d)}`);
+      const key = `${year}-${pad2(month)}-${pad2(d)}`;
+      const result = weekOffMap.get(key);
+      if (result?.isOff) weekOffDates.push(key);
     }
 
     // ---- Today block ----
     const today0 = startOfDay(now);
     const todayKey = toKey(today0);
     const todayHoliday = await isHoliday(today0, organisation_id);
-    const todayWeekOff = await isWeekOff(today0, organisation_id, userId, employeeModel);
+    const todayWeekOff = (today0 >= monthStart && today0 <= monthEnd)
+      ? (weekOffMap.get(todayKey) ?? { isOff: false, reason: "unconfigured", unconfigured: true })
+      : await isWeekOff(today0, organisation_id, userId, employeeModel);
     const shift = await resolveEmployeeShift(user, organisation_id);
     const { allowed: withinShiftWindow, tooLate: checkinTooLate } = evaluateCheckinWindow(shift, now);
 
