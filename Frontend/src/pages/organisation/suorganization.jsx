@@ -69,6 +69,105 @@ const STYLES = `
   .su-scroll::-webkit-scrollbar-track { background:transparent; }
   .su-scroll::-webkit-scrollbar-thumb { background:#dde3ec; border-radius:6px; }
   .su-scroll { -webkit-overflow-scrolling: touch; }
+
+  /* ---------- Self-adjusting org-chart connector system ----------
+     These rules replace the old fixed-pixel VLine/HLine calculations.
+     Every connector is percentage/relative based, so it stays correctly
+     aligned at any breakpoint and automatically extends to however many
+     admins / managers / employees are rendered - no width math needed.
+
+     Connector segments are widened (via calc()+negative margin driven by
+     the per-gap --org-gap custom property) so each child's horizontal
+     spine reaches all the way to its own outer box edge - i.e. exactly
+     where the neighbouring sibling's box begins - instead of stopping at
+     the inner edge of its own padding. That removes the small seam/gap
+     that used to appear where two siblings' spines were supposed to
+     meet, for any number of siblings at any breakpoint. */
+
+  .org-tree-root { display: flex; flex-direction: column; align-items: center; }
+
+  .org-branch { display: flex; flex-direction: column; align-items: center; position: relative; min-width: 0; }
+
+  .org-branch-trunk {
+    width: 1.5px;
+    flex-shrink: 0;
+    background: linear-gradient(to bottom, #dde3ec, #c8d2e0);
+    transform-origin: top;
+    animation: drawV 0.25s ease forwards;
+  }
+
+  .org-branch-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    justify-content: center;
+    position: relative;
+  }
+
+  .org-branch-child {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 0;
+  }
+/* Spacing between siblings is applied as padding on each child (not a
+     flex 'gap') so the connector segments below - which are sized to
+     100% of the child's own box - stay flush against their neighbours
+     and the horizontal spine no longer breaks at each gap. The gap
+     amount is also stored in --org-gap so the connector itself can
+     expand past the padding and meet its neighbour with zero seam. */
+  .org-branch-child.org-gap-sm { --org-gap: 4px; padding: 0 var(--org-gap); }
+  @media (min-width:640px) { .org-branch-child.org-gap-sm { --org-gap: 6px; } }
+  @media (min-width:768px) { .org-branch-child.org-gap-sm { --org-gap: 7px; } }
+
+  .org-branch-child.org-gap-md { --org-gap: 6px; padding: 0 var(--org-gap); }
+  @media (min-width:640px) { .org-branch-child.org-gap-md { --org-gap: 10px; } }
+  @media (min-width:768px) { .org-branch-child.org-gap-md { --org-gap: 14px; } }
+
+  .org-branch-child.org-gap-lg { --org-gap: 6px; padding: 0 var(--org-gap); }
+  @media (min-width:640px) { .org-branch-child.org-gap-lg { --org-gap: 7px; } }
+  @media (min-width:768px) { .org-branch-child.org-gap-lg { --org-gap: 8px; } }
+
+  .org-branch-child-connector {
+    position: relative;
+    width: calc(100% + (2 * var(--org-gap, 0px)));
+    margin-left: calc(0 * var(--org-gap, 0px));
+    height: 18px;
+    flex-shrink: 0;
+  }
+
+  .org-branch-child-connector::before,
+  .org-branch-child-connector::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    height: 1.5px;
+    width: 50%;
+    background: #dde3ec;
+  }
+  .org-branch-child-connector::before { left: 0; }
+  .org-branch-child-connector::after  { right: 0; }
+
+  .org-branch-child-connector .org-vline {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1.5px;
+    height: 22px;
+    background: #dde3ec;
+  }
+
+  /* single child: no horizontal spine needed, just the straight drop line */
+  .org-branch-child.org-only .org-branch-child-connector::before,
+  .org-branch-child.org-only .org-branch-child-connector::after {
+    background: transparent;
+  }
+  /* first/last child: no spine sticking out past the outermost nodes */
+  .org-branch-child.org-first .org-branch-child-connector::before { background: transparent; }
+  .org-branch-child.org-last  .org-branch-child-connector::after  { background: transparent; }
 `;
 
 const BRAND       = "#730042";
@@ -137,21 +236,41 @@ function Skeleton({ w, h, r = 8 }) {
   );
 }
 
-function VLine({ h = 32, delay = 0 }) {
-  return (
-    <div
-      className="shrink-0 origin-top mx-auto"
-      style={{ width: 1.5, height: h, background: "linear-gradient(to bottom, #dde3ec, #c8d2e0)", animation: `drawV 0.25s ease ${delay}ms forwards`, transform: "scaleY(0)" }}
-    />
-  );
+/* ---------- Generic tree-connector helpers ----------
+   TreeTrunk draws the single vertical line from a parent node down to
+   the row of its children.
+   TreeBranch draws a row of children, automatically giving each child
+   the correct half-spine connector (first / middle / last / only),
+   regardless of how many children there are or how wide they render
+   at any breakpoint. Add or remove nodes freely - nothing here needs
+   to be recalculated by hand. */
+
+function TreeTrunk({ height = 22 }) {
+  return <div className="org-branch-trunk" style={{ height }} />;
 }
 
-function HLine({ w, delay = 0 }) {
+function TreeBranch({ children, gapClass = "" }) {
+  const items = (Array.isArray(children) ? children : [children]).filter(Boolean);
+  if (items.length === 0) return null;
+
   return (
-    <div
-      className="shrink-0 origin-center"
-      style={{ width: w, height: 1.5, background: "#dde3ec", animation: `drawH 0.3s ease ${delay}ms forwards`, transform: "scaleX(0)" }}
-    />
+    <div className="org-branch-row">
+      {items.map((item, i) => {
+        const posCls =
+          items.length === 1 ? "org-only" :
+          i === 0 ? "org-first" :
+          i === items.length - 1 ? "org-last" :
+          "org-mid";
+        return (
+          <div key={item?.key ?? i} className={`org-branch-child ${posCls} ${gapClass}`}>
+            <div className="org-branch-child-connector">
+              <span className="org-vline" />
+            </div>
+            {item}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -288,13 +407,13 @@ function SkeletonTree() {
     <div className="flex flex-col items-center gap-0 w-full min-w-0">
       <Skeleton w={164} h={110} r={16} />
       <div className="w-1.5 h-6 sm:h-7 bg-gray-200 mx-auto" />
-      <div className="flex gap-3 sm:gap-4 md:gap-5 justify-center w-full min-w-0 flex-wrap">
+      <div className="flex gap-3 sm:gap-4 md:gap-5 justify-center w-full min-w-0">
         {[1, 2, 3].map(i => (
           <div key={i} className="flex flex-col items-center min-w-0">
             <div className="w-1.5 h-4 sm:h-5 bg-gray-200 mx-auto" />
             <Skeleton w={136} h={92} r={13} />
             <div className="w-1.5 h-4 sm:h-5 bg-gray-200 mx-auto" />
-            <div className="flex gap-2 sm:gap-2.5 md:gap-3.5 justify-center w-full min-w-0 flex-wrap">
+            <div className="flex gap-2 sm:gap-2.5 md:gap-3.5 justify-center w-full min-w-0">
               {[1, 2].map(j => (
                 <div key={j} className="flex flex-col items-center min-w-0">
                   <div className="w-1.5 h-3 sm:h-4 bg-gray-200 mx-auto" />
@@ -519,7 +638,11 @@ function ReviewsTab({ uid, role }) {
   );
 }
 
-function ManagerBranch({ manager, allManagers, employees, depth, delayBase, matchName, hasQ, parentMatched, onNodeClick }) {
+/* ManagerBranch renders a manager node plus (recursively) any sub-managers
+   and employees under it. Line drawing is fully delegated to TreeTrunk /
+   TreeBranch above, so this component no longer needs to compute pixel
+   widths or depth-based offsets - it scales to any number of children. */
+function ManagerBranch({ manager, allManagers, employees, matchName, hasQ, parentMatched, onNodeClick, delay = 0 }) {
   const mgrMatch  = hasQ && matchName(manager.f_name, manager.l_name, manager.department, manager.designation);
   const mgrDimmed = hasQ && !mgrMatch && !parentMatched;
   const mgrId = idStr(manager._id);
@@ -527,81 +650,54 @@ function ManagerBranch({ manager, allManagers, employees, depth, delayBase, matc
   const subManagers = allManagers.filter((m) => idStr(m.reporting_manager) === mgrId && m.reporting_manager_model === "Manager");
   const mgrEmps = employees.filter((e) => idStr(e.Under_manager) === mgrId);
 
-  const childCount = subManagers.length + mgrEmps.length;
-  const CHILD_GAP = depth > 0 ? 10 : 8;
-  const SUB_W = 118;
-  const EMP_W = 100;
-
-  const subTotalW = subManagers.length > 1 ? (subManagers.length - 1) * (SUB_W + CHILD_GAP) : 0;
-  const empTotalW = mgrEmps.length > 1 ? (mgrEmps.length - 1) * (EMP_W + CHILD_GAP) : 0;
+  const hasChildren = subManagers.length > 0 || mgrEmps.length > 0;
 
   return (
-    <div className="flex flex-col items-center min-w-0">
-      <VLine h={18} delay={delayBase - 55} />
+    <div className="org-branch">
       <ManagerNode
         manager={manager}
-        delay={delayBase}
+        delay={delay}
         highlighted={mgrMatch}
         dimmed={mgrDimmed}
         onClick={() => onNodeClick(manager, "manager")}
       />
 
-      {subManagers.length > 0 && (
+      {hasChildren && (
         <>
-          <VLine h={20} delay={delayBase + 100} />
-          {subManagers.length > 1 && <HLine w={subTotalW} delay={delayBase + 140} />}
-        </>
-      )}
-
-      {subManagers.length > 0 && (
-        <div className="flex gap-2 sm:gap-3 md:gap-3.5 justify-center items-start min-w-0 flex-wrap">
-          {subManagers.map((sub, si) => (
-            <ManagerBranch
-              key={sub._id}
-              manager={sub}
-              allManagers={allManagers}
-              employees={employees}
-              depth={depth + 1}
-              delayBase={delayBase + 180 + si * 50}
-              matchName={matchName}
-              hasQ={hasQ}
-              parentMatched={mgrMatch || parentMatched}
-              onNodeClick={onNodeClick}
-            />
-          ))}
-        </div>
-      )}
-
-      {mgrEmps.length > 0 && (
-        <>
-          <VLine h={20} delay={delayBase + 100} />
-          {mgrEmps.length > 1 && <HLine w={empTotalW} delay={delayBase + 140} />}
-        </>
-      )}
-
-      {mgrEmps.length > 0 && (
-        <div className="flex gap-2 sm:gap-2.5 md:gap-3 justify-center items-start min-w-0 flex-wrap">
-          {mgrEmps.map((emp, ei) => {
-            const empMatch  = hasQ && matchName(emp.f_name, emp.l_name, emp.department, emp.designation);
-            const empDimmed = hasQ && !empMatch && !mgrMatch && !parentMatched;
-            const empDelay  = delayBase + 180 + ei * 45;
-            return (
-              <div key={emp._id} className="flex flex-col items-center min-w-0">
-                <VLine h={16} delay={empDelay - 45} />
-                <EmployeeNode
-                  employee={emp}
-                  delay={empDelay}
-                  highlighted={empMatch}
-                  dimmed={empDimmed}
-                  onClick={() => onNodeClick(emp, "employee")}
+          <TreeTrunk height={20} />
+          <TreeBranch gapClass="org-gap-sm">
+            {[
+              ...subManagers.map((sub, i) => (
+                <ManagerBranch
+                  key={sub._id}
+                  manager={sub}
+                  allManagers={allManagers}
+                  employees={employees}
+                  matchName={matchName}
+                  hasQ={hasQ}
+                  parentMatched={mgrMatch || parentMatched}
+                  onNodeClick={onNodeClick}
+                  delay={i * 50}
                 />
-              </div>
-            );
-          })}
-        </div>
+              )),
+              ...mgrEmps.map((emp, i) => {
+                const empMatch  = hasQ && matchName(emp.f_name, emp.l_name, emp.department, emp.designation);
+                const empDimmed = hasQ && !empMatch && !mgrMatch && !parentMatched;
+                return (
+                  <EmployeeNode
+                    key={emp._id}
+                    employee={emp}
+                    delay={i * 45}
+                    highlighted={empMatch}
+                    dimmed={empDimmed}
+                    onClick={() => onNodeClick(emp, "employee")}
+                  />
+                );
+              }),
+            ]}
+          </TreeBranch>
+        </>
       )}
-
-      {childCount === 0 && null}
     </div>
   );
 }
@@ -619,11 +715,8 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
            normalize(desig).includes(q);
   };
 
-  const ADM_GAP = 20;
-  const ADM_W   = 158;
-
   return (
-    <div className="w-max min-w-full flex flex-col items-center mx-auto">
+    <div className="org-tree-root w-max min-w-full mx-auto">
       <SuperAdminNode
         name={fullName(superAdmin) || "Super Admin"}
         role={superAdmin?.organisation_name || "Super Admin"}
@@ -635,67 +728,56 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
 
       {admins.length > 0 && (
         <>
-          <VLine h={26} delay={220} />
-          {admins.length > 1 && <HLine w={(admins.length - 1) * (ADM_W + ADM_GAP)} delay={280} />}
+          <TreeTrunk height={26} />
+          <TreeBranch gapClass="org-gap-lg">
+            {admins.map((admin, ai) => {
+              const admMatch  = hasQ && matchName(admin.f_name, admin.l_name, "", admin.designation);
+              const admDimmed = hasQ && !admMatch;
+              const admDelay  = 340 + ai * 60;
+              const adminId   = idStr(admin._id);
+
+              const admManagers = managers.filter(
+                (m) => idStr(m.reporting_manager) === adminId && m.reporting_manager_model === "Admin"
+              );
+
+              return (
+                <div key={admin._id} className="flex flex-col items-center min-w-0">
+                  <AdminNode
+                    admin={admin}
+                    delay={admDelay}
+                    highlighted={admMatch}
+                    dimmed={admDimmed}
+                    onClick={() => onNodeClick(admin, "admin")}
+                  />
+
+                  {admManagers.length > 0 ? (
+                    <>
+                      <TreeTrunk height={24} />
+                      <TreeBranch gapClass="org-gap-md">
+                        {admManagers.map((mgr, mi) => (
+                          <ManagerBranch
+                            key={mgr._id}
+                            manager={mgr}
+                            allManagers={managers}
+                            employees={employees}
+                            matchName={matchName}
+                            hasQ={hasQ}
+                            parentMatched={admMatch}
+                            onNodeClick={onNodeClick}
+                            delay={mi * 55}
+                          />
+                        ))}
+                      </TreeBranch>
+                    </>
+                  ) : (
+                    <p className="mt-3 text-[10px] sm:text-[11px] text-gray-300 italic">No managers under this admin</p>
+                  )}
+                </div>
+              );
+            })}
+          </TreeBranch>
         </>
       )}
-
-      <div className="flex gap-3 sm:gap-5 md:gap-7 justify-center items-start min-w-0 flex-wrap">
-        {admins.map((admin, ai) => {
-          const admMatch  = hasQ && matchName(admin.f_name, admin.l_name, "", admin.designation);
-          const admDimmed = hasQ && !admMatch;
-          const admDelay  = 340 + ai * 60;
-          const adminId   = idStr(admin._id);
-
-          const admManagers = managers.filter(
-            (m) => idStr(m.reporting_manager) === adminId && m.reporting_manager_model === "Admin"
-          );
-          const MAN_GAP = 14;
-          const MAN_W   = 118;
-          const manTotal = admManagers.length > 1 ? (admManagers.length - 1) * (MAN_W + MAN_GAP) : 0;
-
-          return (
-            <div key={admin._id} className="flex flex-col items-center min-w-0">
-              <VLine h={20} delay={admDelay - 60} />
-              <AdminNode
-                admin={admin}
-                delay={admDelay}
-                highlighted={admMatch}
-                dimmed={admDimmed}
-                onClick={() => onNodeClick(admin, "admin")}
-              />
-
-              {admManagers.length > 0 && (
-                <>
-                  <VLine h={24} delay={admDelay + 120} />
-                  {admManagers.length > 1 && <HLine w={manTotal} delay={admDelay + 160} />}
-                </>
-              )}
-
-              <div className="flex gap-2.5 sm:gap-3.5 md:gap-4 justify-center items-start min-w-0 flex-wrap">
-                {admManagers.map((mgr, mi) => (
-                  <ManagerBranch
-                    key={mgr._id}
-                    manager={mgr}
-                    allManagers={managers}
-                    employees={employees}
-                    depth={0}
-                    delayBase={admDelay + 200 + mi * 55}
-                    matchName={matchName}
-                    hasQ={hasQ}
-                    parentMatched={admMatch}
-                    onNodeClick={onNodeClick}
-                  />
-                ))}
-              </div>
-
-              {admManagers.length === 0 && (
-                <p className="mt-3 text-[10px] sm:text-[11px] text-gray-300 italic">No managers under this admin</p>
-              )}
-            </div>
-          );
-        })}
-      </div>
 
       {admins.length === 0 && !loading && (
         <div className="mt-9 px-6 py-4 rounded-xl border-[1.5px] border-dashed border-gray-200 text-xs sm:text-sm text-gray-300 bg-[#fafbfc] min-w-0">
