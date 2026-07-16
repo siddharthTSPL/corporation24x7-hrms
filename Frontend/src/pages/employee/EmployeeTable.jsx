@@ -530,9 +530,9 @@ function PermissionsPanel({perms,onChange,roleType="employee"}){
   );
 }
 
-function ReportingManagerSelect({value,onChange,managersOnly,managersWithAdmin,label="Reporting Manager",name="reporting_manager"}){
-  const managersList = managersOnly?.managers ?? [];
-  const withAdminList = managersWithAdmin?.managers ?? [];
+function ReportingManagerSelect({value,onChange,managersOnly,managersWithAdmin,label="Reporting Manager",name="reporting_manager",excludeId=null}){
+  const managersList = (managersOnly?.managers ?? []).filter(m => m._id !== excludeId);
+  const withAdminList = (managersWithAdmin?.managers ?? []).filter(m => m._id !== excludeId);
   const adminList = withAdminList.filter(m => m.isAdmin);
   const pureManagers = managersList;
   return(
@@ -2377,7 +2377,7 @@ export default function EmployeeTable(){
           )}
           {(editTarget.role==="manager"||editTarget.role==="senior_manager")&&(
             <div className="col-span-1 sm:col-span-2">
-              <ReportingManagerSelect value={editForm.reporting_manager} onChange={handleEditChange} managersOnly={managersOnly} managersWithAdmin={managersWithAdmin} label="Reporting Manager" name="reporting_manager"/>
+              <ReportingManagerSelect value={editForm.reporting_manager} onChange={handleEditChange} managersOnly={managersOnly} managersWithAdmin={managersWithAdmin} label="Reporting Manager" name="reporting_manager" excludeId={editTarget?._id}/>
             </div>
           )}
           <Field label="Gender">
@@ -2419,7 +2419,7 @@ export default function EmployeeTable(){
                 <option value="manager">Manager</option><option value="senior_manager">Senior Manager</option><option value="official">Official</option>
               </select>
             </Field>
-            <ReportingManagerSelect value={promoteToMgrForm.reporting_manager} onChange={(e)=>setPromoteToMgrForm({...promoteToMgrForm,reporting_manager:e.target.value})} managersOnly={managersOnly} managersWithAdmin={managersWithAdmin} label="Reporting Manager" name="reporting_manager"/>
+            <ReportingManagerSelect value={promoteToMgrForm.reporting_manager} onChange={(e)=>setPromoteToMgrForm({...promoteToMgrForm,reporting_manager:e.target.value})} managersOnly={managersOnly} managersWithAdmin={managersWithAdmin} label="Reporting Manager" name="reporting_manager" excludeId={promoteToMgrTarget?._id}/>
           </div>
         </ConfirmModal>
       )}
@@ -2431,7 +2431,9 @@ export default function EmployeeTable(){
           onConfirm={handlePromoteToAdmin} onCancel={()=>setPromoteToAdminTarget(null)}>
           <div className="flex flex-col gap-2 -mt-1">
             <Field label="New Designation"><input className={inputCls} placeholder="e.g. HR Manager" value={promoteToAdminForm.designation} onChange={(e)=>setPromoteToAdminForm({...promoteToAdminForm,designation:e.target.value})}/></Field>
-            <ReportingManagerSelect value={promoteToAdminForm.reporting_manager} onChange={(e)=>setPromoteToAdminForm({...promoteToAdminForm,reporting_manager:e.target.value})} managersOnly={managersOnly} managersWithAdmin={managersWithAdmin} label="Reporting Manager (optional)" name="reporting_manager"/>
+            <div className="text-xs text-[#7A3500] bg-[#FEF3C7] border border-[#FDE68A] rounded-lg px-3 py-2">
+              As an Admin, {promoteToAdminTarget.f_name} will report directly to the Super Admin.
+            </div>
           </div>
         </ConfirmModal>
       )}
@@ -2460,7 +2462,7 @@ export default function EmployeeTable(){
                 <option value="manager">Manager</option><option value="senior_manager">Senior Manager</option>
               </select>
             </Field>
-            <ReportingManagerSelect value={demoteAdminToMgrForm.reporting_manager} onChange={(e)=>setDemoteAdminToMgrForm({...demoteAdminToMgrForm,reporting_manager:e.target.value})} managersOnly={managersOnly} managersWithAdmin={managersWithAdmin} label="Reporting Manager (optional)" name="reporting_manager"/>
+            <ReportingManagerSelect value={demoteAdminToMgrForm.reporting_manager} onChange={(e)=>setDemoteAdminToMgrForm({...demoteAdminToMgrForm,reporting_manager:e.target.value})} managersOnly={managersOnly} managersWithAdmin={managersWithAdmin} label="Reporting Manager (optional)" name="reporting_manager" excludeId={demoteAdminToMgrTarget?._id}/>
           </div>
         </ConfirmModal>
       )}
