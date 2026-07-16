@@ -8,7 +8,7 @@ import { usePermissionStore } from "../../auth/store/permission/permissionStore"
 
 const GlobalStyles = () => (
   <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Outfit:wght@300;400;500;600&display=swap');
     *, *::before, *::after { box-sizing: border-box; }
 
     @keyframes fadeUp {
@@ -37,7 +37,7 @@ const GlobalStyles = () => (
 
     .rc-input {
       width: 100%;
-      font-family: 'DM Sans', sans-serif;
+      font-family: 'Outfit', sans-serif;
       font-size: 13px;
       color: #2a1a16;
       background: #faf8f6;
@@ -59,7 +59,7 @@ const GlobalStyles = () => (
       font-size: 11px;
       font-weight: 500;
       color: #b0948a;
-      font-family: 'DM Sans', sans-serif;
+      font-family: 'Outfit', sans-serif;
       text-transform: uppercase;
       letter-spacing: .4px;
       display: block;
@@ -67,7 +67,7 @@ const GlobalStyles = () => (
     }
 
     .rc-btn-primary {
-      font-family: 'DM Sans', sans-serif;
+      font-family: 'Outfit', sans-serif;
       font-size: 13px;
       font-weight: 600;
       padding: 10px 24px;
@@ -75,7 +75,7 @@ const GlobalStyles = () => (
       cursor: pointer;
       border: none;
       background: #730042;
-      color: #f9f8f2;
+      color: #fdf5f9;
       transition: all .2s;
       letter-spacing: .2px;
     }
@@ -87,7 +87,7 @@ const GlobalStyles = () => (
     .rc-btn-primary:disabled { opacity: .55; cursor: not-allowed; }
 
     .rc-btn-locked {
-      font-family: 'DM Sans', sans-serif;
+      font-family: 'Outfit', sans-serif;
       font-size: 13px;
       font-weight: 600;
       padding: 10px 24px;
@@ -103,7 +103,7 @@ const GlobalStyles = () => (
     }
 
     .rc-btn-ghost {
-      font-family: 'DM Sans', sans-serif;
+      font-family: 'Outfit', sans-serif;
       font-size: 13px;
       font-weight: 500;
       padding: 9px 20px;
@@ -117,7 +117,7 @@ const GlobalStyles = () => (
     .rc-btn-ghost:hover { background: rgba(115,0,66,0.05); border-color: #730042; }
 
     .rc-tab {
-      font-family: 'DM Sans', sans-serif;
+      font-family: 'Outfit', sans-serif;
       font-size: 12px;
       font-weight: 500;
       padding: 7px 16px;
@@ -130,7 +130,7 @@ const GlobalStyles = () => (
     }
     .rc-tab.active {
       background: #730042;
-      color: #f9f8f2;
+      color: #fdf5f9;
       box-shadow: 0 2px 8px rgba(115,0,66,0.25);
     }
     .rc-tab:not(.active):hover { background: rgba(115,0,66,0.07); color: #730042; }
@@ -155,7 +155,7 @@ const GlobalStyles = () => (
       padding: 3px 9px;
       border-radius: 20px;
       font-size: 11px;
-      font-family: 'DM Sans', sans-serif;
+      font-family: 'Outfit', sans-serif;
       font-weight: 500;
       background: rgba(115,0,66,0.07);
       color: #730042;
@@ -178,7 +178,7 @@ const GlobalStyles = () => (
       font-size: 11px;
       font-weight: 600;
       color: #b0948a;
-      font-family: 'DM Sans', sans-serif;
+      font-family: 'Outfit', sans-serif;
       text-transform: uppercase;
       letter-spacing: .5px;
       padding: 0 0 10px;
@@ -190,7 +190,7 @@ const GlobalStyles = () => (
       width: 18px;
       height: 18px;
       border: 2px solid rgba(249,248,242,0.3);
-      border-top-color: #f9f8f2;
+      border-top-color: #fdf5f9;
       border-radius: 50%;
       animation: spin .7s linear infinite;
       display: inline-block;
@@ -244,6 +244,7 @@ const GlobalStyles = () => (
 const STATUS_META = {
   PENDING:           { label: "Pending",          color: "#92400E", bg: "#faeeda" },
   APPROVED:          { label: "Approved ✓",        color: "#1a6b48", bg: "#e8f5e9" },
+  FILLED:            { label: "Filled ✓",          color: "#0f766e", bg: "#e6faf7" },
   REJECTED:          { label: "Rejected ✗",        color: "#791F1F", bg: "#fcebeb" },
   ON_HOLD:           { label: "On Hold",           color: "#185FA5", bg: "#e6f1fb" },
   REVISION_REQUIRED: { label: "Revision Required", color: "#5b21b6", bg: "#f3e8ff" },
@@ -294,8 +295,8 @@ function timeAgo(iso) {
 function InfoRow({ label, value }) {
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
-      <span style={{ fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif", textTransform:"uppercase", letterSpacing:".4px" }}>{label}</span>
-      <span style={{ fontSize:13, fontWeight:500, color:"#2a1a16", fontFamily:"'DM Sans',sans-serif" }}>{value || "—"}</span>
+      <span style={{ fontSize:10, color:"#b0948a", fontFamily:"'Outfit',sans-serif", textTransform:"uppercase", letterSpacing:".4px" }}>{label}</span>
+      <span style={{ fontSize:13, fontWeight:500, color:"#2a1a16", fontFamily:"'Outfit',sans-serif" }}>{value || "—"}</span>
     </div>
   );
 }
@@ -313,15 +314,20 @@ function StatsBar({ reqs }) {
   const total    = reqs.length;
   const pending  = reqs.filter(r => r.status === "PENDING").length;
   const approved = reqs.filter(r => r.status === "APPROVED").length;
+  const filled   = reqs.filter(r => r.status === "FILLED").length;
   const rejected = reqs.filter(r => r.status === "REJECTED").length;
   const onHold   = reqs.filter(r => r.status === "ON_HOLD").length;
+  const openPositions   = reqs.reduce((sum, r) => sum + (r.openings || 0), 0);
+  const filledPositions = reqs.reduce((sum, r) => sum + Math.min(r.filled_count || 0, r.openings || 0), 0);
 
   const stats = [
-    { label: "Total",    value: total,    color: "#730042" },
-    { label: "Pending",  value: pending,  color: "#BA7517" },
-    { label: "Approved", value: approved, color: "#1D9E75" },
-    { label: "Rejected", value: rejected, color: "#E24B4A" },
-    { label: "On Hold",  value: onHold,   color: "#378ADD" },
+    { label: "Total",            value: total,    color: "#730042" },
+    { label: "Pending",          value: pending,  color: "#BA7517" },
+    { label: "Approved",         value: approved, color: "#1D9E75" },
+    { label: "Filled",           value: filled,   color: "#0f766e" },
+    { label: "Positions Filled", value: `${filledPositions}/${openPositions}`, color: "#0f766e" },
+    { label: "Rejected",         value: rejected, color: "#E24B4A" },
+    { label: "On Hold",          value: onHold,   color: "#378ADD" },
   ];
 
   return (
@@ -333,8 +339,8 @@ function StatsBar({ reqs }) {
       {stats.map(s => (
         <div key={s.label} className="rc-card" style={{ animationDelay:".05s" }}>
           <div style={{ padding:"14px 16px" }}>
-            <div style={{ fontSize:22, fontWeight:700, color:s.color, fontFamily:"'Lora',serif", lineHeight:1 }}>{s.value}</div>
-            <div style={{ fontSize:11, color:"#b0948a", marginTop:4, fontFamily:"'DM Sans',sans-serif" }}>{s.label}</div>
+            <div style={{ fontSize:22, fontWeight:700, color:s.color, fontFamily:"'Cormorant Garamond',serif", lineHeight:1 }}>{s.value}</div>
+            <div style={{ fontSize:11, color:"#b0948a", marginTop:4, fontFamily:"'Outfit',sans-serif" }}>{s.label}</div>
           </div>
         </div>
       ))}
@@ -352,10 +358,10 @@ function LockedPanel({ title, message, action }) {
       }}>
         🔒
       </div>
-      <div style={{ fontSize:14, fontWeight:600, fontFamily:"'Lora',serif", color:"#2a1a16" }}>
+      <div style={{ fontSize:14, fontWeight:600, fontFamily:"'Cormorant Garamond',serif", color:"#2a1a16" }}>
         {title}
       </div>
-      <div style={{ fontSize:12, color:"#b0948a", fontFamily:"'DM Sans',sans-serif", textAlign:"center", maxWidth:300 }}>
+      <div style={{ fontSize:12, color:"#b0948a", fontFamily:"'Outfit',sans-serif", textAlign:"center", maxWidth:300 }}>
         {message}
       </div>
       {action}
@@ -366,7 +372,7 @@ function LockedPanel({ title, message, action }) {
 function AccessDeniedFull() {
   return (
     <div style={{
-      fontFamily:"'DM Sans','Segoe UI',sans-serif", background:"#f9f8f2",
+      fontFamily:"'Outfit','Segoe UI',sans-serif", background:"#fdf5f9",
       minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center",
       padding:24,
     }}>
@@ -379,10 +385,10 @@ function AccessDeniedFull() {
         }}>
           🔒
         </div>
-        <h2 style={{ fontSize:"clamp(20px,5vw,24px)", fontWeight:700, color:"#2a1a16", margin:"0 0 8px", fontFamily:"'Lora',serif" }}>
+        <h2 style={{ fontSize:"clamp(20px,5vw,24px)", fontWeight:700, color:"#2a1a16", margin:"0 0 8px", fontFamily:"'Cormorant Garamond',serif" }}>
           Access Restricted
         </h2>
-        <p style={{ fontSize:13, color:"#b0948a", lineHeight:1.7, margin:0, fontFamily:"'DM Sans',sans-serif" }}>
+        <p style={{ fontSize:13, color:"#b0948a", lineHeight:1.7, margin:0, fontFamily:"'Outfit',sans-serif" }}>
           You don't have permission to use recruitment. Contact your admin to request access.
         </p>
       </div>
@@ -402,19 +408,22 @@ function RequisitionDetail({ req, onClose }) {
         <div style={{ background:"linear-gradient(135deg,#730042,#a0004a)", padding:"22px 24px 18px", position:"sticky", top:0, zIndex:10 }}>
           <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:10 }}>
             <div>
-              <div style={{ fontSize:11, color:"rgba(249,248,242,0.6)", fontFamily:"'DM Sans',sans-serif", marginBottom:4, textTransform:"uppercase", letterSpacing:".4px" }}>
+              <div style={{ fontSize:11, color:"rgba(249,248,242,0.6)", fontFamily:"'Outfit',sans-serif", marginBottom:4, textTransform:"uppercase", letterSpacing:".4px" }}>
                 Requisition Detail
               </div>
-              <div style={{ fontSize:18, fontWeight:700, color:"#f9f8f2", fontFamily:"'Lora',serif", lineHeight:1.25 }}>
+              <div style={{ fontSize:18, fontWeight:700, color:"#fdf5f9", fontFamily:"'Cormorant Garamond',serif", lineHeight:1.25 }}>
                 {req.job_title}
               </div>
-              <div style={{ fontSize:12, color:"rgba(249,248,242,0.65)", marginTop:5, fontFamily:"'DM Sans',sans-serif" }}>
-                {req.department} · {req.openings} opening{req.openings !== 1 ? "s" : ""}
+              <div style={{ fontSize:12, color:"rgba(249,248,242,0.65)", marginTop:5, fontFamily:"'Outfit',sans-serif" }}>
+                {req.department} ·{" "}
+                {req.status === "APPROVED" || req.status === "FILLED"
+                  ? `${Math.min(req.filled_count || 0, req.openings)}/${req.openings} opening${req.openings !== 1 ? "s" : ""} filled`
+                  : `${req.openings} opening${req.openings !== 1 ? "s" : ""}`}
               </div>
             </div>
             <button onClick={onClose} style={{
               background:"rgba(249,248,242,0.15)", border:"none", cursor:"pointer",
-              color:"#f9f8f2", width:32, height:32, borderRadius:8, fontSize:18,
+              color:"#fdf5f9", width:32, height:32, borderRadius:8, fontSize:18,
               display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0,
             }}>×</button>
           </div>
@@ -432,8 +441,8 @@ function RequisitionDetail({ req, onClose }) {
               border: `0.5px solid ${req.status === "APPROVED" ? "#a5d6a7" : req.status === "REJECTED" ? "#ef9a9a" : "#f0c080"}`,
               borderRadius:10, padding:"12px 14px",
             }}>
-              <div style={{ fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif", marginBottom:4, textTransform:"uppercase", letterSpacing:".4px" }}>Admin Comment</div>
-              <div style={{ fontSize:13, color:"#2a1a16", fontFamily:"'DM Sans',sans-serif", lineHeight:1.6 }}>{req.admin_comment}</div>
+              <div style={{ fontSize:10, color:"#b0948a", fontFamily:"'Outfit',sans-serif", marginBottom:4, textTransform:"uppercase", letterSpacing:".4px" }}>Admin Comment</div>
+              <div style={{ fontSize:13, color:"#2a1a16", fontFamily:"'Outfit',sans-serif", lineHeight:1.6 }}>{req.admin_comment}</div>
             </div>
           )}
 
@@ -463,7 +472,7 @@ function RequisitionDetail({ req, onClose }) {
           {req.job_description && (
             <div>
               <div className="rc-section-title">Job Description</div>
-              <div style={{ fontSize:13, color:"#4a3530", lineHeight:1.7, fontFamily:"'DM Sans',sans-serif", whiteSpace:"pre-wrap" }}>
+              <div style={{ fontSize:13, color:"#4a3530", lineHeight:1.7, fontFamily:"'Outfit',sans-serif", whiteSpace:"pre-wrap" }}>
                 {req.job_description}
               </div>
             </div>
@@ -472,7 +481,7 @@ function RequisitionDetail({ req, onClose }) {
           {req.hiring_reason && (
             <div>
               <div className="rc-section-title">Hiring Reason</div>
-              <div style={{ fontSize:13, color:"#4a3530", lineHeight:1.7, fontFamily:"'DM Sans',sans-serif" }}>
+              <div style={{ fontSize:13, color:"#4a3530", lineHeight:1.7, fontFamily:"'Outfit',sans-serif" }}>
                 {req.hiring_reason}
               </div>
             </div>
@@ -705,7 +714,7 @@ function CreateForm({ onSuccess, onCancel, allowCancel }) {
 
       {error && (
         <div style={{ background:"#fcebeb", border:"0.5px solid #ef9a9a", borderRadius:9, padding:"10px 14px",
-          fontSize:12, color:"#791F1F", fontFamily:"'DM Sans',sans-serif" }}>
+          fontSize:12, color:"#791F1F", fontFamily:"'Outfit',sans-serif" }}>
           {error}
         </div>
       )}
@@ -740,11 +749,19 @@ function RequisitionRow({ req, onClick, delay }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:8, flexWrap:"wrap" }}>
           <div>
-            <div style={{ fontSize:14, fontWeight:600, color:"#2a1a16", fontFamily:"'Lora',serif", lineHeight:1.25 }}>
+            <div style={{ fontSize:14, fontWeight:600, color:"#2a1a16", fontFamily:"'Cormorant Garamond',serif", lineHeight:1.25 }}>
               {req.job_title}
             </div>
-            <div style={{ fontSize:11, color:"#b0948a", marginTop:3, fontFamily:"'DM Sans',sans-serif" }}>
-              {req.department} · {req.openings} opening{req.openings !== 1 ? "s" : ""} · {req.employment_type}
+            <div style={{ fontSize:11, color:"#b0948a", marginTop:3, fontFamily:"'Outfit',sans-serif" }}>
+              {req.department} · {req.employment_type}
+              {(req.status === "APPROVED" || req.status === "FILLED") && (
+                <span style={{ fontWeight: 600, color: req.status === "FILLED" ? "#0f766e" : "#730042" }}>
+                  {" "}· {Math.min(req.filled_count || 0, req.openings)}/{req.openings} opening{req.openings !== 1 ? "s" : ""} filled
+                </span>
+              )}
+              {req.status !== "APPROVED" && req.status !== "FILLED" && (
+                <> · {req.openings} opening{req.openings !== 1 ? "s" : ""}</>
+              )}
             </div>
           </div>
           <span style={{ padding:"3px 10px", borderRadius:20, fontSize:10, fontWeight:600,
@@ -754,20 +771,20 @@ function RequisitionRow({ req, onClick, delay }) {
         </div>
         <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginTop:9, alignItems:"center" }}>
           <span style={{ padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:500,
-            background:pm.bg, color:pm.color, fontFamily:"'DM Sans',sans-serif" }}>
+            background:pm.bg, color:pm.color, fontFamily:"'Outfit',sans-serif" }}>
             {pm.label} Priority
           </span>
           <span style={{ padding:"2px 8px", borderRadius:20, fontSize:10, fontWeight:500,
-            background:wm.bg, color:wm.color, fontFamily:"'DM Sans',sans-serif" }}>
+            background:wm.bg, color:wm.color, fontFamily:"'Outfit',sans-serif" }}>
             {wm.label}
           </span>
           {req.experience_required && (
-            <span style={{ fontSize:11, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>
+            <span style={{ fontSize:11, color:"#b0948a", fontFamily:"'Outfit',sans-serif" }}>
               {req.experience_required}+ yrs exp
             </span>
           )}
           {req.salary_range?.min && req.salary_range?.max && (
-            <span style={{ fontSize:11, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>
+            <span style={{ fontSize:11, color:"#b0948a", fontFamily:"'Outfit',sans-serif" }}>
               ₹{Number(req.salary_range.min/100000).toFixed(1)}L – ₹{Number(req.salary_range.max/100000).toFixed(1)}L
             </span>
           )}
@@ -775,9 +792,9 @@ function RequisitionRow({ req, onClick, delay }) {
             <span key={i} className="rc-skill-tag" style={{ cursor:"default" }}>{sk}</span>
           ))}
           {req.skills_required?.length > 3 && (
-            <span style={{ fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>+{req.skills_required.length - 3} more</span>
+            <span style={{ fontSize:10, color:"#b0948a", fontFamily:"'Outfit',sans-serif" }}>+{req.skills_required.length - 3} more</span>
           )}
-          <span style={{ fontSize:10, color:"#c9bab5", marginLeft:"auto", fontFamily:"'DM Sans',sans-serif", whiteSpace:"nowrap" }}>
+          <span style={{ fontSize:10, color:"#c9bab5", marginLeft:"auto", fontFamily:"'Outfit',sans-serif", whiteSpace:"nowrap" }}>
             {timeAgo(req.createdAt)}
           </span>
         </div>
@@ -786,8 +803,8 @@ function RequisitionRow({ req, onClick, delay }) {
   );
 }
 
-const FILTER_TABS = ["All", "PENDING", "APPROVED", "REJECTED", "ON_HOLD", "REVISION_REQUIRED"];
-const FILTER_LABELS = { All:"All", PENDING:"Pending", APPROVED:"Approved", REJECTED:"Rejected", ON_HOLD:"On Hold", REVISION_REQUIRED:"Revision" };
+const FILTER_TABS = ["All", "PENDING", "APPROVED", "FILLED", "REJECTED", "ON_HOLD", "REVISION_REQUIRED"];
+const FILTER_LABELS = { All:"All", PENDING:"Pending", APPROVED:"Approved", FILLED:"Filled", REJECTED:"Rejected", ON_HOLD:"On Hold", REVISION_REQUIRED:"Revision" };
 
 export default function RecruitmentMA() {
   const navigate = useNavigate();
@@ -826,7 +843,7 @@ export default function RecruitmentMA() {
   });
 
   return (
-    <div style={{ fontFamily:"'DM Sans','Segoe UI',sans-serif", background:"#f9f8f2",
+    <div style={{ fontFamily:"'Outfit','Segoe UI',sans-serif", background:"#fdf5f9",
       minHeight:"100vh", padding:"clamp(16px,4vw,24px) clamp(16px,4vw,28px)", color:"#2a1a16" }}>
       <GlobalStyles/>
 
@@ -838,10 +855,10 @@ export default function RecruitmentMA() {
             cursor:"pointer", color:"#730042", fontSize:16, flexShrink:0,
           }}>←</button>
           <div>
-            <h1 style={{ fontSize:20, fontWeight:700, margin:0, letterSpacing:"-.3px", fontFamily:"'Lora',serif" }}>
+            <h1 style={{ fontSize:20, fontWeight:700, margin:0, letterSpacing:"-.3px", fontFamily:"'Cormorant Garamond',serif" }}>
               Recruitment
             </h1>
-            <p style={{ fontSize:12, color:"#b0948a", margin:0, marginTop:2, fontFamily:"'DM Sans',sans-serif" }}>
+            <p style={{ fontSize:12, color:"#b0948a", margin:0, marginTop:2, fontFamily:"'Outfit',sans-serif" }}>
               Manage your hiring requisitions
             </p>
           </div>
@@ -859,7 +876,7 @@ export default function RecruitmentMA() {
             )
           )}
           {view === "create" && (
-            <div style={{ fontSize:12, color:"#b0948a", fontFamily:"'DM Sans',sans-serif" }}>
+            <div style={{ fontSize:12, color:"#b0948a", fontFamily:"'Outfit',sans-serif" }}>
               New Hiring Requisition
             </div>
           )}
@@ -870,7 +887,7 @@ export default function RecruitmentMA() {
         <div style={{
           background:"#e8f5e9", border:"0.5px solid #a5d6a7", borderRadius:10,
           padding:"12px 16px", marginBottom:16, display:"flex", alignItems:"center", gap:10,
-          animation:"fadeUp .3s ease both", fontFamily:"'DM Sans',sans-serif",
+          animation:"fadeUp .3s ease both", fontFamily:"'Outfit',sans-serif",
         }}>
           <span style={{ fontSize:18 }}>✅</span>
           <div>
@@ -885,7 +902,7 @@ export default function RecruitmentMA() {
           <div className="rc-card" style={{ animationDelay:".05s" }}>
             <CardAccent color="#730042"/>
             <div style={{ padding:"20px 24px 24px" }}>
-              <div style={{ fontSize:16, fontWeight:700, fontFamily:"'Lora',serif", marginBottom:20, color:"#2a1a16" }}>
+              <div style={{ fontSize:16, fontWeight:700, fontFamily:"'Cormorant Garamond',serif", marginBottom:20, color:"#2a1a16" }}>
                 New Hiring Requisition
               </div>
               <CreateForm
@@ -953,17 +970,17 @@ export default function RecruitmentMA() {
             ) : isError ? (
               <div style={{ padding:"40px 20px", textAlign:"center" }}>
                 <div style={{ fontSize:24, marginBottom:8 }}>⚠️</div>
-                <div style={{ fontSize:13, fontWeight:600, color:"#791F1F", fontFamily:"'Lora',serif", marginBottom:4 }}>Failed to load</div>
-                <div style={{ fontSize:12, color:"#b0948a", fontFamily:"'DM Sans',sans-serif", marginBottom:14 }}>{error?.message}</div>
+                <div style={{ fontSize:13, fontWeight:600, color:"#791F1F", fontFamily:"'Cormorant Garamond',serif", marginBottom:4 }}>Failed to load</div>
+                <div style={{ fontSize:12, color:"#b0948a", fontFamily:"'Outfit',sans-serif", marginBottom:14 }}>{error?.message}</div>
                 <button className="rc-btn-ghost" onClick={() => refetch()}>Retry</button>
               </div>
             ) : filtered.length === 0 ? (
               <div className="rc-empty-state">
                 <div style={{ fontSize:40 }}>📋</div>
-                <div style={{ fontSize:14, fontWeight:600, fontFamily:"'Lora',serif", color:"#2a1a16" }}>
+                <div style={{ fontSize:14, fontWeight:600, fontFamily:"'Cormorant Garamond',serif", color:"#2a1a16" }}>
                   {reqs.length === 0 ? "No requisitions yet" : "No results found"}
                 </div>
-                <div style={{ fontSize:12, color:"#b0948a", fontFamily:"'DM Sans',sans-serif", textAlign:"center", maxWidth:260 }}>
+                <div style={{ fontSize:12, color:"#b0948a", fontFamily:"'Outfit',sans-serif", textAlign:"center", maxWidth:260 }}>
                   {reqs.length === 0
                     ? "Submit your first hiring requisition to get started."
                     : "Try adjusting your search or filter."}
