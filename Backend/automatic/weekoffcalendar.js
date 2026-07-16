@@ -3,7 +3,7 @@ const WeeklyOffSchedule = require("../Models/weeklyoffschedule.model");
 const Holiday = require("../Models/holiday.model");
 const EmployeeWeekOffOverride = require("../Models/employeeweekoffoverride.model");
 const WeekOffGroup = require("../Models/weekoffgroup.model");
-const { startOfISTDay, dayNameIST, IST_OFFSET_MS } = require("../utils/Istdate.utils");
+const { startOfISTDay, dayNameIST, toISTKey, IST_OFFSET_MS } = require("../utils/Istdate.utils");
 
 // startOfDay/dayName used to call Date's local setHours(0,0,0,0)/getDay(),
 // which read the SERVER PROCESS's OS timezone. On a dev machine set to IST
@@ -168,11 +168,107 @@ async function hasRotationalScheduleForWeek(organisation_id, date) {
   return !!exists;
 }
 
+/**
+ * Batched version of isWeekOff() for an entire month. The per-day loop in
+ * getCalendarMeta() used to call isWeekOff() once per day (28-31 sequential
+ * DB round-trips, each re-fetching the SAME override/policy docs that don't
+ * change day to day). This does the override/policy/group lookups ONCE and,
+ * for rotational orgs, fetches all WeeklyOffSchedule docs touching the
+ * month in a single query — so a full month resolves in a handful of
+ * queries instead of ~30-150.
+ *
+ * Returns a Map<"YYYY-MM-DD", { isOff, reason, unconfigured? }> covering
+ * every day from `monthStart` to `monthEnd` (inclusive, IST calendar days).
+ */
+async function getWeekOffMapForRange(monthStart, monthEnd, organisation_id, employee = null, employeeModel = null) {
+  const days = [];
+  for (let t = new Date(monthStart); t <= monthEnd; t = new Date(t.getTime() + 24 * 60 * 60 * 1000)) {
+    days.push(startOfDay(t));
+  }
+
+  const override = employee
+    ? await EmployeeWeekOffOverride.findOne({ organisation_id, employee, employeeModel, isActive: true }).lean()
+    : null;
+
+  const fixedResult = (dName) => {
+    if (override) {
+      if (override.weekOffType === "sunday") return { isOff: dName === "sunday", reason: "override" };
+      if (override.weekOffType === "sat_sun") return { isOff: dName === "saturday" || dName === "sunday", reason: "override" };
+      if (override.weekOffType === "custom_fixed_days") return { isOff: (override.fixedOffDays || []).includes(dName), reason: "override" };
+    }
+    return null;
+  };
+
+  // If the override fully decides every day (not "rotational"), we're done
+  // without ever touching HolidayPolicy/WeekOffGroup/WeeklyOffSchedule.
+  if (override && override.weekOffType !== "rotational") {
+    const map = new Map();
+    days.forEach((d) => {
+      const key = toISTKey(d);
+      map.set(key, fixedResult(dayName(d)));
+    });
+    return map;
+  }
+
+  const policy = await HolidayPolicy.findOne({ organisation_id }).lean();
+  const weekOffType = policy?.weekOffType || "sunday";
+
+  if (weekOffType === "sunday" || weekOffType === "sat_sun") {
+    const map = new Map();
+    days.forEach((d) => {
+      const key = toISTKey(d);
+      const dName = dayName(d);
+      map.set(key, weekOffType === "sunday"
+        ? { isOff: dName === "sunday", reason: "sunday" }
+        : { isOff: dName === "saturday" || dName === "sunday", reason: "sat_sun" });
+    });
+    return map;
+  }
+
+  // Rotational: one group lookup, then one batched schedule fetch for every
+  // week the month spans (instead of one WeeklyOffSchedule query per day).
+  let groupId = null;
+  if (employee) {
+    const group = await WeekOffGroup.findOne({
+      organisation_id, isActive: true,
+      members: { $elemMatch: { employee, employeeModel } },
+    }).select("_id").lean();
+    groupId = group ? group._id : null;
+  }
+
+  const weekStarts = [...new Set(days.map((d) => getWeekStart(d).getTime()))].map((t) => new Date(t));
+  const schedules = await WeeklyOffSchedule.find({
+    organisation_id,
+    weekStartDate: { $in: weekStarts },
+    group: { $in: [groupId, null] },
+  }).lean();
+
+  const scheduleFor = (weekStartMs) => {
+    const specific = schedules.find((s) => s.weekStartDate.getTime() === weekStartMs && String(s.group || "") === String(groupId || ""));
+    if (specific) return specific;
+    return schedules.find((s) => s.weekStartDate.getTime() === weekStartMs && !s.group) || null;
+  };
+
+  const map = new Map();
+  days.forEach((d) => {
+    const key = toISTKey(d);
+    const dName = dayName(d);
+    const schedule = scheduleFor(getWeekStart(d).getTime());
+    if (!schedule) {
+      map.set(key, { isOff: false, reason: "unconfigured", unconfigured: true });
+    } else {
+      map.set(key, { isOff: schedule.offDays.includes(dName), reason: "rotational" });
+    }
+  });
+  return map;
+}
+
 module.exports = {
   isWeekOff,
   isHoliday,
   classifyNonWorkingDay,
   hasRotationalScheduleForWeek,
+  getWeekOffMapForRange,
   getWeekStart,
   getWeekEnd,
   startOfDay,

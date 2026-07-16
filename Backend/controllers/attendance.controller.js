@@ -3,7 +3,7 @@ const AdminModel = require("../Models/Admin.model");
 const Shift = require("../Models/shift.model");
 const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
 const { resolveEmployeeShift, evaluateCheckinWindow, evaluateCheckoutWindow, getShiftThresholds, getForceCheckoutInstant } = require("../utils/shift.utils");
-const { isHoliday, isWeekOff, startOfDay } = require("../automatic/weekoffcalendar");
+const { isHoliday, isWeekOff, startOfDay, getWeekOffMapForRange } = require("../automatic/weekoffcalendar");
 const { getISTDateParts, istDateFromYMD, toISTKey } = require("../utils/Istdate.utils");
 
 const getUserId = (user) => user._id || user.id;
@@ -426,17 +426,20 @@ const getCalendarMeta = async (req, res) => {
     const holidays = holidayDocs.map((h) => ({ date: toKey(h.date), name: h.name }));
 
     const weekOffDates = [];
+    const weekOffMap = await getWeekOffMapForRange(monthStart, monthEnd, organisation_id, userId, employeeModel);
     for (let d = 1; d <= daysInMonth; d++) {
-      const date = istDateFromYMD(year, month, d);
-      const result = await isWeekOff(date, organisation_id, userId, employeeModel);
-      if (result.isOff) weekOffDates.push(`${year}-${pad2(month)}-${pad2(d)}`);
+      const key = `${year}-${pad2(month)}-${pad2(d)}`;
+      const result = weekOffMap.get(key);
+      if (result?.isOff) weekOffDates.push(key);
     }
 
     // ---- Today block ----
     const today0 = startOfDay(now);
     const todayKey = toKey(today0);
     const todayHoliday = await isHoliday(today0, organisation_id);
-    const todayWeekOff = await isWeekOff(today0, organisation_id, userId, employeeModel);
+    const todayWeekOff = (today0 >= monthStart && today0 <= monthEnd)
+      ? (weekOffMap.get(todayKey) ?? { isOff: false, reason: "unconfigured", unconfigured: true })
+      : await isWeekOff(today0, organisation_id, userId, employeeModel);
     const shift = await resolveEmployeeShift(user, organisation_id);
     const { allowed: withinShiftWindow, tooLate: checkinTooLate } = evaluateCheckinWindow(shift, now);
 
