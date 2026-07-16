@@ -1,4 +1,3 @@
-
 const HiringRequisition = require("../Models/Hiringrequisition.model");
 const Candidate = require("../Models/candidate.model");
 
@@ -12,6 +11,34 @@ const STAGE_ORDER = {
   OFFER_RELEASED: ["JOINED"],
   JOINED: [],
   REJECTED: [],
+};
+
+// Stages that count as an "opening" being filled.
+const FILLED_STAGES = ["SELECTED", "OFFER_RELEASED", "JOINED"];
+
+// Recomputes filled_count for a requisition from its candidates and
+// keeps requisition.status in sync (APPROVED <-> FILLED) whenever the
+// number of filled openings changes. This is what makes "openings"
+// actually go down when a candidate is marked SELECTED.
+const syncRequisitionFillStatus = async (requisitionId) => {
+  const requisition = await HiringRequisition.findById(requisitionId);
+  if (!requisition) return null;
+
+  const filled_count = await Candidate.countDocuments({
+    requisition_id: requisitionId,
+    current_stage: { $in: FILLED_STAGES },
+  });
+
+  requisition.filled_count = filled_count;
+
+  // Only auto-manage the FILLED <-> APPROVED transition. Don't touch
+  // requisitions that are PENDING / REJECTED / ON_HOLD / REVISION_REQUIRED.
+  if (["APPROVED", "FILLED"].includes(requisition.status)) {
+    requisition.status = filled_count >= requisition.openings ? "FILLED" : "APPROVED";
+  }
+
+  await requisition.save();
+  return requisition;
 };
 
 const createRequisition = async (req, res) => {
@@ -196,7 +223,10 @@ const addCandidate = async (req, res) => {
   });
 
   if (!requisition) {
-    return res.status(404).json({ success: false, message: "Approved requisition not found" });
+    return res.status(404).json({
+      success: false,
+      message: "Approved requisition not found, or all openings for this requisition are already filled",
+    });
   }
 
   const existing = await Candidate.findOne({
@@ -278,7 +308,16 @@ const updateCandidateStage = async (req, res) => {
 
   await candidate.save();
 
-  return res.status(200).json({ success: true, message: `Candidate moved to ${stage}`, data: candidate });
+  const requisition = await syncRequisitionFillStatus(candidate.requisition_id);
+
+  return res.status(200).json({
+    success: true,
+    message: `Candidate moved to ${stage}`,
+    data: candidate,
+    requisition: requisition
+      ? { _id: requisition._id, openings: requisition.openings, filled_count: requisition.filled_count, status: requisition.status }
+      : undefined,
+  });
 };
 
 const scheduleInterview = async (req, res) => {
