@@ -41,6 +41,13 @@ const mergeDuplicateAttendance = async () => {
       console.log(
         `[DUPLICATE] key=${key} keeping=${survivor._id} (source=${survivor.source}, status=${survivor.status}, checkOut=${!!survivor.checkOut}) deleting=[${toDelete.map((d) => d._id).join(", ")}]`
       );
+      const lwpRisk = toDelete.filter((d) => d.checkOut && (d.status === "absent" || d.status === "half_day"));
+      if (lwpRisk.length > 0) {
+        console.log(
+          `  ⚠️  LWP RISK: ${lwpRisk.length} of the deleted doc(s) had a real checkout with status absent/half_day — ` +
+          `employee ${lwpRisk[0].employee} may have had LWP double-counted for this day. Review LeaveBalance manually.`
+        );
+      }
       if (APPLY) {
         await Attendance.deleteMany({ _id: { $in: toDelete.map((d) => d._id) } });
       }
