@@ -18,12 +18,6 @@ import {
 import logo from '../../assets/TorchX.svg'
 import PlantImage from '../../assets/plant.png'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ██ BRAND TOKENS — same palette as before, referenced as Tailwind arbitrary values
-// P  = #7A004B (primary)   PH = #5a0033 (primary hover)
-// PL = #FDF4F8 (tint bg)   PB = #EAC7D7 (border tint)
-// D  = #111111 (ink)       G  = #5C5C5C (muted text)
-// ─────────────────────────────────────────────────────────────────────────────
 const radarData = [
   { metric: 'Leadership', value: 85 },
   { metric: 'Teamwork', value: 72 },
@@ -61,18 +55,12 @@ const fontStyles = `
   .nav-mobile-menu { overflow: hidden; animation: menuDrop .24s ease both; }
 `
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ██ WRAP — consistent 1500px container + fluid gutters, everywhere
-// ─────────────────────────────────────────────────────────────────────────────
 const Wrap = ({ children, className = '' }) => (
   <div className={`max-w-[1500px] mx-auto w-full px-5 sm:px-10 lg:px-16 ${className}`}>
     {children}
   </div>
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ██ DIVIDER
-// ─────────────────────────────────────────────────────────────────────────────
 function Divider() {
   return (
     <div className="bg-[#FDF4F8] py-3 flex items-center">
@@ -81,9 +69,6 @@ function Divider() {
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ██ NAVBAR
-// ─────────────────────────────────────────────────────────────────────────────
 function Navbar() {
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
@@ -155,9 +140,6 @@ function Navbar() {
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ██ ANALYTICS FLOATING CARD — decorative, SVG untouched
-// ─────────────────────────────────────────────────────────────────────────────
 function AnalyticsCard() {
   const P = '#7A004B'
   return (
@@ -204,9 +186,6 @@ function AnalyticsCard() {
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ██ DASHBOARD MOCKUP — pure SVG, unaffected by Tailwind conversion
-// ─────────────────────────────────────────────────────────────────────────────
 function DashboardMockup() {
   const P = '#7A004B'
   return (
@@ -399,11 +378,7 @@ function DashboardMockup() {
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ██ HERO
-// ─────────────────────────────────────────────────────────────────────────────
 function Hero() {
-  const navigate = useNavigate()
   return (
     <section className="bg-white overflow-hidden pt-20 pb-[72px]">
       <Wrap>
@@ -427,12 +402,12 @@ function Hero() {
             </p>
 
             <div className="flex flex-wrap gap-3.5">
-              <button
-                onClick={() => navigate('/signup')}
+              <a
+                href="https://torchxsuite.com/signup"
                 className="inline-flex items-center gap-2 bg-[#7A004B] text-white text-[15px] font-ui font-semibold px-7 py-3.5 rounded-full border-none cursor-pointer shadow-[0_8px_24px_rgba(122,0,75,0.25)] transition-all hover:bg-[#5a0033] hover:-translate-y-0.5"
               >
                 Sign Up For Free Trial <FiArrowRight />
-              </button>
+              </a>
               <a
                 href="#expert"
                 className="inline-flex items-center gap-2 border-2 border-[#7A004B] text-[#7A004B] bg-transparent text-[15px] font-ui font-semibold px-7 py-3.5 rounded-full no-underline transition-all hover:bg-[#FDF4F8] hover:-translate-y-0.5"
@@ -455,9 +430,6 @@ function Hero() {
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ██ STATS
-// ─────────────────────────────────────────────────────────────────────────────
 function Stats() {
   const stats = [
     { icon: <BsPeopleFill size={22} />, num: '100+', label: 'Happy customers of TorchX Talent' },
@@ -494,9 +466,6 @@ function Stats() {
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ██ FEATURE CARD SUB-COMPONENTS
-// ─────────────────────────────────────────────────────────────────────────────
 function MiniSidebar() {
   const icons = [FiUser, FiMessageSquare, FiUsers, FiSettings, FiLogOut]
   return (
@@ -676,9 +645,6 @@ function EmployeePortalCard() {
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ██ FEATURES SECTION
-// ─────────────────────────────────────────────────────────────────────────────
 function Features() {
   return (
     <section id="features" className="scroll-anchor bg-[#F8F5F7] font-body pt-8 pb-9">
@@ -707,9 +673,6 @@ function Features() {
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ██ PRICING
-// ─────────────────────────────────────────────────────────────────────────────
 function Pricing() {
   const plans = [
     { name: 'Basic', desc: 'Perfect for small teams getting started', price: '₹47', features: ['Employee database','Attendance tracking','Leave management','Basic payroll','Employee self-service portal','Email support'] },
@@ -824,9 +787,6 @@ function Pricing() {
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ██ TESTIMONIALS
-// ─────────────────────────────────────────────────────────────────────────────
 function Testimonials() {
   const [startIndex, setStartIndex] = useState(0)
   const testimonials = [
@@ -927,9 +887,6 @@ function Testimonials() {
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ██ LEGAL MODAL
-// ─────────────────────────────────────────────────────────────────────────────
 const legalDocs = {
   privacy: {
     title: 'Privacy Policy', effective: 'April 01, 2026',
@@ -1011,9 +968,6 @@ function LegalModal({ docKey, onClose }) {
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ██ FOOTER — links point to real destinations for internal/external link SEO
-// ─────────────────────────────────────────────────────────────────────────────
 function Footer() {
   const cols = [
     { title: 'Product', links: [
@@ -1114,9 +1068,6 @@ function Footer() {
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ██ ROOT EXPORT
-// ─────────────────────────────────────────────────────────────────────────────
 export default function LandingPage() {
   return (
     <>
