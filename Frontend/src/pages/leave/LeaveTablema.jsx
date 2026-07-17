@@ -390,7 +390,7 @@ const daysDiff = (s,e) => {
 
 const todayStr = () => new Date().toISOString().split("T")[0];
 const avatarColor = (name="") => AVATAR_COLORS[name.charCodeAt(0)%AVATAR_COLORS.length];
-const initials = (f="",l="") => `${f[0]||""}${l[0]||""}`.toUpperCase();
+const initials = (f="",l="") => (`${f[0]||""}${l[0]||""}`.toUpperCase() || "?");
 
 const normalizeLeave = (raw) => {
   if (!raw||typeof raw!=="object") return null;
@@ -619,17 +619,21 @@ const ReasonBox = ({reason,accent,accentBorder,accentLabel}) => (
   ) : null
 );
 
-const AvatarBox = ({name,subtext}) => (
-  <div style={{display:"flex",alignItems:"center",gap:13}}>
-    <div style={{width:42,height:42,borderRadius:13,background:avatarColor(name||"A"),color:"#fff",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"'DM Sans',sans-serif",boxShadow:"0 3px 9px rgba(0,0,0,0.14)"}}>
-      {name?.charAt(0)?.toUpperCase()||"?"}
+const AvatarBox = ({name,subtext}) => {
+  const cleanName = (name||"").trim();
+  const displayName = cleanName || "Unknown";
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:13}}>
+      <div style={{width:42,height:42,borderRadius:13,background:avatarColor(cleanName||"A"),color:"#fff",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"'DM Sans',sans-serif",boxShadow:"0 3px 9px rgba(0,0,0,0.14)"}}>
+        {cleanName.charAt(0)?.toUpperCase()||"?"}
+      </div>
+      <div>
+        <div style={{fontSize:14,fontWeight:600,color:cleanName?"#1C1028":"#9B8BAE",fontStyle:cleanName?"normal":"italic",fontFamily:"'DM Sans',sans-serif"}}>{displayName}</div>
+        {subtext&&<div style={{fontSize:11,color:"#9B8BAE",marginTop:2,fontFamily:"'DM Sans',sans-serif"}}>{subtext}</div>}
+      </div>
     </div>
-    <div>
-      <div style={{fontSize:14,fontWeight:600,color:"#1C1028",fontFamily:"'DM Sans',sans-serif"}}>{name}</div>
-      {subtext&&<div style={{fontSize:11,color:"#9B8BAE",marginTop:2,fontFamily:"'DM Sans',sans-serif"}}>{subtext}</div>}
-    </div>
-  </div>
-);
+  );
+};
 
 const DaysBadge = ({days,color,bg}) => (
   <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 9px",borderRadius:18,fontSize:11,fontWeight:600,background:bg||"#F4EEF9",color:color||"#6B1A4A",fontFamily:"'DM Sans',sans-serif"}}>
