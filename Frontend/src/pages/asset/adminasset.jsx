@@ -309,9 +309,21 @@ function AssignPersonModal({ open, onClose, asset, assignType, employees, manage
   if (!open || !asset) return null;
 
   const isEmployee = assignType === "employee";
+
+  // Defensive filter: source list (employees/managers) is already role-specific,
+  // but we double-check via `role` field if present, so mixed backend data
+  // never leaks into the wrong dropdown.
   const list = isEmployee
-    ? (employees ?? []).filter((e) => (e.working_status || "working") === "working")
-    : (managers ?? []).filter((m) => (m.working_status || "working") === "working");
+    ? (employees ?? []).filter(
+        (e) =>
+          (e.working_status || "working") === "working" &&
+          (!e.role || e.role === "employee")
+      )
+    : (managers ?? []).filter(
+        (m) =>
+          (m.working_status || "working") === "working" &&
+          (!m.role || m.role === "manager")
+      );
 
   const available = asset.available_quantity ?? 0;
   const qtyNum = Number(quantity);
