@@ -202,12 +202,13 @@ export const useDeleteAdmin = () => {
 
 
 
-export const useGetAllAdmins = () => {
+export const useGetAllAdmins = (options = {}) => {
   return useQuery({
     queryKey: ["admins"],
     queryFn: getAllAdmins,
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
+    ...options,
   });
 };
 
@@ -245,23 +246,25 @@ export const useAddEmployee = () => {
 
 
 
-export const useGetAllManagers = () => {
+export const useGetAllManagers = (options = {}) => {
   return useQuery({
     queryKey: ["managers"],
     queryFn: getAllManagers,
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
+    ...options,
   });
 };
 
 
 
-export const useGetAllEmployees = () => {
+export const useGetAllEmployees = (options = {}) => {
   return useQuery({
     queryKey: ["employees"],
     queryFn: getAllEmployees,
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
+    ...options,
   });
 };
 

@@ -68,6 +68,21 @@ const STYLES = `
   .su-scroll::-webkit-scrollbar-thumb { background:#dde3ec; border-radius:6px; }
   .su-scroll { -webkit-overflow-scrolling: touch; }
 
+  /* ---------- Profile detail panel field rows ----------
+     These classes are used in EmployeeDetailPanel's info list. They
+     were previously referenced in JSX but never given rules here, so
+     the label span and value span rendered back-to-back with no gap
+     (e.g. "Emp IDENG05"). Flex + space-between fixes the layout. */
+  .su-field-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .su-field-val {
+    flex: 1 1 auto;
+  }
+
   /* ---------- Org-chart connector lines ----------
      Lines are drawn with a measured SVG overlay (see OrgConnectorGroup
      below) instead of CSS width/gap math, so they are always pixel-
@@ -431,8 +446,9 @@ function EmployeeDetailPanel({ person, type, onClose }) {
     if (isAdmin) return [
       ["Emp ID",      person.empid || "—"],
       ["Email",       person.work_email],
-      ["Phone",       person.phone || "—"],
+      ["Phone",       person.personal_contact || "—"],
       ["Gender",      person.gender || "—"],
+      ["Marital",     person.marital_status || "—"],
       ["Designation", person.designation || "—"],
       ["Status",      person.status || "—"],
     ];
@@ -502,16 +518,20 @@ function EmployeeDetailPanel({ person, type, onClose }) {
 
           {!isSA && (
             <div className="flex gap-2 mb-5 flex-wrap min-w-0">
-              {["info", "leave", "reviews"].map((t) => (
+              {["info", "reviews"].map((t) => (
                 <button
                   key={t}
                   className={`px-4 py-2 rounded-lg border text-xs font-medium transition-all min-h-[40px] flex items-center shrink-0 ${tab === t ? "bg-[#730042] text-white border-[#730042] shadow-md" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}
                   onClick={() => setTab(t)}
                 >
-                  {t === "info" ? "Information" : t === "leave" ? "Leave" : "Reviews"}
+                  {t === "info" ? "Information" : "Reviews"}
                 </button>
               ))}
             </div>
+          )}
+
+          {(tab === "info" || isSA) && !isSA && !isAdmin && (
+            <ReportingChain uid={person._id} role={type} />
           )}
 
           {(tab === "info" || isSA) && (
@@ -525,7 +545,6 @@ function EmployeeDetailPanel({ person, type, onClose }) {
             </div>
           )}
 
-          {tab === "leave"   && !isSA && <LeaveTab uid={person._id} />}
           {tab === "reviews" && !isSA && <ReviewsTab uid={person._id} role={type} />}
         </div>
       </div>
@@ -533,45 +552,44 @@ function EmployeeDetailPanel({ person, type, onClose }) {
   );
 }
 
-function LeaveTab({ uid }) {
-  const { data: empData, isLoading } = useGetParticularEmployee(uid);
-  const lb = empData?.leaveBalance;
+// Shows who this employee/manager reports to (manager, then the admin
+// that manager sits under). Relies on the manager/admin fields the
+// getperticularemployee/getperticularemanager endpoints now return -
+// previously the employee endpoint's manager lookup was broken (queried
+// Managermodel by the employee's own _id) so this was never renderable.
+function ReportingChain({ uid, role }) {
+  const fetchFn = role === "manager" ? useGetParticularManager : useGetParticularEmployee;
+  const { data, isLoading } = fetchFn(uid);
 
-  if (isLoading) return (
-    <div className="flex justify-center pt-9">
-      <div className="w-6 h-6 rounded-full border-2 border-[#730042]/30 border-t-[#730042] animate-spin" />
-    </div>
-  );
+  if (isLoading) return null;
 
-  if (!lb) return (
-    <div className="text-xs sm:text-sm text-gray-400 text-center pt-9">No leave data found.</div>
-  );
+  const manager = data?.manager;
+  const admin   = data?.admin;
 
-  const leaveTypes = [
-    ["Casual Leave",    lb.casualLeave,    lb.casualLeaveUsed,    "#10b981"],
-    ["Sick Leave",      lb.sickLeave,      lb.sickLeaveUsed,      "#0ea5e9"],
-    ["Earned Leave",    lb.earnedLeave,    lb.earnedLeaveUsed,    "#6366f1"],
-    ["Maternity Leave", lb.maternityLeave, lb.maternityLeaveUsed, "#ec4899"],
-  ].filter(([, total]) => total !== undefined && total !== null);
+  if (!manager && !admin) return null;
 
   return (
-    <div className="flex flex-col gap-3 min-w-0">
-      {leaveTypes.map(([label, total, used, color]) => {
-        const remaining = (total || 0) - (used || 0);
-        const pct = total ? Math.round(((used || 0) / total) * 100) : 0;
-        return (
-          <div key={label} className="bg-[#fafbfc] rounded-xl border border-gray-100 p-3 sm:p-4 min-w-0">
-            <div className="flex justify-between items-center mb-2 gap-2">
-              <span className="text-xs sm:text-sm font-medium text-slate-900 truncate">{label}</span>
-              <span className="text-[11.5px] text-gray-500 shrink-0" style={{ fontFamily: "'JetBrains Mono',monospace" }}>{used || 0} / {total || 0}</span>
-            </div>
-            <div className="h-1.5 rounded bg-gray-100 overflow-hidden">
-              <div className="h-full rounded transition-all duration-700" style={{ width: `${pct}%`, background: color }} />
-            </div>
-            <div className="text-[11px] sm:text-xs text-gray-400 mt-1.5">{remaining} days remaining</div>
-          </div>
-        );
-      })}
+    <div className="flex flex-wrap items-center gap-1.5 mb-3 min-w-0">
+      <span className="text-[10px] sm:text-[11px] text-gray-400 font-medium shrink-0">Reports to</span>
+      {manager && (
+        <button
+          className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-700 font-medium hover:bg-slate-100 transition-colors max-w-full truncate"
+          title={`${fullName(manager)} · Manager`}
+        >
+          {fullName(manager)} <span className="text-slate-400">· Manager</span>
+        </button>
+      )}
+      {admin && (
+        <>
+          <span className="text-gray-300 text-xs shrink-0">→</span>
+          <button
+            className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-700 font-medium hover:bg-slate-100 transition-colors max-w-full truncate"
+            title={`${fullName(admin)} · Admin`}
+          >
+            {fullName(admin)} <span className="text-slate-400">· Admin</span>
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -783,6 +801,65 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
           </div>
         )
       )}
+
+      <OrphanNotice admins={admins} managers={managers} employees={employees} onNodeClick={onNodeClick} />
+    </div>
+  );
+}
+
+// Surfaces any manager/employee whose reporting_manager / Under_manager
+// doesn't resolve to a node that's actually in the current admins/
+// managers arrays (deleted parent, bad id, mismatched
+// reporting_manager_model, etc). Previously these records were just
+// dropped from the tree with no indication anything was missing, while
+// still being counted in the header stats - the exact mismatch reported
+// against this chart ("6 Employees" stat vs. only 2 cards visible).
+function OrphanNotice({ admins, managers, employees, onNodeClick }) {
+  const adminIdSet   = new Set(admins.map((a) => idStr(a._id)));
+  const managerIdSet = new Set(managers.map((m) => idStr(m._id)));
+
+  const orphanManagers = managers.filter((m) => {
+    if (m.reporting_manager_model === "Admin")   return !adminIdSet.has(idStr(m.reporting_manager));
+    if (m.reporting_manager_model === "Manager") return !managerIdSet.has(idStr(m.reporting_manager));
+    return true; // no recognizable parent reference at all
+  });
+
+  const orphanEmployees = employees.filter((e) => !managerIdSet.has(idStr(e.Under_manager)));
+
+  const total = orphanManagers.length + orphanEmployees.length;
+  if (total === 0) return null;
+
+  return (
+    <div className="mt-9 w-full max-w-xl mx-auto px-4 sm:px-5 py-3 sm:py-4 rounded-xl border-[1.5px] border-dashed border-amber-300 bg-amber-50 min-w-0">
+      <p className="text-xs sm:text-sm font-semibold text-amber-800">
+        {total} unassigned {total === 1 ? "record" : "records"} not shown in the chart above
+      </p>
+      <p className="text-[11px] sm:text-xs text-amber-700 mt-1">
+        {orphanManagers.length > 0 && `${orphanManagers.length} manager${orphanManagers.length !== 1 ? "s" : ""}`}
+        {orphanManagers.length > 0 && orphanEmployees.length > 0 && " and "}
+        {orphanEmployees.length > 0 && `${orphanEmployees.length} employee${orphanEmployees.length !== 1 ? "s" : ""}`}
+        {" "}reference a manager/admin that no longer exists or was never set. Click a name to open and reassign.
+      </p>
+      <div className="flex flex-wrap gap-1.5 mt-2.5">
+        {orphanManagers.map((m) => (
+          <button
+            key={m._id}
+            onClick={() => onNodeClick(m, "manager")}
+            className="text-[11px] px-2.5 py-1 rounded-full bg-white border border-amber-300 text-amber-800 font-medium hover:bg-amber-100 transition-colors"
+          >
+            {fullName(m)} · Manager
+          </button>
+        ))}
+        {orphanEmployees.map((e) => (
+          <button
+            key={e._id}
+            onClick={() => onNodeClick(e, "employee")}
+            className="text-[11px] px-2.5 py-1 rounded-full bg-white border border-amber-300 text-amber-800 font-medium hover:bg-amber-100 transition-colors"
+          >
+            {fullName(e)} · Employee
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -811,8 +888,20 @@ export default function SuperAdminOrgChart() {
     return Array.isArray(raw) ? raw : [];
   }, [mgrData]);
   const employees  = useMemo(() => {
+    // /superadmin/getallemployee returns a MERGED directory list under
+    // `users`: admins + managers + employees, each tagged with `type`.
+    // That shape is intentional (Payroll, dashboard, and the people-
+    // management pages all consume the merged list for search/lookup),
+    // but the org chart specifically needs only employee-level nodes -
+    // admins/managers are already fetched from their own endpoints
+    // above. Without this filter, admins/managers get double-counted
+    // in the "Employees"/"Total" stats even though they never render
+    // as duplicate cards in the tree (they lack Under_manager).
     const raw = empData?.users || empData || [];
-    return Array.isArray(raw) ? raw : [];
+    const list = Array.isArray(raw) ? raw : [];
+    return list.some((p) => p?.type)
+      ? list.filter((p) => p.type === "employee")
+      : list;
   }, [empData]);
 
   const orgName  = orgData?.organisation_name || superAdmin?.organisation_name || "Organisation";
