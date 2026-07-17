@@ -25,7 +25,7 @@ export const getOrgInfo = async () => {
 
 
 export const changeSuperAdminPassword = async (data) => {
-  const res = await api.put("superadmin/change-password", data);
+  const res = await api.put("superadmin/changepassword", data);
   return res.data;
 };
 
@@ -40,7 +40,7 @@ export const verifySuperAdminOtp = async (data) => {
 };
 
 export const resetSuperAdminPassword = async (data) => {
-  const res = await api.post("superadmin/reset-password", data);
+  const res = await api.post("superadmin/resetpassword", data);
   return res.data;
 };
 
@@ -65,12 +65,12 @@ export const getAllAdmins = async () => {
 };
 
 export const addManager = async (data) => {
-  const res = await api.post("superadmin/add-manager", data);
+  const res = await api.post("superadmin/addmanager", data);
   return res.data;
 };
 
 export const addEmployee = async (data) => {
-  const res = await api.post("superadmin/add-employee", data);
+  const res = await api.post("superadmin/addemployee", data);
   return res.data;
 };
 
@@ -85,22 +85,22 @@ export const getAllEmployees = async () => {
 };
 
 export const editEmployee = async (uid, data) => {
-  const res = await api.put(`superadmin/edit-employee/${uid}`, data);
+  const res = await api.put(`superadmin/editemployee/${uid}`, data);
   return res.data;
 };
 
 export const getParticularEmployee = async (uid) => {
-  const res = await api.get(`superadmin/employee/${uid}`);
+  const res = await api.get(`superadmin/getperticularemployee/${uid}`);
   return res.data;
 };
 
 export const getParticularManager = async (uid) => {
-  const res = await api.get(`superadmin/manager/${uid}`);
+  const res = await api.get(`superadmin/getperticularemanager/${uid}`);
   return res.data;
 };
 
 export const deleteEmployee = async (uid) => {
-  const res = await api.delete(`superadmin/delete-employee/${uid}`);
+  const res = await api.delete(`superadmin/deleteuser/${uid}`);
   return res.data;
 };
 

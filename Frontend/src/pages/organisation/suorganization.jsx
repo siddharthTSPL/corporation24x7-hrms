@@ -68,6 +68,21 @@ const STYLES = `
   .su-scroll::-webkit-scrollbar-thumb { background:#dde3ec; border-radius:6px; }
   .su-scroll { -webkit-overflow-scrolling: touch; }
 
+  /* ---------- Profile detail panel field rows ----------
+     These classes are used in EmployeeDetailPanel's info list. They
+     were previously referenced in JSX but never given rules here, so
+     the label span and value span rendered back-to-back with no gap
+     (e.g. "Emp IDENG05"). Flex + space-between fixes the layout. */
+  .su-field-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .su-field-val {
+    flex: 1 1 auto;
+  }
+
   /* ---------- Org-chart connector lines ----------
      Lines are drawn with a measured SVG overlay (see OrgConnectorGroup
      below) instead of CSS width/gap math, so they are always pixel-
@@ -783,6 +798,65 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
           </div>
         )
       )}
+
+      <OrphanNotice admins={admins} managers={managers} employees={employees} onNodeClick={onNodeClick} />
+    </div>
+  );
+}
+
+// Surfaces any manager/employee whose reporting_manager / Under_manager
+// doesn't resolve to a node that's actually in the current admins/
+// managers arrays (deleted parent, bad id, mismatched
+// reporting_manager_model, etc). Previously these records were just
+// dropped from the tree with no indication anything was missing, while
+// still being counted in the header stats - the exact mismatch reported
+// against this chart ("6 Employees" stat vs. only 2 cards visible).
+function OrphanNotice({ admins, managers, employees, onNodeClick }) {
+  const adminIdSet   = new Set(admins.map((a) => idStr(a._id)));
+  const managerIdSet = new Set(managers.map((m) => idStr(m._id)));
+
+  const orphanManagers = managers.filter((m) => {
+    if (m.reporting_manager_model === "Admin")   return !adminIdSet.has(idStr(m.reporting_manager));
+    if (m.reporting_manager_model === "Manager") return !managerIdSet.has(idStr(m.reporting_manager));
+    return true; // no recognizable parent reference at all
+  });
+
+  const orphanEmployees = employees.filter((e) => !managerIdSet.has(idStr(e.Under_manager)));
+
+  const total = orphanManagers.length + orphanEmployees.length;
+  if (total === 0) return null;
+
+  return (
+    <div className="mt-9 w-full max-w-xl mx-auto px-4 sm:px-5 py-3 sm:py-4 rounded-xl border-[1.5px] border-dashed border-amber-300 bg-amber-50 min-w-0">
+      <p className="text-xs sm:text-sm font-semibold text-amber-800">
+        {total} unassigned {total === 1 ? "record" : "records"} not shown in the chart above
+      </p>
+      <p className="text-[11px] sm:text-xs text-amber-700 mt-1">
+        {orphanManagers.length > 0 && `${orphanManagers.length} manager${orphanManagers.length !== 1 ? "s" : ""}`}
+        {orphanManagers.length > 0 && orphanEmployees.length > 0 && " and "}
+        {orphanEmployees.length > 0 && `${orphanEmployees.length} employee${orphanEmployees.length !== 1 ? "s" : ""}`}
+        {" "}reference a manager/admin that no longer exists or was never set. Click a name to open and reassign.
+      </p>
+      <div className="flex flex-wrap gap-1.5 mt-2.5">
+        {orphanManagers.map((m) => (
+          <button
+            key={m._id}
+            onClick={() => onNodeClick(m, "manager")}
+            className="text-[11px] px-2.5 py-1 rounded-full bg-white border border-amber-300 text-amber-800 font-medium hover:bg-amber-100 transition-colors"
+          >
+            {fullName(m)} · Manager
+          </button>
+        ))}
+        {orphanEmployees.map((e) => (
+          <button
+            key={e._id}
+            onClick={() => onNodeClick(e, "employee")}
+            className="text-[11px] px-2.5 py-1 rounded-full bg-white border border-amber-300 text-amber-800 font-medium hover:bg-amber-100 transition-colors"
+          >
+            {fullName(e)} · Employee
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -811,8 +885,20 @@ export default function SuperAdminOrgChart() {
     return Array.isArray(raw) ? raw : [];
   }, [mgrData]);
   const employees  = useMemo(() => {
+    // /superadmin/getallemployee returns a MERGED directory list under
+    // `users`: admins + managers + employees, each tagged with `type`.
+    // That shape is intentional (Payroll, dashboard, and the people-
+    // management pages all consume the merged list for search/lookup),
+    // but the org chart specifically needs only employee-level nodes -
+    // admins/managers are already fetched from their own endpoints
+    // above. Without this filter, admins/managers get double-counted
+    // in the "Employees"/"Total" stats even though they never render
+    // as duplicate cards in the tree (they lack Under_manager).
     const raw = empData?.users || empData || [];
-    return Array.isArray(raw) ? raw : [];
+    const list = Array.isArray(raw) ? raw : [];
+    return list.some((p) => p?.type)
+      ? list.filter((p) => p.type === "employee")
+      : list;
   }, [empData]);
 
   const orgName  = orgData?.organisation_name || superAdmin?.organisation_name || "Organisation";
