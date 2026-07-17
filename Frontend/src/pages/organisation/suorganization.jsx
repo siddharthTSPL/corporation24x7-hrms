@@ -434,8 +434,8 @@ const LEAVE_META = {
   SL:  { label: "Sick Leave",      color: "#2563eb" },
   ML:  { label: "Maternity Leave", color: "#78716c" },
   PL:  { label: "Paternity Leave", color: "#16a34a" },
-  pbc: { label: "PBC (Public Holidays)" },
-  lwp: { label: "LWP (Loss of Pay)" },
+  pbc: { label: "PBC (Paid Leave)" },
+  lwp: { label: "LWP (Leave Without Pay)" },
 };
 
 const LEAVE_BALANCE_HIDDEN_KEYS = new Set([
@@ -1383,4 +1383,4 @@ export default function SuperAdminOrgChart() {
       )}
     </div>
   );
-}
+} 
