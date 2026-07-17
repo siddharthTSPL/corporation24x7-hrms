@@ -6,6 +6,7 @@ const { calculateSalaryBreakup, calculatePayrollForMonth } = require("../utils/p
 
 // ---------- Salary structure (one-time CTC set, auto-computed breakup) ----------
 
+
 // This is the "one click" step: give it employee + annual CTC, it pulls the
 // org's current PayrollPolicy and computes the full monthly breakup
 // (Basic/HRA/allowances/PF/ESI) automatically, then saves it. Calling this
