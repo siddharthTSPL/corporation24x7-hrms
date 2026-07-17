@@ -343,7 +343,7 @@ function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, c
   const reason = isOnLeave
     ? "leave"
     : isFaceSession
-      ? "checked_in_by_face"
+      ? (checkinGate?.isVeryLate ? "outside_shift" : "checked_in_by_face")
       : (!alreadyActedToday ? (checkinGate?.reason ?? null) : null);
   const preBlocked = isOnLeave || isFaceSession || (!alreadyActedToday && !checkinGate?.canCheckIn);
 
@@ -351,9 +351,9 @@ function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, c
     leave:         { theme:"indigo", icon:"🏖️", label:`On Leave — ${leaveLabel[leaveType]||"Approved Leave"}` },
     holiday:       { theme:"amber",  icon:"🎉", label:`Holiday — ${checkinGate?.holidayName || "Company Holiday"}` },
     weekoff:       { theme:"slate",  icon:"🛋️", label:"Week Off" },
-    too_early:     { theme:"slate",  icon:"⏰", label: checkinGate?.shift
-      ? `Check-in opens closer to ${checkinGate.shift.startTime}`
-      : "Check-in not open yet" },
+    outside_shift: { theme:"rose",   icon:"⛔", label: checkinGate?.shift
+      ? `Outside Shift — ${checkinGate.shift.startTime} to ${checkinGate.shift.endTime}`
+      : "Outside Shift Window" },
     checked_in_by_face: { theme:"pink", icon:"🤳", label: "Checked in via Face Attendance" },
     loading:       { theme:"slate",  icon:"⏳", label:"Checking today's status…" },
   };
@@ -375,7 +375,7 @@ function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, c
   else if (isCheckedIn) buttonLabel = "🔴 Check Out";
   else if (reason === "holiday") buttonLabel = "🎉 Holiday Today";
   else if (reason === "weekoff") buttonLabel = "🛋️ Week Off";
-  else if (reason === "too_early") buttonLabel = "⏰ Not Open Yet";
+  else if (reason === "outside_shift") buttonLabel = "⛔ Outside Shift";
   else if (reason === "loading") buttonLabel = "Please wait…";
 
   const buttonDisabled = preBlocked || isCheckedOut;
@@ -805,6 +805,7 @@ export default function Dashboard() {
     return {
       canCheckIn: t.canCheckIn,
       reason: t.disabledReason,
+      isVeryLate: t.isVeryLate,
       holidayName: t.holidayName,
       shift: t.shift,
     };
