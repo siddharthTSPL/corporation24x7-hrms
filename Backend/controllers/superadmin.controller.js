@@ -1265,19 +1265,19 @@ const getallemployee = async (req, res, next) => {
     const [admins, managers, users] = await Promise.all([
       AdminModel.find({ organisation_id, working_status: "working" })
         .select(
-          "empid uid f_name l_name work_email role department designation office_location organisation_id",
+          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact marital_status",
         )
         .lean(),
 
       Managermodel.find({ organisation_id, working_status: "working" })
         .select(
-          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact",
+          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact marital_status",
         )
         .lean(),
 
       Usermodel.find({ organisation_id, working_status: "working" })
         .select(
-          "empid uid f_name l_name work_email role department designation office_location organisation_id Under_manager",
+          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact marital_status Under_manager",
         )
         .populate({
           path: "Under_manager",
