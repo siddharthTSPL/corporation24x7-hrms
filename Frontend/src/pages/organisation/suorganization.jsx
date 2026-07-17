@@ -530,6 +530,10 @@ function EmployeeDetailPanel({ person, type, onClose }) {
             </div>
           )}
 
+          {(tab === "info" || isSA) && !isSA && !isAdmin && (
+            <ReportingChain uid={person._id} role={type} />
+          )}
+
           {(tab === "info" || isSA) && (
             <div className="bg-[#fafbfc] rounded-xl p-4 sm:px-5 border border-gray-100 flex flex-col min-w-0">
               {fields.map(([label, val]) => (
@@ -545,6 +549,48 @@ function EmployeeDetailPanel({ person, type, onClose }) {
         </div>
       </div>
     </>
+  );
+}
+
+// Shows who this employee/manager reports to (manager, then the admin
+// that manager sits under). Relies on the manager/admin fields the
+// getperticularemployee/getperticularemanager endpoints now return -
+// previously the employee endpoint's manager lookup was broken (queried
+// Managermodel by the employee's own _id) so this was never renderable.
+function ReportingChain({ uid, role }) {
+  const fetchFn = role === "manager" ? useGetParticularManager : useGetParticularEmployee;
+  const { data, isLoading } = fetchFn(uid);
+
+  if (isLoading) return null;
+
+  const manager = data?.manager;
+  const admin   = data?.admin;
+
+  if (!manager && !admin) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 mb-3 min-w-0">
+      <span className="text-[10px] sm:text-[11px] text-gray-400 font-medium shrink-0">Reports to</span>
+      {manager && (
+        <button
+          className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-700 font-medium hover:bg-slate-100 transition-colors max-w-full truncate"
+          title={`${fullName(manager)} · Manager`}
+        >
+          {fullName(manager)} <span className="text-slate-400">· Manager</span>
+        </button>
+      )}
+      {admin && (
+        <>
+          <span className="text-gray-300 text-xs shrink-0">→</span>
+          <button
+            className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-700 font-medium hover:bg-slate-100 transition-colors max-w-full truncate"
+            title={`${fullName(admin)} · Admin`}
+          >
+            {fullName(admin)} <span className="text-slate-400">· Admin</span>
+          </button>
+        </>
+      )}
+    </div>
   );
 }
 
