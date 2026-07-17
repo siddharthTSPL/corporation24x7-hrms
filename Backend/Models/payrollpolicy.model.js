@@ -10,6 +10,7 @@ const mongoose = require("mongoose");
 // `enabled: false` on a component means: skip it entirely during payroll
 // calculation (contributes 0, doesn't show up in the payslip breakdown).
 
+
 const allowanceSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
