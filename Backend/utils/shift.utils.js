@@ -30,6 +30,29 @@ const getShiftThresholds = (shift) => {
   };
 };
 
+// Face-attendance-only status rule. Manual/System flow keeps using
+// getShiftThresholds + calculateStatus (fixed absentBelowMinutes /
+// halfDayBelowMinutes from the shift doc) - UNCHANGED, untouched.
+//
+// Face has no activity-ping tracking, so instead of fixed minute
+// thresholds, worked time (raw checkin->checkout gap) is judged as a
+// PERCENTAGE of that shift's own total length:
+//   < 50% of shift length      -> absent
+//   50% - 85% of shift length  -> half_day
+//   >= 85% of shift length     -> present
+const FACE_ABSENT_RATIO = 0.5;
+const FACE_PRESENT_RATIO = 0.85;
+
+const calculateFaceStatus = (workedMinutes, shift) => {
+  const shiftMinutes = getShiftDurationMinutes(shift);
+  const absentBelow = shiftMinutes * FACE_ABSENT_RATIO;
+  const presentAtOrAbove = shiftMinutes * FACE_PRESENT_RATIO;
+
+  if (workedMinutes < absentBelow) return "absent";
+  if (workedMinutes < presentAtOrAbove) return "half_day";
+  return "present";
+};
+
 // Late is measured from (shift start + graceMinutes). Anyone inside the
 // grace window is "on time"; lateMinutes is how far past the grace edge
 // they are, not how far past the raw shift start.
@@ -195,6 +218,7 @@ module.exports = {
   toMinutes,
   getShiftDurationMinutes,
   getShiftThresholds,
+  calculateFaceStatus,
   evaluateCheckinWindow,
   evaluateCheckoutWindow,
   getForceCheckoutInstant,
