@@ -37,7 +37,14 @@ export const DEPT_FULL_FORMS = {
 
 export const getDepartmentName = (dept) =>
   DEPT_FULL_FORMS[dept] || dept || "—";
-const ROLE_LABEL = { admin: "Admin",  official: "Official" };
+const ROLE_LABEL = {
+  admin: "Admin",
+  senior_admin: "Senior Admin",
+  official: "Official",
+  manager: "Manager",
+  senior_manager: "Senior Manager",
+  employee: "Employee",
+};
 
 const WORKING_STATUS_OPTIONS = [
   { value: "resigned", label: "Resigned" },
@@ -2091,11 +2098,13 @@ function SuperAdminDashboard() {
           </div>
         ) : (
           <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 sm:gap-3 p-3 sm:p-5">
-            {displayEmp.map((emp, i) => {
+       {displayEmp.map((emp, i) => {
               const name = [emp.f_name, emp.l_name].filter(Boolean).join(" ") || "Employee";
-              const role = emp.designation || emp.role || "";
+              const roleKey = (emp.role || "").toLowerCase();
+              const roleLabel = ROLE_LABEL[roleKey] || (roleKey ? roleKey.charAt(0).toUpperCase() + roleKey.slice(1) : "");
+              const designation = emp.designation || "";
               const dept = emp.department || "";
-              const isManager = (emp.role || "").toLowerCase() === "manager";
+              const isManager = roleKey === "manager" || roleKey === "senior_manager";
               return (
                 <div key={emp._id || i} className="border border-[#e8d5e2] rounded-xl p-2.5 sm:p-3 flex items-center gap-2.5 sm:gap-3 hover:shadow-sm hover:bg-[#fdf5f9] transition-all duration-150">
                   <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-[11px] sm:text-[12px] font-bold text-white flex-shrink-0" style={{ background: isManager ? "linear-gradient(135deg,#730042,#cd166e)" : `linear-gradient(135deg,${avaColor(emp.f_name || "")},${avaColor((emp.l_name || "A"))})` }}>
@@ -2103,8 +2112,12 @@ function SuperAdminDashboard() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-[11px] sm:text-[12px] font-semibold text-[#0d0209] truncate leading-tight">{name}</p>
-                    {isManager && <span className="text-[9px] bg-[#f7ecf3] text-[#730042] px-1.5 py-0.5 rounded-full font-bold uppercase">MGR</span>}
-                    {role && <p className="text-[10px] sm:text-[11px] text-[#7a5568] truncate mt-0.5">{role}</p>}
+                    {roleLabel && (
+                      <span className="text-[9px] bg-[#f7ecf3] text-[#730042] px-1.5 py-0.5 rounded-full font-bold inline-block mt-0.5">
+                        {roleLabel}
+                      </span>
+                    )}
+                    {designation && <p className="text-[10px] sm:text-[11px] text-[#7a5568] truncate mt-0.5">{designation}</p>}
                     {dept && <span className="text-[9px] sm:text-[10px] bg-[#f7ecf3] text-[#730042] px-1.5 py-0.5 rounded-full font-semibold inline-block mt-0.5 sm:mt-1">{getDepartmentName(dept)}</span>}
                   </div>
                 </div>
