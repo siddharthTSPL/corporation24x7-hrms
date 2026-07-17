@@ -2499,6 +2499,32 @@ const setLeavePolicy = async (req, res, next) => {
   return res.status(200).json({ success: true, message: "Leave policy updated", policy });
 };
 
+const getperticularadmin = async (req, res, next) => {
+  const { uid } = req.params;
+  const organisation_id = req.superAdmin._id;
+
+  const [admin, leaveBalance, reviews] = await Promise.all([
+    AdminModel.findOne({ _id: uid, organisation_id }).select(EXCLUDE).lean(),
+    leavebalanceModel.findOne({ employee: uid, organisation_id }).lean(),
+    reviewModel
+      .find({ reviewee: uid, organisation_id, revieweeRoleModel: "Admin" })
+      .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      .lean(),
+  ]);
+
+  if (!admin)
+    return next(
+      Object.assign(new Error("Admin not found"), { statusCode: 404 }),
+    );
+
+  res.status(200).json({
+    success: true,
+    admin,
+    leaveBalance: leaveBalance || null,
+    reviews: reviews || [],
+  });
+};
+
 module.exports = {
   registerSuperAdmin,
   verifySuperAdmin,
@@ -2544,5 +2570,6 @@ module.exports = {
   getInactiveUsers,
   getActiveUserCount,
   getLeavePolicy,
-  setLeavePolicy
+  setLeavePolicy,
+  getperticularadmin
 };
