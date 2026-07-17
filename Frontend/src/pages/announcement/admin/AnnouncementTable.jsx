@@ -70,9 +70,9 @@ export default function AnnouncementTable({ announcements, isLoading, isError, o
                     />
                   </td>
 
-                  <td className="px-5 py-4 max-w-[200px]">
-                    <p className="text-[13px] font-semibold text-[#730042] truncate">{item.title}</p>
-                    <p className="text-[11px] text-[#993556] truncate mt-0.5">{item.message}</p>
+                  <td className="px-5 py-4 max-w-[320px]">
+                    <p className="text-[13px] font-semibold text-[#730042]">{item.title}</p>
+                    <p className="text-[11px] text-[#993556] mt-0.5 whitespace-pre-wrap break-words">{item.message}</p>
                   </td>
 
                   <td className="px-5 py-4"><AudienceBadge audience={item.audience} /></td>

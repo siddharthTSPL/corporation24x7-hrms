@@ -10,6 +10,7 @@ import {
 } from "../../auth/server-state/adminleave/adminleave.hook";
 import { useAdminGetMyWFH } from "../../auth/server-state/adminwfh/adminwfh.hook";
 import { useTodayAttendance, useCalendarMeta } from "../../auth/server-state/attendance/attendance.hook";
+import { useGetAllAnnouncement } from "../../auth/server-state/adminannounce/adminannounce.hook";
 import AttendanceModal from "./AttendanceModal";
 import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus, isPastShiftEnd } from "../../pages/utils/attendance";
 
@@ -17,17 +18,6 @@ const MONTHS = ["January","February","March","April","May","June","July","August
 const DAYS = ["S","M","T","W","T","F","S"];
 const APPROVED_STATUSES = ["approved_manager","approved_admin","approved_reporting_manager","approved"];
 const APPROVED_WFH_STATUSES = ["approved","approved_admin","approved_reporting_manager"];
-
-// Department short-form -> full-form mapping (kept in sync with SuperAdmin's DEPT_OPTIONS)
-const DEPT_FULL_FORMS = {
-  OPR: "Operations",
-  BPO: "Business Process Outsourcing",
-  ENG: "Engineering",
-  HR: "Human Resources",
-  MGMT: "Management",
-};
-
-const getDepartmentName = (dept) => DEPT_FULL_FORMS[dept] || dept || "—";
 
 function getInitials(f="",l="") {
   return `${f[0]||""}${l[0]||""}`.toUpperCase();
@@ -803,6 +793,7 @@ export default function Dashboard() {
   const { data:checkinData, isLoading:mapLoading }=useGetTodayCheckins();
   const { data:leaveReqData, isLoading:leaveReqLoading }=useGetForwardedLeaves();
   const { data:calMeta }=useCalendarMeta(selectedMonth, new Date().getFullYear());
+  const { data:annData, isLoading:annLoading }=useGetAllAnnouncement();
 
   const { mutate:acceptLeave, isPending:accepting }=useAcceptLeave();
   const { mutate:rejectLeave, isPending:rejecting }=useRejectLeave();
@@ -827,6 +818,7 @@ export default function Dashboard() {
   }, [calMeta]);
 
   const employees = Array.isArray(empData?.employees) ? empData.employees : Array.isArray(empData) ? empData : [];
+  const announcements = Array.isArray(annData?.announcements) ? annData.announcements : Array.isArray(annData) ? annData : [];
   const checkins = checkinData?.checkins ?? [];
   const leaveRequests = Array.isArray(leaveReqData?.leaves) ? leaveReqData.leaves : Array.isArray(leaveReqData) ? leaveReqData : [];
 
@@ -1045,8 +1037,7 @@ export default function Dashboard() {
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <Badge variant="brand">{employee?.uid??"—"}</Badge>
                     <Badge variant="green">Active</Badge>
-                    {/* Department now shown in full form instead of short code */}
-                    <Badge variant="blue">{getDepartmentName(employee?.department)}</Badge>
+                    <Badge variant="blue">{employee?.department??"—"}</Badge>
                   </div>
                   <div className="mt-3 pt-3 border-t border-[#ede5e0] flex flex-col gap-1">
                     <div className="text-[10px] text-[#b0948a] font-sans">📧 {employee?.work_email??"—"}</div>
@@ -1190,8 +1181,7 @@ export default function Dashboard() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 px-4 sm:px-5 py-3.5">
               <InfoField label="Work email" value={employee?.work_email} loading={meLoading} />
-              {/* Department now shown in full form instead of short code */}
-              <InfoField label="Department" value={getDepartmentName(employee?.department)} loading={meLoading} />
+              <InfoField label="Department" value={employee?.department} loading={meLoading} />
               <InfoField label="Office" value={employee?.office_location} loading={meLoading} />
               <InfoField label="Gender" value={employee?.gender} loading={meLoading} />
               <InfoField label="Marital status" value={employee?.marital_status} loading={meLoading} />
@@ -1260,6 +1250,46 @@ export default function Dashboard() {
           <LeaveHistoryList leaves={allLeaves} loading={histLoading} />
         </div>
 
+        <div className="bg-white rounded-2xl border border-[#ede5e0] shadow-sm overflow-hidden relative animate-fadein hover:shadow-lg transition-shadow mb-3.5">
+          <CardAccent color="#730042" />
+          <div className="p-4 sm:p-5 border-b border-[#ede5e0] flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2 font-sans text-[12px] font-semibold">
+              📢 Announcements
+            </div>
+            {!annLoading && <Badge variant="brand">{announcements.length} total</Badge>}
+          </div>
+
+          {annLoading ? (
+            <div className="text-center py-10 px-5 text-[#cfc3bc]">
+              <div className="text-3xl mb-2.5">⏳</div>
+              <p className="text-[12px] font-sans">Loading announcements…</p>
+            </div>
+          ) : announcements.length === 0 ? (
+            <div className="text-center py-10 px-5 text-[#cfc3bc]">
+              <div className="text-3xl mb-2.5">📢</div>
+              <p className="text-[12px] font-sans">No announcements yet.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-[#ede5e0]">
+              {announcements.slice(0, 5).map((ann) => (
+                <div key={ann._id} className="p-4 sm:p-5">
+                  <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                    <Badge variant={ann.priority === "high" ? "red" : ann.priority === "low" ? "slate" : "amber"}>
+                      {(ann.priority || "normal").toString().replace(/^\w/, c => c.toUpperCase())}
+                    </Badge>
+                    <Badge variant="slate">{(ann.audience || "all").toString().toUpperCase()}</Badge>
+                    {ann.expiresAt && (
+                      <span className="ml-auto text-[10px] text-[#b0948a] font-sans">Expires {fmtDate(ann.expiresAt)}</span>
+                    )}
+                  </div>
+                  <p className="text-[12px] font-semibold text-[#2a1a16] font-sans mb-1">{ann.title}</p>
+                  <p className="text-[11px] text-[#7a6a63] font-sans leading-relaxed whitespace-pre-wrap break-words">{ann.message}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="bg-white rounded-2xl border border-[#ede5e0] shadow-sm overflow-hidden">
           <div className="p-4 sm:p-5 border-b border-[#ede5e0] flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2 font-sans text-[12px] font-semibold">
@@ -1299,7 +1329,7 @@ export default function Dashboard() {
                     <div className="min-w-0">
                       <div className="text-[12px] font-semibold text-[#2a1a16] leading-tight truncate font-sans">{name}</div>
                       {role && <div className="text-[10px] text-[#b0948a] mt-0.5 truncate font-sans">{role}</div>}
-                      {dept && <span className="inline-block text-[9px] font-semibold bg-[rgba(115,0,66,0.08)] text-[#730042] px-1.5 py-0.5 rounded-full mt-1 font-sans">{getDepartmentName(dept)}</span>}
+                      {dept && <span className="inline-block text-[9px] font-semibold bg-[rgba(115,0,66,0.08)] text-[#730042] px-1.5 py-0.5 rounded-full mt-1 font-sans">{dept}</span>}
                       {email && (
                         <div className="text-[9px] text-[#cfc3bc] mt-1 truncate font-sans">✉ {email}</div>
                       )}
