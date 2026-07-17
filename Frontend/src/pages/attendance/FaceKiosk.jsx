@@ -76,7 +76,7 @@ function classifyResult(data, err) {
     if (err.reason === "not_registered")
       return { kind: "not_registered", title: "Not registered", detail: "This face isn't registered yet. Please ask your admin to register you first, then try again." };
     if (err.reason === "too_late")
-      return { kind: "blocked", title: "Too late", detail: err.message, subDetail: buildSubDetail(err.data) };
+      return { kind: "checkin_late", title: "Quite late, but welcome!", detail: err.message, subDetail: buildSubDetail(err.data) };
     if (err.reason === "too_early")
       return { kind: "too_early", title: "Too early", detail: err.message, subDetail: buildSubDetail(err.data) };
     if (err.reason === "checked_in_by_system")

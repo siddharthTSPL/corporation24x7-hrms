@@ -6,7 +6,7 @@ import { useGetAllManagerLeaves } from "../../auth/server-state/manager/managerl
 import { useGetAttendance } from "../../auth/server-state/manager/managgerother/managerother.hook";
 import { useGetMyLeavesManager } from "../../auth/server-state/manager/managerleave/managerleave.hook";
 import { useCalendarMeta, useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
-import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus } from "../../pages/utils/attendance";
+import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus, isPastShiftEnd } from "../../pages/utils/attendance";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS   = ["S","M","T","W","T","F","S"];
@@ -408,7 +408,7 @@ function SegBar({ segments }) {
   );
 }
 
-function Calendar({ month, joiningDate, attendanceMap = new Map(), myApprovedLeaves = [], holidays = [], weekOffDates = [] }) {
+function Calendar({ month, joiningDate, attendanceMap = new Map(), myApprovedLeaves = [], holidays = [], weekOffDates = [], todayShiftEnd = null }) {
   const year     = new Date().getFullYear();
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMo = new Date(year, month + 1, 0).getDate();
@@ -477,7 +477,8 @@ function Calendar({ month, joiningDate, attendanceMap = new Map(), myApprovedLea
       status = "leave";
     } else if (!isFuture) {
       const record = attendanceMap.get(key);
-      status = resolveAttendanceStatus(record, { isToday }) ?? "absent";
+      const resolved = resolveAttendanceStatus(record, { isToday });
+      status = resolved ?? (isToday && !isPastShiftEnd(todayShiftEnd) ? "pending" : "absent");
     }
 
     cells.push({ day: d, status, isToday, label });
@@ -493,6 +494,7 @@ function Calendar({ month, joiningDate, attendanceMap = new Map(), myApprovedLea
     holiday:        { background: "#fdecea", color: "#c2410c", fontWeight: 600 },
     weekoff:        { background: "#f1f5f9", color: "#64748b", fontWeight: 500 },
     future:         { color: "#d4c8c4", fontWeight: 400 },
+    pending:        { background: "#f8fafc", color: "#94a3b8", fontWeight: 500 },
     before_joining: { color: "#ede5e0", fontWeight: 400, background: "transparent" },
   };
 
@@ -626,7 +628,7 @@ function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, c
   const reason = isOnLeave
     ? "leave"
     : isFaceSession
-      ? "checked_in_by_face"
+      ? (checkinGate?.isVeryLate ? "outside_shift" : "checked_in_by_face")
       : (!alreadyActedToday ? (checkinGate?.reason ?? null) : null);
   const isBlocked = isOnLeave || isFaceSession || (!alreadyActedToday && !checkinGate?.canCheckIn);
 
@@ -634,12 +636,9 @@ function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, c
     leave:         { theme:"indigo", icon:"🏖️", label: `On Leave — ${leaveLabel[leaveType] || "Approved Leave"}` },
     holiday:       { theme:"amber",  icon:"🎉", label: `Holiday — ${checkinGate?.holidayName || "Company Holiday"}` },
     weekoff:       { theme:"slate",  icon:"🛋️", label: "Week Off" },
-    too_early:     { theme:"slate",  icon:"⏰", label: checkinGate?.shift
-      ? `Check-in opens closer to ${checkinGate.shift.startTime}`
-      : "Check-in not open yet" },
-    too_late:      { theme:"rose",   icon:"⛔", label: checkinGate?.shift
-      ? `Check-in closed — more than 1 hour past ${checkinGate.shift.startTime}`
-      : "Check-in window closed" },
+    outside_shift: { theme:"rose",   icon:"⛔", label: checkinGate?.shift
+      ? `Outside Shift — ${checkinGate.shift.startTime} to ${checkinGate.shift.endTime}`
+      : "Outside Shift Window" },
     checked_in_by_face: { theme:"pink", icon:"🤳", label: "Checked in via Face Attendance" },
     loading:       { theme:"slate",  icon:"⏳", label: "Checking today's status…" },
   };
@@ -676,8 +675,7 @@ function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, c
   else if (isCheckedIn) buttonLabel = "🔴 Check Out";
   else if (reason === "holiday") buttonLabel = "🎉 Holiday Today";
   else if (reason === "weekoff") buttonLabel = "🛋️ Week Off";
-  else if (reason === "too_early") buttonLabel = "⏰ Not Open Yet";
-  else if (reason === "too_late") buttonLabel = "⛔ Blocked";
+  else if (reason === "outside_shift") buttonLabel = "⛔ Outside Shift";
   else if (reason === "loading") buttonLabel = "Please wait…";
 
   const buttonDisabled = isBlocked || isCheckedOut;
@@ -916,6 +914,7 @@ export default function ManagerDashboard() {
     return {
       canCheckIn: t.canCheckIn,
       reason: t.disabledReason,
+      isVeryLate: t.isVeryLate,
       holidayName: t.holidayName,
       shift: t.shift,
     };
@@ -986,11 +985,14 @@ export default function ManagerDashboard() {
       });
       if (isOwnLeave) continue;
 
-      counted++;
       const key = getISTDayKey(date);
       const rec = attendanceMap.get(key);
       const isTodayCell = date.toDateString() === today.toDateString();
       const status = resolveAttendanceStatus(rec, { isToday: isTodayCell });
+      if (isTodayCell && !status && !isPastShiftEnd(calMeta?.today?.shift?.endTime)) {
+        continue; // still pending - shift hasn't ended yet
+      }
+      counted++;
 
       if (status === "present")   present++;
       else if (status === "absent" || !status) absent++;
@@ -1238,6 +1240,7 @@ export default function ManagerDashboard() {
               myApprovedLeaves={myOwnAppliedLeaves}
               holidays={calMeta?.holidays ?? []}
               weekOffDates={calMeta?.weekOffDates ?? []}
+              todayShiftEnd={calMeta?.today?.shift?.endTime ?? null}
             />
           </div>
 

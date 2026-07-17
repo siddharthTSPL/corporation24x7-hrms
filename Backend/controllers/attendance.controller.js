@@ -57,19 +57,24 @@ const checkin = async (req, res) => {
     }
 
     const shift = await resolveEmployeeShift(user, organisation_id);
-    const { allowed, isLate, tooLate } = evaluateCheckinWindow(shift, new Date());
+    const { allowed, isLate, lateMinutes, tooLate } = evaluateCheckinWindow(shift, new Date());
 
+    // Same "outside_shift" window as Face Attendance and getCalendarMeta:
+    // more than earlyBufferMinutes before shift start, OR more than
+    // lateCheckinCutoffMinutes after shift end.
     if (!allowed) {
-      if (tooLate) {
-        return res.status(400).json({
-          message: `Not allowed — you are too late. Check-in for ${shift.name} closes ${shift.lateCheckinCutoffMinutes ?? 60} minute(s) after shift start (${shift.startTime}).`,
-          reason: "too_late",
-          shift: { name: shift.name, startTime: shift.startTime, endTime: shift.endTime },
-        });
-      }
       return res.status(400).json({
-        message: `Check-in opens ${shift.earlyBufferMinutes ?? 60} minute(s) before your shift (${shift.startTime}).`,
-        reason: "too_early",
+        message: `Outside Shift. Check-in opens ${shift.earlyBufferMinutes ?? 60} minute(s) before your shift (${shift.startTime}).`,
+        reason: "outside_shift",
+        shift: { name: shift.name, startTime: shift.startTime, endTime: shift.endTime },
+      });
+    }
+
+    if (tooLate) {
+      const lateCutoff = shift.lateCheckinCutoffMinutes ?? 60;
+      return res.status(400).json({
+        message: `Outside Shift. Your check-in window for ${shift.name} (${shift.startTime} – ${shift.endTime}) closed ${lateCutoff} minute(s) after shift end. Please contact your admin/manager.`,
+        reason: "outside_shift",
         shift: { name: shift.name, startTime: shift.startTime, endTime: shift.endTime },
       });
     }
@@ -141,7 +146,10 @@ const checkin = async (req, res) => {
       }
     }
 
-    res.json({ message: "Check-in successful", attendance: newAttendance, isLate });
+    const message = isLate
+      ? `You are a bit late (by ${Math.round(lateMinutes)} min), but welcome! Check-in successful.`
+      : "Check-in successful";
+    res.json({ message, attendance: newAttendance, isLate, lateMinutes });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -170,7 +178,14 @@ const activity = async (req, res) => {
           onModel: getOnModel(user.role),
           role: user.role,
           date: today,
-          checkIn: new Date(),
+          // Deliberately NOT setting checkIn here - an agent ping is just
+          // background activity tracking, not a real check-in. Leaving
+          // checkIn unset means anything reading `attendance.checkIn` (or
+          // `!!attendance.checkIn`) is naturally correct on its own,
+          // without every consumer having to remember to also check
+          // `source !== "agent"`. checkIn only gets set for real when a
+          // manual/face check-in upgrades this record (see checkin()
+          // above and scanFace() in faceattendance.controller.js).
           shift: shift._id,
           activeMinutes: 0,
           idleMinutes: 0,
@@ -483,7 +498,7 @@ const getCalendarMeta = async (req, res) => {
     if (todayHoliday.isHoliday) disabledReason = "holiday";
     else if (todayWeekOff.isOff) disabledReason = "weekoff";
     else if (checkedInByFace) disabledReason = "checked_in_by_face";
-    else if (!withinShiftWindow) disabledReason = checkinTooLate ? "too_late" : "too_early";
+    else if (!withinShiftWindow || checkinTooLate) disabledReason = "outside_shift";
 
     res.json({
       success: true,
@@ -500,9 +515,11 @@ const getCalendarMeta = async (req, res) => {
           startTime: shift.startTime,
           endTime: shift.endTime,
           earlyBufferMinutes: shift.earlyBufferMinutes ?? 60,
+          lateCheckinCutoffMinutes: shift.lateCheckinCutoffMinutes ?? 60,
         },
         withinShiftWindow,
-        canCheckIn: !todayHoliday.isHoliday && !todayWeekOff.isOff && !checkedInByFace && withinShiftWindow,
+        isVeryLate: checkinTooLate,
+        canCheckIn: !todayHoliday.isHoliday && !todayWeekOff.isOff && !checkedInByFace && withinShiftWindow && !checkinTooLate,
         disabledReason,
         checkedInByFace,
         faceCheckInTime: checkedInByFace ? todayAttendance.checkIn : null,
