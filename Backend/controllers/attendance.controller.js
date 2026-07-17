@@ -59,10 +59,22 @@ const checkin = async (req, res) => {
     const shift = await resolveEmployeeShift(user, organisation_id);
     const { allowed, isLate, lateMinutes, tooLate } = evaluateCheckinWindow(shift, new Date());
 
+    // Same "outside_shift" window as Face Attendance and getCalendarMeta:
+    // more than earlyBufferMinutes before shift start, OR more than
+    // lateCheckinCutoffMinutes after shift end.
     if (!allowed) {
       return res.status(400).json({
-        message: `Check-in opens ${shift.earlyBufferMinutes ?? 60} minute(s) before your shift (${shift.startTime}).`,
-        reason: "too_early",
+        message: `Outside Shift. Check-in opens ${shift.earlyBufferMinutes ?? 60} minute(s) before your shift (${shift.startTime}).`,
+        reason: "outside_shift",
+        shift: { name: shift.name, startTime: shift.startTime, endTime: shift.endTime },
+      });
+    }
+
+    if (tooLate) {
+      const lateCutoff = shift.lateCheckinCutoffMinutes ?? 60;
+      return res.status(400).json({
+        message: `Outside Shift. Your check-in window for ${shift.name} (${shift.startTime} – ${shift.endTime}) closed ${lateCutoff} minute(s) after shift end. Please contact your admin/manager.`,
+        reason: "outside_shift",
         shift: { name: shift.name, startTime: shift.startTime, endTime: shift.endTime },
       });
     }
@@ -134,8 +146,8 @@ const checkin = async (req, res) => {
       }
     }
 
-    const message = isLate && tooLate
-      ? `You are quite late (by ${Math.round(lateMinutes)} min), but welcome! Check-in successful.`
+    const message = isLate
+      ? `You are a bit late (by ${Math.round(lateMinutes)} min), but welcome! Check-in successful.`
       : "Check-in successful";
     res.json({ message, attendance: newAttendance, isLate, lateMinutes });
   } catch (error) {
@@ -479,7 +491,7 @@ const getCalendarMeta = async (req, res) => {
     if (todayHoliday.isHoliday) disabledReason = "holiday";
     else if (todayWeekOff.isOff) disabledReason = "weekoff";
     else if (checkedInByFace) disabledReason = "checked_in_by_face";
-    else if (!withinShiftWindow) disabledReason = "too_early";
+    else if (!withinShiftWindow || checkinTooLate) disabledReason = "outside_shift";
 
     res.json({
       success: true,
@@ -496,10 +508,11 @@ const getCalendarMeta = async (req, res) => {
           startTime: shift.startTime,
           endTime: shift.endTime,
           earlyBufferMinutes: shift.earlyBufferMinutes ?? 60,
+          lateCheckinCutoffMinutes: shift.lateCheckinCutoffMinutes ?? 60,
         },
         withinShiftWindow,
-        isVeryLate: checkinTooLate, // informational only — no longer blocks check-in
-        canCheckIn: !todayHoliday.isHoliday && !todayWeekOff.isOff && !checkedInByFace && withinShiftWindow,
+        isVeryLate: checkinTooLate,
+        canCheckIn: !todayHoliday.isHoliday && !todayWeekOff.isOff && !checkedInByFace && withinShiftWindow && !checkinTooLate,
         disabledReason,
         checkedInByFace,
         faceCheckInTime: checkedInByFace ? todayAttendance.checkIn : null,

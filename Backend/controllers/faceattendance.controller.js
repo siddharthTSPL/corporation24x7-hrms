@@ -1,514 +1,311 @@
+const multer = require("multer");
+const FaceProfile = require("../Models/faceprofile.model");
 const Attendance = require("../Models/attendance.model");
-const AdminModel = require("../Models/Admin.model");
-const Shift = require("../Models/shift.model");
+const User = require("../Models/user.model");
+const Manager = require("../Models/manager.model");
+const AdminUser = require("../Models/Admin.model");
 const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
-const { resolveEmployeeShift, evaluateCheckinWindow, evaluateCheckoutWindow, getShiftThresholds, getForceCheckoutInstant } = require("../utils/shift.utils");
-const { isHoliday, isWeekOff, startOfDay, getWeekOffMapForRange } = require("../automatic/weekoffcalendar");
-const { getISTDateParts, istDateFromYMD, toISTKey } = require("../utils/Istdate.utils");
+const { getEmbedding, cosineSimilarity } = require("../utils/faceService");
+const { startOfISTDay } = require("../utils/istDate.utils");
+const {
+  resolveEmployeeShift,
+  evaluateCheckinWindow,
+  evaluateCheckoutWindow,
+  getShiftThresholds,
+} = require("../utils/shift.utils");
 
-const getUserId = (user) => user._id || user.id;
+const MODEL_BY_ONMODEL = { User, Manager, Admin: AdminUser };
 
-const getOnModel = (role) => {
-  if (role === "manager") return "Manager";
-  if (role === "admin") return "Admin";
-  if (role === "employee") return "User";
-  return "User";
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+const SIMILARITY_THRESHOLD = 0.62;
+
+const minutesToLabel = (mins) => {
+  const m = Math.round(mins);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem ? `${h}h ${rem}m` : `${h}h`;
 };
 
-const resolveOrganisationId = async (user) => {
-  if (user.organisation_id) return user.organisation_id;
-  if (user.role === "admin") {
-    const admin = await AdminModel.findById(getUserId(user)).select("organisation_id").lean();
-    return admin?.organisation_id || null;
-  }
-  return null;
-};
-
-const displayMinutes = (mins) => Math.round(mins || 0);
-
-const checkin = async (req, res) => {
+const enrollFace = async (req, res) => {
   try {
-    const { latitude, longitude, selfie } = req.body;
-    const user = req.user;
-    const userId = getUserId(user);
-    const organisation_id = await resolveOrganisationId(user);
+    const { employeeId, onModel, role } = req.body;
 
-    if (!latitude || !longitude)
-      return res.status(400).json({ message: "Location required" });
+    if (!employeeId || !onModel || !role)
+      return res
+        .status(400)
+        .json({ message: "employeeId, onModel and role are required" });
 
-    const employeeModel = getOnModel(user.role);
-    const today0 = startOfDay(new Date());
+    if (!["User", "Manager", "Admin"].includes(onModel))
+      return res.status(400).json({ message: "onModel must be User, Manager or Admin" });
 
-    const holidayCheck = await isHoliday(today0, organisation_id);
-    if (holidayCheck.isHoliday) {
-      return res.status(400).json({
-        message: `Today is a holiday (${holidayCheck.name}). Check-in is disabled.`,
-        reason: "holiday",
-        holidayName: holidayCheck.name,
-      });
-    }
+    if (!req.file)
+      return res.status(400).json({ message: "A photo file is required (field name: photo)" });
 
-    const weekOffCheck = await isWeekOff(today0, organisation_id, userId, employeeModel);
-    if (weekOffCheck.isOff) {
-      return res.status(400).json({
-        message: "Today is your week off. Check-in is disabled.",
-        reason: "weekoff",
-      });
-    }
+    const organisation_id = req.admin.organisation_id;
+    const imageBase64 = req.file.buffer.toString("base64");
 
-    const shift = await resolveEmployeeShift(user, organisation_id);
-    const { allowed, isLate, lateMinutes, tooLate } = evaluateCheckinWindow(shift, new Date());
+    const embedding = await getEmbedding(imageBase64);
 
-    if (!allowed) {
-      return res.status(400).json({
-        message: `Check-in opens ${shift.earlyBufferMinutes ?? 60} minute(s) before your shift (${shift.startTime}).`,
-        reason: "too_early",
-        shift: { name: shift.name, startTime: shift.startTime, endTime: shift.endTime },
-      });
-    }
-
-    const today = startOfDay(new Date()); // IST-based day boundary (see automatic/weekoffcalendar.js)
-
-    const attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
-
-    if (attendance) {
-      if (attendance.checkOut)
-        return res.status(400).json({ message: "You have already completed your attendance for today.", alreadyDone: true });
-      if (attendance.source === "agent") {
-        attendance.latitude = latitude;
-        attendance.longitude = longitude;
-        attendance.selfie = selfie || attendance.selfie;
-        attendance.checkIn = new Date();
-        attendance.source = "manual";
-        attendance.onModel = getOnModel(user.role);
-        attendance.shift = shift._id;
-        attendance.isLate = isLate;
-        attendance.activeMinutes = 0;
-        attendance.idleMinutes = 0;
-        attendance.lastUpdated = Date.now();
-        await attendance.save();
-        return res.json({ message: "Check-in successful", attendance, isLate });
-      }
-      // One channel per day: whichever system checked you in owns the
-      // whole day, including checkout. The other channel must not act on
-      // this record - it should only report who already checked you in.
-      if (attendance.source === "face") {
-        return res.status(400).json({
-          message: "Already checked in by Face Attendance. Please use Face Attendance to check out too.",
-          reason: "checked_in_by_face",
-        });
-      }
-      return res.status(400).json({
-        message: "Already checked in by System. Please check out from here as well.",
-        reason: "checked_in_by_system",
-      });
-    }
-
-    let newAttendance;
-    try {
-      newAttendance = await Attendance.create({
+    const profile = await FaceProfile.findOneAndUpdate(
+      { organisation_id, employee: employeeId },
+      {
         organisation_id,
-        employee: userId,
-        onModel: getOnModel(user.role),
-        role: user.role,
-        date: today,
-        checkIn: new Date(),
-        latitude,
-        longitude,
-        selfie,
-        shift: shift._id,
-        isLate,
-        activeMinutes: 0,
-        idleMinutes: 0,
-        lastUpdated: Date.now(),
-        source: "manual",
-      });
-    } catch (createErr) {
-      // Another request (e.g. the desktop agent's ping) created today's
-      // record in the tiny window between our findOne above and this
-      // create() - re-fetch instead of failing the check-in.
-      if (createErr.code === 11000) {
-        newAttendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
-      } else {
-        throw createErr;
-      }
-    }
+        employee: employeeId,
+        onModel,
+        role,
+        embedding,
+        enrolledBy: req.admin._id,
+      },
+      { upsert: true, new: true }
+    );
 
-    const message = isLate && tooLate
-      ? `You are quite late (by ${Math.round(lateMinutes)} min), but welcome! Check-in successful.`
-      : "Check-in successful";
-    res.json({ message, attendance: newAttendance, isLate, lateMinutes });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-const activity = async (req, res) => {
-  try {
-    const { status } = req.body;
-    const user = req.user;
-    const userId = getUserId(user);
-    const organisation_id = await resolveOrganisationId(user);
-
-    if (!["active", "idle"].includes(status))
-      return res.status(400).json({ message: "Invalid status" });
-
-    const today = startOfDay(new Date()); // IST-based day boundary (see automatic/weekoffcalendar.js)
-
-    let attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
-
-    if (!attendance) {
-      const shift = await resolveEmployeeShift(user, organisation_id);
-      try {
-        attendance = await Attendance.create({
-          organisation_id,
-          employee: userId,
-          onModel: getOnModel(user.role),
-          role: user.role,
-          date: today,
-          checkIn: new Date(),
-          shift: shift._id,
-          activeMinutes: 0,
-          idleMinutes: 0,
-          lastUpdated: Date.now(),
-          source: "agent",
-        });
-      } catch (createErr) {
-        if (createErr.code === 11000) {
-          // Someone else (manual/face check-in) created today's record a
-          // moment ago - fine, today already has a real record; nothing
-          // for this background ping to do.
-          return res.json({ message: "Activity started", activeMinutes: 0, idleMinutes: 0 });
-        }
-        throw createErr;
-      }
-      return res.json({ message: "Activity started", activeMinutes: 0, idleMinutes: 0 });
-    }
-
-    if (attendance.checkOut)
-      return res.status(400).json({ message: "Already checked out" });
-
-    const now = Date.now();
-    const elapsedMs = now - (attendance.lastUpdated || now);
-    const elapsedMinutes = Math.min(elapsedMs / 60000, 3);
-
-    if (attendance.source === "manual") {
-      if (status === "active") attendance.activeMinutes += elapsedMinutes;
-      else attendance.idleMinutes += elapsedMinutes;
-    }
-
-    attendance.lastUpdated = now;
-    await attendance.save();
-
-    res.json({
-      message: "Activity updated",
-      activeMinutes: displayMinutes(attendance.activeMinutes),
-      idleMinutes: displayMinutes(attendance.idleMinutes),
+    res.status(200).json({
+      message: "Face enrolled successfully",
+      profileId: profile._id,
     });
   } catch (error) {
+    res.status(error.statusCode || 500).json({ message: error.message });
+  }
+};
+
+const listEnrolled = async (req, res) => {
+  try {
+    const organisation_id = req.admin.organisation_id;
+    const profiles = await FaceProfile.find({ organisation_id })
+      .select("employee onModel role createdAt")
+      .lean();
+    res.json({ count: profiles.length, profiles });
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-const checkout = async (req, res) => {
+const removeFace = async (req, res) => {
   try {
-    const user = req.user;
-    const userId = getUserId(user);
-    const organisation_id = await resolveOrganisationId(user);
+    const organisation_id = req.admin.organisation_id;
+    await FaceProfile.findOneAndDelete({ organisation_id, employee: req.params.employeeId });
+    res.json({ message: "Face profile removed" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
 
-    const today = startOfDay(new Date()); // IST-based day boundary (see automatic/weekoffcalendar.js)
+const scanFace = async (req, res) => {
+  try {
+    const { image, gate } = req.body;
+    if (!image) return res.status(400).json({ message: "image (base64) is required" });
 
-    const attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
+    // Kiosk sends a preset gate name (Gate 1..5) or a free-text "Other"
+    // value. Just cap length/sanitize - this is a location label, not a
+    // permission gate, so we don't hard-reject unrecognised values.
+    const gateName = typeof gate === "string" && gate.trim() ? gate.trim().slice(0, 40) : null;
 
-    if (!attendance)
-      return res.status(404).json({ message: "Please check in first" });
-    if (attendance.source === "agent")
-      return res.status(400).json({ message: "Please check in first before checking out" });
-    if (attendance.source === "face")
-      return res.status(400).json({
-        message: "You checked in via Face Attendance. Please use Face Attendance to check out too.",
-        reason: "checked_in_by_face",
+    const { organisation_id } = req.kiosk;
+
+    const liveEmbedding = await getEmbedding(image);
+
+    const profiles = await FaceProfile.find({ organisation_id }).lean();
+    if (!profiles.length)
+      return res.status(404).json({
+        message: "No employees are registered for face attendance yet. Please register first.",
+        reason: "not_registered",
       });
-    if (attendance.checkOut)
-      return res.status(400).json({ message: "Already checked out" });
 
-    // Use the shift stamped at checkin so a later shift change doesn't
-    // retroactively alter today's thresholds; fall back if it's missing
-    // (e.g. old records created before this feature existed).
-    const shiftDoc = attendance.shift
-      ? await Shift.findById(attendance.shift).lean()
-      : await resolveEmployeeShift(user, organisation_id);
-    const thresholds = getShiftThresholds(shiftDoc);
+    let best = null;
+    let bestScore = 0;
+    for (const profile of profiles) {
+      const score = cosineSimilarity(liveEmbedding, profile.embedding);
+      if (score > bestScore) {
+        bestScore = score;
+        best = profile;
+      }
+    }
+
+    if (!best || bestScore < SIMILARITY_THRESHOLD)
+      return res.status(404).json({
+        message: "Face not recognized. If you're new here, please register first.",
+        reason: "not_registered",
+      });
+
+    const EmployeeModel = MODEL_BY_ONMODEL[best.onModel];
+    const employeeDoc = await EmployeeModel.findById(best.employee)
+      .select("f_name l_name shift")
+      .lean();
+
+    if (!employeeDoc)
+      return res.status(404).json({ message: "Matched employee record no longer exists" });
+
+    const employeeName = `${employeeDoc.f_name || ""} ${employeeDoc.l_name || ""}`.trim();
+    const shift = await resolveEmployeeShift(employeeDoc, organisation_id);
+    const shiftInfo = { name: shift.name, startTime: shift.startTime, endTime: shift.endTime };
 
     const now = new Date();
-    const checkoutWindow = evaluateCheckoutWindow(shiftDoc, now, attendance.checkIn);
+    const today = startOfISTDay(now); // IST-based day boundary, not server-local
+
+    let attendance = await Attendance.findOne({
+      employee: best.employee,
+      role: best.role,
+      date: today,
+      organisation_id,
+    });
+
+    // No record yet, OR only a background desktop-agent ping exists.
+    // An "agent" record was never a real, window-validated check-in, so
+    // it must be treated as "not checked in" here too - otherwise a face
+    // scan could silently close out a ping as a completed attendance day
+    // (this is how a stray agent ping + one scan produced a full day
+    // with no real check-in ever happening).
+    const needsRealCheckin = !attendance || attendance.source === "agent";
+
+    // One channel per day: a real System (manual/app) check-in owns the
+    // whole day. Face scan must not silently checkout a System-checked-in
+    // record - it should just report who already checked them in.
+    if (attendance && attendance.source === "manual" && !attendance.checkOut) {
+      return res.status(400).json({
+        message: `${employeeName || "This employee"} already checked in via System. Please check out from System (app) too.`,
+        reason: "checked_in_by_system",
+        employeeName,
+        shift: shiftInfo,
+        checkIn: attendance.checkIn,
+      });
+    }
+
+    if (needsRealCheckin) {
+      const { allowed, isLate, lateMinutes, tooLate } = evaluateCheckinWindow(shift, now);
+
+      if (!allowed) {
+        const earlyBuffer = shift.earlyBufferMinutes ?? 60;
+        return res.status(403).json({
+          message: `Not allowed. ${employeeName || "Your"} shift starts at ${shift.startTime}. Check-in opens ${earlyBuffer} minute(s) before that.`,
+          reason: "too_early",
+          employeeName,
+          shift: shiftInfo,
+        });
+      }
+
+      if (attendance) {
+        attendance.checkIn = now;
+        attendance.source = "face";
+        attendance.isLate = isLate;
+        attendance.lateMinutes = lateMinutes;
+        attendance.shift = shift._id;
+        attendance.activeMinutes = 0;
+        attendance.idleMinutes = 0;
+        attendance.checkInGate = gateName;
+        await attendance.save();
+      } else {
+        attendance = await Attendance.create({
+          organisation_id,
+          employee: best.employee,
+          onModel: best.onModel,
+          role: best.role,
+          date: today,
+          checkIn: now,
+          shift: shift._id,
+          isLate,
+          lateMinutes,
+          source: "face",
+          checkInGate: gateName,
+        });
+      }
+
+      const grace = shift.graceMinutes ?? 15;
+      const checkinMessage = !isLate
+        ? "Checked in on time"
+        : tooLate
+          ? `You are quite late (by ${minutesToLabel(lateMinutes)}), but welcome! Checked in.`
+          : `Checked in — late by ${minutesToLabel(lateMinutes)} (grace period was ${shift.startTime} to +${grace} min)`;
+
+      return res.json({
+        message: checkinMessage,
+        action: "checkin",
+        employeeName,
+        matchConfidence: Number(bestScore.toFixed(3)),
+        time: attendance.checkIn,
+        isLate,
+        lateMinutes,
+        gate: gateName,
+        shift: shiftInfo,
+      });
+    }
+
+    if (attendance.checkOut)
+      return res.status(400).json({
+        message: `Today's attendance is already done for ${employeeName || "this employee"} — checked in and checked out.`,
+        reason: "attendance_completed",
+        employeeName,
+        shift: shiftInfo,
+        checkIn: attendance.checkIn,
+        checkOut: attendance.checkOut,
+      });
+
+    const checkoutWindow = evaluateCheckoutWindow(shift, now, attendance.checkIn);
 
     if (!checkoutWindow.allowed) {
+      const who = employeeName || "You";
+      const verb = employeeName ? "is" : "are";
       return res.status(400).json({
-        message: `You're already checked in for today. Checkout opens in ${checkoutWindow.minutesUntilCheckoutOpens} minute(s).`,
+        message: `${who} ${verb} already checked in for today. Checkout opens in ${checkoutWindow.minutesUntilCheckoutOpens} minute(s).`,
         reason: "checkin_already_done",
+        employeeName,
+        shift: shiftInfo,
+        checkIn: attendance.checkIn,
         minutesUntilCheckoutOpens: checkoutWindow.minutesUntilCheckoutOpens,
       });
     }
 
-    attendance.checkOut = now;
-    const status = calculateStatus(attendance.activeMinutes, thresholds);
     const { remark, isOvertime, overtimeMinutes } = checkoutWindow;
-    attendance.status = status;
+
+    attendance.checkOut = now;
+    attendance.checkOutGate = gateName;
+    const durationMinutes = Math.round((attendance.checkOut - attendance.checkIn) / 60000);
+    attendance.activeMinutes = durationMinutes;
+
+    // Presence is judged the same way as the manual/agent flow: purely
+    // against the shift's own configurable absentBelowMinutes /
+    // halfDayBelowMinutes (set per-shift by the SuperAdmin), not a
+    // hardcoded percentage of the shift length.
+    const thresholds = getShiftThresholds(shift);
+    attendance.status = calculateStatus(durationMinutes, thresholds);
     attendance.checkoutRemark = remark;
     attendance.overtimeMinutes = isOvertime ? overtimeMinutes : 0;
     await attendance.save();
     await updateSummary(attendance);
 
-    const message =
-      remark === "auto_overtime"
-        ? `You are automatically checked out because you are overtime more than ${Math.floor((shiftDoc.maxOvertimeMinutes ?? 60) / 60)} hour(s).`
-        : "Checkout successful";
+    const remarkMessage = {
+      on_time: "Checked out on time. Have a good day!",
+      overtime: `Checked out — overtime of ${minutesToLabel(overtimeMinutes)}`,
+      early_checkout: "Checked out early, before your shift ended",
+      auto_overtime: `You are automatically checked out because you are overtime more than ${Math.floor((shift.maxOvertimeMinutes ?? 60) / 60)} hour(s).`,
+    }[remark];
 
-    res.json({
-      message,
-      status,
+    const finalMessage = attendance.status === "absent"
+      ? `Checked out after only ${minutesToLabel(durationMinutes)} — marked Absent as per your shift's attendance rules.`
+      : attendance.status === "half_day"
+        ? `Checked out after ${minutesToLabel(durationMinutes)} — marked Half Day as per your shift's attendance rules.`
+        : remarkMessage;
+
+    return res.json({
+      message: finalMessage,
+      action: "checkout",
+      employeeName,
+      matchConfidence: Number(bestScore.toFixed(3)),
+      status: attendance.status,
       checkoutRemark: remark,
       overtimeMinutes: attendance.overtimeMinutes,
-      activeMinutes: displayMinutes(attendance.activeMinutes),
-      idleMinutes: displayMinutes(attendance.idleMinutes),
+      time: attendance.checkOut,
+      workedMinutes: durationMinutes,
+      gate: gateName,
+      shift: shiftInfo,
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(error.statusCode || 500).json({ message: error.message });
   }
 };
 
-const getToday = async (req, res) => {
-  try {
-    const user = req.user;
-    const userId = getUserId(user);
-    const organisation_id = await resolveOrganisationId(user);
-
-    const today = startOfDay(new Date()); // IST-based day boundary (see automatic/weekoffcalendar.js)
-
-    const attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id }).lean();
-
-    if (!attendance)
-      return res.json({ attendance: null, isCheckedIn: false, isCheckedOut: false });
-
-    res.json({
-      attendance: {
-        ...attendance,
-        activeMinutes: displayMinutes(attendance.activeMinutes),
-        idleMinutes: displayMinutes(attendance.idleMinutes),
-      },
-      isCheckedIn: !attendance.checkOut && !!attendance.checkIn && attendance.source !== "agent",
-      isCheckedOut: !!attendance.checkOut,
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// Runs frequently (every 5 min, see automatic/autoelcredit.js) rather than
-// once a day, because "shift end + maxOvertimeMinutes" is a different
-// clock time for every shift - a single fixed daily run can't catch a
-// shift that ends at 9 PM if it only runs at 7 PM.
-//
-// Deliberately NOT scoped to `date: today` - an overnight shift's record
-// may still be dated "yesterday" (IST) when its overtime cutoff arrives.
-// Deliberately excludes source "agent": an agent-only ping was never a
-// real, window-validated check-in and must not be auto-completed as a
-// full attendance day (see faceattendance.controller.js).
-const autoCheckoutAll = async () => {
-  try {
-    const openSessions = await Attendance.find({
-      source: { $in: ["manual", "face"] },
-      checkIn: { $exists: true },
-      checkOut: { $exists: false },
-    }).select("_id activeMinutes organisation_id shift employee role date checkIn").lean();
-
-    if (!openSessions.length) return;
-
-    const shiftCache = new Map();
-    const getShiftFor = async (session) => {
-      if (session.shift) {
-        if (!shiftCache.has(String(session.shift))) {
-          const shift = await Shift.findById(session.shift).lean();
-          shiftCache.set(String(session.shift), shift);
-        }
-        return shiftCache.get(String(session.shift));
-      }
-      return resolveEmployeeShift({}, session.organisation_id);
-    };
-
-    const now = new Date();
-    const ops = [];
-    const summaryPayloads = [];
-
-    for (const a of openSessions) {
-      const shift = await getShiftFor(a);
-      if (!shift) continue;
-
-      const forceCheckoutAt = getForceCheckoutInstant(shift, a.date);
-      if (now < forceCheckoutAt) continue; // overtime cutoff not reached yet
-
-      const thresholds = getShiftThresholds(shift);
-      const status = calculateStatus(a.activeMinutes, thresholds);
-      const checkoutWindow = evaluateCheckoutWindow(shift, forceCheckoutAt, a.checkIn);
-
-      ops.push({
-        updateOne: {
-          filter: { _id: a._id, organisation_id: a.organisation_id, checkOut: { $exists: false } },
-          update: {
-            $set: {
-              checkOut: forceCheckoutAt,
-              status,
-              checkoutRemark: "auto_overtime",
-              overtimeMinutes: checkoutWindow.overtimeMinutes ?? 0,
-              autoCheckedOut: true,
-            },
-          },
-        },
-      });
-      summaryPayloads.push({ ...a, checkOut: forceCheckoutAt, status });
-    }
-
-    if (!ops.length) return;
-
-    await Attendance.bulkWrite(ops, { ordered: false });
-    await Promise.all(summaryPayloads.map((a) => updateSummary(a)));
-  } catch (error) {
-    console.error("[Cron] Auto checkout failed:", error.message);
-  }
-};
-
-const getMyShift = async (req, res) => {
-  try {
-    const user = req.user;
-    const organisation_id = await resolveOrganisationId(user);
-    const shift = await resolveEmployeeShift(user, organisation_id);
-
-    res.json({
-      shift: {
-        name: shift.name,
-        startTime: shift.startTime,
-        endTime: shift.endTime,
-        graceMinutes: shift.graceMinutes ?? 15,
-        earlyBufferMinutes: shift.earlyBufferMinutes ?? 60,
-      },
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// Returns holiday list + week-off dates for a given month, plus a rich
-// "today" block combining holiday / week-off / shift-window so the
-// frontend can grey out Check-in proactively instead of waiting for a
-// 400 from /checkin.
-const getCalendarMeta = async (req, res) => {
-  try {
-    const user = req.user;
-    const userId = getUserId(user);
-    const organisation_id = await resolveOrganisationId(user);
-    const employeeModel = getOnModel(user.role);
-
-    const now = new Date();
-    // Default month/year must reflect the IST calendar day, not whatever
-    // the server process's OS timezone happens to be (see Istdate.utils.js).
-    const nowIST = getISTDateParts(now);
-    const month = req.query.month ? Number(req.query.month) : nowIST.month; // 1-12
-    const year = req.query.year ? Number(req.query.year) : nowIST.year;
-
-    // Days in month is pure UTC calendar arithmetic (Date.UTC/getUTCDate),
-    // not timezone-sensitive, so this is safe as-is.
-    const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
-    const monthStart = istDateFromYMD(year, month, 1);
-    const monthEnd = istDateFromYMD(year, month, daysInMonth);
-
-    // Only look as far into the month as today, plus the rest of the
-    // month for holidays (holidays are known in advance; week-off status
-    // for far-future rotational weeks may be "unconfigured" and that's fine).
-    const Holiday = require("../Models/holiday.model");
-    const holidayDocs = await Holiday.find({
-      organisation_id,
-      date: { $gte: monthStart, $lte: monthEnd },
-    }).sort({ date: 1 }).lean();
-
-    // toKey used to read dt.getFullYear()/getMonth()/getDate() directly -
-    // those are LOCAL (server-process-timezone) getters. On a host running
-    // UTC, a `date` field stored as IST-midnight (e.g. the UTC instant
-    // "2026-07-14T18:30:00Z", which IS calendar day 2026-07-15 in IST)
-    // reads back as "2026-07-14" - exactly the off-by-one-day seen in
-    // production. toISTKey shifts into IST first, so it's correct
-    // regardless of what timezone the server happens to run in.
-    const pad2 = (n) => String(n).padStart(2, "0");
-    const toKey = (d) => toISTKey(d);
-
-    const holidays = holidayDocs.map((h) => ({ date: toKey(h.date), name: h.name }));
-
-    const weekOffDates = [];
-    const weekOffMap = await getWeekOffMapForRange(monthStart, monthEnd, organisation_id, userId, employeeModel);
-    for (let d = 1; d <= daysInMonth; d++) {
-      const key = `${year}-${pad2(month)}-${pad2(d)}`;
-      const result = weekOffMap.get(key);
-      if (result?.isOff) weekOffDates.push(key);
-    }
-
-    // ---- Today block ----
-    const today0 = startOfDay(now);
-    const todayKey = toKey(today0);
-    const todayHoliday = await isHoliday(today0, organisation_id);
-    const todayWeekOff = (today0 >= monthStart && today0 <= monthEnd)
-      ? (weekOffMap.get(todayKey) ?? { isOff: false, reason: "unconfigured", unconfigured: true })
-      : await isWeekOff(today0, organisation_id, userId, employeeModel);
-    const shift = await resolveEmployeeShift(user, organisation_id);
-    const { allowed: withinShiftWindow, tooLate: checkinTooLate } = evaluateCheckinWindow(shift, now);
-
-    // Cross-channel check: if Face Attendance already checked this person
-    // in (and they haven't checked out), the System channel must not
-    // offer a fresh check-in - it should say who already did it. A
-    // "manual"-source record isn't blocked here since that's the normal
-    // "already checked in, show checkout" state handled elsewhere by
-    // isCheckedIn/isCheckedOut - this is specifically the cross-channel case.
-    const todayAttendance = await Attendance.findOne({
-      employee: userId,
-      role: user.role,
-      date: today0,
-      organisation_id,
-    }).select("source checkOut checkIn").lean();
-    const checkedInByFace = todayAttendance?.source === "face" && !todayAttendance?.checkOut;
-
-    let disabledReason = null;
-    if (todayHoliday.isHoliday) disabledReason = "holiday";
-    else if (todayWeekOff.isOff) disabledReason = "weekoff";
-    else if (checkedInByFace) disabledReason = "checked_in_by_face";
-    else if (!withinShiftWindow || checkinTooLate) disabledReason = "outside_shift";
-
-    res.json({
-      success: true,
-      holidays,
-      weekOffDates,
-      today: {
-        date: todayKey,
-        isHoliday: todayHoliday.isHoliday,
-        holidayName: todayHoliday.name || null,
-        isWeekOff: todayWeekOff.isOff,
-        weekOffReason: todayWeekOff.reason,
-        shift: {
-          name: shift.name,
-          startTime: shift.startTime,
-          endTime: shift.endTime,
-          earlyBufferMinutes: shift.earlyBufferMinutes ?? 60,
-          lateCheckinCutoffMinutes: shift.lateCheckinCutoffMinutes ?? 60,
-        },
-        withinShiftWindow,
-        isVeryLate: checkinTooLate,
-        canCheckIn: !todayHoliday.isHoliday && !todayWeekOff.isOff && !checkedInByFace && withinShiftWindow && !checkinTooLate,
-        disabledReason,
-        checkedInByFace,
-        faceCheckInTime: checkedInByFace ? todayAttendance.checkIn : null,
-      },
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-module.exports = { checkin, activity, checkout, getToday, autoCheckoutAll, getMyShift, getCalendarMeta };
+module.exports = { enrollFace, listEnrolled, removeFace, scanFace, upload };
