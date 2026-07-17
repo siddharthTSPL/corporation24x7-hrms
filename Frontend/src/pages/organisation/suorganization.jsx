@@ -9,6 +9,7 @@ import {
   useGetOrgInfo,
   useGetParticularEmployee,
   useGetParticularManager,
+  useGetParticularAdmin,
 } from "../../auth/server-state/superadmin/other/suother.hook";
 
 const STYLES = `
@@ -418,6 +419,172 @@ function SkeletonTree() {
   );
 }
 
+// ---------- Leave balance tab (v3) ----------
+// Matches the target design: EL / SL / ML / PL always render as a quota
+// card (title, "<n> left" pill, progress bar, Entitled/Availed row),
+// regardless of whether the backend stores that type as a bucketed
+// object ({entitled, availed, ...}) or a flat number. LWP / PBC (and any
+// other leftover keys) render as plain counter tiles underneath, since
+// they're running totals rather than an entitlement pool.
+
+const PRIMARY_ORDER = ["EL", "SL", "ML", "PL"];
+
+const LEAVE_META = {
+  EL:  { label: "Earned Leave",    color: "#730042" },
+  SL:  { label: "Sick Leave",      color: "#2563eb" },
+  ML:  { label: "Maternity Leave", color: "#78716c" },
+  PL:  { label: "Paternity Leave", color: "#16a34a" },
+  pbc: { label: "PBC (Public Holidays)" },
+  lwp: { label: "LWP (Loss of Pay)" },
+};
+
+const LEAVE_BALANCE_HIDDEN_KEYS = new Set([
+  "_id", "__v", "employee", "organisation_id", "createdAt", "updatedAt",
+  "mlStartDate", "mlEndDate", "lastAccrualDate",
+]);
+
+function humanizeKey(key) {
+  if (LEAVE_META[key]?.label) return LEAVE_META[key].label;
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/_/g, " ")
+    .replace(/^./, (c) => c.toUpperCase())
+    .trim();
+}
+
+function fmtLeaveDate(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+// Normalizes either shape -> { entitled, availed, accrued, yearlyEntitled }
+function normalizeBucket(val) {
+  if (val && typeof val === "object") {
+    return {
+      entitled: Number(val.entitled ?? 0),
+      availed: Number(val.availed ?? 0),
+      accrued: val.accrued != null ? Number(val.accrued) : null,
+      yearlyEntitled: val.yearlyEntitled != null ? Number(val.yearlyEntitled) : null,
+    };
+  }
+  // Flat number stored under a primary key (e.g. ML: 182) -> treat as
+  // the entitled pool; availed isn't tracked separately for that shape.
+  return { entitled: Number(val ?? 0), availed: 0, accrued: null, yearlyEntitled: null };
+}
+
+function QuotaCard({ typeKey, rawValue }) {
+  const meta = LEAVE_META[typeKey] || { label: humanizeKey(typeKey), color: "#730042" };
+  const { entitled, availed, accrued } = normalizeBucket(rawValue);
+  const remaining = entitled - availed;
+  const pct = entitled > 0 ? Math.min(100, Math.max(0, (availed / entitled) * 100)) : 0;
+  const isEmpty = entitled === 0;
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-4 sm:p-5 min-w-0">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <span className="text-sm font-semibold text-slate-900 truncate">{meta.label}</span>
+        <span
+          className="text-[11px] font-semibold px-2.5 py-1 rounded-full shrink-0"
+          style={{
+            color: isEmpty ? "#9ca3af" : meta.color,
+            background: isEmpty ? "#f3f4f6" : `${meta.color}18`,
+          }}
+        >
+          {remaining} left
+        </span>
+      </div>
+
+      <div className="w-full h-[5px] rounded-full bg-gray-100 overflow-hidden mb-3">
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${pct}%`, background: isEmpty ? "#e5e7eb" : meta.color }}
+        />
+      </div>
+
+      <div className="flex items-center justify-between text-xs sm:text-[13px] text-gray-500">
+        <span>Entitled: <b className="text-slate-800 font-semibold">{entitled}</b></span>
+        <span>Availed: <b className="text-slate-800 font-semibold">{availed}</b></span>
+      </div>
+      {accrued != null && (
+        <div className="text-xs sm:text-[13px] text-gray-500 mt-1.5">
+          Accrued: <b className="text-slate-800 font-semibold">{accrued}</b>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CounterTile({ typeKey, rawValue }) {
+  const meta = LEAVE_META[typeKey];
+  const value = rawValue && typeof rawValue === "object" ? (rawValue.entitled ?? 0) : rawValue;
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-4 sm:p-5 min-w-0">
+      <div className="text-xs text-gray-400 mb-2 truncate">{meta?.label || humanizeKey(typeKey)}</div>
+      <div
+        className="text-xl sm:text-2xl font-bold text-slate-900"
+        style={{ fontFamily: "'JetBrains Mono',monospace" }}
+      >
+        {typeof value === "boolean" ? (value ? "Yes" : "No") : value}
+      </div>
+    </div>
+  );
+}
+
+function LeaveBalanceTab({ leaveBalance, isLoading, showHeader = true }) {
+  if (isLoading) return (
+    <div className="flex justify-center pt-9">
+      <div className="w-6 h-6 rounded-full border-2 border-[#730042]/30 border-t-[#730042] animate-spin" />
+    </div>
+  );
+
+  if (!leaveBalance) return (
+    <div className="text-xs sm:text-sm text-gray-400 text-center pt-9">No leave balance record found.</div>
+  );
+
+  const allKeys = Object.keys(leaveBalance).filter((k) => !LEAVE_BALANCE_HIDDEN_KEYS.has(k));
+  const primaryKeys = PRIMARY_ORDER.filter((k) => allKeys.includes(k));
+  const secondaryKeys = allKeys.filter(
+    (k) => !PRIMARY_ORDER.includes(k) && (typeof leaveBalance[k] !== "object" || leaveBalance[k] === null)
+  );
+
+  if (!primaryKeys.length && !secondaryKeys.length) return (
+    <div className="text-xs sm:text-sm text-gray-400 text-center pt-9">No leave balance fields to show.</div>
+  );
+
+  return (
+    <div className="bg-[#fafbfc] rounded-2xl border border-gray-100 p-4 sm:p-6 min-w-0">
+      {showHeader && (
+        <div className="mb-4 sm:mb-5">
+          <h3 className="text-base sm:text-lg font-bold text-slate-900">Leave Balance</h3>
+          <p className="text-xs sm:text-sm text-gray-400 mt-0.5">Your current leave entitlements</p>
+        </div>
+      )}
+
+      {primaryKeys.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          {primaryKeys.map((key) => (
+            <QuotaCard key={key} typeKey={key} rawValue={leaveBalance[key]} />
+          ))}
+        </div>
+      )}
+
+      {secondaryKeys.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-3 sm:mt-4">
+          {secondaryKeys.map((key) => (
+            <CounterTile key={key} typeKey={key} rawValue={leaveBalance[key]} />
+          ))}
+        </div>
+      )}
+
+      {leaveBalance.lastAccrualDate && (
+        <div className="text-[11px] text-gray-400 text-right mt-3">
+          Last accrual: {fmtLeaveDate(leaveBalance.lastAccrualDate)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EmployeeDetailPanel({ person, type, onClose }) {
   const [tab, setTab] = useState("info");
   const isManager  = type === "manager";
@@ -428,6 +595,23 @@ function EmployeeDetailPanel({ person, type, onClose }) {
 
   const accentColor = isSA ? NODE_COLOR.sa : isAdmin ? NODE_COLOR.admin : isManager ? NODE_COLOR.manager : NODE_COLOR.employee;
   const roleLabel   = isSA ? "Super Admin" : isAdmin ? "Admin" : isManager ? "Manager" : "Employee";
+
+  // Fetch the full record (incl. leaveBalance) for whichever role this is,
+  // so the Leave Balance tab has real data to show without a separate
+  // top-level fetch per node type in the tree.
+  const detailFetchFn = isAdmin
+    ? useGetParticularAdmin
+    : isManager
+      ? useGetParticularManager
+      : !isSA
+        ? useGetParticularEmployee
+        : null;
+
+  const { data: detailData, isLoading: detailLoading } = detailFetchFn
+    ? detailFetchFn(person._id)
+    : { data: null, isLoading: false };
+
+  const leaveBalance = detailData?.leaveBalance || null;
 
   const fields = useMemo(() => {
     if (isSA) return [
@@ -518,13 +702,13 @@ function EmployeeDetailPanel({ person, type, onClose }) {
 
           {!isSA && (
             <div className="flex gap-2 mb-5 flex-wrap min-w-0">
-              {["info", "reviews"].map((t) => (
+              {["info", "leave", "reviews"].map((t) => (
                 <button
                   key={t}
                   className={`px-4 py-2 rounded-lg border text-xs font-medium transition-all min-h-[40px] flex items-center shrink-0 ${tab === t ? "bg-[#730042] text-white border-[#730042] shadow-md" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}
                   onClick={() => setTab(t)}
                 >
-                  {t === "info" ? "Information" : "Reviews"}
+                  {t === "info" ? "Information" : t === "leave" ? "Leave Balance" : "Reviews"}
                 </button>
               ))}
             </div>
@@ -541,6 +725,10 @@ function EmployeeDetailPanel({ person, type, onClose }) {
             </div>
           )}
 
+          {tab === "leave" && !isSA && (
+            <LeaveBalanceTab leaveBalance={leaveBalance} isLoading={detailLoading} showHeader={false} />
+          )}
+
           {tab === "reviews" && !isSA && <ReviewsTab uid={person._id} role={type} />}
         </div>
       </div>
@@ -549,7 +737,10 @@ function EmployeeDetailPanel({ person, type, onClose }) {
 }
 
 function ReviewsTab({ uid, role }) {
-  const fetchFn = role === "manager" ? useGetParticularManager : useGetParticularEmployee;
+  const fetchFn =
+    role === "manager" ? useGetParticularManager :
+    role === "admin"   ? useGetParticularAdmin :
+    useGetParticularEmployee;
   const { data, isLoading } = fetchFn(uid);
   const reviews = data?.reviews || [];
 
