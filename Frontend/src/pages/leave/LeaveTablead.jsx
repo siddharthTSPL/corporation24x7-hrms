@@ -142,7 +142,7 @@ const daysDiff = (s, e) => {
 
 const todayStr = () => new Date().toISOString().split("T")[0];
 const avatarColor = (name = "") => AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
-const initials = (f = "", l = "") => `${f[0] || ""}${l[0] || ""}`.toUpperCase();
+const initials = (f = "", l = "") => (`${f[0] || ""}${l[0] || ""}`.toUpperCase() || "?");
 
 const Spinner = () => (
   <div className="flex flex-col items-center justify-center py-10 xs:py-12 sm:py-16 gap-3">
@@ -453,14 +453,16 @@ const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, acce
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <div className="text-[12.5px] xs:text-[13px] sm:text-[14px] font-semibold text-[#1C1028] truncate max-w-[140px] xs:max-w-[180px] sm:max-w-none">{person.f_name} {person.l_name}</div>
+                <div className={`text-[12.5px] xs:text-[13px] sm:text-[14px] font-semibold truncate max-w-[140px] xs:max-w-[180px] sm:max-w-none ${(person.f_name || person.l_name) ? "text-[#1C1028]" : "text-[#9B8BAE] italic"}`}>
+                  {(person.f_name || person.l_name) ? `${person.f_name || ""} ${person.l_name || ""}` : `Unknown ${leave.manager ? "Manager" : "Employee"}`}
+                </div>
                 {personLabel && (
                   <span className="text-[9px] sm:text-[10px] font-bold bg-[#F3E8FF] text-[#6B21A8] px-2 py-px rounded-[10px]">
                     {personLabel}
                   </span>
                 )}
               </div>
-              <div className="text-[10px] sm:text-[11px] text-[#9B8BAE] mt-0.5 truncate max-w-[130px] xs:max-w-[180px] sm:max-w-none">{person.work_email}</div>
+              <div className="text-[10px] sm:text-[11px] text-[#9B8BAE] mt-0.5 truncate max-w-[130px] xs:max-w-[180px] sm:max-w-none">{person.work_email || (person.f_name ? "" : "Account no longer available")}</div>
             </div>
           </div>
 
