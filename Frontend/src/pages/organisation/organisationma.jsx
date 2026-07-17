@@ -21,6 +21,41 @@ const initials = (name = "") =>
 
 const norm = (s = "") => s.toLowerCase().trim();
 
+const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+};
+
+const getDepartmentName = (dept) => DEPT_FULL_FORMS[dept] || dept || "—";
+
+const STYLES = `
+  @keyframes pulseYou  {
+    0%,100% { box-shadow: 0 0 0 0 rgba(115,0,66,0.25); }
+    50%      { box-shadow: 0 0 0 6px rgba(115,0,66,0.06); }
+  }
+  .you-pill {
+    position: absolute;
+    top: -9px;
+    right: -9px;
+    z-index: 30;
+    background: #730042;
+    color: #ffffff;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(115,0,66,0.45), 0 0 0 2px #ffffff;
+    white-space: nowrap;
+    animation: pulseYou 2.6s ease-in-out infinite;
+    pointer-events: none;
+  }
+`;
+
 function Sk({ w, h, r = 8 }) {
   return (
     <div className="shrink-0 animate-pulse bg-gradient-to-r from-[#f5edf2] via-[#ecdce6] to-[#f5edf2] bg-[length:600px_100%]" style={{ width: w, height: h, borderRadius: r }} />
@@ -48,9 +83,10 @@ function Hi({ text = "", q = "", className = "" }) {
   );
 }
 
-// Colour is only applied when a node sits on the viewer's own reporting line
-// (their manager chain above them + everyone who reports up to them below).
-// Everything else renders in a neutral black & white palette.
+function YouPill() {
+  return <span className="you-pill"></span>;
+}
+
 const CFG = {
   org:     { accentOn: "bg-[#1a0d14]", avBgOn: "bg-[#1a0d14]", avColorOn: "text-[#f5edf2]" },
   admin:   { accentOn: "bg-[#5a2240]", avBgOn: "bg-[#f0e4ec]", avColorOn: "text-[#5a2240]" },
@@ -60,7 +96,7 @@ const CFG = {
 };
 const OFF = { accent: "bg-gray-300", avBg: "bg-gray-100", avColor: "text-gray-400" };
 
-function Card({ level, name, sub, empid, width = 172, delay = 0, dim, hl, chain, q, you = false, empCount }) {
+function Card({ level, name, department, designation, empid, isOrg, width = 172, delay = 0, dim, hl, chain, q, you = false, empCount }) {
   const c = CFG[level] || CFG.emp;
   const accentCls  = chain ? c.accentOn  : OFF.accent;
   const avBgCls    = chain ? c.avBgOn    : OFF.avBg;
@@ -68,6 +104,7 @@ function Card({ level, name, sub, empid, width = 172, delay = 0, dim, hl, chain,
 
   return (
     <div className="shrink-0">
+      <style>{STYLES}</style>
       <div
         className={[
           "bg-white border rounded-[11px] py-3.5 px-3 pb-[11px] shadow-[0_2px_8px_rgba(115,0,66,0.04)] flex flex-col items-center relative overflow-hidden transition-transform duration-150 ease hover:-translate-y-0.5 cursor-default",
@@ -78,13 +115,18 @@ function Card({ level, name, sub, empid, width = 172, delay = 0, dim, hl, chain,
         ].filter(Boolean).join(" ")}
         style={{ width }}
       >
+        {you && <YouPill />}
         <div className={`absolute top-0 left-0 right-0 h-[3px] rounded-t-[11px] ${you ? "bg-gradient-to-r from-[#730042] to-[#CD166E]" : accentCls}`} />
-        {you && <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 text-[7px] font-bold tracking-[0.1em] px-2 py-0.5 rounded-lg bg-[#730042] text-white whitespace-nowrap font-['DM_Mono',monospace]">YOU</div>}
         <Avatar name={name} size={38} bg={you ? "bg-[#fce7f3]" : avBgCls} color={you ? "text-[#730042]" : avColorCls} />
         <div className="mt-2 mb-1.5 text-center w-full">
           <Hi text={name} q={q} className={`block text-xs font-semibold leading-[1.3] font-['Syne',sans-serif] truncate ${chain ? "text-[#1a0d14]" : "text-gray-400"}`} />
-          {sub && <Hi text={sub} q={q} className={`block text-[10px] mt-0.5 truncate ${chain ? "text-[#8a6878]" : "text-gray-300"}`} />}
-          {empid && <span className={`block text-[9px] mt-0.5 font-['DM_Mono',monospace] truncate ${chain ? "text-[#c8a8bb]" : "text-gray-300"}`}>{empid}</span>}
+          {!isOrg && (
+            <>
+              <Hi text={department || "—"} q={q} className={`block text-[10px] mt-0.5 truncate ${chain ? "text-[#8a6878]" : "text-gray-300"}`} />
+              <Hi text={designation || "—"} q={q} className={`block text-[10px] mt-0.5 truncate ${chain ? "text-[#8a6878]" : "text-gray-300"}`} />
+              <span className={`block text-[9px] mt-0.5 font-['DM_Mono',monospace] truncate ${chain ? "text-[#c8a8bb]" : "text-gray-300"}`}>{empid || "—"}</span>
+            </>
+          )}
           {empCount !== undefined && <span className={`text-[10px] block mt-0.5 ${chain ? "text-[#c8a8bb]" : "text-gray-300"}`}>{empCount} report{empCount !== 1 ? "s" : ""}</span>}
         </div>
       </div>
@@ -145,9 +187,6 @@ function collectMatchKeys(nodes, q, matches) {
   });
 }
 
-// Walk the tree to find "me" (isCurrentManager), then collect:
-//  - path: every manager id between the org root and me (my own reporting line upward)
-//  - descendants: every manager/employee id that reports up to me (downward)
 function collectDescendants(mgr, set) {
   (mgr.employees || []).forEach(e => set.add(`e-${e.id}`));
   (mgr.subManagers || []).forEach(sm => {
@@ -175,7 +214,6 @@ function findSelfChain(managers) {
 }
 
 function buildChainIds(data) {
-  // org + admin are always on your line since they sit above everyone
   const ids = new Set(["org", "admin"]);
   const self = findSelfChain(data?.managers || []);
   if (self) {
@@ -198,7 +236,8 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, chainIds, isSubMgr = fa
       <Card
         level={isSubMgr ? "subMgr" : "manager"}
         name={mgr.name}
-        sub={mgr.designation || mgr.department}
+        department={mgr.department ? getDepartmentName(mgr.department) : "—"}
+        designation={mgr.designation || "—"}
         empid={mgr.empid}
         width={CARD_W}
         delay={mDelay}
@@ -249,7 +288,8 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, chainIds, isSubMgr = fa
                   key={emp.id}
                   level="emp"
                   name={emp.name}
-                  sub={emp.designation || emp.department}
+                  department={emp.department ? getDepartmentName(emp.department) : "—"}
+                  designation={emp.designation || "—"}
                   empid={emp.empid}
                   width={EMP_W}
                   delay={eDelay}
@@ -327,13 +367,13 @@ function OrgTree({ data, loading, q }) {
   return (
     <div className="flex flex-col items-center min-w-max">
       <div>
-        <Card level="org" name={data.organisation_name || "Organisation"} sub={data.super_admin?.name} width={CARD_W} delay={0} dim={dim("org")} hl={matches.has("org")} chain={chainIds.has("org")} q={q} />
+        <Card level="org" name={data.organisation_name || "Organisation"} department="—" designation={data.super_admin?.name || "—"} isOrg width={CARD_W} delay={0} dim={dim("org")} hl={matches.has("org")} chain={chainIds.has("org")} q={q} />
       </div>
       <VLine h={22} />
 
       {data.admin && (
         <>
-          <Card level="admin" name={data.admin.name} sub={data.admin.designation} empid={data.admin.empid} width={CARD_W} delay={80} dim={dim("admin")} hl={matches.has("admin")} chain={chainIds.has("admin")} q={q} />
+          <Card level="admin" name={data.admin.name} department={data.admin.department ? getDepartmentName(data.admin.department) : "—"} designation={data.admin.designation || "—"} empid={data.admin.empid} width={CARD_W} delay={80} dim={dim("admin")} hl={matches.has("admin")} chain={chainIds.has("admin")} q={q} />
           <VLine h={22} />
         </>
       )}
@@ -509,7 +549,7 @@ export default function OrganizationPageManager() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-2.5 mb-5">
           <StatCard label="Organisation"  text={orgName}                        icon={Building2} barBg="bg-[#1a0d14]" iconBg="bg-[#1a0d14]/10" iconColor="text-[#1a0d14]" delay={60}  />
           <StatCard label="Your name"     text={myInfo?.name}                   icon={User}      barBg="bg-[#730042]" iconBg="bg-[#730042]/10" iconColor="text-[#730042]" delay={95}  />
-          <StatCard label="Department"    text={myInfo?.department}             icon={Users}     barBg="bg-[#CD166E]" iconBg="bg-[#CD166E]/10" iconColor="text-[#CD166E]" delay={130} />
+          <StatCard label="Department"    text={myInfo?.department ? getDepartmentName(myInfo.department) : undefined} icon={Users}     barBg="bg-[#CD166E]" iconBg="bg-[#CD166E]/10" iconColor="text-[#CD166E]" delay={130} />
           <StatCard label="Designation"   text={myInfo?.designation}            icon={Crown}     barBg="bg-[#a8005c]" iconBg="bg-[#a8005c]/10" iconColor="text-[#a8005c]" delay={165} />
         </div>
 
@@ -545,7 +585,6 @@ export default function OrganizationPageManager() {
             </div>
           </div>
 
-         
           <div ref={chartRef} className="overflow-x-auto overscroll-x-contain py-6 px-3 sm:p-9 bg-white max-w-full">
             <OrgTree data={data} loading={loading} q={norm(searchQuery)} />
           </div>

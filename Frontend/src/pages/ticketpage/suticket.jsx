@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   useGetAllTickets,
   useGetTicketById,
@@ -6,6 +6,28 @@ import {
   useEscalateTicket,
   useDeleteTicket,
 } from "../../auth/server-state/ticket/ticket.hook";
+
+const HTML_TO_IMAGE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js";
+
+function loadImageScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) return resolve();
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.body.appendChild(s);
+  });
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 const GlobalStyles = () => (
   <style>{`
@@ -751,6 +773,7 @@ export default function SuperAdminTicketSystem({sidebarWidth=240}) {
   const [activeTab,  setActiveTab]  = useState("all");
   const [selectedId, setSelectedId] = useState(null);
   const [toast,      setToast]      = useState({visible:false,message:"",type:"success"});
+  const pageRef = useRef(null);
 
   const TAB_PRESET = {
     all:{}, posh:{type:"posh"}, critical:{severity:"critical"},
@@ -767,6 +790,28 @@ export default function SuperAdminTicketSystem({sidebarWidth=240}) {
     setTimeout(()=>setToast(p=>({...p,visible:false})),3500);
   };
 
+  const exportCsv = () => {
+    const headers = ["Ticket Number","Type","Status","Severity","Title","Submitted By","Category","Created At","SLA Deadline","Overdue","Escalated"];
+    const rows = tickets.map((t) => [
+      t.ticketNumber ?? "",
+      TYPE_META[t.type]?.label ?? t.type ?? "",
+      STATUS_META[t.status]?.label ?? t.status ?? "",
+      SEV_META[t.severity]?.label ?? t.severity ?? "",
+      t.title ?? "",
+      t.isAnonymous ? "Anonymous" : `${t.submittedBy?.f_name ?? ""} ${t.submittedBy?.l_name ?? ""}`.trim(),
+      CAT_LABELS[t.category] ?? t.category ?? "",
+      fmtFull(t.createdAt),
+      fmt(t.slaDeadline),
+      t.isOverdue ? "Yes" : "No",
+      t.isEscalated ? "Yes" : "No",
+    ]);
+    const escape = (v) => { const s = String(v ?? ""); return s.includes(",")||s.includes('"')||s.includes("\n") ? `"${s.replace(/"/g,'""')}"` : s; };
+    const csv = [headers, ...rows].map((r) => r.map(escape).join(",")).join("\n");
+    const blob = new Blob(["\uFEFF"+csv], { type:"text/csv;charset=utf-8;" });
+    downloadBlob(blob, `tickets-grievances-${Date.now()}.csv`);
+    showToast("CSV exported!","success");
+  };
+
   const TABS = [
     {key:"all",      label:"All",        count:pagination.total||0},
     {key:"posh",     label:"🔴 POSH",    count:stats?.byType?.posh||0,         alert:true},
@@ -780,10 +825,15 @@ export default function SuperAdminTicketSystem({sidebarWidth=240}) {
     <div className="tk-page" style={{padding:"28px 32px"}}>
       <GlobalStyles/>
 
-      <div style={{position:"relative",maxWidth:1080}}>
+      <div style={{position:"relative",maxWidth:1080}} ref={pageRef}>
 
-        <div className="tk-section-badge">
-          🎫 SUPER ADMIN · TICKET MANAGEMENT
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
+          <div className="tk-section-badge">
+            🎫 SUPER ADMIN · TICKET MANAGEMENT
+          </div>
+          <button className="tk-btn tk-btn-ghost" onClick={exportCsv} style={{marginBottom:20}}>
+            ⬇ Export CSV
+          </button>
         </div>
 
         <h1 style={{fontSize:32,fontWeight:700,color:"var(--text)",margin:"0 0 6px",fontFamily:"'Cormorant Garamond',serif",letterSpacing:"-.3px"}}>

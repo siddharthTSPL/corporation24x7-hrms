@@ -76,7 +76,15 @@ export const useRequestRevision = () => {
 };
 
 export const useAddCandidate = () => {
-  return useMutation({ mutationFn: addCandidate });
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: addCandidate,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["candidates", variables.requisition_id] });
+      queryClient.invalidateQueries({ queryKey: ["all-requisitions"] });
+      queryClient.invalidateQueries({ queryKey: ["requisition"] });
+    },
+  });
 };
 
 export const useGetCandidatesByRequisition = (requisition_id) => {
@@ -103,16 +111,36 @@ export const useUpdateCandidateStage = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, data }) => updateCandidateStage(id, data),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      // Openings/filled_count and requisition status can change (e.g. SELECTED -> FILLED),
+      // so refresh everything that shows those numbers, not just the candidate list.
       queryClient.invalidateQueries({ queryKey: ["candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["candidate", variables.id] });
+      queryClient.invalidateQueries({ queryKey: ["all-requisitions"] });
+      queryClient.invalidateQueries({ queryKey: ["pending-requisitions"] });
+      queryClient.invalidateQueries({ queryKey: ["requisition"] });
     },
   });
 };
 
 export const useScheduleInterview = () => {
-  return useMutation({ mutationFn: ({ id, data }) => scheduleInterview(id, data) });
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }) => scheduleInterview(id, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["candidate", variables.id] });
+      queryClient.invalidateQueries({ queryKey: ["candidates"] });
+    },
+  });
 };
 
 export const useSubmitInterviewFeedback = () => {
-  return useMutation({ mutationFn: ({ candidateId, roundId, data }) => submitInterviewFeedback(candidateId, roundId, data) });
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ candidateId, roundId, data }) => submitInterviewFeedback(candidateId, roundId, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["candidate", variables.candidateId] });
+      queryClient.invalidateQueries({ queryKey: ["candidates"] });
+    },
+  });
 };

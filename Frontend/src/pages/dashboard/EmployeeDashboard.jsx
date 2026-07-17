@@ -4,6 +4,7 @@ import { useGetMeUser } from "../../auth/server-state/employee/employeeauth/empl
 import { useGetAllLeaveHistory } from "../../auth/server-state/employee/employeeleave/employeeleave.hook";
 import { useGetAttendance } from "../../auth/server-state/employee/employeeother/employeeother.hook";
 import { useCalendarMeta, useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
+import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus, isPastShiftEnd } from "../../pages/utils/attendance";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS = ["S","M","T","W","T","F","S"];
@@ -48,19 +49,6 @@ function isDateInRange(date,start,end) {
   const s=new Date(start); s.setHours(0,0,0,0);
   const e=new Date(end); e.setHours(0,0,0,0);
   return d>=s && d<=e;
-}
-
-function resolveAttendanceStatus(record) {
-  if (!record) return null;
-  if (record.checkIn && !record.checkOut) return "checkedin";
-  const s=(record.status||"").toLowerCase();
-  if (s.includes("half")) return "halfday";
-  if (s==="present") return "present";
-  if (s==="absent") return "absent";
-  if (s==="late") return "late";
-  if (s==="lwp") return "absent";
-  if (record.checkIn && record.checkOut) return "present";
-  return "absent";
 }
 
 function Avatar({ src, initials, size=36, className="", style={} }) {
@@ -177,7 +165,7 @@ function SegBar({ segments }) {
   );
 }
 
-function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=[], holidays=[], weekOffDates=[] }) {
+function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=[], holidays=[], weekOffDates=[], todayShiftEnd=null }) {
   const year=new Date().getFullYear();
   const firstDay=new Date(year,month,1).getDay();
   const daysInMo=new Date(year,month+1,0).getDate();
@@ -231,9 +219,10 @@ function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=
     else if (weekOffSet.has(d)) { status="weekoff"; }
     else if (leaveDaySet.has(d)) { status="leave"; }
     else if (!isFuture) {
-      const key=date.toISOString().slice(0,10);
+      const key=getISTDayKey(date);
       const record=attendanceMap.get(key);
-      status=resolveAttendanceStatus(record)??"absent";
+      const resolved=resolveAttendanceStatus(record, { isToday });
+      status = resolved ?? (isToday && !isPastShiftEnd(todayShiftEnd) ? "pending" : "absent");
     }
     cells.push({ day:d, status, isToday, label });
   }
@@ -248,6 +237,7 @@ function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=
     holiday:{ bg:"bg-orange-50", text:"text-orange-700 font-semibold" },
     weekoff:{ bg:"bg-slate-100", text:"text-slate-500 font-medium" },
     future:{ bg:"", text:"text-[#d4c8c4]" },
+    pending:{ bg:"bg-gray-50", text:"text-gray-400 font-medium" },
     before_joining:{ bg:"", text:"text-[#cfc6c1] opacity-35" },
   };
 
@@ -331,19 +321,23 @@ function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, c
   // regardless of holiday/week-off/shift-window (those only gate the
   // initial check-in).
   const alreadyActedToday = isCheckedIn || isCheckedOut;
-  const reason = isOnLeave ? "leave" : (!alreadyActedToday ? (checkinGate?.reason ?? null) : null);
-  const isBlocked = isOnLeave || (!alreadyActedToday && !checkinGate?.canCheckIn);
+  // A face check-in owns the whole day — this app can't check them out,
+  // so treat an open face session as "blocked" the same way holiday/leave is.
+  const isFaceSession = myAtt?.source === "face" && !isCheckedOut;
+  const reason = isOnLeave
+    ? "leave"
+    : isFaceSession
+      ? (checkinGate?.isVeryLate ? "outside_shift" : "checked_in_by_face")
+      : (!alreadyActedToday ? (checkinGate?.reason ?? null) : null);
+  const isBlocked = isOnLeave || isFaceSession || (!alreadyActedToday && !checkinGate?.canCheckIn);
 
   const REASON_META = {
     leave:         { theme:"indigo", icon:"🏖️", label:`On Leave — ${leaveLabel[leaveType]||"Approved Leave"}` },
     holiday:       { theme:"amber",  icon:"🎉", label:`Holiday — ${checkinGate?.holidayName || "Company Holiday"}` },
     weekoff:       { theme:"slate",  icon:"🛋️", label:"Week Off" },
-    too_early:     { theme:"slate",  icon:"⏰", label: checkinGate?.shift
-      ? `Check-in opens closer to ${checkinGate.shift.startTime}`
-      : "Check-in not open yet" },
-    too_late:      { theme:"rose",   icon:"⛔", label: checkinGate?.shift
-      ? `Check-in closed — more than 1 hour past ${checkinGate.shift.startTime}`
-      : "Check-in window closed" },
+    outside_shift: { theme:"rose",   icon:"⛔", label: checkinGate?.shift
+      ? `Outside Shift — ${checkinGate.shift.startTime} to ${checkinGate.shift.endTime}`
+      : "Outside Shift Window" },
     checked_in_by_face: { theme:"pink", icon:"🤳", label: "Checked in via Face Attendance" },
     loading:       { theme:"slate",  icon:"⏳", label:"Checking today's status…" },
   };
@@ -361,12 +355,11 @@ function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, c
   let buttonLabel = "Check In";
   if (isOnLeave) buttonLabel = "🚫 Check-in Disabled";
   else if (isCheckedOut) buttonLabel = "✅ Completed";
+  else if (reason === "checked_in_by_face") buttonLabel = "🤳 Checked In (Face)";
   else if (isCheckedIn) buttonLabel = "🔴 Check Out";
   else if (reason === "holiday") buttonLabel = "🎉 Holiday Today";
   else if (reason === "weekoff") buttonLabel = "🛋️ Week Off";
-  else if (reason === "too_early") buttonLabel = "⏰ Not Open Yet";
-  else if (reason === "too_late") buttonLabel = "⛔ Blocked";
-  else if (reason === "checked_in_by_face") buttonLabel = "🤳 Checked In (Face)";
+  else if (reason === "outside_shift") buttonLabel = "⛔ Outside Shift";
   else if (reason === "loading") buttonLabel = "Please wait…";
 
   const buttonDisabled = isBlocked || isCheckedOut;
@@ -580,6 +573,7 @@ export default function EmployeeDashboard() {
     return {
       canCheckIn: t.canCheckIn,
       reason: t.disabledReason,
+      isVeryLate: t.isVeryLate,
       holidayName: t.holidayName,
       shift: t.shift,
     };
@@ -587,14 +581,7 @@ export default function EmployeeDashboard() {
 
   const attendanceMap=useMemo(()=>{
     const records=Array.isArray(attData)?attData:Array.isArray(attData?.attendance)?attData.attendance:[];
-    const IST_OFFSET_MS=5.5*60*60*1000;
-    const map=new Map();
-    records.forEach(rec=>{
-      if (!rec.date) return;
-      const istKey=new Date(new Date(rec.date).getTime()+IST_OFFSET_MS).toISOString().slice(0,10);
-      map.set(istKey,rec);
-    });
-    return map;
+    return buildAttendanceMap(records);
   },[attData]);
 
   const approvedLeaves=useMemo(()=>allLeaves.filter(lv=>APPROVED_STATUSES.includes(lv.status)),[allLeaves]);
@@ -617,17 +604,34 @@ export default function EmployeeDashboard() {
   const { presentCount, absentCount, halfCount, checkedInCount, attendanceRate }=useMemo(()=>{
     const year=new Date().getFullYear();
     const today=new Date(); today.setHours(0,0,0,0);
+    const weekOffSet = new Set(
+      (calMeta?.weekOffDates ?? [])
+        .map(ds => new Date(ds))
+        .filter(d => d.getFullYear() === year && d.getMonth() === selectedMonth)
+        .map(d => d.getDate())
+    );
+    const holidaySet = new Set(
+      (calMeta?.holidays ?? [])
+        .map(h => new Date(h.date))
+        .filter(d => d.getFullYear() === year && d.getMonth() === selectedMonth)
+        .map(d => d.getDate())
+    );
     let present=0,absent=0,half=0,checkedIn=0,counted=0;
     const daysInMonth=new Date(year,selectedMonth+1,0).getDate();
     for (let d=1; d<=daysInMonth; d++) {
       const date=new Date(year,selectedMonth,d); date.setHours(0,0,0,0);
       if (date>today) break;
       if (joiningMidnight && date<joiningMidnight) continue;
+      if (weekOffSet.has(d) || holidaySet.has(d)) continue;
       if (approvedLeaves.some(lv=>isDateInRange(date,lv.startDate,lv.endDate))) continue;
-      counted++;
-      const key=date.toISOString().slice(0,10);
+      const key=getISTDayKey(date);
       const rec=attendanceMap.get(key);
-      const status=resolveAttendanceStatus(rec);
+      const isTodayCell=date.toDateString()===today.toDateString();
+      const status=resolveAttendanceStatus(rec, { isToday: isTodayCell });
+      if (isTodayCell && !status && !isPastShiftEnd(calMeta?.today?.shift?.endTime)) {
+        continue; // still pending - shift hasn't ended yet
+      }
+      counted++;
       if (status==="present") present++;
       else if (status==="absent"||!status) absent++;
       else if (status==="halfday"||status==="late") half++;
@@ -635,7 +639,7 @@ export default function EmployeeDashboard() {
     }
     const rate=counted>0?Math.round(((present+checkedIn)/counted)*100):0;
     return { presentCount:present, absentCount:absent, halfCount:half, checkedInCount:checkedIn, attendanceRate:rate };
-  },[attendanceMap,selectedMonth,approvedLeaves,joiningMidnight]);
+  },[attendanceMap,selectedMonth,approvedLeaves,joiningMidnight,calMeta]);
 
   const elRemaining=(lb?.EL?.entitled??0)-(lb?.EL?.availed??0);
   const slRemaining=(lb?.SL?.entitled??0)-(lb?.SL?.availed??0);
@@ -834,7 +838,7 @@ export default function EmployeeDashboard() {
               )}
               {/* Calendar: constrained width on large screens so it doesn't stretch too wide */}
               <div className="max-w-2xl mx-auto">
-                <Calendar month={selectedMonth} joiningDate={joiningDate} attendanceMap={attendanceMap} approvedLeaves={approvedLeaves} holidays={calMeta?.holidays ?? []} weekOffDates={calMeta?.weekOffDates ?? []} />
+                <Calendar month={selectedMonth} joiningDate={joiningDate} attendanceMap={attendanceMap} approvedLeaves={approvedLeaves} holidays={calMeta?.holidays ?? []} weekOffDates={calMeta?.weekOffDates ?? []} todayShiftEnd={calMeta?.today?.shift?.endTime ?? null} />
               </div>
             </div>
             <div className="grid grid-cols-5 border-t border-[#f0e8e4] mt-3">

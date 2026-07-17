@@ -783,6 +783,9 @@ const editmanager = async (req, res, next) => {
       role, office_location, designation, department, reporting_manager,
     } = req.body;
 
+    if (reporting_manager && reporting_manager.toString() === id.toString())
+      return next(Object.assign(new Error("A manager cannot report to themselves"), { statusCode: 400 }));
+
     const { reportingManagerId, reportingManagerModel } = await resolveReportingManager(
       reporting_manager,
       organisation_id
@@ -855,6 +858,7 @@ const promoteEmployeeToManager = async (req, res, next) => {
 
     const [newManager] = await Managermodel.create([{
       organisation_id,
+      empid: user.empid,
       uid: newUid,
       profile_image: user.profile_image || null,
       department: user.department,
@@ -990,8 +994,13 @@ const promoteManagerToAdmin = async (req, res, next) => {
     if (!superAdmin)
       return next(Object.assign(new Error("Organisation not found"), { statusCode: 404 }));
 
-    let resolvedReportingManagerId = null;
-    let resolvedReportingManagerModel = null;
+    if (reporting_manager && reporting_manager.toString() === id.toString())
+      return next(Object.assign(new Error("A manager cannot report to themselves"), { statusCode: 400 }));
+
+    // Default: a newly promoted Admin reports directly to the Super Admin unless
+    // a specific reporting manager/admin was explicitly chosen.
+    let resolvedReportingManagerId = superAdmin._id;
+    let resolvedReportingManagerModel = "SuperAdmin";
     if (reporting_manager) {
       const superAdminDoc = await SuperAdminModel.findById(reporting_manager).select("_id").lean();
       if (superAdminDoc) {
@@ -1014,6 +1023,7 @@ const promoteManagerToAdmin = async (req, res, next) => {
 
     const [newAdmin] = await Adminmodel.create([{
       organisation_id,
+      empid: manager.empid,
       uid: newUid,
       profile_image: manager.profile_image || null,
       department: manager.department,
@@ -1168,8 +1178,10 @@ const promoteEmployeeToAdmin = async (req, res, next) => {
     if (!superAdmin)
       return next(Object.assign(new Error("Organisation not found"), { statusCode: 404 }));
 
-    let resolvedReportingManagerId = null;
-    let resolvedReportingManagerModel = null;
+    // Default: a newly promoted Admin reports directly to the Super Admin unless
+    // a specific reporting manager/admin was explicitly chosen.
+    let resolvedReportingManagerId = superAdmin._id;
+    let resolvedReportingManagerModel = "SuperAdmin";
     if (reporting_manager) {
       const superAdminDoc = await SuperAdminModel.findById(reporting_manager).select("_id").lean();
       if (superAdminDoc) {
@@ -1192,6 +1204,7 @@ const promoteEmployeeToAdmin = async (req, res, next) => {
 
     const [newAdmin] = await Adminmodel.create([{
       organisation_id,
+      empid: user.empid,
       uid: newUid,
       profile_image: user.profile_image || null,
       department: user.department,
@@ -1346,6 +1359,7 @@ const demoteManagerToEmployee = async (req, res, next) => {
 
     const [newEmployee] = await Usermodel.create([{
       organisation_id,
+      empid: manager.empid,
       uid: newUid,
       profile_image: manager.profile_image || null,
       department: manager.department,
@@ -1489,6 +1503,9 @@ const demoteAdminToManager = async (req, res, next) => {
     if (existing)
       return next(Object.assign(new Error("A manager with this email already exists"), { statusCode: 400 }));
 
+    if (reporting_manager && reporting_manager.toString() === id.toString())
+      return next(Object.assign(new Error("A manager cannot report to themselves"), { statusCode: 400 }));
+
     const { reportingManagerId, reportingManagerModel } = await resolveReportingManager(
       reporting_manager, organisation_id
     );
@@ -1501,6 +1518,7 @@ const demoteAdminToManager = async (req, res, next) => {
 
     const [newManager] = await Managermodel.create([{
       organisation_id,
+      empid: adminToDemote.empid,
       uid: newUid,
       profile_image: adminToDemote.profile_image || null,
       department: adminToDemote.department,
@@ -1650,6 +1668,7 @@ const demoteAdminToEmployee = async (req, res, next) => {
 
     const [newEmployee] = await Usermodel.create([{
       organisation_id,
+      empid: adminToDemote.empid,
       uid: newUid,
       profile_image: adminToDemote.profile_image || null,
       department: adminToDemote.department,
@@ -2708,38 +2727,38 @@ const getOrgInfo = async (req, res, next) => {
   try {
     if (!req.admin)
       return res.status(401).json({ success: false, message: "Unauthorized" });
- 
+
     const admin = await Adminmodel.findById(req.admin._id)
       .select(
-        "f_name l_name work_email designation department office_location organisation_id"
+        "empid f_name l_name work_email designation department office_location organisation_id"
       )
       .lean();
- 
+
     if (!admin)
       return res.status(404).json({ success: false, message: "Admin not found" });
- 
+
     const organisation_id = admin.organisation_id;
- 
+
     const superAdmin = await SuperAdminModel.findById(organisation_id)
       .select("f_name l_name email organisation_name profile_image")
       .lean();
- 
+
     const managers = await Managermodel.find({ organisation_id })
       .select(
-        "f_name l_name work_email designation department office_location reporting_manager reporting_manager_model"
+        "empid f_name l_name work_email designation department office_location reporting_manager reporting_manager_model"
       )
       .lean();
- 
+
     const employees = await Usermodel
       .find({
         organisation_id,
         Under_manager: { $in: managers.map((m) => m._id) },
       })
       .select(
-        "f_name l_name work_email designation department office_location Under_manager"
+        "empid f_name l_name work_email designation department office_location Under_manager"
       )
       .lean();
- 
+
     const topLevelManagers = managers
       .filter(
         (mgr) =>
@@ -2748,6 +2767,7 @@ const getOrgInfo = async (req, res, next) => {
       )
       .map((mgr) => ({
         id: mgr._id,
+        empid: mgr.empid,
         name: `${mgr.f_name} ${mgr.l_name}`,
         email: mgr.work_email,
         designation: mgr.designation,
@@ -2757,6 +2777,7 @@ const getOrgInfo = async (req, res, next) => {
           .filter((emp) => emp.Under_manager?.toString() === mgr._id.toString())
           .map((emp) => ({
             id: emp._id,
+            empid: emp.empid,
             name: `${emp.f_name} ${emp.l_name}`,
             email: emp.work_email,
             designation: emp.designation,
@@ -2764,7 +2785,7 @@ const getOrgInfo = async (req, res, next) => {
           })),
         subManagers: buildManagerTree(managers, mgr._id, "Manager", employees),
       }));
- 
+
     return res.status(200).json({
       success: true,
       organisation_id,
@@ -2779,6 +2800,7 @@ const getOrgInfo = async (req, res, next) => {
         : null,
       admin: {
         id: admin._id,
+        empid: admin.empid,
         name: `${admin.f_name} ${admin.l_name}`,
         email: admin.work_email,
         designation: admin.designation,
@@ -2801,6 +2823,7 @@ const buildManagerTree = (managers, parentId, parentModel, employees) => {
     })
     .map((mgr) => ({
       id: mgr._id,
+      empid: mgr.empid,
       name: `${mgr.f_name} ${mgr.l_name}`,
       email: mgr.work_email,
       designation: mgr.designation,
@@ -2811,6 +2834,7 @@ const buildManagerTree = (managers, parentId, parentModel, employees) => {
         .filter((emp) => emp.Under_manager?.toString() === mgr._id.toString())
         .map((emp) => ({
           id: emp._id,
+          empid: emp.empid,
           name: `${emp.f_name} ${emp.l_name}`,
           email: emp.work_email,
           designation: emp.designation,
@@ -3309,7 +3333,7 @@ const setManagerWorkingStatus = async (req, res, next) => {
       );
 
     const existingManager = await Managermodel.findOne({ _id: id, organisation_id })
-      .select("_id f_name l_name working_status")
+      .select("empid _id f_name l_name working_status")
       .lean();
 
     if (!existingManager)
@@ -3471,10 +3495,27 @@ const getAllAdminsForOrg = async (req, res, next) => {
     next(error);
   }
 };
+const getMyAttendanceHistory = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+    const attendance = await Attendance.find({
+      employee: req.admin._id,
+      organisation_id: req.admin.organisation_id,
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+    res.status(200).json({ success: true, count: attendance.length, attendance });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   verifyAdmin,
   adminlogin,
   adminlogout,
+  getMyAttendanceHistory,
   addmanager,
   addemployee,
   findallmanagers,

@@ -41,7 +41,7 @@ const syncActiveUserCounts = async () => {
   console.log("Done.");
 };
 
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect(process.env.LINK)
   .then(async () => {
     await syncActiveUserCounts();
     process.exit(0);

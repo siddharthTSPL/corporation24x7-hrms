@@ -31,7 +31,7 @@
     "mongoose": "^9.3.3",
     "moongose": "^1.0.0",
     "morgan": "^1.10.1",
-    "multer": "^2.1.1",
+    "multer": "^2.2.0",
     "multer-storage-cloudinary": "^4.0.0",
     "node-cron": "^4.2.1",
     "nodemailer": "^8.0.2",

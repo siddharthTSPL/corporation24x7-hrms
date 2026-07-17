@@ -10,6 +10,9 @@ const AVATAR_STYLES = [
 
 const MARITAL_OPTIONS = ["single", "married", "divorced"];
 const OFFICE_LOCATIONS = ["Noida", "Bareilly", "Delhi", "Mumbai"];
+const PHONE_REGEX = /^[0-9]{10}$/;
+const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+const ACCOUNT_REGEX = /^[0-9]{9,18}$/;
 
 const C = {
   brand:      "#730042",
@@ -207,6 +210,15 @@ function Sidebar({ tab, setTab, manager, initials }) {
     )},
     { key: "documents", label: "Documents", icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3" y="1" width="10" height="14" rx="2" stroke="currentColor" strokeWidth="1.4"/><path d="M5.5 5h5M5.5 8h5M5.5 11h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+    )},
+    { key: "identity", label: "Identity", icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" strokeWidth="1.4"/><circle cx="6" cy="7" r="1.4" stroke="currentColor" strokeWidth="1.2"/><path d="M4.5 11c0-1.1 0.9-1.8 1.5-1.8s1.5 0.7 1.5 1.8M9.5 6.5h3M9.5 9h3" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg>
+    )},
+    { key: "leave", label: "Leave Balance", icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" strokeWidth="1.4"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+    )},
+    { key: "reviews", label: "Reviews", icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><polygon points="8,1.5 9.9,5.4 14,6 11,9 11.8,13.5 8,11.4 4.2,13.5 5,9 2,6 6.1,5.4" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/></svg>
     )},
     { key: "password", label: "Password", icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="4" y="7" width="8" height="6" rx="2" stroke="currentColor" strokeWidth="1.4"/><path d="M6 7V5a2 2 0 0 1 4 0v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
@@ -467,125 +479,230 @@ function ContactTab({ manager, onSuccess, onError }) {
   );
 }
 
-function AddressTab({ manager, onSuccess, onError }) {
+function AddressTab({ manager }) {
+  return (
+    <SectionCard title="Address information" subtitle="On record, contact HR to update" accent={C.amber}>
+      <ReadonlyField label="Address" value={manager?.address} />
+      <div className="st-2col" style={{ display: "grid", gap: "0 16px" }}>
+        <ReadonlyField label="City" value={manager?.city} />
+        <ReadonlyField label="State" value={manager?.state} />
+      </div>
+      <div className="st-2col" style={{ display: "grid", gap: "0 16px" }}>
+        <ReadonlyField label="Pincode" value={manager?.pincode} />
+        <ReadonlyField label="Country" value={manager?.country} />
+      </div>
+    </SectionCard>
+  );
+}
+
+function IdentityTab({ manager }) {
+  return (
+    <SectionCard title="Identity numbers" subtitle="Government ID records on file" accent={C.brand}>
+      <div className="st-2col" style={{ display: "grid", gap: "0 20px" }}>
+        <ReadonlyField label="Aadhaar number" value={manager?.aadhaar_number} />
+        <ReadonlyField label="PAN number" value={manager?.pan_number} />
+      </div>
+    </SectionCard>
+  );
+}
+
+function DocumentsBankingTab({ manager, onSuccess, onError }) {
   const queryClient = useQueryClient();
   const updateProfile = useUpdateProfile();
-
   const [form, setForm] = useState({
-    address: manager?.address || "",
-    city:    manager?.city    || "",
-    state:   manager?.state   || "",
-    pincode: manager?.pincode || "",
+    resume: "", aadhaar_card: "", pan_card: "", experience_letter: "",
+    bank_name: "", account_holder_name: "", account_number: "", ifsc_code: "",
   });
 
   useEffect(() => {
     if (manager) {
       setForm({
-        address: manager.address || "",
-        city:    manager.city    || "",
-        state:   manager.state   || "",
-        pincode: manager.pincode || "",
+        resume: manager.resume || "",
+        aadhaar_card: manager.aadhaar_card || "",
+        pan_card: manager.pan_card || "",
+        experience_letter: manager.experience_letter || "",
+        bank_name: manager.bank_name || "",
+        account_holder_name: manager.account_holder_name || "",
+        account_number: manager.account_number || "",
+        ifsc_code: manager.ifsc_code || "",
       });
     }
   }, [manager]);
 
-  const handleSave = () => {
-    updateProfile.mutate(form, {
-      onSuccess: (data) => {
-        queryClient.setQueryData(["meManager"], old => old ? { ...old, manager: { ...old.manager, ...data.manager } } : old);
-        queryClient.invalidateQueries({ queryKey: ["meManager"] });
-        onSuccess("Address updated successfully!");
+  const set = (key) => (e) => setForm(p => ({ ...p, [key]: e.target.value }));
+
+  const onProfileSuccess = (data, msg) => {
+    queryClient.setQueryData(["meManager"], old => old ? { ...old, manager: { ...old.manager, ...data.manager } } : old);
+    queryClient.invalidateQueries({ queryKey: ["meManager"] });
+    onSuccess(msg);
+  };
+
+  const handleSaveDocs = () => {
+    updateProfile.mutate(
+      {
+        resume: form.resume,
+        aadhaar_card: form.aadhaar_card,
+        pan_card: form.pan_card,
+        experience_letter: form.experience_letter,
       },
-      onError: (err) => onError(getErrorMessage(err)),
-    });
+      {
+        onSuccess: (data) => onProfileSuccess(data, "Documents updated!"),
+        onError: (err) => onError(getErrorMessage(err)),
+      }
+    );
+  };
+
+  const handleSaveBanking = () => {
+    if (form.bank_name && form.bank_name.length > 100) { onError("Bank name is too long"); return; }
+    if (!form.account_holder_name.trim()) { onError("Account holder name is required"); return; }
+    if (!ACCOUNT_REGEX.test(form.account_number)) { onError("Account number must be 9-18 digits"); return; }
+    if (!IFSC_REGEX.test(form.ifsc_code.toUpperCase())) { onError("Invalid IFSC code"); return; }
+    updateProfile.mutate(
+      {
+        bank_name: form.bank_name,
+        account_holder_name: form.account_holder_name,
+        account_number: form.account_number,
+        ifsc_code: form.ifsc_code.toUpperCase(),
+      },
+      {
+        onSuccess: (data) => onProfileSuccess(data, "Banking details updated!"),
+        onError: (err) => onError(getErrorMessage(err)),
+      }
+    );
   };
 
   return (
-    <SectionCard title="Address information" subtitle="Your residential details" accent={C.amber}>
-      <InputField
-        label="Address"
-        value={form.address}
-        onChange={e => setForm(p => ({ ...p, address: e.target.value }))}
-        placeholder="Enter your address"
-      />
-      <div className="st-2col" style={{ display: "grid", gap: "0 16px" }}>
-        <InputField
-          label="City"
-          value={form.city}
-          onChange={e => setForm(p => ({ ...p, city: e.target.value }))}
-          placeholder="City"
-        />
-        <InputField
-          label="State"
-          value={form.state}
-          onChange={e => setForm(p => ({ ...p, state: e.target.value }))}
-          placeholder="State"
-        />
+    <>
+      <SectionCard title="Documents" subtitle="Paste a link to each uploaded file" accent={C.blue}>
+        <InputField label="Resume" value={form.resume} onChange={set("resume")} placeholder="https://…" />
+        <InputField label="Aadhaar card" value={form.aadhaar_card} onChange={set("aadhaar_card")} placeholder="https://…" />
+        <InputField label="PAN card" value={form.pan_card} onChange={set("pan_card")} placeholder="https://…" />
+        <InputField label="Experience letter" value={form.experience_letter} onChange={set("experience_letter")} placeholder="https://…" />
+        <PrimaryButton onClick={handleSaveDocs} loading={updateProfile.isPending}>Save documents</PrimaryButton>
+      </SectionCard>
+
+      <SectionCard title="Banking details" subtitle="Used for salary disbursement" accent={C.green}>
+        <InputField label="Bank name" value={form.bank_name} onChange={set("bank_name")} placeholder="Bank name" />
+        <InputField label="Account holder name" value={form.account_holder_name} onChange={set("account_holder_name")} placeholder="As per bank records" />
+        <div className="st-2col" style={{ display: "grid", gap: "0 16px" }}>
+          <InputField label="Account number" value={form.account_number} onChange={set("account_number")} placeholder="9-18 digit account number" />
+          <InputField label="IFSC code" value={form.ifsc_code} onChange={(e) => setForm(p => ({ ...p, ifsc_code: e.target.value.toUpperCase() }))} placeholder="ABCD0123456" />
+        </div>
+        <PrimaryButton onClick={handleSaveBanking} loading={updateProfile.isPending} color={C.green}>Save banking details</PrimaryButton>
+      </SectionCard>
+    </>
+  );
+}
+
+function LeaveTab({ leaveBalance }) {
+  if (!leaveBalance) {
+    return (
+      <SectionCard title="Leave Balance" accent={C.green}>
+        <div style={{ textAlign: "center", padding: "32px 0", color: C.muted, fontSize: 13 }}>
+          No leave balance data available.
+        </div>
+      </SectionCard>
+    );
+  }
+
+  const leaves = [
+    { key: "EL", label: "Earned Leave", color: C.brand, entitled: leaveBalance.EL?.entitled, availed: leaveBalance.EL?.availed, accrued: leaveBalance.EL?.accrued },
+    { key: "SL", label: "Sick Leave", color: C.blue, entitled: leaveBalance.SL?.entitled, availed: leaveBalance.SL?.availed },
+    { key: "ML", label: "Maternity Leave", color: C.amber, entitled: leaveBalance.ML, availed: null },
+    { key: "PL", label: "Paternity Leave", color: C.green, entitled: leaveBalance.PL, availed: null },
+  ];
+
+  return (
+    <SectionCard title="Leave Balance" subtitle="Your current leave entitlements" accent={C.green}>
+      <div className="st-2col" style={{ display: "grid", gap: 12, marginBottom: 16 }}>
+        {leaves.map(l => {
+          const entitled = l.entitled ?? 0;
+          const availed = l.availed ?? 0;
+          const remaining = entitled - availed;
+          const pct = entitled > 0 ? Math.max(0, Math.min(100, (remaining / entitled) * 100)) : 0;
+          return (
+            <div key={l.key} style={{ padding: "14px 16px", borderRadius: 12, border: `0.5px solid ${C.border}`, background: C.surface }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{l.label}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20, background: `${l.color}15`, color: l.color, whiteSpace: "nowrap" }}>
+                  {remaining} left
+                </span>
+              </div>
+              <div style={{ height: 5, borderRadius: 4, background: C.border, marginBottom: 8 }}>
+                <div style={{ height: "100%", width: `${pct}%`, borderRadius: 4, background: l.color, transition: "width 0.4s" }} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: C.muted, gap: 6 }}>
+                <span>Entitled: <b style={{ color: C.text }}>{entitled}</b></span>
+                <span>Availed: <b style={{ color: C.text }}>{availed}</b></span>
+              </div>
+              {l.accrued !== undefined && (
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>
+                  Accrued: <b style={{ color: C.text }}>{l.accrued}</b>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
-      <InputField
-        label="Pincode"
-        value={form.pincode}
-        onChange={e => setForm(p => ({ ...p, pincode: e.target.value }))}
-        placeholder="Enter pincode"
-      />
-      <PrimaryButton onClick={handleSave} loading={updateProfile.isPending}>
-        Save address
-      </PrimaryButton>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        {[
+          { label: "LWP (Loss of Pay)", value: leaveBalance.lwp ?? 0 },
+          { label: "PBC (Public Holidays)", value: leaveBalance.pbc ?? 0 },
+        ].map(item => (
+          <div key={item.label} style={{ flex: 1, minWidth: 140, padding: "12px 14px", borderRadius: 10, border: `0.5px solid ${C.border}`, background: C.surface }}>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>{item.label}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{item.value}</div>
+          </div>
+        ))}
+      </div>
     </SectionCard>
   );
 }
 
-function DocumentsTab({ manager }) {
-  const docFields = [
-    { label: "Aadhaar number",      value: manager?.aadhaar_number },
-    { label: "PAN number",          value: manager?.pan_number },
-    { label: "Bank name",           value: manager?.bank_name },
-    { label: "Account holder name", value: manager?.account_holder_name },
-    { label: "Account number",      value: manager?.account_number },
-    { label: "IFSC code",           value: manager?.ifsc_code },
-  ];
+function ReviewsTab({ reviews }) {
+  if (!reviews?.length) {
+    return (
+      <SectionCard title="My Reviews" accent={C.brand}>
+        <div style={{ textAlign: "center", padding: "32px 0", color: C.muted, fontSize: 13 }}>
+          No reviews received yet.
+        </div>
+      </SectionCard>
+    );
+  }
 
-  const fileFields = [
-    { label: "Resume",            value: manager?.resume },
-    { label: "Aadhaar card",      value: manager?.aadhaar_card },
-    { label: "PAN card",          value: manager?.pan_card },
-    { label: "Experience letter", value: manager?.experience_letter },
-  ];
+  const avg = (reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length).toFixed(1);
 
   return (
-    <>
-      <SectionCard title="Identity & banking" subtitle="Your identity and bank details on record" accent={C.brand}>
-        <div className="st-2col" style={{ display: "grid", gap: "0 20px" }}>
-          {docFields.map(f => (
-            <ReadonlyField key={f.label} label={f.label} value={f.value} />
-          ))}
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Uploaded documents" subtitle="Files submitted during onboarding" accent={C.blue}>
-        <div className="st-2col" style={{ display: "grid", gap: "0 20px" }}>
-          {fileFields.map(f => (
-            <div key={f.label} style={{ marginBottom: 16 }}>
-              <FieldLabel>{f.label}</FieldLabel>
-              <div style={{
-                padding: "10px 14px", borderRadius: 10,
-                background: "#f9f4f2", border: `0.5px solid ${C.border}`,
-                fontSize: 13, color: f.value ? C.blue : C.muted, fontWeight: 500,
-                display: "flex", alignItems: "center", gap: 8,
-              }}>
-                {f.value ? (
-                  <>
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="1" width="10" height="12" rx="2" stroke={C.blue} strokeWidth="1.3"/><path d="M4.5 4.5h5M4.5 7h5M4.5 9.5h3" stroke={C.blue} strokeWidth="1.2" strokeLinecap="round"/></svg>
-                    Uploaded
-                  </>
-                ) : "Not uploaded"}
+    <SectionCard title="My Reviews" subtitle={`${reviews.length} review${reviews.length !== 1 ? "s" : ""} · avg ${avg}/5`} accent={C.brand}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {reviews.map((r, i) => (
+          <div key={r._id || i} style={{ padding: "14px 16px", borderRadius: 10, border: `0.5px solid ${C.border}`, background: C.surface }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8, gap: 8, flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>
+                  {r.reviewer?.f_name ? `${r.reviewer.f_name} ${r.reviewer.l_name || ""}` : "Anonymous"}
+                </div>
+                <div style={{ fontSize: 11, color: C.muted }}>{r.reviewer?.role || ""} · {r.monthYear || (r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "")}</div>
               </div>
-              <div style={{ fontSize: 11, color: C.mutedMid, marginTop: 4 }}>Read-only</div>
+              <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+                {[1,2,3,4,5].map(s => (
+                  <svg key={s} width="14" height="14" viewBox="0 0 24 24">
+                    <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
+                      fill={s <= (r.rating || 0) ? "#f59e0b" : "transparent"}
+                      stroke="#f59e0b" strokeWidth="1.5" strokeLinejoin="round" />
+                  </svg>
+                ))}
+              </div>
             </div>
-          ))}
-        </div>
-      </SectionCard>
-    </>
+            {r.comment && (
+              <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, fontStyle: "italic" }}>
+                "{r.comment}"
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </SectionCard>
   );
 }
 
@@ -780,6 +897,8 @@ export default function ManagerSettingsPage() {
 
   const { data: meData, isLoading } = useGetMeManager();
   const manager = meData?.manager ?? null;
+  const leaveBalance = Array.isArray(meData?.leavebalance) ? meData.leavebalance[0] : meData?.leavebalance;
+  const reviews = meData?.reviews ?? [];
   const initials = manager ? getInitials(manager.f_name, manager.l_name) : "—";
 
   const showSuccess = (msg) => setToast({ message: msg, type: "success" });
@@ -823,8 +942,11 @@ export default function ManagerSettingsPage() {
         <div style={{ flex: 1, minWidth: 0 }}>
           {tab === "profile"   && <ProfileTab   manager={manager} />}
           {tab === "contact"   && <ContactTab   manager={manager} onSuccess={showSuccess} onError={showError} />}
-          {tab === "address"   && <AddressTab   manager={manager} onSuccess={showSuccess} onError={showError} />}
-          {tab === "documents" && <DocumentsTab manager={manager} />}
+          {tab === "address"   && <AddressTab   manager={manager} />}
+          {tab === "identity"  && <IdentityTab  manager={manager} />}
+          {tab === "documents" && <DocumentsBankingTab manager={manager} onSuccess={showSuccess} onError={showError} />}
+          {tab === "leave"     && <LeaveTab     leaveBalance={leaveBalance} />}
+          {tab === "reviews"   && <ReviewsTab   reviews={reviews} />}
           {tab === "password"  && <PasswordTab  onSuccess={showSuccess} onError={showError} />}
           {tab === "avatar"    && <AvatarTab    manager={manager} onSuccess={showSuccess} onError={showError} />}
 

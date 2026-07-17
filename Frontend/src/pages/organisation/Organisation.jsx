@@ -13,6 +13,16 @@ const initials = (name = "") =>
 
 const norm = (s = "") => s.toLowerCase().trim();
 
+const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+};
+
+const getDepartmentName = (dept) => DEPT_FULL_FORMS[dept] || dept || "—";
+
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
@@ -25,11 +35,34 @@ const STYLES = `
   @keyframes shimmer   { 0% { background-position:-600px 0; } 100% { background-position:600px 0; } }
   @keyframes spin      { to { transform:rotate(360deg); } }
   @keyframes slideDown { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes pulseYou  {
+    0%,100% { box-shadow: 0 0 0 0 rgba(115,0,66,0.25); }
+    50%      { box-shadow: 0 0 0 6px rgba(115,0,66,0.06); }
+  }
 
   .nd { transition: transform 0.16s ease, box-shadow 0.16s ease; cursor: default; }
   .nd:hover { transform: translateY(-2px); }
   .nd-hl  { outline: 2px solid #1e293b !important; outline-offset: 2px; box-shadow: 0 0 0 5px rgba(30,41,59,0.1) !important; }
   .nd-dim { opacity: 0.15; filter: grayscale(0.4); transition: opacity 0.2s, filter 0.2s; }
+
+  .you-pill {
+    position: absolute;
+    top: -9px;
+    right: -9px;
+    z-index: 30;
+    background: #730042;
+    color: #ffffff;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(115,0,66,0.45), 0 0 0 2px #ffffff;
+    white-space: nowrap;
+    animation: pulseYou 2.6s ease-in-out infinite;
+    pointer-events: none;
+  }
 
   .stat-h { transition: transform 0.14s ease; }
   .stat-h:hover { transform: translateY(-2px); }
@@ -67,6 +100,10 @@ const STYLES = `
   .et { position:fixed;bottom:16px;right:16px;left:16px;z-index:9999;display:flex;align-items:center;gap:10px;padding:12px 18px;border-radius:10px;background:#1e293b;color:#fff;font-size:13px;font-weight:500;box-shadow:0 8px 28px rgba(0,0,0,0.22);animation:slideDown .22s ease forwards;font-family:'DM Sans',sans-serif;pointer-events:none;justify-content:center; }
   @media (min-width: 640px) { .et { left:auto;right:24px;bottom:24px;justify-content:flex-start; } }
   .export-mode, .export-mode * { animation:none!important;opacity:1!important;transform:none!important; }
+
+  @media (max-width: 480px) {
+    .org-root .nd { padding-left: 8px !important; padding-right: 8px !important; }
+  }
 `;
 
 function Sk({ w, h, r = 8 }) {
@@ -96,8 +133,10 @@ function Hi({ text = "", q = "", style = {} }) {
   );
 }
 
-// Admin sits at the root of their whole org, so every node is on their own line —
-// the palette here stays a simple grayscale ramp by depth rather than per-role colour.
+function YouPill() {
+  return <span className="you-pill"></span>;
+}
+
 const CFG = {
   org:     { accent: "#0f172a", avBg: "#0f172a", avColor: "#f8fafc" },
   admin:   { accent: "#334155", avBg: "#e2e8f0", avColor: "#334155" },
@@ -106,7 +145,7 @@ const CFG = {
   emp:     { accent: "#94a3b8", avBg: "#f8fafc", avColor: "#64748b" },
 };
 
-function Card({ level, name, sub, empid, width = 172, delay = 0, dim, hl, q, empCount }) {
+function Card({ level, name, department, designation, empid, isOrg, width = 172, delay = 0, dim, hl, q, you, empCount }) {
   const c = CFG[level] || CFG.emp;
   return (
     <div style={{ animation: `scaleIn 0.26s ease ${delay}ms forwards`, opacity: 0, flexShrink: 0 }}>
@@ -114,12 +153,18 @@ function Card({ level, name, sub, empid, width = 172, delay = 0, dim, hl, q, emp
         className={["nd", hl ? "nd-hl" : "", dim ? "nd-dim" : ""].filter(Boolean).join(" ")}
         style={{ width, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 11, padding: "14px 12px 11px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", display: "flex", flexDirection: "column", alignItems: "center", position: "relative", overflow: "hidden" }}
       >
+        {you && <YouPill />}
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: c.accent, borderRadius: "11px 11px 0 0" }} />
         <Avatar name={name} size={38} bg={c.avBg} color={c.avColor} />
         <div style={{ marginTop: 8, marginBottom: 6, textAlign: "center", width: "100%" }}>
           <Hi text={name} q={q} style={{ fontSize: 12, fontWeight: 600, color: "#0f172a", display: "block", lineHeight: 1.3, fontFamily: "'Syne',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />
-          {sub && <Hi text={sub} q={q} style={{ fontSize: 10, color: "#64748b", display: "block", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />}
-          {empid && <span style={{ fontSize: 9, color: "#94a3b8", display: "block", marginTop: 2, fontFamily: "'DM Mono',monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{empid}</span>}
+          {!isOrg && (
+            <>
+              <Hi text={department || "—"} q={q} style={{ fontSize: 10, color: "#64748b", display: "block", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />
+              <Hi text={designation || "—"} q={q} style={{ fontSize: 10, color: "#64748b", display: "block", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />
+              <span style={{ fontSize: 9, color: "#94a3b8", display: "block", marginTop: 2, fontFamily: "'DM Mono',monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{empid || "—"}</span>
+            </>
+          )}
           {empCount !== undefined && <span style={{ fontSize: 10, color: "#94a3b8", display: "block", marginTop: 2 }}>{empCount} report{empCount !== 1 ? "s" : ""}</span>}
         </div>
       </div>
@@ -197,7 +242,8 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
       <Card
         level={level}
         name={mgr.name}
-        sub={mgr.designation || mgr.department}
+        department={mgr.department ? getDepartmentName(mgr.department) : "—"}
+        designation={mgr.designation || "—"}
         empid={mgr.empid}
         width={CARD_W}
         delay={mDelay}
@@ -246,7 +292,8 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
                   key={emp.id}
                   level="emp"
                   name={emp.name}
-                  sub={emp.designation || emp.department}
+                  department={emp.department ? getDepartmentName(emp.department) : "—"}
+                  designation={emp.designation || "—"}
                   empid={emp.empid}
                   width={EMP_W}
                   delay={eDelay}
@@ -318,13 +365,25 @@ function OrgTree({ data, loading, q }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: "max-content" }}>
       <div style={{ animation: `scaleIn 0.26s ease 40ms forwards`, opacity: 0 }}>
-        <Card level="org" name={data.organisation_name || "Organisation"} sub={data.super_admin?.name} width={CARD_W} delay={0} dim={dim("org")} hl={matches.has("org")} q={q} />
+        <Card level="org" name={data.organisation_name || "Organisation"} department="—" designation={data.super_admin?.name || "—"} isOrg width={CARD_W} delay={0} dim={dim("org")} hl={matches.has("org")} q={q} />
       </div>
       <VLine h={22} />
 
       {data.admin && (
         <>
-          <Card level="admin" name={data.admin.name} sub={data.admin.designation || data.admin.department} empid={data.admin.empid} width={CARD_W} delay={80} dim={dim("admin")} hl={matches.has("admin")} q={q} />
+          <Card
+            level="admin"
+            name={data.admin.name}
+            department={data.admin.department ? getDepartmentName(data.admin.department) : "—"}
+            designation={data.admin.designation || "—"}
+            empid={data.admin.empid}
+            width={CARD_W}
+            delay={80}
+            dim={dim("admin")}
+            hl={matches.has("admin")}
+            q={q}
+            you
+          />
           <VLine h={22} />
         </>
       )}
@@ -500,10 +559,10 @@ export default function OrganizationPageAdmin() {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5 mb-5 sm:mb-[22px]">
-          <StatCard label="Organisation"  text={orgName}                    icon={Building2} accent="#0f172a" delay={60}  />
-          <StatCard label="Admin name"    text={adminInfo?.name}            icon={User}      accent="#334155" delay={95}  />
-          <StatCard label="Department"    text={adminInfo?.department}      icon={Users}     accent="#475569" delay={130} />
-          <StatCard label="Designation"   text={adminInfo?.designation}     icon={Crown}     accent="#64748b" delay={165} />
+          <StatCard label="Organisation"  text={orgName}                                icon={Building2} accent="#0f172a" delay={60}  />
+          <StatCard label="Admin name"    text={adminInfo?.name}                        icon={User}      accent="#334155" delay={95}  />
+          <StatCard label="Department"    text={adminInfo?.department ? getDepartmentName(adminInfo.department) : undefined} icon={Users}     accent="#475569" delay={130} />
+          <StatCard label="Designation"   text={adminInfo?.designation}                 icon={Crown}     accent="#64748b" delay={165} />
         </div>
 
         {searchOpen && searchQuery && matchCount === 0 && (

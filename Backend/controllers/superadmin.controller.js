@@ -1265,19 +1265,19 @@ const getallemployee = async (req, res, next) => {
     const [admins, managers, users] = await Promise.all([
       AdminModel.find({ organisation_id, working_status: "working" })
         .select(
-          "uid f_name l_name work_email role department designation office_location organisation_id",
+          "empid uid f_name l_name work_email role department designation office_location organisation_id",
         )
         .lean(),
 
       Managermodel.find({ organisation_id, working_status: "working" })
         .select(
-          "uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact",
+          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact",
         )
         .lean(),
 
       Usermodel.find({ organisation_id, working_status: "working" })
         .select(
-          "uid f_name l_name work_email role department designation office_location organisation_id Under_manager",
+          "empid uid f_name l_name work_email role department designation office_location organisation_id Under_manager",
         )
         .populate({
           path: "Under_manager",
@@ -1856,6 +1856,7 @@ function buildManagerNode(manager, allManagers, allEmployees) {
 
   return {
     id: manager._id,
+    empid: manager.empid,
     name: `${manager.f_name} ${manager.l_name}`,
     email: manager.work_email,
     designation: manager.designation,
@@ -1865,6 +1866,7 @@ function buildManagerNode(manager, allManagers, allEmployees) {
     reportsTo: manager.reporting_manager_model,
     employees: directEmployees.map((emp) => ({
       id: emp._id,
+      empid: emp.empid,
       name: `${emp.f_name} ${emp.l_name}`,
       email: emp.work_email,
       designation: emp.designation,
@@ -1913,17 +1915,17 @@ const getOrgInfo = async (req, res, next) => {
     const [admins, managers, employees] = await Promise.all([
       AdminModel.find({ organisation_id })
         .select(
-          "f_name l_name work_email designation department office_location role reporting_manager reporting_manager_model"
+          "empid f_name l_name work_email designation department office_location role reporting_manager reporting_manager_model"
         )
         .lean(),
       Managermodel.find({ organisation_id })
         .select(
-          "f_name l_name work_email designation department office_location role reporting_manager reporting_manager_model"
+          "empid f_name l_name work_email designation department office_location role reporting_manager reporting_manager_model"
         )
         .lean(),
       Usermodel.find({ organisation_id })
         .select(
-          "f_name l_name work_email designation department office_location Under_manager"
+          "empid f_name l_name work_email designation department office_location Under_manager"
         )
         .lean(),
     ]);
@@ -1940,6 +1942,7 @@ const getOrgInfo = async (req, res, next) => {
 
       const node = {
         id: admin._id,
+        empid: admin.empid,
         name: `${admin.f_name} ${admin.l_name}`,
         email: admin.work_email,
         designation: admin.designation,
@@ -2006,6 +2009,7 @@ const getOrgInfo = async (req, res, next) => {
       unassignedManagers: orphanManagerTree,
       unassignedEmployees: unassignedEmployees.map((emp) => ({
         id: emp._id,
+        empid: emp.empid,
         name: `${emp.f_name} ${emp.l_name}`,
         email: emp.work_email,
         designation: emp.designation,

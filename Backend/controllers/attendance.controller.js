@@ -3,7 +3,8 @@ const AdminModel = require("../Models/Admin.model");
 const Shift = require("../Models/shift.model");
 const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
 const { resolveEmployeeShift, evaluateCheckinWindow, evaluateCheckoutWindow, getShiftThresholds, getForceCheckoutInstant } = require("../utils/shift.utils");
-const { isHoliday, isWeekOff, startOfDay } = require("../automatic/weekoffcalendar");
+const { isHoliday, isWeekOff, startOfDay, getWeekOffMapForRange } = require("../automatic/weekoffcalendar");
+const { getISTDateParts, istDateFromYMD, toISTKey } = require("../utils/Istdate.utils");
 
 const getUserId = (user) => user._id || user.id;
 
@@ -56,19 +57,24 @@ const checkin = async (req, res) => {
     }
 
     const shift = await resolveEmployeeShift(user, organisation_id);
-    const { allowed, isLate, tooLate } = evaluateCheckinWindow(shift, new Date());
+    const { allowed, isLate, lateMinutes, tooLate } = evaluateCheckinWindow(shift, new Date());
 
+    // Same "outside_shift" window as Face Attendance and getCalendarMeta:
+    // more than earlyBufferMinutes before shift start, OR more than
+    // lateCheckinCutoffMinutes after shift end.
     if (!allowed) {
-      if (tooLate) {
-        return res.status(400).json({
-          message: `Not allowed — you are too late. Check-in for ${shift.name} closes ${shift.lateCheckinCutoffMinutes ?? 60} minute(s) after shift start (${shift.startTime}).`,
-          reason: "too_late",
-          shift: { name: shift.name, startTime: shift.startTime, endTime: shift.endTime },
-        });
-      }
       return res.status(400).json({
-        message: `Check-in opens ${shift.earlyBufferMinutes ?? 60} minute(s) before your shift (${shift.startTime}).`,
-        reason: "too_early",
+        message: `Outside Shift. Check-in opens ${shift.earlyBufferMinutes ?? 60} minute(s) before your shift (${shift.startTime}).`,
+        reason: "outside_shift",
+        shift: { name: shift.name, startTime: shift.startTime, endTime: shift.endTime },
+      });
+    }
+
+    if (tooLate) {
+      const lateCutoff = shift.lateCheckinCutoffMinutes ?? 60;
+      return res.status(400).json({
+        message: `Outside Shift. Your check-in window for ${shift.name} (${shift.startTime} – ${shift.endTime}) closed ${lateCutoff} minute(s) after shift end. Please contact your admin/manager.`,
+        reason: "outside_shift",
         shift: { name: shift.name, startTime: shift.startTime, endTime: shift.endTime },
       });
     }
@@ -110,25 +116,40 @@ const checkin = async (req, res) => {
       });
     }
 
-    const newAttendance = await Attendance.create({
-      organisation_id,
-      employee: userId,
-      onModel: getOnModel(user.role),
-      role: user.role,
-      date: today,
-      checkIn: new Date(),
-      latitude,
-      longitude,
-      selfie,
-      shift: shift._id,
-      isLate,
-      activeMinutes: 0,
-      idleMinutes: 0,
-      lastUpdated: Date.now(),
-      source: "manual",
-    });
+    let newAttendance;
+    try {
+      newAttendance = await Attendance.create({
+        organisation_id,
+        employee: userId,
+        onModel: getOnModel(user.role),
+        role: user.role,
+        date: today,
+        checkIn: new Date(),
+        latitude,
+        longitude,
+        selfie,
+        shift: shift._id,
+        isLate,
+        activeMinutes: 0,
+        idleMinutes: 0,
+        lastUpdated: Date.now(),
+        source: "manual",
+      });
+    } catch (createErr) {
+      // Another request (e.g. the desktop agent's ping) created today's
+      // record in the tiny window between our findOne above and this
+      // create() - re-fetch instead of failing the check-in.
+      if (createErr.code === 11000) {
+        newAttendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
+      } else {
+        throw createErr;
+      }
+    }
 
-    res.json({ message: "Check-in successful", attendance: newAttendance, isLate });
+    const message = isLate
+      ? `You are a bit late (by ${Math.round(lateMinutes)} min), but welcome! Check-in successful.`
+      : "Check-in successful";
+    res.json({ message, attendance: newAttendance, isLate, lateMinutes });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -150,19 +171,36 @@ const activity = async (req, res) => {
 
     if (!attendance) {
       const shift = await resolveEmployeeShift(user, organisation_id);
-      attendance = await Attendance.create({
-        organisation_id,
-        employee: userId,
-        onModel: getOnModel(user.role),
-        role: user.role,
-        date: today,
-        checkIn: new Date(),
-        shift: shift._id,
-        activeMinutes: 0,
-        idleMinutes: 0,
-        lastUpdated: Date.now(),
-        source: "agent",
-      });
+      try {
+        attendance = await Attendance.create({
+          organisation_id,
+          employee: userId,
+          onModel: getOnModel(user.role),
+          role: user.role,
+          date: today,
+          // Deliberately NOT setting checkIn here - an agent ping is just
+          // background activity tracking, not a real check-in. Leaving
+          // checkIn unset means anything reading `attendance.checkIn` (or
+          // `!!attendance.checkIn`) is naturally correct on its own,
+          // without every consumer having to remember to also check
+          // `source !== "agent"`. checkIn only gets set for real when a
+          // manual/face check-in upgrades this record (see checkin()
+          // above and scanFace() in faceattendance.controller.js).
+          shift: shift._id,
+          activeMinutes: 0,
+          idleMinutes: 0,
+          lastUpdated: Date.now(),
+          source: "agent",
+        });
+      } catch (createErr) {
+        if (createErr.code === 11000) {
+          // Someone else (manual/face check-in) created today's record a
+          // moment ago - fine, today already has a real record; nothing
+          // for this background ping to do.
+          return res.json({ message: "Activity started", activeMinutes: 0, idleMinutes: 0 });
+        }
+        throw createErr;
+      }
       return res.json({ message: "Activity started", activeMinutes: 0, idleMinutes: 0 });
     }
 
@@ -278,7 +316,7 @@ const getToday = async (req, res) => {
         activeMinutes: displayMinutes(attendance.activeMinutes),
         idleMinutes: displayMinutes(attendance.idleMinutes),
       },
-      isCheckedIn: attendance.source === "manual" && !attendance.checkOut,
+      isCheckedIn: !attendance.checkOut && !!attendance.checkIn && attendance.source !== "agent",
       isCheckedOut: !!attendance.checkOut,
     });
   } catch (error) {
@@ -391,11 +429,17 @@ const getCalendarMeta = async (req, res) => {
     const employeeModel = getOnModel(user.role);
 
     const now = new Date();
-    const month = req.query.month ? Number(req.query.month) : now.getMonth() + 1; // 1-12
-    const year = req.query.year ? Number(req.query.year) : now.getFullYear();
+    // Default month/year must reflect the IST calendar day, not whatever
+    // the server process's OS timezone happens to be (see Istdate.utils.js).
+    const nowIST = getISTDateParts(now);
+    const month = req.query.month ? Number(req.query.month) : nowIST.month; // 1-12
+    const year = req.query.year ? Number(req.query.year) : nowIST.year;
 
-    const monthStart = new Date(year, month - 1, 1);
-    const monthEnd = new Date(year, month, 0);
+    // Days in month is pure UTC calendar arithmetic (Date.UTC/getUTCDate),
+    // not timezone-sensitive, so this is safe as-is.
+    const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const monthStart = istDateFromYMD(year, month, 1);
+    const monthEnd = istDateFromYMD(year, month, daysInMonth);
 
     // Only look as far into the month as today, plus the rest of the
     // month for holidays (holidays are known in advance; week-off status
@@ -406,41 +450,33 @@ const getCalendarMeta = async (req, res) => {
       date: { $gte: monthStart, $lte: monthEnd },
     }).sort({ date: 1 }).lean();
 
-    // BUG FIX: this used to be `new Date(d).toISOString().slice(0, 10)`,
-    // which formats in UTC. Holiday/shift dates in this codebase are all
-    // stored and constructed using LOCAL (server) midnight - e.g.
-    // `new Date(year, month - 1, day)` or `date.setHours(0, 0, 0, 0)`.
-    // Converting one of those to an ISO string and slicing rolls the date
-    // back by one day whenever the server's local timezone is ahead of
-    // UTC (e.g. IST, UTC+5:30), because UTC midnight of that instant falls
-    // on the *previous* calendar day. Reading the LOCAL Y/M/D components
-    // instead keeps the key matching the calendar day everyone intended,
+    // toKey used to read dt.getFullYear()/getMonth()/getDate() directly -
+    // those are LOCAL (server-process-timezone) getters. On a host running
+    // UTC, a `date` field stored as IST-midnight (e.g. the UTC instant
+    // "2026-07-14T18:30:00Z", which IS calendar day 2026-07-15 in IST)
+    // reads back as "2026-07-14" - exactly the off-by-one-day seen in
+    // production. toISTKey shifts into IST first, so it's correct
     // regardless of what timezone the server happens to run in.
     const pad2 = (n) => String(n).padStart(2, "0");
-    const toKey = (d) => {
-      const dt = new Date(d);
-      return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
-    };
+    const toKey = (d) => toISTKey(d);
 
     const holidays = holidayDocs.map((h) => ({ date: toKey(h.date), name: h.name }));
 
     const weekOffDates = [];
-    const daysInMonth = monthEnd.getDate();
+    const weekOffMap = await getWeekOffMapForRange(monthStart, monthEnd, organisation_id, userId, employeeModel);
     for (let d = 1; d <= daysInMonth; d++) {
-      const date = new Date(year, month - 1, d);
-      const result = await isWeekOff(date, organisation_id, userId, employeeModel);
-      // Build the key directly from the loop's own year/month/d instead of
-      // re-deriving it from `date` - this sidesteps any Date serialization
-      // entirely for this one, since we already know exactly which
-      // calendar day we're evaluating.
-      if (result.isOff) weekOffDates.push(`${year}-${pad2(month)}-${pad2(d)}`);
+      const key = `${year}-${pad2(month)}-${pad2(d)}`;
+      const result = weekOffMap.get(key);
+      if (result?.isOff) weekOffDates.push(key);
     }
 
     // ---- Today block ----
     const today0 = startOfDay(now);
     const todayKey = toKey(today0);
     const todayHoliday = await isHoliday(today0, organisation_id);
-    const todayWeekOff = await isWeekOff(today0, organisation_id, userId, employeeModel);
+    const todayWeekOff = (today0 >= monthStart && today0 <= monthEnd)
+      ? (weekOffMap.get(todayKey) ?? { isOff: false, reason: "unconfigured", unconfigured: true })
+      : await isWeekOff(today0, organisation_id, userId, employeeModel);
     const shift = await resolveEmployeeShift(user, organisation_id);
     const { allowed: withinShiftWindow, tooLate: checkinTooLate } = evaluateCheckinWindow(shift, now);
 
@@ -462,7 +498,7 @@ const getCalendarMeta = async (req, res) => {
     if (todayHoliday.isHoliday) disabledReason = "holiday";
     else if (todayWeekOff.isOff) disabledReason = "weekoff";
     else if (checkedInByFace) disabledReason = "checked_in_by_face";
-    else if (!withinShiftWindow) disabledReason = checkinTooLate ? "too_late" : "too_early";
+    else if (!withinShiftWindow || checkinTooLate) disabledReason = "outside_shift";
 
     res.json({
       success: true,
@@ -479,9 +515,11 @@ const getCalendarMeta = async (req, res) => {
           startTime: shift.startTime,
           endTime: shift.endTime,
           earlyBufferMinutes: shift.earlyBufferMinutes ?? 60,
+          lateCheckinCutoffMinutes: shift.lateCheckinCutoffMinutes ?? 60,
         },
         withinShiftWindow,
-        canCheckIn: !todayHoliday.isHoliday && !todayWeekOff.isOff && !checkedInByFace && withinShiftWindow,
+        isVeryLate: checkinTooLate,
+        canCheckIn: !todayHoliday.isHoliday && !todayWeekOff.isOff && !checkedInByFace && withinShiftWindow && !checkinTooLate,
         disabledReason,
         checkedInByFace,
         faceCheckInTime: checkedInByFace ? todayAttendance.checkIn : null,
