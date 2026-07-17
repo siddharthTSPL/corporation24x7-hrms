@@ -7,6 +7,7 @@
 
 const daysInMonth = (month, year) => new Date(Date.UTC(year, month, 0)).getUTCDate();
 
+
 /**
  * Given an annual CTC and the org's PayrollPolicy (mongoose doc or plain
  * object), returns the monthly salary breakup.
