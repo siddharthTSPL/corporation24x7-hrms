@@ -1451,20 +1451,30 @@ const deleteemployee = async (req, res, next) => {
 const showallleaves = async (req, res, next) => {
   const organisation_id = req.superAdmin._id;
  
+  const personFields = "f_name l_name work_email empid department designation";
+
   const [employeeLeaves, managerLeaves, adminLeaves] = await Promise.all([
     Leave.find({ organisation_id })
-      .populate("employee", "f_name l_name work_email empid department designation")
-      .populate("manager", "f_name l_name work_email empid department designation")
+      .populate("employee", personFields)
+      .populate("manager", personFields)
+      .populate({ path: "directed_to", select: personFields, refPath: "directed_to_model" })
+      .populate({ path: "approvedBy", select: personFields, refPath: "approvedByModel" })
+      .populate({ path: "rejectedBy", select: personFields, refPath: "rejectedByModel" })
       .sort({ createdAt: -1 })
       .lean(),
  
     ManagerLeave.find({ organisation_id })
-      .populate("manager", "f_name l_name work_email empid department designation")
+      .populate("manager", personFields)
+      .populate({ path: "directed_to", select: personFields, refPath: "directed_to_model" })
+      .populate({ path: "approvedBy", select: personFields, refPath: "approvedByModel" })
+      .populate({ path: "rejectedBy", select: personFields, refPath: "rejectedByModel" })
       .sort({ createdAt: -1 })
       .lean(),
  
     AdminLeave.find({ organisation_id })
       .populate("admin", "f_name l_name work_email designation")
+      .populate("approvedBy", "f_name l_name work_email")
+      .populate("rejectedBy", "f_name l_name work_email")
       .sort({ createdAt: -1 })
       .lean(),
   ]);
