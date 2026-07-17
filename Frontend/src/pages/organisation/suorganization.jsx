@@ -518,13 +518,13 @@ function EmployeeDetailPanel({ person, type, onClose }) {
 
           {!isSA && (
             <div className="flex gap-2 mb-5 flex-wrap min-w-0">
-              {["info", "leave", "reviews"].map((t) => (
+              {["info", "reviews"].map((t) => (
                 <button
                   key={t}
                   className={`px-4 py-2 rounded-lg border text-xs font-medium transition-all min-h-[40px] flex items-center shrink-0 ${tab === t ? "bg-[#730042] text-white border-[#730042] shadow-md" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}
                   onClick={() => setTab(t)}
                 >
-                  {t === "info" ? "Information" : t === "leave" ? "Leave" : "Reviews"}
+                  {t === "info" ? "Information" : "Reviews"}
                 </button>
               ))}
             </div>
@@ -541,59 +541,10 @@ function EmployeeDetailPanel({ person, type, onClose }) {
             </div>
           )}
 
-          {tab === "leave"   && !isSA && <LeaveTab uid={person._id} />}
           {tab === "reviews" && !isSA && <ReviewsTab uid={person._id} role={type} />}
         </div>
       </div>
     </>
-  );
-}
-
-function LeaveTab({ uid }) {
-  const { data: empData, isLoading } = useGetParticularEmployee(uid);
-  const lb = empData?.leaveBalance;
-
-  if (isLoading) return (
-    <div className="flex justify-center pt-9">
-      <div className="w-6 h-6 rounded-full border-2 border-[#730042]/30 border-t-[#730042] animate-spin" />
-    </div>
-  );
-
-  if (!lb) return (
-    <div className="flex flex-col items-center gap-1.5 text-center pt-9 pb-4">
-      <div className="text-xs sm:text-sm text-gray-500 font-medium">No leave balance assigned yet</div>
-      <div className="text-[11px] sm:text-xs text-gray-400 max-w-[240px]">
-        This person hasn't been allotted a leave policy yet. Once assigned, their balances will show up here.
-      </div>
-    </div>
-  );
-
-  const leaveTypes = [
-    ["Casual Leave",    lb.casualLeave,    lb.casualLeaveUsed,    "#10b981"],
-    ["Sick Leave",      lb.sickLeave,      lb.sickLeaveUsed,      "#0ea5e9"],
-    ["Earned Leave",    lb.earnedLeave,    lb.earnedLeaveUsed,    "#6366f1"],
-    ["Maternity Leave", lb.maternityLeave, lb.maternityLeaveUsed, "#ec4899"],
-  ].filter(([, total]) => total !== undefined && total !== null);
-
-  return (
-    <div className="flex flex-col gap-3 min-w-0">
-      {leaveTypes.map(([label, total, used, color]) => {
-        const remaining = (total || 0) - (used || 0);
-        const pct = total ? Math.round(((used || 0) / total) * 100) : 0;
-        return (
-          <div key={label} className="bg-[#fafbfc] rounded-xl border border-gray-100 p-3 sm:p-4 min-w-0">
-            <div className="flex justify-between items-center mb-2 gap-2">
-              <span className="text-xs sm:text-sm font-medium text-slate-900 truncate">{label}</span>
-              <span className="text-[11.5px] text-gray-500 shrink-0" style={{ fontFamily: "'JetBrains Mono',monospace" }}>{used || 0} / {total || 0}</span>
-            </div>
-            <div className="h-1.5 rounded bg-gray-100 overflow-hidden">
-              <div className="h-full rounded transition-all duration-700" style={{ width: `${pct}%`, background: color }} />
-            </div>
-            <div className="text-[11px] sm:text-xs text-gray-400 mt-1.5">{remaining} days remaining</div>
-          </div>
-        );
-      })}
-    </div>
   );
 }
 
