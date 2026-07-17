@@ -446,8 +446,9 @@ function EmployeeDetailPanel({ person, type, onClose }) {
     if (isAdmin) return [
       ["Emp ID",      person.empid || "—"],
       ["Email",       person.work_email],
-      ["Phone",       person.phone || "—"],
+      ["Phone",       person.personal_contact || "—"],
       ["Gender",      person.gender || "—"],
+      ["Marital",     person.marital_status || "—"],
       ["Designation", person.designation || "—"],
       ["Status",      person.status || "—"],
     ];
@@ -559,7 +560,12 @@ function LeaveTab({ uid }) {
   );
 
   if (!lb) return (
-    <div className="text-xs sm:text-sm text-gray-400 text-center pt-9">No leave data found.</div>
+    <div className="flex flex-col items-center gap-1.5 text-center pt-9 pb-4">
+      <div className="text-xs sm:text-sm text-gray-500 font-medium">No leave balance assigned yet</div>
+      <div className="text-[11px] sm:text-xs text-gray-400 max-w-[240px]">
+        This person hasn't been allotted a leave policy yet. Once assigned, their balances will show up here.
+      </div>
+    </div>
   );
 
   const leaveTypes = [
