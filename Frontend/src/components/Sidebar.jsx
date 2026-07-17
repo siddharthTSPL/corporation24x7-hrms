@@ -18,6 +18,7 @@ import {
   FaShieldAlt,
   FaUsersCog,
   FaLock,
+  FaMoneyCheckAlt,
 } from "react-icons/fa";
 import { useAuth } from "../auth/store/getmeauth/getmeauth";
 import { useAdminLogout } from "../auth/server-state/adminauth/adminauth.hook";
@@ -36,6 +37,7 @@ const superAdminMenu = [
   { name: "Team Documents", path: "/superadmin-documents",     icon: <FaFileAlt /> },
   { name:"Timesheet",       path: "/superadmin-timesheet",     icon: <FaLock /> },
   { name: "TorchX Management", path: "/superadmin-management", icon: <FaUsersCog /> },
+  { name: "Payroll",       path: "/superadmin-payroll",       icon: <FaMoneyCheckAlt /> },
   { name: "TorchX Voice",   path: "/superadmin-complaints",    icon: <FaShieldAlt /> },
   { name: "Settings",       path: "/superadmin-settings",      icon: <FaCog /> },
 ];
@@ -53,6 +55,7 @@ const adminMenu = [
     permissionGroup: ["recruitment.can_view_hiring_requisitions", "recruitment.can_create_hiring_requisition", "recruitment.can_view_candidates", "recruitment.can_add_candidate"] },
   { name: "TorchX Voice",  path: "/admin-complaints",    icon: <FaShieldAlt />, permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"] },
   { name: "Timesheet",     path: "/admin-timesheet",     icon: <FaLock /> },
+  { name: "Payroll",       path: "/payroll",             icon: <FaMoneyCheckAlt /> },
   { name: "TorchX Management", path: "/admin-management", icon: <FaUsersCog /> },
   { name: "Document",      path: "/document-admin",      icon: <FaFileAlt />,   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Team Document", path: "/document-admin-team", icon: <FaFileAlt />,   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
