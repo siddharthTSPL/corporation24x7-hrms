@@ -3,6 +3,7 @@ const PayrollPolicy = require("../Models/payrollpolicy.model");
 // Same shape as the schema defaults — used by resetToStandard() and by
 // getPolicy() the very first time an org asks (so the frontend always has
 // something sane to render, even before the org saves anything).
+
 const STANDARD_DEFAULTS = {
   basic: { percentOfGross: 40 },
   hra: { enabled: true, percentOfBasic: 50 },
