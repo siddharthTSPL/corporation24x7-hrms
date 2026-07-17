@@ -92,10 +92,13 @@ function calculatePayrollForMonth({ structure, policy, attendanceSummary, month,
   const presentDays = attendanceSummary?.presentDays ?? totalDays; // no attendance record yet -> assume fully present
   const halfDays = attendanceSummary?.halfDays ?? 0;
   const absentDays = attendanceSummary?.absentDays ?? 0;
-  const paidDays = Math.max(0, totalDays - absentDays);
+
+  // A half day counts as 0.5 day unpaid, same as half a day's absence.
+  const unpaidDays = absentDays + halfDays * 0.5;
+  const paidDays = Math.max(0, totalDays - unpaidDays);
 
   const perDayRate = totalDays > 0 ? monthlyGross / totalDays : 0;
-  const lossOfPay = round2(perDayRate * absentDays);
+  const lossOfPay = round2(perDayRate * unpaidDays);
 
   // ---- Deductions ----
   const pfEnabled = policy?.pf?.enabled !== false;
