@@ -170,19 +170,6 @@ function exportToCSV(data) {
   URL.revokeObjectURL(url);
 }
 
-function resolveLeaveValue(val) {
-  if (val === null || val === undefined) return "—";
-  if (typeof val === "object") {
-    if (val.remaining !== undefined) return String(val.remaining);
-    if (val.balance !== undefined) return String(val.balance);
-    if (val.total !== undefined) return String(val.total);
-    return "—";
-  }
-  return String(val);
-}
-
-const LEAVE_SKIP_KEYS = ["_id","employee","organisation_id","__v","createdAt","updatedAt","mlStartDate","mlEndDate","lastAccrualDate"];
-
 function Field({label,error,children,required,span2}){
   return(
     <div className={`flex flex-col gap-1 ${span2?"col-span-2":""}`}>
@@ -875,12 +862,47 @@ function AccountSummaryDrawer({
   const data=isManager?mgrQuery.data:empQuery.data;
   const loading=isManager?mgrQuery.isLoading:empQuery.isLoading;
   const person=data?.user||data?.manager;
-  const leaveBalance=data?.leaveBalance;
   const reviews=data?.reviews||[];
   const [tab,setTab]=useState("info");
   const [showPermissions,setShowPermissions]=useState(false);
   const [wsLoading,setWsLoading]=useState(false);
   const [assetBlock,setAssetBlock]=useState(null);
+
+  // ── Leave balance: normalize + role/gender aware cards ──────────────────
+  // Backend returns the SAME shape used across the employee/manager leave
+  // pages: { EL:{entitled,availed,accrued,available}, SL:{entitled,availed,available},
+  // ML, PL, pbc, lwp }. Some endpoints send it as `leaveBalance`, others as
+  // `leavebalance`, and sometimes as an array — handle all three.
+  const rawLeaveBalance = data?.leaveBalance ?? data?.leavebalance;
+  const leaveBalance = Array.isArray(rawLeaveBalance) ? rawLeaveBalance[0] : rawLeaveBalance;
+
+  const isMarried = person?.marital_status === "married";
+  const showML = person?.gender === "female" && isMarried;
+  const showPL = person?.gender === "male" && isMarried;
+
+  const leaveCards = leaveBalance ? [
+    {
+      label: "Earned Leave",
+      total: Number(leaveBalance.EL?.entitled ?? 0),
+      used: Number(leaveBalance.EL?.availed ?? 0),
+      remaining:
+        leaveBalance.EL?.available ??
+        Math.max(0, Number(leaveBalance.EL?.accrued ?? 0) - Number(leaveBalance.EL?.availed ?? 0)),
+    },
+    {
+      label: "Sick Leave",
+      total: Number(leaveBalance.SL?.entitled ?? 0),
+      used: Number(leaveBalance.SL?.availed ?? 0),
+      remaining:
+        leaveBalance.SL?.available ??
+        Math.max(0, Number(leaveBalance.SL?.entitled ?? 0) - Number(leaveBalance.SL?.availed ?? 0)),
+    },
+    ...(showML ? [{ label: "Maternity Leave", total: leaveBalance.ML || 0, used: 0, remaining: leaveBalance.ML || 0 }] : []),
+    ...(showPL ? [{ label: "Paternity Leave", total: leaveBalance.PL || 0, used: 0, remaining: leaveBalance.PL || 0 }] : []),
+    { label: "Paid by Company", total: leaveBalance.pbc || 0, used: 0, remaining: leaveBalance.pbc || 0 },
+    { label: "Leave Without Pay", total: leaveBalance.lwp || 0, used: 0, remaining: leaveBalance.lwp || 0 },
+  ] : [];
+  // ──────────────────────────────────────────────────────────────────────
 
   const setEmpWS=useSetEmployeeWorkingStatus(userId);
   const setMgrWS=useSetManagerWorkingStatus(userId);
@@ -1038,16 +1060,15 @@ function AccountSummaryDrawer({
                 )}
                 {tab==="leave"&&(
                   <div>
-                    {leaveBalance?(
+                    {leaveCards.length>0?(
                       <div className="grid grid-cols-2 gap-2">
-                        {Object.entries(leaveBalance)
-                          .filter(([k])=>!LEAVE_SKIP_KEYS.includes(k))
-                          .map(([k,v])=>(
-                            <div key={k} className="p-3 rounded-xl border border-[#F4C0D1] bg-[#FBEAF0]">
-                              <p className="text-[10px] font-bold uppercase tracking-wider text-[#993556]">{k.replace(/_/g," ")}</p>
-                              <p className="text-xl font-bold text-[#730042] mt-0.5">{resolveLeaveValue(v)}</p>
-                            </div>
-                          ))}
+                        {leaveCards.map((c)=>(
+                          <div key={c.label} className="p-3 rounded-xl border border-[#F4C0D1] bg-[#FBEAF0]">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-[#993556]">{c.label}</p>
+                            <p className="text-xl font-bold text-[#730042] mt-0.5">{c.remaining}</p>
+                            <p className="text-[10px] text-[#993556] mt-1">{c.used} used / {c.total} total</p>
+                          </div>
+                        ))}
                       </div>
                     ):(
                       <div className="text-center py-8 text-[#993556] text-sm">No leave balance data</div>
