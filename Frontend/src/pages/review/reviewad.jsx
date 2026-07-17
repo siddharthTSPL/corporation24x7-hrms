@@ -17,6 +17,19 @@ const BRAND = {
   accentBorder: "#D4A0B8",
 };
 
+// Department short-form -> full-form mapping.
+// Keep this in sync with the SuperAdmin dashboard's DEPT_OPTIONS list
+// so any new department code added there gets a matching full name here.
+const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+};
+
+const getDepartmentName = (dept) => DEPT_FULL_FORMS[dept] || dept || "";
+
 function getFullName(m) {
   if (m?.f_name) return `${m.f_name} ${m.l_name ?? ""}`.trim();
   return m?.name ?? "Unknown";
@@ -114,7 +127,7 @@ function ManagerCard({ manager, selected, onClick }) {
         {manager.designation && (
           <p className="m-0 mt-0.5 text-[10px] sm:text-[11px] text-[#8B1A4A] capitalize truncate">
             {manager.designation}
-            {manager.department ? ` · ${manager.department}` : ""}
+            {manager.department ? ` · ${getDepartmentName(manager.department)}` : ""}
           </p>
         )}
       </div>
@@ -536,7 +549,7 @@ function ReviewFormFields({
           </p>
           <p className="m-0 mt-0.5 text-[11px] text-[#9B7A8A] capitalize truncate">
             {selected.designation}
-            {selected.department ? ` · ${selected.department}` : ""}
+            {selected.department ? ` · ${getDepartmentName(selected.department)}` : ""}
           </p>
         </div>
       </div>

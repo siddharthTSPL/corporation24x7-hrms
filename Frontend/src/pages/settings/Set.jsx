@@ -12,6 +12,19 @@ const PHONE_REGEX = /^[0-9]{10}$/;
 const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 const ACCOUNT_REGEX = /^[0-9]{9,18}$/;
 
+// Department short-form -> full-form mapping.
+// Keep this in sync with the SuperAdmin dashboard's DEPT_OPTIONS list
+// so any new department code added there gets a matching full name here.
+const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+};
+
+const getDepartmentName = (dept) => DEPT_FULL_FORMS[dept] || dept || "—";
+
 const LOCATION_DATA = {
   India: {
     "Uttar Pradesh": ["Bareilly", "Noida", "Lucknow", "Kanpur", "Agra"],
@@ -276,7 +289,8 @@ function ProfileTab({ adminData }) {
         <Grid>
           <ReadonlyField label="Role" value={adminData?.role} />
           <ReadonlyField label="Designation" value={adminData?.designation} />
-          <ReadonlyField label="Department" value={adminData?.department} />
+          {/* Department now shown in full form instead of short code */}
+          <ReadonlyField label="Department" value={getDepartmentName(adminData?.department)} />
           <ReadonlyField label="Office location" value={adminData?.office_location} />
           <ReadonlyField label="Working status" value={adminData?.working_status} />
           <ReadonlyField label="Last login" value={fmtDate(adminData?.last_login)} />
