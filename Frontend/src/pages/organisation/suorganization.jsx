@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useLayoutEffect } from "react";
 import {
   useGetMeSuperAdmin,
 } from "../../auth/server-state/superadmin/auth/suauth.hook";
@@ -24,8 +24,6 @@ const STYLES = `
   @keyframes fadeUp    { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
   @keyframes fadeIn    { from { opacity:0; } to { opacity:1; } }
   @keyframes scaleIn   { from { opacity:0; transform:scale(0.93); } to { opacity:1; transform:scale(1); } }
-  @keyframes drawH     { from { transform:scaleX(0); } to { transform:scaleX(1); } }
-  @keyframes drawV     { from { transform:scaleY(0); } to { transform:scaleY(1); } }
   @keyframes slideR    { from { opacity:0; transform:translateX(28px); } to { opacity:1; transform:translateX(0); } }
   @keyframes ringPulse {
     0%,100% { box-shadow: 0 0 0 0 rgba(15,23,42,0.2), 0 4px 20px rgba(15,23,42,0.08); }
@@ -70,110 +68,21 @@ const STYLES = `
   .su-scroll::-webkit-scrollbar-thumb { background:#dde3ec; border-radius:6px; }
   .su-scroll { -webkit-overflow-scrolling: touch; }
 
-  /* ---------- Self-adjusting org-chart connector system ----------
-     These rules replace the old fixed-pixel VLine/HLine calculations.
-     Every connector is percentage/relative based, so it stays correctly
-     aligned at any breakpoint and automatically extends to however many
-     admins / managers / employees are rendered - no width math needed.
-
-     Connector segments are widened (via calc()+negative margin driven by
-     the per-gap --org-gap custom property) so each child's horizontal
-     spine reaches all the way to its own outer box edge - i.e. exactly
-     where the neighbouring sibling's box begins - instead of stopping at
-     the inner edge of its own padding. That removes the small seam/gap
-     that used to appear where two siblings' spines were supposed to
-     meet, for any number of siblings at any breakpoint. */
+  /* ---------- Org-chart connector lines ----------
+     Lines are drawn with a measured SVG overlay (see OrgConnectorGroup
+     below) instead of CSS width/gap math, so they are always pixel-
+     perfect regardless of card width, text truncation, breakpoint, or
+     how many siblings are rendered - no seams, no misaligned elbows. */
 
   .org-tree-root { display: flex; flex-direction: column; align-items: center; }
-
   .org-branch { display: flex; flex-direction: column; align-items: center; position: relative; min-width: 0; }
-
-  .org-branch-trunk {
-    width: 1.5px;
-    flex-shrink: 0;
-    background: linear-gradient(to bottom, #dde3ec, #c8d2e0);
-    transform-origin: top;
-    animation: drawV 0.25s ease forwards;
-  }
-
-  .org-branch-row {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    align-items: flex-start;
-    justify-content: center;
-    position: relative;
-  }
-
-  .org-branch-child {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: 0;
-  }
-/* Spacing between siblings is applied as padding on each child (not a
-     flex 'gap') so the connector segments below - which are sized to
-     100% of the child's own box - stay flush against their neighbours
-     and the horizontal spine no longer breaks at each gap. The gap
-     amount is also stored in --org-gap so the connector itself can
-     expand past the padding and meet its neighbour with zero seam. */
-  .org-branch-child.org-gap-sm { --org-gap: 4px; padding: 0 var(--org-gap); }
-  @media (min-width:640px) { .org-branch-child.org-gap-sm { --org-gap: 6px; } }
-  @media (min-width:768px) { .org-branch-child.org-gap-sm { --org-gap: 7px; } }
-
-  .org-branch-child.org-gap-md { --org-gap: 6px; padding: 0 var(--org-gap); }
-  @media (min-width:640px) { .org-branch-child.org-gap-md { --org-gap: 10px; } }
-  @media (min-width:768px) { .org-branch-child.org-gap-md { --org-gap: 14px; } }
-
-  .org-branch-child.org-gap-lg { --org-gap: 6px; padding: 0 var(--org-gap); }
-  @media (min-width:640px) { .org-branch-child.org-gap-lg { --org-gap: 7px; } }
-  @media (min-width:768px) { .org-branch-child.org-gap-lg { --org-gap: 8px; } }
-
-  .org-branch-child-connector {
-    position: relative;
-    width: calc(100% + (2 * var(--org-gap, 0px)));
-    margin-left: calc(0 * var(--org-gap, 0px));
-    height: 18px;
-    flex-shrink: 0;
-  }
-
-  .org-branch-child-connector::before,
-  .org-branch-child-connector::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    height: 1.5px;
-    width: 50%;
-    background: #dde3ec;
-  }
-  .org-branch-child-connector::before { left: 0; }
-  .org-branch-child-connector::after  { right: 0; }
-
-  .org-branch-child-connector .org-vline {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 1.5px;
-    height: 22px;
-    background: #dde3ec;
-  }
-
-  /* single child: no horizontal spine needed, just the straight drop line */
-  .org-branch-child.org-only .org-branch-child-connector::before,
-  .org-branch-child.org-only .org-branch-child-connector::after {
-    background: transparent;
-  }
-  /* first/last child: no spine sticking out past the outermost nodes */
-  .org-branch-child.org-first .org-branch-child-connector::before { background: transparent; }
-  .org-branch-child.org-last  .org-branch-child-connector::after  { background: transparent; }
 `;
 
 const BRAND       = "#730042";
 const BRAND_LIGHT = "rgba(115,0,66,0.07)";
 const REFRESH_MS  = 1000 * 60 * 2;
 const HTML_TO_IMAGE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js";
+const LINE_COLOR = "#c9d2e0";
 
 const NODE_COLOR = { sa: "#0f172a", admin: "#334155", manager: "#475569", employee: "#64748b" };
 
@@ -236,40 +145,106 @@ function Skeleton({ w, h, r = 8 }) {
   );
 }
 
-/* ---------- Generic tree-connector helpers ----------
-   TreeTrunk draws the single vertical line from a parent node down to
-   the row of its children.
-   TreeBranch draws a row of children, automatically giving each child
-   the correct half-spine connector (first / middle / last / only),
-   regardless of how many children there are or how wide they render
-   at any breakpoint. Add or remove nodes freely - nothing here needs
-   to be recalculated by hand. */
+/* ---------- Measured SVG connector system ----------
+   OrgConnectorGroup draws the lines from one parent node down to a row
+   of children by actually measuring their rendered positions on screen
+   (getBoundingClientRect), instead of guessing pixel widths from CSS.
+   That's what makes every elbow/spine align exactly under each card,
+   at any breakpoint, with any number of siblings, any text length -
+   there's nothing to get out of sync.
 
-function TreeTrunk({ height = 22 }) {
-  return <div className="org-branch-trunk" style={{ height }} />;
-}
-
-function TreeBranch({ children, gapClass = "" }) {
+   parentRef  - ref to the DOM node of the single parent card above this row
+   children   - array of React nodes, one per sibling in the row (each can
+                itself be a full nested branch - only its OWN top card's
+                position is used as the anchor, because that's always the
+                first element painted inside each row item)               */
+function OrgConnectorGroup({ parentRef, children, gapClassName = "gap-4" }) {
   const items = (Array.isArray(children) ? children : [children]).filter(Boolean);
+  const containerRef = useRef(null);
+  const rowRef = useRef(null);
+  const [lines, setLines] = useState(null);
+
+  useLayoutEffect(() => {
+    if (!containerRef.current || !rowRef.current || !parentRef.current) return undefined;
+
+    const measure = () => {
+      if (!containerRef.current || !rowRef.current || !parentRef.current) return;
+      const cRect = containerRef.current.getBoundingClientRect();
+      const pRect = parentRef.current.getBoundingClientRect();
+      const parentX = pRect.left + pRect.width / 2 - cRect.left;
+      const parentY = pRect.bottom - cRect.top;
+
+      const kids = Array.from(rowRef.current.children)
+        .map((el) => {
+          const r = el.getBoundingClientRect();
+          if (!r.width && !r.height) return null;
+          return { x: r.left + r.width / 2 - cRect.left, y: r.top - cRect.top };
+        })
+        .filter(Boolean);
+
+      if (!kids.length) { setLines(null); return; }
+
+      const minKidY = Math.min(...kids.map((k) => k.y));
+      const busY = parentY + Math.max(12, (minKidY - parentY) / 2);
+      const minX = Math.min(...kids.map((k) => k.x));
+      const maxX = Math.max(...kids.map((k) => k.x));
+
+      setLines({ parentX, parentY, busY, kids, minX, maxX });
+    };
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(containerRef.current);
+    ro.observe(rowRef.current);
+    ro.observe(parentRef.current);
+
+    window.addEventListener("resize", measure);
+    // Catch late layout shifts: web-font swap, entrance animations
+    // (scaleIn/fadeUp) settling, and images/avatars finishing paint.
+    const t1 = setTimeout(measure, 120);
+    const t2 = setTimeout(measure, 450);
+    document.fonts?.ready?.then(measure).catch(() => {});
+
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [items.length]);
+
   if (items.length === 0) return null;
 
   return (
-    <div className="org-branch-row">
-      {items.map((item, i) => {
-        const posCls =
-          items.length === 1 ? "org-only" :
-          i === 0 ? "org-first" :
-          i === items.length - 1 ? "org-last" :
-          "org-mid";
-        return (
-          <div key={item?.key ?? i} className={`org-branch-child ${posCls} ${gapClass}`}>
-            <div className="org-branch-child-connector">
-              <span className="org-vline" />
-            </div>
-            {item}
-          </div>
-        );
-      })}
+    <div ref={containerRef} className="relative w-full flex flex-col items-center">
+      <div aria-hidden style={{ height: 26 }} />
+      {lines && (
+        <svg
+          className="absolute inset-0 pointer-events-none"
+          style={{ overflow: "visible", width: "100%", height: "100%" }}
+        >
+          <line x1={lines.parentX} y1={lines.parentY} x2={lines.parentX} y2={lines.busY} stroke={LINE_COLOR} strokeWidth="1.5" />
+          {lines.kids.length > 1 && (
+            <line x1={lines.minX} y1={lines.busY} x2={lines.maxX} y2={lines.busY} stroke={LINE_COLOR} strokeWidth="1.5" />
+          )}
+          {lines.kids.map((k, i) => (
+            <line
+              key={i}
+              x1={k.x}
+              y1={lines.kids.length > 1 ? lines.busY : lines.parentY}
+              x2={k.x}
+              y2={k.y}
+              stroke={LINE_COLOR}
+              strokeWidth="1.5"
+            />
+          ))}
+        </svg>
+      )}
+      <div ref={rowRef} className={`flex flex-row flex-nowrap items-start justify-center ${gapClassName}`}>
+        {items.map((item, i) => (
+          <div key={item?.key ?? i} className="min-w-0">{item}</div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -309,9 +284,9 @@ function YouPill() {
   return <span className="su-you-pill"></span>;
 }
 
-function SuperAdminNode({ name, role, initials, delay = 0, onClick, isYou }) {
+const SuperAdminNode = ({ nodeRef, name, role, initials, delay = 0, onClick, isYou }) => {
   return (
-    <div className="opacity-0 shrink-0" style={{ animation: `scaleIn 0.4s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms forwards` }}>
+    <div ref={nodeRef} className="opacity-0 shrink-0" style={{ animation: `scaleIn 0.4s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms forwards` }}>
       <div
         className="su-card-hover su-card-sa w-[164px] sm:w-[190px] md:w-[210px] lg:w-[225px] bg-white border-[1.5px] border-[#e8edf5] rounded-2xl p-3 sm:p-4 md:p-5 flex flex-col items-center relative overflow-hidden shadow-sm"
         onClick={onClick}
@@ -329,12 +304,12 @@ function SuperAdminNode({ name, role, initials, delay = 0, onClick, isYou }) {
       </div>
     </div>
   );
-}
+};
 
-function AdminNode({ admin, delay = 0, dimmed, highlighted, onClick }) {
+const AdminNode = ({ nodeRef, admin, delay = 0, dimmed, highlighted, onClick }) => {
   const name = fullName(admin);
   return (
-    <div className="opacity-0 shrink-0" style={{ animation: `scaleIn 0.35s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms forwards` }}>
+    <div ref={nodeRef} className="opacity-0 shrink-0" style={{ animation: `scaleIn 0.35s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms forwards` }}>
       <div
         className={`su-card-hover w-[136px] sm:w-[158px] md:w-[174px] lg:w-[184px] bg-white border-[1.5px] border-[#e8edf5] rounded-xl p-2.5 sm:p-3 md:p-4 flex flex-col items-center relative overflow-hidden shadow-sm ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
         onClick={onClick}
@@ -353,12 +328,12 @@ function AdminNode({ admin, delay = 0, dimmed, highlighted, onClick }) {
       </div>
     </div>
   );
-}
+};
 
-function ManagerNode({ manager, delay = 0, dimmed, highlighted, onClick }) {
+const ManagerNode = ({ nodeRef, manager, delay = 0, dimmed, highlighted, onClick }) => {
   const name = fullName(manager);
   return (
-    <div className="opacity-0 shrink-0" style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards` }}>
+    <div ref={nodeRef} className="opacity-0 shrink-0" style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards` }}>
       <div
         className={`su-card-hover w-[118px] sm:w-[138px] md:w-[152px] lg:w-[160px] bg-[#f9fbfe] border-[1.5px] border-[#e4edf6] rounded-lg p-2 sm:p-2.5 md:p-3 flex flex-col items-center relative overflow-hidden shadow-sm ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
         onClick={onClick}
@@ -377,12 +352,12 @@ function ManagerNode({ manager, delay = 0, dimmed, highlighted, onClick }) {
       </div>
     </div>
   );
-}
+};
 
-function EmployeeNode({ employee, delay = 0, dimmed, highlighted, onClick }) {
+const EmployeeNode = ({ nodeRef, employee, delay = 0, dimmed, highlighted, onClick }) => {
   const name = fullName(employee);
   return (
-    <div className="opacity-0 shrink-0" style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards` }}>
+    <div ref={nodeRef} className="opacity-0 shrink-0" style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards` }}>
       <div
         className={`su-card-hover w-[100px] sm:w-[116px] md:w-[132px] lg:w-[140px] bg-[#fafbfc] border-[1.5px] border-[#e8edf5] rounded-lg p-1.5 sm:p-2 md:p-2.5 flex flex-col items-center relative ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
         onClick={onClick}
@@ -400,7 +375,7 @@ function EmployeeNode({ employee, delay = 0, dimmed, highlighted, onClick }) {
       </div>
     </div>
   );
-}
+};
 
 function SkeletonTree() {
   return (
@@ -639,10 +614,11 @@ function ReviewsTab({ uid, role }) {
 }
 
 /* ManagerBranch renders a manager node plus (recursively) any sub-managers
-   and employees under it. Line drawing is fully delegated to TreeTrunk /
-   TreeBranch above, so this component no longer needs to compute pixel
-   widths or depth-based offsets - it scales to any number of children. */
+   and employees under it. It owns its own node ref so OrgConnectorGroup
+   can measure exactly where this manager's card sits, and draws its own
+   OrgConnectorGroup for whatever is nested beneath it. */
 function ManagerBranch({ manager, allManagers, employees, matchName, hasQ, parentMatched, onNodeClick, delay = 0 }) {
+  const nodeRef = useRef(null);
   const mgrMatch  = hasQ && matchName(manager.f_name, manager.l_name, manager.department, manager.designation);
   const mgrDimmed = hasQ && !mgrMatch && !parentMatched;
   const mgrId = idStr(manager._id);
@@ -655,6 +631,7 @@ function ManagerBranch({ manager, allManagers, employees, matchName, hasQ, paren
   return (
     <div className="org-branch">
       <ManagerNode
+        nodeRef={nodeRef}
         manager={manager}
         delay={delay}
         highlighted={mgrMatch}
@@ -663,46 +640,103 @@ function ManagerBranch({ manager, allManagers, employees, matchName, hasQ, paren
       />
 
       {hasChildren && (
-        <>
-          <TreeTrunk height={20} />
-          <TreeBranch gapClass="org-gap-sm">
-            {[
-              ...subManagers.map((sub, i) => (
-                <ManagerBranch
-                  key={sub._id}
-                  manager={sub}
-                  allManagers={allManagers}
-                  employees={employees}
-                  matchName={matchName}
-                  hasQ={hasQ}
-                  parentMatched={mgrMatch || parentMatched}
-                  onNodeClick={onNodeClick}
-                  delay={i * 50}
+        <OrgConnectorGroup parentRef={nodeRef} gapClassName="gap-1.5 sm:gap-2 md:gap-2.5">
+          {[
+            ...subManagers.map((sub, i) => (
+              <ManagerBranch
+                key={sub._id}
+                manager={sub}
+                allManagers={allManagers}
+                employees={employees}
+                matchName={matchName}
+                hasQ={hasQ}
+                parentMatched={mgrMatch || parentMatched}
+                onNodeClick={onNodeClick}
+                delay={i * 50}
+              />
+            )),
+            ...mgrEmps.map((emp, i) => {
+              const empMatch  = hasQ && matchName(emp.f_name, emp.l_name, emp.department, emp.designation);
+              const empDimmed = hasQ && !empMatch && !mgrMatch && !parentMatched;
+              return (
+                <EmployeeBranch
+                  key={emp._id}
+                  employee={emp}
+                  delay={i * 45}
+                  highlighted={empMatch}
+                  dimmed={empDimmed}
+                  onClick={() => onNodeClick(emp, "employee")}
                 />
-              )),
-              ...mgrEmps.map((emp, i) => {
-                const empMatch  = hasQ && matchName(emp.f_name, emp.l_name, emp.department, emp.designation);
-                const empDimmed = hasQ && !empMatch && !mgrMatch && !parentMatched;
-                return (
-                  <EmployeeNode
-                    key={emp._id}
-                    employee={emp}
-                    delay={i * 45}
-                    highlighted={empMatch}
-                    dimmed={empDimmed}
-                    onClick={() => onNodeClick(emp, "employee")}
-                  />
-                );
-              }),
-            ]}
-          </TreeBranch>
-        </>
+              );
+            }),
+          ]}
+        </OrgConnectorGroup>
+      )}
+    </div>
+  );
+}
+
+// Thin wrapper so a leaf employee card also owns a ref the same way a
+// branch does - keeps OrgConnectorGroup's "measure my first child" rule
+// consistent whether the row item is a leaf or a whole nested branch.
+function EmployeeBranch({ employee, delay, highlighted, dimmed, onClick }) {
+  const nodeRef = useRef(null);
+  return (
+    <div className="org-branch">
+      <EmployeeNode nodeRef={nodeRef} employee={employee} delay={delay} highlighted={highlighted} dimmed={dimmed} onClick={onClick} />
+    </div>
+  );
+}
+
+// AdminBranch mirrors ManagerBranch one level up: an admin card plus
+// (via OrgConnectorGroup) the row of managers reporting to it.
+function AdminBranch({ admin, managers, employees, matchName, hasQ, onNodeClick, delay = 0 }) {
+  const nodeRef = useRef(null);
+  const admMatch  = hasQ && matchName(admin.f_name, admin.l_name, "", admin.designation);
+  const admDimmed = hasQ && !admMatch;
+  const adminId   = idStr(admin._id);
+
+  const admManagers = managers.filter(
+    (m) => idStr(m.reporting_manager) === adminId && m.reporting_manager_model === "Admin"
+  );
+
+  return (
+    <div className="org-branch">
+      <AdminNode
+        nodeRef={nodeRef}
+        admin={admin}
+        delay={delay}
+        highlighted={admMatch}
+        dimmed={admDimmed}
+        onClick={() => onNodeClick(admin, "admin")}
+      />
+
+      {admManagers.length > 0 ? (
+        <OrgConnectorGroup parentRef={nodeRef} gapClassName="gap-2 sm:gap-3 md:gap-3.5">
+          {admManagers.map((mgr, mi) => (
+            <ManagerBranch
+              key={mgr._id}
+              manager={mgr}
+              allManagers={managers}
+              employees={employees}
+              matchName={matchName}
+              hasQ={hasQ}
+              parentMatched={admMatch}
+              onNodeClick={onNodeClick}
+              delay={mi * 55}
+            />
+          ))}
+        </OrgConnectorGroup>
+      ) : (
+        <p className="mt-3 text-[10px] sm:text-[11px] text-gray-300 italic">No managers under this admin</p>
       )}
     </div>
   );
 }
 
 function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery, onNodeClick }) {
+  const saRef = useRef(null);
+
   if (loading) return <SkeletonTree />;
 
   const q    = normalize(searchQuery);
@@ -718,6 +752,7 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
   return (
     <div className="org-tree-root w-max min-w-full mx-auto">
       <SuperAdminNode
+        nodeRef={saRef}
         name={fullName(superAdmin) || "Super Admin"}
         role={superAdmin?.organisation_name || "Super Admin"}
         initials={getInitials(superAdmin?.f_name, superAdmin?.l_name)}
@@ -726,63 +761,27 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
         onClick={() => onNodeClick(superAdmin, "superadmin")}
       />
 
-      {admins.length > 0 && (
-        <>
-          <TreeTrunk height={26} />
-          <TreeBranch gapClass="org-gap-lg">
-            {admins.map((admin, ai) => {
-              const admMatch  = hasQ && matchName(admin.f_name, admin.l_name, "", admin.designation);
-              const admDimmed = hasQ && !admMatch;
-              const admDelay  = 340 + ai * 60;
-              const adminId   = idStr(admin._id);
-
-              const admManagers = managers.filter(
-                (m) => idStr(m.reporting_manager) === adminId && m.reporting_manager_model === "Admin"
-              );
-
-              return (
-                <div key={admin._id} className="flex flex-col items-center min-w-0">
-                  <AdminNode
-                    admin={admin}
-                    delay={admDelay}
-                    highlighted={admMatch}
-                    dimmed={admDimmed}
-                    onClick={() => onNodeClick(admin, "admin")}
-                  />
-
-                  {admManagers.length > 0 ? (
-                    <>
-                      <TreeTrunk height={24} />
-                      <TreeBranch gapClass="org-gap-md">
-                        {admManagers.map((mgr, mi) => (
-                          <ManagerBranch
-                            key={mgr._id}
-                            manager={mgr}
-                            allManagers={managers}
-                            employees={employees}
-                            matchName={matchName}
-                            hasQ={hasQ}
-                            parentMatched={admMatch}
-                            onNodeClick={onNodeClick}
-                            delay={mi * 55}
-                          />
-                        ))}
-                      </TreeBranch>
-                    </>
-                  ) : (
-                    <p className="mt-3 text-[10px] sm:text-[11px] text-gray-300 italic">No managers under this admin</p>
-                  )}
-                </div>
-              );
-            })}
-          </TreeBranch>
-        </>
-      )}
-
-      {admins.length === 0 && !loading && (
-        <div className="mt-9 px-6 py-4 rounded-xl border-[1.5px] border-dashed border-gray-200 text-xs sm:text-sm text-gray-300 bg-[#fafbfc] min-w-0">
-          No admins created yet
-        </div>
+      {admins.length > 0 ? (
+        <OrgConnectorGroup parentRef={saRef} gapClassName="gap-3 sm:gap-4 md:gap-5">
+          {admins.map((admin, ai) => (
+            <AdminBranch
+              key={admin._id}
+              admin={admin}
+              managers={managers}
+              employees={employees}
+              matchName={matchName}
+              hasQ={hasQ}
+              onNodeClick={onNodeClick}
+              delay={340 + ai * 60}
+            />
+          ))}
+        </OrgConnectorGroup>
+      ) : (
+        !loading && (
+          <div className="mt-9 px-6 py-4 rounded-xl border-[1.5px] border-dashed border-gray-200 text-xs sm:text-sm text-gray-300 bg-[#fafbfc] min-w-0">
+            No admins created yet
+          </div>
+        )
       )}
     </div>
   );
