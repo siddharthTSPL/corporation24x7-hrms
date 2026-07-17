@@ -38,6 +38,7 @@ import {
   setKioskPassword,
   getLeavePolicy,
   setLeavePolicy,
+  getParticularAdmin
 } from "../../../api/superadmin/other/su.other";
 
 
@@ -471,5 +472,15 @@ export const useSetLeavePolicy = () => {
         }
       );
     },
+  });
+};
+
+
+export const useGetParticularAdmin = (uid) => {
+  return useQuery({
+    queryKey: ["admin-detail", uid],
+    queryFn: () => getParticularAdmin(uid),
+    enabled: !!uid,
+    refetchOnWindowFocus: false,
   });
 };

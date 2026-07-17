@@ -184,3 +184,7 @@ export const setKioskPassword = async (data) => {
   const res = await api.put("superadmin/kiosk-password", data);
   return res.data;
 };
+export const getParticularAdmin = async (uid) => {
+  const res = await api.get(`superadmin/getperticularadmin/${uid}`);
+  return res.data;
+};

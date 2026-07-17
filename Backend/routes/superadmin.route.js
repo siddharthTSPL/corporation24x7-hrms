@@ -48,6 +48,8 @@ const {
   getActiveUserCount,
   getLeavePolicy,
   setLeavePolicy,
+  getperticularadmin
+
 } = require("../controllers/superadmin.controller");
 
 
@@ -256,6 +258,7 @@ superAdminRouter.post(
   asyncHandler(setLeavePolicy),
 );
 
+superAdminRouter.get("/getperticularadmin/:uid", superAdminAuth, asyncHandler(getperticularadmin));
 
 
 
