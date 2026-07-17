@@ -4,14 +4,14 @@ const Attendance = require("../Models/attendance.model");
 const User = require("../Models/user.model");
 const Manager = require("../Models/manager.model");
 const AdminUser = require("../Models/Admin.model");
-const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
+const { updateSummary } = require("../automatic/monthattendanceupdate");
 const { getEmbedding, cosineSimilarity } = require("../utils/faceService");
 const { startOfISTDay } = require("../utils/istDate.utils");
 const {
   resolveEmployeeShift,
   evaluateCheckinWindow,
   evaluateCheckoutWindow,
-  getShiftThresholds,
+  calculateFaceStatus,
 } = require("../utils/shift.utils");
 
 const MODEL_BY_ONMODEL = { User, Manager, Admin: AdminUser };
@@ -266,12 +266,11 @@ const scanFace = async (req, res) => {
     const durationMinutes = Math.round((attendance.checkOut - attendance.checkIn) / 60000);
     attendance.activeMinutes = durationMinutes;
 
-    // Presence is judged the same way as the manual/agent flow: purely
-    // against the shift's own configurable absentBelowMinutes /
-    // halfDayBelowMinutes (set per-shift by the SuperAdmin), not a
-    // hardcoded percentage of the shift length.
-    const thresholds = getShiftThresholds(shift);
-    attendance.status = calculateStatus(durationMinutes, thresholds);
+    // Face-only rule: judged as a PERCENTAGE of this shift's own total
+    // length (<50% = absent, 50%-85% = half_day, >=85% = present) -
+    // separate from the manual/agent flow, which still uses the shift's
+    // fixed absentBelowMinutes/halfDayBelowMinutes untouched.
+    attendance.status = calculateFaceStatus(durationMinutes, shift);
     attendance.checkoutRemark = remark;
     attendance.overtimeMinutes = isOvertime ? overtimeMinutes : 0;
     await attendance.save();
