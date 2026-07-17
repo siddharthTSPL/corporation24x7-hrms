@@ -41,15 +41,14 @@ const evaluateCheckinWindow = (shift, now = new Date()) => {
 
   const earlyBuffer = shift.earlyBufferMinutes ?? 60;
   const grace = shift.graceMinutes ?? 15;
-  // Check-in closes this many minutes after shift start - it must NOT stay
-  // open for the whole shift. Using shift end (`end`) here was the bug:
-  // it let check-in stay "open" until 7 PM for a 10 AM shift, and this
-  // function never returned `tooLate` at all so the too-late message the
-  // controllers already had could never fire.
+  // Outside-shift buffer: check-in stays open from (shift start - earlyBuffer)
+  // all the way through the shift and up to this many minutes AFTER shift
+  // END. Anyone inside that whole range can check in (marked late if past
+  // grace); only outside it is check-in blocked as "outside shift".
   const lateCutoff = shift.lateCheckinCutoffMinutes ?? 60;
 
   let windowStart = start - earlyBuffer;
-  let windowEnd = start + lateCutoff;
+  let windowEnd = overnight ? end + 1440 + lateCutoff : end + lateCutoff;
   let effectiveNow = nowMinutes;
 
   // Shift starts late at night and crosses midnight (e.g. 23:00-07:00): if
@@ -63,7 +62,11 @@ const evaluateCheckinWindow = (shift, now = new Date()) => {
     if (effectiveNow < windowStart) effectiveNow += 1440;
   }
 
-  const allowed = effectiveNow >= windowStart && effectiveNow <= windowEnd;
+  // Late checkin is no longer hard-blocked. `allowed` only enforces the
+  // early-buffer lower bound now; `tooLate` is kept purely as an
+  // informational flag (past lateCheckinCutoffMinutes) so controllers can
+  // show a "you're quite late, but welcome" message instead of a 403.
+  const allowed = effectiveNow >= windowStart;
   const tooLate = effectiveNow > windowEnd;
   const lateEdge = start + grace;
   const isLate = effectiveNow > lateEdge;
