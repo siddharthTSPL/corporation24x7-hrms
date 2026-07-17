@@ -6,7 +6,7 @@ import { useGetAllManagerLeaves } from "../../auth/server-state/manager/managerl
 import { useGetAttendance } from "../../auth/server-state/manager/managgerother/managerother.hook";
 import { useGetMyLeavesManager } from "../../auth/server-state/manager/managerleave/managerleave.hook";
 import { useCalendarMeta, useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
-import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus } from "../../pages/utils/attendance";
+import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus, isPastShiftEnd } from "../../pages/utils/attendance";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS   = ["S","M","T","W","T","F","S"];
@@ -408,7 +408,7 @@ function SegBar({ segments }) {
   );
 }
 
-function Calendar({ month, joiningDate, attendanceMap = new Map(), myApprovedLeaves = [], holidays = [], weekOffDates = [] }) {
+function Calendar({ month, joiningDate, attendanceMap = new Map(), myApprovedLeaves = [], holidays = [], weekOffDates = [], todayShiftEnd = null }) {
   const year     = new Date().getFullYear();
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMo = new Date(year, month + 1, 0).getDate();
@@ -477,7 +477,8 @@ function Calendar({ month, joiningDate, attendanceMap = new Map(), myApprovedLea
       status = "leave";
     } else if (!isFuture) {
       const record = attendanceMap.get(key);
-      status = resolveAttendanceStatus(record, { isToday }) ?? "absent";
+      const resolved = resolveAttendanceStatus(record, { isToday });
+      status = resolved ?? (isToday && !isPastShiftEnd(todayShiftEnd) ? "pending" : "absent");
     }
 
     cells.push({ day: d, status, isToday, label });
@@ -493,6 +494,7 @@ function Calendar({ month, joiningDate, attendanceMap = new Map(), myApprovedLea
     holiday:        { background: "#fdecea", color: "#c2410c", fontWeight: 600 },
     weekoff:        { background: "#f1f5f9", color: "#64748b", fontWeight: 500 },
     future:         { color: "#d4c8c4", fontWeight: 400 },
+    pending:        { background: "#f8fafc", color: "#94a3b8", fontWeight: 500 },
     before_joining: { color: "#ede5e0", fontWeight: 400, background: "transparent" },
   };
 
@@ -983,11 +985,14 @@ export default function ManagerDashboard() {
       });
       if (isOwnLeave) continue;
 
-      counted++;
       const key = getISTDayKey(date);
       const rec = attendanceMap.get(key);
       const isTodayCell = date.toDateString() === today.toDateString();
       const status = resolveAttendanceStatus(rec, { isToday: isTodayCell });
+      if (isTodayCell && !status && !isPastShiftEnd(calMeta?.today?.shift?.endTime)) {
+        continue; // still pending - shift hasn't ended yet
+      }
+      counted++;
 
       if (status === "present")   present++;
       else if (status === "absent" || !status) absent++;
@@ -1235,6 +1240,7 @@ export default function ManagerDashboard() {
               myApprovedLeaves={myOwnAppliedLeaves}
               holidays={calMeta?.holidays ?? []}
               weekOffDates={calMeta?.weekOffDates ?? []}
+              todayShiftEnd={calMeta?.today?.shift?.endTime ?? null}
             />
           </div>
 

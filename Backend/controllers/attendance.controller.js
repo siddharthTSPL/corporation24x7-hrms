@@ -178,7 +178,14 @@ const activity = async (req, res) => {
           onModel: getOnModel(user.role),
           role: user.role,
           date: today,
-          checkIn: new Date(),
+          // Deliberately NOT setting checkIn here - an agent ping is just
+          // background activity tracking, not a real check-in. Leaving
+          // checkIn unset means anything reading `attendance.checkIn` (or
+          // `!!attendance.checkIn`) is naturally correct on its own,
+          // without every consumer having to remember to also check
+          // `source !== "agent"`. checkIn only gets set for real when a
+          // manual/face check-in upgrades this record (see checkin()
+          // above and scanFace() in faceattendance.controller.js).
           shift: shift._id,
           activeMinutes: 0,
           idleMinutes: 0,

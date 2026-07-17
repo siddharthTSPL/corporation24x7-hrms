@@ -46,5 +46,25 @@ export function resolveAttendanceStatus(record, { isToday = false } = {}) {
   // even though the person never actually checked in.
   if (isToday && record.checkIn && record.source !== "agent") return "checkedin";
 
+  // For TODAY specifically, an agent-only ping or no real check-in yet
+  // does NOT mean absent - the day isn't over. Return null here so the
+  // caller can show a neutral "pending" state until the shift actually
+  // ends, instead of jumping straight to red "absent" first thing in
+  // the morning. For any past day, no real check-in really does mean absent.
+  if (isToday) return null;
+
   return "absent";
+}
+
+// Shift end times ("HH:MM") are stored/compared in IST since that's the
+// org's operating timezone; the browser clock is assumed to already be
+// IST for the India-based user base (consistent with how "today" is
+// rendered elsewhere in this file with toLocaleDateString("en-IN")).
+export function isPastShiftEnd(endTime) {
+  if (!endTime) return false; // unknown shift -> don't force "absent" early
+  const [h, m] = endTime.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return false;
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0, 0);
+  return now >= end;
 }
