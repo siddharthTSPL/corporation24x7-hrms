@@ -1375,10 +1375,6 @@ const getperticularemployee = async (req, res, next) => {
     return next(
       Object.assign(new Error("User not found"), { statusCode: 404 }),
     );
-  if (!leaveBalance)
-    return next(
-      Object.assign(new Error("Leave balance not found"), { statusCode: 404 }),
-    );
 
   const manager = await Managermodel.findOne({
     _id: user._id,
@@ -1391,7 +1387,7 @@ const getperticularemployee = async (req, res, next) => {
     success: true,
     user,
     manager: manager || null,
-    leaveBalance,
+    leaveBalance: leaveBalance || null,
     reviews: reviews || [],
   });
 };
@@ -1413,15 +1409,11 @@ const getperticularemanager = async (req, res, next) => {
     return next(
       Object.assign(new Error("Manager not found"), { statusCode: 404 }),
     );
-  if (!leaveBalance)
-    return next(
-      Object.assign(new Error("Leave balance not found"), { statusCode: 404 }),
-    );
 
   res.status(200).json({
     success: true,
     manager,
-    leaveBalance,
+    leaveBalance: leaveBalance || null,
     reviews: reviews || [],
   });
 };
@@ -1451,30 +1443,20 @@ const deleteemployee = async (req, res, next) => {
 const showallleaves = async (req, res, next) => {
   const organisation_id = req.superAdmin._id;
  
-  const personFields = "f_name l_name work_email empid department designation";
-
   const [employeeLeaves, managerLeaves, adminLeaves] = await Promise.all([
     Leave.find({ organisation_id })
-      .populate("employee", personFields)
-      .populate("manager", personFields)
-      .populate({ path: "directed_to", select: personFields, refPath: "directed_to_model" })
-      .populate({ path: "approvedBy", select: personFields, refPath: "approvedByModel" })
-      .populate({ path: "rejectedBy", select: personFields, refPath: "rejectedByModel" })
+      .populate("employee", "f_name l_name work_email empid department designation")
+      .populate("manager", "f_name l_name work_email empid department designation")
       .sort({ createdAt: -1 })
       .lean(),
  
     ManagerLeave.find({ organisation_id })
-      .populate("manager", personFields)
-      .populate({ path: "directed_to", select: personFields, refPath: "directed_to_model" })
-      .populate({ path: "approvedBy", select: personFields, refPath: "approvedByModel" })
-      .populate({ path: "rejectedBy", select: personFields, refPath: "rejectedByModel" })
+      .populate("manager", "f_name l_name work_email empid department designation")
       .sort({ createdAt: -1 })
       .lean(),
  
     AdminLeave.find({ organisation_id })
       .populate("admin", "f_name l_name work_email designation")
-      .populate("approvedBy", "f_name l_name work_email")
-      .populate("rejectedBy", "f_name l_name work_email")
       .sort({ createdAt: -1 })
       .lean(),
   ]);
