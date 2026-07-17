@@ -286,11 +286,11 @@ function Login() {
                     Forgot Password?
                   </p>
                   <p
-                    onClick={() => (window.location.href = "/talent/signup")}
-                    className="cursor-pointer hover:text-[#730042] ml-auto"
-                  >
-                    Sign Up
-                  </p>
+  onClick={() => (window.location.href = "https://torchxsuite.com/signup")}
+  className="cursor-pointer hover:text-[#730042] ml-auto"
+>
+  Sign Up
+</p>
                 </div>
 
                 <div className="flex items-center gap-3 my-4">
