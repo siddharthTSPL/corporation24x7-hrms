@@ -11,7 +11,7 @@ import {
 import { useAdminGetMyWFH } from "../../auth/server-state/adminwfh/adminwfh.hook";
 import { useTodayAttendance, useCalendarMeta } from "../../auth/server-state/attendance/attendance.hook";
 import AttendanceModal from "./AttendanceModal";
-import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus } from "../../pages/utils/attendance";
+import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus, isPastShiftEnd } from "../../pages/utils/attendance";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS = ["S","M","T","W","T","F","S"];
@@ -169,7 +169,7 @@ function SegBar({ segments }) {
   );
 }
 
-function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=[], approvedWFH=[], holidays=[], weekOffDates=[] }) {
+function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=[], approvedWFH=[], holidays=[], weekOffDates=[], todayShiftEnd=null }) {
   const year=new Date().getFullYear();
   const firstDay=new Date(year,month,1).getDay();
   const daysInMo=new Date(year,month+1,0).getDate();
@@ -239,7 +239,10 @@ function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=
     else if (!isFuture) {
       const key=getISTDayKey(date);
       const record=attendanceMap.get(key);
-      status=resolveAttendanceStatus(record, { isToday })??"absent";
+      const resolved=resolveAttendanceStatus(record, { isToday });
+      // resolved === null for today with no real check-in yet: don't jump
+      // to "absent" until the shift has actually ended.
+      status = resolved ?? (isToday && !isPastShiftEnd(todayShiftEnd) ? "pending" : "absent");
     }
     cells.push({ day:d, status, isToday, label });
   }
@@ -255,6 +258,7 @@ function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=
     holiday:{ bg:"bg-orange-50", text:"text-orange-700 font-semibold" },
     weekoff:{ bg:"bg-slate-100", text:"text-slate-500 font-medium" },
     future:{ bg:"", text:"text-[#d4c8c4]" },
+    pending:{ bg:"bg-gray-50", text:"text-gray-400 font-medium" },
     before_joining:{ bg:"", text:"text-[#cfc6c1] opacity-35" },
   };
 
@@ -875,11 +879,14 @@ export default function Dashboard() {
       if (joiningMidnight && date<joiningMidnight) continue;
       if (weekOffSet.has(d) || holidaySet.has(d) || wfhSet.has(d)) continue;
       if (approvedLeaves.some(lv=>isDateInRange(date,lv.startDate,lv.endDate))) continue;
-      counted++;
       const key=getISTDayKey(date);
       const rec=attendanceMap.get(key);
       const isTodayCell=date.toDateString()===today.toDateString();
       const status=resolveAttendanceStatus(rec, { isToday: isTodayCell });
+      if (isTodayCell && !status && !isPastShiftEnd(calMeta?.today?.shift?.endTime)) {
+        continue; // still pending - shift hasn't ended, don't count it either way yet
+      }
+      counted++;
       if (status==="present") present++;
       else if (status==="absent"||!status) absent++;
       else if (status==="halfday"||status==="late") half++;
@@ -1123,7 +1130,7 @@ export default function Dashboard() {
                 </div>
               )}
               <div className="max-w-2xl mx-auto">
-                <Calendar month={selectedMonth} joiningDate={joiningDate} attendanceMap={attendanceMap} approvedLeaves={approvedLeaves} approvedWFH={approvedWFH} holidays={calMeta?.holidays ?? []} weekOffDates={calMeta?.weekOffDates ?? []} />
+                <Calendar month={selectedMonth} joiningDate={joiningDate} attendanceMap={attendanceMap} approvedLeaves={approvedLeaves} approvedWFH={approvedWFH} holidays={calMeta?.holidays ?? []} weekOffDates={calMeta?.weekOffDates ?? []} todayShiftEnd={calMeta?.today?.shift?.endTime ?? null} />
               </div>
             </div>
             <div className="grid grid-cols-5 border-t border-[#f0e8e4] mt-3">
