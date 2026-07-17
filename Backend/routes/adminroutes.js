@@ -2,6 +2,7 @@ const express = require("express");
 const adminrouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const adminauthmiddleware = require("../middleware/auth/admin.middleware");
+const adminOrSuperAdminAuth = require("../middleware/auth/adminOrSuperadmin.middleware");
 const checkPermission = require("../middleware/auth/Checkpermission.middleware");
 const multer = require("multer");
 
@@ -128,7 +129,7 @@ adminrouter.get(
 );
 adminrouter.get(
   "/getallemployee",
-  adminauthmiddleware,
+  adminOrSuperAdminAuth,
   asyncHandler(getallemployee),
 );
 adminrouter.put(
@@ -339,7 +340,7 @@ adminrouter.put(
   adminauthmiddleware,
   asyncHandler(setManagerWorkingStatus)
 );
-adminrouter.get("/all-admins", adminauthmiddleware, asyncHandler(getAllAdminsForOrg));
+adminrouter.get("/all-admins", adminOrSuperAdminAuth, asyncHandler(getAllAdminsForOrg));
 
 adminrouter.get("/inactive-users", adminauthmiddleware, asyncHandler(getInactiveUsers));
 adminrouter.get("/active-user-count", adminauthmiddleware, getActiveUserCount);
