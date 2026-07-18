@@ -19,6 +19,21 @@ const DAYS = ["S","M","T","W","T","F","S"];
 const APPROVED_STATUSES = ["approved_manager","approved_admin","approved_reporting_manager","approved"];
 const APPROVED_WFH_STATUSES = ["approved","approved_admin","approved_reporting_manager"];
 
+// Department short-code -> full form mapping.
+const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "BPO",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+};
+
+function getDeptFullForm(code) {
+  if (!code) return "—";
+  const key = String(code).trim().toUpperCase();
+  return DEPT_FULL_FORMS[key] || code;
+}
+
 function getInitials(f="",l="") {
   return `${f[0]||""}${l[0]||""}`.toUpperCase();
 }
@@ -618,6 +633,7 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
       const size = role?.toLowerCase() === "manager" || role?.toLowerCase() === "admin" ? 15 : 11;
       const pulse = size + 14;
       const inits = getInitials(...(name || "?").split(" "));
+      const deptFull = getDeptFullForm(dept);
 
       const icon = L.divIcon({
         className: "",
@@ -635,7 +651,7 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
               <div style="width:32px;height:32px;border-radius:50%;background:${color};color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">${inits}</div>
               <div>
                 <div style="font-weight:700;font-size:13px;color:${color};">${name || "Unknown"}</div>
-                <div style="font-size:11px;color:#8a6070;text-transform:capitalize;">${role ?? ""}${dept ? " · " + dept : ""}</div>
+                <div style="font-size:11px;color:#8a6070;text-transform:capitalize;">${role ?? ""}${deptFull ? " · " + deptFull : ""}</div>
               </div>
             </div>
             ${email ? `<div style="font-size:11px;color:#8a6070;margin-bottom:6px;">✉ ${email}</div>` : ""}
@@ -1037,7 +1053,7 @@ export default function Dashboard() {
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <Badge variant="brand">{employee?.uid??"—"}</Badge>
                     <Badge variant="green">Active</Badge>
-                    <Badge variant="blue">{employee?.department??"—"}</Badge>
+                    <Badge variant="blue">{getDeptFullForm(employee?.department)??"—"}</Badge>
                   </div>
                   <div className="mt-3 pt-3 border-t border-[#ede5e0] flex flex-col gap-1">
                     <div className="text-[10px] text-[#b0948a] font-sans">📧 {employee?.work_email??"—"}</div>
@@ -1181,7 +1197,7 @@ export default function Dashboard() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 px-4 sm:px-5 py-3.5">
               <InfoField label="Work email" value={employee?.work_email} loading={meLoading} />
-              <InfoField label="Department" value={employee?.department} loading={meLoading} />
+              <InfoField label="Department" value={getDeptFullForm(employee?.department)} loading={meLoading} />
               <InfoField label="Office" value={employee?.office_location} loading={meLoading} />
               <InfoField label="Gender" value={employee?.gender} loading={meLoading} />
               <InfoField label="Marital status" value={employee?.marital_status} loading={meLoading} />
@@ -1230,24 +1246,6 @@ export default function Dashboard() {
             </div>
             <ReviewCard reviews={reviews} loading={meLoading} />
           </div>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative animate-fadein hover:shadow-lg transition-shadow mb-3.5" style={{ animationDelay:".45s" }}>
-          <CardAccent color="#378ADD" />
-          <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between border-b border-[#ede5e0] flex-wrap gap-2">
-            <div>
-              <span className="text-[12px] font-semibold font-sans">Leave History</span>
-              {!histLoading && (
-                <span className="ml-2 text-[11px] text-[#b0948a] font-sans">({allLeaves.length} total)</span>
-              )}
-            </div>
-            <div className="flex gap-1.5 flex-wrap">
-              <Badge variant="green">{approvedLeaves.length} approved</Badge>
-              <Badge variant="amber">{allLeaves.filter(l=>l.status?.includes("pending")).length} pending</Badge>
-              <Badge variant="red">{allLeaves.filter(l=>l.status?.includes("rejected")).length} rejected</Badge>
-            </div>
-          </div>
-          <LeaveHistoryList leaves={allLeaves} loading={histLoading} />
         </div>
 
         <div className="bg-white rounded-2xl border border-[#ede5e0] shadow-sm overflow-hidden relative animate-fadein hover:shadow-lg transition-shadow mb-3.5">
@@ -1320,7 +1318,7 @@ export default function Dashboard() {
               {(empExpand?employees:employees.slice(0,8)).map((emp, i) => {
                 const name = [emp.f_name, emp.l_name].filter(Boolean).join(" ") || "Employee";
                 const role = emp.designation || emp.role || "";
-                const dept = emp.department || "";
+                const dept = getDeptFullForm(emp.department);
                 const email = emp.work_email || "";
                 return (
                   <div key={emp._id || emp.id || i} className="border border-[#ede5e0] rounded-xl p-3.5 flex items-center gap-3 transition-all hover:shadow-sm hover:bg-[#fdfcfb]">

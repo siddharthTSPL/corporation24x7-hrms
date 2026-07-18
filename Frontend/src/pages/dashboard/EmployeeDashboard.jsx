@@ -984,25 +984,7 @@ export default function EmployeeDashboard() {
           </div>
         </div>
 
-        {/* Leave History */}
-        <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative animate-fadein hover:shadow-lg transition-shadow" style={{ animationDelay:".45s" }}>
-          <CardAccent color="#378ADD" />
-          <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between border-b border-[#ede5e0] flex-wrap gap-2">
-            <div>
-              <span className="text-[12px] font-semibold font-sans">Leave History</span>
-              {!histLoading && (
-                <span className="ml-2 text-[11px] text-[#b0948a] font-sans">({allLeaves.length} total)</span>
-              )}
-            </div>
-            <div className="flex gap-1.5 flex-wrap">
-              <Badge variant="green">{approvedLeaves.length} approved</Badge>
-              <Badge variant="amber">{allLeaves.filter(l=>l.status?.includes("pending")).length} pending</Badge>
-              <Badge variant="red">{allLeaves.filter(l=>l.status?.includes("rejected")).length} rejected</Badge>
-            </div>
-          </div>
-          <LeaveHistoryList leaves={allLeaves} loading={histLoading} />
-        </div>
-
+     
       </div>
     </div>
   );
