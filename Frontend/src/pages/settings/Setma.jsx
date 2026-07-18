@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
+import React from "react";
+import { useUpdateProfile, useUpdatePassword, useGetMeUser } from "../../auth/server-state/employee/employeeauth/employeeauth.hook";
 import { useQueryClient } from "@tanstack/react-query";
-import { useGetMeManager } from "../../auth/server-state/manager/managerauth/managerauth.hook";
-import { useUpdateProfile, useUpdatePassword } from "../../auth/server-state/manager/managgerother/managerother.hook";
 
 const AVATAR_STYLES = [
   "avataaars", "bottts", "personas", "lorelei",
@@ -197,12 +197,12 @@ function PrimaryButton({ onClick, disabled, loading, children, color = C.brand }
   );
 }
 
-function Sidebar({ tab, setTab, manager, initials }) {
+function Sidebar({ tab, setTab, employee, initials }) {
   const tabs = [
     { key: "profile", label: "Profile", icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.4"/><path d="M2 13c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
     )},
-    { key: "contact", label: "Contact & office", icon: (
+    { key: "contact", label: "Contact info", icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="3" stroke="currentColor" strokeWidth="1.4"/><path d="M5 6h6M5 9h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
     )},
     { key: "address", label: "Address", icon: (
@@ -240,21 +240,21 @@ function Sidebar({ tab, setTab, manager, initials }) {
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
           <div style={{
             width: 56, height: 56, borderRadius: "50%",
-            background: manager?.profile_image ? "transparent" : C.brand,
+            background: employee?.profile_image ? "transparent" : C.brand,
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 20, fontWeight: 500, color: "#fff",
             overflow: "hidden", border: `3px solid ${C.brandLight}`,
           }}>
-            {manager?.profile_image
-              ? <img src={manager.profile_image} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            {employee?.profile_image
+              ? <img src={employee.profile_image} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               : initials
             }
           </div>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{manager?.f_name} {manager?.l_name}</div>
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{manager?.designation || "—"}</div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{employee?.f_name} {employee?.l_name}</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{employee?.designation || "—"}</div>
             <div style={{ marginTop: 8 }}>
-              <Badge>{manager?.role || "manager"}</Badge>
+              <Badge>{employee?.role || "employee"}</Badge>
             </div>
           </div>
         </div>
@@ -292,10 +292,10 @@ function Sidebar({ tab, setTab, manager, initials }) {
   );
 }
 
-function ProfileTab({ manager }) {
-  const joined = manager?.createdAt;
+function ProfileTab({ employee }) {
+  const joined = employee?.createdAt;
   const joinedFmt = joined ? new Date(joined).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—";
-  const pwUpdated = manager?.updatedAt ? new Date(manager.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—";
+  const pwUpdated = employee?.passwordupdatedAt ? new Date(employee.passwordupdatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—";
 
   const deptMap = { OPR: "Operations", BPO: "BPO", ENG: "Engineering" };
 
@@ -303,79 +303,81 @@ function ProfileTab({ manager }) {
     <>
       <SectionCard title="Personal details" subtitle="Your core information on record" accent={C.brand}>
         <div className="st-2col" style={{ display: "grid", gap: "0 20px" }}>
-          <ReadonlyField label="First name"     value={manager?.f_name} />
-          <ReadonlyField label="Last name"      value={manager?.l_name} />
-          <ReadonlyField label="Work email"     value={manager?.work_email} />
-          <ReadonlyField label="Employee ID"    value={manager?.empid} />
-          <ReadonlyField label="Gender"         value={manager?.gender} />
-          <ReadonlyField label="Marital status" value={manager?.marital_status} />
+          <ReadonlyField label="First name" value={employee?.f_name} />
+          <ReadonlyField label="Last name" value={employee?.l_name} />
+          <ReadonlyField label="Work email" value={employee?.work_email} />
+          <ReadonlyField label="Employee ID" value={employee?.empid} />
+          <ReadonlyField label="Gender" value={employee?.gender} />
+          <ReadonlyField label="Marital status" value={employee?.marital_status} />
         </div>
       </SectionCard>
 
       <SectionCard title="Job information" subtitle="Your current role and team" accent={C.blue}>
         <div className="st-2col" style={{ display: "grid", gap: "0 20px" }}>
-          <ReadonlyField label="Role"            value={manager?.role} />
-          <ReadonlyField label="Designation"     value={manager?.designation} />
-          <ReadonlyField label="Department"      value={deptMap[manager?.department] || manager?.department} />
-          <ReadonlyField label="Office location" value={manager?.office_location} />
+          <ReadonlyField label="Role" value={employee?.role} />
+          <ReadonlyField label="Designation" value={employee?.designation} />
+          <ReadonlyField label="Department" value={deptMap[employee?.department] || employee?.department} />
+          <ReadonlyField label="Office location" value={employee?.office_location} />
           <ReadonlyField label="Date of joining" value={joinedFmt} />
-          <ReadonlyField label="Account status"  value={manager?.status} />
-          <ReadonlyField label="Email verified"  value={manager?.isVerified ? "✓ Verified" : "Not verified"} />
-          <ReadonlyField label="Last updated"    value={pwUpdated} />
+          <ReadonlyField label="Account status" value={employee?.status} />
+          <ReadonlyField label="Email verified" value={employee?.isverified ? "✓ Verified" : "Not verified"} />
+          <ReadonlyField label="Password last updated" value={pwUpdated} />
         </div>
       </SectionCard>
 
       <SectionCard title="Experience" subtitle="Your work background" accent={C.amber}>
         <div className="st-2col" style={{ display: "grid", gap: "0 20px" }}>
-          <ReadonlyField label="Fresher"                  value={manager?.is_fresher ? "Yes" : "No"} />
-          <ReadonlyField label="Total experience (years)" value={manager?.total_experience !== undefined ? String(manager.total_experience) : "—"} />
+          <ReadonlyField label="Fresher" value={employee?.is_fresher ? "Yes" : "No"} />
+          <ReadonlyField label="Total experience (years)" value={employee?.total_experience !== undefined ? String(employee.total_experience) : "—"} />
+          {!employee?.is_fresher && (
+            <>
+              <ReadonlyField label="Previous company" value={employee?.previous_company} />
+              <ReadonlyField label="Previous designation" value={employee?.previous_designation} />
+            </>
+          )}
         </div>
       </SectionCard>
 
-      <SectionCard title="Banking details" subtitle="Your bank information on record" accent={C.green}>
+      <SectionCard title="Reporting manager" subtitle="Your direct reporting line" accent={C.green}>
         <div className="st-2col" style={{ display: "grid", gap: "0 20px" }}>
-          <ReadonlyField label="Bank name"           value={manager?.bank_name} />
-          <ReadonlyField label="Account holder name" value={manager?.account_holder_name} />
-          <ReadonlyField label="Account number"      value={manager?.account_number} />
-          <ReadonlyField label="IFSC code"           value={manager?.ifsc_code} />
+          <ReadonlyField label="Manager name" value={employee?.Under_manager ? `${employee.Under_manager.f_name} ${employee.Under_manager.l_name}` : "—"} />
+          <ReadonlyField label="Manager email" value={employee?.Under_manager?.work_email} />
+          <ReadonlyField label="Manager role" value={employee?.Under_manager?.role} />
+          <ReadonlyField label="Manager designation" value={employee?.Under_manager?.designation} />
         </div>
       </SectionCard>
     </>
   );
 }
 
-function ContactTab({ manager, onSuccess, onError }) {
+function ContactTab({ employee, onSuccess, onError }) {
   const queryClient = useQueryClient();
   const updateProfile = useUpdateProfile();
 
   const [form, setForm] = useState({
-    personal_contact: manager?.personal_contact || "",
-    e_contact:        manager?.e_contact        || "",
-    marital_status:   manager?.marital_status   || "single",
-    gender:           manager?.gender           || "male",
-    designation:      manager?.designation      || "",
-    office_location:  manager?.office_location  || "Noida",
+    personal_contact: employee?.personal_contact || "",
+    e_contact: employee?.e_contact || "",
+    marital_status: employee?.marital_status || "single",
+    gender: employee?.gender || "male",
   });
 
   useEffect(() => {
-    if (manager) {
+    if (employee) {
       setForm({
-        personal_contact: manager.personal_contact || "",
-        e_contact:        manager.e_contact        || "",
-        marital_status:   manager.marital_status   || "single",
-        gender:           manager.gender           || "male",
-        designation:      manager.designation      || "",
-        office_location:  manager.office_location  || "Noida",
+        personal_contact: employee.personal_contact || "",
+        e_contact: employee.e_contact || "",
+        marital_status: employee.marital_status || "single",
+        gender: employee.gender || "male",
       });
     }
-  }, [manager]);
+  }, [employee]);
 
   const handleSave = () => {
     if (!form.personal_contact) { onError("Personal contact is required"); return; }
     updateProfile.mutate(form, {
       onSuccess: (data) => {
-        queryClient.setQueryData(["meManager"], old => old ? { ...old, manager: { ...old.manager, ...data.manager } } : old);
-        queryClient.invalidateQueries({ queryKey: ["meManager"] });
+        queryClient.setQueryData(["meUser"], old => old ? { ...old, employee: { ...old.employee, ...data.employee } } : old);
+        queryClient.invalidateQueries({ queryKey: ["meUser"] });
         onSuccess("Contact info updated successfully!");
       },
       onError: (err) => onError(getErrorMessage(err)),
@@ -383,7 +385,7 @@ function ContactTab({ manager, onSuccess, onError }) {
   };
 
   return (
-    <SectionCard title="Contact & office information" subtitle="Fields you can update yourself" accent={C.green}>
+    <SectionCard title="Contact information" subtitle="Fields you can update yourself" accent={C.green}>
       <InputField
         label="Personal contact"
         type="tel"
@@ -399,29 +401,6 @@ function ContactTab({ manager, onSuccess, onError }) {
         placeholder="Enter emergency contact"
         hint="This contact will be reached in case of emergency"
       />
-      <InputField
-        label="Designation"
-        value={form.designation}
-        onChange={e => setForm(p => ({ ...p, designation: e.target.value }))}
-        placeholder="Enter your designation"
-      />
-      <div style={{ marginBottom: 16 }}>
-        <FieldLabel>Office location</FieldLabel>
-        <select
-          value={form.office_location}
-          onChange={e => setForm(p => ({ ...p, office_location: e.target.value }))}
-          style={{
-            width: "100%", padding: "10px 14px",
-            borderRadius: 10, border: `0.5px solid ${C.border}`,
-            fontSize: 13, color: C.text, background: C.surface,
-            fontFamily: "inherit", outline: "none", boxSizing: "border-box",
-          }}
-          onFocus={e => e.target.style.borderColor = C.brand}
-          onBlur={e => e.target.style.borderColor = C.border}
-        >
-          {OFFICE_LOCATIONS.map(o => <option key={o} value={o}>{o}</option>)}
-        </select>
-      </div>
       <div style={{ marginBottom: 20 }}>
         <FieldLabel>Gender</FieldLabel>
         <div style={{ display: "flex", gap: 10 }}>
@@ -479,34 +458,34 @@ function ContactTab({ manager, onSuccess, onError }) {
   );
 }
 
-function AddressTab({ manager }) {
+function AddressTab({ employee }) {
   return (
     <SectionCard title="Address information" subtitle="On record, contact HR to update" accent={C.amber}>
-      <ReadonlyField label="Address" value={manager?.address} />
+      <ReadonlyField label="Address" value={employee?.address} />
       <div className="st-2col" style={{ display: "grid", gap: "0 16px" }}>
-        <ReadonlyField label="City" value={manager?.city} />
-        <ReadonlyField label="State" value={manager?.state} />
+        <ReadonlyField label="City" value={employee?.city} />
+        <ReadonlyField label="State" value={employee?.state} />
       </div>
       <div className="st-2col" style={{ display: "grid", gap: "0 16px" }}>
-        <ReadonlyField label="Pincode" value={manager?.pincode} />
-        <ReadonlyField label="Country" value={manager?.country} />
+        <ReadonlyField label="Pincode" value={employee?.pincode} />
+        <ReadonlyField label="Country" value={employee?.country} />
       </div>
     </SectionCard>
   );
 }
 
-function IdentityTab({ manager }) {
+function IdentityTab({ employee }) {
   return (
     <SectionCard title="Identity numbers" subtitle="Government ID records on file" accent={C.brand}>
       <div className="st-2col" style={{ display: "grid", gap: "0 20px" }}>
-        <ReadonlyField label="Aadhaar number" value={manager?.aadhaar_number} />
-        <ReadonlyField label="PAN number" value={manager?.pan_number} />
+        <ReadonlyField label="Aadhaar number" value={employee?.aadhaar_number} />
+        <ReadonlyField label="PAN number" value={employee?.pan_number} />
       </div>
     </SectionCard>
   );
 }
 
-function DocumentsBankingTab({ manager, onSuccess, onError }) {
+function DocumentsBankingTab({ employee, onSuccess, onError }) {
   const queryClient = useQueryClient();
   const updateProfile = useUpdateProfile();
   const [form, setForm] = useState({
@@ -515,25 +494,25 @@ function DocumentsBankingTab({ manager, onSuccess, onError }) {
   });
 
   useEffect(() => {
-    if (manager) {
+    if (employee) {
       setForm({
-        resume: manager.resume || "",
-        aadhaar_card: manager.aadhaar_card || "",
-        pan_card: manager.pan_card || "",
-        experience_letter: manager.experience_letter || "",
-        bank_name: manager.bank_name || "",
-        account_holder_name: manager.account_holder_name || "",
-        account_number: manager.account_number || "",
-        ifsc_code: manager.ifsc_code || "",
+        resume: employee.resume || "",
+        aadhaar_card: employee.aadhaar_card || "",
+        pan_card: employee.pan_card || "",
+        experience_letter: employee.experience_letter || "",
+        bank_name: employee.bank_name || "",
+        account_holder_name: employee.account_holder_name || "",
+        account_number: employee.account_number || "",
+        ifsc_code: employee.ifsc_code || "",
       });
     }
-  }, [manager]);
+  }, [employee]);
 
   const set = (key) => (e) => setForm(p => ({ ...p, [key]: e.target.value }));
 
   const onProfileSuccess = (data, msg) => {
-    queryClient.setQueryData(["meManager"], old => old ? { ...old, manager: { ...old.manager, ...data.manager } } : old);
-    queryClient.invalidateQueries({ queryKey: ["meManager"] });
+    queryClient.setQueryData(["meUser"], old => old ? { ...old, employee: { ...old.employee, ...data.employee } } : old);
+    queryClient.invalidateQueries({ queryKey: ["meUser"] });
     onSuccess(msg);
   };
 
@@ -709,7 +688,7 @@ function ReviewsTab({ reviews }) {
 function PasswordTab({ onSuccess, onError }) {
   const updatePassword = useUpdatePassword();
   const [show, setShow] = useState(false);
-  const [form, setForm] = useState({ oldPassword: "", newPassword: "", confirm: "" });
+  const [form, setForm] = useState({ oldpassword: "", newpassword: "", confirm: "" });
 
   const strength = (pw) => {
     if (!pw) return 0;
@@ -722,7 +701,7 @@ function PasswordTab({ onSuccess, onError }) {
     return s;
   };
 
-  const s = strength(form.newPassword);
+  const s = strength(form.newpassword);
   const strengthLabel = ["", "Weak", "Fair", "Good", "Strong", "Very strong"][s];
   const strengthColor = ["", C.red, C.amber, "#f9a825", C.green, C.green][s];
 
@@ -731,14 +710,14 @@ function PasswordTab({ onSuccess, onError }) {
     : <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3"/><line x1="2" y1="2" x2="14" y2="14" stroke={C.muted} strokeWidth="1.3" strokeLinecap="round"/></svg>;
 
   const handleChange = () => {
-    if (!form.oldPassword || !form.newPassword) { onError("All fields are required"); return; }
-    if (form.newPassword !== form.confirm) { onError("Passwords do not match"); return; }
-    if (form.newPassword.length < 6) { onError("Password must be at least 6 characters"); return; }
-    if (form.oldPassword === form.newPassword) { onError("New password must differ from old password"); return; }
+    if (!form.oldpassword || !form.newpassword) { onError("All fields are required"); return; }
+    if (form.newpassword !== form.confirm) { onError("Passwords do not match"); return; }
+    if (form.newpassword.length < 6) { onError("Password must be at least 6 characters"); return; }
+    if (form.oldpassword === form.newpassword) { onError("New password must differ from old password"); return; }
     updatePassword.mutate(
-      { oldPassword: form.oldPassword, newPassword: form.newPassword },
+      { oldpassword: form.oldpassword, newpassword: form.newpassword },
       {
-        onSuccess: () => { setForm({ oldPassword: "", newPassword: "", confirm: "" }); onSuccess("Password changed successfully!"); },
+        onSuccess: () => { setForm({ oldpassword: "", newpassword: "", confirm: "" }); onSuccess("Password changed successfully!"); },
         onError: (err) => onError(getErrorMessage(err)),
       }
     );
@@ -753,15 +732,15 @@ function PasswordTab({ onSuccess, onError }) {
   return (
     <SectionCard title="Change password" subtitle="Keep your account secure with a strong password" accent={C.brand}>
       <div style={{ maxWidth: 400 }}>
-        <InputField label="Current password *" type={show ? "text" : "password"} name="oldPassword"
-          value={form.oldPassword} onChange={e => setForm(p => ({ ...p, oldPassword: e.target.value }))}
+        <InputField label="Current password *" type={show ? "text" : "password"} name="oldpassword"
+          value={form.oldpassword} onChange={e => setForm(p => ({ ...p, oldpassword: e.target.value }))}
           placeholder="Enter current password" rightEl={eyeToggle} />
 
-        <InputField label="New password *" type={show ? "text" : "password"} name="newPassword"
-          value={form.newPassword} onChange={e => setForm(p => ({ ...p, newPassword: e.target.value }))}
+        <InputField label="New password *" type={show ? "text" : "password"} name="newpassword"
+          value={form.newpassword} onChange={e => setForm(p => ({ ...p, newpassword: e.target.value }))}
           placeholder="Enter new password" rightEl={eyeToggle} />
 
-        {form.newPassword && (
+        {form.newpassword && (
           <div style={{ marginTop: -8, marginBottom: 16 }}>
             <div style={{ display: "flex", gap: 4, marginBottom: 5 }}>
               {[1,2,3,4,5].map(i => (
@@ -775,7 +754,7 @@ function PasswordTab({ onSuccess, onError }) {
         <InputField label="Confirm new password *" type={show ? "text" : "password"} name="confirm"
           value={form.confirm} onChange={e => setForm(p => ({ ...p, confirm: e.target.value }))}
           placeholder="Confirm new password"
-          hint={form.confirm && form.newPassword !== form.confirm ? "Passwords do not match" : ""}
+          hint={form.confirm && form.newpassword !== form.confirm ? "Passwords do not match" : ""}
         />
 
         <PrimaryButton onClick={handleChange} loading={updatePassword.isPending}>
@@ -790,15 +769,15 @@ function PasswordTab({ onSuccess, onError }) {
   );
 }
 
-function AvatarTab({ manager, onSuccess, onError }) {
+function AvatarTab({ employee, onSuccess, onError }) {
   const queryClient = useQueryClient();
   const updateProfile = useUpdateProfile();
-  const [currentImg, setCurrentImg] = useState(manager?.profile_image || "");
+  const [currentImg, setCurrentImg] = useState(employee?.profile_image || "");
   const [pending, setPending] = useState(null);
 
-  useEffect(() => { setCurrentImg(manager?.profile_image || ""); }, [manager]);
+  useEffect(() => { setCurrentImg(employee?.profile_image || ""); }, [employee]);
 
-  const initials = getInitials(manager?.f_name, manager?.l_name);
+  const initials = getInitials(employee?.f_name, employee?.l_name);
   const seed = initials || "default";
 
   const applyAvatar = (url) => {
@@ -807,13 +786,13 @@ function AvatarTab({ manager, onSuccess, onError }) {
     updateProfile.mutate(
       { profile_image: url },
       {
-        onSuccess: () => {
-          queryClient.setQueryData(["meManager"], old => old ? { ...old, manager: { ...old.manager, profile_image: url } } : old);
-          queryClient.invalidateQueries({ queryKey: ["meManager"] });
+        onSuccess: (data) => {
+          queryClient.setQueryData(["meUser"], old => old ? { ...old, employee: { ...old.employee, profile_image: url } } : old);
+          queryClient.invalidateQueries({ queryKey: ["meUser"] });
           onSuccess("Avatar updated!");
           setPending(null);
         },
-        onError: (err) => { setCurrentImg(manager?.profile_image || ""); onError(getErrorMessage(err)); setPending(null); },
+        onError: (err) => { setCurrentImg(employee?.profile_image || ""); onError(getErrorMessage(err)); setPending(null); },
       }
     );
   };
@@ -891,15 +870,15 @@ function AvatarTab({ manager, onSuccess, onError }) {
   );
 }
 
-export default function ManagerSettingsPage() {
+export default function EmployeeSettingsPage() {
   const [tab, setTab] = useState("profile");
   const [toast, setToast] = useState({ message: "", type: "" });
 
-  const { data: meData, isLoading } = useGetMeManager();
-  const manager = meData?.manager ?? null;
+  const { data: meData, isLoading } = useGetMeUser();
+  const employee = meData?.employee ?? null;
   const leaveBalance = Array.isArray(meData?.leavebalance) ? meData.leavebalance[0] : meData?.leavebalance;
   const reviews = meData?.reviews ?? [];
-  const initials = manager ? getInitials(manager.f_name, manager.l_name) : "—";
+  const initials = employee ? getInitials(employee.f_name, employee.l_name) : "—";
 
   const showSuccess = (msg) => setToast({ message: msg, type: "success" });
   const showError   = (msg) => setToast({ message: msg, type: "error" });
@@ -937,18 +916,18 @@ export default function ManagerSettingsPage() {
       </div>
 
       <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-        <Sidebar tab={tab} setTab={setTab} manager={manager} initials={initials} />
+        <Sidebar tab={tab} setTab={setTab} employee={employee} initials={initials} />
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          {tab === "profile"   && <ProfileTab   manager={manager} />}
-          {tab === "contact"   && <ContactTab   manager={manager} onSuccess={showSuccess} onError={showError} />}
-          {tab === "address"   && <AddressTab   manager={manager} />}
-          {tab === "identity"  && <IdentityTab  manager={manager} />}
-          {tab === "documents" && <DocumentsBankingTab manager={manager} onSuccess={showSuccess} onError={showError} />}
+          {tab === "profile"   && <ProfileTab   employee={employee} />}
+          {tab === "contact"   && <ContactTab   employee={employee} onSuccess={showSuccess} onError={showError} />}
+          {tab === "address"   && <AddressTab   employee={employee} />}
+          {tab === "identity"  && <IdentityTab  employee={employee} />}
+          {tab === "documents" && <DocumentsBankingTab employee={employee} onSuccess={showSuccess} onError={showError} />}
           {tab === "leave"     && <LeaveTab     leaveBalance={leaveBalance} />}
           {tab === "reviews"   && <ReviewsTab   reviews={reviews} />}
           {tab === "password"  && <PasswordTab  onSuccess={showSuccess} onError={showError} />}
-          {tab === "avatar"    && <AvatarTab    manager={manager} onSuccess={showSuccess} onError={showError} />}
+          {tab === "avatar"    && <AvatarTab    employee={employee} onSuccess={showSuccess} onError={showError} />}
 
           <div style={{ textAlign: "center", fontSize: 12, color: C.mutedMid, marginTop: 8 }}>
             Changes are saved to your account automatically
@@ -958,8 +937,3 @@ export default function ManagerSettingsPage() {
     </div>
   );
 }
-
-
-
-
-
