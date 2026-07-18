@@ -37,12 +37,12 @@ const LEAVE_META = {
 
 const STATUS_META = {
   pending:                        { label: "Pending",           bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
-  forwarded_reporting_manager:    { label: "Fwd by Manager",    bg: "#EFF6FF", color: "#1D4ED8", dot: "#3B82F6" },
-  approved_reporting_manager:     { label: "Approved",          bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
-  rejected_reporting_manager:     { label: "Rejected",          bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
-  pending_reporting_manager:      { label: "Pending Review",    bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
-  approved_manager:               { label: "Mgr Approved",      bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
-  rejected_manager:               { label: "Mgr Rejected",      bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  forwarded_reporting_manager:    { label: "Forwarded to Reporting Manager", bg: "#EFF6FF", color: "#1D4ED8", dot: "#3B82F6" },
+  approved_reporting_manager:     { label: "Approved by Reporting Manager",  bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_reporting_manager:     { label: "Rejected by Reporting Manager",  bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  pending_reporting_manager:      { label: "Pending Review",                 bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
+  approved_manager:               { label: "Approved by Manager",            bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_manager:               { label: "Rejected by Manager",            bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
   pending_manager:                { label: "Pending Manager",   bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
   pending_admin:                  { label: "Pending Admin",     bg: "#FFF7ED", color: "#9A3412", dot: "#F97316" },
   approved_admin:                 { label: "Approved by Admin", bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
@@ -61,7 +61,7 @@ const AVATAR_COLORS = [
   "linear-gradient(135deg,#1E3A5F,#60A5FA)",
 ];
 
-const initials    = (f = "", l = "") => (`${f[0] || ""}${l[0] || ""}`.toUpperCase() || "?");
+const initials    = (f = "", l = "") => `${f[0] || ""}${l[0] || ""}`.toUpperCase();
 const avatarColor = (name = "") => AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
 const formatDate  = (d) => {
   if (!d) return "—";
@@ -77,6 +77,30 @@ const isTerminalStatus = (status) =>
 
 const humanizeStatus = (s = "") =>
   s.split("_").filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+
+const ROLE_LABEL = { Manager: "Manager", Admin: "Admin", SuperAdmin: "Super Admin" };
+
+// Builds a full "Approved/Rejected by <Role> — <Name>" line from populated data.
+// Returns null (never "Unknown") when there isn't enough real data to show.
+const decisionInfo = (leave) => {
+  const isRejected = leave.status?.startsWith("rejected");
+  const isApproved = leave.status?.startsWith("approved");
+  if (!isRejected && !isApproved) return null;
+
+  const actor = isRejected ? leave.rejectedBy : leave.approvedBy;
+  const actorModel = isRejected ? leave.rejectedByModel : leave.approvedByModel;
+
+  const person = actor && typeof actor === "object" ? actor : null;
+  const name = person ? `${person.f_name || ""} ${person.l_name || ""}`.trim() : "";
+  const role = actorModel ? (ROLE_LABEL[actorModel] || actorModel) : (leave.admin !== undefined ? "Super Admin" : "");
+
+  if (!name && !role) return null;
+
+  const action = isRejected ? "Rejected" : "Approved";
+  if (name && role) return `${action} by ${role} — ${name}`;
+  if (name) return `${action} by ${name}`;
+  return `${action} by ${role}`;
+};
 
 const csvEscape = (val) => `"${String(val ?? "").replace(/"/g, '""')}"`;
 
@@ -100,7 +124,7 @@ const exportLeavesToCSV = (leaves, filename, personKey) => {
   ];
   const rows = leaves.map((l) => {
     const person = l[personKey] || l.employee || l.manager || l.admin || {};
-    const decidedBy = l.approvedByModel || l.rejectedByModel || "—";
+    const decidedBy = decisionInfo(l) || "—";
     return [
       csvEscape(`${person.f_name || ""} ${person.l_name || ""}`.trim() || "—"),
       csvEscape(person.empid || "—"),
@@ -331,41 +355,32 @@ const SummaryStrip = ({ stats }) => (
   </div>
 );
 
-const PersonCard = ({ person, accentBadge, roleLabel = "Person" }) => {
-  const name = `${person?.f_name || ""} ${person?.l_name || ""}`.trim();
-  const displayName = name || `Unknown ${roleLabel}`;
-  const isUnknown = !name;
-  return (
-    <div className="flex items-center gap-3 sm:gap-4 mb-3 min-w-0">
-      <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 text-white text-sm font-bold shadow-md"
-        style={{ background: avatarColor(person?.f_name || "A") }}>
-        {initials(person?.f_name, person?.l_name)}
+const PersonCard = ({ person, accentBadge }) => (
+  <div className="flex items-center gap-3 sm:gap-4 mb-3 min-w-0">
+    <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 text-white text-sm font-bold shadow-md"
+      style={{ background: avatarColor(person.f_name || "A") }}>
+      {initials(person.f_name, person.l_name)}
+    </div>
+    <div className="min-w-0 flex-1">
+      <div className="text-sm font-semibold text-gray-800 truncate">
+        {person.f_name} {person.l_name}
       </div>
-      <div className="min-w-0 flex-1">
-        <div className={`text-sm font-semibold truncate ${isUnknown ? "text-gray-400 italic" : "text-gray-800"}`}>
-          {displayName}
-        </div>
-        <div className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
-          {isUnknown ? (
-            <span className="truncate">{person?._id ? `ID: ${person._id}` : "Account no longer available"}</span>
-          ) : (
-            <span className="truncate">{person.work_email}</span>
-          )}
-          {person?.designation && (
-            <span className="px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-semibold shrink-0">
-              {person.designation}
-            </span>
-          )}
-          {accentBadge && (
-            <span className="px-1.5 py-0.5 rounded-md bg-gradient-to-br from-pink-50 to-pink-100 text-[#730042] text-[10px] font-bold border border-pink-200 shrink-0">
-              {accentBadge}
-            </span>
-          )}
-        </div>
+      <div className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+        <span className="truncate">{person.work_email}</span>
+        {person.designation && (
+          <span className="px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-semibold shrink-0">
+            {person.designation}
+          </span>
+        )}
+        {accentBadge && (
+          <span className="px-1.5 py-0.5 rounded-md bg-gradient-to-br from-pink-50 to-pink-100 text-[#730042] text-[10px] font-bold border border-pink-200 shrink-0">
+            {accentBadge}
+          </span>
+        )}
       </div>
     </div>
-  );
-};
+  </div>
+);
 
 const ActionButtons = ({ onApprove, onReject }) => (
   <div className="flex sm:flex-col gap-2 w-full sm:w-auto shrink-0">
@@ -401,7 +416,7 @@ const ProcessingOverlay = () => (
   </div>
 );
 
-const LeaveCard = ({ leave, person, accentBadge, roleLabel, actionable, processingId, onApprove, onReject, idx }) => {
+const LeaveCard = ({ leave, person, accentBadge, actionable, processingId, onApprove, onReject, idx }) => {
   const isProcessing = processingId === leave._id;
   const days = leave.days || daysDiff(leave.startDate, leave.endDate);
   const accent = (LEAVE_META[leave.leaveType] || { accent: "#730042" }).accent;
@@ -412,7 +427,7 @@ const LeaveCard = ({ leave, person, accentBadge, roleLabel, actionable, processi
       <div className="absolute top-0 left-0 w-1 bottom-0 rounded-l-2xl" style={{ background: accent }} />
       
       <div className="flex-1 min-w-0 w-full pl-2">
-        <PersonCard person={person} accentBadge={accentBadge} roleLabel={roleLabel} />
+        <PersonCard person={person} accentBadge={accentBadge} />
         <div className="flex gap-1.5 flex-wrap mb-2.5">
           <TypeBadge type={leave.leaveType} />
           <StatusBadge status={leave.status} />
@@ -436,23 +451,9 @@ const LeaveCard = ({ leave, person, accentBadge, roleLabel, actionable, processi
             <span className="text-blue-600 font-semibold">Remarks — </span>{leave.remarks}
           </div>
         )}
-        {!isTerminalStatus(leave.status) && leave.directed_to && (
-          <div className="bg-amber-50/60 rounded-xl px-3.5 py-2.5 text-xs text-amber-800 mt-2 border-l-4 border-amber-300 leading-relaxed">
-            <span className="text-amber-700 font-semibold">Currently with — </span>
-            {`${leave.directed_to.f_name || ""} ${leave.directed_to.l_name || ""}`.trim() || "Unknown"}
-            {leave.directed_to_model ? ` (${leave.directed_to_model})` : ""}
-          </div>
-        )}
-        {leave.status?.startsWith("approved") && leave.approvedBy && (
-          <div className="bg-green-50/60 rounded-xl px-3.5 py-2.5 text-xs text-green-800 mt-2 border-l-4 border-green-300 leading-relaxed">
-            <span className="text-green-700 font-semibold">Approved by — </span>
-            {`${leave.approvedBy.f_name || ""} ${leave.approvedBy.l_name || ""}`.trim() || "Unknown"}
-          </div>
-        )}
-        {leave.status?.startsWith("rejected") && leave.rejectedBy && (
-          <div className="bg-red-50/60 rounded-xl px-3.5 py-2.5 text-xs text-red-800 mt-2 border-l-4 border-red-300 leading-relaxed">
-            <span className="text-red-700 font-semibold">Rejected by — </span>
-            {`${leave.rejectedBy.f_name || ""} ${leave.rejectedBy.l_name || ""}`.trim() || "Unknown"}
+        {decisionInfo(leave) && (
+          <div className="bg-rose-50/50 rounded-xl px-3.5 py-2.5 text-xs text-rose-800 mt-2 border-l-4 border-rose-300 leading-relaxed">
+            <span className="text-rose-700 font-semibold">Decision — </span>{decisionInfo(leave)}
           </div>
         )}
       </div>
@@ -622,7 +623,6 @@ const EmployeeLeavesTab = ({ leaves, isLoading, processingId }) => {
             key={leave._id}
             leave={leave}
             person={leave.employee || {}}
-            roleLabel="Employee"
             accentBadge={null}
             actionable={false}
             processingId={processingId}
@@ -729,7 +729,6 @@ const ManagerLeavesTab = ({ leaves, isLoading, processingId }) => {
             key={leave._id}
             leave={leave}
             person={leave.manager || {}}
-            roleLabel="Manager"
             accentBadge="Manager"
             actionable={false}
             processingId={processingId}
@@ -834,7 +833,6 @@ const AdminLeavesTab = ({ leaves, isLoading, processingId, onAction }) => {
             key={leave._id}
             leave={leave}
             person={leave.admin || {}}
-            roleLabel="Admin"
             accentBadge="Admin"
             actionable={true}
             processingId={processingId}
