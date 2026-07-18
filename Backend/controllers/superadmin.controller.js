@@ -31,6 +31,36 @@ const { notifyLeaveDecision, notifyAssetAssigned } = require("../utils/notify.ut
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
 
+// Walks up a manager's reporting chain (manager -> manager -> ... -> admin)
+// to find the admin they - and therefore their reports - ultimately sit
+// under. A manager can report directly to an Admin, or to another
+// Manager who eventually reports to an Admin. Capped at 10 hops as a
+// safety net in case of a bad/circular reporting_manager reference.
+async function resolveAdminInChain(startManager, organisation_id) {
+  let current = startManager;
+  for (let hops = 0; current && hops < 10; hops += 1) {
+    if (!current.reporting_manager || !current.reporting_manager_model) return null;
+
+    if (current.reporting_manager_model === "Admin") {
+      return AdminModel.findOne({
+        _id: current.reporting_manager,
+        organisation_id,
+      })
+        .select(EXCLUDE)
+        .lean();
+    }
+
+    // reporting_manager_model === "Manager": go up one more level
+    current = await Managermodel.findOne({
+      _id: current.reporting_manager,
+      organisation_id,
+    })
+      .select("reporting_manager reporting_manager_model")
+      .lean();
+  }
+  return null;
+}
+
 // ─── Role-based default permissions ───────────────────────────────────────────
 // admin   : announcements + documents + tickets + recruitment  (all features)
 // manager : announcements + documents + tickets + recruitment  (all features)
@@ -1265,19 +1295,19 @@ const getallemployee = async (req, res, next) => {
     const [admins, managers, users] = await Promise.all([
       AdminModel.find({ organisation_id, working_status: "working" })
         .select(
-          "empid uid f_name l_name work_email role department designation office_location organisation_id",
+          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact marital_status",
         )
         .lean(),
 
       Managermodel.find({ organisation_id, working_status: "working" })
         .select(
-          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact",
+          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact marital_status",
         )
         .lean(),
 
       Usermodel.find({ organisation_id, working_status: "working" })
         .select(
-          "empid uid f_name l_name work_email role department designation office_location organisation_id Under_manager",
+          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact marital_status Under_manager",
         )
         .populate({
           path: "Under_manager",
@@ -1375,23 +1405,30 @@ const getperticularemployee = async (req, res, next) => {
     return next(
       Object.assign(new Error("User not found"), { statusCode: 404 }),
     );
-  if (!leaveBalance)
-    return next(
-      Object.assign(new Error("Leave balance not found"), { statusCode: 404 }),
-    );
 
-  const manager = await Managermodel.findOne({
-    _id: user._id,
-    organisation_id,
-  })
-    .select(EXCLUDE)
-    .lean();
+  // Was previously querying Managermodel by the employee's OWN _id
+  // (a copy-paste bug), which could never match a real manager - so
+  // `manager` in the response was always null. The employee's actual
+  // manager is user.Under_manager.
+  const managerId = user.Under_manager?._id || user.Under_manager || null;
+  const manager = managerId
+    ? await Managermodel.findOne({ _id: managerId, organisation_id })
+        .select(EXCLUDE)
+        .lean()
+    : null;
+
+  // Walk up the reporting chain (manager -> manager -> ... -> admin)
+  // to find the admin this employee ultimately reports up to.
+  const admin = manager
+    ? await resolveAdminInChain(manager, organisation_id)
+    : null;
 
   res.status(200).json({
     success: true,
     user,
     manager: manager || null,
-    leaveBalance,
+    admin: admin || null,
+    leaveBalance: leaveBalance || null,
     reviews: reviews || [],
   });
 };
@@ -1413,15 +1450,14 @@ const getperticularemanager = async (req, res, next) => {
     return next(
       Object.assign(new Error("Manager not found"), { statusCode: 404 }),
     );
-  if (!leaveBalance)
-    return next(
-      Object.assign(new Error("Leave balance not found"), { statusCode: 404 }),
-    );
+
+  const admin = await resolveAdminInChain(manager, organisation_id);
 
   res.status(200).json({
     success: true,
     manager,
-    leaveBalance,
+    admin: admin || null,
+    leaveBalance: leaveBalance || null,
     reviews: reviews || [],
   });
 };
@@ -2469,6 +2505,32 @@ const setLeavePolicy = async (req, res, next) => {
   return res.status(200).json({ success: true, message: "Leave policy updated", policy });
 };
 
+const getperticularadmin = async (req, res, next) => {
+  const { uid } = req.params;
+  const organisation_id = req.superAdmin._id;
+
+  const [admin, leaveBalance, reviews] = await Promise.all([
+    AdminModel.findOne({ _id: uid, organisation_id }).select(EXCLUDE).lean(),
+    leavebalanceModel.findOne({ employee: uid, organisation_id }).lean(),
+    reviewModel
+      .find({ reviewee: uid, organisation_id, revieweeRoleModel: "Admin" })
+      .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      .lean(),
+  ]);
+
+  if (!admin)
+    return next(
+      Object.assign(new Error("Admin not found"), { statusCode: 404 }),
+    );
+
+  res.status(200).json({
+    success: true,
+    admin,
+    leaveBalance: leaveBalance || null,
+    reviews: reviews || [],
+  });
+};
+
 module.exports = {
   registerSuperAdmin,
   verifySuperAdmin,
@@ -2514,5 +2576,6 @@ module.exports = {
   getInactiveUsers,
   getActiveUserCount,
   getLeavePolicy,
-  setLeavePolicy
+  setLeavePolicy,
+  getperticularadmin
 };
