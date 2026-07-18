@@ -960,6 +960,3 @@ export default function ManagerSettingsPage() {
 }
 
 
-
-
-

@@ -294,7 +294,20 @@ function ProfileTab({ employee }) {
   const joinedFmt = joined ? new Date(joined).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—";
   const pwUpdated = employee?.passwordupdatedAt ? new Date(employee.passwordupdatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—";
 
-  const deptMap = { OPR: "Operations", BPO: "BPO", ENG: "Engineering" };
+  const deptMap = {
+    OPR: "Operations",
+    BPO: "Business Process Outsourcing",
+    ENG: "Engineering",
+    HR: "Human Resources",
+    IT: "Information Technology",
+    FIN: "Finance",
+    SALES: "Sales",
+    MKT: "Marketing",
+    ADMIN: "Administration",
+    LEGAL: "Legal",
+    SUPPORT: "Customer Support",
+    QA: "Quality Assurance",
+  };
 
   return (
     <>
@@ -845,3 +858,5 @@ export default function EmployeeSettingsPage() {
     </div>
   );
 }
+
+
