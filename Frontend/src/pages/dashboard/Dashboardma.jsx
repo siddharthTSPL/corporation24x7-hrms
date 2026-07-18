@@ -1430,20 +1430,7 @@ export default function ManagerDashboard() {
         </div>
       </div>
 
-      <div className="md-card" style={{ animationDelay:".45s" }}>
-        <CardAccent color="#378ADD"/>
-        <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
-          borderBottom:"0.5px solid #ede5e0", flexWrap:"wrap", gap:8 }}>
-          <span style={{ fontSize:12, fontWeight:600, fontFamily:"'DM Sans',sans-serif" }}>Team Leave History</span>
-          <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-            <Badge variant="green">{allEmployeeLeaves.filter(l => APPROVED_STATUSES.includes(l.status)).length} approved</Badge>
-            <Badge variant="amber">{allEmployeeLeaves.filter(l => l.status?.includes("pending")).length} pending</Badge>
-          </div>
-        </div>
-        <div className="md-table-scroll">
-          <LeaveHistoryList leaves={allEmployeeLeaves} loading={histLoading}/>
-        </div>
-      </div>
+    
 
     </div>
   );
