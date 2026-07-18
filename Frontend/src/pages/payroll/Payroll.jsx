@@ -588,7 +588,7 @@ function StructuresTab({ notify, directory }) {
           <Field label="Effective From" hint="Defaults to today">
             <TextInput type="date" value={form.effectiveFrom} onChange={(e) => setForm((p) => ({ ...p, effectiveFrom: e.target.value }))} />
           </Field>
-          <PrimaryButton type="submit" loading={saving}>Save Salary Structure</PrimaryButton>
+          <PrimaryButton type="submit" loading={saving} className="mb-6">Save Salary Structure</PrimaryButton>
         </form>
       </Card>
 
