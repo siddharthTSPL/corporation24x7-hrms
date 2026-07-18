@@ -53,6 +53,11 @@ function formatDate(dateStr) {
   });
 }
 
+function formatRole(role) {
+  if (!role) return "—";
+  return role.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function daysLeft(dateStr) {
   if (!dateStr) return null;
   const diff = new Date(dateStr) - new Date();
@@ -274,7 +279,7 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
             <div className="text-sm font-semibold text-[#2a1a16] truncate">{superAdmin?.f_name} {superAdmin?.l_name}</div>
             <div className="text-[11px] text-[#b0948a] mt-0.5 truncate">{superAdmin?.organisation_name || "—"}</div>
             <div className="mt-2 flex flex-wrap gap-1.5 items-center justify-center">
-              <Badge color={C.brand} bg={C.brandLight}>{(superAdmin?.role || "super_admin").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}</Badge>
+              <Badge color={C.brand} bg={C.brandLight}>{formatRole(superAdmin?.role || "super_admin")}</Badge>
               {superAdmin?.is_trial_active && <PlanBadge plan="free_trial" />}
             </div>
           </div>
@@ -328,7 +333,7 @@ function OverviewTab({ superAdmin }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-0">
           <ReadonlyField label="Full name" value={`${superAdmin?.f_name || ""} ${superAdmin?.l_name || ""}`.trim()} />
           <ReadonlyField label="Email address" value={superAdmin?.email} />
-          <ReadonlyField label="Role" value={superAdmin?.role} />
+          <ReadonlyField label="Role" value={formatRole(superAdmin?.role)} />
           <div className="mb-4">
             <FieldLabel>Account status</FieldLabel>
             <div className="px-3.5 py-2.5 rounded-lg bg-[#f9f4f2] border border-[#ede5e0] flex items-center">
@@ -431,7 +436,7 @@ function ProfileTab({ superAdmin, onSuccess, onError }) {
         hint="Email cannot be changed. Contact support if needed."
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-0">
-        <ReadonlyField label="Role" value={superAdmin?.role} />
+        <ReadonlyField label="Role" value={formatRole(superAdmin?.role)} />
         <ReadonlyField label="Company domain" value={superAdmin?.company_domain} />
       </div>
       <PrimaryButton onClick={handleSave} loading={updateProfile.isPending}>
