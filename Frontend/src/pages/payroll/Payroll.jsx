@@ -251,7 +251,6 @@ function GhostButton({ children, ...rest }) {
   );
 }
 
-// ── Employee directory (shared across tabs) ──────────────────────────────────
 
 function useEmployeeDirectory() {
   const { data: empData, isLoading: empLoading } = useGetAllEmployee();
@@ -287,7 +286,6 @@ function resolveName(directory, id, fallbackModel) {
   return `${MODEL_LABEL[fallbackModel] || fallbackModel} — ${String(id).slice(-6)}`;
 }
 
-// ── Policy Tab ────────────────────────────────────────────────────────────────
 
 function PolicyTab({ notify }) {
   const { data, isLoading } = useGetPayrollPolicy();
@@ -465,7 +463,7 @@ function PolicyTab({ notify }) {
       </Card>
 
       <Card title="Allowances" subtitle='The "balancing" allowance absorbs whatever gross remains after Basic, HRA and other allowances'>
-        <div className="overflow-x-auto -mx-1">
+        <div className="overflow-x-auto overscroll-x-contain -mx-1">
           <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 560 }}>
             <thead>
               <tr style={{ textAlign: "left", fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>
@@ -522,7 +520,6 @@ function PolicyTab({ notify }) {
   );
 }
 
-// ── Salary Structures Tab ────────────────────────────────────────────────────
 
 function StructuresTab({ notify, directory }) {
   const [modelFilter, setModelFilter] = useState("");
@@ -606,7 +603,7 @@ function StructuresTab({ notify, directory }) {
         ) : structures.length === 0 ? (
           <p style={{ color: C.muted, fontSize: 13 }}>No salary structures found.</p>
         ) : (
-          <div className="overflow-x-auto -mx-1">
+          <div className="overflow-x-auto overscroll-x-contain -mx-1">
             <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 760 }}>
               <thead>
                 <tr style={{ textAlign: "left", fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>
@@ -644,7 +641,6 @@ function StructuresTab({ notify, directory }) {
   );
 }
 
-// ── Generate Payroll Tab ─────────────────────────────────────────────────────
 
 function GenerateTab({ notify, directory }) {
   const now = new Date();
@@ -802,15 +798,14 @@ function GenerateTab({ notify, directory }) {
   );
 }
 
-// ── Payroll Records Tab ──────────────────────────────────────────────────────
 
 function PayslipModal({ payroll, directory, onClose }) {
   if (!payroll) return null;
   return (
-    <div className="fixed inset-0 z-[998] flex items-center justify-center p-3 sm:p-4" style={{ background: "rgba(0,0,0,0.45)" }} onClick={onClose}>
+    <div className="fixed inset-0 z-[998] flex items-center justify-center p-3 sm:p-4 overscroll-contain" style={{ background: "rgba(0,0,0,0.45)" }} onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="p-4 sm:p-[22px]"
+        className="p-4 sm:p-[22px] overscroll-contain"
         style={{ background: "#fff", borderRadius: 14, maxWidth: 520, width: "100%", maxHeight: "88vh", overflowY: "auto" }}
       >
         <div className="flex items-center justify-between mb-3 gap-3">
@@ -916,7 +911,7 @@ function RecordsTab({ notify, directory }) {
       ) : payrolls.length === 0 ? (
         <p style={{ color: C.muted, fontSize: 13 }}>No payroll records found for these filters.</p>
       ) : (
-        <div className="overflow-x-auto -mx-1">
+        <div className="overflow-x-auto overscroll-x-contain -mx-1">
           <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 820 }}>
             <thead>
               <tr style={{ textAlign: "left", fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>
@@ -953,7 +948,6 @@ function RecordsTab({ notify, directory }) {
   );
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function Payroll() {
   const [tab, setTab] = useState("policy");
@@ -962,7 +956,10 @@ export default function Payroll() {
   const directory = useEmployeeDirectory();
 
   return (
-    <div className="w-full h-full min-h-0 overflow-x-hidden overflow-y-auto p-3 sm:p-6 lg:p-8 box-border" style={{ background: C.page }}>
+    <div
+      className="w-full overflow-x-hidden p-3 sm:p-6 lg:p-8 box-border"
+      style={{ background: C.page }}
+    >
       <style>{`
         @keyframes payroll-spin { to { transform: rotate(360deg); } }
         @keyframes payroll-slideIn { from { transform: translateX(12px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
