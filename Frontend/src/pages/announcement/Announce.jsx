@@ -431,7 +431,7 @@ export default function AnnouncementPage() {
 
   if (allLocked) {
     return (
-      <div className="p-4 sm:p-6 md:p-8 min-h-screen overflow-x-hidden" style={{ background: "#F9F8F2" }}>
+      <div className="p-3 sm:p-5 md:p-6 lg:p-8 min-h-screen overflow-x-hidden" style={{ background: "#F9F8F2" }}>
         <div className="max-w-[1600px] mx-auto bg-white rounded-[14px] border border-[#F4C0D1] overflow-hidden">
           <FullPageLockScreen />
         </div>
@@ -447,10 +447,10 @@ export default function AnnouncementPage() {
   ];
 
   return (
-    <div className="p-3 xs:p-4 sm:p-6 md:p-8 min-h-screen overflow-x-hidden" style={{ background: "#F9F8F2" }}>
+    <div className="p-3 sm:p-5 md:p-6 lg:p-8 min-h-screen overflow-x-hidden" style={{ background: "#F9F8F2" }}>
       <div className="max-w-[1600px] mx-auto">
 
-        <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-3 mb-6 sm:mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 sm:mb-8">
           <div className="min-w-0">
             <h1 className="text-lg sm:text-xl font-semibold text-[#730042] tracking-tight truncate">Announcements</h1>
             <p className="text-[12px] text-[#993556] mt-1">Create and manage announcements for your team</p>
@@ -459,7 +459,7 @@ export default function AnnouncementPage() {
           {canCreate ? (
             <button
               onClick={openCreate}
-              className="inline-flex items-center justify-center gap-2 w-full xs:w-auto px-5 py-2.5 min-h-11 rounded-xl text-[13px] font-medium text-white transition-opacity hover:opacity-88 flex-shrink-0"
+              className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-2.5 min-h-11 rounded-xl text-[13px] font-medium text-white transition-opacity hover:opacity-88 flex-shrink-0"
               style={{ background: "#730042" }}
             >
               <IconPlus size={14} />
@@ -467,7 +467,7 @@ export default function AnnouncementPage() {
             </button>
           ) : (
             <div
-              className="inline-flex items-center justify-center gap-2 w-full xs:w-auto px-5 py-2.5 min-h-11 rounded-xl text-[13px] font-medium text-[#993556] border border-[#F4C0D1] opacity-60 flex-shrink-0 cursor-not-allowed select-none"
+              className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-2.5 min-h-11 rounded-xl text-[13px] font-medium text-[#993556] border border-[#F4C0D1] opacity-60 flex-shrink-0 cursor-not-allowed select-none"
               style={{ background: "#fff" }}
               title="You don't have permission to create announcements"
             >
@@ -481,7 +481,7 @@ export default function AnnouncementPage() {
           {!canView && <ViewBlurOverlay />}
 
           <div className={!canView ? "pointer-events-none select-none" : ""} aria-hidden={!canView}>
-            <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-6 sm:mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 mb-6 sm:mb-8">
               {stats.map((s) => (
                 <div key={s.label} className="bg-white rounded-xl border border-[#F4C0D1] p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
                   <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${s.bg}`}>
@@ -544,7 +544,7 @@ export default function AnnouncementPage() {
 
               {!canView ? (
                 <>
-                  <div className="hidden md:block overflow-x-auto">
+                  <div className="hidden lg:block overflow-x-auto">
                     <table className="w-full table-fixed text-sm">
                       <thead>
                         <tr className="border-b border-[#F4C0D1]" style={{ background: "#F9F8F2" }}>
@@ -558,11 +558,11 @@ export default function AnnouncementPage() {
                       <tbody className="divide-y divide-[#FBEAF0]"><SkeletonTableRows /></tbody>
                     </table>
                   </div>
-                  <div className="md:hidden p-4 space-y-3"><SkeletonMobileRows /></div>
+                  <div className="lg:hidden p-4 space-y-3"><SkeletonMobileRows /></div>
                 </>
               ) : isLoading ? (
                 <>
-                  <div className="hidden md:block overflow-x-auto">
+                  <div className="hidden lg:block overflow-x-auto">
                     <table className="w-full min-w-[820px] text-sm">
                       <thead>
                         <tr className="border-b border-[#F4C0D1]" style={{ background: "#F9F8F2" }}>
@@ -577,7 +577,7 @@ export default function AnnouncementPage() {
                       <tbody className="divide-y divide-[#FBEAF0]"><SkeletonTableRows /></tbody>
                     </table>
                   </div>
-                  <div className="md:hidden p-4 space-y-3"><SkeletonMobileRows /></div>
+                  <div className="lg:hidden p-4 space-y-3"><SkeletonMobileRows /></div>
                 </>
               ) : isError ? (
                 <div className="py-14 sm:py-16 text-center px-4">
@@ -599,7 +599,7 @@ export default function AnnouncementPage() {
                 </div>
               ) : (
                 <>
-                  <div className="hidden md:block overflow-x-auto">
+                  <div className="hidden lg:block overflow-x-auto">
                     <table className="w-full min-w-[820px] text-sm">
                       <thead>
                         <tr className="border-b border-[#F4C0D1]" style={{ background: "#F9F8F2" }}>
@@ -680,7 +680,7 @@ export default function AnnouncementPage() {
                     </table>
                   </div>
 
-                  <div className="md:hidden p-4 space-y-3">
+                  <div className="lg:hidden p-4 space-y-3">
                     {announcements.map((item, idx) => (
                       <MobileAnnouncementCard
                         key={item._id}
@@ -768,7 +768,7 @@ export default function AnnouncementPage() {
                   )}
                 </Field>
 
-                <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Field label="Audience">
                     <select name="audience" value={form.audience} onChange={handleChange} className={inputCls}>
                       <option value="all">All</option>
