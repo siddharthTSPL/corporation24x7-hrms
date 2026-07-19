@@ -1,21 +1,6 @@
 import React, { useState } from "react";
 import { useReviewEmployee, useGetUsersUnderManager } from "../../auth/server-state/manager/managgerother/managerother.hook";
 
-const BRAND = {
-  pink: "#8B1A4A",
-  maroon: "#5C0F30",
-  cream: "#F9F8F2",
-  dark: "#1A0010",
-  darkSurface: "#FFFFFF",
-  cardBg: "#F5F0F3",
-  cardBorder: "#E8D5DF",
-  mutedText: "#9B7A8A",
-  pageBackground: "#F2EEF0",
-  textPrimary: "#2D0A1A",
-  accentLight: "#FAF0F5",
-  accentBorder: "#D4A0B8",
-};
-
 function getFullName(m) {
   if (m?.f_name) return `${m.f_name} ${m.l_name ?? ""}`.trim();
   return m?.name ?? "Unknown";
@@ -32,7 +17,7 @@ function getEmail(m) {
 function StarRating({ value, onChange }) {
   const [hovered, setHovered] = useState(0);
   return (
-    <div style={{ display: "flex", gap: 6 }}>
+    <div className="flex gap-1 sm:gap-1.5">
       {[1, 2, 3, 4, 5].map((star) => {
         const filled = star <= (hovered || value);
         return (
@@ -42,17 +27,13 @@ function StarRating({ value, onChange }) {
             onClick={() => onChange(star)}
             onMouseEnter={() => setHovered(star)}
             onMouseLeave={() => setHovered(0)}
-            style={{
-              background: "none", border: "none", cursor: "pointer", padding: 2,
-              transition: "transform 0.15s",
-              transform: filled ? "scale(1.15)" : "scale(1)",
-            }}
+            className={`bg-transparent border-none cursor-pointer p-0.5 transition-transform duration-150 ${filled ? "scale-110" : "scale-100"}`}
           >
-            <svg width="28" height="28" viewBox="0 0 24 24">
+            <svg width="24" height="24" viewBox="0 0 24 24" className="sm:w-7 sm:h-7">
               <polygon
                 points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
-                fill={filled ? BRAND.pink : "transparent"}
-                stroke={filled ? BRAND.pink : BRAND.mutedText}
+                fill={filled ? "#8B1A4A" : "transparent"}
+                stroke={filled ? "#8B1A4A" : "#9B7A8A"}
                 strokeWidth="1.5"
                 strokeLinejoin="round"
               />
@@ -70,71 +51,45 @@ function EmployeeCard({ employee, selected, onClick }) {
     <button
       type="button"
       onClick={() => onClick(employee)}
-      style={{
-        all: "unset",
-        cursor: "pointer",
-        display: "flex",
-        alignItems: "center",
-        gap: 14,
-        padding: "14px 18px",
-        borderRadius: 14,
-        border: `1.5px solid ${isSelected ? BRAND.pink : BRAND.cardBorder}`,
-        background: isSelected
-          ? `linear-gradient(135deg, #F5E8EF 0%, #EDD5E3 100%)`
-          : BRAND.darkSurface,
-        transition: "all 0.2s",
-        boxShadow: isSelected
-          ? `0 0 0 3px ${BRAND.pink}22, 0 4px 24px #00000015`
-          : "0 2px 8px #00000010",
-        position: "relative",
-        overflow: "hidden",
-      }}
+      className={[
+        "w-full text-left cursor-pointer flex items-center gap-3 sm:gap-3.5 py-3 px-3.5 sm:px-[18px] rounded-2xl border relative overflow-hidden transition-all duration-200 min-w-0",
+        isSelected
+          ? "border-[#8B1A4A] bg-gradient-to-br from-[#F5E8EF] to-[#EDD5E3] shadow-[0_0_0_3px_rgba(139,26,74,0.13),0_4px_24px_rgba(0,0,0,0.08)]"
+          : "border-[#E8D5DF] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)]",
+      ].join(" ")}
     >
       {isSelected && (
-        <div style={{
-          position: "absolute", top: 0, left: 0, right: 0, height: 2,
-          background: `linear-gradient(90deg, ${BRAND.maroon}, ${BRAND.pink})`,
-        }} />
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#5C0F30] to-[#8B1A4A]" />
       )}
-      <div style={{
-        width: 44, height: 44, borderRadius: "50%",
-        background: isSelected
-          ? `linear-gradient(135deg, ${BRAND.maroon}, ${BRAND.pink})`
-          : `linear-gradient(135deg, #C9829E, ${BRAND.pink})`,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontFamily: "'Playfair Display', Georgia, serif",
-        fontWeight: 700, fontSize: 15, color: "#FFFFFF", flexShrink: 0,
-        border: `1px solid ${isSelected ? BRAND.pink : BRAND.accentBorder}`,
-      }}>
+      <div
+        className={[
+          "w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center font-bold text-sm sm:text-[15px] text-white shrink-0 border",
+          isSelected ? "bg-gradient-to-br from-[#5C0F30] to-[#8B1A4A] border-[#8B1A4A]" : "bg-gradient-to-br from-[#C9829E] to-[#8B1A4A] border-[#D4A0B8]",
+        ].join(" ")}
+        style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+      >
         {getInitials(employee)}
       </div>
-      <div style={{ textAlign: "left", minWidth: 0 }}>
-        <p style={{
-          margin: 0,
-          fontFamily: "'Playfair Display', Georgia, serif",
-          fontSize: 15, fontWeight: 600, color: BRAND.textPrimary,
-          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-        }}>
+      <div className="text-left min-w-0 flex-1">
+        <p
+          className="m-0 text-sm sm:text-[15px] font-semibold text-[#2D0A1A] whitespace-nowrap overflow-hidden text-ellipsis"
+          style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+        >
           {getFullName(employee)}
         </p>
-        <p style={{ margin: "2px 0 0", fontSize: 12, color: BRAND.mutedText, letterSpacing: "0.03em" }}>
+        <p className="mt-0.5 mb-0 text-[11px] sm:text-xs text-[#9B7A8A] tracking-wide truncate">
           {getEmail(employee)}
         </p>
         {employee.designation && (
-          <p style={{ margin: "2px 0 0", fontSize: 11, color: BRAND.pink, textTransform: "capitalize" }}>
+          <p className="mt-0.5 mb-0 text-[10px] sm:text-[11px] text-[#8B1A4A] capitalize truncate">
             {employee.designation}{employee.department ? ` · ${employee.department}` : ""}
           </p>
         )}
       </div>
       {isSelected && (
-        <div style={{
-          marginLeft: "auto", width: 20, height: 20, borderRadius: "50%",
-          background: BRAND.pink, display: "flex", alignItems: "center",
-          justifyContent: "center", flexShrink: 0,
-        }}>
+        <div className="ml-auto w-5 h-5 rounded-full bg-[#8B1A4A] flex items-center justify-center shrink-0">
           <svg width="11" height="11" viewBox="0 0 12 12">
-            <polyline points="2,6 5,9 10,3" fill="none" stroke="white"
-              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <polyline points="2,6 5,9 10,3" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
       )}
@@ -145,10 +100,8 @@ function EmployeeCard({ employee, selected, onClick }) {
 const ratingLabels = { 1: "Poor", 2: "Fair", 3: "Good", 4: "Very Good", 5: "Excellent" };
 
 export default function ReviewEmployee() {
-  // ✅ now using the fixed hook (useQuery internally)
   const { data, isLoading, isError, error, refetch } = useGetUsersUnderManager();
 
-  // backend sends: res.status(200).json(users)  →  plain array
   const employees = Array.isArray(data) ? data : data?.users ?? data?.data ?? [];
 
   const { mutate: submitReview, isPending, error: submitError } = useReviewEmployee();
@@ -183,167 +136,98 @@ export default function ReviewEmployee() {
   };
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: BRAND.pageBackground,
-      fontFamily: "'Inter', 'Helvetica Neue', sans-serif",
-      padding: "48px 24px",
-      display: "flex",
-      justifyContent: "center",
-    }}>
+    <div className="min-h-screen bg-[#F2EEF0] font-['Inter','Helvetica_Neue',sans-serif] px-3 py-8 sm:px-6 sm:py-10 md:px-6 md:py-12 flex justify-center overflow-x-hidden">
       <link
         href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500&display=swap"
         rel="stylesheet"
       />
 
-      <div style={{ width: "100%", maxWidth: 960 }}>
+      <div className="w-full max-w-[960px] min-w-0">
 
-        {/* Header */}
-        <div style={{ marginBottom: 48, textAlign: "center" }}>
-          <div style={{
-            display: "inline-block", padding: "4px 16px",
-            border: `1px solid ${BRAND.accentBorder}`, borderRadius: 20,
-            fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase",
-            color: BRAND.pink, marginBottom: 16,
-            background: BRAND.accentLight,
-          }}>
+        <div className="mb-8 sm:mb-12 text-center px-1">
+          <div className="inline-block px-3 py-1 sm:px-4 border border-[#D4A0B8] rounded-full text-[10px] sm:text-[11px] tracking-[0.12em] uppercase text-[#8B1A4A] mb-4 bg-[#FAF0F5]">
             Performance Review
           </div>
-          <h1 style={{
-            fontFamily: "'Playfair Display', Georgia, serif",
-            fontSize: "clamp(28px, 5vw, 44px)", fontWeight: 700,
-            color: BRAND.textPrimary, margin: "0 0 12px", letterSpacing: "-0.01em",
-          }}>
+          <h1
+            className="text-[26px] sm:text-4xl md:text-[44px] font-bold text-[#2D0A1A] m-0 mb-3 tracking-[-0.01em] leading-tight"
+            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+          >
             Review an Employee
           </h1>
-          <p style={{
-            fontSize: 15, color: BRAND.mutedText, margin: 0,
-            maxWidth: 440, marginLeft: "auto", marginRight: "auto", lineHeight: 1.6,
-          }}>
+          <p className="text-sm sm:text-[15px] text-[#9B7A8A] m-0 max-w-[440px] mx-auto leading-relaxed">
             Evaluate your team members and help them grow with honest, constructive feedback.
           </p>
         </div>
 
-        {/* Success toast */}
         {submitted && (
-          <div style={{
-            background: `linear-gradient(135deg, #EDD5E3, #F5E8EF)`,
-            border: `1px solid ${BRAND.pink}55`, borderRadius: 12,
-            padding: "14px 20px", marginBottom: 28,
-            display: "flex", alignItems: "center", gap: 12,
-            color: BRAND.textPrimary, fontSize: 14,
-          }}>
-            <div style={{
-              width: 22, height: 22, borderRadius: "50%", background: BRAND.pink,
-              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            }}>
+          <div className="bg-gradient-to-br from-[#EDD5E3] to-[#F5E8EF] border border-[#8B1A4A]/35 rounded-xl px-4 py-3.5 sm:px-5 mb-6 sm:mb-7 flex items-center gap-3 text-[#2D0A1A] text-[13px] sm:text-sm">
+            <div className="w-[22px] h-[22px] rounded-full bg-[#8B1A4A] flex items-center justify-center shrink-0">
               <svg width="12" height="12" viewBox="0 0 12 12">
-                <polyline points="2,6 5,9 10,3" fill="none" stroke="white"
-                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <polyline points="2,6 5,9 10,3" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
             Review submitted successfully. Thank you for your feedback.
           </div>
         )}
 
-        {/* Submit error */}
         {submitError && (
-          <div style={{
-            background: "#FFF0F0", border: "1px solid #cc3355", borderRadius: 12,
-            padding: "14px 20px", marginBottom: 28, color: "#8B1A2A", fontSize: 14,
-          }}>
+          <div className="bg-[#FFF0F0] border border-[#cc3355] rounded-xl px-4 py-3.5 sm:px-5 mb-6 sm:mb-7 text-[#8B1A2A] text-[13px] sm:text-sm break-words">
             {submitError?.response?.data?.message ?? "Something went wrong. Please try again."}
           </div>
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1.1fr", gap: 28, alignItems: "start" }}>
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.1fr] gap-5 sm:gap-6 lg:gap-7 items-start">
 
-          {/* ── Left: Employee List ───────────────────────────────────── */}
-          <div style={{
-            background: BRAND.darkSurface, borderRadius: 20,
-            border: `1px solid ${BRAND.cardBorder}`, overflow: "hidden",
-            boxShadow: "0 2px 16px #00000010",
-          }}>
-            <div style={{ padding: "20px 20px 14px", borderBottom: `1px solid ${BRAND.cardBorder}` }}>
-              <div style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                marginBottom: employees.length > 0 ? 12 : 0,
-              }}>
-                <p style={{
-                  margin: 0, fontSize: 11, letterSpacing: "0.1em",
-                  textTransform: "uppercase", color: BRAND.mutedText, fontWeight: 500,
-                }}>
+          <div className="bg-white rounded-[20px] border border-[#E8D5DF] overflow-hidden shadow-[0_2px_16px_rgba(0,0,0,0.06)] min-w-0">
+            <div className="px-4 sm:px-5 pt-4 sm:pt-5 pb-3.5 border-b border-[#E8D5DF]">
+              <div className={`flex justify-between items-center ${employees.length > 0 ? "mb-3" : ""}`}>
+                <p className="m-0 text-[11px] tracking-[0.1em] uppercase text-[#9B7A8A] font-medium">
                   Your Team
                 </p>
                 {employees.length > 0 && (
-                  <span style={{
-                    fontSize: 11, color: BRAND.pink,
-                    background: `${BRAND.pink}15`, padding: "2px 10px", borderRadius: 20,
-                  }}>
+                  <span className="text-[11px] text-[#8B1A4A] bg-[#8B1A4A]/[0.08] px-2.5 py-0.5 rounded-full whitespace-nowrap">
                     {employees.length} members
                   </span>
                 )}
               </div>
 
-              {/* Search — only appears when > 3 employees */}
               {employees.length > 3 && (
-                <div style={{ position: "relative" }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{
-                    position: "absolute", left: 10, top: "50%",
-                    transform: "translateY(-50%)", pointerEvents: "none",
-                  }}>
-                    <circle cx="11" cy="11" r="8" stroke={BRAND.mutedText} strokeWidth="2" />
-                    <path d="M21 21l-4.35-4.35" stroke={BRAND.mutedText} strokeWidth="2" strokeLinecap="round" />
+                <div className="relative">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <circle cx="11" cy="11" r="8" stroke="#9B7A8A" strokeWidth="2" />
+                    <path d="M21 21l-4.35-4.35" stroke="#9B7A8A" strokeWidth="2" strokeLinecap="round" />
                   </svg>
                   <input
                     type="text"
                     placeholder="Search employees…"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    style={{
-                      width: "100%", boxSizing: "border-box",
-                      background: BRAND.cardBg, border: `1px solid ${BRAND.cardBorder}`,
-                      borderRadius: 10, padding: "8px 12px 8px 32px",
-                      color: BRAND.textPrimary, fontSize: 13, outline: "none",
-                      fontFamily: "'Inter', sans-serif",
-                    }}
+                    className="w-full box-border bg-[#F5F0F3] border border-[#E8D5DF] rounded-[10px] py-2 pl-8 pr-3 text-[#2D0A1A] text-[13px] outline-none font-['Inter',sans-serif] focus:border-[#8B1A4A]"
                   />
                 </div>
               )}
             </div>
 
-            <div style={{
-              padding: 14, display: "flex", flexDirection: "column", gap: 8,
-              maxHeight: 440, overflowY: "auto",
-            }}>
+            <div className="p-3.5 flex flex-col gap-2 max-h-[300px] sm:max-h-[380px] lg:max-h-[440px] overflow-y-auto">
               {isLoading && (
-                <div style={{
-                  color: BRAND.mutedText, fontSize: 14, padding: "16px 8px",
-                  display: "flex", alignItems: "center", gap: 8,
-                }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                    style={{ animation: "spin 1s linear infinite" }}>
-                    <circle cx="12" cy="12" r="10" stroke={BRAND.mutedText} strokeWidth="2" opacity="0.3" />
-                    <path d="M12 2a10 10 0 0 1 10 10" stroke={BRAND.mutedText} strokeWidth="2" strokeLinecap="round" />
+                <div className="text-[#9B7A8A] text-sm py-4 px-2 flex items-center gap-2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="animate-spin">
+                    <circle cx="12" cy="12" r="10" stroke="#9B7A8A" strokeWidth="2" opacity="0.3" />
+                    <path d="M12 2a10 10 0 0 1 10 10" stroke="#9B7A8A" strokeWidth="2" strokeLinecap="round" />
                   </svg>
                   Loading your team…
                 </div>
               )}
 
               {isError && (
-                <div style={{ padding: "12px 8px" }}>
-                  <div style={{ color: "#8B1A2A", fontSize: 13, marginBottom: 6 }}>
+                <div className="py-3 px-2">
+                  <div className="text-[#8B1A2A] text-[13px] mb-1.5 break-words">
                     {error?.response?.data?.message ?? error?.message ?? "Failed to load employees."}
                   </div>
                   <button
                     type="button"
                     onClick={() => refetch()}
-                    style={{
-                      all: "unset", cursor: "pointer", fontSize: 12,
-                      color: BRAND.pink, border: `1px solid ${BRAND.pink}55`,
-                      borderRadius: 8, padding: "6px 14px",
-                      background: BRAND.accentLight,
-                    }}
+                    className="cursor-pointer text-xs text-[#8B1A4A] border border-[#8B1A4A]/35 rounded-lg py-1.5 px-3.5 bg-[#FAF0F5]"
                   >
                     Retry
                   </button>
@@ -355,135 +239,93 @@ export default function ReviewEmployee() {
               ))}
 
               {!isLoading && !isError && employees.length > 0 && filtered.length === 0 && (
-                <div style={{ color: BRAND.mutedText, fontSize: 13, padding: "12px 8px" }}>
+                <div className="text-[#9B7A8A] text-[13px] py-3 px-2 break-words">
                   No results for "{search}"
                 </div>
               )}
 
               {!isLoading && !isError && employees.length === 0 && (
-                <div style={{ color: BRAND.mutedText, fontSize: 14, padding: "16px 8px" }}>
+                <div className="text-[#9B7A8A] text-sm py-4 px-2">
                   No employees found under your management.
                 </div>
               )}
             </div>
           </div>
 
-          {/* ── Right: Review Form ────────────────────────────────────── */}
-          <div style={{
-            background: BRAND.darkSurface, borderRadius: 20,
-            border: `1px solid ${BRAND.cardBorder}`, overflow: "hidden",
-            boxShadow: "0 2px 16px #00000010",
-          }}>
-            <div style={{
-              padding: "20px 24px 14px", borderBottom: `1px solid ${BRAND.cardBorder}`,
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-            }}>
-              <p style={{
-                margin: 0, fontSize: 11, letterSpacing: "0.1em",
-                textTransform: "uppercase", color: BRAND.mutedText, fontWeight: 500,
-              }}>
+          <div className="bg-white rounded-[20px] border border-[#E8D5DF] overflow-hidden shadow-[0_2px_16px_rgba(0,0,0,0.06)] min-w-0">
+            <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3.5 border-b border-[#E8D5DF] flex justify-between items-center gap-2 flex-wrap">
+              <p className="m-0 text-[11px] tracking-[0.1em] uppercase text-[#9B7A8A] font-medium">
                 Your Review
               </p>
               {selected && (
-                <span style={{
-                  fontSize: 13, color: BRAND.pink,
-                  fontFamily: "'Playfair Display', Georgia, serif", fontStyle: "italic",
-                }}>
+                <span
+                  className="text-[13px] text-[#8B1A4A] italic truncate max-w-[60%]"
+                  style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+                >
                   {getFullName(selected)}
                 </span>
               )}
             </div>
 
-            <div style={{ padding: "24px 24px 28px" }}>
+            <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-6 sm:pb-7">
               {!selected ? (
-                <div style={{
-                  textAlign: "center", padding: "36px 20px",
-                  color: BRAND.mutedText, fontSize: 14, lineHeight: 1.6,
-                }}>
-                  <div style={{
-                    width: 56, height: 56, borderRadius: "50%",
-                    background: BRAND.accentLight, border: `1px dashed ${BRAND.accentBorder}`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    margin: "0 auto 16px",
-                  }}>
+                <div className="text-center py-8 sm:py-9 px-4 sm:px-5 text-[#9B7A8A] text-sm leading-relaxed">
+                  <div className="w-14 h-14 rounded-full bg-[#FAF0F5] border border-dashed border-[#D4A0B8] flex items-center justify-center mx-auto mb-4">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
                       <path
                         d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"
-                        stroke={BRAND.mutedText} strokeWidth="1.5"
-                        strokeLinecap="round" strokeLinejoin="round"
+                        stroke="#9B7A8A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
                       />
                     </svg>
                   </div>
                   Select a team member from the left to begin your review.
                 </div>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+                <div className="flex flex-col gap-6 sm:gap-7">
 
-                  {/* Selected employee pill */}
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 12,
-                    padding: "12px 14px", background: BRAND.accentLight,
-                    borderRadius: 12, border: `1px solid ${BRAND.accentBorder}`,
-                  }}>
-                    <div style={{
-                      width: 38, height: 38, borderRadius: "50%",
-                      background: `linear-gradient(135deg, ${BRAND.maroon}, ${BRAND.pink})`,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 13, fontWeight: 700, color: "#FFFFFF",
-                      fontFamily: "'Playfair Display', Georgia, serif", flexShrink: 0,
-                    }}>
+                  <div className="flex items-center gap-3 py-3 px-3.5 bg-[#FAF0F5] rounded-xl border border-[#D4A0B8] min-w-0">
+                    <div
+                      className="w-9 h-9 sm:w-[38px] sm:h-[38px] rounded-full bg-gradient-to-br from-[#5C0F30] to-[#8B1A4A] flex items-center justify-center text-[13px] font-bold text-white shrink-0"
+                      style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+                    >
                       {getInitials(selected)}
                     </div>
-                    <div>
-                      <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: BRAND.textPrimary }}>
+                    <div className="min-w-0">
+                      <p className="m-0 text-sm font-medium text-[#2D0A1A] truncate">
                         {getFullName(selected)}
                       </p>
-                      <p style={{ margin: 0, fontSize: 11, color: BRAND.mutedText, textTransform: "capitalize" }}>
+                      <p className="m-0 text-[11px] text-[#9B7A8A] capitalize truncate">
                         {selected.designation}{selected.department ? ` · ${selected.department}` : ""}
                       </p>
                     </div>
                   </div>
 
-                  {/* Rating */}
                   <div>
-                    <label style={{
-                      display: "block", fontSize: 12, letterSpacing: "0.08em",
-                      textTransform: "uppercase", color: BRAND.mutedText,
-                      marginBottom: 12, fontWeight: 500,
-                    }}>
+                    <label className="block text-xs tracking-[0.08em] uppercase text-[#9B7A8A] mb-3 font-medium">
                       Rating
                     </label>
-                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                    <div className="flex flex-wrap items-center gap-3 sm:gap-4">
                       <StarRating value={rating} onChange={setRating} />
                       {rating > 0 && (
-                        <span style={{
-                          fontSize: 13, color: BRAND.pink,
-                          fontFamily: "'Playfair Display', Georgia, serif", fontStyle: "italic",
-                        }}>
+                        <span className="text-[13px] text-[#8B1A4A] italic" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
                           {ratingLabels[rating]}
                         </span>
                       )}
                     </div>
                     {rating > 0 && (
-                      <div style={{ display: "flex", gap: 4, marginTop: 12 }}>
+                      <div className="flex gap-1 mt-3">
                         {[1, 2, 3, 4, 5].map((i) => (
-                          <div key={i} style={{
-                            flex: 1, height: 3, borderRadius: 4,
-                            background: i <= rating ? BRAND.pink : BRAND.cardBorder,
-                            transition: "background 0.2s",
-                          }} />
+                          <div
+                            key={i}
+                            className={`flex-1 h-[3px] rounded transition-colors duration-200 ${i <= rating ? "bg-[#8B1A4A]" : "bg-[#E8D5DF]"}`}
+                          />
                         ))}
                       </div>
                     )}
                   </div>
 
-                  {/* Comment */}
                   <div>
-                    <label style={{
-                      display: "block", fontSize: 12, letterSpacing: "0.08em",
-                      textTransform: "uppercase", color: BRAND.mutedText,
-                      marginBottom: 12, fontWeight: 500,
-                    }}>
+                    <label className="block text-xs tracking-[0.08em] uppercase text-[#9B7A8A] mb-3 font-medium">
                       Feedback
                     </label>
                     <textarea
@@ -491,51 +333,29 @@ export default function ReviewEmployee() {
                       value={comment}
                       onChange={(e) => setComment(e.target.value)}
                       placeholder="Describe this employee's performance, collaboration, reliability, and areas for growth…"
-                      style={{
-                        width: "100%",
-                        background: BRAND.cardBg,
-                        border: `1px solid ${comment.length > 0 ? BRAND.pink + "66" : BRAND.cardBorder}`,
-                        borderRadius: 12, padding: "14px 16px",
-                        color: BRAND.textPrimary, fontSize: 14, lineHeight: 1.6,
-                        resize: "vertical", outline: "none",
-                        fontFamily: "'Inter', sans-serif",
-                        boxSizing: "border-box", transition: "border-color 0.2s",
-                      }}
+                      className={`w-full box-border bg-[#F5F0F3] rounded-xl py-3.5 px-4 text-[#2D0A1A] text-sm leading-relaxed resize-y outline-none font-['Inter',sans-serif] transition-colors duration-200 border ${comment.length > 0 ? "border-[#8B1A4A]/40" : "border-[#E8D5DF]"} focus:border-[#8B1A4A]`}
                     />
-                    <div style={{
-                      marginTop: 6, fontSize: 11,
-                      color: comment.trim().length < 10 ? BRAND.mutedText : BRAND.pink,
-                      textAlign: "right", transition: "color 0.2s",
-                    }}>
+                    <div className={`mt-1.5 text-[11px] text-right transition-colors duration-200 ${comment.trim().length < 10 ? "text-[#9B7A8A]" : "text-[#8B1A4A]"}`}>
                       {comment.trim().length} / 10 min chars
                     </div>
                   </div>
 
-                  <div style={{ height: 1, background: BRAND.cardBorder }} />
+                  <div className="h-px bg-[#E8D5DF]" />
 
-                  {/* Submit */}
                   <button
                     type="button"
                     onClick={handleSubmit}
                     disabled={!canSubmit}
-                    style={{
-                      all: "unset",
-                      cursor: canSubmit ? "pointer" : "not-allowed",
-                      display: "flex", alignItems: "center",
-                      justifyContent: "center", gap: 10,
-                      padding: "14px 28px", borderRadius: 12,
-                      background: canSubmit
-                        ? `linear-gradient(135deg, ${BRAND.maroon} 0%, ${BRAND.pink} 100%)`
-                        : BRAND.cardBg,
-                      color: canSubmit ? "#FFFFFF" : BRAND.mutedText,
-                      fontSize: 14, fontWeight: 500, letterSpacing: "0.02em",
-                      transition: "all 0.2s", opacity: canSubmit ? 1 : 0.6,
-                    }}
+                    className={[
+                      "w-full sm:w-auto self-stretch sm:self-auto flex items-center justify-center gap-2.5 py-3.5 px-7 rounded-xl text-sm font-medium tracking-wide transition-all duration-200",
+                      canSubmit
+                        ? "cursor-pointer bg-gradient-to-br from-[#5C0F30] to-[#8B1A4A] text-white opacity-100 hover:brightness-105"
+                        : "cursor-not-allowed bg-[#F5F0F3] text-[#9B7A8A] opacity-60",
+                    ].join(" ")}
                   >
                     {isPending ? (
                       <>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                          style={{ animation: "spin 1s linear infinite" }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="animate-spin">
                           <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" opacity="0.3" />
                           <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                         </svg>
@@ -545,8 +365,7 @@ export default function ReviewEmployee() {
                       <>
                         Submit Review
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                          <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor"
-                            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       </>
                     )}
@@ -559,15 +378,9 @@ export default function ReviewEmployee() {
       </div>
 
       <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        textarea::placeholder { color: ${BRAND.mutedText}; }
-        textarea:focus { border-color: ${BRAND.pink} !important; }
-        input::placeholder { color: ${BRAND.mutedText}; }
-        input:focus { border-color: ${BRAND.pink} !important; outline: none; }
-        button:not([disabled]):hover { filter: brightness(1.05); }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: ${BRAND.cardBorder}; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #E8D5DF; border-radius: 4px; }
       `}</style>
     </div>
   );

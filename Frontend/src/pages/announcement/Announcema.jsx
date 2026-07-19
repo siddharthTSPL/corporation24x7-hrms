@@ -6,25 +6,19 @@ import {
 } from "../../auth/server-state/manager/managerannounce/managerannounce.hook";
 import { usePermissionStore } from "../../auth/store/permission/permissionStore";
 
-const C = {
-  deep:    "#730042",
-  mid:     "#CD166E",
-  cream:   "#F9F8F2",
-  white:   "#ffffff",
-  deepA10: "rgba(115,0,66,0.10)",
-  deepA15: "rgba(115,0,66,0.15)",
-  deepA25: "rgba(115,0,66,0.25)",
-  deepA45: "rgba(115,0,66,0.45)",
-  deepA55: "rgba(115,0,66,0.55)",
-  midA10:  "rgba(205,22,110,0.10)",
-  midA20:  "rgba(205,22,110,0.20)",
-  midA25:  "rgba(205,22,110,0.25)",
-};
+/**
+ * Color reference (used only as a guide for the arbitrary Tailwind values below):
+ * deep    #730042
+ * mid     #CD166E
+ * cream   #F9F8F2
+ * white   #ffffff
+ * Opacity variants are expressed with Tailwind's color/opacity modifier, e.g. bg-[#730042]/10
+ */
 
 const PERMS = {
-  view:   "announcements.can_view_announcements",
+  view: "announcements.can_view_announcements",
   create: "announcements.can_create_announcement",
-  edit:   "announcements.can_edit_announcement",
+  edit: "announcements.can_edit_announcement",
   delete: "announcements.can_delete_announcement",
 };
 
@@ -33,25 +27,22 @@ const FontInjector = () => (
     * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
     @keyframes blink  { 0%,100%{opacity:1} 50%{opacity:.25} }
     @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:none} }
-    @keyframes spin   { to{transform:rotate(360deg)} }
-    .ann-card-hover:hover { border-color: rgba(205,22,110,0.45) !important; transform: translateY(-3px); }
-    .read-more-btn:hover  { color: #730042 !important; }
-    .filter-btn:hover     { background: rgba(115,0,66,0.08) !important; }
-    .icon-btn:hover        { filter: brightness(0.96); }
-    .create-btn:hover:not(:disabled) { filter: brightness(0.93); }
   `}</style>
 );
 
 const fmtDate = (d) => {
   if (!d) return "";
   return new Date(d).toLocaleDateString("en-IN", {
-    day: "2-digit", month: "long", year: "numeric",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
   });
 };
 const fmtTime = (d) => {
   if (!d) return "";
   return new Date(d).toLocaleTimeString("en-IN", {
-    hour: "2-digit", minute: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 };
 const excerpt = (text, len = 130) => {
@@ -59,22 +50,30 @@ const excerpt = (text, len = 130) => {
   return text.length > len ? text.slice(0, len).trimEnd() + "…" : text;
 };
 
+// Static, fully-written class strings (never built via runtime concatenation)
+// so Tailwind's scanner can pick them all up.
 const PRIORITY_STYLES = {
-  high:   { label: "Urgent",  bg: C.midA10,  border: C.midA25,  color: C.deep },
-  medium: { label: "Info",    bg: C.deepA10, border: C.deepA15, color: C.deep },
-  low:    { label: "General", bg: "rgba(249,248,242,0.9)", border: C.deepA15, color: C.deep },
+  high: {
+    label: "Urgent",
+    className: "bg-[#CD166E]/10 border-[#CD166E]/25 text-[#730042]",
+  },
+  medium: {
+    label: "Info",
+    className: "bg-[#730042]/10 border-[#730042]/15 text-[#730042]",
+  },
+  low: {
+    label: "General",
+    className: "bg-[#F9F8F2]/90 border-[#730042]/15 text-[#730042]",
+  },
 };
 
 const PriorityPill = ({ priority }) => {
-  const s = PRIORITY_STYLES[(priority || "low").toLowerCase()] || PRIORITY_STYLES.low;
+  const s =
+    PRIORITY_STYLES[(priority || "low").toLowerCase()] || PRIORITY_STYLES.low;
   return (
-    <span style={{
-      display: "inline-flex", alignItems: "center",
-      padding: "3px 10px", borderRadius: 99,
-      fontSize: 10, fontWeight: 500, letterSpacing: ".1em",
-      textTransform: "uppercase", fontFamily: "'Segoe UI', sans-serif",
-      background: s.bg, border: `1px solid ${s.border}`, color: s.color,
-    }}>
+    <span
+      className={`inline-flex items-center rounded-full border px-2.5 py-[3px] text-[10px] font-medium uppercase tracking-[.1em] font-sans ${s.className}`}
+    >
       {s.label}
     </span>
   );
@@ -83,57 +82,30 @@ const PriorityPill = ({ priority }) => {
 const AudiencePill = ({ audience }) => {
   const isManagers = (audience || "").toLowerCase() === "managers";
   return (
-    <span style={{
-      display: "inline-flex", alignItems: "center",
-      padding: "3px 10px", borderRadius: 99,
-      fontSize: 10, fontWeight: 500, letterSpacing: ".1em",
-      textTransform: "uppercase", fontFamily: "'Segoe UI', sans-serif",
-      background: isManagers ? C.midA10 : C.deepA10,
-      border: `1px solid ${isManagers ? C.midA25 : C.deepA15}`,
-      color: C.deep,
-    }}>
+    <span
+      className={`inline-flex items-center rounded-full border px-2.5 py-[3px] text-[10px] font-medium uppercase tracking-[.1em] font-sans text-[#730042] ${
+        isManagers
+          ? "bg-[#CD166E]/10 border-[#CD166E]/25"
+          : "bg-[#730042]/10 border-[#730042]/15"
+      }`}
+    >
       {isManagers ? "Managers" : "All Staff"}
     </span>
   );
 };
 
-const iconBtnStyle = {
-  display: "inline-flex", alignItems: "center", justifyContent: "center",
-  width: 28, height: 28, borderRadius: 8, border: "none", cursor: "pointer",
-  background: C.deepA10, color: C.deep, flexShrink: 0,
-};
-
-const lockBtnStyle = {
-  ...iconBtnStyle,
-  background: C.deepA10, color: C.deepA45, cursor: "not-allowed",
-};
-
-const actionBtnStyle = {
-  flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
-  gap: 6, padding: "10px 16px", borderRadius: 10, border: "none",
-  fontSize: 12.5, fontWeight: 500, fontFamily: "'Segoe UI', sans-serif",
-};
-
 const AccessDenied = () => (
-  <div style={{
-    minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-    background: C.cream, fontFamily: "'Segoe UI', sans-serif", padding: 24,
-  }}>
-    <div style={{ textAlign: "center", maxWidth: 360 }}>
-      <div style={{
-        width: 84, height: 84, borderRadius: "50%", background: C.deepA10,
-        display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 22px",
-      }}>
-        <FaLock size={30} color={C.deep} />
+  <div className="min-h-screen flex items-center justify-center bg-[#F9F8F2] font-sans px-4 sm:px-6">
+    <div className="text-center max-w-[360px]">
+      <div className="w-[84px] h-[84px] rounded-full bg-[#730042]/10 flex items-center justify-center mx-auto mb-5">
+        <FaLock size={30} className="text-[#730042]" />
       </div>
-      <h2 style={{
-        fontSize: "clamp(22px,5vw,28px)", fontWeight: 600, color: C.deep,
-        margin: "0 0 8px", fontFamily: "'Segoe UI', sans-serif",
-      }}>
+      <h2 className="text-[clamp(22px,5vw,28px)] font-semibold text-[#730042] mb-2 font-sans">
         Access Restricted
       </h2>
-      <p style={{ fontSize: 14, color: C.deepA55, lineHeight: 1.7, margin: 0 }}>
-        You don't have permission to use announcements. Contact your admin to request access.
+      <p className="text-sm text-[#730042]/55 leading-relaxed m-0">
+        You don't have permission to use announcements. Contact your admin to
+        request access.
       </p>
     </div>
   </div>
@@ -146,141 +118,120 @@ const DetailModal = ({ id, onClose, canEdit, canDelete, onEdit, onDelete }) => {
   return (
     <div
       onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{
-        position: "fixed", inset: 0, zIndex: 9999,
-        background: "rgba(115,0,66,0.18)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: 20, backdropFilter: "blur(4px)",
-      }}
+      className="fixed inset-0 z-[9999] bg-[#730042]/[0.18] flex items-center justify-center p-3 sm:p-5 backdrop-blur-[4px]"
     >
-      <div style={{
-        background: C.cream, borderRadius: 20,
-        border: `.5px solid ${C.midA25}`,
-        width: "100%", maxWidth: 600,
-        maxHeight: "88vh", overflowY: "auto",
-        fontFamily: "'Segoe UI', sans-serif",
-        boxShadow: "0 24px 48px rgba(115,0,66,0.12)",
-      }}>
-        <div style={{
-          background: C.white, padding: "18px 24px",
-          borderBottom: `.5px solid ${C.deepA10}`,
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          borderRadius: "20px 20px 0 0",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: 9,
-              background: C.midA10, border: `.5px solid ${C.midA25}`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
-                stroke={C.mid} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+      <div className="bg-[#F9F8F2] rounded-[20px] border-[.5px] border-[#CD166E]/25 w-full max-w-[600px] max-h-[90vh] sm:max-h-[88vh] overflow-y-auto font-sans shadow-[0_24px_48px_rgba(115,0,66,0.12)]">
+        <div className="bg-white px-4 py-4 sm:px-6 sm:py-[18px] border-b-[.5px] border-[#730042]/10 flex items-center justify-between rounded-t-[20px] sticky top-0 z-10">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-[9px] bg-[#CD166E]/10 border-[.5px] border-[#CD166E]/25 flex items-center justify-center">
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#CD166E"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
               </svg>
             </div>
-            <span style={{
-              fontSize: 11, fontWeight: 500, letterSpacing: ".14em",
-              textTransform: "uppercase", color: C.deep,
-            }}>
+            <span className="text-[11px] font-medium tracking-[.14em] uppercase text-[#730042]">
               Announcement detail
             </span>
           </div>
           <button
             onClick={onClose}
-            style={{
-              width: 30, height: 30, borderRadius: 8,
-              background: C.deepA10, border: "none", cursor: "pointer",
-              color: C.deep, fontSize: 16, display: "flex",
-              alignItems: "center", justifyContent: "center",
-            }}
-          >✕</button>
+            className="w-[30px] h-[30px] rounded-lg bg-[#730042]/10 border-none cursor-pointer text-[#730042] text-base flex items-center justify-center"
+          >
+            ✕
+          </button>
         </div>
 
-        <div style={{ padding: "28px clamp(18px,4vw,28px) 32px" }}>
+        <div className="px-4 pt-6 pb-8 sm:px-7 sm:pt-7 sm:pb-8">
           {isLoading ? (
-            <div style={{ textAlign: "center", padding: "48px 0" }}>
-              <div style={{
-                width: 36, height: 36,
-                border: `3px solid ${C.deepA10}`,
-                borderTopColor: C.mid, borderRadius: "50%",
-                animation: "spin 0.8s linear infinite",
-                margin: "0 auto 12px",
-              }} />
-              <p style={{ color: C.deepA45, fontSize: 13, margin: 0 }}>Loading…</p>
+            <div className="text-center py-12">
+              <div className="w-9 h-9 border-[3px] border-[#730042]/10 border-t-[#CD166E] rounded-full animate-spin mx-auto mb-3" />
+              <p className="text-[#730042]/45 text-[13px] m-0">Loading…</p>
             </div>
           ) : error || !ann ? (
-            <p style={{ color: C.deepA45, textAlign: "center", padding: "32px 0" }}>
+            <p className="text-[#730042]/45 text-center py-8">
               Announcement not found.
             </p>
           ) : (
             <>
-              <div style={{
-                display: "flex", alignItems: "center",
-                gap: 10, flexWrap: "wrap", marginBottom: 16,
-              }}>
+              <div className="flex items-center gap-2.5 flex-wrap mb-4">
                 {ann.priority && <PriorityPill priority={ann.priority} />}
                 {ann.audience && <AudiencePill audience={ann.audience} />}
-                <span style={{ marginLeft: "auto", fontSize: 11, color: C.deepA45 }}>
+                <span className="ml-auto text-[11px] text-[#730042]/45">
                   {fmtDate(ann.createdAt)} · {fmtTime(ann.createdAt)}
                 </span>
               </div>
 
-              <h2 style={{
-                fontFamily: "'Segoe UI', sans-serif",
-                fontSize: "clamp(20px,5vw,28px)", fontWeight: 600, color: C.deep,
-                lineHeight: 1.3, margin: 0, letterSpacing: "-0.3px",
-              }}>
+              <h2 className="font-sans text-[clamp(20px,5vw,28px)] font-semibold text-[#730042] leading-tight m-0 tracking-[-0.3px]">
                 {ann.title}
               </h2>
 
-              <div style={{ height: .5, background: C.midA20, margin: "18px 0 22px" }} />
+              <div className="h-[.5px] bg-[#CD166E]/20 my-[18px]" />
 
-              <p style={{ fontSize: 15, color: C.deepA55, lineHeight: 1.85, margin: 0 }}>
-                {ann.body || ann.content || ann.message || ann.description || "No content available."}
+              <p className="text-[15px] text-[#730042]/55 leading-[1.85] m-0">
+                {ann.body ||
+                  ann.content ||
+                  ann.message ||
+                  ann.description ||
+                  "No content available."}
               </p>
 
               {ann.expiresAt && (
-                <div style={{
-                  marginTop: 20, padding: "12px 16px",
-                  background: C.deepA10, borderRadius: 10,
-                  border: `.5px solid ${C.deepA15}`,
-                  display: "flex", alignItems: "center", gap: 8,
-                }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                    stroke={C.deep} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+                <div className="mt-5 px-4 py-3 bg-[#730042]/10 rounded-[10px] border-[.5px] border-[#730042]/15 flex items-center gap-2">
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#730042"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 6v6l4 2" />
                   </svg>
-                  <span style={{ fontSize: 12, color: C.deep }}>
+                  <span className="text-xs text-[#730042]">
                     Expires {fmtDate(ann.expiresAt)}
                   </span>
                 </div>
               )}
 
-              <div style={{
-                display: "flex", flexWrap: "wrap", gap: 10,
-                marginTop: 24, paddingTop: 20, borderTop: `.5px solid ${C.deepA10}`,
-              }}>
+              <div className="flex flex-wrap gap-2.5 mt-6 pt-5 border-t-[.5px] border-[#730042]/10">
                 {canEdit ? (
                   <button
                     onClick={() => onEdit(ann)}
-                    style={{ ...actionBtnStyle, background: C.deep, color: C.white, cursor: "pointer" }}
+                    className="flex-1 min-w-[120px] flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-[10px] border-none text-[12.5px] font-medium font-sans bg-[#730042] text-white cursor-pointer hover:brightness-95"
                   >
                     <FaPen size={11} /> Edit
                   </button>
                 ) : (
-                  <button disabled style={{ ...actionBtnStyle, background: C.deepA10, color: C.deepA45, cursor: "not-allowed" }}>
+                  <button
+                    disabled
+                    className="flex-1 min-w-[120px] flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-[10px] border-none text-[12.5px] font-medium font-sans bg-[#730042]/10 text-[#730042]/45 cursor-not-allowed"
+                  >
                     <FaLock size={11} /> Edit
                   </button>
                 )}
                 {canDelete ? (
                   <button
                     onClick={() => onDelete(ann)}
-                    style={{ ...actionBtnStyle, background: C.midA10, color: C.mid, border: `1px solid ${C.midA25}`, cursor: "pointer" }}
+                    className="flex-1 min-w-[120px] flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-[10px] text-[12.5px] font-medium font-sans bg-[#CD166E]/10 text-[#CD166E] border border-[#CD166E]/25 cursor-pointer hover:brightness-95"
                   >
                     <FaTrash size={11} /> Delete
                   </button>
                 ) : (
-                  <button disabled style={{ ...actionBtnStyle, background: C.deepA10, color: C.deepA45, cursor: "not-allowed" }}>
+                  <button
+                    disabled
+                    className="flex-1 min-w-[120px] flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-[10px] border-none text-[12.5px] font-medium font-sans bg-[#730042]/10 text-[#730042]/45 cursor-not-allowed"
+                  >
                     <FaLock size={11} /> Delete
                   </button>
                 )}
@@ -299,103 +250,96 @@ const AnnCard = ({ ann, index, onClick, canEdit, canDelete, onEdit, onDelete }) 
   return (
     <div
       onClick={() => onClick(ann._id)}
-      className="ann-card-hover"
-      style={{
-        background: C.white,
-        border: `.5px solid ${C.deepA15}`,
-        borderRadius: 16,
-        padding: isFeatured ? "30px 28px 24px" : "22px 22px 20px",
-        cursor: "pointer",
-        transition: "border-color .2s, transform .2s",
-        gridColumn: isFeatured ? "1 / -1" : "auto",
-        position: "relative",
-        overflow: "hidden",
-        animation: `fadeUp 0.4s ease both`,
-        animationDelay: `${index * 0.06}s`,
-        fontFamily: "'Segoe UI', sans-serif",
-      }}
+      className={`group bg-white border-[.5px] border-[#730042]/15 rounded-2xl cursor-pointer transition-all duration-200 relative overflow-hidden font-sans hover:border-[#CD166E]/45 hover:-translate-y-[3px] animate-[fadeUp_0.4s_ease_both] ${
+        isFeatured
+          ? "p-5 pt-7 sm:p-7 sm:pt-[30px] col-span-full"
+          : "p-4 pt-[22px] sm:p-[22px] sm:pt-[22px]"
+      }`}
+      style={{ animationDelay: `${index * 0.06}s` }}
     >
       {isFeatured && (
-        <div style={{
-          position: "absolute", top: 0, left: 0, right: 0,
-          height: 2, background: C.mid,
-        }} />
+        <div className="absolute top-0 left-0 right-0 h-0.5 bg-[#CD166E]" />
       )}
 
-      <div style={{
-        display: "flex", alignItems: "center",
-        justifyContent: "space-between", gap: 8,
-        marginBottom: 14, flexWrap: "wrap",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <div className="flex items-center justify-between gap-2 mb-3.5 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           {ann.priority && <PriorityPill priority={ann.priority} />}
           {ann.audience && <AudiencePill audience={ann.audience} />}
           {isFeatured && (
-            <span style={{
-              fontSize: 10, fontWeight: 500, color: C.mid,
-              letterSpacing: ".14em", textTransform: "uppercase",
-              display: "flex", alignItems: "center", gap: 4,
-            }}>
-              <svg width="8" height="8" viewBox="0 0 10 10" fill={C.mid}><circle cx="5" cy="5" r="5"/></svg>
+            <span className="text-[10px] font-medium text-[#CD166E] tracking-[.14em] uppercase flex items-center gap-1">
+              <svg width="8" height="8" viewBox="0 0 10 10" fill="#CD166E">
+                <circle cx="5" cy="5" r="5" />
+              </svg>
               Featured
             </span>
           )}
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 11, color: C.deepA45, letterSpacing: ".03em" }}>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-[#730042]/45 tracking-[.03em] whitespace-nowrap">
             {fmtDate(ann.createdAt)}
           </span>
           {canEdit ? (
-            <button className="icon-btn" onClick={(e) => { e.stopPropagation(); onEdit(ann); }} style={iconBtnStyle}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(ann);
+              }}
+              className="inline-flex items-center justify-center w-7 h-7 rounded-lg border-none cursor-pointer bg-[#730042]/10 text-[#730042] flex-shrink-0 hover:brightness-95"
+            >
               <FaPen size={11} />
             </button>
           ) : (
-            <span title="Edit — No permission" style={lockBtnStyle}><FaLock size={10} /></span>
+            <span
+              title="Edit — No permission"
+              className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[#730042]/10 text-[#730042]/45 flex-shrink-0 cursor-not-allowed"
+            >
+              <FaLock size={10} />
+            </span>
           )}
           {canDelete ? (
-            <button className="icon-btn" onClick={(e) => { e.stopPropagation(); onDelete(ann); }} style={{ ...iconBtnStyle, background: C.midA10, color: C.mid }}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(ann);
+              }}
+              className="inline-flex items-center justify-center w-7 h-7 rounded-lg border-none cursor-pointer bg-[#CD166E]/10 text-[#CD166E] flex-shrink-0 hover:brightness-95"
+            >
               <FaTrash size={11} />
             </button>
           ) : (
-            <span title="Delete — No permission" style={lockBtnStyle}><FaLock size={10} /></span>
+            <span
+              title="Delete — No permission"
+              className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[#730042]/10 text-[#730042]/45 flex-shrink-0 cursor-not-allowed"
+            >
+              <FaLock size={10} />
+            </span>
           )}
         </div>
       </div>
 
-      <h3 style={{
-        fontFamily: "'Segoe UI', sans-serif",
-        fontSize: isFeatured ? "clamp(18px,3vw,22px)" : 17, fontWeight: 600,
-        color: C.deep, lineHeight: 1.3, marginBottom: 10,
-        letterSpacing: "-0.2px",
-      }}>
+      <h3
+        className={`font-sans font-semibold text-[#730042] leading-tight mb-2.5 tracking-[-0.2px] ${
+          isFeatured ? "text-[clamp(18px,3vw,22px)]" : "text-[17px]"
+        }`}
+      >
         {ann.title || "Untitled Announcement"}
       </h3>
 
-      <p style={{
-        fontSize: 13.5, color: C.deepA55, lineHeight: 1.75, marginBottom: 18,
-      }}>
-        {excerpt(ann.body || ann.content || ann.message || ann.description, isFeatured ? 200 : 100)}
+      <p className="text-[13.5px] text-[#730042]/55 leading-[1.75] mb-4">
+        {excerpt(
+          ann.body || ann.content || ann.message || ann.description,
+          isFeatured ? 200 : 100
+        )}
       </p>
 
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        paddingTop: 14, borderTop: `.5px solid ${C.deepA10}`,
-      }}>
+      <div className="flex items-center justify-between pt-3.5 border-t-[.5px] border-[#730042]/10">
         {ann.expiresAt && (
-          <span style={{ fontSize: 10.5, color: C.deepA45, letterSpacing: ".06em" }}>
+          <span className="text-[10.5px] text-[#730042]/45 tracking-[.06em]">
             Expires {fmtDate(ann.expiresAt)}
           </span>
         )}
-        <span
-          className="read-more-btn"
-          style={{
-            marginLeft: "auto", fontSize: 11.5, fontWeight: 500,
-            color: C.mid, letterSpacing: ".06em", textTransform: "uppercase",
-            display: "flex", alignItems: "center", gap: 3,
-            transition: "color .15s",
-          }}
-        >
+        <span className="ml-auto text-[11.5px] font-medium text-[#CD166E] tracking-[.06em] uppercase flex items-center gap-[3px] transition-colors group-hover:text-[#730042]">
           Read more ›
         </span>
       </div>
@@ -403,7 +347,11 @@ const AnnCard = ({ ann, index, onClick, canEdit, canDelete, onEdit, onDelete }) 
   );
 };
 
-const Announcema = ({ onCreate = () => {}, onEdit = () => {}, onDelete = () => {} } = {}) => {
+const Announcema = ({
+  onCreate = () => {},
+  onEdit = () => {},
+  onDelete = () => {},
+} = {}) => {
   const { data, isLoading, isError: error } = useManagerAnnouncements();
   const [selectedId, setSelectedId] = useState(null);
   const [filter, setFilter] = useState("all");
@@ -421,8 +369,9 @@ const Announcema = ({ onCreate = () => {}, onEdit = () => {}, onDelete = () => {
 
   const filtered = allAnnouncements
     .filter((ann) => {
-      if (filter === "high")     return (ann.priority || "").toLowerCase() === "high";
-      if (filter === "managers") return (ann.audience || "").toLowerCase() === "managers";
+      if (filter === "high") return (ann.priority || "").toLowerCase() === "high";
+      if (filter === "managers")
+        return (ann.audience || "").toLowerCase() === "managers";
       return true;
     })
     .sort((a, b) => {
@@ -433,195 +382,146 @@ const Announcema = ({ onCreate = () => {}, onEdit = () => {}, onDelete = () => {
       return new Date(b.createdAt) - new Date(a.createdAt);
     });
 
-  const urgentCount   = allAnnouncements.filter((a) => (a.priority || "").toLowerCase() === "high").length;
-  const managersCount = allAnnouncements.filter((a) => (a.audience || "").toLowerCase() === "managers").length;
+  const urgentCount = allAnnouncements.filter(
+    (a) => (a.priority || "").toLowerCase() === "high"
+  ).length;
+  const managersCount = allAnnouncements.filter(
+    (a) => (a.audience || "").toLowerCase() === "managers"
+  ).length;
 
   const FILTERS = [
-    { id: "all",      label: `All`,           count: allAnnouncements.length },
-    { id: "high",     label: `Urgent`,        count: urgentCount },
-    { id: "managers", label: `Managers only`, count: managersCount },
+    { id: "all", label: "All", count: allAnnouncements.length },
+    { id: "high", label: "Urgent", count: urgentCount },
+    { id: "managers", label: "Managers only", count: managersCount },
   ];
 
   return (
-    <div style={{ background: C.cream, minHeight: "100vh", fontFamily: "'Segoe UI', sans-serif" }}>
+    <div className="bg-[#F9F8F2] min-h-screen font-sans">
       <FontInjector />
 
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "clamp(24px,5vw,40px) clamp(16px,4vw,24px)" }}>
-
-        <div style={{
-          display: "flex", alignItems: "center", gap: 10,
-          marginBottom: "1.25rem", animation: "fadeUp .45s ease both", flexWrap: "wrap",
-        }}>
-          <div style={{ width: 32, height: 1, background: C.deep }} />
-          <span style={{
-            fontSize: 11, fontWeight: 500, letterSpacing: ".18em",
-            textTransform: "uppercase", color: C.deep,
-          }}>
+      <div className="max-w-[1100px] mx-auto px-4 sm:px-6 py-6 sm:py-8 lg:py-10">
+        {/* Eyebrow */}
+        <div className="flex items-center gap-2.5 mb-5 flex-wrap animate-[fadeUp_.45s_ease_both]">
+          <div className="w-8 h-px bg-[#730042]" />
+          <span className="text-[11px] font-medium tracking-[.18em] uppercase text-[#730042]">
             Company Bulletin
           </span>
-          <div style={{
-            marginLeft: "auto", display: "flex", alignItems: "center", gap: 6,
-            background: C.deepA10, border: `1px solid ${C.deepA25}`,
-            padding: "4px 11px", borderRadius: 99,
-          }}>
-            <div style={{
-              width: 6, height: 6, borderRadius: "50%", background: C.mid,
-              animation: "blink 1.8s ease-in-out infinite",
-            }} />
-            <span style={{
-              fontSize: 10, fontWeight: 500, letterSpacing: ".14em",
-              textTransform: "uppercase", color: C.deep,
-            }}>
+          <div className="ml-auto flex items-center gap-1.5 bg-[#730042]/10 border border-[#730042]/25 px-[11px] py-1 rounded-full">
+            <div className="w-1.5 h-1.5 rounded-full bg-[#CD166E] animate-[blink_1.8s_ease-in-out_infinite]" />
+            <span className="text-[10px] font-medium tracking-[.14em] uppercase text-[#730042]">
               Live
             </span>
           </div>
         </div>
 
-        <div style={{
-          display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
-          animation: "fadeUp .5s ease both",
-        }}>
-          <h1 style={{
-            fontFamily: "'Segoe UI', sans-serif",
-            fontSize: "clamp(30px,7vw,48px)", fontWeight: 600, color: C.deep,
-            letterSpacing: "-1px", lineHeight: 1.1, margin: "0 .35rem 0 0",
-          }}>
-            Announce<span style={{ fontWeight: 600, color: C.mid }}>ments</span>
+        {/* Heading + create button */}
+        <div className="flex items-center gap-3.5 flex-wrap animate-[fadeUp_.5s_ease_both]">
+          <h1 className="font-sans text-[clamp(30px,7vw,48px)] font-semibold text-[#730042] tracking-[-1px] leading-[1.1] m-0 mr-1.5">
+            Announce<span className="font-semibold text-[#CD166E]">ments</span>
           </h1>
 
           <button
-            className="create-btn"
             onClick={() => canCreate && onCreate()}
             disabled={!canCreate}
             title={!canCreate ? "New Announcement — No permission" : undefined}
-            style={{
-              marginLeft: "auto", display: "flex", alignItems: "center", gap: 8,
-              padding: "10px 18px", borderRadius: 99, border: "none",
-              fontSize: 12.5, fontWeight: 500, letterSpacing: ".05em", textTransform: "uppercase",
-              fontFamily: "'Segoe UI', sans-serif",
-              cursor: canCreate ? "pointer" : "not-allowed",
-              background: canCreate ? C.deep : C.deepA10,
-              color: canCreate ? C.white : C.deepA45,
-            }}
+            className={`ml-auto flex items-center gap-2 px-4 py-2.5 rounded-full border-none text-[12.5px] font-medium tracking-[.05em] uppercase font-sans ${
+              canCreate
+                ? "cursor-pointer bg-[#730042] text-white hover:brightness-95"
+                : "cursor-not-allowed bg-[#730042]/10 text-[#730042]/45"
+            }`}
           >
             {canCreate ? <FaPlus size={11} /> : <FaLock size={11} />}
-            New Announcement
+            <span className="hidden xs:inline sm:inline">New Announcement</span>
+            <span className="inline xs:hidden sm:hidden">New</span>
           </button>
         </div>
 
         {canView && (
-          <div style={{
-            display: "flex", alignItems: "center", gap: 14,
-            margin: "1.25rem 0 2rem", animation: "fadeUp .55s ease both", flexWrap: "wrap",
-          }}>
-            <div style={{ flex: 1, height: .5, background: C.deepA25, minWidth: 40 }} />
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <div className="flex items-center gap-3.5 my-5 sm:my-8 animate-[fadeUp_.55s_ease_both] flex-wrap">
+            <div className="flex-1 h-[.5px] bg-[#730042]/25 min-w-[24px]" />
+            <div className="flex gap-1.5 flex-wrap justify-center w-full sm:w-auto order-3 sm:order-none">
               {FILTERS.map((f) => (
                 <button
                   key={f.id}
-                  className="filter-btn"
                   onClick={() => setFilter(f.id)}
-                  style={{
-                    padding: "5px 14px", borderRadius: 99, cursor: "pointer",
-                    fontSize: 11, fontWeight: 500, letterSpacing: ".08em",
-                    textTransform: "uppercase", transition: "all .2s",
-                    background: filter === f.id ? C.deep : "transparent",
-                    color:      filter === f.id ? C.white : C.deepA45,
-                    border: `1px solid ${filter === f.id ? C.deep : C.deepA25}`,
-                  }}
+                  className={`px-3.5 py-[5px] rounded-full cursor-pointer text-[11px] font-medium tracking-[.08em] uppercase transition-all duration-200 border ${
+                    filter === f.id
+                      ? "bg-[#730042] text-white border-[#730042]"
+                      : "bg-transparent text-[#730042]/45 border-[#730042]/25 hover:bg-[#730042]/8"
+                  }`}
                 >
                   {f.label} · {f.count}
                 </button>
               ))}
             </div>
-            <div style={{ flex: 1, height: .5, background: C.deepA25, minWidth: 40 }} />
+            <div className="flex-1 h-[.5px] bg-[#730042]/25 min-w-[24px]" />
           </div>
         )}
 
         {!canView ? (
-          <div style={{ textAlign: "center", padding: "5rem 1rem" }}>
-            <div style={{
-              width: 60, height: 60, borderRadius: "50%",
-              border: `1.5px solid ${C.midA25}`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              margin: "0 auto 1.25rem",
-            }}>
-              <FaLock size={22} color={C.mid} />
+          <div className="text-center py-20 px-4">
+            <div className="w-[60px] h-[60px] rounded-full border-[1.5px] border-[#CD166E]/25 flex items-center justify-center mx-auto mb-5">
+              <FaLock size={22} className="text-[#CD166E]" />
             </div>
-            <h3 style={{
-              fontFamily: "'Segoe UI', sans-serif",
-              fontSize: "clamp(20px,4vw,24px)", fontWeight: 600,
-              color: C.deep, marginBottom: ".5rem",
-            }}>
+            <h3 className="font-sans text-[clamp(20px,4vw,24px)] font-semibold text-[#730042] mb-2">
               Viewing is restricted
             </h3>
-            <p style={{ fontSize: 13, color: C.deepA45, margin: 0 }}>
-              You don't have permission to view announcements. Contact your admin to request access.
+            <p className="text-[13px] text-[#730042]/45 m-0">
+              You don't have permission to view announcements. Contact your
+              admin to request access.
             </p>
           </div>
         ) : (
           <>
             {isLoading && (
-              <div style={{
-                display: "flex", flexDirection: "column",
-                alignItems: "center", justifyContent: "center",
-                padding: "80px 0", gap: 16,
-              }}>
-                <div style={{
-                  width: 38, height: 38,
-                  border: `3px solid ${C.deepA10}`,
-                  borderTopColor: C.mid, borderRadius: "50%",
-                  animation: "spin .8s linear infinite",
-                }} />
-                <p style={{ color: C.deepA45, fontSize: 13, margin: 0 }}>
+              <div className="flex flex-col items-center justify-center py-20 gap-4">
+                <div className="w-[38px] h-[38px] border-[3px] border-[#730042]/10 border-t-[#CD166E] rounded-full animate-spin" />
+                <p className="text-[#730042]/45 text-[13px] m-0">
                   Loading announcements…
                 </p>
               </div>
             )}
 
             {error && (
-              <div style={{ textAlign: "center", padding: "64px 0" }}>
-                <p style={{ color: C.mid, fontWeight: 500, fontSize: 15, margin: "0 0 6px" }}>
+              <div className="text-center py-16">
+                <p className="text-[#CD166E] font-medium text-[15px] mb-1.5">
                   Failed to load announcements
                 </p>
-                <p style={{ color: C.deepA45, fontSize: 13, margin: 0 }}>
+                <p className="text-[#730042]/45 text-[13px] m-0">
                   Please try refreshing the page.
                 </p>
               </div>
             )}
 
             {!isLoading && !error && filtered.length === 0 && (
-              <div style={{ textAlign: "center", padding: "5rem 1rem" }}>
-                <div style={{
-                  width: 60, height: 60, borderRadius: "50%",
-                  border: `1.5px solid ${C.midA25}`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  margin: "0 auto 1.25rem",
-                }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
-                    stroke={C.mid} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+              <div className="text-center py-20 px-4">
+                <div className="w-[60px] h-[60px] rounded-full border-[1.5px] border-[#CD166E]/25 flex items-center justify-center mx-auto mb-5">
+                  <svg
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#CD166E"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
                   </svg>
                 </div>
-                <h3 style={{
-                  fontFamily: "'Segoe UI', sans-serif",
-                  fontSize: "clamp(20px,4vw,24px)", fontWeight: 600,
-                  color: C.deep, marginBottom: ".5rem",
-                }}>
+                <h3 className="font-sans text-[clamp(20px,4vw,24px)] font-semibold text-[#730042] mb-2">
                   Nothing yet
                 </h3>
-                <p style={{ fontSize: 13, color: C.deepA45, margin: 0 }}>
-                  {filter !== "all" ? "Try a different filter." : "New announcements will appear here."}
+                <p className="text-[13px] text-[#730042]/45 m-0">
+                  {filter !== "all"
+                    ? "Try a different filter."
+                    : "New announcements will appear here."}
                 </p>
               </div>
             )}
 
             {!isLoading && filtered.length > 0 && (
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-                gap: 14,
-              }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3.5">
                 {filtered.map((ann, i) => (
                   <AnnCard
                     key={ann._id}
