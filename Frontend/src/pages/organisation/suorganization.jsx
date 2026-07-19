@@ -69,11 +69,6 @@ const STYLES = `
   .su-scroll::-webkit-scrollbar-thumb { background:#dde3ec; border-radius:6px; }
   .su-scroll { -webkit-overflow-scrolling: touch; }
 
-  /* ---------- Profile detail panel field rows ----------
-     These classes are used in EmployeeDetailPanel's info list. They
-     were previously referenced in JSX but never given rules here, so
-     the label span and value span rendered back-to-back with no gap
-     (e.g. "Emp IDENG05"). Flex + space-between fixes the layout. */
   .su-field-row {
     display: flex;
     align-items: flex-start;
@@ -83,12 +78,6 @@ const STYLES = `
   .su-field-val {
     flex: 1 1 auto;
   }
-
-  /* ---------- Org-chart connector lines ----------
-     Lines are drawn with a measured SVG overlay (see OrgConnectorGroup
-     below) instead of CSS width/gap math, so they are always pixel-
-     perfect regardless of card width, text truncation, breakpoint, or
-     how many siblings are rendered - no seams, no misaligned elbows. */
 
   .org-tree-root { display: flex; flex-direction: column; align-items: center; }
   .org-branch { display: flex; flex-direction: column; align-items: center; position: relative; min-width: 0; }
@@ -161,19 +150,6 @@ function Skeleton({ w, h, r = 8 }) {
   );
 }
 
-/* ---------- Measured SVG connector system ----------
-   OrgConnectorGroup draws the lines from one parent node down to a row
-   of children by actually measuring their rendered positions on screen
-   (getBoundingClientRect), instead of guessing pixel widths from CSS.
-   That's what makes every elbow/spine align exactly under each card,
-   at any breakpoint, with any number of siblings, any text length -
-   there's nothing to get out of sync.
-
-   parentRef  - ref to the DOM node of the single parent card above this row
-   children   - array of React nodes, one per sibling in the row (each can
-                itself be a full nested branch - only its OWN top card's
-                position is used as the anchor, because that's always the
-                first element painted inside each row item)               */
 function OrgConnectorGroup({ parentRef, children, gapClassName = "gap-4" }) {
   const items = (Array.isArray(children) ? children : [children]).filter(Boolean);
   const containerRef = useRef(null);
@@ -215,8 +191,6 @@ function OrgConnectorGroup({ parentRef, children, gapClassName = "gap-4" }) {
     ro.observe(parentRef.current);
 
     window.addEventListener("resize", measure);
-    // Catch late layout shifts: web-font swap, entrance animations
-    // (scaleIn/fadeUp) settling, and images/avatars finishing paint.
     const t1 = setTimeout(measure, 120);
     const t2 = setTimeout(measure, 450);
     document.fonts?.ready?.then(measure).catch(() => {});
@@ -419,14 +393,6 @@ function SkeletonTree() {
   );
 }
 
-// ---------- Leave balance tab (v3) ----------
-// Matches the target design: EL / SL / ML / PL always render as a quota
-// card (title, "<n> left" pill, progress bar, Entitled/Availed row),
-// regardless of whether the backend stores that type as a bucketed
-// object ({entitled, availed, ...}) or a flat number. LWP / PBC (and any
-// other leftover keys) render as plain counter tiles underneath, since
-// they're running totals rather than an entitlement pool.
-
 const PRIMARY_ORDER = ["EL", "SL", "ML", "PL"];
 
 const LEAVE_META = {
@@ -457,7 +423,6 @@ function fmtLeaveDate(iso) {
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 
-// Normalizes either shape -> { entitled, availed, accrued, yearlyEntitled }
 function normalizeBucket(val) {
   if (val && typeof val === "object") {
     return {
@@ -467,8 +432,6 @@ function normalizeBucket(val) {
       yearlyEntitled: val.yearlyEntitled != null ? Number(val.yearlyEntitled) : null,
     };
   }
-  // Flat number stored under a primary key (e.g. ML: 182) -> treat as
-  // the entitled pool; availed isn't tracked separately for that shape.
   return { entitled: Number(val ?? 0), availed: 0, accrued: null, yearlyEntitled: null };
 }
 
@@ -596,9 +559,6 @@ function EmployeeDetailPanel({ person, type, onClose }) {
   const accentColor = isSA ? NODE_COLOR.sa : isAdmin ? NODE_COLOR.admin : isManager ? NODE_COLOR.manager : NODE_COLOR.employee;
   const roleLabel   = isSA ? "Super Admin" : isAdmin ? "Admin" : isManager ? "Manager" : "Employee";
 
-  // Fetch the full record (incl. leaveBalance) for whichever role this is,
-  // so the Leave Balance tab has real data to show without a separate
-  // top-level fetch per node type in the tree.
   const detailFetchFn = isAdmin
     ? useGetParticularAdmin
     : isManager
@@ -614,19 +574,36 @@ function EmployeeDetailPanel({ person, type, onClose }) {
   const leaveBalance = detailData?.leaveBalance || null;
 
   const fields = useMemo(() => {
-    if (isSA) return [
-      ["Email",        person.email],
-      ["Phone",        person.phone || "—"],
-      ["Organisation", person.organisation_name],
-      ["Domain",       person.company_domain || "—"],
-      ["Address",      person.company_address || "—"],
-      ["Industry",     person.industry || "—"],
-      ["Plan",         person.plan || "—"],
-      ["Plan expires", fmtDate(person.plan_expires_at)],
-      ["Status",       person.status],
-      ["Last login",   fmtDate(person.last_login)],
-      ["Member since", fmtDate(person.createdAt)],
-    ];
+    if (isSA) {
+      const activeLicense = person.licenses?.find(
+        (l) => l.isActive && new Date(l.expiresAt) > new Date()
+      );
+      const isTrial = person.is_trial_active && new Date() < new Date(person.trial_expires_at);
+
+      const currentPlanLabel = isTrial
+        ? "Trial"
+        : activeLicense?.plan || person.plan || "—";
+
+      const currentPlanExpiry = isTrial
+        ? fmtDate(person.trial_expires_at)
+        : activeLicense
+        ? fmtDate(activeLicense.expiresAt)
+        : fmtDate(person.plan_expires_at);
+
+      return [
+        ["Email",        person.email],
+        ["Phone",        person.phone || "—"],
+        ["Organisation", person.organisation_name],
+        ["Domain",       person.company_domain || "—"],
+        ["Address",      person.company_address || "—"],
+        ["Industry",     person.industry || "—"],
+        ["Plan",         currentPlanLabel],
+        ["Plan expires", currentPlanExpiry],
+        ["Status",       person.status],
+        ["Last login",   fmtDate(person.last_login)],
+        ["Member since", fmtDate(person.createdAt)],
+      ];
+    }
     if (isAdmin) return [
       ["Emp ID",      person.empid || "—"],
       ["Email",       person.work_email],
@@ -776,10 +753,6 @@ function ReviewsTab({ uid, role }) {
   );
 }
 
-/* ManagerBranch renders a manager node plus (recursively) any sub-managers
-   and employees under it. It owns its own node ref so OrgConnectorGroup
-   can measure exactly where this manager's card sits, and draws its own
-   OrgConnectorGroup for whatever is nested beneath it. */
 function ManagerBranch({ manager, allManagers, employees, matchName, hasQ, parentMatched, onNodeClick, delay = 0 }) {
   const nodeRef = useRef(null);
   const mgrMatch  = hasQ && matchName(manager.f_name, manager.l_name, manager.department, manager.designation);
@@ -839,9 +812,6 @@ function ManagerBranch({ manager, allManagers, employees, matchName, hasQ, paren
   );
 }
 
-// Thin wrapper so a leaf employee card also owns a ref the same way a
-// branch does - keeps OrgConnectorGroup's "measure my first child" rule
-// consistent whether the row item is a leaf or a whole nested branch.
 function EmployeeBranch({ employee, delay, highlighted, dimmed, onClick }) {
   const nodeRef = useRef(null);
   return (
@@ -851,8 +821,6 @@ function EmployeeBranch({ employee, delay, highlighted, dimmed, onClick }) {
   );
 }
 
-// AdminBranch mirrors ManagerBranch one level up: an admin card plus
-// (via OrgConnectorGroup) the row of managers reporting to it.
 function AdminBranch({ admin, managers, employees, matchName, hasQ, onNodeClick, delay = 0 }) {
   const nodeRef = useRef(null);
   const admMatch  = hasQ && matchName(admin.f_name, admin.l_name, "", admin.designation);
@@ -952,13 +920,6 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
   );
 }
 
-// Surfaces any manager/employee whose reporting_manager / Under_manager
-// doesn't resolve to a node that's actually in the current admins/
-// managers arrays (deleted parent, bad id, mismatched
-// reporting_manager_model, etc). Previously these records were just
-// dropped from the tree with no indication anything was missing, while
-// still being counted in the header stats - the exact mismatch reported
-// against this chart ("6 Employees" stat vs. only 2 cards visible).
 function OrphanNotice({ admins, managers, employees, onNodeClick }) {
   const adminIdSet   = new Set(admins.map((a) => idStr(a._id)));
   const managerIdSet = new Set(managers.map((m) => idStr(m._id)));
@@ -966,7 +927,7 @@ function OrphanNotice({ admins, managers, employees, onNodeClick }) {
   const orphanManagers = managers.filter((m) => {
     if (m.reporting_manager_model === "Admin")   return !adminIdSet.has(idStr(m.reporting_manager));
     if (m.reporting_manager_model === "Manager") return !managerIdSet.has(idStr(m.reporting_manager));
-    return true; // no recognizable parent reference at all
+    return true;
   });
 
   const orphanEmployees = employees.filter((e) => !managerIdSet.has(idStr(e.Under_manager)));
@@ -1033,15 +994,6 @@ export default function SuperAdminOrgChart() {
     return Array.isArray(raw) ? raw : [];
   }, [mgrData]);
   const employees  = useMemo(() => {
-    // /superadmin/getallemployee returns a MERGED directory list under
-    // `users`: admins + managers + employees, each tagged with `type`.
-    // That shape is intentional (Payroll, dashboard, and the people-
-    // management pages all consume the merged list for search/lookup),
-    // but the org chart specifically needs only employee-level nodes -
-    // admins/managers are already fetched from their own endpoints
-    // above. Without this filter, admins/managers get double-counted
-    // in the "Employees"/"Total" stats even though they never render
-    // as duplicate cards in the tree (they lack Under_manager).
     const raw = empData?.users || empData || [];
     const list = Array.isArray(raw) ? raw : [];
     return list.some((p) => p?.type)
@@ -1383,4 +1335,4 @@ export default function SuperAdminOrgChart() {
       )}
     </div>
   );
-} 
+}
