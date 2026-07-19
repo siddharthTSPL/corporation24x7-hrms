@@ -592,15 +592,15 @@ function EmployeeDetailPanel({ person, type, onClose }) {
 
       return [
         ["Email",        person.email],
-        ["Phone",        person.phone || "—"],
+        // ["Phone",        person.phone || "—"],
         ["Organisation", person.organisation_name],
         ["Domain",       person.company_domain || "—"],
-        ["Address",      person.company_address || "—"],
-        ["Industry",     person.industry || "—"],
+        // ["Address",      person.company_address || "—"],
+        // ["Industry",     person.industry || "—"],
         ["Plan",         currentPlanLabel],
         ["Plan expires", currentPlanExpiry],
         ["Status",       person.status],
-        ["Last login",   fmtDate(person.last_login)],
+        // ["Last login",   fmtDate(person.last_login)],
         ["Member since", fmtDate(person.createdAt)],
       ];
     }
