@@ -112,8 +112,8 @@ function ToastStack({ toasts }) {
 function Modal({ open, onClose, title, children, wide }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50 backdrop-blur-sm p-0 sm:p-4">
-      <div className={`w-full ${wide ? 'sm:max-w-2xl' : 'sm:max-w-md'} bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto`}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50 backdrop-blur-sm p-0 sm:p-4 overscroll-contain">
+      <div className={`w-full ${wide ? 'sm:max-w-2xl' : 'sm:max-w-md'} bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto overscroll-contain`}>
         <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-4 border-b border-slate-100 sticky top-0 bg-white z-10">
           <h3 className="text-base font-semibold text-slate-800 break-words min-w-0">{title}</h3>
           <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors shrink-0">
@@ -1181,7 +1181,7 @@ function WeekOffPanel({ notify }) {
                 {groups.map((g) => (
                   <div key={g._id} className="rounded-xl border border-slate-200 p-4 min-w-0">
                     <h4 className="text-sm font-semibold text-slate-800 mb-2 break-words">{g.name}</h4>
-                    <div className="flex flex-col gap-1.5 mb-3 max-h-32 overflow-y-auto">
+                    <div className="flex flex-col gap-1.5 mb-3 max-h-32 overflow-y-auto overscroll-contain">
                       {(g.members || []).length === 0 && <p className="text-xs text-slate-400">No members yet</p>}
                       {(g.members || []).map((m) => (
                         <div key={String(m.employee)} className="flex items-center justify-between gap-2 text-xs bg-slate-50 rounded-lg px-2.5 py-1.5">
@@ -1542,7 +1542,7 @@ export default function SuperAdminManagement() {
   const { toasts, notify } = useToasts();
 
   return (
-    <div className="w-full h-full min-h-0 overflow-x-hidden overflow-y-auto bg-slate-50 box-border">
+    <div className="w-full overflow-x-hidden bg-slate-50 box-border">
       <ToastStack toasts={toasts} />
       <div className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-10 min-w-0">
         <div className="mb-8">
@@ -1556,7 +1556,7 @@ export default function SuperAdminManagement() {
           </p>
         </div>
 
-        <div className="flex gap-1.5 p-1 bg-white border border-slate-200 rounded-xl w-full sm:w-fit mb-6 overflow-x-auto max-w-full">
+        <div className="flex gap-1.5 p-1 bg-white border border-slate-200 rounded-xl w-full sm:w-fit mb-6 overflow-x-auto overscroll-x-contain max-w-full">
           {TABS.map((t) => {
             const Icon = t.icon;
             const active = tab === t.key;
