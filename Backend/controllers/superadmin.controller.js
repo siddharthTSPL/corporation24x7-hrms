@@ -2579,7 +2579,3 @@ module.exports = {
   setLeavePolicy,
   getperticularadmin
 };
-
-
-
-
