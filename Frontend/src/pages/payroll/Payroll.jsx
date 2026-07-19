@@ -147,7 +147,7 @@ function Card({ title, subtitle, children, right }) {
           {right}
         </div>
       )}
-      <div style={{ padding: 18 }}>{children}</div>
+      <div className="p-3 sm:p-[18px]">{children}</div>
     </div>
   );
 }
@@ -169,10 +169,10 @@ const inputStyle = {
 };
 
 function TextInput(props) {
-  return <input {...props} style={{ ...inputStyle, ...(props.style || {}) }} />;
+  return <input {...props} className={`min-w-0 ${props.className || ""}`} style={{ ...inputStyle, ...(props.style || {}) }} />;
 }
 function Select(props) {
-  return <select {...props} style={{ ...inputStyle, ...(props.style || {}) }} />;
+  return <select {...props} className={`min-w-0 ${props.className || ""}`} style={{ ...inputStyle, ...(props.style || {}) }} />;
 }
 
 function Toggle({ checked, onChange, disabled }) {
@@ -221,11 +221,12 @@ function PrimaryButton({ children, loading, ...rest }) {
     <button
       {...rest}
       disabled={loading || rest.disabled}
+      className={`w-full sm:w-auto ${rest.className || ""}`}
       style={{
-        display: "inline-flex", alignItems: "center", gap: 8, padding: "9px 16px", borderRadius: 9,
+        display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px 16px", borderRadius: 9,
         border: "none", background: C.brand, color: "#fff", fontSize: 13, fontWeight: 700,
         cursor: loading || rest.disabled ? "not-allowed" : "pointer", opacity: loading || rest.disabled ? 0.7 : 1,
-        fontFamily: "inherit", ...(rest.style || {}),
+        fontFamily: "inherit", minHeight: 40, ...(rest.style || {}),
       }}
     >
       {loading && <Spinner size={13} />}
@@ -238,10 +239,11 @@ function GhostButton({ children, ...rest }) {
   return (
     <button
       {...rest}
+      className={rest.className || ""}
       style={{
         display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 9,
         border: `1px solid ${C.border}`, background: "#fff", color: C.text, fontSize: 12.5, fontWeight: 600,
-        cursor: "pointer", fontFamily: "inherit", ...(rest.style || {}),
+        cursor: "pointer", fontFamily: "inherit", minHeight: 36, ...(rest.style || {}),
       }}
     >
       {children}
@@ -385,9 +387,9 @@ function PolicyTab({ notify }) {
         title="Salary Structure Rules"
         subtitle="Applies to all future salary structures for this organisation"
         right={
-          <div className="flex items-center gap-2">
-            <GhostButton onClick={handleReset} disabled={resetting}>{resetting ? "Resetting…" : "Reset to Standard"}</GhostButton>
-            <PrimaryButton onClick={handleSave} loading={saving}>Save Policy</PrimaryButton>
+          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+            <GhostButton onClick={handleReset} disabled={resetting} className="flex-1 sm:flex-none justify-center">{resetting ? "Resetting…" : "Reset to Standard"}</GhostButton>
+            <PrimaryButton onClick={handleSave} loading={saving} className="flex-1 sm:flex-none">Save Policy</PrimaryButton>
           </div>
         }
       >
@@ -400,7 +402,7 @@ function PolicyTab({ notify }) {
           </Field>
 
           <Field label="HRA">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <Toggle checked={!!form.hra?.enabled} onChange={(v) => set("hra.enabled", v)} />
               <TextInput
                 type="number" min={0} max={100} disabled={!form.hra?.enabled}
@@ -420,7 +422,7 @@ function PolicyTab({ notify }) {
               <TextInput type="number" min={0} max={100} disabled={!form.pf?.enabled} value={form.pf?.employerPercent ?? 0} onChange={(e) => set("pf.employerPercent", Number(e.target.value))} style={{ maxWidth: 90 }} />
               <span style={{ fontSize: 12, color: C.muted }}>Employer %</span>
             </div>
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
               <Toggle checked={!!form.pf?.applyWageCeiling} onChange={(v) => set("pf.applyWageCeiling", v)} disabled={!form.pf?.enabled} />
               <span style={{ fontSize: 12, color: C.muted }}>Apply wage ceiling</span>
               <TextInput
@@ -439,14 +441,14 @@ function PolicyTab({ notify }) {
               <TextInput type="number" step="0.01" min={0} max={100} disabled={!form.esi?.enabled} value={form.esi?.employerPercent ?? 0} onChange={(e) => set("esi.employerPercent", Number(e.target.value))} style={{ maxWidth: 90 }} />
               <span style={{ fontSize: 12, color: C.muted }}>Employer %</span>
             </div>
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
               <span style={{ fontSize: 12, color: C.muted }}>Wage threshold</span>
               <TextInput type="number" min={0} disabled={!form.esi?.enabled} value={form.esi?.wageThreshold ?? 0} onChange={(e) => set("esi.wageThreshold", Number(e.target.value))} style={{ maxWidth: 120 }} />
             </div>
           </Field>
 
           <Field label="Professional Tax">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <Toggle checked={!!form.professionalTax?.enabled} onChange={(v) => set("professionalTax.enabled", v)} />
               <TextInput type="number" min={0} disabled={!form.professionalTax?.enabled} value={form.professionalTax?.monthlyAmount ?? 0} onChange={(e) => set("professionalTax.monthlyAmount", Number(e.target.value))} style={{ maxWidth: 130 }} />
               <span style={{ fontSize: 12.5, color: C.muted }}>₹ / month</span>
@@ -454,7 +456,7 @@ function PolicyTab({ notify }) {
           </Field>
 
           <Field label="TDS (Income Tax)" hint="Uses each employee's annualTaxEstimate ÷ 12">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <Toggle checked={!!form.tds?.enabled} onChange={(v) => set("tds.enabled", v)} />
               <span style={{ fontSize: 12.5, color: C.muted }}>{form.tds?.enabled ? "Enabled" : "Disabled"}</span>
             </div>
@@ -478,7 +480,7 @@ function PolicyTab({ notify }) {
               {(form.allowances || []).map((a) => (
                 <tr key={a.name} style={{ borderTop: `1px solid ${C.border}` }}>
                   <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>
-                    {a.name} {a.isBalancing && <Badge color={C.blue} bg={C.blueBg}>Balancing</Badge>}
+                    <span className="break-words">{a.name}</span> {a.isBalancing && <Badge color={C.blue} bg={C.blueBg}>Balancing</Badge>}
                   </td>
                   <td style={{ padding: "8px 10px" }}>
                     <TextInput type="number" min={0} max={100} value={a.percentOfBasic ?? 0} onChange={(e) => handleAllowanceField(a.name, "percentOfBasic", Number(e.target.value))} style={{ maxWidth: 100 }} />
@@ -505,7 +507,7 @@ function PolicyTab({ notify }) {
 
         <div className="flex items-end gap-3 flex-wrap mt-4 pt-4" style={{ borderTop: `1px dashed ${C.border}` }}>
           <Field label="New allowance name">
-            <TextInput value={newAllowance.name} onChange={(e) => setNewAllowance((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Meal Allowance" style={{ minWidth: 180 }} />
+            <TextInput value={newAllowance.name} onChange={(e) => setNewAllowance((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Meal Allowance" style={{ maxWidth: 180 }} />
           </Field>
           <Field label="% of Basic">
             <TextInput type="number" min={0} max={100} value={newAllowance.percentOfBasic} onChange={(e) => setNewAllowance((p) => ({ ...p, percentOfBasic: Number(e.target.value) }))} style={{ maxWidth: 100 }} />
@@ -565,7 +567,7 @@ function StructuresTab({ notify, directory }) {
   return (
     <>
       <Card title="Set / Revise CTC" subtitle="Setting CTC auto-computes the monthly breakup from the current policy. Setting it again revises CTC and keeps history.">
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
           <Field label="Employee Type">
             <Select value={form.employeeModel} onChange={(e) => setForm((p) => ({ ...p, employeeModel: e.target.value, employee: "" }))}>
               {MODELS.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
@@ -586,7 +588,7 @@ function StructuresTab({ notify, directory }) {
           <Field label="Effective From" hint="Defaults to today">
             <TextInput type="date" value={form.effectiveFrom} onChange={(e) => setForm((p) => ({ ...p, effectiveFrom: e.target.value }))} />
           </Field>
-          <PrimaryButton type="submit" loading={saving}>Save Salary Structure</PrimaryButton>
+          <PrimaryButton type="submit" loading={saving} className="mb-6">Save Salary Structure</PrimaryButton>
         </form>
       </Card>
 
@@ -709,7 +711,7 @@ function GenerateTab({ notify, directory }) {
   return (
     <>
       <Card title="Generate Payroll — Single Employee" subtitle="Requires a salary structure (set CTC first) and pulls the employee's attendance summary for the month">
-        <form onSubmit={handleSingle} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+        <form onSubmit={handleSingle} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
           <Field label="Employee Type">
             <Select value={single.employeeModel} onChange={(e) => setSingle((p) => ({ ...p, employeeModel: e.target.value, employee: "" }))}>
               {MODELS.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
@@ -738,7 +740,7 @@ function GenerateTab({ notify, directory }) {
           <Field label="Other Deductions (₹)"><TextInput type="number" min={0} value={single.otherDeductions} onChange={(e) => setSingle((p) => ({ ...p, otherDeductions: e.target.value }))} /></Field>
           <Field label="Remarks"><TextInput value={single.remarks} onChange={(e) => setSingle((p) => ({ ...p, remarks: e.target.value }))} /></Field>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <input id="single-force" type="checkbox" checked={single.force} onChange={(e) => setSingle((p) => ({ ...p, force: e.target.checked }))} />
             <label htmlFor="single-force" style={{ fontSize: 12.5, color: C.muted }}>Force overwrite if approved/paid</label>
           </div>
@@ -760,7 +762,7 @@ function GenerateTab({ notify, directory }) {
       </Card>
 
       <Card title="Bulk Generate — Whole Organisation" subtitle="Generates payroll for every active employee (of the chosen type) who already has a salary structure">
-        <form onSubmit={handleBulk} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+        <form onSubmit={handleBulk} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
           <Field label="Employee Type">
             <Select value={bulk.employeeModel} onChange={(e) => setBulk((p) => ({ ...p, employeeModel: e.target.value }))}>
               {MODELS.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
@@ -774,7 +776,7 @@ function GenerateTab({ notify, directory }) {
           <Field label="Year">
             <TextInput type="number" value={bulk.year} onChange={(e) => setBulk((p) => ({ ...p, year: e.target.value }))} />
           </Field>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <input id="bulk-force" type="checkbox" checked={bulk.force} onChange={(e) => setBulk((p) => ({ ...p, force: e.target.checked }))} />
             <label htmlFor="bulk-force" style={{ fontSize: 12.5, color: C.muted }}>Force overwrite</label>
           </div>
@@ -789,7 +791,7 @@ function GenerateTab({ notify, directory }) {
             {bulkResult.skippedDetails?.length > 0 && (
               <ul style={{ fontSize: 12.5, color: C.muted, paddingLeft: 18 }}>
                 {bulkResult.skippedDetails.map((s, i) => (
-                  <li key={i}>{resolveName(directory, s.employee, bulk.employeeModel)} — {s.reason}</li>
+                  <li key={i} className="break-words">{resolveName(directory, s.employee, bulk.employeeModel)} — {s.reason}</li>
                 ))}
               </ul>
             )}
@@ -805,24 +807,25 @@ function GenerateTab({ notify, directory }) {
 function PayslipModal({ payroll, directory, onClose }) {
   if (!payroll) return null;
   return (
-    <div className="fixed inset-0 z-[998] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }} onClick={onClose}>
+    <div className="fixed inset-0 z-[998] flex items-center justify-center p-3 sm:p-4" style={{ background: "rgba(0,0,0,0.45)" }} onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ background: "#fff", borderRadius: 14, maxWidth: 520, width: "100%", maxHeight: "88vh", overflowY: "auto", padding: 22 }}
+        className="p-4 sm:p-[22px]"
+        style={{ background: "#fff", borderRadius: 14, maxWidth: 520, width: "100%", maxHeight: "88vh", overflowY: "auto" }}
       >
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 gap-3">
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: C.text }}>Payslip</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: C.muted }}>×</button>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: C.muted, flexShrink: 0 }}>×</button>
         </div>
-        <p style={{ fontSize: 13, color: C.muted, marginBottom: 2 }}>{resolveName(directory, payroll.employee, payroll.employeeModel)}</p>
-        <p style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>{MONTH_NAMES[payroll.month - 1]} {payroll.year} {statusBadge(payroll.status)}</p>
+        <p style={{ fontSize: 13, color: C.muted, marginBottom: 2 }} className="break-words">{resolveName(directory, payroll.employee, payroll.employeeModel)}</p>
+        <p style={{ fontSize: 13, color: C.muted, marginBottom: 12 }} className="flex items-center gap-2 flex-wrap">{MONTH_NAMES[payroll.month - 1]} {payroll.year} {statusBadge(payroll.status)}</p>
 
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mb-3">
+        <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1.5 mb-3">
           <span style={{ fontSize: 12.5, color: C.muted }}>Basic</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.breakup?.basic)}</span>
           <span style={{ fontSize: 12.5, color: C.muted }}>HRA</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.breakup?.hra)}</span>
           {(payroll.breakup?.allowances || []).map((a) => (
             <Fragment key={a.name}>
-              <span style={{ fontSize: 12.5, color: C.muted }}>{a.name}</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(a.amount)}</span>
+              <span style={{ fontSize: 12.5, color: C.muted }} className="break-words">{a.name}</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(a.amount)}</span>
             </Fragment>
           ))}
           <span style={{ fontSize: 12.5, color: C.muted }}>Bonus</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.earnings?.bonus)}</span>
@@ -832,7 +835,7 @@ function PayslipModal({ payroll, directory, onClose }) {
           <span style={{ fontSize: 13, fontWeight: 700 }}>Total Earnings</span><span style={{ fontSize: 13, fontWeight: 700, textAlign: "right" }}>{fmtINR(payroll.earnings?.totalEarnings)}</span>
         </div>
 
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mb-3 pt-3" style={{ borderTop: `1px dashed ${C.border}` }}>
+        <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1.5 mb-3 pt-3" style={{ borderTop: `1px dashed ${C.border}` }}>
           <span style={{ fontSize: 12.5, color: C.muted }}>PF</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.deductions?.pf)}</span>
           <span style={{ fontSize: 12.5, color: C.muted }}>ESI</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.deductions?.esi)}</span>
           <span style={{ fontSize: 12.5, color: C.muted }}>Professional Tax</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.deductions?.professionalTax)}</span>
@@ -844,7 +847,7 @@ function PayslipModal({ payroll, directory, onClose }) {
           <span style={{ fontSize: 13, fontWeight: 700 }}>Total Deductions</span><span style={{ fontSize: 13, fontWeight: 700, textAlign: "right" }}>{fmtINR(payroll.deductions?.totalDeductions)}</span>
         </div>
 
-        <div className="flex items-center justify-between pt-3" style={{ borderTop: `2px solid ${C.border}` }}>
+        <div className="flex items-center justify-between pt-3 gap-3" style={{ borderTop: `2px solid ${C.border}` }}>
           <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Net Salary</span>
           <span style={{ fontSize: 17, fontWeight: 800, color: C.brandDark }}>{fmtINR(payroll.netSalary)}</span>
         </div>
@@ -854,7 +857,7 @@ function PayslipModal({ payroll, directory, onClose }) {
             Paid days: {payroll.attendance.paidDays} / {payroll.attendance.daysInMonth} · Absent: {payroll.attendance.absentDays} · Half-days: {payroll.attendance.halfDays}
           </p>
         )}
-        {payroll.remarks && <p style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Remarks: {payroll.remarks}</p>}
+        {payroll.remarks && <p style={{ fontSize: 12, color: C.muted, marginTop: 6 }} className="break-words">Remarks: {payroll.remarks}</p>}
       </div>
     </div>
   );
@@ -959,7 +962,7 @@ export default function Payroll() {
   const directory = useEmployeeDirectory();
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8" style={{ background: C.page, minHeight: "100%" }}>
+    <div className="w-full h-full min-h-0 overflow-x-hidden overflow-y-auto p-3 sm:p-6 lg:p-8 box-border" style={{ background: C.page }}>
       <style>{`
         @keyframes payroll-spin { to { transform: rotate(360deg); } }
         @keyframes payroll-slideIn { from { transform: translateX(12px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
@@ -973,11 +976,12 @@ export default function Payroll() {
           <p style={{ fontSize: 13, color: C.muted, marginTop: 3, marginBottom: 0 }}>Configure policy, manage salary structures, and generate payslips</p>
         </div>
 
-        <div className="flex gap-1.5 mb-5 flex-wrap" style={{ borderBottom: `1px solid ${C.border}` }}>
+        <div className="flex gap-1.5 mb-5 flex-wrap overflow-x-auto" style={{ borderBottom: `1px solid ${C.border}` }}>
           {TABS.map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
+              className="whitespace-nowrap"
               style={{
                 padding: "9px 14px", border: "none", background: "none", cursor: "pointer",
                 fontSize: 13, fontWeight: 700, fontFamily: "inherit",
