@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import React from "react";
 import talent from "../assets/Talent.png";
+import TechTorchLogo from "../../src/assets/TechTorchLogo.png"
 import {
   FaHome,
   FaCalendarAlt,
@@ -247,10 +248,20 @@ function Sidebar({ collapsed, setCollapsed }) {
 
         {!collapsed && (
           <div className="mt-auto border-t border-gray-200 p-4">
-            <p className="text-xs text-center text-gray-500">
-              Powered by TechTorch | &copy; 2026
-            </p>
-          </div>
+  <div className="flex items-center justify-center gap-2">
+    <span className="text-xs text-gray-500">Powered by</span>
+
+    <img
+      src={TechTorchLogo}
+      alt="TechTorch Solutions"
+      className="h-5 w-auto object-contain"
+    />
+
+    <span className="text-xs text-gray-500">
+      | &copy; 2026
+    </span>
+  </div>
+</div>
         )}
       </div>
     </>
