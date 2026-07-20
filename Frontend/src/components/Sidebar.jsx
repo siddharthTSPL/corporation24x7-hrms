@@ -157,8 +157,8 @@ function Sidebar({ collapsed, setCollapsed }) {
       )}
 
       <div
-        className={`fixed md:static z-50 top-0 left-0 h-full bg-white shadow-md transition-all duration-300 flex flex-col
-        ${collapsed ? "w-16" : "w-56"}
+        className={`fixed md:static z-50 top-0 left-0 h-full bg-white shadow-md transition-all duration-300 flex flex-col flex-shrink-0
+        ${collapsed ? "w-16 md:min-w-16" : "w-56 md:min-w-56"}
         ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
       >
         <div className="p-4 flex items-center justify-between border-b">
@@ -247,21 +247,21 @@ function Sidebar({ collapsed, setCollapsed }) {
         </div>
 
         {!collapsed && (
-          <div className="mt-auto border-t border-gray-200 p-4">
-  <div className="flex items-center justify-center gap-2">
-    <span className="text-xs text-gray-500">Powered by</span>
+          <div className="mt-auto border-t border-gray-200 p-4 flex-shrink-0">
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              <span className="text-xs text-gray-500 whitespace-nowrap">Powered by</span>
 
-    <img
-      src={TechTorchLogo}
-      alt="TechTorch Solutions"
-      className="h-5 w-auto object-contain"
-    />
+              <img
+                src={TechTorchLogo}
+                alt="TechTorch Solutions"
+                className="h-5 w-auto object-contain flex-shrink-0"
+              />
 
-    <span className="text-xs text-gray-500">
-      | &copy; 2026
-    </span>
-  </div>
-</div>
+              <span className="text-xs text-gray-500 whitespace-nowrap">
+                | &copy; 2026
+              </span>
+            </div>
+          </div>
         )}
       </div>
     </>

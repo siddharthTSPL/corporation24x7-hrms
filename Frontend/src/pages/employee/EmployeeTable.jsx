@@ -1037,7 +1037,7 @@ function AccountSummaryDrawer({
                           <Avatar name={`${(person.Under_manager||person.reporting_manager)?.f_name??""} ${(person.Under_manager||person.reporting_manager)?.l_name??""}`} size="sm"/>
                           <div className="min-w-0">
                             <p className="text-xs font-semibold text-[#730042] truncate">{(person.Under_manager||person.reporting_manager)?.f_name} {(person.Under_manager||person.reporting_manager)?.l_name}</p>
-                            <p className="text-[10px] text-[#993556] truncate">{(person.Under_manager||person.reporting_manager)?.uid}</p>
+                            <p className="text-[10px] text-[#993556] truncate">{(person.Under_manager||person.reporting_manager)?.work_email}</p>
                           </div>
                         </div>
                       </div>
@@ -2131,15 +2131,15 @@ export default function EmployeeTable(){
   const inactiveCount = inactiveData?.count ?? 0;
 
   return(
-    <div className="min-h-screen w-full min-w-0 overflow-x-hidden p-3 sm:p-4 md:p-6 lg:p-8 font-['DM_Sans',system-ui,sans-serif]" style={{background:"#F9F8F2"}}>
+    <div className="h-full w-full min-w-0 flex flex-col overflow-hidden p-3 sm:p-4 md:p-6 lg:p-8 font-['DM_Sans',system-ui,sans-serif]" style={{background:"#F9F8F2"}}>
       <style>{`
         .scrollbar-hide::-webkit-scrollbar{display:none;}
         .scrollbar-hide{-ms-overflow-style:none;scrollbar-width:none;}
         @media(max-width:480px){.xs\\:inline{display:inline;}.xs\\:block{display:block;}}
       `}</style>
 
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
+      <div className="max-w-7xl mx-auto w-full h-full flex flex-col min-h-0">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 flex-shrink-0">
           <div className="min-w-0">
             <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-[#730042] tracking-tight">Employee Directory</h1>
             <p className="text-[11px] sm:text-xs md:text-sm text-[#993556] mt-0.5 break-words">
@@ -2198,14 +2198,14 @@ export default function EmployeeTable(){
         </div>
 
         {showInactive&&inactiveCount>0&&(
-          <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-xs text-[#6B7280]">
+          <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-xs text-[#6B7280] flex-shrink-0">
             <FaBan size={11} className="flex-shrink-0"/>
             <span>Showing <strong>{inactiveCount}</strong> inactive user{inactiveCount!==1?"s":""} (resigned / fired / terminated). Their profiles are read-only.</span>
           </div>
         )}
 
-        <div className="bg-white rounded-2xl border border-[#F4C0D1] overflow-hidden">
-          <div className="p-3 sm:p-4 border-b border-[#F4C0D1]" style={{background:"#F9F8F2"}}>
+        <div className="bg-white rounded-2xl border border-[#F4C0D1] overflow-hidden flex flex-col flex-1 min-h-0">
+          <div className="p-3 sm:p-4 border-b border-[#F4C0D1] flex-shrink-0" style={{background:"#F9F8F2"}}>
             <div className="flex gap-2 mb-2">
               <div className="relative flex-1">
                 <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[#993556]" size={12}/>
@@ -2279,7 +2279,7 @@ export default function EmployeeTable(){
             )}
           </div>
 
-          <div className="lg:hidden p-3 space-y-2.5" style={{background:"#F9F8F2"}}>
+          <div className="lg:hidden p-3 space-y-2.5 overflow-y-auto flex-1 min-h-0" style={{background:"#F9F8F2"}}>
             {listLoading?<MobileSkeletons/>:filtered.length===0?(
               <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
                 <div className="text-4xl">👥</div>
@@ -2291,9 +2291,9 @@ export default function EmployeeTable(){
             ))}
           </div>
 
-          <div className="hidden lg:block overflow-x-auto">
+          <div className="hidden lg:block overflow-auto flex-1 min-h-0">
             <table className="w-full min-w-[800px] text-sm">
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <tr className="border-b border-[#F4C0D1]" style={{background:"#F9F8F2"}}>
                   {["Employee","Department","Designation","Location","Manager / Reports To","Role","Employment","Actions"].map((h)=>(
                     <th key={h} className="px-3 lg:px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-[#993556] whitespace-nowrap">{h}</th>
@@ -2357,7 +2357,7 @@ export default function EmployeeTable(){
           </div>
 
           {!listLoading&&filtered.length>0&&(
-            <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-t border-[#F4C0D1] text-[11px] sm:text-xs text-[#993556] flex items-center justify-between gap-2" style={{background:"#F9F8F2"}}>
+            <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-t border-[#F4C0D1] text-[11px] sm:text-xs text-[#993556] flex items-center justify-between gap-2 flex-shrink-0" style={{background:"#F9F8F2"}}>
               <span>Showing {filtered.length} of {allUsers.length}</span>
               {activeFilterCount>0&&<button onClick={clearFilters} className="text-[#A32D2D] font-medium hover:underline flex-shrink-0">Clear filters</button>}
             </div>
