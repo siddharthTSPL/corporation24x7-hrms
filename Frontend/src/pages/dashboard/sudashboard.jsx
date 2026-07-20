@@ -1748,6 +1748,9 @@ function SuperAdminDashboard() {
               <button onClick={() => setReviewModal(true)} className="flex items-center gap-1.5 bg-white/15 border border-white/25 text-white px-3 py-2 rounded-xl text-[12px] font-semibold hover:bg-white/25 transition-colors backdrop-blur-sm min-h-[44px]">
                 <FaStar size={9} /> Review
               </button>
+              <a href="https://torchxsuite.com/login" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 bg-white/15 border border-white/25 text-white px-3 py-2 rounded-xl text-[12px] font-semibold hover:bg-white/25 transition-colors backdrop-blur-sm min-h-[44px]">
+                <FaGlobe size={9} /> Access TorchX Store
+              </a>
             </div>
           </div>
 
@@ -1764,6 +1767,9 @@ function SuperAdminDashboard() {
             <button onClick={() => setReviewModal(true)} className="flex-1 flex items-center justify-center gap-1.5 bg-white/15 border border-white/25 text-white px-3 py-2.5 rounded-xl text-[12px] font-semibold hover:bg-white/25 transition-colors backdrop-blur-sm min-h-[44px]">
               <FaStar size={9} /> Review
             </button>
+            <a href="https://torchxsuite.com/login" target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1.5 bg-white/15 border border-white/25 text-white px-3 py-2.5 rounded-xl text-[12px] font-semibold hover:bg-white/25 transition-colors backdrop-blur-sm min-h-[44px]">
+              <FaGlobe size={9} /> Store
+            </a>
           </div>
         </div>
       </div>
