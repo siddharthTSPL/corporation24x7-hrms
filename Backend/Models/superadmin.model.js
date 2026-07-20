@@ -56,7 +56,7 @@ const licenseSchema = new mongoose.Schema(
     plan: {
       type: String,
       enum: ["basic", "Advance", "enterprise"],
-      default: "startup",
+      default: "basic",
     },
     plan_type: {
       type: String,
@@ -73,12 +73,13 @@ const licenseSchema = new mongoose.Schema(
 
 const superAdminSchema = new mongoose.Schema(
   {
-    profile_image:{
-      type: String
+    profile_image: {
+      type: String,
     },
     organisation_id: {
       type: String,
       unique: true,
+      sparse: true,
     },
     f_name: String,
 
@@ -95,26 +96,49 @@ const superAdminSchema = new mongoose.Schema(
       required: true,
     },
 
+    phone: {
+      type: String,
+    },
+
     organisation_name: {
       type: String,
       required: true,
       unique: true,
     },
 
-    country: {
+    address: {
+      line1: { type: String, default: "" },
+      line2: { type: String, default: "" },
+      city: { type: String, default: "" },
+      state: { type: String, default: "" },
+      zip_code: { type: String, default: "" },
+      country: { type: String, default: "India" },
+    },
+
+    company_address: {
       type: String,
     },
 
-    state: {
+    company_size: {
       type: String,
     },
 
-    city: {
+    industry: {
       type: String,
     },
 
-    zip_code: {
+    pan_or_gstin: {
       type: String,
+    },
+
+    pan_gstin_type: {
+      type: String,
+      enum: ["PAN", "GSTIN"],
+    },
+
+    last_login: {
+      type: Date,
+      default: null,
     },
 
     company_domain: {
@@ -129,6 +153,21 @@ const superAdminSchema = new mongoose.Schema(
     ],
 
     licenses: [licenseSchema],
+
+    plan: {
+      type: String,
+      default: null,
+    },
+
+    plan_started_at: {
+      type: Date,
+      default: null,
+    },
+
+    plan_expires_at: {
+      type: Date,
+      default: null,
+    },
 
     trial_started_at: {
       type: Date,
@@ -150,9 +189,9 @@ const superAdminSchema = new mongoose.Schema(
       default: "super_admin",
     },
 
-    active_user_count:{
+    active_user_count: {
       type: Number,
-      default: 0
+      default: 1,
     },
 
     working_status: {
@@ -172,11 +211,11 @@ const superAdminSchema = new mongoose.Schema(
       default: false,
     },
 
-    // Dedicated credential for face-attendance kiosk devices. Kept
-    // completely separate from the superadmin's own login password so a
-    // tablet sitting at reception never holds (or needs) the actual
-    // account password — only whoever knows this org-level kiosk
-    // password can sign a device in.
+    isFirstLogin: {
+      type: Boolean,
+      default: false,
+    },
+
     kiosk_password: {
       type: String,
       select: false,
@@ -197,13 +236,12 @@ superAdminSchema.pre("validate", function () {
 });
 
 superAdminSchema.pre("save", async function () {
-  if (!this.isModified("password")) return;
-  this.password = await bcrypt.hash(this.password, 10);
-});
-
-superAdminSchema.pre("save", async function () {
-  if (!this.isModified("kiosk_password") || !this.kiosk_password) return;
-  this.kiosk_password = await bcrypt.hash(this.kiosk_password, 10);
+  if (this.isModified("password")) {
+    this.password = await bcrypt.hash(this.password, 10);
+  }
+  if (this.isModified("kiosk_password") && this.kiosk_password) {
+    this.kiosk_password = await bcrypt.hash(this.kiosk_password, 10);
+  }
 });
 
 superAdminSchema.methods.isValidPassword = async function (password) {
@@ -216,27 +254,48 @@ superAdminSchema.methods.isValidKioskPassword = async function (password) {
 };
 
 superAdminSchema.methods.isTrialValid = function () {
-  return new Date() < new Date(this.trial_expires_at);
+  return this.is_trial_active && new Date() < new Date(this.trial_expires_at);
 };
 
 superAdminSchema.methods.generateLicense = function (
   product,
   durationDays = 30,
-  plan = "startup"
+  plan = "basic",
+  users = 0,
+  plan_type = "monthly",
+  startDate = new Date()
 ) {
+  const activatedAt = new Date(startDate);
+  const expiresAt = new Date(
+    activatedAt.getTime() + durationDays * 24 * 60 * 60 * 1000
+  );
+
   const existing = this.licenses.find((l) => l.product === product);
 
   if (existing) {
-    throw new Error(`${product} already purchased`);
+    existing.activatedAt = activatedAt;
+    existing.expiresAt = expiresAt;
+    existing.isActive = true;
+    existing.plan = plan;
+    existing.users = users;
+    existing.plan_type = plan_type;
+
+    if (!this.purchased_products.includes(product)) {
+      this.purchased_products.push(product);
+    }
+
+    return existing;
   }
 
   const license = {
     product,
     license_key: generateLicenseKey(product),
-    activatedAt: new Date(),
-    expiresAt: new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000),
+    activatedAt,
+    expiresAt,
     isActive: true,
     plan,
+    users,
+    plan_type,
   };
 
   this.licenses.push(license);
@@ -257,6 +316,43 @@ superAdminSchema.methods.canAccessProduct = function (product) {
   }
 
   return license.isActive && new Date(license.expiresAt) > new Date();
+};
+
+superAdminSchema.methods.syncLicenseStatus = function (product) {
+  const license = this.licenses.find((l) => l.product === product);
+  if (!license) return false;
+
+  const expired = new Date(license.expiresAt) <= new Date();
+  if (expired && license.isActive) {
+    license.isActive = false;
+    return true;
+  }
+  return false;
+};
+
+superAdminSchema.methods.syncAllLicenseStatuses = function () {
+  let changed = false;
+  const now = new Date();
+  for (const license of this.licenses) {
+    if (license.isActive && new Date(license.expiresAt) <= now) {
+      license.isActive = false;
+      changed = true;
+    }
+  }
+  return changed;
+};
+
+superAdminSchema.statics.forceExpireStaleLicenses = async function () {
+  const now = new Date();
+  const result = await this.updateMany(
+    { "licenses.isActive": true, "licenses.expiresAt": { $lte: now } },
+    { $set: { "licenses.$[elem].isActive": false } },
+    { arrayFilters: [{ "elem.isActive": true, "elem.expiresAt": { $lte: now } }] }
+  );
+  return {
+    matchedDocuments: result.matchedCount,
+    modifiedDocuments: result.modifiedCount,
+  };
 };
 
 superAdminSchema.statics.checkDomainAvailable = async function (
