@@ -23,6 +23,7 @@ const AdminLeave = require("../Models/adleave.model");
 const SuperAdminModel = require("../Models/superadmin.model");
 const Document = require("../Models/document.model");
 const Ticket = require("../Models/ticket.model");
+const { startOfDay } = require("../automatic/weekoffcalendar");
 const { processLeaveDeduction } = require("../automatic/calculateleave");
 const AttendanceSummary = require("../Models/attendancesummary.model");
 const WFH = require("../Models/wfh.model");
@@ -667,7 +668,20 @@ const findallmanagerswoadmin = async (req, res, next) => {
 
     const organisation_id = req.admin.organisation_id;
 
-    const managers = await Managermodel.find({ organisation_id, working_status: "working" })
+    // Was querying every manager in the org, so any admin could see (and
+    // review) managers that don't report up to them. Scope to just this
+    // admin's own team, same as getTodayCheckins does.
+    const teamManagerIds = [...(await getAdminTeamManagerIds(req.admin._id, organisation_id))];
+
+    if (!teamManagerIds.length) {
+      return res.status(200).json({ success: true, organisation_id, count: 0, managers: [] });
+    }
+
+    const managers = await Managermodel.find({
+      organisation_id,
+      working_status: "working",
+      _id: { $in: teamManagerIds },
+    })
       .select(EXCLUDE)
       .populate("reporting_manager", "f_name l_name work_email designation")
       .lean();
@@ -2777,8 +2791,15 @@ const getTodayCheckins = async (req, res) => {
     return res.status(401).json({ success: false, message: "Unauthorized" });
 
   const organisation_id = req.admin.organisation_id;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // IMPORTANT: attendance.controller.js stores `date` as startOfDay(new Date())
+  // which is the IST calendar-day boundary (see automatic/weekoffcalendar.js /
+  // utils/Istdate.utils.js), NOT the server process's local midnight. Using
+  // `new Date(); today.setHours(0,0,0,0)` here reads the OS timezone of
+  // whichever machine Node happens to be running on - on a dev laptop that's
+  // usually IST already (so localhost "works"), but on the live server
+  // (typically UTC) it computes a midnight that's 5:30 hrs off from the
+  // stored `date`, so the query matches nothing and the map shows empty.
+  const today = startOfDay(new Date());
 
   // Scope to this admin's own team (managers under them + employees under
   // those managers) instead of the whole organisation.
@@ -2803,8 +2824,13 @@ const getTodayCheckins = async (req, res) => {
     checkIn: { $exists: true },
     employee: { $in: scopedEmployeeIds },
   })
-    .populate("employee", "f_name l_name work_email department designation")
-    .select("employee role latitude longitude checkIn checkOut source")
+    // `employee` uses refPath: "onModel", so Mongoose needs `onModel` itself
+    // loaded on the doc to know which collection (User/Manager/Admin) to
+    // populate from. The previous .select() below excluded it, which meant
+    // populate silently resolved employee to null for every record -> the
+    // "Unknown" name and missing avatar on every pin.
+    .populate("employee", "f_name l_name work_email department designation profile_image")
+    .select("employee onModel role latitude longitude checkIn checkOut source")
     .lean();
 
   const payload = checkins.map((c) => ({
@@ -2812,6 +2838,7 @@ const getTodayCheckins = async (req, res) => {
     name: [c.employee?.f_name, c.employee?.l_name].filter(Boolean).join(" ") || "Unknown",
     email: c.employee?.work_email || "",
     dept: c.employee?.department || c.employee?.designation || "",
+    avatar: c.employee?.profile_image || null,
     role: c.role,
     lat: c.latitude ?? null,
     lng: c.longitude ?? null,
