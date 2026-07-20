@@ -13,6 +13,7 @@ const cookieOpts = () => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
     maxAge: 15 * 24 * 60 * 60 * 1000,
   };
 };
@@ -341,6 +342,7 @@ const unifiedVerifyForgotPasswordOtp = async (req, res, next) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    path: "/",
     maxAge: 15 * 60 * 1000,
   });
 
@@ -402,6 +404,7 @@ const unifiedResetPassword = async (req, res, next) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    path: "/",
   });
 
   return res.status(200).json({ success: true, message: "Password updated successfully" });
