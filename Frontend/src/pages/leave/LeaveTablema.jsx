@@ -654,7 +654,7 @@ const ReasonBox = ({reason,accent,accentBorder,accentLabel}) => (
 
 const AvatarBox = ({name,subtext}) => {
   const cleanName = (name||"").trim();
-  const displayName = cleanName || "Former Employee";
+  const displayName = cleanName || "Promoted/Demoted Employee";
   const displaySubtext = subtext || (cleanName ? "" : "Profile unavailable — role was changed later");
   return (
     <div style={{display:"flex",alignItems:"center",gap:13,minWidth:0}}>
