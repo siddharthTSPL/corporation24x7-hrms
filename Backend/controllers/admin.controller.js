@@ -224,6 +224,7 @@ const adminlogin = async (req, res, next) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
   };
 
   // if (admin.isFirstLogin) {
@@ -278,6 +279,7 @@ const adminlogout = async (req, res, next) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
   });
   res.status(200).json({ message: "Admin logout successful" });
 };
@@ -2533,6 +2535,7 @@ const verifyAotp = async (req, res, next) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
   };
 
   res.cookie("token", token, { ...cookieOpts, maxAge: 7 * 24 * 60 * 60 * 1000 });
@@ -2596,6 +2599,7 @@ const resetAdminPassword = async (req, res, next) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
   });
 
   res.status(200).json({ success: true, message: "Password updated successfully" });
