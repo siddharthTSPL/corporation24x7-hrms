@@ -425,6 +425,8 @@ const LeaveTimeline = ({ leave }) => {
 const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, accentColor, personLabel, showTimeline }) => {
   const [expanded, setExpanded] = useState(false);
   const person = leave.employee || leave.manager || {};
+  const hasPerson = !!(person.f_name || person.l_name);
+  const roleGuess = leave.manager ? "Manager" : "Employee";
   const days   = leave.days || daysDiff(leave.startDate, leave.endDate);
   const accent = accentColor || (LEAVE_META[leave.leaveType] || { accent: "#8B3A8A" }).accent;
 
@@ -453,16 +455,24 @@ const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, acce
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <div className={`text-[12.5px] xs:text-[13px] sm:text-[14px] font-semibold truncate max-w-[140px] xs:max-w-[180px] sm:max-w-none ${(person.f_name || person.l_name) ? "text-[#1C1028]" : "text-[#9B8BAE] italic"}`}>
-                  {(person.f_name || person.l_name) ? `${person.f_name || ""} ${person.l_name || ""}` : `Unknown ${leave.manager ? "Manager" : "Employee"}`}
+                <div className={`text-[12.5px] xs:text-[13px] sm:text-[14px] font-semibold truncate max-w-[140px] xs:max-w-[180px] sm:max-w-none ${hasPerson ? "text-[#1C1028]" : "text-[#9B8BAE] italic"}`}>
+                  {hasPerson ? `${person.f_name || ""} ${person.l_name || ""}` : `Former ${roleGuess}`}
                 </div>
                 {personLabel && (
                   <span className="text-[9px] sm:text-[10px] font-bold bg-[#F3E8FF] text-[#6B21A8] px-2 py-px rounded-[10px]">
                     {personLabel}
                   </span>
                 )}
+                {!hasPerson && (
+                  <span
+                    className="text-[9px] sm:text-[10px] font-bold bg-[#FFF7ED] text-[#B45309] px-2 py-px rounded-[10px]"
+                    title="This person's role changed after this leave was recorded, so their live profile can no longer be linked."
+                  >
+                    Role changed
+                  </span>
+                )}
               </div>
-              <div className="text-[10px] sm:text-[11px] text-[#9B8BAE] mt-0.5 truncate max-w-[130px] xs:max-w-[180px] sm:max-w-none">{person.work_email || (person.f_name ? "" : "Account no longer available")}</div>
+              <div className="text-[10px] sm:text-[11px] text-[#9B8BAE] mt-0.5 truncate max-w-[130px] xs:max-w-[180px] sm:max-w-none">{person.work_email || (hasPerson ? "" : "Profile unavailable — role was changed later")}</div>
             </div>
           </div>
 
