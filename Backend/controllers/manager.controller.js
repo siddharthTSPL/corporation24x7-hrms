@@ -1101,9 +1101,19 @@ const editprofilemanager = async (req, res, next) => {
     const {
       personal_contact, e_contact, marital_status, profile_image, office_location, designation, gender,
       resume, aadhaar_card, pan_card, experience_letter,
-      bank_name, account_holder_name, account_number, ifsc_code,
+      bank_name, account_holder_name, account_number, ifsc_code, date_of_joining,
     } = req.body;
     let leaveUpdateRequired = false;
+    if (date_of_joining !== undefined) {
+      if (date_of_joining === null || date_of_joining === "") {
+        manager.date_of_joining = null;
+      } else {
+        const parsedDOJ = new Date(date_of_joining);
+        if (isNaN(parsedDOJ.getTime()))
+          return next(Object.assign(new Error("Invalid date of joining"), { statusCode: 400 }));
+        manager.date_of_joining = parsedDOJ;
+      }
+    }
     if (personal_contact !== undefined) {
       if (typeof personal_contact !== "string" || !PHONE_REGEX.test(personal_contact))
         return next(Object.assign(new Error("Phone number must be a valid 10-digit number"), { statusCode: 400 }));
@@ -1218,6 +1228,7 @@ const editprofilemanager = async (req, res, next) => {
         account_holder_name: manager.account_holder_name,
         account_number: manager.account_number,
         ifsc_code: manager.ifsc_code,
+        date_of_joining: manager.date_of_joining,
       },
     });
   } catch (error) {
