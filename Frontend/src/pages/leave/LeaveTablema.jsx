@@ -621,7 +621,8 @@ const ReasonBox = ({reason,accent,accentBorder,accentLabel}) => (
 
 const AvatarBox = ({name,subtext}) => {
   const cleanName = (name||"").trim();
-  const displayName = cleanName || "Unknown";
+  const displayName = cleanName || "Former Employee";
+  const displaySubtext = subtext || (cleanName ? "" : "Profile unavailable — role was changed later");
   return (
     <div style={{display:"flex",alignItems:"center",gap:13}}>
       <div style={{width:42,height:42,borderRadius:13,background:avatarColor(cleanName||"A"),color:"#fff",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"'DM Sans',sans-serif",boxShadow:"0 3px 9px rgba(0,0,0,0.14)"}}>
@@ -629,7 +630,7 @@ const AvatarBox = ({name,subtext}) => {
       </div>
       <div>
         <div style={{fontSize:14,fontWeight:600,color:cleanName?"#1C1028":"#9B8BAE",fontStyle:cleanName?"normal":"italic",fontFamily:"'DM Sans',sans-serif"}}>{displayName}</div>
-        {subtext&&<div style={{fontSize:11,color:"#9B8BAE",marginTop:2,fontFamily:"'DM Sans',sans-serif"}}>{subtext}</div>}
+        {displaySubtext&&<div style={{fontSize:11,color:"#9B8BAE",marginTop:2,fontFamily:"'DM Sans',sans-serif"}}>{displaySubtext}</div>}
       </div>
     </div>
   );
