@@ -42,6 +42,13 @@ function getErrorMessage(err) {
   return err?.response?.data?.message || err?.message || "Something went wrong";
 }
 
+function toDateInputValue(date) {
+  if (!date) return "";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
 function Badge({ children, color = C.brand, bg = C.brandLight }) {
   return (
     <span style={{
@@ -293,7 +300,7 @@ function Sidebar({ tab, setTab, manager, initials }) {
 }
 
 function ProfileTab({ manager }) {
-  const joined = manager?.createdAt;
+  const joined = manager?.date_of_joining || manager?.createdAt;
   const joinedFmt = joined ? new Date(joined).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—";
   const pwUpdated = manager?.updatedAt ? new Date(manager.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—";
 
@@ -355,6 +362,7 @@ function ContactTab({ manager, onSuccess, onError }) {
     gender:           manager?.gender           || "male",
     designation:      manager?.designation      || "",
     office_location:  manager?.office_location  || "Noida",
+    date_of_joining:  toDateInputValue(manager?.date_of_joining),
   });
 
   useEffect(() => {
@@ -366,6 +374,7 @@ function ContactTab({ manager, onSuccess, onError }) {
         gender:           manager.gender           || "male",
         designation:      manager.designation      || "",
         office_location:  manager.office_location  || "Noida",
+        date_of_joining:  toDateInputValue(manager.date_of_joining),
       });
     }
   }, [manager]);
@@ -422,6 +431,13 @@ function ContactTab({ manager, onSuccess, onError }) {
           {OFFICE_LOCATIONS.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
       </div>
+      <InputField
+        label="Date of joining"
+        type="date"
+        value={form.date_of_joining}
+        onChange={e => setForm(p => ({ ...p, date_of_joining: e.target.value }))}
+        hint="Shown on your dashboard in place of your account creation date"
+      />
       <div style={{ marginBottom: 20 }}>
         <FieldLabel>Gender</FieldLabel>
         <div style={{ display: "flex", gap: 10 }}>
@@ -958,5 +974,3 @@ export default function ManagerSettingsPage() {
     </div>
   );
 }
-
-

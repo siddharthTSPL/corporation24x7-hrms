@@ -87,6 +87,13 @@ function getErrorMessage(err) {
   return err?.response?.data?.message || err?.message || "Something went wrong";
 }
 
+function toDateInputValue(date) {
+  if (!date) return "";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
 function fmtDate(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
@@ -292,6 +299,7 @@ function ProfileTab({ adminData }) {
           {/* Department now shown in full form instead of short code */}
           <ReadonlyField label="Department" value={getDepartmentName(adminData?.department)} />
           <ReadonlyField label="Office location" value={adminData?.office_location} />
+          <ReadonlyField label="Date of joining" value={fmtDate(adminData?.date_of_joining || adminData?.createdAt)} />
           <ReadonlyField label="Working status" value={adminData?.working_status} />
           <ReadonlyField label="Last login" value={fmtDate(adminData?.last_login)} />
           <ReadonlyField label="Email verified" value={adminData?.isVerified ? "✓ Verified" : "Not verified"} />
@@ -316,6 +324,7 @@ function ContactTab({ adminData, onSuccess, onError }) {
   const [form, setForm] = useState({
     personal_contact: "", e_contact: "",
     country: "India", state: "Uttar Pradesh", city: "Bareilly",
+    date_of_joining: "",
   });
 
   useEffect(() => {
@@ -328,6 +337,7 @@ function ContactTab({ adminData, onSuccess, onError }) {
         personal_contact: adminData.personal_contact || "",
         e_contact: adminData.e_contact || "",
         country, state, city,
+        date_of_joining: toDateInputValue(adminData.date_of_joining),
       });
     }
   }, [adminData]);
@@ -355,7 +365,7 @@ function ContactTab({ adminData, onSuccess, onError }) {
     if (!PHONE_REGEX.test(form.personal_contact)) { onError("Phone number must be a valid 10-digit number"); return; }
     if (form.e_contact && !PHONE_REGEX.test(form.e_contact)) { onError("Emergency contact must be a valid 10-digit number"); return; }
     mutate(
-      { personal_contact: form.personal_contact, e_contact: form.e_contact, office_location: form.city },
+      { personal_contact: form.personal_contact, e_contact: form.e_contact, office_location: form.city, date_of_joining: form.date_of_joining },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["auth"] });
@@ -375,6 +385,13 @@ function ContactTab({ adminData, onSuccess, onError }) {
         <SelectField label="State" value={form.state} onChange={setState} options={Object.keys(LOCATION_DATA[form.country] || {})} />
         <SelectField label="City (office location)" value={form.city} onChange={setCity} options={cityOptions} />
       </Grid>
+      <InputField
+        label="Date of joining"
+        type="date"
+        value={form.date_of_joining}
+        onChange={e => setForm(p => ({ ...p, date_of_joining: e.target.value }))}
+        hint="Shown on your dashboard in place of your account creation date"
+      />
       <PrimaryButton onClick={handleSave} loading={isPending}>Save contact info</PrimaryButton>
     </SectionCard>
   );
