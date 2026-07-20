@@ -1037,7 +1037,7 @@ function AccountSummaryDrawer({
                           <Avatar name={`${(person.Under_manager||person.reporting_manager)?.f_name??""} ${(person.Under_manager||person.reporting_manager)?.l_name??""}`} size="sm"/>
                           <div className="min-w-0">
                             <p className="text-xs font-semibold text-[#730042] truncate">{(person.Under_manager||person.reporting_manager)?.f_name} {(person.Under_manager||person.reporting_manager)?.l_name}</p>
-                            <p className="text-[10px] text-[#993556] truncate">{(person.Under_manager||person.reporting_manager)?.work_email}</p>
+                            <p className="text-[10px] text-[#993556] truncate">{(person.Under_manager||person.reporting_manager)?.uid}</p>
                           </div>
                         </div>
                       </div>
