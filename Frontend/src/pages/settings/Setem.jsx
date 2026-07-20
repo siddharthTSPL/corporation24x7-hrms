@@ -42,6 +42,13 @@ function getErrorMessage(err) {
   return err?.response?.data?.message || err?.message || "Something went wrong";
 }
 
+function toDateInputValue(date) {
+  if (!date) return "";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
 function Badge({ children, color = C.brand, bg = C.brandLight }) {
   return (
     <span style={{
@@ -290,7 +297,7 @@ function Sidebar({ tab, setTab, employee, initials }) {
 }
 
 function ProfileTab({ employee }) {
-  const joined = employee?.createdAt;
+  const joined = employee?.date_of_joining || employee?.createdAt;
   const joinedFmt = joined ? new Date(joined).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—";
   const pwUpdated = employee?.passwordupdatedAt ? new Date(employee.passwordupdatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—";
 
@@ -369,6 +376,7 @@ function ContactTab({ employee, onSuccess, onError }) {
     e_contact: employee?.e_contact || "",
     marital_status: employee?.marital_status || "single",
     gender: employee?.gender || "male",
+    date_of_joining: toDateInputValue(employee?.date_of_joining),
   });
 
   useEffect(() => {
@@ -378,6 +386,7 @@ function ContactTab({ employee, onSuccess, onError }) {
         e_contact: employee.e_contact || "",
         marital_status: employee.marital_status || "single",
         gender: employee.gender || "male",
+        date_of_joining: toDateInputValue(employee.date_of_joining),
       });
     }
   }, [employee]);
@@ -410,6 +419,13 @@ function ContactTab({ employee, onSuccess, onError }) {
         onChange={e => setForm(p => ({ ...p, e_contact: e.target.value }))}
         placeholder="Enter emergency contact"
         hint="This contact will be reached in case of emergency"
+      />
+      <InputField
+        label="Date of joining"
+        type="date"
+        value={form.date_of_joining}
+        onChange={e => setForm(p => ({ ...p, date_of_joining: e.target.value }))}
+        hint="Shown on your dashboard in place of your account creation date"
       />
       <div style={{ marginBottom: 20 }}>
         <FieldLabel>Gender</FieldLabel>
@@ -858,5 +874,3 @@ export default function EmployeeSettingsPage() {
     </div>
   );
 }
-
-
