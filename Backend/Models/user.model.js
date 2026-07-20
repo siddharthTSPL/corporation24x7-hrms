@@ -140,6 +140,7 @@ const userSchema = new mongoose.Schema(
     isFirstLogin: { type: Boolean, default: true },
     passwordupdatedAt: { type: Date, default: Date.now },
     isverified: { type: Boolean, default: false },
+    date_of_joining: { type: Date, default: null },
   },
   { timestamps: true }
 );
