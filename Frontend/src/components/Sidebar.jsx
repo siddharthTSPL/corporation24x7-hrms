@@ -19,6 +19,7 @@ import {
   FaUsersCog,
   FaLock,
   FaMoneyCheckAlt,
+  FaClipboardCheck,
 } from "react-icons/fa";
 import { useAuth } from "../auth/store/getmeauth/getmeauth";
 import { useAdminLogout } from "../auth/server-state/adminauth/adminauth.hook";
@@ -32,7 +33,7 @@ const superAdminMenu = [
   { name: "Organisations",  path: "/superadmin-organisations", icon: <FaBuilding /> },
   { name: "Announcements",  path: "/superadmin-announcements", icon: <FaBullhorn /> },
   { name: "Leaves",         path: "/superadmin-leaves",        icon: <FaCalendarAlt /> },
-  { name: "Reviews",        path: "/superadmin-reviews",       icon: <FaBullhorn /> },
+  { name: "Reviews",        path: "/superadmin-reviews",       icon: <FaClipboardCheck /> },
   {name: "Asset Management", path: "/superadmin-asset-management", icon: <FaFolder /> },
   { name: "Team Documents", path: "/superadmin-documents",     icon: <FaFileAlt /> },
   { name:"Timesheet",       path: "/superadmin-timesheet",     icon: <FaLock /> },
@@ -46,7 +47,7 @@ const adminMenu = [
   { name: "Dashboard",     path: "/dashboard",           icon: <FaHome /> },
   { name: "Onboarding",    path: "/employee",            icon: <FaUsers /> },
   { name: "Announcement",  path: "/announcement",        icon: <FaBullhorn />,  permissionGroup: ["announcements.can_view_announcements", "announcements.can_create_announcement", "announcements.can_edit_announcement", "announcements.can_delete_announcement"] },
-  { name: "Review",        path: "/review-admin",        icon: <FaBullhorn /> },
+  { name: "Review",        path: "/review-admin",        icon: <FaClipboardCheck /> },
   { name: "Leave",         path: "/leave-admin",         icon: <FaCalendarAlt /> },
   { name: "Organisation",  path: "/organisation",        icon: <FaBuilding /> },
   { name:"Asset Management", path: "/admin-asset-management", icon: <FaFolder /> },
@@ -67,7 +68,7 @@ const managerMenu = [
   { name: "Leave",        path: "/leave-manager",        icon: <FaCalendarAlt /> },
   { name: "Announcement", path: "/announcement-manager", icon: <FaBullhorn />,  permissionGroup: ["announcements.can_view_announcements", "announcements.can_create_announcement", "announcements.can_edit_announcement", "announcements.can_delete_announcement"] },
   { name: "Organisation", path: "/organisation-manager", icon: <FaBuilding /> },
-  { name: "Review",       path: "/review-manager",       icon: <FaBullhorn /> },
+  { name: "Review",       path: "/review-manager",       icon: <FaClipboardCheck /> },
   { name: "Timesheet",    path: "/manager-timesheet",    icon: <FaLock /> },
   { name: "File",         path: "/file-manager",         icon: <FaFolder />,    permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Recruitment",  path: "/recruitment-manager",  icon: <FaUsersCog />,  permissionGroup: ["recruitment.can_view_hiring_requisitions", "recruitment.can_create_hiring_requisition", "recruitment.can_view_candidates", "recruitment.can_add_candidate"] },
