@@ -1185,7 +1185,7 @@ export default function Dashboard() {
             <CardAccent color="#1D9E75" />
             <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between border-b border-[#ede5e0]">
               <span className="text-[12px] font-semibold font-sans">Leave balance</span>
-              <span className="text-[10px] text-[#b0948a] font-sans">FY 2025–26</span>
+              <span className="text-[10px] text-[#b0948a] font-sans">FY 2026–27</span>
             </div>
             <div className="px-4 sm:px-5 pb-1">
               {meLoading
