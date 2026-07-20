@@ -930,7 +930,7 @@ export default function EmployeeDashboard() {
               <InfoField label="Contact" value={employee?.personal_contact} loading={meLoading} />
               <InfoField label="Emergency contact" value={employee?.e_contact} loading={meLoading} />
               <InfoField label="Manager" value={managerName} loading={meLoading} />
-              <InfoField label="Member since" value={employee?.createdAt?fmtDate(employee.createdAt):null} loading={meLoading} />
+              <InfoField label="Member since" value={joiningDate?fmtDate(joiningDate):null} loading={meLoading} />
             </div>
           </div>
 
