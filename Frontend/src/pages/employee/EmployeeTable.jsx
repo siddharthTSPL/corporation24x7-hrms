@@ -1297,15 +1297,12 @@ function ActionMenu({user,onView,onEdit,onDelete,onPromoteToManager,onPromoteToA
       if(!btnRef.current)return;
       const rect=btnRef.current.getBoundingClientRect();
       const menuWidth=190;
-      const menuHeightEstimate=320;
       let left=rect.right-menuWidth;
       if(left<8)left=8;
       if(left+menuWidth>window.innerWidth-8)left=window.innerWidth-menuWidth-8;
       let top=rect.bottom+4;
-      if(top+menuHeightEstimate>window.innerHeight){
-        top=rect.top-menuHeightEstimate-4;
-        if(top<8)top=8;
-      }
+      const maxTop=window.innerHeight-8;
+      if(top>maxTop)top=maxTop;
       setPos({top,left});
     };
     updatePos();
@@ -2134,7 +2131,7 @@ export default function EmployeeTable(){
   const inactiveCount = inactiveData?.count ?? 0;
 
   return(
-    <div className="min-h-screen overflow-x-hidden p-3 sm:p-4 md:p-6 lg:p-8 font-['DM_Sans',system-ui,sans-serif]" style={{background:"#F9F8F2"}}>
+    <div className="min-h-screen w-full min-w-0 overflow-x-hidden p-3 sm:p-4 md:p-6 lg:p-8 font-['DM_Sans',system-ui,sans-serif]" style={{background:"#F9F8F2"}}>
       <style>{`
         .scrollbar-hide::-webkit-scrollbar{display:none;}
         .scrollbar-hide{-ms-overflow-style:none;scrollbar-width:none;}
