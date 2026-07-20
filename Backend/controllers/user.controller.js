@@ -751,9 +751,20 @@ const editprofile = async (req, res, next) => {
   const {
     personal_contact, e_contact, marital_status, profile_image, gender, office_location,
     resume, aadhaar_card, pan_card, experience_letter,
-    bank_name, account_holder_name, account_number, ifsc_code,
+    bank_name, account_holder_name, account_number, ifsc_code, date_of_joining,
   } = req.body;
   let leaveUpdateRequired = false;
+
+  if (date_of_joining !== undefined) {
+    if (date_of_joining === null || date_of_joining === "") {
+      employee.date_of_joining = null;
+    } else {
+      const parsedDOJ = new Date(date_of_joining);
+      if (isNaN(parsedDOJ.getTime()))
+        return next(Object.assign(new Error("Invalid date of joining"), { statusCode: 400 }));
+      employee.date_of_joining = parsedDOJ;
+    }
+  }
 
   if (personal_contact !== undefined) {
     if (typeof personal_contact !== "string" || !PHONE_REGEX.test(personal_contact))
@@ -891,6 +902,7 @@ const editprofile = async (req, res, next) => {
       account_holder_name: employee.account_holder_name,
       account_number: employee.account_number,
       ifsc_code: employee.ifsc_code,
+      date_of_joining: employee.date_of_joining,
     },
   });
 };
