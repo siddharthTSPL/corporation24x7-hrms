@@ -17,6 +17,7 @@ const {
   addemployee,
   findallmanagers,
   getallemployee,
+  getMyTeamOverview,
   editemployee,
   editmanager,
   promoteEmployeeToManager,
@@ -131,6 +132,11 @@ adminrouter.get(
   "/getallemployee",
   adminOrSuperAdminAuth,
   asyncHandler(getallemployee),
+);
+adminrouter.get(
+  "/dashboard/myteam",
+  adminauthmiddleware,
+  asyncHandler(getMyTeamOverview),
 );
 adminrouter.put(
   "/editemployee/:id",
