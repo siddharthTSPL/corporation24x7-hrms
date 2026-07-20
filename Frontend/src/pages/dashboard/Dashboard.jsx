@@ -625,13 +625,16 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
     if (!checkins.length) return;
 
     const bounds = [];
-    checkins.forEach(({ lat, lng, name, role, dept, email, checkIn, checkedOut, source }) => {
+    checkins.forEach(({ lat, lng, name, role, dept, email, checkIn, checkedOut, source, avatar }) => {
       if (!lat || !lng) return;
       const color = role?.toLowerCase() === "admin" ? "#4a0029" : role?.toLowerCase() === "manager" ? "#730042" : "#a0005c";
       const size = role?.toLowerCase() === "manager" || role?.toLowerCase() === "admin" ? 15 : 11;
       const pulse = size + 14;
       const inits = getInitials(...(name || "?").split(" "));
       const deptFull = getDeptFullForm(dept);
+      const avatarHtml = avatar
+        ? `<img src="${avatar}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0;" />`
+        : `<div style="width:32px;height:32px;border-radius:50%;background:${color};color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">${inits}</div>`;
 
       const icon = L.divIcon({
         className: "",
@@ -646,7 +649,7 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
         .bindPopup(
           `<div style="font-family:'DM Sans',sans-serif;padding:6px 4px;min-width:175px;">
             <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px;">
-              <div style="width:32px;height:32px;border-radius:50%;background:${color};color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">${inits}</div>
+              ${avatarHtml}
               <div>
                 <div style="font-weight:700;font-size:13px;color:${color};">${name || "Unknown"}</div>
                 <div style="font-size:11px;color:#8a6070;text-transform:capitalize;">${role ?? ""}${deptFull ? " · " + deptFull : ""}</div>
@@ -702,9 +705,13 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
         <div className="absolute bottom-2 left-2 right-2 z-[500] flex flex-wrap gap-1.5 pointer-events-none">
           {noPinCheckins.map((c) => (
             <div key={c.id} className="pointer-events-auto flex items-center gap-1.5 bg-white/95 border border-[#ede5e0] rounded-full pl-1 pr-2.5 py-1 shadow-sm text-[10px] font-sans text-[#2a1a16]">
-              <span className="w-4 h-4 rounded-full bg-[#a0005c] text-white flex items-center justify-center text-[8px] font-bold shrink-0">
-                {getInitials(...(c.name || "?").split(" "))}
-              </span>
+              {c.avatar ? (
+                <img src={c.avatar} alt="" className="w-4 h-4 rounded-full object-cover shrink-0" />
+              ) : (
+                <span className="w-4 h-4 rounded-full bg-[#a0005c] text-white flex items-center justify-center text-[8px] font-bold shrink-0">
+                  {getInitials(...(c.name || "?").split(" "))}
+                </span>
+              )}
               <span className="font-medium truncate max-w-[90px]">{c.name || "Unknown"}</span>
               <span className="text-[#b0948a]">{c.source === "face" ? "🤳" : "💻"} {fmtTime(c.checkIn)}</span>
             </div>
