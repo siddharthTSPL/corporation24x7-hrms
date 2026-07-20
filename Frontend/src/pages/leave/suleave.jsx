@@ -365,7 +365,7 @@ const PersonCard = ({ person, accentBadge }) => {
       </div>
       <div className="min-w-0 flex-1">
         <div className={`text-sm font-semibold truncate ${hasPerson ? "text-gray-800" : "text-gray-400 italic"}`}>
-          {hasPerson ? `${person.f_name} ${person.l_name}` : "Former Employee"}
+          {hasPerson ? `${person.f_name} ${person.l_name}` : "Promoted/demoted Employee"}
         </div>
         <div className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
           <span className="truncate">{hasPerson ? person.work_email : "Profile unavailable — role was changed later"}</span>
