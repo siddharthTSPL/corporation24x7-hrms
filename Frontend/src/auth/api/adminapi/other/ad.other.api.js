@@ -24,6 +24,13 @@ export const getAllEmployee = async () => {
   return res.data;
 };
 
+// Dashboard-only: managers + employees that report (directly or through a
+// chain of managers) to the logged-in admin, not the whole organisation.
+export const getMyTeamOverview = async () => {
+  const res = await api.get("/admin/dashboard/myteam");
+  return res.data;
+};
+
 export const getParticularEmployee = async (id) => {
   const res = await api.get(`/admin/getperticularemployee/${id}`);
   return res.data;
