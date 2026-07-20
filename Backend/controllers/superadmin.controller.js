@@ -11,6 +11,7 @@ const Review = require("../Models/review.model");
 const leavebalanceModel = require("../Models/leavebalance.model");
 const reviewModel = require("../Models/review.model");
 const Attendance = require("../Models/attendance.model");
+const { startOfDay } = require("../automatic/weekoffcalendar");
 const generateUID = require("../automatic/uidgeneration");
 const assignDefaultLeave = require("../automatic/bydefaultleaveset");
 const LeavePolicy = require("../Models/Leavepolicy.model");
@@ -1820,8 +1821,12 @@ const reviewtoadmin = async (req, res, next) => {
 const getTodayCheckins = async (req, res, next) => {
   const organisation_id = req.superAdmin._id;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Use the same IST-based day boundary that attendance.controller.js stores
+  // `date` with. new Date().setHours(0,0,0,0) reads the server process's OS
+  // timezone, which differs between localhost (usually IST) and the live
+  // server (usually UTC) - that mismatch is why check-ins showed up locally
+  // but not on production.
+  const today = startOfDay(new Date());
 
   const checkins = await Attendance.find({
     organisation_id,
@@ -1830,8 +1835,11 @@ const getTodayCheckins = async (req, res, next) => {
     latitude: { $exists: true, $ne: null },
     longitude: { $exists: true, $ne: null },
   })
-    .populate("employee", "f_name l_name work_email department designation")
-    .select("employee role latitude longitude checkIn checkOut")
+    // onModel drives the refPath on `employee` - it must be selected or
+    // populate can't tell which collection (User/Manager/Admin) to resolve
+    // against, and silently returns employee: null (-> "Unknown").
+    .populate("employee", "f_name l_name work_email department designation profile_image")
+    .select("employee onModel role latitude longitude checkIn checkOut")
     .lean();
 
   const payload = checkins.map((c) => ({
@@ -1841,6 +1849,7 @@ const getTodayCheckins = async (req, res, next) => {
       "Unknown",
     email: c.employee?.work_email || "",
     dept: c.employee?.department || c.employee?.designation || "",
+    avatar: c.employee?.profile_image || null,
     role: c.role,
     lat: c.latitude,
     lng: c.longitude,
@@ -2579,5 +2588,3 @@ module.exports = {
   setLeavePolicy,
   getperticularadmin
 };
-
-
