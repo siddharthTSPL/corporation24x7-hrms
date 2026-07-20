@@ -4,8 +4,6 @@ import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook"
 import { useGetAllEmployee, useGetTodayCheckins, useGetAttendanceHistory } from "../../auth/server-state/adminother/adminother.hook";
 import {
   useGetForwardedLeaves,
-  useAcceptLeave,
-  useRejectLeave,
   useAdminGetMyLeaveHistory,
 } from "../../auth/server-state/adminleave/adminleave.hook";
 import { useAdminGetMyWFH } from "../../auth/server-state/adminwfh/adminwfh.hook";
@@ -701,76 +699,62 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
   );
 };
 
-function leaveTypeColor(type="") {
-  const t=type.toLowerCase();
-  if (t.includes("sick")||t.includes("sl")) return "#1D9E75";
-  if (t.includes("earn")||t.includes("el")) return "#730042";
-  if (t.includes("pat")||t.includes("pl")) return "#378ADD";
-  if (t.includes("mat")||t.includes("ml")) return "#9333EA";
-  return "#730042";
+const ANNOUNCEMENT_PREVIEW_LEN = 110;
+
+function AnnouncementItem({ ann }) {
+  const [expanded, setExpanded] = useState(false);
+  const message = ann.message || "";
+  const isLong = message.length > ANNOUNCEMENT_PREVIEW_LEN;
+  const shown = expanded || !isLong ? message : `${message.slice(0, ANNOUNCEMENT_PREVIEW_LEN).trimEnd()}…`;
+
+  return (
+    <div className="p-3.5 border-b border-[#f0e8e4] last:border-0 hover:bg-[#fdfcfb] transition-colors">
+      <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+        <Badge variant={ann.priority === "high" ? "red" : ann.priority === "low" ? "slate" : "amber"}>
+          {(ann.priority || "normal").toString().replace(/^\w/, c => c.toUpperCase())}
+        </Badge>
+        <Badge variant="slate">{(ann.audience || "all").toString().toUpperCase()}</Badge>
+        {ann.expiresAt && (
+          <span className="ml-auto text-[10px] text-[#b0948a] font-sans">Expires {fmtDate(ann.expiresAt)}</span>
+        )}
+      </div>
+      <p className="text-[12px] font-semibold text-[#2a1a16] font-sans mb-1">{ann.title}</p>
+      <p className="text-[11px] text-[#7a6a63] font-sans leading-relaxed whitespace-pre-wrap break-words">{shown}</p>
+      {isLong && (
+        <button
+          onClick={() => setExpanded(v => !v)}
+          className="mt-1.5 text-[10px] font-semibold text-[#730042] cursor-pointer bg-none border-none p-0 hover:underline font-sans"
+        >
+          {expanded ? "See less" : "See more"}
+        </button>
+      )}
+    </div>
+  );
 }
 
-function LeaveRequestsPanel({ leaves, loading, onAccept, onReject, accepting, rejecting }) {
-  const pendingCount = leaves.filter(l => (l.status||"").toLowerCase().includes("pending")).length;
+function AnnouncementsPanel({ announcements, loading }) {
+  const urgentCount = announcements.filter(a => a.priority === "high").length;
   return (
     <div className="bg-white rounded-2xl border border-[#ede5e0] shadow-sm overflow-hidden flex flex-col h-full">
-      <div className="px-4 sm:px-5 py-3.5 border-b border-[#ede5e0] flex items-center justify-between">
-        <span className="text-[12px] font-semibold font-sans">Leave Requests</span>
-        {pendingCount>0 && <Badge variant="amber">{pendingCount} pending</Badge>}
+      <div className="px-4 sm:px-5 py-3.5 border-b border-[#ede5e0] flex items-center justify-between gap-2">
+        <span className="text-[12px] font-semibold font-sans">📢 Announcements</span>
+        <div className="flex items-center gap-1.5">
+          {urgentCount>0 && <Badge variant="red">{urgentCount} urgent</Badge>}
+          {!loading && <Badge variant="brand">{announcements.length} total</Badge>}
+        </div>
       </div>
       <div className="overflow-y-auto max-h-[420px] flex-1">
         {loading ? (
           <div className="p-4 flex flex-col gap-2.5">
             {[1,2,3].map(i => <Skeleton key={i} className="h-14 rounded-xl w-full" />)}
           </div>
-        ) : leaves.length===0 ? (
+        ) : announcements.length===0 ? (
           <div className="text-center py-10 px-5 text-[#cfc3bc]">
-            <div className="text-3xl mb-2.5">✅</div>
-            <p className="text-[12px] font-sans">No leave requests. All clear.</p>
+            <div className="text-3xl mb-2.5">📢</div>
+            <p className="text-[12px] font-sans">No announcements yet.</p>
           </div>
         ) : (
-          leaves.map((leave) => {
-            const name = leave.employeeName || leave.name ||
-              (leave.employee ? [leave.employee.f_name, leave.employee.l_name].filter(Boolean).join(" ") : "") ||
-              leave.manager ? [leave.manager?.f_name, leave.manager?.l_name].filter(Boolean).join(" ") : "Employee";
-            const type = leave.leaveType || leave.type || "Leave";
-            const from = leave.startDate || leave.from || leave.fromDate || "";
-            const to = leave.endDate || leave.to || leave.toDate || "";
-            const status = (leave.status||"pending").toLowerCase();
-            const isPending = status.includes("pending");
-            return (
-              <div key={leave._id||leave.id} className="p-3.5 border-b border-[#f0e8e4] last:border-0 flex items-start gap-2.5 hover:bg-[#fdfcfb] transition-colors">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
-                  style={{ background: leaveTypeColor(type) }}>
-                  {getInitials(...(name||"E").split(" "))}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[12px] font-semibold text-[#2a1a16] truncate font-sans">{name||"Employee"}</div>
-                  <div className="text-[10px] text-[#b0948a] mt-0.5 font-sans">{type} · {fmtDate(from)}{to&&to!==from?` → ${fmtDate(to)}`:""}</div>
-                  {isPending ? (
-                    <div className="flex gap-1.5 mt-2">
-                      <button onClick={()=>onAccept(leave._id||leave.id)} disabled={accepting}
-                        className="bg-green-50 text-green-700 border border-green-200 rounded-md px-2.5 py-1 text-[10px] font-semibold cursor-pointer hover:bg-green-600 hover:text-white transition-all disabled:opacity-50 font-sans">
-                        Approve
-                      </button>
-                      <button onClick={()=>onReject(leave._id||leave.id)} disabled={rejecting}
-                        className="bg-red-50 text-red-700 border border-red-200 rounded-md px-2.5 py-1 text-[10px] font-semibold cursor-pointer hover:bg-red-600 hover:text-white transition-all disabled:opacity-50 font-sans">
-                        Reject
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="inline-block mt-1.5 px-2 py-0.5 rounded-full text-[9px] font-semibold capitalize"
-                      style={{
-                        background: status.includes("approved") ? "#e8f5e9" : status.includes("rejected") ? "#fcebeb" : "#faeeda",
-                        color: status.includes("approved") ? "#1a6b48" : status.includes("rejected") ? "#791F1F" : "#92400E",
-                      }}>
-                      {status.replace(/_/g," ")}
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })
+          announcements.map((ann) => <AnnouncementItem key={ann._id} ann={ann} />)
         )}
       </div>
     </div>
@@ -807,12 +791,9 @@ export default function Dashboard() {
   const { data:wfhData, isLoading:wfhLoading }=useAdminGetMyWFH();
   const { data:empData, isLoading:empLoading }=useGetAllEmployee();
   const { data:checkinData, isLoading:mapLoading }=useGetTodayCheckins();
-  const { data:leaveReqData, isLoading:leaveReqLoading }=useGetForwardedLeaves();
+  const { data:leaveReqData }=useGetForwardedLeaves();
   const { data:calMeta }=useCalendarMeta(selectedMonth, new Date().getFullYear());
   const { data:annData, isLoading:annLoading }=useGetAllAnnouncement();
-
-  const { mutate:acceptLeave, isPending:accepting }=useAcceptLeave();
-  const { mutate:rejectLeave, isPending:rejecting }=useRejectLeave();
 
   const employee=meData?.user??null;
   const lb=meData?.leaveBalance??null;
@@ -1016,14 +997,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <LeaveRequestsPanel
-            leaves={leaveRequests}
-            loading={leaveReqLoading}
-            onAccept={(id)=>acceptLeave(id)}
-            onReject={(id)=>rejectLeave(id)}
-            accepting={accepting}
-            rejecting={rejecting}
-          />
+          <AnnouncementsPanel announcements={announcements} loading={annLoading} />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 mb-3.5">
@@ -1246,46 +1220,6 @@ export default function Dashboard() {
             </div>
             <ReviewCard reviews={reviews} loading={meLoading} />
           </div>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-[#ede5e0] shadow-sm overflow-hidden relative animate-fadein hover:shadow-lg transition-shadow mb-3.5">
-          <CardAccent color="#730042" />
-          <div className="p-4 sm:p-5 border-b border-[#ede5e0] flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2 font-sans text-[12px] font-semibold">
-              📢 Announcements
-            </div>
-            {!annLoading && <Badge variant="brand">{announcements.length} total</Badge>}
-          </div>
-
-          {annLoading ? (
-            <div className="text-center py-10 px-5 text-[#cfc3bc]">
-              <div className="text-3xl mb-2.5">⏳</div>
-              <p className="text-[12px] font-sans">Loading announcements…</p>
-            </div>
-          ) : announcements.length === 0 ? (
-            <div className="text-center py-10 px-5 text-[#cfc3bc]">
-              <div className="text-3xl mb-2.5">📢</div>
-              <p className="text-[12px] font-sans">No announcements yet.</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-[#ede5e0]">
-              {announcements.slice(0, 5).map((ann) => (
-                <div key={ann._id} className="p-4 sm:p-5">
-                  <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-                    <Badge variant={ann.priority === "high" ? "red" : ann.priority === "low" ? "slate" : "amber"}>
-                      {(ann.priority || "normal").toString().replace(/^\w/, c => c.toUpperCase())}
-                    </Badge>
-                    <Badge variant="slate">{(ann.audience || "all").toString().toUpperCase()}</Badge>
-                    {ann.expiresAt && (
-                      <span className="ml-auto text-[10px] text-[#b0948a] font-sans">Expires {fmtDate(ann.expiresAt)}</span>
-                    )}
-                  </div>
-                  <p className="text-[12px] font-semibold text-[#2a1a16] font-sans mb-1">{ann.title}</p>
-                  <p className="text-[11px] text-[#7a6a63] font-sans leading-relaxed whitespace-pre-wrap break-words">{ann.message}</p>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         <div className="bg-white rounded-2xl border border-[#ede5e0] shadow-sm overflow-hidden">
