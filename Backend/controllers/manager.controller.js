@@ -128,6 +128,7 @@ const managerlogin = async (req, res, next) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
     maxAge: 15 * 24 * 60 * 60 * 1000,
   });
 
@@ -148,7 +149,7 @@ const managerlogout = async (req, res, next) => {
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
     await managermodel.findByIdAndUpdate(req.manager._id, { status: "inactive" });
     const isProduction = process.env.NODE_ENV === "production";
-    res.clearCookie("token", { httpOnly: true, secure: isProduction, sameSite: isProduction ? "none" : "lax" });
+    res.clearCookie("token", { httpOnly: true, secure: isProduction, sameSite: isProduction ? "none" : "lax", path: "/" });
     res.status(200).json({ message: "Manager logout successful" });
   } catch (error) {
     next(error);
