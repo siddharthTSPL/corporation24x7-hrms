@@ -823,7 +823,7 @@ export default function Dashboard() {
   const allLeaves=histData?.leave??histData?.leaves??[];
   const reviews=meData?.reviews??[];
 
-  const joiningDate=employee?.createdAt??null;
+  const joiningDate=employee?.date_of_joining??employee?.createdAt??null;
 
   const checkinGate = useMemo(() => {
     if (!calMeta?.today) return { canCheckIn: false, reason: "loading" };
@@ -1208,7 +1208,7 @@ export default function Dashboard() {
               <InfoField label="Marital status" value={employee?.marital_status} loading={meLoading} />
               <InfoField label="Contact" value={employee?.personal_contact} loading={meLoading} />
               <InfoField label="Emergency contact" value={employee?.e_contact} loading={meLoading} />
-              <InfoField label="Member since" value={employee?.createdAt?fmtDate(employee.createdAt):null} loading={meLoading} />
+              <InfoField label="Member since" value={joiningDate?fmtDate(joiningDate):null} loading={meLoading} />
             </div>
           </div>
 

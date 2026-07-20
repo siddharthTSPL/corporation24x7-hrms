@@ -1379,7 +1379,7 @@ export default function ManagerDashboard() {
             <InfoField label="Emergency contact" value={manager?.e_contact}        loading={meLoading}/>
             <InfoField label="Role"              value={getRoleFullForm(manager?.role)}             loading={meLoading}/>
             <InfoField label="Member since"
-              value={manager?.createdAt ? fmtDate(manager.createdAt) : null}
+              value={joiningDate ? fmtDate(joiningDate) : null}
               loading={meLoading}/>
           </div>
         </div>

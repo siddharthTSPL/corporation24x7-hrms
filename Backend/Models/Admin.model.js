@@ -227,6 +227,11 @@ const adminSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    date_of_joining: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
