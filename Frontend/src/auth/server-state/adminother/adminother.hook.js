@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  getAllEmployee, getParticularEmployee, deleteUser, getEmployeeStats, reviewToManager,
+  getAllEmployee, getMyTeamOverview, getParticularEmployee, deleteUser, getEmployeeStats, reviewToManager,
   editEmployee, editManager, getparticularEmployeeStats, getParticularManager,
   getTodayCheckins, getOrgInfo, changeManagerRole, demoteManagerToEmployee,
   demoteAdminToManager, demoteAdminToEmployee, promoteEmployeeToManager,
@@ -14,6 +14,17 @@ export const useGetAllEmployee = () => {
   return useQuery({
     queryKey: ["employees"],
     queryFn: getAllEmployee,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
+};
+
+// Dashboard-only: scoped to the logged-in admin's own team.
+export const useGetMyTeamOverview = () => {
+  return useQuery({
+    queryKey: ["myTeamOverview"],
+    queryFn: getMyTeamOverview,
     staleTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: true,

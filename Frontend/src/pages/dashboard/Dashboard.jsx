@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
-import { useGetAllEmployee, useGetTodayCheckins, useGetAttendanceHistory } from "../../auth/server-state/adminother/adminother.hook";
+import { useGetMyTeamOverview, useGetTodayCheckins, useGetAttendanceHistory } from "../../auth/server-state/adminother/adminother.hook";
 import {
   useGetForwardedLeaves,
   useAdminGetMyLeaveHistory,
@@ -625,13 +625,16 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
     if (!checkins.length) return;
 
     const bounds = [];
-    checkins.forEach(({ lat, lng, name, role, dept, email, checkIn, checkedOut }) => {
+    checkins.forEach(({ lat, lng, name, role, dept, email, checkIn, checkedOut, source, avatar }) => {
       if (!lat || !lng) return;
       const color = role?.toLowerCase() === "admin" ? "#4a0029" : role?.toLowerCase() === "manager" ? "#730042" : "#a0005c";
       const size = role?.toLowerCase() === "manager" || role?.toLowerCase() === "admin" ? 15 : 11;
       const pulse = size + 14;
       const inits = getInitials(...(name || "?").split(" "));
       const deptFull = getDeptFullForm(dept);
+      const avatarHtml = avatar
+        ? `<img src="${avatar}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0;" />`
+        : `<div style="width:32px;height:32px;border-radius:50%;background:${color};color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">${inits}</div>`;
 
       const icon = L.divIcon({
         className: "",
@@ -646,7 +649,7 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
         .bindPopup(
           `<div style="font-family:'DM Sans',sans-serif;padding:6px 4px;min-width:175px;">
             <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px;">
-              <div style="width:32px;height:32px;border-radius:50%;background:${color};color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">${inits}</div>
+              ${avatarHtml}
               <div>
                 <div style="font-weight:700;font-size:13px;color:${color};">${name || "Unknown"}</div>
                 <div style="font-size:11px;color:#8a6070;text-transform:capitalize;">${role ?? ""}${deptFull ? " · " + deptFull : ""}</div>
@@ -654,6 +657,7 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
             </div>
             ${email ? `<div style="font-size:11px;color:#8a6070;margin-bottom:6px;">✉ ${email}</div>` : ""}
             <div style="font-size:11px;color:#333;">✅ <strong>Check-in:</strong> ${fmtTime(checkIn)}</div>
+            <div style="font-size:11px;color:#8a6070;margin-top:3px;">${source === "face" ? "🤳 Face terminal" : "💻 System (live)"}</div>
             ${checkedOut
               ? `<div style="font-size:11px;color:#0d9e6e;margin-top:3px;">🏁 Checked out</div>`
               : `<div style="font-size:11px;color:#b8760a;margin-top:3px;">🟡 Still on duty</div>`}
@@ -681,6 +685,8 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
     };
   }, []);
 
+  const noPinCheckins = checkins.filter((c) => !c.lat || !c.lng);
+
   return (
     <div className="h-full w-full relative">
       <div ref={mapRef} className="h-full w-full" />
@@ -693,6 +699,23 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-[500] pointer-events-none">
           <span className="text-3xl">📍</span>
           <p className="text-sm text-[#8a6070] m-0">No check-ins recorded yet today</p>
+        </div>
+      )}
+      {!loading && noPinCheckins.length > 0 && (
+        <div className="absolute bottom-2 left-2 right-2 z-[500] flex flex-wrap gap-1.5 pointer-events-none">
+          {noPinCheckins.map((c) => (
+            <div key={c.id} className="pointer-events-auto flex items-center gap-1.5 bg-white/95 border border-[#ede5e0] rounded-full pl-1 pr-2.5 py-1 shadow-sm text-[10px] font-sans text-[#2a1a16]">
+              {c.avatar ? (
+                <img src={c.avatar} alt="" className="w-4 h-4 rounded-full object-cover shrink-0" />
+              ) : (
+                <span className="w-4 h-4 rounded-full bg-[#a0005c] text-white flex items-center justify-center text-[8px] font-bold shrink-0">
+                  {getInitials(...(c.name || "?").split(" "))}
+                </span>
+              )}
+              <span className="font-medium truncate max-w-[90px]">{c.name || "Unknown"}</span>
+              <span className="text-[#b0948a]">{c.source === "face" ? "🤳" : "💻"} {fmtTime(c.checkIn)}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -789,7 +812,7 @@ export default function Dashboard() {
   const { data:attData, isLoading:attLoading }=useTodayAttendance();
   const { data:attHistoryData }=useGetAttendanceHistory();
   const { data:wfhData, isLoading:wfhLoading }=useAdminGetMyWFH();
-  const { data:empData, isLoading:empLoading }=useGetAllEmployee();
+  const { data:empData, isLoading:empLoading }=useGetMyTeamOverview();
   const { data:checkinData, isLoading:mapLoading }=useGetTodayCheckins();
   const { data:leaveReqData }=useGetForwardedLeaves();
   const { data:calMeta }=useCalendarMeta(selectedMonth, new Date().getFullYear());
@@ -814,7 +837,7 @@ export default function Dashboard() {
     };
   }, [calMeta]);
 
-  const employees = Array.isArray(empData?.employees) ? empData.employees : Array.isArray(empData) ? empData : [];
+  const employees = Array.isArray(empData?.users) ? empData.users : Array.isArray(empData) ? empData : [];
   const announcements = Array.isArray(annData?.announcements) ? annData.announcements : Array.isArray(annData) ? annData : [];
   const checkins = checkinData?.checkins ?? [];
   const leaveRequests = Array.isArray(leaveReqData?.leaves) ? leaveReqData.leaves : Array.isArray(leaveReqData) ? leaveReqData : [];
@@ -902,6 +925,8 @@ export default function Dashboard() {
 
   const totalEmployees = empData?.count || employees.length || 0;
   const presentTodayCount = checkinData?.total ?? checkins.length;
+  const liveCheckinCount = useMemo(()=>checkins.filter(c=>c.source!=="face").length,[checkins]);
+  const faceCheckinCount = useMemo(()=>checkins.filter(c=>c.source==="face").length,[checkins]);
 
   if (meError) return (
     <div className="font-sans bg-[#f9f8f2] min-h-screen flex items-center justify-center p-6">
@@ -991,6 +1016,12 @@ export default function Dashboard() {
                   <div className="w-2 h-2 rounded-full" style={{ background:c }} />{l}
                 </div>
               ))}
+              <div className="flex items-center gap-1.5 text-[10px] text-[#b0948a] font-sans">
+                💻 {liveCheckinCount} live
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px] text-[#b0948a] font-sans">
+                🤳 {faceCheckinCount} face
+              </div>
               <span className="ml-auto text-[10px] text-[#cfc3bc] font-sans hidden sm:inline">
                 🏢 {totalEmployees} employees · {presentTodayCount} present
               </span>

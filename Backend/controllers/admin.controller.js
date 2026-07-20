@@ -23,6 +23,7 @@ const AdminLeave = require("../Models/adleave.model");
 const SuperAdminModel = require("../Models/superadmin.model");
 const Document = require("../Models/document.model");
 const Ticket = require("../Models/ticket.model");
+const { startOfDay } = require("../automatic/weekoffcalendar");
 const { processLeaveDeduction } = require("../automatic/calculateleave");
 const AttendanceSummary = require("../Models/attendancesummary.model");
 const WFH = require("../Models/wfh.model");
@@ -667,7 +668,20 @@ const findallmanagerswoadmin = async (req, res, next) => {
 
     const organisation_id = req.admin.organisation_id;
 
-    const managers = await Managermodel.find({ organisation_id, working_status: "working" })
+    // Was querying every manager in the org, so any admin could see (and
+    // review) managers that don't report up to them. Scope to just this
+    // admin's own team, same as getTodayCheckins does.
+    const teamManagerIds = [...(await getAdminTeamManagerIds(req.admin._id, organisation_id))];
+
+    if (!teamManagerIds.length) {
+      return res.status(200).json({ success: true, organisation_id, count: 0, managers: [] });
+    }
+
+    const managers = await Managermodel.find({
+      organisation_id,
+      working_status: "working",
+      _id: { $in: teamManagerIds },
+    })
       .select(EXCLUDE)
       .populate("reporting_manager", "f_name l_name work_email designation")
       .lean();
@@ -681,6 +695,37 @@ const findallmanagerswoadmin = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+// Walks the manager hierarchy and returns the set of manager _ids (as
+// strings) that report — directly, or through a chain of managers — to
+// the given admin. Used to scope "my team" data (dashboard employee list,
+// today's check-ins, etc.) to just the people under a specific admin,
+// instead of leaking the whole organisation to every admin.
+const getAdminTeamManagerIds = async (adminId, organisation_id) => {
+  const allManagers = await Managermodel.find({ organisation_id })
+    .select("_id reporting_manager reporting_manager_model")
+    .lean();
+
+  const managerIds = new Set();
+  let frontierIds = allManagers
+    .filter((m) => m.reporting_manager_model === "Admin" && String(m.reporting_manager) === String(adminId))
+    .map((m) => String(m._id));
+
+  while (frontierIds.length) {
+    frontierIds.forEach((id) => managerIds.add(id));
+    const frontierSet = new Set(frontierIds);
+    frontierIds = allManagers
+      .filter(
+        (m) =>
+          m.reporting_manager_model === "Manager" &&
+          frontierSet.has(String(m.reporting_manager)) &&
+          !managerIds.has(String(m._id))
+      )
+      .map((m) => String(m._id));
+  }
+
+  return managerIds;
 };
 
 const getallemployee = async (req, res, next) => {
@@ -699,6 +744,53 @@ const getallemployee = async (req, res, next) => {
         .select("uid f_name l_name work_email role designation office_location department gender personal_contact e_contact reporting_manager reporting_manager_model organisation_id")
         .populate({ path: "reporting_manager", select: "f_name l_name work_email role" })
         .lean(),
+    ]);
+
+    const allEmployees = [
+      ...users.map((user) => ({ type: "employee", ...user })),
+      ...managers.map((manager) => ({ type: "manager", ...manager })),
+    ];
+
+    return res.status(200).json({
+      success: true,
+      organisation_id,
+      employees: users.length,
+      managers: managers.length,
+      count: allEmployees.length,
+      users: allEmployees,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Dashboard-only variant of getallemployee: scoped to just the managers +
+// employees that report — directly, or through a chain of managers — to
+// the logged-in admin. Used by the admin dashboard's "Employee Overview" /
+// "Organisation" cards, which should reflect *this admin's* team, not the
+// whole organisation (getallemployee above stays org-wide since Employee
+// Table, Payroll, Assets, Face Enrollment etc. still need the full list).
+const getMyTeamOverview = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const organisation_id = req.admin.organisation_id;
+    const teamManagerIds = [...(await getAdminTeamManagerIds(req.admin._id, organisation_id))];
+
+    const [users, managers] = await Promise.all([
+      teamManagerIds.length
+        ? Usermodel.find({ organisation_id, working_status: "working", Under_manager: { $in: teamManagerIds } })
+            .select("uid f_name l_name work_email role department designation office_location profile_image Under_manager organisation_id")
+            .populate({ path: "Under_manager", select: "uid f_name l_name work_email role" })
+            .lean()
+        : [],
+      teamManagerIds.length
+        ? Managermodel.find({ organisation_id, working_status: "working", _id: { $in: teamManagerIds } })
+            .select("uid f_name l_name work_email role designation office_location department gender personal_contact e_contact profile_image reporting_manager reporting_manager_model organisation_id")
+            .populate({ path: "reporting_manager", select: "f_name l_name work_email role" })
+            .lean()
+        : [],
     ]);
 
     const allEmployees = [
@@ -2699,18 +2791,46 @@ const getTodayCheckins = async (req, res) => {
     return res.status(401).json({ success: false, message: "Unauthorized" });
 
   const organisation_id = req.admin.organisation_id;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // IMPORTANT: attendance.controller.js stores `date` as startOfDay(new Date())
+  // which is the IST calendar-day boundary (see automatic/weekoffcalendar.js /
+  // utils/Istdate.utils.js), NOT the server process's local midnight. Using
+  // `new Date(); today.setHours(0,0,0,0)` here reads the OS timezone of
+  // whichever machine Node happens to be running on - on a dev laptop that's
+  // usually IST already (so localhost "works"), but on the live server
+  // (typically UTC) it computes a midnight that's 5:30 hrs off from the
+  // stored `date`, so the query matches nothing and the map shows empty.
+  const today = startOfDay(new Date());
 
+  // Scope to this admin's own team (managers under them + employees under
+  // those managers) instead of the whole organisation.
+  const teamManagerIds = [...(await getAdminTeamManagerIds(req.admin._id, organisation_id))];
+  const teamEmployees = teamManagerIds.length
+    ? await Usermodel.find({ organisation_id, Under_manager: { $in: teamManagerIds } }).select("_id").lean()
+    : [];
+  const scopedEmployeeIds = [...teamManagerIds, ...teamEmployees.map((u) => String(u._id))];
+
+  if (!scopedEmployeeIds.length) {
+    return res.json({ checkins: [], total: 0 });
+  }
+
+  // No lat/lng filter here: face-terminal check-ins don't carry GPS
+  // coordinates (the kiosk is a fixed device), so requiring lat/lng used
+  // to silently drop every face check-in. We still include hasLocation so
+  // the map can plot only the ones that have coordinates while the list
+  // shows everyone, whichever terminal (System/live or Face) they used.
   const checkins = await Attendance.find({
     organisation_id,
     date: today,
     checkIn: { $exists: true },
-    latitude: { $exists: true, $ne: null },
-    longitude: { $exists: true, $ne: null },
+    employee: { $in: scopedEmployeeIds },
   })
-    .populate("employee", "f_name l_name work_email department designation")
-    .select("employee role latitude longitude checkIn checkOut")
+    // `employee` uses refPath: "onModel", so Mongoose needs `onModel` itself
+    // loaded on the doc to know which collection (User/Manager/Admin) to
+    // populate from. The previous .select() below excluded it, which meant
+    // populate silently resolved employee to null for every record -> the
+    // "Unknown" name and missing avatar on every pin.
+    .populate("employee", "f_name l_name work_email department designation profile_image")
+    .select("employee onModel role latitude longitude checkIn checkOut source")
     .lean();
 
   const payload = checkins.map((c) => ({
@@ -2718,9 +2838,12 @@ const getTodayCheckins = async (req, res) => {
     name: [c.employee?.f_name, c.employee?.l_name].filter(Boolean).join(" ") || "Unknown",
     email: c.employee?.work_email || "",
     dept: c.employee?.department || c.employee?.designation || "",
+    avatar: c.employee?.profile_image || null,
     role: c.role,
-    lat: c.latitude,
-    lng: c.longitude,
+    lat: c.latitude ?? null,
+    lng: c.longitude ?? null,
+    hasLocation: c.latitude != null && c.longitude != null,
+    source: c.source === "face" ? "face" : "live",
     checkIn: c.checkIn,
     checkedOut: !!c.checkOut,
   }));
@@ -3525,6 +3648,7 @@ module.exports = {
   addemployee,
   findallmanagers,
   getallemployee,
+  getMyTeamOverview,
   editemployee,
   editmanager,
   promoteEmployeeToManager,
