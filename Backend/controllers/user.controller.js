@@ -180,6 +180,7 @@ const token = jwt.sign(
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
     maxAge: 15 * 24 * 60 * 60 * 1000,
   });
 
@@ -208,6 +209,7 @@ const userlogout = async (req, res, next) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
   });
   res.status(200).json({ success: true, message: "Logout successful" });
 };
@@ -390,6 +392,7 @@ const verifyOtp = async (req, res, next) => {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? "none" : "lax",
+    path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
