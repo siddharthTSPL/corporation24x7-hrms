@@ -475,6 +475,7 @@ const loginSuperAdmin = async (req, res, next) => {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? "none" : "lax",
+      path: "/",
     };
 
     if (superAdmin.isFirstLogin) {
@@ -590,6 +591,7 @@ const logoutSuperAdmin = async (req, res, next) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
   });
   res.status(200).json({ success: true, message: "Logged out successfully" });
 };
@@ -767,6 +769,7 @@ const verifyOtp = async (req, res, next) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
   };
 
   const token = jwt.sign(
@@ -853,6 +856,7 @@ const resetPassword = async (req, res, next) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
   });
 
   res.status(200).json({ success: true, message: "Password updated successfully" });
