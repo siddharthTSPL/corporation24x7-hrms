@@ -456,7 +456,7 @@ const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, acce
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
                 <div className={`text-[12.5px] xs:text-[13px] sm:text-[14px] font-semibold truncate max-w-[140px] xs:max-w-[180px] sm:max-w-none ${hasPerson ? "text-[#1C1028]" : "text-[#9B8BAE] italic"}`}>
-                  {hasPerson ? `${person.f_name || ""} ${person.l_name || ""}` : `Former ${roleGuess}`}
+                  {hasPerson ? `${person.f_name || ""} ${person.l_name || ""}` : `Promoted/Demoted ${roleGuess}`}
                 </div>
                 {personLabel && (
                   <span className="text-[9px] sm:text-[10px] font-bold bg-[#F3E8FF] text-[#6B21A8] px-2 py-px rounded-[10px]">
