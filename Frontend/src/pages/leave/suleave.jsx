@@ -355,32 +355,43 @@ const SummaryStrip = ({ stats }) => (
   </div>
 );
 
-const PersonCard = ({ person, accentBadge }) => (
-  <div className="flex items-center gap-3 sm:gap-4 mb-3 min-w-0">
-    <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 text-white text-sm font-bold shadow-md"
-      style={{ background: avatarColor(person.f_name || "A") }}>
-      {initials(person.f_name, person.l_name)}
-    </div>
-    <div className="min-w-0 flex-1">
-      <div className="text-sm font-semibold text-gray-800 truncate">
-        {person.f_name} {person.l_name}
+const PersonCard = ({ person, accentBadge }) => {
+  const hasPerson = !!(person?.f_name || person?.l_name);
+  return (
+    <div className="flex items-center gap-3 sm:gap-4 mb-3 min-w-0">
+      <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 text-white text-sm font-bold shadow-md"
+        style={{ background: avatarColor(person?.f_name || "A") }}>
+        {initials(person?.f_name, person?.l_name)}
       </div>
-      <div className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
-        <span className="truncate">{person.work_email}</span>
-        {person.designation && (
-          <span className="px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-semibold shrink-0">
-            {person.designation}
-          </span>
-        )}
-        {accentBadge && (
-          <span className="px-1.5 py-0.5 rounded-md bg-gradient-to-br from-pink-50 to-pink-100 text-[#730042] text-[10px] font-bold border border-pink-200 shrink-0">
-            {accentBadge}
-          </span>
-        )}
+      <div className="min-w-0 flex-1">
+        <div className={`text-sm font-semibold truncate ${hasPerson ? "text-gray-800" : "text-gray-400 italic"}`}>
+          {hasPerson ? `${person.f_name} ${person.l_name}` : "Former Employee"}
+        </div>
+        <div className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+          <span className="truncate">{hasPerson ? person.work_email : "Profile unavailable — role was changed later"}</span>
+          {person?.designation && (
+            <span className="px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-semibold shrink-0">
+              {person.designation}
+            </span>
+          )}
+          {!hasPerson && (
+            <span
+              className="px-1.5 py-0.5 rounded-md bg-orange-50 text-orange-700 text-[10px] font-semibold shrink-0"
+              title="This person's role changed after this leave was recorded, so their live profile can no longer be linked."
+            >
+              Role changed
+            </span>
+          )}
+          {accentBadge && (
+            <span className="px-1.5 py-0.5 rounded-md bg-gradient-to-br from-pink-50 to-pink-100 text-[#730042] text-[10px] font-bold border border-pink-200 shrink-0">
+              {accentBadge}
+            </span>
+          )}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const ActionButtons = ({ onApprove, onReject }) => (
   <div className="flex sm:flex-col gap-2 w-full sm:w-auto shrink-0">
