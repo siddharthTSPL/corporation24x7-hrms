@@ -179,25 +179,41 @@ function ActionMenu({ asset, onEdit, onDelete, onAssign, onAssignments }) {
   // Menu can show up to 5 rows (Edit, Assign Employee, Assign Manager, Assignments, Delete)
   const MENU_HEIGHT_ESTIMATE = canAssign ? 230 : 150;
 
-  const computePosition = () => {
-    const btn = btnRef.current;
-    if (!btn) return;
-    const rect = btn.getBoundingClientRect();
-    const viewportW = window.innerWidth;
-    const viewportH = window.innerHeight;
+ 
 
-    let left = rect.right - MENU_WIDTH;
-    if (left < 8) left = 8;
-    if (left + MENU_WIDTH > viewportW - 8) left = viewportW - MENU_WIDTH - 8;
+const computePosition = () => {
+  const btn = btnRef.current;
+  if (!btn) return;
 
-    let top = rect.bottom + 6;
-    if (top + MENU_HEIGHT_ESTIMATE > viewportH - 8) {
-      top = rect.top - MENU_HEIGHT_ESTIMATE - 6;
-      if (top < 8) top = 8;
-    }
+  const rect = btn.getBoundingClientRect();
 
-    setCoords({ top, left });
-  };
+  const viewportW = window.innerWidth;
+  const viewportH = window.innerHeight;
+
+  // Button ke vertical center ke saath align
+  let top = rect.top;
+
+  // Agar niche cut ho raha ho to sirf viewport ke andar rakho
+  if (top + MENU_HEIGHT_ESTIMATE > viewportH - 8) {
+    top = viewportH - MENU_HEIGHT_ESTIMATE - 8;
+  }
+
+  if (top < 8) top = 8;
+
+  // Default -> button ke right side
+  let left = rect.right + 8;
+
+  // Agar right side space nahi hai to left side dikhao
+  if (left + MENU_WIDTH > viewportW - 8) {
+    left = rect.left - MENU_WIDTH - 8;
+  }
+
+  // Agar left side bhi bahar ja raha ho
+  if (left < 8) left = 8;
+
+  setCoords({ top, left });
+};
+
 
   useEffect(() => {
     if (!open) return;
@@ -994,7 +1010,7 @@ export default function AdminAssets() {
                           <AssigneeStack asset={asset} />
                         </td>
                         <td className="px-4 py-3">
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                         
                             <ActionMenu
                               asset={asset}
                               onEdit={(a) => setFormModal({ open: true, editing: a })}
@@ -1002,7 +1018,7 @@ export default function AdminAssets() {
                               onAssign={(a, type) => setAssignModal({ open: true, asset: a, assignType: type })}
                               onAssignments={(a) => setAssignmentsDrawer({ open: true, asset: a })}
                             />
-                          </div>
+                          
                         </td>
                       </tr>
                     ))}
