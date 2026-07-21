@@ -62,6 +62,8 @@ const {
   getAssetByIdSuperAdmin,
   deleteAssetSuperAdmin,
   getAssetsOfPerson,
+  getEmployeesWithAssets,
+  getEmployeeAssetHistory,
 } = require("../controllers/asset.controller");
 
 superAdminRouter.post("/register", asyncHandler(registerSuperAdmin));
@@ -265,6 +267,13 @@ superAdminRouter.get("/getperticularadmin/:uid", superAdminAuth, asyncHandler(ge
 // assest route
 superAdminRouter.post("/assets", superAdminAuth, asyncHandler(createAssetSuperAdmin));
 superAdminRouter.get("/assets", superAdminAuth, asyncHandler(getAllAssetsSuperAdmin));
+// Employee-wise asset views (kept above "/assets/:id" so "employees" isn't swallowed as an :id)
+superAdminRouter.get("/assets/employees", superAdminAuth, asyncHandler(getEmployeesWithAssets));
+superAdminRouter.get(
+  "/assets/employees/:person_id/:person_model/history",
+  superAdminAuth,
+  asyncHandler(getEmployeeAssetHistory)
+);
 superAdminRouter.get("/assets/:id", superAdminAuth, asyncHandler(getAssetByIdSuperAdmin));
 superAdminRouter.put("/assets/:id", superAdminAuth, asyncHandler(updateAssetSuperAdmin));
 superAdminRouter.delete("/assets/:id", superAdminAuth, asyncHandler(deleteAssetSuperAdmin));
