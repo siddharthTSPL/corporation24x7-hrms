@@ -1278,6 +1278,7 @@ function ConfirmModal({title,message,icon,confirmLabel,confirmColor,onConfirm,on
 function ActionMenu({user,onView,onEdit,onDelete,onPromoteToManager,onPromoteToAdmin,onDemoteToEmployee,onDemoteToManager,onDemoteToEmployee2,currentAdminId}){
   const [open,setOpen]=useState(false);
   const [pos,setPos]=useState({top:0,left:0});
+  const [ready,setReady]=useState(false);
   const btnRef=useRef();
   const menuRef=useRef();
 
@@ -1291,21 +1292,47 @@ function ActionMenu({user,onView,onEdit,onDelete,onPromoteToManager,onPromoteToA
     return()=>document.removeEventListener("mousedown",h);
   },[]);
 
+  const MARGIN=8;
+  const GAP=6;
+  const MENU_WIDTH=190;
+
+  const updatePos=()=>{
+    const btn=btnRef.current;
+    const menu=menuRef.current;
+    if(!btn)return;
+    const rect=btn.getBoundingClientRect();
+    const menuHeight=menu?menu.offsetHeight:220;
+    const viewportW=window.innerWidth;
+    const viewportH=window.innerHeight;
+
+    const spaceLeft=rect.left;
+    const spaceRight=viewportW-rect.right;
+    let left;
+    if(spaceLeft>=MENU_WIDTH+GAP||spaceLeft>=spaceRight){
+      left=rect.left-MENU_WIDTH-GAP;
+    }else{
+      left=rect.right+GAP;
+    }
+    if(left<MARGIN)left=MARGIN;
+    if(left+MENU_WIDTH>viewportW-MARGIN)left=viewportW-MENU_WIDTH-MARGIN;
+
+    let top=rect.top+rect.height/2-menuHeight/2;
+    const minTop=MARGIN;
+    const maxTop=viewportH-MARGIN-menuHeight;
+    if(top<minTop)top=minTop;
+    if(top>maxTop)top=Math.max(minTop,maxTop);
+
+    setPos({top,left});
+  };
+
+  useEffect(()=>{
+    if(!open){setReady(false);return;}
+    updatePos();
+    setReady(true);
+  },[open]);
+
   useEffect(()=>{
     if(!open)return;
-    const updatePos=()=>{
-      if(!btnRef.current)return;
-      const rect=btnRef.current.getBoundingClientRect();
-      const menuWidth=190;
-      let left=rect.right-menuWidth;
-      if(left<8)left=8;
-      if(left+menuWidth>window.innerWidth-8)left=window.innerWidth-menuWidth-8;
-      let top=rect.bottom+4;
-      const maxTop=window.innerHeight-8;
-      if(top>maxTop)top=maxTop;
-      setPos({top,left});
-    };
-    updatePos();
     window.addEventListener("scroll",updatePos,true);
     window.addEventListener("resize",updatePos);
     return()=>{
@@ -1330,7 +1357,7 @@ function ActionMenu({user,onView,onEdit,onDelete,onPromoteToManager,onPromoteToA
         <div
           ref={menuRef}
           className="fixed z-[999] bg-white border border-[#F4C0D1] rounded-xl shadow-xl min-w-[185px] max-w-[calc(100vw-2rem)] py-1 overflow-hidden max-h-[80vh] overflow-y-auto"
-          style={{top:pos.top,left:pos.left}}
+          style={{top:pos.top,left:pos.left,width:MENU_WIDTH,visibility:ready?"visible":"hidden"}}
           onClick={(e)=>e.stopPropagation()}
         >
           <button onClick={()=>{onView(user._id,user.role);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#730042] hover:bg-[#FBEAF0]">
