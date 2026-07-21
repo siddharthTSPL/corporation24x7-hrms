@@ -469,7 +469,7 @@ const applyleave = async (req, res, next) => {
 
   const user = await usermodel
     .findOne({ _id: req.employee._id, organisation_id })
-    .select("gender marital_status Under_manager f_name l_name")
+    .select("gender marital_status Under_manager f_name l_name work_email")
     .lean();
   if (!user)
     return next(Object.assign(new Error("User not found"), { statusCode: 404 }));
@@ -524,6 +524,9 @@ const applyleave = async (req, res, next) => {
     organisation_id,
     employee: req.employee._id,
     manager: user.Under_manager,
+    applicantName: `${user.f_name} ${user.l_name || ""}`.trim(),
+    applicantEmail: user.work_email,
+    applicantRole: "Employee",
     leaveType,
     startDate: start,
     endDate: end,
