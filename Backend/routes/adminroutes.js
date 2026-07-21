@@ -84,6 +84,8 @@ const {
   getAssetByIdAdmin,
   deleteAssetAdmin,
   getAssetsOfPerson,
+  getEmployeesWithAssets,
+  getEmployeeAssetHistory,
 } = require("../controllers/asset.controller");
 
 adminrouter.get("/verify/:token", asyncHandler(verifyAdmin));
@@ -354,6 +356,13 @@ adminrouter.get("/active-user-count", adminauthmiddleware, getActiveUserCount);
 // ── Asset Management (Admin) ──────────────────────────────────────────────────
 adminrouter.post("/assets", adminauthmiddleware, asyncHandler(createAssetAdmin));
 adminrouter.get("/assets", adminauthmiddleware, asyncHandler(getAllAssetsAdmin));
+// Employee-wise asset views (kept above "/assets/:id" so "employees" isn't swallowed as an :id)
+adminrouter.get("/assets/employees", adminauthmiddleware, asyncHandler(getEmployeesWithAssets));
+adminrouter.get(
+  "/assets/employees/:person_id/:person_model/history",
+  adminauthmiddleware,
+  asyncHandler(getEmployeeAssetHistory)
+);
 adminrouter.get("/assets/:id", adminauthmiddleware, asyncHandler(getAssetByIdAdmin));
 adminrouter.put("/assets/:id", adminauthmiddleware, asyncHandler(updateAssetAdmin));
 adminrouter.delete("/assets/:id", adminauthmiddleware, asyncHandler(deleteAssetAdmin));
