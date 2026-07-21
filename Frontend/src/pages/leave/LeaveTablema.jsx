@@ -654,8 +654,8 @@ const ReasonBox = ({reason,accent,accentBorder,accentLabel}) => (
 
 const AvatarBox = ({name,subtext}) => {
   const cleanName = (name||"").trim();
-  const displayName = cleanName || "Promoted/Demoted Employee";
-  const displaySubtext = subtext || (cleanName ? "" : "Profile unavailable — role was changed later");
+  const displayName = cleanName || "Unknown";
+  const displaySubtext = subtext || (cleanName ? "" : "Profile unavailable");
   return (
     <div style={{display:"flex",alignItems:"center",gap:13,minWidth:0}}>
       <div style={{width:42,height:42,borderRadius:13,background:avatarColor(cleanName||"A"),color:"#fff",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"'DM Sans',sans-serif",boxShadow:"0 3px 9px rgba(0,0,0,0.14)"}}>
@@ -855,7 +855,12 @@ const ForwardedLeavesPanel = ({showToast}) => {
   };
 
   const renderCard = (leave,idx,leaveFor) => {
-    const person       = leaveFor==="employee" ? (leave.employee||{}) : (leave.manager||{});
+    const person        = leaveFor==="employee" ? (leave.employee||{}) : (leave.manager||{});
+    const hasLivePerson = !!(person.f_name || person.l_name);
+    const personName    = hasLivePerson ? `${person.f_name||""} ${person.l_name||""}`.trim() : (leave.applicantName||"");
+    const personEmail   = person.work_email || leave.applicantEmail || "";
+    const roleGuess     = leave.applicantRole || (leaveFor==="employee" ? "Employee" : "Manager");
+    const roleChanged   = !hasLivePerson && !!personName;
     const isProcessing = processingId===leave._id;
     const days         = leave.days||daysDiff(leave.startDate,leave.endDate);
     const isMgrLeave   = leaveFor==="manager";
@@ -867,8 +872,8 @@ const ForwardedLeavesPanel = ({showToast}) => {
         <div className="mlw-card-body">
           <div style={{flex:1,minWidth:0}}>
             <AvatarBox
-              name={`${person.f_name||""} ${person.l_name||""}`}
-              subtext={[person.designation||person.work_email,isMgrLeave&&person.department?person.department:null].filter(Boolean).join(" · ")}
+              name={personName}
+              subtext={roleChanged ? `Was ${roleGuess} · ${personEmail}` : [person.designation||personEmail,isMgrLeave&&person.department?person.department:null].filter(Boolean).join(" · ")}
             />
             {isMgrLeave&&(
               <div style={{display:"inline-flex",alignItems:"center",gap:5,marginTop:9,padding:"3px 9px",background:"linear-gradient(135deg,#F5F3FF,#EDE9FE)",borderRadius:7,border:"1px solid #DDD6FE"}}>
