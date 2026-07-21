@@ -128,6 +128,12 @@ function activeAssignments(asset) {
   return (asset?.assignments || []).filter((a) => !a.is_returned);
 }
 
+// Display label for assigned_to_model — "User" (the backend/DB model name) is shown as "Employee".
+function roleLabel(model) {
+  if (model === "User") return "Employee";
+  return model || "Unknown";
+}
+
 function AssigneeStack({ asset }) {
   const active = activeAssignments(asset);
   if (active.length === 0) return <span className="text-[#c499b4] text-[12px]">—</span>;
@@ -146,7 +152,7 @@ function AssigneeStack({ asset }) {
               <p className="text-[11px] font-semibold text-[#730042] truncate">
                 {p.f_name} {p.l_name} {a.quantity > 1 ? `× ${a.quantity}` : ""}
               </p>
-              <p className="text-[10px] text-[#993556] truncate">{a.assigned_to_model}</p>
+              <p className="text-[10px] text-[#993556] truncate">{roleLabel(a.assigned_to_model)}</p>
             </div>
           </div>
         );
@@ -542,7 +548,7 @@ function AssignmentsDrawer({ open, onClose, asset, onRevokeClick }) {
                     <div key={a._id} className="p-3 rounded-xl border border-[#e8d5e2] bg-[#fdf5f9] flex flex-col sm:flex-row sm:items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="text-[12px] font-bold text-[#0d0209]">{p.f_name} {p.l_name}</p>
-                        <p className="text-[10px] text-[#993556] uppercase tracking-wide">{a.assigned_to_model} · {a.quantity} unit{a.quantity > 1 ? "s" : ""}</p>
+                        <p className="text-[10px] text-[#993556] uppercase tracking-wide">{roleLabel(a.assigned_to_model)} · {a.quantity} unit{a.quantity > 1 ? "s" : ""}</p>
                         <p className="text-[11px] text-[#7a5568] mt-1">
                           Since {a.assigned_date ? new Date(a.assigned_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
                         </p>
@@ -574,7 +580,7 @@ function AssignmentsDrawer({ open, onClose, asset, onRevokeClick }) {
                     <div key={h._id} className="p-3 rounded-xl border border-[#e8d5e2] bg-[#fdf5f9]">
                       <div className="flex flex-wrap items-center justify-between gap-1 mb-1">
                         <span className="text-[11px] font-bold text-[#730042] uppercase tracking-wider">
-                          {p.f_name} {p.l_name} · {h.assigned_to_model || "Unknown"}
+                          {p.f_name} {p.l_name} · {roleLabel(h.assigned_to_model)}
                         </span>
                         {h.return_condition && (
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${h.return_condition === "good" ? "bg-emerald-50 text-emerald-700" : h.return_condition === "damaged" ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"}`}>
@@ -1045,5 +1051,3 @@ export default function SuperAdminAssets() {
     </div>
   );
 }
-
-
