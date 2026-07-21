@@ -2272,6 +2272,9 @@ const applyleave = async (req, res, next) => {
   const leave = await AdminLeave.create({
     organisation_id,
     admin: req.admin._id,
+    applicantName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+    applicantEmail: req.admin.work_email,
+    applicantRole: "Admin",
     leaveType,
     startDate: start,
     endDate: end,
