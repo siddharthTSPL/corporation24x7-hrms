@@ -425,8 +425,16 @@ const LeaveTimeline = ({ leave }) => {
 const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, accentColor, personLabel, showTimeline }) => {
   const [expanded, setExpanded] = useState(false);
   const person = leave.employee || leave.manager || {};
-  const hasPerson = !!(person.f_name || person.l_name);
-  const roleGuess = leave.manager ? "Manager" : "Employee";
+  const hasLivePerson = !!(person.f_name || person.l_name);
+  const roleGuess = leave.applicantRole || (leave.manager ? "Manager" : "Employee");
+  const personName = hasLivePerson
+    ? `${person.f_name || ""} ${person.l_name || ""}`.trim()
+    : (leave.applicantName || "");
+  const personEmail = person.work_email || leave.applicantEmail || "";
+  const [personFirst, ...personRest] = personName.split(" ");
+  const personLast = personRest.join(" ");
+  const hasPerson = !!personName;
+  const roleChanged = !hasLivePerson && hasPerson;
   const days   = leave.days || daysDiff(leave.startDate, leave.endDate);
   const accent = accentColor || (LEAVE_META[leave.leaveType] || { accent: "#8B3A8A" }).accent;
 
@@ -449,30 +457,30 @@ const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, acce
           <div className="flex items-center gap-2.5 xs:gap-3 min-w-0 flex-1">
             <div
               className="w-8 h-8 xs:w-9 xs:h-9 sm:w-11 sm:h-11 rounded-[10px] xs:rounded-[12px] sm:rounded-[14px] flex items-center justify-center flex-shrink-0 text-[11px] xs:text-xs sm:text-[14px] font-bold text-white"
-              style={{ background: avatarColor(person.f_name || "A"), boxShadow: "0 3px 10px rgba(0,0,0,0.15)" }}
+              style={{ background: avatarColor(personFirst || "A"), boxShadow: "0 3px 10px rgba(0,0,0,0.15)" }}
             >
-              {initials(person.f_name, person.l_name)}
+              {initials(personFirst, personLast)}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
                 <div className={`text-[12.5px] xs:text-[13px] sm:text-[14px] font-semibold truncate max-w-[140px] xs:max-w-[180px] sm:max-w-none ${hasPerson ? "text-[#1C1028]" : "text-[#9B8BAE] italic"}`}>
-                  {hasPerson ? `${person.f_name || ""} ${person.l_name || ""}` : `Promoted/Demoted ${roleGuess}`}
+                  {hasPerson ? personName : `Unknown ${roleGuess}`}
                 </div>
                 {personLabel && (
                   <span className="text-[9px] sm:text-[10px] font-bold bg-[#F3E8FF] text-[#6B21A8] px-2 py-px rounded-[10px]">
                     {personLabel}
                   </span>
                 )}
-                {!hasPerson && (
+                {roleChanged && (
                   <span
                     className="text-[9px] sm:text-[10px] font-bold bg-[#FFF7ED] text-[#B45309] px-2 py-px rounded-[10px]"
-                    title="This person's role changed after this leave was recorded, so their live profile can no longer be linked."
+                    title={`This person was a ${roleGuess} when this leave was applied, but their role has changed since.`}
                   >
-                    Role changed
+                    Was {roleGuess}
                   </span>
                 )}
               </div>
-              <div className="text-[10px] sm:text-[11px] text-[#9B8BAE] mt-0.5 truncate max-w-[130px] xs:max-w-[180px] sm:max-w-none">{person.work_email || (hasPerson ? "" : "Profile unavailable — role was changed later")}</div>
+              <div className="text-[10px] sm:text-[11px] text-[#9B8BAE] mt-0.5 truncate max-w-[130px] xs:max-w-[180px] sm:max-w-none">{personEmail || (hasPerson ? "" : "Profile unavailable")}</div>
             </div>
           </div>
 
