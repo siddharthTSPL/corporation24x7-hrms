@@ -355,31 +355,35 @@ const SummaryStrip = ({ stats }) => (
   </div>
 );
 
-const PersonCard = ({ person, accentBadge }) => {
-  const hasPerson = !!(person?.f_name || person?.l_name);
+const PersonCard = ({ person, accentBadge, fallbackName, fallbackEmail, fallbackRole }) => {
+  const hasLivePerson = !!(person?.f_name || person?.l_name);
+  const personName = hasLivePerson ? `${person.f_name} ${person.l_name}`.trim() : (fallbackName || "");
+  const personEmail = person?.work_email || fallbackEmail || "";
+  const hasPerson = !!personName;
+  const roleChanged = !hasLivePerson && hasPerson;
   return (
     <div className="flex items-center gap-3 sm:gap-4 mb-3 min-w-0">
       <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 text-white text-sm font-bold shadow-md"
-        style={{ background: avatarColor(person?.f_name || "A") }}>
-        {initials(person?.f_name, person?.l_name)}
+        style={{ background: avatarColor(personName || "A") }}>
+        {initials(...personName.split(" "))}
       </div>
       <div className="min-w-0 flex-1">
         <div className={`text-sm font-semibold truncate ${hasPerson ? "text-gray-800" : "text-gray-400 italic"}`}>
-          {hasPerson ? `${person.f_name} ${person.l_name}` : "Promoted/demoted Employee"}
+          {hasPerson ? personName : `Unknown ${fallbackRole || "User"}`}
         </div>
         <div className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
-          <span className="truncate">{hasPerson ? person.work_email : "Profile unavailable — role was changed later"}</span>
+          <span className="truncate">{personEmail || (hasPerson ? "" : "Profile unavailable")}</span>
           {person?.designation && (
             <span className="px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-semibold shrink-0">
               {person.designation}
             </span>
           )}
-          {!hasPerson && (
+          {roleChanged && (
             <span
               className="px-1.5 py-0.5 rounded-md bg-orange-50 text-orange-700 text-[10px] font-semibold shrink-0"
-              title="This person's role changed after this leave was recorded, so their live profile can no longer be linked."
+              title={`This person was a ${fallbackRole || "different role"} when this leave was applied, but their role has changed since.`}
             >
-              Role changed
+              Was {fallbackRole || "different role"}
             </span>
           )}
           {accentBadge && (
@@ -438,7 +442,13 @@ const LeaveCard = ({ leave, person, accentBadge, actionable, processingId, onApp
       <div className="absolute top-0 left-0 w-1 bottom-0 rounded-l-2xl" style={{ background: accent }} />
       
       <div className="flex-1 min-w-0 w-full pl-2">
-        <PersonCard person={person} accentBadge={accentBadge} />
+        <PersonCard
+          person={person}
+          accentBadge={accentBadge}
+          fallbackName={leave.applicantName}
+          fallbackEmail={leave.applicantEmail}
+          fallbackRole={leave.applicantRole}
+        />
         <div className="flex gap-1.5 flex-wrap mb-2.5">
           <TypeBadge type={leave.leaveType} />
           <StatusBadge status={leave.status} />
