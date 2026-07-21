@@ -479,6 +479,9 @@ const applyleavem = async (req, res, next) => {
   const leave = await managerLeaveModel.create({
     organisation_id,
     manager: managerId,
+    applicantName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+    applicantEmail: req.manager.work_email,
+    applicantRole: "Manager",
     leaveType,
     startDate: start,
     endDate: end,
