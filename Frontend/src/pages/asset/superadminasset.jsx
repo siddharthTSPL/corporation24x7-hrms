@@ -173,21 +173,22 @@ function ActionMenu({ asset, onEdit, onDelete, onAssign, onAssignments }) {
     const viewportW = window.innerWidth;
     const viewportH = window.innerHeight;
 
-    let left = rect.right - MENU_WIDTH;
+    const spaceLeft = rect.left;
+    const spaceRight = viewportW - rect.right;
+    let left;
+    if (spaceLeft >= MENU_WIDTH + GAP || spaceLeft >= spaceRight) {
+      left = rect.left - MENU_WIDTH - GAP;
+    } else {
+      left = rect.right + GAP;
+    }
     if (left < MARGIN) left = MARGIN;
     if (left + MENU_WIDTH > viewportW - MARGIN) left = viewportW - MENU_WIDTH - MARGIN;
 
-    const spaceBelow = viewportH - rect.bottom;
-    const spaceAbove = rect.top;
-    let top;
-    if (spaceBelow >= menuHeight + GAP || spaceBelow >= spaceAbove) {
-      top = rect.bottom + GAP;
-      const maxTop = viewportH - MARGIN - menuHeight;
-      if (top > maxTop) top = Math.max(MARGIN, maxTop);
-    } else {
-      top = rect.top - menuHeight - GAP;
-      if (top < MARGIN) top = MARGIN;
-    }
+    let top = rect.top + rect.height / 2 - menuHeight / 2;
+    const minTop = MARGIN;
+    const maxTop = viewportH - MARGIN - menuHeight;
+    if (top < minTop) top = minTop;
+    if (top > maxTop) top = Math.max(minTop, maxTop);
 
     setCoords({ top, left });
   };
