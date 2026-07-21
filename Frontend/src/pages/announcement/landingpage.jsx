@@ -17,6 +17,7 @@ import {
 } from 'recharts'
 import logo from '../../assets/TorchX.svg'
 import PlantImage from '../../assets/plant.png'
+import { useAuth } from '../../auth/store/getmeauth/getmeauth'
 
 const radarData = [
   { metric: 'Leadership', value: 85 },
@@ -69,7 +70,7 @@ function Divider() {
   )
 }
 
-function Navbar() {
+function Navbar({ accountLabel, onAccountClick }) {
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const links = ['Features', 'Testimonials', 'Pricing', 'About']
@@ -99,12 +100,12 @@ function Navbar() {
               {l}
             </a>
           ))}
-          <a
-            href="https://torchxsuite.com/talent/login"
-            className="bg-[#7A004B] text-white text-sm font-ui font-semibold px-7 py-2.5 rounded-full no-underline shadow-[0_4px_18px_rgba(122,0,75,0.25)] transition-all hover:bg-[#5a0033] hover:-translate-y-0.5"
+          <button
+            onClick={onAccountClick}
+            className="bg-[#7A004B] text-white text-sm font-ui font-semibold px-7 py-2.5 rounded-full border-none cursor-pointer whitespace-nowrap shadow-[0_4px_18px_rgba(122,0,75,0.25)] transition-all hover:bg-[#5a0033] hover:-translate-y-0.5"
           >
-            Sign in
-          </a>
+            {accountLabel}
+          </button>
         </div>
 
         <button
@@ -128,12 +129,12 @@ function Navbar() {
               {l}
             </a>
           ))}
-          <a
-            href="https://torchxsuite.com/talent/login"
-            className="bg-[#7A004B] text-white text-sm font-ui font-semibold py-3 rounded-full no-underline text-center"
+          <button
+            onClick={() => { setOpen(false); onAccountClick() }}
+            className="bg-[#7A004B] text-white text-sm font-ui font-semibold py-3 rounded-full border-none cursor-pointer text-center"
           >
-            Login
-          </a>
+            {accountLabel}
+          </button>
         </div>
       )}
     </nav>
@@ -406,7 +407,7 @@ function Hero() {
                 href="https://torchxsuite.com/signup"
                 className="inline-flex items-center gap-2 bg-[#7A004B] text-white text-[15px] font-ui font-semibold px-7 py-3.5 rounded-full border-none cursor-pointer shadow-[0_8px_24px_rgba(122,0,75,0.25)] transition-all hover:bg-[#5a0033] hover:-translate-y-0.5"
               >
-                Sign Up For Free Trial <FiArrowRight />
+                Sign Up for Talent Account <FiArrowRight />
               </a>
               <a
                 href="#expert"
@@ -1069,10 +1070,27 @@ function Footer() {
 }
 
 export default function LandingPage() {
+  const navigate = useNavigate()
+  const { data: auth } = useAuth()
+  const isAuthenticated = !!auth
+
+  // "Access Your Talent Account" when a live session is found; falls back to
+  // "Sign in to your Talent Account" while auth is still resolving/expired
+  // so the button never flashes the wrong label once it's checked.
+  const accountLabel = isAuthenticated
+    ? 'Access Your Talent Account'
+    : 'Sign in to your Talent Account'
+
+  const handleAccountClick = () => {
+    // /redirect resolves the logged-in person's role and sends them to the
+    // right dashboard; if the session token expired it bounces to /login.
+    navigate(isAuthenticated ? '/redirect' : '/login')
+  }
+
   return (
     <>
       <style>{fontStyles}</style>
-      <Navbar />
+      <Navbar accountLabel={accountLabel} onAccountClick={handleAccountClick} />
       <Hero />
       <Stats />
       <Divider />
