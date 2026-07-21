@@ -13,8 +13,11 @@ import {
   useDeleteAssetSuperAdmin,
   useAssignAssetToAdmin,
   useRevokeAssetSuperAdmin,
+  useGetEmployeesWithAssetsSuperAdmin,
+  useGetEmployeeAssetHistorySuperAdmin,
 } from "../../auth/server-state/superadmin/asset/superadminasset.hook";
 import { useGetAllAdmins } from "../../auth/server-state/superadmin/other/suother.hook";
+import EmployeeAssetsPanel from "./EmployeeAssetsPanel";
 
 const ASSET_TYPES = ["laptop","desktop","monitor","keyboard","mouse","headset","mobile","tablet","other"];
 const CONDITIONS   = ["new","good","fair","poor"];
@@ -675,6 +678,7 @@ export default function SuperAdminAssets() {
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [exportDone, setExportDone] = useState(false);
+  const [activeTab, setActiveTab] = useState("assets"); // "assets" | "employees"
   const pageRef = useRef(null);
 
   const { data, isLoading } = useGetAllAssetsSuperAdmin(
@@ -808,6 +812,31 @@ export default function SuperAdminAssets() {
           ))}
         </div>
 
+        <div className="flex gap-2 mb-4 sm:mb-6 border-b border-[#F4C0D1]">
+          <button
+            onClick={() => setActiveTab("assets")}
+            className={`px-4 py-2.5 text-[13px] font-semibold border-b-2 transition-colors -mb-px min-h-[44px] ${
+              activeTab === "assets" ? "border-[#730042] text-[#730042]" : "border-transparent text-[#993556] hover:text-[#730042]"
+            }`}
+          >
+            Assets
+          </button>
+          <button
+            onClick={() => setActiveTab("employees")}
+            className={`px-4 py-2.5 text-[13px] font-semibold border-b-2 transition-colors -mb-px min-h-[44px] ${
+              activeTab === "employees" ? "border-[#730042] text-[#730042]" : "border-transparent text-[#993556] hover:text-[#730042]"
+            }`}
+          >
+            Employee Assets
+          </button>
+        </div>
+
+        {activeTab === "employees" ? (
+          <EmployeeAssetsPanel
+            useEmployees={useGetEmployeesWithAssetsSuperAdmin}
+            useHistory={useGetEmployeeAssetHistorySuperAdmin}
+          />
+        ) : (
         <div className="bg-white rounded-2xl border border-[#F4C0D1] overflow-hidden">
           <div className="px-3 sm:px-5 py-3 sm:py-4 border-b border-[#F4C0D1] bg-[#F9F8F2]">
             <div className="flex flex-col sm:flex-row gap-2 mb-2">
@@ -964,6 +993,7 @@ export default function SuperAdminAssets() {
             </div>
           )}
         </div>
+        )}
       </div>
 
       <AssetFormModal

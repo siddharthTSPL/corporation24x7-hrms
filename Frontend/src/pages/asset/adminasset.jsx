@@ -14,9 +14,12 @@ import {
   useAssignAssetToEmployee,
   useAssignAssetToManager,
   useRevokeAssetAdmin,
+  useGetEmployeesWithAssetsAdmin,
+  useGetEmployeeAssetHistoryAdmin,
 } from "../../auth/server-state/adminasset/adminasset.hook";
 import { useFindAllManagerswithoutAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
 import {  useGetAllEmployee } from "../../auth/server-state/adminother/adminother.hook";
+import EmployeeAssetsPanel from "./EmployeeAssetsPanel";
 const ASSET_TYPES = ["laptop","desktop","monitor","keyboard","mouse","headset","mobile","tablet","other"];
 const CONDITIONS  = ["new","good","fair","poor"];
 const STATUSES    = ["available","assigned","under_maintenance","retired"];
@@ -705,6 +708,7 @@ export default function AdminAssets() {
   const [filters, setFilters] = useState({ status: "", asset_type: "" });
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [activeTab, setActiveTab] = useState("assets"); // "assets" | "employees"
 
   const { data, isLoading } = useGetAllAssetsAdmin(
     Object.fromEntries(Object.entries(filters).filter(([, v]) => v))
@@ -859,6 +863,31 @@ export default function AdminAssets() {
           ))}
         </div>
 
+        <div className="flex gap-2 mb-4 sm:mb-6 border-b border-[#F4C0D1]">
+          <button
+            onClick={() => setActiveTab("assets")}
+            className={`px-4 py-2.5 text-[13px] font-semibold border-b-2 transition-colors -mb-px min-h-[44px] ${
+              activeTab === "assets" ? "border-[#730042] text-[#730042]" : "border-transparent text-[#993556] hover:text-[#730042]"
+            }`}
+          >
+            Assets
+          </button>
+          <button
+            onClick={() => setActiveTab("employees")}
+            className={`px-4 py-2.5 text-[13px] font-semibold border-b-2 transition-colors -mb-px min-h-[44px] ${
+              activeTab === "employees" ? "border-[#730042] text-[#730042]" : "border-transparent text-[#993556] hover:text-[#730042]"
+            }`}
+          >
+            Employee Assets
+          </button>
+        </div>
+
+        {activeTab === "employees" ? (
+          <EmployeeAssetsPanel
+            useEmployees={useGetEmployeesWithAssetsAdmin}
+            useHistory={useGetEmployeeAssetHistoryAdmin}
+          />
+        ) : (
         <div className="bg-white rounded-2xl border border-[#F4C0D1] overflow-hidden">
           <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#F4C0D1] bg-[#F9F8F2]">
             <div className="flex gap-2 mb-2">
@@ -1015,6 +1044,7 @@ export default function AdminAssets() {
             </div>
           )}
         </div>
+        )}
       </div>
 
       <AssetFormModal
