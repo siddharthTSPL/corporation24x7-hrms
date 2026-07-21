@@ -17,6 +17,9 @@ const leaveSchema = new mongoose.Schema({
     ref: "Manager",
     required: true,
   },
+  applicantName: { type: String },
+  applicantEmail: { type: String },
+  applicantRole: { type: String, default: "Employee" },
   leaveType: {
     type: String,
     enum: ["el", "sl", "ml", "pl", "half_day_el", "half_day_sl", "lwp"],
