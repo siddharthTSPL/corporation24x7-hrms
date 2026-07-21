@@ -51,3 +51,15 @@ export const getAssetsOfPersonAdmin = async (person_id, person_model) => {
   const res = await api.get(`admin/assets/person/${person_id}/${person_model}`);
   return res.data;
 };
+
+// List of employees/managers who currently hold at least one asset, with a summary count.
+export const getEmployeesWithAssetsAdmin = async () => {
+  const res = await api.get('admin/assets/employees');
+  return res.data;
+};
+
+// Full assign/revoke history (active + returned) for a single employee.
+export const getEmployeeAssetHistoryAdmin = async (person_id, person_model) => {
+  const res = await api.get(`admin/assets/employees/${person_id}/${person_model}/history`);
+  return res.data;
+};

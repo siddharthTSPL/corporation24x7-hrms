@@ -9,6 +9,8 @@ import {
   assignAssetToManager,
   revokeAssetAdmin,
   getAssetsOfPersonAdmin,
+  getEmployeesWithAssetsAdmin,
+  getEmployeeAssetHistoryAdmin,
 } from "../../api/adminapi/asset/adminasset.api";
 
 export const useGetAllAssetsAdmin = (params) => {
@@ -34,6 +36,24 @@ export const useGetAssetsOfPersonAdmin = (person_id, person_model) => {
   return useQuery({
     queryKey: ["admin-assets-person", person_id, person_model],
     queryFn: () => getAssetsOfPersonAdmin(person_id, person_model),
+    enabled: !!person_id && !!person_model,
+    staleTime: 0,
+  });
+};
+
+export const useGetEmployeesWithAssetsAdmin = () => {
+  return useQuery({
+    queryKey: ["admin-assets-employees"],
+    queryFn: () => getEmployeesWithAssetsAdmin(),
+    staleTime: 0,
+    refetchOnMount: true,
+  });
+};
+
+export const useGetEmployeeAssetHistoryAdmin = (person_id, person_model) => {
+  return useQuery({
+    queryKey: ["admin-assets-employee-history", person_id, person_model],
+    queryFn: () => getEmployeeAssetHistoryAdmin(person_id, person_model),
     enabled: !!person_id && !!person_model,
     staleTime: 0,
   });
@@ -77,6 +97,8 @@ export const useAssignAssetToEmployee = () => {
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ["admin-assets"] });
       queryClient.invalidateQueries({ queryKey: ["admin-asset", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-assets-employees"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-assets-employee-history"] });
     },
   });
 };
@@ -88,6 +110,8 @@ export const useAssignAssetToManager = () => {
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ["admin-assets"] });
       queryClient.invalidateQueries({ queryKey: ["admin-asset", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-assets-employees"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-assets-employee-history"] });
     },
   });
 };
@@ -100,6 +124,8 @@ export const useRevokeAssetAdmin = () => {
       queryClient.invalidateQueries({ queryKey: ["admin-assets"] });
       queryClient.invalidateQueries({ queryKey: ["admin-asset", id] });
       queryClient.invalidateQueries({ queryKey: ["admin-assets-person"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-assets-employees"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-assets-employee-history"] });
     },
   });
 };
