@@ -326,3 +326,4 @@ export default function EmployeeAssetsPanel({ useEmployees, useHistory }) {
     </div>
   );
 }
+
