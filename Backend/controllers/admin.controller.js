@@ -1031,6 +1031,16 @@ const promoteEmployeeToManager = async (req, res, next) => {
         { $set: { against: newManager._id, againstModel: "Manager" } },
         { session }
       ),
+
+      Leave.updateMany(
+        { employee: id, organisation_id, applicantName: { $exists: false } },
+        { $set: {
+          applicantName: `${user.f_name} ${user.l_name || ""}`.trim(),
+          applicantEmail: user.work_email,
+          applicantRole: "Employee",
+        } },
+        { session }
+      ),
     ]);
 
     await session.commitTransaction();
@@ -1216,6 +1226,16 @@ const promoteManagerToAdmin = async (req, res, next) => {
         { $set: { against: newAdmin._id, againstModel: "Admin" } },
         { session }
       ),
+
+      ManagerLeave.updateMany(
+        { manager: id, organisation_id, applicantName: { $exists: false } },
+        { $set: {
+          applicantName: `${manager.f_name} ${manager.l_name || ""}`.trim(),
+          applicantEmail: manager.work_email,
+          applicantRole: "Manager",
+        } },
+        { session }
+      ),
     ]);
 
     await session.commitTransaction();
@@ -1385,6 +1405,16 @@ const promoteEmployeeToAdmin = async (req, res, next) => {
         { $set: { against: newAdmin._id, againstModel: "Admin" } },
         { session }
       ),
+
+      Leave.updateMany(
+        { employee: id, organisation_id, applicantName: { $exists: false } },
+        { $set: {
+          applicantName: `${user.f_name} ${user.l_name || ""}`.trim(),
+          applicantEmail: user.work_email,
+          applicantRole: "Employee",
+        } },
+        { session }
+      ),
     ]);
 
     await session.commitTransaction();
@@ -1543,6 +1573,16 @@ const demoteManagerToEmployee = async (req, res, next) => {
         { $set: { against: newEmployee._id, againstModel: "User" } },
         { session }
       ),
+
+      ManagerLeave.updateMany(
+        { manager: id, organisation_id, applicantName: { $exists: false } },
+        { $set: {
+          applicantName: `${manager.f_name} ${manager.l_name || ""}`.trim(),
+          applicantEmail: manager.work_email,
+          applicantRole: "Manager",
+        } },
+        { session }
+      ),
     ]);
 
     await session.commitTransaction();
@@ -1689,6 +1729,16 @@ const demoteAdminToManager = async (req, res, next) => {
       Ticket.updateMany(
         { against: id, againstModel: "Admin", organisation_id },
         { $set: { against: newManager._id, againstModel: "Manager" } },
+        { session }
+      ),
+
+      AdminLeave.updateMany(
+        { admin: id, organisation_id, applicantName: { $exists: false } },
+        { $set: {
+          applicantName: `${adminToDemote.f_name} ${adminToDemote.l_name || ""}`.trim(),
+          applicantEmail: adminToDemote.work_email,
+          applicantRole: "Admin",
+        } },
         { session }
       ),
     ]);
@@ -1838,6 +1888,16 @@ const demoteAdminToEmployee = async (req, res, next) => {
       Ticket.updateMany(
         { against: id, againstModel: "Admin", organisation_id },
         { $set: { against: newEmployee._id, againstModel: "User" } },
+        { session }
+      ),
+
+      AdminLeave.updateMany(
+        { admin: id, organisation_id, applicantName: { $exists: false } },
+        { $set: {
+          applicantName: `${adminToDemote.f_name} ${adminToDemote.l_name || ""}`.trim(),
+          applicantEmail: adminToDemote.work_email,
+          applicantRole: "Admin",
+        } },
         { session }
       ),
     ]);
