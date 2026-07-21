@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import {
   FaPlus, FaTimes, FaCheck, FaEdit, FaTrash, FaSearch, FaFilter,
@@ -165,35 +165,54 @@ function AssigneeStack({ asset }) {
 function ActionMenu({ asset, onEdit, onDelete, onAssign, onAssignments }) {
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const [ready, setReady] = useState(false);
   const btnRef = useRef(null);
   const menuRef = useRef(null);
 
   const MENU_WIDTH = 200;
-  const MENU_HEIGHT_ESTIMATE = 190;
+  const MARGIN = 8;
+  const GAP = 6;
 
   const computePosition = () => {
     const btn = btnRef.current;
+    const menu = menuRef.current;
     if (!btn) return;
     const rect = btn.getBoundingClientRect();
+    const menuHeight = menu ? menu.offsetHeight : 190;
     const viewportW = window.innerWidth;
     const viewportH = window.innerHeight;
 
-    let left = rect.right - MENU_WIDTH;
-    if (left < 8) left = 8;
-    if (left + MENU_WIDTH > viewportW - 8) left = viewportW - MENU_WIDTH - 8;
-
-    let top = rect.bottom + 6;
-    if (top + MENU_HEIGHT_ESTIMATE > viewportH - 8) {
-      top = rect.top - MENU_HEIGHT_ESTIMATE - 6;
-      if (top < 8) top = 8;
+    const spaceLeft = rect.left;
+    const spaceRight = viewportW - rect.right;
+    let left;
+    if (spaceLeft >= MENU_WIDTH + GAP || spaceLeft >= spaceRight) {
+      left = rect.left - MENU_WIDTH - GAP;
+    } else {
+      left = rect.right + GAP;
     }
+    if (left < MARGIN) left = MARGIN;
+    if (left + MENU_WIDTH > viewportW - MARGIN) left = viewportW - MENU_WIDTH - MARGIN;
+
+    let top = rect.top + rect.height / 2 - menuHeight / 2;
+    const minTop = MARGIN;
+    const maxTop = viewportH - MARGIN - menuHeight;
+    if (top < minTop) top = minTop;
+    if (top > maxTop) top = Math.max(minTop, maxTop);
 
     setCoords({ top, left });
   };
 
+  useLayoutEffect(() => {
+    if (!open) {
+      setReady(false);
+      return;
+    }
+    computePosition();
+    setReady(true);
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
-    computePosition();
     const handleReposition = () => computePosition();
     window.addEventListener("scroll", handleReposition, true);
     window.addEventListener("resize", handleReposition);
@@ -231,7 +250,13 @@ function ActionMenu({ asset, onEdit, onDelete, onAssign, onAssignments }) {
       {open && createPortal(
         <div
           ref={menuRef}
-          style={{ position: "fixed", top: coords.top, left: coords.left, width: MENU_WIDTH }}
+          style={{
+            position: "fixed",
+            top: coords.top,
+            left: coords.left,
+            width: MENU_WIDTH,
+            visibility: ready ? "visible" : "hidden",
+          }}
           className="z-[2000] bg-white border border-[#e8d5e2] rounded-xl shadow-xl py-1 overflow-hidden"
         >
           <button onClick={() => { onEdit(asset); setOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-[#730042] hover:bg-[#f7ecf3]">
