@@ -1,8 +1,13 @@
+const mongoose = require("mongoose");
 const AssetModel = require("../Models/Asset.model");
 const AdminModel = require("../Models/Admin.model");
 const Managermodel = require("../Models/manager.model");
 const Usermodel = require("../Models/user.model");
 const { notifyAssetAssigned } = require("../utils/notify.utils");
+
+const PERSON_MODEL_MAP = { Admin: AdminModel, Manager: Managermodel, User: Usermodel };
+const PERSON_SELECT =
+  "_id f_name l_name uid work_email designation department working_status profile_image";
 
 const generateAssetId = () => {
   const ts = Date.now().toString(36).toUpperCase();
@@ -764,6 +769,153 @@ const getAssignableEmployeesAdmin = async (req, res, next) => {
   }
 };
 
+// List of employees/admins/managers who currently hold at least one assigned asset unit,
+// with a summary of how many assets they have. Available to both SuperAdmin and Admin.
+const getEmployeesWithAssets = async (req, res, next) => {
+  try {
+    let organisation_id;
+    if (req.superAdmin) organisation_id = req.superAdmin._id;
+    else if (req.admin) organisation_id = req.admin.organisation_id;
+    else return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const grouped = await AssetModel.aggregate([
+      { $match: { organisation_id: new mongoose.Types.ObjectId(organisation_id) } },
+      { $unwind: "$assignments" },
+      { $match: { "assignments.is_returned": false } },
+      {
+        $group: {
+          _id: {
+            assigned_to: "$assignments.assigned_to",
+            assigned_to_model: "$assignments.assigned_to_model",
+          },
+          total_assets_assigned: { $sum: "$assignments.quantity" },
+          distinct_assignments: { $sum: 1 },
+          last_assigned_date: { $max: "$assignments.assigned_date" },
+        },
+      },
+    ]);
+
+    const idsByModel = { Admin: [], Manager: [], User: [] };
+    grouped.forEach((g) => idsByModel[g._id.assigned_to_model]?.push(g._id.assigned_to));
+
+    const peopleByKey = {};
+    await Promise.all(
+      Object.keys(idsByModel).map(async (modelName) => {
+        if (!idsByModel[modelName].length) return;
+        const people = await PERSON_MODEL_MAP[modelName]
+          .find({ _id: { $in: idsByModel[modelName] } })
+          .select(PERSON_SELECT)
+          .lean();
+        people.forEach((p) => (peopleByKey[`${modelName}_${p._id}`] = p));
+      })
+    );
+
+    const employees = grouped
+      .map((g) => {
+        const key = `${g._id.assigned_to_model}_${g._id.assigned_to}`;
+        const person = peopleByKey[key];
+        if (!person) return null;
+        return {
+          person_id: person._id,
+          person_model: g._id.assigned_to_model,
+          f_name: person.f_name,
+          l_name: person.l_name,
+          uid: person.uid,
+          work_email: person.work_email,
+          designation: person.designation,
+          department: person.department,
+          working_status: person.working_status,
+          total_assets_assigned: g.total_assets_assigned,
+          distinct_assignments: g.distinct_assignments,
+          last_assigned_date: g.last_assigned_date,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => new Date(b.last_assigned_date) - new Date(a.last_assigned_date));
+
+    return res.status(200).json({ success: true, total: employees.length, employees });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Full asset assignment history (active + returned) for a single person, with assign/revoke dates.
+// Available to both SuperAdmin and Admin.
+const getEmployeeAssetHistory = async (req, res, next) => {
+  try {
+    const { person_id, person_model } = req.params;
+
+    if (!PERSON_MODEL_MAP[person_model])
+      return next(Object.assign(new Error("Invalid person_model"), { statusCode: 400 }));
+
+    let organisation_id;
+    if (req.superAdmin) organisation_id = req.superAdmin._id;
+    else if (req.admin) organisation_id = req.admin.organisation_id;
+    else return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const person = await PERSON_MODEL_MAP[person_model]
+      .findOne({ _id: person_id, organisation_id })
+      .select(PERSON_SELECT)
+      .lean();
+    if (!person) return next(Object.assign(new Error("Employee not found"), { statusCode: 404 }));
+
+    const assets = await AssetModel.find({
+      organisation_id,
+      assignments: {
+        $elemMatch: { assigned_to: person_id, assigned_to_model: person_model },
+      },
+    })
+      .select("asset_id asset_name asset_type serial_number brand model_number status assignments")
+      .lean();
+
+    const history = [];
+    assets.forEach((a) => {
+      (a.assignments || [])
+        .filter(
+          (x) =>
+            String(x.assigned_to) === String(person_id) && x.assigned_to_model === person_model
+        )
+        .forEach((x) => {
+          history.push({
+            assignment_id: x._id,
+            asset_id: a._id,
+            asset_code: a.asset_id,
+            asset_name: a.asset_name,
+            asset_type: a.asset_type,
+            serial_number: a.serial_number,
+            brand: a.brand,
+            model_number: a.model_number,
+            asset_status: a.status,
+            quantity: x.quantity,
+            assigned_date: x.assigned_date,
+            returned_date: x.returned_date,
+            is_returned: x.is_returned,
+            return_condition: x.return_condition,
+            return_notes: x.return_notes,
+          });
+        });
+    });
+
+    history.sort((a, b) => new Date(b.assigned_date) - new Date(a.assigned_date));
+
+    const currently_assigned = history.filter((h) => !h.is_returned);
+    const returned_history = history.filter((h) => h.is_returned);
+
+    return res.status(200).json({
+      success: true,
+      employee: { ...person, person_model },
+      total_records: history.length,
+      currently_assigned_count: currently_assigned.length,
+      returned_count: returned_history.length,
+      currently_assigned,
+      returned_history,
+      history,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createAssetSuperAdmin,
   updateAssetSuperAdmin,
@@ -784,4 +936,6 @@ module.exports = {
   getAssignableAdminsSuperAdmin,
   getAssignableManagersAdmin,
   getAssignableEmployeesAdmin,
+  getEmployeesWithAssets,
+  getEmployeeAssetHistory,
 };
