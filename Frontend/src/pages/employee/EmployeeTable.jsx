@@ -2171,7 +2171,7 @@ export default function EmployeeTable(){
             <p className="text-[11px] sm:text-xs md:text-sm text-[#993556] mt-0.5 break-words">
               {activeUsers.length} active · {filtered.length} shown · {employeeData?.employees??0} employees · {employeeData?.managers??0} managers
               {inactiveCount>0&&<> · <span className="text-[#6B7280]">{inactiveCount} inactive</span></>}
-              {allowedUsers!==null&&<> · <span className={isLimitReached?"text-[#DC2626] font-semibold":"text-[#993556]"}>{remainingSlots} slot{remainingSlots!==1?"s":""} remaining of {allowedUsers}</span></>}
+              {allowedUsers!==null&&<> · <span className={isLimitReached?"text-[#DC2626] font-semibold":"text-[#993556]"}>{remainingSlots} User{remainingSlots!==1?"s":""} remaining of {allowedUsers}</span></>}
             </p>
           </div>
           <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
