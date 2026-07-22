@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 require("dotenv").config();
-const { markNoShowAbsences } = require("../automatic/markNoShowAbsent");
+const { markNoShowAbsences } = require("../automatic/Marknoshowabsent");
 const { startOfDay } = require("../automatic/weekoffcalendar");
 
 // One-time backfill for the no-show-absent bug: AttendanceSummary was never
@@ -13,14 +13,21 @@ const { startOfDay } = require("../automatic/weekoffcalendar");
 //   node scripts/backfillNoShowAbsent.js 2026-06-01           -> from given date to yesterday
 //   node scripts/backfillNoShowAbsent.js 2026-06-01 2026-06-30 -> explicit range (inclusive)
 //
-// Safe to re-run: markNoShowAbsences() only $inc's a day once it confirms
-// there's no existing Attendance record for that employee/day, so running
-// this twice for the same range WILL double count. Do not re-run over a
-// range you've already backfilled unless you first re-run
-// Reconcileattendancesummaryleaveaware.js --apply (which rebuilds the
-// checkout-driven portion from scratch) right before this script, so the
-// two together produce a clean, correct total rather than adding on top of
-// a previous backfill.
+// Safe to re-run, including over overlapping ranges: markNoShowAbsences()
+// now records each counted date in AttendanceSummary.noShowDates and skips
+// a date it has already counted, so running this twice (or three times)
+// over the same range no longer double-counts absentDays.
+//
+// It also now skips any date before the employee's date_of_joining
+// (falling back to createdAt when date_of_joining isn't set), so it won't
+// mark someone absent for days before they were onboarded.
+//
+// If you're fixing numbers that were already double-counted by an OLD run
+// of this script (before this fix), run
+// scripts/Reconcileattendancesummaryleaveaware.js --apply first — it fully
+// recomputes presentDays/halfDays/absentDays from scratch (checkout records
+// + a fresh no-show sweep), so it overwrites bad historical totals instead
+// of adding to them.
 
 const args = process.argv.slice(2);
 const startArg = args[0] ? new Date(args[0]) : new Date("2026-01-01");

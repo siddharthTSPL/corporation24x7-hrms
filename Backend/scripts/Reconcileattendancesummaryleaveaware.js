@@ -4,23 +4,48 @@ const AttendanceSummary = require("../Models/attendancesummary.model");
 const Leave = require("../Models/leave.model");
 const ManagerLeave = require("../Models/maleave.model");
 const AdminLeave = require("../Models/adleave.model");
+const User = require("../Models/user.model");
+const Manager = require("../Models/manager.model");
+const Admin = require("../Models/Admin.model");
+const { classifyNonWorkingDay, startOfDay } = require("../automatic/weekoffcalendar");
+const { getISTDateParts, toISTKey } = require("../utils/Istdate.utils");
 require("dotenv").config();
 
 const APPLY = process.argv.includes("--apply");
 
-// Leave-aware replacement for Reconcileattendancesummary.js.
-// That script (and the pre-fix monthattendanceupdate.js) counted a day as
-// absent/half_day in AttendanceSummary even when it was covered by an
-// approved EL/SL/ML/PL leave, which meant Payroll (which reads
-// AttendanceSummary.absentDays/halfDays directly) could dock salary on a
-// day that should have been paid leave. This script recomputes
-// AttendanceSummary the same corrected way updateSummary() now does:
-// a day only counts as an unpaid absent/half-day if there was NO approved
-// leave covering that date.
+// Leave-aware, no-show-aware, join-date-aware rebuild of AttendanceSummary.
+//
+// This replaces two previously separate (and previously conflicting) code
+// paths:
+//   1. This script's old version, which only recomputed present/half/absent
+//      from CHECKED-OUT Attendance records. It $set the whole absentDays
+//      field, so any employee/month with ZERO checkout records (e.g. an
+//      employee who simply never checked in all month) was never touched
+//      at all — their AttendanceSummary doc was left exactly as-is, bugs
+//      and all. This is why an employee could show 45 absent days in a
+//      22-day-old month: the no-show cron/backfill had been $inc'ing that
+//      number (sometimes more than once per day, see Marknoshowabsent.js),
+//      and this script never recomputed/overwrote it because it only looks
+//      at checkout records.
+//   2. Marknoshowabsent.js / Backfillnoshowabsent.js, which $inc absentDays
+//      for no-show days. $inc is fine going forward but can't repair
+//      numbers that are already wrong.
+//
+// This script now does BOTH in one pass and fully $sets the result, so it
+// is safe to run at any time to get every employee/month back to the truth:
+// presentDays/halfDays from checkout records, absentDays from checkout
+// records with status "absent" PLUS every working day with no Attendance
+// record at all, from the employee's date_of_joining (falling back to
+// createdAt) through yesterday, excluding holidays/week-offs/approved leave.
+
+const ROLE_CONFIG = {
+  employee: { Model: User, onModel: "User", LeaveModel: Leave, leaveField: "employee" },
+  manager: { Model: Manager, onModel: "Manager", LeaveModel: ManagerLeave, leaveField: "manager" },
+  admin: { Model: Admin, onModel: "Admin", LeaveModel: AdminLeave, leaveField: "admin" },
+};
 
 const loadApprovedLeaveRanges = async () => {
-  // employee/role -> [{start, end}]
-  const map = new Map();
+  const map = new Map(); // "employeeId_role" -> [{start, end}]
 
   const addAll = (docs, empField, role) => {
     docs.forEach((d) => {
@@ -52,29 +77,46 @@ const isOnApprovedLeave = (leaveMap, employeeId, role, date) => {
   return ranges.some((r) => date >= r.start && date <= r.end);
 };
 
+const bucketKey = (employee, role, year, month) => `${employee}_${role}_${year}_${month}`;
+
+const getOrCreateBucket = (buckets, employee, role, year, month, organisation_id) => {
+  const key = bucketKey(employee, role, year, month);
+  if (!buckets.has(key)) {
+    buckets.set(key, {
+      employee, role, organisation_id, year, month,
+      presentDays: 0, halfDays: 0, absentDays: 0, totalWorkingMinutes: 0,
+    });
+  }
+  return buckets.get(key);
+};
+
 const recomputeSummaries = async () => {
-  const [records, leaveMap] = await Promise.all([
-    Attendance.find({ checkOut: { $exists: true, $ne: null } }).lean(),
+  const yesterday = startOfDay(new Date(Date.now() - 24 * 60 * 60 * 1000));
+
+  const [allRecords, leaveMap] = await Promise.all([
+    Attendance.find({}).select("employee role date checkOut status activeMinutes organisation_id").lean(),
     loadApprovedLeaveRanges(),
   ]);
 
-  console.log(`Found ${records.length} completed attendance record(s)`);
+  console.log(`Found ${allRecords.length} attendance record(s) total`);
   console.log(`Loaded approved leave ranges for ${leaveMap.size} employee(s)\n`);
 
-  const buckets = new Map(); // "employee_role_year_month" -> accumulator
+  const buckets = new Map();
 
-  records.forEach((r) => {
-    const d = new Date(r.date);
-    const key = `${r.employee}_${r.role}_${d.getUTCFullYear()}_${d.getUTCMonth() + 1}`;
-    if (!buckets.has(key)) {
-      buckets.set(key, {
-        employee: r.employee, role: r.role,
-        organisation_id: r.organisation_id,
-        year: d.getUTCFullYear(), month: d.getUTCMonth() + 1,
-        presentDays: 0, halfDays: 0, absentDays: 0, totalWorkingMinutes: 0,
-      });
-    }
-    const b = buckets.get(key);
+  // A day with ANY Attendance record (checked out or not) is never a
+  // no-show — it's either already counted below (checkout) or still
+  // in-progress (no checkout yet, e.g. today; skipped either way here
+  // since the no-show sweep only ever looks at dates up to yesterday).
+  const hasAnyRecord = new Set();
+
+  allRecords.forEach((r) => {
+    hasAnyRecord.add(`${r.employee}_${r.role}_${toISTKey(r.date)}`);
+
+    if (!r.checkOut) return; // not checked out yet — handled by no-show sweep only if it's a genuinely empty day, otherwise ignored
+
+    const { year, month } = getISTDateParts(r.date);
+    const d = startOfDay(r.date);
+    const b = getOrCreateBucket(buckets, String(r.employee), r.role, year, month, r.organisation_id);
     b.totalWorkingMinutes += r.activeMinutes || 0;
 
     const onLeave = (r.status === "half_day" || r.status === "absent")
@@ -91,11 +133,52 @@ const recomputeSummaries = async () => {
     }
   });
 
+  // No-show sweep: for every active employee, walk every day from their
+  // join date through yesterday and count genuine no-shows (no Attendance
+  // record, not a holiday/week-off, not on approved leave).
+  for (const role of Object.keys(ROLE_CONFIG)) {
+    const { Model, onModel, leaveField } = ROLE_CONFIG[role];
+    const employees = await Model.find({ status: "active" })
+      .select("_id organisation_id date_of_joining createdAt")
+      .lean();
+
+    for (const emp of employees) {
+      const effectiveJoinDate = emp.date_of_joining || emp.createdAt;
+      if (!effectiveJoinDate) {
+        console.log(`[SKIP] employee=${emp._id} role=${role}: no date_of_joining and no createdAt, cannot determine a safe start date`);
+        continue;
+      }
+
+      let cursor = startOfDay(effectiveJoinDate);
+      const end = yesterday;
+      while (cursor <= end) {
+        const key = `${emp._id}_${role}_${toISTKey(cursor)}`;
+        const { year, month } = getISTDateParts(cursor);
+        // Ensure a bucket exists for every month in the employee's tenure,
+        // even if it ends up all zeros — this is what lets a stale/garbage
+        // AttendanceSummary doc (e.g. from a pre-fix double-counted run)
+        // get overwritten back to the truth instead of being left alone.
+        const b = getOrCreateBucket(buckets, String(emp._id), role, year, month, emp.organisation_id);
+
+        if (!hasAnyRecord.has(key)) {
+          const nonWorking = await classifyNonWorkingDay(cursor, emp.organisation_id, emp._id, onModel);
+          if (nonWorking.type !== "holiday" && nonWorking.type !== "week_off" && nonWorking.type !== "unconfigured") {
+            if (!isOnApprovedLeave(leaveMap, emp._id, role, cursor)) {
+              b.absentDays += 1;
+            }
+          }
+        }
+
+        cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000);
+      }
+    }
+  }
+
   let mismatches = 0;
 
   for (const b of buckets.values()) {
     const existing = await AttendanceSummary.findOne({
-      employee: b.employee, year: b.year, month: b.month,
+      employee: b.employee, role: b.role, year: b.year, month: b.month,
     }).lean();
 
     const same = existing
@@ -107,7 +190,7 @@ const recomputeSummaries = async () => {
     if (!same) {
       mismatches++;
       console.log(
-        `[MISMATCH] employee=${b.employee} ${b.year}-${b.month}: ` +
+        `[MISMATCH] employee=${b.employee} role=${b.role} ${b.year}-${b.month}: ` +
         `stored={present:${existing?.presentDays ?? "-"}, half:${existing?.halfDays ?? "-"}, absent:${existing?.absentDays ?? "-"}, mins:${existing?.totalWorkingMinutes ?? "-"}} ` +
         `→ recomputed={present:${b.presentDays}, half:${b.halfDays}, absent:${b.absentDays}, mins:${b.totalWorkingMinutes}}`
       );
@@ -119,6 +202,11 @@ const recomputeSummaries = async () => {
               organisation_id: b.organisation_id,
               presentDays: b.presentDays, halfDays: b.halfDays,
               absentDays: b.absentDays, totalWorkingMinutes: b.totalWorkingMinutes,
+              // Reset the idempotency tracker to match the freshly
+              // recomputed absentDays for this month — from this point on
+              // Marknoshowabsent.js's own noShowDates check takes over
+              // again for any NEW no-show day going forward.
+              noShowDates: [],
             },
           },
           { upsert: true }
@@ -138,7 +226,11 @@ const recomputeSummaries = async () => {
     "NOTE 2: Any Payroll documents already generated for the corrected months " +
     "were built from the old (wrong) absentDays/halfDays numbers and will need " +
     "to be regenerated after this script runs, or they will still reflect the " +
-    "incorrect deduction."
+    "incorrect deduction.\n" +
+    "NOTE 3: After this runs with --apply, Marknoshowabsent.js's noShowDates " +
+    "tracking is reset to empty for every corrected month — this is expected " +
+    "and correct, it just means the very next nightly cron run re-derives it " +
+    "from scratch for that month's remaining days."
   );
 };
 
