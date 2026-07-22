@@ -968,7 +968,7 @@ export default function SuperAdminAssets() {
                           <AssigneeStack asset={asset} />
                         </td>
                         <td className="px-4 py-3">
-                          <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                          <div className="onClick={(e)=>e.stopPropagation()}">
                             <ActionMenu
                               asset={asset}
                               onEdit={(a) => setFormModal({ open: true, editing: a })}
