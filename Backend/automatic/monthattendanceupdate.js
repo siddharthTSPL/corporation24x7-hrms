@@ -49,13 +49,29 @@ const updateSummary = async (attendance) => {
   const date  = new Date(attendance.date);
   const empId = new mongoose.Types.ObjectId(attendance.employee);
 
+  const isUnpaidCandidate = attendance.status === "half_day" || attendance.status === "absent";
+
+  // Same rule that decides LWP must also decide whether this day counts as
+  // an unpaid absent/half-day in AttendanceSummary — payroll reads
+  // AttendanceSummary directly, so if this check only gated LWP, an
+  // employee on approved (and available) EL/SL would still get their
+  // salary docked for a day that correctly has zero LWP.
+  const onLeave = isUnpaidCandidate
+    ? await hasApprovedLeave(attendance.employee, attendance.date, attendance.role)
+    : false;
+
   const summaryInc = { totalWorkingMinutes: attendance.activeMinutes || 0 };
 
-  if      (attendance.status === "present")  { summaryInc.presentDays = 1; }
-  else if (attendance.status === "half_day") { summaryInc.halfDays = 1; summaryInc.presentDays = 0.5; }
-  else if (attendance.status === "absent")   { summaryInc.absentDays = 1; }
+  if (attendance.status === "present") {
+    summaryInc.presentDays = 1;
+  } else if (attendance.status === "half_day") {
+    summaryInc.presentDays = 0.5;
+    if (!onLeave) summaryInc.halfDays = 1;
+  } else if (attendance.status === "absent") {
+    if (!onLeave) summaryInc.absentDays = 1;
+  }
 
-  const summaryWrite = AttendanceSummary.findOneAndUpdate(
+  await AttendanceSummary.findOneAndUpdate(
     {
       employee: attendance.employee,
       role:     attendance.role,
@@ -66,22 +82,12 @@ const updateSummary = async (attendance) => {
     { upsert: true, new: true }
   );
 
-  if (attendance.status === "half_day" || attendance.status === "absent") {
+  if (isUnpaidCandidate && !onLeave) {
     const lwpAmount = attendance.status === "half_day" ? 0.5 : 1;
-
-    const [, onLeave] = await Promise.all([
-      summaryWrite,
-      hasApprovedLeave(attendance.employee, attendance.date, attendance.role),
-    ]);
-
-    if (!onLeave) {
-      await LeaveBalance.findOneAndUpdate(
-        { employee: empId },
-        { $inc: { lwp: lwpAmount } }
-      );
-    }
-  } else {
-    await summaryWrite;
+    await LeaveBalance.findOneAndUpdate(
+      { employee: empId },
+      { $inc: { lwp: lwpAmount } }
+    );
   }
 };
 
