@@ -271,7 +271,19 @@ const checkout = async (req, res) => {
     }
 
     attendance.checkOut = now;
-    const status = calculateStatus(attendance.activeMinutes, thresholds);
+    // activeMinutes only grows via periodic /activity heartbeat pings (see
+    // activity() above). If that heartbeat never fired during this session
+    // (e.g. checked in/out without the tracker running), activeMinutes sits
+    // at 0 even though the person was genuinely checked in for hours -
+    // calculateStatus would then wrongly call a real session "absent".
+    // Fall back to the raw checkIn->checkOut duration in that case; if any
+    // real heartbeat data exists, keep trusting it as-is.
+    const elapsedSessionMinutes = attendance.checkIn
+      ? (now.getTime() - new Date(attendance.checkIn).getTime()) / 60000
+      : 0;
+    const effectiveActiveMinutes =
+      attendance.activeMinutes > 0 ? attendance.activeMinutes : elapsedSessionMinutes;
+    const status = calculateStatus(effectiveActiveMinutes, thresholds);
     const { remark, isOvertime, overtimeMinutes } = checkoutWindow;
     attendance.status = status;
     attendance.checkoutRemark = remark;
@@ -368,7 +380,14 @@ const autoCheckoutAll = async () => {
       if (now < forceCheckoutAt) continue; // overtime cutoff not reached yet
 
       const thresholds = getShiftThresholds(shift);
-      const status = calculateStatus(a.activeMinutes, thresholds);
+      // Same fallback as checkout() above: if activeMinutes never got any
+      // heartbeat data (still 0), use the raw checkIn->cutoff duration
+      // instead of auto-marking a genuine multi-hour session "absent".
+      const elapsedSessionMinutes = a.checkIn
+        ? (forceCheckoutAt.getTime() - new Date(a.checkIn).getTime()) / 60000
+        : 0;
+      const effectiveActiveMinutes = a.activeMinutes > 0 ? a.activeMinutes : elapsedSessionMinutes;
+      const status = calculateStatus(effectiveActiveMinutes, thresholds);
       const checkoutWindow = evaluateCheckoutWindow(shift, forceCheckoutAt, a.checkIn);
 
       ops.push({
