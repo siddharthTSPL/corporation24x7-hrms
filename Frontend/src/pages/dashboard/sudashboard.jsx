@@ -1970,7 +1970,7 @@ function SuperAdminDashboard() {
             <span className="font-bold text-[13px] sm:text-[15px] text-[#0d0209]">Admin Management</span>
             {isAtLimit && (
               <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full">
-                <FaCrown size={8} /> Seat limit reached
+                <FaCrown size={8} /> User limit reached
               </span>
             )}
           </div>
