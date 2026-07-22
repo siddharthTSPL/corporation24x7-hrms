@@ -1037,7 +1037,7 @@ function AccountSummaryDrawer({
                           <Avatar name={`${(person.Under_manager||person.reporting_manager)?.f_name??""} ${(person.Under_manager||person.reporting_manager)?.l_name??""}`} size="sm"/>
                           <div className="min-w-0">
                             <p className="text-xs font-semibold text-[#730042] truncate">{(person.Under_manager||person.reporting_manager)?.f_name} {(person.Under_manager||person.reporting_manager)?.l_name}</p>
-                            <p className="text-[10px] text-[#993556] truncate">{(person.Under_manager||person.reporting_manager)?.work_email}</p>
+                            <p className="text-[10px] text-[#993556] truncate">{(person.Under_manager||person.reporting_manager)?.empid}</p>
                           </div>
                         </div>
                       </div>
@@ -1938,7 +1938,6 @@ export default function EmployeeTable(){
     if(!editForm.l_name?.trim())err.l_name="Required";
     if(!editForm.work_email?.trim())err.work_email="Required";
     else if(!EMAIL_REGEX.test(editForm.work_email))err.work_email="Invalid email address";
-    if(!editForm.department)err.department="Required";
     if(!editForm.designation?.trim())err.designation="Required";
     if(editForm.personal_contact&&!PHONE_REGEX.test(editForm.personal_contact))err.personal_contact="Must be a valid 10-digit Indian mobile number";
     if(editForm.e_contact&&!PHONE_REGEX.test(editForm.e_contact))err.e_contact="Must be a valid 10-digit Indian mobile number";
@@ -2360,12 +2359,12 @@ export default function EmployeeTable(){
                         {u.Under_manager?(
                           <div className="text-xs">
                             <p className="font-medium text-[#730042] truncate max-w-[80px] lg:max-w-none">{u.Under_manager.f_name} {u.Under_manager.l_name}</p>
-                            <p className="text-[#993556] text-[10px] hidden lg:block">{u.Under_manager.uid}</p>
+                            <p className="text-[#993556] text-[10px] hidden lg:block">{u.Under_manager.empid}</p>
                           </div>
                         ):u.reporting_manager?(
                           <div className="text-xs">
                             <p className="font-medium text-[#730042] truncate max-w-[80px] lg:max-w-none">{u.reporting_manager.f_name} {u.reporting_manager.l_name}</p>
-                            <p className="text-[#993556] text-[10px] hidden lg:block">{u.reporting_manager.work_email}</p>
+                            <p className="text-[#993556] text-[10px] hidden lg:block">{u.reporting_manager.empid}</p>
                           </div>
                         ):<span className="text-[#F4C0D1] text-xs">—</span>}
                       </td>
@@ -2434,24 +2433,8 @@ export default function EmployeeTable(){
           <Field label="First Name" required error={editErrors.f_name}><input name="f_name" value={editForm.f_name} onChange={handleEditChange} className={inputCls}/></Field>
           <Field label="Last Name" required error={editErrors.l_name}><input name="l_name" value={editForm.l_name} onChange={handleEditChange} className={inputCls}/></Field>
           <Field label="Work Email" required error={editErrors.work_email}><input name="work_email" type="email" value={editForm.work_email} onChange={handleEditChange} className={inputCls}/></Field>
-          <Field label="Department" required error={editErrors.department}>
-            <select name="department" value={editForm.department} onChange={handleEditChange} className={inputCls}>
-              <option value="">Select Department</option>
-              {DEPT_OPTIONS.map((dept) => (
-                <option key={dept} value={dept}>
-                  {DEPT_FULL_FORMS[dept]}
-                </option>
-              ))}
-            </select>
-          </Field>
           <Field label="Designation" required error={editErrors.designation}><input name="designation" value={editForm.designation} onChange={handleEditChange} className={inputCls}/></Field>
-          <Field label="Role">
-            <select name="role" value={editForm.role} onChange={handleEditChange} className={inputCls}>
-              <option value="employee">Employee</option><option value="manager">Manager</option>
-              <option value="senior_manager">Senior Manager</option><option value="official">Official</option>
-            </select>
-          </Field>
-          {(editTarget.role==="employee"||editTarget.role==="official"||editForm.role==="employee"||editForm.role==="official")&&(
+          {(editTarget.role==="employee"||editTarget.role==="official")&&(
             <div className="col-span-1 sm:col-span-2">
               <UnderManagerSelect value={editForm.Under_manager} onChange={handleEditChange} managersOnly={managersOnly}/>
             </div>
@@ -2473,11 +2456,7 @@ export default function EmployeeTable(){
           </Field>
           <Field label="Phone" error={editErrors.personal_contact}><input name="personal_contact" value={editForm.personal_contact} onChange={handleEditChange} className={inputCls}/></Field>
           <Field label="Emergency Contact" error={editErrors.e_contact}><input name="e_contact" value={editForm.e_contact} onChange={handleEditChange} className={inputCls}/></Field>
-          <Field label="Office Location">
-            <select name="office_location" value={editForm.office_location} onChange={handleEditChange} className={inputCls}>
-              <option value="">Select Location</option>{LOCATIONS.map((l)=><option key={l} value={l}>{l}</option>)}
-            </select>
-          </Field>
+          
         </Modal>
       )}
 
