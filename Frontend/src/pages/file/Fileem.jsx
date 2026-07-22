@@ -1,6 +1,8 @@
 import { useState } from "react";
 import {
   FaCloudUploadAlt,
+  FaEdit,
+  FaTrash,
   FaTimes,
   FaFilePdf,
   FaFileImage,
@@ -15,6 +17,8 @@ import Can from "../../components/can";
 import {
   useGetDocuments,
   useUploadDocument,
+  useEditDocument,
+  useDeleteDocument,
   useGetPersonalDocuments,
   useGetExpenseDocuments,
 } from "../../auth/server-state/employee/employeeother/employeeother.hook";
@@ -95,9 +99,10 @@ const Banner = ({ tone, message, onClose }) => (
   </div>
 );
 
-const UploadModal = ({ onClose, onSubmit, submitting, error }) => {
-  const [title, setTitle] = useState("");
-  const [fileType, setFileType] = useState(SUB.PERSONAL);
+// ── Upload / Edit modal ─────────────────────────────────────────────────
+const DocumentFormModal = ({ mode, initial, onClose, onSubmit, submitting, error }) => {
+  const [title, setTitle] = useState(initial?.title || "");
+  const [fileType, setFileType] = useState(initial?.fileType || SUB.PERSONAL);
   const [file, setFile] = useState(null);
   const [localError, setLocalError] = useState("");
 
@@ -118,11 +123,11 @@ const UploadModal = ({ onClose, onSubmit, submitting, error }) => {
 
   const handleSubmit = () => {
     if (!title.trim()) return setLocalError("Title is required.");
-    if (!file) return setLocalError("Please choose a file to upload.");
+    if (mode === "upload" && !file) return setLocalError("Please choose a file to upload.");
     const formData = new FormData();
     formData.append("title", title.trim());
     formData.append("fileType", fileType);
-    formData.append("file", file);
+    if (file) formData.append("file", file);
     onSubmit(formData);
   };
 
@@ -130,7 +135,9 @@ const UploadModal = ({ onClose, onSubmit, submitting, error }) => {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
       <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h3 className="font-semibold text-gray-800">Upload document</h3>
+          <h3 className="font-semibold text-gray-800">
+            {mode === "upload" ? "Upload document" : "Edit document"}
+          </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <FaTimes />
           </button>
@@ -174,7 +181,9 @@ const UploadModal = ({ onClose, onSubmit, submitting, error }) => {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">File</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">
+              File {mode === "edit" && <span className="text-gray-400">(optional — keep existing)</span>}
+            </label>
             <label className="flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 rounded-lg py-6 text-sm text-gray-400 cursor-pointer hover:border-[#730042]/40 hover:text-[#730042]/70 transition">
               <FaCloudUploadAlt size={18} />
               {file ? file.name : "PDF, PNG or JPG, up to 2MB"}
@@ -200,7 +209,7 @@ const UploadModal = ({ onClose, onSubmit, submitting, error }) => {
             disabled={submitting}
             className="px-4 py-2 text-sm font-medium text-white rounded-lg bg-[#730042] hover:bg-[#5c0335] disabled:opacity-50 transition"
           >
-            {submitting ? "Uploading…" : "Upload"}
+            {submitting ? "Saving…" : mode === "upload" ? "Upload" : "Save changes"}
           </button>
         </div>
       </div>
@@ -208,21 +217,73 @@ const UploadModal = ({ onClose, onSubmit, submitting, error }) => {
   );
 };
 
+// ── Delete confirm modal ────────────────────────────────────────────────
+const DeleteConfirmModal = ({ doc, onClose, onConfirm, submitting }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+    <div className="bg-white w-full max-w-sm rounded-2xl shadow-xl p-5">
+      <h3 className="font-semibold text-gray-800 mb-1">Delete document?</h3>
+      <p className="text-sm text-gray-400 mb-5">
+        "{doc?.title}" will be permanently removed. This can't be undone.
+      </p>
+      <div className="flex justify-end gap-3">
+        <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">
+          Cancel
+        </button>
+        <button
+          onClick={onConfirm}
+          disabled={submitting}
+          className="px-4 py-2 text-sm font-medium text-white rounded-lg bg-red-500 hover:bg-red-600 disabled:opacity-50 transition"
+        >
+          {submitting ? "Deleting…" : "Delete"}
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
 const MyDocumentsSection = () => {
   const { data, isLoading } = useGetDocuments();
   const uploadMutation = useUploadDocument();
+  const editMutation = useEditDocument();
+  const deleteMutation = useDeleteDocument();
+
   const [filter, setFilter] = useState("all");
-  const [showUpload, setShowUpload] = useState(false);
+  const [modal, setModal] = useState(null); // { type: 'upload' | 'edit' | 'delete', doc }
   const [banner, setBanner] = useState(null);
 
   const docs = data?.documents ?? [];
   const filtered = filter === "all" ? docs : docs.filter((d) => d.fileType === filter);
 
+  const closeModal = () => setModal(null);
+
   const handleUpload = (formData) => {
     uploadMutation.mutate(formData, {
       onSuccess: () => {
         setBanner({ tone: "success", message: "Document uploaded successfully." });
-        setShowUpload(false);
+        closeModal();
+      },
+      onError: (err) => setBanner({ tone: "error", message: err.message }),
+    });
+  };
+
+  const handleEdit = (formData) => {
+    editMutation.mutate(
+      { id: modal.doc.id, data: formData },
+      {
+        onSuccess: () => {
+          setBanner({ tone: "success", message: "Document updated successfully." });
+          closeModal();
+        },
+        onError: (err) => setBanner({ tone: "error", message: err.message }),
+      }
+    );
+  };
+
+  const handleDelete = () => {
+    deleteMutation.mutate(modal.doc.id, {
+      onSuccess: () => {
+        setBanner({ tone: "success", message: "Document deleted." });
+        closeModal();
       },
       onError: (err) => setBanner({ tone: "error", message: err.message }),
     });
@@ -250,7 +311,7 @@ const MyDocumentsSection = () => {
         </div>
 
         <button
-          onClick={() => setShowUpload(true)}
+          onClick={() => setModal({ type: "upload" })}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#730042] text-white text-sm font-medium hover:bg-[#5c0335] transition"
         >
           <FaPlus size={12} />
@@ -279,13 +340,13 @@ const MyDocumentsSection = () => {
                   <th className="px-5 py-3 font-medium">Category</th>
                   <th className="px-5 py-3 font-medium">Size</th>
                   <th className="px-5 py-3 font-medium">Uploaded</th>
-                  <th className="px-5 py-3 font-medium text-right">Action</th>
+                  <th className="px-5 py-3 font-medium text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((doc) => (
                   <tr
-                    key={doc._id}
+                    key={doc.id}
                     className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60"
                   >
                     <td className="px-5 py-3.5">
@@ -300,21 +361,29 @@ const MyDocumentsSection = () => {
                       <TypeBadge type={doc.fileType} />
                     </td>
                     <td className="px-5 py-3.5 text-gray-500">
-                      {formatSize(doc.size ?? doc.sizeKB)}
+                      {formatSize(doc.sizeKB)}
                     </td>
                     <td className="px-5 py-3.5 text-gray-500">
                       {formatDate(doc.uploadedAt)}
                     </td>
-                    <td className="px-5 py-3.5 text-right">
-                      <a
-                        href={doc.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 text-xs font-medium text-[#730042] hover:underline"
-                      >
-                        <FaEye size={11} />
-                        View
-                      </a>
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center justify-end gap-3 text-gray-400">
+                        <a
+                          href={doc.fileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="View"
+                          className="hover:text-[#730042]"
+                        >
+                          <FaEye size={14} />
+                        </a>
+                        <button onClick={() => setModal({ type: "edit", doc })} title="Edit" className="hover:text-[#730042]">
+                          <FaEdit size={14} />
+                        </button>
+                        <button onClick={() => setModal({ type: "delete", doc })} title="Delete" className="hover:text-red-500">
+                          <FaTrash size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -336,42 +405,66 @@ const MyDocumentsSection = () => {
             />
           ) : (
             filtered.map((doc) => (
-              <div key={doc._id} className="flex items-start gap-3 px-4 py-4">
-                <div className="w-9 h-9 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
-                  <FileIcon url={doc.fileUrl} className="text-gray-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-700 truncate">{doc.title}</p>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <TypeBadge type={doc.fileType} />
-                    <span className="text-xs text-gray-400">
-                      {formatSize(doc.size ?? doc.sizeKB)}
-                    </span>
+              <div key={doc.id} className="px-4 py-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
+                    <FileIcon url={doc.fileUrl} className="text-gray-400" />
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Uploaded {formatDate(doc.uploadedAt)}
-                  </p>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-700 truncate">{doc.title}</p>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <TypeBadge type={doc.fileType} />
+                      <span className="text-xs text-gray-400">
+                        {formatSize(doc.sizeKB)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Uploaded {formatDate(doc.uploadedAt)}
+                    </p>
+                  </div>
                 </div>
-                <a
-                  href={doc.fileUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-[#730042] shrink-0 mt-1"
-                >
-                  <FaEye size={14} />
-                </a>
+                <div className="flex items-center gap-4 mt-3 pl-12 text-gray-400">
+                  <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs hover:text-[#730042]">
+                    <FaEye size={12} /> View
+                  </a>
+                  <button onClick={() => setModal({ type: "edit", doc })} className="flex items-center gap-1.5 text-xs hover:text-[#730042]">
+                    <FaEdit size={12} /> Edit
+                  </button>
+                  <button onClick={() => setModal({ type: "delete", doc })} className="flex items-center gap-1.5 text-xs hover:text-red-500">
+                    <FaTrash size={12} /> Delete
+                  </button>
+                </div>
               </div>
             ))
           )}
         </div>
       </div>
 
-      {showUpload && (
-        <UploadModal
-          onClose={() => setShowUpload(false)}
+      {modal?.type === "upload" && (
+        <DocumentFormModal
+          mode="upload"
+          onClose={closeModal}
           onSubmit={handleUpload}
           submitting={uploadMutation.isPending}
           error={uploadMutation.error?.message}
+        />
+      )}
+      {modal?.type === "edit" && (
+        <DocumentFormModal
+          mode="edit"
+          initial={modal.doc}
+          onClose={closeModal}
+          onSubmit={handleEdit}
+          submitting={editMutation.isPending}
+          error={editMutation.error?.message}
+        />
+      )}
+      {modal?.type === "delete" && (
+        <DeleteConfirmModal
+          doc={modal.doc}
+          onClose={closeModal}
+          onConfirm={handleDelete}
+          submitting={deleteMutation.isPending}
         />
       )}
     </div>
