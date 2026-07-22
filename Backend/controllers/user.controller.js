@@ -806,10 +806,12 @@ const editprofile = async (req, res, next) => {
       employee.marital_status = marital_status;
     }
   }
-  if (office_location !== undefined) {
-    if (!["Noida", "Bareilly", "Delhi", "Mumbai"].includes(office_location))
-      return next(Object.assign(new Error("Invalid office location"), { statusCode: 400 }));
-    employee.office_location = office_location;
+ if (office_location !== undefined) {
+    if (typeof office_location !== "string" || !office_location.trim() || office_location.trim().length > 100)
+      return next(
+        Object.assign(new Error("Office location must be a valid, non-empty location name (max 100 characters)"), { statusCode: 400 }),
+      );
+    employee.office_location = office_location.trim();
   }
   if (profile_image !== undefined) {
     if (typeof profile_image !== "string")
