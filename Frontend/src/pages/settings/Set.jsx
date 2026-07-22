@@ -449,7 +449,7 @@ function ContactTab({ adminData, onSuccess, onError }) {
         onChange={e => setForm(p => ({ ...p, date_of_joining: e.target.value }))}
         hint="Shown on your dashboard in place of your account creation date"
       />
-      <PrimaryButton onClick={handleSave} loading={isPending}>Save contact info</PrimaryButton>
+     <PrimaryButton onClick={handleSave} loading={isPending} color={C.brandDark}>Save contact info</PrimaryButton>
     </SectionCard>
   );
 }
@@ -552,7 +552,7 @@ function DocumentsBankingTab({ adminData, onSuccess, onError }) {
         <InputField label="Aadhaar card" value={form.aadhaar_card} onChange={set("aadhaar_card")} placeholder="https://…" />
         <InputField label="PAN card" value={form.pan_card} onChange={set("pan_card")} placeholder="https://…" />
         <InputField label="Experience letter" value={form.experience_letter} onChange={set("experience_letter")} placeholder="https://…" />
-        <PrimaryButton onClick={handleSaveDocs} loading={isPending}>Save documents</PrimaryButton>
+        <PrimaryButton onClick={handleSaveDocs} loading={isPending} color={C.brandDark}>Save documents</PrimaryButton>
       </SectionCard>
 
       <SectionCard title="Banking details" subtitle="Used for salary disbursement" accent={C.green}>
@@ -562,7 +562,7 @@ function DocumentsBankingTab({ adminData, onSuccess, onError }) {
           <InputField label="Account number" value={form.account_number} onChange={set("account_number")} placeholder="9-18 digit account number" />
           <InputField label="IFSC code" value={form.ifsc_code} onChange={(e) => setForm(p => ({ ...p, ifsc_code: e.target.value.toUpperCase() }))} placeholder="ABCD0123456" />
         </Grid>
-        <PrimaryButton onClick={handleSaveBanking} loading={isPending} color={C.green}>Save banking details</PrimaryButton>
+        <PrimaryButton onClick={handleSaveBanking} loading={isPending} color={C.brandDark}>Save banking details</PrimaryButton>
       </SectionCard>
     </>
   );
@@ -759,7 +759,7 @@ function PasswordTab({ onSuccess, onError }) {
         <InputField label="Confirm new password *" type={show ? "text" : "password"} value={form.confirm} onChange={set("confirm")} placeholder="Confirm password"
           hint={form.confirm && form.newPassword !== form.confirm ? "Passwords do not match" : ""}
         />
-        <PrimaryButton onClick={handleChange} loading={isPending}>Update password</PrimaryButton>
+       <PrimaryButton onClick={handleChange} loading={isPending} color={C.brandDark}>Update password</PrimaryButton>
         <div style={{ marginTop: 14, padding: "11px 14px", background: C.brandLight, borderRadius: 9, fontSize: 12, color: C.brandDark, lineHeight: 1.6 }}>
           Use 10+ characters with uppercase, numbers and symbols for a strong password.
         </div>
