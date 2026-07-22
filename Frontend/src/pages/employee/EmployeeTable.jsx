@@ -2371,10 +2371,10 @@ export default function EmployeeTable(){
                       <td className="px-3 lg:px-4 py-3">{roleBadge(u)}</td>
                       <td className="px-3 lg:px-4 py-3"><WorkingStatusBadge status={u.working_status}/></td>
                       <td className="px-3 lg:px-4 py-3">
-                        <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity" onClick={(e)=>e.stopPropagation()}>
-                          <ActionMenu user={u} onView={handleView} onEdit={handleOpenEdit} onDelete={setDeleteTarget} {...actionMenuProps}/>
-                        </div>
-                      </td>
+  <div onClick={(e)=>e.stopPropagation()}>
+    <ActionMenu user={u} onView={handleView} onEdit={handleOpenEdit} onDelete={setDeleteTarget} {...actionMenuProps}/>
+  </div>
+</td>
                     </tr>
                   );
                 })}
