@@ -1638,7 +1638,7 @@ function SuperAdminDashboard() {
       icon: <FaToggleOn />,
       label: "Active Users",
       value: activeUserLoading ? "—" : `${activeUserCount}/${allowedUsers}`,
-      sub: activeUserLoading ? "Loading…" : isAtLimit ? "Seat limit reached" : isNearLimit ? "Approaching limit" : `${allowedUsers - activeUserCount} seats remaining`,
+      sub: activeUserLoading ? "Loading…" : isAtLimit ? "User limit reached" : isNearLimit ? "Approaching limit" : `${allowedUsers - activeUserCount} seats remaining`,
       color: activeUserColor,
       bgColor: isAtLimit ? "#fce8e6" : isNearLimit ? "#fff8e1" : "#f7ecf3",
       bar: activeUserLoading ? null : userUsagePercent,
