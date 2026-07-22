@@ -2931,6 +2931,141 @@ const getTodayCheckins = async (req, res) => {
   res.json({ checkins: payload, total: payload.length });
 };
 
+// Powers the "Attendance Details" button on the Live Attendance Map card.
+// type=today  -> live check-in/out status for every team member today.
+// type=monthly -> rolled-up AttendanceSummary counts (presentDays/halfDays/
+// absentDays/totalWorkingMinutes) for the requested month+year.
+// Scoped to this admin's own team, same as getTodayCheckins.
+const getAttendanceOverview = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+
+    const organisation_id = req.admin.organisation_id;
+    const type = req.query.type === "monthly" ? "monthly" : "today";
+
+    const teamManagerIds = [...(await getAdminTeamManagerIds(req.admin._id, organisation_id))];
+
+    const [managers, employees] = await Promise.all([
+      teamManagerIds.length
+        ? Managermodel.find({ organisation_id, _id: { $in: teamManagerIds } })
+            .select("empid f_name l_name work_email role designation department office_location profile_image reporting_manager reporting_manager_model")
+            .populate({ path: "reporting_manager", select: "f_name l_name empid" })
+            .lean()
+        : [],
+      teamManagerIds.length
+        ? Usermodel.find({ organisation_id, Under_manager: { $in: teamManagerIds } })
+            .select("empid f_name l_name work_email role designation department office_location profile_image Under_manager")
+            .populate({ path: "Under_manager", select: "f_name l_name empid" })
+            .lean()
+        : [],
+    ]);
+
+    const people = [
+      ...managers.map((m) => ({
+        id: String(m._id),
+        empid: m.empid,
+        name: [m.f_name, m.l_name].filter(Boolean).join(" "),
+        email: m.work_email,
+        role: m.role || "manager",
+        designation: m.designation,
+        department: m.department,
+        office_location: m.office_location,
+        avatar: m.profile_image || null,
+        reportingManager: m.reporting_manager
+          ? [m.reporting_manager.f_name, m.reporting_manager.l_name].filter(Boolean).join(" ")
+          : "—",
+      })),
+      ...employees.map((u) => ({
+        id: String(u._id),
+        empid: u.empid,
+        name: [u.f_name, u.l_name].filter(Boolean).join(" "),
+        email: u.work_email,
+        role: u.role || "employee",
+        designation: u.designation,
+        department: u.department,
+        office_location: u.office_location,
+        avatar: u.profile_image || null,
+        reportingManager: u.Under_manager
+          ? [u.Under_manager.f_name, u.Under_manager.l_name].filter(Boolean).join(" ")
+          : "—",
+      })),
+    ];
+
+    if (!people.length)
+      return res.json({ success: true, type, total: 0, data: [] });
+
+    const peopleIds = people.map((p) => p.id);
+
+    if (type === "today") {
+      const today = startOfDay(new Date());
+      const records = await Attendance.find({
+        organisation_id,
+        date: today,
+        employee: { $in: peopleIds },
+      })
+        .select("employee checkIn checkOut latitude longitude source activeMinutes idleMinutes")
+        .lean();
+
+      const byEmp = new Map(records.map((r) => [String(r.employee), r]));
+      const data = people.map((p) => {
+        const r = byEmp.get(p.id);
+        const checkedIn = !!r?.checkIn;
+        const checkedOut = !!r?.checkOut;
+        return {
+          ...p,
+          checkIn: r?.checkIn || null,
+          checkOut: r?.checkOut || null,
+          status: checkedIn ? (checkedOut ? "present" : "on_duty") : "absent",
+          source: r?.source === "face" ? "face" : r ? "live" : null,
+          lat: r?.latitude ?? null,
+          lng: r?.longitude ?? null,
+          activeMinutes: r?.activeMinutes ?? 0,
+          idleMinutes: r?.idleMinutes ?? 0,
+        };
+      });
+
+      return res.json({ success: true, type, date: today, total: data.length, data });
+    }
+
+    // monthly — deliberately NOT filtered by organisation_id here: historical
+    // AttendanceSummary docs may predate the organisation_id backfill in
+    // monthattendanceupdate.js, so org-scoping goes through peopleIds instead.
+    const now = new Date();
+    const month = Math.min(Math.max(parseInt(req.query.month, 10) || now.getMonth() + 1, 1), 12);
+    const year = parseInt(req.query.year, 10) || now.getFullYear();
+
+    const summaries = await AttendanceSummary.find({
+      employee: { $in: peopleIds },
+      month,
+      year,
+    }).lean();
+    const summaryByEmp = new Map(summaries.map((s) => [String(s.employee), s]));
+
+    const data = people.map((p) => {
+      const s = summaryByEmp.get(p.id);
+      const presentDays = s?.presentDays ?? 0;
+      const halfDays = s?.halfDays ?? 0;
+      const absentDays = s?.absentDays ?? 0;
+      const totalWorkingMinutes = s?.totalWorkingMinutes ?? 0;
+      const markedDays = presentDays + halfDays + absentDays;
+      return {
+        ...p,
+        presentDays,
+        halfDays,
+        absentDays,
+        markedDays,
+        totalWorkingMinutes,
+        attendancePercent: markedDays > 0 ? Math.round(((presentDays + halfDays * 0.5) / markedDays) * 100) : 0,
+      };
+    });
+
+    return res.json({ success: true, type, month, year, total: data.length, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getOrgInfo = async (req, res, next) => {
   try {
     if (!req.admin)
@@ -3759,6 +3894,7 @@ module.exports = {
   editadminprofile,
   changepassword,
   getTodayCheckins,
+  getAttendanceOverview,
   getOrgInfo,
   getAllPersonalDocumentsAdmin,
   getAllExpenseDocumentsAdmin,

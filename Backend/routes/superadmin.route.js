@@ -37,6 +37,7 @@ const {
   deleteAnnouncement,
   reviewtoadmin,
   getTodayCheckins,
+  getAttendanceOverview,
   getOrgInfo,
   getAllPersonalDocumentsSuperAdmin,
   getAllExpenseDocumentsSuperAdmin,
@@ -203,6 +204,11 @@ superAdminRouter.get(
   "/gettodaycheckins",
   superAdminAuth,
   asyncHandler(getTodayCheckins),
+);
+superAdminRouter.get(
+  "/attendance-overview",
+  superAdminAuth,
+  asyncHandler(getAttendanceOverview),
 );
 
 superAdminRouter.get(

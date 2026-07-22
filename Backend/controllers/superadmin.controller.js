@@ -11,6 +11,7 @@ const Review = require("../Models/review.model");
 const leavebalanceModel = require("../Models/leavebalance.model");
 const reviewModel = require("../Models/review.model");
 const Attendance = require("../Models/attendance.model");
+const AttendanceSummary = require("../Models/attendancesummary.model");
 const { startOfDay } = require("../automatic/weekoffcalendar");
 const generateUID = require("../automatic/uidgeneration");
 const assignDefaultLeave = require("../automatic/bydefaultleaveset");
@@ -1864,6 +1865,147 @@ const getTodayCheckins = async (req, res, next) => {
   res.json({ checkins: payload, total: payload.length });
 };
 
+// Powers the "Attendance Details" button on the Live Attendance Map card.
+// Org-wide (admins + managers + employees), unlike admin.controller.js's
+// version which is scoped to one admin's own team.
+// type=today   -> live check-in/out status for everyone today.
+// type=monthly -> rolled-up AttendanceSummary counts for the requested
+// month+year.
+const getAttendanceOverview = async (req, res, next) => {
+  try {
+    const organisation_id = req.superAdmin._id;
+    const type = req.query.type === "monthly" ? "monthly" : "today";
+
+    const [admins, managers, employees] = await Promise.all([
+      AdminModel.find({ organisation_id })
+        .select("empid f_name l_name work_email role designation department office_location profile_image")
+        .lean(),
+      Managermodel.find({ organisation_id })
+        .select("empid f_name l_name work_email role designation department office_location profile_image reporting_manager reporting_manager_model")
+        .populate({ path: "reporting_manager", select: "f_name l_name empid" })
+        .lean(),
+      Usermodel.find({ organisation_id })
+        .select("empid f_name l_name work_email role designation department office_location profile_image Under_manager")
+        .populate({ path: "Under_manager", select: "f_name l_name empid" })
+        .lean(),
+    ]);
+
+    const people = [
+      ...admins.map((a) => ({
+        id: String(a._id),
+        empid: a.empid,
+        name: [a.f_name, a.l_name].filter(Boolean).join(" "),
+        email: a.work_email,
+        role: a.role || "admin",
+        designation: a.designation,
+        department: a.department,
+        office_location: a.office_location,
+        avatar: a.profile_image || null,
+        reportingManager: "—",
+      })),
+      ...managers.map((m) => ({
+        id: String(m._id),
+        empid: m.empid,
+        name: [m.f_name, m.l_name].filter(Boolean).join(" "),
+        email: m.work_email,
+        role: m.role || "manager",
+        designation: m.designation,
+        department: m.department,
+        office_location: m.office_location,
+        avatar: m.profile_image || null,
+        reportingManager: m.reporting_manager
+          ? [m.reporting_manager.f_name, m.reporting_manager.l_name].filter(Boolean).join(" ")
+          : "—",
+      })),
+      ...employees.map((u) => ({
+        id: String(u._id),
+        empid: u.empid,
+        name: [u.f_name, u.l_name].filter(Boolean).join(" "),
+        email: u.work_email,
+        role: u.role || "employee",
+        designation: u.designation,
+        department: u.department,
+        office_location: u.office_location,
+        avatar: u.profile_image || null,
+        reportingManager: u.Under_manager
+          ? [u.Under_manager.f_name, u.Under_manager.l_name].filter(Boolean).join(" ")
+          : "—",
+      })),
+    ];
+
+    if (!people.length)
+      return res.json({ success: true, type, total: 0, data: [] });
+
+    const peopleIds = people.map((p) => p.id);
+
+    if (type === "today") {
+      const today = startOfDay(new Date());
+      const records = await Attendance.find({
+        organisation_id,
+        date: today,
+        employee: { $in: peopleIds },
+      })
+        .select("employee checkIn checkOut latitude longitude source activeMinutes idleMinutes")
+        .lean();
+
+      const byEmp = new Map(records.map((r) => [String(r.employee), r]));
+      const data = people.map((p) => {
+        const r = byEmp.get(p.id);
+        const checkedIn = !!r?.checkIn;
+        const checkedOut = !!r?.checkOut;
+        return {
+          ...p,
+          checkIn: r?.checkIn || null,
+          checkOut: r?.checkOut || null,
+          status: checkedIn ? (checkedOut ? "present" : "on_duty") : "absent",
+          source: r?.source === "face" ? "face" : r ? "live" : null,
+          lat: r?.latitude ?? null,
+          lng: r?.longitude ?? null,
+          activeMinutes: r?.activeMinutes ?? 0,
+          idleMinutes: r?.idleMinutes ?? 0,
+        };
+      });
+
+      return res.json({ success: true, type, date: today, total: data.length, data });
+    }
+
+    // monthly — not filtered by organisation_id (see admin.controller.js's
+    // version for why); peopleIds already scopes this to the org.
+    const now = new Date();
+    const month = Math.min(Math.max(parseInt(req.query.month, 10) || now.getMonth() + 1, 1), 12);
+    const year = parseInt(req.query.year, 10) || now.getFullYear();
+
+    const summaries = await AttendanceSummary.find({
+      employee: { $in: peopleIds },
+      month,
+      year,
+    }).lean();
+    const summaryByEmp = new Map(summaries.map((s) => [String(s.employee), s]));
+
+    const data = people.map((p) => {
+      const s = summaryByEmp.get(p.id);
+      const presentDays = s?.presentDays ?? 0;
+      const halfDays = s?.halfDays ?? 0;
+      const absentDays = s?.absentDays ?? 0;
+      const totalWorkingMinutes = s?.totalWorkingMinutes ?? 0;
+      const markedDays = presentDays + halfDays + absentDays;
+      return {
+        ...p,
+        presentDays,
+        halfDays,
+        absentDays,
+        markedDays,
+        totalWorkingMinutes,
+        attendancePercent: markedDays > 0 ? Math.round(((presentDays + halfDays * 0.5) / markedDays) * 100) : 0,
+      };
+    });
+
+    return res.json({ success: true, type, month, year, total: data.length, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // ─── Helper: recursively build manager hierarchy ──────────────────────────────
 const buildManagerTree = (managers, parentId, parentModel, employees) => {
   return managers
@@ -2579,6 +2721,7 @@ module.exports = {
   deleteAnnouncement,
   reviewtoadmin,
   getTodayCheckins,
+  getAttendanceOverview,
   getOrgInfo,
   getAllPersonalDocumentsSuperAdmin,
   getAllExpenseDocumentsSuperAdmin,
