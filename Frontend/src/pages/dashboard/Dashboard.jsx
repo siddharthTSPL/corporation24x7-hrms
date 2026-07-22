@@ -1102,35 +1102,43 @@ export default function Dashboard() {
           </div>
 
           <div className="rounded-2xl overflow-hidden relative animate-fadein bg-[#730042] border border-[#5a0033] hover:shadow-lg transition-shadow" style={{ animationDelay:".15s" }}>
-            <div className="absolute -top-5 -right-5 w-20 h-20 rounded-full bg-white/[.06]" />
-            <div className="absolute -bottom-2.5 -left-2.5 w-16 h-16 rounded-full bg-white/[.04]" />
-            <div className="p-4 pt-5 relative">
-              <div className="text-[11px] text-white/60 font-medium tracking-wide mb-3 uppercase font-sans">Organisation</div>
-              {empLoading||mapLoading ? (
-                <div className="flex flex-col gap-2"><Skeleton className="h-5 w-3/5" /><Skeleton className="h-3.5 w-4/5" /></div>
-              ) : (
-                <>
-                  <div className="flex items-baseline gap-1.5 mb-3">
-                    <span className="text-3xl font-bold text-[#f9f8f2] leading-none" style={{ fontFamily:"'Lora',serif" }}>{totalEmployees}</span>
-                    <span className="text-[12px] text-white/60 font-sans">total people</span>
-                  </div>
-                  <div className="h-px bg-white/15 mb-3" />
-                  <div className="flex justify-between text-[11px] font-sans mb-2">
-                    <span className="text-white/50">Present today</span>
-                    <span className="font-medium text-white/80">{presentTodayCount}</span>
-                  </div>
-                  <div className="flex justify-between text-[11px] font-sans mb-2">
-                    <span className="text-white/50">Pending leaves</span>
-                    <span className="font-medium text-white/80">{leaveRequests.filter(l=>(l.status||"").toLowerCase().includes("pending")).length}</span>
-                  </div>
-                  <div className="flex justify-between text-[11px] font-sans">
-                    <span className="text-white/50">Attendance rate</span>
-                    <span className="font-medium text-white/80">{totalEmployees>0?Math.round((presentTodayCount/totalEmployees)*100):0}%</span>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
+  <div className="absolute -top-5 -right-5 w-20 h-20 rounded-full bg-white/[.06]" />
+  <div className="absolute -bottom-2.5 -left-2.5 w-16 h-16 rounded-full bg-white/[.04]" />
+  <div className="p-4 pt-5 relative">
+    <div className="text-[11px] text-white/60 font-medium tracking-wide mb-3 uppercase font-sans">Organisation</div>
+    {empLoading||mapLoading ? (
+      <div className="flex flex-col gap-2"><Skeleton className="h-5 w-3/5" /><Skeleton className="h-3.5 w-4/5" /></div>
+    ) : (
+      <>
+        <div className="flex items-baseline gap-1.5 mb-3">
+          <span className="text-3xl font-bold text-[#f9f8f2] leading-none" style={{ fontFamily:"'Lora',serif" }}>{totalEmployees}</span>
+          <span className="text-[12px] text-white/60 font-sans">total people</span>
+        </div>
+        <div className="h-px bg-white/15 mb-3" />
+        <div className="flex justify-between text-[11px] font-sans mb-2">
+          <span className="text-white/50">Present today</span>
+          <span className="font-medium text-white/80">{presentTodayCount}</span>
+        </div>
+        <div className="flex justify-between text-[11px] font-sans mb-2">
+          <span className="text-white/50">🤳 Face (FRS)</span>
+          <span className="font-medium text-white/80">{faceCheckinCount}</span>
+        </div>
+        <div className="flex justify-between text-[11px] font-sans mb-2">
+          <span className="text-white/50">💻 System (SCC)</span>
+          <span className="font-medium text-white/80">{liveCheckinCount}</span>
+        </div>
+        <div className="flex justify-between text-[11px] font-sans mb-2">
+          <span className="text-white/50">Pending leaves</span>
+          <span className="font-medium text-white/80">{leaveRequests.filter(l=>(l.status||"").toLowerCase().includes("pending")).length}</span>
+        </div>
+        <div className="flex justify-between text-[11px] font-sans">
+          <span className="text-white/50">Attendance rate</span>
+          <span className="font-medium text-white/80">{totalEmployees>0?Math.round((presentTodayCount/totalEmployees)*100):0}%</span>
+        </div>
+      </>
+    )}
+  </div>
+</div>
         </div>
 
         <div className="mb-3.5">
