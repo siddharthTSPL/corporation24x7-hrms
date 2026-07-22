@@ -8,6 +8,7 @@ import { toast } from "react-hot-toast";
 import {
   reviewToAdmin,
   getTodayCheckins,
+  getAttendanceOverview,
   getOrgInfo,
   changeSuperAdminPassword,
   forgotPasswordSuperAdmin,
@@ -57,6 +58,16 @@ export const useGetTodayCheckins = () => {
     queryFn: getTodayCheckins,
     staleTime: 1000 * 60,
     refetchOnWindowFocus: false,
+  });
+};
+
+// Attendance Details modal (Today / Monthly tabs).
+export const useGetAttendanceOverview = ({ type = "today", month, year } = {}, options = {}) => {
+  return useQuery({
+    queryKey: ["attendanceOverview", type, type === "monthly" ? month : null, type === "monthly" ? year : null],
+    queryFn: () => getAttendanceOverview({ type, month, year }),
+    staleTime: 30 * 1000,
+    ...options,
   });
 };
 
