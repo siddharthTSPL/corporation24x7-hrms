@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEditAdminProfile, useChangeAdminPassword } from "../../auth/server-state/adminauth/adminauth.hook";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
+import { Country, State, City } from "country-state-city";
 
+const DEFAULT_COUNTRY_ISO = "IN";
 const AVATAR_STYLES = [
   "avataaars", "bottts", "personas", "lorelei",
   "micah", "open-peeps", "big-ears", "croodles",
@@ -79,6 +81,8 @@ const TABS = [
   { key: "avatar",    label: "Avatar" },
 ];
 
+
+
 function getInitials(name = "") {
   return name.split(" ").filter(Boolean).map(w => w[0]).join("").toUpperCase().slice(0, 2) || "?";
 }
@@ -97,6 +101,22 @@ function toDateInputValue(date) {
 function fmtDate(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+}
+
+
+function findLocationByCityName(cityName) {
+  if (!cityName) return null;
+  const countries = Country.getAllCountries();
+  for (const country of countries) {
+    const states = State.getStatesOfCountry(country.isoCode);
+    for (const state of states) {
+      const cities = City.getCitiesOfState(country.isoCode, state.isoCode);
+      if (cities.some(c => c.name === cityName)) {
+        return { countryIso: country.isoCode, stateIso: state.isoCode };
+      }
+    }
+  }
+  return null;
 }
 
 function findLocation(city) {
@@ -318,48 +338,70 @@ function ProfileTab({ adminData }) {
   );
 }
 
+
+
 function ContactTab({ adminData, onSuccess, onError }) {
   const queryClient = useQueryClient();
   const { mutate, isPending } = useEditAdminProfile();
+
   const [form, setForm] = useState({
-    personal_contact: "", e_contact: "",
-    country: "India", state: "Uttar Pradesh", city: "Bareilly",
+    personal_contact: "",
+    e_contact: "",
+    countryIso: DEFAULT_COUNTRY_ISO,
+    stateIso: "",
+    city: "",
     date_of_joining: "",
   });
 
+  const countries = Country.getAllCountries();
+  const states = form.countryIso ? State.getStatesOfCountry(form.countryIso) : [];
+  const cities = form.countryIso && form.stateIso ? City.getCitiesOfState(form.countryIso, form.stateIso) : [];
+
   useEffect(() => {
-    if (adminData) {
-      const match = findLocation(adminData.office_location);
-      const country = match?.country || "India";
-      const state = match?.state || Object.keys(LOCATION_DATA[country])[0];
-      const city = adminData.office_location || LOCATION_DATA[country][state][0];
-      setForm({
-        personal_contact: adminData.personal_contact || "",
-        e_contact: adminData.e_contact || "",
-        country, state, city,
-        date_of_joining: toDateInputValue(adminData.date_of_joining),
-      });
+    if (!adminData) return;
+
+    const cityName = adminData.office_location || "";
+    const match = findLocationByCityName(cityName);
+
+    let countryIso = match?.countryIso || DEFAULT_COUNTRY_ISO;
+    let stateIso = match?.stateIso || "";
+
+    if (!stateIso) {
+      const defaultStates = State.getStatesOfCountry(countryIso);
+      stateIso = defaultStates[0]?.isoCode || "";
     }
+
+    setForm({
+      personal_contact: adminData.personal_contact || "",
+      e_contact: adminData.e_contact || "",
+      countryIso,
+      stateIso,
+      city: cityName,
+      date_of_joining: toDateInputValue(adminData.date_of_joining),
+    });
   }, [adminData]);
 
   const setPhone = (key) => (e) => setForm(p => ({ ...p, [key]: e.target.value }));
 
   const setCountry = (e) => {
-    const country = e.target.value;
-    const state = Object.keys(LOCATION_DATA[country])[0];
-    const city = LOCATION_DATA[country][state][0];
-    setForm(p => ({ ...p, country, state, city }));
+    const countryIso = e.target.value;
+    const firstState = State.getStatesOfCountry(countryIso)[0];
+    const stateIso = firstState?.isoCode || "";
+    const firstCity = stateIso ? City.getCitiesOfState(countryIso, stateIso)[0] : null;
+    setForm(p => ({ ...p, countryIso, stateIso, city: firstCity?.name || "" }));
   };
 
   const setState = (e) => {
-    const state = e.target.value;
-    const city = LOCATION_DATA[form.country][state][0];
-    setForm(p => ({ ...p, state, city }));
+    const stateIso = e.target.value;
+    const firstCity = City.getCitiesOfState(form.countryIso, stateIso)[0];
+    setForm(p => ({ ...p, stateIso, city: firstCity?.name || "" }));
   };
 
   const setCity = (e) => setForm(p => ({ ...p, city: e.target.value }));
 
-  const cityOptions = LOCATION_DATA[form.country]?.[form.state] || (form.city ? [form.city] : []);
+  const cityOptions = form.city && !cities.some(c => c.name === form.city)
+    ? [{ name: form.city }, ...cities]
+    : cities;
 
   const handleSave = () => {
     if (!PHONE_REGEX.test(form.personal_contact)) { onError("Phone number must be a valid 10-digit number"); return; }
@@ -381,9 +423,24 @@ function ContactTab({ adminData, onSuccess, onError }) {
       <InputField label="Phone number" type="tel" value={form.personal_contact} onChange={setPhone("personal_contact")} placeholder="10-digit phone number" />
       <InputField label="Emergency contact" type="tel" value={form.e_contact} onChange={setPhone("e_contact")} placeholder="Emergency contact" hint="Reached in case of emergency" />
       <Grid cols={3}>
-        <SelectField label="Country" value={form.country} onChange={setCountry} options={Object.keys(LOCATION_DATA)} />
-        <SelectField label="State" value={form.state} onChange={setState} options={Object.keys(LOCATION_DATA[form.country] || {})} />
-        <SelectField label="City (office location)" value={form.city} onChange={setCity} options={cityOptions} />
+        <SelectField
+          label="Country"
+          value={form.countryIso}
+          onChange={setCountry}
+          options={countries.map(c => ({ value: c.isoCode, label: c.name }))}
+        />
+        <SelectField
+          label="State"
+          value={form.stateIso}
+          onChange={setState}
+          options={states.map(s => ({ value: s.isoCode, label: s.name }))}
+        />
+        <SelectField
+          label="City (office location)"
+          value={form.city}
+          onChange={setCity}
+          options={cityOptions.map(c => ({ value: c.name, label: c.name }))}
+        />
       </Grid>
       <InputField
         label="Date of joining"
@@ -396,7 +453,6 @@ function ContactTab({ adminData, onSuccess, onError }) {
     </SectionCard>
   );
 }
-
 function AddressTab({ adminData }) {
   return (
     <SectionCard title="Address information" subtitle="On record, contact HR to update" accent={C.amber}>
