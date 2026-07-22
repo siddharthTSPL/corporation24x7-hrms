@@ -934,18 +934,19 @@ export default function AdminSettingsPage() {
   return (
     <div className="w-full max-w-full min-h-screen overflow-x-hidden" style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", background: C.page, color: C.text }}>
       <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes slideIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
-        * { box-sizing: border-box; }
-        input::placeholder { color: #c9bab5; }
-        select option { color: #2a1a16; }
-        .mobile-menu-btn { display: none; }
-        @media (max-width: 768px) {
-          .settings-layout { flex-direction: column !important; }
-          .settings-sidebar { display: none !important; }
-          .mobile-menu-btn { display: flex !important; }
-        }
-      `}</style>
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes slideIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
+  * { box-sizing: border-box; }
+  input::placeholder { color: #c9bab5; }
+  select option { color: #2a1a16; }
+  select { position: relative; }
+  .mobile-menu-btn { display: none; }
+  @media (max-width: 768px) {
+    .settings-layout { flex-direction: column !important; }
+    .settings-sidebar { display: none !important; }
+    .mobile-menu-btn { display: flex !important; }
+  }
+`}</style>
 
       <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: "", type: "" })} />
       {mobileMenuOpen && <MobileTabBar tab={tab} setTab={setTab} onClose={() => setMobileMenuOpen(false)} />}
