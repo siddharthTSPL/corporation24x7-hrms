@@ -7,7 +7,10 @@ const compression = require('compression');
 require('../automatic/autoelcredit');
 require('../automatic/timerautopause');
 require('../automatic/Timesheetescalation');
-require('../automatic/markNoShowAbsent');
+const { catchUpMissedRuns } = require('../automatic/Marknoshowabsent');
+catchUpMissedRuns().catch((err) =>
+  console.error('[Startup] catchUpMissedRuns failed:', err.message)
+);
 
 const app = express();
 
