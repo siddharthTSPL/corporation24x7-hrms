@@ -7,6 +7,7 @@ const compression = require('compression');
 require('../automatic/autoelcredit');
 require('../automatic/timerautopause');
 require('../automatic/Timesheetescalation');
+require('../automatic/markNoShowAbsent');
 
 const app = express();
 
