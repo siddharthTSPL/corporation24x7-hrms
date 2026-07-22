@@ -1638,7 +1638,7 @@ function SuperAdminDashboard() {
       icon: <FaToggleOn />,
       label: "Active Users",
       value: activeUserLoading ? "—" : `${activeUserCount}/${allowedUsers}`,
-      sub: activeUserLoading ? "Loading…" : isAtLimit ? "Seat limit reached" : isNearLimit ? "Approaching limit" : `${allowedUsers - activeUserCount} seats remaining`,
+      sub: activeUserLoading ? "Loading…" : isAtLimit ? "User limit reached" : isNearLimit ? "Approaching limit" : `${allowedUsers - activeUserCount} seats remaining`,
       color: activeUserColor,
       bgColor: isAtLimit ? "#fce8e6" : isNearLimit ? "#fff8e1" : "#f7ecf3",
       bar: activeUserLoading ? null : userUsagePercent,
@@ -1805,6 +1805,90 @@ function SuperAdminDashboard() {
             </div>
             <span className="ml-auto text-[10px] sm:text-[11px] text-[#c499b4]">Click pin for details</span>
           </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden">
+          <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#e8d5e2] flex items-center justify-between">
+            <div className="flex items-center gap-2 sm:gap-2.5">
+              <FaBullhorn size={12} className="text-[#730042]" />
+              <span className="font-bold text-[13px] sm:text-[15px] text-[#0d0209]">Announcements</span>
+            </div>
+            <button onClick={() => setAnnModal({ open: true, editing: null })} className="flex items-center gap-1 sm:gap-1.5 bg-[#730042] text-white px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-[12px] font-semibold hover:bg-[#4a0029] transition-colors min-h-[36px]">
+              <FaPlus size={9} /> New
+            </button>
+          </div>
+          {annLoading ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4]">
+              <span className="text-2xl">⏳</span><p className="text-[12px]">Loading…</p>
+            </div>
+          ) : announcements.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4] text-center px-4">
+              <FaBullhorn size={24} /><p className="text-[12px]">No announcements yet. Publish one to notify your team.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-[#f7ecf3]">
+              {announcements.slice(0, 5).map((ann) => {
+                const priority = (ann.priority || "normal").toLowerCase();
+                const audience = ann.audience || "all";
+                return (
+                  <div key={ann._id} className="px-4 sm:px-5 py-3 sm:py-4 hover:bg-[#fdf5f9] transition-colors">
+                    <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 flex-wrap">
+                      <span className={`text-[9px] sm:text-[10px] font-bold tracking-wide uppercase px-2 sm:px-2.5 py-0.5 rounded-full ${priorityChipCls(priority)}`}>
+                        {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                      </span>
+                      <span className="text-[9px] sm:text-[10px] font-semibold bg-gray-50 text-gray-500 border border-gray-200 px-2 sm:px-2.5 py-0.5 rounded-full uppercase">{audience}</span>
+                    </div>
+                    <p className="text-[12px] sm:text-[13px] font-semibold text-[#0d0209] mb-1">{ann.title}</p>
+                    <p className="text-[11px] sm:text-[12px] text-[#7a5568] leading-relaxed line-clamp-2">{ann.message}</p>
+                    <div className="flex gap-1.5 sm:gap-2 mt-2 sm:mt-3 pt-2 sm:pt-2.5 border-t border-[#f7ecf3]">
+                      <button onClick={() => setAnnModal({ open: true, editing: ann })} className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] text-[#c499b4] hover:text-[#730042] hover:bg-[#f7ecf3] px-1.5 sm:px-2 py-1 rounded-lg transition-colors font-medium min-h-[32px]">
+                        <FaEdit size={9} /> Edit
+                      </button>
+                      <button onClick={() => { if (window.confirm("Delete this announcement?")) deleteAnn(ann._id); }} className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] text-[#c499b4] hover:text-red-600 hover:bg-red-50 px-1.5 sm:px-2 py-1 rounded-lg transition-colors font-medium min-h-[32px]">
+                        <FaTrash size={9} /> Delete
+                      </button>
+                      {ann.expiresAt && (
+                        <span className="ml-auto text-[9px] sm:text-[10px] text-[#c499b4] self-center">Expires {fmtDate(ann.expiresAt)}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 mb-4 sm:mb-5">
+        <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden">
+          <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#e8d5e2] flex items-center justify-between">
+            <div className="flex items-center gap-2 sm:gap-2.5">
+              <FaLayerGroup size={12} className="text-[#730042]" />
+              <span className="font-bold text-[13px] sm:text-[15px] text-[#0d0209]">Department Breakdown</span>
+            </div>
+            <span className="text-[10px] sm:text-[11px] text-[#c499b4] font-semibold">{deptLoading ? "…" : `${totalEmpCount} total`}</span>
+          </div>
+          {deptLoading ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4]">
+              <span className="text-2xl">⏳</span><p className="text-[12px]">Loading…</p>
+            </div>
+          ) : departments.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4]">
+              <FaChartBar size={24} /><p className="text-[12px]">No departments yet.</p>
+            </div>
+          ) : (
+            <div>
+              {departments.map((dep) => (
+                <div key={dep.department} className="px-4 sm:px-5 py-2.5 sm:py-3 border-b border-[#f7ecf3] last:border-0 flex items-center gap-3 sm:gap-4">
+                  <p className="text-[11px] sm:text-[12px] font-semibold text-[#0d0209] w-24 sm:w-32 flex-shrink-0 truncate" title={getDepartmentName(dep.department)}>{getDepartmentName(dep.department)}</p>
+                  <div className="flex-1 h-2 bg-[#e8d5e2] rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-[#4a0029] to-[#cd166e] transition-all duration-1000" style={{ width: `${Math.round((dep.lastNumber / maxDept) * 100)}%` }} />
+                  </div>
+                  <p className="text-[12px] sm:text-[13px] font-bold text-[#730042] w-5 sm:w-6 text-right flex-shrink-0">{dep.lastNumber}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden flex flex-col">
@@ -1983,90 +2067,6 @@ function SuperAdminDashboard() {
             })}
           </div>
         )}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 mb-4 sm:mb-5">
-        <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden">
-          <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#e8d5e2] flex items-center justify-between">
-            <div className="flex items-center gap-2 sm:gap-2.5">
-              <FaLayerGroup size={12} className="text-[#730042]" />
-              <span className="font-bold text-[13px] sm:text-[15px] text-[#0d0209]">Department Breakdown</span>
-            </div>
-            <span className="text-[10px] sm:text-[11px] text-[#c499b4] font-semibold">{deptLoading ? "…" : `${totalEmpCount} total`}</span>
-          </div>
-          {deptLoading ? (
-            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4]">
-              <span className="text-2xl">⏳</span><p className="text-[12px]">Loading…</p>
-            </div>
-          ) : departments.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4]">
-              <FaChartBar size={24} /><p className="text-[12px]">No departments yet.</p>
-            </div>
-          ) : (
-            <div>
-              {departments.map((dep) => (
-                <div key={dep.department} className="px-4 sm:px-5 py-2.5 sm:py-3 border-b border-[#f7ecf3] last:border-0 flex items-center gap-3 sm:gap-4">
-                  <p className="text-[11px] sm:text-[12px] font-semibold text-[#0d0209] w-24 sm:w-32 flex-shrink-0 truncate" title={getDepartmentName(dep.department)}>{getDepartmentName(dep.department)}</p>
-                  <div className="flex-1 h-2 bg-[#e8d5e2] rounded-full overflow-hidden">
-                    <div className="h-full rounded-full bg-gradient-to-r from-[#4a0029] to-[#cd166e] transition-all duration-1000" style={{ width: `${Math.round((dep.lastNumber / maxDept) * 100)}%` }} />
-                  </div>
-                  <p className="text-[12px] sm:text-[13px] font-bold text-[#730042] w-5 sm:w-6 text-right flex-shrink-0">{dep.lastNumber}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden">
-          <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#e8d5e2] flex items-center justify-between">
-            <div className="flex items-center gap-2 sm:gap-2.5">
-              <FaBullhorn size={12} className="text-[#730042]" />
-              <span className="font-bold text-[13px] sm:text-[15px] text-[#0d0209]">Announcements</span>
-            </div>
-            <button onClick={() => setAnnModal({ open: true, editing: null })} className="flex items-center gap-1 sm:gap-1.5 bg-[#730042] text-white px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-[12px] font-semibold hover:bg-[#4a0029] transition-colors min-h-[36px]">
-              <FaPlus size={9} /> New
-            </button>
-          </div>
-          {annLoading ? (
-            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4]">
-              <span className="text-2xl">⏳</span><p className="text-[12px]">Loading…</p>
-            </div>
-          ) : announcements.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4] text-center px-4">
-              <FaBullhorn size={24} /><p className="text-[12px]">No announcements yet. Publish one to notify your team.</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-[#f7ecf3]">
-              {announcements.slice(0, 5).map((ann) => {
-                const priority = (ann.priority || "normal").toLowerCase();
-                const audience = ann.audience || "all";
-                return (
-                  <div key={ann._id} className="px-4 sm:px-5 py-3 sm:py-4 hover:bg-[#fdf5f9] transition-colors">
-                    <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 flex-wrap">
-                      <span className={`text-[9px] sm:text-[10px] font-bold tracking-wide uppercase px-2 sm:px-2.5 py-0.5 rounded-full ${priorityChipCls(priority)}`}>
-                        {priority.charAt(0).toUpperCase() + priority.slice(1)}
-                      </span>
-                      <span className="text-[9px] sm:text-[10px] font-semibold bg-gray-50 text-gray-500 border border-gray-200 px-2 sm:px-2.5 py-0.5 rounded-full uppercase">{audience}</span>
-                    </div>
-                    <p className="text-[12px] sm:text-[13px] font-semibold text-[#0d0209] mb-1">{ann.title}</p>
-                    <p className="text-[11px] sm:text-[12px] text-[#7a5568] leading-relaxed line-clamp-2">{ann.message}</p>
-                    <div className="flex gap-1.5 sm:gap-2 mt-2 sm:mt-3 pt-2 sm:pt-2.5 border-t border-[#f7ecf3]">
-                      <button onClick={() => setAnnModal({ open: true, editing: ann })} className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] text-[#c499b4] hover:text-[#730042] hover:bg-[#f7ecf3] px-1.5 sm:px-2 py-1 rounded-lg transition-colors font-medium min-h-[32px]">
-                        <FaEdit size={9} /> Edit
-                      </button>
-                      <button onClick={() => { if (window.confirm("Delete this announcement?")) deleteAnn(ann._id); }} className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] text-[#c499b4] hover:text-red-600 hover:bg-red-50 px-1.5 sm:px-2 py-1 rounded-lg transition-colors font-medium min-h-[32px]">
-                        <FaTrash size={9} /> Delete
-                      </button>
-                      {ann.expiresAt && (
-                        <span className="ml-auto text-[9px] sm:text-[10px] text-[#c499b4] self-center">Expires {fmtDate(ann.expiresAt)}</span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden mb-4 sm:mb-5">
