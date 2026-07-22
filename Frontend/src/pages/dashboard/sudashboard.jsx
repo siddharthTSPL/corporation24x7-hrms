@@ -16,7 +16,7 @@ import { Country, State, City } from "country-state-city";
 import { useGetMeSuperAdmin } from "../../auth/server-state/superadmin/auth/suauth.hook";
 import { SuperAdminAssetReturnWarning } from "../asset/superadminasset";
 import {
-  useGetTodayCheckins, useGetNoOfEmployees, useGetAllEmployees,
+  useGetTodayCheckins, useGetAttendanceOverview, useGetNoOfEmployees, useGetAllEmployees,
   useDeleteEmployee, useAddEmployee, useAddManager, useEditEmployee,
   useGetPermissions, useUpdatePermissions, useSetAdminWorkingStatus,
   useSuperAdminActiveUserCount,
@@ -24,6 +24,7 @@ import {
 import { useShowAllLeaves, useAcceptLeaveByAdmin, useRejectLeaveByAdmin } from "../../auth/server-state/superadmin/leave/suleave.hook";
 import { useGetAllAnnouncements, useCreateAnnouncement, useUpdateAnnouncement, useDeleteAnnouncement } from "../../auth/server-state/superadmin/announcement/suannouncement.hook";
 import { useGetAllAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin, useReviewToAdmin } from "../../auth/server-state/superadmin/other/suother.hook";
+import AttendanceDetailsModal from "./AttendanceDetailsModal";
 
 const DEPT_OPTIONS = [ "OPR","BPO", "ENG", "HR", "MGMT"];
 export const DEPT_FULL_FORMS = {
@@ -1542,6 +1543,7 @@ function SuperAdminDashboard() {
   const [leaveTab, setLeaveTab] = useState("admin");
   const [empExpand, setEmpExpand] = useState(false);
   const [empSearch, setEmpSearch] = useState("");
+  const [attendanceDetailsOpen, setAttendanceDetailsOpen] = useState(false);
 
   useEffect(() => {
     const REFRESH_FLAG_KEY = "dashboardAutoRefreshed";
@@ -1785,10 +1787,19 @@ function SuperAdminDashboard() {
               <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
               <span className="font-bold text-[13px] sm:text-[15px] text-[#0d0209] truncate">Live Attendance Map</span>
             </div>
-            <span className="text-[10px] sm:text-[11px] text-[#c499b4] font-medium flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
-              <FaMapMarkerAlt size={9} />
-              {mapLoading ? "Loading…" : `${checkins.length} today`}
-            </span>
+            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+              <span className="text-[10px] sm:text-[11px] text-[#c499b4] font-medium flex items-center gap-1 sm:gap-1.5">
+                <FaMapMarkerAlt size={9} />
+                {mapLoading ? "Loading…" : `${checkins.length} today`}
+              </span>
+              <button
+                onClick={() => setAttendanceDetailsOpen(true)}
+                className="text-[10px] sm:text-[11px] font-semibold text-white rounded-lg px-2.5 sm:px-3 py-1.5 flex items-center gap-1.5 hover:opacity-90 transition-opacity whitespace-nowrap"
+                style={{ background: "linear-gradient(135deg, #730042 0%, #9B2554 100%)" }}
+              >
+                <FaChartBar size={9} /> Attendance Details
+              </button>
+            </div>
           </div>
           <div className="h-[240px] sm:h-[300px]">
             <AttendanceMap checkins={checkins} loading={mapLoading} />
@@ -2183,6 +2194,12 @@ function SuperAdminDashboard() {
       <SuperAdminAssetReturnWarning
         data={assetWarning.data}
         onClose={() => setAssetWarning({ open: false, data: null })}
+      />
+
+      <AttendanceDetailsModal
+        open={attendanceDetailsOpen}
+        onClose={() => setAttendanceDetailsOpen(false)}
+        useOverviewHook={useGetAttendanceOverview}
       />
     </div>
   );

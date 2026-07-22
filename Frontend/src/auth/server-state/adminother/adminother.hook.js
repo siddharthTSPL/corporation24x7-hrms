@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getAllEmployee, getMyTeamOverview, getParticularEmployee, deleteUser, getEmployeeStats, reviewToManager,
   editEmployee, editManager, getparticularEmployeeStats, getParticularManager,
-  getTodayCheckins, getOrgInfo, changeManagerRole, demoteManagerToEmployee,
+  getTodayCheckins, getAttendanceOverview, getOrgInfo, changeManagerRole, demoteManagerToEmployee,
   demoteAdminToManager, demoteAdminToEmployee, promoteEmployeeToManager,
   promoteEmployeeToAdmin, promoteManagerToAdmin, getTodayLeaves,
   getAllPersonalDocuments, getAllExpenseDocuments, getDocumentDetails,
@@ -219,6 +219,16 @@ export const useGetOrgInfo = () => {
     staleTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+  });
+};
+
+// Attendance Details modal (Today / Monthly tabs).
+export const useGetAttendanceOverview = ({ type = "today", month, year } = {}, options = {}) => {
+  return useQuery({
+    queryKey: ["attendanceOverview", type, type === "monthly" ? month : null, type === "monthly" ? year : null],
+    queryFn: () => getAttendanceOverview({ type, month, year }),
+    staleTime: 30 * 1000,
+    ...options,
   });
 };
 

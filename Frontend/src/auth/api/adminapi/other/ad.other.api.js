@@ -111,6 +111,18 @@ export const getTodayCheckins = async () => {
   return res.data;
 };
 
+// Powers the "Attendance Details" modal (Today + Monthly tabs) opened from
+// the Live Attendance Map card.
+export const getAttendanceOverview = async ({ type = "today", month, year } = {}) => {
+  const params = { type };
+  if (type === "monthly") {
+    if (month) params.month = month;
+    if (year) params.year = year;
+  }
+  const res = await api.get("/admin/attendance-overview", { params });
+  return res.data;
+};
+
 export const getOrgInfo = async () => {
   const res = await api.get("/admin/getorginfo");
   return res.data;
