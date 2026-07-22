@@ -809,7 +809,7 @@ const editprofile = async (req, res, next) => {
  if (office_location !== undefined) {
     if (typeof office_location !== "string" || !office_location.trim() || office_location.trim().length > 100)
       return next(
-        Object.assign(new Error("Office location must be a valid, non-empty location name (max 100 characters)"), { statusCode: 400 }),
+        Object.assign(new Error("Office location must be a valid"), { statusCode: 400 }),
       );
     employee.office_location = office_location.trim();
   }
