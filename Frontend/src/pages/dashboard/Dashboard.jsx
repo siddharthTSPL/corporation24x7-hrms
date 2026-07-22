@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
-import { useGetMyTeamOverview, useGetTodayCheckins, useGetAttendanceHistory } from "../../auth/server-state/adminother/adminother.hook";
+import { useGetMyTeamOverview, useGetTodayCheckins, useGetAttendanceHistory, useGetAttendanceOverview } from "../../auth/server-state/adminother/adminother.hook";
 import {
   useGetForwardedLeaves,
   useAdminGetMyLeaveHistory,
@@ -10,6 +10,7 @@ import { useAdminGetMyWFH } from "../../auth/server-state/adminwfh/adminwfh.hook
 import { useTodayAttendance, useCalendarMeta } from "../../auth/server-state/attendance/attendance.hook";
 import { useGetAllAnnouncement } from "../../auth/server-state/adminannounce/adminannounce.hook";
 import AttendanceModal from "./AttendanceModal";
+import AttendanceDetailsModal from "./AttendanceDetailsModal";
 import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus, isPastShiftEnd } from "../../pages/utils/attendance";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -789,6 +790,7 @@ export default function Dashboard() {
   const [selectedMonth, setSelectedMonth]=useState(new Date().getMonth());
   const [empExpand, setEmpExpand]=useState(false);
   const [showAttendanceModal, setShowAttendanceModal]=useState(false);
+  const [attendanceDetailsOpen, setAttendanceDetailsOpen] = useState(false);
 
    useEffect(() => {
     const refreshKey = "dashboard_auto_refreshed";
@@ -1003,9 +1005,18 @@ export default function Dashboard() {
                 <div className="live-dot"></div>
                 Live Attendance Map
               </div>
-              <span className="text-[10px] text-[#b0948a] font-sans flex items-center gap-1">
-                📍 {mapLoading?"Loading…":`${checkins.length} check-in${checkins.length!==1?"s":""} today`}
-              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] text-[#b0948a] font-sans flex items-center gap-1">
+                  📍 {mapLoading?"Loading…":`${checkins.length} check-in${checkins.length!==1?"s":""} today`}
+                </span>
+                <button
+                  onClick={() => setAttendanceDetailsOpen(true)}
+                  className="text-[10px] font-semibold text-white rounded-lg px-2.5 py-1.5 flex items-center gap-1.5 hover:opacity-90 transition-opacity whitespace-nowrap"
+                  style={{ background: "linear-gradient(135deg, #730042 0%, #9B2554 100%)" }}
+                >
+                  📊 Attendance Details
+                </button>
+              </div>
             </div>
             <div className="h-[260px] sm:h-[320px] lg:h-[360px] w-full">
               <AttendanceMap checkins={checkins} loading={mapLoading} />
@@ -1312,6 +1323,12 @@ export default function Dashboard() {
           onClose={()=>setShowAttendanceModal(false)}
         />
       )}
+
+      <AttendanceDetailsModal
+        open={attendanceDetailsOpen}
+        onClose={() => setAttendanceDetailsOpen(false)}
+        useOverviewHook={useGetAttendanceOverview}
+      />
     </div>
   );
 }
