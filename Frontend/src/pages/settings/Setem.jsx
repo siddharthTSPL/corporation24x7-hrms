@@ -12,7 +12,7 @@ const AVATAR_STYLES = [
 ];
 
 const MARITAL_OPTIONS = ["single", "married", "divorced"];
-const OFFICE_LOCATIONS = ["Noida", "Bareilly", "Delhi", "Mumbai"];
+
 const PHONE_REGEX = /^[0-9]{10}$/;
 const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 const ACCOUNT_REGEX = /^[0-9]{9,18}$/;
