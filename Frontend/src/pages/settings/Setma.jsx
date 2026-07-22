@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGetMeManager } from "../../auth/server-state/manager/managerauth/managerauth.hook";
 import { useUpdateProfile, useUpdatePassword } from "../../auth/server-state/manager/managgerother/managerother.hook";
@@ -415,12 +415,22 @@ function ContactTab({ manager, onSuccess, onError }) {
     date_of_joining:  toDateInputValue(manager?.date_of_joining),
   });
 
-  const countries = Country.getAllCountries();
-  const states = form.countryIso ? State.getStatesOfCountry(form.countryIso) : [];
-  const cities = form.countryIso && form.stateIso ? City.getCitiesOfState(form.countryIso, form.stateIso) : [];
-  const cityOptions = form.city && !cities.some(c => c.name === form.city)
-    ? [{ name: form.city }, ...cities]
-    : cities;
+  const countries = useMemo(() => Country.getAllCountries(), []);
+
+const states = useMemo(
+  () => (form.countryIso ? State.getStatesOfCountry(form.countryIso) : []),
+  [form.countryIso]
+);
+
+const cities = useMemo(
+  () => (form.countryIso && form.stateIso ? City.getCitiesOfState(form.countryIso, form.stateIso) : []),
+  [form.countryIso, form.stateIso]
+);
+const cityOptions = useMemo(() => {
+    return form.city && !cities.some(c => c.name === form.city)
+      ? [{ name: form.city }, ...cities]
+      : cities;
+  }, [form.city, cities]);
 
   useEffect(() => {
     if (!manager) return;
