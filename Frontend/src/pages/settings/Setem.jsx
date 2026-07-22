@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import React from "react";
 import { useUpdateProfile, useUpdatePassword, useGetMeUser } from "../../auth/server-state/employee/employeeauth/employeeauth.hook";
 import { useQueryClient } from "@tanstack/react-query";
+import { Country, State, City } from "country-state-city";
+
+const DEFAULT_COUNTRY_ISO = "IN";
 
 const AVATAR_STYLES = [
   "avataaars", "bottts", "personas", "lorelei",
@@ -60,6 +63,21 @@ function Badge({ children, color = C.brand, bg = C.brandLight }) {
       {children}
     </span>
   );
+}
+
+function findLocationByCityName(cityName) {
+  if (!cityName) return null;
+  const countries = Country.getAllCountries();
+  for (const country of countries) {
+    const states = State.getStatesOfCountry(country.isoCode);
+    for (const state of states) {
+      const cities = City.getCitiesOfState(country.isoCode, state.isoCode);
+      if (cities.some(c => c.name === cityName)) {
+        return { countryIso: country.isoCode, stateIso: state.isoCode };
+      }
+    }
+  }
+  return null;
 }
 
 function Spinner({ size = 16, color = "#fff" }) {
@@ -377,23 +395,71 @@ function ContactTab({ employee, onSuccess, onError }) {
     marital_status: employee?.marital_status || "single",
     gender: employee?.gender || "male",
     date_of_joining: toDateInputValue(employee?.date_of_joining),
+    countryIso: DEFAULT_COUNTRY_ISO,
+    stateIso: "",
+    city: employee?.office_location || "",
   });
 
+  const countries = Country.getAllCountries();
+  const states = form.countryIso ? State.getStatesOfCountry(form.countryIso) : [];
+  const cities = form.countryIso && form.stateIso ? City.getCitiesOfState(form.countryIso, form.stateIso) : [];
+  const cityOptions = form.city && !cities.some(c => c.name === form.city)
+    ? [{ name: form.city }, ...cities]
+    : cities;
+
   useEffect(() => {
-    if (employee) {
-      setForm({
-        personal_contact: employee.personal_contact || "",
-        e_contact: employee.e_contact || "",
-        marital_status: employee.marital_status || "single",
-        gender: employee.gender || "male",
-        date_of_joining: toDateInputValue(employee.date_of_joining),
-      });
+    if (!employee) return;
+
+    const cityName = employee.office_location || "";
+    const match = findLocationByCityName(cityName);
+
+    let countryIso = match?.countryIso || DEFAULT_COUNTRY_ISO;
+    let stateIso = match?.stateIso || "";
+
+    if (!stateIso) {
+      const defaultStates = State.getStatesOfCountry(countryIso);
+      stateIso = defaultStates[0]?.isoCode || "";
     }
+
+    setForm({
+      personal_contact: employee.personal_contact || "",
+      e_contact: employee.e_contact || "",
+      marital_status: employee.marital_status || "single",
+      gender: employee.gender || "male",
+      date_of_joining: toDateInputValue(employee.date_of_joining),
+      countryIso,
+      stateIso,
+      city: cityName,
+    });
   }, [employee]);
+
+  const setCountry = (e) => {
+    const countryIso = e.target.value;
+    const firstState = State.getStatesOfCountry(countryIso)[0];
+    const stateIso = firstState?.isoCode || "";
+    const firstCity = stateIso ? City.getCitiesOfState(countryIso, stateIso)[0] : null;
+    setForm(p => ({ ...p, countryIso, stateIso, city: firstCity?.name || "" }));
+  };
+
+  const setState = (e) => {
+    const stateIso = e.target.value;
+    const firstCity = City.getCitiesOfState(form.countryIso, stateIso)[0];
+    setForm(p => ({ ...p, stateIso, city: firstCity?.name || "" }));
+  };
+
+  const setCity = (e) => setForm(p => ({ ...p, city: e.target.value }));
 
   const handleSave = () => {
     if (!form.personal_contact) { onError("Personal contact is required"); return; }
-    updateProfile.mutate(form, {
+    const payload = {
+      personal_contact: form.personal_contact,
+      e_contact: form.e_contact,
+      marital_status: form.marital_status,
+      gender: form.gender,
+      date_of_joining: form.date_of_joining,
+      office_location: form.city,
+    };
+    updateProfile.mutate(payload, {
       onSuccess: (data) => {
         queryClient.setQueryData(["meUser"], old => old ? { ...old, employee: { ...old.employee, ...data.employee } } : old);
         queryClient.invalidateQueries({ queryKey: ["meUser"] });
@@ -402,6 +468,13 @@ function ContactTab({ employee, onSuccess, onError }) {
       onError: (err) => onError(getErrorMessage(err)),
     });
   };
+
+  const selectClass =
+    "w-full min-w-0 max-w-full appearance-none truncate rounded-[10px] border border-[#ede5e0] " +
+    "bg-white px-3.5 py-2.5 pr-8 text-[13px] text-[#2a1a16] font-['DM_Sans','Segoe_UI',sans-serif] " +
+    "outline-none transition-colors focus:border-[#730042] " +
+    "bg-[length:10px_6px] bg-no-repeat bg-[right_12px_center] " +
+    "bg-[url('data:image/svg+xml;utf8,<svg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%2710%27%20height=%276%27%20viewBox=%270%200%2010%206%27><path%20d=%27M1%201l4%204%204-4%27%20stroke=%27%23b0948a%27%20stroke-width=%271.5%27%20fill=%27none%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27/></svg>')]";
 
   return (
     <SectionCard title="Contact information" subtitle="Fields you can update yourself" accent={C.green}>
@@ -427,6 +500,36 @@ function ContactTab({ employee, onSuccess, onError }) {
         onChange={e => setForm(p => ({ ...p, date_of_joining: e.target.value }))}
         hint="Shown on your dashboard in place of your account creation date"
       />
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-0 sm:gap-x-3 gap-y-0 min-w-0 w-full max-w-full mb-4">
+        <div className="min-w-0 mb-4 sm:mb-0">
+          <FieldLabel>Country</FieldLabel>
+          <select value={form.countryIso} onChange={setCountry} className={selectClass}>
+            {countries.map(c => (
+              <option key={c.isoCode} value={c.isoCode}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="min-w-0 mb-4 sm:mb-0">
+          <FieldLabel>State</FieldLabel>
+          <select value={form.stateIso} onChange={setState} className={selectClass}>
+            {states.map(s => (
+              <option key={s.isoCode} value={s.isoCode}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="min-w-0 mb-4 sm:mb-0">
+          <FieldLabel>City</FieldLabel>
+          <select value={form.city} onChange={setCity} className={selectClass}>
+            {cityOptions.map(c => (
+              <option key={c.name} value={c.name}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       <div style={{ marginBottom: 20 }}>
         <FieldLabel>Gender</FieldLabel>
         <div style={{ display: "flex", gap: 10 }}>

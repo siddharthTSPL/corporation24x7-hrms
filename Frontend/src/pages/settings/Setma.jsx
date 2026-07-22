@@ -2,7 +2,10 @@ import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGetMeManager } from "../../auth/server-state/manager/managerauth/managerauth.hook";
 import { useUpdateProfile, useUpdatePassword } from "../../auth/server-state/manager/managgerother/managerother.hook";
+import { Country, State, City } from "country-state-city";
 
+
+const DEFAULT_COUNTRY_ISO = "IN";
 const AVATAR_STYLES = [
   "avataaars", "bottts", "personas", "lorelei",
   "micah", "open-peeps", "big-ears", "croodles",
@@ -33,6 +36,23 @@ const C = {
   muted:      "#b0948a",
   mutedMid:   "#c9bab5",
 };
+
+
+
+function findLocationByCityName(cityName) {
+  if (!cityName) return null;
+  const countries = Country.getAllCountries();
+  for (const country of countries) {
+    const states = State.getStatesOfCountry(country.isoCode);
+    for (const state of states) {
+      const cities = City.getCitiesOfState(country.isoCode, state.isoCode);
+      if (cities.some(c => c.name === cityName)) {
+        return { countryIso: country.isoCode, stateIso: state.isoCode };
+      }
+    }
+  }
+  return null;
+}
 
 function getInitials(fName = "", lName = "") {
   return `${(fName[0] || "").toUpperCase()}${(lName[0] || "").toUpperCase()}`;
@@ -351,6 +371,34 @@ function ProfileTab({ manager }) {
   );
 }
 
+function selectStyle(focused) {
+  return {
+    width: "100%",
+    padding: "10px 30px 10px 14px",
+    borderRadius: 10,
+    border: `0.5px solid ${focused ? C.brand : C.border}`,
+    fontSize: 13,
+    color: C.text,
+    background: C.surface,
+    fontFamily: "inherit",
+    outline: "none",
+    boxSizing: "border-box",
+    maxWidth: "100%",
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    appearance: "none",
+    WebkitAppearance: "none",
+    MozAppearance: "none",
+    backgroundImage:
+      "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%23b0948a' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>\")",
+    backgroundRepeat: "no-repeat",
+    backgroundPosition: "right 10px center",
+    
+  };
+}
+
 function ContactTab({ manager, onSuccess, onError }) {
   const queryClient = useQueryClient();
   const updateProfile = useUpdateProfile();
@@ -361,27 +409,74 @@ function ContactTab({ manager, onSuccess, onError }) {
     marital_status:   manager?.marital_status   || "single",
     gender:           manager?.gender           || "male",
     designation:      manager?.designation      || "",
-    office_location:  manager?.office_location  || "Noida",
+    countryIso:       DEFAULT_COUNTRY_ISO,
+    stateIso:         "",
+    city:             manager?.office_location  || "",
     date_of_joining:  toDateInputValue(manager?.date_of_joining),
   });
 
+  const countries = Country.getAllCountries();
+  const states = form.countryIso ? State.getStatesOfCountry(form.countryIso) : [];
+  const cities = form.countryIso && form.stateIso ? City.getCitiesOfState(form.countryIso, form.stateIso) : [];
+  const cityOptions = form.city && !cities.some(c => c.name === form.city)
+    ? [{ name: form.city }, ...cities]
+    : cities;
+
   useEffect(() => {
-    if (manager) {
-      setForm({
-        personal_contact: manager.personal_contact || "",
-        e_contact:        manager.e_contact        || "",
-        marital_status:   manager.marital_status   || "single",
-        gender:           manager.gender           || "male",
-        designation:      manager.designation      || "",
-        office_location:  manager.office_location  || "Noida",
-        date_of_joining:  toDateInputValue(manager.date_of_joining),
-      });
+    if (!manager) return;
+
+    const cityName = manager.office_location || "";
+    const match = findLocationByCityName(cityName);
+
+    let countryIso = match?.countryIso || DEFAULT_COUNTRY_ISO;
+    let stateIso = match?.stateIso || "";
+
+    if (!stateIso) {
+      const defaultStates = State.getStatesOfCountry(countryIso);
+      stateIso = defaultStates[0]?.isoCode || "";
     }
+
+    setForm({
+      personal_contact: manager.personal_contact || "",
+      e_contact:        manager.e_contact        || "",
+      marital_status:   manager.marital_status   || "single",
+      gender:           manager.gender           || "male",
+      designation:      manager.designation      || "",
+      countryIso,
+      stateIso,
+      city:             cityName,
+      date_of_joining:  toDateInputValue(manager.date_of_joining),
+    });
   }, [manager]);
+
+  const setCountry = (e) => {
+    const countryIso = e.target.value;
+    const firstState = State.getStatesOfCountry(countryIso)[0];
+    const stateIso = firstState?.isoCode || "";
+    const firstCity = stateIso ? City.getCitiesOfState(countryIso, stateIso)[0] : null;
+    setForm(p => ({ ...p, countryIso, stateIso, city: firstCity?.name || "" }));
+  };
+
+  const setState = (e) => {
+    const stateIso = e.target.value;
+    const firstCity = City.getCitiesOfState(form.countryIso, stateIso)[0];
+    setForm(p => ({ ...p, stateIso, city: firstCity?.name || "" }));
+  };
+
+  const setCity = (e) => setForm(p => ({ ...p, city: e.target.value }));
 
   const handleSave = () => {
     if (!form.personal_contact) { onError("Personal contact is required"); return; }
-    updateProfile.mutate(form, {
+    const payload = {
+      personal_contact: form.personal_contact,
+      e_contact: form.e_contact,
+      marital_status: form.marital_status,
+      gender: form.gender,
+      designation: form.designation,
+      office_location: form.city,
+      date_of_joining: form.date_of_joining,
+    };
+    updateProfile.mutate(payload, {
       onSuccess: (data) => {
         queryClient.setQueryData(["meManager"], old => old ? { ...old, manager: { ...old.manager, ...data.manager } } : old);
         queryClient.invalidateQueries({ queryKey: ["meManager"] });
@@ -414,23 +509,39 @@ function ContactTab({ manager, onSuccess, onError }) {
         onChange={e => setForm(p => ({ ...p, designation: e.target.value }))}
         placeholder="Enter your designation"
       />
-      <div style={{ marginBottom: 16 }}>
-        <FieldLabel>Office location</FieldLabel>
-        <select
-          value={form.office_location}
-          onChange={e => setForm(p => ({ ...p, office_location: e.target.value }))}
-          style={{
-            width: "100%", padding: "10px 14px",
-            borderRadius: 10, border: `0.5px solid ${C.border}`,
-            fontSize: 13, color: C.text, background: C.surface,
-            fontFamily: "inherit", outline: "none", boxSizing: "border-box",
-          }}
-          onFocus={e => e.target.style.borderColor = C.brand}
-          onBlur={e => e.target.style.borderColor = C.border}
-        >
-          {OFFICE_LOCATIONS.map(o => <option key={o} value={o}>{o}</option>)}
-        </select>
+
+      <div
+        className="st-2col"
+        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "0 16px", minWidth: 0,  }}
+      >
+        <div style={{ marginBottom: 16, minWidth: 0 }}>
+          <FieldLabel>Country</FieldLabel>
+          <select value={form.countryIso} onChange={setCountry} style={selectStyle(false)}>
+            {countries.map(c => (
+              <option key={c.isoCode} value={c.isoCode}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ marginBottom: 16, minWidth: 0 }}>
+          <FieldLabel>State</FieldLabel>
+          <select value={form.stateIso} onChange={setState} style={selectStyle(false)}>
+            {states.map(s => (
+              <option key={s.isoCode} value={s.isoCode}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ marginBottom: 16, minWidth: 0 }}>
+          <FieldLabel>City (office location)</FieldLabel>
+          <select value={form.city} onChange={setCity} style={selectStyle(false)}>
+            {cityOptions.map(c => (
+              <option key={c.name} value={c.name}>{c.name}</option>
+            ))}
+          </select>
+        </div>
       </div>
+
       <InputField
         label="Date of joining"
         type="date"
@@ -933,17 +1044,20 @@ export default function ManagerSettingsPage() {
 
   return (
     <div className="st-page" style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", background: C.page, minHeight: "100vh", padding: "28px 32px", color: C.text }}>
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes slideIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
-        input:focus { border-color: ${C.brand} !important; box-shadow: 0 0 0 3px ${C.brandLight}; }
-        button:not([disabled]):hover { opacity: 0.88; }
-        .st-2col { grid-template-columns: 1fr 1fr; }
-        @media (max-width: 720px) {
-          .st-page { padding: 16px 14px !important; }
-          .st-2col { grid-template-columns: 1fr !important; gap: 16px 0 !important; }
-        }
-      `}</style>
+    <style>{`
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes slideIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
+  * { box-sizing: border-box; }
+  input::placeholder { color: #c9bab5; }
+  select option { color: #2a1a16; }
+  select { position: relative; }
+  .mobile-menu-btn { display: none; }
+  @media (max-width: 768px) {
+    .settings-layout { flex-direction: column !important; }
+    .settings-sidebar { display: none !important; }
+    .mobile-menu-btn { display: flex !important; }
+  }
+`}</style>
 
       <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: "", type: "" })} />
 
