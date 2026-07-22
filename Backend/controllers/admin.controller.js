@@ -3004,7 +3004,7 @@ const getAttendanceOverview = async (req, res, next) => {
         date: today,
         employee: { $in: peopleIds },
       })
-        .select("employee checkIn checkOut latitude longitude source activeMinutes idleMinutes")
+        .select("employee checkIn checkOut latitude longitude source activeMinutes idleMinutes status")
         .lean();
 
       const byEmp = new Map(records.map((r) => [String(r.employee), r]));
@@ -3012,11 +3012,20 @@ const getAttendanceOverview = async (req, res, next) => {
         const r = byEmp.get(p.id);
         const checkedIn = !!r?.checkIn;
         const checkedOut = !!r?.checkOut;
+        // Once checked out, trust the stored `status` (present/half_day/absent)
+        // instead of re-deriving it from checkIn/checkOut presence. `status`
+        // is computed at checkout time from activeMinutes vs the shift's
+        // thresholds (see attendance.controller.js checkout()), so a punch
+        // in+out with too little active time is correctly "absent" or
+        // "half_day" even though both timestamps are set. The old logic
+        // treated any checkIn+checkOut pair as "present" regardless of how
+        // little time was actually worked.
+        const status = checkedIn ? (checkedOut ? (r.status || "absent") : "on_duty") : "absent";
         return {
           ...p,
           checkIn: r?.checkIn || null,
           checkOut: r?.checkOut || null,
-          status: checkedIn ? (checkedOut ? "present" : "on_duty") : "absent",
+          status,
           source: r?.source === "face" ? "face" : r ? "live" : null,
           lat: r?.latitude ?? null,
           lng: r?.longitude ?? null,

@@ -1876,6 +1876,12 @@ const getAttendanceOverview = async (req, res, next) => {
     const organisation_id = req.superAdmin._id;
     const type = req.query.type === "monthly" ? "monthly" : "today";
 
+    // Every Admin reports to this Superadmin by default (there's no
+    // reporting_manager field on the Admin model) - show their actual
+    // name here instead of the literal word "Superadmin".
+    const superAdminName =
+      [req.superAdmin.f_name, req.superAdmin.l_name].filter(Boolean).join(" ") || "Superadmin";
+
     const [admins, managers, employees] = await Promise.all([
       AdminModel.find({ organisation_id })
         .select("empid f_name l_name work_email role designation department office_location profile_image")
@@ -1901,7 +1907,7 @@ const getAttendanceOverview = async (req, res, next) => {
         department: a.department,
         office_location: a.office_location,
         avatar: a.profile_image || null,
-        reportingManager: "—",
+        reportingManager: superAdminName,
       })),
       ...managers.map((m) => ({
         id: String(m._id),
@@ -1945,7 +1951,7 @@ const getAttendanceOverview = async (req, res, next) => {
         date: today,
         employee: { $in: peopleIds },
       })
-        .select("employee checkIn checkOut latitude longitude source activeMinutes idleMinutes")
+        .select("employee checkIn checkOut latitude longitude source activeMinutes idleMinutes status")
         .lean();
 
       const byEmp = new Map(records.map((r) => [String(r.employee), r]));
@@ -1953,11 +1959,20 @@ const getAttendanceOverview = async (req, res, next) => {
         const r = byEmp.get(p.id);
         const checkedIn = !!r?.checkIn;
         const checkedOut = !!r?.checkOut;
+        // Once checked out, trust the stored `status` (present/half_day/absent)
+        // instead of re-deriving it from checkIn/checkOut presence. `status`
+        // is computed at checkout time from activeMinutes vs the shift's
+        // thresholds (see attendance.controller.js checkout()), so a punch
+        // in+out with too little active time is correctly "absent" or
+        // "half_day" even though both timestamps are set. The old logic
+        // treated any checkIn+checkOut pair as "present" regardless of how
+        // little time was actually worked.
+        const status = checkedIn ? (checkedOut ? (r.status || "absent") : "on_duty") : "absent";
         return {
           ...p,
           checkIn: r?.checkIn || null,
           checkOut: r?.checkOut || null,
-          status: checkedIn ? (checkedOut ? "present" : "on_duty") : "absent",
+          status,
           source: r?.source === "face" ? "face" : r ? "live" : null,
           lat: r?.latitude ?? null,
           lng: r?.longitude ?? null,
