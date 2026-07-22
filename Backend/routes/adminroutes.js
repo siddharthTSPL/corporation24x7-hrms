@@ -48,6 +48,7 @@ const {
   editadminprofile,
   changepassword,
   getTodayCheckins,
+  getAttendanceOverview,
   getOrgInfo,
   getAllPersonalDocumentsAdmin,
   getAllExpenseDocumentsAdmin,
@@ -117,6 +118,11 @@ adminrouter.get(
   "/gettodaycheckins",
   adminauthmiddleware,
   asyncHandler(getTodayCheckins),
+);
+adminrouter.get(
+  "/attendance-overview",
+  adminauthmiddleware,
+  asyncHandler(getAttendanceOverview),
 );
 
 adminrouter.post("/addmanager", adminauthmiddleware, asyncHandler(addmanager));
