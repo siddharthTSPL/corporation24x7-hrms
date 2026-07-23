@@ -2002,6 +2002,7 @@ const getAttendanceOverview = async (req, res, next) => {
       const presentDays = s?.presentDays ?? 0;
       const halfDays = s?.halfDays ?? 0;
       const absentDays = s?.absentDays ?? 0;
+      const weekOffHolidayDays = s?.weekOffHolidayDays ?? 0;
       const totalWorkingMinutes = s?.totalWorkingMinutes ?? 0;
       const markedDays = presentDays + halfDays + absentDays;
       return {
@@ -2009,6 +2010,7 @@ const getAttendanceOverview = async (req, res, next) => {
         presentDays,
         halfDays,
         absentDays,
+        weekOffHolidayDays,
         markedDays,
         totalWorkingMinutes,
         attendancePercent: markedDays > 0 ? Math.round(((presentDays + halfDays * 0.5) / markedDays) * 100) : 0,

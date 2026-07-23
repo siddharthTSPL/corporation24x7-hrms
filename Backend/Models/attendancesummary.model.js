@@ -27,6 +27,10 @@ const summarySchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  weekOffHolidayDays: {
+    type: Number,
+    default: 0,
+  },
   totalWorkingMinutes: {
     type: Number,
     default: 0,
