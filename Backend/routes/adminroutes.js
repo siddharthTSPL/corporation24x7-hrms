@@ -16,6 +16,7 @@ const {
   addmanager,
   addemployee,
   findallmanagers,
+  findallemployeesfull,
   getallemployee,
   getMyTeamOverview,
   editemployee,
@@ -142,6 +143,14 @@ adminrouter.get(
   adminauthmiddleware,
   asyncHandler(findallmanagers),
 );
+
+
+adminrouter.get(
+  "/findallemployeesfull",
+  adminauthmiddleware,
+  asyncHandler(findallemployeesfull)
+);
+
 adminrouter.get(
   "/getallemployee",
   adminOrSuperAdminAuth,
