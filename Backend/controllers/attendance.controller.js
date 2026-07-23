@@ -170,6 +170,23 @@ const activity = async (req, res) => {
     let attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
 
     if (!attendance) {
+      // A background agent ping on a holiday/week-off must NOT create an
+      // Attendance stub. Unlike checkin(), this endpoint has no user-facing
+      // error to return for - it just silently no-ops. Without this guard,
+      // the laptop being on in the background on an off-day creates a
+      // source:"agent" record that never gets checked out (autoCheckoutAll
+      // deliberately excludes source "agent"), which then permanently
+      // blocks markNoShowAbsences()'s no-show sweep for that date (it skips
+      // any date that already has ANY Attendance record) - the day ends up
+      // uncounted anywhere: not present, not absent, not weekOffHolidayDays.
+      const holidayCheck = await isHoliday(today, organisation_id);
+      const weekOffCheck = holidayCheck.isHoliday
+        ? null
+        : await isWeekOff(today, organisation_id, userId, getOnModel(user.role));
+      if (holidayCheck.isHoliday || weekOffCheck?.isOff) {
+        return res.json({ message: "Off day - activity not tracked", activeMinutes: 0, idleMinutes: 0 });
+      }
+
       const shift = await resolveEmployeeShift(user, organisation_id);
       try {
         attendance = await Attendance.create({

@@ -12,6 +12,15 @@ catchUpMissedRuns().catch((err) =>
   console.error('[Startup] catchUpMissedRuns failed:', err.message)
 );
 
+// Same reasoning as catchUpMissedRuns above: if the nightly 2 AM reconcile
+// cron was missed (server asleep/restarting), also do one recompute pass
+// on boot so a missed night doesn't leave stale numbers until the next
+// scheduled run.
+const { recomputeSummaries } = require('../automatic/nightlyReconcile');
+recomputeSummaries(true).catch((err) =>
+  console.error('[Startup] recomputeSummaries failed:', err.message)
+);
+
 const app = express();
 
 app.enable("trust proxy");

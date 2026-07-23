@@ -11,7 +11,7 @@ const { classifyNonWorkingDay, startOfDay } = require("../automatic/weekoffcalen
 const { getISTDateParts, toISTKey } = require("../utils/Istdate.utils");
 require("dotenv").config();
 
-const APPLY = process.argv.includes("--apply");
+const CLI_APPLY = process.argv.includes("--apply");
 
 // Leave-aware, no-show-aware, join-date-aware rebuild of AttendanceSummary.
 //
@@ -36,7 +36,17 @@ const APPLY = process.argv.includes("--apply");
 // presentDays/halfDays from checkout records, absentDays from checkout
 // records with status "absent" PLUS every working day with no Attendance
 // record at all, from the employee's date_of_joining (falling back to
-// createdAt) through yesterday, excluding holidays/week-offs/approved leave.
+// createdAt) through yesterday, excluding holidays/week-offs/approved PAID
+// leave. weekOffHolidayDays is also recomputed here (a no-Attendance-record
+// day that classifies as holiday/week_off), so this single script now
+// replaces the need to separately run
+// `node scripts/Backfillnoshowabsent.js --weekoff-only`.
+//
+// "Approved PAID leave" deliberately excludes leaveType "lwp": an approved
+// LWP leave is the employee going unpaid for that day by their own choice,
+// not an excused one, so those days still get recomputed as absentDays —
+// matching the same rule now used by Marknoshowabsent.js and
+// monthattendanceupdate.js.
 
 const ROLE_CONFIG = {
   employee: { Model: User, onModel: "User", LeaveModel: Leave, leaveField: "employee" },
@@ -55,12 +65,16 @@ const loadApprovedLeaveRanges = async () => {
     });
   };
 
+  // leaveType "lwp" is excluded: an approved LWP leave is an unpaid day by
+  // the employee's own choice, not an excused one — it must still be
+  // recomputed as absent below. Only genuinely paid leave (el/sl/ml/pl/
+  // half_day_*) belongs in this "excused" range map.
   const [empLeaves, mgrLeaves, adminLeaves] = await Promise.all([
-    Leave.find({ status: { $in: ["approved_manager", "approved_admin"] } })
+    Leave.find({ status: { $in: ["approved_manager", "approved_admin"] }, leaveType: { $ne: "lwp" } })
       .select("employee startDate endDate").lean(),
-    ManagerLeave.find({ status: { $in: ["approved_reporting_manager", "approved_admin"] } })
+    ManagerLeave.find({ status: { $in: ["approved_reporting_manager", "approved_admin"] }, leaveType: { $ne: "lwp" } })
       .select("manager startDate endDate").lean(),
-    AdminLeave.find({ status: "approved_superadmin" })
+    AdminLeave.find({ status: "approved_superadmin", leaveType: { $ne: "lwp" } })
       .select("admin startDate endDate").lean(),
   ]);
 
@@ -84,17 +98,17 @@ const getOrCreateBucket = (buckets, employee, role, year, month, organisation_id
   if (!buckets.has(key)) {
     buckets.set(key, {
       employee, role, organisation_id, year, month,
-      presentDays: 0, halfDays: 0, absentDays: 0, totalWorkingMinutes: 0,
+      presentDays: 0, halfDays: 0, absentDays: 0, weekOffHolidayDays: 0, totalWorkingMinutes: 0,
     });
   }
   return buckets.get(key);
 };
 
-const recomputeSummaries = async () => {
+const recomputeSummaries = async (apply = CLI_APPLY) => {
   const yesterday = startOfDay(new Date(Date.now() - 24 * 60 * 60 * 1000));
 
   const [allRecords, leaveMap] = await Promise.all([
-    Attendance.find({}).select("employee role date checkOut status activeMinutes organisation_id").lean(),
+    Attendance.find({}).select("employee role date checkOut status activeMinutes organisation_id source").lean(),
     loadApprovedLeaveRanges(),
   ]);
 
@@ -103,14 +117,21 @@ const recomputeSummaries = async () => {
 
   const buckets = new Map();
 
-  // A day with ANY Attendance record (checked out or not) is never a
-  // no-show — it's either already counted below (checkout) or still
-  // in-progress (no checkout yet, e.g. today; skipped either way here
-  // since the no-show sweep only ever looks at dates up to yesterday).
+  // A day with ANY REAL Attendance record (manual/face check-in, or
+  // anything that got checked out) is never a no-show. A pure
+  // source:"agent" stub that never got checked out is deliberately
+  // excluded here - it's a background ping, not real attendance (see the
+  // matching fix + comment in Marknoshowabsent.js and the activity()
+  // weekoff/holiday guard in attendance.controller.js). Without this
+  // exclusion, such a stub would make this script think the day is
+  // "handled" and skip it in the no-show sweep below, permanently hiding
+  // it from weekOffHolidayDays/absentDays.
   const hasAnyRecord = new Set();
 
   allRecords.forEach((r) => {
-    hasAnyRecord.add(`${r.employee}_${r.role}_${toISTKey(r.date)}`);
+    if (r.checkOut || r.source !== "agent") {
+      hasAnyRecord.add(`${r.employee}_${r.role}_${toISTKey(r.date)}`);
+    }
 
     if (!r.checkOut) return; // not checked out yet — handled by no-show sweep only if it's a genuinely empty day, otherwise ignored
 
@@ -138,7 +159,10 @@ const recomputeSummaries = async () => {
   // record, not a holiday/week-off, not on approved leave).
   for (const role of Object.keys(ROLE_CONFIG)) {
     const { Model, onModel, leaveField } = ROLE_CONFIG[role];
-    const employees = await Model.find({ status: "active" })
+    // See the matching note in Marknoshowabsent.js: `status` is a login/
+    // logout session flag, not an employment flag — working_status is the
+    // field that actually tells us if this person is still employed.
+    const employees = await Model.find({ working_status: "working" })
       .select("_id organisation_id date_of_joining createdAt")
       .lean();
 
@@ -162,7 +186,13 @@ const recomputeSummaries = async () => {
 
         if (!hasAnyRecord.has(key)) {
           const nonWorking = await classifyNonWorkingDay(cursor, emp.organisation_id, emp._id, onModel);
-          if (nonWorking.type !== "holiday" && nonWorking.type !== "week_off" && nonWorking.type !== "unconfigured") {
+          if (nonWorking.type === "holiday" || nonWorking.type === "week_off") {
+            // Matches Marknoshowabsent.js: a holiday/week-off with no
+            // Attendance record always counts here, regardless of leave —
+            // an employee doesn't need to "apply leave" for their own
+            // week-off or a company holiday.
+            b.weekOffHolidayDays += 1;
+          } else if (nonWorking.type !== "unconfigured") {
             if (!isOnApprovedLeave(leaveMap, emp._id, role, cursor)) {
               b.absentDays += 1;
             }
@@ -185,28 +215,25 @@ const recomputeSummaries = async () => {
       && existing.presentDays === b.presentDays
       && existing.halfDays === b.halfDays
       && existing.absentDays === b.absentDays
+      && existing.weekOffHolidayDays === b.weekOffHolidayDays
       && existing.totalWorkingMinutes === b.totalWorkingMinutes;
 
     if (!same) {
       mismatches++;
       console.log(
         `[MISMATCH] employee=${b.employee} role=${b.role} ${b.year}-${b.month}: ` +
-        `stored={present:${existing?.presentDays ?? "-"}, half:${existing?.halfDays ?? "-"}, absent:${existing?.absentDays ?? "-"}, mins:${existing?.totalWorkingMinutes ?? "-"}} ` +
-        `→ recomputed={present:${b.presentDays}, half:${b.halfDays}, absent:${b.absentDays}, mins:${b.totalWorkingMinutes}}`
+        `stored={present:${existing?.presentDays ?? "-"}, half:${existing?.halfDays ?? "-"}, absent:${existing?.absentDays ?? "-"}, weekOffHoliday:${existing?.weekOffHolidayDays ?? "-"}, mins:${existing?.totalWorkingMinutes ?? "-"}} ` +
+        `→ recomputed={present:${b.presentDays}, half:${b.halfDays}, absent:${b.absentDays}, weekOffHoliday:${b.weekOffHolidayDays}, mins:${b.totalWorkingMinutes}}`
       );
-      if (APPLY) {
+      if (apply) {
         await AttendanceSummary.findOneAndUpdate(
           { employee: b.employee, role: b.role, year: b.year, month: b.month },
           {
             $set: {
               organisation_id: b.organisation_id,
               presentDays: b.presentDays, halfDays: b.halfDays,
-              absentDays: b.absentDays, totalWorkingMinutes: b.totalWorkingMinutes,
-              // Reset the idempotency tracker to match the freshly
-              // recomputed absentDays for this month — from this point on
-              // Marknoshowabsent.js's own noShowDates check takes over
-              // again for any NEW no-show day going forward.
-              noShowDates: [],
+              absentDays: b.absentDays, weekOffHolidayDays: b.weekOffHolidayDays,
+              totalWorkingMinutes: b.totalWorkingMinutes,
             },
           },
           { upsert: true }
@@ -215,8 +242,8 @@ const recomputeSummaries = async () => {
     }
   }
 
-  console.log(`\n${mismatches} employee-month summary(ies) ${APPLY ? "corrected" : "would be corrected"}.`);
-  if (!APPLY) console.log("\nDRY RUN — nothing was changed. Re-run with --apply to actually fix AttendanceSummary.");
+  console.log(`\n${mismatches} employee-month summary(ies) ${apply ? "corrected" : "would be corrected"}.`);
+  if (!apply) console.log("\nDRY RUN — nothing was changed. Re-run with --apply to actually fix AttendanceSummary.");
 
   console.log(
     "\nNOTE 1: LeaveBalance.lwp is NOT touched by this script. It's a cumulative " +
@@ -224,22 +251,32 @@ const recomputeSummaries = async () => {
     "so it can't be safely recomputed from Attendance + Leave alone. Check it " +
     "manually per employee if you suspect it's wrong.\n" +
     "NOTE 2: Any Payroll documents already generated for the corrected months " +
-    "were built from the old (wrong) absentDays/halfDays numbers and will need " +
-    "to be regenerated after this script runs, or they will still reflect the " +
-    "incorrect deduction.\n" +
-    "NOTE 3: After this runs with --apply, Marknoshowabsent.js's noShowDates " +
-    "tracking is reset to empty for every corrected month — this is expected " +
-    "and correct, it just means the very next nightly cron run re-derives it " +
-    "from scratch for that month's remaining days."
+    "were built from the old (wrong) absentDays/halfDays/weekOffHolidayDays " +
+    "numbers and will need to be regenerated after this script runs, or they " +
+    "will still reflect the incorrect deduction.\n" +
+    "NOTE 3: absentDays now also counts days covered ONLY by an approved LWP " +
+    "leave (leaveType 'lwp') — those are unpaid days by the employee's own " +
+    "choice, not excused ones, so they show as absent here even though " +
+    "LeaveBalance.lwp for them was already charged once at approval time.\n" +
+    "NOTE 4: This script's writes don't touch the NoShowLog collection, so " +
+    "Marknoshowabsent.js's own per-day idempotency tracking is untouched and " +
+    "the next nightly cron run continues normally for new days going forward."
   );
 };
 
-mongoose.connect(process.env.LINK)
-  .then(async () => {
-    await recomputeSummaries();
-    process.exit(0);
-  })
-  .catch((err) => {
-    console.error("DB connection failed:", err.message);
-    process.exit(1);
-  });
+module.exports = { recomputeSummaries };
+
+// Only run as a standalone script (`node scripts/Reconcileattendancesummaryleaveaware.js`)
+// when required directly - not when imported by automatic/nightlyReconcile.js, which
+// reuses recomputeSummaries() inside the already-connected main server process.
+if (require.main === module) {
+  mongoose.connect(process.env.LINK)
+    .then(async () => {
+      await recomputeSummaries();
+      process.exit(0);
+    })
+    .catch((err) => {
+      console.error("DB connection failed:", err.message);
+      process.exit(1);
+    });
+}
