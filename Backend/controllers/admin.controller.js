@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Adminmodel = require("../Models/Admin.model");
 const Managermodel = require("../Models/manager.model");
+
 const announcementmodel = require("../Models/announcement.model");
 const uidmodel = require("../Models/UIDmodel.model");
 const Usermodel = require("../Models/user.model");
@@ -655,6 +656,29 @@ const findallmanagers = async (req, res, next) => {
       organisation_id,
       count: allManagers.length,
       managers: allManagers,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const findallemployeesfull = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const organisation_id = req.admin.organisation_id;
+
+    const employees = await Usermodel.find({ organisation_id, working_status: "working" })
+      .select(EXCLUDE)
+      .populate("Under_manager", "f_name l_name work_email designation")
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      organisation_id,
+      count: employees.length,
+      employees,
     });
   } catch (error) {
     next(error);
@@ -3919,6 +3943,7 @@ module.exports = {
   adminRateTicket,
   adminGetTicketDetail,
   findallmanagerswoadmin,
+  findallemployeesfull,
   setEmployeeWorkingStatus,
   setManagerWorkingStatus,
   getInactiveUsers,

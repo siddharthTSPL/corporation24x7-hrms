@@ -12,6 +12,8 @@ import {
 import {
   useAddManager, useAddEmployee, useFindAllManagers, useFindAllManagerswithoutAdmin,
 } from "../../auth/server-state/adminauth/adminauth.hook";
+import { useFindAllEmployeesFull } from "../../auth/server-state/adminauth/adminauth.hook";
+
 import {
   useGetAllEmployee, useDeleteUser, useEditEmployee, useEditManager,
   usePromoteEmployeeToManager, usePromoteEmployeeToAdmin, usePromoteManagerToAdmin,
@@ -153,21 +155,14 @@ function exportToCSV(data) {
   const dateStamp = new Date().toISOString().slice(0, 10);
 
   const FULL_HEADERS = [
-    // Personal
-    "UID","First Name","Last Name","Work Email","Gender","Marital Status",
+    "Employee ID","UID","First Name","Last Name","Work Email","Gender","Marital Status",
     "Personal Contact","Emergency Contact",
-    // Professional
     "Role","Department","Designation","Office Location",
     "Reporting / Under Manager","Is Fresher","Total Experience",
     "Previous Company","Previous Designation",
-    // Address (Residential + Permanent)
     "Residential Address","Residential City","Residential State","Residential Pincode","Residential Country",
-    
-    // Identity
     "Aadhaar Number","PAN Number",
-    // Banking
     "Bank Name","Account Holder Name","Account Number","IFSC Code",
-    // Other (Documents & Status)
     "Resume URL","Aadhaar Card URL","PAN Card URL","Experience Letter URL",
     "Status","Working Status",
   ];
@@ -175,14 +170,13 @@ function exportToCSV(data) {
   const buildRow = (u) => {
     const reportingPerson = u.Under_manager || u.reporting_manager;
     return [
-      u.uid??"",u.f_name??"",u.l_name??"",u.work_email??"",u.gender??"",u.marital_status??"",
+      u.empid??"",u.uid??"",u.f_name??"",u.l_name??"",u.work_email??"",u.gender??"",u.marital_status??"",
       u.personal_contact??"",u.e_contact??"",
       u.role??"",DEPT_FULL_FORMS[u.department]??u.department??"",u.designation??"",u.office_location??"",
       reportingPerson?`${reportingPerson.f_name??""} ${reportingPerson.l_name??""}`.trim():"",
       u.is_fresher?"Yes":"No",u.total_experience??"",
       u.previous_company??"",u.previous_designation??"",
       u.address??"",u.city??"",u.state??"",u.pincode??"",u.country??"",
-      u.permanent_address??"",u.permanent_city??"",u.permanent_state??"",u.permanent_pincode??"",u.permanent_country??"",
       u.aadhaar_number??"",u.pan_number??"",
       u.bank_name??"",u.account_holder_name??"",u.account_number??"",u.ifsc_code??"",
       u.resume??"",u.aadhaar_card??"",u.pan_card??"",u.experience_letter??"",
@@ -190,7 +184,6 @@ function exportToCSV(data) {
     ];
   };
 
-  // Column width auto-calculate karta hai (header vs har row ki value ki max length se)
   const computeColWidths = (rows) => {
     return FULL_HEADERS.map((header, colIdx) => {
       let maxLen = header.length;
@@ -198,7 +191,6 @@ function exportToCSV(data) {
         const val = String(row[colIdx] ?? "");
         if (val.length > maxLen) maxLen = val.length;
       });
-      // thoda padding + max cap taaki bahut lambi URL wali column screen na todhe
       return { wch: Math.min(Math.max(maxLen + 2, 10), 45) };
     });
   };
@@ -206,7 +198,6 @@ function exportToCSV(data) {
   const downloadXLSX = (rows, filename, sheetName) => {
     const worksheet = XLSX.utils.aoa_to_sheet([FULL_HEADERS, ...rows]);
     worksheet["!cols"] = computeColWidths(rows);
-    // header row ko freeze kar dete hain taaki scroll karte waqt headers dikhte rahein
     worksheet["!freeze"] = { xSplit: 0, ySplit: 1 };
 
     const workbook = XLSX.utils.book_new();
@@ -220,18 +211,10 @@ function exportToCSV(data) {
   const managers  = data.filter((u)=>getType(u)==="manager");
 
   if(employees.length>0){
-    downloadXLSX(
-      employees.map(buildRow),
-      `Torchx-Talent-Employee-${dateStamp}.xlsx`,
-      "Employees"
-    );
+    downloadXLSX(employees.map(buildRow), `Torchx-Talent-Employee-${dateStamp}.xlsx`, "Employees");
   }
   if(managers.length>0){
-    downloadXLSX(
-      managers.map(buildRow),
-      `Torchx-Talent-Manager-${dateStamp}.xlsx`,
-      "Managers"
-    );
+    downloadXLSX(managers.map(buildRow), `Torchx-Talent-Manager-${dateStamp}.xlsx`, "Managers");
   }
 }
 
@@ -583,6 +566,7 @@ function PermissionsPanel({perms,onChange,roleType="employee"}){
 }
 
 function ReportingManagerSelect({value,onChange,managersOnly,managersWithAdmin,label="Reporting Manager",name="reporting_manager",excludeId=null}){
+  
   const managersList = (managersOnly?.managers ?? []).filter(m => m._id !== excludeId);
   const withAdminList = (managersWithAdmin?.managers ?? []).filter(m => m._id !== excludeId);
   const adminList = withAdminList.filter(m => m.isAdmin);
@@ -1943,6 +1927,7 @@ export default function EmployeeTable(){
   const {mutate:addManagerApi}=useAddManager();
   const {data:managersOnly}=useFindAllManagerswithoutAdmin();
   const {data:managersWithAdmin}=useFindAllManagers();
+  const {data:employeesFull}=useFindAllEmployeesFull();
   const {data:employeeData,isLoading:listLoading,refetch:refetchList}=useGetAllEmployee();
   const {data:inactiveData}=useAdminInactiveUsers();
   const {data:activeUserCountData}=useGetActiveUserCount();
@@ -2258,13 +2243,28 @@ return(
                 </span>
               </button>
             )}
-            <button onClick={()=>exportToCSV(filtered)}
-              className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all w-full sm:w-auto"
-              style={{borderColor:"#085041",color:"#085041"}}
-              onMouseEnter={(e)=>{e.currentTarget.style.background="#085041";e.currentTarget.style.color="#fff";}}
-              onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#085041";}}>
-              <FaFileExcel size={12}/><span>Export CSV</span>
-            </button>
+        <button onClick={()=>{
+    const managerFullMap = new Map((managersWithAdmin?.managers??[]).map(m=>[m._id,m]));
+    const employeeFullMap = new Map((employeesFull?.employees??[]).map(e=>[e._id,e]));
+
+    const enriched = filtered.map((u)=>{
+      const effType = u.type || (u.role==="manager"||u.role==="senior_manager" ? "manager" : "employee");
+      if(effType==="manager" && managerFullMap.has(u._id)){
+        return {...u, ...managerFullMap.get(u._id), type:u.type};
+      }
+      if(effType==="employee" && employeeFullMap.has(u._id)){
+        return {...u, ...employeeFullMap.get(u._id), type:u.type};
+      }
+      return u;
+    });
+    exportToCSV(enriched);
+  }}
+  className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all w-full sm:w-auto"
+  style={{borderColor:"#085041",color:"#085041"}}
+  onMouseEnter={(e)=>{e.currentTarget.style.background="#085041";e.currentTarget.style.color="#fff";}}
+  onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#085041";}}>
+  <FaFileExcel size={12}/><span>Export CSV</span>
+</button>
             {isLimitReached ? (
               <div className="col-span-2 sm:col-span-auto flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 border-[#FCA5A5] bg-[#FFF5F5] text-xs sm:text-sm font-semibold text-[#991B1B]">
                 <FaExclamationTriangle size={12}/>

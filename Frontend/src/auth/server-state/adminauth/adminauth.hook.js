@@ -10,6 +10,7 @@ import {
   addManager,
   addEmployee,
   findAllManagers,
+  findAllEmployeesFull,
   findAllManagerswithoutAdmin,
   editAdminProfile,
   changeAdminPassword,
@@ -103,6 +104,13 @@ export const useFindAllManagers = () => {
     queryFn: findAllManagers,
   });
 };
+
+export function useFindAllEmployeesFull() {
+  return useQuery({
+    queryKey: ["findAllEmployeesFull"],
+    queryFn: findAllEmployeesFull,   // ✅ ab pehle se imported api function use hoga
+  });
+}
 
 export const useEditAdminProfile = () => {
   const queryClient = useQueryClient();
