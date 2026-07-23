@@ -95,7 +95,12 @@ const menuByRole = {
   employee:   employeeMenu,
 };
 
-function Sidebar({ collapsed, setCollapsed }) {
+// NOTE: added `className` (default "") to props so the parent
+// (MainLayout) can pass positioning/sticky classes down to the
+// actual root <div> of the sidebar. Previously this prop was
+// silently ignored, which is why "sticky top-0" from MainLayout
+// never had any effect and the sidebar scrolled with the page.
+function Sidebar({ collapsed, setCollapsed, className = "" }) {
   const location  = useLocation();
   const navigate  = useNavigate();
   const { data: auth } = useAuth();
@@ -156,12 +161,13 @@ function Sidebar({ collapsed, setCollapsed }) {
         />
       )}
 
-      <div
-        className={`fixed md:static z-50 top-0 left-0 h-full bg-white shadow-md transition-all duration-300 flex flex-col flex-shrink-0
-        ${collapsed ? "w-16 md:min-w-16" : "w-56 md:min-w-56"}
-        ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
-      >
-        <div className="p-4 flex items-center justify-between border-b">
+    <div
+  className={`fixed md:static z-50 top-0 left-0 h-full bg-white shadow-md transition-all duration-300 flex flex-col flex-shrink-0
+  ${collapsed ? "w-16 md:min-w-16" : "w-56 md:min-w-56"}
+  ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+  ${className}`}
+>
+        <div className="p-4 flex items-center justify-between border-b flex-shrink-0">
           <img src={talent} alt="Talent" className="w-40" />
           <button className="md:hidden" onClick={() => setMobileOpen(false)}>
             <FaTimes />
@@ -169,7 +175,7 @@ function Sidebar({ collapsed, setCollapsed }) {
         </div>
 
        {!collapsed && role && (
-  <div className="mx-3 mt-2 mb-1 flex items-center gap-2 rounded-md bg-[#730042]/10 px-3 py-1.5">
+  <div className="mx-3 mt-2 mb-1 flex items-center gap-2 rounded-md bg-[#730042]/10 px-3 py-1.5 flex-shrink-0">
     <FaShieldAlt className="text-[#730042] text-xs" />
 
     <span className="text-xs font-semibold text-[#730042]">
@@ -187,7 +193,7 @@ function Sidebar({ collapsed, setCollapsed }) {
 )}
 
         <div
-          className="flex items-center justify-between px-4 py-3 cursor-pointer"
+          className="flex items-center justify-between px-4 py-3 cursor-pointer flex-shrink-0"
           onClick={() => setOpen(!open)}
         >
           {!collapsed && (
@@ -198,6 +204,12 @@ function Sidebar({ collapsed, setCollapsed }) {
           <FaChevronDown className={open ? "rotate-180" : ""} />
         </div>
 
+        {/*
+          This nav list gets its own scroll region (overflow-y-auto).
+          That way, if the menu is ever longer than the viewport, IT
+          scrolls internally instead of the whole sidebar (or worse,
+          the whole page) scrolling.
+        */}
         <div className="flex-1 overflow-y-auto">
           {open && (
             <nav className="px-2 flex flex-col gap-1">

@@ -1,13 +1,35 @@
 @import "tailwindcss";
 
-
 :root {
   --primary: #730042;
   --secondary: #90DBF4;
   --background: #F1FAFF;
   --text: #1F2937;
-  --accent:#FDCB6E;
+  --accent: #FDCB6E;
   --error: #EB5757;
 }
 
+/*
+  THE ACTUAL ROOT CAUSE FIX.
 
+  Without this, html/body/#root have no fixed height, so if
+  anything on the page overflows even slightly, the BROWSER
+  DOCUMENT ITSELF scrolls — not just your table's scroll
+  container. When the document scrolls, everything in normal
+  flow moves together, including a sidebar that isn't actually
+  fixed/sticky relative to the viewport. That's the "whole page
+  scrolls with the sidebar" bug.
+
+  Locking these three to 100% height + overflow: hidden means
+  the document can never scroll. The only elements that can
+  scroll afterward are the ones you've explicitly given
+  `overflow-y-auto` / `overflow-auto` to (the sidebar's own nav
+  list, and the employee table's scroll wrapper).
+*/
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
