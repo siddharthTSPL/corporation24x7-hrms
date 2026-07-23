@@ -892,7 +892,7 @@ export default function AdminAssets() {
               activeTab === "assets" ? "border-[#730042] text-[#730042]" : "border-transparent text-[#993556] hover:text-[#730042]"
             }`}
           >
-            Assets
+           All Assets
           </button>
           <button
             onClick={() => setActiveTab("employees")}
@@ -900,7 +900,7 @@ export default function AdminAssets() {
               activeTab === "employees" ? "border-[#730042] text-[#730042]" : "border-transparent text-[#993556] hover:text-[#730042]"
             }`}
           >
-            Employee Assets
+            Assigned Assets
           </button>
         </div>
 
