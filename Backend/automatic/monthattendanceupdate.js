@@ -4,6 +4,7 @@ const Leave = require("../Models/leave.model");
 const ManagerLeave = require("../Models/maleave.model");
 const AdminLeave = require("../Models/adleave.model");
 const { getISTDateParts } = require("../utils/Istdate.utils");
+const { isDateInLwpPortion } = require("../utils/leaveLwpDay.utils");
 const mongoose = require("mongoose");
 
 function calculateStatus(activeMinutes, thresholds) {
@@ -22,41 +23,48 @@ function calculateStatus(activeMinutes, thresholds) {
 // all, so the automatic no-leave-filed LWP debit below isn't applied a
 // second time on top of what processLeaveDeduction() already charged at
 // approval time for an explicit LWP leave.
+// excludeLwp=true additionally requires that `date` NOT fall inside the
+// leave's own lwpDays shortfall portion (see isDateInLwpPortion /
+// Models/leave.model.js's `lwpDays` comment). Without this, an "el"
+// leave that ran out of balance partway through would still excuse its
+// LWP-shortfall days just because leaveType !== "lwp" at the document
+// level - even though those specific days were never actually paid.
 const hasApprovedLeave = async (employeeId, date, role, { excludeLwp = false } = {}) => {
   const checkDate = new Date(date);
   const id = new mongoose.Types.ObjectId(employeeId);
   const leaveTypeFilter = excludeLwp ? { leaveType: { $ne: "lwp" } } : {};
+  const selectFields = "_id startDate endDate lwpDays";
 
+  let leave;
   if (role === "manager") {
-    const leave = await ManagerLeave.findOne({
+    leave = await ManagerLeave.findOne({
       manager: id,
       status: { $in: ["approved_reporting_manager", "approved_admin"] },
       startDate: { $lte: checkDate },
       endDate:   { $gte: checkDate },
       ...leaveTypeFilter,
-    }).select("_id").lean();
-    return !!leave;
-  }
-
-  if (role === "admin") {
-    const leave = await AdminLeave.findOne({
+    }).select(selectFields).lean();
+  } else if (role === "admin") {
+    leave = await AdminLeave.findOne({
       admin: id,
       status: "approved_superadmin",
       startDate: { $lte: checkDate },
       endDate:   { $gte: checkDate },
       ...leaveTypeFilter,
-    }).select("_id").lean();
-    return !!leave;
+    }).select(selectFields).lean();
+  } else {
+    leave = await Leave.findOne({
+      employee: id,
+      status: { $in: ["approved_manager", "approved_admin"] },
+      startDate: { $lte: checkDate },
+      endDate:   { $gte: checkDate },
+      ...leaveTypeFilter,
+    }).select(selectFields).lean();
   }
 
-  const leave = await Leave.findOne({
-    employee: id,
-    status: { $in: ["approved_manager", "approved_admin"] },
-    startDate: { $lte: checkDate },
-    endDate:   { $gte: checkDate },
-    ...leaveTypeFilter,
-  }).select("_id").lean();
-  return !!leave;
+  if (!leave) return false;
+  if (excludeLwp && isDateInLwpPortion(leave, checkDate)) return false;
+  return true;
 };
 
 const updateSummary = async (attendance) => {

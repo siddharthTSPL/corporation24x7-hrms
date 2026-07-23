@@ -9,6 +9,7 @@ const Manager = require("../Models/manager.model");
 const Admin = require("../Models/Admin.model");
 const { classifyNonWorkingDay, startOfDay } = require("../automatic/weekoffcalendar");
 const { getISTDateParts, toISTKey } = require("../utils/Istdate.utils");
+const { isDateInLwpPortion } = require("../utils/leaveLwpDay.utils");
 require("dotenv").config();
 
 const CLI_APPLY = process.argv.includes("--apply");
@@ -47,6 +48,12 @@ const CLI_APPLY = process.argv.includes("--apply");
 // not an excused one, so those days still get recomputed as absentDays —
 // matching the same rule now used by Marknoshowabsent.js and
 // monthattendanceupdate.js.
+//
+// Additionally, even an el/sl/ml/pl leave can partially run out of balance
+// mid-application - those shortfall days are recorded per-leave in
+// `lwpDays` (see Models/leave.model.js) and are excluded from the excused
+// range here too (isOnApprovedLeave -> isDateInLwpPortion), so they get
+// recomputed as absentDays exactly like a genuine no-show day would.
 
 const ROLE_CONFIG = {
   employee: { Model: User, onModel: "User", LeaveModel: Leave, leaveField: "employee" },
@@ -61,21 +68,27 @@ const loadApprovedLeaveRanges = async () => {
     docs.forEach((d) => {
       const key = `${d[empField]}_${role}`;
       if (!map.has(key)) map.set(key, []);
-      map.get(key).push({ start: new Date(d.startDate), end: new Date(d.endDate) });
+      // lwpDays carried along so isOnApprovedLeave() can, per date, exclude
+      // the LWP-shortfall portion of an otherwise-paid leave (see
+      // Models/leave.model.js's `lwpDays` field comment and
+      // utils/leaveLwpDay.utils.js).
+      map.get(key).push({ startDate: new Date(d.startDate), endDate: new Date(d.endDate), lwpDays: d.lwpDays || 0 });
     });
   };
 
   // leaveType "lwp" is excluded: an approved LWP leave is an unpaid day by
   // the employee's own choice, not an excused one — it must still be
   // recomputed as absent below. Only genuinely paid leave (el/sl/ml/pl/
-  // half_day_*) belongs in this "excused" range map.
+  // half_day_*) belongs in this "excused" range map - and even within it,
+  // isOnApprovedLeave() below still filters out that leave's own lwpDays
+  // shortfall days.
   const [empLeaves, mgrLeaves, adminLeaves] = await Promise.all([
     Leave.find({ status: { $in: ["approved_manager", "approved_admin"] }, leaveType: { $ne: "lwp" } })
-      .select("employee startDate endDate").lean(),
+      .select("employee startDate endDate lwpDays").lean(),
     ManagerLeave.find({ status: { $in: ["approved_reporting_manager", "approved_admin"] }, leaveType: { $ne: "lwp" } })
-      .select("manager startDate endDate").lean(),
+      .select("manager startDate endDate lwpDays").lean(),
     AdminLeave.find({ status: "approved_superadmin", leaveType: { $ne: "lwp" } })
-      .select("admin startDate endDate").lean(),
+      .select("admin startDate endDate lwpDays").lean(),
   ]);
 
   addAll(empLeaves, "employee", "employee");
@@ -88,7 +101,7 @@ const loadApprovedLeaveRanges = async () => {
 const isOnApprovedLeave = (leaveMap, employeeId, role, date) => {
   const ranges = leaveMap.get(`${employeeId}_${role}`);
   if (!ranges) return false;
-  return ranges.some((r) => date >= r.start && date <= r.end);
+  return ranges.some((r) => date >= r.startDate && date <= r.endDate && !isDateInLwpPortion(r, date));
 };
 
 const bucketKey = (employee, role, year, month) => `${employee}_${role}_${year}_${month}`;
