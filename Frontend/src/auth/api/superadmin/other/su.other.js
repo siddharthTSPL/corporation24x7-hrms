@@ -28,6 +28,17 @@ export const getAttendanceOverview = async ({ type = "today", month, year } = {}
   return res.data;
 };
 
+// Powers the "History" button on the Monthly tab — day-wise check-in/out,
+// source (face/system), active/idle minutes for one employee, optionally
+// filtered by a startDate/endDate range (YYYY-MM-DD).
+export const getAttendanceHistory = async (employeeId, { startDate, endDate } = {}) => {
+  const params = {};
+  if (startDate) params.startDate = startDate;
+  if (endDate) params.endDate = endDate;
+  const res = await api.get(`superadmin/attendance-history/${employeeId}`, { params });
+  return res.data;
+};
+
 export const getOrgInfo = async () => {
   const res = await api.get("superadmin/getorginfo");
   return res.data;
