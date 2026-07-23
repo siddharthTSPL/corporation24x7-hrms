@@ -2160,14 +2160,17 @@ export default function EmployeeTable(){
 
   const inactiveCount = inactiveData?.count ?? 0;
 
-  return(
-    <div className="h-full w-full min-w-0 flex flex-col overflow-hidden p-3 sm:p-4 md:p-6 lg:p-8 font-['DM_Sans',system-ui,sans-serif]" style={{background:"#F9F8F2"}}>
-      <style>{`
-        .scrollbar-hide::-webkit-scrollbar{display:none;}
-        .scrollbar-hide{-ms-overflow-style:none;scrollbar-width:none;}
-        @media(max-width:480px){.xs\\:inline{display:inline;}.xs\\:block{display:block;}}
-      `}</style>
-
+return(
+    <div
+      className="h-full flex flex-col overflow-hidden pt-3 pr-3 pb-3 pl-1 sm:pt-4 sm:pr-4 sm:pb-4 sm:pl-2 md:pt-6 md:pr-6 md:pb-6 md:pl-3 lg:pt-8 lg:pr-8 lg:pb-8 lg:pl-4 font-['DM_Sans',system-ui,sans-serif]"
+      style={{
+        background: "#F9F8F2",
+        minWidth: "800px",
+        zoom: 0.9,
+        width: "100%",
+        height: "100%",
+      }}
+    >
       <div className="max-w-7xl mx-auto w-full h-full flex flex-col min-h-0">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 flex-shrink-0">
           <div className="min-w-0">
@@ -2321,8 +2324,8 @@ export default function EmployeeTable(){
             ))}
           </div>
 
-          <div className="hidden lg:block overflow-auto flex-1 min-h-0">
-            <table className="w-full min-w-[800px] text-sm">
+          <div className="hidden lg:block overflow-y-auto overflow-x-hidden flex-1 min-h-0 employee-table-scrollbar">
+  <table className="w-full text-sm">
               <thead className="sticky top-0 z-10">
                 <tr className="border-b border-[#F4C0D1]" style={{background:"#F9F8F2"}}>
                   {["Employee","Department","Designation","Location","Manager / Reports To","Role","Employment","Actions"].map((h)=>(
