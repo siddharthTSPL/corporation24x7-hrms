@@ -1878,6 +1878,7 @@ function validateBankInfo(form){
   const hasBankPartial=[form.bank_name,form.account_holder_name,form.account_number,form.ifsc_code].some(Boolean);
   const hasBankFull=[form.bank_name,form.account_holder_name,form.account_number,form.ifsc_code].every(Boolean);
   if(hasBankPartial&&!hasBankFull)err.bank_group="Fill all bank details together or leave all blank";
+  if(form.account_holder_name&&!NAME_REGEX.test(form.account_holder_name))err.account_holder_name="Only letters allowed, no numbers";
   if(form.account_number&&!ACCOUNT_REGEX.test(form.account_number))err.account_number="Account number must be 9-18 digits";
   if(form.ifsc_code&&!IFSC_REGEX.test(form.ifsc_code))err.ifsc_code="Invalid IFSC code format (e.g. SBIN0001234)";
   if(form.resume&&!URL_REGEX.test(form.resume))err.resume="Must be a valid URL starting with https://";
@@ -1885,6 +1886,39 @@ function validateBankInfo(form){
   if(form.pan_card&&!URL_REGEX.test(form.pan_card))err.pan_card="Must be a valid URL starting with https://";
   if(form.experience_letter&&!URL_REGEX.test(form.experience_letter))err.experience_letter="Must be a valid URL starting with https://";
   return err;
+}
+
+const FIELD_LABELS = {
+  empid:"Employee ID",f_name:"First Name",l_name:"Last Name",work_email:"Work Email",
+  password:"Password",confirm_password:"Confirm Password",gender:"Gender",
+  personal_contact:"Personal Contact",e_contact:"Emergency Contact",
+  department:"Department",designation:"Designation",
+  office_location_country:"Office Country",office_location_state:"Office State",office_location:"Office City",
+  address:"Address",country:"Residential Country",state:"Residential State",city:"Residential City",
+  pincode:"Residential Pincode",permanent_pincode:"Permanent Pincode",
+  aadhaar_number:"Aadhaar Number",pan_number:"PAN Number",
+  total_experience:"Total Experience",
+  bank_group:"Bank Details",account_number:"Account Number",ifsc_code:"IFSC Code",
+  account_holder_name:"Account Holder Name",bank_name:"Bank Name",
+  resume:"Resume URL",aadhaar_card:"Aadhaar Card URL",pan_card:"PAN Card URL",experience_letter:"Experience Letter URL",
+};
+
+const FIELD_STEP_MAP = {
+  empid:0,f_name:0,l_name:0,work_email:0,password:0,confirm_password:0,gender:0,personal_contact:0,e_contact:0,
+  department:1,designation:1,office_location_country:1,office_location_state:1,office_location:1,
+  address:2,country:2,state:2,city:2,pincode:2,permanent_pincode:2,
+  aadhaar_number:3,pan_number:3,
+  total_experience:4,
+  bank_group:5,account_number:5,ifsc_code:5,account_holder_name:5,bank_name:5,resume:5,aadhaar_card:5,pan_card:5,experience_letter:5,
+};
+
+function getErrorSummary(err){
+  const fields=Object.keys(err);
+  if(fields.length===0)return{message:"",step:0};
+  const labels=fields.map((f)=>FIELD_LABELS[f]||f);
+  const step=Math.min(...fields.map((f)=>FIELD_STEP_MAP[f]??0));
+  const stepLabel=EMP_STEPS[step]?.label||"";
+  return{message:`Fix these fields: ${labels.join(", ")} — go to "${stepLabel}" step`,step};
 }
 
 export default function EmployeeTable(){
@@ -2054,7 +2088,7 @@ export default function EmployeeTable(){
     if(["personal_contact","e_contact","aadhaar_number","pincode","permanent_pincode"].includes(name)){
       nextValue=numericOnly(value);
     }
-    if(["f_name","l_name"].includes(name)&&value&&!/^[A-Za-z\s.'-]*$/.test(value)){
+    if(["f_name","l_name", "account_holder_name"].includes(name)&&value&&!/^[A-Za-z\s.'-]*$/.test(value)){
       return;
     }
     setter((prev)=>{
@@ -2098,35 +2132,49 @@ export default function EmployeeTable(){
     return Object.keys(err).length===0;
   };
 
-  const handleEmpSubmit=()=>{
-    if(!validateEmp()){showPopup("error","Please fix the errors in the form");setEmpStep(0);return;}
-    addEmployeeApi({
-      empid:empForm.empid,
-      f_name:empForm.f_name,l_name:empForm.l_name,work_email:empForm.work_email,
-      password:empForm.password,gender:empForm.gender,marital_status:empForm.marital_status,
-      personal_contact:empForm.personal_contact,e_contact:empForm.e_contact,
-      role:empForm.role,office_location:empForm.office_location,
-      designation:empForm.designation,department:empForm.department,
-      Under_manager:empForm.Under_manager||undefined,
-      address:empForm.address,city:empForm.city,state:empForm.state,pincode:empForm.pincode,country:empForm.country,
-      permanent_address:empForm.permanent_address||undefined,permanent_city:empForm.permanent_city||undefined,
-      permanent_state:empForm.permanent_state||undefined,permanent_pincode:empForm.permanent_pincode||undefined,
-      permanent_country:empForm.permanent_country||undefined,
-      aadhaar_number:empForm.aadhaar_number||undefined,pan_number:empForm.pan_number||undefined,
-      is_fresher:empForm.is_fresher,
-      total_experience:empForm.is_fresher?undefined:empForm.total_experience||undefined,
-      previous_company:empForm.is_fresher?undefined:empForm.previous_company||undefined,
-      previous_designation:empForm.is_fresher?undefined:empForm.previous_designation||undefined,
-      bank_name:empForm.bank_name||undefined,account_holder_name:empForm.account_holder_name||undefined,
-      account_number:empForm.account_number||undefined,ifsc_code:empForm.ifsc_code||undefined,
-      resume:empForm.resume||undefined,aadhaar_card:empForm.aadhaar_card||undefined,
-      pan_card:empForm.pan_card||undefined,experience_letter:empForm.experience_letter||undefined,
-      permissions:empPerms,
-    },{
-      onSuccess:(res)=>{showPopup("success",res?.message||"Employee added successfully");setOpen(false);setEmpForm(EMPTY_EMP);setEmpErrors({});setEmpStep(0);setEmpPerms({...EMP_DEFAULT_PERMISSIONS});refetchList();},
-      onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Something went wrong"),
-    });
+ const handleEmpSubmit=()=>{
+  const err={
+    ...validateContactInfo(empForm),
+    ...validateWorkInfo(empForm),
+    ...validateAddressInfo(empForm),
+    ...validateIdentityInfo(empForm),
+    ...validateExperienceInfo(empForm),
+    ...validateBankInfo(empForm),
   };
+  setEmpErrors(err);
+  if(Object.keys(err).length>0){
+    const{message,step}=getErrorSummary(err);
+    setEmpStep(step);
+    showPopup("error",message);
+    return;
+  }
+  addEmployeeApi({
+    empid:empForm.empid,
+    f_name:empForm.f_name,l_name:empForm.l_name,work_email:empForm.work_email,
+    password:empForm.password,gender:empForm.gender,marital_status:empForm.marital_status,
+    personal_contact:empForm.personal_contact,e_contact:empForm.e_contact,
+    role:empForm.role,office_location:empForm.office_location,
+    designation:empForm.designation,department:empForm.department,
+    Under_manager:empForm.Under_manager||undefined,
+    address:empForm.address,city:empForm.city,state:empForm.state,pincode:empForm.pincode,country:empForm.country,
+    permanent_address:empForm.permanent_address||undefined,permanent_city:empForm.permanent_city||undefined,
+    permanent_state:empForm.permanent_state||undefined,permanent_pincode:empForm.permanent_pincode||undefined,
+    permanent_country:empForm.permanent_country||undefined,
+    aadhaar_number:empForm.aadhaar_number||undefined,pan_number:empForm.pan_number||undefined,
+    is_fresher:empForm.is_fresher,
+    total_experience:empForm.is_fresher?undefined:empForm.total_experience||undefined,
+    previous_company:empForm.is_fresher?undefined:empForm.previous_company||undefined,
+    previous_designation:empForm.is_fresher?undefined:empForm.previous_designation||undefined,
+    bank_name:empForm.bank_name||undefined,account_holder_name:empForm.account_holder_name||undefined,
+    account_number:empForm.account_number||undefined,ifsc_code:empForm.ifsc_code||undefined,
+    resume:empForm.resume||undefined,aadhaar_card:empForm.aadhaar_card||undefined,
+    pan_card:empForm.pan_card||undefined,experience_letter:empForm.experience_letter||undefined,
+    permissions:empPerms,
+  },{
+    onSuccess:(res)=>{showPopup("success",res?.message||"Employee added successfully");setOpen(false);setEmpForm(EMPTY_EMP);setEmpErrors({});setEmpStep(0);setEmpPerms({...EMP_DEFAULT_PERMISSIONS});refetchList();},
+    onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Something went wrong"),
+  });
+};
 
   const validateMgr=()=>{
     const err={
@@ -2141,35 +2189,49 @@ export default function EmployeeTable(){
     return Object.keys(err).length===0;
   };
 
-  const handleMgrSubmit=()=>{
-    if(!validateMgr()){showPopup("error","Please fix the errors in the form");setMgrStep(0);return;}
-    addManagerApi({
-      empid:mgrForm.empid,
-      f_name:mgrForm.f_name,l_name:mgrForm.l_name,work_email:mgrForm.work_email,
-      password:mgrForm.password,gender:mgrForm.gender,marital_status:mgrForm.marital_status,
-      personal_contact:mgrForm.personal_contact,e_contact:mgrForm.e_contact,
-      role:mgrForm.role,office_location:mgrForm.office_location,
-      designation:mgrForm.designation,department:mgrForm.department,
-      reporting_manager:mgrForm.reporting_manager||undefined,
-      address:mgrForm.address,city:mgrForm.city,state:mgrForm.state,pincode:mgrForm.pincode,country:mgrForm.country,
-      permanent_address:mgrForm.permanent_address||undefined,permanent_city:mgrForm.permanent_city||undefined,
-      permanent_state:mgrForm.permanent_state||undefined,permanent_pincode:mgrForm.permanent_pincode||undefined,
-      permanent_country:mgrForm.permanent_country||undefined,
-      aadhaar_number:mgrForm.aadhaar_number||undefined,pan_number:mgrForm.pan_number||undefined,
-      is_fresher:mgrForm.is_fresher,
-      total_experience:mgrForm.is_fresher?undefined:mgrForm.total_experience||undefined,
-      previous_company:mgrForm.is_fresher?undefined:mgrForm.previous_company||undefined,
-      previous_designation:mgrForm.is_fresher?undefined:mgrForm.previous_designation||undefined,
-      bank_name:mgrForm.bank_name||undefined,account_holder_name:mgrForm.account_holder_name||undefined,
-      account_number:mgrForm.account_number||undefined,ifsc_code:mgrForm.ifsc_code||undefined,
-      resume:mgrForm.resume||undefined,aadhaar_card:mgrForm.aadhaar_card||undefined,
-      pan_card:mgrForm.pan_card||undefined,experience_letter:mgrForm.experience_letter||undefined,
-      permissions:mgrPerms,
-    },{
-      onSuccess:(res)=>{showPopup("success",res?.message||"Manager added Successfully & verification email sent");setOpenManager(false);setMgrForm(EMPTY_MGR);setMgrErrors({});setMgrStep(0);setMgrPerms({...MGR_DEFAULT_PERMISSIONS});refetchList();},
-      onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Something went wrong"),
-    });
+const handleMgrSubmit=()=>{
+  const err={
+    ...validateContactInfo(mgrForm),
+    ...validateWorkInfo(mgrForm),
+    ...validateAddressInfo(mgrForm),
+    ...validateIdentityInfo(mgrForm),
+    ...validateExperienceInfo(mgrForm),
+    ...validateBankInfo(mgrForm),
   };
+  setMgrErrors(err);
+  if(Object.keys(err).length>0){
+    const{message,step}=getErrorSummary(err);
+    setMgrStep(step);
+    showPopup("error",message);
+    return;
+  }
+  addManagerApi({
+    empid:mgrForm.empid,
+    f_name:mgrForm.f_name,l_name:mgrForm.l_name,work_email:mgrForm.work_email,
+    password:mgrForm.password,gender:mgrForm.gender,marital_status:mgrForm.marital_status,
+    personal_contact:mgrForm.personal_contact,e_contact:mgrForm.e_contact,
+    role:mgrForm.role,office_location:mgrForm.office_location,
+    designation:mgrForm.designation,department:mgrForm.department,
+    reporting_manager:mgrForm.reporting_manager||undefined,
+    address:mgrForm.address,city:mgrForm.city,state:mgrForm.state,pincode:mgrForm.pincode,country:mgrForm.country,
+    permanent_address:mgrForm.permanent_address||undefined,permanent_city:mgrForm.permanent_city||undefined,
+    permanent_state:mgrForm.permanent_state||undefined,permanent_pincode:mgrForm.permanent_pincode||undefined,
+    permanent_country:mgrForm.permanent_country||undefined,
+    aadhaar_number:mgrForm.aadhaar_number||undefined,pan_number:mgrForm.pan_number||undefined,
+    is_fresher:mgrForm.is_fresher,
+    total_experience:mgrForm.is_fresher?undefined:mgrForm.total_experience||undefined,
+    previous_company:mgrForm.is_fresher?undefined:mgrForm.previous_company||undefined,
+    previous_designation:mgrForm.is_fresher?undefined:mgrForm.previous_designation||undefined,
+    bank_name:mgrForm.bank_name||undefined,account_holder_name:mgrForm.account_holder_name||undefined,
+    account_number:mgrForm.account_number||undefined,ifsc_code:mgrForm.ifsc_code||undefined,
+    resume:mgrForm.resume||undefined,aadhaar_card:mgrForm.aadhaar_card||undefined,
+    pan_card:mgrForm.pan_card||undefined,experience_letter:mgrForm.experience_letter||undefined,
+    permissions:mgrPerms,
+  },{
+    onSuccess:(res)=>{showPopup("success",res?.message||"Manager added Successfully & verification email sent");setOpenManager(false);setMgrForm(EMPTY_MGR);setMgrErrors({});setMgrStep(0);setMgrPerms({...MGR_DEFAULT_PERMISSIONS});refetchList();},
+    onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Something went wrong"),
+  });
+};
 
   const filtered=allUsers.filter((u)=>{
     const name=`${u.f_name??""} ${u.l_name??""}`.toLowerCase();
