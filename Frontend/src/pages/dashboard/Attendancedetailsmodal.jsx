@@ -28,7 +28,10 @@ const fmtMinutes = (mins) => {
 const STATUS_META = {
   present: { label: "Present ✓", color: "#16A34A", bg: "#DCFCE7" },
   on_duty: { label: "On Duty 🟡", color: "#B8760A", bg: "#FEF3C7" },
+  half_day: { label: "Half Day", color: "#B8760A", bg: "#FEF3C7" },
   absent: { label: "Not Checked In", color: "#DC2626", bg: "#FEE2E2" },
+  // Checked in/out but active time was too low to count as present/half-day.
+  absent_checked_in: { label: "Absent", color: "#DC2626", bg: "#FEE2E2" },
 };
 
 function Avatar({ name, role }) {
@@ -70,8 +73,25 @@ function PersonMeta({ p }) {
   );
 }
 
+// Resolves which status pill to show for a person's "Today" row.
+// Rule of thumb: "Not Checked In" is reserved ONLY for someone with no
+// checkIn timestamp at all. Anyone with a real checkIn is, by definition,
+// checked in - so from there we branch on checkOut/status instead of ever
+// falling back to "Not Checked In" again.
+function resolveTodayMeta(p) {
+  if (!p.checkIn) return STATUS_META.absent; // truly never checked in
+  if (!p.checkOut) return STATUS_META.on_duty; // checked in, still working
+  const s = (p.status || "").toLowerCase();
+  if (s === "present") return STATUS_META.present;
+  if (s.includes("half")) return STATUS_META.half_day;
+  // Checked in AND checked out, but the work session didn't meet the
+  // present/half-day bar - still "Absent" for payroll purposes, but never
+  // labeled "Not Checked In" since they demonstrably did check in.
+  return STATUS_META.absent_checked_in;
+}
+
 function TodayRow({ p }) {
-  const meta = STATUS_META[p.status] || STATUS_META.absent;
+  const meta = resolveTodayMeta(p);
   return (
     <tr className="border-b border-gray-100 hover:bg-gray-50/70 transition-colors">
       <td className="py-2.5 pl-3 pr-2">
@@ -137,6 +157,7 @@ function MonthlyRow({ p }) {
       <td className="py-2.5 px-2 text-[12px] text-center text-green-700 font-semibold">{p.presentDays}</td>
       <td className="py-2.5 px-2 text-[12px] text-center text-amber-700 font-semibold">{p.halfDays}</td>
       <td className="py-2.5 px-2 text-[12px] text-center text-red-600 font-semibold">{p.absentDays}</td>
+      <td className="py-2.5 px-2 text-[12px] text-center text-gray-500 font-semibold">{p.weekOffHolidayDays ?? 0}</td>
       <td className="py-2.5 px-2 text-[12px] text-gray-600 font-mono whitespace-nowrap">{fmtMinutes(p.totalWorkingMinutes)}</td>
       <td className="py-2.5 pr-3 pl-2">
         <span className="text-[11px] font-bold whitespace-nowrap" style={{ color: pctColor }}>
@@ -309,6 +330,7 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook 
                       <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Present</th>
                       <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Half Day</th>
                       <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Absent</th>
+                      <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Weekoff/Holiday</th>
                       <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Total Hours</th>
                       <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 pr-3 pl-2">Attendance %</th>
                     </>
