@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
-import { useGetMyTeamOverview, useGetTodayCheckins, useGetAttendanceHistory, useGetAttendanceOverview } from "../../auth/server-state/adminother/adminother.hook";
+import { useGetMyTeamOverview, useGetTodayCheckins, useGetAttendanceHistory, useGetEmployeeAttendanceHistory, useGetAttendanceOverview } from "../../auth/server-state/adminother/adminother.hook";
 import {
   useGetForwardedLeaves,
   useAdminGetMyLeaveHistory,
@@ -1336,6 +1336,7 @@ export default function Dashboard() {
         open={attendanceDetailsOpen}
         onClose={() => setAttendanceDetailsOpen(false)}
         useOverviewHook={useGetAttendanceOverview}
+        useHistoryHook={useGetEmployeeAttendanceHistory}
       />
     </div>
   );
