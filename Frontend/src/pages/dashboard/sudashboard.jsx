@@ -1423,32 +1423,81 @@ const AttendanceMap = ({ checkins = [], loading }) => {
     markRef.current.forEach((m) => map.removeLayer(m));
     markRef.current = [];
     if (!checkins.length) return;
+
+    // Group check-ins that share (roughly) the same spot so overlapping
+    // pins merge into one cluster marker instead of hiding one another.
+    const groups = new Map();
+    checkins.forEach((c) => {
+      if (!c.lat || !c.lng) return;
+      const key = `${Number(c.lat).toFixed(4)},${Number(c.lng).toFixed(4)}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(c);
+    });
+
     const bounds = [];
-    checkins.forEach(({ lat, lng, name, role, dept, email, checkIn, checkedOut }) => {
-      if (!lat || !lng) return;
-      const color = ROLE_COLOR[role?.toLowerCase()] ?? ROLE_COLOR.employee;
-      const sz = role?.toLowerCase() === "manager" ? 16 : 12;
+    const initials = (n) => (n || "?").trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("");
+
+    const personRow = (p) => {
+      const color = ROLE_COLOR[p.role?.toLowerCase()] ?? ROLE_COLOR.employee;
+      return `<div style="display:flex;gap:9px;align-items:flex-start;padding:8px 4px;border-bottom:1px solid #f1e0ea;">
+        <div style="flex:0 0 auto;width:30px;height:30px;border-radius:50%;background:${color};color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px ${color}55;">${initials(p.name)}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-weight:700;font-size:12.5px;color:#0d0209;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name || "Unknown"}</span>
+            <span style="font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:999px;background:${color}17;color:${color};text-transform:capitalize;flex:0 0 auto;">${p.role || ""}</span>
+          </div>
+          ${p.dept ? `<div style="font-size:10.5px;color:#8a6070;margin-top:1px;">${p.dept}</div>` : ""}
+          ${p.email ? `<div style="font-size:10.5px;color:#8a6070;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">✉ ${p.email}</div>` : ""}
+          <div style="font-size:10.5px;margin-top:3px;display:flex;align-items:center;gap:8px;">
+            <span style="color:#0d0209;">✅ ${fmtTime(p.checkIn)}</span>
+            ${p.checkedOut ? `<span style="color:#0d9e6e;font-weight:600;">🏁 Checked out</span>` : `<span style="color:#b8760a;font-weight:600;">🟡 On duty</span>`}
+          </div>
+        </div>
+      </div>`;
+    };
+
+    groups.forEach((people) => {
+      const { lat, lng } = people[0];
+      const allCheckedOut = people.every((p) => p.checkedOut);
+      const hasManager = people.some((p) => p.role?.toLowerCase() === "manager");
+      const color = hasManager ? ROLE_COLOR.manager : ROLE_COLOR.employee;
+      const count = people.length;
+      const sz = count > 1 ? 22 : (hasManager ? 16 : 12);
       const pulse = sz + 16;
+
       const icon = window.L.divIcon({
         className: "",
         html: `<div style="position:relative;width:${pulse}px;height:${pulse}px;">
           <div style="position:absolute;top:50%;left:50%;width:${pulse}px;height:${pulse}px;border-radius:50%;background:${color}33;animation:mPulse 2.2s infinite;transform:translate(-50%,-50%);"></div>
-          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${sz}px;height:${sz}px;border-radius:50%;background:${color};border:2.5px solid white;box-shadow:0 2px 10px ${color}66;${checkedOut ? "opacity:.45;" : ""}"></div>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);min-width:${sz}px;height:${sz}px;padding:0 3px;border-radius:${count > 1 ? "9px" : "50%"};background:${color};border:2.5px solid white;box-shadow:0 2px 10px ${color}66;${allCheckedOut ? "opacity:.45;" : ""}${count > 1 ? "display:flex;align-items:center;justify-content:center;color:#fff;font-size:10.5px;font-weight:700;font-family:system-ui,sans-serif;" : ""}">${count > 1 ? count : ""}</div>
         </div>`,
         iconSize: [pulse, pulse], iconAnchor: [pulse / 2, pulse / 2],
       });
+
+      const popupHtml = count > 1
+        ? `<div style="font-family:system-ui,sans-serif;padding:2px;min-width:230px;max-width:260px;">
+            <div style="font-weight:700;font-size:12.5px;color:${color};margin-bottom:2px;display:flex;align-items:center;justify-content:between;gap:6px;">
+              <span>📍 ${count} people here</span>
+            </div>
+            <div style="max-height:260px;overflow-y:auto;margin-top:4px;">
+              ${people.map(personRow).join("")}
+            </div>
+          </div>`
+        : `<div style="font-family:system-ui,sans-serif;padding:4px;min-width:170px;">
+            <div style="font-weight:700;font-size:13px;color:${color};margin-bottom:4px;">${people[0].name || "Unknown"}</div>
+            <div style="font-size:11px;color:#8a6070;margin-bottom:6px;text-transform:capitalize;">${people[0].role ?? ""}${people[0].dept ? " · " + people[0].dept : ""}</div>
+            ${people[0].email ? `<div style="font-size:11px;color:#8a6070;margin-bottom:4px;">✉ ${people[0].email}</div>` : ""}
+            <div style="font-size:11px;">✅ Check-in: <strong>${fmtTime(people[0].checkIn)}</strong></div>
+            ${people[0].checkedOut ? `<div style="font-size:11px;color:#0d9e6e;margin-top:2px;">🏁 Checked out</div>` : `<div style="font-size:11px;color:#b8760a;margin-top:2px;">🟡 On duty</div>`}
+          </div>`;
+
       const marker = window.L.marker([lat, lng], { icon })
-        .bindPopup(`<div style="font-family:system-ui,sans-serif;padding:4px;min-width:170px;">
-          <div style="font-weight:700;font-size:13px;color:${color};margin-bottom:4px;">${name || "Unknown"}</div>
-          <div style="font-size:11px;color:#8a6070;margin-bottom:6px;text-transform:capitalize;">${role ?? ""}${dept ? " · " + dept : ""}</div>
-          ${email ? `<div style="font-size:11px;color:#8a6070;margin-bottom:4px;">✉ ${email}</div>` : ""}
-          <div style="font-size:11px;">✅ Check-in: <strong>${fmtTime(checkIn)}</strong></div>
-          ${checkedOut ? `<div style="font-size:11px;color:#0d9e6e;margin-top:2px;">🏁 Checked out</div>` : `<div style="font-size:11px;color:#b8760a;margin-top:2px;">🟡 On duty</div>`}
-        </div>`, { closeButton: false, maxWidth: 220 })
+        .bindPopup(popupHtml, { closeButton: true, maxWidth: 280 })
         .addTo(map);
       markRef.current.push(marker);
       bounds.push([lat, lng]);
     });
+
     if (bounds.length) {
       try { map.fitBounds(bounds, { padding: [40, 40], maxZoom: 10 }); } catch (_) {}
     }
