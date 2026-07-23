@@ -18,10 +18,9 @@ export default function MainLayout() {
         className="h-screen sticky top-0"
       />
 
-      <div className="flex-1 min-w-0 h-screen overflow-hidden flex flex-col">
-     
-        <Outlet />
-      </div>
+    <div className="flex-1 min-w-0 h-screen overflow-y-auto overflow-x-hidden flex flex-col">
+  <Outlet />
+</div>
     </div>
   );
 }

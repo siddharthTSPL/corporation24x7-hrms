@@ -31,5 +31,6 @@ body,
 #root {
   height: 100%;
   margin: 0;
-  overflow: hidden;
+  overflow-y: hidden;   /* sirf vertical page-scroll band karo */
+ 
 }
