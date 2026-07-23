@@ -9,6 +9,7 @@ const AttendanceSummary = require("../Models/attendancesummary.model");
 const NoShowLog = require("../Models/noshowlog.model");
 const { classifyNonWorkingDay, startOfDay } = require("./weekoffcalendar");
 const { getISTDateParts } = require("../utils/Istdate.utils");
+const { isDateInLwpPortion } = require("../utils/leaveLwpDay.utils");
 
 // Same shape as monthattendanceupdate.js's hasApprovedLeave — kept local
 // so this file has no runtime dependency on that module's internals.
@@ -128,16 +129,24 @@ async function markNoShowAbsences(forDate = new Date(Date.now() - 24 * 60 * 60 *
       // one. It must still show up as an absent day in AttendanceSummary
       // (its LeaveBalance.lwp effect is already applied once, in full, by
       // processLeaveDeduction() at approval time — see calculateleave.js).
-      // Only genuinely paid leave (el/sl/ml/pl/half_day_*) excuses the day.
-      const onPaidLeave = isWorkingDay
+      // Only genuinely paid leave (el/sl/ml/pl/half_day_*) excuses the day -
+      // and even within such a leave, only the days actually covered by
+      // balance. A leave whose balance ran out partway through has its
+      // shortfall days recorded in `lwpDays` (see Models/leave.model.js and
+      // automatic/calculateleave.js) - isDateInLwpPortion() below excludes
+      // those specific days from being excused, so they fall through and
+      // get counted as absent here, one day at a time as the nightly sweep
+      // reaches each date (never all at once).
+      const paidLeaveDoc = isWorkingDay
         ? await LeaveModel.findOne({
             [leaveField]: emp._id,
             status: { $in: leaveApprovedStatuses },
             leaveType: { $ne: "lwp" },
             startDate: { $lte: date },
             endDate: { $gte: date },
-          }).select("_id").lean()
+          }).select("startDate endDate lwpDays").lean()
         : null;
+      const onPaidLeave = paidLeaveDoc && !isDateInLwpPortion(paidLeaveDoc, date);
       if (isWorkingDay && onPaidLeave) continue;
 
       // Claim this employee/day before incrementing anything. If another
