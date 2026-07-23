@@ -23,6 +23,8 @@ import {
 import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
 import axios from "axios";
 
+import * as XLSX from "xlsx";
+
 
 
 
@@ -160,7 +162,7 @@ function exportToCSV(data) {
     "Previous Company","Previous Designation",
     // Address (Residential + Permanent)
     "Residential Address","Residential City","Residential State","Residential Pincode","Residential Country",
-    "Permanent Address","Permanent City","Permanent State","Permanent Pincode","Permanent Country",
+    
     // Identity
     "Aadhaar Number","PAN Number",
     // Banking
@@ -188,18 +190,28 @@ function exportToCSV(data) {
     ];
   };
 
-  const escape = (v) => {
-    const s = String(v??"");
-    return s.includes(",")||s.includes('"')||s.includes("\n") ? `"${s.replace(/"/g,'""')}"` : s;
+  // Column width auto-calculate karta hai (header vs har row ki value ki max length se)
+  const computeColWidths = (rows) => {
+    return FULL_HEADERS.map((header, colIdx) => {
+      let maxLen = header.length;
+      rows.forEach((row) => {
+        const val = String(row[colIdx] ?? "");
+        if (val.length > maxLen) maxLen = val.length;
+      });
+      // thoda padding + max cap taaki bahut lambi URL wali column screen na todhe
+      return { wch: Math.min(Math.max(maxLen + 2, 10), 45) };
+    });
   };
 
-  const downloadCSV = (rows, filename) => {
-    const csv = [FULL_HEADERS,...rows].map((r)=>r.map(escape).join(",")).join("\n");
-    const blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = filename; a.click();
-    URL.revokeObjectURL(url);
+  const downloadXLSX = (rows, filename, sheetName) => {
+    const worksheet = XLSX.utils.aoa_to_sheet([FULL_HEADERS, ...rows]);
+    worksheet["!cols"] = computeColWidths(rows);
+    // header row ko freeze kar dete hain taaki scroll karte waqt headers dikhte rahein
+    worksheet["!freeze"] = { xSplit: 0, ySplit: 1 };
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    XLSX.writeFile(workbook, filename);
   };
 
   const getType = (u) => u.type || (u.role==="manager"||u.role==="senior_manager" ? "manager" : "employee");
@@ -207,8 +219,20 @@ function exportToCSV(data) {
   const employees = data.filter((u)=>getType(u)==="employee");
   const managers  = data.filter((u)=>getType(u)==="manager");
 
-  if(employees.length>0) downloadCSV(employees.map(buildRow), `Torchx-Talent-Employee-${dateStamp}.csv`);
-  if(managers.length>0)  downloadCSV(managers.map(buildRow), `Torchx-Talent-Manager-${dateStamp}.csv`);
+  if(employees.length>0){
+    downloadXLSX(
+      employees.map(buildRow),
+      `Torchx-Talent-Employee-${dateStamp}.xlsx`,
+      "Employees"
+    );
+  }
+  if(managers.length>0){
+    downloadXLSX(
+      managers.map(buildRow),
+      `Torchx-Talent-Manager-${dateStamp}.xlsx`,
+      "Managers"
+    );
+  }
 }
 
 function Field({label,error,children,required,span2}){
@@ -2202,7 +2226,7 @@ return(
       style={{
         background: "#F9F8F2",
         minWidth: "800px",
-        zoom: 0.9,
+        zoom: 0.85,
         width: "100%",
         height: "100%",
       }}
