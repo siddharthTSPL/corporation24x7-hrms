@@ -49,6 +49,7 @@ const {
   changepassword,
   getTodayCheckins,
   getAttendanceOverview,
+  getAttendanceHistory,
   getOrgInfo,
   getAllPersonalDocumentsAdmin,
   getAllExpenseDocumentsAdmin,
@@ -123,6 +124,11 @@ adminrouter.get(
   "/attendance-overview",
   adminauthmiddleware,
   asyncHandler(getAttendanceOverview),
+);
+adminrouter.get(
+  "/attendance-history/:employeeId",
+  adminauthmiddleware,
+  asyncHandler(getAttendanceHistory),
 );
 
 adminrouter.post("/addmanager", adminauthmiddleware, asyncHandler(addmanager));
