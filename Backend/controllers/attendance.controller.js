@@ -170,6 +170,23 @@ const activity = async (req, res) => {
     let attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
 
     if (!attendance) {
+      // A background agent ping on a holiday/week-off must NOT create an
+      // Attendance stub. Unlike checkin(), this endpoint has no user-facing
+      // error to return for - it just silently no-ops. Without this guard,
+      // the laptop being on in the background on an off-day creates a
+      // source:"agent" record that never gets checked out (autoCheckoutAll
+      // deliberately excludes source "agent"), which then permanently
+      // blocks markNoShowAbsences()'s no-show sweep for that date (it skips
+      // any date that already has ANY Attendance record) - the day ends up
+      // uncounted anywhere: not present, not absent, not weekOffHolidayDays.
+      const holidayCheck = await isHoliday(today, organisation_id);
+      const weekOffCheck = holidayCheck.isHoliday
+        ? null
+        : await isWeekOff(today, organisation_id, userId, getOnModel(user.role));
+      if (holidayCheck.isHoliday || weekOffCheck?.isOff) {
+        return res.json({ message: "Off day - activity not tracked", activeMinutes: 0, idleMinutes: 0 });
+      }
+
       const shift = await resolveEmployeeShift(user, organisation_id);
       try {
         attendance = await Attendance.create({
@@ -271,7 +288,19 @@ const checkout = async (req, res) => {
     }
 
     attendance.checkOut = now;
-    const status = calculateStatus(attendance.activeMinutes, thresholds);
+    // activeMinutes only grows via periodic /activity heartbeat pings (see
+    // activity() above). If that heartbeat never fired during this session
+    // (e.g. checked in/out without the tracker running), activeMinutes sits
+    // at 0 even though the person was genuinely checked in for hours -
+    // calculateStatus would then wrongly call a real session "absent".
+    // Fall back to the raw checkIn->checkOut duration in that case; if any
+    // real heartbeat data exists, keep trusting it as-is.
+    const elapsedSessionMinutes = attendance.checkIn
+      ? (now.getTime() - new Date(attendance.checkIn).getTime()) / 60000
+      : 0;
+    const effectiveActiveMinutes =
+      attendance.activeMinutes > 0 ? attendance.activeMinutes : elapsedSessionMinutes;
+    const status = calculateStatus(effectiveActiveMinutes, thresholds);
     const { remark, isOvertime, overtimeMinutes } = checkoutWindow;
     attendance.status = status;
     attendance.checkoutRemark = remark;
@@ -368,7 +397,14 @@ const autoCheckoutAll = async () => {
       if (now < forceCheckoutAt) continue; // overtime cutoff not reached yet
 
       const thresholds = getShiftThresholds(shift);
-      const status = calculateStatus(a.activeMinutes, thresholds);
+      // Same fallback as checkout() above: if activeMinutes never got any
+      // heartbeat data (still 0), use the raw checkIn->cutoff duration
+      // instead of auto-marking a genuine multi-hour session "absent".
+      const elapsedSessionMinutes = a.checkIn
+        ? (forceCheckoutAt.getTime() - new Date(a.checkIn).getTime()) / 60000
+        : 0;
+      const effectiveActiveMinutes = a.activeMinutes > 0 ? a.activeMinutes : elapsedSessionMinutes;
+      const status = calculateStatus(effectiveActiveMinutes, thresholds);
       const checkoutWindow = evaluateCheckoutWindow(shift, forceCheckoutAt, a.checkIn);
 
       ops.push({
