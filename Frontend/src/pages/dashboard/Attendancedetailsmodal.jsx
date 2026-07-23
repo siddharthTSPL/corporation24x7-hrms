@@ -3,6 +3,7 @@ import {
   FaTimes, FaSearch, FaMapMarkerAlt, FaIdCard, FaEnvelope,
   FaUserTie, FaBuilding, FaCalendarAlt, FaClock,
 } from "react-icons/fa";
+import AttendanceHistoryModal from "./AttendanceHistoryModal";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -130,7 +131,7 @@ function TodayRow({ p }) {
   );
 }
 
-function MonthlyRow({ p }) {
+function MonthlyRow({ p, onHistoryClick }) {
   const pct = p.attendancePercent ?? 0;
   const pctColor = pct >= 90 ? "#16A34A" : pct >= 70 ? "#D97706" : "#DC2626";
   return (
@@ -159,10 +160,20 @@ function MonthlyRow({ p }) {
       <td className="py-2.5 px-2 text-[12px] text-center text-red-600 font-semibold">{p.absentDays}</td>
       <td className="py-2.5 px-2 text-[12px] text-center text-gray-500 font-semibold">{p.weekOffHolidayDays ?? 0}</td>
       <td className="py-2.5 px-2 text-[12px] text-gray-600 font-mono whitespace-nowrap">{fmtMinutes(p.totalWorkingMinutes)}</td>
-      <td className="py-2.5 pr-3 pl-2">
+      <td className="py-2.5 px-2">
         <span className="text-[11px] font-bold whitespace-nowrap" style={{ color: pctColor }}>
           {pct}%
         </span>
+      </td>
+      <td className="py-2.5 pr-3 pl-2">
+        <button
+          type="button"
+          onClick={() => onHistoryClick?.(p)}
+          className="flex items-center gap-1 text-[10.5px] font-semibold rounded-lg px-2.5 py-1.5 whitespace-nowrap transition-colors"
+          style={{ color: "#730042", background: "#fdf2f7", border: "1px solid #e8b8cf" }}
+        >
+          <FaClock size={9} /> History
+        </button>
       </td>
     </tr>
   );
@@ -177,9 +188,10 @@ function MonthlyRow({ p }) {
  * (useGetAttendanceOverview from adminother.hook.js or suother.hook.js) -
  * passed in so this component stays shared between both dashboards.
  */
-export default function AttendanceDetailsModal({ open, onClose, useOverviewHook }) {
+export default function AttendanceDetailsModal({ open, onClose, useOverviewHook, useHistoryHook }) {
   const [tab, setTab] = useState("today");
   const [search, setSearch] = useState("");
+  const [historyModal, setHistoryModal] = useState({ open: false, person: null });
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
@@ -214,6 +226,7 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook 
   const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i);
 
   return (
+    <>
     <div
       className="fixed inset-0 z-[1000] flex items-center justify-center p-3 sm:p-6"
       style={{ background: "rgba(20,10,15,0.55)" }}
@@ -332,14 +345,23 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook 
                       <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Absent</th>
                       <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Weekoff/Holiday</th>
                       <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Total Hours</th>
-                      <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 pr-3 pl-2">Attendance %</th>
+                      <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Attendance %</th>
+                      <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 pr-3 pl-2">Actions</th>
                     </>
                   )}
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((p) =>
-                  tab === "today" ? <TodayRow key={p.id} p={p} /> : <MonthlyRow key={p.id} p={p} />
+                  tab === "today" ? (
+                    <TodayRow key={p.id} p={p} />
+                  ) : (
+                    <MonthlyRow
+                      key={p.id}
+                      p={p}
+                      onHistoryClick={(person) => setHistoryModal({ open: true, person })}
+                    />
+                  )
                 )}
               </tbody>
             </table>
@@ -360,5 +382,16 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook 
         </div>
       </div>
     </div>
+
+      {useHistoryHook && (
+        <AttendanceHistoryModal
+          open={historyModal.open}
+          onClose={() => setHistoryModal({ open: false, person: null })}
+          employeeId={historyModal.person?.id}
+          employeeName={historyModal.person?.name}
+          useHistoryHook={useHistoryHook}
+        />
+      )}
+    </>
   );
 }
