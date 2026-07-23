@@ -9,6 +9,7 @@ import {
   reviewToAdmin,
   getTodayCheckins,
   getAttendanceOverview,
+  getAttendanceHistory,
   getOrgInfo,
   changeSuperAdminPassword,
   forgotPasswordSuperAdmin,
@@ -71,6 +72,16 @@ export const useGetAttendanceOverview = ({ type = "today", month, year } = {}, o
   });
 };
 
+// "History" button on the Monthly tab — day-wise history for one employee.
+export const useGetAttendanceHistory = (employeeId, { startDate, endDate } = {}, options = {}) => {
+  return useQuery({
+    queryKey: ["attendanceHistory", employeeId, startDate ?? null, endDate ?? null],
+    queryFn: () => getAttendanceHistory(employeeId, { startDate, endDate }),
+    enabled: !!employeeId,
+    staleTime: 30 * 1000,
+    ...options,
+  });
+};
 
 
 export const useGetOrgInfo = () => {

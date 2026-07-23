@@ -3104,6 +3104,96 @@ const getAttendanceOverview = async (req, res, next) => {
   }
 };
 
+// Day-wise attendance history for one team member (manager or employee) —
+// powers the "History" button on the Monthly tab of AttendanceDetailsModal.
+// Accepts an optional startDate/endDate range (YYYY-MM-DD); defaults to the
+// current calendar month when neither is passed. Scoped to the admin's own
+// team via getAdminTeamManagerIds, same as getAttendanceOverview above.
+const getAttendanceHistory = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+
+    const organisation_id = req.admin.organisation_id;
+    const { employeeId } = req.params;
+    if (!employeeId)
+      return res.status(400).json({ success: false, message: "employeeId is required" });
+
+    const teamManagerIds = [...(await getAdminTeamManagerIds(req.admin._id, organisation_id))];
+
+    const [manager, employee] = await Promise.all([
+      teamManagerIds.length
+        ? Managermodel.findOne({ _id: employeeId, organisation_id, _id: { $in: teamManagerIds } })
+            .select("empid f_name l_name work_email role designation department office_location")
+            .lean()
+        : null,
+      Usermodel.findOne({ _id: employeeId, organisation_id, Under_manager: { $in: teamManagerIds } })
+        .select("empid f_name l_name work_email role designation department office_location")
+        .lean(),
+    ]);
+    const person = manager || employee;
+    if (!person)
+      return res.status(404).json({ success: false, message: "Employee not found in your team" });
+
+    const now = new Date();
+    let { startDate, endDate } = req.query;
+    let rangeStart, rangeEnd;
+    if (startDate && endDate) {
+      rangeStart = startOfDay(new Date(startDate));
+      rangeEnd = startOfDay(new Date(endDate));
+    } else {
+      rangeStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      rangeEnd = startOfDay(now);
+    }
+
+    const records = await Attendance.find({
+      organisation_id,
+      employee: employeeId,
+      date: { $gte: rangeStart, $lte: rangeEnd },
+    })
+      .select("date checkIn checkOut source status activeMinutes idleMinutes isLate lateMinutes overtimeMinutes checkoutRemark checkInGate checkOutGate")
+      .sort({ date: -1 })
+      .lean();
+
+    const data = records.map((r) => ({
+      id: String(r._id),
+      date: r.date,
+      checkIn: r.checkIn || null,
+      checkOut: r.checkOut || null,
+      source: r.source === "face" ? "face" : r.source === "agent" ? "agent" : "system",
+      status: r.status || "absent",
+      activeMinutes: r.activeMinutes ?? 0,
+      idleMinutes: r.idleMinutes ?? 0,
+      isLate: !!r.isLate,
+      lateMinutes: r.lateMinutes ?? 0,
+      overtimeMinutes: r.overtimeMinutes ?? 0,
+      checkoutRemark: r.checkoutRemark || null,
+      checkInGate: r.checkInGate || null,
+      checkOutGate: r.checkOutGate || null,
+    }));
+
+    return res.json({
+      success: true,
+      employee: {
+        id: String(person._id),
+        empid: person.empid,
+        name: [person.f_name, person.l_name].filter(Boolean).join(" "),
+        email: person.work_email,
+        role: person.role,
+        designation: person.designation,
+        department: person.department,
+        office_location: person.office_location,
+      },
+      startDate: rangeStart,
+      endDate: rangeEnd,
+      total: data.length,
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getOrgInfo = async (req, res, next) => {
   try {
     if (!req.admin)
@@ -3933,6 +4023,7 @@ module.exports = {
   changepassword,
   getTodayCheckins,
   getAttendanceOverview,
+  getAttendanceHistory,
   getOrgInfo,
   getAllPersonalDocumentsAdmin,
   getAllExpenseDocumentsAdmin,

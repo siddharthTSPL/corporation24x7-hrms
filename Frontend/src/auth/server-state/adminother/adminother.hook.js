@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getAllEmployee, getMyTeamOverview, getParticularEmployee, deleteUser, getEmployeeStats, reviewToManager,
   editEmployee, editManager, getparticularEmployeeStats, getParticularManager,
-  getTodayCheckins, getAttendanceOverview, getOrgInfo, changeManagerRole, demoteManagerToEmployee,
+  getTodayCheckins, getAttendanceOverview, getEmployeeAttendanceHistory, getOrgInfo, changeManagerRole, demoteManagerToEmployee,
   demoteAdminToManager, demoteAdminToEmployee, promoteEmployeeToManager,
   promoteEmployeeToAdmin, promoteManagerToAdmin, getTodayLeaves,
   getAllPersonalDocuments, getAllExpenseDocuments, getDocumentDetails,
@@ -227,6 +227,17 @@ export const useGetAttendanceOverview = ({ type = "today", month, year } = {}, o
   return useQuery({
     queryKey: ["attendanceOverview", type, type === "monthly" ? month : null, type === "monthly" ? year : null],
     queryFn: () => getAttendanceOverview({ type, month, year }),
+    staleTime: 30 * 1000,
+    ...options,
+  });
+};
+
+// "History" button on the Monthly tab — day-wise history for one team member.
+export const useGetEmployeeAttendanceHistory = (employeeId, { startDate, endDate } = {}, options = {}) => {
+  return useQuery({
+    queryKey: ["employeeAttendanceHistory", employeeId, startDate ?? null, endDate ?? null],
+    queryFn: () => getEmployeeAttendanceHistory(employeeId, { startDate, endDate }),
+    enabled: !!employeeId,
     staleTime: 30 * 1000,
     ...options,
   });

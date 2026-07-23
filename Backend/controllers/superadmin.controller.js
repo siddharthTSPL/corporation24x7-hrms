@@ -2023,6 +2023,92 @@ const getAttendanceOverview = async (req, res, next) => {
   }
 };
 
+// Day-wise attendance history for one employee (any role) — powers the
+// "History" button on the Monthly tab of AttendanceDetailsModal. Accepts an
+// optional startDate/endDate range (YYYY-MM-DD); defaults to the current
+// calendar month when neither is passed.
+const getAttendanceHistory = async (req, res, next) => {
+  try {
+    const organisation_id = req.superAdmin._id;
+    const { employeeId } = req.params;
+
+    if (!employeeId)
+      return res.status(400).json({ success: false, message: "employeeId is required" });
+
+    const [admin, manager, employee] = await Promise.all([
+      AdminModel.findOne({ _id: employeeId, organisation_id })
+        .select("empid f_name l_name work_email role designation department office_location")
+        .lean(),
+      Managermodel.findOne({ _id: employeeId, organisation_id })
+        .select("empid f_name l_name work_email role designation department office_location")
+        .lean(),
+      Usermodel.findOne({ _id: employeeId, organisation_id })
+        .select("empid f_name l_name work_email role designation department office_location")
+        .lean(),
+    ]);
+    const person = admin || manager || employee;
+    if (!person)
+      return res.status(404).json({ success: false, message: "Employee not found in your organisation" });
+
+    const now = new Date();
+    let { startDate, endDate } = req.query;
+    let rangeStart, rangeEnd;
+    if (startDate && endDate) {
+      rangeStart = startOfDay(new Date(startDate));
+      rangeEnd = startOfDay(new Date(endDate));
+    } else {
+      rangeStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      rangeEnd = startOfDay(now);
+    }
+
+    const records = await Attendance.find({
+      organisation_id,
+      employee: employeeId,
+      date: { $gte: rangeStart, $lte: rangeEnd },
+    })
+      .select("date checkIn checkOut source status activeMinutes idleMinutes isLate lateMinutes overtimeMinutes checkoutRemark checkInGate checkOutGate")
+      .sort({ date: -1 })
+      .lean();
+
+    const data = records.map((r) => ({
+      id: String(r._id),
+      date: r.date,
+      checkIn: r.checkIn || null,
+      checkOut: r.checkOut || null,
+      source: r.source === "face" ? "face" : r.source === "agent" ? "agent" : "system",
+      status: r.status || "absent",
+      activeMinutes: r.activeMinutes ?? 0,
+      idleMinutes: r.idleMinutes ?? 0,
+      isLate: !!r.isLate,
+      lateMinutes: r.lateMinutes ?? 0,
+      overtimeMinutes: r.overtimeMinutes ?? 0,
+      checkoutRemark: r.checkoutRemark || null,
+      checkInGate: r.checkInGate || null,
+      checkOutGate: r.checkOutGate || null,
+    }));
+
+    return res.json({
+      success: true,
+      employee: {
+        id: String(person._id),
+        empid: person.empid,
+        name: [person.f_name, person.l_name].filter(Boolean).join(" "),
+        email: person.work_email,
+        role: person.role,
+        designation: person.designation,
+        department: person.department,
+        office_location: person.office_location,
+      },
+      startDate: rangeStart,
+      endDate: rangeEnd,
+      total: data.length,
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // ─── Helper: recursively build manager hierarchy ──────────────────────────────
 const buildManagerTree = (managers, parentId, parentModel, employees) => {
   return managers
@@ -2739,6 +2825,7 @@ module.exports = {
   reviewtoadmin,
   getTodayCheckins,
   getAttendanceOverview,
+  getAttendanceHistory,
   getOrgInfo,
   getAllPersonalDocumentsSuperAdmin,
   getAllExpenseDocumentsSuperAdmin,
