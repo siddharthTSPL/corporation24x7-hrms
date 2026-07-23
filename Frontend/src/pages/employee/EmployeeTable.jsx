@@ -12,6 +12,8 @@ import {
 import {
   useAddManager, useAddEmployee, useFindAllManagers, useFindAllManagerswithoutAdmin,
 } from "../../auth/server-state/adminauth/adminauth.hook";
+import { useFindAllEmployeesFull } from "../../auth/server-state/adminauth/adminauth.hook";
+
 import {
   useGetAllEmployee, useDeleteUser, useEditEmployee, useEditManager,
   usePromoteEmployeeToManager, usePromoteEmployeeToAdmin, usePromoteManagerToAdmin,
@@ -153,21 +155,14 @@ function exportToCSV(data) {
   const dateStamp = new Date().toISOString().slice(0, 10);
 
   const FULL_HEADERS = [
-    // Personal
-    "UID","First Name","Last Name","Work Email","Gender","Marital Status",
+    "Employee ID","UID","First Name","Last Name","Work Email","Gender","Marital Status",
     "Personal Contact","Emergency Contact",
-    // Professional
     "Role","Department","Designation","Office Location",
     "Reporting / Under Manager","Is Fresher","Total Experience",
     "Previous Company","Previous Designation",
-    // Address (Residential + Permanent)
     "Residential Address","Residential City","Residential State","Residential Pincode","Residential Country",
-    
-    // Identity
     "Aadhaar Number","PAN Number",
-    // Banking
     "Bank Name","Account Holder Name","Account Number","IFSC Code",
-    // Other (Documents & Status)
     "Resume URL","Aadhaar Card URL","PAN Card URL","Experience Letter URL",
     "Status","Working Status",
   ];
@@ -175,14 +170,13 @@ function exportToCSV(data) {
   const buildRow = (u) => {
     const reportingPerson = u.Under_manager || u.reporting_manager;
     return [
-      u.uid??"",u.f_name??"",u.l_name??"",u.work_email??"",u.gender??"",u.marital_status??"",
+      u.empid??"",u.uid??"",u.f_name??"",u.l_name??"",u.work_email??"",u.gender??"",u.marital_status??"",
       u.personal_contact??"",u.e_contact??"",
       u.role??"",DEPT_FULL_FORMS[u.department]??u.department??"",u.designation??"",u.office_location??"",
       reportingPerson?`${reportingPerson.f_name??""} ${reportingPerson.l_name??""}`.trim():"",
       u.is_fresher?"Yes":"No",u.total_experience??"",
       u.previous_company??"",u.previous_designation??"",
       u.address??"",u.city??"",u.state??"",u.pincode??"",u.country??"",
-      u.permanent_address??"",u.permanent_city??"",u.permanent_state??"",u.permanent_pincode??"",u.permanent_country??"",
       u.aadhaar_number??"",u.pan_number??"",
       u.bank_name??"",u.account_holder_name??"",u.account_number??"",u.ifsc_code??"",
       u.resume??"",u.aadhaar_card??"",u.pan_card??"",u.experience_letter??"",
@@ -190,7 +184,6 @@ function exportToCSV(data) {
     ];
   };
 
-  // Column width auto-calculate karta hai (header vs har row ki value ki max length se)
   const computeColWidths = (rows) => {
     return FULL_HEADERS.map((header, colIdx) => {
       let maxLen = header.length;
@@ -198,7 +191,6 @@ function exportToCSV(data) {
         const val = String(row[colIdx] ?? "");
         if (val.length > maxLen) maxLen = val.length;
       });
-      // thoda padding + max cap taaki bahut lambi URL wali column screen na todhe
       return { wch: Math.min(Math.max(maxLen + 2, 10), 45) };
     });
   };
@@ -206,7 +198,6 @@ function exportToCSV(data) {
   const downloadXLSX = (rows, filename, sheetName) => {
     const worksheet = XLSX.utils.aoa_to_sheet([FULL_HEADERS, ...rows]);
     worksheet["!cols"] = computeColWidths(rows);
-    // header row ko freeze kar dete hain taaki scroll karte waqt headers dikhte rahein
     worksheet["!freeze"] = { xSplit: 0, ySplit: 1 };
 
     const workbook = XLSX.utils.book_new();
@@ -220,18 +211,10 @@ function exportToCSV(data) {
   const managers  = data.filter((u)=>getType(u)==="manager");
 
   if(employees.length>0){
-    downloadXLSX(
-      employees.map(buildRow),
-      `Torchx-Talent-Employee-${dateStamp}.xlsx`,
-      "Employees"
-    );
+    downloadXLSX(employees.map(buildRow), `Torchx-Talent-Employee-${dateStamp}.xlsx`, "Employees");
   }
   if(managers.length>0){
-    downloadXLSX(
-      managers.map(buildRow),
-      `Torchx-Talent-Manager-${dateStamp}.xlsx`,
-      "Managers"
-    );
+    downloadXLSX(managers.map(buildRow), `Torchx-Talent-Manager-${dateStamp}.xlsx`, "Managers");
   }
 }
 
@@ -583,6 +566,7 @@ function PermissionsPanel({perms,onChange,roleType="employee"}){
 }
 
 function ReportingManagerSelect({value,onChange,managersOnly,managersWithAdmin,label="Reporting Manager",name="reporting_manager",excludeId=null}){
+  
   const managersList = (managersOnly?.managers ?? []).filter(m => m._id !== excludeId);
   const withAdminList = (managersWithAdmin?.managers ?? []).filter(m => m._id !== excludeId);
   const adminList = withAdminList.filter(m => m.isAdmin);
@@ -1894,6 +1878,7 @@ function validateBankInfo(form){
   const hasBankPartial=[form.bank_name,form.account_holder_name,form.account_number,form.ifsc_code].some(Boolean);
   const hasBankFull=[form.bank_name,form.account_holder_name,form.account_number,form.ifsc_code].every(Boolean);
   if(hasBankPartial&&!hasBankFull)err.bank_group="Fill all bank details together or leave all blank";
+  if(form.account_holder_name&&!NAME_REGEX.test(form.account_holder_name))err.account_holder_name="Only letters allowed, no numbers";
   if(form.account_number&&!ACCOUNT_REGEX.test(form.account_number))err.account_number="Account number must be 9-18 digits";
   if(form.ifsc_code&&!IFSC_REGEX.test(form.ifsc_code))err.ifsc_code="Invalid IFSC code format (e.g. SBIN0001234)";
   if(form.resume&&!URL_REGEX.test(form.resume))err.resume="Must be a valid URL starting with https://";
@@ -1901,6 +1886,39 @@ function validateBankInfo(form){
   if(form.pan_card&&!URL_REGEX.test(form.pan_card))err.pan_card="Must be a valid URL starting with https://";
   if(form.experience_letter&&!URL_REGEX.test(form.experience_letter))err.experience_letter="Must be a valid URL starting with https://";
   return err;
+}
+
+const FIELD_LABELS = {
+  empid:"Employee ID",f_name:"First Name",l_name:"Last Name",work_email:"Work Email",
+  password:"Password",confirm_password:"Confirm Password",gender:"Gender",
+  personal_contact:"Personal Contact",e_contact:"Emergency Contact",
+  department:"Department",designation:"Designation",
+  office_location_country:"Office Country",office_location_state:"Office State",office_location:"Office City",
+  address:"Address",country:"Residential Country",state:"Residential State",city:"Residential City",
+  pincode:"Residential Pincode",permanent_pincode:"Permanent Pincode",
+  aadhaar_number:"Aadhaar Number",pan_number:"PAN Number",
+  total_experience:"Total Experience",
+  bank_group:"Bank Details",account_number:"Account Number",ifsc_code:"IFSC Code",
+  account_holder_name:"Account Holder Name",bank_name:"Bank Name",
+  resume:"Resume URL",aadhaar_card:"Aadhaar Card URL",pan_card:"PAN Card URL",experience_letter:"Experience Letter URL",
+};
+
+const FIELD_STEP_MAP = {
+  empid:0,f_name:0,l_name:0,work_email:0,password:0,confirm_password:0,gender:0,personal_contact:0,e_contact:0,
+  department:1,designation:1,office_location_country:1,office_location_state:1,office_location:1,
+  address:2,country:2,state:2,city:2,pincode:2,permanent_pincode:2,
+  aadhaar_number:3,pan_number:3,
+  total_experience:4,
+  bank_group:5,account_number:5,ifsc_code:5,account_holder_name:5,bank_name:5,resume:5,aadhaar_card:5,pan_card:5,experience_letter:5,
+};
+
+function getErrorSummary(err){
+  const fields=Object.keys(err);
+  if(fields.length===0)return{message:"",step:0};
+  const labels=fields.map((f)=>FIELD_LABELS[f]||f);
+  const step=Math.min(...fields.map((f)=>FIELD_STEP_MAP[f]??0));
+  const stepLabel=EMP_STEPS[step]?.label||"";
+  return{message:`Fix these fields: ${labels.join(", ")} — go to "${stepLabel}" step`,step};
 }
 
 export default function EmployeeTable(){
@@ -1943,6 +1961,7 @@ export default function EmployeeTable(){
   const {mutate:addManagerApi}=useAddManager();
   const {data:managersOnly}=useFindAllManagerswithoutAdmin();
   const {data:managersWithAdmin}=useFindAllManagers();
+  const {data:employeesFull}=useFindAllEmployeesFull();
   const {data:employeeData,isLoading:listLoading,refetch:refetchList}=useGetAllEmployee();
   const {data:inactiveData}=useAdminInactiveUsers();
   const {data:activeUserCountData}=useGetActiveUserCount();
@@ -2069,7 +2088,7 @@ export default function EmployeeTable(){
     if(["personal_contact","e_contact","aadhaar_number","pincode","permanent_pincode"].includes(name)){
       nextValue=numericOnly(value);
     }
-    if(["f_name","l_name"].includes(name)&&value&&!/^[A-Za-z\s.'-]*$/.test(value)){
+    if(["f_name","l_name", "account_holder_name"].includes(name)&&value&&!/^[A-Za-z\s.'-]*$/.test(value)){
       return;
     }
     setter((prev)=>{
@@ -2113,35 +2132,49 @@ export default function EmployeeTable(){
     return Object.keys(err).length===0;
   };
 
-  const handleEmpSubmit=()=>{
-    if(!validateEmp()){showPopup("error","Please fix the errors in the form");setEmpStep(0);return;}
-    addEmployeeApi({
-      empid:empForm.empid,
-      f_name:empForm.f_name,l_name:empForm.l_name,work_email:empForm.work_email,
-      password:empForm.password,gender:empForm.gender,marital_status:empForm.marital_status,
-      personal_contact:empForm.personal_contact,e_contact:empForm.e_contact,
-      role:empForm.role,office_location:empForm.office_location,
-      designation:empForm.designation,department:empForm.department,
-      Under_manager:empForm.Under_manager||undefined,
-      address:empForm.address,city:empForm.city,state:empForm.state,pincode:empForm.pincode,country:empForm.country,
-      permanent_address:empForm.permanent_address||undefined,permanent_city:empForm.permanent_city||undefined,
-      permanent_state:empForm.permanent_state||undefined,permanent_pincode:empForm.permanent_pincode||undefined,
-      permanent_country:empForm.permanent_country||undefined,
-      aadhaar_number:empForm.aadhaar_number||undefined,pan_number:empForm.pan_number||undefined,
-      is_fresher:empForm.is_fresher,
-      total_experience:empForm.is_fresher?undefined:empForm.total_experience||undefined,
-      previous_company:empForm.is_fresher?undefined:empForm.previous_company||undefined,
-      previous_designation:empForm.is_fresher?undefined:empForm.previous_designation||undefined,
-      bank_name:empForm.bank_name||undefined,account_holder_name:empForm.account_holder_name||undefined,
-      account_number:empForm.account_number||undefined,ifsc_code:empForm.ifsc_code||undefined,
-      resume:empForm.resume||undefined,aadhaar_card:empForm.aadhaar_card||undefined,
-      pan_card:empForm.pan_card||undefined,experience_letter:empForm.experience_letter||undefined,
-      permissions:empPerms,
-    },{
-      onSuccess:(res)=>{showPopup("success",res?.message||"Employee added successfully");setOpen(false);setEmpForm(EMPTY_EMP);setEmpErrors({});setEmpStep(0);setEmpPerms({...EMP_DEFAULT_PERMISSIONS});refetchList();},
-      onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Something went wrong"),
-    });
+ const handleEmpSubmit=()=>{
+  const err={
+    ...validateContactInfo(empForm),
+    ...validateWorkInfo(empForm),
+    ...validateAddressInfo(empForm),
+    ...validateIdentityInfo(empForm),
+    ...validateExperienceInfo(empForm),
+    ...validateBankInfo(empForm),
   };
+  setEmpErrors(err);
+  if(Object.keys(err).length>0){
+    const{message,step}=getErrorSummary(err);
+    setEmpStep(step);
+    showPopup("error",message);
+    return;
+  }
+  addEmployeeApi({
+    empid:empForm.empid,
+    f_name:empForm.f_name,l_name:empForm.l_name,work_email:empForm.work_email,
+    password:empForm.password,gender:empForm.gender,marital_status:empForm.marital_status,
+    personal_contact:empForm.personal_contact,e_contact:empForm.e_contact,
+    role:empForm.role,office_location:empForm.office_location,
+    designation:empForm.designation,department:empForm.department,
+    Under_manager:empForm.Under_manager||undefined,
+    address:empForm.address,city:empForm.city,state:empForm.state,pincode:empForm.pincode,country:empForm.country,
+    permanent_address:empForm.permanent_address||undefined,permanent_city:empForm.permanent_city||undefined,
+    permanent_state:empForm.permanent_state||undefined,permanent_pincode:empForm.permanent_pincode||undefined,
+    permanent_country:empForm.permanent_country||undefined,
+    aadhaar_number:empForm.aadhaar_number||undefined,pan_number:empForm.pan_number||undefined,
+    is_fresher:empForm.is_fresher,
+    total_experience:empForm.is_fresher?undefined:empForm.total_experience||undefined,
+    previous_company:empForm.is_fresher?undefined:empForm.previous_company||undefined,
+    previous_designation:empForm.is_fresher?undefined:empForm.previous_designation||undefined,
+    bank_name:empForm.bank_name||undefined,account_holder_name:empForm.account_holder_name||undefined,
+    account_number:empForm.account_number||undefined,ifsc_code:empForm.ifsc_code||undefined,
+    resume:empForm.resume||undefined,aadhaar_card:empForm.aadhaar_card||undefined,
+    pan_card:empForm.pan_card||undefined,experience_letter:empForm.experience_letter||undefined,
+    permissions:empPerms,
+  },{
+    onSuccess:(res)=>{showPopup("success",res?.message||"Employee added successfully");setOpen(false);setEmpForm(EMPTY_EMP);setEmpErrors({});setEmpStep(0);setEmpPerms({...EMP_DEFAULT_PERMISSIONS});refetchList();},
+    onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Something went wrong"),
+  });
+};
 
   const validateMgr=()=>{
     const err={
@@ -2156,35 +2189,49 @@ export default function EmployeeTable(){
     return Object.keys(err).length===0;
   };
 
-  const handleMgrSubmit=()=>{
-    if(!validateMgr()){showPopup("error","Please fix the errors in the form");setMgrStep(0);return;}
-    addManagerApi({
-      empid:mgrForm.empid,
-      f_name:mgrForm.f_name,l_name:mgrForm.l_name,work_email:mgrForm.work_email,
-      password:mgrForm.password,gender:mgrForm.gender,marital_status:mgrForm.marital_status,
-      personal_contact:mgrForm.personal_contact,e_contact:mgrForm.e_contact,
-      role:mgrForm.role,office_location:mgrForm.office_location,
-      designation:mgrForm.designation,department:mgrForm.department,
-      reporting_manager:mgrForm.reporting_manager||undefined,
-      address:mgrForm.address,city:mgrForm.city,state:mgrForm.state,pincode:mgrForm.pincode,country:mgrForm.country,
-      permanent_address:mgrForm.permanent_address||undefined,permanent_city:mgrForm.permanent_city||undefined,
-      permanent_state:mgrForm.permanent_state||undefined,permanent_pincode:mgrForm.permanent_pincode||undefined,
-      permanent_country:mgrForm.permanent_country||undefined,
-      aadhaar_number:mgrForm.aadhaar_number||undefined,pan_number:mgrForm.pan_number||undefined,
-      is_fresher:mgrForm.is_fresher,
-      total_experience:mgrForm.is_fresher?undefined:mgrForm.total_experience||undefined,
-      previous_company:mgrForm.is_fresher?undefined:mgrForm.previous_company||undefined,
-      previous_designation:mgrForm.is_fresher?undefined:mgrForm.previous_designation||undefined,
-      bank_name:mgrForm.bank_name||undefined,account_holder_name:mgrForm.account_holder_name||undefined,
-      account_number:mgrForm.account_number||undefined,ifsc_code:mgrForm.ifsc_code||undefined,
-      resume:mgrForm.resume||undefined,aadhaar_card:mgrForm.aadhaar_card||undefined,
-      pan_card:mgrForm.pan_card||undefined,experience_letter:mgrForm.experience_letter||undefined,
-      permissions:mgrPerms,
-    },{
-      onSuccess:(res)=>{showPopup("success",res?.message||"Manager added Successfully & verification email sent");setOpenManager(false);setMgrForm(EMPTY_MGR);setMgrErrors({});setMgrStep(0);setMgrPerms({...MGR_DEFAULT_PERMISSIONS});refetchList();},
-      onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Something went wrong"),
-    });
+const handleMgrSubmit=()=>{
+  const err={
+    ...validateContactInfo(mgrForm),
+    ...validateWorkInfo(mgrForm),
+    ...validateAddressInfo(mgrForm),
+    ...validateIdentityInfo(mgrForm),
+    ...validateExperienceInfo(mgrForm),
+    ...validateBankInfo(mgrForm),
   };
+  setMgrErrors(err);
+  if(Object.keys(err).length>0){
+    const{message,step}=getErrorSummary(err);
+    setMgrStep(step);
+    showPopup("error",message);
+    return;
+  }
+  addManagerApi({
+    empid:mgrForm.empid,
+    f_name:mgrForm.f_name,l_name:mgrForm.l_name,work_email:mgrForm.work_email,
+    password:mgrForm.password,gender:mgrForm.gender,marital_status:mgrForm.marital_status,
+    personal_contact:mgrForm.personal_contact,e_contact:mgrForm.e_contact,
+    role:mgrForm.role,office_location:mgrForm.office_location,
+    designation:mgrForm.designation,department:mgrForm.department,
+    reporting_manager:mgrForm.reporting_manager||undefined,
+    address:mgrForm.address,city:mgrForm.city,state:mgrForm.state,pincode:mgrForm.pincode,country:mgrForm.country,
+    permanent_address:mgrForm.permanent_address||undefined,permanent_city:mgrForm.permanent_city||undefined,
+    permanent_state:mgrForm.permanent_state||undefined,permanent_pincode:mgrForm.permanent_pincode||undefined,
+    permanent_country:mgrForm.permanent_country||undefined,
+    aadhaar_number:mgrForm.aadhaar_number||undefined,pan_number:mgrForm.pan_number||undefined,
+    is_fresher:mgrForm.is_fresher,
+    total_experience:mgrForm.is_fresher?undefined:mgrForm.total_experience||undefined,
+    previous_company:mgrForm.is_fresher?undefined:mgrForm.previous_company||undefined,
+    previous_designation:mgrForm.is_fresher?undefined:mgrForm.previous_designation||undefined,
+    bank_name:mgrForm.bank_name||undefined,account_holder_name:mgrForm.account_holder_name||undefined,
+    account_number:mgrForm.account_number||undefined,ifsc_code:mgrForm.ifsc_code||undefined,
+    resume:mgrForm.resume||undefined,aadhaar_card:mgrForm.aadhaar_card||undefined,
+    pan_card:mgrForm.pan_card||undefined,experience_letter:mgrForm.experience_letter||undefined,
+    permissions:mgrPerms,
+  },{
+    onSuccess:(res)=>{showPopup("success",res?.message||"Manager added Successfully & verification email sent");setOpenManager(false);setMgrForm(EMPTY_MGR);setMgrErrors({});setMgrStep(0);setMgrPerms({...MGR_DEFAULT_PERMISSIONS});refetchList();},
+    onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Something went wrong"),
+  });
+};
 
   const filtered=allUsers.filter((u)=>{
     const name=`${u.f_name??""} ${u.l_name??""}`.toLowerCase();
@@ -2258,13 +2305,28 @@ return(
                 </span>
               </button>
             )}
-            <button onClick={()=>exportToCSV(filtered)}
-              className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all w-full sm:w-auto"
-              style={{borderColor:"#085041",color:"#085041"}}
-              onMouseEnter={(e)=>{e.currentTarget.style.background="#085041";e.currentTarget.style.color="#fff";}}
-              onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#085041";}}>
-              <FaFileExcel size={12}/><span>Export CSV</span>
-            </button>
+        <button onClick={()=>{
+    const managerFullMap = new Map((managersWithAdmin?.managers??[]).map(m=>[m._id,m]));
+    const employeeFullMap = new Map((employeesFull?.employees??[]).map(e=>[e._id,e]));
+
+    const enriched = filtered.map((u)=>{
+      const effType = u.type || (u.role==="manager"||u.role==="senior_manager" ? "manager" : "employee");
+      if(effType==="manager" && managerFullMap.has(u._id)){
+        return {...u, ...managerFullMap.get(u._id), type:u.type};
+      }
+      if(effType==="employee" && employeeFullMap.has(u._id)){
+        return {...u, ...employeeFullMap.get(u._id), type:u.type};
+      }
+      return u;
+    });
+    exportToCSV(enriched);
+  }}
+  className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all w-full sm:w-auto"
+  style={{borderColor:"#085041",color:"#085041"}}
+  onMouseEnter={(e)=>{e.currentTarget.style.background="#085041";e.currentTarget.style.color="#fff";}}
+  onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#085041";}}>
+  <FaFileExcel size={12}/><span>Export CSV</span>
+</button>
             {isLimitReached ? (
               <div className="col-span-2 sm:col-span-auto flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 border-[#FCA5A5] bg-[#FFF5F5] text-xs sm:text-sm font-semibold text-[#991B1B]">
                 <FaExclamationTriangle size={12}/>
