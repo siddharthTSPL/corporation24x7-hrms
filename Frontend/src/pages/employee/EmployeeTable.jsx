@@ -23,6 +23,8 @@ import {
 import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
 import axios from "axios";
 
+import * as XLSX from "xlsx";
+
 
 
 
@@ -148,31 +150,89 @@ const numericOnly = (value) => value.replace(/\D/g, "");
 
 
 function exportToCSV(data) {
-  const headers = [
-    "UID","First Name","Last Name","Work Email","Role","Department",
-    "Designation","Office Location","Gender","Marital Status",
-    "Personal Contact","Emergency Contact","City","State","Pincode",
-    "Reporting / Under Manager","Is Fresher","Total Experience","Status","Working Status",
+  const dateStamp = new Date().toISOString().slice(0, 10);
+
+  const FULL_HEADERS = [
+    // Personal
+    "UID","First Name","Last Name","Work Email","Gender","Marital Status",
+    "Personal Contact","Emergency Contact",
+    // Professional
+    "Role","Department","Designation","Office Location",
+    "Reporting / Under Manager","Is Fresher","Total Experience",
+    "Previous Company","Previous Designation",
+    // Address (Residential + Permanent)
+    "Residential Address","Residential City","Residential State","Residential Pincode","Residential Country",
+    
+    // Identity
+    "Aadhaar Number","PAN Number",
+    // Banking
+    "Bank Name","Account Holder Name","Account Number","IFSC Code",
+    // Other (Documents & Status)
+    "Resume URL","Aadhaar Card URL","PAN Card URL","Experience Letter URL",
+    "Status","Working Status",
   ];
-  const rows = data.map((u) => [
-    u.uid??"",u.f_name??"",u.l_name??"",u.work_email??"",u.role??"",
-    DEPT_FULL_FORMS[u.department]??u.department??"",u.designation??"",u.office_location??"",u.gender??"",
-    u.marital_status??"",u.personal_contact??"",u.e_contact??"",
-    u.city??"",u.state??"",u.pincode??"",
-    u.Under_manager
-      ?`${u.Under_manager.f_name??""} ${u.Under_manager.l_name??""}`.trim()
-      :u.reporting_manager
-        ?`${u.reporting_manager.f_name??""} ${u.reporting_manager.l_name??""}`.trim()
-        :"",
-    u.is_fresher?"Yes":"No",u.total_experience??"",u.status??"",u.working_status??"",
-  ]);
-  const escape=(v)=>{const s=String(v??"");return s.includes(",")||s.includes('"')||s.includes("\n")?`"${s.replace(/"/g,'""')}"`:s;};
-  const csv=[headers,...rows].map((r)=>r.map(escape).join(",")).join("\n");
-  const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");
-  a.href=url;a.download=`employees_${new Date().toISOString().slice(0,10)}.csv`;a.click();
-  URL.revokeObjectURL(url);
+
+  const buildRow = (u) => {
+    const reportingPerson = u.Under_manager || u.reporting_manager;
+    return [
+      u.uid??"",u.f_name??"",u.l_name??"",u.work_email??"",u.gender??"",u.marital_status??"",
+      u.personal_contact??"",u.e_contact??"",
+      u.role??"",DEPT_FULL_FORMS[u.department]??u.department??"",u.designation??"",u.office_location??"",
+      reportingPerson?`${reportingPerson.f_name??""} ${reportingPerson.l_name??""}`.trim():"",
+      u.is_fresher?"Yes":"No",u.total_experience??"",
+      u.previous_company??"",u.previous_designation??"",
+      u.address??"",u.city??"",u.state??"",u.pincode??"",u.country??"",
+      u.permanent_address??"",u.permanent_city??"",u.permanent_state??"",u.permanent_pincode??"",u.permanent_country??"",
+      u.aadhaar_number??"",u.pan_number??"",
+      u.bank_name??"",u.account_holder_name??"",u.account_number??"",u.ifsc_code??"",
+      u.resume??"",u.aadhaar_card??"",u.pan_card??"",u.experience_letter??"",
+      u.status??"",u.working_status??"",
+    ];
+  };
+
+  // Column width auto-calculate karta hai (header vs har row ki value ki max length se)
+  const computeColWidths = (rows) => {
+    return FULL_HEADERS.map((header, colIdx) => {
+      let maxLen = header.length;
+      rows.forEach((row) => {
+        const val = String(row[colIdx] ?? "");
+        if (val.length > maxLen) maxLen = val.length;
+      });
+      // thoda padding + max cap taaki bahut lambi URL wali column screen na todhe
+      return { wch: Math.min(Math.max(maxLen + 2, 10), 45) };
+    });
+  };
+
+  const downloadXLSX = (rows, filename, sheetName) => {
+    const worksheet = XLSX.utils.aoa_to_sheet([FULL_HEADERS, ...rows]);
+    worksheet["!cols"] = computeColWidths(rows);
+    // header row ko freeze kar dete hain taaki scroll karte waqt headers dikhte rahein
+    worksheet["!freeze"] = { xSplit: 0, ySplit: 1 };
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    XLSX.writeFile(workbook, filename);
+  };
+
+  const getType = (u) => u.type || (u.role==="manager"||u.role==="senior_manager" ? "manager" : "employee");
+
+  const employees = data.filter((u)=>getType(u)==="employee");
+  const managers  = data.filter((u)=>getType(u)==="manager");
+
+  if(employees.length>0){
+    downloadXLSX(
+      employees.map(buildRow),
+      `Torchx-Talent-Employee-${dateStamp}.xlsx`,
+      "Employees"
+    );
+  }
+  if(managers.length>0){
+    downloadXLSX(
+      managers.map(buildRow),
+      `Torchx-Talent-Manager-${dateStamp}.xlsx`,
+      "Managers"
+    );
+  }
 }
 
 function Field({label,error,children,required,span2}){
@@ -2162,16 +2222,16 @@ export default function EmployeeTable(){
 
 return(
     <div
-      className="h-full flex flex-col overflow-hidden pt-3 pr-3 pb-3 pl-1 sm:pt-4 sm:pr-4 sm:pb-4 sm:pl-2 md:pt-6 md:pr-6 md:pb-6 md:pl-3 lg:pt-8 lg:pr-8 lg:pb-8 lg:pl-4 font-['DM_Sans',system-ui,sans-serif]"
+      className="h-full flex flex-col overflow-hidden pt-3 pr-3 pb-3 pl-1 sm:pt-4 sm:pr-4 sm:pb-4 sm:pl-1 md:pt-6 md:pr-6 md:pb-6 md:pl-3 lg:pt-8 lg:pr-8 lg:pb-8 lg:pl-4 font-['DM_Sans',system-ui,sans-serif]"
       style={{
         background: "#F9F8F2",
         minWidth: "800px",
-        zoom: 0.9,
+        zoom: 0.85,
         width: "100%",
         height: "100%",
       }}
     >
-      <div className="max-w-7xl mx-auto w-full h-full flex flex-col min-h-0">
+      <div className="max-w-7xl w-full h-full flex flex-col min-h-0">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 flex-shrink-0">
           <div className="min-w-0">
             <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-[#730042] tracking-tight">Employee Directory</h1>
