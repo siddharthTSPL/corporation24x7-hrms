@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useCreateAnnouncement,
   useGetAllAnnouncement,
@@ -35,12 +35,14 @@ const PRIORITY_CONFIG = {
 };
 
 const AUDIENCE_CONFIG = {
-  all:       { label: "All",       color: "bg-[#EEEDFE] text-[#3C3489]" },
+  all: { label: "All", color: "bg-[#EEEDFE] text-[#3C3489]" },
   employees: { label: "Employees", color: "bg-[#E6F1FB] text-[#0C447C]" },
-  managers:  { label: "Managers",  color: "bg-[#FBEAF0] text-[#730042]" },
+  managers: { label: "Managers", color: "bg-[#FBEAF0] text-[#730042]" },
 };
 
 const AVATAR_BG = ["#730042", "#993556", "#72243E", "#CD166E", "#4B1528"];
+
+/* --------------------------------- Icons --------------------------------- */
 
 function IconMegaphone({ size = 20, color = "currentColor" }) {
   return (
@@ -143,13 +145,19 @@ function IconMail({ size = 13, color = "currentColor" }) {
   );
 }
 
+/* ------------------------------ Shared bits ------------------------------ */
+
 const inputCls =
   "w-full px-3 py-2.5 min-h-11 border border-[#F4C0D1] rounded-[9px] bg-[#F9F8F2] text-[13px] text-[#730042] " +
   "outline-none focus:border-[#CD166E] focus:ring-2 focus:ring-[#CD166E]/20 transition-all placeholder-[#993556]/40 font-[inherit]";
 
+// scroll containers get momentum scrolling on iOS + contain overscroll so
+// scrolling a modal/table never "leaks" into the page behind it
+const scrollFixStyle = { WebkitOverflowScrolling: "touch", overscrollBehavior: "contain" };
+
 function Field({ label, optional, error, children }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5 min-w-0">
       <label className="text-[10px] font-semibold uppercase tracking-wider text-[#993556]">
         {label}{" "}
         {optional && <span className="font-normal normal-case text-[#B4B2A9] text-[10px]">(optional)</span>}
@@ -167,13 +175,13 @@ function ImageOrPlaceholder({ src, alt, className, placeholderBg }) {
       <img
         src={src}
         alt={alt}
-        className={className}
+        className={`${className} max-w-full`}
         onError={(e) => (e.target.style.display = "none")}
       />
     );
   }
   return (
-    <div className={`flex items-center justify-center ${className}`} style={{ background: placeholderBg }}>
+    <div className={`flex items-center justify-center max-w-full ${className}`} style={{ background: placeholderBg }}>
       <IconMegaphone size={22} color="rgba(255,255,255,0.28)" />
     </div>
   );
@@ -230,11 +238,26 @@ function SkeletonMobileRows() {
   ));
 }
 
+/**
+ * Full-screen (on mobile) modal overlay.
+ * - fixed inset-0 + z-50: sits above everything, own stacking context
+ * - dvh so mobile browser chrome (address bar) doesn't clip content
+ * - overscrollBehavior: contain keeps scroll from "leaking" to the page behind it
+ * - overflow-y-auto on the overlay itself is a fallback for very small screens
+ *
+ * NOTE: this component MUST keep `fixed inset-0` — without it the modal
+ * renders inline in the page flow instead of as an overlay.
+ */
 function ModalOverlay({ onClose, children }) {
   return (
     <div
-      className="fixed inset-0 flex items-end sm:items-center justify-center z-50 px-0 sm:px-4"
-      style={{ background: "rgba(115,0,66,0.32)", backdropFilter: "blur(2px)" }}
+      className="fixed inset-0 flex items-end sm:items-center justify-center z-50 px-0 sm:px-4 overflow-y-auto"
+      style={{
+        background: "rgba(115,0,66,0.32)",
+        backdropFilter: "blur(2px)",
+        height: "100dvh",
+        ...scrollFixStyle,
+      }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       {children}
@@ -244,7 +267,7 @@ function ModalOverlay({ onClose, children }) {
 
 function MobileAnnouncementCard({ item, idx, canEdit, canDelete, onEdit, onDelete }) {
   return (
-    <div className="bg-white rounded-[14px] border border-[#F4C0D1] overflow-hidden">
+    <div className="bg-white rounded-[14px] border border-[#F4C0D1] overflow-hidden w-full min-w-0">
       <div className="flex items-start gap-3 p-4">
         <ImageOrPlaceholder
           src={item.notice_image}
@@ -276,7 +299,7 @@ function MobileAnnouncementCard({ item, idx, canEdit, canDelete, onEdit, onDelet
           {canEdit && (
             <button
               onClick={() => onEdit(item)}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 min-h-11 rounded-[8px] border border-[#F4C0D1] text-[12px] font-medium text-[#993556] hover:bg-[#FBEAF0] hover:text-[#CD166E] transition-all"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 min-h-11 rounded-[8px] border border-[#F4C0D1] text-[12px] font-medium text-[#993556] hover:bg-[#FBEAF0] hover:text-[#CD166E] transition-all active:scale-[0.98]"
               style={{ background: "#F9F8F2" }}
             >
               <IconEdit size={12} /> Edit
@@ -285,7 +308,7 @@ function MobileAnnouncementCard({ item, idx, canEdit, canDelete, onEdit, onDelet
           {canDelete && (
             <button
               onClick={() => onDelete(item)}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 min-h-11 rounded-[8px] border border-[#F4C0D1] text-[12px] font-medium text-[#993556] hover:bg-[#FCEBEB] hover:text-[#A32D2D] transition-all"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 min-h-11 rounded-[8px] border border-[#F4C0D1] text-[12px] font-medium text-[#993556] hover:bg-[#FCEBEB] hover:text-[#A32D2D] transition-all active:scale-[0.98]"
               style={{ background: "#F9F8F2" }}
             >
               <IconTrash size={12} /> Delete
@@ -356,9 +379,9 @@ export default function AnnouncementPage() {
   const [errors, setErrors] = useState({});
 
   const can = usePermissionStore((state) => state.can);
-  const canView   = can("announcements.can_view_announcements");
+  const canView = can("announcements.can_view_announcements");
   const canCreate = can("announcements.can_create_announcement");
-  const canEdit   = can("announcements.can_edit_announcement");
+  const canEdit = can("announcements.can_edit_announcement");
   const canDelete = can("announcements.can_delete_announcement");
 
   const allLocked = !canView && !canCreate && !canEdit && !canDelete;
@@ -372,6 +395,35 @@ export default function AnnouncementPage() {
   const announcements = data?.announcements || [];
   const isPending = isCreating || isUpdating;
 
+  // Lock background scroll while any modal/dialog is open, and restore the
+  // exact previous inline styles on close/unmount. Without this, iOS/Android
+  // browsers can let a touch drag scroll the page underneath a "fixed"
+  // overlay at the same time as the modal, which feels like "scrolling is
+  // broken" (touches fight between the two layers).
+  useEffect(() => {
+    const isOpen = Boolean(modalMode || deleteTarget);
+    if (!isOpen) return;
+
+    const { style } = document.body;
+    const prevOverflow = style.overflow;
+    const prevPosition = style.position;
+    const prevWidth = style.width;
+    const scrollY = window.scrollY;
+
+    style.overflow = "hidden";
+    style.position = "fixed";
+    style.top = `-${scrollY}px`;
+    style.width = "100%";
+
+    return () => {
+      style.overflow = prevOverflow;
+      style.position = prevPosition;
+      style.width = prevWidth;
+      style.top = "";
+      window.scrollTo(0, scrollY);
+    };
+  }, [modalMode, deleteTarget]);
+
   const openCreate = () => {
     if (!canCreate) return;
     setForm(EMPTY_FORM);
@@ -383,12 +435,12 @@ export default function AnnouncementPage() {
     if (!canEdit) return;
     setSelectedItem(item);
     setForm({
-      title:        item.title,
-      message:      item.message,
-      audience:     item.audience,
-      priority:     item.priority,
+      title: item.title,
+      message: item.message,
+      audience: item.audience,
+      priority: item.priority,
       notice_image: item.notice_image || "",
-      expiresAt:    item.expiresAt ? new Date(item.expiresAt).toISOString().split("T")[0] : "",
+      expiresAt: item.expiresAt ? new Date(item.expiresAt).toISOString().split("T")[0] : "",
     });
     setErrors({});
     setModalMode("edit");
@@ -431,7 +483,10 @@ export default function AnnouncementPage() {
 
   if (allLocked) {
     return (
-      <div className="p-3 sm:p-5 md:p-6 lg:p-8 min-h-screen overflow-x-hidden" style={{ background: "#F9F8F2" }}>
+      <div
+        className="p-3 sm:p-5 md:p-6 lg:p-8 w-full max-w-full min-h-full overflow-x-hidden"
+        style={{ background: "#F9F8F2" }}
+      >
         <div className="max-w-[1600px] mx-auto bg-white rounded-[14px] border border-[#F4C0D1] overflow-hidden">
           <FullPageLockScreen />
         </div>
@@ -440,16 +495,20 @@ export default function AnnouncementPage() {
   }
 
   const stats = [
-    { label: "Total",         value: announcements.length,                                                                icon: <IconFile  size={18} color="#CD166E" />, bg: "bg-[#FBEAF0]" },
-    { label: "High priority", value: announcements.filter((a) => a.priority === "high").length,                          icon: <IconAlert size={18} color="#A32D2D" />, bg: "bg-[#FCEBEB]" },
-    { label: "Audience: all", value: announcements.filter((a) => a.audience === "all").length,                           icon: <IconGlobe size={18} color="#3C3489" />, bg: "bg-[#EEEDFE]" },
-    { label: "With expiry",   value: announcements.filter((a) => a.expiresAt && new Date(a.expiresAt) > new Date()).length, icon: <IconClock size={18} color="#633806" />, bg: "bg-[#FAEEDA]" },
+    { label: "Total", value: announcements.length, icon: <IconFile size={18} color="#CD166E" />, bg: "bg-[#FBEAF0]" },
+    { label: "High priority", value: announcements.filter((a) => a.priority === "high").length, icon: <IconAlert size={18} color="#A32D2D" />, bg: "bg-[#FCEBEB]" },
+    { label: "Audience: all", value: announcements.filter((a) => a.audience === "all").length, icon: <IconGlobe size={18} color="#3C3489" />, bg: "bg-[#EEEDFE]" },
+    { label: "With expiry", value: announcements.filter((a) => a.expiresAt && new Date(a.expiresAt) > new Date()).length, icon: <IconClock size={18} color="#633806" />, bg: "bg-[#FAEEDA]" },
   ];
 
   return (
-    <div className="p-3 sm:p-5 md:p-6 lg:p-8 min-h-screen overflow-x-hidden" style={{ background: "#F9F8F2" }}>
-      <div className="max-w-[1600px] mx-auto">
-
+    // w-full + max-w-full + overflow-x-hidden on the root stop any stray wide
+    // child from ever creating horizontal scroll on a phone. This page does
+    // NOT own its own vertical scroll container (no h-screen / overflow-y-auto
+    // here) — that's intentionally left to the layout that renders this page,
+    // so there's only ever one scrollable region, not two fighting each other.
+    <div className="p-3 sm:p-5 md:p-6 lg:p-8 w-full max-w-full min-h-full overflow-x-hidden" style={{ background: "#F9F8F2" }}>
+      <div className="max-w-[1600px] mx-auto w-full min-w-0">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 sm:mb-8">
           <div className="min-w-0">
             <h1 className="text-lg sm:text-xl font-semibold text-[#730042] tracking-tight truncate">Announcements</h1>
@@ -459,7 +518,7 @@ export default function AnnouncementPage() {
           {canCreate ? (
             <button
               onClick={openCreate}
-              className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-2.5 min-h-11 rounded-xl text-[13px] font-medium text-white transition-opacity hover:opacity-88 flex-shrink-0"
+              className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-2.5 min-h-11 rounded-xl text-[13px] font-medium text-white transition-opacity hover:opacity-88 active:scale-[0.98] flex-shrink-0"
               style={{ background: "#730042" }}
             >
               <IconPlus size={14} />
@@ -481,14 +540,14 @@ export default function AnnouncementPage() {
           {!canView && <ViewBlurOverlay />}
 
           <div className={!canView ? "pointer-events-none select-none" : ""} aria-hidden={!canView}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 mb-6 sm:mb-8">
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-3 md:gap-4 mb-6 sm:mb-8">
               {stats.map((s) => (
-                <div key={s.label} className="bg-white rounded-xl border border-[#F4C0D1] p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
+                <div key={s.label} className="bg-white rounded-xl border border-[#F4C0D1] p-3 sm:p-4 flex items-center gap-2 sm:gap-4 min-w-0">
                   <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${s.bg}`}>
                     {s.icon}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-lg sm:text-xl font-semibold text-[#730042]">
+                    <div className="text-base sm:text-xl font-semibold text-[#730042] truncate">
                       {!canView ? "•••" : isLoading ? "—" : s.value}
                     </div>
                     <div className="text-[10px] sm:text-[11px] text-[#993556] mt-0.5 truncate">{s.label}</div>
@@ -502,11 +561,11 @@ export default function AnnouncementPage() {
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-[#993556] mb-3">
                   Latest announcements
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
                   {announcements.slice(0, 3).map((item, idx) => (
                     <div
                       key={item._id}
-                      className="bg-white rounded-[14px] border border-[#F4C0D1] overflow-hidden hover:-translate-y-0.5 transition-transform duration-200"
+                      className="bg-white rounded-[14px] border border-[#F4C0D1] overflow-hidden hover:-translate-y-0.5 transition-transform duration-200 w-full min-w-0"
                     >
                       <ImageOrPlaceholder
                         src={item.notice_image}
@@ -544,7 +603,8 @@ export default function AnnouncementPage() {
 
               {!canView ? (
                 <>
-                  <div className="hidden lg:block overflow-x-auto">
+                  {/* Table only ever renders at lg+ (own contained scroller) — mobile never sees it */}
+                  <div className="hidden lg:block overflow-x-auto" style={scrollFixStyle}>
                     <table className="w-full table-fixed text-sm">
                       <thead>
                         <tr className="border-b border-[#F4C0D1]" style={{ background: "#F9F8F2" }}>
@@ -562,13 +622,16 @@ export default function AnnouncementPage() {
                 </>
               ) : isLoading ? (
                 <>
-                  <div className="hidden lg:block overflow-x-auto">
+                  <div className="hidden lg:block overflow-x-auto" style={scrollFixStyle}>
                     <table className="w-full min-w-[820px] text-sm">
                       <thead>
                         <tr className="border-b border-[#F4C0D1]" style={{ background: "#F9F8F2" }}>
                           {["Image", "Title & Message", "Audience", "Priority", "Expiry", "Created", "Actions"].map((h) => (
-                            <th key={h} className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-[#993556] whitespace-nowrap"
-                              style={h === "Actions" ? { textAlign: "center" } : {}}>
+                            <th
+                              key={h}
+                              className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-[#993556] whitespace-nowrap"
+                              style={h === "Actions" ? { textAlign: "center" } : {}}
+                            >
                               {h}
                             </th>
                           ))}
@@ -599,7 +662,8 @@ export default function AnnouncementPage() {
                 </div>
               ) : (
                 <>
-                  <div className="hidden lg:block overflow-x-auto">
+                  {/* Desktop / large-tablet table — own horizontal scroller, isolated from the page. lg+ only. */}
+                  <div className="hidden lg:block overflow-x-auto" style={scrollFixStyle}>
                     <table className="w-full min-w-[820px] text-sm">
                       <thead>
                         <tr className="border-b border-[#F4C0D1]" style={{ background: "#F9F8F2" }}>
@@ -680,7 +744,8 @@ export default function AnnouncementPage() {
                     </table>
                   </div>
 
-                  <div className="lg:hidden p-4 space-y-3">
+                  {/* Mobile / small-tablet cards — < lg. Stacks vertically, never needs horizontal scroll. */}
+                  <div className="lg:hidden p-3 sm:p-4 space-y-3 w-full min-w-0">
                     {announcements.map((item, idx) => (
                       <MobileAnnouncementCard
                         key={item._id}
@@ -701,7 +766,10 @@ export default function AnnouncementPage() {
 
         {modalMode && (canCreate || canEdit) && (
           <ModalOverlay onClose={closeModal}>
-            <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[95vh] sm:max-h-[92vh] overflow-y-auto overflow-x-hidden border border-[#F4C0D1] sm:border">
+            <div
+              className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl overflow-y-auto overflow-x-hidden border border-[#F4C0D1] sm:border"
+              style={{ maxHeight: "92dvh", ...scrollFixStyle }}
+            >
               <div
                 className="sticky top-0 z-10 flex items-center justify-between gap-3 px-5 sm:px-6 py-4 border-b border-[#F4C0D1] rounded-t-2xl"
                 style={{ background: "#730042" }}
@@ -710,7 +778,7 @@ export default function AnnouncementPage() {
                   <h2 className="text-[15px] font-semibold text-white truncate">
                     {modalMode === "create" ? "New Announcement" : "Edit Announcement"}
                   </h2>
-                  <p className="text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.55)" }}>Fill in the details below</p>
+                  <p className="text-[11px] mt-0.5 truncate" style={{ color: "rgba(255,255,255,0.55)" }}>Fill in the details below</p>
                 </div>
                 <button
                   onClick={closeModal}
@@ -723,7 +791,7 @@ export default function AnnouncementPage() {
                 </button>
               </div>
 
-              <div className="px-5 sm:px-6 py-5 flex flex-col gap-4" style={{ background: "#F9F8F2" }}>
+              <div className="px-5 sm:px-6 py-5 flex flex-col gap-4 min-w-0" style={{ background: "#F9F8F2" }}>
                 <Field label="Title" error={errors.title}>
                   <input
                     name="title"
@@ -798,7 +866,7 @@ export default function AnnouncementPage() {
 
               <div
                 className="sticky bottom-0 flex flex-col sm:flex-row sm:justify-end gap-3 px-5 sm:px-6 py-4 border-t border-[#F4C0D1] rounded-b-2xl"
-                style={{ background: "#F9F8F2" }}
+                style={{ background: "#F9F8F2", paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
               >
                 <button
                   onClick={closeModal}
@@ -824,7 +892,10 @@ export default function AnnouncementPage() {
 
         {deleteTarget && canDelete && (
           <ModalOverlay onClose={() => setDeleteTarget(null)}>
-            <div className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl border border-[#F4C0D1] overflow-hidden">
+            <div
+              className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl border border-[#F4C0D1] overflow-hidden overflow-y-auto"
+              style={{ maxHeight: "92dvh", ...scrollFixStyle }}
+            >
               <div className="px-6 pt-8 pb-5 text-center" style={{ background: "#FBEAF0" }}>
                 <div
                   className="w-12 h-12 rounded-full border border-[#F7C1C1] flex items-center justify-center mx-auto mb-3"
@@ -841,7 +912,10 @@ export default function AnnouncementPage() {
                   <br />This action cannot be undone.
                 </p>
               </div>
-              <div className="flex flex-col sm:flex-row gap-3 px-6 pb-6">
+              <div
+                className="flex flex-col sm:flex-row gap-3 px-6 pb-6"
+                style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+              >
                 <button
                   onClick={() => setDeleteTarget(null)}
                   className="flex-1 py-2.5 min-h-11 rounded-xl border border-[#F4C0D1] text-[12px] font-medium text-[#730042] transition-colors hover:bg-[#FBEAF0]"
