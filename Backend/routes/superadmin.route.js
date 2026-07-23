@@ -38,6 +38,7 @@ const {
   reviewtoadmin,
   getTodayCheckins,
   getAttendanceOverview,
+  getAttendanceHistory,
   getOrgInfo,
   getAllPersonalDocumentsSuperAdmin,
   getAllExpenseDocumentsSuperAdmin,
@@ -209,6 +210,11 @@ superAdminRouter.get(
   "/attendance-overview",
   superAdminAuth,
   asyncHandler(getAttendanceOverview),
+);
+superAdminRouter.get(
+  "/attendance-history/:employeeId",
+  superAdminAuth,
+  asyncHandler(getAttendanceHistory),
 );
 
 superAdminRouter.get(
