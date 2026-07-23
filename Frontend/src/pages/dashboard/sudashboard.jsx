@@ -16,7 +16,7 @@ import { Country, State, City } from "country-state-city";
 import { useGetMeSuperAdmin } from "../../auth/server-state/superadmin/auth/suauth.hook";
 import { SuperAdminAssetReturnWarning } from "../asset/superadminasset";
 import {
-  useGetTodayCheckins, useGetAttendanceOverview, useGetNoOfEmployees, useGetAllEmployees,
+  useGetTodayCheckins, useGetAttendanceOverview, useGetAttendanceHistory, useGetNoOfEmployees, useGetAllEmployees,
   useDeleteEmployee, useAddEmployee, useAddManager, useEditEmployee,
   useGetPermissions, useUpdatePermissions, useSetAdminWorkingStatus,
   useSuperAdminActiveUserCount,
@@ -2200,6 +2200,7 @@ function SuperAdminDashboard() {
         open={attendanceDetailsOpen}
         onClose={() => setAttendanceDetailsOpen(false)}
         useOverviewHook={useGetAttendanceOverview}
+        useHistoryHook={useGetAttendanceHistory}
       />
     </div>
   );
