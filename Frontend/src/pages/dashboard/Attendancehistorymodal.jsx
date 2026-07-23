@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { FaTimes, FaClock, FaCalendarAlt, FaMapMarkerAlt } from "react-icons/fa";
+import { FaTimes, FaClock, FaCalendarAlt, FaMapMarkerAlt, FaDownload, FaFilter } from "react-icons/fa";
+import { downloadCsv } from "./exportCsv";
 
 const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", weekday: "short" }) : "—";
@@ -42,6 +43,20 @@ const PRESETS = [
   { key: "custom", label: "Custom" },
 ];
 
+const STATUS_FILTER_OPTIONS = [
+  { value: "all", label: "All Status" },
+  { value: "present", label: "Present" },
+  { value: "half_day", label: "Half Day" },
+  { value: "absent", label: "Absent" },
+];
+
+const SOURCE_FILTER_OPTIONS = [
+  { value: "all", label: "All Sources" },
+  { value: "face", label: "🤳 Face" },
+  { value: "system", label: "📍 System" },
+  { value: "agent", label: "💻 Agent" },
+];
+
 function presetRange(key) {
   const now = new Date();
   if (key === "last_7") {
@@ -59,6 +74,20 @@ function presetRange(key) {
   // this_month (default)
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
   return { startDate: toInputDate(start), endDate: toInputDate(now) };
+}
+
+function FilterSelect({ value, onChange, options }) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 outline-none bg-white"
+    >
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>{o.label}</option>
+      ))}
+    </select>
+  );
 }
 
 function HistoryRow({ r }) {
@@ -103,6 +132,8 @@ function HistoryRow({ r }) {
 export default function AttendanceHistoryModal({ open, onClose, employeeId, employeeName, useHistoryHook }) {
   const [preset, setPreset] = useState("this_month");
   const [range, setRange] = useState(() => presetRange("this_month"));
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState("all");
 
   const applyPreset = (key) => {
     setPreset(key);
@@ -115,7 +146,15 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
     { enabled: open && !!employeeId }
   );
 
-  const rows = data?.data ?? [];
+  const allRows = data?.data ?? [];
+
+  const rows = useMemo(() => {
+    return allRows.filter((r) => {
+      if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      if (sourceFilter !== "all" && r.source !== sourceFilter) return false;
+      return true;
+    });
+  }, [allRows, statusFilter, sourceFilter]);
 
   const totals = useMemo(() => {
     return rows.reduce(
@@ -128,6 +167,24 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
       { active: 0, idle: 0, daysPresentish: 0 }
     );
   }, [rows]);
+
+  const exportCsv = () => {
+    downloadCsv(
+      `attendance-history-${(employeeName || employeeId || "employee").replace(/\s+/g, "_")}-${range.startDate}_to_${range.endDate}.csv`,
+      [
+        { key: "date", label: "Date", format: (r) => fmtDate(r.date) },
+        { key: "checkIn", label: "Check-in", format: (r) => fmtTime(r.checkIn) },
+        { key: "checkOut", label: "Check-out", format: (r) => fmtTime(r.checkOut) },
+        { key: "source", label: "Via", format: (r) => (SOURCE_META[r.source] || SOURCE_META.system).label.replace(/^\S+\s/, "") },
+        { key: "activeMinutes", label: "Active Minutes", format: (r) => Math.round(r.activeMinutes || 0) },
+        { key: "idleMinutes", label: "Idle Minutes", format: (r) => Math.round(r.idleMinutes || 0) },
+        { key: "status", label: "Status", format: (r) => (STATUS_META[r.status] || STATUS_META.absent).label },
+        { key: "isLate", label: "Late", format: (r) => (r.isLate ? "Yes" : "No") },
+        { key: "overtimeMinutes", label: "Overtime Minutes", format: (r) => Math.round(r.overtimeMinutes || 0) },
+      ],
+      rows
+    );
+  };
 
   if (!open) return null;
 
@@ -201,6 +258,23 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
           )}
         </div>
 
+        <div className="px-4 sm:px-6 py-2.5 flex items-center gap-2 flex-wrap border-b border-gray-100 flex-shrink-0 bg-gray-50/40">
+          <span className="flex items-center gap-1 text-[10.5px] font-semibold uppercase tracking-wide text-gray-400 mr-0.5">
+            <FaFilter size={9} /> Filters
+          </span>
+          <FilterSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_FILTER_OPTIONS} />
+          <FilterSelect value={sourceFilter} onChange={setSourceFilter} options={SOURCE_FILTER_OPTIONS} />
+          <button
+            type="button"
+            onClick={exportCsv}
+            disabled={!rows.length}
+            className="ml-auto flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-3 py-1.5 whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ color: "#fff", background: "#730042" }}
+          >
+            <FaDownload size={10} /> Export CSV
+          </button>
+        </div>
+
         <div className="px-4 sm:px-6 py-2.5 flex items-center gap-4 flex-wrap flex-shrink-0 bg-gray-50/60 border-b border-gray-100">
           <span className="text-[11.5px] text-gray-500">
             Active: <strong className="text-emerald-700">{fmtMinutes(totals.active)}</strong>
@@ -225,7 +299,9 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
           ) : rows.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-14 text-center">
               <span className="text-3xl">📍</span>
-              <p className="text-[13px] text-gray-400">No attendance records in this range</p>
+              <p className="text-[13px] text-gray-400">
+                {allRows.length ? "No records match your filters" : "No attendance records in this range"}
+              </p>
             </div>
           ) : (
             <table className="w-full border-collapse">

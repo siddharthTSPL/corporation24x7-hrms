@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import {
   FaTimes, FaSearch, FaMapMarkerAlt, FaIdCard, FaEnvelope,
-  FaUserTie, FaBuilding, FaCalendarAlt, FaClock,
+  FaUserTie, FaBuilding, FaCalendarAlt, FaClock, FaDownload,
+  FaFilter, FaCheckCircle, FaUserClock, FaBan, FaLayerGroup,
 } from "react-icons/fa";
 import AttendanceHistoryModal from "./AttendanceHistoryModal";
+import { downloadCsv } from "./exportCsv";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -89,6 +91,45 @@ function resolveTodayMeta(p) {
   // present/half-day bar - still "Absent" for payroll purposes, but never
   // labeled "Not Checked In" since they demonstrably did check in.
   return STATUS_META.absent_checked_in;
+}
+
+// Same branching as resolveTodayMeta, but returns the STATUS_META *key*
+// instead of the display object — used for the Status filter dropdown.
+function resolveTodayStatusKey(p) {
+  if (!p.checkIn) return "absent";
+  if (!p.checkOut) return "on_duty";
+  const s = (p.status || "").toLowerCase();
+  if (s === "present") return "present";
+  if (s.includes("half")) return "half_day";
+  return "absent_checked_in";
+}
+
+function StatChip({ icon, label, value, color, bg }) {
+  return (
+    <div className="flex items-center gap-2 rounded-xl px-3 py-2 flex-1 min-w-[110px]" style={{ background: bg }}>
+      <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] flex-shrink-0" style={{ background: `${color}22`, color }}>
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="m-0 text-[15px] font-bold leading-none" style={{ color }}>{value}</p>
+        <p className="m-0 mt-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-gray-400 truncate">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+function FilterSelect({ value, onChange, options, className = "" }) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 outline-none bg-white ${className}`}
+    >
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>{o.label}</option>
+      ))}
+    </select>
+  );
 }
 
 function TodayRow({ p }) {
@@ -191,6 +232,10 @@ function MonthlyRow({ p, onHistoryClick }) {
 export default function AttendanceDetailsModal({ open, onClose, useOverviewHook, useHistoryHook }) {
   const [tab, setTab] = useState("today");
   const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [deptFilter, setDeptFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all"); // today tab only
+  const [sourceFilter, setSourceFilter] = useState("all"); // today tab only
   const [historyModal, setHistoryModal] = useState({ open: false, person: null });
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -208,18 +253,122 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
   const activeQuery = tab === "today" ? todayQuery : monthlyQuery;
   const rows = activeQuery.data?.data ?? [];
 
+  const roleOptions = useMemo(() => {
+    const set = new Set(rows.map((p) => p.role).filter(Boolean));
+    return [{ value: "all", label: "All Roles" }, ...[...set].sort().map((r) => ({ value: r, label: r.charAt(0).toUpperCase() + r.slice(1) }))];
+  }, [rows]);
+
+  const deptOptions = useMemo(() => {
+    const set = new Set(rows.map((p) => p.department).filter(Boolean));
+    return [{ value: "all", label: "All Departments" }, ...[...set].sort().map((d) => ({ value: d, label: d }))];
+  }, [rows]);
+
+  const STATUS_FILTER_OPTIONS = [
+    { value: "all", label: "All Status" },
+    { value: "present", label: "Present" },
+    { value: "on_duty", label: "On Duty" },
+    { value: "half_day", label: "Half Day" },
+    { value: "absent_checked_in", label: "Absent (Checked In)" },
+    { value: "absent", label: "Not Checked In" },
+  ];
+
+  const SOURCE_FILTER_OPTIONS = [
+    { value: "all", label: "All Sources" },
+    { value: "face", label: "🤳 Face" },
+    { value: "live", label: "📍 System" },
+  ];
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter(
-      (p) =>
-        p.name?.toLowerCase().includes(q) ||
-        p.empid?.toLowerCase().includes(q) ||
-        p.email?.toLowerCase().includes(q) ||
-        p.office_location?.toLowerCase().includes(q) ||
-        p.reportingManager?.toLowerCase().includes(q)
-    );
-  }, [rows, search]);
+    return rows.filter((p) => {
+      if (q) {
+        const matches =
+          p.name?.toLowerCase().includes(q) ||
+          p.empid?.toLowerCase().includes(q) ||
+          p.email?.toLowerCase().includes(q) ||
+          p.office_location?.toLowerCase().includes(q) ||
+          p.reportingManager?.toLowerCase().includes(q);
+        if (!matches) return false;
+      }
+      if (roleFilter !== "all" && p.role !== roleFilter) return false;
+      if (deptFilter !== "all" && p.department !== deptFilter) return false;
+      if (tab === "today") {
+        if (statusFilter !== "all" && resolveTodayStatusKey(p) !== statusFilter) return false;
+        if (sourceFilter !== "all" && p.source !== sourceFilter) return false;
+      }
+      return true;
+    });
+  }, [rows, search, roleFilter, deptFilter, statusFilter, sourceFilter, tab]);
+
+  // Quick counts for the stat strip — always computed off the currently
+  // filtered set so the numbers match what's actually visible below.
+  const todayStats = useMemo(() => {
+    if (tab !== "today") return null;
+    const acc = { present: 0, onDuty: 0, absentCheckedIn: 0, notCheckedIn: 0 };
+    filtered.forEach((p) => {
+      const key = resolveTodayStatusKey(p);
+      if (key === "present" || key === "half_day") acc.present += 1;
+      else if (key === "on_duty") acc.onDuty += 1;
+      else if (key === "absent_checked_in") acc.absentCheckedIn += 1;
+      else acc.notCheckedIn += 1;
+    });
+    return acc;
+  }, [filtered, tab]);
+
+  const monthlyStats = useMemo(() => {
+    if (tab !== "monthly") return null;
+    if (!filtered.length) return { avgPercent: 0, totalPresent: 0, totalAbsent: 0, totalHours: "0h 0m" };
+    const totalPresent = filtered.reduce((s, p) => s + (p.presentDays || 0), 0);
+    const totalAbsent = filtered.reduce((s, p) => s + (p.absentDays || 0), 0);
+    const totalMins = filtered.reduce((s, p) => s + (p.totalWorkingMinutes || 0), 0);
+    const avgPercent = Math.round(filtered.reduce((s, p) => s + (p.attendancePercent || 0), 0) / filtered.length);
+    return { avgPercent, totalPresent, totalAbsent, totalHours: fmtMinutes(totalMins) };
+  }, [filtered, tab]);
+
+  const exportCsv = () => {
+    const stamp = tab === "today" ? new Date().toISOString().slice(0, 10) : `${year}-${String(month).padStart(2, "0")}`;
+    if (tab === "today") {
+      downloadCsv(
+        `attendance-today-${stamp}.csv`,
+        [
+          { key: "name", label: "Employee" },
+          { key: "empid", label: "Emp ID" },
+          { key: "email", label: "Email" },
+          { key: "role", label: "Role" },
+          { key: "department", label: "Department" },
+          { key: "reportingManager", label: "Reporting Manager" },
+          { key: "office_location", label: "Office Location" },
+          { key: "checkIn", label: "Check-in", format: (r) => fmtTime(r.checkIn) },
+          { key: "checkOut", label: "Check-out", format: (r) => fmtTime(r.checkOut) },
+          { key: "status", label: "Status", format: (r) => resolveTodayMeta(r).label },
+          { key: "source", label: "Via", format: (r) => (r.source === "face" ? "Face" : r.source === "live" ? "System" : "—") },
+          { key: "activeMinutes", label: "Active Minutes", format: (r) => Math.round(r.activeMinutes || 0) },
+          { key: "idleMinutes", label: "Idle Minutes", format: (r) => Math.round(r.idleMinutes || 0) },
+        ],
+        filtered
+      );
+    } else {
+      downloadCsv(
+        `attendance-monthly-${stamp}.csv`,
+        [
+          { key: "name", label: "Employee" },
+          { key: "empid", label: "Emp ID" },
+          { key: "email", label: "Email" },
+          { key: "role", label: "Role" },
+          { key: "department", label: "Department" },
+          { key: "reportingManager", label: "Reporting Manager" },
+          { key: "office_location", label: "Office Location" },
+          { key: "presentDays", label: "Present Days" },
+          { key: "halfDays", label: "Half Days" },
+          { key: "absentDays", label: "Absent Days" },
+          { key: "weekOffHolidayDays", label: "Weekoff/Holiday Days" },
+          { key: "totalWorkingMinutes", label: "Total Hours", format: (r) => fmtMinutes(r.totalWorkingMinutes) },
+          { key: "attendancePercent", label: "Attendance %", format: (r) => `${r.attendancePercent ?? 0}%` },
+        ],
+        filtered
+      );
+    }
+  };
 
   if (!open) return null;
 
@@ -233,7 +382,7 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[88vh] flex flex-col overflow-hidden"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div
@@ -300,17 +449,58 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
                 </select>
               </>
             )}
-            <div className="relative">
-              <FaSearch size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-300" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search name, empid, email…"
-                className="text-[12px] border border-gray-200 rounded-lg pl-7 pr-3 py-1.5 outline-none w-[190px] focus:border-[#c499b4]"
-              />
-            </div>
+            <button
+              type="button"
+              onClick={exportCsv}
+              disabled={!filtered.length}
+              className="flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-3 py-1.5 whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ color: "#fff", background: "#730042" }}
+            >
+              <FaDownload size={10} /> Export CSV
+            </button>
           </div>
         </div>
+
+        <div className="px-4 sm:px-6 py-2.5 flex items-center gap-2 flex-wrap border-b border-gray-100 flex-shrink-0 bg-gray-50/40">
+          <span className="flex items-center gap-1 text-[10.5px] font-semibold uppercase tracking-wide text-gray-400 mr-0.5">
+            <FaFilter size={9} /> Filters
+          </span>
+          <FilterSelect value={roleFilter} onChange={setRoleFilter} options={roleOptions} />
+          <FilterSelect value={deptFilter} onChange={setDeptFilter} options={deptOptions} />
+          {tab === "today" && (
+            <>
+              <FilterSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_FILTER_OPTIONS} />
+              <FilterSelect value={sourceFilter} onChange={setSourceFilter} options={SOURCE_FILTER_OPTIONS} />
+            </>
+          )}
+          <div className="relative ml-auto">
+            <FaSearch size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-300" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search name, empid, email…"
+              className="text-[12px] border border-gray-200 rounded-lg pl-7 pr-3 py-1.5 outline-none w-[190px] focus:border-[#c499b4]"
+            />
+          </div>
+        </div>
+
+        {tab === "today" && todayStats && (
+          <div className="px-4 sm:px-6 py-2.5 flex items-center gap-2 flex-wrap border-b border-gray-100 flex-shrink-0">
+            <StatChip icon={<FaCheckCircle size={11} />} label="Present" value={todayStats.present} color="#16A34A" bg="#DCFCE7" />
+            <StatChip icon={<FaUserClock size={11} />} label="On Duty" value={todayStats.onDuty} color="#B8760A" bg="#FEF3C7" />
+            <StatChip icon={<FaBan size={11} />} label="Absent" value={todayStats.absentCheckedIn} color="#DC2626" bg="#FEE2E2" />
+            <StatChip icon={<FaLayerGroup size={11} />} label="Not Checked In" value={todayStats.notCheckedIn} color="#6B7280" bg="#F3F4F6" />
+          </div>
+        )}
+
+        {tab === "monthly" && monthlyStats && (
+          <div className="px-4 sm:px-6 py-2.5 flex items-center gap-2 flex-wrap border-b border-gray-100 flex-shrink-0">
+            <StatChip icon={<FaCheckCircle size={11} />} label="Avg Attendance" value={`${monthlyStats.avgPercent}%`} color="#16A34A" bg="#DCFCE7" />
+            <StatChip icon={<FaUserClock size={11} />} label="Total Present Days" value={monthlyStats.totalPresent} color="#0D9E6E" bg="#E8F7F1" />
+            <StatChip icon={<FaBan size={11} />} label="Total Absent Days" value={monthlyStats.totalAbsent} color="#DC2626" bg="#FEE2E2" />
+            <StatChip icon={<FaClock size={11} />} label="Total Hours" value={monthlyStats.totalHours} color="#730042" bg="#fdf2f7" />
+          </div>
+        )}
 
         <div className="overflow-auto flex-1">
           {activeQuery.isLoading ? (
@@ -322,7 +512,7 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
               ⚠ Could not load attendance details.
             </div>
           ) : filtered.length === 0 ? (
-            <EmptyState text={search ? "No matches for your search" : "No team members found"} />
+            <EmptyState text={rows.length ? "No matches for your filters" : "No team members found"} />
           ) : (
             <table className="w-full border-collapse">
               <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_0_0_#f1f1f1]">
