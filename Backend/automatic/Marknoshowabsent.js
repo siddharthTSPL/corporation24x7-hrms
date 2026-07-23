@@ -8,6 +8,7 @@ const Attendance = require("../Models/attendance.model");
 const AttendanceSummary = require("../Models/attendancesummary.model");
 const NoShowLog = require("../Models/noshowlog.model");
 const { classifyNonWorkingDay, startOfDay } = require("./weekoffcalendar");
+const { getISTDateParts } = require("../utils/Istdate.utils");
 
 // Same shape as monthattendanceupdate.js's hasApprovedLeave — kept local
 // so this file has no runtime dependency on that module's internals.
@@ -24,10 +25,17 @@ const ROLE_CONFIG = {
 /**
  * For the given (already-finished) calendar day, find every active employee
  * across all three roles who has NO Attendance record at all for that day,
- * and — if that day isn't a holiday/week-off/approved-leave day — count it
- * as an absent day in AttendanceSummary. If it IS a holiday/week-off day,
- * count it in weekOffHolidayDays instead. A day the employee hadn't joined
- * the company by yet is skipped entirely — it isn't any of the above.
+ * and — if that day isn't a holiday/week-off/approved-PAID-leave day —
+ * count it as an absent day in AttendanceSummary. If it IS a holiday/
+ * week-off day, count it in weekOffHolidayDays instead. A day the employee
+ * hadn't joined the company by yet is skipped entirely — it isn't any of
+ * the above.
+ *
+ * "Approved-PAID-leave" deliberately excludes leaveType "lwp": an approved
+ * LWP leave is the employee knowingly going unpaid for that day, not an
+ * excused day, so it still counts as absent here (LeaveBalance.lwp itself
+ * was already credited once, in full, by processLeaveDeduction() at leave
+ * approval time — this file never touches LeaveBalance).
  *
  * A rotational org's "unconfigured" week (no WeeklyOffSchedule entry filled
  * in for that week) is deliberately NOT treated as a free pass here: it's
@@ -58,13 +66,26 @@ const ROLE_CONFIG = {
  */
 async function markNoShowAbsences(forDate = new Date(Date.now() - 24 * 60 * 60 * 1000)) {
   const date = startOfDay(forDate);
-  const month = date.getMonth() + 1;
-  const year = date.getFullYear();
+  // IST calendar month/year, not server-local getMonth()/getFullYear() -
+  // `date` is stored as the UTC instant of IST midnight, so on a non-IST
+  // host the last day of a month reads back as the 1st of the NEXT month
+  // (and vice versa), silently bucketing weekOffHolidayDays/absentDays
+  // into the wrong AttendanceSummary doc. See same fix in
+  // monthattendanceupdate.js.
+  const { month, year } = getISTDateParts(date);
 
   for (const role of Object.keys(ROLE_CONFIG)) {
     const { Model, onModel, LeaveModel, leaveField, leaveApprovedStatuses } = ROLE_CONFIG[role];
 
-    const employees = await Model.find({ status: "active" })
+    // NOTE: filtering on working_status, not status. `status` on User/
+    // Manager/Admin is dual-purposed as a login/logout session flag (see
+    // Unified.auth.controller.js — set to "active" on login, "inactive" on
+    // logout) as well as an offboarding flag, so it does NOT reliably mean
+    // "currently employed" — someone simply logged out looks identical to
+    // someone who resigned. working_status ("working"/"resigned"/"fired"/
+    // "terminated") is the field that actually tracks employment, so it's
+    // the correct one to gate no-show/absent sweeping on.
+    const employees = await Model.find({ working_status: "working" })
       .select("_id organisation_id date_of_joining createdAt")
       .lean();
 
@@ -77,12 +98,20 @@ async function markNoShowAbsences(forDate = new Date(Date.now() - 24 * 60 * 60 *
       const joinDate = emp.date_of_joining || emp.createdAt;
       if (joinDate && date < startOfDay(joinDate)) continue;
 
-      // Already has a record for this day (checked in, whatever the
-      // outcome) -> handled by the checkout-driven path already.
+      // A REAL record for this day (manual/face check-in, or anything that
+      // got checked out) -> handled by the checkout-driven path already,
+      // skip it here. A pure source:"agent" stub that never got checked
+      // out is NOT real attendance - it's a background ping that slipped
+      // through before/without the activity() weekoff/holiday guard (see
+      // attendance.controller.js). autoCheckoutAll() deliberately never
+      // closes source:"agent" records, so without this exclusion such a
+      // stub would block this sweep FOREVER and the day would end up
+      // uncounted anywhere (not present, not absent, not weekOffHolidayDays).
       const existing = await Attendance.findOne({
         employee: emp._id,
         role,
         date,
+        $or: [{ source: { $ne: "agent" } }, { checkOut: { $exists: true } }],
       }).select("_id").lean();
       if (existing) continue;
 
@@ -94,15 +123,22 @@ async function markNoShowAbsences(forDate = new Date(Date.now() - 24 * 60 * 60 *
       // as "not a holiday, not a week-off" — only check leave for these;
       // holiday/week_off don't need it.
       const isWorkingDay = nonWorking.type !== "holiday" && nonWorking.type !== "week_off";
-      const onLeave = isWorkingDay
+      // leaveType "lwp" is excluded here on purpose: an approved LWP leave
+      // means the employee is knowingly taking an unpaid day, not an excused
+      // one. It must still show up as an absent day in AttendanceSummary
+      // (its LeaveBalance.lwp effect is already applied once, in full, by
+      // processLeaveDeduction() at approval time — see calculateleave.js).
+      // Only genuinely paid leave (el/sl/ml/pl/half_day_*) excuses the day.
+      const onPaidLeave = isWorkingDay
         ? await LeaveModel.findOne({
             [leaveField]: emp._id,
             status: { $in: leaveApprovedStatuses },
+            leaveType: { $ne: "lwp" },
             startDate: { $lte: date },
             endDate: { $gte: date },
           }).select("_id").lean()
         : null;
-      if (isWorkingDay && onLeave) continue;
+      if (isWorkingDay && onPaidLeave) continue;
 
       // Claim this employee/day before incrementing anything. If another
       // invocation (nightly cron overlapping a startup catch-up, or two
