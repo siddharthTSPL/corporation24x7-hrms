@@ -274,7 +274,13 @@ const adminlogin = async (req, res, next) => {
 const adminlogout = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  Adminmodel.findByIdAndUpdate(req.admin._id, { status: "inactive" }).exec();
+  // NOTE: do NOT flip `status` here. `status` represents the admin's
+  // account state (active/inactive/suspended) and is checked by
+  // admin.middleware.js on every request. Setting it to "inactive" on
+  // logout locks the admin out of the account (403 "Your account is
+  // inactive") until their next successful login, and can 403 any other
+  // still-valid session/tab/device in the meantime. Logout should only
+  // clear this session's cookie, not mutate account status.
   const isProduction = process.env.NODE_ENV === "production";
   res.clearCookie("token", {
     httpOnly: true,
