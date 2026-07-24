@@ -18,6 +18,21 @@ const PHONE_REGEX = /^[0-9]{10}$/;
 const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 const ACCOUNT_REGEX = /^[0-9]{9,18}$/;
 
+// Shared with the mobile tab dropdown so the two navigation styles
+// (sidebar on larger screens, a <select> on phones/small tablets)
+// never fall out of sync.
+const SETTINGS_TABS = [
+  { key: "profile", label: "Profile" },
+  { key: "contact", label: "Contact & office" },
+  { key: "address", label: "Address" },
+  { key: "documents", label: "Documents" },
+  { key: "identity", label: "Identity" },
+  { key: "leave", label: "Leave Balance" },
+  { key: "reviews", label: "Reviews" },
+  { key: "password", label: "Password" },
+  { key: "avatar", label: "Avatar" },
+];
+
 const C = {
   brand:      "#730042",
   brandLight: "rgba(115,0,66,0.08)",
@@ -113,16 +128,13 @@ function Toast({ message, type, onClose }) {
 
   const isSuccess = type === "success";
   return (
-    <div style={{
-      position: "fixed", top: 24, right: 24, zIndex: 999,
-      background: isSuccess ? "#f0faf5" : "#fff5f5",
-      border: `0.5px solid ${isSuccess ? "#a8dfc3" : "#f5c6c6"}`,
-      borderRadius: 12, padding: "14px 18px",
-      display: "flex", alignItems: "center", gap: 10,
-      boxShadow: "0 4px 24px rgba(115,0,66,0.10)",
-      minWidth: 260, maxWidth: 360,
-      animation: "slideIn 0.25s ease",
-    }}>
+    <div
+      className="st-toast"
+      style={{
+        background: isSuccess ? "#f0faf5" : "#fff5f5",
+        border: `0.5px solid ${isSuccess ? "#a8dfc3" : "#f5c6c6"}`,
+      }}
+    >
       <div style={{
         width: 28, height: 28, borderRadius: "50%",
         background: isSuccess ? C.greenBg : C.redBg,
@@ -134,28 +146,28 @@ function Toast({ message, type, onClose }) {
           : <svg width="14" height="14" viewBox="0 0 14 14"><line x1="3" y1="3" x2="11" y2="11" stroke={C.red} strokeWidth="2" strokeLinecap="round"/><line x1="11" y1="3" x2="3" y2="11" stroke={C.red} strokeWidth="2" strokeLinecap="round"/></svg>
         }
       </div>
-      <span style={{ fontSize: 13, fontWeight: 500, color: isSuccess ? "#1a5c3a" : "#7a1a1a", flex: 1 }}>
+      <span style={{ fontSize: 13, fontWeight: 500, color: isSuccess ? "#1a5c3a" : "#7a1a1a", flex: 1, minWidth: 0 }}>
         {message}
       </span>
-      <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
+      <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: 16, lineHeight: 1, padding: 0, flexShrink: 0 }}>×</button>
     </div>
   );
 }
 
 function SectionCard({ title, subtitle, accent = C.brand, children }) {
   return (
-    <div style={{
+    <div className="st-section-card" style={{
       background: C.surface, borderRadius: 16,
       border: `0.5px solid ${C.border}`,
       overflow: "hidden", position: "relative",
-      marginBottom: 16,
+      marginBottom: 16, minWidth: 0,
     }}>
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: accent, borderRadius: "16px 16px 0 0" }} />
-      <div style={{ padding: "20px 24px 16px", borderBottom: `0.5px solid ${C.border}` }}>
+      <div className="st-section-head" style={{ padding: "20px 24px 16px", borderBottom: `0.5px solid ${C.border}` }}>
         <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>{title}</div>
         {subtitle && <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>{subtitle}</div>}
       </div>
-      <div style={{ padding: "20px 24px" }}>{children}</div>
+      <div className="st-section-body" style={{ padding: "20px 24px" }}>{children}</div>
     </div>
   );
 }
@@ -166,12 +178,13 @@ function FieldLabel({ children }) {
 
 function ReadonlyField({ value, label }) {
   return (
-    <div style={{ marginBottom: 16 }}>
+    <div style={{ marginBottom: 16, minWidth: 0 }}>
       <FieldLabel>{label}</FieldLabel>
       <div style={{
         padding: "10px 14px", borderRadius: 10,
         background: "#f9f4f2", border: `0.5px solid ${C.border}`,
         fontSize: 13, color: C.text, fontWeight: 500,
+        wordBreak: "break-word",
       }}>
         {value || "—"}
       </div>
@@ -182,7 +195,7 @@ function ReadonlyField({ value, label }) {
 
 function InputField({ label, value, onChange, type = "text", placeholder, hint, rightEl, name }) {
   return (
-    <div style={{ marginBottom: 16 }}>
+    <div style={{ marginBottom: 16, minWidth: 0 }}>
       <FieldLabel>{label}</FieldLabel>
       <div style={{ position: "relative" }}>
         <input
@@ -265,7 +278,7 @@ function Sidebar({ tab, setTab, manager, initials }) {
   ];
 
   return (
-    <div style={{ width: 220, flexShrink: 0 }}>
+    <div className="settings-sidebar">
       <div style={{
         background: C.surface, borderRadius: 16,
         border: `0.5px solid ${C.border}`,
@@ -280,15 +293,16 @@ function Sidebar({ tab, setTab, manager, initials }) {
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 20, fontWeight: 500, color: "#fff",
             overflow: "hidden", border: `3px solid ${C.brandLight}`,
+            flexShrink: 0,
           }}>
             {manager?.profile_image
               ? <img src={manager.profile_image} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               : initials
             }
           </div>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{manager?.f_name} {manager?.l_name}</div>
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{manager?.designation || "—"}</div>
+          <div style={{ textAlign: "center", minWidth: 0, width: "100%" }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{manager?.f_name} {manager?.l_name}</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{manager?.designation || "—"}</div>
             <div style={{ marginTop: 8 }}>
               <Badge>{manager?.role || "manager"}</Badge>
             </div>
@@ -316,9 +330,9 @@ function Sidebar({ tab, setTab, manager, initials }) {
               }}
             >
               {t.icon}
-              {t.label}
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{t.label}</span>
               {active && (
-                <div style={{ marginLeft: "auto", width: 5, height: 5, borderRadius: "50%", background: C.brand }} />
+                <div style={{ marginLeft: "auto", width: 5, height: 5, borderRadius: "50%", background: C.brand, flexShrink: 0 }} />
               )}
             </button>
           );
@@ -338,7 +352,7 @@ function ProfileTab({ manager }) {
   return (
     <>
       <SectionCard title="Personal details" subtitle="Your core information on record" accent={C.brand}>
-        <div className="st-2col" style={{ display: "grid", gap: "0 20px" }}>
+        <div className="st-2col">
           <ReadonlyField label="First name"     value={manager?.f_name} />
           <ReadonlyField label="Last name"      value={manager?.l_name} />
           <ReadonlyField label="Work email"     value={manager?.work_email} />
@@ -349,7 +363,7 @@ function ProfileTab({ manager }) {
       </SectionCard>
 
       <SectionCard title="Job information" subtitle="Your current role and team" accent={C.blue}>
-        <div className="st-2col" style={{ display: "grid", gap: "0 20px" }}>
+        <div className="st-2col">
           <ReadonlyField label="Role"            value={manager?.role} />
           <ReadonlyField label="Designation"     value={manager?.designation} />
           <ReadonlyField label="Department"      value={deptMap[manager?.department] || manager?.department} />
@@ -362,14 +376,14 @@ function ProfileTab({ manager }) {
       </SectionCard>
 
       <SectionCard title="Experience" subtitle="Your work background" accent={C.amber}>
-        <div className="st-2col" style={{ display: "grid", gap: "0 20px" }}>
+        <div className="st-2col">
           <ReadonlyField label="Fresher"                  value={manager?.is_fresher ? "Yes" : "No"} />
           <ReadonlyField label="Total experience (years)" value={manager?.total_experience !== undefined ? String(manager.total_experience) : "—"} />
         </div>
       </SectionCard>
 
       <SectionCard title="Banking details" subtitle="Your bank information on record" accent={C.green}>
-        <div className="st-2col" style={{ display: "grid", gap: "0 20px" }}>
+        <div className="st-2col">
           <ReadonlyField label="Bank name"           value={manager?.bank_name} />
           <ReadonlyField label="Account holder name" value={manager?.account_holder_name} />
           <ReadonlyField label="Account number"      value={manager?.account_number} />
@@ -530,8 +544,8 @@ const cityOptions = useMemo(() => {
       />
 
       <div
-        className="st-2col"
-        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "0 16px", minWidth: 0,  }}
+        className="st-location-grid"
+        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "0 16px", minWidth: 0 }}
       >
         <div style={{ marginBottom: 16, minWidth: 0 }}>
           <FieldLabel>Country</FieldLabel>
@@ -570,7 +584,7 @@ const cityOptions = useMemo(() => {
       />
       <div style={{ marginBottom: 20 }}>
         <FieldLabel>Gender</FieldLabel>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           {["male", "female"].map(opt => {
             const active = form.gender === opt;
             return (
@@ -578,7 +592,7 @@ const cityOptions = useMemo(() => {
                 key={opt}
                 onClick={() => setForm(p => ({ ...p, gender: opt }))}
                 style={{
-                  flex: 1, padding: "10px 0",
+                  flex: "1 1 100px", padding: "10px 0",
                   borderRadius: 10, border: `0.5px solid ${active ? C.brand : C.border}`,
                   background: active ? C.brandLight : C.surface,
                   color: active ? C.brand : C.muted,
@@ -595,7 +609,7 @@ const cityOptions = useMemo(() => {
       </div>
       <div style={{ marginBottom: 20 }}>
         <FieldLabel>Marital status</FieldLabel>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           {MARITAL_OPTIONS.map(opt => {
             const active = form.marital_status === opt;
             return (
@@ -603,7 +617,7 @@ const cityOptions = useMemo(() => {
                 key={opt}
                 onClick={() => setForm(p => ({ ...p, marital_status: opt }))}
                 style={{
-                  flex: 1, padding: "10px 0",
+                  flex: "1 1 100px", padding: "10px 0",
                   borderRadius: 10, border: `0.5px solid ${active ? C.brand : C.border}`,
                   background: active ? C.brandLight : C.surface,
                   color: active ? C.brand : C.muted,
@@ -629,11 +643,11 @@ function AddressTab({ manager }) {
   return (
     <SectionCard title="Address information" subtitle="On record, contact HR to update" accent={C.amber}>
       <ReadonlyField label="Address" value={manager?.address} />
-      <div className="st-2col" style={{ display: "grid", gap: "0 16px" }}>
+      <div className="st-2col">
         <ReadonlyField label="City" value={manager?.city} />
         <ReadonlyField label="State" value={manager?.state} />
       </div>
-      <div className="st-2col" style={{ display: "grid", gap: "0 16px" }}>
+      <div className="st-2col">
         <ReadonlyField label="Pincode" value={manager?.pincode} />
         <ReadonlyField label="Country" value={manager?.country} />
       </div>
@@ -644,7 +658,7 @@ function AddressTab({ manager }) {
 function IdentityTab({ manager }) {
   return (
     <SectionCard title="Identity numbers" subtitle="Government ID records on file" accent={C.brand}>
-      <div className="st-2col" style={{ display: "grid", gap: "0 20px" }}>
+      <div className="st-2col">
         <ReadonlyField label="Aadhaar number" value={manager?.aadhaar_number} />
         <ReadonlyField label="PAN number" value={manager?.pan_number} />
       </div>
@@ -730,7 +744,7 @@ function DocumentsBankingTab({ manager, onSuccess, onError }) {
       <SectionCard title="Banking details" subtitle="Used for salary disbursement" accent={C.green}>
         <InputField label="Bank name" value={form.bank_name} onChange={set("bank_name")} placeholder="Bank name" />
         <InputField label="Account holder name" value={form.account_holder_name} onChange={set("account_holder_name")} placeholder="As per bank records" />
-        <div className="st-2col" style={{ display: "grid", gap: "0 16px" }}>
+        <div className="st-2col">
           <InputField label="Account number" value={form.account_number} onChange={set("account_number")} placeholder="9-18 digit account number" />
           <InputField label="IFSC code" value={form.ifsc_code} onChange={(e) => setForm(p => ({ ...p, ifsc_code: e.target.value.toUpperCase() }))} placeholder="ABCD0123456" />
         </div>
@@ -760,14 +774,14 @@ function LeaveTab({ leaveBalance }) {
 
   return (
     <SectionCard title="Leave Balance" subtitle="Your current leave entitlements" accent={C.green}>
-      <div className="st-2col" style={{ display: "grid", gap: 12, marginBottom: 16 }}>
+      <div className="st-2col" style={{ gap: 12, marginBottom: 16 }}>
         {leaves.map(l => {
           const entitled = l.entitled ?? 0;
           const availed = l.availed ?? 0;
           const remaining = entitled - availed;
           const pct = entitled > 0 ? Math.max(0, Math.min(100, (remaining / entitled) * 100)) : 0;
           return (
-            <div key={l.key} style={{ padding: "14px 16px", borderRadius: 12, border: `0.5px solid ${C.border}`, background: C.surface }}>
+            <div key={l.key} style={{ padding: "14px 16px", borderRadius: 12, border: `0.5px solid ${C.border}`, background: C.surface, minWidth: 0 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 8 }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{l.label}</span>
                 <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20, background: `${l.color}15`, color: l.color, whiteSpace: "nowrap" }}>
@@ -795,7 +809,7 @@ function LeaveTab({ leaveBalance }) {
           { label: "LWP (Loss of Pay)", value: leaveBalance.lwp ?? 0 },
           { label: "PBC (Public Holidays)", value: leaveBalance.pbc ?? 0 },
         ].map(item => (
-          <div key={item.label} style={{ flex: 1, minWidth: 140, padding: "12px 14px", borderRadius: 10, border: `0.5px solid ${C.border}`, background: C.surface }}>
+          <div key={item.label} style={{ flex: "1 1 140px", minWidth: 140, padding: "12px 14px", borderRadius: 10, border: `0.5px solid ${C.border}`, background: C.surface }}>
             <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>{item.label}</div>
             <div style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{item.value}</div>
           </div>
@@ -822,9 +836,9 @@ function ReviewsTab({ reviews }) {
     <SectionCard title="My Reviews" subtitle={`${reviews.length} review${reviews.length !== 1 ? "s" : ""} · avg ${avg}/5`} accent={C.brand}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {reviews.map((r, i) => (
-          <div key={r._id || i} style={{ padding: "14px 16px", borderRadius: 10, border: `0.5px solid ${C.border}`, background: C.surface }}>
+          <div key={r._id || i} style={{ padding: "14px 16px", borderRadius: 10, border: `0.5px solid ${C.border}`, background: C.surface, minWidth: 0 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8, gap: 8, flexWrap: "wrap" }}>
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>
                   {r.reviewer?.f_name ? `${r.reviewer.f_name} ${r.reviewer.l_name || ""}` : "Anonymous"}
                 </div>
@@ -841,7 +855,7 @@ function ReviewsTab({ reviews }) {
               </div>
             </div>
             {r.comment && (
-              <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, fontStyle: "italic" }}>
+              <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, fontStyle: "italic", wordBreak: "break-word" }}>
                 "{r.comment}"
               </div>
             )}
@@ -898,7 +912,7 @@ function PasswordTab({ onSuccess, onError }) {
 
   return (
     <SectionCard title="Change password" subtitle="Keep your account secure with a strong password" accent={C.brand}>
-      <div style={{ maxWidth: 400 }}>
+      <div style={{ maxWidth: 400, width: "100%" }}>
         <InputField label="Current password *" type={show ? "text" : "password"} name="oldPassword"
           value={form.oldPassword} onChange={e => setForm(p => ({ ...p, oldPassword: e.target.value }))}
           placeholder="Enter current password" rightEl={eyeToggle} />
@@ -968,7 +982,7 @@ function AvatarTab({ manager, onSuccess, onError }) {
 
   return (
     <SectionCard title="Profile avatar" subtitle="Choose an avatar that represents you" accent={C.blue}>
-      <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 24, padding: "16px 20px", background: C.page, borderRadius: 12, border: `0.5px solid ${C.border}` }}>
+      <div className="st-avatar-current" style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 24, padding: "16px 20px", background: C.page, borderRadius: 12, border: `0.5px solid ${C.border}`, flexWrap: "wrap" }}>
         <div style={{
           width: 72, height: 72, borderRadius: "50%",
           background: currentImg ? "transparent" : C.brand,
@@ -982,7 +996,7 @@ function AvatarTab({ manager, onSuccess, onError }) {
             : initials
           }
         </div>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 500, color: C.text, marginBottom: 4 }}>Current avatar</div>
           <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>
             {currentImg ? "DiceBear avatar" : "Initials avatar (default)"}
@@ -1000,7 +1014,7 @@ function AvatarTab({ manager, onSuccess, onError }) {
       </div>
 
       <FieldLabel>Choose a style</FieldLabel>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+      <div className="st-avatar-grid">
         {AVATAR_STYLES.map((style) => {
           const url = `https://api.dicebear.com/7.x/${style}/svg?seed=${seed}`;
           const isActive = currentImg?.includes(style);
@@ -1018,6 +1032,7 @@ function AvatarTab({ manager, onSuccess, onError }) {
                 transition: "all 0.15s", position: "relative",
                 outline: isActive ? `2px solid ${C.brand}` : "none",
                 outlineOffset: 2,
+                minWidth: 0,
               }}
             >
               {isLoading && (
@@ -1026,7 +1041,7 @@ function AvatarTab({ manager, onSuccess, onError }) {
                 </div>
               )}
               <img src={url} alt={style} style={{ width: "100%", aspectRatio: "1", display: "block", borderRadius: 8 }} />
-              <div style={{ fontSize: 10, color: isActive ? C.brand : C.muted, marginTop: 6, textAlign: "center", fontWeight: isActive ? 500 : 400, textTransform: "capitalize" }}>
+              <div style={{ fontSize: 10, color: isActive ? C.brand : C.muted, marginTop: 6, textAlign: "center", fontWeight: isActive ? 500 : 400, textTransform: "capitalize", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {style}
               </div>
             </button>
@@ -1062,7 +1077,7 @@ export default function ManagerSettingsPage() {
   }
 
   return (
-    <div className="st-page" style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", background: C.page, minHeight: "100vh", padding: "28px 32px", color: C.text }}>
+    <div className="st-page" style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", background: C.page, minHeight: "100vh", color: C.text }}>
     <style>{`
   @keyframes spin { to { transform: rotate(360deg); } }
   @keyframes slideIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
@@ -1070,37 +1085,127 @@ export default function ManagerSettingsPage() {
   input::placeholder { color: #c9bab5; }
   select option { color: #2a1a16; }
   select { position: relative; }
-  .mobile-menu-btn { display: none; }
-  @media (max-width: 768px) {
-    .settings-layout { flex-direction: column !important; }
-    .settings-sidebar { display: none !important; }
-    .mobile-menu-btn { display: flex !important; }
+
+  /* ---------- base / desktop-first layout ---------- */
+  .st-page { padding: 28px 32px; overflow-x: hidden; }
+  .st-content-wrap { max-width: 1400px; margin: 0 auto; width: 100%; }
+
+  .st-toast {
+    position: fixed; top: 24px; right: 24px; z-index: 999;
+    border-radius: 12px; padding: 14px 18px;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 4px 24px rgba(115,0,66,0.10);
+    min-width: 260px; max-width: 360px;
+    animation: slideIn 0.25s ease;
+  }
+
+  .settings-layout { display: flex; gap: 16px; align-items: flex-start; }
+  .settings-sidebar { width: 220px; flex-shrink: 0; }
+
+  .mobile-tab-select-wrap { display: none; }
+  .mobile-profile-bar { display: none; }
+
+  .st-2col { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 20px; min-width: 0; }
+
+  .st-avatar-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+
+  /* ---------- large desktop / wide monitors ---------- */
+  @media (min-width: 1600px) {
+    .st-content-wrap { max-width: 1500px; }
+  }
+
+  /* ---------- small laptops / large tablets (landscape) ---------- */
+  @media (max-width: 1200px) {
+    .settings-sidebar { width: 190px; }
+    .st-avatar-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+
+  /* ---------- tablets (portrait) & phones: stacked layout ---------- */
+  @media (max-width: 900px) {
+    .st-page { padding: 20px 16px; }
+    .settings-layout { flex-direction: column; }
+    .settings-sidebar { display: none; }
+    .mobile-tab-select-wrap { display: block; margin-bottom: 12px; }
+    .mobile-profile-bar {
+      display: flex; align-items: center; gap: 12px;
+      background: #ffffff; border: 0.5px solid #ede5e0; border-radius: 16px;
+      padding: 14px 16px; margin-bottom: 12px;
+    }
+    .st-avatar-grid { grid-template-columns: repeat(3, 1fr); }
+    .st-section-head { padding: 16px 18px 12px !important; }
+    .st-section-body { padding: 16px 18px !important; }
+  }
+
+  /* ---------- phones ---------- */
+  @media (max-width: 640px) {
+    .st-2col { grid-template-columns: 1fr; gap: 0; }
+    .st-location-grid { grid-template-columns: 1fr !important; }
+    .st-avatar-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  }
+
+  /* ---------- small phones ---------- */
+  @media (max-width: 480px) {
+    .st-page { padding: 14px 10px; }
+    .st-section-head { padding: 14px 14px 10px !important; }
+    .st-section-body { padding: 14px 14px !important; }
+    .st-avatar-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .st-toast { top: 12px; right: 12px; left: 12px; min-width: auto; max-width: none; }
+    .st-avatar-current { padding: 14px !important; gap: 14px !important; }
   }
 `}</style>
 
       <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: "", type: "" })} />
 
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0, letterSpacing: "-0.3px" }}>Settings</h1>
-        <p style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>Manage your profile, contact info and security</p>
-      </div>
+      <div className="st-content-wrap">
+        <div style={{ marginBottom: 28 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0, letterSpacing: "-0.3px" }}>Settings</h1>
+          <p style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>Manage your profile, contact info and security</p>
+        </div>
 
-      <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-        <Sidebar tab={tab} setTab={setTab} manager={manager} initials={initials} />
+        <div className="mobile-profile-bar">
+          <div style={{
+            width: 44, height: 44, borderRadius: "50%",
+            background: manager?.profile_image ? "transparent" : C.brand,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 16, fontWeight: 500, color: "#fff",
+            overflow: "hidden", flexShrink: 0,
+          }}>
+            {manager?.profile_image
+              ? <img src={manager.profile_image} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              : initials
+            }
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{manager?.f_name} {manager?.l_name}</div>
+            <div style={{ fontSize: 11, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{manager?.designation || manager?.role || "—"}</div>
+          </div>
+        </div>
 
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {tab === "profile"   && <ProfileTab   manager={manager} />}
-          {tab === "contact"   && <ContactTab   manager={manager} onSuccess={showSuccess} onError={showError} />}
-          {tab === "address"   && <AddressTab   manager={manager} />}
-          {tab === "identity"  && <IdentityTab  manager={manager} />}
-          {tab === "documents" && <DocumentsBankingTab manager={manager} onSuccess={showSuccess} onError={showError} />}
-          {tab === "leave"     && <LeaveTab     leaveBalance={leaveBalance} />}
-          {tab === "reviews"   && <ReviewsTab   reviews={reviews} />}
-          {tab === "password"  && <PasswordTab  onSuccess={showSuccess} onError={showError} />}
-          {tab === "avatar"    && <AvatarTab    manager={manager} onSuccess={showSuccess} onError={showError} />}
+        <div className="mobile-tab-select-wrap">
+          <select value={tab} onChange={(e) => setTab(e.target.value)} style={selectStyle(false)}>
+            {SETTINGS_TABS.map(t => (
+              <option key={t.key} value={t.key}>{t.label}</option>
+            ))}
+          </select>
+        </div>
 
-          <div style={{ textAlign: "center", fontSize: 12, color: C.mutedMid, marginTop: 8 }}>
-            Changes are saved to your account automatically
+        <div className="settings-layout">
+          <Sidebar tab={tab} setTab={setTab} manager={manager} initials={initials} />
+
+          <div style={{ flex: 1, minWidth: 0, width: "100%" }}>
+            {tab === "profile"   && <ProfileTab   manager={manager} />}
+            {tab === "contact"   && <ContactTab   manager={manager} onSuccess={showSuccess} onError={showError} />}
+            {tab === "address"   && <AddressTab   manager={manager} />}
+            {tab === "identity"  && <IdentityTab  manager={manager} />}
+            {tab === "documents" && <DocumentsBankingTab manager={manager} onSuccess={showSuccess} onError={showError} />}
+            {tab === "leave"     && <LeaveTab     leaveBalance={leaveBalance} />}
+            {tab === "reviews"   && <ReviewsTab   reviews={reviews} />}
+            {tab === "password"  && <PasswordTab  onSuccess={showSuccess} onError={showError} />}
+            {tab === "avatar"    && <AvatarTab    manager={manager} onSuccess={showSuccess} onError={showError} />}
+
+            <div style={{ textAlign: "center", fontSize: 12, color: C.mutedMid, marginTop: 8 }}>
+              Changes are saved to your account automatically
+            </div>
           </div>
         </div>
       </div>
