@@ -147,7 +147,8 @@ const managerlogout = async (req, res, next) => {
   try {
     if (!req.manager)
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-    await managermodel.findByIdAndUpdate(req.manager._id, { status: "inactive" });
+    // `status` = account state, checked on every request by the auth
+    // middleware. Do not set it to "inactive" here — see adminlogout note.
     const isProduction = process.env.NODE_ENV === "production";
     res.clearCookie("token", { httpOnly: true, secure: isProduction, sameSite: isProduction ? "none" : "lax", path: "/" });
     res.status(200).json({ message: "Manager logout successful" });
