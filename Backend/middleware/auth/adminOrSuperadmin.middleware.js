@@ -37,6 +37,10 @@ const adminOrSuperAdminAuth = async (req, res, next) => {
         return res.status(403).json({ message: "Your account has been suspended" });
       }
 
+      if (superAdmin.working_status !== "working") {
+        return res.status(403).json({ message: "Your account is not active." });
+      }
+
       if (!superAdmin.isVerified) {
         return res.status(403).json({ message: "Please verify your email first" });
       }
@@ -70,9 +74,13 @@ const adminOrSuperAdminAuth = async (req, res, next) => {
       return res.status(403).json({ message: "Your account has been suspended" });
     }
 
-    if (admin.status === "inactive") {
-      return res.status(403).json({ message: "Your account is inactive" });
+    if (admin.working_status !== "working") {
+      return res.status(403).json({ message: "Your account is not active. Please contact super admin." });
     }
+
+    // Intentionally not checking admin.status === "inactive" here —
+    // see admin.middleware.js for why. working_status is the source of
+    // truth for login eligibility, checked here on every request.
 
     req.admin = admin;
     req.user = admin;

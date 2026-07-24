@@ -22,6 +22,10 @@ const authmanager = async (req, res, next) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
+    if (manager.working_status !== "working") {
+      return res.status(403).json({ message: "Your account is not active. Please contact super admin." });
+    }
+
     if (decoded.role !== "manager" && decoded.role !== "senior_manager" && decoded.role !== "official") {
       return res.status(403).json({ message: "Access denied" });
     }

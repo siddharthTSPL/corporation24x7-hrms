@@ -30,9 +30,17 @@ if (!decoded.role || !adminRoles.includes(decoded.role)) {
       return res.status(403).json({ message: "Your account has been suspended" });
     }
 
-    if (admin.status === "inactive") {
-      return res.status(403).json({ message: "Your account is inactive" });
+    if (admin.working_status !== "working") {
+      return res.status(403).json({ message: "Your account is not active. Please contact super admin." });
     }
+
+    // Intentionally not checking admin.status === "inactive" here.
+    // `working_status` (working/resigned/fired/terminated) is the source
+    // of truth for whether the account should be able to log in / stay
+    // authenticated — checked here on every request (not just at login),
+    // so a stale token for a resigned/fired/terminated admin is rejected
+    // immediately. `status` gets flipped by other, unrelated flows and
+    // shouldn't gate every request.
 
     req.admin = admin;
     req.user = admin;

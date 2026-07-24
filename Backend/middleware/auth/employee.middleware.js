@@ -27,6 +27,10 @@ const authemployee = async (req, res, next) => {
     const employee = await usermodel.findById(rawId);
     if (!employee) return res.status(401).json({ message: "Unauthorized: user not found" });
 
+    if (employee.working_status !== "working") {
+      return res.status(403).json({ message: "Your account is not active. Please contact your admin." });
+    }
+
     req.employee = employee;
     req.user = employee;
 
