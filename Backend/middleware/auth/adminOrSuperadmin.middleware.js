@@ -70,9 +70,9 @@ const adminOrSuperAdminAuth = async (req, res, next) => {
       return res.status(403).json({ message: "Your account has been suspended" });
     }
 
-    if (admin.status === "inactive") {
-      return res.status(403).json({ message: "Your account is inactive" });
-    }
+    // Intentionally not checking admin.status === "inactive" here —
+    // see admin.middleware.js for why. working_status is the source of
+    // truth for login eligibility, checked at login time.
 
     req.admin = admin;
     req.user = admin;
