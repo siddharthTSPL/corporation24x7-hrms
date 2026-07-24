@@ -14,9 +14,7 @@ const PHONE_REGEX = /^[0-9]{10}$/;
 const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 const ACCOUNT_REGEX = /^[0-9]{9,18}$/;
 
-// Department short-form -> full-form mapping.
-// Keep this in sync with the SuperAdmin dashboard's DEPT_OPTIONS list
-// so any new department code added there gets a matching full name here.
+
 const DEPT_FULL_FORMS = {
   OPR: "Operations",
   BPO: "Business Process Outsourcing",
