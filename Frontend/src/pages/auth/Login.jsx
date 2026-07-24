@@ -20,6 +20,7 @@ import { getMeUser } from "../../auth/api/employeeapi/auth/em.auth.api";
 import { getMeSuperAdmin } from "../../auth/api/superadmin/auth/su.auth";
 import { fetchMyPermissions } from "../../auth/api/permission/permission.api";
 import { usePermissionStore } from "../../auth/store/permission/permissionStore";
+import { setAgentToken } from "../../pages/utils/Desktopagent";
 
 // Prefer the backend's explicit account-type bucket (superadmin/admin/manager/employee).
 // Falls back to normalizing the raw role string for older responses that don't send accountType.
@@ -149,13 +150,7 @@ function Login() {
   const finishPostAuth = async (data) => {
     const role = normalizeRole(data);
     if (data?.token) {
-      try {
-        await fetch("http://localhost:47821/set-token", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: data.token }),
-        });
-      } catch (_) {}
+      setAgentToken(data.token);
     }
     await syncProfileToCache(role, data);
     setShowLoader(false);
