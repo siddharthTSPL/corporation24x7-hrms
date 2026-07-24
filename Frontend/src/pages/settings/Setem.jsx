@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import React from "react";
 import { useUpdateProfile, useUpdatePassword, useGetMeUser } from "../../auth/server-state/employee/employeeauth/employeeauth.hook";
 import { useQueryClient } from "@tanstack/react-query";
 import { Country, State, City } from "country-state-city";
 
 const DEFAULT_COUNTRY_ISO = "IN";
+const ALL_COUNTRIES = Country.getAllCountries();
 
 const AVATAR_STYLES = [
   "avataaars", "bottts", "personas", "lorelei",
@@ -400,12 +401,20 @@ function ContactTab({ employee, onSuccess, onError }) {
     city: employee?.office_location || "",
   });
 
-  const countries = Country.getAllCountries();
-  const states = form.countryIso ? State.getStatesOfCountry(form.countryIso) : [];
-  const cities = form.countryIso && form.stateIso ? City.getCitiesOfState(form.countryIso, form.stateIso) : [];
-  const cityOptions = form.city && !cities.some(c => c.name === form.city)
-    ? [{ name: form.city }, ...cities]
-    : cities;
+  // AFTER
+const countries = ALL_COUNTRIES;
+const states = useMemo(
+  () => (form.countryIso ? State.getStatesOfCountry(form.countryIso) : []),
+  [form.countryIso]
+);
+const cities = useMemo(
+  () => (form.countryIso && form.stateIso ? City.getCitiesOfState(form.countryIso, form.stateIso) : []),
+  [form.countryIso, form.stateIso]
+);
+const cityOptions = useMemo(
+  () => (form.city && !cities.some(c => c.name === form.city) ? [{ name: form.city }, ...cities] : cities),
+  [form.city, cities]
+);
 
   useEffect(() => {
     if (!employee) return;
