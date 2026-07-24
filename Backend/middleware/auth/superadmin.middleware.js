@@ -25,6 +25,10 @@ const superAdminAuth = async (req, res, next) => {
       return res.status(403).json({ message: "Your account has been suspended" });
     }
 
+    if (superAdmin.working_status !== "working") {
+      return res.status(403).json({ message: "Your account is not active." });
+    }
+
     if (!superAdmin.isVerified) {
       return res.status(403).json({ message: "Please verify your email first" });
     }

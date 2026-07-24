@@ -9,7 +9,8 @@ mongoose.set("strictQuery", false);
 const dbconnect = async () => {
   try {
     await mongoose.connect(process.env.LINK, {
-      maxPoolSize: 10,
+      maxPoolSize: 50,
+      minPoolSize: 5,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
       family: 4, 

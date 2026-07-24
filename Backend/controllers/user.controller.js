@@ -203,7 +203,8 @@ const token = jwt.sign(
 const userlogout = async (req, res, next) => {
   if (!req.employee)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  usermodel.findByIdAndUpdate(req.employee._id, { status: "inactive" }).exec();
+  // `status` = account state, checked on every request by the auth
+  // middleware. Do not set it to "inactive" here — see adminlogout note.
   const isProduction = process.env.NODE_ENV === "production";
   res.clearCookie("token", {
     httpOnly: true,
