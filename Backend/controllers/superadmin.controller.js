@@ -585,8 +585,9 @@ const getMe = async (req, res, next) => {
 };
 
 const logoutSuperAdmin = async (req, res, next) => {
-  req.superAdmin.status = "inactive";
-  await req.superAdmin.save();
+  // `status` = account state, checked on every request by the auth
+  // middleware (and gates every admin/manager/employee under this org).
+  // Do not set it to "inactive" here — see adminlogout note.
   const isProduction = process.env.NODE_ENV === "production";
   res.clearCookie("token", {
     httpOnly: true,
