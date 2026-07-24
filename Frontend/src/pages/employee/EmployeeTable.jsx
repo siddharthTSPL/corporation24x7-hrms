@@ -155,7 +155,7 @@ function exportToCSV(data) {
   const dateStamp = new Date().toISOString().slice(0, 10);
 
   const FULL_HEADERS = [
-    "Employee ID","UID","First Name","Last Name","Work Email","Gender","Marital Status",
+    "Employee ID","First Name","Last Name","Work Email","Gender","Marital Status",
     "Personal Contact","Emergency Contact",
     "Role","Department","Designation","Office Location",
     "Reporting / Under Manager","Is Fresher","Total Experience",
@@ -170,7 +170,7 @@ function exportToCSV(data) {
   const buildRow = (u) => {
     const reportingPerson = u.Under_manager || u.reporting_manager;
     return [
-      u.empid??"",u.uid??"",u.f_name??"",u.l_name??"",u.work_email??"",u.gender??"",u.marital_status??"",
+      u.empid??"",u.f_name??"",u.l_name??"",u.work_email??"",u.gender??"",u.marital_status??"",
       u.personal_contact??"",u.e_contact??"",
       u.role??"",DEPT_FULL_FORMS[u.department]??u.department??"",u.designation??"",u.office_location??"",
       reportingPerson?`${reportingPerson.f_name??""} ${reportingPerson.l_name??""}`.trim():"",
@@ -1026,7 +1026,7 @@ function AccountSummaryDrawer({
                     <div className="flex flex-wrap gap-1.5 mt-1.5">
                       <WorkingStatusBadge status={person.working_status}/>
                     </div>
-                    {person.uid&&<p className="text-[11px] text-[#993556] mt-1.5 font-mono bg-[#F9F8F2] px-1.5 py-0.5 rounded inline-block border border-[#F4C0D1]">{person.uid}</p>}
+                    {person.empid&&<p className="text-[11px] text-[#993556] mt-1.5 font-mono bg-[#F9F8F2] px-1.5 py-0.5 rounded inline-block border border-[#F4C0D1]">{person.empid}</p>}
                   </div>
                 </div>
                 {avgRating!==null&&(
@@ -2239,7 +2239,7 @@ const handleMgrSubmit=()=>{
     const effectiveType = u.type || (u.role === "manager" || u.role === "senior_manager" ? "manager" : "employee");
     const matchType=filters.type?filters.type==="employee"?effectiveType==="employee":filters.type==="manager"?effectiveType==="manager":u.role===filters.type:true;
     return(
-      (name.includes(q)||(u.work_email??"").toLowerCase().includes(q)||(u.uid??"").toLowerCase().includes(q)||(u.designation??"").toLowerCase().includes(q))&&
+      (name.includes(q)||(u.work_email??"").toLowerCase().includes(q)||(u.empid??"").toLowerCase().includes(q)||(u.designation??"").toLowerCase().includes(q))&&
       (filters.department?u.department===filters.department:true)&&
       (filters.role?u.role===filters.role:true)&&
       (filters.location?u.office_location===filters.location:true)&&
@@ -2364,7 +2364,7 @@ return(
             <div className="flex gap-2 mb-2">
               <div className="relative flex-1">
                 <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[#993556]" size={12}/>
-                <input placeholder="Search name, email, UID or designation…"
+                <input placeholder="Search name, email, Employee ID or designation…"
                   className={`${inputCls} pl-8 sm:pl-9`}
                   value={filters.search}
                   onChange={(e)=>setFilters({...filters,search:e.target.value})}/>
@@ -2477,7 +2477,7 @@ return(
                           <div className="min-w-0">
                             <p className={`font-semibold text-xs lg:text-sm truncate max-w-[120px] lg:max-w-[160px] ${isInactive?"text-[#6B7280]":"text-[#730042]"}`}>{u.f_name} {u.l_name}</p>
                             <p className="text-[11px] text-[#993556] truncate max-w-[120px] lg:max-w-[160px]">{u.work_email}</p>
-                            {u.uid&&<p className="text-[10px] text-[#993556]/60 font-mono">{u.uid}</p>}
+                            {u.empid&&<p className="text-[10px] text-[#993556]/60 font-mono">{u.empid}</p>}
                           </div>
                         </div>
                       </td>
