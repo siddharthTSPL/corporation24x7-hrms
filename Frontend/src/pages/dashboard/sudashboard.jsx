@@ -1632,7 +1632,9 @@ function SuperAdminDashboard() {
   const employees = Array.isArray(empData?.users) ? empData.users : Array.isArray(empData) ? empData : [];
   const departments = Array.isArray(deptData?.departments) ? deptData.departments : [];
   const totalEmpCount = deptData?.totalEmployees ?? employees.length;
-  const announcements = Array.isArray(annRaw?.announcements) ? annRaw.announcements : Array.isArray(annRaw) ? annRaw : [];
+  const announcements = (Array.isArray(annRaw?.announcements) ? annRaw.announcements : Array.isArray(annRaw) ? annRaw : [])
+  .slice()
+  .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   const adminLeaves = Array.isArray(leavesRaw?.adminLeaves?.leaves) ? leavesRaw.adminLeaves.leaves : [];
   const activeLeaves = adminLeaves;
