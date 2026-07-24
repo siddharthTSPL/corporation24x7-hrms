@@ -6,6 +6,7 @@ import { Country, State, City } from "country-state-city";
 
 
 const DEFAULT_COUNTRY_ISO = "IN";
+const ALL_COUNTRIES = Country.getAllCountries();
 const AVATAR_STYLES = [
   "avataaars", "bottts", "personas", "lorelei",
   "micah", "open-peeps", "big-ears", "croodles",
@@ -39,19 +40,27 @@ const C = {
 
 
 
+const locationLookupCache = new Map();
+
 function findLocationByCityName(cityName) {
   if (!cityName) return null;
+  if (locationLookupCache.has(cityName)) return locationLookupCache.get(cityName);
+
+  let result = null;
   const countries = Country.getAllCountries();
-  for (const country of countries) {
+  outer: for (const country of countries) {
     const states = State.getStatesOfCountry(country.isoCode);
     for (const state of states) {
       const cities = City.getCitiesOfState(country.isoCode, state.isoCode);
       if (cities.some(c => c.name === cityName)) {
-        return { countryIso: country.isoCode, stateIso: state.isoCode };
+        result = { countryIso: country.isoCode, stateIso: state.isoCode };
+        break outer;
       }
     }
   }
-  return null;
+
+  locationLookupCache.set(cityName, result);
+  return result;
 }
 
 function getInitials(fName = "", lName = "") {
@@ -415,7 +424,7 @@ function ContactTab({ manager, onSuccess, onError }) {
     date_of_joining:  toDateInputValue(manager?.date_of_joining),
   });
 
-  const countries = useMemo(() => Country.getAllCountries(), []);
+  const countries = ALL_COUNTRIES;
 
 const states = useMemo(
   () => (form.countryIso ? State.getStatesOfCountry(form.countryIso) : []),
