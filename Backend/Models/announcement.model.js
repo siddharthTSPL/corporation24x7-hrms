@@ -45,7 +45,8 @@ const announcementSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now,
-  },
+  }, 
+  
 });
 
 announcementSchema.index({ audience: 1, createdAt: -1 });

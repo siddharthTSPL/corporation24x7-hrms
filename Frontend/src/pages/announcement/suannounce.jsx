@@ -535,7 +535,9 @@ export default function AnnouncementPage() {
   const { mutate: deleteAnnouncement, isPending: isDeleting } = useDeleteAnnouncement();
   const { data, isLoading, isError } = useGetAllAnnouncements();
 
-  const announcements = data?.announcements || [];
+  const announcements = [...(data?.announcements || [])].sort(
+  (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+  );
   const isPending = isCreating || isUpdating;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
