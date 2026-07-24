@@ -2273,7 +2273,7 @@ return(
       style={{
         background: "#F9F8F2",
         minWidth: "800px",
-        zoom: 0.9,
+        zoom: 0.85,
         width: "100%",
         height: "100%",
       }}
