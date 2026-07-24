@@ -762,15 +762,15 @@ const getallemployee = async (req, res, next) => {
     const organisation_id = req.admin.organisation_id;
 
     const [users, managers] = await Promise.all([
-      Usermodel.find({ organisation_id, working_status: "working" })
-        .select("uid f_name l_name work_email role department designation office_location Under_manager organisation_id")
-        .populate({ path: "Under_manager", select: "empid uid f_name l_name work_email role" })
-        .lean(),
-      Managermodel.find({ organisation_id, working_status: "working" })
-        .select("uid f_name l_name work_email role designation office_location department gender personal_contact e_contact reporting_manager reporting_manager_model organisation_id")
-        .populate({ path: "reporting_manager", select: "empid uid f_name l_name work_email role" })
-        .lean(),
-    ]);
+  Usermodel.find({ organisation_id, working_status: "working" })
+    .select("empid uid f_name l_name work_email role department designation office_location Under_manager organisation_id")
+    .populate({ path: "Under_manager", select: "empid uid f_name l_name work_email role" })
+    .lean(),
+  Managermodel.find({ organisation_id, working_status: "working" })
+    .select("empid uid f_name l_name work_email role designation office_location department gender personal_contact e_contact reporting_manager reporting_manager_model organisation_id")
+    .populate({ path: "reporting_manager", select: "empid uid f_name l_name work_email role" })
+    .lean(),
+]);
 
     const allEmployees = [
       ...users.map((user) => ({ type: "employee", ...user })),
@@ -790,12 +790,7 @@ const getallemployee = async (req, res, next) => {
   }
 };
 
-// Dashboard-only variant of getallemployee: scoped to just the managers +
-// employees that report — directly, or through a chain of managers — to
-// the logged-in admin. Used by the admin dashboard's "Employee Overview" /
-// "Organisation" cards, which should reflect *this admin's* team, not the
-// whole organisation (getallemployee above stays org-wide since Employee
-// Table, Payroll, Assets, Face Enrollment etc. still need the full list).
+
 const getMyTeamOverview = async (req, res, next) => {
   try {
     if (!req.admin)
@@ -807,13 +802,13 @@ const getMyTeamOverview = async (req, res, next) => {
     const [users, managers] = await Promise.all([
       teamManagerIds.length
         ? Usermodel.find({ organisation_id, working_status: "working", Under_manager: { $in: teamManagerIds } })
-            .select("uid f_name l_name work_email role department designation office_location profile_image Under_manager organisation_id")
+           .select("empid uid f_name l_name work_email role department designation office_location profile_image Under_manager organisation_id")
             .populate({ path: "Under_manager", select:"empid uid f_name l_name work_email role" })
             .lean()
         : [],
       teamManagerIds.length
         ? Managermodel.find({ organisation_id, working_status: "working", _id: { $in: teamManagerIds } })
-            .select("uid f_name l_name work_email role designation office_location department gender personal_contact e_contact profile_image reporting_manager reporting_manager_model organisation_id")
+            .select("empid uid f_name l_name work_email role designation office_location department gender personal_contact e_contact profile_image reporting_manager reporting_manager_model organisation_id")
             .populate({ path: "reporting_manager", select: "empid uid f_name l_name work_email role" })
             .lean()
         : [],

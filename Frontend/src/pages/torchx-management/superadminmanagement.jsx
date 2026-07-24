@@ -91,11 +91,11 @@ function useToasts() {
 function ToastStack({ toasts }) {
   if (!toasts.length) return null;
   return (
-    <div className="fixed top-4 right-4 left-4 sm:left-auto z-[100] flex flex-col gap-2 w-auto sm:w-[calc(100%-2rem)] sm:max-w-sm">
+    <div className="fixed top-4 inset-x-4 sm:inset-x-auto sm:right-4 z-[100] flex flex-col gap-2 max-w-full sm:w-[calc(100%-2rem)] sm:max-w-sm">
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`flex items-start gap-2.5 rounded-xl border px-4 py-3 shadow-lg backdrop-blur-sm text-sm font-medium min-w-0 ${
+          className={`flex items-start gap-2.5 rounded-xl border px-4 py-3 shadow-lg backdrop-blur-sm text-sm font-medium min-w-0 w-full ${
             t.type === 'error'
               ? 'bg-rose-50/95 border-rose-200 text-rose-700'
               : 'bg-emerald-50/95 border-emerald-200 text-emerald-700'
@@ -113,14 +113,14 @@ function Modal({ open, onClose, title, children, wide }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50 backdrop-blur-sm p-0 sm:p-4 overscroll-contain">
-      <div className={`w-full ${wide ? 'sm:max-w-2xl' : 'sm:max-w-md'} bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto overscroll-contain`}>
+      <div className={`w-full ${wide ? 'sm:max-w-2xl' : 'sm:max-w-md'} bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden overscroll-contain`}>
         <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-4 border-b border-slate-100 sticky top-0 bg-white z-10">
           <h3 className="text-base font-semibold text-slate-800 break-words min-w-0">{title}</h3>
           <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors shrink-0">
             <X className="w-4.5 h-4.5" />
           </button>
         </div>
-        <div className="p-4 sm:p-5">{children}</div>
+        <div className="p-4 sm:p-5 min-w-0">{children}</div>
       </div>
     </div>
   );
@@ -128,7 +128,7 @@ function Modal({ open, onClose, title, children, wide }) {
 
 function Field({ label, children }) {
   return (
-    <div className="flex flex-col gap-1.5 min-w-0">
+    <div className="flex flex-col gap-1.5 min-w-0 w-full">
       <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</label>
       {children}
     </div>
@@ -181,7 +181,7 @@ function DayPicker({ value, onChange }) {
 
 function SectionCard({ icon: Icon, title, subtitle, action, children }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm min-w-0">
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm min-w-0 w-full overflow-hidden">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-5 py-4 border-b border-slate-100">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-[#F9F0F5] text-[#730042] flex items-center justify-center shrink-0">
@@ -194,7 +194,7 @@ function SectionCard({ icon: Icon, title, subtitle, action, children }) {
         </div>
         {action && <div className="w-full sm:w-auto">{action}</div>}
       </div>
-      <div className="p-4 sm:p-5">{children}</div>
+      <div className="p-4 sm:p-5 min-w-0">{children}</div>
     </div>
   );
 }
@@ -334,9 +334,9 @@ function ShiftHistoryModal({ open, onClose, employeeId, role, personName, shifts
           {history.map((entry) => {
             const isEditing = editingId === entry._id;
             return (
-              <div key={entry._id} className="py-3 flex flex-col gap-2">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
+              <div key={entry._id} className="py-3 flex flex-col gap-2 min-w-0">
+                <div className="flex flex-wrap items-start justify-between gap-2 min-w-0">
+                  <div className="min-w-0 w-full sm:w-auto sm:flex-1">
                     <p className="text-sm text-slate-800 break-words">
                       <span className="text-slate-400">{shiftLabel(entry.previous_shift)}</span>
                       <span className="mx-1.5 text-slate-300">→</span>
@@ -368,8 +368,8 @@ function ShiftHistoryModal({ open, onClose, employeeId, role, personName, shifts
                   )}
                 </div>
                 {isEditing && (
-                  <div className="flex flex-wrap items-center gap-2 bg-slate-50 rounded-lg p-3">
-                    <select className={`${inputCls} w-auto flex-1 min-w-[160px]`} value={editShiftId} onChange={(e) => setEditShiftId(e.target.value)}>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-slate-50 rounded-lg p-3 min-w-0">
+                    <select className={`${inputCls} w-full sm:w-auto sm:flex-1 sm:min-w-[160px]`} value={editShiftId} onChange={(e) => setEditShiftId(e.target.value)}>
                       <option value="">Org default</option>
                       {shifts.map((s) => (
                         <option key={s._id} value={s._id}>
@@ -377,12 +377,14 @@ function ShiftHistoryModal({ open, onClose, employeeId, role, personName, shifts
                         </option>
                       ))}
                     </select>
-                    <Button onClick={() => saveEdit(entry)} disabled={editMutation.isPending} className="text-xs py-1.5 min-h-0">
-                      {editMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
-                    </Button>
-                    <Button variant="ghost" onClick={cancelEdit} className="text-xs py-1.5 min-h-0">
-                      Cancel
-                    </Button>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                      <Button onClick={() => saveEdit(entry)} disabled={editMutation.isPending} className="text-xs py-1.5 min-h-0 flex-1 sm:flex-none">
+                        {editMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
+                      </Button>
+                      <Button variant="ghost" onClick={cancelEdit} className="text-xs py-1.5 min-h-0 flex-1 sm:flex-none">
+                        Cancel
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -499,7 +501,7 @@ function ShiftsPanel({ notify }) {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 w-full min-w-0">
       <SectionCard
         icon={Clock}
         title="Shifts"
@@ -540,7 +542,7 @@ function ShiftsPanel({ notify }) {
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-slate-500 bg-slate-50 rounded-lg p-3">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-slate-500 bg-slate-50 rounded-lg p-3 min-w-0">
                   <span>Grace</span>
                   <span className="text-slate-700 font-medium text-right">{s.graceMinutes} min</span>
                   <span>Early check-in</span>
@@ -688,10 +690,10 @@ function ShiftsPanel({ notify }) {
           </Field>
         </div>
         <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-5">
-          <Button variant="ghost" onClick={() => setModalOpen(false)}>
+          <Button variant="ghost" onClick={() => setModalOpen(false)} className="w-full sm:w-auto">
             Cancel
           </Button>
-          <Button onClick={submitShift} disabled={createShift.isPending || updateShift.isPending}>
+          <Button onClick={submitShift} disabled={createShift.isPending || updateShift.isPending} className="w-full sm:w-auto">
             {createShift.isPending || updateShift.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : editing ? 'Save changes' : 'Create shift'}
           </Button>
         </div>
@@ -793,7 +795,7 @@ function HolidayCalendar({ month, year, holidays, onAddRange, onEditHoliday, onD
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 min-w-0">
       <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
         {DAYS.map((d) => (
           <div key={d} className="text-[10px] sm:text-[11px] font-semibold uppercase text-slate-400 text-center py-1">
@@ -830,8 +832,8 @@ function HolidayCalendar({ month, year, holidays, onAddRange, onEditHoliday, onD
       </div>
 
       {rangeStart && !editingHoliday && (
-        <div className="rounded-xl border border-[#E8D5E2] bg-[#F9F0F5] p-4 flex flex-col sm:flex-row gap-3 sm:items-end">
-          <div className="flex-1 min-w-0">
+        <div className="rounded-xl border border-[#E8D5E2] bg-[#F9F0F5] p-4 flex flex-col sm:flex-row gap-3 sm:items-end min-w-0">
+          <div className="flex-1 min-w-0 w-full">
             <p className="text-xs font-semibold text-[#730042] uppercase tracking-wide mb-1.5">
               {selectedDates.length > 1 ? `${selectedDates.length} days selected` : '1 day selected'}
             </p>
@@ -846,11 +848,11 @@ function HolidayCalendar({ month, year, holidays, onAddRange, onEditHoliday, onD
               onChange={(e) => setRangeName(e.target.value)}
             />
           </div>
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={clearSelection}>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button variant="ghost" onClick={clearSelection} className="flex-1 sm:flex-none">
               Cancel
             </Button>
-            <Button onClick={submitRange} disabled={adding || !rangeName.trim()}>
+            <Button onClick={submitRange} disabled={adding || !rangeName.trim()} className="flex-1 sm:flex-none">
               {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add holiday'}
             </Button>
           </div>
@@ -858,23 +860,23 @@ function HolidayCalendar({ month, year, holidays, onAddRange, onEditHoliday, onD
       )}
 
       {editingHoliday && (
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 flex flex-col sm:flex-row gap-3 sm:items-end">
-          <div className="flex-1 min-w-0">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 flex flex-col sm:flex-row gap-3 sm:items-end min-w-0">
+          <div className="flex-1 min-w-0 w-full">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">{toISODate(editingHoliday.date)}</p>
             <input className={inputCls} value={editName} onChange={(e) => setEditName(e.target.value)} />
           </div>
-          <div className="flex gap-2 flex-wrap">
-            <Button variant="ghost" onClick={() => setEditingHoliday(null)}>
+          <div className="flex gap-2 flex-wrap w-full sm:w-auto">
+            <Button variant="ghost" onClick={() => setEditingHoliday(null)} className="flex-1 sm:flex-none">
               Cancel
             </Button>
-            <Button variant="danger" onClick={submitDelete} disabled={deleting}>
+            <Button variant="danger" onClick={submitDelete} disabled={deleting} className="flex-1 sm:flex-none">
               {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : (
                 <>
                   <Trash2 className="w-3.5 h-3.5" /> Delete
                 </>
               )}
             </Button>
-            <Button onClick={submitEdit} disabled={editing || !editName.trim()}>
+            <Button onClick={submitEdit} disabled={editing || !editName.trim()} className="flex-1 sm:flex-none">
               {editing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
             </Button>
           </div>
@@ -934,7 +936,7 @@ function HolidaysPanel({ notify }) {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 w-full min-w-0">
       <SectionCard icon={CalendarDays} title="Holiday calendar" subtitle="Dates the whole organisation gets off, regardless of week-off policy">
         <div className="flex items-center gap-3 mb-4 flex-wrap">
           <select className={`${inputCls} w-auto`} value={filter.month} onChange={(e) => setFilter((f) => ({ ...f, month: Number(e.target.value) }))}>
@@ -1135,7 +1137,7 @@ function WeekOffPanel({ notify }) {
   const isRotational = policy === 'rotational';
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 w-full min-w-0">
       <SectionCard icon={Settings2} title="Week-off policy" subtitle="Choose how weekly offs work across the organisation">
         {policyQuery.isLoading ? (
           <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
@@ -1150,7 +1152,7 @@ function WeekOffPanel({ notify }) {
                 key={opt.v}
                 onClick={() => savePolicy(opt.v)}
                 disabled={setPolicy.isPending}
-                className={`text-left p-4 rounded-xl border transition-colors ${
+                className={`text-left p-4 rounded-xl border transition-colors min-w-0 ${
                   policy === opt.v ? 'border-[#730042] bg-[#F9F0F5] ring-1 ring-[#730042]' : 'border-slate-200 hover:border-[#730042]'
                 }`}
               >
@@ -1184,7 +1186,7 @@ function WeekOffPanel({ notify }) {
                     <div className="flex flex-col gap-1.5 mb-3 max-h-32 overflow-y-auto overscroll-contain">
                       {(g.members || []).length === 0 && <p className="text-xs text-slate-400">No members yet</p>}
                       {(g.members || []).map((m) => (
-                        <div key={String(m.employee)} className="flex items-center justify-between gap-2 text-xs bg-slate-50 rounded-lg px-2.5 py-1.5">
+                        <div key={String(m.employee)} className="flex items-center justify-between gap-2 text-xs bg-slate-50 rounded-lg px-2.5 py-1.5 min-w-0">
                           <span className="text-slate-600 truncate">
                             {m.employeeModel} · {String(m.employee).slice(-6)}
                           </span>
@@ -1196,7 +1198,7 @@ function WeekOffPanel({ notify }) {
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2">
                       <select
-                        className={`${inputCls} text-xs py-1.5 sm:w-28`}
+                        className={`${inputCls} text-xs py-1.5 w-full sm:w-28`}
                         value={memberDraft[g._id]?.role || 'employee'}
                         onChange={(e) =>
                           setMemberDraft((d) => ({ ...d, [g._id]: { ...d[g._id], role: e.target.value, employee: '' } }))
@@ -1209,7 +1211,7 @@ function WeekOffPanel({ notify }) {
                         ))}
                       </select>
                       <PersonSelect
-                        className={`${inputCls} text-xs py-1.5`}
+                        className={`${inputCls} text-xs py-1.5 w-full`}
                         role={memberDraft[g._id]?.role || 'employee'}
                         value={memberDraft[g._id]?.employee || ''}
                         onChange={(v) => setMemberDraft((d) => ({ ...d, [g._id]: { ...d[g._id], employee: v } }))}
@@ -1327,7 +1329,7 @@ function WeekOffPanel({ notify }) {
             ) : (
               <div className="flex flex-col divide-y divide-slate-100">
                 {schedules.map((s) => (
-                  <div key={s._id} className="flex flex-wrap items-center justify-between gap-2 py-3">
+                  <div key={s._id} className="flex flex-wrap items-center justify-between gap-2 py-3 min-w-0">
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-slate-800">
                         {toISODate(s.weekStartDate)} – {toISODate(s.weekEndDate)}
@@ -1351,7 +1353,7 @@ function WeekOffPanel({ notify }) {
 
       <SectionCard icon={ShieldCheck} title="Individual overrides" subtitle="Give one person a different week-off rule than the rest of the org">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 min-w-0">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Set an override</p>
             <select
               className={inputCls}
@@ -1388,7 +1390,7 @@ function WeekOffPanel({ notify }) {
               {setEmployeeOverride.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save override'}
             </Button>
           </div>
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 min-w-0">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Remove an override</p>
             <select className={inputCls} value={removeRole} onChange={(e) => { setRemoveRole(e.target.value); setRemoveEmployeeId(''); }}>
               {ROLE_OPTIONS.map((r) => (
@@ -1446,7 +1448,7 @@ function LeavePolicyPanel({ notify }) {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 w-full min-w-0">
       <SectionCard
         icon={Umbrella}
         title="Yearly leave entitlement"
@@ -1466,7 +1468,7 @@ function LeavePolicyPanel({ notify }) {
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-4 min-w-0">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Earned Leave (EL) — per year</p>
                 <Field label="Admin">
                   <input
@@ -1491,7 +1493,7 @@ function LeavePolicyPanel({ notify }) {
                   />
                 </Field>
               </div>
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-4 min-w-0">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Sick Leave (SL) — per year</p>
                 <Field label="Admin">
                   <input
@@ -1542,15 +1544,15 @@ export default function SuperAdminManagement() {
   const { toasts, notify } = useToasts();
 
   return (
-    <div className="w-full overflow-x-hidden bg-slate-50 box-border">
+    <div className="w-full max-w-full overflow-x-hidden bg-slate-50 box-border">
       <ToastStack toasts={toasts} />
-      <div className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-10 min-w-0">
-        <div className="mb-8">
+      <div className="w-full max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-10 min-w-0">
+        <div className="mb-8 min-w-0">
           <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#730042] bg-[#F9F0F5] px-2.5 py-1 rounded-full mb-2">
             <ShieldCheck className="w-3.5 h-3.5" /> Superadmin
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Shift &amp; holiday management</h1>
-          <p className="text-sm text-slate-500 mt-1.5">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight break-words">Shift &amp; holiday management</h1>
+          <p className="text-sm text-slate-500 mt-1.5 break-words">
             Configure working hours, the holiday calendar and week-off rules across every organisation admin reports into. Employees can only check in
             during their assigned shift window, and holidays or week-offs keep check-in closed automatically.
           </p>
