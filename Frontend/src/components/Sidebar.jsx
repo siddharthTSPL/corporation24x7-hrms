@@ -28,6 +28,7 @@ import { useLogoutManager } from "../auth/server-state/manager/managerauth/manag
 import { useLogoutUser } from "../auth/server-state/employee/employeeauth/employeeauth.hook";
 import { useLogoutSuperAdmin } from "../auth/server-state/superadmin/auth/suauth.hook";
 import { usePermissionStore } from "../auth/store/permission/permissionStore";
+import { clearAgentToken } from "../pages/utils/Desktopagent";
 
 const superAdminMenu = [
   { name: "Dashboard",      path: "/superadmin-dashboard",     icon: <FaHome /> },
@@ -134,9 +135,7 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
     const onSuccess = async () => {
       localStorage.removeItem("role");
       clearPermissions();
-      try {
-        await fetch("http://localhost:47821/clear-token");
-      } catch (_) {}
+      clearAgentToken();
       navigate("/login");
     };
 
