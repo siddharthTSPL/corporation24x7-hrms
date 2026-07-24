@@ -38,6 +38,8 @@ const GlobalStyles = () => (
     @keyframes fadeSlideUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
     @keyframes progressIn { from { width:0; } }
 
+    html, body { overflow-x: hidden; max-width: 100%; }
+
     .mlw-root {
       min-height: 100vh;
       width: 100%;
@@ -46,10 +48,8 @@ const GlobalStyles = () => (
       position: relative;
       background: linear-gradient(160deg,#F7F3FC 0%,#F0EBF8 50%,#F4F0FA 100%);
       font-family: 'DM Sans', sans-serif;
-      padding: 28px 32px;
+      padding: clamp(14px, 3vw, 32px);
     }
-    @media (max-width: 1024px) { .mlw-root { padding: 22px 20px; } }
-    @media (max-width: 640px)  { .mlw-root { padding: 16px 14px; } }
 
     .mlw-bg-blob {
       position: absolute;
@@ -58,15 +58,16 @@ const GlobalStyles = () => (
     }
 
     .mlw-inner { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; width: 100%; }
+    @media (min-width: 1440px) { .mlw-inner { max-width: 1240px; } }
 
     .mlw-header {
       display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 26px; flex-wrap: wrap; gap: 14px;
+      margin-bottom: clamp(18px, 3vw, 26px); flex-wrap: wrap; gap: 14px;
       animation: fadeSlideUp .3s ease both;
     }
     .mlw-header-left  { display: flex; align-items: center; gap: 14px; min-width: 0; flex: 1 1 240px; }
     .mlw-header-text  { min-width: 0; }
-    .mlw-header-text h1 { max-width: 100%; overflow-wrap: break-word; }
+    .mlw-header-text h1 { max-width: 100%; overflow-wrap: break-word; font-size: clamp(17px, 2.4vw, 21px); }
     .mlw-header-icon  {
       width: 48px; height: 48px; border-radius: 14px; flex-shrink: 0;
       background: linear-gradient(135deg,#6B1A4A,#A8295E);
@@ -75,7 +76,6 @@ const GlobalStyles = () => (
     }
     @media (max-width: 480px) {
       .mlw-header-icon { width: 40px; height: 40px; border-radius: 12px; }
-      .mlw-header h1 { font-size: 18px !important; }
     }
     .mlw-manager-chip {
       background: #fff; border: 1px solid rgba(200,185,220,0.45);
@@ -85,7 +85,7 @@ const GlobalStyles = () => (
       max-width: 100%;
     }
     @media (max-width: 480px) {
-      .mlw-manager-chip { padding: 7px 11px; gap: 8px; }
+      .mlw-manager-chip { padding: 7px 11px; gap: 8px; width: 100%; }
       .mlw-manager-chip > div:last-child > div:first-child { font-size: 11px !important; }
       .mlw-manager-chip > div:last-child > div:last-child  { font-size: 9px !important; }
     }
@@ -101,7 +101,7 @@ const GlobalStyles = () => (
       background: rgba(235,228,245,0.75);
       backdrop-filter: blur(8px);
       border-radius: 13px; padding: 4px;
-      margin-bottom: 26px;
+      margin-bottom: clamp(18px, 3vw, 26px);
       border: 1px solid rgba(200,185,220,0.3);
       box-shadow: 0 2px 8px rgba(80,40,100,0.06);
       overflow-x: auto; -webkit-overflow-scrolling: touch;
@@ -110,12 +110,12 @@ const GlobalStyles = () => (
     }
     .mlw-tabs-wrap::-webkit-scrollbar { display: none; }
     .mlw-tab-btn {
-      padding: 9px 18px; border-radius: 10px; font-size: 13px; font-weight: 500;
+      padding: 10px 18px; min-height: 42px; border-radius: 10px; font-size: 13px; font-weight: 500;
       font-family: 'DM Sans', sans-serif; border: none; cursor: pointer;
       transition: all .2s ease; white-space: nowrap; flex-shrink: 0;
     }
-    @media (max-width: 640px) { .mlw-tab-btn { padding: 8px 13px; font-size: 12px; } }
-    @media (max-width: 400px) { .mlw-tab-btn { padding: 7px 10px; font-size: 11px; } }
+    @media (max-width: 640px) { .mlw-tab-btn { padding: 9px 13px; font-size: 12px; min-height: 40px; } }
+    @media (max-width: 400px) { .mlw-tab-btn { padding: 8px 10px; font-size: 11px; } }
 
     .mlw-card {
       background: #fff; border-radius: 18px; border: 1px solid rgba(200,185,220,0.3);
@@ -124,22 +124,22 @@ const GlobalStyles = () => (
       transition: box-shadow .22s ease, transform .22s ease;
       animation: fadeSlideUp .33s ease both; position: relative; overflow: hidden;
     }
-    @media (max-width: 480px) { .mlw-card { padding: 14px 14px; } }
+    @media (max-width: 480px) { .mlw-card { padding: 14px 14px; border-radius: 15px; } }
     .mlw-card:hover { box-shadow: 0 7px 24px rgba(80,40,100,0.13),0 2px 6px rgba(0,0,0,0.06); transform: translateY(-1px); }
 
     .mlw-card-body {
       display: flex; justify-content: space-between;
       align-items: flex-start; gap: 14px; padding-left: 6px;
     }
-    @media (max-width: 560px) {
+    @media (max-width: 700px) {
       .mlw-card-body { flex-direction: column; gap: 14px; padding-left: 0; }
       .mlw-card-actions { flex-direction: row !important; flex-wrap: wrap; width: 100%; }
-      .mlw-card-actions button { flex: 1 1 80px; justify-content: center; }
+      .mlw-card-actions button { flex: 1 1 100px; justify-content: center; min-height: 40px; }
     }
 
     .mlw-action-btn {
       display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-      padding: 7px 14px; border-radius: 9px; font-size: 12px; font-weight: 600;
+      padding: 8px 14px; border-radius: 9px; font-size: 12px; font-weight: 600;
       cursor: pointer; border: none; font-family: 'DM Sans', sans-serif;
       letter-spacing: .2px; transition: all .17s ease; white-space: nowrap;
     }
@@ -150,12 +150,13 @@ const GlobalStyles = () => (
     .mlw-chip-btn {
       border-radius: 20px; font-size: 12px; font-weight: 500; cursor: pointer;
       font-family: 'DM Sans', sans-serif; transition: all .18s ease;
-      display: inline-flex; align-items: center; gap: 5px; padding: 5px 13px;
+      display: inline-flex; align-items: center; gap: 5px; padding: 6px 13px;
+      min-height: 34px;
     }
-    @media (max-width: 420px) { .mlw-chip-btn { font-size: 11px; padding: 5px 10px; } }
+    @media (max-width: 420px) { .mlw-chip-btn { font-size: 11px; padding: 6px 10px; } }
 
     .mlw-input {
-      padding: 10px 14px; border-radius: 11px; font-size: 13px;
+      padding: 10px 14px; min-height: 42px; border-radius: 11px; font-size: 13px;
       font-family: 'DM Sans', sans-serif; color: #1C1028; background: #FDFBFF;
       outline: none; transition: border .2s, box-shadow .2s;
       width: 100%; box-sizing: border-box;
@@ -163,7 +164,7 @@ const GlobalStyles = () => (
     .mlw-input:focus { border-color: #8B3A8A !important; box-shadow: 0 0 0 3px rgba(139,58,138,0.10); }
 
     .mlw-btn-primary {
-      padding: 10px 24px; border-radius: 11px; font-size: 13px; font-weight: 600;
+      padding: 11px 24px; min-height: 44px; border-radius: 11px; font-size: 13px; font-weight: 600;
       font-family: 'DM Sans', sans-serif;
       background: linear-gradient(135deg,#6B1A4A,#9B2458);
       color: #fff; border: none; cursor: pointer;
@@ -174,7 +175,7 @@ const GlobalStyles = () => (
     .mlw-btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none !important; }
 
     .mlw-btn-secondary {
-      padding: 10px 24px; border-radius: 11px; font-size: 13px; font-weight: 500;
+      padding: 11px 24px; min-height: 44px; border-radius: 11px; font-size: 13px; font-weight: 500;
       font-family: 'DM Sans', sans-serif; background: #F4EEF9; color: #6B1A4A;
       border: 1.5px solid #DFD0EC; cursor: pointer; transition: all .18s ease;
     }
@@ -205,7 +206,7 @@ const GlobalStyles = () => (
       grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
       gap: 14px; margin-bottom: 22px;
     }
-    @media (max-width: 480px) { .mlw-stat-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; } }
+    @media (max-width: 560px) { .mlw-stat-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; } }
     @media (max-width: 340px) { .mlw-stat-grid { grid-template-columns: 1fr; } }
 
     .mlw-stat-card {
@@ -214,32 +215,37 @@ const GlobalStyles = () => (
       box-shadow: 0 2px 10px rgba(80,40,100,0.07);
       transition: all .22s ease; animation: fadeSlideUp .4s ease both;
     }
+    @media (max-width: 480px) { .mlw-stat-card { padding: 14px 14px 12px; border-radius: 15px; } }
     .mlw-stat-card:hover { box-shadow: 0 7px 24px rgba(80,40,100,0.12); transform: translateY(-2px); }
+    .mlw-stat-num { font-size: clamp(24px, 5vw, 36px); font-weight: 700; line-height: 1; margin: 5px 0 2px; font-family: 'Playfair Display', serif; }
+    .mlw-stat-watermark { font-size: clamp(30px, 6vw, 46px); font-weight: 800; opacity: .06; font-family: 'Playfair Display', serif; line-height: 1; user-select: none; pointer-events: none; }
 
     .mlw-form-grid {
       display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;
     }
-    @media (max-width: 600px) { .mlw-form-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 640px) { .mlw-form-grid { grid-template-columns: 1fr; } }
 
     .mlw-form-actions {
       display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; flex-wrap: wrap;
     }
-    @media (max-width: 420px) {
-      .mlw-form-actions { flex-direction: column; }
+    @media (max-width: 460px) {
+      .mlw-form-actions { flex-direction: column-reverse; }
       .mlw-form-actions button { width: 100%; }
     }
 
     .mlw-summary-counters {
-      display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 10px; margin-bottom: 20px;
     }
+    @media (max-width: 380px) { .mlw-summary-counters { grid-template-columns: repeat(2, 1fr); } }
 
     .mlw-filter-bar {
       display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: flex-end;
     }
     .mlw-filter-field { flex: 1 1 150px; min-width: 0; }
-    @media (max-width: 480px) { .mlw-filter-field { flex-basis: 100%; } }
+    @media (max-width: 560px) { .mlw-filter-field { flex-basis: 100%; } }
     .mlw-filter-export-btn { flex: 0 0 auto; }
-    @media (max-width: 480px) { .mlw-filter-export-btn { flex: 1 1 100%; } .mlw-filter-export-btn button { width: 100%; } }
+    @media (max-width: 560px) { .mlw-filter-export-btn { flex: 1 1 100%; } .mlw-filter-export-btn button { width: 100%; } }
 
     .mlw-progress-fill { height: 100%; border-radius: 8px; animation: progressIn .8s ease both; }
 
@@ -250,6 +256,7 @@ const GlobalStyles = () => (
       transition: box-shadow .2s ease, transform .2s ease;
       animation: fadeSlideUp .3s ease both; position: relative; overflow: hidden;
     }
+    @media (max-width: 480px) { .mlw-history-card { padding: 12px 12px; } }
     .mlw-history-card:hover { box-shadow: 0 5px 20px rgba(80,40,100,0.11); transform: translateY(-1px); }
 
     .mlw-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
@@ -465,7 +472,7 @@ const EmptyState = ({msg="No records found"}) => (
         <path d="M9 16h6M9 20h10" stroke="#D4BFEA" strokeWidth="1.2" strokeLinecap="round"/>
       </svg>
     </div>
-    <p style={{fontSize:13,color:"#9B8BAE",fontWeight:500,fontFamily:"'DM Sans',sans-serif",margin:0}}>{msg}</p>
+    <p style={{fontSize:13,color:"#9B8BAE",fontWeight:500,fontFamily:"'DM Sans',sans-serif",margin:0,textAlign:"center",padding:"0 16px"}}>{msg}</p>
   </div>
 );
 
@@ -478,7 +485,8 @@ const FilterExportBar = ({ search, setSearch, dateFrom, setDateFrom, dateTo, set
         placeholder="Name or reason…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        style={{ width: "100%", padding: "8px 12px", borderRadius: 10, fontSize: 13, border: "1.5px solid #E5DAF0", color: "#4A3860", outline: "none", boxSizing: "border-box" }}
+        className="mlw-input"
+        style={{ border: "1.5px solid #E5DAF0", color: "#4A3860" }}
       />
     </div>
     <div className="mlw-filter-field">
@@ -487,7 +495,8 @@ const FilterExportBar = ({ search, setSearch, dateFrom, setDateFrom, dateTo, set
         type="date"
         value={dateFrom}
         onChange={(e) => setDateFrom(e.target.value)}
-        style={{ width: "100%", padding: "8px 12px", borderRadius: 10, fontSize: 13, border: "1.5px solid #E5DAF0", color: "#4A3860", outline: "none", boxSizing: "border-box" }}
+        className="mlw-input"
+        style={{ border: "1.5px solid #E5DAF0", color: "#4A3860" }}
       />
     </div>
     <div className="mlw-filter-field">
@@ -496,7 +505,8 @@ const FilterExportBar = ({ search, setSearch, dateFrom, setDateFrom, dateTo, set
         type="date"
         value={dateTo}
         onChange={(e) => setDateTo(e.target.value)}
-        style={{ width: "100%", padding: "8px 12px", borderRadius: 10, fontSize: 13, border: "1.5px solid #E5DAF0", color: "#4A3860", outline: "none", boxSizing: "border-box" }}
+        className="mlw-input"
+        style={{ border: "1.5px solid #E5DAF0", color: "#4A3860" }}
       />
     </div>
     <div className="mlw-filter-export-btn">
@@ -504,7 +514,7 @@ const FilterExportBar = ({ search, setSearch, dateFrom, setDateFrom, dateTo, set
         onClick={onExport}
         disabled={exportDisabled}
         style={{
-          padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#fff", cursor: exportDisabled ? "not-allowed" : "pointer",
+          padding: "10px 16px", minHeight: 42, borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#fff", cursor: exportDisabled ? "not-allowed" : "pointer",
           background: "linear-gradient(135deg,#6B1A4A,#9B2458)", boxShadow: "0 3px 12px rgba(107,26,74,0.3)",
           opacity: exportDisabled ? 0.4 : 1, border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, whiteSpace: "nowrap",
         }}
@@ -521,18 +531,18 @@ const Pagination = ({ page, setPage, totalPages }) => {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 18, paddingTop: 14, borderTop: "1px solid rgba(200,185,220,0.28)", flexWrap: "wrap" }}>
       <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-        style={{ padding: "6px 12px", borderRadius: 10, fontSize: 12, fontWeight: 700, background: "#F4EEF9", color: "#6B1A4A", border: "none", cursor: page === 1 ? "not-allowed" : "pointer", opacity: page === 1 ? 0.4 : 1 }}>
+        style={{ padding: "8px 14px", minHeight: 38, borderRadius: 10, fontSize: 12, fontWeight: 700, background: "#F4EEF9", color: "#6B1A4A", border: "none", cursor: page === 1 ? "not-allowed" : "pointer", opacity: page === 1 ? 0.4 : 1 }}>
         ← Prev
       </button>
       {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
         <button key={p} onClick={() => setPage(p)}
-          style={{ width: 30, height: 30, borderRadius: 10, fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer",
+          style={{ width: 34, height: 34, borderRadius: 10, fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer",
             background: p === page ? "linear-gradient(135deg,#6B1A4A,#9B2458)" : "#F4EEF9", color: p === page ? "#fff" : "#6B1A4A" }}>
           {p}
         </button>
       ))}
       <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-        style={{ padding: "6px 12px", borderRadius: 10, fontSize: 12, fontWeight: 700, background: "#F4EEF9", color: "#6B1A4A", border: "none", cursor: page === totalPages ? "not-allowed" : "pointer", opacity: page === totalPages ? 0.4 : 1 }}>
+        style={{ padding: "8px 14px", minHeight: 38, borderRadius: 10, fontSize: 12, fontWeight: 700, background: "#F4EEF9", color: "#6B1A4A", border: "none", cursor: page === totalPages ? "not-allowed" : "pointer", opacity: page === totalPages ? 0.4 : 1 }}>
         Next →
       </button>
     </div>
@@ -558,7 +568,7 @@ const Toast = ({toast}) => {
         {toast.type==="error"  &&<svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M3 3l4 4M7 3l-4 4" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/></svg>}
         {toast.type==="info"   &&<svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M5 4v4M5 3v.5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/></svg>}
       </div>
-      {toast.message}
+      <span style={{wordBreak:"break-word"}}>{toast.message}</span>
     </div>
   );
 };
@@ -598,7 +608,7 @@ const SectionBox = ({title,children,rightEl}) => (
 );
 
 const FormField = ({label,error,children}) => (
-  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+  <div style={{display:"flex",flexDirection:"column",gap:6,minWidth:0}}>
     <label style={{fontSize:11,fontWeight:600,color:"#6B5080",textTransform:"uppercase",letterSpacing:".5px",fontFamily:"'DM Sans',sans-serif"}}>
       {label} <span style={{color:"#CD166E"}}>*</span>
     </label>
@@ -661,9 +671,9 @@ const AvatarBox = ({name,subtext}) => {
       <div style={{width:42,height:42,borderRadius:13,background:avatarColor(cleanName||"A"),color:"#fff",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"'DM Sans',sans-serif",boxShadow:"0 3px 9px rgba(0,0,0,0.14)"}}>
         {cleanName.charAt(0)?.toUpperCase()||"?"}
       </div>
-      <div>
-        <div style={{fontSize:14,fontWeight:600,color:cleanName?"#1C1028":"#9B8BAE",fontStyle:cleanName?"normal":"italic",fontFamily:"'DM Sans',sans-serif"}}>{displayName}</div>
-        {subtext&&<div style={{fontSize:11,color:"#9B8BAE",marginTop:2,fontFamily:"'DM Sans',sans-serif"}}>{subtext}</div>}
+      <div style={{minWidth:0}}>
+        <div style={{fontSize:14,fontWeight:600,color:cleanName?"#1C1028":"#9B8BAE",fontStyle:cleanName?"normal":"italic",fontFamily:"'DM Sans',sans-serif",overflowWrap:"break-word"}}>{displayName}</div>
+        {subtext&&<div style={{fontSize:11,color:"#9B8BAE",marginTop:2,fontFamily:"'DM Sans',sans-serif",overflowWrap:"break-word"}}>{subtext}</div>}
       </div>
     </div>
   );
@@ -754,8 +764,8 @@ const EmployeeLeavesPanel = ({showToast}) => {
           {label:"Approved", val:leaves.filter(l=>l.status?.startsWith("approved")).length,  color:"#14803D",bg:"linear-gradient(135deg,#F0FDF4,#DCFCE7)"},
           {label:"Forwarded",val:leaves.filter(l=>l.status==="forwarded_reporting_manager"||l.status==="forwarded_admin").length,color:"#1D4ED8",bg:"linear-gradient(135deg,#EFF6FF,#DBEAFE)"},
         ].map((s,i)=>(
-          <div key={s.label} style={{background:s.bg,borderRadius:13,padding:"10px 16px",display:"flex",alignItems:"center",gap:10,border:"1px solid rgba(0,0,0,0.05)",boxShadow:"0 2px 7px rgba(0,0,0,0.04)",animation:`fadeSlideUp .3s ease ${i*.06}s both`,minWidth:90}}>
-            <span style={{fontSize:24,fontWeight:800,color:s.color,fontFamily:"'Playfair Display',serif",lineHeight:1}}>{s.val}</span>
+          <div key={s.label} style={{background:s.bg,borderRadius:13,padding:"10px 14px",display:"flex",alignItems:"center",gap:9,border:"1px solid rgba(0,0,0,0.05)",boxShadow:"0 2px 7px rgba(0,0,0,0.04)",animation:`fadeSlideUp .3s ease ${i*.06}s both`,minWidth:0}}>
+            <span style={{fontSize:"clamp(19px,4vw,24px)",fontWeight:800,color:s.color,fontFamily:"'Playfair Display',serif",lineHeight:1}}>{s.val}</span>
             <span style={{fontSize:11,color:s.color,fontWeight:600,fontFamily:"'DM Sans',sans-serif",opacity:.8,lineHeight:1.3}}>{s.label}</span>
           </div>
         ))}
@@ -981,11 +991,11 @@ const MyBalancePanel = ({manager,leavebalance}) => {
           return (
             <div key={s.key} className="mlw-stat-card" style={{animationDelay:`${i*.07}s`}}>
               <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:s.accent,borderRadius:"18px 18px 0 0"}}/>
-              <div style={{position:"absolute",right:-6,top:10,fontSize:46,fontWeight:800,color:s.accent,opacity:.06,fontFamily:"'Playfair Display',serif",lineHeight:1,userSelect:"none",pointerEvents:"none"}}>
+              <div className="mlw-stat-watermark" style={{position:"absolute",right:-4,top:10,color:s.accent}}>
                 {(LEAVE_META[s.key]||{short:s.key.toUpperCase().slice(0,2)}).short}
               </div>
               <div style={{fontSize:11,color:"#9B8BAE",fontWeight:600,fontFamily:"'DM Sans',sans-serif",marginTop:7,textTransform:"uppercase",letterSpacing:".5px"}}>{s.label}</div>
-              <div style={{fontSize:36,fontWeight:700,color:s.accent,lineHeight:1,margin:"5px 0 2px",fontFamily:"'Playfair Display',serif"}}>{remaining}</div>
+              <div className="mlw-stat-num" style={{color:s.accent}}>{remaining}</div>
               <div style={{fontSize:10,color:"#9B8BAE",fontFamily:"'DM Sans',sans-serif"}}>of {s.entitled} days</div>
               <div style={{height:4,background:"#F0EAF8",borderRadius:7,marginTop:13,overflow:"hidden"}}>
                 <div className="mlw-progress-fill" style={{width:`${Math.max(pct,3)}%`,background:s.accent,animationDelay:`${i*.09+.3}s`}}/>
@@ -1435,7 +1445,7 @@ const ManagerLeaveWFH = () => {
               </svg>
             </div>
             <div className="mlw-header-text">
-              <h1 style={{fontSize:21,fontWeight:700,color:"#1C1028",margin:0,fontFamily:"'Playfair Display',serif",letterSpacing:"-.3px"}}>Leave & WFH</h1>
+              <h1 style={{fontWeight:700,color:"#1C1028",margin:0,fontFamily:"'Playfair Display',serif",letterSpacing:"-.3px"}}>Leave & WFH</h1>
               <p style={{fontSize:12,color:"#9B8BAE",margin:"2px 0 0",fontWeight:400,fontFamily:"'DM Sans',sans-serif"}}>Manage team leaves · Track balance · Request WFH</p>
             </div>
           </div>
@@ -1445,9 +1455,9 @@ const ManagerLeaveWFH = () => {
               <div className="mlw-manager-avatar">
                 {(manager.f_name?.[0]||"")}{(manager.l_name?.[0]||"")}
               </div>
-              <div>
-                <div style={{fontWeight:600,fontSize:12,color:"#1C1028",fontFamily:"'DM Sans',sans-serif"}}>{manager.f_name} {manager.l_name}</div>
-                <div style={{fontSize:10,color:"#9B8BAE",marginTop:1,fontFamily:"'DM Sans',sans-serif"}}>{manager.designation||manager.role}</div>
+              <div style={{minWidth:0}}>
+                <div style={{fontWeight:600,fontSize:12,color:"#1C1028",fontFamily:"'DM Sans',sans-serif",overflowWrap:"break-word"}}>{manager.f_name} {manager.l_name}</div>
+                <div style={{fontSize:10,color:"#9B8BAE",marginTop:1,fontFamily:"'DM Sans',sans-serif",overflowWrap:"break-word"}}>{manager.designation||manager.role}</div>
               </div>
             </div>
           )}

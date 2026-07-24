@@ -85,7 +85,7 @@ function useToasts() {
 function ToastStack({ toasts }) {
   if (!toasts.length) return null;
   return (
-    <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 w-[calc(100%-2rem)] max-w-sm">
+    <div className="fixed top-3 right-3 left-3 sm:left-auto sm:top-4 sm:right-4 z-[100] flex flex-col gap-2 w-auto sm:w-full sm:max-w-sm">
       {toasts.map((t) => (
         <div
           key={t.id}
@@ -96,7 +96,7 @@ function ToastStack({ toasts }) {
           }`}
         >
           {t.type === 'error' ? <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" /> : <Check className="w-4 h-4 mt-0.5 shrink-0" />}
-          <span>{t.message}</span>
+          <span className="break-words">{t.message}</span>
         </div>
       ))}
     </div>
@@ -106,15 +106,22 @@ function ToastStack({ toasts }) {
 function Modal({ open, onClose, title, children, wide }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50 backdrop-blur-sm p-0 sm:p-4">
-      <div className={`w-full ${wide ? 'sm:max-w-2xl' : 'sm:max-w-md'} bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto`}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 sticky top-0 bg-white z-10">
-          <h3 className="text-base font-semibold text-slate-800">{title}</h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50 backdrop-blur-sm p-0 sm:p-4 md:p-6">
+      <div
+        className={`w-full ${
+          wide ? 'sm:max-w-2xl lg:max-w-3xl' : 'sm:max-w-md md:max-w-lg'
+        } bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[92vh] sm:max-h-[88vh] overflow-y-auto`}
+      >
+        <div className="flex items-center justify-between px-4 sm:px-5 md:px-6 py-4 border-b border-slate-100 sticky top-0 bg-white z-10">
+          <h3 className="text-base md:text-lg font-semibold text-slate-800 truncate pr-3">{title}</h3>
+          <button
+            onClick={onClose}
+            className="p-2 -mr-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors shrink-0"
+          >
             <X className="w-4.5 h-4.5" />
           </button>
         </div>
-        <div className="p-5">{children}</div>
+        <div className="p-4 sm:p-5 md:p-6">{children}</div>
       </div>
     </div>
   );
@@ -122,7 +129,7 @@ function Modal({ open, onClose, title, children, wide }) {
 
 function Field({ label, children }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5 min-w-0">
       <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</label>
       {children}
     </div>
@@ -130,7 +137,7 @@ function Field({ label, children }) {
 }
 
 const inputCls =
-  'w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#730042]/30 focus:border-[#730042] transition-colors';
+  'w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 sm:py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#730042]/30 focus:border-[#730042] transition-colors';
 
 function Button({ children, onClick, variant = 'primary', className = '', disabled, type = 'button' }) {
   const styles = {
@@ -144,7 +151,7 @@ function Button({ children, onClick, variant = 'primary', className = '', disabl
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${styles[variant]} ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2.5 sm:py-2 min-h-[44px] sm:min-h-0 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${styles[variant]} ${className}`}
     >
       {children}
     </button>
@@ -153,7 +160,7 @@ function Button({ children, onClick, variant = 'primary', className = '', disabl
 
 function DayPicker({ value, onChange }) {
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-1.5 sm:gap-2">
       {DAYS.map((d) => {
         const active = value.includes(d);
         return (
@@ -161,7 +168,7 @@ function DayPicker({ value, onChange }) {
             key={d}
             type="button"
             onClick={() => onChange(active ? value.filter((x) => x !== d) : [...value, d])}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+            className={`min-w-[42px] px-2.5 py-2 sm:py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
               active ? 'bg-[#730042] border-[#730042] text-white' : 'bg-white border-slate-200 text-slate-500 hover:border-[#730042]'
             }`}
           >
@@ -176,25 +183,25 @@ function DayPicker({ value, onChange }) {
 function SectionCard({ icon: Icon, title, subtitle, action, children }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm min-w-0">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-5 py-4 border-b border-slate-100">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-5 md:px-6 py-4 border-b border-slate-100">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-[#F9F0F5] text-[#730042] flex items-center justify-center shrink-0">
             <Icon className="w-4.5 h-4.5" />
           </div>
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-slate-800 truncate">{title}</h2>
-            {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+            <h2 className="text-sm md:text-base font-semibold text-slate-800 truncate">{title}</h2>
+            {subtitle && <p className="text-xs md:text-sm text-slate-400 mt-0.5">{subtitle}</p>}
           </div>
         </div>
-        {action}
+        {action && <div className="w-full sm:w-auto">{action}</div>}
       </div>
-      <div className="p-4 sm:p-5">{children}</div>
+      <div className="p-4 sm:p-5 md:p-6">{children}</div>
     </div>
   );
 }
 
 function EmptyRow({ text }) {
-  return <div className="text-sm text-slate-400 text-center py-8 border border-dashed border-slate-200 rounded-xl">{text}</div>;
+  return <div className="text-sm text-slate-400 text-center py-8 px-4 border border-dashed border-slate-200 rounded-xl">{text}</div>;
 }
 
 function personLabel(p) {
@@ -327,7 +334,7 @@ function ShiftHistoryModal({ open, onClose, employeeId, role, personName, shifts
                       <span className="mx-1.5 text-slate-300">→</span>
                       <span className="font-medium">{shiftLabel(entry.shift)}</span>
                     </p>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs text-slate-400 mt-1 break-words">
                       {formatDateTime(entry.createdAt)} · by {actorLabel(entry.assigned_by, entry.assigned_by_model)}
                     </p>
                     {entry.note && <p className="text-xs text-slate-500 mt-1 italic break-words">"{entry.note}"</p>}
@@ -336,7 +343,7 @@ function ShiftHistoryModal({ open, onClose, employeeId, role, personName, shifts
                     <div className="flex gap-1.5 shrink-0">
                       <button
                         onClick={() => startEdit(entry)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                        className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                         title="Edit this entry"
                       >
                         <Pencil className="w-3.5 h-3.5" />
@@ -344,7 +351,7 @@ function ShiftHistoryModal({ open, onClose, employeeId, role, personName, shifts
                       <button
                         onClick={() => removeEntry(entry)}
                         disabled={deleteMutation.isPending}
-                        className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-50 hover:text-rose-600"
+                        className="p-2 rounded-lg text-rose-400 hover:bg-rose-50 hover:text-rose-600"
                         title="Delete this entry"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -353,8 +360,8 @@ function ShiftHistoryModal({ open, onClose, employeeId, role, personName, shifts
                   )}
                 </div>
                 {isEditing && (
-                  <div className="flex flex-wrap items-center gap-2 bg-slate-50 rounded-lg p-3">
-                    <select className={`${inputCls} w-auto flex-1 min-w-[160px]`} value={editShiftId} onChange={(e) => setEditShiftId(e.target.value)}>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-slate-50 rounded-lg p-3">
+                    <select className={`${inputCls} sm:w-auto sm:flex-1 sm:min-w-[160px]`} value={editShiftId} onChange={(e) => setEditShiftId(e.target.value)}>
                       <option value="">Org default</option>
                       {shifts.map((s) => (
                         <option key={s._id} value={s._id}>
@@ -362,12 +369,14 @@ function ShiftHistoryModal({ open, onClose, employeeId, role, personName, shifts
                         </option>
                       ))}
                     </select>
-                    <Button onClick={() => saveEdit(entry)} disabled={editMutation.isPending} className="text-xs py-1.5">
-                      {editMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
-                    </Button>
-                    <Button variant="ghost" onClick={cancelEdit} className="text-xs py-1.5">
-                      Cancel
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button onClick={() => saveEdit(entry)} disabled={editMutation.isPending} className="text-xs py-1.5 flex-1 sm:flex-none">
+                        {editMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
+                      </Button>
+                      <Button variant="ghost" onClick={cancelEdit} className="text-xs py-1.5 flex-1 sm:flex-none">
+                        Cancel
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -494,7 +503,7 @@ function ShiftsPanel({ notify }) {
   };
 
   return (
-    <div className="flex flex-col gap-6 min-w-0">
+    <div className="flex flex-col gap-5 sm:gap-6 min-w-0">
       <SectionCard
         icon={Clock}
         title="Shifts"
@@ -512,7 +521,7 @@ function ShiftsPanel({ notify }) {
         ) : shifts.length === 0 ? (
           <EmptyRow text="No shifts yet. Create the first one to get started." />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
             {shifts.map((s) => (
               <div key={s._id} className="rounded-xl border border-slate-200 p-4 flex flex-col gap-3 hover:border-[#730042] transition-colors min-w-0">
                 <div className="flex items-start justify-between gap-2">
@@ -531,7 +540,7 @@ function ShiftsPanel({ notify }) {
                       {s.durationMinutes ? `${Math.round((s.durationMinutes / 60) * 10) / 10}h` : ''}
                     </p>
                   </div>
-                  <button onClick={() => openEdit(s)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 shrink-0">
+                  <button onClick={() => openEdit(s)} className="p-2 -mr-1 -mt-1 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 shrink-0">
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -551,7 +560,7 @@ function ShiftsPanel({ notify }) {
                   {!s.isDefault && (
                     <Button
                       variant="subtle"
-                      className="flex-1 text-xs py-1.5"
+                      className="flex-1 text-xs py-2 sm:py-1.5 min-w-[110px]"
                       onClick={() => makeDefault(s._id)}
                       disabled={setDefaultMutation.isPending}
                     >
@@ -560,7 +569,7 @@ function ShiftsPanel({ notify }) {
                   )}
                   <Button
                     variant="danger"
-                    className="flex-1 text-xs py-1.5"
+                    className="flex-1 text-xs py-2 sm:py-1.5 min-w-[110px]"
                     onClick={() => removeShift(s)}
                     disabled={deleteShiftMutation.isPending}
                   >
@@ -574,7 +583,7 @@ function ShiftsPanel({ notify }) {
       </SectionCard>
 
       <SectionCard icon={UserPlus} title="Assign shift to a person" subtitle="Choose who follows which shift; leave shift empty to use the org default">
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
           <Field label="Role">
             <select
               className={inputCls}
@@ -607,7 +616,7 @@ function ShiftsPanel({ notify }) {
               ))}
             </select>
           </Field>
-          <Button onClick={submitAssign} disabled={assigning} className="h-[38px]">
+          <Button onClick={submitAssign} disabled={assigning} className="w-full lg:w-auto lg:h-[42px]">
             {assigning ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Assign'}
           </Button>
         </div>
@@ -621,7 +630,7 @@ function ShiftsPanel({ notify }) {
               }
               setHistoryModalOpen(true);
             }}
-            className="text-xs"
+            className="text-xs w-full sm:w-auto"
           >
             <History className="w-3.5 h-3.5" /> View shift history
           </Button>
@@ -692,11 +701,11 @@ function ShiftsPanel({ notify }) {
             />
           </Field>
         </div>
-        <div className="flex justify-end gap-2 pt-5">
-          <Button variant="ghost" onClick={() => setModalOpen(false)}>
+        <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-5">
+          <Button variant="ghost" onClick={() => setModalOpen(false)} className="w-full sm:w-auto">
             Cancel
           </Button>
-          <Button onClick={submitShift} disabled={saving}>
+          <Button onClick={submitShift} disabled={saving} className="w-full sm:w-auto">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : editing ? 'Save changes' : 'Create shift'}
           </Button>
         </div>
@@ -798,10 +807,10 @@ function HolidayCalendar({ month, year, holidays, onAddRange, onEditHoliday, onD
   };
 
   return (
-    <div className="flex flex-col gap-4 min-w-0">
-      <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+    <div className="flex flex-col gap-4 min-w-0 max-w-2xl mx-auto w-full">
+      <div className="grid grid-cols-7 gap-1 sm:gap-1.5 lg:gap-2">
         {DAYS.map((d) => (
-          <div key={d} className="text-[10px] sm:text-[11px] font-semibold uppercase text-slate-400 text-center py-1">
+          <div key={d} className="text-[10px] sm:text-[11px] lg:text-xs font-semibold uppercase text-slate-400 text-center py-1">
             {DAY_LABEL[d]}
           </div>
         ))}
@@ -817,7 +826,7 @@ function HolidayCalendar({ month, year, holidays, onAddRange, onEditHoliday, onD
               type="button"
               onClick={() => handleDayClick(dateStr)}
               title={holiday ? holiday.name : 'Click to add a holiday'}
-              className={`aspect-square rounded-lg text-[11px] sm:text-xs font-medium flex flex-col items-center justify-center gap-0.5 border transition-colors ${
+              className={`aspect-square rounded-lg text-[11px] sm:text-xs lg:text-sm font-medium flex flex-col items-center justify-center gap-0.5 border transition-colors ${
                 holiday
                   ? isEditingThis
                     ? 'bg-[#730042] border-[#730042] text-white'
@@ -852,10 +861,10 @@ function HolidayCalendar({ month, year, holidays, onAddRange, onEditHoliday, onD
             />
           </div>
           <div className="flex gap-2">
-            <Button variant="ghost" onClick={clearSelection}>
+            <Button variant="ghost" onClick={clearSelection} className="flex-1 sm:flex-none">
               Cancel
             </Button>
-            <Button onClick={submitRange} disabled={adding || !rangeName.trim()}>
+            <Button onClick={submitRange} disabled={adding || !rangeName.trim()} className="flex-1 sm:flex-none">
               {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add holiday'}
             </Button>
           </div>
@@ -868,18 +877,18 @@ function HolidayCalendar({ month, year, holidays, onAddRange, onEditHoliday, onD
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">{toISODate(editingHoliday.date)}</p>
             <input className={inputCls} value={editName} onChange={(e) => setEditName(e.target.value)} />
           </div>
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={() => setEditingHoliday(null)}>
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="ghost" onClick={() => setEditingHoliday(null)} className="flex-1 sm:flex-none">
               Cancel
             </Button>
-            <Button variant="danger" onClick={submitDelete} disabled={deleting}>
+            <Button variant="danger" onClick={submitDelete} disabled={deleting} className="flex-1 sm:flex-none">
               {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : (
                 <>
                   <Trash2 className="w-3.5 h-3.5" /> Delete
                 </>
               )}
             </Button>
-            <Button onClick={submitEdit} disabled={editing || !editName.trim()}>
+            <Button onClick={submitEdit} disabled={editing || !editName.trim()} className="flex-1 sm:flex-none">
               {editing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
             </Button>
           </div>
@@ -939,7 +948,7 @@ function HolidaysPanel({ notify }) {
   };
 
   return (
-    <div className="flex flex-col gap-6 min-w-0">
+    <div className="flex flex-col gap-5 sm:gap-6 min-w-0">
       <SectionCard icon={CalendarDays} title="Holiday calendar" subtitle="Dates the whole organisation gets off, regardless of week-off policy">
         <div className="flex items-center gap-3 mb-4 flex-wrap">
           <select className={`${inputCls} w-auto`} value={filter.month} onChange={(e) => setFilter((f) => ({ ...f, month: Number(e.target.value) }))}>
@@ -1138,7 +1147,7 @@ function WeekOffPanel({ notify }) {
   const isRotational = policy === 'rotational';
 
   return (
-    <div className="flex flex-col gap-6 min-w-0">
+    <div className="flex flex-col gap-5 sm:gap-6 min-w-0">
       <SectionCard icon={Settings2} title="Week-off policy" subtitle="Choose how weekly offs work across the organisation">
         {policyLoading ? (
           <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
@@ -1153,13 +1162,13 @@ function WeekOffPanel({ notify }) {
                 key={opt.v}
                 onClick={() => savePolicy(opt.v)}
                 disabled={setPolicyMutation.isPending}
-                className={`text-left p-4 rounded-xl border transition-colors ${
+                className={`text-left p-4 rounded-xl border transition-colors min-h-[44px] ${
                   policy === opt.v ? 'border-[#730042] bg-[#F9F0F5] ring-1 ring-[#730042]' : 'border-slate-200 hover:border-[#730042]'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-slate-800">{opt.label}</span>
-                  {policy === opt.v && <Check className="w-4 h-4 text-[#730042]" />}
+                  {policy === opt.v && <Check className="w-4 h-4 text-[#730042] shrink-0" />}
                 </div>
                 <p className="text-xs text-slate-500 mt-1">{opt.desc}</p>
               </button>
@@ -1173,14 +1182,14 @@ function WeekOffPanel({ notify }) {
           <SectionCard icon={Users} title="Week-off groups" subtitle="Teams that can be given a different off-day in the same week">
             <div className="flex flex-col sm:flex-row gap-2 mb-4">
               <input className={inputCls} placeholder="New group name, e.g. Group A" value={groupName} onChange={(e) => setGroupName(e.target.value)} />
-              <Button onClick={createGroup} disabled={createGroupMutation.isPending} className="sm:w-auto">
+              <Button onClick={createGroup} disabled={createGroupMutation.isPending} className="w-full sm:w-auto">
                 <Plus className="w-4 h-4" /> Create
               </Button>
             </div>
             {groups.length === 0 ? (
               <EmptyRow text="No groups yet. The default schedule applies to everyone." />
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {groups.map((g) => (
                   <div key={g._id} className="rounded-xl border border-slate-200 p-4 min-w-0">
                     <h4 className="text-sm font-semibold text-slate-800 mb-2 truncate">{g.name}</h4>
@@ -1199,7 +1208,7 @@ function WeekOffPanel({ notify }) {
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2">
                       <select
-                        className={`${inputCls} text-xs py-1.5 sm:w-28`}
+                        className={`${inputCls} text-xs py-2 sm:py-1.5 sm:w-28`}
                         value={memberDraft[g._id]?.role || 'employee'}
                         onChange={(e) =>
                           setMemberDraft((d) => ({ ...d, [g._id]: { ...d[g._id], role: e.target.value, employee: '' } }))
@@ -1212,7 +1221,7 @@ function WeekOffPanel({ notify }) {
                         ))}
                       </select>
                       <PersonSelect
-                        className={`${inputCls} text-xs py-1.5`}
+                        className={`${inputCls} text-xs py-2 sm:py-1.5`}
                         role={memberDraft[g._id]?.role || 'employee'}
                         value={memberDraft[g._id]?.employee || ''}
                         onChange={(v) => setMemberDraft((d) => ({ ...d, [g._id]: { ...d[g._id], employee: v } }))}
@@ -1220,7 +1229,7 @@ function WeekOffPanel({ notify }) {
                         loading={peopleLoading}
                         placeholder="Choose person"
                       />
-                      <Button variant="subtle" className="py-1.5 px-2.5" onClick={() => addMember(g._id)} disabled={addGroupMembersMutation.isPending}>
+                      <Button variant="subtle" className="py-2 sm:py-1.5 px-2.5 w-full sm:w-auto" onClick={() => addMember(g._id)} disabled={addGroupMembersMutation.isPending}>
                         <Plus className="w-3.5 h-3.5" />
                       </Button>
                     </div>
@@ -1231,7 +1240,7 @@ function WeekOffPanel({ notify }) {
           </SectionCard>
 
           <SectionCard icon={CalendarDays} title="Set off-days for a single week">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <Field label="Week starting (any day in the week)">
                 <input
                   type="date"
@@ -1251,7 +1260,7 @@ function WeekOffPanel({ notify }) {
                 </select>
               </Field>
               <div className="flex items-end">
-                <Button onClick={submitWeekForm} disabled={setWeekScheduleMutation.isPending} className="w-full h-[38px]">
+                <Button onClick={submitWeekForm} disabled={setWeekScheduleMutation.isPending} className="w-full lg:h-[42px]">
                   {setWeekScheduleMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save week'}
                 </Button>
               </div>
@@ -1264,7 +1273,7 @@ function WeekOffPanel({ notify }) {
           </SectionCard>
 
           <SectionCard icon={CalendarDays} title="Apply the same off-days to a whole month">
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <Field label="Month">
                 <select className={inputCls} value={monthForm.month} onChange={(e) => setMonthForm((f) => ({ ...f, month: Number(e.target.value) }))}>
                   {MONTH_NAMES.map((m, i) => (
@@ -1288,7 +1297,7 @@ function WeekOffPanel({ notify }) {
                 </select>
               </Field>
               <div className="flex items-end">
-                <Button onClick={submitMonthForm} disabled={setMonthScheduleMutation.isPending} className="w-full h-[38px]">
+                <Button onClick={submitMonthForm} disabled={setMonthScheduleMutation.isPending} className="w-full lg:h-[42px]">
                   {setMonthScheduleMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Apply to month'}
                 </Button>
               </div>
@@ -1353,7 +1362,7 @@ function WeekOffPanel({ notify }) {
       )}
 
       <SectionCard icon={ShieldCheck} title="Individual overrides" subtitle="Give one person a different week-off rule than the rest of the org">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="flex flex-col gap-3">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Set an override</p>
             <select
@@ -1387,7 +1396,7 @@ function WeekOffPanel({ notify }) {
             {overrideForm.weekOffType === 'custom_fixed_days' && (
               <DayPicker value={overrideForm.fixedOffDays} onChange={(v) => setOverrideForm((f) => ({ ...f, fixedOffDays: v }))} />
             )}
-            <Button onClick={submitOverride} disabled={setOverrideMutation.isPending} className="self-start">
+            <Button onClick={submitOverride} disabled={setOverrideMutation.isPending} className="self-start w-full sm:w-auto">
               {setOverrideMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save override'}
             </Button>
           </div>
@@ -1401,7 +1410,7 @@ function WeekOffPanel({ notify }) {
               ))}
             </select>
             <PersonSelect role={removeRole} value={removeEmployeeId} onChange={setRemoveEmployeeId} people={people} loading={peopleLoading} />
-            <Button variant="danger" onClick={submitRemoveOverride} className="self-start" disabled={removeOverrideMutation.isPending}>
+            <Button variant="danger" onClick={submitRemoveOverride} className="self-start w-full sm:w-auto" disabled={removeOverrideMutation.isPending}>
               Remove override
             </Button>
           </div>
@@ -1424,10 +1433,10 @@ export default function AdminManagement() {
   return (
     <div className="min-h-screen bg-slate-50 w-full max-w-full overflow-x-hidden">
       <ToastStack toasts={toasts} />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 min-w-0">
-        <div className="mb-8">
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Shift &amp; holiday management</h1>
-          <p className="text-sm text-slate-500 mt-1.5">
+      <div className="max-w-6xl 2xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-5 sm:py-8 lg:py-10 min-w-0">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-lg sm:text-xl md:text-2xl lg:text-[28px] font-bold text-slate-900 tracking-tight">Shift &amp; holiday management</h1>
+          <p className="text-sm md:text-[15px] text-slate-500 mt-1.5 max-w-3xl">
             Configure working hours, the holiday calendar and week-off rules. Employees can only check in during their assigned shift window, and days
             marked as a holiday or week-off are automatically kept closed for check-in.
           </p>
@@ -1441,11 +1450,11 @@ export default function AdminManagement() {
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-2 min-h-[44px] sm:min-h-0 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
                   active ? 'bg-[#730042] text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="w-4 h-4 shrink-0" />
                 {t.label}
               </button>
             );
