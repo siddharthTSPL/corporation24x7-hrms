@@ -7,6 +7,7 @@ const checkPermission = require("../middleware/auth/Checkpermission.middleware")
 const multer = require("multer");
 
 const upload = multer({ storage: multer.memoryStorage() });
+const { sendSupportRequest } = require("../controllers/support.controller");
 
 const {
   verifyAdmin,
@@ -391,5 +392,8 @@ adminrouter.patch("/assets/:id/assign-employee", adminauthmiddleware, asyncHandl
 adminrouter.patch("/assets/:id/assign-manager", adminauthmiddleware, asyncHandler(assignAssetToManager));
 adminrouter.patch("/assets/:id/revoke", adminauthmiddleware, asyncHandler(revokeAssetAdmin));
 adminrouter.get("/assets/person/:person_id/:person_model", adminauthmiddleware, asyncHandler(getAssetsOfPerson));
+
+// Help & Support form — no permission gate, every logged-in admin can reach support.
+adminrouter.post("/contact-support", adminauthmiddleware, asyncHandler(sendSupportRequest));
 
 module.exports = adminrouter;
