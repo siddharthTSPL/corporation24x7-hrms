@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { FaTimes, FaClock, FaCalendarAlt, FaDownload, FaUsers } from "react-icons/fa";
 import { downloadCsv } from "./exportCsv";
 
@@ -135,6 +135,7 @@ export default function AttendanceBulkHistoryModal({ open, onClose, people, fetc
           idle += r.idleMinutes || 0;
           if (r.checkIn) present += 1;
           combined.push({
+            employeeId: person.id,
             employeeName: person.name || "Unknown",
             empid: person.empid || "—",
             date: fmtDate(r.date),
@@ -170,6 +171,19 @@ export default function AttendanceBulkHistoryModal({ open, onClose, people, fetc
     // history modal fetching as soon as it's opened.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  const groupedByEmployee = useMemo(() => {
+    if (!rows) return [];
+    const map = new Map();
+    perEmployee.forEach((e) => map.set(e.id, { ...e, days: [] }));
+    rows.forEach((r) => {
+      if (!map.has(r.employeeId)) {
+        map.set(r.employeeId, { id: r.employeeId, name: r.employeeName, empid: r.empid, records: 0, active: 0, idle: 0, present: 0, days: [] });
+      }
+      map.get(r.employeeId).days.push(r);
+    });
+    return [...map.values()].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  }, [rows, perEmployee]);
 
   const exportCsv = () => {
     if (!rows?.length) return;
@@ -331,28 +345,48 @@ export default function AttendanceBulkHistoryModal({ open, onClose, people, fetc
                 </div>
               )}
 
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2 pr-2">Employee</th>
-                    <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2 px-2">Records</th>
-                    <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2 px-2">Days Present</th>
-                    <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2 px-2">Active</th>
-                    <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2 pl-2">Idle</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {perEmployee.map((e) => (
-                    <tr key={e.id} className="border-b border-gray-100">
-                      <td className="py-2 pr-2 text-[12px] text-gray-800 font-medium">{e.name} <span className="text-gray-400 font-normal">({e.empid})</span></td>
-                      <td className="py-2 px-2 text-[12px] text-gray-600 text-center">{e.records}</td>
-                      <td className="py-2 px-2 text-[12px] text-gray-600 text-center">{e.present}</td>
-                      <td className="py-2 px-2 text-[12px] text-emerald-700 font-mono">{fmtMinutes(e.active)}</td>
-                      <td className="py-2 pl-2 text-[12px] text-amber-700 font-mono">{fmtMinutes(e.idle)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {groupedByEmployee.map((e) => (
+                <div key={e.id} className="border border-gray-200 rounded-xl overflow-hidden">
+                  <div className="px-3 py-2.5 flex items-center justify-between flex-wrap gap-2" style={{ background: "#fdf2f7" }}>
+                    <div>
+                      <p className="m-0 text-[13px] font-bold text-gray-900">{e.name} <span className="text-gray-400 font-normal">({e.empid})</span></p>
+                      <p className="m-0 mt-0.5 text-[11px] text-gray-500">
+                        {e.records} record{e.records === 1 ? "" : "s"} · {e.present} day{e.present === 1 ? "" : "s"} present · Active {fmtMinutes(e.active)} · Idle {fmtMinutes(e.idle)}
+                      </p>
+                    </div>
+                  </div>
+                  {e.days.length === 0 ? (
+                    <p className="m-0 px-3 py-3 text-[12px] text-gray-400">No records in this range.</p>
+                  ) : (
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50/60 border-b border-gray-100">
+                          <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2 pl-3 pr-2">Date</th>
+                          <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2 px-2">Check-in</th>
+                          <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2 px-2">Check-out</th>
+                          <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2 px-2">Via</th>
+                          <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2 px-2">Active</th>
+                          <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2 px-2">Idle</th>
+                          <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2 pr-3 pl-2">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {e.days.map((d, i) => (
+                          <tr key={i} className="border-b border-gray-50 last:border-b-0">
+                            <td className="py-2 pl-3 pr-2 text-[12px] font-medium text-gray-800 whitespace-nowrap">{d.date}</td>
+                            <td className="py-2 px-2 text-[12px] text-gray-600 font-mono">{d.checkIn}</td>
+                            <td className="py-2 px-2 text-[12px] text-gray-600 font-mono">{d.checkOut}</td>
+                            <td className="py-2 px-2 text-[12px] text-gray-600">{d.via}</td>
+                            <td className="py-2 px-2 text-[12px] text-emerald-700 font-mono">{fmtMinutes(d.activeMinutes)}</td>
+                            <td className="py-2 px-2 text-[12px] text-amber-700 font-mono">{fmtMinutes(d.idleMinutes)}</td>
+                            <td className="py-2 pr-3 pl-2 text-[12px] text-gray-600 whitespace-nowrap">{d.status}{d.isLate === "Yes" ? " · Late" : ""}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>
