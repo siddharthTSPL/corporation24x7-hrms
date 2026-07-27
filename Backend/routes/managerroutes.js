@@ -7,6 +7,7 @@ const checkPermission = require("../middleware/auth/Checkpermission.middleware")
 const multer = require("multer");
 
 const upload = multer({ storage: multer.memoryStorage() });
+const { sendSupportRequest } = require("../controllers/support.controller");
 
 const {
   uploadDocument,
@@ -67,5 +68,8 @@ managerrouter.get(
   managermiddleware,
   asyncHandler(managercontroller.viewallleaves)
 );
+
+// Help & Support form — no permission gate, every logged-in manager can reach support.
+managerrouter.post("/contact-support", managermiddleware, asyncHandler(sendSupportRequest));
 
 module.exports = managerrouter;

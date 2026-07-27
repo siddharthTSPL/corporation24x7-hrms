@@ -1583,6 +1583,7 @@ const AdminLeaveWFH = () => {
         </div>
 
         <div
+          data-tour="leave-tabs"
           className="grid grid-cols-2 xs:grid-cols-3 sm:flex sm:flex-wrap gap-1 rounded-[12px] sm:rounded-[14px] p-1 mb-5 sm:mb-7"
           style={{
             background: "rgba(235,228,245,0.7)",

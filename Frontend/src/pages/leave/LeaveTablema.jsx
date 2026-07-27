@@ -1463,7 +1463,7 @@ const ManagerLeaveWFH = () => {
           )}
         </div>
 
-        <div className="mlw-tabs-wrap">
+        <div className="mlw-tabs-wrap" data-tour="leave-tabs">
           {TABS.map(t=>{
             const active = tab===t.key;
             return (

@@ -14,7 +14,7 @@ export default function Announceem() {
   const announcements = data?.announcements || [];
 
   return (
-    <div style={{ background: C.cream, minHeight: "100vh", fontFamily: "'Segoe UI', sans-serif" }}>
+    <div data-tour="announcement-view" style={{ background: C.cream, minHeight: "100vh", fontFamily: "'Segoe UI', sans-serif" }}>
       <FontInjector />
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 24px" }}>
