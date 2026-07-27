@@ -1,5 +1,6 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { FaTimes, FaArrowLeft, FaArrowRight, FaMapSigns } from "react-icons/fa";
 
 const PAD = 8;
@@ -9,6 +10,13 @@ const PAD = 8;
  * that must match a DOM node already on the page — usually a
  * `data-tour="..."` attribute) and darkens everything except that node.
  *
+ * A step can optionally set `path` (e.g. "/leave-employee") to point at an
+ * element that lives on a different page than the one the tour started on
+ * — for example, the "Apply Leave" tab on the Leave page, or the
+ * "New Announcement" button on the Announcement page. When the tour reaches
+ * such a step it navigates there automatically, waits for the page to
+ * render, then spotlights the element as usual.
+ *
  * Steps whose target isn't currently in the DOM (e.g. a menu item hidden by
  * a permission gate) are skipped automatically instead of showing an empty
  * spotlight.
@@ -16,6 +24,9 @@ const PAD = 8;
 export default function HelpTour({ steps, onClose }) {
   const [index, setIndex] = useState(0);
   const [rect, setRect] = useState(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const pendingNav = useRef(false);
 
   const step = steps[index];
 
@@ -30,20 +41,48 @@ export default function HelpTour({ steps, onClose }) {
     setRect({ top: r.top - PAD, left: r.left - PAD, width: r.width + PAD * 2, height: r.height + PAD * 2 });
   }, [step]);
 
-  // If the current step's target isn't rendered (permission-gated menu item,
-  // collapsed section, etc.), skip forward past it instead of getting stuck.
+  // If a step targets a different route, navigate there first and give the
+  // new page a moment to mount before measuring/skipping.
   useEffect(() => {
     if (!step) return;
+    if (step.path && step.path !== location.pathname) {
+      pendingNav.current = true;
+      navigate(step.path);
+      return;
+    }
+    pendingNav.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, step]);
+
+  // If the current step's target isn't rendered (permission-gated menu item,
+  // collapsed section, page still loading after navigation, etc.), skip
+  // forward past it instead of getting stuck.
+  useEffect(() => {
+    if (!step) return;
+    if (step.path && step.path !== location.pathname) return; // still navigating
+
     const el = document.querySelector(step.selector);
     if (!el) {
-      if (index < steps.length - 1) setIndex((i) => i + 1);
-      else onClose();
-      return;
+      // Just navigated — give the new page's async data a little longer
+      // before deciding the target really is missing (e.g. gated by a
+      // permission that hasn't finished loading).
+      const wasNavigating = pendingNav.current;
+      pendingNav.current = false;
+      const delay = wasNavigating ? 500 : 0;
+      const t = setTimeout(() => {
+        if (document.querySelector(step.selector)) {
+          measure();
+          return;
+        }
+        if (index < steps.length - 1) setIndex((i) => i + 1);
+        else onClose();
+      }, delay);
+      return () => clearTimeout(t);
     }
     el.scrollIntoView({ behavior: "smooth", block: "nearest" });
     const t = setTimeout(measure, 220);
     return () => clearTimeout(t);
-  }, [index, step, steps.length, measure, onClose]);
+  }, [index, step, steps.length, measure, onClose, location.pathname]);
 
   useEffect(() => {
     window.addEventListener("resize", measure);
