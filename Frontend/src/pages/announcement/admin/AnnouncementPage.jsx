@@ -106,6 +106,7 @@ export default function AnnouncementPage() {
         </div>
         {canCreate ? (
           <button onClick={openCreate}
+            data-tour="announcement-create"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-medium text-white transition-opacity hover:opacity-88"
             style={{ background: "#730042" }}>
             <IconPlus size={14} />
@@ -113,6 +114,7 @@ export default function AnnouncementPage() {
           </button>
         ) : (
           <div
+            data-tour="announcement-create"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-medium text-[#993556] border border-[#F4C0D1] opacity-60 cursor-not-allowed select-none"
             style={{ background: "#fff" }}
             title="You don't have permission to create announcements">
