@@ -5,7 +5,6 @@ import {
   FaFilter, FaCheckCircle, FaUserClock, FaBan, FaLayerGroup,
 } from "react-icons/fa";
 import AttendanceHistoryModal from "./AttendanceHistoryModal";
-import AttendanceBulkHistoryModal from "./AttendanceBulkHistoryModal";
 import { downloadCsv } from "./exportCsv";
 
 const MONTH_NAMES = [
@@ -18,6 +17,38 @@ const ROLE_COLOR = {
   manager: "#730042",
   employee: "#a0005c",
 };
+
+// Fixed role list — always shown in full, regardless of who has a record
+// in the currently loaded rows.
+const ROLE_OPTIONS = [
+  { value: "all", label: "All Roles" },
+  { value: "employee", label: "Employee" },
+  { value: "manager", label: "Manager" },
+  { value: "senior_manager", label: "Senior Manager" },
+  { value: "admin", label: "Admin" },
+  { value: "senior_admin", label: "Senior Admin" },
+  { value: "official", label: "Official" },
+];
+
+// Department short-code -> full form mapping.
+const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+};
+
+// Fixed department list — full forms, always shown in full.
+const DEPT_OPTIONS = [
+  { value: "all", label: "All Departments" },
+  ...Object.entries(DEPT_FULL_FORMS).map(([code, label]) => ({ value: code, label })),
+];
+
+function getDeptFullForm(code) {
+  if (!code) return "—";
+  return DEPT_FULL_FORMS[code] || code;
+}
 
 const fmtTime = (d) =>
   d ? new Date(d).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—";
@@ -230,7 +261,7 @@ function MonthlyRow({ p, onHistoryClick }) {
  * (useGetAttendanceOverview from adminother.hook.js or suother.hook.js) -
  * passed in so this component stays shared between both dashboards.
  */
-export default function AttendanceDetailsModal({ open, onClose, useOverviewHook, useHistoryHook, fetchHistory }) {
+export default function AttendanceDetailsModal({ open, onClose, useOverviewHook, useHistoryHook }) {
   const [tab, setTab] = useState("today");
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -238,7 +269,6 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
   const [statusFilter, setStatusFilter] = useState("all"); // today tab only
   const [sourceFilter, setSourceFilter] = useState("all"); // today tab only
   const [historyModal, setHistoryModal] = useState({ open: false, person: null });
-  const [bulkHistoryOpen, setBulkHistoryOpen] = useState(false);
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
@@ -254,16 +284,6 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
 
   const activeQuery = tab === "today" ? todayQuery : monthlyQuery;
   const rows = activeQuery.data?.data ?? [];
-
-  const roleOptions = useMemo(() => {
-    const set = new Set(rows.map((p) => p.role).filter(Boolean));
-    return [{ value: "all", label: "All Roles" }, ...[...set].sort().map((r) => ({ value: r, label: r.charAt(0).toUpperCase() + r.slice(1) }))];
-  }, [rows]);
-
-  const deptOptions = useMemo(() => {
-    const set = new Set(rows.map((p) => p.department).filter(Boolean));
-    return [{ value: "all", label: "All Departments" }, ...[...set].sort().map((d) => ({ value: d, label: d }))];
-  }, [rows]);
 
   const STATUS_FILTER_OPTIONS = [
     { value: "all", label: "All Status" },
@@ -337,7 +357,7 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
           { key: "empid", label: "Emp ID" },
           { key: "email", label: "Email" },
           { key: "role", label: "Role" },
-          { key: "department", label: "Department" },
+          { key: "department", label: "Department", format: (r) => getDeptFullForm(r.department) },
           { key: "reportingManager", label: "Reporting Manager" },
           { key: "office_location", label: "Office Location" },
           { key: "checkIn", label: "Check-in", format: (r) => fmtTime(r.checkIn) },
@@ -357,7 +377,7 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
           { key: "empid", label: "Emp ID" },
           { key: "email", label: "Email" },
           { key: "role", label: "Role" },
-          { key: "department", label: "Department" },
+          { key: "department", label: "Department", format: (r) => getDeptFullForm(r.department) },
           { key: "reportingManager", label: "Reporting Manager" },
           { key: "office_location", label: "Office Location" },
           { key: "presentDays", label: "Present Days" },
@@ -460,17 +480,6 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
             >
               <FaDownload size={10} /> Export CSV
             </button>
-            {tab === "monthly" && fetchHistory && (
-              <button
-                type="button"
-                onClick={() => setBulkHistoryOpen(true)}
-                disabled={!filtered.length}
-                className="flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-3 py-1.5 whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ color: "#730042", background: "#fdf2f7", border: "1px solid #e8b8cf" }}
-              >
-                <FaClock size={10} /> History (All)
-              </button>
-            )}
           </div>
         </div>
 
@@ -478,8 +487,8 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
           <span className="flex items-center gap-1 text-[10.5px] font-semibold uppercase tracking-wide text-gray-400 mr-0.5">
             <FaFilter size={9} /> Filters
           </span>
-          <FilterSelect value={roleFilter} onChange={setRoleFilter} options={roleOptions} />
-          <FilterSelect value={deptFilter} onChange={setDeptFilter} options={deptOptions} />
+          <FilterSelect value={roleFilter} onChange={setRoleFilter} options={ROLE_OPTIONS} />
+          <FilterSelect value={deptFilter} onChange={setDeptFilter} options={DEPT_OPTIONS} />
           {tab === "today" && (
             <>
               <FilterSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_FILTER_OPTIONS} />
@@ -593,15 +602,6 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
           employeeId={historyModal.person?.id}
           employeeName={historyModal.person?.name}
           useHistoryHook={useHistoryHook}
-        />
-      )}
-
-      {fetchHistory && (
-        <AttendanceBulkHistoryModal
-          open={bulkHistoryOpen}
-          onClose={() => setBulkHistoryOpen(false)}
-          people={filtered}
-          fetchHistory={fetchHistory}
         />
       )}
     </>
