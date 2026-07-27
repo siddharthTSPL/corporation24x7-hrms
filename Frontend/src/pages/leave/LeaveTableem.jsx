@@ -826,7 +826,7 @@ const EmployeeLeaveWFH = () => {
           )}
         </div>
 
-        <div className="flex flex-wrap gap-1 bg-[rgba(235,228,245,0.7)] backdrop-blur-[8px] rounded-[14px] p-1 mb-7 w-full sm:w-fit border border-[rgba(200,185,220,0.3)] shadow-[0_2px_8px_rgba(80,40,100,0.06)]">
+        <div data-tour="leave-tabs" className="flex flex-wrap gap-1 bg-[rgba(235,228,245,0.7)] backdrop-blur-[8px] rounded-[14px] p-1 mb-7 w-full sm:w-fit border border-[rgba(200,185,220,0.3)] shadow-[0_2px_8px_rgba(80,40,100,0.06)]">
           {TABS.map(t => {
             const active = tab === t.key;
             return (
