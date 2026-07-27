@@ -626,7 +626,7 @@ export default function EmployeeTickets() {
           </div>
         </div>
 
-        <div className="flex gap-1 bg-violet-50/50 rounded-xl p-1 mb-5 w-fit border border-[rgba(115,0,66,0.1)] flex-wrap">
+        <div data-tour="ticket-tabs" className="flex gap-1 bg-violet-50/50 rounded-xl p-1 mb-5 w-fit border border-[rgba(115,0,66,0.1)] flex-wrap">
           <button
             onClick={() => handleTabClick("submit")}
             className={`px-4 sm:px-5 py-2 rounded-lg border-none cursor-pointer text-[12.5px] transition-all font-[inherit] flex items-center gap-1.5 ${
