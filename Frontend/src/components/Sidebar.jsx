@@ -53,15 +53,18 @@ const superAdminMenu = [
 const adminMenu = [
   { name: "Dashboard",     path: "/dashboard",           icon: <FaHome />, blurb: "Your organisation's overview — headcount, attendance, and activity." },
   { name: "Onboarding",    path: "/employee",            icon: <FaUsers />, blurb: "Add and manage employees and managers." },
-  { name: "Announcement",  path: "/announcement",        icon: <FaBullhorn />, blurb: "Create and publish announcements for your organisation.",  permissionGroup: ["announcements.can_view_announcements", "announcements.can_create_announcement", "announcements.can_edit_announcement", "announcements.can_delete_announcement"] },
+  { name: "Announcement",  path: "/announcement",        icon: <FaBullhorn />, blurb: "Create and publish announcements for your organisation.",  permissionGroup: ["announcements.can_view_announcements", "announcements.can_create_announcement", "announcements.can_edit_announcement", "announcements.can_delete_announcement"],
+    pageStep: { selector: '[data-tour="announcement-create"]', title: "Creating an announcement", content: "Click here to write a new announcement. Once published, it's instantly visible to your managers and employees." } },
   { name: "Review",        path: "/review-admin",        icon: <FaClipboardCheck />, blurb: "Run and track performance reviews for your team." },
-  { name: "Leave",         path: "/leave-admin",         icon: <FaCalendarAlt />, blurb: "Approve or reject leave requests from managers and employees." },
+  { name: "Leave",         path: "/leave-admin",         icon: <FaCalendarAlt />, blurb: "Approve or reject leave requests from managers and employees.",
+    pageStep: { selector: '[data-tour="leave-tabs"]', title: "Managing leave", content: "Use these tabs to review pending requests, check your own leave balance, or apply for your own leave and WFH." } },
   { name: "Organisation",  path: "/organisation",        icon: <FaBuilding />, blurb: "View your organisation's structure and org chart." },
   { name:"Asset Management", path: "/admin-asset-management", icon: <FaFolder />, blurb: "Assign, revoke, and track company assets." },
   { name: "Face Attendance", path: "/face-enrollment", icon: <FaShieldAlt />, blurb: "Enroll employee faces for kiosk-based attendance." },
   { name: "Recruitment",   path: "/recruitment-admin",   icon: <FaUsersCog />, blurb: "Post hiring requisitions and track candidates.",
     permissionGroup: ["recruitment.can_view_hiring_requisitions", "recruitment.can_create_hiring_requisition", "recruitment.can_view_candidates", "recruitment.can_add_candidate"] },
-  { name: "TorchX Voice",  path: "/admin-complaints",    icon: <FaShieldAlt />, blurb: "Raise or resolve support tickets.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"] },
+  { name: "TorchX Voice",  path: "/admin-complaints",    icon: <FaShieldAlt />, blurb: "Raise or resolve support tickets.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"],
+    pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to track ones you've already raised." } },
   { name: "Timesheet",     path: "/admin-timesheet",     icon: <FaLock />, blurb: "Review and approve team timesheets." },
   { name: "Payroll",       path: "/payroll",             icon: <FaMoneyCheckAlt />, blurb: "Run payroll and manage payslips." },
   { name: "TorchX Management", path: "/admin-management", icon: <FaUsersCog />, blurb: "Manage your organisation's TorchX product access." },
@@ -72,25 +75,31 @@ const adminMenu = [
 
 const managerMenu = [
   { name: "Dashboard",    path: "/manager-dashboard",    icon: <FaHome />, blurb: "Your team's overview — attendance, leaves, and activity." },
-  { name: "Leave",        path: "/leave-manager",        icon: <FaCalendarAlt />, blurb: "Approve or forward leave requests from your team." },
-  { name: "Announcement", path: "/announcement-manager", icon: <FaBullhorn />, blurb: "View and share announcements with your team.",  permissionGroup: ["announcements.can_view_announcements", "announcements.can_create_announcement", "announcements.can_edit_announcement", "announcements.can_delete_announcement"] },
+  { name: "Leave",        path: "/leave-manager",        icon: <FaCalendarAlt />, blurb: "Approve or forward leave requests from your team.",
+    pageStep: { selector: '[data-tour="leave-tabs"]', title: "Managing leave", content: "Use these tabs to review your team's leave requests, check your own balance, or apply for your own leave." } },
+  { name: "Announcement", path: "/announcement-manager", icon: <FaBullhorn />, blurb: "View and share announcements with your team.",  permissionGroup: ["announcements.can_view_announcements", "announcements.can_create_announcement", "announcements.can_edit_announcement", "announcements.can_delete_announcement"],
+    pageStep: { selector: '[data-tour="announcement-view"]', title: "Reading announcements", content: "Announcements published by your admin show up here, newest first." } },
   { name: "Organisation", path: "/organisation-manager", icon: <FaBuilding />, blurb: "View your organisation's structure and org chart." },
   { name: "Review",       path: "/review-manager",       icon: <FaClipboardCheck />, blurb: "Run performance reviews for your reportees." },
   { name: "Timesheet",    path: "/manager-timesheet",    icon: <FaLock />, blurb: "Track and approve your team's timesheets." },
   { name: "File",         path: "/file-manager",         icon: <FaFolder />, blurb: "Upload and manage documents.",    permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Recruitment",  path: "/recruitment-manager",  icon: <FaUsersCog />, blurb: "Track hiring requisitions and candidates.",  permissionGroup: ["recruitment.can_view_hiring_requisitions", "recruitment.can_create_hiring_requisition", "recruitment.can_view_candidates", "recruitment.can_add_candidate"] },
-  { name: "TorchX Voice", path: "/manager-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"] },
+  { name: "TorchX Voice", path: "/manager-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"],
+    pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to track ones you've already raised." } },
   { name: "Settings",     path: "/settings-manager",     icon: <FaCog />, blurb: "Update your profile and account preferences." },
 ];
 
 const employeeMenu = [
   { name: "Dashboard",    path: "/employee-dashboard",    icon: <FaHome />, blurb: "Your personal overview — attendance, leaves, and updates." },
-  { name: "Leave",        path: "/leave-employee",        icon: <FaCalendarAlt />, blurb: "Apply for leave and track your leave balance." },
-  { name: "Announcement", path: "/announcement-employee", icon: <FaBullhorn />, blurb: "See company announcements.",  permissionGroup: ["announcements.can_view_announcements", "announcements.can_create_announcement", "announcements.can_edit_announcement", "announcements.can_delete_announcement"] },
+  { name: "Leave",        path: "/leave-employee",        icon: <FaCalendarAlt />, blurb: "Apply for leave and track your leave balance.",
+    pageStep: { selector: '[data-tour="leave-tabs"]', title: "Applying for leave", content: "Open the \"Apply Leave\" tab to submit a request, or \"Leave Balance\" to see how many days you have left." } },
+  { name: "Announcement", path: "/announcement-employee", icon: <FaBullhorn />, blurb: "See company announcements.",  permissionGroup: ["announcements.can_view_announcements", "announcements.can_create_announcement", "announcements.can_edit_announcement", "announcements.can_delete_announcement"],
+    pageStep: { selector: '[data-tour="announcement-view"]', title: "Reading announcements", content: "Every announcement your organisation publishes shows up here, newest first." } },
   { name: "Organisation", path: "/organisation-employee", icon: <FaBuilding />, blurb: "View your organisation's structure and org chart." },
   { name: "Timesheet",    path: "/employee-timesheet",    icon: <FaLock />, blurb: "Log your hours and track your timesheet." },
   { name: "File",         path: "/file-employee",         icon: <FaFolder />, blurb: "Upload and manage your personal documents.",    permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
-  { name: "TorchX Voice", path: "/employee-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket for any issue.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"] },
+  { name: "TorchX Voice", path: "/employee-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket for any issue.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"],
+    pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to check the status of one you've already sent." } },
   { name: "Settings",     path: "/settings-employee",     icon: <FaCog />, blurb: "Update your profile and account preferences." },
 ];
 
@@ -143,19 +152,30 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
   // sync with what's actually in the sidebar. Items hidden by a permission
   // gate are left out — HelpTour also self-skips if a target ever vanishes
   // mid-tour (e.g. permissions load in late).
+  //
+  // Each menu item contributes at least one step (pointing at its sidebar
+  // entry). Items that carry a `pageStep` (Announcement, Leave, TorchX
+  // Voice) contribute a second step right after it — that one sets `path`,
+  // so HelpTour navigates into the actual page and spotlights the real
+  // control (the "New Announcement" button, the "Apply Leave" tab, etc.)
+  // instead of only describing it from the sidebar.
   const tourSteps = [
     {
       selector: '[data-tour="sidebar-brand"]',
       title: "Welcome to TorchX Talent",
-      content: "Quick tour of what you can do from here — takes less than a minute.",
+      content: "Here's a quick walkthrough of what you can do from here — it takes less than a minute.",
     },
     ...menu
       .filter((item) => isAllowed(item) && item.blurb)
-      .map((item) => ({
-        selector: `[data-tour="menu-${item.path}"]`,
-        title: item.name,
-        content: item.blurb,
-      })),
+      .flatMap((item) => {
+        const navStep = {
+          selector: `[data-tour="menu-${item.path}"]`,
+          title: item.name,
+          content: item.blurb,
+        };
+        if (!item.pageStep) return [navStep];
+        return [navStep, { path: item.path, ...item.pageStep }];
+      }),
     {
       selector: '[data-tour="help-button"]',
       title: "Need help anytime?",
@@ -305,7 +325,7 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
                         <FaMapSigns className="text-[#730042]" />
                         <span>
                           <span className="block font-medium">Take a Tour</span>
-                          <span className="block text-[11px] text-gray-400">Hum kaha se kya kar sakte hain</span>
+                          <span className="block text-[11px] text-gray-400">A quick walkthrough of where everything is</span>
                         </span>
                       </button>
                       <button
