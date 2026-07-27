@@ -1832,7 +1832,7 @@ function SuperAdminDashboard() {
         {stats.map((s, i) => <StatCard key={i} {...s} />)}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 sm:gap-5 mb-4 sm:mb-5">
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 sm:gap-5 mb-4 sm:mb-5 items-start">
         <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden">
           <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#e8d5e2] flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
@@ -1870,8 +1870,8 @@ function SuperAdminDashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden">
-          <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#e8d5e2] flex items-center justify-between">
+        <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden flex flex-col max-h-[420px]">
+          <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#e8d5e2] flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-2 sm:gap-2.5">
               <FaBullhorn size={12} className="text-[#730042]" />
               <span className="font-bold text-[13px] sm:text-[15px] text-[#0d0209]">Announcements</span>
@@ -1889,8 +1889,8 @@ function SuperAdminDashboard() {
               <FaBullhorn size={24} /><p className="text-[12px]">No announcements yet. Publish one to notify your team.</p>
             </div>
           ) : (
-            <div className="divide-y divide-[#f7ecf3]">
-              {announcements.slice(0, 5).map((ann) => {
+            <div className="divide-y divide-[#f7ecf3] overflow-y-auto flex-1 min-h-0">
+              {announcements.map((ann) => {
                 const priority = (ann.priority || "normal").toLowerCase();
                 const audience = ann.audience || "all";
                 return (
