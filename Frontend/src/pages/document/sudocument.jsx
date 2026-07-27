@@ -36,6 +36,19 @@ function fmtRole(role) {
   return role.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+};
+
+function fmtDept(code) {
+  if (!code) return "—";
+  return DEPT_FULL_FORMS[code] || code;
+}
+
 function getInitials(name = "") {
   return name
     .split(" ")
@@ -73,7 +86,7 @@ function exportToCSV(docs, tabLabel) {
     `"${d.uploader?.name || "—"}"`,
     `"${d.uploader?.email || "—"}"`,
     `"${d.uploaderModel || "—"}"`,
-    `"${d.uploader?.department || "—"}"`,
+    `"${fmtDept(d.uploader?.department)}"`,
     `"${d.uploader?.designation || "—"}"`,
     fmtSize(d.sizeKB),
     fmtDate(d.uploadedAt),
@@ -292,7 +305,7 @@ function DetailDrawer({ documentId, docType, onClose }) {
                   </div>
                   <div className="space-y-1 pt-1">
                     <InfoRow label="Role" value={fmtRole(doc.uploaderModel)} />
-                    <InfoRow label="Department" value={doc.uploader.department || "—"} />
+                    <InfoRow label="Department" value={fmtDept(doc.uploader.department)} />
                     <InfoRow label="Designation" value={doc.uploader.designation || "—"} />
                     {doc.uploader.contact && (
                       <InfoRow label="Contact" value={doc.uploader.contact} />
@@ -443,7 +456,7 @@ function UploaderDrawer({ group, personalDocs, expenseDocs, onClose, onOpenDoc }
           </div>
           <div className="min-w-0">
             <p className="text-[10px] text-[#b0948a] uppercase tracking-wide">Department</p>
-            <p className="text-xs font-medium text-[#2a1a16] mt-0.5 truncate">{group.department || "—"}</p>
+            <p className="text-xs font-medium text-[#2a1a16] mt-0.5 truncate">{fmtDept(group.department)}</p>
           </div>
           <div className="min-w-0">
             <p className="text-[10px] text-[#b0948a] uppercase tracking-wide">Designation</p>
@@ -530,8 +543,10 @@ function UploaderCard({ group, onClick }) {
           <div className="flex items-center gap-1.5 mt-2 flex-wrap">
             <Badge className="bg-[#730042]/8 text-[#730042] capitalize">{fmtRole(group.role)}</Badge>
             {group.department && (
-              <Badge className="bg-[#f9f8f2] text-[#b0948a] border border-[#ede5e0] truncate max-w-[120px]">{group.department}</Badge>
-            )}
+  <Badge className="bg-[#f9f8f2] text-[#b0948a] border border-[#ede5e0] truncate max-w-[120px]">
+    {fmtDept(group.department)}
+  </Badge>
+)}
           </div>
         </div>
       </div>
@@ -586,7 +601,7 @@ function UploaderTableRow({ group, onClick }) {
         <Badge className="bg-[#730042]/8 text-[#730042] capitalize">{fmtRole(group.role)}</Badge>
       </td>
       <td className="px-4 py-3">
-        <p className="text-xs text-[#b0948a] truncate max-w-[120px] xl:max-w-xs">{group.department || "—"}</p>
+      <p className="text-xs text-[#b0948a] truncate max-w-[120px] xl:max-w-xs">{fmtDept(group.department)}</p>
       </td>
       <td className="px-4 py-3">
         <p className="text-xs text-[#b0948a] truncate max-w-[120px] xl:max-w-xs">{group.designation || "—"}</p>
