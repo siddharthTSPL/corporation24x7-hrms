@@ -712,7 +712,7 @@ export default function ManagerTickets() {
           </div>
         </div>
 
-        <div style={{display:"flex",gap:3,background:"rgba(230,220,245,.55)",borderRadius:12,padding:4,marginBottom:26,width:"fit-content",border:`1px solid ${C.border}`,flexWrap:"wrap"}}>
+        <div data-tour="ticket-tabs" style={{display:"flex",gap:3,background:"rgba(230,220,245,.55)",borderRadius:12,padding:4,marginBottom:26,width:"fit-content",border:`1px solid ${C.border}`,flexWrap:"wrap"}}>
           {[["submit","📝 Submit New"],["mytickets",`📋 My Tickets${count?` (${count})`:""}`]].map(([k,l])=>{
             const locked = k==="submit" && !canRaise;
             return (
