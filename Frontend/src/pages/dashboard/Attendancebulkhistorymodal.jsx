@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FaTimes, FaClock, FaCalendarAlt, FaDownload, FaUsers } from "react-icons/fa";
 import { downloadCsv } from "./exportCsv";
 
@@ -101,13 +101,19 @@ export default function AttendanceBulkHistoryModal({ open, onClose, people, fetc
 
   const applyPreset = (key) => {
     setPreset(key);
-    if (key !== "custom") setRange(presetRange(key));
-    setRows(null);
-    setPerEmployee([]);
-    setFailed([]);
+    if (key !== "custom") {
+      const r = presetRange(key);
+      setRange(r);
+      generate(r);
+    } else {
+      setRows(null);
+      setPerEmployee([]);
+      setFailed([]);
+    }
   };
 
-  const generate = async () => {
+  const generate = async (rangeOverride) => {
+    const useRange = rangeOverride || range;
     if (!people?.length || !fetchHistory || isGenerating) return;
     setIsGenerating(true);
     setRows(null);
@@ -121,7 +127,7 @@ export default function AttendanceBulkHistoryModal({ open, onClose, people, fetc
 
     await runWithConcurrency(people, CONCURRENCY, async (person) => {
       try {
-        const res = await fetchHistory(person.id, { startDate: range.startDate, endDate: range.endDate });
+        const res = await fetchHistory(person.id, { startDate: useRange.startDate, endDate: useRange.endDate });
         const dayRows = res?.data ?? [];
         let active = 0, idle = 0, present = 0;
         dayRows.forEach((r) => {
@@ -155,6 +161,15 @@ export default function AttendanceBulkHistoryModal({ open, onClose, people, fetc
     setFailed(failedNames);
     setIsGenerating(false);
   };
+
+  useEffect(() => {
+    if (open && people?.length && fetchHistory) {
+      generate(range);
+    }
+    // Auto-generate once when the modal opens, same as the individual
+    // history modal fetching as soon as it's opened.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const exportCsv = () => {
     if (!rows?.length) return;
@@ -237,7 +252,11 @@ export default function AttendanceBulkHistoryModal({ open, onClose, people, fetc
                 value={range.startDate}
                 max={range.endDate}
                 disabled={isGenerating}
-                onChange={(e) => { setRange((r) => ({ ...r, startDate: e.target.value })); setRows(null); }}
+                onChange={(e) => {
+                  const r = { ...range, startDate: e.target.value };
+                  setRange(r);
+                  if (r.startDate && r.endDate && r.startDate <= r.endDate) generate(r);
+                }}
                 className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 outline-none"
               />
               <span className="text-[11px] text-gray-400">to</span>
@@ -247,7 +266,11 @@ export default function AttendanceBulkHistoryModal({ open, onClose, people, fetc
                 min={range.startDate}
                 max={toInputDate(new Date())}
                 disabled={isGenerating}
-                onChange={(e) => { setRange((r) => ({ ...r, endDate: e.target.value })); setRows(null); }}
+                onChange={(e) => {
+                  const r = { ...range, endDate: e.target.value };
+                  setRange(r);
+                  if (r.startDate && r.endDate && r.startDate <= r.endDate) generate(r);
+                }}
                 className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 outline-none"
               />
             </div>
@@ -257,12 +280,12 @@ export default function AttendanceBulkHistoryModal({ open, onClose, people, fetc
         <div className="px-4 sm:px-6 py-3 flex items-center gap-3 flex-wrap border-b border-gray-100 flex-shrink-0 bg-gray-50/40">
           <button
             type="button"
-            onClick={generate}
+            onClick={() => generate()}
             disabled={isGenerating || !total}
             className="flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-3 py-1.5 whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ color: "#fff", background: "#730042" }}
           >
-            <FaClock size={10} /> {isGenerating ? `Generating ${progress.done}/${progress.total}…` : "Generate for All"}
+            <FaClock size={10} /> {isGenerating ? `Generating ${progress.done}/${progress.total}…` : "Refresh"}
           </button>
           <button
             type="button"
@@ -290,7 +313,7 @@ export default function AttendanceBulkHistoryModal({ open, onClose, people, fetc
             <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
               <span className="text-3xl">📋</span>
               <p className="text-[13px] text-gray-400">
-                Pick a date range and hit "Generate for All" to pull everyone's day-wise history in one go.
+                Pick a date range above — everyone's day-wise history is generated automatically.
               </p>
             </div>
           )}
