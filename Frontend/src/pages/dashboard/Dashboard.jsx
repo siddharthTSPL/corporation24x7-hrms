@@ -760,15 +760,15 @@ function AnnouncementItem({ ann }) {
 function AnnouncementsPanel({ announcements, loading }) {
   const urgentCount = announcements.filter(a => a.priority === "high").length;
   return (
-    <div className="bg-white rounded-2xl border border-[#ede5e0] shadow-sm overflow-hidden flex flex-col h-full">
-      <div className="px-4 sm:px-5 py-3.5 border-b border-[#ede5e0] flex items-center justify-between gap-2">
+    <div className="bg-white rounded-2xl border border-[#ede5e0] shadow-sm overflow-hidden flex flex-col max-h-[460px]">
+      <div className="px-4 sm:px-5 py-3.5 border-b border-[#ede5e0] flex items-center justify-between gap-2 flex-shrink-0">
         <span className="text-[12px] font-semibold font-sans">📢 Announcements</span>
         <div className="flex items-center gap-1.5">
           {urgentCount>0 && <Badge variant="red">{urgentCount} urgent</Badge>}
           {!loading && <Badge variant="brand">{announcements.length} total</Badge>}
         </div>
       </div>
-      <div className="overflow-y-auto max-h-[420px] flex-1">
+      <div className="overflow-y-auto flex-1 min-h-0">
         {loading ? (
           <div className="p-4 flex flex-col gap-2.5">
             {[1,2,3].map(i => <Skeleton key={i} className="h-14 rounded-xl w-full" />)}
@@ -963,7 +963,7 @@ export default function Dashboard() {
           <div>
             <h1 className="text-xl sm:text-2xl font-bold m-0 tracking-tight" style={{ fontFamily:"'Lora',serif" }}>Dashboard</h1>
             <p className="text-[12px] text-[#b0948a] mt-0.5 font-sans">
-              {employee?`Welcome back, ${employee.f_name} · ${employee.empid}`:"Welcome back"}
+              {employee?`Welcome back, ${employee.f_name} · ${employee.uid}`:"Welcome back"}
             </p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -999,7 +999,7 @@ export default function Dashboard() {
           onOpenAttendance={()=>setShowAttendanceModal(true)}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 mb-3.5">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 mb-3.5 items-start">
           <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative animate-fadein hover:shadow-lg transition-shadow lg:col-span-2">
             <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between border-b border-[#ede5e0] flex-wrap gap-2">
               <div className="flex items-center gap-2 font-sans text-[12px] font-semibold">
@@ -1068,7 +1068,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <Badge variant="brand">Emp ID: {employee?.empid??"—"}</Badge>
+                    <Badge variant="brand">Emp ID: {employee?.uid??"—"}</Badge>
                     <Badge variant="green">Active</Badge>
                     <Badge variant="blue">{getDeptFullForm(employee?.department)??"—"}</Badge>
                   </div>
@@ -1215,7 +1215,7 @@ export default function Dashboard() {
                 </div>
                 <div className="mt-1.5 flex gap-1.5 flex-wrap">
                   <Badge variant="green">Active</Badge>
-                  <Badge variant="blue">Emp ID: {employee?.empid??"—"}</Badge>
+                  <Badge variant="blue">Emp ID: {employee?.uid??"—"}</Badge>
                   {reviews.length>0 && <StarRating rating={reviews.reduce((s,r)=>s+r.rating,0)/reviews.length} size={12} />}
                 </div>
               </div>
