@@ -5,6 +5,7 @@ import {
   FaFilter, FaCheckCircle, FaUserClock, FaBan, FaLayerGroup,
 } from "react-icons/fa";
 import AttendanceHistoryModal from "./AttendanceHistoryModal";
+import AttendanceBulkHistoryModal from "./AttendanceBulkHistoryModal";
 import { downloadCsv } from "./exportCsv";
 
 const MONTH_NAMES = [
@@ -229,7 +230,7 @@ function MonthlyRow({ p, onHistoryClick }) {
  * (useGetAttendanceOverview from adminother.hook.js or suother.hook.js) -
  * passed in so this component stays shared between both dashboards.
  */
-export default function AttendanceDetailsModal({ open, onClose, useOverviewHook, useHistoryHook }) {
+export default function AttendanceDetailsModal({ open, onClose, useOverviewHook, useHistoryHook, fetchHistory }) {
   const [tab, setTab] = useState("today");
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -237,6 +238,7 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
   const [statusFilter, setStatusFilter] = useState("all"); // today tab only
   const [sourceFilter, setSourceFilter] = useState("all"); // today tab only
   const [historyModal, setHistoryModal] = useState({ open: false, person: null });
+  const [bulkHistoryOpen, setBulkHistoryOpen] = useState(false);
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
@@ -458,6 +460,17 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
             >
               <FaDownload size={10} /> Export CSV
             </button>
+            {tab === "monthly" && fetchHistory && (
+              <button
+                type="button"
+                onClick={() => setBulkHistoryOpen(true)}
+                disabled={!filtered.length}
+                className="flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-3 py-1.5 whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ color: "#730042", background: "#fdf2f7", border: "1px solid #e8b8cf" }}
+              >
+                <FaClock size={10} /> History (All)
+              </button>
+            )}
           </div>
         </div>
 
@@ -580,6 +593,15 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
           employeeId={historyModal.person?.id}
           employeeName={historyModal.person?.name}
           useHistoryHook={useHistoryHook}
+        />
+      )}
+
+      {fetchHistory && (
+        <AttendanceBulkHistoryModal
+          open={bulkHistoryOpen}
+          onClose={() => setBulkHistoryOpen(false)}
+          people={filtered}
+          fetchHistory={fetchHistory}
         />
       )}
     </>
