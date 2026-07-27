@@ -89,7 +89,7 @@ export default function TechnicalSupportModal({ role, onClose }) {
               <textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Kya problem aa rahi hai, thoda detail mein likhein..."
+                placeholder="Please describe the issue you're facing, with as much detail as possible..."
                 rows={5}
                 maxLength={2000}
                 className="w-full text-sm rounded-lg border border-gray-300 px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#CD166E]/30 focus:border-[#CD166E]"
