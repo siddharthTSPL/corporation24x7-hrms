@@ -689,7 +689,7 @@ export default function AdminTickets() {
           </div>
         </div>
 
-        <div className="flex gap-1 bg-purple-100/60 rounded-xl p-1 border border-purple-100">
+        <div data-tour="ticket-tabs" className="flex gap-1 bg-purple-100/60 rounded-xl p-1 border border-purple-100">
           {[
             ["submit",    `📝 Submit New${!canRaise ? " 🔒" : ""}`],
             ["mytickets", `📋 My Tickets${canView && count ? ` (${count})` : ""}${!canView ? " 🔒" : ""}`],

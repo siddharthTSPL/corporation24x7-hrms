@@ -17,6 +17,9 @@ const leaveSchema = new mongoose.Schema({
     ref: "Manager",
     required: true,
   },
+  applicantName: { type: String },
+  applicantEmail: { type: String },
+  applicantRole: { type: String, default: "Employee" },
   leaveType: {
     type: String,
     enum: ["el", "sl", "ml", "pl", "half_day_el", "half_day_sl", "lwp"],
@@ -25,6 +28,16 @@ const leaveSchema = new mongoose.Schema({
   startDate: { type: Date, required: true },
   endDate: { type: Date, required: true },
   days: { type: Number, required: true },
+  // Of `days`, how many fell outside available EL/SL/ML/PL balance and were
+  // auto-converted to LWP by processLeaveDeduction() (see calculateleave.js).
+  // 0 for a fully-covered leave or an explicit leaveType:"lwp" application.
+  // Convention: balance covers the day range chronologically from
+  // startDate, so the LAST `lwpDays` calendar days of [startDate, endDate]
+  // are the LWP ones — matches how the balance would be consumed if each
+  // day were applied for one at a time. Consumed by the leave-aware
+  // absent-day checks in monthattendanceupdate.js, Marknoshowabsent.js,
+  // and Reconcileattendancesummaryleaveaware.js.
+  lwpDays: { type: Number, default: 0 },
   reason: { type: String, required: true },
   status: {
     type: String,

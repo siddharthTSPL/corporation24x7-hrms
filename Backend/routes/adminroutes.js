@@ -2,10 +2,12 @@ const express = require("express");
 const adminrouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const adminauthmiddleware = require("../middleware/auth/admin.middleware");
+const adminOrSuperAdminAuth = require("../middleware/auth/adminOrSuperadmin.middleware");
 const checkPermission = require("../middleware/auth/Checkpermission.middleware");
 const multer = require("multer");
 
 const upload = multer({ storage: multer.memoryStorage() });
+const { sendSupportRequest } = require("../controllers/support.controller");
 
 const {
   verifyAdmin,
@@ -15,7 +17,9 @@ const {
   addmanager,
   addemployee,
   findallmanagers,
+  findallemployeesfull,
   getallemployee,
+  getMyTeamOverview,
   editemployee,
   editmanager,
   promoteEmployeeToManager,
@@ -46,6 +50,8 @@ const {
   editadminprofile,
   changepassword,
   getTodayCheckins,
+  getAttendanceOverview,
+  getAttendanceHistory,
   getOrgInfo,
   getAllPersonalDocumentsAdmin,
   getAllExpenseDocumentsAdmin,
@@ -82,6 +88,8 @@ const {
   getAssetByIdAdmin,
   deleteAssetAdmin,
   getAssetsOfPerson,
+  getEmployeesWithAssets,
+  getEmployeeAssetHistory,
 } = require("../controllers/asset.controller");
 
 adminrouter.get("/verify/:token", asyncHandler(verifyAdmin));
@@ -114,6 +122,16 @@ adminrouter.get(
   adminauthmiddleware,
   asyncHandler(getTodayCheckins),
 );
+adminrouter.get(
+  "/attendance-overview",
+  adminauthmiddleware,
+  asyncHandler(getAttendanceOverview),
+);
+adminrouter.get(
+  "/attendance-history/:employeeId",
+  adminauthmiddleware,
+  asyncHandler(getAttendanceHistory),
+);
 
 adminrouter.post("/addmanager", adminauthmiddleware, asyncHandler(addmanager));
 adminrouter.post(
@@ -126,10 +144,23 @@ adminrouter.get(
   adminauthmiddleware,
   asyncHandler(findallmanagers),
 );
+
+
+adminrouter.get(
+  "/findallemployeesfull",
+  adminauthmiddleware,
+  asyncHandler(findallemployeesfull)
+);
+
 adminrouter.get(
   "/getallemployee",
-  adminauthmiddleware,
+  adminOrSuperAdminAuth,
   asyncHandler(getallemployee),
+);
+adminrouter.get(
+  "/dashboard/myteam",
+  adminauthmiddleware,
+  asyncHandler(getMyTeamOverview),
 );
 adminrouter.put(
   "/editemployee/:id",
@@ -339,7 +370,7 @@ adminrouter.put(
   adminauthmiddleware,
   asyncHandler(setManagerWorkingStatus)
 );
-adminrouter.get("/all-admins", adminauthmiddleware, asyncHandler(getAllAdminsForOrg));
+adminrouter.get("/all-admins", adminOrSuperAdminAuth, asyncHandler(getAllAdminsForOrg));
 
 adminrouter.get("/inactive-users", adminauthmiddleware, asyncHandler(getInactiveUsers));
 adminrouter.get("/active-user-count", adminauthmiddleware, getActiveUserCount);
@@ -347,6 +378,13 @@ adminrouter.get("/active-user-count", adminauthmiddleware, getActiveUserCount);
 // ── Asset Management (Admin) ──────────────────────────────────────────────────
 adminrouter.post("/assets", adminauthmiddleware, asyncHandler(createAssetAdmin));
 adminrouter.get("/assets", adminauthmiddleware, asyncHandler(getAllAssetsAdmin));
+// Employee-wise asset views (kept above "/assets/:id" so "employees" isn't swallowed as an :id)
+adminrouter.get("/assets/employees", adminauthmiddleware, asyncHandler(getEmployeesWithAssets));
+adminrouter.get(
+  "/assets/employees/:person_id/:person_model/history",
+  adminauthmiddleware,
+  asyncHandler(getEmployeeAssetHistory)
+);
 adminrouter.get("/assets/:id", adminauthmiddleware, asyncHandler(getAssetByIdAdmin));
 adminrouter.put("/assets/:id", adminauthmiddleware, asyncHandler(updateAssetAdmin));
 adminrouter.delete("/assets/:id", adminauthmiddleware, asyncHandler(deleteAssetAdmin));
@@ -354,5 +392,8 @@ adminrouter.patch("/assets/:id/assign-employee", adminauthmiddleware, asyncHandl
 adminrouter.patch("/assets/:id/assign-manager", adminauthmiddleware, asyncHandler(assignAssetToManager));
 adminrouter.patch("/assets/:id/revoke", adminauthmiddleware, asyncHandler(revokeAssetAdmin));
 adminrouter.get("/assets/person/:person_id/:person_model", adminauthmiddleware, asyncHandler(getAssetsOfPerson));
+
+// Help & Support form — no permission gate, every logged-in admin can reach support.
+adminrouter.post("/contact-support", adminauthmiddleware, asyncHandler(sendSupportRequest));
 
 module.exports = adminrouter;

@@ -2,6 +2,7 @@ const express = require("express");
 const superAdminRouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const superAdminAuth = require("../middleware/auth/superadmin.middleware");
+const { sendSupportRequest } = require("../controllers/support.controller");
 const {
   registerSuperAdmin,
   verifySuperAdmin,
@@ -37,6 +38,8 @@ const {
   deleteAnnouncement,
   reviewtoadmin,
   getTodayCheckins,
+  getAttendanceOverview,
+  getAttendanceHistory,
   getOrgInfo,
   getAllPersonalDocumentsSuperAdmin,
   getAllExpenseDocumentsSuperAdmin,
@@ -48,6 +51,8 @@ const {
   getActiveUserCount,
   getLeavePolicy,
   setLeavePolicy,
+  getperticularadmin
+
 } = require("../controllers/superadmin.controller");
 
 
@@ -60,6 +65,8 @@ const {
   getAssetByIdSuperAdmin,
   deleteAssetSuperAdmin,
   getAssetsOfPerson,
+  getEmployeesWithAssets,
+  getEmployeeAssetHistory,
 } = require("../controllers/asset.controller");
 
 superAdminRouter.post("/register", asyncHandler(registerSuperAdmin));
@@ -200,6 +207,16 @@ superAdminRouter.get(
   superAdminAuth,
   asyncHandler(getTodayCheckins),
 );
+superAdminRouter.get(
+  "/attendance-overview",
+  superAdminAuth,
+  asyncHandler(getAttendanceOverview),
+);
+superAdminRouter.get(
+  "/attendance-history/:employeeId",
+  superAdminAuth,
+  asyncHandler(getAttendanceHistory),
+);
 
 superAdminRouter.get(
   "/getallpersonaldocuments",
@@ -256,12 +273,20 @@ superAdminRouter.post(
   asyncHandler(setLeavePolicy),
 );
 
+superAdminRouter.get("/getperticularadmin/:uid", superAdminAuth, asyncHandler(getperticularadmin));
 
 
 
 // assest route
 superAdminRouter.post("/assets", superAdminAuth, asyncHandler(createAssetSuperAdmin));
 superAdminRouter.get("/assets", superAdminAuth, asyncHandler(getAllAssetsSuperAdmin));
+// Employee-wise asset views (kept above "/assets/:id" so "employees" isn't swallowed as an :id)
+superAdminRouter.get("/assets/employees", superAdminAuth, asyncHandler(getEmployeesWithAssets));
+superAdminRouter.get(
+  "/assets/employees/:person_id/:person_model/history",
+  superAdminAuth,
+  asyncHandler(getEmployeeAssetHistory)
+);
 superAdminRouter.get("/assets/:id", superAdminAuth, asyncHandler(getAssetByIdSuperAdmin));
 superAdminRouter.put("/assets/:id", superAdminAuth, asyncHandler(updateAssetSuperAdmin));
 superAdminRouter.delete("/assets/:id", superAdminAuth, asyncHandler(deleteAssetSuperAdmin));
@@ -269,6 +294,7 @@ superAdminRouter.patch("/assets/:id/assign-admin", superAdminAuth, asyncHandler(
 superAdminRouter.patch("/assets/:id/revoke", superAdminAuth, asyncHandler(revokeAssetFromAdminSuperAdmin));
 superAdminRouter.get("/assets/person/:person_id/:person_model", superAdminAuth, asyncHandler(getAssetsOfPerson));
 
-
+// Help & Support form — no permission gate, super admin can reach support too.
+superAdminRouter.post("/contact-support", superAdminAuth, asyncHandler(sendSupportRequest));
 
 module.exports = superAdminRouter;

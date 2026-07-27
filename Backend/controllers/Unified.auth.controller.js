@@ -13,6 +13,7 @@ const cookieOpts = () => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
     maxAge: 15 * 24 * 60 * 60 * 1000,
   };
 };
@@ -37,6 +38,12 @@ const findAccountByEmail = async (email) => {
 };
 
 const buildLoginToken = async (role, account) => {
+  if (account.working_status && account.working_status !== "working") {
+    throw Object.assign(
+      new Error(role === "employee" ? "Your account is not active. Please contact your admin." : "Your account is not active. Please contact super admin."),
+      { statusCode: 403 }
+    );
+  }
   if (role === "superadmin") {
     // Mirror unifiedLogin: logout sets status to "inactive", so the OTP
     // path must reactivate the account too, or the very next authenticated
@@ -124,6 +131,8 @@ const unifiedLogin = async (req, res, next) => {
       return next(Object.assign(new Error("Please verify your email before logging in"), { statusCode: 403 }));
     if (superAdmin.status === "suspended")
       return next(Object.assign(new Error("Your account has been suspended. Contact support."), { statusCode: 403 }));
+    if (superAdmin.working_status !== "working")
+      return next(Object.assign(new Error("Your account is not active."), { statusCode: 403 }));
 
     const isMatch = await superAdmin.isValidPassword(password);
     if (!isMatch)
@@ -162,6 +171,8 @@ const unifiedLogin = async (req, res, next) => {
       return next(Object.assign(new Error("Please verify your email before logging in"), { statusCode: 403 }));
     if (admin.status === "suspended")
       return next(Object.assign(new Error("Your account has been suspended. Contact super admin."), { statusCode: 403 }));
+    if (admin.working_status !== "working")
+      return next(Object.assign(new Error("Your account is not active. Please contact super admin."), { statusCode: 403 }));
 
     const isMatch = await admin.isValidPassword(password);
     if (!isMatch)
@@ -186,6 +197,8 @@ const unifiedLogin = async (req, res, next) => {
   if (manager) {
     if (!manager.isVerified)
       return next(Object.assign(new Error("Please verify your email before logging in"), { statusCode: 400 }));
+    if (manager.working_status !== "working")
+      return next(Object.assign(new Error("Your account is not active. Please contact super admin."), { statusCode: 403 }));
 
     const isMatch = await manager.isValidPassword(password);
     if (!isMatch)
@@ -231,6 +244,9 @@ const unifiedLogin = async (req, res, next) => {
   // --- 4. Employee ---
   const user = await Usermodel.findOne({ work_email: email });
   if (user) {
+    if (user.working_status !== "working")
+      return next(Object.assign(new Error("Your account is not active. Please contact your admin."), { statusCode: 403 }));
+
     const isMatch = await user.isValidPassword(password);
     if (!isMatch)
       return next(Object.assign(new Error("Invalid credentials"), { statusCode: 401 }));
@@ -341,6 +357,7 @@ const unifiedVerifyForgotPasswordOtp = async (req, res, next) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    path: "/",
     maxAge: 15 * 60 * 1000,
   });
 
@@ -402,6 +419,7 @@ const unifiedResetPassword = async (req, res, next) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    path: "/",
   });
 
   return res.status(200).json({ success: true, message: "Password updated successfully" });

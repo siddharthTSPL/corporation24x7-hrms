@@ -15,6 +15,9 @@ const adminLeaveSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    applicantName: { type: String },
+    applicantEmail: { type: String },
+    applicantRole: { type: String, default: "Admin" },
     leaveType: {
       type: String,
       enum: ["el", "sl", "ml", "pl", "half_day_el", "half_day_sl", "lwp"],
@@ -25,6 +28,10 @@ const adminLeaveSchema = new mongoose.Schema(
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true },
     days: { type: Number, required: true, min: 0.5 },
+    // See identical field + comment on Models/leave.model.js — how many of
+    // `days` were auto-converted to LWP for lack of balance, and (by
+    // convention) land on the LAST `lwpDays` days of the range.
+    lwpDays: { type: Number, default: 0 },
     reason: { type: String, required: true, trim: true, maxlength: 500 },
     status: {
       type: String,

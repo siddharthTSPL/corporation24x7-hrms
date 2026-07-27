@@ -13,8 +13,23 @@ export const useAuth = () => {
     queryKey: ["auth"],
 
     queryFn: async () => {
-      const savedRole = localStorage.getItem("role");
-      if (!savedRole) return null;
+      let savedRole = localStorage.getItem("role");
+
+      // No role saved in this app yet — this can happen when the person
+      // logged in on the Console (torchxsuite.com/) and landed here with
+      // a valid shared "token" cookie but no localStorage flag. Console
+      // only ever creates SuperAdmin sessions, so try that once before
+      // giving up; on success we adopt it as the saved role going forward.
+      if (!savedRole) {
+        try {
+          const res = await getMeSuperAdmin();
+          localStorage.setItem("role", "superadmin");
+          setPermissions("superadmin", null);
+          return { role: "superadmin", data: res };
+        } catch {
+          return null;
+        }
+      }
 
       try {
         let userData = null;

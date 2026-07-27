@@ -24,6 +24,13 @@ export const getAllEmployee = async () => {
   return res.data;
 };
 
+// Dashboard-only: managers + employees that report (directly or through a
+// chain of managers) to the logged-in admin, not the whole organisation.
+export const getMyTeamOverview = async () => {
+  const res = await api.get("/admin/dashboard/myteam");
+  return res.data;
+};
+
 export const getParticularEmployee = async (id) => {
   const res = await api.get(`/admin/getperticularemployee/${id}`);
   return res.data;
@@ -101,6 +108,29 @@ export const getparticularEmployeeStats = async (id) => {
 
 export const getTodayCheckins = async () => {
   const res = await api.get("/admin/gettodaycheckins");
+  return res.data;
+};
+
+// Powers the "Attendance Details" modal (Today + Monthly tabs) opened from
+// the Live Attendance Map card.
+export const getAttendanceOverview = async ({ type = "today", month, year } = {}) => {
+  const params = { type };
+  if (type === "monthly") {
+    if (month) params.month = month;
+    if (year) params.year = year;
+  }
+  const res = await api.get("/admin/attendance-overview", { params });
+  return res.data;
+};
+
+// Powers the "History" button on the Monthly tab — day-wise check-in/out,
+// source (face/system), active/idle minutes for one employee, optionally
+// filtered by a startDate/endDate range (YYYY-MM-DD).
+export const getEmployeeAttendanceHistory = async (employeeId, { startDate, endDate } = {}) => {
+  const params = {};
+  if (startDate) params.startDate = startDate;
+  if (endDate) params.endDate = endDate;
+  const res = await api.get(`/admin/attendance-history/${employeeId}`, { params });
   return res.data;
 };
 

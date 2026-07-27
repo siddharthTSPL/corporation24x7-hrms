@@ -1,22 +1,38 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
-import { useGetAllEmployee, useGetTodayCheckins, useGetAttendanceHistory } from "../../auth/server-state/adminother/adminother.hook";
+import { useGetMyTeamOverview, useGetTodayCheckins, useGetAttendanceHistory, useGetEmployeeAttendanceHistory, useGetAttendanceOverview } from "../../auth/server-state/adminother/adminother.hook";
+import { getEmployeeAttendanceHistory } from "../../auth/api/adminapi/other/ad.other.api";
 import {
   useGetForwardedLeaves,
-  useAcceptLeave,
-  useRejectLeave,
   useAdminGetMyLeaveHistory,
 } from "../../auth/server-state/adminleave/adminleave.hook";
 import { useAdminGetMyWFH } from "../../auth/server-state/adminwfh/adminwfh.hook";
 import { useTodayAttendance, useCalendarMeta } from "../../auth/server-state/attendance/attendance.hook";
+import { useGetAllAnnouncement } from "../../auth/server-state/adminannounce/adminannounce.hook";
 import AttendanceModal from "./AttendanceModal";
+import AttendanceDetailsModal from "./AttendanceDetailsModal";
 import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus, isPastShiftEnd } from "../../pages/utils/attendance";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS = ["S","M","T","W","T","F","S"];
 const APPROVED_STATUSES = ["approved_manager","approved_admin","approved_reporting_manager","approved"];
 const APPROVED_WFH_STATUSES = ["approved","approved_admin","approved_reporting_manager"];
+
+// Department short-code -> full form mapping.
+const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+};
+
+function getDeptFullForm(code) {
+  if (!code) return "—";
+  const key = String(code).trim().toUpperCase();
+  return DEPT_FULL_FORMS[key] || code;
+}
 
 function getInitials(f="",l="") {
   return `${f[0]||""}${l[0]||""}`.toUpperCase();
@@ -611,12 +627,16 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
     if (!checkins.length) return;
 
     const bounds = [];
-    checkins.forEach(({ lat, lng, name, role, dept, email, checkIn, checkedOut }) => {
+    checkins.forEach(({ lat, lng, name, role, dept, email, checkIn, checkedOut, source, avatar }) => {
       if (!lat || !lng) return;
       const color = role?.toLowerCase() === "admin" ? "#4a0029" : role?.toLowerCase() === "manager" ? "#730042" : "#a0005c";
       const size = role?.toLowerCase() === "manager" || role?.toLowerCase() === "admin" ? 15 : 11;
       const pulse = size + 14;
       const inits = getInitials(...(name || "?").split(" "));
+      const deptFull = getDeptFullForm(dept);
+      const avatarHtml = avatar
+        ? `<img src="${avatar}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0;" />`
+        : `<div style="width:32px;height:32px;border-radius:50%;background:${color};color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">${inits}</div>`;
 
       const icon = L.divIcon({
         className: "",
@@ -631,14 +651,15 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
         .bindPopup(
           `<div style="font-family:'DM Sans',sans-serif;padding:6px 4px;min-width:175px;">
             <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px;">
-              <div style="width:32px;height:32px;border-radius:50%;background:${color};color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">${inits}</div>
+              ${avatarHtml}
               <div>
                 <div style="font-weight:700;font-size:13px;color:${color};">${name || "Unknown"}</div>
-                <div style="font-size:11px;color:#8a6070;text-transform:capitalize;">${role ?? ""}${dept ? " · " + dept : ""}</div>
+                <div style="font-size:11px;color:#8a6070;text-transform:capitalize;">${role ?? ""}${deptFull ? " · " + deptFull : ""}</div>
               </div>
             </div>
             ${email ? `<div style="font-size:11px;color:#8a6070;margin-bottom:6px;">✉ ${email}</div>` : ""}
             <div style="font-size:11px;color:#333;">✅ <strong>Check-in:</strong> ${fmtTime(checkIn)}</div>
+            <div style="font-size:11px;color:#8a6070;margin-top:3px;">${source === "face" ? "🤳 Face terminal" : "💻 System (live)"}</div>
             ${checkedOut
               ? `<div style="font-size:11px;color:#0d9e6e;margin-top:3px;">🏁 Checked out</div>`
               : `<div style="font-size:11px;color:#b8760a;margin-top:3px;">🟡 Still on duty</div>`}
@@ -666,6 +687,8 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
     };
   }, []);
 
+  const noPinCheckins = checkins.filter((c) => !c.lat || !c.lng);
+
   return (
     <div className="h-full w-full relative">
       <div ref={mapRef} className="h-full w-full" />
@@ -680,80 +703,83 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
           <p className="text-sm text-[#8a6070] m-0">No check-ins recorded yet today</p>
         </div>
       )}
+      {!loading && noPinCheckins.length > 0 && (
+        <div className="absolute bottom-2 left-2 right-2 z-[500] flex flex-wrap gap-1.5 pointer-events-none">
+          {noPinCheckins.map((c) => (
+            <div key={c.id} className="pointer-events-auto flex items-center gap-1.5 bg-white/95 border border-[#ede5e0] rounded-full pl-1 pr-2.5 py-1 shadow-sm text-[10px] font-sans text-[#2a1a16]">
+              {c.avatar ? (
+                <img src={c.avatar} alt="" className="w-4 h-4 rounded-full object-cover shrink-0" />
+              ) : (
+                <span className="w-4 h-4 rounded-full bg-[#a0005c] text-white flex items-center justify-center text-[8px] font-bold shrink-0">
+                  {getInitials(...(c.name || "?").split(" "))}
+                </span>
+              )}
+              <span className="font-medium truncate max-w-[90px]">{c.name || "Unknown"}</span>
+              <span className="text-[#b0948a]">{c.source === "face" ? "🤳" : "💻"} {fmtTime(c.checkIn)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
 
-function leaveTypeColor(type="") {
-  const t=type.toLowerCase();
-  if (t.includes("sick")||t.includes("sl")) return "#1D9E75";
-  if (t.includes("earn")||t.includes("el")) return "#730042";
-  if (t.includes("pat")||t.includes("pl")) return "#378ADD";
-  if (t.includes("mat")||t.includes("ml")) return "#9333EA";
-  return "#730042";
+const ANNOUNCEMENT_PREVIEW_LEN = 110;
+
+function AnnouncementItem({ ann }) {
+  const [expanded, setExpanded] = useState(false);
+  const message = ann.message || "";
+  const isLong = message.length > ANNOUNCEMENT_PREVIEW_LEN;
+  const shown = expanded || !isLong ? message : `${message.slice(0, ANNOUNCEMENT_PREVIEW_LEN).trimEnd()}…`;
+
+  return (
+    <div className="p-3.5 border-b border-[#f0e8e4] last:border-0 hover:bg-[#fdfcfb] transition-colors">
+      <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+        <Badge variant={ann.priority === "high" ? "red" : ann.priority === "low" ? "slate" : "amber"}>
+          {(ann.priority || "normal").toString().replace(/^\w/, c => c.toUpperCase())}
+        </Badge>
+        <Badge variant="slate">{(ann.audience || "all").toString().toUpperCase()}</Badge>
+        {ann.expiresAt && (
+          <span className="ml-auto text-[10px] text-[#b0948a] font-sans">Expires {fmtDate(ann.expiresAt)}</span>
+        )}
+      </div>
+      <p className="text-[12px] font-semibold text-[#2a1a16] font-sans mb-1">{ann.title}</p>
+      <p className="text-[11px] text-[#7a6a63] font-sans leading-relaxed whitespace-pre-wrap break-words">{shown}</p>
+      {isLong && (
+        <button
+          onClick={() => setExpanded(v => !v)}
+          className="mt-1.5 text-[10px] font-semibold text-[#730042] cursor-pointer bg-none border-none p-0 hover:underline font-sans"
+        >
+          {expanded ? "See less" : "See more"}
+        </button>
+      )}
+    </div>
+  );
 }
 
-function LeaveRequestsPanel({ leaves, loading, onAccept, onReject, accepting, rejecting }) {
-  const pendingCount = leaves.filter(l => (l.status||"").toLowerCase().includes("pending")).length;
+function AnnouncementsPanel({ announcements, loading }) {
+  const urgentCount = announcements.filter(a => a.priority === "high").length;
   return (
-    <div className="bg-white rounded-2xl border border-[#ede5e0] shadow-sm overflow-hidden flex flex-col h-full">
-      <div className="px-4 sm:px-5 py-3.5 border-b border-[#ede5e0] flex items-center justify-between">
-        <span className="text-[12px] font-semibold font-sans">Leave Requests</span>
-        {pendingCount>0 && <Badge variant="amber">{pendingCount} pending</Badge>}
+    <div className="bg-white rounded-2xl border border-[#ede5e0] shadow-sm overflow-hidden flex flex-col max-h-[460px]">
+      <div className="px-4 sm:px-5 py-3.5 border-b border-[#ede5e0] flex items-center justify-between gap-2 flex-shrink-0">
+        <span className="text-[12px] font-semibold font-sans">📢 Announcements</span>
+        <div className="flex items-center gap-1.5">
+          {urgentCount>0 && <Badge variant="red">{urgentCount} urgent</Badge>}
+          {!loading && <Badge variant="brand">{announcements.length} total</Badge>}
+        </div>
       </div>
-      <div className="overflow-y-auto max-h-[420px] flex-1">
+      <div className="overflow-y-auto flex-1 min-h-0">
         {loading ? (
           <div className="p-4 flex flex-col gap-2.5">
             {[1,2,3].map(i => <Skeleton key={i} className="h-14 rounded-xl w-full" />)}
           </div>
-        ) : leaves.length===0 ? (
+        ) : announcements.length===0 ? (
           <div className="text-center py-10 px-5 text-[#cfc3bc]">
-            <div className="text-3xl mb-2.5">✅</div>
-            <p className="text-[12px] font-sans">No leave requests. All clear.</p>
+            <div className="text-3xl mb-2.5">📢</div>
+            <p className="text-[12px] font-sans">No announcements yet.</p>
           </div>
         ) : (
-          leaves.map((leave) => {
-            const name = leave.employeeName || leave.name ||
-              (leave.employee ? [leave.employee.f_name, leave.employee.l_name].filter(Boolean).join(" ") : "") ||
-              leave.manager ? [leave.manager?.f_name, leave.manager?.l_name].filter(Boolean).join(" ") : "Employee";
-            const type = leave.leaveType || leave.type || "Leave";
-            const from = leave.startDate || leave.from || leave.fromDate || "";
-            const to = leave.endDate || leave.to || leave.toDate || "";
-            const status = (leave.status||"pending").toLowerCase();
-            const isPending = status.includes("pending");
-            return (
-              <div key={leave._id||leave.id} className="p-3.5 border-b border-[#f0e8e4] last:border-0 flex items-start gap-2.5 hover:bg-[#fdfcfb] transition-colors">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
-                  style={{ background: leaveTypeColor(type) }}>
-                  {getInitials(...(name||"E").split(" "))}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[12px] font-semibold text-[#2a1a16] truncate font-sans">{name||"Employee"}</div>
-                  <div className="text-[10px] text-[#b0948a] mt-0.5 font-sans">{type} · {fmtDate(from)}{to&&to!==from?` → ${fmtDate(to)}`:""}</div>
-                  {isPending ? (
-                    <div className="flex gap-1.5 mt-2">
-                      <button onClick={()=>onAccept(leave._id||leave.id)} disabled={accepting}
-                        className="bg-green-50 text-green-700 border border-green-200 rounded-md px-2.5 py-1 text-[10px] font-semibold cursor-pointer hover:bg-green-600 hover:text-white transition-all disabled:opacity-50 font-sans">
-                        Approve
-                      </button>
-                      <button onClick={()=>onReject(leave._id||leave.id)} disabled={rejecting}
-                        className="bg-red-50 text-red-700 border border-red-200 rounded-md px-2.5 py-1 text-[10px] font-semibold cursor-pointer hover:bg-red-600 hover:text-white transition-all disabled:opacity-50 font-sans">
-                        Reject
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="inline-block mt-1.5 px-2 py-0.5 rounded-full text-[9px] font-semibold capitalize"
-                      style={{
-                        background: status.includes("approved") ? "#e8f5e9" : status.includes("rejected") ? "#fcebeb" : "#faeeda",
-                        color: status.includes("approved") ? "#1a6b48" : status.includes("rejected") ? "#791F1F" : "#92400E",
-                      }}>
-                      {status.replace(/_/g," ")}
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })
+          announcements.map((ann) => <AnnouncementItem key={ann._id} ann={ann} />)
         )}
       </div>
     </div>
@@ -765,6 +791,7 @@ export default function Dashboard() {
   const [selectedMonth, setSelectedMonth]=useState(new Date().getMonth());
   const [empExpand, setEmpExpand]=useState(false);
   const [showAttendanceModal, setShowAttendanceModal]=useState(false);
+  const [attendanceDetailsOpen, setAttendanceDetailsOpen] = useState(false);
 
    useEffect(() => {
     const refreshKey = "dashboard_auto_refreshed";
@@ -788,20 +815,18 @@ export default function Dashboard() {
   const { data:attData, isLoading:attLoading }=useTodayAttendance();
   const { data:attHistoryData }=useGetAttendanceHistory();
   const { data:wfhData, isLoading:wfhLoading }=useAdminGetMyWFH();
-  const { data:empData, isLoading:empLoading }=useGetAllEmployee();
+  const { data:empData, isLoading:empLoading }=useGetMyTeamOverview();
   const { data:checkinData, isLoading:mapLoading }=useGetTodayCheckins();
-  const { data:leaveReqData, isLoading:leaveReqLoading }=useGetForwardedLeaves();
+  const { data:leaveReqData }=useGetForwardedLeaves();
   const { data:calMeta }=useCalendarMeta(selectedMonth, new Date().getFullYear());
-
-  const { mutate:acceptLeave, isPending:accepting }=useAcceptLeave();
-  const { mutate:rejectLeave, isPending:rejecting }=useRejectLeave();
+  const { data:annData, isLoading:annLoading }=useGetAllAnnouncement();
 
   const employee=meData?.user??null;
   const lb=meData?.leaveBalance??null;
   const allLeaves=histData?.leave??histData?.leaves??[];
   const reviews=meData?.reviews??[];
 
-  const joiningDate=employee?.createdAt??null;
+  const joiningDate=employee?.date_of_joining??employee?.createdAt??null;
 
   const checkinGate = useMemo(() => {
     if (!calMeta?.today) return { canCheckIn: false, reason: "loading" };
@@ -815,7 +840,8 @@ export default function Dashboard() {
     };
   }, [calMeta]);
 
-  const employees = Array.isArray(empData?.employees) ? empData.employees : Array.isArray(empData) ? empData : [];
+  const employees = Array.isArray(empData?.users) ? empData.users : Array.isArray(empData) ? empData : [];
+  const announcements = Array.isArray(annData?.announcements) ? annData.announcements : Array.isArray(annData) ? annData : [];
   const checkins = checkinData?.checkins ?? [];
   const leaveRequests = Array.isArray(leaveReqData?.leaves) ? leaveReqData.leaves : Array.isArray(leaveReqData) ? leaveReqData : [];
 
@@ -902,6 +928,8 @@ export default function Dashboard() {
 
   const totalEmployees = empData?.count || employees.length || 0;
   const presentTodayCount = checkinData?.total ?? checkins.length;
+  const liveCheckinCount = useMemo(()=>checkins.filter(c=>c.source!=="face").length,[checkins]);
+  const faceCheckinCount = useMemo(()=>checkins.filter(c=>c.source==="face").length,[checkins]);
 
   if (meError) return (
     <div className="font-sans bg-[#f9f8f2] min-h-screen flex items-center justify-center p-6">
@@ -971,16 +999,25 @@ export default function Dashboard() {
           onOpenAttendance={()=>setShowAttendanceModal(true)}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 mb-3.5">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 mb-3.5 items-start">
           <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative animate-fadein hover:shadow-lg transition-shadow lg:col-span-2">
             <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between border-b border-[#ede5e0] flex-wrap gap-2">
               <div className="flex items-center gap-2 font-sans text-[12px] font-semibold">
                 <div className="live-dot"></div>
                 Live Attendance Map
               </div>
-              <span className="text-[10px] text-[#b0948a] font-sans flex items-center gap-1">
-                📍 {mapLoading?"Loading…":`${checkins.length} check-in${checkins.length!==1?"s":""} today`}
-              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] text-[#b0948a] font-sans flex items-center gap-1">
+                  📍 {mapLoading?"Loading…":`${checkins.length} check-in${checkins.length!==1?"s":""} today`}
+                </span>
+                <button
+                  onClick={() => setAttendanceDetailsOpen(true)}
+                  className="text-[10px] font-semibold text-white rounded-lg px-2.5 py-1.5 flex items-center gap-1.5 hover:opacity-90 transition-opacity whitespace-nowrap"
+                  style={{ background: "linear-gradient(135deg, #730042 0%, #9B2554 100%)" }}
+                >
+                  📊 Attendance Details
+                </button>
+              </div>
             </div>
             <div className="h-[260px] sm:h-[320px] lg:h-[360px] w-full">
               <AttendanceMap checkins={checkins} loading={mapLoading} />
@@ -991,20 +1028,19 @@ export default function Dashboard() {
                   <div className="w-2 h-2 rounded-full" style={{ background:c }} />{l}
                 </div>
               ))}
+              <div className="flex items-center gap-1.5 text-[10px] text-[#b0948a] font-sans">
+                💻 {liveCheckinCount} live
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px] text-[#b0948a] font-sans">
+                🤳 {faceCheckinCount} face
+              </div>
               <span className="ml-auto text-[10px] text-[#cfc3bc] font-sans hidden sm:inline">
                 🏢 {totalEmployees} employees · {presentTodayCount} present
               </span>
             </div>
           </div>
 
-          <LeaveRequestsPanel
-            leaves={leaveRequests}
-            loading={leaveReqLoading}
-            onAccept={(id)=>acceptLeave(id)}
-            onReject={(id)=>rejectLeave(id)}
-            accepting={accepting}
-            rejecting={rejecting}
-          />
+          <AnnouncementsPanel announcements={announcements} loading={annLoading} />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 mb-3.5">
@@ -1032,9 +1068,9 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <Badge variant="brand">{employee?.uid??"—"}</Badge>
+                    <Badge variant="brand">Emp ID: {employee?.uid??"—"}</Badge>
                     <Badge variant="green">Active</Badge>
-                    <Badge variant="blue">{employee?.department??"—"}</Badge>
+                    <Badge variant="blue">{getDeptFullForm(employee?.department)??"—"}</Badge>
                   </div>
                   <div className="mt-3 pt-3 border-t border-[#ede5e0] flex flex-col gap-1">
                     <div className="text-[10px] text-[#b0948a] font-sans">📧 {employee?.work_email??"—"}</div>
@@ -1078,35 +1114,43 @@ export default function Dashboard() {
           </div>
 
           <div className="rounded-2xl overflow-hidden relative animate-fadein bg-[#730042] border border-[#5a0033] hover:shadow-lg transition-shadow" style={{ animationDelay:".15s" }}>
-            <div className="absolute -top-5 -right-5 w-20 h-20 rounded-full bg-white/[.06]" />
-            <div className="absolute -bottom-2.5 -left-2.5 w-16 h-16 rounded-full bg-white/[.04]" />
-            <div className="p-4 pt-5 relative">
-              <div className="text-[11px] text-white/60 font-medium tracking-wide mb-3 uppercase font-sans">Organisation</div>
-              {empLoading||mapLoading ? (
-                <div className="flex flex-col gap-2"><Skeleton className="h-5 w-3/5" /><Skeleton className="h-3.5 w-4/5" /></div>
-              ) : (
-                <>
-                  <div className="flex items-baseline gap-1.5 mb-3">
-                    <span className="text-3xl font-bold text-[#f9f8f2] leading-none" style={{ fontFamily:"'Lora',serif" }}>{totalEmployees}</span>
-                    <span className="text-[12px] text-white/60 font-sans">total people</span>
-                  </div>
-                  <div className="h-px bg-white/15 mb-3" />
-                  <div className="flex justify-between text-[11px] font-sans mb-2">
-                    <span className="text-white/50">Present today</span>
-                    <span className="font-medium text-white/80">{presentTodayCount}</span>
-                  </div>
-                  <div className="flex justify-between text-[11px] font-sans mb-2">
-                    <span className="text-white/50">Pending leaves</span>
-                    <span className="font-medium text-white/80">{leaveRequests.filter(l=>(l.status||"").toLowerCase().includes("pending")).length}</span>
-                  </div>
-                  <div className="flex justify-between text-[11px] font-sans">
-                    <span className="text-white/50">Attendance rate</span>
-                    <span className="font-medium text-white/80">{totalEmployees>0?Math.round((presentTodayCount/totalEmployees)*100):0}%</span>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
+  <div className="absolute -top-5 -right-5 w-20 h-20 rounded-full bg-white/[.06]" />
+  <div className="absolute -bottom-2.5 -left-2.5 w-16 h-16 rounded-full bg-white/[.04]" />
+  <div className="p-4 pt-5 relative">
+    <div className="text-[11px] text-white/60 font-medium tracking-wide mb-3 uppercase font-sans">Organisation</div>
+    {empLoading||mapLoading ? (
+      <div className="flex flex-col gap-2"><Skeleton className="h-5 w-3/5" /><Skeleton className="h-3.5 w-4/5" /></div>
+    ) : (
+      <>
+        <div className="flex items-baseline gap-1.5 mb-3">
+          <span className="text-3xl font-bold text-[#f9f8f2] leading-none" style={{ fontFamily:"'Lora',serif" }}>{totalEmployees}</span>
+          <span className="text-[12px] text-white/60 font-sans">total people</span>
+        </div>
+        <div className="h-px bg-white/15 mb-3" />
+        <div className="flex justify-between text-[11px] font-sans mb-2">
+          <span className="text-white/50">Present today</span>
+          <span className="font-medium text-white/80">{presentTodayCount}</span>
+        </div>
+        <div className="flex justify-between text-[11px] font-sans mb-2">
+          <span className="text-white/50">🤳 Face (FRS)</span>
+          <span className="font-medium text-white/80">{faceCheckinCount}</span>
+        </div>
+        <div className="flex justify-between text-[11px] font-sans mb-2">
+          <span className="text-white/50">💻 System (SCC)</span>
+          <span className="font-medium text-white/80">{liveCheckinCount}</span>
+        </div>
+        <div className="flex justify-between text-[11px] font-sans mb-2">
+          <span className="text-white/50">Pending leaves</span>
+          <span className="font-medium text-white/80">{leaveRequests.filter(l=>(l.status||"").toLowerCase().includes("pending")).length}</span>
+        </div>
+        <div className="flex justify-between text-[11px] font-sans">
+          <span className="text-white/50">Attendance rate</span>
+          <span className="font-medium text-white/80">{totalEmployees>0?Math.round((presentTodayCount/totalEmployees)*100):0}%</span>
+        </div>
+      </>
+    )}
+  </div>
+</div>
         </div>
 
         <div className="mb-3.5">
@@ -1171,20 +1215,20 @@ export default function Dashboard() {
                 </div>
                 <div className="mt-1.5 flex gap-1.5 flex-wrap">
                   <Badge variant="green">Active</Badge>
-                  <Badge variant="blue">{employee?.uid??"—"}</Badge>
+                  <Badge variant="blue">Emp ID: {employee?.uid??"—"}</Badge>
                   {reviews.length>0 && <StarRating rating={reviews.reduce((s,r)=>s+r.rating,0)/reviews.length} size={12} />}
                 </div>
               </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 px-4 sm:px-5 py-3.5">
               <InfoField label="Work email" value={employee?.work_email} loading={meLoading} />
-              <InfoField label="Department" value={employee?.department} loading={meLoading} />
+              <InfoField label="Department" value={getDeptFullForm(employee?.department)} loading={meLoading} />
               <InfoField label="Office" value={employee?.office_location} loading={meLoading} />
               <InfoField label="Gender" value={employee?.gender} loading={meLoading} />
               <InfoField label="Marital status" value={employee?.marital_status} loading={meLoading} />
               <InfoField label="Contact" value={employee?.personal_contact} loading={meLoading} />
               <InfoField label="Emergency contact" value={employee?.e_contact} loading={meLoading} />
-              <InfoField label="Member since" value={employee?.createdAt?fmtDate(employee.createdAt):null} loading={meLoading} />
+              <InfoField label="Member since" value={joiningDate?fmtDate(joiningDate):null} loading={meLoading} />
             </div>
           </div>
 
@@ -1192,7 +1236,7 @@ export default function Dashboard() {
             <CardAccent color="#1D9E75" />
             <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between border-b border-[#ede5e0]">
               <span className="text-[12px] font-semibold font-sans">Leave balance</span>
-              <span className="text-[10px] text-[#b0948a] font-sans">FY 2025–26</span>
+              <span className="text-[10px] text-[#b0948a] font-sans">FY 2026–27</span>
             </div>
             <div className="px-4 sm:px-5 pb-1">
               {meLoading
@@ -1229,24 +1273,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative animate-fadein hover:shadow-lg transition-shadow mb-3.5" style={{ animationDelay:".45s" }}>
-          <CardAccent color="#378ADD" />
-          <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between border-b border-[#ede5e0] flex-wrap gap-2">
-            <div>
-              <span className="text-[12px] font-semibold font-sans">Leave History</span>
-              {!histLoading && (
-                <span className="ml-2 text-[11px] text-[#b0948a] font-sans">({allLeaves.length} total)</span>
-              )}
-            </div>
-            <div className="flex gap-1.5 flex-wrap">
-              <Badge variant="green">{approvedLeaves.length} approved</Badge>
-              <Badge variant="amber">{allLeaves.filter(l=>l.status?.includes("pending")).length} pending</Badge>
-              <Badge variant="red">{allLeaves.filter(l=>l.status?.includes("rejected")).length} rejected</Badge>
-            </div>
-          </div>
-          <LeaveHistoryList leaves={allLeaves} loading={histLoading} />
-        </div>
-
         <div className="bg-white rounded-2xl border border-[#ede5e0] shadow-sm overflow-hidden">
           <div className="p-4 sm:p-5 border-b border-[#ede5e0] flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2 font-sans text-[12px] font-semibold">
@@ -1277,7 +1303,7 @@ export default function Dashboard() {
               {(empExpand?employees:employees.slice(0,8)).map((emp, i) => {
                 const name = [emp.f_name, emp.l_name].filter(Boolean).join(" ") || "Employee";
                 const role = emp.designation || emp.role || "";
-                const dept = emp.department || "";
+                const dept = getDeptFullForm(emp.department);
                 const email = emp.work_email || "";
                 return (
                   <div key={emp._id || emp.id || i} className="border border-[#ede5e0] rounded-xl p-3.5 flex items-center gap-3 transition-all hover:shadow-sm hover:bg-[#fdfcfb]">
@@ -1306,6 +1332,14 @@ export default function Dashboard() {
           onClose={()=>setShowAttendanceModal(false)}
         />
       )}
+
+      <AttendanceDetailsModal
+        open={attendanceDetailsOpen}
+        onClose={() => setAttendanceDetailsOpen(false)}
+        useOverviewHook={useGetAttendanceOverview}
+        useHistoryHook={useGetEmployeeAttendanceHistory}
+        fetchHistory={getEmployeeAttendanceHistory}
+      />
     </div>
   );
 }

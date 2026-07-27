@@ -71,6 +71,7 @@ const SuperAdmintimesheet = lazy(() => import("./pages/timesheet/sutimesheet"));
 const Pagenotfound = lazy(() => import("./pages/pagenotfound/pagenotfound"));
 const Adminasset = lazy(() => import("./pages/asset/adminasset"));
 const Superadminasset = lazy(() => import("./pages/asset/superadminasset"));
+const Payroll = lazy(() => import("./pages/payroll/Payroll"));
 
 // NOTE: renamed to PascalCase — lowercase-first identifiers are
 // interpreted by JSX as native DOM tags (e.g. <adminmanagement />
@@ -216,6 +217,17 @@ function App() {
             <Route path="/manager-timesheet"        element={<Managertimesheet />} />
             <Route path="/employee-timesheet"       element={<Employeetimesheet />} />
             <Route path="/admin-asset-management"   element={<Adminasset />} />
+
+            {/* Restricted to admins only — payroll policy, CTC and payslips
+                are sensitive financial data */}
+            <Route
+              path="/payroll"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <Payroll />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Restricted to admins only — enrolling faces is a sensitive
                 per-employee action, same pattern as /admin-management */}
@@ -392,6 +404,7 @@ function App() {
             <Route path="/superadmin-timesheet"           element={<SuperAdmintimesheet />} />
             <Route path="/superadmin-asset-management"    element={<Superadminasset />} />
             <Route path="/superadmin-management"          element={<SuperAdminManagement />} />
+            <Route path="/superadmin-payroll"              element={<Payroll />} />
           </Route>
 
           <Route path="*" element={<Pagenotfound />} />

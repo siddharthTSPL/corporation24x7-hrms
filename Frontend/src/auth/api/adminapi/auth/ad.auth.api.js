@@ -66,11 +66,16 @@ export const addEmployee = async (data) => {
   return res.data;
 };
 
+
 export const findAllManagers = async () => {
   const res = await api.get('admin/findallmanagers');
   return res.data;
 };
 
+export const findAllEmployeesFull = async () => {
+  const res = await api.get('admin/findallemployeesfull');
+  return res.data;
+};
 
 export const findAllManagerswithoutAdmin = async () => {
   const res = await api.get('admin/all-no-admin');

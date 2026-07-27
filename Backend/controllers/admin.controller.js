@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Adminmodel = require("../Models/Admin.model");
 const Managermodel = require("../Models/manager.model");
+
 const announcementmodel = require("../Models/announcement.model");
 const uidmodel = require("../Models/UIDmodel.model");
 const Usermodel = require("../Models/user.model");
@@ -23,6 +24,7 @@ const AdminLeave = require("../Models/adleave.model");
 const SuperAdminModel = require("../Models/superadmin.model");
 const Document = require("../Models/document.model");
 const Ticket = require("../Models/ticket.model");
+const { startOfDay } = require("../automatic/weekoffcalendar");
 const { processLeaveDeduction } = require("../automatic/calculateleave");
 const AttendanceSummary = require("../Models/attendancesummary.model");
 const WFH = require("../Models/wfh.model");
@@ -223,6 +225,7 @@ const adminlogin = async (req, res, next) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
   };
 
   // if (admin.isFirstLogin) {
@@ -271,12 +274,19 @@ const adminlogin = async (req, res, next) => {
 const adminlogout = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  Adminmodel.findByIdAndUpdate(req.admin._id, { status: "inactive" }).exec();
+  // NOTE: do NOT flip `status` here. `status` represents the admin's
+  // account state (active/inactive/suspended) and is checked by
+  // admin.middleware.js on every request. Setting it to "inactive" on
+  // logout locks the admin out of the account (403 "Your account is
+  // inactive") until their next successful login, and can 403 any other
+  // still-valid session/tab/device in the meantime. Logout should only
+  // clear this session's cookie, not mutate account status.
   const isProduction = process.env.NODE_ENV === "production";
   res.clearCookie("token", {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
   });
   res.status(200).json({ message: "Admin logout successful" });
 };
@@ -658,6 +668,29 @@ const findallmanagers = async (req, res, next) => {
   }
 };
 
+const findallemployeesfull = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const organisation_id = req.admin.organisation_id;
+
+    const employees = await Usermodel.find({ organisation_id, working_status: "working" })
+      .select(EXCLUDE)
+      .populate("Under_manager", "f_name l_name work_email designation")
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      organisation_id,
+      count: employees.length,
+      employees,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 const findallmanagerswoadmin = async (req, res, next) => {
   try {
@@ -667,7 +700,20 @@ const findallmanagerswoadmin = async (req, res, next) => {
 
     const organisation_id = req.admin.organisation_id;
 
-    const managers = await Managermodel.find({ organisation_id, working_status: "working" })
+    // Was querying every manager in the org, so any admin could see (and
+    // review) managers that don't report up to them. Scope to just this
+    // admin's own team, same as getTodayCheckins does.
+    const teamManagerIds = [...(await getAdminTeamManagerIds(req.admin._id, organisation_id))];
+
+    if (!teamManagerIds.length) {
+      return res.status(200).json({ success: true, organisation_id, count: 0, managers: [] });
+    }
+
+    const managers = await Managermodel.find({
+      organisation_id,
+      working_status: "working",
+      _id: { $in: teamManagerIds },
+    })
       .select(EXCLUDE)
       .populate("reporting_manager", "f_name l_name work_email designation")
       .lean();
@@ -683,6 +729,37 @@ const findallmanagerswoadmin = async (req, res, next) => {
   }
 };
 
+// Walks the manager hierarchy and returns the set of manager _ids (as
+// strings) that report — directly, or through a chain of managers — to
+// the given admin. Used to scope "my team" data (dashboard employee list,
+// today's check-ins, etc.) to just the people under a specific admin,
+// instead of leaking the whole organisation to every admin.
+const getAdminTeamManagerIds = async (adminId, organisation_id) => {
+  const allManagers = await Managermodel.find({ organisation_id })
+    .select("_id reporting_manager reporting_manager_model")
+    .lean();
+
+  const managerIds = new Set();
+  let frontierIds = allManagers
+    .filter((m) => m.reporting_manager_model === "Admin" && String(m.reporting_manager) === String(adminId))
+    .map((m) => String(m._id));
+
+  while (frontierIds.length) {
+    frontierIds.forEach((id) => managerIds.add(id));
+    const frontierSet = new Set(frontierIds);
+    frontierIds = allManagers
+      .filter(
+        (m) =>
+          m.reporting_manager_model === "Manager" &&
+          frontierSet.has(String(m.reporting_manager)) &&
+          !managerIds.has(String(m._id))
+      )
+      .map((m) => String(m._id));
+  }
+
+  return managerIds;
+};
+
 const getallemployee = async (req, res, next) => {
   try {
     if (!req.admin)
@@ -691,14 +768,56 @@ const getallemployee = async (req, res, next) => {
     const organisation_id = req.admin.organisation_id;
 
     const [users, managers] = await Promise.all([
-      Usermodel.find({ organisation_id, working_status: "working" })
-        .select("uid f_name l_name work_email role department designation office_location Under_manager organisation_id")
-        .populate({ path: "Under_manager", select: "uid f_name l_name work_email role" })
-        .lean(),
-      Managermodel.find({ organisation_id, working_status: "working" })
-        .select("uid f_name l_name work_email role designation office_location department gender personal_contact e_contact reporting_manager reporting_manager_model organisation_id")
-        .populate({ path: "reporting_manager", select: "f_name l_name work_email role" })
-        .lean(),
+  Usermodel.find({ organisation_id, working_status: "working" })
+    .select("empid uid f_name l_name work_email role department designation office_location Under_manager organisation_id gender e_contact personal_contact")
+    .populate({ path: "Under_manager", select: "empid uid f_name l_name work_email role" })
+    .lean(),
+  Managermodel.find({ organisation_id, working_status: "working" })
+    .select("empid uid f_name l_name work_email role designation office_location department gender personal_contact e_contact reporting_manager reporting_manager_model organisation_id")
+    .populate({ path: "reporting_manager", select: "empid uid f_name l_name work_email role" })
+    .lean(),
+]);
+
+    const allEmployees = [
+      ...users.map((user) => ({ type: "employee", ...user })),
+      ...managers.map((manager) => ({ type: "manager", ...manager })),
+    ];
+
+    return res.status(200).json({
+      success: true,
+      organisation_id,
+      employees: users.length,
+      managers: managers.length,
+      count: allEmployees.length,
+      users: allEmployees,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+const getMyTeamOverview = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const organisation_id = req.admin.organisation_id;
+    const teamManagerIds = [...(await getAdminTeamManagerIds(req.admin._id, organisation_id))];
+
+    const [users, managers] = await Promise.all([
+      teamManagerIds.length
+        ? Usermodel.find({ organisation_id, working_status: "working", Under_manager: { $in: teamManagerIds } })
+           .select("empid uid f_name l_name work_email role department designation office_location profile_image Under_manager organisation_id")
+            .populate({ path: "Under_manager", select:"empid uid f_name l_name work_email role" })
+            .lean()
+        : [],
+      teamManagerIds.length
+        ? Managermodel.find({ organisation_id, working_status: "working", _id: { $in: teamManagerIds } })
+            .select("empid uid f_name l_name work_email role designation office_location department gender personal_contact e_contact profile_image reporting_manager reporting_manager_model organisation_id")
+            .populate({ path: "reporting_manager", select: "empid uid f_name l_name work_email role" })
+            .lean()
+        : [],
     ]);
 
     const allEmployees = [
@@ -937,6 +1056,16 @@ const promoteEmployeeToManager = async (req, res, next) => {
         { $set: { against: newManager._id, againstModel: "Manager" } },
         { session }
       ),
+
+      Leave.updateMany(
+        { employee: id, organisation_id, applicantName: { $exists: false } },
+        { $set: {
+          applicantName: `${user.f_name} ${user.l_name || ""}`.trim(),
+          applicantEmail: user.work_email,
+          applicantRole: "Employee",
+        } },
+        { session }
+      ),
     ]);
 
     await session.commitTransaction();
@@ -1122,6 +1251,16 @@ const promoteManagerToAdmin = async (req, res, next) => {
         { $set: { against: newAdmin._id, againstModel: "Admin" } },
         { session }
       ),
+
+      ManagerLeave.updateMany(
+        { manager: id, organisation_id, applicantName: { $exists: false } },
+        { $set: {
+          applicantName: `${manager.f_name} ${manager.l_name || ""}`.trim(),
+          applicantEmail: manager.work_email,
+          applicantRole: "Manager",
+        } },
+        { session }
+      ),
     ]);
 
     await session.commitTransaction();
@@ -1291,6 +1430,16 @@ const promoteEmployeeToAdmin = async (req, res, next) => {
         { $set: { against: newAdmin._id, againstModel: "Admin" } },
         { session }
       ),
+
+      Leave.updateMany(
+        { employee: id, organisation_id, applicantName: { $exists: false } },
+        { $set: {
+          applicantName: `${user.f_name} ${user.l_name || ""}`.trim(),
+          applicantEmail: user.work_email,
+          applicantRole: "Employee",
+        } },
+        { session }
+      ),
     ]);
 
     await session.commitTransaction();
@@ -1449,6 +1598,16 @@ const demoteManagerToEmployee = async (req, res, next) => {
         { $set: { against: newEmployee._id, againstModel: "User" } },
         { session }
       ),
+
+      ManagerLeave.updateMany(
+        { manager: id, organisation_id, applicantName: { $exists: false } },
+        { $set: {
+          applicantName: `${manager.f_name} ${manager.l_name || ""}`.trim(),
+          applicantEmail: manager.work_email,
+          applicantRole: "Manager",
+        } },
+        { session }
+      ),
     ]);
 
     await session.commitTransaction();
@@ -1595,6 +1754,16 @@ const demoteAdminToManager = async (req, res, next) => {
       Ticket.updateMany(
         { against: id, againstModel: "Admin", organisation_id },
         { $set: { against: newManager._id, againstModel: "Manager" } },
+        { session }
+      ),
+
+      AdminLeave.updateMany(
+        { admin: id, organisation_id, applicantName: { $exists: false } },
+        { $set: {
+          applicantName: `${adminToDemote.f_name} ${adminToDemote.l_name || ""}`.trim(),
+          applicantEmail: adminToDemote.work_email,
+          applicantRole: "Admin",
+        } },
         { session }
       ),
     ]);
@@ -1746,6 +1915,16 @@ const demoteAdminToEmployee = async (req, res, next) => {
         { $set: { against: newEmployee._id, againstModel: "User" } },
         { session }
       ),
+
+      AdminLeave.updateMany(
+        { admin: id, organisation_id, applicantName: { $exists: false } },
+        { $set: {
+          applicantName: `${adminToDemote.f_name} ${adminToDemote.l_name || ""}`.trim(),
+          applicantEmail: adminToDemote.work_email,
+          applicantRole: "Admin",
+        } },
+        { session }
+      ),
     ]);
 
     await session.commitTransaction();
@@ -1819,7 +1998,7 @@ const getperticularemployee = async (req, res, next) => {
 
   const [user, leaveBalance, reviews] = await Promise.all([
     Usermodel.findOne({ _id: id, organisation_id })
-      .populate({ path: "Under_manager", select: "uid f_name l_name work_email role" })
+      .populate({ path: "Under_manager", select: "empid uid f_name l_name work_email role" })
       .select(EXCLUDE)
       .lean(),
     leavebalanceModel.findOne({ employee: id, organisation_id }).lean(),
@@ -1860,7 +2039,7 @@ const getperticularemanager = async (req, res, next) => {
   const [manager, leaveBalance, reviews] = await Promise.all([
     Managermodel.findOne({ _id: id, organisation_id })
       .select(EXCLUDE)
-      .populate("reporting_manager", "f_name l_name work_email designation role")
+      .populate("reporting_manager", "empid uid f_name l_name work_email role")
       .lean(),
     leavebalanceModel.findOne({ employee: id, organisation_id }).lean(),
     reviewModel
@@ -2178,6 +2357,9 @@ const applyleave = async (req, res, next) => {
   const leave = await AdminLeave.create({
     organisation_id,
     admin: req.admin._id,
+    applicantName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+    applicantEmail: req.admin.work_email,
+    applicantRole: "Admin",
     leaveType,
     startDate: start,
     endDate: end,
@@ -2441,6 +2623,7 @@ const verifyAotp = async (req, res, next) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
   };
 
   res.cookie("token", token, { ...cookieOpts, maxAge: 7 * 24 * 60 * 60 * 1000 });
@@ -2504,6 +2687,7 @@ const resetAdminPassword = async (req, res, next) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
   });
 
   res.status(200).json({ success: true, message: "Password updated successfully" });
@@ -2515,8 +2699,13 @@ const getme = async (req, res, next) => {
 
   const organisation_id = req.admin.organisation_id;
 
+  // getme feeds the dashboard's "Date of joining" / "Member since" cards,
+  // which rely on createdAt — so keep it even though the shared EXCLUDE
+  // list hides it from other admin-facing responses.
+  const GETME_SELECT = EXCLUDE.replace(" -createdAt", "");
+
   const [admin, leaveBalance, reviews] = await Promise.all([
-    Adminmodel.findById(req.admin._id).select(EXCLUDE).lean(),
+    Adminmodel.findById(req.admin._id).select(GETME_SELECT).lean(),
     leavebalanceModel.findOne({ employee: req.admin._id, organisation_id }).lean(),
     reviewModel
       .find({ reviewee: req.admin._id, organisation_id })
@@ -2553,7 +2742,19 @@ const editadminprofile = async (req, res, next) => {
     account_holder_name,
     account_number,
     ifsc_code,
+    date_of_joining,
   } = req.body;
+
+  if (date_of_joining !== undefined) {
+    if (date_of_joining === null || date_of_joining === "") {
+      admin.date_of_joining = null;
+    } else {
+      const parsedDOJ = new Date(date_of_joining);
+      if (isNaN(parsedDOJ.getTime()))
+        return next(Object.assign(new Error("Invalid date of joining"), { statusCode: 400 }));
+      admin.date_of_joining = parsedDOJ;
+    }
+  }
 
   if (f_name !== undefined) {
     if (typeof f_name !== "string" || !f_name.trim() || f_name.length > 50)
@@ -2665,6 +2866,7 @@ const editadminprofile = async (req, res, next) => {
       account_holder_name: admin.account_holder_name,
       account_number: admin.account_number,
       ifsc_code: admin.ifsc_code,
+      date_of_joining: admin.date_of_joining,
     },
   });
 };
@@ -2694,18 +2896,46 @@ const getTodayCheckins = async (req, res) => {
     return res.status(401).json({ success: false, message: "Unauthorized" });
 
   const organisation_id = req.admin.organisation_id;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // IMPORTANT: attendance.controller.js stores `date` as startOfDay(new Date())
+  // which is the IST calendar-day boundary (see automatic/weekoffcalendar.js /
+  // utils/Istdate.utils.js), NOT the server process's local midnight. Using
+  // `new Date(); today.setHours(0,0,0,0)` here reads the OS timezone of
+  // whichever machine Node happens to be running on - on a dev laptop that's
+  // usually IST already (so localhost "works"), but on the live server
+  // (typically UTC) it computes a midnight that's 5:30 hrs off from the
+  // stored `date`, so the query matches nothing and the map shows empty.
+  const today = startOfDay(new Date());
 
+  // Scope to this admin's own team (managers under them + employees under
+  // those managers) instead of the whole organisation.
+  const teamManagerIds = [...(await getAdminTeamManagerIds(req.admin._id, organisation_id))];
+  const teamEmployees = teamManagerIds.length
+    ? await Usermodel.find({ organisation_id, Under_manager: { $in: teamManagerIds } }).select("_id").lean()
+    : [];
+  const scopedEmployeeIds = [...teamManagerIds, ...teamEmployees.map((u) => String(u._id))];
+
+  if (!scopedEmployeeIds.length) {
+    return res.json({ checkins: [], total: 0 });
+  }
+
+  // No lat/lng filter here: face-terminal check-ins don't carry GPS
+  // coordinates (the kiosk is a fixed device), so requiring lat/lng used
+  // to silently drop every face check-in. We still include hasLocation so
+  // the map can plot only the ones that have coordinates while the list
+  // shows everyone, whichever terminal (System/live or Face) they used.
   const checkins = await Attendance.find({
     organisation_id,
     date: today,
     checkIn: { $exists: true },
-    latitude: { $exists: true, $ne: null },
-    longitude: { $exists: true, $ne: null },
+    employee: { $in: scopedEmployeeIds },
   })
-    .populate("employee", "f_name l_name work_email department designation")
-    .select("employee role latitude longitude checkIn checkOut")
+    // `employee` uses refPath: "onModel", so Mongoose needs `onModel` itself
+    // loaded on the doc to know which collection (User/Manager/Admin) to
+    // populate from. The previous .select() below excluded it, which meant
+    // populate silently resolved employee to null for every record -> the
+    // "Unknown" name and missing avatar on every pin.
+    .populate("employee", "f_name l_name work_email department designation profile_image")
+    .select("employee onModel role latitude longitude checkIn checkOut source")
     .lean();
 
   const payload = checkins.map((c) => ({
@@ -2713,14 +2943,256 @@ const getTodayCheckins = async (req, res) => {
     name: [c.employee?.f_name, c.employee?.l_name].filter(Boolean).join(" ") || "Unknown",
     email: c.employee?.work_email || "",
     dept: c.employee?.department || c.employee?.designation || "",
+    avatar: c.employee?.profile_image || null,
     role: c.role,
-    lat: c.latitude,
-    lng: c.longitude,
+    lat: c.latitude ?? null,
+    lng: c.longitude ?? null,
+    hasLocation: c.latitude != null && c.longitude != null,
+    source: c.source === "face" ? "face" : "live",
     checkIn: c.checkIn,
     checkedOut: !!c.checkOut,
   }));
 
   res.json({ checkins: payload, total: payload.length });
+};
+
+// Powers the "Attendance Details" button on the Live Attendance Map card.
+// type=today  -> live check-in/out status for every team member today.
+// type=monthly -> rolled-up AttendanceSummary counts (presentDays/halfDays/
+// absentDays/totalWorkingMinutes) for the requested month+year.
+// Scoped to this admin's own team, same as getTodayCheckins.
+const getAttendanceOverview = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+
+    const organisation_id = req.admin.organisation_id;
+    const type = req.query.type === "monthly" ? "monthly" : "today";
+
+    const teamManagerIds = [...(await getAdminTeamManagerIds(req.admin._id, organisation_id))];
+
+    const [managers, employees] = await Promise.all([
+      teamManagerIds.length
+        ? Managermodel.find({ organisation_id, _id: { $in: teamManagerIds } })
+            .select("empid f_name l_name work_email role designation department office_location profile_image reporting_manager reporting_manager_model")
+            .populate({ path: "reporting_manager", select: "f_name l_name empid" })
+            .lean()
+        : [],
+      teamManagerIds.length
+        ? Usermodel.find({ organisation_id, Under_manager: { $in: teamManagerIds } })
+            .select("empid f_name l_name work_email role designation department office_location profile_image Under_manager")
+            .populate({ path: "Under_manager", select: "f_name l_name empid" })
+            .lean()
+        : [],
+    ]);
+
+    const people = [
+      ...managers.map((m) => ({
+        id: String(m._id),
+        empid: m.empid,
+        name: [m.f_name, m.l_name].filter(Boolean).join(" "),
+        email: m.work_email,
+        role: m.role || "manager",
+        designation: m.designation,
+        department: m.department,
+        office_location: m.office_location,
+        avatar: m.profile_image || null,
+        reportingManager: m.reporting_manager
+          ? [m.reporting_manager.f_name, m.reporting_manager.l_name].filter(Boolean).join(" ")
+          : "—",
+      })),
+      ...employees.map((u) => ({
+        id: String(u._id),
+        empid: u.empid,
+        name: [u.f_name, u.l_name].filter(Boolean).join(" "),
+        email: u.work_email,
+        role: u.role || "employee",
+        designation: u.designation,
+        department: u.department,
+        office_location: u.office_location,
+        avatar: u.profile_image || null,
+        reportingManager: u.Under_manager
+          ? [u.Under_manager.f_name, u.Under_manager.l_name].filter(Boolean).join(" ")
+          : "—",
+      })),
+    ];
+
+    if (!people.length)
+      return res.json({ success: true, type, total: 0, data: [] });
+
+    const peopleIds = people.map((p) => p.id);
+
+    if (type === "today") {
+      const today = startOfDay(new Date());
+      const records = await Attendance.find({
+        organisation_id,
+        date: today,
+        employee: { $in: peopleIds },
+      })
+        .select("employee checkIn checkOut latitude longitude source activeMinutes idleMinutes status")
+        .lean();
+
+      const byEmp = new Map(records.map((r) => [String(r.employee), r]));
+      const data = people.map((p) => {
+        const r = byEmp.get(p.id);
+        const checkedIn = !!r?.checkIn;
+        const checkedOut = !!r?.checkOut;
+        // Once checked out, trust the stored `status` (present/half_day/absent)
+        // instead of re-deriving it from checkIn/checkOut presence. `status`
+        // is computed at checkout time from activeMinutes vs the shift's
+        // thresholds (see attendance.controller.js checkout()), so a punch
+        // in+out with too little active time is correctly "absent" or
+        // "half_day" even though both timestamps are set. The old logic
+        // treated any checkIn+checkOut pair as "present" regardless of how
+        // little time was actually worked.
+        const status = checkedIn ? (checkedOut ? (r.status || "absent") : "on_duty") : "absent";
+        return {
+          ...p,
+          checkIn: r?.checkIn || null,
+          checkOut: r?.checkOut || null,
+          status,
+          source: r?.source === "face" ? "face" : r ? "live" : null,
+          lat: r?.latitude ?? null,
+          lng: r?.longitude ?? null,
+          activeMinutes: r?.activeMinutes ?? 0,
+          idleMinutes: r?.idleMinutes ?? 0,
+        };
+      });
+
+      return res.json({ success: true, type, date: today, total: data.length, data });
+    }
+
+    // monthly — deliberately NOT filtered by organisation_id here: historical
+    // AttendanceSummary docs may predate the organisation_id backfill in
+    // monthattendanceupdate.js, so org-scoping goes through peopleIds instead.
+    const now = new Date();
+    const month = Math.min(Math.max(parseInt(req.query.month, 10) || now.getMonth() + 1, 1), 12);
+    const year = parseInt(req.query.year, 10) || now.getFullYear();
+
+    const summaries = await AttendanceSummary.find({
+      employee: { $in: peopleIds },
+      month,
+      year,
+    }).lean();
+    const summaryByEmp = new Map(summaries.map((s) => [String(s.employee), s]));
+
+    const data = people.map((p) => {
+      const s = summaryByEmp.get(p.id);
+      const presentDays = s?.presentDays ?? 0;
+      const halfDays = s?.halfDays ?? 0;
+      const absentDays = s?.absentDays ?? 0;
+      const weekOffHolidayDays = s?.weekOffHolidayDays ?? 0;
+      const totalWorkingMinutes = s?.totalWorkingMinutes ?? 0;
+      // markedDays intentionally excludes weekOffHolidayDays — attendance %
+      // is "present out of working days", not "present out of calendar days".
+      // Including weekoff/holiday in the denominator would inflate the %.
+      const markedDays = presentDays + halfDays + absentDays;
+      return {
+        ...p,
+        presentDays,
+        halfDays,
+        absentDays,
+        weekOffHolidayDays,
+        markedDays,
+        totalWorkingMinutes,
+        attendancePercent: markedDays > 0 ? Math.round(((presentDays + halfDays * 0.5) / markedDays) * 100) : 0,
+      };
+    });
+
+    return res.json({ success: true, type, month, year, total: data.length, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Day-wise attendance history for one team member (manager or employee) —
+// powers the "History" button on the Monthly tab of AttendanceDetailsModal.
+// Accepts an optional startDate/endDate range (YYYY-MM-DD); defaults to the
+// current calendar month when neither is passed. Scoped to the admin's own
+// team via getAdminTeamManagerIds, same as getAttendanceOverview above.
+const getAttendanceHistory = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+
+    const organisation_id = req.admin.organisation_id;
+    const { employeeId } = req.params;
+    if (!employeeId)
+      return res.status(400).json({ success: false, message: "employeeId is required" });
+
+    const teamManagerIds = [...(await getAdminTeamManagerIds(req.admin._id, organisation_id))];
+
+    const [manager, employee] = await Promise.all([
+      teamManagerIds.length
+        ? Managermodel.findOne({ _id: employeeId, organisation_id, _id: { $in: teamManagerIds } })
+            .select("empid f_name l_name work_email role designation department office_location")
+            .lean()
+        : null,
+      Usermodel.findOne({ _id: employeeId, organisation_id, Under_manager: { $in: teamManagerIds } })
+        .select("empid f_name l_name work_email role designation department office_location")
+        .lean(),
+    ]);
+    const person = manager || employee;
+    if (!person)
+      return res.status(404).json({ success: false, message: "Employee not found in your team" });
+
+    const now = new Date();
+    let { startDate, endDate } = req.query;
+    let rangeStart, rangeEnd;
+    if (startDate && endDate) {
+      rangeStart = startOfDay(new Date(startDate));
+      rangeEnd = startOfDay(new Date(endDate));
+    } else {
+      rangeStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      rangeEnd = startOfDay(now);
+    }
+
+    const records = await Attendance.find({
+      organisation_id,
+      employee: employeeId,
+      date: { $gte: rangeStart, $lte: rangeEnd },
+    })
+      .select("date checkIn checkOut source status activeMinutes idleMinutes isLate lateMinutes overtimeMinutes checkoutRemark checkInGate checkOutGate")
+      .sort({ date: -1 })
+      .lean();
+
+    const data = records.map((r) => ({
+      id: String(r._id),
+      date: r.date,
+      checkIn: r.checkIn || null,
+      checkOut: r.checkOut || null,
+      source: r.source === "face" ? "face" : r.source === "agent" ? "agent" : "system",
+      status: r.status || "absent",
+      activeMinutes: r.activeMinutes ?? 0,
+      idleMinutes: r.idleMinutes ?? 0,
+      isLate: !!r.isLate,
+      lateMinutes: r.lateMinutes ?? 0,
+      overtimeMinutes: r.overtimeMinutes ?? 0,
+      checkoutRemark: r.checkoutRemark || null,
+      checkInGate: r.checkInGate || null,
+      checkOutGate: r.checkOutGate || null,
+    }));
+
+    return res.json({
+      success: true,
+      employee: {
+        id: String(person._id),
+        empid: person.empid,
+        name: [person.f_name, person.l_name].filter(Boolean).join(" "),
+        email: person.work_email,
+        role: person.role,
+        designation: person.designation,
+        department: person.department,
+        office_location: person.office_location,
+      },
+      startDate: rangeStart,
+      endDate: rangeEnd,
+      total: data.length,
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const getOrgInfo = async (req, res, next) => {
@@ -3520,6 +3992,7 @@ module.exports = {
   addemployee,
   findallmanagers,
   getallemployee,
+  getMyTeamOverview,
   editemployee,
   editmanager,
   promoteEmployeeToManager,
@@ -3550,6 +4023,8 @@ module.exports = {
   editadminprofile,
   changepassword,
   getTodayCheckins,
+  getAttendanceOverview,
+  getAttendanceHistory,
   getOrgInfo,
   getAllPersonalDocumentsAdmin,
   getAllExpenseDocumentsAdmin,
@@ -3560,6 +4035,7 @@ module.exports = {
   adminRateTicket,
   adminGetTicketDetail,
   findallmanagerswoadmin,
+  findallemployeesfull,
   setEmployeeWorkingStatus,
   setManagerWorkingStatus,
   getInactiveUsers,

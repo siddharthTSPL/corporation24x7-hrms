@@ -142,7 +142,7 @@ const daysDiff = (s, e) => {
 
 const todayStr = () => new Date().toISOString().split("T")[0];
 const avatarColor = (name = "") => AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
-const initials = (f = "", l = "") => `${f[0] || ""}${l[0] || ""}`.toUpperCase();
+const initials = (f = "", l = "") => (`${f[0] || ""}${l[0] || ""}`.toUpperCase() || "?");
 
 const Spinner = () => (
   <div className="flex flex-col items-center justify-center py-10 xs:py-12 sm:py-16 gap-3">
@@ -425,6 +425,16 @@ const LeaveTimeline = ({ leave }) => {
 const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, accentColor, personLabel, showTimeline }) => {
   const [expanded, setExpanded] = useState(false);
   const person = leave.employee || leave.manager || {};
+  const hasLivePerson = !!(person.f_name || person.l_name);
+  const roleGuess = leave.applicantRole || (leave.manager ? "Manager" : "Employee");
+  const personName = hasLivePerson
+    ? `${person.f_name || ""} ${person.l_name || ""}`.trim()
+    : (leave.applicantName || "");
+  const personEmail = person.work_email || leave.applicantEmail || "";
+  const [personFirst, ...personRest] = personName.split(" ");
+  const personLast = personRest.join(" ");
+  const hasPerson = !!personName;
+  const roleChanged = !hasLivePerson && hasPerson;
   const days   = leave.days || daysDiff(leave.startDate, leave.endDate);
   const accent = accentColor || (LEAVE_META[leave.leaveType] || { accent: "#8B3A8A" }).accent;
 
@@ -447,20 +457,30 @@ const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, acce
           <div className="flex items-center gap-2.5 xs:gap-3 min-w-0 flex-1">
             <div
               className="w-8 h-8 xs:w-9 xs:h-9 sm:w-11 sm:h-11 rounded-[10px] xs:rounded-[12px] sm:rounded-[14px] flex items-center justify-center flex-shrink-0 text-[11px] xs:text-xs sm:text-[14px] font-bold text-white"
-              style={{ background: avatarColor(person.f_name || "A"), boxShadow: "0 3px 10px rgba(0,0,0,0.15)" }}
+              style={{ background: avatarColor(personFirst || "A"), boxShadow: "0 3px 10px rgba(0,0,0,0.15)" }}
             >
-              {initials(person.f_name, person.l_name)}
+              {initials(personFirst, personLast)}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <div className="text-[12.5px] xs:text-[13px] sm:text-[14px] font-semibold text-[#1C1028] truncate max-w-[140px] xs:max-w-[180px] sm:max-w-none">{person.f_name} {person.l_name}</div>
+                <div className={`text-[12.5px] xs:text-[13px] sm:text-[14px] font-semibold truncate max-w-[140px] xs:max-w-[180px] sm:max-w-none ${hasPerson ? "text-[#1C1028]" : "text-[#9B8BAE] italic"}`}>
+                  {hasPerson ? personName : `Unknown ${roleGuess}`}
+                </div>
                 {personLabel && (
                   <span className="text-[9px] sm:text-[10px] font-bold bg-[#F3E8FF] text-[#6B21A8] px-2 py-px rounded-[10px]">
                     {personLabel}
                   </span>
                 )}
+                {roleChanged && (
+                  <span
+                    className="text-[9px] sm:text-[10px] font-bold bg-[#FFF7ED] text-[#B45309] px-2 py-px rounded-[10px]"
+                    title={`This person was a ${roleGuess} when this leave was applied, but their role has changed since.`}
+                  >
+                    Was {roleGuess}
+                  </span>
+                )}
               </div>
-              <div className="text-[10px] sm:text-[11px] text-[#9B8BAE] mt-0.5 truncate max-w-[130px] xs:max-w-[180px] sm:max-w-none">{person.work_email}</div>
+              <div className="text-[10px] sm:text-[11px] text-[#9B8BAE] mt-0.5 truncate max-w-[130px] xs:max-w-[180px] sm:max-w-none">{personEmail || (hasPerson ? "" : "Profile unavailable")}</div>
             </div>
           </div>
 
@@ -1563,6 +1583,7 @@ const AdminLeaveWFH = () => {
         </div>
 
         <div
+          data-tour="leave-tabs"
           className="grid grid-cols-2 xs:grid-cols-3 sm:flex sm:flex-wrap gap-1 rounded-[12px] sm:rounded-[14px] p-1 mb-5 sm:mb-7"
           style={{
             background: "rgba(235,228,245,0.7)",

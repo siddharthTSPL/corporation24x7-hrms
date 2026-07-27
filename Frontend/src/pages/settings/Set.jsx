@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEditAdminProfile, useChangeAdminPassword } from "../../auth/server-state/adminauth/adminauth.hook";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
+import { Country, State, City } from "country-state-city";
 
+const DEFAULT_COUNTRY_ISO = "IN";
 const AVATAR_STYLES = [
   "avataaars", "bottts", "personas", "lorelei",
   "micah", "open-peeps", "big-ears", "croodles",
@@ -11,6 +13,17 @@ const AVATAR_STYLES = [
 const PHONE_REGEX = /^[0-9]{10}$/;
 const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 const ACCOUNT_REGEX = /^[0-9]{9,18}$/;
+
+
+const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+};
+
+const getDepartmentName = (dept) => DEPT_FULL_FORMS[dept] || dept || "—";
 
 const LOCATION_DATA = {
   India: {
@@ -66,6 +79,8 @@ const TABS = [
   { key: "avatar",    label: "Avatar" },
 ];
 
+
+
 function getInitials(name = "") {
   return name.split(" ").filter(Boolean).map(w => w[0]).join("").toUpperCase().slice(0, 2) || "?";
 }
@@ -74,9 +89,41 @@ function getErrorMessage(err) {
   return err?.response?.data?.message || err?.message || "Something went wrong";
 }
 
+function toDateInputValue(date) {
+  if (!date) return "";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
 function fmtDate(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+}
+
+
+// AFTER
+const locationLookupCache = new Map();
+
+function findLocationByCityName(cityName) {
+  if (!cityName) return null;
+  if (locationLookupCache.has(cityName)) return locationLookupCache.get(cityName);
+
+  let result = null;
+  const countries = Country.getAllCountries();
+  outer: for (const country of countries) {
+    const states = State.getStatesOfCountry(country.isoCode);
+    for (const state of states) {
+      const cities = City.getCitiesOfState(country.isoCode, state.isoCode);
+      if (cities.some(c => c.name === cityName)) {
+        result = { countryIso: country.isoCode, stateIso: state.isoCode };
+        break outer;
+      }
+    }
+  }
+
+  locationLookupCache.set(cityName, result);
+  return result;
 }
 
 function findLocation(city) {
@@ -276,8 +323,10 @@ function ProfileTab({ adminData }) {
         <Grid>
           <ReadonlyField label="Role" value={adminData?.role} />
           <ReadonlyField label="Designation" value={adminData?.designation} />
-          <ReadonlyField label="Department" value={adminData?.department} />
+          {/* Department now shown in full form instead of short code */}
+          <ReadonlyField label="Department" value={getDepartmentName(adminData?.department)} />
           <ReadonlyField label="Office location" value={adminData?.office_location} />
+          <ReadonlyField label="Date of joining" value={fmtDate(adminData?.date_of_joining || adminData?.createdAt)} />
           <ReadonlyField label="Working status" value={adminData?.working_status} />
           <ReadonlyField label="Last login" value={fmtDate(adminData?.last_login)} />
           <ReadonlyField label="Email verified" value={adminData?.isVerified ? "✓ Verified" : "Not verified"} />
@@ -296,52 +345,76 @@ function ProfileTab({ adminData }) {
   );
 }
 
+
+
 function ContactTab({ adminData, onSuccess, onError }) {
   const queryClient = useQueryClient();
   const { mutate, isPending } = useEditAdminProfile();
+
   const [form, setForm] = useState({
-    personal_contact: "", e_contact: "",
-    country: "India", state: "Uttar Pradesh", city: "Bareilly",
+    personal_contact: "",
+    e_contact: "",
+    countryIso: DEFAULT_COUNTRY_ISO,
+    stateIso: "",
+    city: "",
+    date_of_joining: "",
   });
 
+  const countries = Country.getAllCountries();
+  const states = form.countryIso ? State.getStatesOfCountry(form.countryIso) : [];
+  const cities = form.countryIso && form.stateIso ? City.getCitiesOfState(form.countryIso, form.stateIso) : [];
+
   useEffect(() => {
-    if (adminData) {
-      const match = findLocation(adminData.office_location);
-      const country = match?.country || "India";
-      const state = match?.state || Object.keys(LOCATION_DATA[country])[0];
-      const city = adminData.office_location || LOCATION_DATA[country][state][0];
-      setForm({
-        personal_contact: adminData.personal_contact || "",
-        e_contact: adminData.e_contact || "",
-        country, state, city,
-      });
+    if (!adminData) return;
+
+    const cityName = adminData.office_location || "";
+    const match = findLocationByCityName(cityName);
+
+    let countryIso = match?.countryIso || DEFAULT_COUNTRY_ISO;
+    let stateIso = match?.stateIso || "";
+
+    if (!stateIso) {
+      const defaultStates = State.getStatesOfCountry(countryIso);
+      stateIso = defaultStates[0]?.isoCode || "";
     }
+
+    setForm({
+      personal_contact: adminData.personal_contact || "",
+      e_contact: adminData.e_contact || "",
+      countryIso,
+      stateIso,
+      city: cityName,
+      date_of_joining: toDateInputValue(adminData.date_of_joining),
+    });
   }, [adminData]);
 
   const setPhone = (key) => (e) => setForm(p => ({ ...p, [key]: e.target.value }));
 
   const setCountry = (e) => {
-    const country = e.target.value;
-    const state = Object.keys(LOCATION_DATA[country])[0];
-    const city = LOCATION_DATA[country][state][0];
-    setForm(p => ({ ...p, country, state, city }));
+    const countryIso = e.target.value;
+    const firstState = State.getStatesOfCountry(countryIso)[0];
+    const stateIso = firstState?.isoCode || "";
+    const firstCity = stateIso ? City.getCitiesOfState(countryIso, stateIso)[0] : null;
+    setForm(p => ({ ...p, countryIso, stateIso, city: firstCity?.name || "" }));
   };
 
   const setState = (e) => {
-    const state = e.target.value;
-    const city = LOCATION_DATA[form.country][state][0];
-    setForm(p => ({ ...p, state, city }));
+    const stateIso = e.target.value;
+    const firstCity = City.getCitiesOfState(form.countryIso, stateIso)[0];
+    setForm(p => ({ ...p, stateIso, city: firstCity?.name || "" }));
   };
 
   const setCity = (e) => setForm(p => ({ ...p, city: e.target.value }));
 
-  const cityOptions = LOCATION_DATA[form.country]?.[form.state] || (form.city ? [form.city] : []);
+  const cityOptions = form.city && !cities.some(c => c.name === form.city)
+    ? [{ name: form.city }, ...cities]
+    : cities;
 
   const handleSave = () => {
     if (!PHONE_REGEX.test(form.personal_contact)) { onError("Phone number must be a valid 10-digit number"); return; }
     if (form.e_contact && !PHONE_REGEX.test(form.e_contact)) { onError("Emergency contact must be a valid 10-digit number"); return; }
     mutate(
-      { personal_contact: form.personal_contact, e_contact: form.e_contact, office_location: form.city },
+      { personal_contact: form.personal_contact, e_contact: form.e_contact, office_location: form.city, date_of_joining: form.date_of_joining },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["auth"] });
@@ -357,15 +430,36 @@ function ContactTab({ adminData, onSuccess, onError }) {
       <InputField label="Phone number" type="tel" value={form.personal_contact} onChange={setPhone("personal_contact")} placeholder="10-digit phone number" />
       <InputField label="Emergency contact" type="tel" value={form.e_contact} onChange={setPhone("e_contact")} placeholder="Emergency contact" hint="Reached in case of emergency" />
       <Grid cols={3}>
-        <SelectField label="Country" value={form.country} onChange={setCountry} options={Object.keys(LOCATION_DATA)} />
-        <SelectField label="State" value={form.state} onChange={setState} options={Object.keys(LOCATION_DATA[form.country] || {})} />
-        <SelectField label="City (office location)" value={form.city} onChange={setCity} options={cityOptions} />
+        <SelectField
+          label="Country"
+          value={form.countryIso}
+          onChange={setCountry}
+          options={countries.map(c => ({ value: c.isoCode, label: c.name }))}
+        />
+        <SelectField
+          label="State"
+          value={form.stateIso}
+          onChange={setState}
+          options={states.map(s => ({ value: s.isoCode, label: s.name }))}
+        />
+        <SelectField
+          label="City (office location)"
+          value={form.city}
+          onChange={setCity}
+          options={cityOptions.map(c => ({ value: c.name, label: c.name }))}
+        />
       </Grid>
-      <PrimaryButton onClick={handleSave} loading={isPending}>Save contact info</PrimaryButton>
+      <InputField
+        label="Date of joining"
+        type="date"
+        value={form.date_of_joining}
+        onChange={e => setForm(p => ({ ...p, date_of_joining: e.target.value }))}
+        hint="Shown on your dashboard in place of your account creation date"
+      />
+     <PrimaryButton onClick={handleSave} loading={isPending} color={C.brandDark}>Save contact info</PrimaryButton>
     </SectionCard>
   );
 }
-
 function AddressTab({ adminData }) {
   return (
     <SectionCard title="Address information" subtitle="On record, contact HR to update" accent={C.amber}>
@@ -465,7 +559,7 @@ function DocumentsBankingTab({ adminData, onSuccess, onError }) {
         <InputField label="Aadhaar card" value={form.aadhaar_card} onChange={set("aadhaar_card")} placeholder="https://…" />
         <InputField label="PAN card" value={form.pan_card} onChange={set("pan_card")} placeholder="https://…" />
         <InputField label="Experience letter" value={form.experience_letter} onChange={set("experience_letter")} placeholder="https://…" />
-        <PrimaryButton onClick={handleSaveDocs} loading={isPending}>Save documents</PrimaryButton>
+        <PrimaryButton onClick={handleSaveDocs} loading={isPending} color={C.brandDark}>Save documents</PrimaryButton>
       </SectionCard>
 
       <SectionCard title="Banking details" subtitle="Used for salary disbursement" accent={C.green}>
@@ -475,7 +569,7 @@ function DocumentsBankingTab({ adminData, onSuccess, onError }) {
           <InputField label="Account number" value={form.account_number} onChange={set("account_number")} placeholder="9-18 digit account number" />
           <InputField label="IFSC code" value={form.ifsc_code} onChange={(e) => setForm(p => ({ ...p, ifsc_code: e.target.value.toUpperCase() }))} placeholder="ABCD0123456" />
         </Grid>
-        <PrimaryButton onClick={handleSaveBanking} loading={isPending} color={C.green}>Save banking details</PrimaryButton>
+        <PrimaryButton onClick={handleSaveBanking} loading={isPending} color={C.brandDark}>Save banking details</PrimaryButton>
       </SectionCard>
     </>
   );
@@ -672,7 +766,7 @@ function PasswordTab({ onSuccess, onError }) {
         <InputField label="Confirm new password *" type={show ? "text" : "password"} value={form.confirm} onChange={set("confirm")} placeholder="Confirm password"
           hint={form.confirm && form.newPassword !== form.confirm ? "Passwords do not match" : ""}
         />
-        <PrimaryButton onClick={handleChange} loading={isPending}>Update password</PrimaryButton>
+       <PrimaryButton onClick={handleChange} loading={isPending} color={C.brandDark}>Update password</PrimaryButton>
         <div style={{ marginTop: 14, padding: "11px 14px", background: C.brandLight, borderRadius: 9, fontSize: 12, color: C.brandDark, lineHeight: 1.6 }}>
           Use 10+ characters with uppercase, numbers and symbols for a strong password.
         </div>
@@ -847,18 +941,19 @@ export default function AdminSettingsPage() {
   return (
     <div className="w-full max-w-full min-h-screen overflow-x-hidden" style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", background: C.page, color: C.text }}>
       <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes slideIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
-        * { box-sizing: border-box; }
-        input::placeholder { color: #c9bab5; }
-        select option { color: #2a1a16; }
-        .mobile-menu-btn { display: none; }
-        @media (max-width: 768px) {
-          .settings-layout { flex-direction: column !important; }
-          .settings-sidebar { display: none !important; }
-          .mobile-menu-btn { display: flex !important; }
-        }
-      `}</style>
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes slideIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
+  * { box-sizing: border-box; }
+  input::placeholder { color: #c9bab5; }
+  select option { color: #2a1a16; }
+  select { position: relative; }
+  .mobile-menu-btn { display: none; }
+  @media (max-width: 768px) {
+    .settings-layout { flex-direction: column !important; }
+    .settings-sidebar { display: none !important; }
+    .mobile-menu-btn { display: flex !important; }
+  }
+`}</style>
 
       <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: "", type: "" })} />
       {mobileMenuOpen && <MobileTabBar tab={tab} setTab={setTab} onClose={() => setMobileMenuOpen(false)} />}

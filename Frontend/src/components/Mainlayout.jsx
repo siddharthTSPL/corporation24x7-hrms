@@ -8,18 +8,19 @@ export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(false);
 
   usePermissionsSync();
-  
 
   return (
-    <div className="flex h-screen bg-(--background)">
-      <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
+   
+    <div className="h-screen w-full flex overflow-hidden">
+      <Sidebar
+        collapsed={collapsed}
+        setCollapsed={setCollapsed}
+        className="h-screen sticky top-0"
+      />
 
-      <div className="flex-1 flex flex-col">
-        {/* <Navbar collapsed={collapsed} setCollapsed={setCollapsed} /> */}
-        <div className="p-6 overflow-auto flex-1">
-          <Outlet />
-        </div>
-      </div>
+    <div className="flex-1 min-w-0 h-screen overflow-y-auto overflow-x-hidden flex flex-col">
+  <Outlet />
+</div>
     </div>
   );
 }

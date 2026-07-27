@@ -8,6 +8,8 @@ import {
   assignAssetToAdmin,
   revokeAssetSuperAdmin,
   getAssetsOfPersonSuperAdmin,
+  getEmployeesWithAssetsSuperAdmin,
+  getEmployeeAssetHistorySuperAdmin,
 } from "../../../api/superadmin/asset/superadminasset.api";
 
 export const useGetAllAssetsSuperAdmin = (params) => {
@@ -34,6 +36,24 @@ export const useGetAssetsOfPersonSuperAdmin = (person_id, person_model) => {
     enabled: !!person_id && !!person_model,
     queryFn: () => getAssetsOfPersonSuperAdmin(person_id, person_model),
     staleTime: 1000 * 60 * 5,
+  });
+};
+
+export const useGetEmployeesWithAssetsSuperAdmin = () => {
+  return useQuery({
+    queryKey: ["superadmin-assets-employees"],
+    queryFn: () => getEmployeesWithAssetsSuperAdmin(),
+    staleTime: 0,
+    refetchOnMount: true,
+  });
+};
+
+export const useGetEmployeeAssetHistorySuperAdmin = (person_id, person_model) => {
+  return useQuery({
+    queryKey: ["superadmin-assets-employee-history", person_id, person_model],
+    queryFn: () => getEmployeeAssetHistorySuperAdmin(person_id, person_model),
+    enabled: !!person_id && !!person_model,
+    staleTime: 0,
   });
 };
 
@@ -75,6 +95,8 @@ export const useAssignAssetToAdmin = () => {
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ["superadmin-assets"] });
       queryClient.invalidateQueries({ queryKey: ["superadmin-asset", id] });
+      queryClient.invalidateQueries({ queryKey: ["superadmin-assets-employees"] });
+      queryClient.invalidateQueries({ queryKey: ["superadmin-assets-employee-history"] });
     },
   });
 };
@@ -87,6 +109,8 @@ export const useRevokeAssetSuperAdmin = () => {
       queryClient.invalidateQueries({ queryKey: ["superadmin-assets"] });
       queryClient.invalidateQueries({ queryKey: ["superadmin-asset", id] });
       queryClient.invalidateQueries({ queryKey: ["superadmin-assets-person"] });
+      queryClient.invalidateQueries({ queryKey: ["superadmin-assets-employees"] });
+      queryClient.invalidateQueries({ queryKey: ["superadmin-assets-employee-history"] });
     },
   });
 };

@@ -11,6 +11,8 @@ const Review = require("../Models/review.model");
 const leavebalanceModel = require("../Models/leavebalance.model");
 const reviewModel = require("../Models/review.model");
 const Attendance = require("../Models/attendance.model");
+const AttendanceSummary = require("../Models/attendancesummary.model");
+const { startOfDay } = require("../automatic/weekoffcalendar");
 const generateUID = require("../automatic/uidgeneration");
 const assignDefaultLeave = require("../automatic/bydefaultleaveset");
 const LeavePolicy = require("../Models/Leavepolicy.model");
@@ -30,6 +32,36 @@ const { notifyLeaveDecision, notifyAssetAssigned } = require("../utils/notify.ut
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
+
+// Walks up a manager's reporting chain (manager -> manager -> ... -> admin)
+// to find the admin they - and therefore their reports - ultimately sit
+// under. A manager can report directly to an Admin, or to another
+// Manager who eventually reports to an Admin. Capped at 10 hops as a
+// safety net in case of a bad/circular reporting_manager reference.
+async function resolveAdminInChain(startManager, organisation_id) {
+  let current = startManager;
+  for (let hops = 0; current && hops < 10; hops += 1) {
+    if (!current.reporting_manager || !current.reporting_manager_model) return null;
+
+    if (current.reporting_manager_model === "Admin") {
+      return AdminModel.findOne({
+        _id: current.reporting_manager,
+        organisation_id,
+      })
+        .select(EXCLUDE)
+        .lean();
+    }
+
+    // reporting_manager_model === "Manager": go up one more level
+    current = await Managermodel.findOne({
+      _id: current.reporting_manager,
+      organisation_id,
+    })
+      .select("reporting_manager reporting_manager_model")
+      .lean();
+  }
+  return null;
+}
 
 // ─── Role-based default permissions ───────────────────────────────────────────
 // admin   : announcements + documents + tickets + recruitment  (all features)
@@ -444,6 +476,7 @@ const loginSuperAdmin = async (req, res, next) => {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? "none" : "lax",
+      path: "/",
     };
 
     if (superAdmin.isFirstLogin) {
@@ -552,13 +585,15 @@ const getMe = async (req, res, next) => {
 };
 
 const logoutSuperAdmin = async (req, res, next) => {
-  req.superAdmin.status = "inactive";
-  await req.superAdmin.save();
+  // `status` = account state, checked on every request by the auth
+  // middleware (and gates every admin/manager/employee under this org).
+  // Do not set it to "inactive" here — see adminlogout note.
   const isProduction = process.env.NODE_ENV === "production";
   res.clearCookie("token", {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
   });
   res.status(200).json({ success: true, message: "Logged out successfully" });
 };
@@ -736,6 +771,7 @@ const verifyOtp = async (req, res, next) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
   };
 
   const token = jwt.sign(
@@ -822,6 +858,7 @@ const resetPassword = async (req, res, next) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
   });
 
   res.status(200).json({ success: true, message: "Password updated successfully" });
@@ -1265,19 +1302,19 @@ const getallemployee = async (req, res, next) => {
     const [admins, managers, users] = await Promise.all([
       AdminModel.find({ organisation_id, working_status: "working" })
         .select(
-          "empid uid f_name l_name work_email role department designation office_location organisation_id",
+          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact marital_status",
         )
         .lean(),
 
       Managermodel.find({ organisation_id, working_status: "working" })
         .select(
-          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact",
+          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact marital_status",
         )
         .lean(),
 
       Usermodel.find({ organisation_id, working_status: "working" })
         .select(
-          "empid uid f_name l_name work_email role department designation office_location organisation_id Under_manager",
+          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact marital_status Under_manager",
         )
         .populate({
           path: "Under_manager",
@@ -1375,23 +1412,30 @@ const getperticularemployee = async (req, res, next) => {
     return next(
       Object.assign(new Error("User not found"), { statusCode: 404 }),
     );
-  if (!leaveBalance)
-    return next(
-      Object.assign(new Error("Leave balance not found"), { statusCode: 404 }),
-    );
 
-  const manager = await Managermodel.findOne({
-    _id: user._id,
-    organisation_id,
-  })
-    .select(EXCLUDE)
-    .lean();
+  // Was previously querying Managermodel by the employee's OWN _id
+  // (a copy-paste bug), which could never match a real manager - so
+  // `manager` in the response was always null. The employee's actual
+  // manager is user.Under_manager.
+  const managerId = user.Under_manager?._id || user.Under_manager || null;
+  const manager = managerId
+    ? await Managermodel.findOne({ _id: managerId, organisation_id })
+        .select(EXCLUDE)
+        .lean()
+    : null;
+
+  // Walk up the reporting chain (manager -> manager -> ... -> admin)
+  // to find the admin this employee ultimately reports up to.
+  const admin = manager
+    ? await resolveAdminInChain(manager, organisation_id)
+    : null;
 
   res.status(200).json({
     success: true,
     user,
     manager: manager || null,
-    leaveBalance,
+    admin: admin || null,
+    leaveBalance: leaveBalance || null,
     reviews: reviews || [],
   });
 };
@@ -1413,15 +1457,14 @@ const getperticularemanager = async (req, res, next) => {
     return next(
       Object.assign(new Error("Manager not found"), { statusCode: 404 }),
     );
-  if (!leaveBalance)
-    return next(
-      Object.assign(new Error("Leave balance not found"), { statusCode: 404 }),
-    );
+
+  const admin = await resolveAdminInChain(manager, organisation_id);
 
   res.status(200).json({
     success: true,
     manager,
-    leaveBalance,
+    admin: admin || null,
+    leaveBalance: leaveBalance || null,
     reviews: reviews || [],
   });
 };
@@ -1455,16 +1498,22 @@ const showallleaves = async (req, res, next) => {
     Leave.find({ organisation_id })
       .populate("employee", "f_name l_name work_email empid department designation")
       .populate("manager", "f_name l_name work_email empid department designation")
+      .populate("approvedBy", "f_name l_name designation")
+      .populate("rejectedBy", "f_name l_name designation")
       .sort({ createdAt: -1 })
       .lean(),
  
     ManagerLeave.find({ organisation_id })
       .populate("manager", "f_name l_name work_email empid department designation")
+      .populate("approvedBy", "f_name l_name designation")
+      .populate("rejectedBy", "f_name l_name designation")
       .sort({ createdAt: -1 })
       .lean(),
  
     AdminLeave.find({ organisation_id })
       .populate("admin", "f_name l_name work_email designation")
+      .populate("approvedBy", "f_name l_name")
+      .populate("rejectedBy", "f_name l_name")
       .sort({ createdAt: -1 })
       .lean(),
   ]);
@@ -1778,8 +1827,12 @@ const reviewtoadmin = async (req, res, next) => {
 const getTodayCheckins = async (req, res, next) => {
   const organisation_id = req.superAdmin._id;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Use the same IST-based day boundary that attendance.controller.js stores
+  // `date` with. new Date().setHours(0,0,0,0) reads the server process's OS
+  // timezone, which differs between localhost (usually IST) and the live
+  // server (usually UTC) - that mismatch is why check-ins showed up locally
+  // but not on production.
+  const today = startOfDay(new Date());
 
   const checkins = await Attendance.find({
     organisation_id,
@@ -1788,8 +1841,11 @@ const getTodayCheckins = async (req, res, next) => {
     latitude: { $exists: true, $ne: null },
     longitude: { $exists: true, $ne: null },
   })
-    .populate("employee", "f_name l_name work_email department designation")
-    .select("employee role latitude longitude checkIn checkOut")
+    // onModel drives the refPath on `employee` - it must be selected or
+    // populate can't tell which collection (User/Manager/Admin) to resolve
+    // against, and silently returns employee: null (-> "Unknown").
+    .populate("employee", "f_name l_name work_email department designation profile_image")
+    .select("employee onModel role latitude longitude checkIn checkOut")
     .lean();
 
   const payload = checkins.map((c) => ({
@@ -1799,6 +1855,7 @@ const getTodayCheckins = async (req, res, next) => {
       "Unknown",
     email: c.employee?.work_email || "",
     dept: c.employee?.department || c.employee?.designation || "",
+    avatar: c.employee?.profile_image || null,
     role: c.role,
     lat: c.latitude,
     lng: c.longitude,
@@ -1807,6 +1864,250 @@ const getTodayCheckins = async (req, res, next) => {
   }));
 
   res.json({ checkins: payload, total: payload.length });
+};
+
+// Powers the "Attendance Details" button on the Live Attendance Map card.
+// Org-wide (admins + managers + employees), unlike admin.controller.js's
+// version which is scoped to one admin's own team.
+// type=today   -> live check-in/out status for everyone today.
+// type=monthly -> rolled-up AttendanceSummary counts for the requested
+// month+year.
+const getAttendanceOverview = async (req, res, next) => {
+  try {
+    const organisation_id = req.superAdmin._id;
+    const type = req.query.type === "monthly" ? "monthly" : "today";
+
+    // Every Admin reports to this Superadmin by default (there's no
+    // reporting_manager field on the Admin model) - show their actual
+    // name here instead of the literal word "Superadmin".
+    const superAdminName =
+      [req.superAdmin.f_name, req.superAdmin.l_name].filter(Boolean).join(" ") || "Superadmin";
+
+    const [admins, managers, employees] = await Promise.all([
+      AdminModel.find({ organisation_id })
+        .select("empid f_name l_name work_email role designation department office_location profile_image")
+        .lean(),
+      Managermodel.find({ organisation_id })
+        .select("empid f_name l_name work_email role designation department office_location profile_image reporting_manager reporting_manager_model")
+        .populate({ path: "reporting_manager", select: "f_name l_name empid" })
+        .lean(),
+      Usermodel.find({ organisation_id })
+        .select("empid f_name l_name work_email role designation department office_location profile_image Under_manager")
+        .populate({ path: "Under_manager", select: "f_name l_name empid" })
+        .lean(),
+    ]);
+
+    const people = [
+      ...admins.map((a) => ({
+        id: String(a._id),
+        empid: a.empid,
+        name: [a.f_name, a.l_name].filter(Boolean).join(" "),
+        email: a.work_email,
+        role: a.role || "admin",
+        designation: a.designation,
+        department: a.department,
+        office_location: a.office_location,
+        avatar: a.profile_image || null,
+        reportingManager: superAdminName,
+      })),
+      ...managers.map((m) => ({
+        id: String(m._id),
+        empid: m.empid,
+        name: [m.f_name, m.l_name].filter(Boolean).join(" "),
+        email: m.work_email,
+        role: m.role || "manager",
+        designation: m.designation,
+        department: m.department,
+        office_location: m.office_location,
+        avatar: m.profile_image || null,
+        reportingManager: m.reporting_manager
+          ? [m.reporting_manager.f_name, m.reporting_manager.l_name].filter(Boolean).join(" ")
+          : "—",
+      })),
+      ...employees.map((u) => ({
+        id: String(u._id),
+        empid: u.empid,
+        name: [u.f_name, u.l_name].filter(Boolean).join(" "),
+        email: u.work_email,
+        role: u.role || "employee",
+        designation: u.designation,
+        department: u.department,
+        office_location: u.office_location,
+        avatar: u.profile_image || null,
+        reportingManager: u.Under_manager
+          ? [u.Under_manager.f_name, u.Under_manager.l_name].filter(Boolean).join(" ")
+          : "—",
+      })),
+    ];
+
+    if (!people.length)
+      return res.json({ success: true, type, total: 0, data: [] });
+
+    const peopleIds = people.map((p) => p.id);
+
+    if (type === "today") {
+      const today = startOfDay(new Date());
+      const records = await Attendance.find({
+        organisation_id,
+        date: today,
+        employee: { $in: peopleIds },
+      })
+        .select("employee checkIn checkOut latitude longitude source activeMinutes idleMinutes status")
+        .lean();
+
+      const byEmp = new Map(records.map((r) => [String(r.employee), r]));
+      const data = people.map((p) => {
+        const r = byEmp.get(p.id);
+        const checkedIn = !!r?.checkIn;
+        const checkedOut = !!r?.checkOut;
+        // Once checked out, trust the stored `status` (present/half_day/absent)
+        // instead of re-deriving it from checkIn/checkOut presence. `status`
+        // is computed at checkout time from activeMinutes vs the shift's
+        // thresholds (see attendance.controller.js checkout()), so a punch
+        // in+out with too little active time is correctly "absent" or
+        // "half_day" even though both timestamps are set. The old logic
+        // treated any checkIn+checkOut pair as "present" regardless of how
+        // little time was actually worked.
+        const status = checkedIn ? (checkedOut ? (r.status || "absent") : "on_duty") : "absent";
+        return {
+          ...p,
+          checkIn: r?.checkIn || null,
+          checkOut: r?.checkOut || null,
+          status,
+          source: r?.source === "face" ? "face" : r ? "live" : null,
+          lat: r?.latitude ?? null,
+          lng: r?.longitude ?? null,
+          activeMinutes: r?.activeMinutes ?? 0,
+          idleMinutes: r?.idleMinutes ?? 0,
+        };
+      });
+
+      return res.json({ success: true, type, date: today, total: data.length, data });
+    }
+
+    // monthly — not filtered by organisation_id (see admin.controller.js's
+    // version for why); peopleIds already scopes this to the org.
+    const now = new Date();
+    const month = Math.min(Math.max(parseInt(req.query.month, 10) || now.getMonth() + 1, 1), 12);
+    const year = parseInt(req.query.year, 10) || now.getFullYear();
+
+    const summaries = await AttendanceSummary.find({
+      employee: { $in: peopleIds },
+      month,
+      year,
+    }).lean();
+    const summaryByEmp = new Map(summaries.map((s) => [String(s.employee), s]));
+
+    const data = people.map((p) => {
+      const s = summaryByEmp.get(p.id);
+      const presentDays = s?.presentDays ?? 0;
+      const halfDays = s?.halfDays ?? 0;
+      const absentDays = s?.absentDays ?? 0;
+      const weekOffHolidayDays = s?.weekOffHolidayDays ?? 0;
+      const totalWorkingMinutes = s?.totalWorkingMinutes ?? 0;
+      const markedDays = presentDays + halfDays + absentDays;
+      return {
+        ...p,
+        presentDays,
+        halfDays,
+        absentDays,
+        weekOffHolidayDays,
+        markedDays,
+        totalWorkingMinutes,
+        attendancePercent: markedDays > 0 ? Math.round(((presentDays + halfDays * 0.5) / markedDays) * 100) : 0,
+      };
+    });
+
+    return res.json({ success: true, type, month, year, total: data.length, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Day-wise attendance history for one employee (any role) — powers the
+// "History" button on the Monthly tab of AttendanceDetailsModal. Accepts an
+// optional startDate/endDate range (YYYY-MM-DD); defaults to the current
+// calendar month when neither is passed.
+const getAttendanceHistory = async (req, res, next) => {
+  try {
+    const organisation_id = req.superAdmin._id;
+    const { employeeId } = req.params;
+
+    if (!employeeId)
+      return res.status(400).json({ success: false, message: "employeeId is required" });
+
+    const [admin, manager, employee] = await Promise.all([
+      AdminModel.findOne({ _id: employeeId, organisation_id })
+        .select("empid f_name l_name work_email role designation department office_location")
+        .lean(),
+      Managermodel.findOne({ _id: employeeId, organisation_id })
+        .select("empid f_name l_name work_email role designation department office_location")
+        .lean(),
+      Usermodel.findOne({ _id: employeeId, organisation_id })
+        .select("empid f_name l_name work_email role designation department office_location")
+        .lean(),
+    ]);
+    const person = admin || manager || employee;
+    if (!person)
+      return res.status(404).json({ success: false, message: "Employee not found in your organisation" });
+
+    const now = new Date();
+    let { startDate, endDate } = req.query;
+    let rangeStart, rangeEnd;
+    if (startDate && endDate) {
+      rangeStart = startOfDay(new Date(startDate));
+      rangeEnd = startOfDay(new Date(endDate));
+    } else {
+      rangeStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      rangeEnd = startOfDay(now);
+    }
+
+    const records = await Attendance.find({
+      organisation_id,
+      employee: employeeId,
+      date: { $gte: rangeStart, $lte: rangeEnd },
+    })
+      .select("date checkIn checkOut source status activeMinutes idleMinutes isLate lateMinutes overtimeMinutes checkoutRemark checkInGate checkOutGate")
+      .sort({ date: -1 })
+      .lean();
+
+    const data = records.map((r) => ({
+      id: String(r._id),
+      date: r.date,
+      checkIn: r.checkIn || null,
+      checkOut: r.checkOut || null,
+      source: r.source === "face" ? "face" : r.source === "agent" ? "agent" : "system",
+      status: r.status || "absent",
+      activeMinutes: r.activeMinutes ?? 0,
+      idleMinutes: r.idleMinutes ?? 0,
+      isLate: !!r.isLate,
+      lateMinutes: r.lateMinutes ?? 0,
+      overtimeMinutes: r.overtimeMinutes ?? 0,
+      checkoutRemark: r.checkoutRemark || null,
+      checkInGate: r.checkInGate || null,
+      checkOutGate: r.checkOutGate || null,
+    }));
+
+    return res.json({
+      success: true,
+      employee: {
+        id: String(person._id),
+        empid: person.empid,
+        name: [person.f_name, person.l_name].filter(Boolean).join(" "),
+        email: person.work_email,
+        role: person.role,
+        designation: person.designation,
+        department: person.department,
+        office_location: person.office_location,
+      },
+      startDate: rangeStart,
+      endDate: rangeEnd,
+      total: data.length,
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 // ─── Helper: recursively build manager hierarchy ──────────────────────────────
@@ -2463,6 +2764,32 @@ const setLeavePolicy = async (req, res, next) => {
   return res.status(200).json({ success: true, message: "Leave policy updated", policy });
 };
 
+const getperticularadmin = async (req, res, next) => {
+  const { uid } = req.params;
+  const organisation_id = req.superAdmin._id;
+
+  const [admin, leaveBalance, reviews] = await Promise.all([
+    AdminModel.findOne({ _id: uid, organisation_id }).select(EXCLUDE).lean(),
+    leavebalanceModel.findOne({ employee: uid, organisation_id }).lean(),
+    reviewModel
+      .find({ reviewee: uid, organisation_id, revieweeRoleModel: "Admin" })
+      .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      .lean(),
+  ]);
+
+  if (!admin)
+    return next(
+      Object.assign(new Error("Admin not found"), { statusCode: 404 }),
+    );
+
+  res.status(200).json({
+    success: true,
+    admin,
+    leaveBalance: leaveBalance || null,
+    reviews: reviews || [],
+  });
+};
+
 module.exports = {
   registerSuperAdmin,
   verifySuperAdmin,
@@ -2498,6 +2825,8 @@ module.exports = {
   deleteAnnouncement,
   reviewtoadmin,
   getTodayCheckins,
+  getAttendanceOverview,
+  getAttendanceHistory,
   getOrgInfo,
   getAllPersonalDocumentsSuperAdmin,
   getAllExpenseDocumentsSuperAdmin,
@@ -2508,5 +2837,6 @@ module.exports = {
   getInactiveUsers,
   getActiveUserCount,
   getLeavePolicy,
-  setLeavePolicy
+  setLeavePolicy,
+  getperticularadmin
 };

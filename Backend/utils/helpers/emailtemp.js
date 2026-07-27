@@ -369,6 +369,80 @@ function buildForgotPasswordOtpEmail({ recipientName = "", otp, expiresInMinutes
   });
 }
 
+// ---------------------------------------------------------------
+// Technical support request (Help & Support form)
+// ---------------------------------------------------------------
+
+const ROLE_LABELS = {
+  superadmin: "Super Admin",
+  super_admin: "Super Admin",
+  admin: "Admin",
+  senior_admin: "Senior Admin",
+  official: "Official",
+  manager: "Manager",
+  senior_manager: "Senior Manager",
+  employee: "Employee",
+};
+
+function roleLabel(role) {
+  return ROLE_LABELS[role] || role || "-";
+}
+
+// Sent to the support inbox — one line per reporter/context field, then
+// the message itself, verbatim, so nothing gets lost in translation.
+function buildSupportRequestEmail({
+  name,
+  email,
+  role,
+  uid,
+  organisationName,
+  subject,
+  message,
+  page,
+}) {
+  const rows = [
+    detailRow("Reported By", name),
+    detailRow("Email", email),
+    detailRow("Role", roleLabel(role)),
+    detailRow("Employee ID", uid),
+    detailRow("Organisation", organisationName),
+    detailRow("Page", page),
+  ].join("");
+
+  const body = `
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${rows}</table>
+    ${sectionLabel("Message")}
+    <p style="margin:0;color:${BRAND.text};font-size:14px;line-height:1.7;white-space:pre-wrap;">${escapeHtml(message)}</p>
+  `;
+
+  return emailShell({
+    preheader: `New support request: ${subject}`,
+    headerTitle: escapeHtml(subject),
+    footerNote: `Raised via the Help &amp; Support form inside ${PRODUCT_NAME}. Reply directly to this email to respond to ${escapeHtml(name || "the reporter")}.`,
+    bodyHtml: body,
+  });
+}
+
+// Short acknowledgement sent back to the reporter so they know it went through.
+function buildSupportAckEmail({ name, subject }) {
+  const greeting = name ? `Hi ${escapeHtml(name)},` : "Hello,";
+  const body = `
+    <p style="margin:0 0 16px;color:${BRAND.text};font-size:15px;line-height:1.6;">
+      ${greeting}<br/><br/>
+      We've received your support request <strong>"${escapeHtml(subject)}"</strong>. Our team will get back to you over email shortly.
+    </p>
+    <p style="margin:0;color:${BRAND.muted};font-size:12px;line-height:1.6;">
+      If this is urgent, please mention it in a follow-up reply to this email.
+    </p>
+  `;
+
+  return emailShell({
+    preheader: "We've received your support request",
+    headerTitle: "Support Request Received",
+    bodyHtml: body,
+  });
+}
+
 module.exports = {
   buildManagerEmail,
   buildEmployeeEmail,
@@ -376,6 +450,8 @@ module.exports = {
   buildStatusDecisionEmail,
   buildAssetAssignedEmail,
   buildForgotPasswordOtpEmail,
+  buildSupportRequestEmail,
+  buildSupportAckEmail,
   leaveTypeLabel,
   formatDate,
 };

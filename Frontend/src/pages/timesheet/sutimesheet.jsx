@@ -198,7 +198,7 @@ function JobDetailModal({ jobId, open, onClose }) {
             <div className="font-bold text-[16px] sm:text-[17px] text-gray-900 mb-1 break-words">{job.title}</div>
             {job.description && <div className="text-[13px] text-gray-500 leading-relaxed break-words">{job.description}</div>}
           </div>
-          <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="bg-[#F8F9FC] rounded-xl p-3 min-w-0">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Assigned To</div>
               <div className="text-[13px] font-bold text-gray-900 truncate">{job.assigned_to_info?.name || "—"}</div>
@@ -345,14 +345,14 @@ function TimerWidget({ assignedJobs }) {
               isRunning ? "text-white/60" : "text-gray-400")}>{timer.job.title}</span>
           )}
         </div>
-        <div className="px-4 sm:px-5 py-4 flex flex-col xs:flex-row items-stretch xs:items-center justify-between gap-3 sm:gap-4">
-          <div className={cn("font-mono text-3xl sm:text-4xl font-extrabold tracking-widest tabular-nums select-none text-center xs:text-left",
+        <div className="px-4 sm:px-5 py-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+          <div className={cn("font-mono text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-widest tabular-nums select-none text-center sm:text-left",
             isRunning ? "text-white" : isPaused ? "text-amber-600" : "text-gray-200")}>
             {fmtSeconds(displaySecs)}
           </div>
-          <div className="flex gap-2 shrink-0 flex-wrap justify-center xs:justify-end">
+          <div className="flex gap-2 shrink-0 flex-wrap justify-center sm:justify-end">
             {!timer ? (
-              <Btn onClick={() => setStartModal(true)} className="flex-1 xs:flex-initial">▶ Start</Btn>
+              <Btn onClick={() => setStartModal(true)} className="w-full sm:w-auto">▶ Start</Btn>
             ) : (
               <>
                 {isRunning && (
@@ -377,11 +377,11 @@ function TimerWidget({ assignedJobs }) {
             {activeJobs.map((j) => <option key={j._id} value={j._id}>{j.title}</option>)}
           </Select>
           <Input label="Note (optional)" placeholder="What are you working on?" value={startForm.note} onChange={(e) => setStartForm((p) => ({ ...p, note: e.target.value }))} />
-          <div className="flex flex-col-reverse xs:flex-row gap-2 xs:justify-end">
-            <Btn variant="ghost" onClick={() => setStartModal(false)} className="w-full xs:w-auto">Cancel</Btn>
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+            <Btn variant="ghost" onClick={() => setStartModal(false)} className="w-full sm:w-auto">Cancel</Btn>
             <Btn onClick={() => startTimerMut.mutate({ job: startForm.job, note: startForm.note }, {
               onSuccess: () => { setStartModal(false); setStartForm({ job: "", note: "" }); refetchTimer(); }
-            })} disabled={!startForm.job || startTimerMut.isPending} className="w-full xs:w-auto">
+            })} disabled={!startForm.job || startTimerMut.isPending} className="w-full sm:w-auto">
               {startTimerMut.isPending ? "Starting…" : "▶ Start"}
             </Btn>
           </div>
@@ -395,11 +395,11 @@ function TimerWidget({ assignedJobs }) {
             <span className="font-mono font-extrabold text-lg sm:text-xl text-[#730042]">{fmtSeconds(displaySecs)}</span>
           </div>
           <Input label="Note (optional)" placeholder="Brief summary…" value={stopNote} onChange={(e) => setStopNote(e.target.value)} />
-          <div className="flex flex-col-reverse xs:flex-row gap-2 xs:justify-end">
-            <Btn variant="ghost" onClick={() => setStopModal(false)} className="w-full xs:w-auto">Cancel</Btn>
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+            <Btn variant="ghost" onClick={() => setStopModal(false)} className="w-full sm:w-auto">Cancel</Btn>
             <Btn variant="success" onClick={() => stopTimerMut.mutate({ note: stopNote }, {
               onSuccess: () => { setStopModal(false); setStopNote(""); refetchTimer(); }
-            })} disabled={stopTimerMut.isPending} className="w-full xs:w-auto">
+            })} disabled={stopTimerMut.isPending} className="w-full sm:w-auto">
               {stopTimerMut.isPending ? "Logging…" : "■ Log Time"}
             </Btn>
           </div>
@@ -623,7 +623,7 @@ export default function SuperAdminTimesheet() {
           <div className="md:hidden flex items-center gap-2 flex-1 pl-2 sm:pl-3 min-w-0">
             <button onClick={() => setMobileNavOpen(v => !v)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#E4E6EF] text-[13px] font-semibold text-gray-700 bg-[#F8F9FC] min-h-[40px]">
-              <span className="truncate max-w-[110px] xs:max-w-none">{currentTabLabel}</span>
+              <span className="truncate max-w-[140px] sm:max-w-none">{currentTabLabel}</span>
               <svg className="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 16 16">
                 <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -634,9 +634,9 @@ export default function SuperAdminTimesheet() {
           </div>
 
           <div className="flex gap-2 shrink-0 pl-2 sm:pl-4 py-2 sm:py-2.5 border-l border-[#E4E6EF] ml-auto">
-            <Btn onClick={() => setCreateJobOpen(true)} className="text-[12px] px-3 sm:px-4 hidden xs:inline-flex">＋ New Job</Btn>
+            <Btn onClick={() => setCreateJobOpen(true)} className="text-[12px] px-3 sm:px-4 hidden sm:inline-flex">＋ New Job</Btn>
             <Btn variant="ghost" onClick={() => setCreateProjectOpen(true)} className="text-[12px] px-3 sm:px-4 hidden sm:inline-flex">＋ Project</Btn>
-            <Btn onClick={() => setCreateJobOpen(true)} className="text-[11px] px-2.5 xs:hidden">＋ Job</Btn>
+            <Btn onClick={() => setCreateJobOpen(true)} className="text-[11px] px-2.5 sm:hidden">＋ Job</Btn>
           </div>
         </div>
 
@@ -668,7 +668,7 @@ export default function SuperAdminTimesheet() {
 
         {tab === "overview" && (
           <div className="flex flex-col gap-4 sm:gap-5">
-            <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <StatTile label="Total Projects"  value={projects.length}                                     sub="Across all teams"           colorClass="text-[#730042]"    />
               <StatTile label="Active Jobs"     value={jobs.filter(j => j.status === "in_progress").length} sub={`${completedJobs} completed`} colorClass="text-blue-600"  />
               <StatTile label="Hours Logged"    value={`${totalHours.toFixed(0)}h`}                        sub={`${billableJobs} billable jobs`} colorClass="text-emerald-600" />
@@ -896,7 +896,7 @@ export default function SuperAdminTimesheet() {
                   <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">{fmtShort(weekStart)} – {fmtShort(weekEnd)}</span>
                   <button onClick={() => shiftWeek(1)} className="bg-transparent border-none cursor-pointer text-gray-700 text-base flex w-6 h-6 items-center justify-center shrink-0">›</button>
                 </div>
-                <Btn onClick={() => setLogModal(true)} className="flex-1 xs:flex-initial">+ Log Time</Btn>
+                <Btn onClick={() => setLogModal(true)} className="w-full sm:w-auto">+ Log Time</Btn>
               </div>
             </div>
 
@@ -1110,9 +1110,9 @@ export default function SuperAdminTimesheet() {
           <div className="text-[14px] text-gray-700">
             Approve the timesheet for <strong className="text-gray-900">{approveModal?.owner?.f_name} {approveModal?.owner?.l_name}</strong>?
           </div>
-          <div className="flex flex-col-reverse xs:flex-row gap-2 xs:justify-end">
-            <Btn variant="ghost" onClick={() => setApproveModal(null)} className="w-full xs:w-auto">Cancel</Btn>
-            <Btn variant="success" onClick={() => handleApprove(approveModal)} disabled={approveTS.isPending} className="w-full xs:w-auto">
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+            <Btn variant="ghost" onClick={() => setApproveModal(null)} className="w-full sm:w-auto">Cancel</Btn>
+            <Btn variant="success" onClick={() => handleApprove(approveModal)} disabled={approveTS.isPending} className="w-full sm:w-auto">
               {approveTS.isPending ? "Approving…" : "Approve"}
             </Btn>
           </div>
@@ -1125,9 +1125,9 @@ export default function SuperAdminTimesheet() {
             Rejecting timesheet for <strong className="text-gray-900">{rejectModal?.owner?.f_name} {rejectModal?.owner?.l_name}</strong>
           </div>
           <Input label="Reason (required)" placeholder="Explain the issue…" value={rejectRemarks} onChange={e => setRejectRemarks(e.target.value)} />
-          <div className="flex flex-col-reverse xs:flex-row gap-2 xs:justify-end">
-            <Btn variant="ghost" onClick={() => setRejectModal(null)} className="w-full xs:w-auto">Cancel</Btn>
-            <Btn variant="danger" onClick={handleReject} disabled={!rejectRemarks.trim() || rejectTS.isPending} className="w-full xs:w-auto">
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+            <Btn variant="ghost" onClick={() => setRejectModal(null)} className="w-full sm:w-auto">Cancel</Btn>
+            <Btn variant="danger" onClick={handleReject} disabled={!rejectRemarks.trim() || rejectTS.isPending} className="w-full sm:w-auto">
               {rejectTS.isPending ? "Rejecting…" : "Reject"}
             </Btn>
           </div>
@@ -1138,7 +1138,7 @@ export default function SuperAdminTimesheet() {
         <div className="flex flex-col gap-3.5">
           <Input label="Project Name" placeholder="e.g. Website Redesign" value={projectForm.name} onChange={e => setProjectForm(p => ({ ...p, name: e.target.value }))} />
           <Input label="Description" placeholder="Brief description…" value={projectForm.description} onChange={e => setProjectForm(p => ({ ...p, description: e.target.value }))} />
-          <div className="grid grid-cols-1 xs:grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <Select label="Billing Type" value={projectForm.billing_type} onChange={e => setProjectForm(p => ({ ...p, billing_type: e.target.value }))}>
               <option value="hourly">Hourly</option>
               <option value="fixed">Fixed</option>
@@ -1151,9 +1151,9 @@ export default function SuperAdminTimesheet() {
             </Select>
           </div>
           <Input label="Default Hourly Rate" type="number" placeholder="0.00" value={projectForm.default_hourly_rate} onChange={e => setProjectForm(p => ({ ...p, default_hourly_rate: e.target.value }))} />
-          <div className="flex flex-col-reverse xs:flex-row gap-2 xs:justify-end pt-1">
-            <Btn variant="ghost" onClick={() => setCreateProjectOpen(false)} className="w-full xs:w-auto">Cancel</Btn>
-            <Btn onClick={handleCreateProject} disabled={!projectForm.name || createProject.isPending} className="w-full xs:w-auto">
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-1">
+            <Btn variant="ghost" onClick={() => setCreateProjectOpen(false)} className="w-full sm:w-auto">Cancel</Btn>
+            <Btn onClick={handleCreateProject} disabled={!projectForm.name || createProject.isPending} className="w-full sm:w-auto">
               {createProject.isPending ? "Creating…" : "Create Project"}
             </Btn>
           </div>
@@ -1170,7 +1170,7 @@ export default function SuperAdminTimesheet() {
               <option key={t.id} value={t.id}>{t.name} — {t.role || t.model}</option>
             ))}
           </Select>
-          <div className="grid grid-cols-1 xs:grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <Select label="Priority" value={jobForm.priority} onChange={e => setJobForm(p => ({ ...p, priority: e.target.value }))}>
               <option value="low">Low</option>
               <option value="medium">Medium</option>
@@ -1179,7 +1179,7 @@ export default function SuperAdminTimesheet() {
             </Select>
             <Input label="Estimated Hours" type="number" placeholder="0" value={jobForm.estimated_hours} onChange={e => setJobForm(p => ({ ...p, estimated_hours: e.target.value }))} />
           </div>
-          <div className="grid grid-cols-1 xs:grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <Input label="Hourly Rate" type="number" placeholder="0.00" value={jobForm.hourly_rate} onChange={e => setJobForm(p => ({ ...p, hourly_rate: e.target.value }))} />
             <Select label="Currency" value={jobForm.currency} onChange={e => setJobForm(p => ({ ...p, currency: e.target.value }))}>
               <option value="INR">INR</option>
@@ -1191,9 +1191,9 @@ export default function SuperAdminTimesheet() {
             <input type="checkbox" checked={jobForm.billable} onChange={e => setJobForm(p => ({ ...p, billable: e.target.checked }))} className="w-4 h-4 accent-[#730042]" />
             <span className="text-[13px] text-gray-600">Billable job</span>
           </label>
-          <div className="flex flex-col-reverse xs:flex-row gap-2 xs:justify-end pt-1">
-            <Btn variant="ghost" onClick={() => setCreateJobOpen(false)} className="w-full xs:w-auto">Cancel</Btn>
-            <Btn onClick={handleCreateJob} disabled={!jobForm.title || !jobForm.assigned_to || createJob.isPending} className="w-full xs:w-auto">
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-1">
+            <Btn variant="ghost" onClick={() => setCreateJobOpen(false)} className="w-full sm:w-auto">Cancel</Btn>
+            <Btn onClick={handleCreateJob} disabled={!jobForm.title || !jobForm.assigned_to || createJob.isPending} className="w-full sm:w-auto">
               {createJob.isPending ? "Creating…" : "Create Job"}
             </Btn>
           </div>
@@ -1206,14 +1206,14 @@ export default function SuperAdminTimesheet() {
             <option value="">Select job…</option>
             {assignedJobs.map(j => <option key={j._id} value={j._id}>{j.title}</option>)}
           </Select>
-          <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Date" type="date" value={logForm.log_date} onChange={e => setLogForm(p => ({ ...p, log_date: e.target.value }))} />
             <Input label="Duration (minutes)" type="number" placeholder="e.g. 90" min="1" value={logForm.duration_minutes} onChange={e => setLogForm(p => ({ ...p, duration_minutes: e.target.value }))} />
           </div>
           <Input label="Note (optional)" placeholder="What did you work on?" value={logForm.note} onChange={e => setLogForm(p => ({ ...p, note: e.target.value }))} />
-          <div className="flex flex-col-reverse xs:flex-row gap-2 xs:justify-end pt-1">
-            <Btn variant="ghost" onClick={() => setLogModal(false)} className="w-full xs:w-auto">Cancel</Btn>
-            <Btn onClick={handleLogTime} disabled={!logForm.job || !logForm.duration_minutes || logTime.isPending} className="w-full xs:w-auto">
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-1">
+            <Btn variant="ghost" onClick={() => setLogModal(false)} className="w-full sm:w-auto">Cancel</Btn>
+            <Btn onClick={handleLogTime} disabled={!logForm.job || !logForm.duration_minutes || logTime.isPending} className="w-full sm:w-auto">
               {logTime.isPending ? "Saving…" : "Save Entry"}
             </Btn>
           </div>

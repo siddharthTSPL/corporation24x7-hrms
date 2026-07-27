@@ -535,7 +535,9 @@ export default function AnnouncementPage() {
   const { mutate: deleteAnnouncement, isPending: isDeleting } = useDeleteAnnouncement();
   const { data, isLoading, isError } = useGetAllAnnouncements();
 
-  const announcements = data?.announcements || [];
+  const announcements = [...(data?.announcements || [])].sort(
+  (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+  );
   const isPending = isCreating || isUpdating;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
@@ -790,13 +792,7 @@ export default function AnnouncementPage() {
                     </p>
                   </div>
                   <p
-                    className="text-[11px] text-[#993556] leading-relaxed mb-2"
-                    style={{
-                      display: "-webkit-box",
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: "vertical",
-                      overflow: "hidden",
-                    }}
+                    className="text-[11px] text-[#993556] leading-relaxed mb-2 whitespace-pre-wrap break-words"
                   >
                     {item.message}
                   </p>
@@ -921,11 +917,11 @@ export default function AnnouncementPage() {
                     </td>
 
                     {/* Title + Message */}
-                    <td className="px-3 md:px-4 lg:px-5 py-4 max-w-[160px] lg:max-w-[220px]">
-                      <p className="text-[13px] font-semibold text-[#730042] truncate">
+                    <td className="px-3 md:px-4 lg:px-5 py-4 max-w-[260px] lg:max-w-[340px]">
+                      <p className="text-[13px] font-semibold text-[#730042]">
                         {item.title}
                       </p>
-                      <p className="text-[11px] text-[#993556] truncate mt-0.5">
+                      <p className="text-[11px] text-[#993556] mt-0.5 whitespace-pre-wrap break-words">
                         {item.message}
                       </p>
                     </td>

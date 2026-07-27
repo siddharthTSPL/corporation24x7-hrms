@@ -9,6 +9,7 @@ import {
   useGetOrgInfo,
   useGetParticularEmployee,
   useGetParticularManager,
+  useGetParticularAdmin,
 } from "../../auth/server-state/superadmin/other/suother.hook";
 
 const STYLES = `
@@ -68,11 +69,15 @@ const STYLES = `
   .su-scroll::-webkit-scrollbar-thumb { background:#dde3ec; border-radius:6px; }
   .su-scroll { -webkit-overflow-scrolling: touch; }
 
-  /* ---------- Org-chart connector lines ----------
-     Lines are drawn with a measured SVG overlay (see OrgConnectorGroup
-     below) instead of CSS width/gap math, so they are always pixel-
-     perfect regardless of card width, text truncation, breakpoint, or
-     how many siblings are rendered - no seams, no misaligned elbows. */
+  .su-field-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .su-field-val {
+    flex: 1 1 auto;
+  }
 
   .org-tree-root { display: flex; flex-direction: column; align-items: center; }
   .org-branch { display: flex; flex-direction: column; align-items: center; position: relative; min-width: 0; }
@@ -145,19 +150,6 @@ function Skeleton({ w, h, r = 8 }) {
   );
 }
 
-/* ---------- Measured SVG connector system ----------
-   OrgConnectorGroup draws the lines from one parent node down to a row
-   of children by actually measuring their rendered positions on screen
-   (getBoundingClientRect), instead of guessing pixel widths from CSS.
-   That's what makes every elbow/spine align exactly under each card,
-   at any breakpoint, with any number of siblings, any text length -
-   there's nothing to get out of sync.
-
-   parentRef  - ref to the DOM node of the single parent card above this row
-   children   - array of React nodes, one per sibling in the row (each can
-                itself be a full nested branch - only its OWN top card's
-                position is used as the anchor, because that's always the
-                first element painted inside each row item)               */
 function OrgConnectorGroup({ parentRef, children, gapClassName = "gap-4" }) {
   const items = (Array.isArray(children) ? children : [children]).filter(Boolean);
   const containerRef = useRef(null);
@@ -199,8 +191,6 @@ function OrgConnectorGroup({ parentRef, children, gapClassName = "gap-4" }) {
     ro.observe(parentRef.current);
 
     window.addEventListener("resize", measure);
-    // Catch late layout shifts: web-font swap, entrance animations
-    // (scaleIn/fadeUp) settling, and images/avatars finishing paint.
     const t1 = setTimeout(measure, 120);
     const t2 = setTimeout(measure, 450);
     document.fonts?.ready?.then(measure).catch(() => {});
@@ -403,6 +393,161 @@ function SkeletonTree() {
   );
 }
 
+const PRIMARY_ORDER = ["EL", "SL", "ML", "PL"];
+
+const LEAVE_META = {
+  EL:  { label: "Earned Leave",    color: "#730042" },
+  SL:  { label: "Sick Leave",      color: "#2563eb" },
+  ML:  { label: "Maternity Leave", color: "#78716c" },
+  PL:  { label: "Paternity Leave", color: "#16a34a" },
+  pbc: { label: "PBC (Paid Leave)" },
+  lwp: { label: "LWP (Leave Without Pay)" },
+};
+
+const LEAVE_BALANCE_HIDDEN_KEYS = new Set([
+  "_id", "__v", "employee", "organisation_id", "createdAt", "updatedAt",
+  "mlStartDate", "mlEndDate", "lastAccrualDate",
+]);
+
+function humanizeKey(key) {
+  if (LEAVE_META[key]?.label) return LEAVE_META[key].label;
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/_/g, " ")
+    .replace(/^./, (c) => c.toUpperCase())
+    .trim();
+}
+
+function fmtLeaveDate(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function normalizeBucket(val) {
+  if (val && typeof val === "object") {
+    return {
+      entitled: Number(val.entitled ?? 0),
+      availed: Number(val.availed ?? 0),
+      accrued: val.accrued != null ? Number(val.accrued) : null,
+      yearlyEntitled: val.yearlyEntitled != null ? Number(val.yearlyEntitled) : null,
+    };
+  }
+  return { entitled: Number(val ?? 0), availed: 0, accrued: null, yearlyEntitled: null };
+}
+
+function QuotaCard({ typeKey, rawValue }) {
+  const meta = LEAVE_META[typeKey] || { label: humanizeKey(typeKey), color: "#730042" };
+  const { entitled, availed, accrued } = normalizeBucket(rawValue);
+  const remaining = entitled - availed;
+  const pct = entitled > 0 ? Math.min(100, Math.max(0, (availed / entitled) * 100)) : 0;
+  const isEmpty = entitled === 0;
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-4 sm:p-5 min-w-0">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <span className="text-sm font-semibold text-slate-900 truncate">{meta.label}</span>
+        <span
+          className="text-[11px] font-semibold px-2.5 py-1 rounded-full shrink-0"
+          style={{
+            color: isEmpty ? "#9ca3af" : meta.color,
+            background: isEmpty ? "#f3f4f6" : `${meta.color}18`,
+          }}
+        >
+          {remaining} left
+        </span>
+      </div>
+
+      <div className="w-full h-[5px] rounded-full bg-gray-100 overflow-hidden mb-3">
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${pct}%`, background: isEmpty ? "#e5e7eb" : meta.color }}
+        />
+      </div>
+
+      <div className="flex items-center justify-between text-xs sm:text-[13px] text-gray-500">
+        <span>Entitled: <b className="text-slate-800 font-semibold">{entitled}</b></span>
+        <span>Availed: <b className="text-slate-800 font-semibold">{availed}</b></span>
+      </div>
+      {accrued != null && (
+        <div className="text-xs sm:text-[13px] text-gray-500 mt-1.5">
+          Accrued: <b className="text-slate-800 font-semibold">{accrued}</b>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CounterTile({ typeKey, rawValue }) {
+  const meta = LEAVE_META[typeKey];
+  const value = rawValue && typeof rawValue === "object" ? (rawValue.entitled ?? 0) : rawValue;
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-4 sm:p-5 min-w-0">
+      <div className="text-xs text-gray-400 mb-2 truncate">{meta?.label || humanizeKey(typeKey)}</div>
+      <div
+        className="text-xl sm:text-2xl font-bold text-slate-900"
+        style={{ fontFamily: "'JetBrains Mono',monospace" }}
+      >
+        {typeof value === "boolean" ? (value ? "Yes" : "No") : value}
+      </div>
+    </div>
+  );
+}
+
+function LeaveBalanceTab({ leaveBalance, isLoading, showHeader = true }) {
+  if (isLoading) return (
+    <div className="flex justify-center pt-9">
+      <div className="w-6 h-6 rounded-full border-2 border-[#730042]/30 border-t-[#730042] animate-spin" />
+    </div>
+  );
+
+  if (!leaveBalance) return (
+    <div className="text-xs sm:text-sm text-gray-400 text-center pt-9">No leave balance record found.</div>
+  );
+
+  const allKeys = Object.keys(leaveBalance).filter((k) => !LEAVE_BALANCE_HIDDEN_KEYS.has(k));
+  const primaryKeys = PRIMARY_ORDER.filter((k) => allKeys.includes(k));
+  const secondaryKeys = allKeys.filter(
+    (k) => !PRIMARY_ORDER.includes(k) && (typeof leaveBalance[k] !== "object" || leaveBalance[k] === null)
+  );
+
+  if (!primaryKeys.length && !secondaryKeys.length) return (
+    <div className="text-xs sm:text-sm text-gray-400 text-center pt-9">No leave balance fields to show.</div>
+  );
+
+  return (
+    <div className="bg-[#fafbfc] rounded-2xl border border-gray-100 p-4 sm:p-6 min-w-0">
+      {showHeader && (
+        <div className="mb-4 sm:mb-5">
+          <h3 className="text-base sm:text-lg font-bold text-slate-900">Leave Balance</h3>
+          <p className="text-xs sm:text-sm text-gray-400 mt-0.5">Your current leave entitlements</p>
+        </div>
+      )}
+
+      {primaryKeys.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          {primaryKeys.map((key) => (
+            <QuotaCard key={key} typeKey={key} rawValue={leaveBalance[key]} />
+          ))}
+        </div>
+      )}
+
+      {secondaryKeys.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-3 sm:mt-4">
+          {secondaryKeys.map((key) => (
+            <CounterTile key={key} typeKey={key} rawValue={leaveBalance[key]} />
+          ))}
+        </div>
+      )}
+
+      {leaveBalance.lastAccrualDate && (
+        <div className="text-[11px] text-gray-400 text-right mt-3">
+          Last accrual: {fmtLeaveDate(leaveBalance.lastAccrualDate)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EmployeeDetailPanel({ person, type, onClose }) {
   const [tab, setTab] = useState("info");
   const isManager  = type === "manager";
@@ -414,25 +559,57 @@ function EmployeeDetailPanel({ person, type, onClose }) {
   const accentColor = isSA ? NODE_COLOR.sa : isAdmin ? NODE_COLOR.admin : isManager ? NODE_COLOR.manager : NODE_COLOR.employee;
   const roleLabel   = isSA ? "Super Admin" : isAdmin ? "Admin" : isManager ? "Manager" : "Employee";
 
+  const detailFetchFn = isAdmin
+    ? useGetParticularAdmin
+    : isManager
+      ? useGetParticularManager
+      : !isSA
+        ? useGetParticularEmployee
+        : null;
+
+  const { data: detailData, isLoading: detailLoading } = detailFetchFn
+    ? detailFetchFn(person._id)
+    : { data: null, isLoading: false };
+
+  const leaveBalance = detailData?.leaveBalance || null;
+
   const fields = useMemo(() => {
-    if (isSA) return [
-      ["Email",        person.email],
-      ["Phone",        person.phone || "—"],
-      ["Organisation", person.organisation_name],
-      ["Domain",       person.company_domain || "—"],
-      ["Address",      person.company_address || "—"],
-      ["Industry",     person.industry || "—"],
-      ["Plan",         person.plan || "—"],
-      ["Plan expires", fmtDate(person.plan_expires_at)],
-      ["Status",       person.status],
-      ["Last login",   fmtDate(person.last_login)],
-      ["Member since", fmtDate(person.createdAt)],
-    ];
+    if (isSA) {
+      const activeLicense = person.licenses?.find(
+        (l) => l.isActive && new Date(l.expiresAt) > new Date()
+      );
+      const isTrial = person.is_trial_active && new Date() < new Date(person.trial_expires_at);
+
+      const currentPlanLabel = isTrial
+        ? "Trial"
+        : activeLicense?.plan || person.plan || "—";
+
+      const currentPlanExpiry = isTrial
+        ? fmtDate(person.trial_expires_at)
+        : activeLicense
+        ? fmtDate(activeLicense.expiresAt)
+        : fmtDate(person.plan_expires_at);
+
+      return [
+        ["Email",        person.email],
+        // ["Phone",        person.phone || "—"],
+        ["Organisation", person.organisation_name],
+        ["Domain",       person.company_domain || "—"],
+        // ["Address",      person.company_address || "—"],
+        // ["Industry",     person.industry || "—"],
+        ["Plan",         currentPlanLabel],
+        ["Plan expires", currentPlanExpiry],
+        ["Status",       person.status],
+        // ["Last login",   fmtDate(person.last_login)],
+        ["Member since", fmtDate(person.createdAt)],
+      ];
+    }
     if (isAdmin) return [
       ["Emp ID",      person.empid || "—"],
       ["Email",       person.work_email],
-      ["Phone",       person.phone || "—"],
+      ["Phone",       person.personal_contact || "—"],
       ["Gender",      person.gender || "—"],
+      ["Marital",     person.marital_status || "—"],
       ["Designation", person.designation || "—"],
       ["Status",      person.status || "—"],
     ];
@@ -508,7 +685,7 @@ function EmployeeDetailPanel({ person, type, onClose }) {
                   className={`px-4 py-2 rounded-lg border text-xs font-medium transition-all min-h-[40px] flex items-center shrink-0 ${tab === t ? "bg-[#730042] text-white border-[#730042] shadow-md" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}
                   onClick={() => setTab(t)}
                 >
-                  {t === "info" ? "Information" : t === "leave" ? "Leave" : "Reviews"}
+                  {t === "info" ? "Information" : t === "leave" ? "Leave Balance" : "Reviews"}
                 </button>
               ))}
             </div>
@@ -525,7 +702,10 @@ function EmployeeDetailPanel({ person, type, onClose }) {
             </div>
           )}
 
-          {tab === "leave"   && !isSA && <LeaveTab uid={person._id} />}
+          {tab === "leave" && !isSA && (
+            <LeaveBalanceTab leaveBalance={leaveBalance} isLoading={detailLoading} showHeader={false} />
+          )}
+
           {tab === "reviews" && !isSA && <ReviewsTab uid={person._id} role={type} />}
         </div>
       </div>
@@ -533,51 +713,11 @@ function EmployeeDetailPanel({ person, type, onClose }) {
   );
 }
 
-function LeaveTab({ uid }) {
-  const { data: empData, isLoading } = useGetParticularEmployee(uid);
-  const lb = empData?.leaveBalance;
-
-  if (isLoading) return (
-    <div className="flex justify-center pt-9">
-      <div className="w-6 h-6 rounded-full border-2 border-[#730042]/30 border-t-[#730042] animate-spin" />
-    </div>
-  );
-
-  if (!lb) return (
-    <div className="text-xs sm:text-sm text-gray-400 text-center pt-9">No leave data found.</div>
-  );
-
-  const leaveTypes = [
-    ["Casual Leave",    lb.casualLeave,    lb.casualLeaveUsed,    "#10b981"],
-    ["Sick Leave",      lb.sickLeave,      lb.sickLeaveUsed,      "#0ea5e9"],
-    ["Earned Leave",    lb.earnedLeave,    lb.earnedLeaveUsed,    "#6366f1"],
-    ["Maternity Leave", lb.maternityLeave, lb.maternityLeaveUsed, "#ec4899"],
-  ].filter(([, total]) => total !== undefined && total !== null);
-
-  return (
-    <div className="flex flex-col gap-3 min-w-0">
-      {leaveTypes.map(([label, total, used, color]) => {
-        const remaining = (total || 0) - (used || 0);
-        const pct = total ? Math.round(((used || 0) / total) * 100) : 0;
-        return (
-          <div key={label} className="bg-[#fafbfc] rounded-xl border border-gray-100 p-3 sm:p-4 min-w-0">
-            <div className="flex justify-between items-center mb-2 gap-2">
-              <span className="text-xs sm:text-sm font-medium text-slate-900 truncate">{label}</span>
-              <span className="text-[11.5px] text-gray-500 shrink-0" style={{ fontFamily: "'JetBrains Mono',monospace" }}>{used || 0} / {total || 0}</span>
-            </div>
-            <div className="h-1.5 rounded bg-gray-100 overflow-hidden">
-              <div className="h-full rounded transition-all duration-700" style={{ width: `${pct}%`, background: color }} />
-            </div>
-            <div className="text-[11px] sm:text-xs text-gray-400 mt-1.5">{remaining} days remaining</div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function ReviewsTab({ uid, role }) {
-  const fetchFn = role === "manager" ? useGetParticularManager : useGetParticularEmployee;
+  const fetchFn =
+    role === "manager" ? useGetParticularManager :
+    role === "admin"   ? useGetParticularAdmin :
+    useGetParticularEmployee;
   const { data, isLoading } = fetchFn(uid);
   const reviews = data?.reviews || [];
 
@@ -613,10 +753,6 @@ function ReviewsTab({ uid, role }) {
   );
 }
 
-/* ManagerBranch renders a manager node plus (recursively) any sub-managers
-   and employees under it. It owns its own node ref so OrgConnectorGroup
-   can measure exactly where this manager's card sits, and draws its own
-   OrgConnectorGroup for whatever is nested beneath it. */
 function ManagerBranch({ manager, allManagers, employees, matchName, hasQ, parentMatched, onNodeClick, delay = 0 }) {
   const nodeRef = useRef(null);
   const mgrMatch  = hasQ && matchName(manager.f_name, manager.l_name, manager.department, manager.designation);
@@ -676,9 +812,6 @@ function ManagerBranch({ manager, allManagers, employees, matchName, hasQ, paren
   );
 }
 
-// Thin wrapper so a leaf employee card also owns a ref the same way a
-// branch does - keeps OrgConnectorGroup's "measure my first child" rule
-// consistent whether the row item is a leaf or a whole nested branch.
 function EmployeeBranch({ employee, delay, highlighted, dimmed, onClick }) {
   const nodeRef = useRef(null);
   return (
@@ -688,8 +821,6 @@ function EmployeeBranch({ employee, delay, highlighted, dimmed, onClick }) {
   );
 }
 
-// AdminBranch mirrors ManagerBranch one level up: an admin card plus
-// (via OrgConnectorGroup) the row of managers reporting to it.
 function AdminBranch({ admin, managers, employees, matchName, hasQ, onNodeClick, delay = 0 }) {
   const nodeRef = useRef(null);
   const admMatch  = hasQ && matchName(admin.f_name, admin.l_name, "", admin.designation);
@@ -783,6 +914,58 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
           </div>
         )
       )}
+
+      <OrphanNotice admins={admins} managers={managers} employees={employees} onNodeClick={onNodeClick} />
+    </div>
+  );
+}
+
+function OrphanNotice({ admins, managers, employees, onNodeClick }) {
+  const adminIdSet   = new Set(admins.map((a) => idStr(a._id)));
+  const managerIdSet = new Set(managers.map((m) => idStr(m._id)));
+
+  const orphanManagers = managers.filter((m) => {
+    if (m.reporting_manager_model === "Admin")   return !adminIdSet.has(idStr(m.reporting_manager));
+    if (m.reporting_manager_model === "Manager") return !managerIdSet.has(idStr(m.reporting_manager));
+    return true;
+  });
+
+  const orphanEmployees = employees.filter((e) => !managerIdSet.has(idStr(e.Under_manager)));
+
+  const total = orphanManagers.length + orphanEmployees.length;
+  if (total === 0) return null;
+
+  return (
+    <div className="mt-9 w-full max-w-xl mx-auto px-4 sm:px-5 py-3 sm:py-4 rounded-xl border-[1.5px] border-dashed border-amber-300 bg-amber-50 min-w-0">
+      <p className="text-xs sm:text-sm font-semibold text-amber-800">
+        {total} unassigned {total === 1 ? "record" : "records"} not shown in the chart above
+      </p>
+      <p className="text-[11px] sm:text-xs text-amber-700 mt-1">
+        {orphanManagers.length > 0 && `${orphanManagers.length} manager${orphanManagers.length !== 1 ? "s" : ""}`}
+        {orphanManagers.length > 0 && orphanEmployees.length > 0 && " and "}
+        {orphanEmployees.length > 0 && `${orphanEmployees.length} employee${orphanEmployees.length !== 1 ? "s" : ""}`}
+        {" "}reference a manager/admin that no longer exists or was never set. Click a name to open and reassign.
+      </p>
+      <div className="flex flex-wrap gap-1.5 mt-2.5">
+        {orphanManagers.map((m) => (
+          <button
+            key={m._id}
+            onClick={() => onNodeClick(m, "manager")}
+            className="text-[11px] px-2.5 py-1 rounded-full bg-white border border-amber-300 text-amber-800 font-medium hover:bg-amber-100 transition-colors"
+          >
+            {fullName(m)} · Manager
+          </button>
+        ))}
+        {orphanEmployees.map((e) => (
+          <button
+            key={e._id}
+            onClick={() => onNodeClick(e, "employee")}
+            className="text-[11px] px-2.5 py-1 rounded-full bg-white border border-amber-300 text-amber-800 font-medium hover:bg-amber-100 transition-colors"
+          >
+            {fullName(e)} · Employee
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -812,7 +995,10 @@ export default function SuperAdminOrgChart() {
   }, [mgrData]);
   const employees  = useMemo(() => {
     const raw = empData?.users || empData || [];
-    return Array.isArray(raw) ? raw : [];
+    const list = Array.isArray(raw) ? raw : [];
+    return list.some((p) => p?.type)
+      ? list.filter((p) => p.type === "employee")
+      : list;
   }, [empData]);
 
   const orgName  = orgData?.organisation_name || superAdmin?.organisation_name || "Organisation";

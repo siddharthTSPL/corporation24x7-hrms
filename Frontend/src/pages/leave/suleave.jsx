@@ -37,12 +37,12 @@ const LEAVE_META = {
 
 const STATUS_META = {
   pending:                        { label: "Pending",           bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
-  forwarded_reporting_manager:    { label: "Fwd by Manager",    bg: "#EFF6FF", color: "#1D4ED8", dot: "#3B82F6" },
-  approved_reporting_manager:     { label: "Approved",          bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
-  rejected_reporting_manager:     { label: "Rejected",          bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
-  pending_reporting_manager:      { label: "Pending Review",    bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
-  approved_manager:               { label: "Mgr Approved",      bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
-  rejected_manager:               { label: "Mgr Rejected",      bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  forwarded_reporting_manager:    { label: "Forwarded to Reporting Manager", bg: "#EFF6FF", color: "#1D4ED8", dot: "#3B82F6" },
+  approved_reporting_manager:     { label: "Approved by Reporting Manager",  bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_reporting_manager:     { label: "Rejected by Reporting Manager",  bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  pending_reporting_manager:      { label: "Pending Review",                 bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
+  approved_manager:               { label: "Approved by Manager",            bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_manager:               { label: "Rejected by Manager",            bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
   pending_manager:                { label: "Pending Manager",   bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
   pending_admin:                  { label: "Pending Admin",     bg: "#FFF7ED", color: "#9A3412", dot: "#F97316" },
   approved_admin:                 { label: "Approved by Admin", bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
@@ -78,6 +78,30 @@ const isTerminalStatus = (status) =>
 const humanizeStatus = (s = "") =>
   s.split("_").filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 
+const ROLE_LABEL = { Manager: "Manager", Admin: "Admin", SuperAdmin: "Super Admin" };
+
+// Builds a full "Approved/Rejected by <Role> — <Name>" line from populated data.
+// Returns null (never "Unknown") when there isn't enough real data to show.
+const decisionInfo = (leave) => {
+  const isRejected = leave.status?.startsWith("rejected");
+  const isApproved = leave.status?.startsWith("approved");
+  if (!isRejected && !isApproved) return null;
+
+  const actor = isRejected ? leave.rejectedBy : leave.approvedBy;
+  const actorModel = isRejected ? leave.rejectedByModel : leave.approvedByModel;
+
+  const person = actor && typeof actor === "object" ? actor : null;
+  const name = person ? `${person.f_name || ""} ${person.l_name || ""}`.trim() : "";
+  const role = actorModel ? (ROLE_LABEL[actorModel] || actorModel) : (leave.admin !== undefined ? "Super Admin" : "");
+
+  if (!name && !role) return null;
+
+  const action = isRejected ? "Rejected" : "Approved";
+  if (name && role) return `${action} by ${role} — ${name}`;
+  if (name) return `${action} by ${name}`;
+  return `${action} by ${role}`;
+};
+
 const csvEscape = (val) => `"${String(val ?? "").replace(/"/g, '""')}"`;
 
 const downloadCSV = (headers, rows, filename) => {
@@ -100,7 +124,7 @@ const exportLeavesToCSV = (leaves, filename, personKey) => {
   ];
   const rows = leaves.map((l) => {
     const person = l[personKey] || l.employee || l.manager || l.admin || {};
-    const decidedBy = l.approvedByModel || l.rejectedByModel || "—";
+    const decidedBy = decisionInfo(l) || "—";
     return [
       csvEscape(`${person.f_name || ""} ${person.l_name || ""}`.trim() || "—"),
       csvEscape(person.empid || "—"),
@@ -331,32 +355,47 @@ const SummaryStrip = ({ stats }) => (
   </div>
 );
 
-const PersonCard = ({ person, accentBadge }) => (
-  <div className="flex items-center gap-3 sm:gap-4 mb-3 min-w-0">
-    <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 text-white text-sm font-bold shadow-md"
-      style={{ background: avatarColor(person.f_name || "A") }}>
-      {initials(person.f_name, person.l_name)}
-    </div>
-    <div className="min-w-0 flex-1">
-      <div className="text-sm font-semibold text-gray-800 truncate">
-        {person.f_name} {person.l_name}
+const PersonCard = ({ person, accentBadge, fallbackName, fallbackEmail, fallbackRole }) => {
+  const hasLivePerson = !!(person?.f_name || person?.l_name);
+  const personName = hasLivePerson ? `${person.f_name} ${person.l_name}`.trim() : (fallbackName || "");
+  const personEmail = person?.work_email || fallbackEmail || "";
+  const hasPerson = !!personName;
+  const roleChanged = !hasLivePerson && hasPerson;
+  return (
+    <div className="flex items-center gap-3 sm:gap-4 mb-3 min-w-0">
+      <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 text-white text-sm font-bold shadow-md"
+        style={{ background: avatarColor(personName || "A") }}>
+        {initials(...personName.split(" "))}
       </div>
-      <div className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
-        <span className="truncate">{person.work_email}</span>
-        {person.designation && (
-          <span className="px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-semibold shrink-0">
-            {person.designation}
-          </span>
-        )}
-        {accentBadge && (
-          <span className="px-1.5 py-0.5 rounded-md bg-gradient-to-br from-pink-50 to-pink-100 text-[#730042] text-[10px] font-bold border border-pink-200 shrink-0">
-            {accentBadge}
-          </span>
-        )}
+      <div className="min-w-0 flex-1">
+        <div className={`text-sm font-semibold truncate ${hasPerson ? "text-gray-800" : "text-gray-400 italic"}`}>
+          {hasPerson ? personName : `Unknown ${fallbackRole || "User"}`}
+        </div>
+        <div className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+          <span className="truncate">{personEmail || (hasPerson ? "" : "Profile unavailable")}</span>
+          {person?.designation && (
+            <span className="px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-semibold shrink-0">
+              {person.designation}
+            </span>
+          )}
+          {roleChanged && (
+            <span
+              className="px-1.5 py-0.5 rounded-md bg-orange-50 text-orange-700 text-[10px] font-semibold shrink-0"
+              title={`This person was a ${fallbackRole || "different role"} when this leave was applied, but their role has changed since.`}
+            >
+              Was {fallbackRole || "different role"}
+            </span>
+          )}
+          {accentBadge && (
+            <span className="px-1.5 py-0.5 rounded-md bg-gradient-to-br from-pink-50 to-pink-100 text-[#730042] text-[10px] font-bold border border-pink-200 shrink-0">
+              {accentBadge}
+            </span>
+          )}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const ActionButtons = ({ onApprove, onReject }) => (
   <div className="flex sm:flex-col gap-2 w-full sm:w-auto shrink-0">
@@ -403,7 +442,13 @@ const LeaveCard = ({ leave, person, accentBadge, actionable, processingId, onApp
       <div className="absolute top-0 left-0 w-1 bottom-0 rounded-l-2xl" style={{ background: accent }} />
       
       <div className="flex-1 min-w-0 w-full pl-2">
-        <PersonCard person={person} accentBadge={accentBadge} />
+        <PersonCard
+          person={person}
+          accentBadge={accentBadge}
+          fallbackName={leave.applicantName}
+          fallbackEmail={leave.applicantEmail}
+          fallbackRole={leave.applicantRole}
+        />
         <div className="flex gap-1.5 flex-wrap mb-2.5">
           <TypeBadge type={leave.leaveType} />
           <StatusBadge status={leave.status} />
@@ -425,6 +470,11 @@ const LeaveCard = ({ leave, person, accentBadge, actionable, processingId, onApp
         {leave.remarks && (
           <div className="bg-blue-50/50 rounded-xl px-3.5 py-2.5 text-xs text-blue-800 mt-2 border-l-4 border-blue-300 leading-relaxed">
             <span className="text-blue-600 font-semibold">Remarks — </span>{leave.remarks}
+          </div>
+        )}
+        {decisionInfo(leave) && (
+          <div className="bg-rose-50/50 rounded-xl px-3.5 py-2.5 text-xs text-rose-800 mt-2 border-l-4 border-rose-300 leading-relaxed">
+            <span className="text-rose-700 font-semibold">Decision — </span>{decisionInfo(leave)}
           </div>
         )}
       </div>

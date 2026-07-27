@@ -16,7 +16,7 @@ import { Country, State, City } from "country-state-city";
 import { useGetMeSuperAdmin } from "../../auth/server-state/superadmin/auth/suauth.hook";
 import { SuperAdminAssetReturnWarning } from "../asset/superadminasset";
 import {
-  useGetTodayCheckins, useGetNoOfEmployees, useGetAllEmployees,
+  useGetTodayCheckins, useGetAttendanceOverview, useGetAttendanceHistory, useGetNoOfEmployees, useGetAllEmployees,
   useDeleteEmployee, useAddEmployee, useAddManager, useEditEmployee,
   useGetPermissions, useUpdatePermissions, useSetAdminWorkingStatus,
   useSuperAdminActiveUserCount,
@@ -24,6 +24,8 @@ import {
 import { useShowAllLeaves, useAcceptLeaveByAdmin, useRejectLeaveByAdmin } from "../../auth/server-state/superadmin/leave/suleave.hook";
 import { useGetAllAnnouncements, useCreateAnnouncement, useUpdateAnnouncement, useDeleteAnnouncement } from "../../auth/server-state/superadmin/announcement/suannouncement.hook";
 import { useGetAllAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin, useReviewToAdmin } from "../../auth/server-state/superadmin/other/suother.hook";
+import AttendanceDetailsModal from "./AttendanceDetailsModal";
+import { getAttendanceHistory as fetchEmployeeAttendanceHistory } from "../../auth/api/superadmin/other/su.other";
 
 const DEPT_OPTIONS = [ "OPR","BPO", "ENG", "HR", "MGMT"];
 export const DEPT_FULL_FORMS = {
@@ -1422,32 +1424,81 @@ const AttendanceMap = ({ checkins = [], loading }) => {
     markRef.current.forEach((m) => map.removeLayer(m));
     markRef.current = [];
     if (!checkins.length) return;
+
+    // Group check-ins that share (roughly) the same spot so overlapping
+    // pins merge into one cluster marker instead of hiding one another.
+    const groups = new Map();
+    checkins.forEach((c) => {
+      if (!c.lat || !c.lng) return;
+      const key = `${Number(c.lat).toFixed(4)},${Number(c.lng).toFixed(4)}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(c);
+    });
+
     const bounds = [];
-    checkins.forEach(({ lat, lng, name, role, dept, email, checkIn, checkedOut }) => {
-      if (!lat || !lng) return;
-      const color = ROLE_COLOR[role?.toLowerCase()] ?? ROLE_COLOR.employee;
-      const sz = role?.toLowerCase() === "manager" ? 16 : 12;
+    const initials = (n) => (n || "?").trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("");
+
+    const personRow = (p) => {
+      const color = ROLE_COLOR[p.role?.toLowerCase()] ?? ROLE_COLOR.employee;
+      return `<div style="display:flex;gap:9px;align-items:flex-start;padding:8px 4px;border-bottom:1px solid #f1e0ea;">
+        <div style="flex:0 0 auto;width:30px;height:30px;border-radius:50%;background:${color};color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px ${color}55;">${initials(p.name)}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-weight:700;font-size:12.5px;color:#0d0209;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name || "Unknown"}</span>
+            <span style="font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:999px;background:${color}17;color:${color};text-transform:capitalize;flex:0 0 auto;">${p.role || ""}</span>
+          </div>
+          ${p.dept ? `<div style="font-size:10.5px;color:#8a6070;margin-top:1px;">${p.dept}</div>` : ""}
+          ${p.email ? `<div style="font-size:10.5px;color:#8a6070;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">✉ ${p.email}</div>` : ""}
+          <div style="font-size:10.5px;margin-top:3px;display:flex;align-items:center;gap:8px;">
+            <span style="color:#0d0209;">✅ ${fmtTime(p.checkIn)}</span>
+            ${p.checkedOut ? `<span style="color:#0d9e6e;font-weight:600;">🏁 Checked out</span>` : `<span style="color:#b8760a;font-weight:600;">🟡 On duty</span>`}
+          </div>
+        </div>
+      </div>`;
+    };
+
+    groups.forEach((people) => {
+      const { lat, lng } = people[0];
+      const allCheckedOut = people.every((p) => p.checkedOut);
+      const hasManager = people.some((p) => p.role?.toLowerCase() === "manager");
+      const color = hasManager ? ROLE_COLOR.manager : ROLE_COLOR.employee;
+      const count = people.length;
+      const sz = count > 1 ? 22 : (hasManager ? 16 : 12);
       const pulse = sz + 16;
+
       const icon = window.L.divIcon({
         className: "",
         html: `<div style="position:relative;width:${pulse}px;height:${pulse}px;">
           <div style="position:absolute;top:50%;left:50%;width:${pulse}px;height:${pulse}px;border-radius:50%;background:${color}33;animation:mPulse 2.2s infinite;transform:translate(-50%,-50%);"></div>
-          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${sz}px;height:${sz}px;border-radius:50%;background:${color};border:2.5px solid white;box-shadow:0 2px 10px ${color}66;${checkedOut ? "opacity:.45;" : ""}"></div>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);min-width:${sz}px;height:${sz}px;padding:0 3px;border-radius:${count > 1 ? "9px" : "50%"};background:${color};border:2.5px solid white;box-shadow:0 2px 10px ${color}66;${allCheckedOut ? "opacity:.45;" : ""}${count > 1 ? "display:flex;align-items:center;justify-content:center;color:#fff;font-size:10.5px;font-weight:700;font-family:system-ui,sans-serif;" : ""}">${count > 1 ? count : ""}</div>
         </div>`,
         iconSize: [pulse, pulse], iconAnchor: [pulse / 2, pulse / 2],
       });
+
+      const popupHtml = count > 1
+        ? `<div style="font-family:system-ui,sans-serif;padding:2px;min-width:230px;max-width:260px;">
+            <div style="font-weight:700;font-size:12.5px;color:${color};margin-bottom:2px;display:flex;align-items:center;justify-content:between;gap:6px;">
+              <span>📍 ${count} people here</span>
+            </div>
+            <div style="max-height:260px;overflow-y:auto;margin-top:4px;">
+              ${people.map(personRow).join("")}
+            </div>
+          </div>`
+        : `<div style="font-family:system-ui,sans-serif;padding:4px;min-width:170px;">
+            <div style="font-weight:700;font-size:13px;color:${color};margin-bottom:4px;">${people[0].name || "Unknown"}</div>
+            <div style="font-size:11px;color:#8a6070;margin-bottom:6px;text-transform:capitalize;">${people[0].role ?? ""}${people[0].dept ? " · " + people[0].dept : ""}</div>
+            ${people[0].email ? `<div style="font-size:11px;color:#8a6070;margin-bottom:4px;">✉ ${people[0].email}</div>` : ""}
+            <div style="font-size:11px;">✅ Check-in: <strong>${fmtTime(people[0].checkIn)}</strong></div>
+            ${people[0].checkedOut ? `<div style="font-size:11px;color:#0d9e6e;margin-top:2px;">🏁 Checked out</div>` : `<div style="font-size:11px;color:#b8760a;margin-top:2px;">🟡 On duty</div>`}
+          </div>`;
+
       const marker = window.L.marker([lat, lng], { icon })
-        .bindPopup(`<div style="font-family:system-ui,sans-serif;padding:4px;min-width:170px;">
-          <div style="font-weight:700;font-size:13px;color:${color};margin-bottom:4px;">${name || "Unknown"}</div>
-          <div style="font-size:11px;color:#8a6070;margin-bottom:6px;text-transform:capitalize;">${role ?? ""}${dept ? " · " + dept : ""}</div>
-          ${email ? `<div style="font-size:11px;color:#8a6070;margin-bottom:4px;">✉ ${email}</div>` : ""}
-          <div style="font-size:11px;">✅ Check-in: <strong>${fmtTime(checkIn)}</strong></div>
-          ${checkedOut ? `<div style="font-size:11px;color:#0d9e6e;margin-top:2px;">🏁 Checked out</div>` : `<div style="font-size:11px;color:#b8760a;margin-top:2px;">🟡 On duty</div>`}
-        </div>`, { closeButton: false, maxWidth: 220 })
+        .bindPopup(popupHtml, { closeButton: true, maxWidth: 280 })
         .addTo(map);
       markRef.current.push(marker);
       bounds.push([lat, lng]);
     });
+
     if (bounds.length) {
       try { map.fitBounds(bounds, { padding: [40, 40], maxZoom: 10 }); } catch (_) {}
     }
@@ -1542,6 +1593,7 @@ function SuperAdminDashboard() {
   const [leaveTab, setLeaveTab] = useState("admin");
   const [empExpand, setEmpExpand] = useState(false);
   const [empSearch, setEmpSearch] = useState("");
+  const [attendanceDetailsOpen, setAttendanceDetailsOpen] = useState(false);
 
   useEffect(() => {
     const REFRESH_FLAG_KEY = "dashboardAutoRefreshed";
@@ -1581,7 +1633,9 @@ function SuperAdminDashboard() {
   const employees = Array.isArray(empData?.users) ? empData.users : Array.isArray(empData) ? empData : [];
   const departments = Array.isArray(deptData?.departments) ? deptData.departments : [];
   const totalEmpCount = deptData?.totalEmployees ?? employees.length;
-  const announcements = Array.isArray(annRaw?.announcements) ? annRaw.announcements : Array.isArray(annRaw) ? annRaw : [];
+  const announcements = (Array.isArray(annRaw?.announcements) ? annRaw.announcements : Array.isArray(annRaw) ? annRaw : [])
+  .slice()
+  .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   const adminLeaves = Array.isArray(leavesRaw?.adminLeaves?.leaves) ? leavesRaw.adminLeaves.leaves : [];
   const activeLeaves = adminLeaves;
@@ -1638,7 +1692,7 @@ function SuperAdminDashboard() {
       icon: <FaToggleOn />,
       label: "Active Users",
       value: activeUserLoading ? "—" : `${activeUserCount}/${allowedUsers}`,
-      sub: activeUserLoading ? "Loading…" : isAtLimit ? "Seat limit reached" : isNearLimit ? "Approaching limit" : `${allowedUsers - activeUserCount} seats remaining`,
+      sub: activeUserLoading ? "Loading…" : isAtLimit ? "User limit reached" : isNearLimit ? "Approaching limit" : `${allowedUsers - activeUserCount} seats remaining`,
       color: activeUserColor,
       bgColor: isAtLimit ? "#fce8e6" : isNearLimit ? "#fff8e1" : "#f7ecf3",
       bar: activeUserLoading ? null : userUsagePercent,
@@ -1748,6 +1802,9 @@ function SuperAdminDashboard() {
               <button onClick={() => setReviewModal(true)} className="flex items-center gap-1.5 bg-white/15 border border-white/25 text-white px-3 py-2 rounded-xl text-[12px] font-semibold hover:bg-white/25 transition-colors backdrop-blur-sm min-h-[44px]">
                 <FaStar size={9} /> Review
               </button>
+              <a href="https://torchxsuite.com/login" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 bg-white/15 border border-white/25 text-white px-3 py-2 rounded-xl text-[12px] font-semibold hover:bg-white/25 transition-colors backdrop-blur-sm min-h-[44px]">
+                <FaGlobe size={9} /> Access TorchX Store
+              </a>
             </div>
           </div>
 
@@ -1764,6 +1821,9 @@ function SuperAdminDashboard() {
             <button onClick={() => setReviewModal(true)} className="flex-1 flex items-center justify-center gap-1.5 bg-white/15 border border-white/25 text-white px-3 py-2.5 rounded-xl text-[12px] font-semibold hover:bg-white/25 transition-colors backdrop-blur-sm min-h-[44px]">
               <FaStar size={9} /> Review
             </button>
+            <a href="https://torchxsuite.com/login" target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1.5 bg-white/15 border border-white/25 text-white px-3 py-2.5 rounded-xl text-[12px] font-semibold hover:bg-white/25 transition-colors backdrop-blur-sm min-h-[44px]">
+              <FaGlobe size={9} /> Store
+            </a>
           </div>
         </div>
       </div>
@@ -1772,17 +1832,26 @@ function SuperAdminDashboard() {
         {stats.map((s, i) => <StatCard key={i} {...s} />)}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 sm:gap-5 mb-4 sm:mb-5">
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 sm:gap-5 mb-4 sm:mb-5 items-start">
         <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden">
           <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#e8d5e2] flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
               <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
               <span className="font-bold text-[13px] sm:text-[15px] text-[#0d0209] truncate">Live Attendance Map</span>
             </div>
-            <span className="text-[10px] sm:text-[11px] text-[#c499b4] font-medium flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
-              <FaMapMarkerAlt size={9} />
-              {mapLoading ? "Loading…" : `${checkins.length} today`}
-            </span>
+            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+              <span className="text-[10px] sm:text-[11px] text-[#c499b4] font-medium flex items-center gap-1 sm:gap-1.5">
+                <FaMapMarkerAlt size={9} />
+                {mapLoading ? "Loading…" : `${checkins.length} today`}
+              </span>
+              <button
+                onClick={() => setAttendanceDetailsOpen(true)}
+                className="text-[10px] sm:text-[11px] font-semibold text-white rounded-lg px-2.5 sm:px-3 py-1.5 flex items-center gap-1.5 hover:opacity-90 transition-opacity whitespace-nowrap"
+                style={{ background: "linear-gradient(135deg, #730042 0%, #9B2554 100%)" }}
+              >
+                <FaChartBar size={9} /> Attendance Details
+              </button>
+            </div>
           </div>
           <div className="h-[240px] sm:h-[300px]">
             <AttendanceMap checkins={checkins} loading={mapLoading} />
@@ -1799,6 +1868,90 @@ function SuperAdminDashboard() {
             </div>
             <span className="ml-auto text-[10px] sm:text-[11px] text-[#c499b4]">Click pin for details</span>
           </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden flex flex-col max-h-[420px]">
+          <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#e8d5e2] flex items-center justify-between flex-shrink-0">
+            <div className="flex items-center gap-2 sm:gap-2.5">
+              <FaBullhorn size={12} className="text-[#730042]" />
+              <span className="font-bold text-[13px] sm:text-[15px] text-[#0d0209]">Announcements</span>
+            </div>
+            <button onClick={() => setAnnModal({ open: true, editing: null })} className="flex items-center gap-1 sm:gap-1.5 bg-[#730042] text-white px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-[12px] font-semibold hover:bg-[#4a0029] transition-colors min-h-[36px]">
+              <FaPlus size={9} /> New
+            </button>
+          </div>
+          {annLoading ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4]">
+              <span className="text-2xl">⏳</span><p className="text-[12px]">Loading…</p>
+            </div>
+          ) : announcements.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4] text-center px-4">
+              <FaBullhorn size={24} /><p className="text-[12px]">No announcements yet. Publish one to notify your team.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-[#f7ecf3] overflow-y-auto flex-1 min-h-0">
+              {announcements.map((ann) => {
+                const priority = (ann.priority || "normal").toLowerCase();
+                const audience = ann.audience || "all";
+                return (
+                  <div key={ann._id} className="px-4 sm:px-5 py-3 sm:py-4 hover:bg-[#fdf5f9] transition-colors">
+                    <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 flex-wrap">
+                      <span className={`text-[9px] sm:text-[10px] font-bold tracking-wide uppercase px-2 sm:px-2.5 py-0.5 rounded-full ${priorityChipCls(priority)}`}>
+                        {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                      </span>
+                      <span className="text-[9px] sm:text-[10px] font-semibold bg-gray-50 text-gray-500 border border-gray-200 px-2 sm:px-2.5 py-0.5 rounded-full uppercase">{audience}</span>
+                    </div>
+                    <p className="text-[12px] sm:text-[13px] font-semibold text-[#0d0209] mb-1">{ann.title}</p>
+                    <p className="text-[11px] sm:text-[12px] text-[#7a5568] leading-relaxed line-clamp-2">{ann.message}</p>
+                    <div className="flex gap-1.5 sm:gap-2 mt-2 sm:mt-3 pt-2 sm:pt-2.5 border-t border-[#f7ecf3]">
+                      <button onClick={() => setAnnModal({ open: true, editing: ann })} className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] text-[#c499b4] hover:text-[#730042] hover:bg-[#f7ecf3] px-1.5 sm:px-2 py-1 rounded-lg transition-colors font-medium min-h-[32px]">
+                        <FaEdit size={9} /> Edit
+                      </button>
+                      <button onClick={() => { if (window.confirm("Delete this announcement?")) deleteAnn(ann._id); }} className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] text-[#c499b4] hover:text-red-600 hover:bg-red-50 px-1.5 sm:px-2 py-1 rounded-lg transition-colors font-medium min-h-[32px]">
+                        <FaTrash size={9} /> Delete
+                      </button>
+                      {ann.expiresAt && (
+                        <span className="ml-auto text-[9px] sm:text-[10px] text-[#c499b4] self-center">Expires {fmtDate(ann.expiresAt)}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 mb-4 sm:mb-5">
+        <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden">
+          <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#e8d5e2] flex items-center justify-between">
+            <div className="flex items-center gap-2 sm:gap-2.5">
+              <FaLayerGroup size={12} className="text-[#730042]" />
+              <span className="font-bold text-[13px] sm:text-[15px] text-[#0d0209]">Department Breakdown</span>
+            </div>
+            <span className="text-[10px] sm:text-[11px] text-[#c499b4] font-semibold">{deptLoading ? "…" : `${totalEmpCount} total`}</span>
+          </div>
+          {deptLoading ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4]">
+              <span className="text-2xl">⏳</span><p className="text-[12px]">Loading…</p>
+            </div>
+          ) : departments.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4]">
+              <FaChartBar size={24} /><p className="text-[12px]">No departments yet.</p>
+            </div>
+          ) : (
+            <div>
+              {departments.map((dep) => (
+                <div key={dep.department} className="px-4 sm:px-5 py-2.5 sm:py-3 border-b border-[#f7ecf3] last:border-0 flex items-center gap-3 sm:gap-4">
+                  <p className="text-[11px] sm:text-[12px] font-semibold text-[#0d0209] w-24 sm:w-32 flex-shrink-0 truncate" title={getDepartmentName(dep.department)}>{getDepartmentName(dep.department)}</p>
+                  <div className="flex-1 h-2 bg-[#e8d5e2] rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-[#4a0029] to-[#cd166e] transition-all duration-1000" style={{ width: `${Math.round((dep.lastNumber / maxDept) * 100)}%` }} />
+                  </div>
+                  <p className="text-[12px] sm:text-[13px] font-bold text-[#730042] w-5 sm:w-6 text-right flex-shrink-0">{dep.lastNumber}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden flex flex-col">
@@ -1880,7 +2033,7 @@ function SuperAdminDashboard() {
             <span className="font-bold text-[13px] sm:text-[15px] text-[#0d0209]">Admin Management</span>
             {isAtLimit && (
               <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full">
-                <FaCrown size={8} /> Seat limit reached
+                <FaCrown size={8} /> User limit reached
               </span>
             )}
           </div>
@@ -1977,90 +2130,6 @@ function SuperAdminDashboard() {
             })}
           </div>
         )}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 mb-4 sm:mb-5">
-        <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden">
-          <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#e8d5e2] flex items-center justify-between">
-            <div className="flex items-center gap-2 sm:gap-2.5">
-              <FaLayerGroup size={12} className="text-[#730042]" />
-              <span className="font-bold text-[13px] sm:text-[15px] text-[#0d0209]">Department Breakdown</span>
-            </div>
-            <span className="text-[10px] sm:text-[11px] text-[#c499b4] font-semibold">{deptLoading ? "…" : `${totalEmpCount} total`}</span>
-          </div>
-          {deptLoading ? (
-            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4]">
-              <span className="text-2xl">⏳</span><p className="text-[12px]">Loading…</p>
-            </div>
-          ) : departments.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4]">
-              <FaChartBar size={24} /><p className="text-[12px]">No departments yet.</p>
-            </div>
-          ) : (
-            <div>
-              {departments.map((dep) => (
-                <div key={dep.department} className="px-4 sm:px-5 py-2.5 sm:py-3 border-b border-[#f7ecf3] last:border-0 flex items-center gap-3 sm:gap-4">
-                  <p className="text-[11px] sm:text-[12px] font-semibold text-[#0d0209] w-24 sm:w-32 flex-shrink-0 truncate" title={getDepartmentName(dep.department)}>{getDepartmentName(dep.department)}</p>
-                  <div className="flex-1 h-2 bg-[#e8d5e2] rounded-full overflow-hidden">
-                    <div className="h-full rounded-full bg-gradient-to-r from-[#4a0029] to-[#cd166e] transition-all duration-1000" style={{ width: `${Math.round((dep.lastNumber / maxDept) * 100)}%` }} />
-                  </div>
-                  <p className="text-[12px] sm:text-[13px] font-bold text-[#730042] w-5 sm:w-6 text-right flex-shrink-0">{dep.lastNumber}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden">
-          <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#e8d5e2] flex items-center justify-between">
-            <div className="flex items-center gap-2 sm:gap-2.5">
-              <FaBullhorn size={12} className="text-[#730042]" />
-              <span className="font-bold text-[13px] sm:text-[15px] text-[#0d0209]">Announcements</span>
-            </div>
-            <button onClick={() => setAnnModal({ open: true, editing: null })} className="flex items-center gap-1 sm:gap-1.5 bg-[#730042] text-white px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-[12px] font-semibold hover:bg-[#4a0029] transition-colors min-h-[36px]">
-              <FaPlus size={9} /> New
-            </button>
-          </div>
-          {annLoading ? (
-            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4]">
-              <span className="text-2xl">⏳</span><p className="text-[12px]">Loading…</p>
-            </div>
-          ) : announcements.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#c499b4] text-center px-4">
-              <FaBullhorn size={24} /><p className="text-[12px]">No announcements yet. Publish one to notify your team.</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-[#f7ecf3]">
-              {announcements.slice(0, 5).map((ann) => {
-                const priority = (ann.priority || "normal").toLowerCase();
-                const audience = ann.audience || "all";
-                return (
-                  <div key={ann._id} className="px-4 sm:px-5 py-3 sm:py-4 hover:bg-[#fdf5f9] transition-colors">
-                    <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 flex-wrap">
-                      <span className={`text-[9px] sm:text-[10px] font-bold tracking-wide uppercase px-2 sm:px-2.5 py-0.5 rounded-full ${priorityChipCls(priority)}`}>
-                        {priority.charAt(0).toUpperCase() + priority.slice(1)}
-                      </span>
-                      <span className="text-[9px] sm:text-[10px] font-semibold bg-gray-50 text-gray-500 border border-gray-200 px-2 sm:px-2.5 py-0.5 rounded-full uppercase">{audience}</span>
-                    </div>
-                    <p className="text-[12px] sm:text-[13px] font-semibold text-[#0d0209] mb-1">{ann.title}</p>
-                    <p className="text-[11px] sm:text-[12px] text-[#7a5568] leading-relaxed line-clamp-2">{ann.message}</p>
-                    <div className="flex gap-1.5 sm:gap-2 mt-2 sm:mt-3 pt-2 sm:pt-2.5 border-t border-[#f7ecf3]">
-                      <button onClick={() => setAnnModal({ open: true, editing: ann })} className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] text-[#c499b4] hover:text-[#730042] hover:bg-[#f7ecf3] px-1.5 sm:px-2 py-1 rounded-lg transition-colors font-medium min-h-[32px]">
-                        <FaEdit size={9} /> Edit
-                      </button>
-                      <button onClick={() => { if (window.confirm("Delete this announcement?")) deleteAnn(ann._id); }} className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] text-[#c499b4] hover:text-red-600 hover:bg-red-50 px-1.5 sm:px-2 py-1 rounded-lg transition-colors font-medium min-h-[32px]">
-                        <FaTrash size={9} /> Delete
-                      </button>
-                      {ann.expiresAt && (
-                        <span className="ml-auto text-[9px] sm:text-[10px] text-[#c499b4] self-center">Expires {fmtDate(ann.expiresAt)}</span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-[#e8d5e2] shadow-sm overflow-hidden mb-4 sm:mb-5">
@@ -2177,6 +2246,14 @@ function SuperAdminDashboard() {
       <SuperAdminAssetReturnWarning
         data={assetWarning.data}
         onClose={() => setAssetWarning({ open: false, data: null })}
+      />
+
+      <AttendanceDetailsModal
+        open={attendanceDetailsOpen}
+        onClose={() => setAttendanceDetailsOpen(false)}
+        useOverviewHook={useGetAttendanceOverview}
+        useHistoryHook={useGetAttendanceHistory}
+        fetchHistory={fetchEmployeeAttendanceHistory}
       />
     </div>
   );

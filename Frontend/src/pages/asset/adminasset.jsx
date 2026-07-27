@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   FaPlus, FaTimes, FaCheck, FaEdit, FaTrash, FaSearch, FaFilter,
   FaLaptop, FaDesktop, FaMobileAlt, FaKeyboard, FaMouse, FaHeadphones,
@@ -13,9 +14,12 @@ import {
   useAssignAssetToEmployee,
   useAssignAssetToManager,
   useRevokeAssetAdmin,
+  useGetEmployeesWithAssetsAdmin,
+  useGetEmployeeAssetHistoryAdmin,
 } from "../../auth/server-state/adminasset/adminasset.hook";
 import { useFindAllManagerswithoutAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
 import {  useGetAllEmployee } from "../../auth/server-state/adminother/adminother.hook";
+import EmployeeAssetsPanel from "./EmployeeAssetsPanel";
 const ASSET_TYPES = ["laptop","desktop","monitor","keyboard","mouse","headset","mobile","tablet","other"];
 const CONDITIONS  = ["new","good","fair","poor"];
 const STATUSES    = ["available","assigned","under_maintenance","retired"];
@@ -121,6 +125,12 @@ function activeAssignments(asset) {
   return (asset?.assignments || []).filter((a) => !a.is_returned);
 }
 
+// Display label for assigned_to_model — "User" (the backend/DB model name) is shown as "Employee".
+function roleLabel(model) {
+  if (model === "User") return "Employee";
+  return model || "Unknown";
+}
+
 function AssigneeStack({ asset }) {
   const active = activeAssignments(asset);
   if (active.length === 0) return <span className="text-[#c499b4] text-[12px]">—</span>;
@@ -139,7 +149,7 @@ function AssigneeStack({ asset }) {
               <p className="text-[11px] font-semibold text-[#730042]">
                 {p.f_name} {p.l_name} {a.quantity > 1 ? `× ${a.quantity}` : ""}
               </p>
-              <p className="text-[10px] text-[#993556]">{a.assigned_to_model}</p>
+              <p className="text-[10px] text-[#993556]">{roleLabel(a.assigned_to_model)}</p>
             </div>
           </div>
         );
@@ -149,26 +159,102 @@ function AssigneeStack({ asset }) {
   );
 }
 
+/**
+ * ActionMenu renders its dropdown through a React Portal into document.body,
+ * positioned with `position: fixed` based on the trigger button's bounding rect.
+ * This guarantees the menu is never clipped by an ancestor's `overflow-hidden`
+ * or `overflow-x-auto` (which was happening inside the assets card/table wrapper
+ * on mobile, tablet, and desktop for rows near the container edge).
+ */
 function ActionMenu({ asset, onEdit, onDelete, onAssign, onAssignments }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef();
-  useEffect(() => {
-    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
+
   const canAssign = (asset.available_quantity ?? 0) > 0 && asset.status !== "retired" && asset.status !== "under_maintenance";
   const hasAssignments = (asset.assignments || []).length > 0;
+
+  const MENU_WIDTH = 200;
+  // Menu can show up to 5 rows (Edit, Assign Employee, Assign Manager, Assignments, Delete)
+  const MENU_HEIGHT_ESTIMATE = canAssign ? 230 : 150;
+
+ 
+
+const computePosition = () => {
+  const btn = btnRef.current;
+  if (!btn) return;
+
+  const rect = btn.getBoundingClientRect();
+
+  const viewportW = window.innerWidth;
+  const viewportH = window.innerHeight;
+
+  // Button ke vertical center ke saath align
+  let top = rect.top;
+
+  // Agar niche cut ho raha ho to sirf viewport ke andar rakho
+  if (top + MENU_HEIGHT_ESTIMATE > viewportH - 8) {
+    top = viewportH - MENU_HEIGHT_ESTIMATE - 8;
+  }
+
+  if (top < 8) top = 8;
+
+  // Default -> button ke right side
+  let left = rect.right + 8;
+
+  // Agar right side space nahi hai to left side dikhao
+  if (left + MENU_WIDTH > viewportW - 8) {
+    left = rect.left - MENU_WIDTH - 8;
+  }
+
+  // Agar left side bhi bahar ja raha ho
+  if (left < 8) left = 8;
+
+  setCoords({ top, left });
+};
+
+
+  useEffect(() => {
+    if (!open) return;
+    computePosition();
+    const handleReposition = () => computePosition();
+    window.addEventListener("scroll", handleReposition, true);
+    window.addEventListener("resize", handleReposition);
+    return () => {
+      window.removeEventListener("scroll", handleReposition, true);
+      window.removeEventListener("resize", handleReposition);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    const handleOutside = (e) => {
+      if (
+        btnRef.current && !btnRef.current.contains(e.target) &&
+        menuRef.current && !menuRef.current.contains(e.target)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, []);
+
   return (
-    <div className="relative" ref={ref} onClick={(e) => e.stopPropagation()}>
+    <div onClick={(e) => e.stopPropagation()}>
       <button
+        ref={btnRef}
         onClick={() => setOpen((p) => !p)}
         className="w-8 h-8 rounded-lg flex items-center justify-center text-[#7a5568] border border-[#e8d5e2] hover:bg-[#f7ecf3] hover:text-[#730042] transition-colors"
       >
         <FaEllipsisV size={10} />
       </button>
-      {open && (
-        <div className="absolute right-0 top-9 z-30 bg-white border border-[#e8d5e2] rounded-xl shadow-xl min-w-[190px] py-1 overflow-hidden">
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: "fixed", top: coords.top, left: coords.left, width: MENU_WIDTH }}
+          className="z-[2000] bg-white border border-[#e8d5e2] rounded-xl shadow-xl py-1 overflow-hidden"
+        >
           <button onClick={() => { onEdit(asset); setOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-[#730042] hover:bg-[#f7ecf3]">
             <FaEdit size={10} /> Edit Details
           </button>
@@ -189,7 +275,8 @@ function ActionMenu({ asset, onEdit, onDelete, onAssign, onAssignments }) {
           <button onClick={() => { onDelete(asset); setOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-red-600 hover:bg-red-50">
             <FaTrash size={10} /> Delete
           </button>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -309,9 +396,21 @@ function AssignPersonModal({ open, onClose, asset, assignType, employees, manage
   if (!open || !asset) return null;
 
   const isEmployee = assignType === "employee";
+
+  // Defensive filter: source list (employees/managers) is already role-specific,
+  // but we double-check via `role` field if present, so mixed backend data
+  // never leaks into the wrong dropdown.
   const list = isEmployee
-    ? (employees ?? []).filter((e) => (e.working_status || "working") === "working")
-    : (managers ?? []).filter((m) => (m.working_status || "working") === "working");
+    ? (employees ?? []).filter(
+        (e) =>
+          (e.working_status || "working") === "working" &&
+          (!e.role || e.role === "employee")
+      )
+    : (managers ?? []).filter(
+        (m) =>
+          (m.working_status || "working") === "working" &&
+          (!m.role || m.role === "manager")
+      );
 
   const available = asset.available_quantity ?? 0;
   const qtyNum = Number(quantity);
@@ -496,7 +595,7 @@ function AssignmentsDrawer({ open, onClose, asset, onRevokeClick }) {
                     <div key={a._id} className="p-3 rounded-xl border border-[#e8d5e2] bg-[#fdf5f9] flex items-start justify-between gap-2">
                       <div>
                         <p className="text-[12px] font-bold text-[#0d0209]">{p.f_name} {p.l_name}</p>
-                        <p className="text-[10px] text-[#993556] uppercase tracking-wide">{a.assigned_to_model} · {a.quantity} unit{a.quantity > 1 ? "s" : ""}</p>
+                        <p className="text-[10px] text-[#993556] uppercase tracking-wide">{roleLabel(a.assigned_to_model)} · {a.quantity} unit{a.quantity > 1 ? "s" : ""}</p>
                         <p className="text-[11px] text-[#7a5568] mt-1">
                           Since {a.assigned_date ? new Date(a.assigned_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
                         </p>
@@ -528,7 +627,7 @@ function AssignmentsDrawer({ open, onClose, asset, onRevokeClick }) {
                     <div key={h._id} className="p-3 rounded-xl border border-[#e8d5e2] bg-[#fdf5f9]">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[11px] font-bold text-[#730042] uppercase tracking-wider">
-                          {p.f_name} {p.l_name} · {h.assigned_to_model || "Unknown"}
+                          {p.f_name} {p.l_name} · {roleLabel(h.assigned_to_model)}
                         </span>
                         {h.return_condition && (
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${h.return_condition === "good" ? "bg-emerald-50 text-emerald-700" : h.return_condition === "damaged" ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"}`}>
@@ -631,6 +730,7 @@ export default function AdminAssets() {
   const [filters, setFilters] = useState({ status: "", asset_type: "" });
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [activeTab, setActiveTab] = useState("assets"); // "assets" | "employees"
 
   const { data, isLoading } = useGetAllAssetsAdmin(
     Object.fromEntries(Object.entries(filters).filter(([, v]) => v))
@@ -711,11 +811,11 @@ export default function AdminAssets() {
       const past = (a.assignments || []).filter((x) => x.is_returned);
       const activeStr = active.map((x) => {
         const p = x.assigned_to || {};
-        return `${p.f_name ?? ""} ${p.l_name ?? ""} (${x.assigned_to_model ?? ""}) x${x.quantity ?? 1} since ${x.assigned_date ? new Date(x.assigned_date).toLocaleDateString("en-IN") : "—"}`;
+        return `${p.f_name ?? ""} ${p.l_name ?? ""} (${roleLabel(x.assigned_to_model)}) x${x.quantity ?? 1} since ${x.assigned_date ? new Date(x.assigned_date).toLocaleDateString("en-IN") : "—"}`;
       }).join(" | ");
       const historyStr = past.map((x) => {
         const p = x.assigned_to || {};
-        return `${p.f_name ?? ""} ${p.l_name ?? ""} (${x.assigned_to_model ?? ""}) x${x.quantity ?? 1} · assigned ${x.assigned_date ? new Date(x.assigned_date).toLocaleDateString("en-IN") : "—"} · returned ${x.returned_date ? new Date(x.returned_date).toLocaleDateString("en-IN") : "—"} · condition ${x.return_condition ?? "—"}${x.return_notes ? ` · notes: ${x.return_notes}` : ""}`;
+        return `${p.f_name ?? ""} ${p.l_name ?? ""} (${roleLabel(x.assigned_to_model)}) x${x.quantity ?? 1} · assigned ${x.assigned_date ? new Date(x.assigned_date).toLocaleDateString("en-IN") : "—"} · returned ${x.returned_date ? new Date(x.returned_date).toLocaleDateString("en-IN") : "—"} · condition ${x.return_condition ?? "—"}${x.return_notes ? ` · notes: ${x.return_notes}` : ""}`;
       }).join(" | ");
       return [
         a.asset_id ?? "",
@@ -785,6 +885,31 @@ export default function AdminAssets() {
           ))}
         </div>
 
+        <div className="flex gap-2 mb-4 sm:mb-6 border-b border-[#F4C0D1]">
+          <button
+            onClick={() => setActiveTab("assets")}
+            className={`px-4 py-2.5 text-[13px] font-semibold border-b-2 transition-colors -mb-px min-h-[44px] ${
+              activeTab === "assets" ? "border-[#730042] text-[#730042]" : "border-transparent text-[#993556] hover:text-[#730042]"
+            }`}
+          >
+           All Assets
+          </button>
+          <button
+            onClick={() => setActiveTab("employees")}
+            className={`px-4 py-2.5 text-[13px] font-semibold border-b-2 transition-colors -mb-px min-h-[44px] ${
+              activeTab === "employees" ? "border-[#730042] text-[#730042]" : "border-transparent text-[#993556] hover:text-[#730042]"
+            }`}
+          >
+            Assigned Assets
+          </button>
+        </div>
+
+        {activeTab === "employees" ? (
+          <EmployeeAssetsPanel
+            useEmployees={useGetEmployeesWithAssetsAdmin}
+            useHistory={useGetEmployeeAssetHistoryAdmin}
+          />
+        ) : (
         <div className="bg-white rounded-2xl border border-[#F4C0D1] overflow-hidden">
           <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-[#F4C0D1] bg-[#F9F8F2]">
             <div className="flex gap-2 mb-2">
@@ -885,7 +1010,7 @@ export default function AdminAssets() {
                           <AssigneeStack asset={asset} />
                         </td>
                         <td className="px-4 py-3">
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                         
                             <ActionMenu
                               asset={asset}
                               onEdit={(a) => setFormModal({ open: true, editing: a })}
@@ -893,7 +1018,7 @@ export default function AdminAssets() {
                               onAssign={(a, type) => setAssignModal({ open: true, asset: a, assignType: type })}
                               onAssignments={(a) => setAssignmentsDrawer({ open: true, asset: a })}
                             />
-                          </div>
+                          
                         </td>
                       </tr>
                     ))}
@@ -941,6 +1066,7 @@ export default function AdminAssets() {
             </div>
           )}
         </div>
+        )}
       </div>
 
       <AssetFormModal

@@ -48,7 +48,7 @@ const verifyUserEmail = async (req, res, next) => {
   res
     .status(200)
     .send(
-      `<!DOCTYPE html><html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/></head><body style="margin:0;font-family:Segoe UI,sans-serif;background:linear-gradient(135deg,#730042,#CD166E);height:100vh;display:flex;align-items:center;justify-content:center;"><div style="background:white;padding:50px 40px;border-radius:16px;text-align:center;box-shadow:0 15px 40px rgba(0,0,0,0.2);max-width:420px;width:90%;"><div style="width:70px;height:70px;margin:0 auto 20px;background:#F9F8F2;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;">✅</div><h1 style="color:#730042;margin-bottom:10px;">Email Verified!</h1><p style="color:#555;font-size:15px;line-height:1.6;">Your account has been successfully verified.</p><a href="${process.env.FRONTEND_URL}/login" style="margin-top:25px;display:inline-block;padding:14px 30px;background:#CD166E;color:white;text-decoration:none;border-radius:10px;font-weight:600;box-shadow:0 6px 16px rgba(205,22,110,0.3);">Go to Login →</a><p style="margin-top:20px;font-size:12px;color:#999;">Secure • Fast • Reliable</p></div></body></html>`,
+      `<!DOCTYPE html><html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/></head><body style="margin:0;font-family:Segoe UI,sans-serif;background:linear-gradient(135deg,#730042,#CD166E);height:100vh;display:flex;align-items:center;justify-content:center;"><div style="background:white;padding:50px 40px;border-radius:16px;text-align:center;box-shadow:0 15px 40px rgba(0,0,0,0.2);max-width:420px;width:90%;"><div style="width:70px;height:70px;margin:0 auto 20px;background:#F9F8F2;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;">✅</div><h1 style="color:#730042;margin-bottom:10px;">Email Verified!</h1><p style="color:#555;font-size:15px;line-height:1.6;">Your account has been successfully verified.</p><a href="https://torchxsuite.com/talent/login" style="margin-top:25px;display:inline-block;padding:14px 30px;background:#CD166E;color:white;text-decoration:none;border-radius:10px;font-weight:600;box-shadow:0 6px 16px rgba(205,22,110,0.3);">Go to Login →</a><p style="margin-top:20px;font-size:12px;color:#999;">Secure • Fast • Reliable</p></div></body></html>`,
     );
 };
 
@@ -180,6 +180,7 @@ const token = jwt.sign(
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
     maxAge: 15 * 24 * 60 * 60 * 1000,
   });
 
@@ -202,12 +203,14 @@ const token = jwt.sign(
 const userlogout = async (req, res, next) => {
   if (!req.employee)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  usermodel.findByIdAndUpdate(req.employee._id, { status: "inactive" }).exec();
+  // `status` = account state, checked on every request by the auth
+  // middleware. Do not set it to "inactive" here — see adminlogout note.
   const isProduction = process.env.NODE_ENV === "production";
   res.clearCookie("token", {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
   });
   res.status(200).json({ success: true, message: "Logout successful" });
 };
@@ -390,6 +393,7 @@ const verifyOtp = async (req, res, next) => {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? "none" : "lax",
+    path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -466,7 +470,7 @@ const applyleave = async (req, res, next) => {
 
   const user = await usermodel
     .findOne({ _id: req.employee._id, organisation_id })
-    .select("gender marital_status Under_manager f_name l_name")
+    .select("gender marital_status Under_manager f_name l_name work_email")
     .lean();
   if (!user)
     return next(Object.assign(new Error("User not found"), { statusCode: 404 }));
@@ -521,6 +525,9 @@ const applyleave = async (req, res, next) => {
     organisation_id,
     employee: req.employee._id,
     manager: user.Under_manager,
+    applicantName: `${user.f_name} ${user.l_name || ""}`.trim(),
+    applicantEmail: user.work_email,
+    applicantRole: "Employee",
     leaveType,
     startDate: start,
     endDate: end,
@@ -751,9 +758,20 @@ const editprofile = async (req, res, next) => {
   const {
     personal_contact, e_contact, marital_status, profile_image, gender, office_location,
     resume, aadhaar_card, pan_card, experience_letter,
-    bank_name, account_holder_name, account_number, ifsc_code,
+    bank_name, account_holder_name, account_number, ifsc_code, date_of_joining,
   } = req.body;
   let leaveUpdateRequired = false;
+
+  if (date_of_joining !== undefined) {
+    if (date_of_joining === null || date_of_joining === "") {
+      employee.date_of_joining = null;
+    } else {
+      const parsedDOJ = new Date(date_of_joining);
+      if (isNaN(parsedDOJ.getTime()))
+        return next(Object.assign(new Error("Invalid date of joining"), { statusCode: 400 }));
+      employee.date_of_joining = parsedDOJ;
+    }
+  }
 
   if (personal_contact !== undefined) {
     if (typeof personal_contact !== "string" || !PHONE_REGEX.test(personal_contact))
@@ -789,10 +807,12 @@ const editprofile = async (req, res, next) => {
       employee.marital_status = marital_status;
     }
   }
-  if (office_location !== undefined) {
-    if (!["Noida", "Bareilly", "Delhi", "Mumbai"].includes(office_location))
-      return next(Object.assign(new Error("Invalid office location"), { statusCode: 400 }));
-    employee.office_location = office_location;
+ if (office_location !== undefined) {
+    if (typeof office_location !== "string" || !office_location.trim() || office_location.trim().length > 100)
+      return next(
+        Object.assign(new Error("Office location must be a valid"), { statusCode: 400 }),
+      );
+    employee.office_location = office_location.trim();
   }
   if (profile_image !== undefined) {
     if (typeof profile_image !== "string")
@@ -891,6 +911,7 @@ const editprofile = async (req, res, next) => {
       account_holder_name: employee.account_holder_name,
       account_number: employee.account_number,
       ifsc_code: employee.ifsc_code,
+      date_of_joining: employee.date_of_joining,
     },
   });
 };

@@ -8,6 +8,8 @@ import { toast } from "react-hot-toast";
 import {
   reviewToAdmin,
   getTodayCheckins,
+  getAttendanceOverview,
+  getAttendanceHistory,
   getOrgInfo,
   changeSuperAdminPassword,
   forgotPasswordSuperAdmin,
@@ -38,6 +40,7 @@ import {
   setKioskPassword,
   getLeavePolicy,
   setLeavePolicy,
+  getParticularAdmin
 } from "../../../api/superadmin/other/su.other";
 
 
@@ -59,6 +62,26 @@ export const useGetTodayCheckins = () => {
   });
 };
 
+// Attendance Details modal (Today / Monthly tabs).
+export const useGetAttendanceOverview = ({ type = "today", month, year } = {}, options = {}) => {
+  return useQuery({
+    queryKey: ["attendanceOverview", type, type === "monthly" ? month : null, type === "monthly" ? year : null],
+    queryFn: () => getAttendanceOverview({ type, month, year }),
+    staleTime: 30 * 1000,
+    ...options,
+  });
+};
+
+// "History" button on the Monthly tab — day-wise history for one employee.
+export const useGetAttendanceHistory = (employeeId, { startDate, endDate } = {}, options = {}) => {
+  return useQuery({
+    queryKey: ["attendanceHistory", employeeId, startDate ?? null, endDate ?? null],
+    queryFn: () => getAttendanceHistory(employeeId, { startDate, endDate }),
+    enabled: !!employeeId,
+    staleTime: 30 * 1000,
+    ...options,
+  });
+};
 
 
 export const useGetOrgInfo = () => {
@@ -202,12 +225,13 @@ export const useDeleteAdmin = () => {
 
 
 
-export const useGetAllAdmins = () => {
+export const useGetAllAdmins = (options = {}) => {
   return useQuery({
     queryKey: ["admins"],
     queryFn: getAllAdmins,
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
+    ...options,
   });
 };
 
@@ -245,23 +269,25 @@ export const useAddEmployee = () => {
 
 
 
-export const useGetAllManagers = () => {
+export const useGetAllManagers = (options = {}) => {
   return useQuery({
     queryKey: ["managers"],
     queryFn: getAllManagers,
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
+    ...options,
   });
 };
 
 
 
-export const useGetAllEmployees = () => {
+export const useGetAllEmployees = (options = {}) => {
   return useQuery({
     queryKey: ["employees"],
     queryFn: getAllEmployees,
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
+    ...options,
   });
 };
 
@@ -468,5 +494,15 @@ export const useSetLeavePolicy = () => {
         }
       );
     },
+  });
+};
+
+
+export const useGetParticularAdmin = (uid) => {
+  return useQuery({
+    queryKey: ["admin-detail", uid],
+    queryFn: () => getParticularAdmin(uid),
+    enabled: !!uid,
+    refetchOnWindowFocus: false,
   });
 };

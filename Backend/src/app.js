@@ -7,6 +7,19 @@ const compression = require('compression');
 require('../automatic/autoelcredit');
 require('../automatic/timerautopause');
 require('../automatic/Timesheetescalation');
+const { catchUpMissedRuns } = require('../automatic/Marknoshowabsent');
+catchUpMissedRuns().catch((err) =>
+  console.error('[Startup] catchUpMissedRuns failed:', err.message)
+);
+
+// Same reasoning as catchUpMissedRuns above: if the nightly 2 AM reconcile
+// cron was missed (server asleep/restarting), also do one recompute pass
+// on boot so a missed night doesn't leave stale numbers until the next
+// scheduled run.
+const { recomputeSummaries } = require('../automatic/nightlyReconcile');
+recomputeSummaries(true).catch((err) =>
+  console.error('[Startup] recomputeSummaries failed:', err.message)
+);
 
 const app = express();
 
@@ -66,6 +79,8 @@ const faceattendancerouter = require('../routes/faceattendance.routes');
 const shiftrouter = require('../routes/shift.routes');
 const holidaypolicyrouter = require('../routes/holidaypolicy.route');
 const unifiedauthrouter = require('../routes/Unified.auth.route');
+const payrollrouter = require('../routes/payroll.route');
+const payrollpolicyrouter = require('../routes/payrollpolicy.route');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 // DEBUG — remove after fix
@@ -85,6 +100,8 @@ const routes = {
   shiftrouter,
   holidaypolicyrouter,
   unifiedauthrouter,
+  payrollrouter,
+  payrollpolicyrouter,
 };
 Object.entries(routes).forEach(([name, r]) => {
   if (!r) console.error(`❌ UNDEFINED: ${name}`);
@@ -109,6 +126,10 @@ app.use('/admin', shiftrouter);
 app.use('/admin/holiday-policy', holidaypolicyrouter);   // was: app.use('/admin', holidaypolicyrouter);
 app.use('/superadmin', shiftrouter);
 app.use('/superadmin/', holidaypolicyrouter); // was: app.use('/superadmin', holidaypolicyrouter);
+app.use('/admin/payroll', payrollrouter);
+app.use('/admin/payroll', payrollpolicyrouter);
+app.use('/superadmin/payroll', payrollrouter);
+app.use('/superadmin/payroll', payrollpolicyrouter);
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 

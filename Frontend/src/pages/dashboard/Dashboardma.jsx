@@ -13,6 +13,41 @@ const DAYS   = ["S","M","T","W","T","F","S"];
 
 const APPROVED_STATUSES = ["approved_manager", "approved_admin", "pending_admin", "approved_reporting_manager"];
 
+const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+};
+
+function getDeptFullForm(code) {
+  if (!code) return "—";
+  const key = String(code).trim().toUpperCase();
+  return DEPT_FULL_FORMS[key] || code;
+}
+
+const ROLE_FULL_FORMS = {
+  sa: "Super Admin",
+  superadmin: "Super Admin",
+  admin: "Admin",
+  mgr: "Manager",
+  manager: "Manager",
+  emp: "Employee",
+  employee: "Employee",
+  hr: "HR",
+};
+
+function getRoleFullForm(code) {
+  if (!code) return null;
+  const key = String(code).trim().toLowerCase();
+  if (ROLE_FULL_FORMS[key]) return ROLE_FULL_FORMS[key];
+  return String(code)
+    .split(/[_\s]+/)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
 const GlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
@@ -748,7 +783,7 @@ const LEAVE_TYPE_META = {
   sl: { label:"Sick",      color:"#1D9E75", bg:"rgba(29,158,117,0.08)" },
   pl: { label:"Paternity", color:"#378ADD", bg:"rgba(55,138,221,0.08)" },
   ml: { label:"Maternity", color:"#9333EA", bg:"rgba(147,51,234,0.08)" },
-  cl: { label:"Casual",    color:"#BA7517", bg:"rgba(186,117,23,0.08)" },
+  cl: { label:"Casual", color:"#BA7517", bg:"rgba(186,117,23,0.08)" },
   lwp:{ label:"LWP",       color:"#E24B4A", bg:"rgba(226,75,74,0.08)" },
 };
 
@@ -1117,7 +1152,7 @@ export default function ManagerDashboard() {
                 <div style={{ display:"flex", alignItems:"center", gap:5, flexWrap:"wrap" }}>
                   <Badge variant="brand">{manager?.uid ?? "—"}</Badge>
                   <Badge variant="green">Active</Badge>
-                  <Badge variant="blue">{manager?.department ?? "—"}</Badge>
+                  <Badge variant="blue">{getDeptFullForm(manager?.department)}</Badge>
                 </div>
                 <div style={{ marginTop:10, paddingTop:10, borderTop:"0.5px solid #ede5e0", display:"flex", flexDirection:"column", gap:3 }}>
                   <div style={{ fontSize:10, color:"#b0948a", fontFamily:"'DM Sans',sans-serif", wordBreak:"break-word" }}>📧 {manager?.work_email ?? "—"}</div>
@@ -1183,7 +1218,7 @@ export default function ManagerDashboard() {
                   <div style={{ minWidth:0 }}>
                     <div style={{ fontSize:14, fontWeight:600, color:"#f9f8f2", fontFamily:"'Lora',serif" }}>{fullName}</div>
                     <div style={{ fontSize:11, color:"rgba(249,248,242,0.6)", marginTop:2, fontFamily:"'DM Sans',sans-serif" }}>
-                      {manager?.role ?? "Manager"}
+                      {getRoleFullForm(manager?.role) ?? "Manager"}
                     </div>
                   </div>
                 </div>
@@ -1314,7 +1349,7 @@ export default function ManagerDashboard() {
           <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
             borderBottom:"0.5px solid #ede5e0", flexWrap:"wrap", gap:8 }}>
             <span style={{ fontSize:12, fontWeight:600, fontFamily:"'DM Sans',sans-serif" }}>Manager profile</span>
-            <Badge variant="brand">{manager?.role ?? "manager"}</Badge>
+            <Badge variant="brand">{getRoleFullForm(manager?.role) ?? "Manager"}</Badge>
           </div>
           <div style={{ padding:"14px 18px", display:"flex", alignItems:"center", gap:14,
             borderBottom:"0.5px solid #ede5e0", flexWrap:"wrap" }}>
@@ -1336,15 +1371,15 @@ export default function ManagerDashboard() {
           </div>
           <div className="md-info-grid">
             <InfoField label="Work email"       value={manager?.work_email}      loading={meLoading}/>
-            <InfoField label="Department"        value={manager?.department}       loading={meLoading}/>
+            <InfoField label="Department"        value={getDeptFullForm(manager?.department)}       loading={meLoading}/>
             <InfoField label="Office"            value={manager?.office_location}  loading={meLoading}/>
             <InfoField label="Gender"            value={manager?.gender}           loading={meLoading}/>
             <InfoField label="Marital status"    value={manager?.marital_status}   loading={meLoading}/>
             <InfoField label="Contact"           value={manager?.personal_contact} loading={meLoading}/>
             <InfoField label="Emergency contact" value={manager?.e_contact}        loading={meLoading}/>
-            <InfoField label="Role"              value={manager?.role}             loading={meLoading}/>
+            <InfoField label="Role"              value={getRoleFullForm(manager?.role)}             loading={meLoading}/>
             <InfoField label="Member since"
-              value={manager?.createdAt ? fmtDate(manager.createdAt) : null}
+              value={joiningDate ? fmtDate(joiningDate) : null}
               loading={meLoading}/>
           </div>
         </div>
@@ -1395,20 +1430,7 @@ export default function ManagerDashboard() {
         </div>
       </div>
 
-      <div className="md-card" style={{ animationDelay:".45s" }}>
-        <CardAccent color="#378ADD"/>
-        <div style={{ padding:"14px 18px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
-          borderBottom:"0.5px solid #ede5e0", flexWrap:"wrap", gap:8 }}>
-          <span style={{ fontSize:12, fontWeight:600, fontFamily:"'DM Sans',sans-serif" }}>Team Leave History</span>
-          <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-            <Badge variant="green">{allEmployeeLeaves.filter(l => APPROVED_STATUSES.includes(l.status)).length} approved</Badge>
-            <Badge variant="amber">{allEmployeeLeaves.filter(l => l.status?.includes("pending")).length} pending</Badge>
-          </div>
-        </div>
-        <div className="md-table-scroll">
-          <LeaveHistoryList leaves={allEmployeeLeaves} loading={histLoading}/>
-        </div>
-      </div>
+    
 
     </div>
   );

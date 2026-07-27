@@ -128,6 +128,7 @@ const managerlogin = async (req, res, next) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    path: "/",
     maxAge: 15 * 24 * 60 * 60 * 1000,
   });
 
@@ -146,9 +147,10 @@ const managerlogout = async (req, res, next) => {
   try {
     if (!req.manager)
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-    await managermodel.findByIdAndUpdate(req.manager._id, { status: "inactive" });
+    // `status` = account state, checked on every request by the auth
+    // middleware. Do not set it to "inactive" here — see adminlogout note.
     const isProduction = process.env.NODE_ENV === "production";
-    res.clearCookie("token", { httpOnly: true, secure: isProduction, sameSite: isProduction ? "none" : "lax" });
+    res.clearCookie("token", { httpOnly: true, secure: isProduction, sameSite: isProduction ? "none" : "lax", path: "/" });
     res.status(200).json({ message: "Manager logout successful" });
   } catch (error) {
     next(error);
@@ -478,6 +480,9 @@ const applyleavem = async (req, res, next) => {
   const leave = await managerLeaveModel.create({
     organisation_id,
     manager: managerId,
+    applicantName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+    applicantEmail: req.manager.work_email,
+    applicantRole: "Manager",
     leaveType,
     startDate: start,
     endDate: end,
@@ -1101,9 +1106,19 @@ const editprofilemanager = async (req, res, next) => {
     const {
       personal_contact, e_contact, marital_status, profile_image, office_location, designation, gender,
       resume, aadhaar_card, pan_card, experience_letter,
-      bank_name, account_holder_name, account_number, ifsc_code,
+      bank_name, account_holder_name, account_number, ifsc_code, date_of_joining,
     } = req.body;
     let leaveUpdateRequired = false;
+    if (date_of_joining !== undefined) {
+      if (date_of_joining === null || date_of_joining === "") {
+        manager.date_of_joining = null;
+      } else {
+        const parsedDOJ = new Date(date_of_joining);
+        if (isNaN(parsedDOJ.getTime()))
+          return next(Object.assign(new Error("Invalid date of joining"), { statusCode: 400 }));
+        manager.date_of_joining = parsedDOJ;
+      }
+    }
     if (personal_contact !== undefined) {
       if (typeof personal_contact !== "string" || !PHONE_REGEX.test(personal_contact))
         return next(Object.assign(new Error("Phone number must be a valid 10-digit number"), { statusCode: 400 }));
@@ -1131,10 +1146,12 @@ const editprofilemanager = async (req, res, next) => {
         manager.marital_status = marital_status;
       }
     }
-    if (office_location !== undefined) {
-      if (!["Noida", "Bareilly", "Delhi", "Mumbai"].includes(office_location))
-        return next(Object.assign(new Error("Invalid office location"), { statusCode: 400 }));
-      manager.office_location = office_location;
+   if (office_location !== undefined) {
+      if (typeof office_location !== "string" || !office_location.trim() || office_location.trim().length > 100)
+        return next(
+          Object.assign(new Error("Office location must be a valid"), { statusCode: 400 }),
+        );
+      manager.office_location = office_location.trim();
     }
     if (profile_image !== undefined) {
       if (typeof profile_image !== "string")
@@ -1218,6 +1235,7 @@ const editprofilemanager = async (req, res, next) => {
         account_holder_name: manager.account_holder_name,
         account_number: manager.account_number,
         ifsc_code: manager.ifsc_code,
+        date_of_joining: manager.date_of_joining,
       },
     });
   } catch (error) {

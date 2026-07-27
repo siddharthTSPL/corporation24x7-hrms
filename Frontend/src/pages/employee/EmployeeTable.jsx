@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Country, State, City } from "country-state-city";
 import {
   FaEdit, FaTrash, FaSearch, FaFilter, FaTimes, FaUserTie, FaUserPlus,
@@ -11,6 +12,8 @@ import {
 import {
   useAddManager, useAddEmployee, useFindAllManagers, useFindAllManagerswithoutAdmin,
 } from "../../auth/server-state/adminauth/adminauth.hook";
+import { useFindAllEmployeesFull } from "../../auth/server-state/adminauth/adminauth.hook";
+
 import {
   useGetAllEmployee, useDeleteUser, useEditEmployee, useEditManager,
   usePromoteEmployeeToManager, usePromoteEmployeeToAdmin, usePromoteManagerToAdmin,
@@ -21,6 +24,11 @@ import {
 } from "../../auth/server-state/adminother/adminother.hook";
 import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
 import axios from "axios";
+
+import * as XLSX from "xlsx";
+
+
+
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/",
@@ -142,46 +150,73 @@ function generatePassword() {
 
 const numericOnly = (value) => value.replace(/\D/g, "");
 
+
 function exportToCSV(data) {
-  const headers = [
-    "UID","First Name","Last Name","Work Email","Role","Department",
-    "Designation","Office Location","Gender","Marital Status",
-    "Personal Contact","Emergency Contact","City","State","Pincode",
-    "Reporting / Under Manager","Is Fresher","Total Experience","Status","Working Status",
+  const dateStamp = new Date().toISOString().slice(0, 10);
+
+  const FULL_HEADERS = [
+    "Employee ID","First Name","Last Name","Work Email","Gender","Marital Status",
+    "Personal Contact","Emergency Contact",
+    "Role","Department","Designation","Office Location",
+    "Reporting / Under Manager","Is Fresher","Total Experience",
+    "Previous Company","Previous Designation",
+    "Residential Address","Residential City","Residential State","Residential Pincode","Residential Country",
+    "Aadhaar Number","PAN Number",
+    "Bank Name","Account Holder Name","Account Number","IFSC Code",
+    "Resume URL","Aadhaar Card URL","PAN Card URL","Experience Letter URL",
+    "Status","Working Status",
   ];
-  const rows = data.map((u) => [
-    u.uid??"",u.f_name??"",u.l_name??"",u.work_email??"",u.role??"",
-    DEPT_FULL_FORMS[u.department]??u.department??"",u.designation??"",u.office_location??"",u.gender??"",
-    u.marital_status??"",u.personal_contact??"",u.e_contact??"",
-    u.city??"",u.state??"",u.pincode??"",
-    u.Under_manager
-      ?`${u.Under_manager.f_name??""} ${u.Under_manager.l_name??""}`.trim()
-      :u.reporting_manager
-        ?`${u.reporting_manager.f_name??""} ${u.reporting_manager.l_name??""}`.trim()
-        :"",
-    u.is_fresher?"Yes":"No",u.total_experience??"",u.status??"",u.working_status??"",
-  ]);
-  const escape=(v)=>{const s=String(v??"");return s.includes(",")||s.includes('"')||s.includes("\n")?`"${s.replace(/"/g,'""')}"`:s;};
-  const csv=[headers,...rows].map((r)=>r.map(escape).join(",")).join("\n");
-  const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");
-  a.href=url;a.download=`employees_${new Date().toISOString().slice(0,10)}.csv`;a.click();
-  URL.revokeObjectURL(url);
-}
 
-function resolveLeaveValue(val) {
-  if (val === null || val === undefined) return "—";
-  if (typeof val === "object") {
-    if (val.remaining !== undefined) return String(val.remaining);
-    if (val.balance !== undefined) return String(val.balance);
-    if (val.total !== undefined) return String(val.total);
-    return "—";
+  const buildRow = (u) => {
+    const reportingPerson = u.Under_manager || u.reporting_manager;
+    return [
+      u.empid??"",u.f_name??"",u.l_name??"",u.work_email??"",u.gender??"",u.marital_status??"",
+      u.personal_contact??"",u.e_contact??"",
+      u.role??"",DEPT_FULL_FORMS[u.department]??u.department??"",u.designation??"",u.office_location??"",
+      reportingPerson?`${reportingPerson.f_name??""} ${reportingPerson.l_name??""}`.trim():"",
+      u.is_fresher?"Yes":"No",u.total_experience??"",
+      u.previous_company??"",u.previous_designation??"",
+      u.address??"",u.city??"",u.state??"",u.pincode??"",u.country??"",
+      u.aadhaar_number??"",u.pan_number??"",
+      u.bank_name??"",u.account_holder_name??"",u.account_number??"",u.ifsc_code??"",
+      u.resume??"",u.aadhaar_card??"",u.pan_card??"",u.experience_letter??"",
+      u.status??"",u.working_status??"",
+    ];
+  };
+
+  const computeColWidths = (rows) => {
+    return FULL_HEADERS.map((header, colIdx) => {
+      let maxLen = header.length;
+      rows.forEach((row) => {
+        const val = String(row[colIdx] ?? "");
+        if (val.length > maxLen) maxLen = val.length;
+      });
+      return { wch: Math.min(Math.max(maxLen + 2, 10), 45) };
+    });
+  };
+
+  const downloadXLSX = (rows, filename, sheetName) => {
+    const worksheet = XLSX.utils.aoa_to_sheet([FULL_HEADERS, ...rows]);
+    worksheet["!cols"] = computeColWidths(rows);
+    worksheet["!freeze"] = { xSplit: 0, ySplit: 1 };
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    XLSX.writeFile(workbook, filename);
+  };
+
+  const getType = (u) => u.type || (u.role==="manager"||u.role==="senior_manager" ? "manager" : "employee");
+
+  const employees = data.filter((u)=>getType(u)==="employee");
+  const managers  = data.filter((u)=>getType(u)==="manager");
+
+  if(employees.length>0){
+    downloadXLSX(employees.map(buildRow), `Torchx-Talent-Employee-${dateStamp}.xlsx`, "Employees");
   }
-  return String(val);
+  if(managers.length>0){
+    downloadXLSX(managers.map(buildRow), `Torchx-Talent-Manager-${dateStamp}.xlsx`, "Managers");
+  }
 }
-
-const LEAVE_SKIP_KEYS = ["_id","employee","organisation_id","__v","createdAt","updatedAt","mlStartDate","mlEndDate","lastAccrualDate"];
 
 function Field({label,error,children,required,span2}){
   return(
@@ -257,33 +292,33 @@ function OfficeLocationFields({form,onChange,errors}){
           {states.map((s)=><option key={s.isoCode} value={s.isoCode}>{s.name}</option>)}
         </select>
       </Field>
-     <Field
-  label="Office Location (City)"
-  required
-  error={errors.office_location}
->
-  <select
-    name="office_location"
-    value={form.office_location}
-    onChange={onChange}
-    className={inputCls}
-    disabled={!form.office_location_state}
-  >
-    <option value="">
-      {form.office_location_state
-        ? "Select City"
-        : "Select state first"}
-    </option>
-    {cities.map((c) => (
-      <option
-        key={`${c.name}-${c.latitude}-${c.longitude}`}
-        value={c.name}
+      <Field
+        label="Office Location (City)"
+        required
+        error={errors.office_location}
       >
-        {c.name}
-      </option>
-    ))}
-  </select>
-</Field>
+        <select
+          name="office_location"
+          value={form.office_location}
+          onChange={onChange}
+          className={inputCls}
+          disabled={!form.office_location_state}
+        >
+          <option value="">
+            {form.office_location_state
+              ? "Select City"
+              : "Select state first"}
+          </option>
+          {cities.map((c) => (
+            <option
+              key={`${c.name}-${c.latitude}-${c.longitude}`}
+              value={c.name}
+            >
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </Field>
     </>
   );
 }
@@ -312,7 +347,7 @@ function AddressFields({form,onChange,errors}){
 
   return(
     <>
-      <div className="col-span-2">
+      <div className="col-span-1 sm:col-span-2">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-1">Residential Address</p>
       </div>
 
@@ -345,14 +380,14 @@ function AddressFields({form,onChange,errors}){
         <input name="address" placeholder="Street address" value={form.address} onChange={onChange} className={inputCls}/>
       </Field>
 
-      <div className="col-span-2 flex items-center gap-2 mt-1">
+      <div className="col-span-1 sm:col-span-2 flex items-center gap-2 mt-1">
         <input type="checkbox" id="same_as_residential" checked={form.same_as_residential} onChange={handleSameAsResidential} className="w-4 h-4 accent-[#CD166E]"/>
         <label htmlFor="same_as_residential" className="text-xs font-medium text-[#730042]">
           Permanent address same as residential
         </label>
       </div>
 
-      <div className="col-span-2">
+      <div className="col-span-1 sm:col-span-2">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-1 mt-2">Permanent Address</p>
       </div>
 
@@ -440,12 +475,12 @@ function InfoRow({icon,label,value}){
 
 function PermissionToggle({label,value,onChange,disabled}){
   return(
-    <div className="flex items-center justify-between py-1.5">
+    <div className="flex items-center justify-between py-1.5 gap-2">
       <span className={`text-xs font-medium ${disabled?"text-[#993556]/40":"text-[#730042]"}`}>{label}</span>
       <button
         type="button"
         onClick={()=>!disabled&&onChange(!value)}
-        className={`transition-colors ${disabled?"cursor-not-allowed opacity-40":""}`}
+        className={`transition-colors flex-shrink-0 ${disabled?"cursor-not-allowed opacity-40":""}`}
         title={disabled?"This permission cannot be changed for this role":""}
       >
         {value
@@ -504,7 +539,7 @@ function PermissionsPanel({perms,onChange,roleType="employee"}){
     ]},
   ];
   return(
-    <div className="col-span-2 space-y-3">
+    <div className="col-span-1 sm:col-span-2 space-y-3">
       {sections.map((sec)=>(
         <div key={sec.key} className="rounded-xl border border-[#F4C0D1] overflow-hidden">
           <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[#993556]" style={{background:"#FBEAF0"}}>
@@ -531,6 +566,7 @@ function PermissionsPanel({perms,onChange,roleType="employee"}){
 }
 
 function ReportingManagerSelect({value,onChange,managersOnly,managersWithAdmin,label="Reporting Manager",name="reporting_manager",excludeId=null}){
+  
   const managersList = (managersOnly?.managers ?? []).filter(m => m._id !== excludeId);
   const withAdminList = (managersWithAdmin?.managers ?? []).filter(m => m._id !== excludeId);
   const adminList = withAdminList.filter(m => m.isAdmin);
@@ -623,14 +659,14 @@ function PermissionsDrawer({userId,userModel,userRole,onClose}){
 
   return(
     <div className="fixed inset-0 z-[60] flex" onClick={(e)=>e.target===e.currentTarget&&onClose()}>
-      <div className="flex-1" onClick={onClose}/>
-      <div className="w-full max-w-xs bg-white shadow-2xl flex flex-col border-l border-[#F4C0D1] h-full overflow-hidden">
+      <div className="hidden sm:block flex-1" onClick={onClose}/>
+      <div className="w-full sm:max-w-xs bg-white shadow-2xl flex flex-col border-l border-[#F4C0D1] h-full overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#F4C0D1] flex-shrink-0" style={{background:"#F9F8F2"}}>
           <div className="flex items-center gap-2">
             <FaKey size={12} className="text-[#CD166E]"/>
             <p className="text-sm font-bold text-[#730042]">Manage Permissions</p>
           </div>
-          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-[#993556] hover:bg-[#FBEAF0]">
+          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-[#993556] hover:bg-[#FBEAF0] flex-shrink-0">
             <FaTimes size={12}/>
           </button>
         </div>
@@ -673,11 +709,11 @@ function AssetReturnBlockedModal({ data, personName, onClose }) {
   const { pending_asset_count, assets, message } = data;
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4"
       style={{ background: "rgba(115,0,66,0.55)", backdropFilter: "blur(3px)" }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6 animate-[modalPop_.2s_ease-out]">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl p-5 sm:p-6 max-h-[92vh] overflow-y-auto animate-[modalPop_.2s_ease-out]">
         <style>{`@keyframes modalPop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}`}</style>
 
         <div className="flex items-start gap-3 p-3 bg-[#FFF5F5] border border-[#FCA5A5] rounded-xl mb-4">
@@ -875,12 +911,41 @@ function AccountSummaryDrawer({
   const data=isManager?mgrQuery.data:empQuery.data;
   const loading=isManager?mgrQuery.isLoading:empQuery.isLoading;
   const person=data?.user||data?.manager;
-  const leaveBalance=data?.leaveBalance;
   const reviews=data?.reviews||[];
   const [tab,setTab]=useState("info");
   const [showPermissions,setShowPermissions]=useState(false);
   const [wsLoading,setWsLoading]=useState(false);
   const [assetBlock,setAssetBlock]=useState(null);
+
+  const rawLeaveBalance = data?.leaveBalance ?? data?.leavebalance;
+  const leaveBalance = Array.isArray(rawLeaveBalance) ? rawLeaveBalance[0] : rawLeaveBalance;
+
+  const isMarried = person?.marital_status === "married";
+  const showML = person?.gender === "female" && isMarried;
+  const showPL = person?.gender === "male" && isMarried;
+
+  const leaveCards = leaveBalance ? [
+    {
+      label: "Earned Leave",
+      total: Number(leaveBalance.EL?.entitled ?? 0),
+      used: Number(leaveBalance.EL?.availed ?? 0),
+      remaining:
+        leaveBalance.EL?.available ??
+        Math.max(0, Number(leaveBalance.EL?.accrued ?? 0) - Number(leaveBalance.EL?.availed ?? 0)),
+    },
+    {
+      label: "Sick Leave",
+      total: Number(leaveBalance.SL?.entitled ?? 0),
+      used: Number(leaveBalance.SL?.availed ?? 0),
+      remaining:
+        leaveBalance.SL?.available ??
+        Math.max(0, Number(leaveBalance.SL?.entitled ?? 0) - Number(leaveBalance.SL?.availed ?? 0)),
+    },
+    ...(showML ? [{ label: "Maternity Leave", total: leaveBalance.ML || 0, used: 0, remaining: leaveBalance.ML || 0 }] : []),
+    ...(showPL ? [{ label: "Paternity Leave", total: leaveBalance.PL || 0, used: 0, remaining: leaveBalance.PL || 0 }] : []),
+    { label: "Paid by Company", total: leaveBalance.pbc || 0, used: 0, remaining: leaveBalance.pbc || 0 },
+    { label: "Leave Without Pay", total: leaveBalance.lwp || 0, used: 0, remaining: leaveBalance.lwp || 0 },
+  ] : [];
 
   const setEmpWS=useSetEmployeeWorkingStatus(userId);
   const setMgrWS=useSetManagerWorkingStatus(userId);
@@ -891,7 +956,7 @@ function AccountSummaryDrawer({
 
   const roleType = isAdmin?"admin":isManager?"manager":"employee";
 
- const handleWorkingStatusSave=async(ws)=>{
+  const handleWorkingStatusSave=async(ws)=>{
     setWsLoading(true);
     try{
       if(isManager){
@@ -925,8 +990,8 @@ function AccountSummaryDrawer({
   return(
     <>
       <div className="fixed inset-0 z-50 flex" onClick={(e)=>e.target===e.currentTarget&&onClose()}>
-        <div className="flex-1" onClick={onClose}/>
-        <div className="w-full max-w-sm bg-white shadow-2xl flex flex-col border-l border-[#F4C0D1] h-full overflow-hidden">
+        <div className="hidden sm:block flex-1" onClick={onClose}/>
+        <div className="w-full sm:max-w-sm bg-white shadow-2xl flex flex-col border-l border-[#F4C0D1] h-full overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#F4C0D1] flex-shrink-0" style={{background:"#F9F8F2"}}>
             <p className="text-sm font-bold text-[#730042]">Account Summary</p>
             <div className="flex items-center gap-2">
@@ -961,7 +1026,7 @@ function AccountSummaryDrawer({
                     <div className="flex flex-wrap gap-1.5 mt-1.5">
                       <WorkingStatusBadge status={person.working_status}/>
                     </div>
-                    {person.uid&&<p className="text-[11px] text-[#993556] mt-1.5 font-mono bg-[#F9F8F2] px-1.5 py-0.5 rounded inline-block border border-[#F4C0D1]">{person.uid}</p>}
+                    {person.empid&&<p className="text-[11px] text-[#993556] mt-1.5 font-mono bg-[#F9F8F2] px-1.5 py-0.5 rounded inline-block border border-[#F4C0D1]">{person.empid}</p>}
                   </div>
                 </div>
                 {avgRating!==null&&(
@@ -1018,36 +1083,35 @@ function AccountSummaryDrawer({
                         <p className="text-[10px] font-bold uppercase tracking-wider text-[#993556] mb-2">Reporting To</p>
                         <div className="flex items-center gap-2 p-2 rounded-lg bg-[#FBEAF0] border border-[#F4C0D1]">
                           <Avatar name={`${(person.Under_manager||person.reporting_manager)?.f_name??""} ${(person.Under_manager||person.reporting_manager)?.l_name??""}`} size="sm"/>
-                          <div>
-                            <p className="text-xs font-semibold text-[#730042]">{(person.Under_manager||person.reporting_manager)?.f_name} {(person.Under_manager||person.reporting_manager)?.l_name}</p>
-                            <p className="text-[10px] text-[#993556]">{(person.Under_manager||person.reporting_manager)?.work_email}</p>
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-[#730042] truncate">{(person.Under_manager||person.reporting_manager)?.f_name} {(person.Under_manager||person.reporting_manager)?.l_name}</p>
+                            <p className="text-[10px] text-[#993556] truncate">{(person.Under_manager||person.reporting_manager)?.empid}</p>
                           </div>
                         </div>
                       </div>
                     )}
-                   {!isAdmin&&(
-  <WorkingStatusSelector
-    currentStatus={person.working_status||"working"}
-    onSave={handleWorkingStatusSave}
-    loading={wsLoading}
-    blockedInfo={assetBlock}
-    onDismissBlock={()=>setAssetBlock(null)}
-  />
-)}
+                    {!isAdmin&&(
+                      <WorkingStatusSelector
+                        currentStatus={person.working_status||"working"}
+                        onSave={handleWorkingStatusSave}
+                        loading={wsLoading}
+                        blockedInfo={assetBlock}
+                        onDismissBlock={()=>setAssetBlock(null)}
+                      />
+                    )}
                   </div>
                 )}
                 {tab==="leave"&&(
                   <div>
-                    {leaveBalance?(
+                    {leaveCards.length>0?(
                       <div className="grid grid-cols-2 gap-2">
-                        {Object.entries(leaveBalance)
-                          .filter(([k])=>!LEAVE_SKIP_KEYS.includes(k))
-                          .map(([k,v])=>(
-                            <div key={k} className="p-3 rounded-xl border border-[#F4C0D1] bg-[#FBEAF0]">
-                              <p className="text-[10px] font-bold uppercase tracking-wider text-[#993556]">{k.replace(/_/g," ")}</p>
-                              <p className="text-xl font-bold text-[#730042] mt-0.5">{resolveLeaveValue(v)}</p>
-                            </div>
-                          ))}
+                        {leaveCards.map((c)=>(
+                          <div key={c.label} className="p-3 rounded-xl border border-[#F4C0D1] bg-[#FBEAF0]">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-[#993556]">{c.label}</p>
+                            <p className="text-xl font-bold text-[#730042] mt-0.5">{c.remaining}</p>
+                            <p className="text-[10px] text-[#993556] mt-1">{c.used} used / {c.total} total</p>
+                          </div>
+                        ))}
                       </div>
                     ):(
                       <div className="text-center py-8 text-[#993556] text-sm">No leave balance data</div>
@@ -1187,16 +1251,16 @@ function StepModal({title,icon,onClose,onSubmit,steps,currentStep,setCurrentStep
         <div className="overflow-y-auto p-3 sm:p-6 flex-1 bg-[#F9F8F2]">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">{children}</div>
         </div>
-        <div className="px-3 sm:px-6 py-3 sm:py-4 border-t border-[#F4C0D1] flex justify-between gap-2 bg-[#F9F8F2] flex-shrink-0">
+        <div className="px-3 sm:px-6 py-3 sm:py-4 border-t border-[#F4C0D1] flex flex-col-reverse sm:flex-row justify-between gap-2 bg-[#F9F8F2] flex-shrink-0">
           <button onClick={onClose} className="px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl border border-[#F4C0D1] text-[#730042] text-xs sm:text-sm font-semibold hover:bg-[#FBEAF0]">Cancel</button>
           <div className="flex gap-2">
-            {!isFirst&&<button onClick={()=>setCurrentStep((s)=>s-1)} className="flex items-center gap-1 sm:gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-[#F4C0D1] text-[#730042] text-xs sm:text-sm font-semibold hover:bg-[#FBEAF0]"><FaChevronLeft size={10}/><span className="hidden xs:inline">Prev</span></button>}
+            {!isFirst&&<button onClick={()=>setCurrentStep((s)=>s-1)} className="flex-1 sm:flex-none flex items-center justify-center gap-1 sm:gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-[#F4C0D1] text-[#730042] text-xs sm:text-sm font-semibold hover:bg-[#FBEAF0]"><FaChevronLeft size={10}/><span className="hidden xs:inline">Prev</span></button>}
             {!isLast?(
-              <button onClick={()=>setCurrentStep((s)=>s+1)} className="flex items-center gap-1 sm:gap-1.5 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90" style={{background:accentColor}}>
+              <button onClick={()=>setCurrentStep((s)=>s+1)} className="flex-1 sm:flex-none flex items-center justify-center gap-1 sm:gap-1.5 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90" style={{background:accentColor}}>
                 <span className="hidden xs:inline">Next</span><FaChevronRight size={10}/>
               </button>
             ):(
-              <button onClick={onSubmit} className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90" style={{background:accentColor}}>Submit</button>
+              <button onClick={onSubmit} className="flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90" style={{background:accentColor}}>Submit</button>
             )}
           </div>
         </div>
@@ -1213,16 +1277,16 @@ function Modal({title,icon,onClose,onSubmit,children,accentColor="#CD166E"}){
     >
       <div className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl flex flex-col max-h-[96vh] sm:max-h-[92vh] border-t sm:border border-[#F4C0D1] shadow-2xl">
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 rounded-t-2xl flex-shrink-0" style={{background:accentColor}}>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <span className="text-white text-lg sm:text-xl">{icon}</span>
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-white">{title}</h2>
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <span className="text-white text-lg sm:text-xl flex-shrink-0">{icon}</span>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-bold text-white truncate">{title}</h2>
               <p className="text-[11px] sm:text-xs" style={{color:"rgba(255,255,255,0.6)"}}>Fill in all required fields</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-white"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white flex-shrink-0 ml-2"
             style={{background:"rgba(255,255,255,0.18)"}}
           >
             <FaTimes size={13}/>
@@ -1231,7 +1295,7 @@ function Modal({title,icon,onClose,onSubmit,children,accentColor="#CD166E"}){
         <div className="overflow-y-auto p-3 sm:p-6 flex-1 bg-[#F9F8F2]">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">{children}</div>
         </div>
-        <div className="px-3 sm:px-6 py-3 sm:py-4 border-t border-[#F4C0D1] flex justify-end gap-2 sm:gap-3 bg-[#F9F8F2] flex-shrink-0">
+        <div className="px-3 sm:px-6 py-3 sm:py-4 border-t border-[#F4C0D1] flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 bg-[#F9F8F2] flex-shrink-0">
           <button onClick={onClose} className="px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl border border-[#F4C0D1] text-[#730042] text-xs sm:text-sm font-semibold hover:bg-[#FBEAF0]">Cancel</button>
           <button onClick={onSubmit} className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90" style={{background:accentColor}}>Submit</button>
         </div>
@@ -1243,14 +1307,14 @@ function Modal({title,icon,onClose,onSubmit,children,accentColor="#CD166E"}){
 function ConfirmModal({title,message,icon,confirmLabel,confirmColor,onConfirm,onCancel,children}){
   return(
     <div className="fixed inset-0 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4" style={{background:"rgba(115,0,66,0.40)",backdropFilter:"blur(3px)"}}>
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm p-5 sm:p-6 flex flex-col gap-4 border-t sm:border border-[#F4C0D1] shadow-2xl">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm p-5 sm:p-6 flex flex-col gap-4 border-t sm:border border-[#F4C0D1] shadow-2xl max-h-[92vh] overflow-y-auto">
         <div className="text-center">
           <div className="text-3xl sm:text-4xl mb-2">{icon}</div>
           <h3 className="text-base sm:text-lg font-bold text-[#730042]">{title}</h3>
           <p className="text-xs sm:text-sm text-[#993556] mt-1">{message}</p>
         </div>
         {children}
-        <div className="flex gap-3 justify-center">
+        <div className="flex flex-col-reverse sm:flex-row gap-3 justify-center">
           <button onClick={onCancel} className="px-4 sm:px-5 py-2 rounded-xl border border-[#F4C0D1] text-xs sm:text-sm font-semibold text-[#730042] hover:bg-[#FBEAF0]">Cancel</button>
           <button onClick={onConfirm} className="px-4 sm:px-5 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90" style={{background:confirmColor||"#A32D2D"}}>{confirmLabel}</button>
         </div>
@@ -1261,25 +1325,89 @@ function ConfirmModal({title,message,icon,confirmLabel,confirmColor,onConfirm,on
 
 function ActionMenu({user,onView,onEdit,onDelete,onPromoteToManager,onPromoteToAdmin,onDemoteToEmployee,onDemoteToManager,onDemoteToEmployee2,currentAdminId}){
   const [open,setOpen]=useState(false);
-  const ref=useRef();
+  const [pos,setPos]=useState({top:0,left:0});
+  const [ready,setReady]=useState(false);
+  const btnRef=useRef();
+  const menuRef=useRef();
+
   useEffect(()=>{
-    const h=(e)=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);};
+    const h=(e)=>{
+      if(btnRef.current&&btnRef.current.contains(e.target))return;
+      if(menuRef.current&&menuRef.current.contains(e.target))return;
+      setOpen(false);
+    };
     document.addEventListener("mousedown",h);
     return()=>document.removeEventListener("mousedown",h);
   },[]);
+
+  const MARGIN=8;
+  const GAP=6;
+  const MENU_WIDTH=190;
+
+  const updatePos=()=>{
+    const btn=btnRef.current;
+    const menu=menuRef.current;
+    if(!btn)return;
+    const rect=btn.getBoundingClientRect();
+    const menuHeight=menu?menu.offsetHeight:220;
+    const viewportW=window.innerWidth;
+    const viewportH=window.innerHeight;
+
+    const spaceLeft=rect.left;
+    const spaceRight=viewportW-rect.right;
+    let left;
+    if(spaceLeft>=MENU_WIDTH+GAP||spaceLeft>=spaceRight){
+      left=rect.left-MENU_WIDTH-GAP;
+    }else{
+      left=rect.right+GAP;
+    }
+    if(left<MARGIN)left=MARGIN;
+    if(left+MENU_WIDTH>viewportW-MARGIN)left=viewportW-MENU_WIDTH-MARGIN;
+
+    let top=rect.top+rect.height/2-menuHeight/2;
+    const minTop=MARGIN;
+    const maxTop=viewportH-MARGIN-menuHeight;
+    if(top<minTop)top=minTop;
+    if(top>maxTop)top=Math.max(minTop,maxTop);
+
+    setPos({top,left});
+  };
+
+  useEffect(()=>{
+    if(!open){setReady(false);return;}
+    updatePos();
+    setReady(true);
+  },[open]);
+
+  useEffect(()=>{
+    if(!open)return;
+    window.addEventListener("scroll",updatePos,true);
+    window.addEventListener("resize",updatePos);
+    return()=>{
+      window.removeEventListener("scroll",updatePos,true);
+      window.removeEventListener("resize",updatePos);
+    };
+  },[open]);
+
   const effectiveType = user.type || (user.role === "manager" || user.role === "senior_manager" ? "manager" : "employee");
   const isEmployee = effectiveType === "employee";
   const isManager = effectiveType === "manager" || user.role === "senior_manager";
   const isAdmin = user.role === "admin" || user.role === "senior_admin";
   const isSelf=currentAdminId&&user._id&&currentAdminId===user._id;
   const isInactive=user.working_status&&user.working_status!=="working";
+
   return(
-    <div className="relative" ref={ref} onClick={(e)=>e.stopPropagation()}>
-      <button onClick={(e)=>{e.stopPropagation();setOpen((p)=>!p);}} className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center text-[#993556] border border-[#F4C0D1] hover:bg-[#FBEAF0]" style={{background:"#F9F8F2"}}>
+    <div className="relative" onClick={(e)=>e.stopPropagation()}>
+      <button ref={btnRef} onClick={(e)=>{e.stopPropagation();setOpen((p)=>!p);}} className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center text-[#993556] border border-[#F4C0D1] hover:bg-[#FBEAF0] flex-shrink-0" style={{background:"#F9F8F2"}}>
         <FaEllipsisV size={10}/>
       </button>
-      {open&&(
-        <div className="absolute right-0 top-9 z-20 bg-white border border-[#F4C0D1] rounded-xl shadow-xl min-w-[185px] py-1 overflow-hidden">
+      {open&&createPortal(
+        <div
+          ref={menuRef}
+          className="fixed z-[999] bg-white border border-[#F4C0D1] rounded-xl shadow-xl min-w-[185px] max-w-[calc(100vw-2rem)] py-1 overflow-hidden max-h-[80vh] overflow-y-auto"
+          style={{top:pos.top,left:pos.left,width:MENU_WIDTH,visibility:ready?"visible":"hidden"}}
+          onClick={(e)=>e.stopPropagation()}
+        >
           <button onClick={()=>{onView(user._id,user.role);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#730042] hover:bg-[#FBEAF0]">
             <FaUser size={10}/> View Profile
           </button>
@@ -1326,7 +1454,8 @@ function ActionMenu({user,onView,onEdit,onDelete,onPromoteToManager,onPromoteToA
           <button onClick={()=>{onDelete(user);setOpen(false);}} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#A32D2D] hover:bg-[#FCEBEB]">
             <FaTrash size={10}/> Delete
           </button>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -1347,7 +1476,7 @@ function roleBadge(u){
 function SkeletonRows(){
   return Array.from({length:5}).map((_,i)=>(
     <tr key={i} className="border-b border-[#FBEAF0]">
-      {Array.from({length:7}).map((_,j)=>(
+      {Array.from({length:8}).map((_,j)=>(
         <td key={j} className="px-4 py-3"><div className="h-4 bg-[#FBEAF0] rounded animate-pulse" style={{width:j===0?"80%":"60%"}}/></td>
       ))}
     </tr>
@@ -1372,7 +1501,7 @@ function MobileSkeletons(){
 function EmptyState({onAdd}){
   return(
     <tr><td colSpan={8}>
-      <div className="flex flex-col items-center justify-center py-12 sm:py-16 gap-3 text-center">
+      <div className="flex flex-col items-center justify-center py-12 sm:py-16 gap-3 text-center px-4">
         <div className="text-4xl sm:text-5xl">👥</div>
         <p className="text-[#730042] font-medium text-sm sm:text-base">No employees found</p>
         <p className="text-[#993556] text-xs sm:text-sm">Add your first employee to get started</p>
@@ -1427,7 +1556,7 @@ function MobileCard({u,onView,onEdit,onDelete,onPromoteToManager,onPromoteToAdmi
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start justify-between gap-2 flex-wrap">
           <div className="min-w-0">
             <p className={`font-semibold text-sm truncate ${isInactive?"text-[#6B7280]":"text-[#730042]"}`}>{u.f_name} {u.l_name}</p>
             <p className="text-xs text-[#993556] truncate">{u.work_email}</p>
@@ -1439,13 +1568,13 @@ function MobileCard({u,onView,onEdit,onDelete,onPromoteToManager,onPromoteToAdmi
           {u.office_location&&<span className="px-2 py-0.5 rounded-full text-xs bg-[#F9F8F2] text-[#993556] border border-[#F4C0D1]">📍 {u.office_location}</span>}
           <WorkingStatusBadge status={u.working_status}/>
         </div>
-        <div className="flex items-center justify-between mt-3">
+        <div className="flex items-center justify-between mt-3 gap-2">
           {u.Under_manager?(
-            <p className="text-[11px] text-[#993556]">Under: <span className="font-medium text-[#730042]">{u.Under_manager.f_name} {u.Under_manager.l_name}</span></p>
+            <p className="text-[11px] text-[#993556] truncate">Under: <span className="font-medium text-[#730042]">{u.Under_manager.f_name} {u.Under_manager.l_name}</span></p>
           ):u.reporting_manager?(
-            <p className="text-[11px] text-[#993556]">Reports to: <span className="font-medium text-[#730042]">{u.reporting_manager.f_name} {u.reporting_manager.l_name}</span></p>
+            <p className="text-[11px] text-[#993556] truncate">Reports to: <span className="font-medium text-[#730042]">{u.reporting_manager.f_name} {u.reporting_manager.l_name}</span></p>
           ):<span/>}
-          <div onClick={(e)=>e.stopPropagation()}>
+          <div className="flex-shrink-0" onClick={(e)=>e.stopPropagation()}>
             <ActionMenu user={u} onView={onView} onEdit={onEdit} onDelete={onDelete}
               onPromoteToManager={onPromoteToManager} onPromoteToAdmin={onPromoteToAdmin}
               onDemoteToEmployee={onDemoteToEmployee} onDemoteToManager={onDemoteToManager}
@@ -1561,7 +1690,7 @@ function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChang
     </>
   );
   if(step===6)return(
-    <div className="col-span-2">
+    <div className="col-span-1 sm:col-span-2">
       <p className="text-xs text-[#993556] mb-1">Set initial permissions for this employee.</p>
       <p className="text-[11px] text-[#993556]/70 mb-3">Greyed toggles are restricted by role and cannot be enabled.</p>
       <PermissionsPanel perms={perms} onChange={onPermChange} roleType="employee"/>
@@ -1676,7 +1805,7 @@ function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin
     </>
   );
   if(step===6)return(
-    <div className="col-span-2">
+    <div className="col-span-1 sm:col-span-2">
       <p className="text-xs text-[#993556] mb-1">Set initial permissions for this manager.</p>
       <p className="text-[11px] text-[#993556]/70 mb-3">Greyed toggles are restricted by role and cannot be enabled.</p>
       <PermissionsPanel perms={perms} onChange={onPermChange} roleType="manager"/>
@@ -1749,6 +1878,7 @@ function validateBankInfo(form){
   const hasBankPartial=[form.bank_name,form.account_holder_name,form.account_number,form.ifsc_code].some(Boolean);
   const hasBankFull=[form.bank_name,form.account_holder_name,form.account_number,form.ifsc_code].every(Boolean);
   if(hasBankPartial&&!hasBankFull)err.bank_group="Fill all bank details together or leave all blank";
+  if(form.account_holder_name&&!NAME_REGEX.test(form.account_holder_name))err.account_holder_name="Only letters allowed, no numbers";
   if(form.account_number&&!ACCOUNT_REGEX.test(form.account_number))err.account_number="Account number must be 9-18 digits";
   if(form.ifsc_code&&!IFSC_REGEX.test(form.ifsc_code))err.ifsc_code="Invalid IFSC code format (e.g. SBIN0001234)";
   if(form.resume&&!URL_REGEX.test(form.resume))err.resume="Must be a valid URL starting with https://";
@@ -1756,6 +1886,39 @@ function validateBankInfo(form){
   if(form.pan_card&&!URL_REGEX.test(form.pan_card))err.pan_card="Must be a valid URL starting with https://";
   if(form.experience_letter&&!URL_REGEX.test(form.experience_letter))err.experience_letter="Must be a valid URL starting with https://";
   return err;
+}
+
+const FIELD_LABELS = {
+  empid:"Employee ID",f_name:"First Name",l_name:"Last Name",work_email:"Work Email",
+  password:"Password",confirm_password:"Confirm Password",gender:"Gender",
+  personal_contact:"Personal Contact",e_contact:"Emergency Contact",
+  department:"Department",designation:"Designation",
+  office_location_country:"Office Country",office_location_state:"Office State",office_location:"Office City",
+  address:"Address",country:"Residential Country",state:"Residential State",city:"Residential City",
+  pincode:"Residential Pincode",permanent_pincode:"Permanent Pincode",
+  aadhaar_number:"Aadhaar Number",pan_number:"PAN Number",
+  total_experience:"Total Experience",
+  bank_group:"Bank Details",account_number:"Account Number",ifsc_code:"IFSC Code",
+  account_holder_name:"Account Holder Name",bank_name:"Bank Name",
+  resume:"Resume URL",aadhaar_card:"Aadhaar Card URL",pan_card:"PAN Card URL",experience_letter:"Experience Letter URL",
+};
+
+const FIELD_STEP_MAP = {
+  empid:0,f_name:0,l_name:0,work_email:0,password:0,confirm_password:0,gender:0,personal_contact:0,e_contact:0,
+  department:1,designation:1,office_location_country:1,office_location_state:1,office_location:1,
+  address:2,country:2,state:2,city:2,pincode:2,permanent_pincode:2,
+  aadhaar_number:3,pan_number:3,
+  total_experience:4,
+  bank_group:5,account_number:5,ifsc_code:5,account_holder_name:5,bank_name:5,resume:5,aadhaar_card:5,pan_card:5,experience_letter:5,
+};
+
+function getErrorSummary(err){
+  const fields=Object.keys(err);
+  if(fields.length===0)return{message:"",step:0};
+  const labels=fields.map((f)=>FIELD_LABELS[f]||f);
+  const step=Math.min(...fields.map((f)=>FIELD_STEP_MAP[f]??0));
+  const stepLabel=EMP_STEPS[step]?.label||"";
+  return{message:`Fix these fields: ${labels.join(", ")} — go to "${stepLabel}" step`,step};
 }
 
 export default function EmployeeTable(){
@@ -1798,6 +1961,7 @@ export default function EmployeeTable(){
   const {mutate:addManagerApi}=useAddManager();
   const {data:managersOnly}=useFindAllManagerswithoutAdmin();
   const {data:managersWithAdmin}=useFindAllManagers();
+  const {data:employeesFull}=useFindAllEmployeesFull();
   const {data:employeeData,isLoading:listLoading,refetch:refetchList}=useGetAllEmployee();
   const {data:inactiveData}=useAdminInactiveUsers();
   const {data:activeUserCountData}=useGetActiveUserCount();
@@ -1857,7 +2021,6 @@ export default function EmployeeTable(){
     if(!editForm.l_name?.trim())err.l_name="Required";
     if(!editForm.work_email?.trim())err.work_email="Required";
     else if(!EMAIL_REGEX.test(editForm.work_email))err.work_email="Invalid email address";
-    if(!editForm.department)err.department="Required";
     if(!editForm.designation?.trim())err.designation="Required";
     if(editForm.personal_contact&&!PHONE_REGEX.test(editForm.personal_contact))err.personal_contact="Must be a valid 10-digit Indian mobile number";
     if(editForm.e_contact&&!PHONE_REGEX.test(editForm.e_contact))err.e_contact="Must be a valid 10-digit Indian mobile number";
@@ -1925,7 +2088,7 @@ export default function EmployeeTable(){
     if(["personal_contact","e_contact","aadhaar_number","pincode","permanent_pincode"].includes(name)){
       nextValue=numericOnly(value);
     }
-    if(["f_name","l_name"].includes(name)&&value&&!/^[A-Za-z\s.'-]*$/.test(value)){
+    if(["f_name","l_name", "account_holder_name"].includes(name)&&value&&!/^[A-Za-z\s.'-]*$/.test(value)){
       return;
     }
     setter((prev)=>{
@@ -1969,35 +2132,49 @@ export default function EmployeeTable(){
     return Object.keys(err).length===0;
   };
 
-  const handleEmpSubmit=()=>{
-    if(!validateEmp()){showPopup("error","Please fix the errors in the form");setEmpStep(0);return;}
-    addEmployeeApi({
-      empid:empForm.empid,
-      f_name:empForm.f_name,l_name:empForm.l_name,work_email:empForm.work_email,
-      password:empForm.password,gender:empForm.gender,marital_status:empForm.marital_status,
-      personal_contact:empForm.personal_contact,e_contact:empForm.e_contact,
-      role:empForm.role,office_location:empForm.office_location,
-      designation:empForm.designation,department:empForm.department,
-      Under_manager:empForm.Under_manager||undefined,
-      address:empForm.address,city:empForm.city,state:empForm.state,pincode:empForm.pincode,country:empForm.country,
-      permanent_address:empForm.permanent_address||undefined,permanent_city:empForm.permanent_city||undefined,
-      permanent_state:empForm.permanent_state||undefined,permanent_pincode:empForm.permanent_pincode||undefined,
-      permanent_country:empForm.permanent_country||undefined,
-      aadhaar_number:empForm.aadhaar_number||undefined,pan_number:empForm.pan_number||undefined,
-      is_fresher:empForm.is_fresher,
-      total_experience:empForm.is_fresher?undefined:empForm.total_experience||undefined,
-      previous_company:empForm.is_fresher?undefined:empForm.previous_company||undefined,
-      previous_designation:empForm.is_fresher?undefined:empForm.previous_designation||undefined,
-      bank_name:empForm.bank_name||undefined,account_holder_name:empForm.account_holder_name||undefined,
-      account_number:empForm.account_number||undefined,ifsc_code:empForm.ifsc_code||undefined,
-      resume:empForm.resume||undefined,aadhaar_card:empForm.aadhaar_card||undefined,
-      pan_card:empForm.pan_card||undefined,experience_letter:empForm.experience_letter||undefined,
-      permissions:empPerms,
-    },{
-      onSuccess:(res)=>{showPopup("success",res?.message||"Employee added successfully");setOpen(false);setEmpForm(EMPTY_EMP);setEmpErrors({});setEmpStep(0);setEmpPerms({...EMP_DEFAULT_PERMISSIONS});refetchList();},
-      onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Something went wrong"),
-    });
+ const handleEmpSubmit=()=>{
+  const err={
+    ...validateContactInfo(empForm),
+    ...validateWorkInfo(empForm),
+    ...validateAddressInfo(empForm),
+    ...validateIdentityInfo(empForm),
+    ...validateExperienceInfo(empForm),
+    ...validateBankInfo(empForm),
   };
+  setEmpErrors(err);
+  if(Object.keys(err).length>0){
+    const{message,step}=getErrorSummary(err);
+    setEmpStep(step);
+    showPopup("error",message);
+    return;
+  }
+  addEmployeeApi({
+    empid:empForm.empid,
+    f_name:empForm.f_name,l_name:empForm.l_name,work_email:empForm.work_email,
+    password:empForm.password,gender:empForm.gender,marital_status:empForm.marital_status,
+    personal_contact:empForm.personal_contact,e_contact:empForm.e_contact,
+    role:empForm.role,office_location:empForm.office_location,
+    designation:empForm.designation,department:empForm.department,
+    Under_manager:empForm.Under_manager||undefined,
+    address:empForm.address,city:empForm.city,state:empForm.state,pincode:empForm.pincode,country:empForm.country,
+    permanent_address:empForm.permanent_address||undefined,permanent_city:empForm.permanent_city||undefined,
+    permanent_state:empForm.permanent_state||undefined,permanent_pincode:empForm.permanent_pincode||undefined,
+    permanent_country:empForm.permanent_country||undefined,
+    aadhaar_number:empForm.aadhaar_number||undefined,pan_number:empForm.pan_number||undefined,
+    is_fresher:empForm.is_fresher,
+    total_experience:empForm.is_fresher?undefined:empForm.total_experience||undefined,
+    previous_company:empForm.is_fresher?undefined:empForm.previous_company||undefined,
+    previous_designation:empForm.is_fresher?undefined:empForm.previous_designation||undefined,
+    bank_name:empForm.bank_name||undefined,account_holder_name:empForm.account_holder_name||undefined,
+    account_number:empForm.account_number||undefined,ifsc_code:empForm.ifsc_code||undefined,
+    resume:empForm.resume||undefined,aadhaar_card:empForm.aadhaar_card||undefined,
+    pan_card:empForm.pan_card||undefined,experience_letter:empForm.experience_letter||undefined,
+    permissions:empPerms,
+  },{
+    onSuccess:(res)=>{showPopup("success",res?.message||"Employee added successfully");setOpen(false);setEmpForm(EMPTY_EMP);setEmpErrors({});setEmpStep(0);setEmpPerms({...EMP_DEFAULT_PERMISSIONS});refetchList();},
+    onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Something went wrong"),
+  });
+};
 
   const validateMgr=()=>{
     const err={
@@ -2012,35 +2189,49 @@ export default function EmployeeTable(){
     return Object.keys(err).length===0;
   };
 
-  const handleMgrSubmit=()=>{
-    if(!validateMgr()){showPopup("error","Please fix the errors in the form");setMgrStep(0);return;}
-    addManagerApi({
-      empid:mgrForm.empid,
-      f_name:mgrForm.f_name,l_name:mgrForm.l_name,work_email:mgrForm.work_email,
-      password:mgrForm.password,gender:mgrForm.gender,marital_status:mgrForm.marital_status,
-      personal_contact:mgrForm.personal_contact,e_contact:mgrForm.e_contact,
-      role:mgrForm.role,office_location:mgrForm.office_location,
-      designation:mgrForm.designation,department:mgrForm.department,
-      reporting_manager:mgrForm.reporting_manager||undefined,
-      address:mgrForm.address,city:mgrForm.city,state:mgrForm.state,pincode:mgrForm.pincode,country:mgrForm.country,
-      permanent_address:mgrForm.permanent_address||undefined,permanent_city:mgrForm.permanent_city||undefined,
-      permanent_state:mgrForm.permanent_state||undefined,permanent_pincode:mgrForm.permanent_pincode||undefined,
-      permanent_country:mgrForm.permanent_country||undefined,
-      aadhaar_number:mgrForm.aadhaar_number||undefined,pan_number:mgrForm.pan_number||undefined,
-      is_fresher:mgrForm.is_fresher,
-      total_experience:mgrForm.is_fresher?undefined:mgrForm.total_experience||undefined,
-      previous_company:mgrForm.is_fresher?undefined:mgrForm.previous_company||undefined,
-      previous_designation:mgrForm.is_fresher?undefined:mgrForm.previous_designation||undefined,
-      bank_name:mgrForm.bank_name||undefined,account_holder_name:mgrForm.account_holder_name||undefined,
-      account_number:mgrForm.account_number||undefined,ifsc_code:mgrForm.ifsc_code||undefined,
-      resume:mgrForm.resume||undefined,aadhaar_card:mgrForm.aadhaar_card||undefined,
-      pan_card:mgrForm.pan_card||undefined,experience_letter:mgrForm.experience_letter||undefined,
-      permissions:mgrPerms,
-    },{
-      onSuccess:(res)=>{showPopup("success",res?.message||"Manager added Successfully & verification email sent");setOpenManager(false);setMgrForm(EMPTY_MGR);setMgrErrors({});setMgrStep(0);setMgrPerms({...MGR_DEFAULT_PERMISSIONS});refetchList();},
-      onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Something went wrong"),
-    });
+const handleMgrSubmit=()=>{
+  const err={
+    ...validateContactInfo(mgrForm),
+    ...validateWorkInfo(mgrForm),
+    ...validateAddressInfo(mgrForm),
+    ...validateIdentityInfo(mgrForm),
+    ...validateExperienceInfo(mgrForm),
+    ...validateBankInfo(mgrForm),
   };
+  setMgrErrors(err);
+  if(Object.keys(err).length>0){
+    const{message,step}=getErrorSummary(err);
+    setMgrStep(step);
+    showPopup("error",message);
+    return;
+  }
+  addManagerApi({
+    empid:mgrForm.empid,
+    f_name:mgrForm.f_name,l_name:mgrForm.l_name,work_email:mgrForm.work_email,
+    password:mgrForm.password,gender:mgrForm.gender,marital_status:mgrForm.marital_status,
+    personal_contact:mgrForm.personal_contact,e_contact:mgrForm.e_contact,
+    role:mgrForm.role,office_location:mgrForm.office_location,
+    designation:mgrForm.designation,department:mgrForm.department,
+    reporting_manager:mgrForm.reporting_manager||undefined,
+    address:mgrForm.address,city:mgrForm.city,state:mgrForm.state,pincode:mgrForm.pincode,country:mgrForm.country,
+    permanent_address:mgrForm.permanent_address||undefined,permanent_city:mgrForm.permanent_city||undefined,
+    permanent_state:mgrForm.permanent_state||undefined,permanent_pincode:mgrForm.permanent_pincode||undefined,
+    permanent_country:mgrForm.permanent_country||undefined,
+    aadhaar_number:mgrForm.aadhaar_number||undefined,pan_number:mgrForm.pan_number||undefined,
+    is_fresher:mgrForm.is_fresher,
+    total_experience:mgrForm.is_fresher?undefined:mgrForm.total_experience||undefined,
+    previous_company:mgrForm.is_fresher?undefined:mgrForm.previous_company||undefined,
+    previous_designation:mgrForm.is_fresher?undefined:mgrForm.previous_designation||undefined,
+    bank_name:mgrForm.bank_name||undefined,account_holder_name:mgrForm.account_holder_name||undefined,
+    account_number:mgrForm.account_number||undefined,ifsc_code:mgrForm.ifsc_code||undefined,
+    resume:mgrForm.resume||undefined,aadhaar_card:mgrForm.aadhaar_card||undefined,
+    pan_card:mgrForm.pan_card||undefined,experience_letter:mgrForm.experience_letter||undefined,
+    permissions:mgrPerms,
+  },{
+    onSuccess:(res)=>{showPopup("success",res?.message||"Manager added Successfully & verification email sent");setOpenManager(false);setMgrForm(EMPTY_MGR);setMgrErrors({});setMgrStep(0);setMgrPerms({...MGR_DEFAULT_PERMISSIONS});refetchList();},
+    onError:(err)=>showPopup("error",err?.response?.data?.message||err?.message||"Something went wrong"),
+  });
+};
 
   const filtered=allUsers.filter((u)=>{
     const name=`${u.f_name??""} ${u.l_name??""}`.toLowerCase();
@@ -2048,7 +2239,7 @@ export default function EmployeeTable(){
     const effectiveType = u.type || (u.role === "manager" || u.role === "senior_manager" ? "manager" : "employee");
     const matchType=filters.type?filters.type==="employee"?effectiveType==="employee":filters.type==="manager"?effectiveType==="manager":u.role===filters.type:true;
     return(
-      (name.includes(q)||(u.work_email??"").toLowerCase().includes(q)||(u.uid??"").toLowerCase().includes(q)||(u.designation??"").toLowerCase().includes(q))&&
+      (name.includes(q)||(u.work_email??"").toLowerCase().includes(q)||(u.empid??"").toLowerCase().includes(q)||(u.designation??"").toLowerCase().includes(q))&&
       (filters.department?u.department===filters.department:true)&&
       (filters.role?u.role===filters.role:true)&&
       (filters.location?u.office_location===filters.location:true)&&
@@ -2076,29 +2267,32 @@ export default function EmployeeTable(){
 
   const inactiveCount = inactiveData?.count ?? 0;
 
-  return(
-    <div className="min-h-screen p-3 sm:p-4 md:p-6 font-['DM_Sans',system-ui,sans-serif]" style={{background:"#F9F8F2"}}>
-      <style>{`
-        .scrollbar-hide::-webkit-scrollbar{display:none;}
-        .scrollbar-hide{-ms-overflow-style:none;scrollbar-width:none;}
-        @media(max-width:480px){.xs\\:inline{display:inline;}.xs\\:block{display:block;}}
-      `}</style>
-
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[#730042] tracking-tight">Employee Directory</h1>
-            <p className="text-xs sm:text-sm text-[#993556] mt-0.5">
+return(
+    <div
+      className="h-full flex flex-col overflow-hidden pt-3 pr-3 pb-3 pl-1 sm:pt-4 sm:pr-4 sm:pb-4 sm:pl-1 md:pt-6 md:pr-6 md:pb-6 md:pl-3 lg:pt-8 lg:pr-8 lg:pb-8 lg:pl-4 font-['DM_Sans',system-ui,sans-serif]"
+      style={{
+        background: "#F9F8F2",
+        minWidth: "800px",
+        zoom: 0.81,
+        width: "100%",
+        height: "100%",
+      }}
+    >
+      <div className="max-w-7xl w-full h-full flex flex-col min-h-0">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 flex-shrink-0">
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-[#730042] tracking-tight">Employee Directory</h1>
+            <p className="text-[11px] sm:text-xs md:text-sm text-[#993556] mt-0.5 break-words">
               {activeUsers.length} active · {filtered.length} shown · {employeeData?.employees??0} employees · {employeeData?.managers??0} managers
               {inactiveCount>0&&<> · <span className="text-[#6B7280]">{inactiveCount} inactive</span></>}
-              {allowedUsers!==null&&<> · <span className={isLimitReached?"text-[#DC2626] font-semibold":"text-[#993556]"}>{remainingSlots} slot{remainingSlots!==1?"s":""} remaining of {allowedUsers}</span></>}
+              {allowedUsers!==null&&<> · <span className={isLimitReached?"text-[#DC2626] font-semibold":"text-[#993556]"}>{remainingSlots} User{remainingSlots!==1?"s":""} remaining of {allowedUsers}</span></>}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
             {inactiveCount>0&&(
               <button
                 onClick={()=>setShowInactive(v=>!v)}
-                className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all"
+                className="flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all w-full sm:w-auto"
                 style={showInactive
                   ?{borderColor:"#6B7280",background:"#6B7280",color:"#fff"}
                   :{borderColor:"#6B7280",color:"#6B7280",background:"transparent"}}
@@ -2111,15 +2305,30 @@ export default function EmployeeTable(){
                 </span>
               </button>
             )}
-            <button onClick={()=>exportToCSV(filtered)}
-              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all"
-              style={{borderColor:"#085041",color:"#085041"}}
-              onMouseEnter={(e)=>{e.currentTarget.style.background="#085041";e.currentTarget.style.color="#fff";}}
-              onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#085041";}}>
-              <FaFileExcel size={12}/><span>Export CSV</span>
-            </button>
+        <button onClick={()=>{
+    const managerFullMap = new Map((managersWithAdmin?.managers??[]).map(m=>[m._id,m]));
+    const employeeFullMap = new Map((employeesFull?.employees??[]).map(e=>[e._id,e]));
+
+    const enriched = filtered.map((u)=>{
+      const effType = u.type || (u.role==="manager"||u.role==="senior_manager" ? "manager" : "employee");
+      if(effType==="manager" && managerFullMap.has(u._id)){
+        return {...u, ...managerFullMap.get(u._id), type:u.type};
+      }
+      if(effType==="employee" && employeeFullMap.has(u._id)){
+        return {...u, ...employeeFullMap.get(u._id), type:u.type};
+      }
+      return u;
+    });
+    exportToCSV(enriched);
+  }}
+  className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all w-full sm:w-auto"
+  style={{borderColor:"#085041",color:"#085041"}}
+  onMouseEnter={(e)=>{e.currentTarget.style.background="#085041";e.currentTarget.style.color="#fff";}}
+  onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#085041";}}>
+  <FaFileExcel size={12}/><span>Export CSV</span>
+</button>
             {isLimitReached ? (
-              <div className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 border-[#FCA5A5] bg-[#FFF5F5] text-xs sm:text-sm font-semibold text-[#991B1B]">
+              <div className="col-span-2 sm:col-span-auto flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 border-[#FCA5A5] bg-[#FFF5F5] text-xs sm:text-sm font-semibold text-[#991B1B]">
                 <FaExclamationTriangle size={12}/>
                 <span className="hidden sm:inline">Limit reached — contact your organization</span>
                 <span className="sm:hidden">Limit reached</span>
@@ -2127,14 +2336,14 @@ export default function EmployeeTable(){
             ):(
               <>
                 <button onClick={()=>{setOpenManager(true);setMgrStep(0);}}
-                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all"
+                  className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all w-full sm:w-auto"
                   style={{borderColor:"#730042",color:"#730042"}}
                   onMouseEnter={(e)=>{e.currentTarget.style.background="#730042";e.currentTarget.style.color="#fff";}}
                   onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#730042";}}>
                   <FaUserTie size={12}/><span>Add Manager</span>
                 </button>
                 <button onClick={()=>{setOpen(true);setEmpStep(0);}}
-                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90"
+                  className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90 w-full sm:w-auto"
                   style={{background:"#730042"}}>
                   <FaUserPlus size={12}/><span>Add Employee</span>
                 </button>
@@ -2144,18 +2353,18 @@ export default function EmployeeTable(){
         </div>
 
         {showInactive&&inactiveCount>0&&(
-          <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-xs text-[#6B7280]">
+          <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-xs text-[#6B7280] flex-shrink-0">
             <FaBan size={11} className="flex-shrink-0"/>
             <span>Showing <strong>{inactiveCount}</strong> inactive user{inactiveCount!==1?"s":""} (resigned / fired / terminated). Their profiles are read-only.</span>
           </div>
         )}
 
-        <div className="bg-white rounded-2xl border border-[#F4C0D1] overflow-hidden">
-          <div className="p-3 sm:p-4 border-b border-[#F4C0D1]" style={{background:"#F9F8F2"}}>
+        <div className="bg-white rounded-2xl border border-[#F4C0D1] overflow-hidden flex flex-col flex-1 min-h-0">
+          <div className="p-3 sm:p-4 border-b border-[#F4C0D1] flex-shrink-0" style={{background:"#F9F8F2"}}>
             <div className="flex gap-2 mb-2">
               <div className="relative flex-1">
                 <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[#993556]" size={12}/>
-                <input placeholder="Search name, email, UID or designation…"
+                <input placeholder="Search name, email, Employee ID or designation…"
                   className={`${inputCls} pl-8 sm:pl-9`}
                   value={filters.search}
                   onChange={(e)=>setFilters({...filters,search:e.target.value})}/>
@@ -2172,11 +2381,11 @@ export default function EmployeeTable(){
                 )}
               </button>
             </div>
-            <div className="hidden sm:flex gap-2">
-              <select className={`${inputCls} flex-1`} value={filters.type} onChange={(e)=>setFilters({...filters,type:e.target.value})}>
+            <div className="hidden sm:flex sm:flex-wrap gap-2">
+              <select className={`${inputCls} flex-1 min-w-[140px]`} value={filters.type} onChange={(e)=>setFilters({...filters,type:e.target.value})}>
                 <option value="">All Types</option><option value="employee">Employees</option><option value="manager">Managers</option>
               </select>
-              <select className={`${inputCls} flex-1`} value={filters.department} onChange={(e)=>setFilters({...filters,department:e.target.value})}>
+              <select className={`${inputCls} flex-1 min-w-[140px]`} value={filters.department} onChange={(e)=>setFilters({...filters,department:e.target.value})}>
                 <option value="">All Departments</option>
                 {DEPT_OPTIONS.map((dept)=>(
                   <option key={dept} value={dept}>
@@ -2184,12 +2393,12 @@ export default function EmployeeTable(){
                   </option>
                 ))}
               </select>
-              <select className={`${inputCls} flex-1`} value={filters.role} onChange={(e)=>setFilters({...filters,role:e.target.value})}>
+              <select className={`${inputCls} flex-1 min-w-[140px]`} value={filters.role} onChange={(e)=>setFilters({...filters,role:e.target.value})}>
                 <option value="">All Roles</option>
                 <option value="employee">Employee</option><option value="manager">Manager</option>
                 <option value="senior_manager">Senior Manager</option><option value="official">Official</option>
               </select>
-              <select className={`${inputCls} flex-1`} value={filters.location} onChange={(e)=>setFilters({...filters,location:e.target.value})}>
+              <select className={`${inputCls} flex-1 min-w-[140px]`} value={filters.location} onChange={(e)=>setFilters({...filters,location:e.target.value})}>
                 <option value="">All Locations</option>{LOCATIONS.map((l)=><option key={l} value={l}>{l}</option>)}
               </select>
             </div>
@@ -2225,7 +2434,7 @@ export default function EmployeeTable(){
             )}
           </div>
 
-          <div className="sm:hidden p-3 space-y-2.5" style={{background:"#F9F8F2"}}>
+          <div className="lg:hidden p-3 space-y-2.5 overflow-y-auto flex-1 min-h-0" style={{background:"#F9F8F2"}}>
             {listLoading?<MobileSkeletons/>:filtered.length===0?(
               <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
                 <div className="text-4xl">👥</div>
@@ -2237,9 +2446,9 @@ export default function EmployeeTable(){
             ))}
           </div>
 
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full min-w-[800px] text-sm">
-              <thead>
+          <div className="hidden lg:block overflow-y-auto overflow-x-hidden flex-1 min-h-0 employee-table-scrollbar">
+  <table className="w-full text-sm">
+              <thead className="sticky top-0 z-10">
                 <tr className="border-b border-[#F4C0D1]" style={{background:"#F9F8F2"}}>
                   {["Employee","Department","Designation","Location","Manager / Reports To","Role","Employment","Actions"].map((h)=>(
                     <th key={h} className="px-3 lg:px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-[#993556] whitespace-nowrap">{h}</th>
@@ -2268,7 +2477,7 @@ export default function EmployeeTable(){
                           <div className="min-w-0">
                             <p className={`font-semibold text-xs lg:text-sm truncate max-w-[120px] lg:max-w-[160px] ${isInactive?"text-[#6B7280]":"text-[#730042]"}`}>{u.f_name} {u.l_name}</p>
                             <p className="text-[11px] text-[#993556] truncate max-w-[120px] lg:max-w-[160px]">{u.work_email}</p>
-                            {u.uid&&<p className="text-[10px] text-[#993556]/60 font-mono">{u.uid}</p>}
+                            {u.empid&&<p className="text-[10px] text-[#993556]/60 font-mono">{u.empid}</p>}
                           </div>
                         </div>
                       </td>
@@ -2279,22 +2488,22 @@ export default function EmployeeTable(){
                         {u.Under_manager?(
                           <div className="text-xs">
                             <p className="font-medium text-[#730042] truncate max-w-[80px] lg:max-w-none">{u.Under_manager.f_name} {u.Under_manager.l_name}</p>
-                            <p className="text-[#993556] text-[10px] hidden lg:block">{u.Under_manager.uid}</p>
+                            <p className="text-[#993556] text-[10px] hidden lg:block">{u.Under_manager.empid}</p>
                           </div>
                         ):u.reporting_manager?(
                           <div className="text-xs">
                             <p className="font-medium text-[#730042] truncate max-w-[80px] lg:max-w-none">{u.reporting_manager.f_name} {u.reporting_manager.l_name}</p>
-                            <p className="text-[#993556] text-[10px] hidden lg:block">{u.reporting_manager.work_email}</p>
+                            <p className="text-[#993556] text-[10px] hidden lg:block">{u.reporting_manager.empid}</p>
                           </div>
                         ):<span className="text-[#F4C0D1] text-xs">—</span>}
                       </td>
                       <td className="px-3 lg:px-4 py-3">{roleBadge(u)}</td>
                       <td className="px-3 lg:px-4 py-3"><WorkingStatusBadge status={u.working_status}/></td>
                       <td className="px-3 lg:px-4 py-3">
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e)=>e.stopPropagation()}>
-                          <ActionMenu user={u} onView={handleView} onEdit={handleOpenEdit} onDelete={setDeleteTarget} {...actionMenuProps}/>
-                        </div>
-                      </td>
+  <div onClick={(e)=>e.stopPropagation()}>
+    <ActionMenu user={u} onView={handleView} onEdit={handleOpenEdit} onDelete={setDeleteTarget} {...actionMenuProps}/>
+  </div>
+</td>
                     </tr>
                   );
                 })}
@@ -2303,9 +2512,9 @@ export default function EmployeeTable(){
           </div>
 
           {!listLoading&&filtered.length>0&&(
-            <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-t border-[#F4C0D1] text-[11px] sm:text-xs text-[#993556] flex items-center justify-between" style={{background:"#F9F8F2"}}>
+            <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-t border-[#F4C0D1] text-[11px] sm:text-xs text-[#993556] flex items-center justify-between gap-2 flex-shrink-0" style={{background:"#F9F8F2"}}>
               <span>Showing {filtered.length} of {allUsers.length}</span>
-              {activeFilterCount>0&&<button onClick={clearFilters} className="text-[#A32D2D] font-medium hover:underline">Clear filters</button>}
+              {activeFilterCount>0&&<button onClick={clearFilters} className="text-[#A32D2D] font-medium hover:underline flex-shrink-0">Clear filters</button>}
             </div>
           )}
         </div>
@@ -2353,24 +2562,8 @@ export default function EmployeeTable(){
           <Field label="First Name" required error={editErrors.f_name}><input name="f_name" value={editForm.f_name} onChange={handleEditChange} className={inputCls}/></Field>
           <Field label="Last Name" required error={editErrors.l_name}><input name="l_name" value={editForm.l_name} onChange={handleEditChange} className={inputCls}/></Field>
           <Field label="Work Email" required error={editErrors.work_email}><input name="work_email" type="email" value={editForm.work_email} onChange={handleEditChange} className={inputCls}/></Field>
-          <Field label="Department" required error={editErrors.department}>
-            <select name="department" value={editForm.department} onChange={handleEditChange} className={inputCls}>
-              <option value="">Select Department</option>
-              {DEPT_OPTIONS.map((dept) => (
-                <option key={dept} value={dept}>
-                  {DEPT_FULL_FORMS[dept]}
-                </option>
-              ))}
-            </select>
-          </Field>
           <Field label="Designation" required error={editErrors.designation}><input name="designation" value={editForm.designation} onChange={handleEditChange} className={inputCls}/></Field>
-          <Field label="Role">
-            <select name="role" value={editForm.role} onChange={handleEditChange} className={inputCls}>
-              <option value="employee">Employee</option><option value="manager">Manager</option>
-              <option value="senior_manager">Senior Manager</option><option value="official">Official</option>
-            </select>
-          </Field>
-          {(editTarget.role==="employee"||editTarget.role==="official"||editForm.role==="employee"||editForm.role==="official")&&(
+          {(editTarget.role==="employee"||editTarget.role==="official")&&(
             <div className="col-span-1 sm:col-span-2">
               <UnderManagerSelect value={editForm.Under_manager} onChange={handleEditChange} managersOnly={managersOnly}/>
             </div>
@@ -2392,11 +2585,7 @@ export default function EmployeeTable(){
           </Field>
           <Field label="Phone" error={editErrors.personal_contact}><input name="personal_contact" value={editForm.personal_contact} onChange={handleEditChange} className={inputCls}/></Field>
           <Field label="Emergency Contact" error={editErrors.e_contact}><input name="e_contact" value={editForm.e_contact} onChange={handleEditChange} className={inputCls}/></Field>
-          <Field label="Office Location">
-            <select name="office_location" value={editForm.office_location} onChange={handleEditChange} className={inputCls}>
-              <option value="">Select Location</option>{LOCATIONS.map((l)=><option key={l} value={l}>{l}</option>)}
-            </select>
-          </Field>
+          
         </Modal>
       )}
 

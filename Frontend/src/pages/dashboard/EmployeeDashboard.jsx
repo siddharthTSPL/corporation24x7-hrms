@@ -10,6 +10,41 @@ const MONTHS = ["January","February","March","April","May","June","July","August
 const DAYS = ["S","M","T","W","T","F","S"];
 const APPROVED_STATUSES = ["approved_manager","approved_admin"];
 
+const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "BPO",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+};
+
+function getDeptFullForm(code) {
+  if (!code) return "—";
+  const key = String(code).trim().toUpperCase();
+  return DEPT_FULL_FORMS[key] || code;
+}
+
+const ROLE_FULL_FORMS = {
+  sa: "Super Admin",
+  superadmin: "Super Admin",
+  admin: "Admin",
+  mgr: "Manager",
+  manager: "Manager",
+  emp: "Employee",
+  employee: "Employee",
+  hr: "HR",
+};
+
+function getRoleFullForm(code) {
+  if (!code) return null;
+  const key = String(code).trim().toLowerCase();
+  if (ROLE_FULL_FORMS[key]) return ROLE_FULL_FORMS[key];
+  return String(code)
+    .split(/[_\s]+/)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
 function getInitials(f="",l="") {
   return `${f[0]||""}${l[0]||""}`.toUpperCase();
 }
@@ -734,7 +769,7 @@ export default function EmployeeDashboard() {
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <Badge variant="brand">{employee?.uid??"—"}</Badge>
                     <Badge variant="green">Active</Badge>
-                    <Badge variant="blue">{employee?.department??"—"}</Badge>
+                    <Badge variant="blue">{getDeptFullForm(employee?.department)}</Badge>
                   </div>
                   <div className="mt-3 pt-3 border-t border-[#ede5e0] flex flex-col gap-1">
                     <div className="text-[10px] text-[#b0948a] font-sans">📧 {employee?.work_email??"—"}</div>
@@ -797,13 +832,13 @@ export default function EmployeeDashboard() {
                     />
                     <div>
                       <div className="text-[14px] font-semibold text-[#f9f8f2] leading-snug" style={{ fontFamily:"'Lora',serif" }}>{managerName}</div>
-                      <div className="text-[11px] text-white/60 mt-0.5 font-sans">{employee?.Under_manager?.designation??employee?.Under_manager?.role??"Manager"}</div>
+                      <div className="text-[11px] text-white/60 mt-0.5 font-sans">{employee?.Under_manager?.designation??getRoleFullForm(employee?.Under_manager?.role)??"Manager"}</div>
                     </div>
                   </div>
                   <div className="h-px bg-white/15 mb-3" />
                   <div className="flex justify-between text-[11px] font-sans mb-2">
                     <span className="text-white/50">Role</span>
-                    <span className="font-medium text-white/70 capitalize">{employee?.Under_manager?.role??"—"}</span>
+                    <span className="font-medium text-white/70 capitalize">{getRoleFullForm(employee?.Under_manager?.role)??"—"}</span>
                   </div>
                   <div>
                     <div className="text-[10px] text-white/40 mb-1 font-sans">Work email</div>
@@ -867,7 +902,7 @@ export default function EmployeeDashboard() {
             <CardAccent color="#730042" />
             <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between border-b border-[#ede5e0]">
               <span className="text-[12px] font-semibold font-sans">Employee profile</span>
-              <Badge variant="brand">{employee?.role??"employee"}</Badge>
+              <Badge variant="brand">{getRoleFullForm(employee?.role)??"Employee"}</Badge>
             </div>
             <div className="px-4 sm:px-5 py-3.5 flex items-center gap-3.5 border-b border-[#ede5e0]">
               <Avatar src={employee?.profile_image} initials={meLoading?"—":empInitials}
@@ -888,14 +923,14 @@ export default function EmployeeDashboard() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 px-4 sm:px-5 py-3.5">
               <InfoField label="Work email" value={employee?.work_email} loading={meLoading} />
-              <InfoField label="Department" value={employee?.department} loading={meLoading} />
+              <InfoField label="Department" value={getDeptFullForm(employee?.department)} loading={meLoading} />
               <InfoField label="Office" value={employee?.office_location} loading={meLoading} />
               <InfoField label="Gender" value={employee?.gender} loading={meLoading} />
               <InfoField label="Marital status" value={employee?.marital_status} loading={meLoading} />
               <InfoField label="Contact" value={employee?.personal_contact} loading={meLoading} />
               <InfoField label="Emergency contact" value={employee?.e_contact} loading={meLoading} />
               <InfoField label="Manager" value={managerName} loading={meLoading} />
-              <InfoField label="Member since" value={employee?.createdAt?fmtDate(employee.createdAt):null} loading={meLoading} />
+              <InfoField label="Member since" value={joiningDate?fmtDate(joiningDate):null} loading={meLoading} />
             </div>
           </div>
 
@@ -949,25 +984,7 @@ export default function EmployeeDashboard() {
           </div>
         </div>
 
-        {/* Leave History */}
-        <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative animate-fadein hover:shadow-lg transition-shadow" style={{ animationDelay:".45s" }}>
-          <CardAccent color="#378ADD" />
-          <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between border-b border-[#ede5e0] flex-wrap gap-2">
-            <div>
-              <span className="text-[12px] font-semibold font-sans">Leave History</span>
-              {!histLoading && (
-                <span className="ml-2 text-[11px] text-[#b0948a] font-sans">({allLeaves.length} total)</span>
-              )}
-            </div>
-            <div className="flex gap-1.5 flex-wrap">
-              <Badge variant="green">{approvedLeaves.length} approved</Badge>
-              <Badge variant="amber">{allLeaves.filter(l=>l.status?.includes("pending")).length} pending</Badge>
-              <Badge variant="red">{allLeaves.filter(l=>l.status?.includes("rejected")).length} rejected</Badge>
-            </div>
-          </div>
-          <LeaveHistoryList leaves={allLeaves} loading={histLoading} />
-        </div>
-
+     
       </div>
     </div>
   );
