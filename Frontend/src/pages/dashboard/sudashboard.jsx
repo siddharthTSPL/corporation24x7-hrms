@@ -25,6 +25,7 @@ import { useShowAllLeaves, useAcceptLeaveByAdmin, useRejectLeaveByAdmin } from "
 import { useGetAllAnnouncements, useCreateAnnouncement, useUpdateAnnouncement, useDeleteAnnouncement } from "../../auth/server-state/superadmin/announcement/suannouncement.hook";
 import { useGetAllAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin, useReviewToAdmin } from "../../auth/server-state/superadmin/other/suother.hook";
 import AttendanceDetailsModal from "./AttendanceDetailsModal";
+import { getAttendanceHistory as fetchEmployeeAttendanceHistory } from "../../auth/api/superadmin/other/su.other";
 
 const DEPT_OPTIONS = [ "OPR","BPO", "ENG", "HR", "MGMT"];
 export const DEPT_FULL_FORMS = {
@@ -2252,6 +2253,7 @@ function SuperAdminDashboard() {
         onClose={() => setAttendanceDetailsOpen(false)}
         useOverviewHook={useGetAttendanceOverview}
         useHistoryHook={useGetAttendanceHistory}
+        fetchHistory={fetchEmployeeAttendanceHistory}
       />
     </div>
   );
