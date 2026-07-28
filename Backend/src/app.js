@@ -81,6 +81,7 @@ const holidaypolicyrouter = require('../routes/holidaypolicy.route');
 const unifiedauthrouter = require('../routes/Unified.auth.route');
 const payrollrouter = require('../routes/payroll.route');
 const payrollpolicyrouter = require('../routes/payrollpolicy.route');
+const reimbursementrouter = require('../routes/reimbursement.route');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 // DEBUG — remove after fix
@@ -102,6 +103,7 @@ const routes = {
   unifiedauthrouter,
   payrollrouter,
   payrollpolicyrouter,
+  reimbursementrouter,
 };
 Object.entries(routes).forEach(([name, r]) => {
   if (!r) console.error(`❌ UNDEFINED: ${name}`);
@@ -130,6 +132,7 @@ app.use('/admin/payroll', payrollrouter);
 app.use('/admin/payroll', payrollpolicyrouter);
 app.use('/superadmin/payroll', payrollrouter);
 app.use('/superadmin/payroll', payrollpolicyrouter);
+app.use('/reimbursement', reimbursementrouter);
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 
