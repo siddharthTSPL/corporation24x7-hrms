@@ -2,6 +2,7 @@ const express = require("express");
 const superAdminRouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const superAdminAuth = require("../middleware/auth/superadmin.middleware");
+const supportUpload = require("../middleware/upload/supportAttachments.middleware");
 const { sendSupportRequest } = require("../controllers/support.controller");
 const {
   registerSuperAdmin,
@@ -295,6 +296,6 @@ superAdminRouter.patch("/assets/:id/revoke", superAdminAuth, asyncHandler(revoke
 superAdminRouter.get("/assets/person/:person_id/:person_model", superAdminAuth, asyncHandler(getAssetsOfPerson));
 
 // Help & Support form — no permission gate, super admin can reach support too.
-superAdminRouter.post("/contact-support", superAdminAuth, asyncHandler(sendSupportRequest));
+superAdminRouter.post("/contact-support", superAdminAuth, supportUpload.array("attachments", 5), asyncHandler(sendSupportRequest));
 
 module.exports = superAdminRouter;
