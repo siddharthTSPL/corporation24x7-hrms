@@ -73,7 +73,7 @@ const _notifyLeaveApplied = async ({
     endDate,
     days,
     reason,
-    portalLink: `${PORTAL_BASE}/leave-requests`,
+    portalLink: `${PORTAL_BASE}/login`,
   });
 
   await safeSendMail({ to: handler.email, subject: `New Leave Request from ${requesterName}`, html });
@@ -102,7 +102,7 @@ const _notifyLeaveForwarded = async ({
     endDate,
     days,
     reason,
-    portalLink: `${PORTAL_BASE}/leave-requests`,
+    portalLink: `${PORTAL_BASE}/login`,
     forwarded: true,
     forwardedByName,
   });
@@ -134,7 +134,7 @@ const _notifyLeaveDecision = async ({
     decision,
     decidedByName,
     remarks,
-    portalLink: `${PORTAL_BASE}/my-leaves`,
+    portalLink: `${PORTAL_BASE}/login`,
   });
 
   await safeSendMail({
@@ -156,7 +156,7 @@ const _notifyWFHApplied = async ({ requesterName, handlerModel, handlerId, start
     endDate,
     days,
     reason,
-    portalLink: `${PORTAL_BASE}/wfh-requests`,
+    portalLink: `${PORTAL_BASE}/login`,
   });
 
   await safeSendMail({ to: handler.email, subject: `New WFH Request from ${requesterName}`, html });
@@ -183,7 +183,7 @@ const _notifyWFHForwarded = async ({
     endDate,
     days,
     reason,
-    portalLink: `${PORTAL_BASE}/wfh-requests`,
+    portalLink: `${PORTAL_BASE}/login`,
     forwarded: true,
     forwardedByName,
   });
@@ -213,7 +213,7 @@ const _notifyWFHDecision = async ({
     decision,
     decidedByName,
     remarks,
-    portalLink: `${PORTAL_BASE}/my-wfh`,
+    portalLink: `${PORTAL_BASE}/login`,
   });
 
   await safeSendMail({
@@ -231,7 +231,7 @@ const _notifyAssetAssigned = async ({ recipientModel, recipientId, asset, assign
     recipientName: recipient.name,
     asset,
     assignedByName,
-    portalLink: `${PORTAL_BASE}/my-assets`,
+    portalLink: `${PORTAL_BASE}/login`,
   });
 
   await safeSendMail({
