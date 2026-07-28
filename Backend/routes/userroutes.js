@@ -7,6 +7,7 @@ const multer = require("multer");
 
 const upload = multer({ storage: multer.memoryStorage() });
 const { sendSupportRequest } = require("../controllers/support.controller");
+const supportUpload = require("../middleware/upload/supportAttachments.middleware");
 
 const {
   verifyUserEmail,
@@ -85,6 +86,6 @@ userrouter.get("/getExpenseDocuments", employeemiddleware, checkPermission("docu
 userrouter.get("/getPersonalDocuments", employeemiddleware, checkPermission("documents.can_view_all_documents"), asyncHandler(getPersonalDocuments));
 
 // Help & Support form — no permission gate, every logged-in employee can reach support.
-userrouter.post("/contact-support", employeemiddleware, asyncHandler(sendSupportRequest));
+userrouter.post("/contact-support", employeemiddleware, supportUpload.array("attachments", 5), asyncHandler(sendSupportRequest));
 
 module.exports = userrouter;
