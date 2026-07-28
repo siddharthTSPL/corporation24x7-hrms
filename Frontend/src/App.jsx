@@ -72,6 +72,10 @@ const Pagenotfound = lazy(() => import("./pages/pagenotfound/pagenotfound"));
 const Adminasset = lazy(() => import("./pages/asset/adminasset"));
 const Superadminasset = lazy(() => import("./pages/asset/superadminasset"));
 const Payroll = lazy(() => import("./pages/payroll/Payroll"));
+const ReimbursementEmployee = lazy(() => import("./pages/reimbursement/ReimbursementEmployee"));
+const ReimbursementManager = lazy(() => import("./pages/reimbursement/ReimbursementManager"));
+const ReimbursementAdmin = lazy(() => import("./pages/reimbursement/ReimbursementAdmin"));
+const ReimbursementSuperadmin = lazy(() => import("./pages/reimbursement/ReimbursementSuperadmin"));
 
 // NOTE: renamed to PascalCase — lowercase-first identifiers are
 // interpreted by JSX as native DOM tags (e.g. <adminmanagement />
@@ -217,6 +221,19 @@ function App() {
             <Route path="/manager-timesheet"        element={<Managertimesheet />} />
             <Route path="/employee-timesheet"       element={<Employeetimesheet />} />
             <Route path="/admin-asset-management"   element={<Adminasset />} />
+
+            <Route
+              path="/reimbursement-admin"
+              element={<ReimbursementAdmin />}
+            />
+            <Route
+              path="/reimbursement-manager"
+              element={<ReimbursementManager />}
+            />
+            <Route
+              path="/reimbursement-employee"
+              element={<ReimbursementEmployee />}
+            />
 
             {/* Restricted to admins only — payroll policy, CTC and payslips
                 are sensitive financial data */}
@@ -405,6 +422,7 @@ function App() {
             <Route path="/superadmin-asset-management"    element={<Superadminasset />} />
             <Route path="/superadmin-management"          element={<SuperAdminManagement />} />
             <Route path="/superadmin-payroll"              element={<Payroll />} />
+            <Route path="/superadmin-reimbursement"        element={<ReimbursementSuperadmin />} />
           </Route>
 
           <Route path="*" element={<Pagenotfound />} />
