@@ -8,6 +8,7 @@ const multer = require("multer");
 
 const upload = multer({ storage: multer.memoryStorage() });
 const { sendSupportRequest } = require("../controllers/support.controller");
+const supportUpload = require("../middleware/upload/supportAttachments.middleware");
 
 const {
   verifyAdmin,
@@ -394,6 +395,6 @@ adminrouter.patch("/assets/:id/revoke", adminauthmiddleware, asyncHandler(revoke
 adminrouter.get("/assets/person/:person_id/:person_model", adminauthmiddleware, asyncHandler(getAssetsOfPerson));
 
 // Help & Support form — no permission gate, every logged-in admin can reach support.
-adminrouter.post("/contact-support", adminauthmiddleware, asyncHandler(sendSupportRequest));
+adminrouter.post("/contact-support", adminauthmiddleware, supportUpload.array("attachments", 5), asyncHandler(sendSupportRequest));
 
 module.exports = adminrouter;

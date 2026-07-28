@@ -21,9 +21,6 @@ import {
   FaLock,
   FaMoneyCheckAlt,
   FaClipboardCheck,
-  FaQuestionCircle,
-  FaMapSigns,
-  FaHeadset,
 } from "react-icons/fa";
 import { useAuth } from "../auth/store/getmeauth/getmeauth";
 import { useAdminLogout } from "../auth/server-state/adminauth/adminauth.hook";
@@ -33,6 +30,7 @@ import { useLogoutSuperAdmin } from "../auth/server-state/superadmin/auth/suauth
 import { usePermissionStore } from "../auth/store/permission/permissionStore";
 import { clearAgentToken } from "../pages/utils/Desktopagent";
 import HelpTour from "./help/HelpTour";
+import FloatingHelp from "./help/FloatingHelp";
 import TechnicalSupportModal from "./help/TechnicalSupportModal";
 
 const superAdminMenu = [
@@ -128,7 +126,6 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
 
   const [open,        setOpen]        = useState(true);
   const [mobileOpen,  setMobileOpen]  = useState(false);
-  const [helpOpen,    setHelpOpen]    = useState(false);
   const [showTour,    setShowTour]    = useState(false);
   const [showSupport, setShowSupport] = useState(false);
 
@@ -180,14 +177,12 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
   ];
 
   const startTour = () => {
-    setHelpOpen(false);
     setOpen(true);
     setMobileOpen(true);
     setShowTour(true);
   };
 
   const openSupportForm = () => {
-    setHelpOpen(false);
     setShowSupport(true);
   };
 
@@ -306,49 +301,6 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
                 );
               })}
 
-              <div className="relative">
-                {helpOpen && (
-                  <>
-                    <div className="fixed inset-0 z-30" onClick={() => setHelpOpen(false)} />
-                    <div
-                      className={`absolute z-40 bottom-full mb-2 bg-white rounded-xl shadow-xl border border-[#F4C0D1] overflow-hidden
-                        ${collapsed ? "left-14 w-52" : "left-0 right-0"}`}
-                    >
-                      <button
-                        onClick={startTour}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-[#FBEAF0] hover:text-[#730042] transition-colors"
-                      >
-                        <FaMapSigns className="text-[#730042]" />
-                        <span>
-                          <span className="block font-medium">Take a Tour</span>
-                          <span className="block text-[11px] text-gray-400">A quick walkthrough of where everything is</span>
-                        </span>
-                      </button>
-                      <button
-                        onClick={openSupportForm}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-[#FBEAF0] hover:text-[#730042] transition-colors border-t border-gray-100"
-                      >
-                        <FaHeadset className="text-[#730042]" />
-                        <span>
-                          <span className="block font-medium">Technical Support</span>
-                          <span className="block text-[11px] text-gray-400">Report a problem via email</span>
-                        </span>
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                <button
-                  data-tour="help-button"
-                  onClick={() => setHelpOpen((v) => !v)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors
-                    ${helpOpen ? "bg-[#FBEAF0] text-[#730042]" : "hover:bg-gray-100 text-gray-700"}`}
-                >
-                  <FaQuestionCircle />
-                  {!collapsed && "Help"}
-                </button>
-              </div>
-
               <button
                 onClick={handleLogout}
                 disabled={isPending}
@@ -380,6 +332,7 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
         )}
       </div>
 
+      <FloatingHelp onTakeTour={startTour} onTechnicalSupport={openSupportForm} />
       {showTour && <HelpTour steps={tourSteps} onClose={() => setShowTour(false)} />}
       {showSupport && <TechnicalSupportModal role={role} onClose={() => setShowSupport(false)} />}
     </>

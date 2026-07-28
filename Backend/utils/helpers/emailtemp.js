@@ -399,6 +399,7 @@ function buildSupportRequestEmail({
   subject,
   message,
   page,
+  attachmentNames,
 }) {
   const rows = [
     detailRow("Reported By", name),
@@ -407,6 +408,7 @@ function buildSupportRequestEmail({
     detailRow("Employee ID", uid),
     detailRow("Organisation", organisationName),
     detailRow("Page", page),
+    detailRow("Attachments", attachmentNames?.length ? attachmentNames.join(", ") : undefined),
   ].join("");
 
   const body = `

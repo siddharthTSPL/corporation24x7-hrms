@@ -64,6 +64,29 @@ function daysLeft(dateStr) {
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }
 
+// Trial flag akela active license ko account mein nahi leta, isliye yaha
+// licenses array priority se check karte hain: plan_active > trial_active > trial_ended.
+// Backend `subscription_status` bhejta hai to wahi use hota hai, warna yaha fallback compute ho jata hai.
+function getSubscriptionInfo(superAdmin) {
+  if (!superAdmin) return { status: "trial_ended", activeLicense: null };
+
+  if (superAdmin.subscription_status) {
+    return {
+      status: superAdmin.subscription_status,
+      activeLicense: superAdmin.active_license || null,
+    };
+  }
+
+  const activeLicense = (superAdmin.licenses || []).find(
+    (lic) => lic.isActive && new Date(lic.expiresAt) > new Date(),
+  );
+  const trialValid =
+    superAdmin.is_trial_active && new Date() < new Date(superAdmin.trial_expires_at);
+
+  const status = activeLicense ? "plan_active" : trialValid ? "trial_active" : "trial_ended";
+  return { status, activeLicense: activeLicense || null };
+}
+
 function Badge({ children, color = C.brand, bg = C.brandLight }) {
   return (
     <span
@@ -75,18 +98,21 @@ function Badge({ children, color = C.brand, bg = C.brandLight }) {
   );
 }
 
-function PlanBadge({ plan }) {
-  const isTrial = plan === "trial" || plan === "free_trial";
+function PlanBadge({ status, planName }) {
+  const isTrial = status === "trial_active";
+  const isEnded = status === "trial_ended";
+
+  const color = isTrial ? C.amber : isEnded ? C.red : "#1a5c3a";
+  const bg = isTrial ? C.amberBg : isEnded ? C.redBg : C.greenBg;
+  const border = isTrial ? "#f5d98a" : isEnded ? "#f5c6c6" : "#a8dfc3";
+  const label = isTrial ? "⏱ Free Trial" : isEnded ? "Trial Ended" : "✓ " + (planName ? `${planName} Plan` : "Active");
+
   return (
     <span
       className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold whitespace-nowrap"
-      style={{
-        color: isTrial ? C.amber : "#1a5c3a",
-        background: isTrial ? C.amberBg : C.greenBg,
-        border: `0.5px solid ${isTrial ? "#f5d98a" : "#a8dfc3"}`,
-      }}
+      style={{ color, background: bg, border: `0.5px solid ${border}` }}
     >
-      {isTrial ? "⏱ Free Trial" : "✓ " + (plan || "Active")}
+      {label}
     </span>
   );
 }
@@ -256,7 +282,10 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
     },
   ];
 
-  const days = daysLeft(superAdmin?.trial_expires_at);
+  const { status, activeLicense } = getSubscriptionInfo(superAdmin);
+  const isPlanActive = status === "plan_active";
+  const countdownDate = isPlanActive ? activeLicense?.expiresAt : superAdmin?.trial_expires_at;
+  const days = daysLeft(countdownDate);
 
   return (
     <div className="w-full lg:w-64 lg:shrink-0">
@@ -280,10 +309,10 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
             <div className="text-[11px] text-[#b0948a] mt-0.5 truncate">{superAdmin?.organisation_name || "—"}</div>
             <div className="mt-2 flex flex-wrap gap-1.5 items-center justify-center">
               <Badge color={C.brand} bg={C.brandLight}>{formatRole(superAdmin?.role || "super_admin")}</Badge>
-              {superAdmin?.is_trial_active && <PlanBadge plan="free_trial" />}
+              <PlanBadge status={status} planName={activeLicense?.plan} />
             </div>
           </div>
-          {days !== null && days <= 30 && (
+          {status !== "trial_ended" && days !== null && days <= 30 && (
             <div
               className="w-full p-2 rounded-lg text-center"
               style={{
@@ -295,7 +324,7 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
                 {days === 0 ? "Expires today!" : `${days} day${days !== 1 ? "s" : ""} left`}
               </div>
               <div className="text-[10px] text-[#b0948a] mt-0.5">
-                Trial expires {formatDate(superAdmin?.trial_expires_at)}
+                {isPlanActive ? "Plan" : "Trial"} expires {formatDate(countdownDate)}
               </div>
             </div>
           )}
@@ -325,7 +354,10 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
 }
 
 function OverviewTab({ superAdmin }) {
-  const days = daysLeft(superAdmin?.trial_expires_at);
+  const { status, activeLicense } = getSubscriptionInfo(superAdmin);
+  const isPlanActive = status === "plan_active";
+  const countdownDate = isPlanActive ? activeLicense?.expiresAt : superAdmin?.trial_expires_at;
+  const days = daysLeft(countdownDate);
 
   return (
     <>
@@ -350,24 +382,53 @@ function OverviewTab({ superAdmin }) {
           <div className="mb-4">
             <FieldLabel>Current plan</FieldLabel>
             <div className="flex items-center gap-2 py-2.5">
-              <PlanBadge plan={superAdmin?.is_trial_active ? "free_trial" : "active"} />
+              <PlanBadge status={status} planName={activeLicense?.plan} />
             </div>
           </div>
-          <ReadonlyField label="Trial started" value={formatDate(superAdmin?.trial_started_at)} />
-          <div className="mb-4">
-            <FieldLabel>Trial expires</FieldLabel>
-            <div
-              className="px-3.5 py-2.5 rounded-lg text-sm font-medium break-words"
-              style={{
-                background: days !== null && days <= 5 ? C.redBg : "#f9f4f2",
-                border: `0.5px solid ${days !== null && days <= 5 ? "#f5c6c6" : C.border}`,
-                color: days !== null && days <= 5 ? C.red : C.text,
-              }}
-            >
-              {formatDate(superAdmin?.trial_expires_at)}
-              {days !== null && <span className="text-[11px] ml-2 opacity-70">({days}d left)</span>}
-            </div>
-          </div>
+
+          {isPlanActive ? (
+            <>
+              <ReadonlyField
+                label="Plan type"
+                value={activeLicense?.plan_type ? activeLicense.plan_type.charAt(0).toUpperCase() + activeLicense.plan_type.slice(1) : "—"}
+              />
+              <ReadonlyField label="Plan activated" value={formatDate(activeLicense?.activatedAt)} />
+              <div className="mb-4">
+                <FieldLabel>Plan expires</FieldLabel>
+                <div
+                  className="px-3.5 py-2.5 rounded-lg text-sm font-medium break-words"
+                  style={{
+                    background: days !== null && days <= 5 ? C.redBg : "#f9f4f2",
+                    border: `0.5px solid ${days !== null && days <= 5 ? "#f5c6c6" : C.border}`,
+                    color: days !== null && days <= 5 ? C.red : C.text,
+                  }}
+                >
+                  {formatDate(activeLicense?.expiresAt)}
+                  {days !== null && <span className="text-[11px] ml-2 opacity-70">({days}d left)</span>}
+                </div>
+              </div>
+              <ReadonlyField label="Seats" value={activeLicense?.users ? `${activeLicense.users} users` : "—"} />
+            </>
+          ) : (
+            <>
+              <ReadonlyField label="Trial started" value={formatDate(superAdmin?.trial_started_at)} />
+              <div className="mb-4">
+                <FieldLabel>Trial expires</FieldLabel>
+                <div
+                  className="px-3.5 py-2.5 rounded-lg text-sm font-medium break-words"
+                  style={{
+                    background: days !== null && days <= 5 ? C.redBg : "#f9f4f2",
+                    border: `0.5px solid ${days !== null && days <= 5 ? "#f5c6c6" : C.border}`,
+                    color: days !== null && days <= 5 ? C.red : C.text,
+                  }}
+                >
+                  {formatDate(superAdmin?.trial_expires_at)}
+                  {days !== null && <span className="text-[11px] ml-2 opacity-70">({days}d left)</span>}
+                </div>
+              </div>
+            </>
+          )}
+
           <ReadonlyField label="Company domain" value={superAdmin?.company_domain} />
           <ReadonlyField label="Licenses" value={superAdmin?.licenses?.length ? `${superAdmin.licenses.length} active` : "None"} />
           <ReadonlyField label="Purchased products" value={superAdmin?.purchased_products?.length ? `${superAdmin.purchased_products.length}` : "None"} />

@@ -2,9 +2,10 @@ import { useMemo, useState } from "react";
 import {
   FaTimes, FaSearch, FaMapMarkerAlt, FaIdCard, FaEnvelope,
   FaUserTie, FaBuilding, FaCalendarAlt, FaClock, FaDownload,
-  FaFilter, FaCheckCircle, FaUserClock, FaBan, FaLayerGroup,
+  FaFilter, FaCheckCircle, FaUserClock, FaBan, FaLayerGroup, FaUsers,
 } from "react-icons/fa";
 import AttendanceHistoryModal from "./AttendanceHistoryModal";
+import AttendanceBulkHistoryModal from "./AttendanceBulkHistoryModal";
 import { downloadCsv } from "./exportCsv";
 
 const MONTH_NAMES = [
@@ -261,7 +262,7 @@ function MonthlyRow({ p, onHistoryClick }) {
  * (useGetAttendanceOverview from adminother.hook.js or suother.hook.js) -
  * passed in so this component stays shared between both dashboards.
  */
-export default function AttendanceDetailsModal({ open, onClose, useOverviewHook, useHistoryHook }) {
+export default function AttendanceDetailsModal({ open, onClose, useOverviewHook, useHistoryHook, fetchHistory }) {
   const [tab, setTab] = useState("today");
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -272,6 +273,11 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
+
+  // Bulk attendance history — opens AttendanceBulkHistoryModal, which pulls
+  // day-wise history (7/15/30/custom range) for every currently filtered
+  // employee at once and lets the admin/manager export it all as one CSV.
+  const [bulkHistoryOpen, setBulkHistoryOpen] = useState(false);
 
   const todayQuery = useOverviewHook(
     { type: "today" },
@@ -480,6 +486,18 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
             >
               <FaDownload size={10} /> Export CSV
             </button>
+            {fetchHistory && (
+              <button
+                type="button"
+                onClick={() => setBulkHistoryOpen(true)}
+                disabled={!filtered.length}
+                title="Day-wise check-in/out history for every listed employee, exportable as one CSV"
+                className="flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-3 py-1.5 whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ color: "#730042", background: "#fdf2f7", border: "1px solid #e8b8cf" }}
+              >
+                <FaUsers size={10} /> Bulk Export
+              </button>
+            )}
           </div>
         </div>
 
@@ -602,6 +620,17 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
           employeeId={historyModal.person?.id}
           employeeName={historyModal.person?.name}
           useHistoryHook={useHistoryHook}
+          people={filtered}
+          fetchHistory={fetchHistory}
+        />
+      )}
+
+      {fetchHistory && (
+        <AttendanceBulkHistoryModal
+          open={bulkHistoryOpen}
+          onClose={() => setBulkHistoryOpen(false)}
+          people={filtered}
+          fetchHistory={fetchHistory}
         />
       )}
     </>
