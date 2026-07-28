@@ -261,7 +261,7 @@ function MonthlyRow({ p, onHistoryClick }) {
  * (useGetAttendanceOverview from adminother.hook.js or suother.hook.js) -
  * passed in so this component stays shared between both dashboards.
  */
-export default function AttendanceDetailsModal({ open, onClose, useOverviewHook, useHistoryHook }) {
+export default function AttendanceDetailsModal({ open, onClose, useOverviewHook, useHistoryHook, fetchHistory }) {
   const [tab, setTab] = useState("today");
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -602,6 +602,8 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
           employeeId={historyModal.person?.id}
           employeeName={historyModal.person?.name}
           useHistoryHook={useHistoryHook}
+          people={filtered}
+          fetchHistory={fetchHistory}
         />
       )}
     </>
