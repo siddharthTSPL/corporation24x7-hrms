@@ -5,6 +5,7 @@ import {
   FaFilter, FaCheckCircle, FaUserClock, FaBan, FaLayerGroup, FaUsers,
 } from "react-icons/fa";
 import AttendanceHistoryModal from "./AttendanceHistoryModal";
+import AttendanceBulkHistoryModal from "./AttendanceBulkHistoryModal";
 import { downloadCsv } from "./exportCsv";
 
 const MONTH_NAMES = [
@@ -49,73 +50,6 @@ function getDeptFullForm(code) {
   if (!code) return "—";
   return DEPT_FULL_FORMS[code] || code;
 }
-
-const toInputDate = (d) => {
-  const dt = new Date(d);
-  const y = dt.getFullYear();
-  const m = String(dt.getMonth() + 1).padStart(2, "0");
-  const day = String(dt.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-};
-
-const BULK_PRESETS = [
-  { key: "last_7", label: "7 Days" },
-  { key: "last_15", label: "15 Days" },
-  { key: "last_30", label: "30 Days" },
-  { key: "custom", label: "Custom" },
-];
-
-function bulkPresetRange(key) {
-  const now = new Date();
-  if (key === "last_15") {
-    const start = new Date(now);
-    start.setDate(start.getDate() - 14);
-    return { startDate: toInputDate(start), endDate: toInputDate(now) };
-  }
-  if (key === "last_30") {
-    const start = new Date(now);
-    start.setDate(start.getDate() - 29);
-    return { startDate: toInputDate(start), endDate: toInputDate(now) };
-  }
-  // last_7 (default)
-  const start = new Date(now);
-  start.setDate(start.getDate() - 6);
-  return { startDate: toInputDate(start), endDate: toInputDate(now) };
-}
-
-const BULK_CONCURRENCY = 5;
-
-async function runWithConcurrency(items, limit, worker) {
-  const results = new Array(items.length);
-  let next = 0;
-  async function runner() {
-    while (next < items.length) {
-      const i = next++;
-      results[i] = await worker(items[i], i);
-    }
-  }
-  const runners = Array.from({ length: Math.min(limit, items.length) }, runner);
-  await Promise.all(runners);
-  return results;
-}
-
-const HIST_STATUS_META = {
-  present: "Present",
-  half_day: "Half Day",
-  absent: "Absent",
-};
-
-const HIST_SOURCE_LABEL = {
-  face: "Face",
-  agent: "Agent",
-  system: "System",
-};
-
-const histFmtDate = (d) =>
-  d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", weekday: "short" }) : "—";
-
-const histFmtTime = (d) =>
-  d ? new Date(d).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—";
 
 const fmtTime = (d) =>
   d ? new Date(d).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—";
@@ -340,18 +274,10 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
 
-  // Day-range bulk export (7/15/30/custom) — pulls day-wise history for
-  // every currently filtered employee in one CSV, independent of the
-  // month-summary "Export CSV" button above.
-  const [bulkPreset, setBulkPreset] = useState("last_7");
-  const [bulkRange, setBulkRange] = useState(() => bulkPresetRange("last_7"));
-  const [isBulkExporting, setIsBulkExporting] = useState(false);
-  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
-
-  const applyBulkPreset = (key) => {
-    setBulkPreset(key);
-    if (key !== "custom") setBulkRange(bulkPresetRange(key));
-  };
+  // Bulk attendance history — opens AttendanceBulkHistoryModal, which pulls
+  // day-wise history (7/15/30/custom range) for every currently filtered
+  // employee at once and lets the admin/manager export it all as one CSV.
+  const [bulkHistoryOpen, setBulkHistoryOpen] = useState(false);
 
   const todayQuery = useOverviewHook(
     { type: "today" },
@@ -472,55 +398,6 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
     }
   };
 
-  // Day-wise export for ALL currently filtered employees at once, for the
-  // 7/15/30/custom range picked above — unlike exportCsv() this pulls
-  // per-day check-in/out rows via fetchHistory, not just the month summary.
-  const exportAllDayWiseCsv = async () => {
-    if (!filtered.length || !fetchHistory || isBulkExporting) return;
-    setIsBulkExporting(true);
-    setBulkProgress({ done: 0, total: filtered.length });
-
-    const combined = [];
-    const failedNames = [];
-
-    await runWithConcurrency(filtered, BULK_CONCURRENCY, async (person) => {
-      try {
-        const res = await fetchHistory(person.id, { startDate: bulkRange.startDate, endDate: bulkRange.endDate });
-        const dayRows = res?.data ?? [];
-        dayRows.forEach((r) => {
-          combined.push({ ...r, employeeName: person.name || "Unknown", empid: person.empid || "—" });
-        });
-      } catch {
-        failedNames.push(person.name || person.empid || person.id);
-      } finally {
-        setBulkProgress((p) => ({ ...p, done: p.done + 1 }));
-      }
-    });
-
-    downloadCsv(
-      `attendance-history-all-employees-${bulkRange.startDate}_to_${bulkRange.endDate}.csv`,
-      [
-        { key: "employeeName", label: "Employee", format: (r) => r.employeeName },
-        { key: "empid", label: "Emp ID", format: (r) => r.empid },
-        { key: "date", label: "Date", format: (r) => histFmtDate(r.date) },
-        { key: "checkIn", label: "Check-in", format: (r) => histFmtTime(r.checkIn) },
-        { key: "checkOut", label: "Check-out", format: (r) => histFmtTime(r.checkOut) },
-        { key: "source", label: "Via", format: (r) => HIST_SOURCE_LABEL[r.source] || "System" },
-        { key: "activeMinutes", label: "Active Minutes", format: (r) => Math.round(r.activeMinutes || 0) },
-        { key: "idleMinutes", label: "Idle Minutes", format: (r) => Math.round(r.idleMinutes || 0) },
-        { key: "status", label: "Status", format: (r) => HIST_STATUS_META[r.status] || "Absent" },
-        { key: "isLate", label: "Late", format: (r) => (r.isLate ? "Yes" : "No") },
-        { key: "overtimeMinutes", label: "Overtime Minutes", format: (r) => Math.round(r.overtimeMinutes || 0) },
-      ],
-      combined
-    );
-
-    setIsBulkExporting(false);
-    if (failedNames.length) {
-      console.warn("Could not fetch attendance history for:", failedNames.join(", "));
-    }
-  };
-
   if (!open) return null;
 
   const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i);
@@ -609,6 +486,18 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
             >
               <FaDownload size={10} /> Export CSV
             </button>
+            {fetchHistory && (
+              <button
+                type="button"
+                onClick={() => setBulkHistoryOpen(true)}
+                disabled={!filtered.length}
+                title="Day-wise check-in/out history for every listed employee, exportable as one CSV"
+                className="flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-3 py-1.5 whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ color: "#730042", background: "#fdf2f7", border: "1px solid #e8b8cf" }}
+              >
+                <FaUsers size={10} /> Bulk Export
+              </button>
+            )}
           </div>
         </div>
 
@@ -634,68 +523,6 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
             />
           </div>
         </div>
-
-        {tab === "monthly" && fetchHistory && (
-          <div className="px-4 sm:px-6 py-3 flex items-center gap-3 flex-wrap border-b border-gray-100 flex-shrink-0" style={{ background: "#fdf2f7" }}>
-            <span className="flex items-center gap-1.5 text-[11.5px] font-bold text-[#730042] whitespace-nowrap">
-              <FaUsers size={11} /> Bulk export — day-wise, all listed employees
-            </span>
-            <div className="flex gap-1.5">
-              {BULK_PRESETS.map((p) => (
-                <button
-                  key={p.key}
-                  type="button"
-                  onClick={() => applyBulkPreset(p.key)}
-                  disabled={isBulkExporting}
-                  className="px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-colors disabled:opacity-50"
-                  style={
-                    bulkPreset === p.key
-                      ? { color: "#fff", background: "#730042", border: "1px solid #730042" }
-                      : { color: "#730042", background: "#fff", border: "1px solid #e8b8cf" }
-                  }
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-            {bulkPreset === "custom" && (
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  value={bulkRange.startDate}
-                  max={bulkRange.endDate}
-                  disabled={isBulkExporting}
-                  onChange={(e) => setBulkRange((r) => ({ ...r, startDate: e.target.value }))}
-                  className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 outline-none"
-                />
-                <span className="text-[11px] text-gray-400">to</span>
-                <input
-                  type="date"
-                  value={bulkRange.endDate}
-                  min={bulkRange.startDate}
-                  max={toInputDate(new Date())}
-                  disabled={isBulkExporting}
-                  onChange={(e) => setBulkRange((r) => ({ ...r, endDate: e.target.value }))}
-                  className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 outline-none"
-                />
-              </div>
-            )}
-            <span className="text-[11px] text-gray-500">
-              {bulkRange.startDate} → {bulkRange.endDate}
-            </span>
-            <button
-              type="button"
-              onClick={exportAllDayWiseCsv}
-              disabled={isBulkExporting || !filtered.length}
-              title="Export day-wise check-in/out history for every listed employee, for the selected range"
-              className="ml-auto flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-3.5 py-1.5 whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{ color: "#fff", background: "#730042" }}
-            >
-              <FaDownload size={10} />
-              {isBulkExporting ? `Exporting ${bulkProgress.done}/${bulkProgress.total}…` : `Export All (${filtered.length})`}
-            </button>
-          </div>
-        )}
 
         {tab === "today" && todayStats && (
           <div className="px-4 sm:px-6 py-2.5 flex items-center gap-2 flex-wrap border-b border-gray-100 flex-shrink-0">
@@ -793,6 +620,15 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
           employeeId={historyModal.person?.id}
           employeeName={historyModal.person?.name}
           useHistoryHook={useHistoryHook}
+          people={filtered}
+          fetchHistory={fetchHistory}
+        />
+      )}
+
+      {fetchHistory && (
+        <AttendanceBulkHistoryModal
+          open={bulkHistoryOpen}
+          onClose={() => setBulkHistoryOpen(false)}
           people={filtered}
           fetchHistory={fetchHistory}
         />
