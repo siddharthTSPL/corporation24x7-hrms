@@ -7,6 +7,22 @@ const {
 
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || process.env.ZOHO_EMAIL;
 
+// Keep this to file types someone would plausibly screenshot/export while
+// reporting a bug — no executables, archives, etc. through the mail relay.
+const ALLOWED_ATTACHMENT_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+  "application/pdf",
+  "text/plain",
+  "text/csv",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",      // .xlsx
+  "application/msword",
+  "application/vnd.ms-excel",
+]);
+
 // Any logged-in role (superadmin/admin/manager/employee) hits this via its
 // own route + own auth middleware — req.user is set by all four middlewares.
 const sendSupportRequest = async (req, res) => {
@@ -25,6 +41,21 @@ const sendSupportRequest = async (req, res) => {
   if (!message || !message.trim()) {
     return res.status(400).json({ success: false, message: "Please describe the problem" });
   }
+
+  const files = req.files || [];
+  const rejected = files.filter((f) => !ALLOWED_ATTACHMENT_TYPES.has(f.mimetype));
+  if (rejected.length) {
+    return res.status(400).json({
+      success: false,
+      message: `Unsupported file type: ${rejected.map((f) => f.originalname).join(", ")}. Please attach images, PDFs, or Office documents only.`,
+    });
+  }
+
+  const attachments = files.map((f) => ({
+    filename: f.originalname,
+    content: f.buffer,
+    contentType: f.mimetype,
+  }));
 
   const name = [user.f_name, user.l_name].filter(Boolean).join(" ") || user.organisation_name || "";
   const email = user.work_email || user.email;
@@ -59,7 +90,9 @@ const sendSupportRequest = async (req, res) => {
       subject: subject.trim(),
       message: message.trim(),
       page,
+      attachmentNames: files.map((f) => f.originalname),
     }),
+    attachments,
   });
 
   if (email) {
@@ -79,6 +112,7 @@ const sendSupportRequest = async (req, res) => {
   return res.status(200).json({
     success: true,
     message: "Your message has been sent to our support team.",
+    attachmentsReceived: attachments.length,
   });
 };
 
