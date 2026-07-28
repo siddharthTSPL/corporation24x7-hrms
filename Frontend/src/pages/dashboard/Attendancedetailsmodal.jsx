@@ -624,63 +624,6 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
               <FilterSelect value={sourceFilter} onChange={setSourceFilter} options={SOURCE_FILTER_OPTIONS} />
             </>
           )}
-          {tab === "monthly" && fetchHistory && (
-            <>
-              <span className="w-px h-4 bg-gray-200 mx-0.5" />
-              <span className="text-[10.5px] font-semibold uppercase tracking-wide text-gray-400">Bulk export</span>
-              <div className="flex gap-1">
-                {BULK_PRESETS.map((p) => (
-                  <button
-                    key={p.key}
-                    type="button"
-                    onClick={() => applyBulkPreset(p.key)}
-                    disabled={isBulkExporting}
-                    className="px-2 py-1 text-[11px] font-semibold rounded-md transition-colors disabled:opacity-50"
-                    style={
-                      bulkPreset === p.key
-                        ? { color: "#730042", background: "#fdf2f7", border: "1px solid #e8b8cf" }
-                        : { color: "#9CA3AF", background: "#fff", border: "1px solid #e5e7eb" }
-                    }
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-              {bulkPreset === "custom" && (
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="date"
-                    value={bulkRange.startDate}
-                    max={bulkRange.endDate}
-                    disabled={isBulkExporting}
-                    onChange={(e) => setBulkRange((r) => ({ ...r, startDate: e.target.value }))}
-                    className="text-[11.5px] border border-gray-200 rounded-lg px-1.5 py-1 text-gray-600 outline-none"
-                  />
-                  <span className="text-[11px] text-gray-400">to</span>
-                  <input
-                    type="date"
-                    value={bulkRange.endDate}
-                    min={bulkRange.startDate}
-                    max={toInputDate(new Date())}
-                    disabled={isBulkExporting}
-                    onChange={(e) => setBulkRange((r) => ({ ...r, endDate: e.target.value }))}
-                    className="text-[11.5px] border border-gray-200 rounded-lg px-1.5 py-1 text-gray-600 outline-none"
-                  />
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={exportAllDayWiseCsv}
-                disabled={isBulkExporting || !filtered.length}
-                title="Export day-wise check-in/out history for every listed employee, for the selected range"
-                className="flex items-center gap-1.5 text-[11.5px] font-semibold rounded-lg px-2.5 py-1.5 whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ color: "#fff", background: "#730042" }}
-              >
-                <FaUsers size={10} />
-                {isBulkExporting ? `Exporting ${bulkProgress.done}/${bulkProgress.total}…` : "Export All"}
-              </button>
-            </>
-          )}
           <div className="relative ml-auto">
             <FaSearch size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-300" />
             <input
@@ -691,6 +634,68 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
             />
           </div>
         </div>
+
+        {tab === "monthly" && fetchHistory && (
+          <div className="px-4 sm:px-6 py-3 flex items-center gap-3 flex-wrap border-b border-gray-100 flex-shrink-0" style={{ background: "#fdf2f7" }}>
+            <span className="flex items-center gap-1.5 text-[11.5px] font-bold text-[#730042] whitespace-nowrap">
+              <FaUsers size={11} /> Bulk export — day-wise, all listed employees
+            </span>
+            <div className="flex gap-1.5">
+              {BULK_PRESETS.map((p) => (
+                <button
+                  key={p.key}
+                  type="button"
+                  onClick={() => applyBulkPreset(p.key)}
+                  disabled={isBulkExporting}
+                  className="px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-colors disabled:opacity-50"
+                  style={
+                    bulkPreset === p.key
+                      ? { color: "#fff", background: "#730042", border: "1px solid #730042" }
+                      : { color: "#730042", background: "#fff", border: "1px solid #e8b8cf" }
+                  }
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            {bulkPreset === "custom" && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={bulkRange.startDate}
+                  max={bulkRange.endDate}
+                  disabled={isBulkExporting}
+                  onChange={(e) => setBulkRange((r) => ({ ...r, startDate: e.target.value }))}
+                  className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 outline-none"
+                />
+                <span className="text-[11px] text-gray-400">to</span>
+                <input
+                  type="date"
+                  value={bulkRange.endDate}
+                  min={bulkRange.startDate}
+                  max={toInputDate(new Date())}
+                  disabled={isBulkExporting}
+                  onChange={(e) => setBulkRange((r) => ({ ...r, endDate: e.target.value }))}
+                  className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 outline-none"
+                />
+              </div>
+            )}
+            <span className="text-[11px] text-gray-500">
+              {bulkRange.startDate} → {bulkRange.endDate}
+            </span>
+            <button
+              type="button"
+              onClick={exportAllDayWiseCsv}
+              disabled={isBulkExporting || !filtered.length}
+              title="Export day-wise check-in/out history for every listed employee, for the selected range"
+              className="ml-auto flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-3.5 py-1.5 whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ color: "#fff", background: "#730042" }}
+            >
+              <FaDownload size={10} />
+              {isBulkExporting ? `Exporting ${bulkProgress.done}/${bulkProgress.total}…` : `Export All (${filtered.length})`}
+            </button>
+          </div>
+        )}
 
         {tab === "today" && todayStats && (
           <div className="px-4 sm:px-6 py-2.5 flex items-center gap-2 flex-wrap border-b border-gray-100 flex-shrink-0">
