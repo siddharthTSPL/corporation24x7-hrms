@@ -68,7 +68,7 @@ const adminMenu = [
   { name: "Timesheet",     path: "/admin-timesheet",     icon: <FaLock />, blurb: "Review and approve team timesheets." },
   { name: "Payroll",       path: "/payroll",             icon: <FaMoneyCheckAlt />, blurb: "Run payroll and manage payslips." },
   { name: "TorchX Management", path: "/admin-management", icon: <FaUsersCog />, blurb: "Manage your organisation's TorchX product access." },
-  { name: "Document",      path: "/document-admin",      icon: <FaFileAlt />, blurb: "Upload and manage your own documents.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
+  { name: "My Document",      path: "/document-admin",      icon: <FaFileAlt />, blurb: "Upload and manage your own documents.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Team Document", path: "/document-admin-team", icon: <FaFileAlt />, blurb: "View documents uploaded by your team.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Settings",      path: "/settings",            icon: <FaCog />, blurb: "Update your profile and account preferences." },
 ];
@@ -110,11 +110,7 @@ const menuByRole = {
   employee:   employeeMenu,
 };
 
-// NOTE: added `className` (default "") to props so the parent
-// (MainLayout) can pass positioning/sticky classes down to the
-// actual root <div> of the sidebar. Previously this prop was
-// silently ignored, which is why "sticky top-0" from MainLayout
-// never had any effect and the sidebar scrolled with the page.
+
 function Sidebar({ collapsed, setCollapsed, className = "" }) {
   const location  = useLocation();
   const navigate  = useNavigate();
