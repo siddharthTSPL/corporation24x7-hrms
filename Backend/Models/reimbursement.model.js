@@ -135,9 +135,8 @@ reimbursementSchema.virtual("isEditable").get(function () {
   return this.status === "draft";
 });
 
-reimbursementSchema.pre("validate", function (next) {
+reimbursementSchema.pre("validate", function () {
   this.approverModel = this.submitterModel === "Admin" ? "SuperAdmin" : "Admin";
-  next();
 });
 
 reimbursementSchema.pre("save", async function () {
