@@ -2022,6 +2022,7 @@ export default function EmployeeTable(){
     if(!editForm.work_email?.trim())err.work_email="Required";
     else if(!EMAIL_REGEX.test(editForm.work_email))err.work_email="Invalid email address";
     if(!editForm.designation?.trim())err.designation="Required";
+    if(!editForm.department)err.department="Required";
     if(editForm.personal_contact&&!PHONE_REGEX.test(editForm.personal_contact))err.personal_contact="Must be a valid 10-digit Indian mobile number";
     if(editForm.e_contact&&!PHONE_REGEX.test(editForm.e_contact))err.e_contact="Must be a valid 10-digit Indian mobile number";
     setEditErrors(err);
@@ -2563,6 +2564,14 @@ return(
           <Field label="Last Name" required error={editErrors.l_name}><input name="l_name" value={editForm.l_name} onChange={handleEditChange} className={inputCls}/></Field>
           <Field label="Work Email" required error={editErrors.work_email}><input name="work_email" type="email" value={editForm.work_email} onChange={handleEditChange} className={inputCls}/></Field>
           <Field label="Designation" required error={editErrors.designation}><input name="designation" value={editForm.designation} onChange={handleEditChange} className={inputCls}/></Field>
+          <Field label="Department" required error={editErrors.department}>
+            <select name="department" value={editForm.department} onChange={handleEditChange} className={inputCls}>
+              <option value="">Select Department</option>
+              {DEPT_OPTIONS.map((dept)=>(
+                <option key={dept} value={dept}>{DEPT_FULL_FORMS[dept]}</option>
+              ))}
+            </select>
+          </Field>
           {(editTarget.role==="employee"||editTarget.role==="official")&&(
             <div className="col-span-1 sm:col-span-2">
               <UnderManagerSelect value={editForm.Under_manager} onChange={handleEditChange} managersOnly={managersOnly}/>
