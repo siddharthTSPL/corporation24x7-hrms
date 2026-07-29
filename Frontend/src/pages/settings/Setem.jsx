@@ -25,6 +25,7 @@ const SETTINGS_TABS = [
   { key: "contact", label: "Contact info" },
   { key: "address", label: "Address" },
   { key: "identity", label: "Identity" },
+  { key: "documents", label: "Documents & Banking" },
   { key: "leave", label: "Leave Balance" },
   { key: "reviews", label: "Reviews" },
   { key: "password", label: "Password" },
@@ -255,6 +256,9 @@ function Sidebar({ tab, setTab, employee, initials }) {
     )},
     { key: "identity", label: "Identity", icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" strokeWidth="1.4"/><circle cx="6" cy="7" r="1.4" stroke="currentColor" strokeWidth="1.2"/><path d="M4.5 11c0-1.1 0.9-1.8 1.5-1.8s1.5 0.7 1.5 1.8M9.5 6.5h3M9.5 9h3" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg>
+    )},
+    { key: "documents", label: "Documents & Banking", icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3" y="1.5" width="10" height="13" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M5.5 5h5M5.5 7.5h5M5.5 10h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
     )},
     { key: "leave", label: "Leave Balance", icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" strokeWidth="1.4"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
@@ -668,6 +672,94 @@ function IdentityTab({ employee }) {
         <ReadonlyField label="PAN number" value={employee?.pan_number} />
       </div>
     </SectionCard>
+  );
+}
+
+function DocumentsBankingTab({ employee, onSuccess, onError }) {
+  const queryClient = useQueryClient();
+  const updateProfile = useUpdateProfile();
+  const [form, setForm] = useState({
+    resume: "", aadhaar_card: "", pan_card: "", experience_letter: "",
+    bank_name: "", account_holder_name: "", account_number: "", ifsc_code: "",
+  });
+
+  useEffect(() => {
+    if (employee) {
+      setForm({
+        resume: employee.resume || "",
+        aadhaar_card: employee.aadhaar_card || "",
+        pan_card: employee.pan_card || "",
+        experience_letter: employee.experience_letter || "",
+        bank_name: employee.bank_name || "",
+        account_holder_name: employee.account_holder_name || "",
+        account_number: employee.account_number || "",
+        ifsc_code: employee.ifsc_code || "",
+      });
+    }
+  }, [employee]);
+
+  const set = (key) => (e) => setForm(p => ({ ...p, [key]: e.target.value }));
+
+  const onProfileSuccess = (data, msg) => {
+    queryClient.setQueryData(["meUser"], old => old ? { ...old, employee: { ...old.employee, ...data.employee } } : old);
+    queryClient.invalidateQueries({ queryKey: ["meUser"] });
+    onSuccess(msg);
+  };
+
+  const handleSaveDocs = () => {
+    updateProfile.mutate(
+      {
+        resume: form.resume,
+        aadhaar_card: form.aadhaar_card,
+        pan_card: form.pan_card,
+        experience_letter: form.experience_letter,
+      },
+      {
+        onSuccess: (data) => onProfileSuccess(data, "Documents updated!"),
+        onError: (err) => onError(getErrorMessage(err)),
+      }
+    );
+  };
+
+  const handleSaveBanking = () => {
+    if (form.bank_name && form.bank_name.length > 100) { onError("Bank name is too long"); return; }
+    if (!form.account_holder_name.trim()) { onError("Account holder name is required"); return; }
+    if (!ACCOUNT_REGEX.test(form.account_number)) { onError("Account number must be 9-18 digits"); return; }
+    if (!IFSC_REGEX.test(form.ifsc_code.toUpperCase())) { onError("Invalid IFSC code"); return; }
+    updateProfile.mutate(
+      {
+        bank_name: form.bank_name,
+        account_holder_name: form.account_holder_name,
+        account_number: form.account_number,
+        ifsc_code: form.ifsc_code.toUpperCase(),
+      },
+      {
+        onSuccess: (data) => onProfileSuccess(data, "Banking details updated!"),
+        onError: (err) => onError(getErrorMessage(err)),
+      }
+    );
+  };
+
+  return (
+    <>
+      <SectionCard title="Documents" subtitle="Paste a link to each uploaded file" accent={C.blue}>
+        <InputField label="Resume" value={form.resume} onChange={set("resume")} placeholder="https://…" />
+        <InputField label="Aadhaar card" value={form.aadhaar_card} onChange={set("aadhaar_card")} placeholder="https://…" />
+        <InputField label="PAN card" value={form.pan_card} onChange={set("pan_card")} placeholder="https://…" />
+        <InputField label="Experience letter" value={form.experience_letter} onChange={set("experience_letter")} placeholder="https://…" />
+        <PrimaryButton onClick={handleSaveDocs} loading={updateProfile.isPending}>Save documents</PrimaryButton>
+      </SectionCard>
+
+      <SectionCard title="Banking details" subtitle="Used for salary disbursement" accent={C.green}>
+        <InputField label="Bank name" value={form.bank_name} onChange={set("bank_name")} placeholder="Bank name" />
+        <InputField label="Account holder name" value={form.account_holder_name} onChange={set("account_holder_name")} placeholder="As per bank records" />
+        <div className="st-2col">
+          <InputField label="Account number" value={form.account_number} onChange={set("account_number")} placeholder="9-18 digit account number" />
+          <InputField label="IFSC code" value={form.ifsc_code} onChange={(e) => setForm(p => ({ ...p, ifsc_code: e.target.value.toUpperCase() }))} placeholder="ABCD0123456" />
+        </div>
+        <PrimaryButton onClick={handleSaveBanking} loading={updateProfile.isPending} color={C.green}>Save banking details</PrimaryButton>
+      </SectionCard>
+    </>
   );
 }
 
@@ -1111,6 +1203,7 @@ export default function EmployeeSettingsPage() {
             {tab === "contact"   && <ContactTab   employee={employee} onSuccess={showSuccess} onError={showError} />}
             {tab === "address"   && <AddressTab   employee={employee} />}
             {tab === "identity"  && <IdentityTab  employee={employee} />}
+            {tab === "documents" && <DocumentsBankingTab employee={employee} onSuccess={showSuccess} onError={showError} />}
             {tab === "leave"     && <LeaveTab     leaveBalance={leaveBalance} />}
             {tab === "reviews"   && <ReviewsTab   reviews={reviews} />}
             {tab === "password"  && <PasswordTab  onSuccess={showSuccess} onError={showError} />}
