@@ -13,6 +13,16 @@ const ALLOWED_TYPES = [
 
 const err = (message, statusCode = 400) => Object.assign(new Error(message), { statusCode });
 
+// True only when the actor (employee/manager/admin) has filled in every
+// bank field needed to actually pay out a reimbursement.
+const hasBankDetails = (actor) =>
+  !!(
+    actor?.bank_name?.trim() &&
+    actor?.account_holder_name?.trim() &&
+    actor?.account_number?.trim() &&
+    actor?.ifsc_code?.trim()
+  );
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -77,6 +87,9 @@ const createClaim = async ({ actor, model, body, files, asDraft }) => {
   const validationError = validateClaimBody(body);
   if (!asDraft && validationError) throw err(validationError);
 
+  if (!asDraft && !hasBankDetails(actor))
+    throw err("Bank details is not available. Please update your bank details in Settings before submitting a reimbursement claim.");
+
   const receipts = await uploadAttachments(files?.receipts);
   const supportingDocuments = await uploadAttachments(files?.supportingDocuments);
 
@@ -139,8 +152,18 @@ const updateClaim = async ({ actor, model, id, body, files }) => {
   if (body.submit === "true" || body.submit === true) {
     const validationError = validateClaimBody(claim.toObject());
     if (validationError) throw err(validationError);
+    if (!hasBankDetails(actor))
+      throw err("Bank details is not available. Please update your bank details in Settings before submitting a reimbursement claim.");
     if (claim.receipts.length === 0)
       throw err("At least one receipt/invoice must be attached to submit a claim");
+    // Re-snapshot bank details in case they were added/changed after the
+    // draft was first saved.
+    claim.bankAccount = {
+      bankName: actor.bank_name || "",
+      accountHolderName: actor.account_holder_name || "",
+      accountNumber: actor.account_number || "",
+      ifscCode: actor.ifsc_code || "",
+    };
     claim.status = "submitted";
   }
 
@@ -169,6 +192,7 @@ const listMyClaims = async ({ actor, model }) => {
     isDeleted: false,
   })
     .sort({ createdAt: -1 })
+    .populate("reportingManager", "f_name l_name work_email personal_contact")
     .lean();
 };
 
@@ -177,7 +201,10 @@ const listMyClaims = async ({ actor, model }) => {
 const listQueueForApprover = async ({ organisation_id, approverModel, status }) => {
   const query = { organisation_id, approverModel, isDeleted: false };
   if (status) query.status = status;
-  return Reimbursement.find(query).sort({ createdAt: -1 }).lean();
+  return Reimbursement.find(query)
+    .sort({ createdAt: -1 })
+    .populate("reportingManager", "f_name l_name work_email personal_contact")
+    .lean();
 };
 
 const decideClaim = async ({
@@ -405,7 +432,10 @@ const superadminGetAll = async (req, res) => {
   if (req.query.status) query.status = req.query.status;
   if (req.query.submitterModel) query.submitterModel = req.query.submitterModel;
 
-  const reimbursements = await Reimbursement.find(query).sort({ createdAt: -1 }).lean();
+  const reimbursements = await Reimbursement.find(query)
+    .sort({ createdAt: -1 })
+    .populate("reportingManager", "f_name l_name work_email personal_contact")
+    .lean();
   res.status(200).json({ success: true, count: reimbursements.length, reimbursements });
 };
 
