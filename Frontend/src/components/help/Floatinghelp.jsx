@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { FaCommentDots, FaTimes, FaMapSigns, FaHeadset } from "react-icons/fa";
+import { FaQuestion, FaTimes, FaMapSigns, FaHeadset } from "react-icons/fa";
 
 const SIZE = 56;
 const MARGIN = 20;
@@ -181,7 +181,7 @@ export default function FloatingHelp({ onTakeTour, onTechnicalSupport }) {
             style={{ background: "#9B2554", opacity: 0.35 }}
           />
         )}
-        {open ? <FaTimes size={18} /> : <FaCommentDots size={22} />}
+        {open ? <FaTimes size={18} /> : <FaQuestion size={20} />}
       </button>
 
       <style>{`
