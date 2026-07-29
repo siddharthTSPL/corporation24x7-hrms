@@ -684,7 +684,7 @@ function PermissionsDrawer({userId,userModel,userRole,onClose}){
               {perms&&<PermissionsPanel perms={perms} onChange={handleToggle} roleType={roleType}/>}
             </div>
             <div className="px-4 py-3 border-t border-[#F4C0D1] flex-shrink-0 bg-[#F9F8F2]">
-              {msg&&<p className={`text-xs mb-2 text-center font-medium ${msg.includes("success")?"text-[#065F46]":"text-[#A32D2D]"}`}>{msg}</p>}
+              {msg&&<p className={`text-xs mb-2 text-center font-medium ${msg.includes("success")?"text-[#22C55E]":"text-[#A32D2D]"}`}>{msg}</p>}
               <button onClick={handleSave} disabled={saving} className="w-full py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-60 hover:opacity-90" style={{background:"#730042"}}>
                 {saving?"Saving…":"Save Permissions"}
               </button>
@@ -1512,13 +1512,13 @@ function EmptyState({onAdd}){
 }
 
 function Popup({type="success",message,onClose}){
-  const styles={success:{background:"#CD166E"},error:{background:"#A32D2D"},info:{background:"#185FA5"}};
+  const textStyles={success:{color:"#22C55E"},error:{color:"#DC2626"},info:{color:"#185FA5"}};
   return(
     <div className="fixed top-4 right-4 sm:top-5 sm:right-5 z-[100] max-w-[calc(100vw-2rem)]" style={{animation:"slideInPopup 0.3s ease forwards"}}>
       <style>{`@keyframes slideInPopup{from{opacity:0;transform:translateX(60px);}to{opacity:1;transform:translateX(0);}}`}</style>
-      <div className="min-w-[240px] sm:min-w-[280px] max-w-sm px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl text-white flex items-start justify-between gap-3" style={styles[type]}>
-        <span className="text-xs sm:text-sm font-medium">{message}</span>
-        <button onClick={onClose} className="text-white/80 hover:text-white flex-shrink-0">✕</button>
+      <div className="min-w-[240px] sm:min-w-[280px] max-w-sm px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-white border-2 flex items-start justify-between gap-3 shadow-lg" style={{borderColor:"#730042"}}>
+        <span className="text-xs sm:text-sm font-semibold" style={textStyles[type]}>{message}</span>
+        <button onClick={onClose} className="flex-shrink-0 hover:opacity-70" style={textStyles[type]}>✕</button>
       </div>
     </div>
   );
@@ -2022,6 +2022,7 @@ export default function EmployeeTable(){
     if(!editForm.work_email?.trim())err.work_email="Required";
     else if(!EMAIL_REGEX.test(editForm.work_email))err.work_email="Invalid email address";
     if(!editForm.designation?.trim())err.designation="Required";
+    if(!editForm.department)err.department="Required";
     if(editForm.personal_contact&&!PHONE_REGEX.test(editForm.personal_contact))err.personal_contact="Must be a valid 10-digit Indian mobile number";
     if(editForm.e_contact&&!PHONE_REGEX.test(editForm.e_contact))err.e_contact="Must be a valid 10-digit Indian mobile number";
     setEditErrors(err);
@@ -2563,6 +2564,14 @@ return(
           <Field label="Last Name" required error={editErrors.l_name}><input name="l_name" value={editForm.l_name} onChange={handleEditChange} className={inputCls}/></Field>
           <Field label="Work Email" required error={editErrors.work_email}><input name="work_email" type="email" value={editForm.work_email} onChange={handleEditChange} className={inputCls}/></Field>
           <Field label="Designation" required error={editErrors.designation}><input name="designation" value={editForm.designation} onChange={handleEditChange} className={inputCls}/></Field>
+          <Field label="Department" required error={editErrors.department}>
+            <select name="department" value={editForm.department} onChange={handleEditChange} className={inputCls}>
+              <option value="">Select Department</option>
+              {DEPT_OPTIONS.map((dept)=>(
+                <option key={dept} value={dept}>{DEPT_FULL_FORMS[dept]}</option>
+              ))}
+            </select>
+          </Field>
           {(editTarget.role==="employee"||editTarget.role==="official")&&(
             <div className="col-span-1 sm:col-span-2">
               <UnderManagerSelect value={editForm.Under_manager} onChange={handleEditChange} managersOnly={managersOnly}/>
