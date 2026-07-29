@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 
 // ---------------------------------------------------------------------------
 // Shared design tokens — mirrors pages/payroll/Payroll.jsx so this module
@@ -200,7 +201,7 @@ function Modal({ title, onClose, children, width = 460 }) {
 // ---------------------------------------------------------------------------
 // Apply / Edit claim form
 // ---------------------------------------------------------------------------
-function ClaimForm({ onSubmit, submitting, initial, onCancel }) {
+function ClaimForm({ onSubmit, submitting, initial, onCancel, bankDetailsAvailable = true }) {
   const [form, setForm] = useState({
     reimbursementType: initial?.reimbursementType || "Travel",
     expenseDate: initial?.expenseDate ? initial.expenseDate.slice(0, 10) : "",
@@ -233,6 +234,10 @@ function ClaimForm({ onSubmit, submitting, initial, onCancel }) {
   const handleSubmit = (status) => async () => {
     setError("");
     if (status === "submitted") {
+      if (!bankDetailsAvailable) {
+        setError("Bank details is not available. Please add your bank details in Settings before submitting a reimbursement claim.");
+        return;
+      }
       if (!form.expenseDate || !form.amountClaimed || !form.description) {
         setError("Expense date, amount, and description are required.");
         return;
@@ -251,6 +256,11 @@ function ClaimForm({ onSubmit, submitting, initial, onCancel }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {!bankDetailsAvailable && (
+        <div style={{ background: C.amberBg, color: C.amber, padding: "10px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
+          Bank details is not available. Please add your bank details in Settings before submitting a claim. You can still save this as a draft.
+        </div>
+      )}
       {error && (
         <div style={{ background: C.redBg, color: C.red, padding: "8px 12px", borderRadius: 8, fontSize: 13 }}>
           {error}
@@ -316,7 +326,7 @@ function ClaimForm({ onSubmit, submitting, initial, onCancel }) {
         <Btn variant="outline" onClick={handleSubmit("draft")} loading={submitting === "draft"}>
           Save as Draft
         </Btn>
-        <Btn variant="primary" onClick={handleSubmit("submitted")} loading={submitting === "submitted"}>
+        <Btn variant="primary" onClick={handleSubmit("submitted")} loading={submitting === "submitted"} disabled={!bankDetailsAvailable}>
           Submit Claim
         </Btn>
       </div>
@@ -344,6 +354,8 @@ function ClaimDetail({ claim }) {
       {row("Department", claim.department)}
       {row("Designation", claim.designation)}
       {row("Email", claim.email)}
+      {row("Reporting Manager", claim.reportingManager ? `${claim.reportingManager.f_name} ${claim.reportingManager.l_name}` : null)}
+      {row("Manager Contact", claim.reportingManager?.work_email || claim.reportingManager?.personal_contact)}
       {row("Type", claim.reimbursementType)}
       {row("Expense Date", fmtDate(claim.expenseDate))}
       {row("Amount", fmtMoney(claim.amountClaimed, claim.currency))}
@@ -351,6 +363,15 @@ function ClaimDetail({ claim }) {
       {row("Cost Center", claim.costCenter)}
       {row("Payment Method", claim.paymentMethod)}
       {row("Submitted On", fmtDate(claim.submissionDate || claim.createdAt))}
+      {(claim.bankAccount?.bankName || claim.bankAccount?.accountNumber) && (
+        <div style={{ padding: "10px 0 4px" }}>
+          <div style={{ color: C.muted, fontSize: 13, marginBottom: 4, fontWeight: 600 }}>Bank Details</div>
+          {row("Bank Name", claim.bankAccount?.bankName)}
+          {row("Account Holder Name", claim.bankAccount?.accountHolderName)}
+          {row("Account Number", claim.bankAccount?.accountNumber)}
+          {row("IFSC Code", claim.bankAccount?.ifscCode)}
+        </div>
+      )}
       <div style={{ padding: "10px 0 6px", fontSize: 13 }}>
         <div style={{ color: C.muted, marginBottom: 4 }}>Description</div>
         <div style={{ color: C.text }}>{claim.description}</div>
@@ -538,6 +559,19 @@ export default function ReimbursementBase({
   const [reviewFilter, setReviewFilter] = useState("submitted");
   const [banner, setBanner] = useState(null);
 
+  const { data: authData } = useAuth();
+  const person =
+    authData?.role === "employee" ? authData?.data?.employee
+    : authData?.role === "manager" ? authData?.data?.manager
+    : authData?.role === "admin" ? authData?.data?.user
+    : null;
+  const bankDetailsAvailable = !!(
+    person?.bank_name?.trim() &&
+    person?.account_holder_name?.trim() &&
+    person?.account_number?.trim() &&
+    person?.ifsc_code?.trim()
+  );
+
   const my = myClaims?.data?.reimbursements || [];
   const pending = reviewQueue?.pending?.data?.reimbursements || [];
   const all = reviewQueue?.all?.data?.reimbursements || [];
@@ -625,7 +659,7 @@ export default function ReimbursementBase({
 
       <div style={{ background: C.surface, borderRadius: 16, border: `1px solid ${C.border}`, padding: 22 }}>
         {tab === "apply" && canApply && (
-          <ClaimForm onSubmit={handleApply} submitting={submitting} />
+          <ClaimForm onSubmit={handleApply} submitting={submitting} bankDetailsAvailable={bankDetailsAvailable} />
         )}
 
         {tab === "mine" && canApply && (
@@ -707,7 +741,7 @@ export default function ReimbursementBase({
 
       {editClaim && (
         <Modal title={`Edit ${editClaim.claimNumber}`} onClose={() => setEditClaim(null)} width={560}>
-          <ClaimForm initial={editClaim} onSubmit={handleUpdate} submitting={submitting} onCancel={() => setEditClaim(null)} />
+          <ClaimForm initial={editClaim} onSubmit={handleUpdate} submitting={submitting} onCancel={() => setEditClaim(null)} bankDetailsAvailable={bankDetailsAvailable} />
         </Modal>
       )}
     </div>
