@@ -1,11 +1,9 @@
 const mongoose = require("mongoose");
 
-// Shared shape for receipts / supporting docs — same idea as ticket.model.js's
-// attachmentSchema, kept local here so this module has no cross-dependency.
 const attachmentSchema = new mongoose.Schema(
   {
     url: { type: String, required: true },
-    fileId: { type: String }, // ImageKit fileId, used for deletion
+    fileId: { type: String },
     originalName: String,
     mimeType: String,
     sizeKb: Number,
@@ -36,10 +34,6 @@ const reimbursementSchema = new mongoose.Schema(
 
     claimNumber: { type: String, unique: true, index: true },
 
-    // ---- Employee / submitter information -------------------------------
-    // Polymorphic submitter: an Employee (User), Manager, or Admin can raise
-    // a claim. Who reviews it depends on submitterModel — see approverModel
-    // below and the visibility rule documented there.
     submittedBy: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,
@@ -50,8 +44,6 @@ const reimbursementSchema = new mongoose.Schema(
       required: true,
       enum: ["User", "Manager", "Admin"],
     },
-    // Snapshotted at submission time so the claim still reads correctly
-    // even if the employee's profile changes later or they leave the org.
     employeeName: { type: String, required: true },
     empid: { type: String, required: true },
     department: { type: String },
@@ -63,7 +55,6 @@ const reimbursementSchema = new mongoose.Schema(
       default: null,
     },
 
-    // ---- Reimbursement details -------------------------------------------
     reimbursementType: {
       type: String,
       enum: [
@@ -84,11 +75,9 @@ const reimbursementSchema = new mongoose.Schema(
     project: { type: String, trim: true, default: "" },
     costCenter: { type: String, trim: true, default: "" },
 
-    // ---- Attachments -------------------------------------------------------
     receipts: { type: [attachmentSchema], default: [] },
     supportingDocuments: { type: [attachmentSchema], default: [] },
 
-    // ---- Payment details -----------------------------------------------
     paymentMethod: {
       type: String,
       enum: ["Bank Transfer", "UPI", "Cash", "Cheque"],
@@ -105,10 +94,6 @@ const reimbursementSchema = new mongoose.Schema(
     paidBy: { type: mongoose.Schema.Types.ObjectId, default: null },
     paidByModel: { type: String, enum: ["Admin", "SuperAdmin", null], default: null },
 
-    // ---- Approval workflow -------------------------------------------------
-    // Employee / Manager claims are reviewed by Admin.
-    // Admin's own claims are reviewed by SuperAdmin.
-    // SuperAdmin can additionally view (and act on) every claim in the org.
     approverModel: {
       type: String,
       enum: ["Admin", "SuperAdmin"],
@@ -151,13 +136,11 @@ reimbursementSchema.virtual("isEditable").get(function () {
 });
 
 reimbursementSchema.pre("validate", function (next) {
-  // Employee/Manager claims are reviewed by Admin; Admin's own claims escalate
-  // to SuperAdmin. This is derived, never set directly by clients.
   this.approverModel = this.submitterModel === "Admin" ? "SuperAdmin" : "Admin";
   next();
 });
 
-reimbursementSchema.pre("save", async function (next) {
+reimbursementSchema.pre("save", async function () {
   if (this.isNew && !this.claimNumber) {
     const year = new Date().getFullYear();
     const count = await this.constructor.countDocuments({
@@ -176,7 +159,6 @@ reimbursementSchema.pre("save", async function (next) {
       note: `Status changed to ${this.status}`,
     });
   }
-  next();
 });
 
 reimbursementSchema.index({ organisation_id: 1, submitterModel: 1, status: 1 });
