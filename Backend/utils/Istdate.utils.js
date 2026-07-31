@@ -66,11 +66,28 @@ function dayNameIST(date = new Date()) {
   return DAY_NAMES[getISTDateParts(date).weekday];
 }
 
+/**
+ * Parses a "YYYY-MM-DD" string (as sent by an <input type="date"> field,
+ * e.g. leave/WFH start & end dates) as the IST calendar day it represents.
+ *
+ * Do NOT use `new Date(str)` for these - the JS spec parses a bare
+ * "YYYY-MM-DD" as UTC midnight, not IST midnight. That value then drifts
+ * a calendar day depending on which timezone later re-reads/re-formats it
+ * (server cron, admin's browser, an email template, etc), which is exactly
+ * the "leave shows one day later than what was submitted" class of bug.
+ */
+function parseISTDateOnly(str) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(str));
+  if (!m) return new Date(str);
+  return istDateFromYMD(Number(m[1]), Number(m[2]), Number(m[3]));
+}
+
 module.exports = {
   startOfISTDay,
   endOfISTDay,
   getISTDateParts,
   istDateFromYMD,
+  parseISTDateOnly,
   toISTKey,
   dayNameIST,
   IST_OFFSET_MINUTES,
