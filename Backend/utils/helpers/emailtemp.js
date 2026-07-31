@@ -32,7 +32,7 @@ function formatDate(date) {
   if (!date) return "-";
   const d = new Date(date);
   if (Number.isNaN(d.getTime())) return "-";
-  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
 }
 
 const LEAVE_TYPE_LABELS = {
