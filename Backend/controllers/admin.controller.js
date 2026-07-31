@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Adminmodel = require("../Models/Admin.model");
 const Managermodel = require("../Models/manager.model");
+const { parseISTDateOnly } = require("../utils/Istdate.utils");
 
 const announcementmodel = require("../Models/announcement.model");
 const uidmodel = require("../Models/UIDmodel.model");
@@ -2333,12 +2334,12 @@ const applyleave = async (req, res, next) => {
   if (!leaveType || !startDate || !endDate || !reason)
     return next(Object.assign(new Error("leaveType, startDate, endDate and reason are required"), { statusCode: 400 }));
 
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = parseISTDateOnly(startDate);
+  const end = parseISTDateOnly(endDate);
   if (end < start)
     return next(Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }));
 
-  const days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  const days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
   const organisation_id = req.admin.organisation_id;
 
   const overlapping = await AdminLeave.findOne({
