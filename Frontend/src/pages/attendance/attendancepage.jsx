@@ -305,20 +305,74 @@ export default function AttendancePage() {
   const [checkoutConfirm, setCheckoutConfirm] = useState(false);
   const [checkoutResult,  setCheckoutResult]  = useState(null);
   const [locationError,   setLocationError]   = useState("");
+  const [acquiringLocation, setAcquiringLocation] = useState(false);
   const [showProfile,     setShowProfile]     = useState(false);
 
   const startCheckin = useCallback(() => {
     setLocationError("");
     clearError();
     if (!navigator.geolocation) { setLocationError("Geolocation not supported."); return; }
-    navigator.geolocation.getCurrentPosition(
+    setAcquiringLocation(true);
+
+    // A single getCurrentPosition() call can return the FIRST fix the device
+    // offers, which on laptops/phones without a quick GPS lock is often a
+    // WiFi/cell/IP-based estimate - that's what causes "Bareilly shows as
+    // Dehradun". So instead we watch for a few seconds and keep the most
+    // accurate (lowest accuracy-radius, in metres) reading seen.
+    const GOOD_ACCURACY_M = 50;       // this good -> stop early, no need to wait out the window
+    const MAX_ACCEPTABLE_ACCURACY_M = 1500; // worse than this -> treat as a bad network/IP fix, reject it
+    const WINDOW_MS = 12_000;
+
+    let watchId = null;
+    let best = null;
+    let settled = false;
+
+    const cleanup = () => {
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      setAcquiringLocation(false);
+    };
+
+    const accept = (fix) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      window._pendingLocation = fix;
+      setShowSelfie(true);
+    };
+
+    const reject = (message) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      setLocationError(message);
+    };
+
+    watchId = navigator.geolocation.watchPosition(
       (pos) => {
-        window._pendingLocation = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-        setShowSelfie(true);
+        const { latitude, longitude, accuracy } = pos.coords;
+        if (!best || accuracy < best.accuracy) best = { latitude, longitude, accuracy };
+        if (accuracy <= GOOD_ACCURACY_M) accept(best);
       },
-      (err) => setLocationError(err.code === 1 ? "Location permission denied." : "Could not get location."),
-      { timeout: 10_000, maximumAge: 60_000 }
+      (err) => {
+        // A transient error shouldn't kill a watch that might still land a
+        // good fix - only permission-denied is fatal immediately.
+        if (err.code === 1) reject("Location permission denied.");
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: WINDOW_MS }
     );
+
+    setTimeout(() => {
+      if (settled) return;
+      if (best && best.accuracy <= MAX_ACCEPTABLE_ACCURACY_M) {
+        accept(best);
+      } else {
+        reject(
+          best
+            ? `Location isn't accurate enough (±${Math.round(best.accuracy)}m). Turn on precise/GPS location and disable any VPN, then try again.`
+            : "Could not get an accurate location. Turn on precise/GPS location and disable any VPN, then try again."
+        );
+      }
+    }, WINDOW_MS);
   }, [clearError]);
 
   const onSelfieCapture = useCallback(async (base64) => {
@@ -514,10 +568,10 @@ export default function AttendancePage() {
             </p>
             <button
               onClick={startCheckin}
-              disabled={isLoading}
+              disabled={isLoading || acquiringLocation}
               className="w-full text-white border-none rounded-2xl py-4 font-bold text-base cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:-translate-y-0.5 active:translate-y-0"
               style={{ background: "linear-gradient(135deg, #7B1C3E 0%, #9B2554 100%)", boxShadow: "0 4px 18px rgba(123,28,62,0.28)" }}>
-              {isLoading ? "Checking in…" : "🟢 Check In"}
+              {acquiringLocation ? "📍 Getting precise location…" : isLoading ? "Checking in…" : "🟢 Check In"}
             </button>
           </div>
         )}
