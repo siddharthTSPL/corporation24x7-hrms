@@ -36,6 +36,20 @@ function fmtRole(role) {
   return role.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+// Department code -> full form mapping (kept in sync with EmployeeTable.jsx DEPT_FULL_FORMS)
+const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+};
+
+function fmtDepartment(dept) {
+  if (!dept) return "—";
+  return DEPT_FULL_FORMS[dept] || dept;
+}
+
 function getInitials(name = "") {
   return name
     .split(" ")
@@ -75,7 +89,7 @@ function exportToCSV(docs) {
     `"${d.uploader?.name || "—"}"`,
     `"${d.uploader?.email || "—"}"`,
     `"${d.uploaderModel || "—"}"`,
-    `"${d.uploader?.department || "—"}"`,
+    `"${fmtDepartment(d.uploader?.department)}"`,
     `"${d.uploader?.designation || "—"}"`,
     fmtSize(d.sizeKB),
     fmtDate(d.uploadedAt),
@@ -414,7 +428,7 @@ function UploaderDrawer({ group, onClose, onOpenDoc }) {
         <div className="px-4 sm:px-6 py-3 border-b border-[#ede5e0] grid grid-cols-2 gap-x-4 gap-y-3 bg-[#f9f8f2]/60 shrink-0">
           {[
             { label: "Role", value: fmtRole(group.role) },
-            { label: "Department", value: group.department || "—" },
+            { label: "Department", value: fmtDepartment(group.department) },
             { label: "Designation", value: group.designation || "—" },
             { label: "Total documents", value: group.personalDocs.length + group.expenseDocs.length },
           ].map(({ label, value }) => (
@@ -507,7 +521,7 @@ function UploaderCard({ group, onClick }) {
         <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
           <Badge className="bg-[#730042]/8 text-[#730042]">{fmtRole(group.role)}</Badge>
           {group.department && (
-            <Badge className="bg-[#f9f8f2] text-[#b0948a] border border-[#ede5e0]">{group.department}</Badge>
+            <Badge className="bg-[#f9f8f2] text-[#b0948a] border border-[#ede5e0]">{fmtDepartment(group.department)}</Badge>
           )}
         </div>
       </div>
@@ -558,7 +572,7 @@ function UploaderTableRow({ group, onClick }) {
         <Badge className="bg-[#730042]/8 text-[#730042]">{fmtRole(group.role)}</Badge>
       </td>
       <td className="px-4 py-3">
-        <p className="text-xs text-[#b0948a] truncate max-w-[110px]">{group.department || "—"}</p>
+        <p className="text-xs text-[#b0948a] truncate max-w-[150px]">{fmtDepartment(group.department)}</p>
       </td>
       <td className="px-4 py-3">
         <p className="text-xs text-[#b0948a] truncate max-w-[110px]">{group.designation || "—"}</p>
