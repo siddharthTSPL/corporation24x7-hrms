@@ -1,6 +1,7 @@
 const WFH = require("../Models/wfh.model");
 const Manager = require("../Models/manager.model");
 const Admin = require("../Models/Admin.model");
+const { parseISTDateOnly } = require("../utils/Istdate.utils");
 const {
   notifyWFHApplied,
   notifyWFHForwarded,
@@ -19,12 +20,12 @@ const applyWFH = async (req, res, next) => {
   if (!employee.Under_manager)
     return next(Object.assign(new Error("No manager assigned. Cannot apply WFH."), { statusCode: 400 }));
 
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = parseISTDateOnly(startDate);
+  const end = parseISTDateOnly(endDate);
   if (end < start)
     return next(Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }));
 
-  const days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  const days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
   const overlapping = await WFH.findOne({
     requester: employee._id,
@@ -73,13 +74,13 @@ const editWFH = async (req, res, next) => {
 
   const { startDate, endDate, reason } = req.body;
   if (startDate && endDate) {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    const start = parseISTDateOnly(startDate);
+    const end = parseISTDateOnly(endDate);
     if (end < start)
       return next(Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }));
     wfh.startDate = start;
     wfh.endDate = end;
-    wfh.days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+    wfh.days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
   }
   if (reason) wfh.reason = reason;
   await wfh.save();
@@ -256,12 +257,12 @@ const managerApplyWFH = async (req, res, next) => {
   if (!currentManager.reporting_manager)
     return next(Object.assign(new Error("No reporting manager assigned. Cannot apply WFH."), { statusCode: 400 }));
 
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = parseISTDateOnly(startDate);
+  const end = parseISTDateOnly(endDate);
   if (end < start)
     return next(Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }));
 
-  const days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  const days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
   const overlapping = await WFH.findOne({
     requester: managerId,
@@ -414,12 +415,12 @@ const adminApplyWFH = async (req, res, next) => {
   if (!organisation_id)
     return next(Object.assign(new Error("No organisation assigned. Cannot apply WFH."), { statusCode: 400 }));
 
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = parseISTDateOnly(startDate);
+  const end = parseISTDateOnly(endDate);
   if (end < start)
     return next(Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }));
 
-  const days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  const days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
   const overlapping = await WFH.findOne({
     requester: admin._id,
