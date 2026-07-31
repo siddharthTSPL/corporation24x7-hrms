@@ -54,6 +54,10 @@ const attendanceSchema = new mongoose.Schema(
     },
     latitude: Number,
     longitude: Number,
+    // GPS accuracy radius in metres reported by the browser (Geolocation
+    // API's coords.accuracy) at check-in time. Lets admins tell a genuine
+    // GPS fix apart from a rough WiFi/IP-based one after the fact.
+    accuracy: Number,
     selfie: String,
     activeMinutes: {
       type: Number,
