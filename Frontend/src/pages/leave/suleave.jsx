@@ -65,7 +65,7 @@ const initials    = (f = "", l = "") => `${f[0] || ""}${l[0] || ""}`.toUpperCase
 const avatarColor = (name = "") => AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
 const formatDate  = (d) => {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  return new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
 };
 const daysDiff = (s, e) => {
   if (!s || !e) return 0;
