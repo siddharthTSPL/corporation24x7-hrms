@@ -8,6 +8,11 @@ const { getISTDateParts, istDateFromYMD, toISTKey } = require("../utils/Istdate.
 
 const getUserId = (user) => user._id || user.id;
 
+// Anything worse than this (metres) is essentially never a real GPS fix -
+// it's a WiFi/cell/IP-based estimate, which is what causes check-ins to
+// land in the wrong city. Reject those rather than silently storing them.
+const MAX_ACCEPTABLE_ACCURACY_M = 1500;
+
 const getOnModel = (role) => {
   if (role === "manager") return "Manager";
   if (role === "admin") return "Admin";
@@ -28,13 +33,20 @@ const displayMinutes = (mins) => Math.round(mins || 0);
 
 const checkin = async (req, res) => {
   try {
-    const { latitude, longitude, selfie } = req.body;
+    const { latitude, longitude, accuracy, selfie } = req.body;
     const user = req.user;
     const userId = getUserId(user);
     const organisation_id = await resolveOrganisationId(user);
 
     if (!latitude || !longitude)
       return res.status(400).json({ message: "Location required" });
+
+    if (accuracy !== undefined && accuracy !== null && Number(accuracy) > MAX_ACCEPTABLE_ACCURACY_M) {
+      return res.status(400).json({
+        message: `Location isn't accurate enough (±${Math.round(Number(accuracy))}m). Turn on precise/GPS location and disable any VPN, then try again.`,
+        reason: "inaccurate_location",
+      });
+    }
 
     const employeeModel = getOnModel(user.role);
     const today0 = startOfDay(new Date());
@@ -89,6 +101,7 @@ const checkin = async (req, res) => {
       if (attendance.source === "agent") {
         attendance.latitude = latitude;
         attendance.longitude = longitude;
+        attendance.accuracy = accuracy;
         attendance.selfie = selfie || attendance.selfie;
         attendance.checkIn = new Date();
         attendance.source = "manual";
@@ -127,6 +140,7 @@ const checkin = async (req, res) => {
         checkIn: new Date(),
         latitude,
         longitude,
+        accuracy,
         selfie,
         shift: shift._id,
         isLate,
