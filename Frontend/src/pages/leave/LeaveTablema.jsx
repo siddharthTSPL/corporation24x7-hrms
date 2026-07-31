@@ -380,7 +380,7 @@ const AVATAR_COLORS = [
 ];
 
 const fmt = (d) =>
-  d ? new Date(d).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"}) : "—";
+  d ? new Date(d).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric",timeZone:"Asia/Kolkata"}) : "—";
 
 const humanizeStatus = (s = "") =>
   s.split("_").filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
