@@ -14,6 +14,7 @@ const Adminmodel = require("../Models/Admin.model");
 const SuperAdminModel = require("../Models/superadmin.model");
 const Managermodel = require("../Models/manager.model");
 const { notifyLeaveApplied, notifyWFHApplied } = require("../utils/notify.utils");
+const { parseISTDateOnly } = require("../utils/Istdate.utils");
 
 const verifyUserEmail = async (req, res, next) => {
   const { token } = req.params;
@@ -482,13 +483,13 @@ const applyleave = async (req, res, next) => {
       ),
     );
 
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = parseISTDateOnly(startDate);
+  const end = parseISTDateOnly(endDate);
   if (end < start)
     return next(
       Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }),
     );
-  const days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  const days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
   if (
     leaveType === "ml" &&
@@ -577,15 +578,15 @@ const editleave = async (req, res, next) => {
 
   const { leaveType, startDate, endDate, reason } = req.body;
   if (startDate && endDate) {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    const start = parseISTDateOnly(startDate);
+    const end = parseISTDateOnly(endDate);
     if (end < start)
       return next(
         Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }),
       );
     leave.startDate = start;
     leave.endDate = end;
-    leave.days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+    leave.days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
   }
   if (leaveType) leave.leaveType = leaveType;
   if (reason) leave.reason = reason;
