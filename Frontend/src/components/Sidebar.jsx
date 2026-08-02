@@ -21,9 +21,6 @@ import {
   FaLock,
   FaMoneyCheckAlt,
   FaClipboardCheck,
-  FaQuestionCircle,
-  FaMapSigns,
-  FaHeadset,
 } from "react-icons/fa";
 import { useAuth } from "../auth/store/getmeauth/getmeauth";
 import { useAdminLogout } from "../auth/server-state/adminauth/adminauth.hook";
@@ -33,6 +30,7 @@ import { useLogoutSuperAdmin } from "../auth/server-state/superadmin/auth/suauth
 import { usePermissionStore } from "../auth/store/permission/permissionStore";
 import { clearAgentToken } from "../pages/utils/Desktopagent";
 import HelpTour from "./help/HelpTour";
+import FloatingHelp from "./help/FloatingHelp";
 import TechnicalSupportModal from "./help/TechnicalSupportModal";
 
 const superAdminMenu = [
@@ -46,6 +44,7 @@ const superAdminMenu = [
   { name:"Timesheet",       path: "/superadmin-timesheet",     icon: <FaLock />, blurb: "Review logged hours and timesheets, org-wide." },
   { name: "TorchX Management", path: "/superadmin-management", icon: <FaUsersCog />, blurb: "Manage TorchX product access and licensing per organisation." },
   { name: "Payroll",       path: "/superadmin-payroll",       icon: <FaMoneyCheckAlt />, blurb: "Oversee payroll runs across every organisation." },
+  { name: "Reimbursements", path: "/superadmin-reimbursement", icon: <FaMoneyCheckAlt />, blurb: "Review reimbursement claims raised by admins, and see every claim org-wide." },
   { name: "TorchX Voice",   path: "/superadmin-complaints",    icon: <FaShieldAlt />, blurb: "Handle support tickets raised by admins, managers, and employees." },
   { name: "Settings",       path: "/superadmin-settings",      icon: <FaCog />, blurb: "Configure platform-wide settings and preferences." },
 ];
@@ -67,6 +66,7 @@ const adminMenu = [
     pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to track ones you've already raised." } },
   { name: "Timesheet",     path: "/admin-timesheet",     icon: <FaLock />, blurb: "Review and approve team timesheets." },
   { name: "Payroll",       path: "/payroll",             icon: <FaMoneyCheckAlt />, blurb: "Run payroll and manage payslips." },
+  { name: "Reimbursements", path: "/reimbursement-admin", icon: <FaMoneyCheckAlt />, blurb: "Review claims from employees and managers, and submit your own." },
   { name: "TorchX Management", path: "/admin-management", icon: <FaUsersCog />, blurb: "Manage your organisation's TorchX product access." },
   { name: "Document",      path: "/document-admin",      icon: <FaFileAlt />, blurb: "Upload and manage your own documents.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Team Document", path: "/document-admin-team", icon: <FaFileAlt />, blurb: "View documents uploaded by your team.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
@@ -82,6 +82,7 @@ const managerMenu = [
   { name: "Organisation", path: "/organisation-manager", icon: <FaBuilding />, blurb: "View your organisation's structure and org chart." },
   { name: "Review",       path: "/review-manager",       icon: <FaClipboardCheck />, blurb: "Run performance reviews for your reportees." },
   { name: "Timesheet",    path: "/manager-timesheet",    icon: <FaLock />, blurb: "Track and approve your team's timesheets." },
+  { name: "Reimbursements", path: "/reimbursement-manager", icon: <FaMoneyCheckAlt />, blurb: "Submit and track your reimbursement claims." },
   { name: "File",         path: "/file-manager",         icon: <FaFolder />, blurb: "Upload and manage documents.",    permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Recruitment",  path: "/recruitment-manager",  icon: <FaUsersCog />, blurb: "Track hiring requisitions and candidates.",  permissionGroup: ["recruitment.can_view_hiring_requisitions", "recruitment.can_create_hiring_requisition", "recruitment.can_view_candidates", "recruitment.can_add_candidate"] },
   { name: "TorchX Voice", path: "/manager-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"],
@@ -97,6 +98,7 @@ const employeeMenu = [
     pageStep: { selector: '[data-tour="announcement-view"]', title: "Reading announcements", content: "Every announcement your organisation publishes shows up here, newest first." } },
   { name: "Organisation", path: "/organisation-employee", icon: <FaBuilding />, blurb: "View your organisation's structure and org chart." },
   { name: "Timesheet",    path: "/employee-timesheet",    icon: <FaLock />, blurb: "Log your hours and track your timesheet." },
+  { name: "Reimbursements", path: "/reimbursement-employee", icon: <FaMoneyCheckAlt />, blurb: "Submit and track your reimbursement claims." },
   { name: "File",         path: "/file-employee",         icon: <FaFolder />, blurb: "Upload and manage your personal documents.",    permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "TorchX Voice", path: "/employee-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket for any issue.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"],
     pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to check the status of one you've already sent." } },
@@ -132,7 +134,6 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
 
   const [open,        setOpen]        = useState(true);
   const [mobileOpen,  setMobileOpen]  = useState(false);
-  const [helpOpen,    setHelpOpen]    = useState(false);
   const [showTour,    setShowTour]    = useState(false);
   const [showSupport, setShowSupport] = useState(false);
 
@@ -184,14 +185,12 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
   ];
 
   const startTour = () => {
-    setHelpOpen(false);
     setOpen(true);
     setMobileOpen(true);
     setShowTour(true);
   };
 
   const openSupportForm = () => {
-    setHelpOpen(false);
     setShowSupport(true);
   };
 
@@ -310,49 +309,6 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
                 );
               })}
 
-              <div className="relative">
-                {helpOpen && (
-                  <>
-                    <div className="fixed inset-0 z-30" onClick={() => setHelpOpen(false)} />
-                    <div
-                      className={`absolute z-40 bottom-full mb-2 bg-white rounded-xl shadow-xl border border-[#F4C0D1] overflow-hidden
-                        ${collapsed ? "left-14 w-52" : "left-0 right-0"}`}
-                    >
-                      <button
-                        onClick={startTour}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-[#FBEAF0] hover:text-[#730042] transition-colors"
-                      >
-                        <FaMapSigns className="text-[#730042]" />
-                        <span>
-                          <span className="block font-medium">Take a Tour</span>
-                          <span className="block text-[11px] text-gray-400">A quick walkthrough of where everything is</span>
-                        </span>
-                      </button>
-                      <button
-                        onClick={openSupportForm}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-[#FBEAF0] hover:text-[#730042] transition-colors border-t border-gray-100"
-                      >
-                        <FaHeadset className="text-[#730042]" />
-                        <span>
-                          <span className="block font-medium">Technical Support</span>
-                          <span className="block text-[11px] text-gray-400">Report a problem via email</span>
-                        </span>
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                <button
-                  data-tour="help-button"
-                  onClick={() => setHelpOpen((v) => !v)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors
-                    ${helpOpen ? "bg-[#FBEAF0] text-[#730042]" : "hover:bg-gray-100 text-gray-700"}`}
-                >
-                  <FaQuestionCircle />
-                  {!collapsed && "Help"}
-                </button>
-              </div>
-
               <button
                 onClick={handleLogout}
                 disabled={isPending}
@@ -384,6 +340,7 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
         )}
       </div>
 
+      <FloatingHelp onTakeTour={startTour} onTechnicalSupport={openSupportForm} />
       {showTour && <HelpTour steps={tourSteps} onClose={() => setShowTour(false)} />}
       {showSupport && <TechnicalSupportModal role={role} onClose={() => setShowSupport(false)} />}
     </>

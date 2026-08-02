@@ -64,7 +64,7 @@ const WFH_STATUS_META = {
 };
 
 const fmt = (d) =>
-  d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+  d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }) : "—";
 
 const daysBetween = (s, e) => {
   if (!s || !e) return 0;

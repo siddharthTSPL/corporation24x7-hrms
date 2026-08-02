@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { FaTimes, FaClock, FaCalendarAlt, FaMapMarkerAlt, FaDownload, FaFilter } from "react-icons/fa";
+import { FaTimes, FaClock, FaCalendarAlt, FaMapMarkerAlt, FaDownload, FaFilter, FaUsers } from "react-icons/fa";
 import { downloadCsv } from "./exportCsv";
 
 const fmtDate = (d) =>
@@ -23,6 +23,22 @@ const toInputDate = (d) => {
   const day = String(dt.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 };
+
+const CONCURRENCY = 5;
+
+async function runWithConcurrency(items, limit, worker) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function runner() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await worker(items[i], i);
+    }
+  }
+  const runners = Array.from({ length: Math.min(limit, items.length) }, runner);
+  await Promise.all(runners);
+  return results;
+}
 
 const STATUS_META = {
   present: { label: "Present", color: "#16A34A", bg: "#DCFCE7" },
@@ -136,11 +152,13 @@ function HistoryRow({ r }) {
  * suother.hook.js, or useGetEmployeeAttendanceHistory from
  * adminother.hook.js) so this stays shared between both dashboards.
  */
-export default function AttendanceHistoryModal({ open, onClose, employeeId, employeeName, useHistoryHook }) {
+export default function AttendanceHistoryModal({ open, onClose, employeeId, employeeName, useHistoryHook, people, fetchHistory }) {
   const [preset, setPreset] = useState("this_month");
   const [range, setRange] = useState(() => presetRange("this_month"));
   const [statusFilter, setStatusFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
+  const [isExportingAll, setIsExportingAll] = useState(false);
+  const [exportAllProgress, setExportAllProgress] = useState({ done: 0, total: 0 });
 
   const applyPreset = (key) => {
     setPreset(key);
@@ -191,6 +209,57 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
       ],
       rows
     );
+  };
+
+  // "Export All" beside the per-employee export — reuses the SAME date
+  // range/preset currently picked here (7/15/30/this-month/custom), but
+  // pulls every employee's full history for it instead of just this one.
+  const exportAllUsersCsv = async () => {
+    if (!people?.length || !fetchHistory || isExportingAll) return;
+    setIsExportingAll(true);
+    setExportAllProgress({ done: 0, total: people.length });
+
+    const combined = [];
+    const failedNames = [];
+
+    await runWithConcurrency(people, CONCURRENCY, async (person) => {
+      try {
+        const res = await fetchHistory(person.id, { startDate: range.startDate, endDate: range.endDate });
+        const dayRows = res?.data ?? [];
+        dayRows.forEach((r) => {
+          if (statusFilter !== "all" && r.status !== statusFilter) return;
+          if (sourceFilter !== "all" && r.source !== sourceFilter) return;
+          combined.push({ ...r, employeeName: person.name || "Unknown", empid: person.empid || "—" });
+        });
+      } catch {
+        failedNames.push(person.name || person.empid || person.id);
+      } finally {
+        setExportAllProgress((p) => ({ ...p, done: p.done + 1 }));
+      }
+    });
+
+    downloadCsv(
+      `attendance-history-all-employees-${range.startDate}_to_${range.endDate}.csv`,
+      [
+        { key: "employeeName", label: "Employee", format: (r) => r.employeeName },
+        { key: "empid", label: "Emp ID", format: (r) => r.empid },
+        { key: "date", label: "Date", format: (r) => fmtDate(r.date) },
+        { key: "checkIn", label: "Check-in", format: (r) => fmtTime(r.checkIn) },
+        { key: "checkOut", label: "Check-out", format: (r) => fmtTime(r.checkOut) },
+        { key: "source", label: "Via", format: (r) => (SOURCE_META[r.source] || SOURCE_META.system).label.replace(/^\S+\s/, "") },
+        { key: "activeMinutes", label: "Active Minutes", format: (r) => Math.round(r.activeMinutes || 0) },
+        { key: "idleMinutes", label: "Idle Minutes", format: (r) => Math.round(r.idleMinutes || 0) },
+        { key: "status", label: "Status", format: (r) => (STATUS_META[r.status] || STATUS_META.absent).label },
+        { key: "isLate", label: "Late", format: (r) => (r.isLate ? "Yes" : "No") },
+        { key: "overtimeMinutes", label: "Overtime Minutes", format: (r) => Math.round(r.overtimeMinutes || 0) },
+      ],
+      combined
+    );
+
+    setIsExportingAll(false);
+    if (failedNames.length) {
+      console.warn("Could not fetch attendance history for:", failedNames.join(", "));
+    }
   };
 
   if (!open) return null;
@@ -280,6 +349,21 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
           >
             <FaDownload size={10} /> Export CSV
           </button>
+          {people?.length > 0 && fetchHistory && (
+            <button
+              type="button"
+              onClick={exportAllUsersCsv}
+              disabled={isExportingAll}
+              title={`Export this same ${PRESETS.find((p) => p.key === preset)?.label || "range"} for every employee`}
+              className="flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-3 py-1.5 whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ color: "#730042", background: "#fdf2f7", border: "1px solid #e8b8cf" }}
+            >
+              <FaUsers size={10} />
+              {isExportingAll
+                ? `Exporting ${exportAllProgress.done}/${exportAllProgress.total}…`
+                : `Export All (${PRESETS.find((p) => p.key === preset)?.label || "range"})`}
+            </button>
+          )}
         </div>
 
         <div className="px-4 sm:px-6 py-2.5 flex items-center gap-4 flex-wrap flex-shrink-0 bg-gray-50/60 border-b border-gray-100">

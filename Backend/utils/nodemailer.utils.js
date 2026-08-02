@@ -15,13 +15,14 @@ transporter.verify()
     .then(() => { console.log("Email transporter is ready to send emails"); })
     .catch((err) => { console.error("Email transporter verification failed:", err); });
 
-async function sendEmail({ to, subject, html, text }) {
+async function sendEmail({ to, subject, html, text, attachments }) {
   const mailOptions = {
     from: process.env.ZOHO_EMAIL,
     to,
     subject,
     html,
     text,
+    ...(attachments?.length && { attachments }),
   };
 
   const details = await transporter.sendMail(mailOptions);

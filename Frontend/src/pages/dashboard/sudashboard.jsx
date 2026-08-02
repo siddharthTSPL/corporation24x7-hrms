@@ -1447,7 +1447,7 @@ const AttendanceMap = ({ checkins = [], loading }) => {
             <span style="font-weight:700;font-size:12.5px;color:#0d0209;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name || "Unknown"}</span>
             <span style="font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:999px;background:${color}17;color:${color};text-transform:capitalize;flex:0 0 auto;">${p.role || ""}</span>
           </div>
-          ${p.dept ? `<div style="font-size:10.5px;color:#8a6070;margin-top:1px;">${p.dept}</div>` : ""}
+          ${p.dept ? `<div style="font-size:10.5px;color:#8a6070;margin-top:1px;">${getDepartmentName(p.dept)}</div>` : ""}
           ${p.email ? `<div style="font-size:10.5px;color:#8a6070;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">✉ ${p.email}</div>` : ""}
           <div style="font-size:10.5px;margin-top:3px;display:flex;align-items:center;gap:8px;">
             <span style="color:#0d0209;">✅ ${fmtTime(p.checkIn)}</span>
@@ -1486,7 +1486,7 @@ const AttendanceMap = ({ checkins = [], loading }) => {
           </div>`
         : `<div style="font-family:system-ui,sans-serif;padding:4px;min-width:170px;">
             <div style="font-weight:700;font-size:13px;color:${color};margin-bottom:4px;">${people[0].name || "Unknown"}</div>
-            <div style="font-size:11px;color:#8a6070;margin-bottom:6px;text-transform:capitalize;">${people[0].role ?? ""}${people[0].dept ? " · " + people[0].dept : ""}</div>
+            <div style="font-size:11px;color:#8a6070;margin-bottom:6px;text-transform:capitalize;">${people[0].role ?? ""}${people[0].dept ? " · " + getDepartmentName(people[0].dept) : ""}</div>
             ${people[0].email ? `<div style="font-size:11px;color:#8a6070;margin-bottom:4px;">✉ ${people[0].email}</div>` : ""}
             <div style="font-size:11px;">✅ Check-in: <strong>${fmtTime(people[0].checkIn)}</strong></div>
             ${people[0].checkedOut ? `<div style="font-size:11px;color:#0d9e6e;margin-top:2px;">🏁 Checked out</div>` : `<div style="font-size:11px;color:#b8760a;margin-top:2px;">🟡 On duty</div>`}

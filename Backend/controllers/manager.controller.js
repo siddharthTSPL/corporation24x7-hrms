@@ -11,6 +11,7 @@ const { processLeaveDeduction } = require("../automatic/calculateleave");
 const Review = require("../Models/review.model");
 const jwt = require("jsonwebtoken");
 const managerLeaveModel = require("../Models/maleave.model");
+const { parseISTDateOnly } = require("../utils/Istdate.utils");
 const Attendance = require("../Models/attendance.model");
 const Ticket = require("../Models/ticket.model");
 const SuperAdminModel = require("../Models/superadmin.model");
@@ -442,13 +443,13 @@ const applyleavem = async (req, res, next) => {
 
   const managerId = req.manager._id;
   const organisation_id = req.manager.organisation_id;
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = parseISTDateOnly(startDate);
+  const end = parseISTDateOnly(endDate);
 
   if (end < start)
     return next(Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }));
 
-  const days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  const days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
   const managerData = await managermodel.findById(managerId)
     .select("reporting_manager reporting_manager_model").lean();

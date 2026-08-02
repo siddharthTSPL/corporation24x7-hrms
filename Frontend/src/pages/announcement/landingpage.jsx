@@ -1088,7 +1088,7 @@ export default function LandingPage() {
   }
 
   return (
-    <>
+    <div style={{ height: '100vh', overflowY: 'auto' }}>
       <style>{fontStyles}</style>
       <Navbar accountLabel={accountLabel} onAccountClick={handleAccountClick} />
       <Hero />
@@ -1100,6 +1100,6 @@ export default function LandingPage() {
       <Divider />
       <Testimonials />
       <Footer />
-    </>
+    </div>
   )
 }
