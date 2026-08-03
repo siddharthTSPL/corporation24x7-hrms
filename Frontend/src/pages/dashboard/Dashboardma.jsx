@@ -1074,7 +1074,7 @@ export default function ManagerDashboard() {
             Dashboard
           </h1>
           <p style={{ fontSize:12, color:"#b0948a", marginTop:2, fontFamily:"'DM Sans',sans-serif" }}>
-            {manager ? `Welcome back, ${manager.f_name} · ${manager.uid}` : "Welcome back"}
+            {manager ? `Welcome back, ${manager.f_name} · ${manager.empid}` : "Welcome back"}
           </p>
         </div>
 
@@ -1150,7 +1150,7 @@ export default function ManagerDashboard() {
                   </div>
                 </div>
                 <div style={{ display:"flex", alignItems:"center", gap:5, flexWrap:"wrap" }}>
-                  <Badge variant="brand">{manager?.uid ?? "—"}</Badge>
+                  <Badge variant="brand">{manager?.empid ?? "—"}</Badge>
                   <Badge variant="green">Active</Badge>
                   <Badge variant="blue">{getDeptFullForm(manager?.department)}</Badge>
                 </div>
@@ -1225,7 +1225,7 @@ export default function ManagerDashboard() {
                 <div style={{ height:"0.5px", background:"rgba(249,248,242,0.15)", marginBottom:10 }}/>
                 <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, fontFamily:"'DM Sans',sans-serif" }}>
                   <span style={{ color:"rgba(249,248,242,0.5)" }}>Manager ID</span>
-                  <span style={{ fontWeight:500, color:"rgba(249,248,242,0.7)" }}>{manager?.uid ?? "—"}</span>
+                  <span style={{ fontWeight:500, color:"rgba(249,248,242,0.7)" }}>{manager?.empid ?? "—"}</span>
                 </div>
                 <div style={{ marginTop:8 }}>
                   <div style={{ fontSize:10, color:"rgba(249,248,242,0.4)", fontFamily:"'DM Sans',sans-serif", marginBottom:2 }}>Work email</div>
@@ -1364,7 +1364,7 @@ export default function ManagerDashboard() {
               </div>
               <div style={{ marginTop:5, display:"flex", gap:5, flexWrap:"wrap" }}>
                 <Badge variant="green">Active</Badge>
-                <Badge variant="blue">{manager?.uid ?? "—"}</Badge>
+                <Badge variant="blue">{manager?.empid ?? "—"}</Badge>
                 {reviews.length > 0 && <StarRating rating={reviews.reduce((s, r) => s + r.rating, 0) / reviews.length} size={12}/>}
               </div>
             </div>
