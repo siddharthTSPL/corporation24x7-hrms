@@ -31,37 +31,25 @@ const resolveOrganisationId = async (user) => {
 
 const displayMinutes = (mins) => Math.round(mins || 0);
 
-// A session's activeMinutes only grows via periodic /activity heartbeat
-// pings. Two situations both leave activeMinutes low/zero and must NOT be
-// treated differently from each other:
-//   - the tracker never ran at all (activeMinutes stays exactly 0)
-//   - the tracker ran only briefly then stopped (crash / sleep / app
-//     closed), leaving a tiny non-zero activeMinutes (e.g. 1-8 minutes)
-//     over an 8-9 hour checkIn->checkOut gap
-// Both mean "we don't have trustworthy activity data for this session".
-// The old rule (`activeMinutes > 0 ? trust it : use raw duration`) treated
-// these as opposites - a truly-untracked day got the generous full-duration
-// benefit of the doubt (often -> present), while a barely-tracked day got
-// stuck with its tiny minute count (often -> absent) despite an identical
-// multi-hour session. That's backwards, since less data should never look
-// "safer" than a little data.
-//
-// Fix: only trust activeMinutes when heartbeat pings covered a meaningful
-// share of the session (active+idle >= half the elapsed time). Otherwise
-// fall back to judging the raw duration as a % of shift length - the same
-// approach already used for Face attendance, which never had heartbeat
-// data to begin with.
-const MIN_TRACKING_COVERAGE_RATIO = 0.5;
-
-const resolveDurationBasedStatus = ({ activeMinutes, idleMinutes, elapsedSessionMinutes, thresholds, shift }) => {
-  const trackedMinutes = (activeMinutes || 0) + (idleMinutes || 0);
-  const hasReliableTracking =
-    elapsedSessionMinutes > 0 && trackedMinutes >= elapsedSessionMinutes * MIN_TRACKING_COVERAGE_RATIO;
-
-  if (hasReliableTracking) {
-    return calculateStatus(activeMinutes, thresholds);
+// Status must be judged differently depending on WHETHER a channel is even
+// capable of measuring active work:
+//   - manual/system: the desktop agent sends periodic /activity heartbeat
+//     pings, so activeMinutes is a real, trustworthy measurement of actual
+//     work done. If it's low/zero, that's real signal (agent wasn't
+//     running / person wasn't working) - it must NOT be overridden by the
+//     raw checkIn->checkOut clock gap, no matter how long that gap is.
+//     Simply being logged in for 8 hours with the tracker off is not
+//     "present".
+//   - face: the kiosk only records a check-in scan and a check-out scan -
+//     there is no heartbeat mechanism at all, by design. activeMinutes is
+//     always 0 here, so the only fair signal is the raw duration, judged
+//     as a % of the shift's length (same as calculateFaceStatus already
+//     does elsewhere for Face check-ins/checkouts).
+const resolveSessionStatus = ({ source, activeMinutes, thresholds, elapsedSessionMinutes, shift }) => {
+  if (source === "face") {
+    return calculateFaceStatus(elapsedSessionMinutes, shift);
   }
-  return calculateFaceStatus(elapsedSessionMinutes, shift);
+  return calculateStatus(activeMinutes, thresholds);
 };
 
 const checkin = async (req, res) => {
@@ -338,9 +326,12 @@ const checkout = async (req, res) => {
     const elapsedSessionMinutes = attendance.checkIn
       ? (now.getTime() - new Date(attendance.checkIn).getTime()) / 60000
       : 0;
-    const status = resolveDurationBasedStatus({
+    // checkout() only ever runs for source "manual" (agent/face are blocked
+    // above), so this always judges by real, measured activeMinutes - no
+    // duration fallback. See resolveSessionStatus for why.
+    const status = resolveSessionStatus({
+      source: attendance.source,
       activeMinutes: attendance.activeMinutes,
-      idleMinutes: attendance.idleMinutes,
       elapsedSessionMinutes,
       thresholds,
       shift: shiftDoc,
@@ -413,7 +404,7 @@ const autoCheckoutAll = async () => {
       source: { $in: ["manual", "face"] },
       checkIn: { $exists: true },
       checkOut: { $exists: false },
-    }).select("_id activeMinutes idleMinutes organisation_id shift employee role date checkIn").lean();
+    }).select("_id activeMinutes idleMinutes source organisation_id shift employee role date checkIn").lean();
 
     if (!openSessions.length) return;
 
@@ -441,15 +432,15 @@ const autoCheckoutAll = async () => {
       if (now < forceCheckoutAt) continue; // overtime cutoff not reached yet
 
       const thresholds = getShiftThresholds(shift);
-      // Same coverage-aware resolver as checkout() above - see
-      // resolveDurationBasedStatus for why "activeMinutes > 0" alone isn't
-      // a safe signal that heartbeat tracking is trustworthy.
+      // Same source-aware resolver as checkout() above - manual/system
+      // sessions are judged strictly on measured activeMinutes; only face
+      // (no heartbeat mechanism) falls back to duration %.
       const elapsedSessionMinutes = a.checkIn
         ? (forceCheckoutAt.getTime() - new Date(a.checkIn).getTime()) / 60000
         : 0;
-      const status = resolveDurationBasedStatus({
+      const status = resolveSessionStatus({
+        source: a.source,
         activeMinutes: a.activeMinutes,
-        idleMinutes: a.idleMinutes,
         elapsedSessionMinutes,
         thresholds,
         shift,
