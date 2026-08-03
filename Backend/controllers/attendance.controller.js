@@ -2,7 +2,7 @@ const Attendance = require("../Models/attendance.model");
 const AdminModel = require("../Models/Admin.model");
 const Shift = require("../Models/shift.model");
 const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
-const { resolveEmployeeShift, evaluateCheckinWindow, evaluateCheckoutWindow, getShiftThresholds, getForceCheckoutInstant } = require("../utils/shift.utils");
+const { resolveEmployeeShift, evaluateCheckinWindow, evaluateCheckoutWindow, getShiftThresholds, getForceCheckoutInstant, calculateFaceStatus } = require("../utils/shift.utils");
 const { isHoliday, isWeekOff, startOfDay, getWeekOffMapForRange } = require("../automatic/weekoffcalendar");
 const { getISTDateParts, istDateFromYMD, toISTKey } = require("../utils/Istdate.utils");
 
@@ -30,6 +30,39 @@ const resolveOrganisationId = async (user) => {
 };
 
 const displayMinutes = (mins) => Math.round(mins || 0);
+
+// A session's activeMinutes only grows via periodic /activity heartbeat
+// pings. Two situations both leave activeMinutes low/zero and must NOT be
+// treated differently from each other:
+//   - the tracker never ran at all (activeMinutes stays exactly 0)
+//   - the tracker ran only briefly then stopped (crash / sleep / app
+//     closed), leaving a tiny non-zero activeMinutes (e.g. 1-8 minutes)
+//     over an 8-9 hour checkIn->checkOut gap
+// Both mean "we don't have trustworthy activity data for this session".
+// The old rule (`activeMinutes > 0 ? trust it : use raw duration`) treated
+// these as opposites - a truly-untracked day got the generous full-duration
+// benefit of the doubt (often -> present), while a barely-tracked day got
+// stuck with its tiny minute count (often -> absent) despite an identical
+// multi-hour session. That's backwards, since less data should never look
+// "safer" than a little data.
+//
+// Fix: only trust activeMinutes when heartbeat pings covered a meaningful
+// share of the session (active+idle >= half the elapsed time). Otherwise
+// fall back to judging the raw duration as a % of shift length - the same
+// approach already used for Face attendance, which never had heartbeat
+// data to begin with.
+const MIN_TRACKING_COVERAGE_RATIO = 0.5;
+
+const resolveDurationBasedStatus = ({ activeMinutes, idleMinutes, elapsedSessionMinutes, thresholds, shift }) => {
+  const trackedMinutes = (activeMinutes || 0) + (idleMinutes || 0);
+  const hasReliableTracking =
+    elapsedSessionMinutes > 0 && trackedMinutes >= elapsedSessionMinutes * MIN_TRACKING_COVERAGE_RATIO;
+
+  if (hasReliableTracking) {
+    return calculateStatus(activeMinutes, thresholds);
+  }
+  return calculateFaceStatus(elapsedSessionMinutes, shift);
+};
 
 const checkin = async (req, res) => {
   try {
@@ -302,19 +335,16 @@ const checkout = async (req, res) => {
     }
 
     attendance.checkOut = now;
-    // activeMinutes only grows via periodic /activity heartbeat pings (see
-    // activity() above). If that heartbeat never fired during this session
-    // (e.g. checked in/out without the tracker running), activeMinutes sits
-    // at 0 even though the person was genuinely checked in for hours -
-    // calculateStatus would then wrongly call a real session "absent".
-    // Fall back to the raw checkIn->checkOut duration in that case; if any
-    // real heartbeat data exists, keep trusting it as-is.
     const elapsedSessionMinutes = attendance.checkIn
       ? (now.getTime() - new Date(attendance.checkIn).getTime()) / 60000
       : 0;
-    const effectiveActiveMinutes =
-      attendance.activeMinutes > 0 ? attendance.activeMinutes : elapsedSessionMinutes;
-    const status = calculateStatus(effectiveActiveMinutes, thresholds);
+    const status = resolveDurationBasedStatus({
+      activeMinutes: attendance.activeMinutes,
+      idleMinutes: attendance.idleMinutes,
+      elapsedSessionMinutes,
+      thresholds,
+      shift: shiftDoc,
+    });
     const { remark, isOvertime, overtimeMinutes } = checkoutWindow;
     attendance.status = status;
     attendance.checkoutRemark = remark;
@@ -383,7 +413,7 @@ const autoCheckoutAll = async () => {
       source: { $in: ["manual", "face"] },
       checkIn: { $exists: true },
       checkOut: { $exists: false },
-    }).select("_id activeMinutes organisation_id shift employee role date checkIn").lean();
+    }).select("_id activeMinutes idleMinutes organisation_id shift employee role date checkIn").lean();
 
     if (!openSessions.length) return;
 
@@ -411,14 +441,19 @@ const autoCheckoutAll = async () => {
       if (now < forceCheckoutAt) continue; // overtime cutoff not reached yet
 
       const thresholds = getShiftThresholds(shift);
-      // Same fallback as checkout() above: if activeMinutes never got any
-      // heartbeat data (still 0), use the raw checkIn->cutoff duration
-      // instead of auto-marking a genuine multi-hour session "absent".
+      // Same coverage-aware resolver as checkout() above - see
+      // resolveDurationBasedStatus for why "activeMinutes > 0" alone isn't
+      // a safe signal that heartbeat tracking is trustworthy.
       const elapsedSessionMinutes = a.checkIn
         ? (forceCheckoutAt.getTime() - new Date(a.checkIn).getTime()) / 60000
         : 0;
-      const effectiveActiveMinutes = a.activeMinutes > 0 ? a.activeMinutes : elapsedSessionMinutes;
-      const status = calculateStatus(effectiveActiveMinutes, thresholds);
+      const status = resolveDurationBasedStatus({
+        activeMinutes: a.activeMinutes,
+        idleMinutes: a.idleMinutes,
+        elapsedSessionMinutes,
+        thresholds,
+        shift,
+      });
       const checkoutWindow = evaluateCheckoutWindow(shift, forceCheckoutAt, a.checkIn);
 
       ops.push({
