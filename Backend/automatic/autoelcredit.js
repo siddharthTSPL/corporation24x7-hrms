@@ -75,3 +75,4 @@ cron.schedule("0 0 1 * *", async () => {
 cron.schedule("*/5 * * * *", () => {
   autoCheckoutAll();
 });
+
