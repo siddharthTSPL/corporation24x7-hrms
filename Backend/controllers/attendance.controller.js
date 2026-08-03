@@ -447,6 +447,15 @@ const autoCheckoutAll = async () => {
       });
       const checkoutWindow = evaluateCheckoutWindow(shift, forceCheckoutAt, a.checkIn);
 
+      // scanFace() stores durationMinutes into activeMinutes for a manual
+      // face checkout (display purposes - face has no real activity
+      // tracking). Auto-checkout must do the same for face sessions,
+      // otherwise a force-closed face session shows "0 min" in history
+      // despite being correctly marked present/half_day from duration.
+      // Manual/system activeMinutes is real tracked data - never overwrite it.
+      const activeMinutesUpdate =
+        a.source === "face" ? { activeMinutes: Math.round(elapsedSessionMinutes) } : {};
+
       ops.push({
         updateOne: {
           filter: { _id: a._id, organisation_id: a.organisation_id, checkOut: { $exists: false } },
@@ -457,6 +466,7 @@ const autoCheckoutAll = async () => {
               checkoutRemark: "auto_overtime",
               overtimeMinutes: checkoutWindow.overtimeMinutes ?? 0,
               autoCheckedOut: true,
+              ...activeMinutesUpdate,
             },
           },
         },
