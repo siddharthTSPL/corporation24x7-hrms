@@ -1068,7 +1068,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <Badge variant="brand">Emp ID: {employee?.uid??"—"}</Badge>
+                    <Badge variant="brand">Emp ID: {employee?.empid??"—"}</Badge>
                     <Badge variant="green">Active</Badge>
                     <Badge variant="blue">{getDeptFullForm(employee?.department)??"—"}</Badge>
                   </div>
@@ -1215,7 +1215,7 @@ export default function Dashboard() {
                 </div>
                 <div className="mt-1.5 flex gap-1.5 flex-wrap">
                   <Badge variant="green">Active</Badge>
-                  <Badge variant="blue">Emp ID: {employee?.uid??"—"}</Badge>
+                  <Badge variant="blue">Emp ID: {employee?.empid??"—"}</Badge>
                   {reviews.length>0 && <StarRating rating={reviews.reduce((s,r)=>s+r.rating,0)/reviews.length} size={12} />}
                 </div>
               </div>
