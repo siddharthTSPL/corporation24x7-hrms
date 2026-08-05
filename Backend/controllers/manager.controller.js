@@ -1092,7 +1092,34 @@ const getme = async (req, res, next) => {
       .lean(),
   ]);
 
-  res.status(200).json({ manager, leavebalance, reviews });
+  // Resolve the actual reporting manager/admin, based on reporting_manager +
+  // reporting_manager_model. Without this, the frontend has no way to show
+  // who the manager actually reports to (previously it silently fell back
+  // to rendering the logged-in manager's own details).
+  let reportingManager = null;
+  if (manager.reporting_manager && manager.reporting_manager_model) {
+    const ReportingModel = manager.reporting_manager_model === "Admin" ? AdminModel : managermodel;
+    const rm = await ReportingModel.findById(manager.reporting_manager)
+      .select("f_name l_name empid work_email designation department role profile_image")
+      .lean();
+
+    if (rm) {
+      reportingManager = {
+        _id: rm._id,
+        f_name: rm.f_name,
+        l_name: rm.l_name,
+        empid: rm.empid,
+        work_email: rm.work_email,
+        designation: rm.designation,
+        department: rm.department,
+        role: manager.reporting_manager_model === "Admin" ? "admin" : (rm.role || "manager"),
+        profile_image: rm.profile_image,
+        model: manager.reporting_manager_model,
+      };
+    }
+  }
+
+  res.status(200).json({ manager, leavebalance, reviews, reportingManager });
 };
 
 const editprofilemanager = async (req, res, next) => {
