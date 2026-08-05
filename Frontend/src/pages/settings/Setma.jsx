@@ -748,7 +748,7 @@ function DocumentsBankingTab({ manager, onSuccess, onError }) {
           <InputField label="Account number" value={form.account_number} onChange={set("account_number")} placeholder="9-18 digit account number" />
           <InputField label="IFSC code" value={form.ifsc_code} onChange={(e) => setForm(p => ({ ...p, ifsc_code: e.target.value.toUpperCase() }))} placeholder="ABCD0123456" />
         </div>
-        <PrimaryButton onClick={handleSaveBanking} loading={updateProfile.isPending} color={C.green}>Save banking details</PrimaryButton>
+        <PrimaryButton onClick={handleSaveBanking} loading={updateProfile.isPending} color={C.brand}>Save banking details</PrimaryButton>
       </SectionCard>
     </>
   );
