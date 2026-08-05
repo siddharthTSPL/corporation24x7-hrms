@@ -13,6 +13,8 @@ import {
   useAddManager, useAddEmployee, useFindAllManagers, useFindAllManagerswithoutAdmin,
 } from "../../auth/server-state/adminauth/adminauth.hook";
 import { useFindAllEmployeesFull } from "../../auth/server-state/adminauth/adminauth.hook";
+import { uploadDocument } from "../../../src/auth/api/adminapi/document/addocument.api"; 
+// ^ actual path apne project structure ke hisaab se adjust karo — jis file me aapne ye upload wala code (uploadDocument function) rakha hai
 
 import {
   useGetAllEmployee, useDeleteUser, useEditEmployee, useEditManager,
@@ -277,6 +279,77 @@ function PasswordField({label,name,value,onChange,error,required=true,onGenerate
   );
 }
 
+function FileUploadField({ label, name, value, onChange, error, accept = ".pdf,.jpg,.jpeg,.png" }) {
+  const inputRef = useRef();
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const fileName = value ? decodeURIComponent(value.split("/").pop().split("?")[0]) : "";
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadError("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await uploadDocument(formData);
+      const url =
+        res?.url ||
+        res?.data?.url ||
+        res?.document?.url ||
+        res?.data?.document?.url ||
+        res?.fileUrl ||
+        res?.data?.fileUrl;
+      if (!url) {
+        console.warn("Upload response did not contain a recognizable URL field:", res);
+        throw new Error("No URL returned from upload");
+      }
+      onChange({ target: { name, value: url } });
+    } catch (err) {
+      setUploadError(err?.message || "Upload failed. Try again.");
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  const handleRemove = () => {
+    onChange({ target: { name, value: "" } });
+    setUploadError("");
+  };
+
+  return (
+    <Field label={label} error={error || uploadError}>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        onChange={handleFileSelect}
+        className="hidden"
+        id={`file-${name}`}
+      />
+      {value ? (
+        <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-[#F4C0D1] bg-[#F9F8F2]">
+          <FaFileAlt size={12} className="text-[#730042] flex-shrink-0" />
+          <a href={value} target="_blank" rel="noopener noreferrer" className="text-sm text-[#730042] truncate flex-1 hover:underline">
+            {fileName || "View file"}
+          </a>
+          <button type="button" onClick={handleRemove} className="text-[#993556] hover:text-[#CD166E] flex-shrink-0">
+            <FaTimes size={12} />
+          </button>
+        </div>
+      ) : (
+        <label
+          htmlFor={`file-${name}`}
+          className={`${inputCls} flex items-center justify-center gap-2 cursor-pointer ${uploading ? "opacity-60 pointer-events-none" : ""}`}
+        >
+          {uploading ? "Uploading…" : " + Upload file"}
+        </label>
+      )}
+    </Field>
+  );
+}
 function OfficeLocationFields({form,onChange,errors}){
   const states = form.office_location_country ? State.getStatesOfCountry(form.office_location_country) : [];
   const cities = form.office_location_country && form.office_location_state
@@ -1756,13 +1829,13 @@ function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChang
       <Field label="Account Holder Name"><input name="account_holder_name" placeholder="Name as per bank" value={form.account_holder_name} onChange={onChange} className={inputCls}/></Field>
       <Field label="Account Number" error={errors.account_number}><input name="account_number" placeholder="9-18 digit account number" maxLength={18} value={form.account_number} onChange={onChange} className={inputCls}/></Field>
       <Field label="IFSC Code" error={errors.ifsc_code}><input name="ifsc_code" placeholder="e.g. SBIN0001234" maxLength={11} value={form.ifsc_code} onChange={(e)=>onChange({target:{name:"ifsc_code",value:e.target.value.toUpperCase()}})} className={inputCls}/></Field>
-      <div className="col-span-1 sm:col-span-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-3">Document URLs (optional)</p>
+     <div className="col-span-1 sm:col-span-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-3">Documents (optional)</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <Field label="Resume URL" error={errors.resume}><input name="resume" placeholder="https://..." value={form.resume} onChange={onChange} className={inputCls}/></Field>
-          <Field label="Aadhaar Card URL" error={errors.aadhaar_card}><input name="aadhaar_card" placeholder="https://..." value={form.aadhaar_card} onChange={onChange} className={inputCls}/></Field>
-          <Field label="PAN Card URL" error={errors.pan_card}><input name="pan_card" placeholder="https://..." value={form.pan_card} onChange={onChange} className={inputCls}/></Field>
-          <Field label="Experience Letter URL" error={errors.experience_letter}><input name="experience_letter" placeholder="https://..." value={form.experience_letter} onChange={onChange} className={inputCls}/></Field>
+          <FileUploadField label="Resume" name="resume" value={form.resume} onChange={onChange} error={errors.resume}/>
+          <FileUploadField label="Aadhaar Card" name="aadhaar_card" value={form.aadhaar_card} onChange={onChange} error={errors.aadhaar_card}/>
+          <FileUploadField label="PAN Card" name="pan_card" value={form.pan_card} onChange={onChange} error={errors.pan_card}/>
+          <FileUploadField label="Experience Letter" name="experience_letter" value={form.experience_letter} onChange={onChange} error={errors.experience_letter}/>
         </div>
       </div>
     </>
@@ -1872,12 +1945,12 @@ function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin
       <Field label="Account Number" error={errors.account_number}><input name="account_number" placeholder="9-18 digit account number" maxLength={18} value={form.account_number} onChange={onChange} className={inputCls}/></Field>
       <Field label="IFSC Code" error={errors.ifsc_code}><input name="ifsc_code" placeholder="e.g. SBIN0001234" maxLength={11} value={form.ifsc_code} onChange={(e)=>onChange({target:{name:"ifsc_code",value:e.target.value.toUpperCase()}})} className={inputCls}/></Field>
       <div className="col-span-1 sm:col-span-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-3">Document URLs (optional)</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-3">Documents (optional)</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <Field label="Resume URL" error={errors.resume}><input name="resume" placeholder="https://..." value={form.resume} onChange={onChange} className={inputCls}/></Field>
-          <Field label="Aadhaar Card URL" error={errors.aadhaar_card}><input name="aadhaar_card" placeholder="https://..." value={form.aadhaar_card} onChange={onChange} className={inputCls}/></Field>
-          <Field label="PAN Card URL" error={errors.pan_card}><input name="pan_card" placeholder="https://..." value={form.pan_card} onChange={onChange} className={inputCls}/></Field>
-          <Field label="Experience Letter URL" error={errors.experience_letter}><input name="experience_letter" placeholder="https://..." value={form.experience_letter} onChange={onChange} className={inputCls}/></Field>
+          <FileUploadField label="Resume" name="resume" value={form.resume} onChange={onChange} error={errors.resume}/>
+          <FileUploadField label="Aadhaar Card" name="aadhaar_card" value={form.aadhaar_card} onChange={onChange} error={errors.aadhaar_card}/>
+          <FileUploadField label="PAN Card" name="pan_card" value={form.pan_card} onChange={onChange} error={errors.pan_card}/>
+          <FileUploadField label="Experience Letter" name="experience_letter" value={form.experience_letter} onChange={onChange} error={errors.experience_letter}/>
         </div>
       </div>
     </>
