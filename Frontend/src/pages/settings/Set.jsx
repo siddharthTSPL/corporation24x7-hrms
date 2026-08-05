@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEditAdminProfile, useChangeAdminPassword } from "../../auth/server-state/adminauth/adminauth.hook";
+import { uploadDocument } from "../../../src/auth/api/adminapi/document/addocument.api";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import { Country, State, City } from "country-state-city";
 
@@ -96,10 +97,106 @@ function toDateInputValue(date) {
   return d.toISOString().slice(0, 10);
 }
 
+function FileUploadField({ label, value, onChange, hint, accept = ".pdf,.jpg,.jpeg,.png" }) {
+  const inputRef = useRef();
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const fileName = value ? decodeURIComponent(value.split("/").pop().split("?")[0]) : "";
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadError("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await uploadDocument(formData);
+      const url =
+        res?.url ||
+        res?.data?.url ||
+        res?.document?.url ||
+        res?.data?.document?.url ||
+        res?.fileUrl ||
+        res?.data?.fileUrl;
+      if (!url) {
+        console.warn("Upload response did not contain a recognizable URL field:", res);
+        throw new Error("No URL returned from upload");
+      }
+      onChange(url);
+    } catch (err) {
+      setUploadError(err?.response?.data?.message || err?.message || "Upload failed. Try again.");
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  const handleRemove = () => {
+    onChange("");
+    setUploadError("");
+  };
+
+  return (
+    <div className="min-w-0" style={{ marginBottom: 14 }}>
+      <FieldLabel>{label}</FieldLabel>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        onChange={handleFileSelect}
+        style={{ display: "none" }}
+        id={`file-upload-${label}`}
+      />
+      {value ? (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8,
+          padding: "9px 12px", borderRadius: 8,
+          border: `1px solid ${C.border}`, background: C.page,
+        }}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+            <path d="M4 1.5h6l3 3v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1z" stroke={C.brand} strokeWidth="1.2"/>
+          </svg>
+          <a href={value} target="_blank" rel="noopener noreferrer"
+            className="truncate"
+            style={{ fontSize: 13, color: C.brand, flex: 1, minWidth: 0, textDecoration: "none", fontWeight: 500 }}>
+            {fileName || "View file"}
+          </a>
+          <button type="button" onClick={handleRemove}
+            style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: 16, lineHeight: 1, padding: 0, flexShrink: 0 }}>
+            ×
+          </button>
+        </div>
+      ) : (
+        <label
+          htmlFor={`file-upload-${label}`}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            width: "100%", padding: "9px 12px", borderRadius: 8,
+            border: `1px dashed ${C.border}`, background: C.surface,
+            fontSize: 13, color: C.muted, cursor: uploading ? "not-allowed" : "pointer",
+            opacity: uploading ? 0.6 : 1, fontFamily: "inherit", boxSizing: "border-box",
+          }}
+        >
+          {uploading ? "Uploading…" : "+ Upload file"}
+        </label>
+      )}
+      {(hint || uploadError) && (
+        <div style={{ fontSize: 11, color: uploadError ? C.red : C.muted, marginTop: 3 }}>
+          {uploadError || hint}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function fmtDate(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
 }
+
+
 
 
 // AFTER
@@ -554,11 +651,11 @@ function DocumentsBankingTab({ adminData, onSuccess, onError }) {
 
   return (
     <>
-      <SectionCard title="Documents" subtitle="Paste a link to each uploaded file" accent={C.blue}>
-        <InputField label="Resume" value={form.resume} onChange={set("resume")} placeholder="https://…" />
-        <InputField label="Aadhaar card" value={form.aadhaar_card} onChange={set("aadhaar_card")} placeholder="https://…" />
-        <InputField label="PAN card" value={form.pan_card} onChange={set("pan_card")} placeholder="https://…" />
-        <InputField label="Experience letter" value={form.experience_letter} onChange={set("experience_letter")} placeholder="https://…" />
+      <SectionCard title="Documents" subtitle="Upload your documents" accent={C.blue}>
+        <FileUploadField label="Resume" value={form.resume} onChange={(url) => setForm(p => ({ ...p, resume: url }))} />
+        <FileUploadField label="Aadhaar card" value={form.aadhaar_card} onChange={(url) => setForm(p => ({ ...p, aadhaar_card: url }))} />
+        <FileUploadField label="PAN card" value={form.pan_card} onChange={(url) => setForm(p => ({ ...p, pan_card: url }))} />
+        <FileUploadField label="Experience letter" value={form.experience_letter} onChange={(url) => setForm(p => ({ ...p, experience_letter: url }))} />
         <PrimaryButton onClick={handleSaveDocs} loading={isPending} color={C.brandDark}>Save documents</PrimaryButton>
       </SectionCard>
 
