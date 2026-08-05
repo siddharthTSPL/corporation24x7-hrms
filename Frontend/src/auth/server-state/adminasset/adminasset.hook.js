@@ -93,12 +93,15 @@ export const useDeleteAssetAdmin = () => {
 export const useAssignAssetToEmployee = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, employee_id, quantity }) => assignAssetToEmployee(id, employee_id, quantity),
+    mutationFn: ({ id, employee_id, quantity }) =>
+      assignAssetToEmployee(id, employee_id, quantity),
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ["admin-assets"] });
       queryClient.invalidateQueries({ queryKey: ["admin-asset", id] });
       queryClient.invalidateQueries({ queryKey: ["admin-assets-employees"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-assets-employee-history"] });
+      queryClient.invalidateQueries({
+        queryKey: ["admin-assets-employee-history"],
+      });
     },
   });
 };
@@ -106,12 +109,15 @@ export const useAssignAssetToEmployee = () => {
 export const useAssignAssetToManager = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, manager_id, quantity }) => assignAssetToManager(id, manager_id, quantity),
+    mutationFn: ({ id, manager_id, quantity }) =>
+      assignAssetToManager(id, manager_id, quantity),
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ["admin-assets"] });
       queryClient.invalidateQueries({ queryKey: ["admin-asset", id] });
       queryClient.invalidateQueries({ queryKey: ["admin-assets-employees"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-assets-employee-history"] });
+      queryClient.invalidateQueries({
+        queryKey: ["admin-assets-employee-history"],
+      });
     },
   });
 };
@@ -125,7 +131,9 @@ export const useRevokeAssetAdmin = () => {
       queryClient.invalidateQueries({ queryKey: ["admin-asset", id] });
       queryClient.invalidateQueries({ queryKey: ["admin-assets-person"] });
       queryClient.invalidateQueries({ queryKey: ["admin-assets-employees"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-assets-employee-history"] });
+      queryClient.invalidateQueries({
+        queryKey: ["admin-assets-employee-history"],
+      });
     },
   });
 };
