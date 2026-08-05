@@ -51,7 +51,18 @@ export const DEPT_FULL_FORMS = {
   MGMT: "Management",
 };
 
-const LOCATIONS = ["Noida", "Bareilly", "Delhi", "Mumbai"];
+const LOCATIONS = [
+  "Noida", "Bareilly", "Delhi", "Mumbai",
+  "Gurugram", "Bengaluru", "Hyderabad", "Pune",
+  "Chennai", "Kolkata", "Ahmedabad", "Jaipur",
+  "Lucknow", "Chandigarh", "Indore", "Nagpur",
+  "Surat", "Kochi", "Coimbatore", "Bhopal",
+  "Vadodara", "Visakhapatnam", "Nashik", "Kanpur",
+  "Patna", "Ludhiana", "Agra", "Meerut",
+  "Faridabad", "Ghaziabad", "Thane", "Navi Mumbai",
+  "Vijayawada", "Mysuru", "Ranchi", "Raipur",
+  "Dehradun", "Amritsar", "Varanasi", "Guwahati",
+];
 
 const WORKING_STATUSES = ["working", "resigned", "fired", "terminated"];
 const IRREVERSIBLE_STATUSES = ["resigned", "terminated"];
@@ -595,6 +606,73 @@ function ReportingManagerSelect({value,onChange,managersOnly,managersWithAdmin,l
         )}
       </select>
     </Field>
+  );
+}
+
+
+
+function LocationCombobox({ value, onChange, options }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef();
+
+  useEffect(() => {
+    const h = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  const filtered = value
+    ? options.filter((l) => l.toLowerCase().includes(value.toLowerCase()))
+    : options;
+
+  return (
+    <div className="relative flex-1 min-w-[140px]" ref={wrapRef}>
+      <input
+        placeholder="All Locations"
+        className={inputCls}
+        value={value}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={() => { onChange(""); setOpen(false); }}
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#993556] hover:text-[#CD166E]"
+        >
+          <FaTimes size={11} />
+        </button>
+      )}
+      {open && (
+        <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-[#F4C0D1] rounded-xl shadow-xl py-1">
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => { onChange(""); setOpen(false); }}
+            className="w-full text-left px-3 py-2 text-xs font-semibold text-[#993556] hover:bg-[#FBEAF0]"
+          >
+            All Locations
+          </button>
+          {filtered.length > 0 ? (
+            filtered.map((l) => (
+              <button
+                key={l}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => { onChange(l); setOpen(false); }}
+                className="w-full text-left px-3 py-2 text-xs text-[#730042] hover:bg-[#FBEAF0]"
+              >
+                {l}
+              </button>
+            ))
+          ) : (
+            <div className="px-3 py-2 text-xs text-[#993556]/70">No match — press Enter to use "{value}"</div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -2382,27 +2460,29 @@ return(
                 )}
               </button>
             </div>
-            <div className="hidden sm:flex sm:flex-wrap gap-2">
-              <select className={`${inputCls} flex-1 min-w-[140px]`} value={filters.type} onChange={(e)=>setFilters({...filters,type:e.target.value})}>
-                <option value="">All Types</option><option value="employee">Employees</option><option value="manager">Managers</option>
-              </select>
-              <select className={`${inputCls} flex-1 min-w-[140px]`} value={filters.department} onChange={(e)=>setFilters({...filters,department:e.target.value})}>
-                <option value="">All Departments</option>
-                {DEPT_OPTIONS.map((dept)=>(
-                  <option key={dept} value={dept}>
-                    {DEPT_FULL_FORMS[dept]}
-                  </option>
-                ))}
-              </select>
-              <select className={`${inputCls} flex-1 min-w-[140px]`} value={filters.role} onChange={(e)=>setFilters({...filters,role:e.target.value})}>
-                <option value="">All Roles</option>
-                <option value="employee">Employee</option><option value="manager">Manager</option>
-                <option value="senior_manager">Senior Manager</option><option value="official">Official</option>
-              </select>
-              <select className={`${inputCls} flex-1 min-w-[140px]`} value={filters.location} onChange={(e)=>setFilters({...filters,location:e.target.value})}>
-                <option value="">All Locations</option>{LOCATIONS.map((l)=><option key={l} value={l}>{l}</option>)}
-              </select>
-            </div>
+<div className="hidden sm:flex sm:flex-wrap gap-2">
+  <select className={`${inputCls} flex-1 min-w-[140px]`} value={filters.type} onChange={(e)=>setFilters({...filters,type:e.target.value})}>
+    <option value="">All Types</option><option value="employee">Employees</option><option value="manager">Managers</option>
+  </select>
+  <select className={`${inputCls} flex-1 min-w-[140px]`} value={filters.department} onChange={(e)=>setFilters({...filters,department:e.target.value})}>
+    <option value="">All Departments</option>
+    {DEPT_OPTIONS.map((dept)=>(
+      <option key={dept} value={dept}>
+        {DEPT_FULL_FORMS[dept]}
+      </option>
+    ))}
+  </select>
+  <select className={`${inputCls} flex-1 min-w-[140px]`} value={filters.role} onChange={(e)=>setFilters({...filters,role:e.target.value})}>
+    <option value="">All Roles</option>
+    <option value="employee">Employee</option><option value="manager">Manager</option>
+    <option value="senior_manager">Senior Manager</option><option value="official">Official</option>
+  </select>
+    <LocationCombobox
+    value={filters.location}
+    onChange={(v) => setFilters({ ...filters, location: v })}
+    options={LOCATIONS}
+  />
+</div>
             {showFilters&&(
               <div className="mt-2 pt-2 border-t border-[#F4C0D1]">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
