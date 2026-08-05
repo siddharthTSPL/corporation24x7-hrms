@@ -60,6 +60,7 @@ export const useGetMeManager = () => {
       manager: data.manager,
       leavebalance: data.leavebalance,
       reviews: data.reviews,
+      reportingManager: data.reportingManager,   // ← ye line add karni hai
     }),
   });
 };
