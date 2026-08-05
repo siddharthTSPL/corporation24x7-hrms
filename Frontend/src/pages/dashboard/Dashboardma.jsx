@@ -935,6 +935,7 @@ export default function ManagerDashboard() {
 
   const manager   = meData?.manager      ?? null;
   const lb        = meData?.leavebalance?.[0] ?? null;
+  const reportingManager = meData?.reportingManager ?? null; 
   const announcements = annData?.announcements ?? (Array.isArray(annData) ? annData : []);
   const reviews = meData?.review ?? [];
 
@@ -1200,43 +1201,52 @@ export default function ManagerDashboard() {
           </div>
         </div>
 
-        <div className="md-card" style={{ animationDelay:".15s", background:"#730042", border:"0.5px solid #5a0033" }}>
-          <div style={{ position:"absolute", top:-20, right:-20, width:80, height:80, borderRadius:"50%", background:"rgba(255,255,255,0.06)" }}/>
-          <div style={{ position:"absolute", bottom:-10, left:-10, width:60, height:60, borderRadius:"50%", background:"rgba(255,255,255,0.04)" }}/>
-          <div style={{ padding:"16px 18px" }}>
-            <div style={{ fontSize:11, color:"rgba(249,248,242,0.6)", fontWeight:500, letterSpacing:".3px",
-              marginBottom:10, fontFamily:"'DM Sans',sans-serif" }}>Reporting to admin</div>
-            {meLoading ? (
-              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                <Skeleton h={18} w="60%" radius={4}/><Skeleton h={14} w="80%" radius={4}/>
-              </div>
-            ) : (
-              <>
-                <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
-                  <Avatar src={manager?.profile_image} initials={mgrInitials} size={42}
-                    style={{ background:"rgba(249,248,242,0.15)" }}/>
-                  <div style={{ minWidth:0 }}>
-                    <div style={{ fontSize:14, fontWeight:600, color:"#f9f8f2", fontFamily:"'Lora',serif" }}>{fullName}</div>
-                    <div style={{ fontSize:11, color:"rgba(249,248,242,0.6)", marginTop:2, fontFamily:"'DM Sans',sans-serif" }}>
-                      {getRoleFullForm(manager?.role) ?? "Manager"}
-                    </div>
-                  </div>
-                </div>
-                <div style={{ height:"0.5px", background:"rgba(249,248,242,0.15)", marginBottom:10 }}/>
-                <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, fontFamily:"'DM Sans',sans-serif" }}>
-                  <span style={{ color:"rgba(249,248,242,0.5)" }}>Manager ID</span>
-                  <span style={{ fontWeight:500, color:"rgba(249,248,242,0.7)" }}>{manager?.empid ?? "—"}</span>
-                </div>
-                <div style={{ marginTop:8 }}>
-                  <div style={{ fontSize:10, color:"rgba(249,248,242,0.4)", fontFamily:"'DM Sans',sans-serif", marginBottom:2 }}>Work email</div>
-                  <div style={{ fontSize:11, fontWeight:500, color:"rgba(249,248,242,0.6)", wordBreak:"break-word", fontFamily:"'DM Sans',sans-serif" }}>
-                    {manager?.work_email ?? "—"}
-                  </div>
-                </div>
-              </>
-            )}
+       <div className="md-card" style={{ animationDelay:".15s", background:"#730042", border:"0.5px solid #5a0033" }}>
+  <div style={{ position:"absolute", top:-20, right:-20, width:80, height:80, borderRadius:"50%", background:"rgba(255,255,255,0.06)" }}/>
+  <div style={{ position:"absolute", bottom:-10, left:-10, width:60, height:60, borderRadius:"50%", background:"rgba(255,255,255,0.04)" }}/>
+  <div style={{ padding:"16px 18px" }}>
+    <div style={{ fontSize:11, color:"rgba(249,248,242,0.6)", fontWeight:500, letterSpacing:".3px",
+      marginBottom:10, fontFamily:"'DM Sans',sans-serif" }}>Reporting to</div>
+    {meLoading ? (
+      <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+        <Skeleton h={18} w="60%" radius={4}/><Skeleton h={14} w="80%" radius={4}/>
+      </div>
+    ) : reportingManager ? (
+      <>
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+          <Avatar src={reportingManager.profile_image}
+            initials={getInitials(reportingManager.f_name, reportingManager.l_name)}
+            size={42} style={{ background:"rgba(249,248,242,0.15)" }}/>
+          <div style={{ minWidth:0 }}>
+            <div style={{ fontSize:14, fontWeight:600, color:"#f9f8f2", fontFamily:"'Lora',serif" }}>
+              {reportingManager.f_name} {reportingManager.l_name}
+            </div>
+            <div style={{ fontSize:11, color:"rgba(249,248,242,0.6)", marginTop:2, fontFamily:"'DM Sans',sans-serif" }}>
+              {getRoleFullForm(reportingManager.role) ?? (reportingManager.model === "Admin" ? "Admin" : "Manager")}
+            </div>
           </div>
         </div>
+        <div style={{ height:"0.5px", background:"rgba(249,248,242,0.15)", marginBottom:10 }}/>
+        <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, fontFamily:"'DM Sans',sans-serif" }}>
+          <span style={{ color:"rgba(249,248,242,0.5)" }}>
+            {reportingManager.model === "Admin" ? "Admin ID" : "Manager ID"}
+          </span>
+          <span style={{ fontWeight:500, color:"rgba(249,248,242,0.7)" }}>{reportingManager.empid ?? "—"}</span>
+        </div>
+        <div style={{ marginTop:8 }}>
+          <div style={{ fontSize:10, color:"rgba(249,248,242,0.4)", fontFamily:"'DM Sans',sans-serif", marginBottom:2 }}>Work email</div>
+          <div style={{ fontSize:11, fontWeight:500, color:"rgba(249,248,242,0.6)", wordBreak:"break-word", fontFamily:"'DM Sans',sans-serif" }}>
+            {reportingManager.work_email ?? "—"}
+          </div>
+        </div>
+      </>
+    ) : (
+      <div style={{ fontSize:12, color:"rgba(249,248,242,0.6)", fontFamily:"'DM Sans',sans-serif" }}>
+        No reporting manager assigned
+      </div>
+    )}
+  </div>
+</div>
       </div>
 
       <div className="md-two-col-grid">
