@@ -21,7 +21,6 @@ import {
   FaLock,
   FaMoneyCheckAlt,
   FaClipboardCheck,
-  FaBook,
 } from "react-icons/fa";
 import { useAuth } from "../auth/store/getmeauth/getmeauth";
 import { useAdminLogout } from "../auth/server-state/adminauth/adminauth.hook";
@@ -33,6 +32,7 @@ import { clearAgentToken } from "../pages/utils/Desktopagent";
 import HelpTour from "./help/HelpTour";
 import FloatingHelp from "./help/FloatingHelp";
 import TechnicalSupportModal from "./help/TechnicalSupportModal";
+import DocumentationModal from "./help/DocumentationModal";
 
 const superAdminMenu = [
   { name: "Dashboard",      path: "/superadmin-dashboard",     icon: <FaHome />, blurb: "Overview of every organisation — usage, activity, and platform health." },
@@ -47,7 +47,6 @@ const superAdminMenu = [
   { name: "Payroll",       path: "/superadmin-payroll",       icon: <FaMoneyCheckAlt />, blurb: "Oversee payroll runs across every organisation." },
   { name: "Reimbursements", path: "/superadmin-reimbursement", icon: <FaMoneyCheckAlt />, blurb: "Review reimbursement claims raised by admins, and see every claim org-wide." },
   { name: "TorchX Voice",   path: "/superadmin-complaints",    icon: <FaShieldAlt />, blurb: "Handle support tickets raised by admins, managers, and employees." },
-  { name: "Help & Support", path: "/help-center",              icon: <FaBook />, blurb: "Guides for every module — how to use TorchX Talent, tailored to your role." },
   { name: "Settings",       path: "/superadmin-settings",      icon: <FaCog />, blurb: "Configure platform-wide settings and preferences." },
 ];
 
@@ -72,7 +71,6 @@ const adminMenu = [
   { name: "TorchX Management", path: "/admin-management", icon: <FaUsersCog />, blurb: "Manage your organisation's TorchX product access." },
   { name: "Document",      path: "/document-admin",      icon: <FaFileAlt />, blurb: "Upload and manage your own documents.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Team Document", path: "/document-admin-team", icon: <FaFileAlt />, blurb: "View documents uploaded by your team.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
-  { name: "Help & Support", path: "/help-center",        icon: <FaBook />, blurb: "Guides for every module — how to use TorchX Talent, tailored to your role." },
   { name: "Settings",      path: "/settings",            icon: <FaCog />, blurb: "Update your profile and account preferences." },
 ];
 
@@ -90,7 +88,6 @@ const managerMenu = [
   { name: "Recruitment",  path: "/recruitment-manager",  icon: <FaUsersCog />, blurb: "Track hiring requisitions and candidates.",  permissionGroup: ["recruitment.can_view_hiring_requisitions", "recruitment.can_create_hiring_requisition", "recruitment.can_view_candidates", "recruitment.can_add_candidate"] },
   { name: "TorchX Voice", path: "/manager-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"],
     pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to track ones you've already raised." } },
-  { name: "Help & Support", path: "/help-center",        icon: <FaBook />, blurb: "Guides for every module — how to use TorchX Talent, tailored to your role." },
   { name: "Settings",     path: "/settings-manager",     icon: <FaCog />, blurb: "Update your profile and account preferences." },
 ];
 
@@ -106,7 +103,6 @@ const employeeMenu = [
   { name: "File",         path: "/file-employee",         icon: <FaFolder />, blurb: "Upload and manage your personal documents.",    permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "TorchX Voice", path: "/employee-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket for any issue.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"],
     pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to check the status of one you've already sent." } },
-  { name: "Help & Support", path: "/help-center",         icon: <FaBook />, blurb: "Guides for every module — how to use TorchX Talent, tailored to your role." },
   { name: "Settings",     path: "/settings-employee",     icon: <FaCog />, blurb: "Update your profile and account preferences." },
 ];
 
@@ -141,6 +137,7 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
   const [mobileOpen,  setMobileOpen]  = useState(false);
   const [showTour,    setShowTour]    = useState(false);
   const [showSupport, setShowSupport] = useState(false);
+  const [showDocs,    setShowDocs]    = useState(false);
 
   const menu = menuByRole[role] ?? employeeMenu;
 
@@ -197,6 +194,10 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
 
   const openSupportForm = () => {
     setShowSupport(true);
+  };
+
+  const openDocumentation = () => {
+    setShowDocs(true);
   };
 
   const handleLogout = () => {
@@ -345,13 +346,10 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
         )}
       </div>
 
-      <FloatingHelp
-        onTakeTour={startTour}
-        onTechnicalSupport={openSupportForm}
-        onDocumentation={() => navigate("/help-center")}
-      />
+      <FloatingHelp onTakeTour={startTour} onTechnicalSupport={openSupportForm} onDocumentation={openDocumentation} />
       {showTour && <HelpTour steps={tourSteps} onClose={() => setShowTour(false)} />}
       {showSupport && <TechnicalSupportModal role={role} onClose={() => setShowSupport(false)} />}
+      {showDocs && <DocumentationModal onClose={() => setShowDocs(false)} />}
     </>
   );
 }

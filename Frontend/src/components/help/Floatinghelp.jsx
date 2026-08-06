@@ -154,8 +154,8 @@ export default function FloatingHelp({ onTakeTour, onTechnicalSupport, onDocumen
           >
             <FaBook className="text-[#730042] flex-shrink-0" />
             <span>
-              <span className="block font-medium">Help &amp; Support</span>
-              <span className="block text-[11px] text-gray-400">Browse guides for every module</span>
+              <span className="block font-medium">Documentation</span>
+              <span className="block text-[11px] text-gray-400">Guides & frequently asked questions</span>
             </span>
           </button>
           <button
