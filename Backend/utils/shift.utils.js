@@ -108,7 +108,14 @@ const evaluateCheckoutWindow = (shift, now = new Date(), checkInTime = null) => 
   const end = toMinutes(shift.endTime);
   const overnight = end <= start;
   const grace = shift.graceMinutes ?? 15;
-  const minMinutesBeforeCheckout = shift.minMinutesBeforeCheckout ?? 10;
+  // Guard against 0 (or any non-positive value) explicitly saved on the
+  // shift doc, not just null/undefined - `?? 10` alone lets a stray 0
+  // through, which collapses this gate to "always allowed" and lets a
+  // second scan checkout the instant it lands right after check-in.
+  const minMinutesBeforeCheckout =
+    Number.isFinite(shift.minMinutesBeforeCheckout) && shift.minMinutesBeforeCheckout > 0
+      ? shift.minMinutesBeforeCheckout
+      : 10;
 
   let nowMinutes = getISTMinutesOfDay(now);
   let effectiveEnd = end;
@@ -173,7 +180,16 @@ const evaluateCheckoutWindow = (shift, now = new Date(), checkInTime = null) => 
 // an IST-midnight instant (i.e. produced by startOfISTDay, which is what
 // every `date` field in this app is), so pure ms arithmetic on top of it
 // is timezone-independent - no local Date getters/setters involved.
-const getForceCheckoutInstant = (shift, attendanceDate) => {
+//
+// `checkInTime`, if provided, guarantees a late check-in still gets a full
+// maxOvertimeMinutes window before being force-closed. Without this, a
+// checkin near the end of the late-checkin window (shift end + up to
+// lateCheckinCutoffMinutes, default 60) could land AFTER the plain
+// shift-end + maxOvertimeMinutes threshold has already passed - the cron
+// (runs every 5 min) would then force-checkout the session within minutes
+// of check-in. We take the LATER of the two floors so neither a fixed
+// shift-end deadline nor a genuine post-checkin grace period is violated.
+const getForceCheckoutInstant = (shift, attendanceDate, checkInTime = null) => {
   const start = toMinutes(shift.startTime);
   const end = toMinutes(shift.endTime);
   const overnight = end <= start;
@@ -184,7 +200,13 @@ const getForceCheckoutInstant = (shift, attendanceDate) => {
   const endOffsetMinutes = overnight ? end + 1440 : end;
   const totalOffsetMinutes = endOffsetMinutes + maxOvertimeMinutes;
 
-  return new Date(new Date(attendanceDate).getTime() + totalOffsetMinutes * 60000);
+  const shiftEndFloor = new Date(new Date(attendanceDate).getTime() + totalOffsetMinutes * 60000);
+
+  if (!checkInTime) return shiftEndFloor;
+
+  const checkinFloor = new Date(new Date(checkInTime).getTime() + maxOvertimeMinutes * 60000);
+
+  return checkinFloor > shiftEndFloor ? checkinFloor : shiftEndFloor;
 };
 
 const ensureDefaultShift = async (organisation_id) => {
