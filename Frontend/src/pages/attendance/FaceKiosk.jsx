@@ -88,6 +88,12 @@ function classifyResult(data, err) {
       return { kind: "too_early", title: "Too early", detail: err.message, subDetail: buildSubDetail(err.data) };
     if (err.reason === "checked_in_by_system")
       return { kind: "cross_channel", title: "Checked in via System", detail: err.message, subDetail: buildSubDetail(err.data) };
+    // Was previously falling through to the generic 400 branch below and
+    // losing its dedicated blue/clock styling — now gets its own kind, plus
+    // the exact unlock instant so the UI can show a live countdown instead
+    // of a message that's only as fresh as this one scan attempt.
+    if (err.reason === "checkin_already_done")
+      return { kind: "checkin_already_done", title: "Already checked in", detail: err.message, subDetail: buildSubDetail(err.data), checkoutOpensAt: err.data?.checkoutOpensAt };
     if (err.status === 400)
       return { kind: "already_done", title: "Already done", detail: err.message, subDetail: buildSubDetail(err.data) };
     return { kind: "error", title: "Scan failed", detail: err.message || "Please try again." };
@@ -98,6 +104,7 @@ function classifyResult(data, err) {
       title: data.employeeName ? `Welcome, ${data.employeeName}` : "Checked in",
       detail: data.message,
       subDetail: buildSubDetail(data),
+      checkoutOpensAt: data.checkoutOpensAt,
     };
   }
   if (data.action === "checkout") {
@@ -117,7 +124,46 @@ function classifyResult(data, err) {
   return { kind: "error", title: "Unrecognised response", detail: data.message || "" };
 }
 
-// ---------------------------------------------------------------- sound --
+// ------------------------------------------------------------ countdown --
+// Live mm:ss chip for "checkout unlocks in..." — ticks every second while
+// the result banner is visible, instead of a static "X minute(s)" label
+// that's only as fresh as the scan that produced it.
+function CountdownChip({ target }) {
+  const targetMs = target ? new Date(target).getTime() : null;
+  const [remainingMs, setRemainingMs] = useState(() => (targetMs ? targetMs - Date.now() : 0));
+
+  useEffect(() => {
+    if (!targetMs) return;
+    setRemainingMs(targetMs - Date.now());
+    const id = setInterval(() => setRemainingMs(targetMs - Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [targetMs]);
+
+  if (!targetMs) return null;
+
+  if (remainingMs <= 0) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded-full px-3 py-1 mt-2">
+        🔓 Checkout window is open
+      </span>
+    );
+  }
+
+  const totalSec = Math.max(0, Math.round(remainingMs / 1000));
+  const mm = Math.floor(totalSec / 60);
+  const ss = String(totalSec % 60).padStart(2, "0");
+
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-full px-3 py-1 mt-2"
+      style={{ color: MAROON, background: "#FBEAF0", border: "1px solid #F4C0D1" }}
+    >
+      🔒 Checkout unlocks in {mm}:{ss}
+    </span>
+  );
+}
+
+
 // Tiny Web Audio beeps — no assets to load, works instantly on any kiosk.
 function useKioskSound() {
   const ctxRef = useRef(null);
@@ -688,6 +734,7 @@ export default function FaceKiosk() {
               {result.subDetail && (
                 <p className={`text-xs mt-1 opacity-75 ${RESULT_STYLES[result.kind]?.text}`}>{result.subDetail}</p>
               )}
+              {result.checkoutOpensAt && <CountdownChip target={result.checkoutOpensAt} />}
               {isFailure && (
                 <p className="text-xs font-bold mt-2 text-gray-500 kiosk-retry-pulse">🔁 Please look at the camera and try again</p>
               )}
