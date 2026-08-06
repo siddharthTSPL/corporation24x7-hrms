@@ -428,7 +428,7 @@ const autoCheckoutAll = async () => {
       const shift = await getShiftFor(a);
       if (!shift) continue;
 
-      const forceCheckoutAt = getForceCheckoutInstant(shift, a.date);
+      const forceCheckoutAt = getForceCheckoutInstant(shift, a.date, a.checkIn);
       if (now < forceCheckoutAt) continue; // overtime cutoff not reached yet
 
       const thresholds = getShiftThresholds(shift);
