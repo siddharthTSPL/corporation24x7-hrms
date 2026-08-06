@@ -43,6 +43,7 @@ const shiftSchema = new mongoose.Schema(
     minMinutesBeforeCheckout: {
       type: Number,
       default: 10,
+      min: [1, "minMinutesBeforeCheckout must be at least 1 minute"],
     },
     // activeMinutes below this -> absent
     absentBelowMinutes: {
