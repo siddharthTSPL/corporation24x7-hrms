@@ -221,6 +221,11 @@ const scanFace = async (req, res) => {
           ? `You are quite late (by ${minutesToLabel(lateMinutes)}), but welcome! Checked in.`
           : `Checked in — late by ${minutesToLabel(lateMinutes)} (grace period was ${shift.startTime} to +${grace} min)`;
 
+      // Exact instant checkout unlocks, so the kiosk can show a live
+      // countdown chip right after check-in instead of only surfacing it
+      // reactively after a blocked second scan.
+      const { checkoutOpensAt } = evaluateCheckoutWindow(shift, attendance.checkIn, attendance.checkIn);
+
       return res.json({
         message: checkinMessage,
         action: "checkin",
@@ -231,6 +236,7 @@ const scanFace = async (req, res) => {
         lateMinutes,
         gate: gateName,
         shift: shiftInfo,
+        checkoutOpensAt,
       });
     }
 
@@ -256,6 +262,7 @@ const scanFace = async (req, res) => {
         shift: shiftInfo,
         checkIn: attendance.checkIn,
         minutesUntilCheckoutOpens: checkoutWindow.minutesUntilCheckoutOpens,
+        checkoutOpensAt: checkoutWindow.checkoutOpensAt,
       });
     }
 
