@@ -13,6 +13,8 @@ import {
   useAddManager, useAddEmployee, useFindAllManagers, useFindAllManagerswithoutAdmin,
 } from "../../auth/server-state/adminauth/adminauth.hook";
 import { useFindAllEmployeesFull } from "../../auth/server-state/adminauth/adminauth.hook";
+import { uploadDocument } from "../../../src/auth/api/adminapi/document/addocument.api"; 
+// ^ actual path apne project structure ke hisaab se adjust karo — jis file me aapne ye upload wala code (uploadDocument function) rakha hai
 
 import {
   useGetAllEmployee, useDeleteUser, useEditEmployee, useEditManager,
@@ -51,7 +53,18 @@ export const DEPT_FULL_FORMS = {
   MGMT: "Management",
 };
 
-const LOCATIONS = ["Noida", "Bareilly", "Delhi", "Mumbai"];
+const LOCATIONS = [
+  "Noida", "Bareilly", "Delhi", "Mumbai",
+  "Gurugram", "Bengaluru", "Hyderabad", "Pune",
+  "Chennai", "Kolkata", "Ahmedabad", "Jaipur",
+  "Lucknow", "Chandigarh", "Indore", "Nagpur",
+  "Surat", "Kochi", "Coimbatore", "Bhopal",
+  "Vadodara", "Visakhapatnam", "Nashik", "Kanpur",
+  "Patna", "Ludhiana", "Agra", "Meerut",
+  "Faridabad", "Ghaziabad", "Thane", "Navi Mumbai",
+  "Vijayawada", "Mysuru", "Ranchi", "Raipur",
+  "Dehradun", "Amritsar", "Varanasi", "Guwahati",
+];
 
 const WORKING_STATUSES = ["working", "resigned", "fired", "terminated"];
 const IRREVERSIBLE_STATUSES = ["resigned", "terminated"];
@@ -266,6 +279,77 @@ function PasswordField({label,name,value,onChange,error,required=true,onGenerate
   );
 }
 
+function FileUploadField({ label, name, value, onChange, error, accept = ".pdf,.jpg,.jpeg,.png" }) {
+  const inputRef = useRef();
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const fileName = value ? decodeURIComponent(value.split("/").pop().split("?")[0]) : "";
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadError("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await uploadDocument(formData);
+      const url =
+        res?.url ||
+        res?.data?.url ||
+        res?.document?.url ||
+        res?.data?.document?.url ||
+        res?.fileUrl ||
+        res?.data?.fileUrl;
+      if (!url) {
+        console.warn("Upload response did not contain a recognizable URL field:", res);
+        throw new Error("No URL returned from upload");
+      }
+      onChange({ target: { name, value: url } });
+    } catch (err) {
+      setUploadError(err?.message || "Upload failed. Try again.");
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  const handleRemove = () => {
+    onChange({ target: { name, value: "" } });
+    setUploadError("");
+  };
+
+  return (
+    <Field label={label} error={error || uploadError}>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        onChange={handleFileSelect}
+        className="hidden"
+        id={`file-${name}`}
+      />
+      {value ? (
+        <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-[#F4C0D1] bg-[#F9F8F2]">
+          <FaFileAlt size={12} className="text-[#730042] flex-shrink-0" />
+          <a href={value} target="_blank" rel="noopener noreferrer" className="text-sm text-[#730042] truncate flex-1 hover:underline">
+            {fileName || "View file"}
+          </a>
+          <button type="button" onClick={handleRemove} className="text-[#993556] hover:text-[#CD166E] flex-shrink-0">
+            <FaTimes size={12} />
+          </button>
+        </div>
+      ) : (
+        <label
+          htmlFor={`file-${name}`}
+          className={`${inputCls} flex items-center justify-center gap-2 cursor-pointer ${uploading ? "opacity-60 pointer-events-none" : ""}`}
+        >
+          {uploading ? "Uploading…" : " + Upload file"}
+        </label>
+      )}
+    </Field>
+  );
+}
 function OfficeLocationFields({form,onChange,errors}){
   const states = form.office_location_country ? State.getStatesOfCountry(form.office_location_country) : [];
   const cities = form.office_location_country && form.office_location_state
@@ -595,6 +679,73 @@ function ReportingManagerSelect({value,onChange,managersOnly,managersWithAdmin,l
         )}
       </select>
     </Field>
+  );
+}
+
+
+
+function LocationCombobox({ value, onChange, options }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef();
+
+  useEffect(() => {
+    const h = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  const filtered = value
+    ? options.filter((l) => l.toLowerCase().includes(value.toLowerCase()))
+    : options;
+
+  return (
+    <div className="relative flex-1 min-w-[140px]" ref={wrapRef}>
+      <input
+        placeholder="All Locations"
+        className={inputCls}
+        value={value}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={() => { onChange(""); setOpen(false); }}
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#993556] hover:text-[#CD166E]"
+        >
+          <FaTimes size={11} />
+        </button>
+      )}
+      {open && (
+        <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-[#F4C0D1] rounded-xl shadow-xl py-1">
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => { onChange(""); setOpen(false); }}
+            className="w-full text-left px-3 py-2 text-xs font-semibold text-[#993556] hover:bg-[#FBEAF0]"
+          >
+            All Locations
+          </button>
+          {filtered.length > 0 ? (
+            filtered.map((l) => (
+              <button
+                key={l}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => { onChange(l); setOpen(false); }}
+                className="w-full text-left px-3 py-2 text-xs text-[#730042] hover:bg-[#FBEAF0]"
+              >
+                {l}
+              </button>
+            ))
+          ) : (
+            <div className="px-3 py-2 text-xs text-[#993556]/70">No match — press Enter to use "{value}"</div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1678,13 +1829,13 @@ function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChang
       <Field label="Account Holder Name"><input name="account_holder_name" placeholder="Name as per bank" value={form.account_holder_name} onChange={onChange} className={inputCls}/></Field>
       <Field label="Account Number" error={errors.account_number}><input name="account_number" placeholder="9-18 digit account number" maxLength={18} value={form.account_number} onChange={onChange} className={inputCls}/></Field>
       <Field label="IFSC Code" error={errors.ifsc_code}><input name="ifsc_code" placeholder="e.g. SBIN0001234" maxLength={11} value={form.ifsc_code} onChange={(e)=>onChange({target:{name:"ifsc_code",value:e.target.value.toUpperCase()}})} className={inputCls}/></Field>
-      <div className="col-span-1 sm:col-span-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-3">Document URLs (optional)</p>
+     <div className="col-span-1 sm:col-span-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-3">Documents (optional)</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <Field label="Resume URL" error={errors.resume}><input name="resume" placeholder="https://..." value={form.resume} onChange={onChange} className={inputCls}/></Field>
-          <Field label="Aadhaar Card URL" error={errors.aadhaar_card}><input name="aadhaar_card" placeholder="https://..." value={form.aadhaar_card} onChange={onChange} className={inputCls}/></Field>
-          <Field label="PAN Card URL" error={errors.pan_card}><input name="pan_card" placeholder="https://..." value={form.pan_card} onChange={onChange} className={inputCls}/></Field>
-          <Field label="Experience Letter URL" error={errors.experience_letter}><input name="experience_letter" placeholder="https://..." value={form.experience_letter} onChange={onChange} className={inputCls}/></Field>
+          <FileUploadField label="Resume" name="resume" value={form.resume} onChange={onChange} error={errors.resume}/>
+          <FileUploadField label="Aadhaar Card" name="aadhaar_card" value={form.aadhaar_card} onChange={onChange} error={errors.aadhaar_card}/>
+          <FileUploadField label="PAN Card" name="pan_card" value={form.pan_card} onChange={onChange} error={errors.pan_card}/>
+          <FileUploadField label="Experience Letter" name="experience_letter" value={form.experience_letter} onChange={onChange} error={errors.experience_letter}/>
         </div>
       </div>
     </>
@@ -1794,12 +1945,12 @@ function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin
       <Field label="Account Number" error={errors.account_number}><input name="account_number" placeholder="9-18 digit account number" maxLength={18} value={form.account_number} onChange={onChange} className={inputCls}/></Field>
       <Field label="IFSC Code" error={errors.ifsc_code}><input name="ifsc_code" placeholder="e.g. SBIN0001234" maxLength={11} value={form.ifsc_code} onChange={(e)=>onChange({target:{name:"ifsc_code",value:e.target.value.toUpperCase()}})} className={inputCls}/></Field>
       <div className="col-span-1 sm:col-span-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-3">Document URLs (optional)</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#993556] mb-3">Documents (optional)</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <Field label="Resume URL" error={errors.resume}><input name="resume" placeholder="https://..." value={form.resume} onChange={onChange} className={inputCls}/></Field>
-          <Field label="Aadhaar Card URL" error={errors.aadhaar_card}><input name="aadhaar_card" placeholder="https://..." value={form.aadhaar_card} onChange={onChange} className={inputCls}/></Field>
-          <Field label="PAN Card URL" error={errors.pan_card}><input name="pan_card" placeholder="https://..." value={form.pan_card} onChange={onChange} className={inputCls}/></Field>
-          <Field label="Experience Letter URL" error={errors.experience_letter}><input name="experience_letter" placeholder="https://..." value={form.experience_letter} onChange={onChange} className={inputCls}/></Field>
+          <FileUploadField label="Resume" name="resume" value={form.resume} onChange={onChange} error={errors.resume}/>
+          <FileUploadField label="Aadhaar Card" name="aadhaar_card" value={form.aadhaar_card} onChange={onChange} error={errors.aadhaar_card}/>
+          <FileUploadField label="PAN Card" name="pan_card" value={form.pan_card} onChange={onChange} error={errors.pan_card}/>
+          <FileUploadField label="Experience Letter" name="experience_letter" value={form.experience_letter} onChange={onChange} error={errors.experience_letter}/>
         </div>
       </div>
     </>
@@ -2382,27 +2533,29 @@ return(
                 )}
               </button>
             </div>
-            <div className="hidden sm:flex sm:flex-wrap gap-2">
-              <select className={`${inputCls} flex-1 min-w-[140px]`} value={filters.type} onChange={(e)=>setFilters({...filters,type:e.target.value})}>
-                <option value="">All Types</option><option value="employee">Employees</option><option value="manager">Managers</option>
-              </select>
-              <select className={`${inputCls} flex-1 min-w-[140px]`} value={filters.department} onChange={(e)=>setFilters({...filters,department:e.target.value})}>
-                <option value="">All Departments</option>
-                {DEPT_OPTIONS.map((dept)=>(
-                  <option key={dept} value={dept}>
-                    {DEPT_FULL_FORMS[dept]}
-                  </option>
-                ))}
-              </select>
-              <select className={`${inputCls} flex-1 min-w-[140px]`} value={filters.role} onChange={(e)=>setFilters({...filters,role:e.target.value})}>
-                <option value="">All Roles</option>
-                <option value="employee">Employee</option><option value="manager">Manager</option>
-                <option value="senior_manager">Senior Manager</option><option value="official">Official</option>
-              </select>
-              <select className={`${inputCls} flex-1 min-w-[140px]`} value={filters.location} onChange={(e)=>setFilters({...filters,location:e.target.value})}>
-                <option value="">All Locations</option>{LOCATIONS.map((l)=><option key={l} value={l}>{l}</option>)}
-              </select>
-            </div>
+<div className="hidden sm:flex sm:flex-wrap gap-2">
+  <select className={`${inputCls} flex-1 min-w-[140px]`} value={filters.type} onChange={(e)=>setFilters({...filters,type:e.target.value})}>
+    <option value="">All Types</option><option value="employee">Employees</option><option value="manager">Managers</option>
+  </select>
+  <select className={`${inputCls} flex-1 min-w-[140px]`} value={filters.department} onChange={(e)=>setFilters({...filters,department:e.target.value})}>
+    <option value="">All Departments</option>
+    {DEPT_OPTIONS.map((dept)=>(
+      <option key={dept} value={dept}>
+        {DEPT_FULL_FORMS[dept]}
+      </option>
+    ))}
+  </select>
+  <select className={`${inputCls} flex-1 min-w-[140px]`} value={filters.role} onChange={(e)=>setFilters({...filters,role:e.target.value})}>
+    <option value="">All Roles</option>
+    <option value="employee">Employee</option><option value="manager">Manager</option>
+    <option value="senior_manager">Senior Manager</option><option value="official">Official</option>
+  </select>
+    <LocationCombobox
+    value={filters.location}
+    onChange={(v) => setFilters({ ...filters, location: v })}
+    options={LOCATIONS}
+  />
+</div>
             {showFilters&&(
               <div className="mt-2 pt-2 border-t border-[#F4C0D1]">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
