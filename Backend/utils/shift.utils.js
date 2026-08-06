@@ -140,6 +140,12 @@ const evaluateCheckoutWindow = (shift, now = new Date(), checkInTime = null) => 
       overtimeMinutes: 0,
       earlyMinutes: 0,
       minutesUntilCheckoutOpens: Math.ceil(minMinutesBeforeCheckout - minutesSinceCheckin),
+      // Exact instant, not just a rounded minute count — lets the UI run a
+      // precise, live mm:ss countdown instead of a static "X minute(s)"
+      // label that only updates on the next scan attempt.
+      checkoutOpensAt: checkInTime
+        ? new Date(new Date(checkInTime).getTime() + minMinutesBeforeCheckout * 60000)
+        : null,
       onTimeWindowEnd: effectiveEnd + grace,
     };
   }
