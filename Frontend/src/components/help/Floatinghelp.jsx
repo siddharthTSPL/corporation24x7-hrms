@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { FaQuestion, FaTimes, FaMapSigns, FaHeadset } from "react-icons/fa";
+import { FaQuestion, FaTimes, FaMapSigns, FaHeadset, FaBook } from "react-icons/fa";
 
 const SIZE = 56;
 const MARGIN = 20;
@@ -42,7 +42,7 @@ function loadSavedPos() {
  * A quick tap/click (no real movement) still opens the two options —
  * "Take a Tour" (replays HelpTour) and "Help" (opens TechnicalSupportModal).
  */
-export default function FloatingHelp({ onTakeTour, onTechnicalSupport }) {
+export default function FloatingHelp({ onTakeTour, onTechnicalSupport, onDocumentation }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState(() => loadSavedPos() || defaultPos());
   const [dragging, setDragging] = useState(false);
@@ -146,6 +146,16 @@ export default function FloatingHelp({ onTakeTour, onTechnicalSupport }) {
             <span>
               <span className="block font-medium">Take a Tour</span>
               <span className="block text-[11px] text-gray-400">A quick walkthrough of where everything is</span>
+            </span>
+          </button>
+          <button
+            onClick={() => { setOpen(false); onDocumentation?.(); }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-[#FBEAF0] hover:text-[#730042] transition-colors border-t border-gray-100 text-left"
+          >
+            <FaBook className="text-[#730042] flex-shrink-0" />
+            <span>
+              <span className="block font-medium">Help &amp; Support</span>
+              <span className="block text-[11px] text-gray-400">Browse guides for every module</span>
             </span>
           </button>
           <button
