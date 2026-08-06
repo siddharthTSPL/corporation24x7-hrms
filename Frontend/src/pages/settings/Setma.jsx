@@ -63,8 +63,22 @@ function findLocationByCityName(cityName) {
   if (locationLookupCache.has(cityName)) return locationLookupCache.get(cityName);
 
   let result = null;
+
+  // Fast path: check India first — covers the overwhelming majority of records
+  const defaultStates = State.getStatesOfCountry(DEFAULT_COUNTRY_ISO);
+  for (const state of defaultStates) {
+    const cities = City.getCitiesOfState(DEFAULT_COUNTRY_ISO, state.isoCode);
+    if (cities.some(c => c.name === cityName)) {
+      result = { countryIso: DEFAULT_COUNTRY_ISO, stateIso: state.isoCode };
+      locationLookupCache.set(cityName, result);
+      return result;
+    }
+  }
+
+  // Slow path: only scan the rest of the world if not found in India
   const countries = Country.getAllCountries();
   outer: for (const country of countries) {
+    if (country.isoCode === DEFAULT_COUNTRY_ISO) continue; // already checked above
     const states = State.getStatesOfCountry(country.isoCode);
     for (const state of states) {
       const cities = City.getCitiesOfState(country.isoCode, state.isoCode);
@@ -548,31 +562,38 @@ const cityOptions = useMemo(() => {
       : cities;
   }, [form.city, cities]);
 
-  useEffect(() => {
+useEffect(() => {
     if (!manager) return;
 
     const cityName = manager.office_location || "";
-    const match = findLocationByCityName(cityName);
 
-    let countryIso = match?.countryIso || DEFAULT_COUNTRY_ISO;
-    let stateIso = match?.stateIso || "";
-
-    if (!stateIso) {
-      const defaultStates = State.getStatesOfCountry(countryIso);
-      stateIso = defaultStates[0]?.isoCode || "";
-    }
-
+    // Show the tab immediately with defaults — dropdown resolution happens after paint
     setForm({
       personal_contact: manager.personal_contact || "",
       e_contact:        manager.e_contact        || "",
       marital_status:   manager.marital_status   || "single",
       gender:           manager.gender           || "male",
       designation:      manager.designation      || "",
-      countryIso,
-      stateIso,
+      countryIso:       DEFAULT_COUNTRY_ISO,
+      stateIso:         "",
       city:             cityName,
       date_of_joining:  toDateInputValue(manager.date_of_joining),
     });
+
+    const timer = setTimeout(() => {
+      const match = findLocationByCityName(cityName);
+      let countryIso = match?.countryIso || DEFAULT_COUNTRY_ISO;
+      let stateIso = match?.stateIso || "";
+
+      if (!stateIso) {
+        const defaultStates = State.getStatesOfCountry(countryIso);
+        stateIso = defaultStates[0]?.isoCode || "";
+      }
+
+      setForm(p => ({ ...p, countryIso, stateIso }));
+    }, 0);
+
+    return () => clearTimeout(timer);
   }, [manager]);
 
   const setCountry = (e) => {
