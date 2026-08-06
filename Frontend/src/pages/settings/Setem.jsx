@@ -561,19 +561,10 @@ const cityOptions = useMemo(
   [form.city, cities]
 );
 
-  useEffect(() => {
+ useEffect(() => {
     if (!employee) return;
 
     const cityName = employee.office_location || "";
-    const match = findLocationByCityName(cityName);
-
-    let countryIso = match?.countryIso || DEFAULT_COUNTRY_ISO;
-    let stateIso = match?.stateIso || "";
-
-    if (!stateIso) {
-      const defaultStates = State.getStatesOfCountry(countryIso);
-      stateIso = defaultStates[0]?.isoCode || "";
-    }
 
     setForm({
       personal_contact: employee.personal_contact || "",
@@ -581,10 +572,25 @@ const cityOptions = useMemo(
       marital_status: employee.marital_status || "single",
       gender: employee.gender || "male",
       date_of_joining: toDateInputValue(employee.date_of_joining),
-      countryIso,
-      stateIso,
+      countryIso: DEFAULT_COUNTRY_ISO,
+      stateIso: "",
       city: cityName,
     });
+
+    const timer = setTimeout(() => {
+      const match = findLocationByCityName(cityName);
+      let countryIso = match?.countryIso || DEFAULT_COUNTRY_ISO;
+      let stateIso = match?.stateIso || "";
+
+      if (!stateIso) {
+        const defaultStates = State.getStatesOfCountry(countryIso);
+        stateIso = defaultStates[0]?.isoCode || "";
+      }
+
+      setForm(p => ({ ...p, countryIso, stateIso }));
+    }, 0);
+
+    return () => clearTimeout(timer);
   }, [employee]);
 
   const setCountry = (e) => {

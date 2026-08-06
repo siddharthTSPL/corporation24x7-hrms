@@ -207,8 +207,22 @@ function findLocationByCityName(cityName) {
   if (locationLookupCache.has(cityName)) return locationLookupCache.get(cityName);
 
   let result = null;
+
+  // Fast path: check India first — covers the overwhelming majority of records
+  const defaultStates = State.getStatesOfCountry(DEFAULT_COUNTRY_ISO);
+  for (const state of defaultStates) {
+    const cities = City.getCitiesOfState(DEFAULT_COUNTRY_ISO, state.isoCode);
+    if (cities.some(c => c.name === cityName)) {
+      result = { countryIso: DEFAULT_COUNTRY_ISO, stateIso: state.isoCode };
+      locationLookupCache.set(cityName, result);
+      return result;
+    }
+  }
+
+  // Slow path: only scan the rest of the world if not found in India
   const countries = Country.getAllCountries();
   outer: for (const country of countries) {
+    if (country.isoCode === DEFAULT_COUNTRY_ISO) continue; // already checked above
     const states = State.getStatesOfCountry(country.isoCode);
     for (const state of states) {
       const cities = City.getCitiesOfState(country.isoCode, state.isoCode);
