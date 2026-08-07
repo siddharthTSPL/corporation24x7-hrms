@@ -7,6 +7,7 @@ const compression = require('compression');
 require('../automatic/autoelcredit');
 require('../automatic/timerautopause');
 require('../automatic/Timesheetescalation');
+require('../automatic/birthdayNotify');
 const { catchUpMissedRuns } = require('../automatic/Marknoshowabsent');
 catchUpMissedRuns().catch((err) =>
   console.error('[Startup] catchUpMissedRuns failed:', err.message)
@@ -82,6 +83,7 @@ const unifiedauthrouter = require('../routes/Unified.auth.route');
 const payrollrouter = require('../routes/payroll.route');
 const payrollpolicyrouter = require('../routes/payrollpolicy.route');
 const reimbursementrouter = require('../routes/reimbursement.route');
+const notificationrouter = require('../routes/notification.routes');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 // DEBUG — remove after fix
@@ -104,6 +106,7 @@ const routes = {
   payrollrouter,
   payrollpolicyrouter,
   reimbursementrouter,
+  notificationrouter,
 };
 Object.entries(routes).forEach(([name, r]) => {
   if (!r) console.error(`❌ UNDEFINED: ${name}`);
@@ -133,6 +136,7 @@ app.use('/admin/payroll', payrollpolicyrouter);
 app.use('/superadmin/payroll', payrollrouter);
 app.use('/superadmin/payroll', payrollpolicyrouter);
 app.use('/reimbursement', reimbursementrouter);
+app.use('/notifications', notificationrouter);
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 
