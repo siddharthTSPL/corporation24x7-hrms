@@ -59,6 +59,20 @@ const buildLoginToken = async (role, account) => {
     );
   }
   if (role === "admin") {
+    const orgSuperAdmin = await SuperAdminModel.findById(account.organisation_id);
+    if (!orgSuperAdmin)
+      throw Object.assign(new Error("Organisation not found. Please contact support."), { statusCode: 404 });
+
+    const trialValid = orgSuperAdmin.isTrialValid();
+    const hasTalentLicense = orgSuperAdmin.licenses?.some(
+      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
+    );
+    if (!trialValid && !hasTalentLicense)
+      throw Object.assign(
+        new Error("Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."),
+        { statusCode: 403, code: "SERVICE_STOPPED" }
+      );
+
     if (account.status !== "active") {
       await AdminModel.findByIdAndUpdate(account._id, { status: "active" });
     }
@@ -101,6 +115,21 @@ const buildLoginToken = async (role, account) => {
     );
   }
   // employee
+  {
+    const orgSuperAdmin = await SuperAdminModel.findById(account.organisation_id);
+    if (!orgSuperAdmin)
+      throw Object.assign(new Error("Organisation not found. Please contact support."), { statusCode: 404 });
+
+    const trialValid = orgSuperAdmin.isTrialValid();
+    const hasTalentLicense = orgSuperAdmin.licenses?.some(
+      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
+    );
+    if (!trialValid && !hasTalentLicense)
+      throw Object.assign(
+        new Error("Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."),
+        { statusCode: 403, code: "SERVICE_STOPPED" }
+      );
+  }
   Usermodel.findByIdAndUpdate(account._id, { status: "active", last_login: new Date() }).exec();
   return jwt.sign(
     {
@@ -181,6 +210,20 @@ const unifiedLogin = async (req, res, next) => {
     // if (admin.isFirstLogin)
     //   return next(Object.assign(new Error("First login detected. Check your email to set password."), { statusCode: 403 }));
 
+    const orgSuperAdmin = await SuperAdminModel.findById(admin.organisation_id);
+    if (!orgSuperAdmin)
+      return next(Object.assign(new Error("Organisation not found. Please contact support."), { statusCode: 404 }));
+
+    const trialValid = orgSuperAdmin.isTrialValid();
+    const hasTalentLicense = orgSuperAdmin.licenses?.some(
+      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
+    );
+    if (!trialValid && !hasTalentLicense)
+      return next(Object.assign(
+        new Error("Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."),
+        { statusCode: 403, code: "SERVICE_STOPPED" }
+      ));
+
     const token = jwt.sign(
       { adminid: admin._id, role: admin.role, email: admin.work_email, created_by: admin.created_by, organisation_id: admin.organisation_id },
       process.env.JWT_SECRET,
@@ -253,6 +296,20 @@ const unifiedLogin = async (req, res, next) => {
 
     // if (user.isFirstLogin)
     //   return next(Object.assign(new Error("First login detected. Check your email to set password."), { statusCode: 403 }));
+
+    const orgSuperAdmin = await SuperAdminModel.findById(user.organisation_id);
+    if (!orgSuperAdmin)
+      return next(Object.assign(new Error("Organisation not found. Please contact support."), { statusCode: 404 }));
+
+    const trialValid = orgSuperAdmin.isTrialValid();
+    const hasTalentLicense = orgSuperAdmin.licenses?.some(
+      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
+    );
+    if (!trialValid && !hasTalentLicense)
+      return next(Object.assign(
+        new Error("Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."),
+        { statusCode: 403, code: "SERVICE_STOPPED" }
+      ));
 
     const token = jwt.sign(
       {
