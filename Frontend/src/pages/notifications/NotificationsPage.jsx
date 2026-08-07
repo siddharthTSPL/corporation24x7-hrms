@@ -137,7 +137,7 @@ export default function NotificationsPage() {
         {!isLoading && !isError && notifications.length === 0 && (
           <div className="px-4 py-16 flex flex-col items-center text-center gap-2">
             <FaInbox className="text-3xl text-gray-300" />
-            <p className="text-sm text-gray-400">Nothing here yet</p>
+            <p className="text-sm text-gray-400">No notification</p>
           </div>
         )}
 
