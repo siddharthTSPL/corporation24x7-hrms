@@ -2,7 +2,7 @@ const cron = require("node-cron");
 const Usermodel = require("../Models/user.model");
 const Managermodel = require("../Models/manager.model");
 const AdminModel = require("../Models/Admin.model");
-const { createNotification, createBulkNotifications } = require("../utils/notification.utils");
+const { createNotification, createBulkNotifications } = require("../utils/Notification.utils");
 
 const ROLE_MODELS = [
   { Model: Usermodel, recipientModel: "User" },
