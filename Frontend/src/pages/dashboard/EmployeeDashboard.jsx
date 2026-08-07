@@ -5,6 +5,7 @@ import { useGetAllLeaveHistory } from "../../auth/server-state/employee/employee
 import { useGetAttendance } from "../../auth/server-state/employee/employeeother/employeeother.hook";
 import { useCalendarMeta, useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
 import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus, isPastShiftEnd } from "../../pages/utils/attendance";
+import NotificationBell from "../../components/notifications/NotificationBell";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS = ["S","M","T","W","T","F","S"];
@@ -716,11 +717,7 @@ export default function EmployeeDashboard() {
                 📍 {employee.office_location}
               </div>
             )}
-            <div className="relative w-9 h-9 rounded-xl border border-[#ede5e0] bg-white flex items-center justify-center cursor-pointer">
-              <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-                <path d="M7.5 1.5a4 4 0 0 0-4 4V7L2 8.5V9.5h11V8.5L11.5 7V5.5a4 4 0 0 0-4-4zM7.5 13.5a1.5 1.5 0 0 1-1.5-1.5h3a1.5 1.5 0 0 1-1.5 1.5z" fill="#730042"/>
-              </svg>
-            </div>
+            <NotificationBell />
             <div className="relative">
               <Avatar
                 src={employee?.profile_image}
