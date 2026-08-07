@@ -84,6 +84,7 @@ const AdminManagement = lazy(() => import("./pages/torchx-management/adminmanage
 const SuperAdminManagement = lazy(() => import("./pages/torchx-management/superadminmanagement"));
 
 const HelpCenter = lazy(() => import("./components/help/Helpcenter"));
+const NotificationsPage = lazy(() => import("./pages/notifications/NotificationsPage"));
 
 function PageSkeleton() {
   const [animationData, setAnimationData] = useState(null);
@@ -224,6 +225,7 @@ function App() {
             <Route path="/employee-timesheet"       element={<Employeetimesheet />} />
             <Route path="/admin-asset-management"   element={<Adminasset />} />
             <Route path="/help-center"               element={<HelpCenter />} />
+            <Route path="/notifications"             element={<NotificationsPage />} />
 
             <Route
               path="/reimbursement-admin"
@@ -427,6 +429,7 @@ function App() {
             <Route path="/superadmin-payroll"              element={<Payroll />} />
             <Route path="/superadmin-reimbursement"        element={<ReimbursementSuperadmin />} />
             <Route path="/help-center"                     element={<HelpCenter />} />
+            <Route path="/notifications"                   element={<NotificationsPage />} />
           </Route>
 
           <Route path="*" element={<Pagenotfound />} />
