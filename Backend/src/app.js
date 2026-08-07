@@ -7,7 +7,7 @@ const compression = require('compression');
 require('../automatic/autoelcredit');
 require('../automatic/timerautopause');
 require('../automatic/Timesheetescalation');
-require('../automatic/birthdayNotify');
+require('../automatic/Birthdaynotify');
 const { catchUpMissedRuns } = require('../automatic/Marknoshowabsent');
 catchUpMissedRuns().catch((err) =>
   console.error('[Startup] catchUpMissedRuns failed:', err.message)
@@ -17,7 +17,7 @@ catchUpMissedRuns().catch((err) =>
 // cron was missed (server asleep/restarting), also do one recompute pass
 // on boot so a missed night doesn't leave stale numbers until the next
 // scheduled run.
-const { recomputeSummaries } = require('../automatic/nightlyReconcile');
+const { recomputeSummaries } = require('../automatic/Nightlyreconcile');
 recomputeSummaries(true).catch((err) =>
   console.error('[Startup] recomputeSummaries failed:', err.message)
 );
@@ -83,7 +83,7 @@ const unifiedauthrouter = require('../routes/Unified.auth.route');
 const payrollrouter = require('../routes/payroll.route');
 const payrollpolicyrouter = require('../routes/payrollpolicy.route');
 const reimbursementrouter = require('../routes/reimbursement.route');
-const notificationrouter = require('../routes/notification.routes');
+const notificationrouter = require('../routes/Notification.routes');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 // DEBUG — remove after fix

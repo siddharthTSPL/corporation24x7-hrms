@@ -435,6 +435,7 @@ function Sidebar({ tab, setTab, employee, initials }) {
 function ProfileTab({ employee }) {
   const joined = employee?.date_of_joining || employee?.createdAt;
   const joinedFmt = joined ? new Date(joined).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—";
+  const dobFmt = employee?.date_of_birth ? new Date(employee.date_of_birth).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "Not set";
   const pwUpdated = employee?.passwordupdatedAt ? new Date(employee.passwordupdatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—";
 
   const deptMap = {
@@ -462,6 +463,7 @@ function ProfileTab({ employee }) {
           <ReadonlyField label="Employee ID" value={employee?.empid} />
           <ReadonlyField label="Gender" value={employee?.gender} />
           <ReadonlyField label="Marital status" value={employee?.marital_status} />
+          <ReadonlyField label="Date of birth" value={dobFmt} />
         </div>
       </SectionCard>
 
@@ -541,6 +543,7 @@ function ContactTab({ employee, onSuccess, onError }) {
     marital_status: employee?.marital_status || "single",
     gender: employee?.gender || "male",
     date_of_joining: toDateInputValue(employee?.date_of_joining),
+    date_of_birth: toDateInputValue(employee?.date_of_birth),
     countryIso: DEFAULT_COUNTRY_ISO,
     stateIso: "",
     city: employee?.office_location || "",
@@ -572,6 +575,7 @@ const cityOptions = useMemo(
       marital_status: employee.marital_status || "single",
       gender: employee.gender || "male",
       date_of_joining: toDateInputValue(employee.date_of_joining),
+      date_of_birth: toDateInputValue(employee.date_of_birth),
       countryIso: DEFAULT_COUNTRY_ISO,
       stateIso: "",
       city: cityName,
@@ -611,12 +615,17 @@ const cityOptions = useMemo(
 
   const handleSave = () => {
     if (!form.personal_contact) { onError("Personal contact is required"); return; }
+    if (form.date_of_birth && new Date(form.date_of_birth) > new Date()) {
+      onError("Date of birth cannot be in the future");
+      return;
+    }
     const payload = {
       personal_contact: form.personal_contact,
       e_contact: form.e_contact,
       marital_status: form.marital_status,
       gender: form.gender,
       date_of_joining: form.date_of_joining,
+      date_of_birth: form.date_of_birth,
       office_location: form.city,
     };
     updateProfile.mutate(payload, {
@@ -659,6 +668,13 @@ const cityOptions = useMemo(
         value={form.date_of_joining}
         onChange={e => setForm(p => ({ ...p, date_of_joining: e.target.value }))}
         hint="Shown on your dashboard in place of your account creation date"
+      />
+      <InputField
+        label="Date of birth"
+        type="date"
+        value={form.date_of_birth}
+        onChange={e => setForm(p => ({ ...p, date_of_birth: e.target.value }))}
+        hint="Used to wish you (and the team) on your birthday"
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-0 sm:gap-x-3 gap-y-0 min-w-0 w-full max-w-full mb-4">

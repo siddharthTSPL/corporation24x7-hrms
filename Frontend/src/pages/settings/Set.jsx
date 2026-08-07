@@ -425,6 +425,7 @@ function ProfileTab({ adminData }) {
           <ReadonlyField label="Employee ID" value={adminData?.empid} />
           <ReadonlyField label="Gender" value={adminData?.gender} />
           <ReadonlyField label="Marital status" value={adminData?.marital_status} />
+          <ReadonlyField label="Date of birth" value={adminData?.date_of_birth ? fmtDate(adminData.date_of_birth) : "Not set"} />
           <ReadonlyField label="Country" value={adminData?.country} />
           <ReadonlyField label="Account status" value={adminData?.status || "active"} />
         </Grid>
@@ -469,6 +470,7 @@ function ContactTab({ adminData, onSuccess, onError }) {
     stateIso: "",
     city: "",
     date_of_joining: "",
+    date_of_birth: "",
   });
 
   const countries = Country.getAllCountries();
@@ -496,6 +498,7 @@ function ContactTab({ adminData, onSuccess, onError }) {
       stateIso,
       city: cityName,
       date_of_joining: toDateInputValue(adminData.date_of_joining),
+      date_of_birth: toDateInputValue(adminData.date_of_birth),
     });
   }, [adminData]);
 
@@ -524,8 +527,9 @@ function ContactTab({ adminData, onSuccess, onError }) {
   const handleSave = () => {
     if (!PHONE_REGEX.test(form.personal_contact)) { onError("Phone number must be a valid 10-digit number"); return; }
     if (form.e_contact && !PHONE_REGEX.test(form.e_contact)) { onError("Emergency contact must be a valid 10-digit number"); return; }
+    if (form.date_of_birth && new Date(form.date_of_birth) > new Date()) { onError("Date of birth cannot be in the future"); return; }
     mutate(
-      { personal_contact: form.personal_contact, e_contact: form.e_contact, office_location: form.city, date_of_joining: form.date_of_joining },
+      { personal_contact: form.personal_contact, e_contact: form.e_contact, office_location: form.city, date_of_joining: form.date_of_joining, date_of_birth: form.date_of_birth },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["auth"] });
@@ -566,6 +570,13 @@ function ContactTab({ adminData, onSuccess, onError }) {
         value={form.date_of_joining}
         onChange={e => setForm(p => ({ ...p, date_of_joining: e.target.value }))}
         hint="Shown on your dashboard in place of your account creation date"
+      />
+      <InputField
+        label="Date of birth"
+        type="date"
+        value={form.date_of_birth}
+        onChange={e => setForm(p => ({ ...p, date_of_birth: e.target.value }))}
+        hint="Used to wish you (and the team) on your birthday"
       />
      <PrimaryButton onClick={handleSave} loading={isPending} color={C.brandDark}>Save contact info</PrimaryButton>
     </SectionCard>

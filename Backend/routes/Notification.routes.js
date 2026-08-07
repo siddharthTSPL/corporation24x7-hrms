@@ -11,7 +11,7 @@ const {
   markAllAsRead,
   deleteNotification,
   clearReadNotifications,
-} = require("../controllers/notification.controller");
+} = require("../controllers/Notification.controller");
 
 notificationRouter.get("/", anyRoleAuth, asyncHandler(getMyNotifications));
 notificationRouter.get("/unread-count", anyRoleAuth, asyncHandler(getUnreadCount));
