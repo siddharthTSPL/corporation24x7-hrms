@@ -13,6 +13,7 @@ import { useGetAllAnnouncement } from "../../auth/server-state/adminannounce/adm
 import AttendanceModal from "./AttendanceModal";
 import AttendanceDetailsModal from "./AttendanceDetailsModal";
 import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus, isPastShiftEnd } from "../../pages/utils/attendance";
+import NotificationBell from "../../components/notifications/NotificationBell";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS = ["S","M","T","W","T","F","S"];
@@ -972,6 +973,7 @@ export default function Dashboard() {
                 📍 {employee.office_location}
               </div>
             )}
+            <NotificationBell />
             <div className="relative">
               <Avatar
                 src={employee?.profile_image}
