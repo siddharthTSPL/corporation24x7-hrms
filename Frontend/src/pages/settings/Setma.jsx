@@ -452,6 +452,7 @@ function Sidebar({ tab, setTab, manager, initials }) {
 function ProfileTab({ manager }) {
   const joined = manager?.date_of_joining || manager?.createdAt;
   const joinedFmt = joined ? new Date(joined).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—";
+  const dobFmt = manager?.date_of_birth ? new Date(manager.date_of_birth).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "Not set";
   const pwUpdated = manager?.updatedAt ? new Date(manager.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—";
 
   const deptMap = { OPR: "Operations", BPO: "BPO", ENG: "Engineering" };
@@ -466,6 +467,7 @@ function ProfileTab({ manager }) {
           <ReadonlyField label="Employee ID"    value={manager?.empid} />
           <ReadonlyField label="Gender"         value={manager?.gender} />
           <ReadonlyField label="Marital status" value={manager?.marital_status} />
+          <ReadonlyField label="Date of birth"  value={dobFmt} />
         </div>
       </SectionCard>
 
@@ -543,6 +545,7 @@ function ContactTab({ manager, onSuccess, onError }) {
     stateIso:         "",
     city:             manager?.office_location  || "",
     date_of_joining:  toDateInputValue(manager?.date_of_joining),
+    date_of_birth:    toDateInputValue(manager?.date_of_birth),
   });
 
   const countries = ALL_COUNTRIES;
@@ -578,6 +581,7 @@ useEffect(() => {
       stateIso:         "",
       city:             cityName,
       date_of_joining:  toDateInputValue(manager.date_of_joining),
+      date_of_birth:    toDateInputValue(manager.date_of_birth),
     });
 
     const timer = setTimeout(() => {
@@ -614,6 +618,10 @@ useEffect(() => {
 
   const handleSave = () => {
     if (!form.personal_contact) { onError("Personal contact is required"); return; }
+    if (form.date_of_birth && new Date(form.date_of_birth) > new Date()) {
+      onError("Date of birth cannot be in the future");
+      return;
+    }
     const payload = {
       personal_contact: form.personal_contact,
       e_contact: form.e_contact,
@@ -622,6 +630,7 @@ useEffect(() => {
       designation: form.designation,
       office_location: form.city,
       date_of_joining: form.date_of_joining,
+      date_of_birth: form.date_of_birth,
     };
     updateProfile.mutate(payload, {
       onSuccess: (data) => {
@@ -695,6 +704,13 @@ useEffect(() => {
         value={form.date_of_joining}
         onChange={e => setForm(p => ({ ...p, date_of_joining: e.target.value }))}
         hint="Shown on your dashboard in place of your account creation date"
+      />
+      <InputField
+        label="Date of birth"
+        type="date"
+        value={form.date_of_birth}
+        onChange={e => setForm(p => ({ ...p, date_of_birth: e.target.value }))}
+        hint="Used to wish you (and the team) on your birthday"
       />
       <div style={{ marginBottom: 20 }}>
         <FieldLabel>Gender</FieldLabel>

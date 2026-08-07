@@ -1134,7 +1134,7 @@ const editprofilemanager = async (req, res, next) => {
     const {
       personal_contact, e_contact, marital_status, profile_image, office_location, designation, gender,
       resume, aadhaar_card, pan_card, experience_letter,
-      bank_name, account_holder_name, account_number, ifsc_code, date_of_joining,
+      bank_name, account_holder_name, account_number, ifsc_code, date_of_joining, date_of_birth,
     } = req.body;
     let leaveUpdateRequired = false;
     if (date_of_joining !== undefined) {
@@ -1145,6 +1145,18 @@ const editprofilemanager = async (req, res, next) => {
         if (isNaN(parsedDOJ.getTime()))
           return next(Object.assign(new Error("Invalid date of joining"), { statusCode: 400 }));
         manager.date_of_joining = parsedDOJ;
+      }
+    }
+    if (date_of_birth !== undefined) {
+      if (date_of_birth === null || date_of_birth === "") {
+        manager.date_of_birth = null;
+      } else {
+        const parsedDOB = new Date(date_of_birth);
+        if (isNaN(parsedDOB.getTime()))
+          return next(Object.assign(new Error("Invalid date of birth"), { statusCode: 400 }));
+        if (parsedDOB > new Date())
+          return next(Object.assign(new Error("Date of birth cannot be in the future"), { statusCode: 400 }));
+        manager.date_of_birth = parsedDOB;
       }
     }
     if (personal_contact !== undefined) {
@@ -1264,6 +1276,7 @@ const editprofilemanager = async (req, res, next) => {
         account_number: manager.account_number,
         ifsc_code: manager.ifsc_code,
         date_of_joining: manager.date_of_joining,
+        date_of_birth: manager.date_of_birth,
       },
     });
   } catch (error) {

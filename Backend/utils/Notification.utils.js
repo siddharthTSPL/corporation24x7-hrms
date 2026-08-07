@@ -1,4 +1,4 @@
-const NotificationModel = require("../Models/notification.model");
+const NotificationModel = require("../Models/Notification.model");
 
 // Same "never crash the caller" guard used in notify.utils.js — creating an
 // in-app notification is a side effect of the real action (leave decision,

@@ -2752,6 +2752,7 @@ const editadminprofile = async (req, res, next) => {
     account_number,
     ifsc_code,
     date_of_joining,
+    date_of_birth,
   } = req.body;
 
   if (date_of_joining !== undefined) {
@@ -2762,6 +2763,19 @@ const editadminprofile = async (req, res, next) => {
       if (isNaN(parsedDOJ.getTime()))
         return next(Object.assign(new Error("Invalid date of joining"), { statusCode: 400 }));
       admin.date_of_joining = parsedDOJ;
+    }
+  }
+
+  if (date_of_birth !== undefined) {
+    if (date_of_birth === null || date_of_birth === "") {
+      admin.date_of_birth = null;
+    } else {
+      const parsedDOB = new Date(date_of_birth);
+      if (isNaN(parsedDOB.getTime()))
+        return next(Object.assign(new Error("Invalid date of birth"), { statusCode: 400 }));
+      if (parsedDOB > new Date())
+        return next(Object.assign(new Error("Date of birth cannot be in the future"), { statusCode: 400 }));
+      admin.date_of_birth = parsedDOB;
     }
   }
 
@@ -2876,6 +2890,7 @@ const editadminprofile = async (req, res, next) => {
       account_number: admin.account_number,
       ifsc_code: admin.ifsc_code,
       date_of_joining: admin.date_of_joining,
+      date_of_birth: admin.date_of_birth,
     },
   });
 };
