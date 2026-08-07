@@ -141,6 +141,7 @@ const userSchema = new mongoose.Schema(
     passwordupdatedAt: { type: Date, default: Date.now },
     isverified: { type: Boolean, default: false },
     date_of_joining: { type: Date, default: null },
+    date_of_birth: { type: Date, default: null },
   },
   { timestamps: true }
 );

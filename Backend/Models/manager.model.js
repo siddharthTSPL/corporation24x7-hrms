@@ -126,6 +126,7 @@ const managerSchema = new mongoose.Schema(
     isVerified: { type: Boolean, default: false },
     isFirstLogin: { type: Boolean, default: true },
     date_of_joining: { type: Date, default: null },
+    date_of_birth: { type: Date, default: null },
   },
   { timestamps: true }
 );
