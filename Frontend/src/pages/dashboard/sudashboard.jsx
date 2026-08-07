@@ -26,6 +26,7 @@ import { useGetAllAnnouncements, useCreateAnnouncement, useUpdateAnnouncement, u
 import { useGetAllAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin, useReviewToAdmin } from "../../auth/server-state/superadmin/other/suother.hook";
 import AttendanceDetailsModal from "./AttendanceDetailsModal";
 import { getAttendanceHistory as fetchEmployeeAttendanceHistory } from "../../auth/api/superadmin/other/su.other";
+import NotificationBell from "../../components/notifications/NotificationBell";
 
 const DEPT_OPTIONS = [ "OPR","BPO", "ENG", "HR", "MGMT"];
 export const DEPT_FULL_FORMS = {
@@ -1798,6 +1799,9 @@ function SuperAdminDashboard() {
               <p className="text-xs sm:text-sm text-white/60 max-w-lg leading-relaxed mb-4 sm:mb-5">"{thought}"</p>
             </div>
             <div className="hidden sm:flex items-center gap-2 flex-shrink-0 mt-1">
+              <div className="bg-white rounded-full shadow-md">
+                <NotificationBell />
+              </div>
               <AddAdminButton isAtLimit={isAtLimit} onClick={() => setAdminModal({ open: true, editing: null })} variant="hero" />
               <button onClick={() => setReviewModal(true)} className="flex items-center gap-1.5 bg-white/15 border border-white/25 text-white px-3 py-2 rounded-xl text-[12px] font-semibold hover:bg-white/25 transition-colors backdrop-blur-sm min-h-[44px]">
                 <FaStar size={9} /> Review
@@ -1816,7 +1820,10 @@ function SuperAdminDashboard() {
             <span className="hidden md:inline-flex bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-[11px] text-white/90 font-medium">📆 {today}</span>
           </div>
 
-          <div className="flex sm:hidden gap-2 mt-3">
+          <div className="flex sm:hidden gap-2 mt-3 items-center">
+            <div className="bg-white rounded-full shadow-md flex-shrink-0">
+              <NotificationBell />
+            </div>
             <AddAdminButton isAtLimit={isAtLimit} onClick={() => setAdminModal({ open: true, editing: null })} variant="heroMobile" />
             <button onClick={() => setReviewModal(true)} className="flex-1 flex items-center justify-center gap-1.5 bg-white/15 border border-white/25 text-white px-3 py-2.5 rounded-xl text-[12px] font-semibold hover:bg-white/25 transition-colors backdrop-blur-sm min-h-[44px]">
               <FaStar size={9} /> Review
