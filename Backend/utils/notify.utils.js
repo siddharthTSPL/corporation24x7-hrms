@@ -4,6 +4,7 @@ const AdminModel = require("../Models/Admin.model");
 const SuperAdminModel = require("../Models/superadmin.model");
 const { sendEmail } = require("./nodemailer.utils");
 const emailtemp = require("./helpers/emailtemp");
+const { createNotification } = require("./Notification.utils");
 
 require("dotenv").config();
 
@@ -51,6 +52,29 @@ const guarded = (fn, label) => async (payload) => {
   }
 };
 
+const fmtDate = (d) => {
+  if (!d) return "";
+  const date = new Date(d);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+};
+
+const leaveDateRange = (startDate, endDate) => {
+  const s = fmtDate(startDate);
+  const e = fmtDate(endDate);
+  if (!s && !e) return "";
+  return s === e || !e ? s : `${s} - ${e}`;
+};
+
+// Creates the in-app bell notification that powers the notification bell /
+// dropdown on Manager, Admin and SuperAdmin (and Employee) dashboards. This
+// runs independently of the email step below, so a missing/invalid work
+// email on the recipient can never suppress the in-app alert.
+const pushBellNotification = async ({ recipientModel, recipientId, organisation_id, ...rest }) => {
+  if (!recipientModel || !recipientId) return;
+  await createNotification({ recipientModel, recipientId: recipientId, organisation_id, ...rest });
+};
+
 const _notifyLeaveApplied = async ({
   requesterName,
   handlerModel,
@@ -61,6 +85,16 @@ const _notifyLeaveApplied = async ({
   days,
   reason,
 }) => {
+  await pushBellNotification({
+    recipientModel: handlerModel,
+    recipientId: handlerId,
+    type: "leave_applied",
+    title: "New Leave Request",
+    message: `${requesterName} applied for ${emailtemp.leaveTypeLabel(leaveType)} leave (${days} day${days === 1 ? "" : "s"}), ${leaveDateRange(startDate, endDate)}.`,
+    priority: "high",
+    meta: { leaveType, startDate, endDate, days, reason },
+  });
+
   const handler = await resolvePerson(handlerModel, handlerId);
   if (!handler || !handler.email) return;
 
@@ -90,6 +124,16 @@ const _notifyLeaveForwarded = async ({
   days,
   reason,
 }) => {
+  await pushBellNotification({
+    recipientModel: handlerModel,
+    recipientId: handlerId,
+    type: "leave_forwarded",
+    title: "Leave Request Forwarded to You",
+    message: `${forwardedByName} forwarded ${requesterName}'s ${emailtemp.leaveTypeLabel(leaveType)} leave request (${days} day${days === 1 ? "" : "s"}), ${leaveDateRange(startDate, endDate)}.`,
+    priority: "high",
+    meta: { leaveType, startDate, endDate, days, reason, forwardedByName },
+  });
+
   const handler = await resolvePerson(handlerModel, handlerId);
   if (!handler || !handler.email) return;
 
@@ -121,6 +165,16 @@ const _notifyLeaveDecision = async ({
   decidedByName,
   remarks,
 }) => {
+  await pushBellNotification({
+    recipientModel,
+    recipientId,
+    type: decision === "approved" ? "leave_approved" : "leave_rejected",
+    title: `Leave Request ${decision === "approved" ? "Approved" : "Rejected"}`,
+    message: `Your ${emailtemp.leaveTypeLabel(leaveType)} leave request (${days} day${days === 1 ? "" : "s"}), ${leaveDateRange(startDate, endDate)}, was ${decision} by ${decidedByName}.${remarks ? ` ${remarks}` : ""}`,
+    priority: "high",
+    meta: { leaveType, startDate, endDate, days, decision, decidedByName, remarks },
+  });
+
   const recipient = await resolvePerson(recipientModel, recipientId);
   if (!recipient || !recipient.email) return;
 
@@ -145,6 +199,16 @@ const _notifyLeaveDecision = async ({
 };
 
 const _notifyWFHApplied = async ({ requesterName, handlerModel, handlerId, startDate, endDate, days, reason }) => {
+  await pushBellNotification({
+    recipientModel: handlerModel,
+    recipientId: handlerId,
+    type: "wfh_applied",
+    title: "New WFH Request",
+    message: `${requesterName} applied for Work From Home (${days} day${days === 1 ? "" : "s"}), ${leaveDateRange(startDate, endDate)}.`,
+    priority: "high",
+    meta: { startDate, endDate, days, reason },
+  });
+
   const handler = await resolvePerson(handlerModel, handlerId);
   if (!handler || !handler.email) return;
 
@@ -172,6 +236,16 @@ const _notifyWFHForwarded = async ({
   days,
   reason,
 }) => {
+  await pushBellNotification({
+    recipientModel: handlerModel,
+    recipientId: handlerId,
+    type: "wfh_forwarded",
+    title: "WFH Request Forwarded to You",
+    message: `${forwardedByName} forwarded ${requesterName}'s Work From Home request (${days} day${days === 1 ? "" : "s"}), ${leaveDateRange(startDate, endDate)}.`,
+    priority: "high",
+    meta: { startDate, endDate, days, reason, forwardedByName },
+  });
+
   const handler = await resolvePerson(handlerModel, handlerId);
   if (!handler || !handler.email) return;
 
@@ -201,6 +275,16 @@ const _notifyWFHDecision = async ({
   decidedByName,
   remarks,
 }) => {
+  await pushBellNotification({
+    recipientModel,
+    recipientId,
+    type: decision === "approved" ? "wfh_approved" : "wfh_rejected",
+    title: `WFH Request ${decision === "approved" ? "Approved" : "Rejected"}`,
+    message: `Your Work From Home request (${days} day${days === 1 ? "" : "s"}), ${leaveDateRange(startDate, endDate)}, was ${decision} by ${decidedByName}.${remarks ? ` ${remarks}` : ""}`,
+    priority: "high",
+    meta: { startDate, endDate, days, decision, decidedByName, remarks },
+  });
+
   const recipient = await resolvePerson(recipientModel, recipientId);
   if (!recipient || !recipient.email) return;
 
