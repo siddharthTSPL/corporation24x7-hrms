@@ -21,7 +21,7 @@ export const useUnreadNotificationCount = (enabled = true) => {
   });
 };
 
-export const useNotifications = ({ page = 1, limit = 20, filter = "all", type } = {}, enabled = true) => {
+export const useNotifications = ({ page = 1, limit = 20, filter = "all", type } = {}, enabled = true, options = {}) => {
   return useQuery({
     queryKey: ["notifications", "list", { page, limit, filter, type }],
     queryFn: () => getNotifications({ page, limit, filter, type }),
@@ -29,6 +29,7 @@ export const useNotifications = ({ page = 1, limit = 20, filter = "all", type } 
     refetchOnWindowFocus: true,
     staleTime: 10000,
     keepPreviousData: true,
+    ...options,
   });
 };
 
