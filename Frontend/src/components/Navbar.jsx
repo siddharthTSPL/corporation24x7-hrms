@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
-import { FaBars, FaSearch, FaBell } from "react-icons/fa";
+import { FaBars, FaSearch } from "react-icons/fa";
 import { useAuth } from "../auth/store/getmeauth/getmeauth";
+import NotificationBell from "./notifications/NotificationBell";
 
 function Navbar({ collapsed, setCollapsed, data = [] }) {
   const { data: auth } = useAuth();
@@ -98,12 +99,7 @@ function Navbar({ collapsed, setCollapsed, data = [] }) {
           {dateTime}
         </div>
 
-        <div className="relative cursor-pointer">
-          <FaBell className="text-lg" />
-          <span className="absolute -top-2 -right-2 bg-[#00A8E8] text-white text-[10px] px-1.5 rounded-full">
-            2
-          </span>
-        </div>
+        <NotificationBell />
 
         {profileImage ? (
           <img
