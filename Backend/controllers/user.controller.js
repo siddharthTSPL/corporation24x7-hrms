@@ -127,33 +127,41 @@ const userlogin = async (req, res, next) => {
       `https://corporation24x7-hrms.onrender.com/user/change-password?token=${resetToken}`;
   }
 
-  const superAdmin = await SuperAdminModel.findOne({
-    company_domain: user.work_email.split("@")[1].toLowerCase().trim(),
-  });
+  let superAdmin = user.organisation_id
+    ? await SuperAdminModel.findById(user.organisation_id)
+    : null;
 
-  if (superAdmin) {
-    const trialValid = superAdmin.isTrialValid();
+  if (!superAdmin) {
+    // Fallback for any legacy records where organisation_id wasn't set correctly
+    superAdmin = await SuperAdminModel.findOne({
+      company_domain: user.work_email.split("@")[1].toLowerCase().trim(),
+    });
+  }
 
-    const hasTalentLicense = superAdmin.licenses.some(
-      (l) =>
-        l.product === "torchx_talent" &&
-        l.isActive &&
-        new Date(l.expiresAt) > new Date()
+  if (!superAdmin)
+    return next(Object.assign(new Error("Organisation not found. Please contact support."), { statusCode: 404 }));
+
+  const trialValid = superAdmin.isTrialValid();
+
+  const hasTalentLicense = superAdmin.licenses.some(
+    (l) =>
+      l.product === "torchx_talent" &&
+      l.isActive &&
+      new Date(l.expiresAt) > new Date()
+  );
+
+  if (!trialValid && !hasTalentLicense) {
+    return next(
+      Object.assign(
+        new Error(
+          "Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."
+        ),
+        {
+          statusCode: 403,
+          code: "SERVICE_STOPPED",
+        }
+      )
     );
-
-    if (!trialValid && !hasTalentLicense) {
-      return next(
-        Object.assign(
-          new Error(
-            "Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."
-          ),
-          {
-            statusCode: 403,
-            code: "SERVICE_STOPPED",
-          }
-        )
-      );
-    }
   }
 
 const token = jwt.sign(
