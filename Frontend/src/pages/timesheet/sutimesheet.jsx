@@ -471,7 +471,7 @@ export default function SuperAdminTimesheet() {
   const [logModal, setLogModal] = useState(false);
   const [logForm, setLogForm] = useState({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" });
 
-  const [projectForm, setProjectForm] = useState({ name: "", description: "", billing_type: "hourly", currency: "INR", default_hourly_rate: "" });
+  const [projectForm, setProjectForm] = useState({ name: "", description: "", billing_type: "billable", currency: "INR", default_hourly_rate: "" });
   const [jobForm, setJobForm] = useState({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: true, hourly_rate: "", currency: "INR" });
 
   const [weekStart, setWeekStart] = useState(getMonday());
@@ -543,7 +543,7 @@ export default function SuperAdminTimesheet() {
   const handleCreateProject = async () => {
     await createProject.mutateAsync({ ...projectForm, default_hourly_rate: Number(projectForm.default_hourly_rate) || 0 });
     setCreateProjectOpen(false);
-    setProjectForm({ name: "", description: "", billing_type: "hourly", currency: "INR", default_hourly_rate: "" });
+    setProjectForm({ name: "", description: "", billing_type: "billable", currency: "INR", default_hourly_rate: "" });
   };
 
   const handleCreateJob = async () => {
@@ -1140,8 +1140,8 @@ export default function SuperAdminTimesheet() {
           <Input label="Description" placeholder="Brief description…" value={projectForm.description} onChange={e => setProjectForm(p => ({ ...p, description: e.target.value }))} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <Select label="Billing Type" value={projectForm.billing_type} onChange={e => setProjectForm(p => ({ ...p, billing_type: e.target.value }))}>
-              <option value="hourly">Hourly</option>
-              <option value="fixed">Fixed</option>
+              <option value="billable">Hourly</option>
+              <option value="fixed_cost">Fixed</option>
               <option value="non_billable">Non Billable</option>
             </Select>
             <Select label="Currency" value={projectForm.currency} onChange={e => setProjectForm(p => ({ ...p, currency: e.target.value }))}>
