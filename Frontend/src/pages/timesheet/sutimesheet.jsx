@@ -74,6 +74,12 @@ const NAV_TABS = [
 
 function cn(...args) { return args.filter(Boolean).join(" "); }
 
+const CURRENCY_SYMBOLS = { INR: "₹", USD: "$", EUR: "€" };
+function fmtRate(rate, currency) {
+  const symbol = CURRENCY_SYMBOLS[currency] || `${currency || ""} `;
+  return `${symbol}${rate}/hr`;
+}
+
 function Badge({ tw = "text-gray-400 bg-gray-100 border-gray-200", children }) {
   return (
     <span className={cn("inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap", tw)}>
@@ -265,7 +271,7 @@ function JobDetailModal({ jobId, open, onClose }) {
           {job.billable && (
             <div className="flex items-center gap-2 flex-wrap">
               <Badge tw="text-emerald-600 bg-emerald-50 border-emerald-200">Billable</Badge>
-              {job.hourly_rate > 0 && <span className="text-[12px] text-gray-500">₹{job.hourly_rate}/hr · {job.currency}</span>}
+              {job.hourly_rate > 0 && <span className="text-[12px] text-gray-500">{fmtRate(job.hourly_rate, job.currency)}</span>}
             </div>
           )}
           {job.overrun_flagged && (
