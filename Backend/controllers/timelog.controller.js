@@ -79,6 +79,12 @@ const logTime = async (req, res, next) => {
   const isBillable =
     billable !== undefined ? !!billable : jobDoc.billable;
 
+  // Auto-move job out of "not_started" the moment work is actually logged against it
+  if (jobDoc.status === "not_started") {
+    jobDoc.status = "in_progress";
+    await jobDoc.save();
+  }
+
   const timeLog = await TimeLog.create({
     organisation_id,
     job,

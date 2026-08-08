@@ -97,6 +97,12 @@ const TABS = [
 
 function cn(...a) { return a.filter(Boolean).join(" "); }
 
+const CURRENCY_SYMBOLS = { INR: "₹", USD: "$", EUR: "€" };
+function fmtRate(rate, currency) {
+  const symbol = CURRENCY_SYMBOLS[currency] || `${currency || ""} `;
+  return `${symbol}${rate}/hr`;
+}
+
 function StatusBadge({ status }) {
   const m = STATUS_META[status] || STATUS_META.draft;
   return (
@@ -255,7 +261,7 @@ function JobDetailModal({ jobId, open, onClose }) {
           {job.billable && (
             <div className="flex items-center gap-2 text-[12px] flex-wrap">
               <Chip color="green">Billable</Chip>
-              {job.hourly_rate > 0 && <span className="text-gray-500">₹{job.hourly_rate}/hr · {job.currency}</span>}
+              {job.hourly_rate > 0 && <span className="text-gray-500">{fmtRate(job.hourly_rate, job.currency)}</span>}
             </div>
           )}
           {job.overrun_flagged && (

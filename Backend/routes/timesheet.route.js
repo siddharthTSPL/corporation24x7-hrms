@@ -22,7 +22,11 @@ const anyRole = (req, res, next) => {
   }
 
   if (decoded.role === "super_admin") return superAdminAuth(req, res, next);
-  if (["admin", "senior_admin", "official"].includes(decoded.role))
+  if (decoded.role === "official") {
+    if (decoded.managerid) return managerAuth(req, res, next);
+    if (decoded.adminid) return adminAuth(req, res, next);
+  }
+  if (["admin", "senior_admin"].includes(decoded.role))
     return adminAuth(req, res, next);
   if (["manager", "senior_manager"].includes(decoded.role))
     return managerAuth(req, res, next);
@@ -43,7 +47,9 @@ const saOrAdmin = (req, res, next) => {
   }
 
   if (decoded.role === "super_admin") return superAdminAuth(req, res, next);
-  if (["admin", "senior_admin", "official"].includes(decoded.role))
+  if (["admin", "senior_admin"].includes(decoded.role))
+    return adminAuth(req, res, next);
+  if (decoded.role === "official" && decoded.adminid)
     return adminAuth(req, res, next);
 
   return res

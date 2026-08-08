@@ -114,7 +114,6 @@ export default function NotificationBell() {
     setSoundOn((prev) => {
       const next = !prev;
       setSoundEnabled(next);
-      toast.success(next ? "Notification sound on" : "Notification sound off");
       return next;
     });
   };
