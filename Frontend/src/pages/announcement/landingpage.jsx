@@ -1000,15 +1000,16 @@ function LegalModal({ docKey, onClose }) {
 function Footer() {
   const cols = [
     { title: 'Product', links: [
+     { label: 'Talent', href: 'https://torchxsuite.com/talent/' },
+      { label: 'Engage', href: '' },
+      { label: 'Finance', href: '' },
+      { label: 'Inventory', href: '' },
+      { label: 'Pay', href: '' },
+    ] },
+
+    { title: 'Solutions', links: [
       { label: 'Features', href: '#features' },
       { label: 'Pricing', href: '#pricing' },
-    ] },
-    { title: 'Solutions', links: [
-      { label: 'Talent', href: 'https://torchxsuite.com/talent/' },
-      { label: 'Engage', href: 'https://torchxsuite.com/engage/' },
-      { label: 'Finance', href: 'https://torchxsuite.com/finance/' },
-      { label: 'Inventory', href: 'https://torchxsuite.com/inventory/' },
-      { label: 'Pay', href: 'https://torchxsuite.com/pay/' },
     ] },
     { title: 'Resources', links: [
       { label: 'Documentation', href: '' },
