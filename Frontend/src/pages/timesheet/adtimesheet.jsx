@@ -108,6 +108,12 @@ const TABS = [
 
 function cn(...args) { return args.filter(Boolean).join(" "); }
 
+const CURRENCY_SYMBOLS = { INR: "₹", USD: "$", EUR: "€" };
+function fmtRate(rate, currency) {
+  const symbol = CURRENCY_SYMBOLS[currency] || `${currency || ""} `;
+  return `${symbol}${rate}/hr`;
+}
+
 function TorchXLogo() {
   return (
     <div className="flex items-center gap-2.5 flex-shrink-0 min-w-0">
@@ -340,7 +346,7 @@ function JobDetailModal({ jobId, open, onClose }) {
           {job.billable && (
             <div className="flex items-center gap-2 flex-wrap">
               <Chip color="green">Billable</Chip>
-              {job.hourly_rate > 0 && <span className="text-[12px] text-gray-500">₹{job.hourly_rate}/hr · {job.currency}</span>}
+              {job.hourly_rate > 0 && <span className="text-[12px] text-gray-500">{fmtRate(job.hourly_rate, job.currency)}</span>}
             </div>
           )}
           {job.overrun_flagged && (
