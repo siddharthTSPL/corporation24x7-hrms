@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
-  useMyProjects, useCreateProject, useAssignableTargets,
+  useMyProjects, useCreateProject, useAddProjectMembers, useRemoveProjectMember, useAssignableTargets,
   useCreateJob, useJobsCreatedByMe, useUpdateJobStatus, useArchiveJob,
   useOverrunRiskJobs, useIdleJobs, useTeamWorkloadHeatmap,
   usePendingApprovals, useApproveTimesheet, useRejectTimesheet,
@@ -471,8 +471,10 @@ export default function SuperAdminTimesheet() {
   const [logModal, setLogModal] = useState(false);
   const [logForm, setLogForm] = useState({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" });
 
-  const [projectForm, setProjectForm] = useState({ name: "", description: "", billing_type: "billable", currency: "INR", default_hourly_rate: "" });
-  const [jobForm, setJobForm] = useState({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: true, hourly_rate: "", currency: "INR" });
+  const [projectForm, setProjectForm] = useState({ name: "", description: "", billing_type: "billable", currency: "INR", default_hourly_rate: "", member_ids: [] });
+  const [jobForm, setJobForm] = useState({ title: "", description: "", project: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: true, hourly_rate: "", currency: "INR" });
+  const [membersModal, setMembersModal] = useState(null);
+  const [membersSelection, setMembersSelection] = useState([]);
 
   const [weekStart, setWeekStart] = useState(getMonday());
   const [logsWeek, setLogsWeek] = useState(getMonday());
@@ -488,7 +490,7 @@ export default function SuperAdminTimesheet() {
     setWeekStart(d.toISOString().slice(0, 10));
   };
 
-  const { data: projectsData }  = useMyProjects();
+  const { data: projectsData, refetch: refetchProjects }  = useMyProjects();
   const { data: jobsData, refetch: refetchJobs } = useJobsCreatedByMe();
   const { data: approvalsData, refetch: refetchApprovals } = usePendingApprovals();
   const { data: overrunData }   = useOverrunRiskJobs();
@@ -506,6 +508,8 @@ export default function SuperAdminTimesheet() {
   const { data: prodData } = useMyProductivitySummary(weekStart);
 
   const createProject   = useCreateProject();
+  const addProjectMembers = useAddProjectMembers();
+  const removeProjectMember = useRemoveProjectMember();
   const createJob       = useCreateJob();
   const approveTS       = useApproveTimesheet();
   const rejectTS        = useRejectTimesheet();
@@ -543,20 +547,46 @@ export default function SuperAdminTimesheet() {
   const handleCreateProject = async () => {
     await createProject.mutateAsync({ ...projectForm, default_hourly_rate: Number(projectForm.default_hourly_rate) || 0 });
     setCreateProjectOpen(false);
-    setProjectForm({ name: "", description: "", billing_type: "billable", currency: "INR", default_hourly_rate: "" });
+    setProjectForm({ name: "", description: "", billing_type: "billable", currency: "INR", default_hourly_rate: "", member_ids: [] });
+    refetchProjects();
   };
 
   const handleCreateJob = async () => {
     const target = targets.find(t => t.id.toString() === jobForm.assigned_to);
     await createJob.mutateAsync({
       ...jobForm,
+      project: jobForm.project || null,
       assigned_to_model: target?.model || "Admin",
       estimated_hours: Number(jobForm.estimated_hours) || 0,
       hourly_rate: Number(jobForm.hourly_rate) || 0,
     });
     setCreateJobOpen(false);
-    setJobForm({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: true, hourly_rate: "", currency: "INR" });
+    setJobForm({ title: "", description: "", project: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: true, hourly_rate: "", currency: "INR" });
     refetchJobs();
+  };
+
+  const openMembersModal = (project) => {
+    setMembersModal(project);
+    setMembersSelection([]);
+  };
+
+  const toggleMemberSelection = (id) => {
+    setMembersSelection(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const handleAddMembers = async () => {
+    if (!membersModal || !membersSelection.length) return;
+    const updated = await addProjectMembers.mutateAsync({ id: membersModal._id, member_ids: membersSelection });
+    setMembersSelection([]);
+    setMembersModal(updated?.project || membersModal);
+    refetchProjects();
+  };
+
+  const handleRemoveMember = async (memberId) => {
+    if (!membersModal) return;
+    await removeProjectMember.mutateAsync({ id: membersModal._id, memberId });
+    setMembersModal(prev => prev ? { ...prev, members: (prev.members || []).filter(m => (m.member?._id || m.member)?.toString() !== memberId) } : prev);
+    refetchProjects();
   };
 
   const handleApprove = async (ts) => {
@@ -791,6 +821,7 @@ export default function SuperAdminTimesheet() {
                       <Badge tw="text-amber-600 bg-amber-50 border-amber-200">{p.members?.length || 0} members</Badge>
                     </div>
                     {p.description && <div className="text-[12px] text-gray-400 mt-3 line-clamp-2">{p.description}</div>}
+                    <Btn variant="ghost" onClick={() => openMembersModal(p)} className="mt-3 w-full text-[12px]">Manage Members</Btn>
                   </Card>
                 ))}
               </div>
@@ -1151,6 +1182,29 @@ export default function SuperAdminTimesheet() {
             </Select>
           </div>
           <Input label="Default Hourly Rate" type="number" placeholder="0.00" value={projectForm.default_hourly_rate} onChange={e => setProjectForm(p => ({ ...p, default_hourly_rate: e.target.value }))} />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Add Members (optional)</label>
+            <div className="border border-[#E4E6EF] rounded-[10px] max-h-[160px] overflow-y-auto p-2 flex flex-col gap-1">
+              {targets.length === 0 ? (
+                <div className="text-[12px] text-gray-400 px-1.5 py-1">No team members found</div>
+              ) : targets.map(t => (
+                <label key={t.id} className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer min-h-[32px]">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 accent-[#730042]"
+                    checked={projectForm.member_ids.includes(t.id.toString())}
+                    onChange={() => setProjectForm(p => ({
+                      ...p,
+                      member_ids: p.member_ids.includes(t.id.toString())
+                        ? p.member_ids.filter(id => id !== t.id.toString())
+                        : [...p.member_ids, t.id.toString()],
+                    }))}
+                  />
+                  <span className="text-[13px] text-gray-700 truncate">{t.name} — {t.role || t.model}</span>
+                </label>
+              ))}
+            </div>
+          </div>
           <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-1">
             <Btn variant="ghost" onClick={() => setCreateProjectOpen(false)} className="w-full sm:w-auto">Cancel</Btn>
             <Btn onClick={handleCreateProject} disabled={!projectForm.name || createProject.isPending} className="w-full sm:w-auto">
@@ -1160,10 +1214,59 @@ export default function SuperAdminTimesheet() {
         </div>
       </Modal>
 
+      <Modal open={!!membersModal} onClose={() => { setMembersModal(null); setMembersSelection([]); }} title={`Manage Members — ${membersModal?.name || ""}`}>
+        <div className="flex flex-col gap-3.5">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Current Members</label>
+            {(!membersModal?.members || membersModal.members.length === 0) ? (
+              <div className="text-[12px] text-gray-400 px-1">No members yet</div>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {membersModal.members.map((m) => {
+                  const mid = (m.member?._id || m.member || "").toString();
+                  const info = targets.find(t => t.id.toString() === mid);
+                  return (
+                    <div key={mid} className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-[#F8F9FC] border border-[#E4E6EF]">
+                      <span className="text-[13px] text-gray-700 truncate">{info?.name || mid} — {m.member_model}</span>
+                      <button onClick={() => handleRemoveMember(mid)} className="text-red-500 hover:text-red-700 text-[12px] font-semibold ml-2 shrink-0">Remove</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Add Members</label>
+            <div className="border border-[#E4E6EF] rounded-[10px] max-h-[160px] overflow-y-auto p-2 flex flex-col gap-1">
+              {targets
+                .filter(t => !(membersModal?.members || []).some(m => (m.member?._id || m.member || "").toString() === t.id.toString()))
+                .map(t => (
+                  <label key={t.id} className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer min-h-[32px]">
+                    <input type="checkbox" className="w-4 h-4 accent-[#730042]" checked={membersSelection.includes(t.id.toString())} onChange={() => toggleMemberSelection(t.id.toString())} />
+                    <span className="text-[13px] text-gray-700 truncate">{t.name} — {t.role || t.model}</span>
+                  </label>
+                ))}
+            </div>
+          </div>
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-1">
+            <Btn variant="ghost" onClick={() => { setMembersModal(null); setMembersSelection([]); }} className="w-full sm:w-auto">Close</Btn>
+            <Btn onClick={handleAddMembers} disabled={!membersSelection.length || addProjectMembers.isPending} className="w-full sm:w-auto">
+              {addProjectMembers.isPending ? "Adding…" : "Add Selected"}
+            </Btn>
+          </div>
+        </div>
+      </Modal>
+
       <Modal open={createJobOpen} onClose={() => setCreateJobOpen(false)} title="Create Job">
         <div className="flex flex-col gap-3.5">
           <Input label="Job Title" placeholder="e.g. Design Login Page" value={jobForm.title} onChange={e => setJobForm(p => ({ ...p, title: e.target.value }))} />
           <Input label="Description" placeholder="Job details…" value={jobForm.description} onChange={e => setJobForm(p => ({ ...p, description: e.target.value }))} />
+          <Select label="Project (optional)" value={jobForm.project} onChange={e => setJobForm(p => ({ ...p, project: e.target.value }))}>
+            <option value="">No project</option>
+            {projects.map(pr => (
+              <option key={pr._id} value={pr._id}>{pr.name}</option>
+            ))}
+          </Select>
           <Select label="Assign To" value={jobForm.assigned_to} onChange={e => setJobForm(p => ({ ...p, assigned_to: e.target.value }))}>
             <option value="">Select team member…</option>
             {targets.map(t => (
