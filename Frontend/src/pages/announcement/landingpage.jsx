@@ -187,6 +187,31 @@ function AnalyticsCard() {
   )
 }
 
+function TalkToExpertButton({ phone = '+917017415604', className }) {
+  const [copied, setCopied] = useState(false)
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+
+  const handleClick = (e) => {
+    if (!isMobile) {
+      e.preventDefault()
+      navigator.clipboard.writeText(phone)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+    // mobile pe default tel: link behavior chalne do
+  }
+
+  return (
+     <a
+      href={`tel:${phone}`}
+      onClick={handleClick}
+      className={className}
+    >
+      {copied ? `Copied: ${phone}` : 'Talk To Expert'}
+    </a>
+  )
+}
+
 function DashboardMockup() {
   const P = '#7A004B'
   return (
@@ -410,11 +435,11 @@ function Hero() {
                 Sign Up for Talent Account <FiArrowRight />
               </a>
               <a
-                href="#expert"
-                className="inline-flex items-center gap-2 border-2 border-[#7A004B] text-[#7A004B] bg-transparent text-[15px] font-ui font-semibold px-7 py-3.5 rounded-full no-underline transition-all hover:bg-[#FDF4F8] hover:-translate-y-0.5"
-              >
-                Talk To Expert
-              </a>
+                href="tel:+917454098820"
+  className="inline-flex items-center gap-2 border-2 border-[#7A004B] text-[#7A004B] bg-transparent text-[15px] font-ui font-semibold px-7 py-3.5 rounded-full no-underline transition-all hover:bg-[#FDF4F8] hover:-translate-y-0.5"
+>
+  Talk To Expert
+</a>
             </div>
           </motion.div>
 
@@ -727,9 +752,12 @@ function Pricing() {
                     </li>
                   ))}
                 </ul>
-                <button className="mt-auto w-full py-3 rounded-full text-sm font-ui font-bold cursor-pointer bg-[#7A004B] text-white border-none transition-all hover:bg-[#5a0033]">
-                  Start Free Trial
-                </button>
+             <a   
+  href="https://torchxsuite.com/signup"
+  className="mt-auto w-full py-3 rounded-full text-sm font-ui font-bold cursor-pointer bg-[#7A004B] text-white border-none transition-all hover:bg-[#5a0033] text-center no-underline inline-block"
+>
+  Start Free Trial
+</a>
               </div>
             ))}
           </div>
@@ -776,11 +804,11 @@ function Pricing() {
               </div>
             </div>
             <a
-              href="#expert"
-              className="inline-flex items-center gap-2 bg-[#7A004B] text-white text-[13px] font-ui font-bold px-6 py-3 rounded-full no-underline whitespace-nowrap transition-colors hover:bg-[#5a0033]"
-            >
-              Talk to an Expert <FiArrowRight />
-            </a>
+             href="tel:+917454098820 "
+  className="inline-flex items-center gap-2 border-2 border-[#7A004B] text-[#7A004B] bg-transparent text-[15px] font-ui font-semibold px-7 py-3.5 rounded-full no-underline transition-all hover:bg-[#FDF4F8] hover:-translate-y-0.5"
+>
+  Talk To Expert
+</a>
           </div>
         </motion.div>
       </Wrap>
@@ -876,7 +904,7 @@ function Testimonials() {
               </div>
             </div>
             <a
-              href="#trial"
+              href="https://torchxsuite.com/signup"
               className="inline-flex items-center gap-2 bg-gradient-to-br from-[#7A004B] to-[#A60062] text-white text-[13px] font-ui font-bold px-6.5 py-3.5 rounded-xl no-underline whitespace-nowrap transition-all shadow-[0_8px_20px_rgba(122,0,75,0.25)] hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(122,0,75,0.35)]"
             >
               Book For Free Trial <FiArrowRight />
@@ -983,7 +1011,7 @@ function Footer() {
       { label: 'Pay', href: 'https://torchxsuite.com/pay/' },
     ] },
     { title: 'Resources', links: [
-      { label: 'Documentation', href: 'https://torchxsuite.com/docs/' },
+      { label: 'Documentation', href: '' },
     ] },
   ]
   const socials = [
