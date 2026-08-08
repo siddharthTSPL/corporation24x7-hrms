@@ -44,6 +44,12 @@ const startTimer = async (req, res, next) => {
     return next(httpError("You can only track time on jobs assigned to you", 403));
   }
 
+  // Auto-move job out of "not_started" the moment the assignee actually starts working on it
+  if (jobDoc.status === "not_started") {
+    jobDoc.status = "in_progress";
+    await jobDoc.save();
+  }
+
   const now = new Date();
   const timer = await ActiveTimer.create({
     organisation_id,
