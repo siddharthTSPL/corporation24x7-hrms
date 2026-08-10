@@ -735,16 +735,22 @@ function ReviewsTab({ uid, role }) {
     <div className="flex flex-col gap-3 min-w-0">
       {reviews.map((r) => (
         <div key={r._id} className="bg-[#fafbfc] rounded-xl border border-gray-100 p-3 sm:p-4 min-w-0">
-          <div className="flex justify-between items-start mb-2 gap-2">
+          <div className="flex justify-between items-start mb-2 gap-2 flex-wrap">
             <span className="text-xs sm:text-sm font-semibold text-slate-900 truncate min-w-0">
               {r.reviewer?.f_name} {r.reviewer?.l_name}
             </span>
-            <div className="flex gap-0.5 shrink-0">
-              {[1,2,3,4,5].map(s => (
-                <span key={s} className="text-sm" style={{ color: s <= r.rating ? "#f59e0b" : "#e2e8f0" }}>★</span>
-              ))}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-xs sm:text-sm font-bold text-slate-900">{r.overallScore!=null?r.overallScore.toFixed(1):"–"}/10</span>
+              {r.overallRating && <span className="text-[11px] text-gray-400">· {r.overallRating}</span>}
             </div>
           </div>
+          {(r.taskSubmission||r.behaviourEthics||r.attendance) && (
+            <div className="flex flex-wrap gap-2 mb-1.5 text-[11px] text-gray-500">
+              {r.taskSubmission && <span>Task: {r.taskSubmission.percentage}% ({r.taskSubmission.rating})</span>}
+              {r.behaviourEthics && <span>Behaviour: {r.behaviourEthics.score}/10</span>}
+              {r.attendance && <span>Attendance: {r.attendance.percentage}%</span>}
+            </div>
+          )}
           <p className="text-xs sm:text-sm text-gray-600 m-0 leading-relaxed break-words">{r.comment}</p>
           <div className="text-[11px] text-gray-400 mt-1.5">{r.monthYear}</div>
         </div>
