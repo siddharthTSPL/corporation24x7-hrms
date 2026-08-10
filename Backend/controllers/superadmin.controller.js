@@ -12,6 +12,7 @@ const leavebalanceModel = require("../Models/leavebalance.model");
 const reviewModel = require("../Models/review.model");
 const Attendance = require("../Models/attendance.model");
 const AttendanceSummary = require("../Models/attendancesummary.model");
+const { computeTaskSubmission, computeBehaviour, computeAttendance, computeOverall } = require("../utils/reviewScoring.utils");
 const { startOfDay } = require("../automatic/weekoffcalendar");
 const generateUID = require("../automatic/uidgeneration");
 const assignDefaultLeave = require("../automatic/bydefaultleaveset");
@@ -1761,12 +1762,12 @@ const deleteAnnouncement = async (req, res, next) => {
 };
 
 const reviewtoadmin = async (req, res, next) => {
-  const { adminid, rating, comment } = req.body;
+  const { adminid, assignedDays, actualDays, behaviourScore, comment } = req.body;
   const organisation_id = req.superAdmin._id;
 
-  if (!adminid || !rating || !comment)
+  if (!adminid || !assignedDays || !actualDays || behaviourScore === undefined || behaviourScore === null)
     return next(
-      Object.assign(new Error("adminid, rating and comment are required"), {
+      Object.assign(new Error("adminid, assignedDays, actualDays and behaviourScore are required"), {
         statusCode: 400,
       }),
     );
@@ -1786,7 +1787,9 @@ const reviewtoadmin = async (req, res, next) => {
     );
 
   const now = new Date();
-  const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const month = now.getMonth() + 1;
+  const year = now.getFullYear();
+  const monthYear = `${year}-${String(month).padStart(2, "0")}`;
 
   const existingreview = await Review.findOne({
     organisation_id,
@@ -1804,24 +1807,57 @@ const reviewtoadmin = async (req, res, next) => {
       ),
     );
 
-  const review = await Review.create({
-    organisation_id,
-    reviewerRole: "super_admin",
-    reviewer: req.superAdmin._id,
-    reviewerRoleModel: "SuperAdmin",
-    revieweeRole: "admin",
-    reviewee: adminid,
-    revieweeRoleModel: "Admin",
-    rating,
-    comment,
-    monthYear,
-  });
+  try {
+    const taskSubmission = computeTaskSubmission(assignedDays, actualDays);
+    const behaviourEthics = computeBehaviour(behaviourScore);
 
-  res.status(201).json({
-    success: true,
-    message: "Review submitted successfully",
-    review,
-  });
+    const summary = await AttendanceSummary.findOne({
+      employee: adminid,
+      role: "admin",
+      month,
+      year,
+    }).lean();
+    const attendance = computeAttendance({
+      presentDays: summary?.presentDays ?? 0,
+      halfDays: summary?.halfDays ?? 0,
+      absentDays: summary?.absentDays ?? 0,
+    });
+
+    const overall = computeOverall({
+      taskScore: taskSubmission.score,
+      behaviourScore: behaviourEthics.score,
+      attendanceScore: attendance.score,
+    });
+
+    const review = await Review.create({
+      organisation_id,
+      reviewerRole: "super_admin",
+      reviewer: req.superAdmin._id,
+      reviewerRoleModel: "SuperAdmin",
+      revieweeRole: "admin",
+      reviewee: adminid,
+      revieweeRoleModel: "Admin",
+      taskSubmission,
+      behaviourEthics,
+      attendance,
+      overallScore: overall.score,
+      overallRating: overall.rating,
+      comment: comment || "",
+      monthYear,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Review submitted successfully",
+      review,
+    });
+  } catch (err) {
+    if (err.code === 11000)
+      return next(
+        Object.assign(new Error("You have already reviewed this admin this month."), { statusCode: 400 }),
+      );
+    next(err);
+  }
 };
 
 const getTodayCheckins = async (req, res, next) => {
