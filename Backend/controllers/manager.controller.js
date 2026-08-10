@@ -1481,7 +1481,7 @@ const getOrgInfoForManager = async (req, res, next) => {
 
     const manager = await managermodel.findById(req.manager._id)
       .select(
-        "f_name l_name empid work_email designation department office_location organisation_id"
+        "f_name l_name empid work_email designation department office_location organisation_id profile_image"
       )
       .lean();
 
@@ -1544,12 +1544,12 @@ const getOrgInfoForManager = async (req, res, next) => {
     }
 
     const admins = await AdminModel.find({ organisation_id, working_status: "working" })
-      .select("f_name l_name empid work_email designation department")
+      .select("f_name l_name empid work_email designation department profile_image")
       .lean();
 
     const managers = await managermodel.find({ organisation_id, working_status: "working" })
       .select(
-        "f_name l_name empid work_email designation department office_location reporting_manager reporting_manager_model"
+        "f_name l_name empid work_email designation department office_location reporting_manager reporting_manager_model profile_image"
       )
       .lean();
 
@@ -1561,7 +1561,7 @@ const getOrgInfoForManager = async (req, res, next) => {
       },
     })
       .select(
-        "f_name l_name empid work_email designation department office_location Under_manager"
+        "f_name l_name empid work_email designation department office_location Under_manager profile_image"
       )
       .lean();
 
@@ -1584,6 +1584,7 @@ const getOrgInfoForManager = async (req, res, next) => {
         designation: mgr.designation,
         department: mgr.department,
         office_location: mgr.office_location,
+        profile_image: mgr.profile_image || null,
         isCurrentManager:
           mgr._id.toString() === req.manager._id.toString(),
 
@@ -1599,6 +1600,7 @@ const getOrgInfoForManager = async (req, res, next) => {
             email: emp.work_email,
             designation: emp.designation,
             department: emp.department,
+            profile_image: emp.profile_image || null,
           })),
 
         subManagers: buildManagerTreeWithCurrentFlags(
@@ -1621,6 +1623,7 @@ const getOrgInfoForManager = async (req, res, next) => {
         id: superAdmin._id,
         name: `${superAdmin.f_name} ${superAdmin.l_name}`,
         email: superAdmin.email,
+        profile_image: superAdmin.profile_image || null,
       },
 
       current_manager: {
@@ -1631,6 +1634,7 @@ const getOrgInfoForManager = async (req, res, next) => {
         designation: manager.designation,
         department: manager.department,
         office_location: manager.office_location,
+        profile_image: manager.profile_image || null,
       },
 
       admin: rootAdmin
@@ -1641,6 +1645,7 @@ const getOrgInfoForManager = async (req, res, next) => {
             email: rootAdmin.work_email,
             designation: rootAdmin.designation,
             department: rootAdmin.department,
+            profile_image: rootAdmin.profile_image || null,
           }
         : null,
 
@@ -1666,6 +1671,7 @@ const buildManagerTree = (managers, parentId, parentModel, employees) => {
       designation: mgr.designation,
       department: mgr.department,
       office_location: mgr.office_location,
+      profile_image: mgr.profile_image || null,
       _raw: mgr,
       employees: employees
         .filter((emp) => emp.Under_manager?.toString() === mgr._id.toString())
@@ -1675,6 +1681,7 @@ const buildManagerTree = (managers, parentId, parentModel, employees) => {
           email: emp.work_email,
           designation: emp.designation,
           department: emp.department,
+          profile_image: emp.profile_image || null,
           isCurrentUser: false,
         })),
       subManagers: buildManagerTree(managers, mgr._id, "Manager", employees),
@@ -1705,6 +1712,7 @@ const buildManagerTreeWithCurrentFlags = (
       designation: mgr.designation,
       department: mgr.department,
       office_location: mgr.office_location,
+      profile_image: mgr.profile_image || null,
       isCurrentManager: currentManagerId
         ? mgr._id.toString() === currentManagerId.toString()
         : false,
@@ -1724,6 +1732,7 @@ const buildManagerTreeWithCurrentFlags = (
           email: emp.work_email,
           designation: emp.designation,
           department: emp.department,
+          profile_image: emp.profile_image || null,
           isCurrentUser: currentEmployeeId
             ? emp._id.toString() === currentEmployeeId.toString()
             : false,

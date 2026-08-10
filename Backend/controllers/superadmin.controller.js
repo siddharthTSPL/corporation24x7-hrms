@@ -1303,19 +1303,19 @@ const getallemployee = async (req, res, next) => {
     const [admins, managers, users] = await Promise.all([
       AdminModel.find({ organisation_id, working_status: "working" })
         .select(
-          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact marital_status",
+          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact marital_status profile_image",
         )
         .lean(),
 
       Managermodel.find({ organisation_id, working_status: "working" })
         .select(
-          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact marital_status",
+          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact marital_status profile_image",
         )
         .lean(),
 
       Usermodel.find({ organisation_id, working_status: "working" })
         .select(
-          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact marital_status Under_manager",
+          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact marital_status Under_manager profile_image",
         )
         .populate({
           path: "Under_manager",
@@ -2199,6 +2199,7 @@ function buildManagerNode(manager, allManagers, allEmployees) {
     designation: manager.designation,
     department: manager.department,
     office_location: manager.office_location,
+    profile_image: manager.profile_image || null,
     role: manager.role,
     reportsTo: manager.reporting_manager_model,
     employees: directEmployees.map((emp) => ({
@@ -2209,6 +2210,7 @@ function buildManagerNode(manager, allManagers, allEmployees) {
       designation: emp.designation,
       department: emp.department,
       office_location: emp.office_location,
+      profile_image: emp.profile_image || null,
     })),
     subManagers: directReports.map((sub) =>
       buildManagerNode(sub, allManagers, allEmployees)
@@ -2252,17 +2254,17 @@ const getOrgInfo = async (req, res, next) => {
     const [admins, managers, employees] = await Promise.all([
       AdminModel.find({ organisation_id })
         .select(
-          "empid f_name l_name work_email designation department office_location role reporting_manager reporting_manager_model"
+          "empid f_name l_name work_email designation department office_location role reporting_manager reporting_manager_model profile_image"
         )
         .lean(),
       Managermodel.find({ organisation_id })
         .select(
-          "empid f_name l_name work_email designation department office_location role reporting_manager reporting_manager_model"
+          "empid f_name l_name work_email designation department office_location role reporting_manager reporting_manager_model profile_image"
         )
         .lean(),
       Usermodel.find({ organisation_id })
         .select(
-          "empid f_name l_name work_email designation department office_location Under_manager"
+          "empid f_name l_name work_email designation department office_location Under_manager profile_image"
         )
         .lean(),
     ]);
@@ -2285,6 +2287,7 @@ const getOrgInfo = async (req, res, next) => {
         designation: admin.designation,
         department: admin.department,
         office_location: admin.office_location,
+        profile_image: admin.profile_image || null,
         role: admin.role,
         managers: directManagers.map((mgr) =>
           buildManagerNode(mgr, managers, employees)
@@ -2333,6 +2336,7 @@ const getOrgInfo = async (req, res, next) => {
         id: superAdmin._id,
         name: `${superAdmin.f_name} ${superAdmin.l_name}`,
         email: superAdmin.email,
+        profile_image: superAdmin.profile_image || null,
       },
 
       totals: {
@@ -2352,6 +2356,7 @@ const getOrgInfo = async (req, res, next) => {
         designation: emp.designation,
         department: emp.department,
         office_location: emp.office_location,
+        profile_image: emp.profile_image || null,
       })),
     });
   } catch (error) {
