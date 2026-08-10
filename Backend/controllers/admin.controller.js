@@ -15,6 +15,7 @@ const LeavePolicy = require("../Models/Leavepolicy.model");
 const PermissionModel = require("../Models/permission.model");
 const Leave = require("../Models/leave.model");
 const Review = require("../Models/review.model");
+const { computeTaskSubmission, computeBehaviour, computeAttendance, computeOverall } = require("../utils/reviewScoring.utils");
 const generateOTP = require("../automatic/otpgenerator");
 const OtpModel = require("../Models/otpbasedlogin.model");
 const leavebalanceModel = require("../Models/leavebalance.model");
@@ -2535,13 +2536,15 @@ const reviewtomanager = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
-  const { managerid, rating, comment } = req.body;
-  if (!managerid || !rating || !comment)
-    return next(Object.assign(new Error("managerid, rating and comment are required"), { statusCode: 400 }));
+  const { managerid, assignedDays, actualDays, behaviourScore, comment } = req.body;
+  if (!managerid || !assignedDays || !actualDays || behaviourScore === undefined || behaviourScore === null)
+    return next(Object.assign(new Error("managerid, assignedDays, actualDays and behaviourScore are required"), { statusCode: 400 }));
 
   const organisation_id = req.admin.organisation_id;
   const now = new Date();
-  const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const month = now.getMonth() + 1;
+  const year = now.getFullYear();
+  const monthYear = `${year}-${String(month).padStart(2, "0")}`;
 
   const [manager, existingreview] = await Promise.all([
     Managermodel.findOne({ _id: managerid, organisation_id }).select("role").lean(),
@@ -2555,20 +2558,51 @@ const reviewtomanager = async (req, res, next) => {
   if (existingreview)
     return next(Object.assign(new Error("You have already reviewed this manager this month."), { statusCode: 400 }));
 
-  const review = await Review.create({
-    organisation_id,
-    reviewerRole: "admin",
-    reviewer: req.admin._id,
-    reviewerRoleModel: "Admin",
-    revieweeRole: manager.role,
-    reviewee: managerid,
-    revieweeRoleModel: "Manager",
-    rating,
-    comment,
-    monthYear,
-  });
+  try {
+    const taskSubmission = computeTaskSubmission(assignedDays, actualDays);
+    const behaviourEthics = computeBehaviour(behaviourScore);
 
-  res.status(201).json({ message: "Review submitted successfully", review });
+    const summary = await AttendanceSummary.findOne({
+      employee: managerid,
+      role: "manager",
+      month,
+      year,
+    }).lean();
+    const attendance = computeAttendance({
+      presentDays: summary?.presentDays ?? 0,
+      halfDays: summary?.halfDays ?? 0,
+      absentDays: summary?.absentDays ?? 0,
+    });
+
+    const overall = computeOverall({
+      taskScore: taskSubmission.score,
+      behaviourScore: behaviourEthics.score,
+      attendanceScore: attendance.score,
+    });
+
+    const review = await Review.create({
+      organisation_id,
+      reviewerRole: "admin",
+      reviewer: req.admin._id,
+      reviewerRoleModel: "Admin",
+      revieweeRole: manager.role,
+      reviewee: managerid,
+      revieweeRoleModel: "Manager",
+      taskSubmission,
+      behaviourEthics,
+      attendance,
+      overallScore: overall.score,
+      overallRating: overall.rating,
+      comment: comment || "",
+      monthYear,
+    });
+
+    res.status(201).json({ message: "Review submitted successfully", review });
+  } catch (err) {
+    if (err.code === 11000)
+      return next(Object.assign(new Error("You have already reviewed this manager this month."), { statusCode: 400 }));
+    next(err);
+  }
 };
 
 const forgetpasswordloginotp = async (req, res, next) => {
