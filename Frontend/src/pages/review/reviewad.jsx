@@ -45,36 +45,25 @@ function getEmail(m) {
   return m?.work_email ?? m?.email ?? "";
 }
 
-function StarRating({ value, onChange }) {
-  const [hovered, setHovered] = useState(0);
-  return (
-    <div className="flex gap-1.5 sm:gap-2">
-      {[1, 2, 3, 4, 5].map((star) => {
-        const filled = star <= (hovered || value);
-        return (
-          <button
-            key={star}
-            type="button"
-            onClick={() => onChange(star)}
-            onMouseEnter={() => setHovered(star)}
-            onMouseLeave={() => setHovered(0)}
-            className="bg-transparent border-none cursor-pointer p-0.5 transition-transform duration-150"
-            style={{ transform: filled ? "scale(1.15)" : "scale(1)" }}
-          >
-            <svg className="w-6 h-6 sm:w-7 sm:h-7" viewBox="0 0 24 24">
-              <polygon
-                points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
-                fill={filled ? BRAND.pink : "transparent"}
-                stroke={filled ? BRAND.pink : BRAND.mutedText}
-                strokeWidth="1.5"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-        );
-      })}
-    </div>
-  );
+// Mirrors backend utils/reviewScoring.utils.js bands, for live preview only.
+// The server always recomputes and is the source of truth.
+const TASK_BANDS = [
+  { min: 140, rating: "Excellent", score: 10 },
+  { min: 110, rating: "Very Good", score: 8 },
+  { min: 90, rating: "Good", score: 6 },
+  { min: 70, rating: "Average", score: 4 },
+  { min: -Infinity, rating: "Poor", score: 2 },
+];
+
+function taskBandFor(percentage) {
+  return TASK_BANDS.find((b) => percentage >= b.min);
+}
+
+function ratingColor(rating) {
+  if (rating === "Excellent" || rating === "Very Good") return "#1E7A3D";
+  if (rating === "Good") return BRAND.pink;
+  if (rating === "Average") return "#B8860B";
+  return "#B0233A";
 }
 
 function ManagerCard({ manager, selected, onClick }) {
@@ -149,14 +138,6 @@ function ManagerCard({ manager, selected, onClick }) {
   );
 }
 
-const ratingLabels = {
-  1: "Poor",
-  2: "Fair",
-  3: "Good",
-  4: "Very Good",
-  5: "Excellent",
-};
-
 export default function ReviewManager() {
   const {
     data,
@@ -173,13 +154,29 @@ export default function ReviewManager() {
   const { mutate: submitReview, isPending, error: submitError } = useReviewToManager();
 
   const [selected, setSelected] = useState(null);
-  const [rating, setRating] = useState(0);
+  const [assignedDays, setAssignedDays] = useState("");
+  const [actualDays, setActualDays] = useState("");
+  const [behaviourScore, setBehaviourScore] = useState("");
   const [comment, setComment] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
+  const assignedNum = Number(assignedDays);
+  const actualNum = Number(actualDays);
+  const behaviourNum = Number(behaviourScore);
+  const taskPreview =
+    assignedNum > 0 && actualNum > 0
+      ? { percentage: Math.round((assignedNum / actualNum) * 1000) / 10, ...taskBandFor((assignedNum / actualNum) * 100) }
+      : null;
+
   const canSubmit =
-    selected && rating > 0 && comment.trim().length >= 10 && !isPending;
+    selected &&
+    assignedNum > 0 &&
+    actualNum > 0 &&
+    behaviourScore !== "" &&
+    behaviourNum >= 0 &&
+    behaviourNum <= 10 &&
+    !isPending;
 
   const handleSelectManager = (manager) => {
     setSelected(manager);
@@ -193,12 +190,20 @@ export default function ReviewManager() {
   const handleSubmit = () => {
     if (!canSubmit) return;
     submitReview(
-      { managerid: selected._id, rating, comment },
+      {
+        managerid: selected._id,
+        assignedDays: assignedNum,
+        actualDays: actualNum,
+        behaviourScore: behaviourNum,
+        comment,
+      },
       {
         onSuccess: () => {
           setSubmitted(true);
           setSelected(null);
-          setRating(0);
+          setAssignedDays("");
+          setActualDays("");
+          setBehaviourScore("");
           setComment("");
           setShowForm(false);
           setTimeout(() => setSubmitted(false), 4000);
@@ -375,8 +380,13 @@ export default function ReviewManager() {
               <div className="p-4 sm:p-5">
                 <MobileReviewForm
                   selected={selected}
-                  rating={rating}
-                  setRating={setRating}
+                  assignedDays={assignedDays}
+                  setAssignedDays={setAssignedDays}
+                  actualDays={actualDays}
+                  setActualDays={setActualDays}
+                  taskPreview={taskPreview}
+                  behaviourScore={behaviourScore}
+                  setBehaviourScore={setBehaviourScore}
                   comment={comment}
                   setComment={setComment}
                   canSubmit={canSubmit}
@@ -497,8 +507,13 @@ export default function ReviewManager() {
               ) : (
                 <DesktopReviewForm
                   selected={selected}
-                  rating={rating}
-                  setRating={setRating}
+                  assignedDays={assignedDays}
+                  setAssignedDays={setAssignedDays}
+                  actualDays={actualDays}
+                  setActualDays={setActualDays}
+                  taskPreview={taskPreview}
+                  behaviourScore={behaviourScore}
+                  setBehaviourScore={setBehaviourScore}
                   comment={comment}
                   setComment={setComment}
                   canSubmit={canSubmit}
@@ -523,8 +538,13 @@ export default function ReviewManager() {
 
 function ReviewFormFields({
   selected,
-  rating,
-  setRating,
+  assignedDays,
+  setAssignedDays,
+  actualDays,
+  setActualDays,
+  taskPreview,
+  behaviourScore,
+  setBehaviourScore,
   comment,
   setComment,
   canSubmit,
@@ -556,58 +576,89 @@ function ReviewFormFields({
 
       <div>
         <label className="block text-xs tracking-[0.08em] uppercase text-[#9B7A8A] mb-3 font-medium">
-          Rating
+          Task Submission
         </label>
-        <div className="flex items-center gap-4 flex-wrap">
-          <StarRating value={rating} onChange={setRating} />
-          {rating > 0 && (
-            <span
-              className="text-[13px] text-[#8B1A4A] italic"
-              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-            >
-              {ratingLabels[rating]}
-            </span>
-          )}
+        <p className="text-[12px] mb-3 -mt-1.5" style={{ color: BRAND.mutedText }}>
+          Enter the days assigned and days actually taken — the system calculates the % and rating.
+        </p>
+        <div className="flex gap-3 flex-wrap">
+          <div className="flex-1 min-w-[120px]">
+            <label className="block text-[10px] mb-1" style={{ color: BRAND.mutedText }}>Assigned Days</label>
+            <input
+              type="number"
+              min="1"
+              value={assignedDays}
+              onChange={(e) => setAssignedDays(e.target.value)}
+              placeholder="e.g. 30"
+              className="w-full box-border bg-[#F5F0F3] border rounded-xl py-2.5 px-3.5 text-sm outline-none font-sans focus:border-[#8B1A4A]"
+              style={{ borderColor: BRAND.cardBorder, color: BRAND.textPrimary }}
+            />
+          </div>
+          <div className="flex-1 min-w-[120px]">
+            <label className="block text-[10px] mb-1" style={{ color: BRAND.mutedText }}>Actual Days Taken</label>
+            <input
+              type="number"
+              min="1"
+              value={actualDays}
+              onChange={(e) => setActualDays(e.target.value)}
+              placeholder="e.g. 20"
+              className="w-full box-border bg-[#F5F0F3] border rounded-xl py-2.5 px-3.5 text-sm outline-none font-sans focus:border-[#8B1A4A]"
+              style={{ borderColor: BRAND.cardBorder, color: BRAND.textPrimary }}
+            />
+          </div>
         </div>
-        {rating > 0 && (
-          <div className="flex gap-1 mt-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div
-                key={i}
-                className="flex-1 h-1 rounded-md transition-colors duration-200"
-                style={{
-                  background: i <= rating ? BRAND.pink : BRAND.cardBorder,
-                }}
-              />
-            ))}
+        {taskPreview && (
+          <div className="mt-3 flex items-center gap-2.5 flex-wrap">
+            <span className="text-[13px] font-semibold" style={{ color: ratingColor(taskPreview.rating) }}>
+              {taskPreview.percentage}% · {taskPreview.rating}
+            </span>
+            <span className="text-[11px]" style={{ color: BRAND.mutedText }}>({taskPreview.score}/10)</span>
           </div>
         )}
       </div>
 
       <div>
         <label className="block text-xs tracking-[0.08em] uppercase text-[#9B7A8A] mb-3 font-medium">
-          Feedback
+          Behaviour &amp; Ethics
+        </label>
+        <p className="text-[12px] mb-3 -mt-1.5" style={{ color: BRAND.mutedText }}>
+          Give a score out of 10 based on conduct, discipline, and professionalism.
+        </p>
+        <input
+          type="number"
+          min="0"
+          max="10"
+          step="0.5"
+          value={behaviourScore}
+          onChange={(e) => setBehaviourScore(e.target.value)}
+          placeholder="0 – 10"
+          className="w-full sm:w-40 box-border bg-[#F5F0F3] border rounded-xl py-2.5 px-3.5 text-sm outline-none font-sans focus:border-[#8B1A4A]"
+          style={{ borderColor: BRAND.cardBorder, color: BRAND.textPrimary }}
+        />
+      </div>
+
+      <div
+        className="text-[11px] rounded-xl px-3.5 py-2.5 border"
+        style={{ color: BRAND.mutedText, background: BRAND.accentLight, borderColor: BRAND.accentBorder }}
+      >
+        Attendance is calculated automatically from this month's attendance records — no input needed here.
+      </div>
+
+      <div>
+        <label className="block text-xs tracking-[0.08em] uppercase text-[#9B7A8A] mb-3 font-medium">
+          Comment <span className="normal-case" style={{ color: `${BRAND.mutedText}b3` }}>(optional)</span>
         </label>
         <textarea
-          rows={5}
+          rows={4}
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          placeholder="Share your observations about this manager's performance, leadership, and communication…"
-          className="w-full bg-[#F5F0F3] border rounded-xl p-3 sm:p-4 text-sm text-[#2D0A1A] leading-relaxed resize-y outline-none font-sans box-border transition-colors min-h-[120px] focus:border-[#8B1A4A] focus:ring-2 focus:ring-[#8B1A4A]/10"
+          placeholder="Any additional notes on this manager's performance, leadership, and communication…"
+          className="w-full bg-[#F5F0F3] border rounded-xl p-3 sm:p-4 text-sm leading-relaxed resize-y outline-none font-sans box-border transition-colors focus:border-[#8B1A4A] focus:ring-2 focus:ring-[#8B1A4A]/10"
           style={{
-            borderColor:
-              comment.length > 0 ? `${BRAND.pink}66` : BRAND.cardBorder,
+            borderColor: comment.length > 0 ? `${BRAND.pink}66` : BRAND.cardBorder,
+            color: BRAND.textPrimary,
           }}
         />
-        <div
-          className="mt-1.5 text-[11px] text-right transition-colors"
-          style={{
-            color:
-              comment.trim().length < 10 ? BRAND.mutedText : BRAND.pink,
-          }}
-        >
-          {comment.trim().length} / 10 min chars
-        </div>
       </div>
 
       <div className="h-px bg-[#E8D5DF]" />
