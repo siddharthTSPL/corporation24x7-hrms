@@ -786,10 +786,17 @@ function ReviewsTab({ reviews }) {
     );
   }
 
-  const avg = (reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length).toFixed(1);
+  const avg = (reviews.reduce((s, r) => s + (r.overallScore || 0), 0) / reviews.length).toFixed(1);
+
+  const ratingBadgeColor = (rating) => {
+    if (rating === "Excellent" || rating === "Very Good") return C.green || "#1E7A3D";
+    if (rating === "Good") return C.brand;
+    if (rating === "Average") return C.amber || "#B8860B";
+    return C.red || "#B0233A";
+  };
 
   return (
-    <SectionCard title="My Reviews" subtitle={`${reviews.length} review${reviews.length !== 1 ? "s" : ""} · avg ${avg}/5`} accent={C.brand}>
+    <SectionCard title="My Reviews" subtitle={`${reviews.length} review${reviews.length !== 1 ? "s" : ""} · avg ${avg}/10`} accent={C.brand}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {reviews.map((r, i) => (
           <div key={r._id || i} className="min-w-0" style={{
@@ -803,16 +810,30 @@ function ReviewsTab({ reviews }) {
                 </div>
                 <div style={{ fontSize: 11, color: C.muted }}>{r.reviewer?.role || ""} · {r.monthYear || fmtDate(r.createdAt)}</div>
               </div>
-              <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
-                {[1,2,3,4,5].map(s => (
-                  <svg key={s} width="14" height="14" viewBox="0 0 24 24">
-                    <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
-                      fill={s <= (r.rating || 0) ? "#f59e0b" : "transparent"}
-                      stroke="#f59e0b" strokeWidth="1.5" strokeLinejoin="round" />
-                  </svg>
-                ))}
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: ratingBadgeColor(r.overallRating) }}>
+                  {r.overallScore != null ? r.overallScore.toFixed(1) : "–"}/10
+                </span>
+                {r.overallRating && (
+                  <span style={{ fontSize: 11, color: C.muted }}>· {r.overallRating}</span>
+                )}
               </div>
             </div>
+
+            {(r.taskSubmission || r.behaviourEthics || r.attendance) && (
+              <div className="flex-wrap" style={{ display: "flex", gap: 12, marginBottom: r.comment ? 8 : 0, fontSize: 11, color: C.muted }}>
+                {r.taskSubmission && (
+                  <span>Task: {r.taskSubmission.percentage}% ({r.taskSubmission.rating})</span>
+                )}
+                {r.behaviourEthics && (
+                  <span>Behaviour: {r.behaviourEthics.score}/10 ({r.behaviourEthics.rating})</span>
+                )}
+                {r.attendance && (
+                  <span>Attendance: {r.attendance.percentage}% ({r.attendance.rating})</span>
+                )}
+              </div>
+            )}
+
             {r.comment && (
               <div className="break-words" style={{ fontSize: 13, color: C.text, lineHeight: 1.6, fontStyle: "italic" }}>
                 "{r.comment}"
