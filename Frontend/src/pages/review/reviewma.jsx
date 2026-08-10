@@ -14,35 +14,25 @@ function getEmail(m) {
   return m?.work_email ?? m?.email ?? "";
 }
 
-function StarRating({ value, onChange }) {
-  const [hovered, setHovered] = useState(0);
-  return (
-    <div className="flex gap-1 sm:gap-1.5">
-      {[1, 2, 3, 4, 5].map((star) => {
-        const filled = star <= (hovered || value);
-        return (
-          <button
-            key={star}
-            type="button"
-            onClick={() => onChange(star)}
-            onMouseEnter={() => setHovered(star)}
-            onMouseLeave={() => setHovered(0)}
-            className={`bg-transparent border-none cursor-pointer p-0.5 transition-transform duration-150 ${filled ? "scale-110" : "scale-100"}`}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" className="sm:w-7 sm:h-7">
-              <polygon
-                points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
-                fill={filled ? "#8B1A4A" : "transparent"}
-                stroke={filled ? "#8B1A4A" : "#9B7A8A"}
-                strokeWidth="1.5"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-        );
-      })}
-    </div>
-  );
+// Mirrors backend utils/reviewScoring.utils.js bands, for live preview only.
+// The server always recomputes and is the source of truth.
+const TASK_BANDS = [
+  { min: 140, rating: "Excellent", score: 10 },
+  { min: 110, rating: "Very Good", score: 8 },
+  { min: 90, rating: "Good", score: 6 },
+  { min: 70, rating: "Average", score: 4 },
+  { min: -Infinity, rating: "Poor", score: 2 },
+];
+
+function taskBandFor(percentage) {
+  return TASK_BANDS.find((b) => percentage >= b.min);
+}
+
+function ratingColor(rating) {
+  if (rating === "Excellent" || rating === "Very Good") return "#1E7A3D";
+  if (rating === "Good") return "#8B1A4A";
+  if (rating === "Average") return "#B8860B";
+  return "#B0233A";
 }
 
 function EmployeeCard({ employee, selected, onClick }) {
@@ -97,8 +87,6 @@ function EmployeeCard({ employee, selected, onClick }) {
   );
 }
 
-const ratingLabels = { 1: "Poor", 2: "Fair", 3: "Good", 4: "Very Good", 5: "Excellent" };
-
 export default function ReviewEmployee() {
   const { data, isLoading, isError, error, refetch } = useGetUsersUnderManager();
 
@@ -107,7 +95,9 @@ export default function ReviewEmployee() {
   const { mutate: submitReview, isPending, error: submitError } = useReviewEmployee();
 
   const [selected, setSelected] = useState(null);
-  const [rating, setRating] = useState(0);
+  const [assignedDays, setAssignedDays] = useState("");
+  const [actualDays, setActualDays] = useState("");
+  const [behaviourScore, setBehaviourScore] = useState("");
   const [comment, setComment] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [search, setSearch] = useState("");
@@ -117,17 +107,40 @@ export default function ReviewEmployee() {
     getEmail(e).toLowerCase().includes(search.toLowerCase())
   );
 
-  const canSubmit = selected && rating > 0 && comment.trim().length >= 10 && !isPending;
+  const assignedNum = Number(assignedDays);
+  const actualNum = Number(actualDays);
+  const behaviourNum = Number(behaviourScore);
+  const taskPreview =
+    assignedNum > 0 && actualNum > 0
+      ? { percentage: Math.round((assignedNum / actualNum) * 1000) / 10, ...taskBandFor((assignedNum / actualNum) * 100) }
+      : null;
+
+  const canSubmit =
+    selected &&
+    assignedNum > 0 &&
+    actualNum > 0 &&
+    behaviourScore !== "" &&
+    behaviourNum >= 0 &&
+    behaviourNum <= 10 &&
+    !isPending;
 
   const handleSubmit = () => {
     if (!canSubmit) return;
     submitReview(
-      { employeeid: selected._id, rating, comment },
+      {
+        employeeid: selected._id,
+        assignedDays: assignedNum,
+        actualDays: actualNum,
+        behaviourScore: behaviourNum,
+        comment,
+      },
       {
         onSuccess: () => {
           setSubmitted(true);
           setSelected(null);
-          setRating(0);
+          setAssignedDays("");
+          setActualDays("");
+          setBehaviourScore("");
           setComment("");
           setTimeout(() => setSubmitted(false), 4000);
         },
@@ -302,42 +315,79 @@ export default function ReviewEmployee() {
 
                   <div>
                     <label className="block text-xs tracking-[0.08em] uppercase text-[#9B7A8A] mb-3 font-medium">
-                      Rating
+                      Task Submission
                     </label>
-                    <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-                      <StarRating value={rating} onChange={setRating} />
-                      {rating > 0 && (
-                        <span className="text-[13px] text-[#8B1A4A] italic" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
-                          {ratingLabels[rating]}
-                        </span>
-                      )}
+                    <p className="text-[12px] text-[#9B7A8A] mb-3 -mt-1.5">
+                      Enter the days assigned and days actually taken — the system calculates the % and rating.
+                    </p>
+                    <div className="flex gap-3 flex-wrap">
+                      <div className="flex-1 min-w-[120px]">
+                        <label className="block text-[10px] text-[#9B7A8A] mb-1">Assigned Days</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={assignedDays}
+                          onChange={(e) => setAssignedDays(e.target.value)}
+                          placeholder="e.g. 30"
+                          className="w-full box-border bg-[#F5F0F3] border border-[#E8D5DF] rounded-xl py-2.5 px-3.5 text-[#2D0A1A] text-sm outline-none font-['Inter',sans-serif] focus:border-[#8B1A4A]"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-[120px]">
+                        <label className="block text-[10px] text-[#9B7A8A] mb-1">Actual Days Taken</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={actualDays}
+                          onChange={(e) => setActualDays(e.target.value)}
+                          placeholder="e.g. 20"
+                          className="w-full box-border bg-[#F5F0F3] border border-[#E8D5DF] rounded-xl py-2.5 px-3.5 text-[#2D0A1A] text-sm outline-none font-['Inter',sans-serif] focus:border-[#8B1A4A]"
+                        />
+                      </div>
                     </div>
-                    {rating > 0 && (
-                      <div className="flex gap-1 mt-3">
-                        {[1, 2, 3, 4, 5].map((i) => (
-                          <div
-                            key={i}
-                            className={`flex-1 h-[3px] rounded transition-colors duration-200 ${i <= rating ? "bg-[#8B1A4A]" : "bg-[#E8D5DF]"}`}
-                          />
-                        ))}
+                    {taskPreview && (
+                      <div className="mt-3 flex items-center gap-2.5 flex-wrap">
+                        <span className="text-[13px] font-semibold" style={{ color: ratingColor(taskPreview.rating) }}>
+                          {taskPreview.percentage}% · {taskPreview.rating}
+                        </span>
+                        <span className="text-[11px] text-[#9B7A8A]">({taskPreview.score}/10)</span>
                       </div>
                     )}
                   </div>
 
                   <div>
                     <label className="block text-xs tracking-[0.08em] uppercase text-[#9B7A8A] mb-3 font-medium">
-                      Feedback
+                      Behaviour &amp; Ethics
+                    </label>
+                    <p className="text-[12px] text-[#9B7A8A] mb-3 -mt-1.5">
+                      Give a score out of 10 based on conduct, discipline, and professionalism.
+                    </p>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      step="0.5"
+                      value={behaviourScore}
+                      onChange={(e) => setBehaviourScore(e.target.value)}
+                      placeholder="0 – 10"
+                      className="w-full sm:w-40 box-border bg-[#F5F0F3] border border-[#E8D5DF] rounded-xl py-2.5 px-3.5 text-[#2D0A1A] text-sm outline-none font-['Inter',sans-serif] focus:border-[#8B1A4A]"
+                    />
+                  </div>
+
+                  <div className="text-[11px] text-[#9B7A8A] bg-[#FAF0F5] border border-[#D4A0B8] rounded-xl px-3.5 py-2.5">
+                    Attendance is calculated automatically from this month's attendance records — no input needed here.
+                  </div>
+
+                  <div>
+                    <label className="block text-xs tracking-[0.08em] uppercase text-[#9B7A8A] mb-3 font-medium">
+                      Comment <span className="normal-case text-[#9B7A8A]/70">(optional)</span>
                     </label>
                     <textarea
-                      rows={5}
+                      rows={4}
                       value={comment}
                       onChange={(e) => setComment(e.target.value)}
-                      placeholder="Describe this employee's performance, collaboration, reliability, and areas for growth…"
+                      placeholder="Any additional notes on performance, collaboration, or areas for growth…"
                       className={`w-full box-border bg-[#F5F0F3] rounded-xl py-3.5 px-4 text-[#2D0A1A] text-sm leading-relaxed resize-y outline-none font-['Inter',sans-serif] transition-colors duration-200 border ${comment.length > 0 ? "border-[#8B1A4A]/40" : "border-[#E8D5DF]"} focus:border-[#8B1A4A]`}
                     />
-                    <div className={`mt-1.5 text-[11px] text-right transition-colors duration-200 ${comment.trim().length < 10 ? "text-[#9B7A8A]" : "text-[#8B1A4A]"}`}>
-                      {comment.trim().length} / 10 min chars
-                    </div>
                   </div>
 
                   <div className="h-px bg-[#E8D5DF]" />
