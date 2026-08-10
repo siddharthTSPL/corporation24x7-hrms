@@ -9,6 +9,8 @@ const { sendEmail } = require("../utils/nodemailer.utils");
 const announcementmodel = require("../Models/announcement.model");
 const { processLeaveDeduction } = require("../automatic/calculateleave");
 const Review = require("../Models/review.model");
+const AttendanceSummary = require("../Models/attendancesummary.model");
+const { computeTaskSubmission, computeBehaviour, computeAttendance, computeOverall } = require("../utils/reviewScoring.utils");
 const jwt = require("jsonwebtoken");
 const managerLeaveModel = require("../Models/maleave.model");
 const { parseISTDateOnly } = require("../utils/Istdate.utils");
@@ -1042,9 +1044,10 @@ const getmyleavehistory = async (req, res, next) => {
 const reviewtoemployee = async (req, res, next) => {
   if (!req.manager)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  const { employeeid, rating, comment } = req.body;
-  if (!rating || !comment)
-    return next(Object.assign(new Error("Rating and comment are required"), { statusCode: 400 }));
+
+  const { employeeid, assignedDays, actualDays, behaviourScore, comment } = req.body;
+  if (!employeeid || !assignedDays || !actualDays || behaviourScore === undefined || behaviourScore === null)
+    return next(Object.assign(new Error("employeeid, assignedDays, actualDays and behaviourScore are required"), { statusCode: 400 }));
 
   const manager = req.manager;
   const organisation_id = manager.organisation_id;
@@ -1056,8 +1059,36 @@ const reviewtoemployee = async (req, res, next) => {
     return next(Object.assign(new Error("Employee not found under your management"), { statusCode: 404 }));
 
   const now = new Date();
-  const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const month = now.getMonth() + 1;
+  const year = now.getFullYear();
+  const monthYear = `${year}-${String(month).padStart(2, "0")}`;
+
   try {
+    // Parameter 1: Task Submission (manager gives days, system computes % + rating + score)
+    const taskSubmission = computeTaskSubmission(assignedDays, actualDays);
+
+    // Parameter 2: Behaviour & Ethics (manager gives score out of 10 directly)
+    const behaviourEthics = computeBehaviour(behaviourScore);
+
+    // Parameter 3: Attendance (fully automatic, from this month's AttendanceSummary)
+    const summary = await AttendanceSummary.findOne({
+      employee: employee._id,
+      role: "employee",
+      month,
+      year,
+    }).lean();
+    const attendance = computeAttendance({
+      presentDays: summary?.presentDays ?? 0,
+      halfDays: summary?.halfDays ?? 0,
+      absentDays: summary?.absentDays ?? 0,
+    });
+
+    const overall = computeOverall({
+      taskScore: taskSubmission.score,
+      behaviourScore: behaviourEthics.score,
+      attendanceScore: attendance.score,
+    });
+
     const review = await Review.create({
       organisation_id,
       reviewerRole: manager.role,
@@ -1066,8 +1097,12 @@ const reviewtoemployee = async (req, res, next) => {
       revieweeRole: "employee",
       reviewee: employee._id,
       revieweeRoleModel: "User",
-      rating,
-      comment,
+      taskSubmission,
+      behaviourEthics,
+      attendance,
+      overallScore: overall.score,
+      overallRating: overall.rating,
+      comment: comment || "",
       monthYear,
     });
     res.status(201).json({ message: "Employee reviewed successfully", review });
