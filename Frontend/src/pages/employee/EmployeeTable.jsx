@@ -1101,7 +1101,8 @@ function AccountSummaryDrawer({
   const setEmpWS=useSetEmployeeWorkingStatus(userId);
   const setMgrWS=useSetManagerWorkingStatus(userId);
 
-  const avgRating=reviews.length?reviews.reduce((s,r)=>s+(r.rating||0),0)/reviews.length:null;
+  // overallScore is out of 10; convert to a 5-star scale for display.
+  const avgRating=reviews.length?reviews.reduce((s,r)=>s+((r.overallScore||0)/2),0)/reviews.length:null;
   const isSelf=currentAdminId&&userId&&currentAdminId===userId;
   const userModel=isAdmin?"Admin":isManager?"Manager":"User";
 
@@ -1275,14 +1276,20 @@ function AccountSummaryDrawer({
                       <div className="text-center py-8 text-[#993556] text-sm">No reviews yet</div>
                     ):reviews.map((r,i)=>(
                       <div key={i} className="p-3 rounded-xl border border-[#F4C0D1] bg-[#FBEAF0]">
-                        <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center justify-between mb-1.5 gap-2 flex-wrap">
                           <p className="text-xs font-semibold text-[#730042]">{r.reviewer?.f_name} {r.reviewer?.l_name}</p>
-                          <div className="flex gap-0.5">
-                            {[1,2,3,4,5].map((s)=>(
-                              <FaStar key={s} size={10} className={s<=r.rating?"text-yellow-400":"text-[#F4C0D1]"}/>
-                            ))}
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-[#730042]">{r.overallScore!=null?r.overallScore.toFixed(1):"–"}/10</span>
+                            {r.overallRating && <span className="text-[10px] text-[#993556]">· {r.overallRating}</span>}
                           </div>
                         </div>
+                        {(r.taskSubmission||r.behaviourEthics||r.attendance) && (
+                          <div className="flex flex-wrap gap-2 mb-1 text-[10px] text-[#993556]/80">
+                            {r.taskSubmission && <span>Task: {r.taskSubmission.percentage}% ({r.taskSubmission.rating})</span>}
+                            {r.behaviourEthics && <span>Behaviour: {r.behaviourEthics.score}/10</span>}
+                            {r.attendance && <span>Attendance: {r.attendance.percentage}%</span>}
+                          </div>
+                        )}
                         <p className="text-xs text-[#993556]">{r.comment}</p>
                         <p className="text-[10px] text-[#993556]/60 mt-1">{r.monthYear}</p>
                       </div>
