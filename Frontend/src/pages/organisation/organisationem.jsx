@@ -95,7 +95,18 @@ function Sk({ w, h, r = 8 }) {
   );
 }
 
-function Avatar({ name, size = 40, bg, color }) {
+function Avatar({ name, size = 40, bg, color, image }) {
+  const [errored, setErrored] = useState(false);
+  if (image && !errored) {
+    return (
+      <img
+        src={image}
+        alt={name}
+        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0, background: bg }}
+        onError={() => setErrored(true)}
+      />
+    );
+  }
   return (
     <div style={{ width: size, height: size, borderRadius: "50%", background: bg, color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0, fontFamily: "'Syne',sans-serif" }}>
       {initials(name)}
@@ -128,7 +139,7 @@ const CFG = {
 };
 const OFF = { accent: "#d4d4d8", avBg: "#f1f5f9", avColor: "#94a3b8", text: "#94a3b8", sub: "#c2c2c8" };
 
-function Card({ level, name, sub, empid, width = 172, delay = 0, dim, hl, chain, q, you = false, empCount }) {
+function Card({ level, name, sub, empid, width = 172, delay = 0, dim, hl, chain, q, you = false, empCount, image }) {
   const c = CFG[level] || CFG.emp;
   const accent  = chain ? c.accentOn  : OFF.accent;
   const avBg    = chain ? c.avBgOn    : OFF.avBg;
@@ -145,7 +156,7 @@ function Card({ level, name, sub, empid, width = 172, delay = 0, dim, hl, chain,
       >
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: you ? "linear-gradient(90deg,#730042,#CD166E)" : accent, borderRadius: "11px 11px 0 0" }} />
         {you && <div style={{ position: "absolute", top: -7, left: "50%", transform: "translateX(-50%)", fontSize: 7, fontWeight: 700, letterSpacing: "0.1em", padding: "2px 8px", borderRadius: 8, background: "#730042", color: "#fff", whiteSpace: "nowrap", fontFamily: "'DM Mono',monospace" }}>YOU</div>}
-        <Avatar name={name} size={38} bg={you ? "#fce7f3" : avBg} color={you ? "#730042" : avColor} />
+        <Avatar name={name} size={38} bg={you ? "#fce7f3" : avBg} color={you ? "#730042" : avColor} image={image} />
         <div style={{ marginTop: 8, marginBottom: 6, textAlign: "center", width: "100%" }}>
           <Hi text={name} q={q} style={{ fontSize: 12, fontWeight: 600, color: nameColor, display: "block", lineHeight: 1.3, fontFamily: "'Syne',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />
           {sub && <Hi text={sub} q={q} style={{ fontSize: 10, color: subColor, display: "block", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />}
@@ -259,6 +270,7 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, chainIds, isSubMgr = fa
         name={mgr.name}
         sub={mgr.designation || (mgr.department ? getDepartmentName(mgr.department) : undefined)}
         empid={mgr.empid}
+        image={mgr.profile_image}
         width={CARD_W}
         delay={mDelay}
         dim={dim(key)}
@@ -309,6 +321,7 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, chainIds, isSubMgr = fa
                   name={emp.name}
                   sub={emp.designation || (emp.department ? getDepartmentName(emp.department) : undefined)}
                   empid={emp.empid}
+                  image={emp.profile_image}
                   width={EMP_W}
                   delay={eDelay}
                   dim={dim(eKey)}
@@ -386,13 +399,13 @@ function OrgTree({ data, loading, q }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: "max-content" }}>
       <div style={{ animation: `scaleIn 0.26s ease 40ms forwards`, opacity: 0 }}>
-        <Card level="org" name={data.organisation_name || "Organisation"} sub={data.super_admin?.name} width={CARD_W} delay={0} dim={dim("org")} hl={matches.has("org")} chain={chainIds.has("org")} q={q} />
+        <Card level="org" name={data.organisation_name || "Organisation"} sub={data.super_admin?.name} image={data.organisation_logo} width={CARD_W} delay={0} dim={dim("org")} hl={matches.has("org")} chain={chainIds.has("org")} q={q} />
       </div>
       <VLine h={22} />
 
       {data.admin && (
         <>
-          <Card level="admin" name={data.admin.name} sub={data.admin.designation} empid={data.admin.empid} width={CARD_W} delay={80} dim={dim("admin")} hl={matches.has("admin")} chain={chainIds.has("admin")} q={q} />
+          <Card level="admin" name={data.admin.name} sub={data.admin.designation} empid={data.admin.empid} image={data.admin.profile_image} width={CARD_W} delay={80} dim={dim("admin")} hl={matches.has("admin")} chain={chainIds.has("admin")} q={q} />
           <VLine h={22} />
         </>
       )}
