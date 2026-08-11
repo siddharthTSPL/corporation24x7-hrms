@@ -14,6 +14,8 @@ import AttendanceModal from "./AttendanceModal";
 import AttendanceDetailsModal from "./AttendanceDetailsModal";
 import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus, isPastShiftEnd } from "../../pages/utils/attendance";
 import NotificationBell from "../../components/notifications/NotificationBell";
+import MyAssetsWidget from "../asset/MyAssetsWidget";
+import { useGetMyAssetsAdmin } from "../../auth/server-state/adminasset/adminasset.hook";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS = ["S","M","T","W","T","F","S"];
@@ -1324,6 +1326,10 @@ export default function Dashboard() {
               })}
             </div>
           )}
+        </div>
+
+        <div className="mt-3.5">
+          <MyAssetsWidget useMyAssets={useGetMyAssetsAdmin} title="My Assets" accent="#730042" />
         </div>
 
       </div>
