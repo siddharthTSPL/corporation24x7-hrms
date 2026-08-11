@@ -6,6 +6,8 @@ import { useGetAttendance } from "../../auth/server-state/employee/employeeother
 import { useCalendarMeta, useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
 import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus, isPastShiftEnd } from "../../pages/utils/attendance";
 import NotificationBell from "../../components/notifications/NotificationBell";
+import MyAssetsWidget from "../asset/MyAssetsWidget";
+import { useGetMyAssetsEmployee } from "../../auth/server-state/employee/employeeasset/employeeasset.hook";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS = ["S","M","T","W","T","F","S"];
@@ -981,7 +983,11 @@ export default function EmployeeDashboard() {
           </div>
         </div>
 
-     
+        {/* My Assets */}
+        <div className="grid grid-cols-1 gap-3.5 mb-3.5">
+          <MyAssetsWidget useMyAssets={useGetMyAssetsEmployee} title="My Assets" accent="#730042" />
+        </div>
+
       </div>
     </div>
   );
