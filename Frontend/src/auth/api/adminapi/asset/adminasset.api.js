@@ -22,6 +22,7 @@ export const getAssetByIdAdmin = async (id) => {
   return res.data;
 };
 
+
 export const updateAssetAdmin = async (id, data) => {
   const res = await api.put(`admin/assets/${id}`, data);
   return res.data;
