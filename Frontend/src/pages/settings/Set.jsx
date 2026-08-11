@@ -4,6 +4,8 @@ import { useEditAdminProfile, useChangeAdminPassword } from "../../auth/server-s
 import { uploadDocument } from "../../../src/auth/api/adminapi/document/addocument.api";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import { Country, State, City } from "country-state-city";
+import MyAssetsWidget from "../asset/MyAssetsWidget";
+import { useGetMyAssetsAdmin } from "../../auth/server-state/adminasset/adminasset.hook";
 
 const DEFAULT_COUNTRY_ISO = "IN";
 const AVATAR_STYLES = [
@@ -76,6 +78,7 @@ const TABS = [
   { key: "documents", label: "Documents & Banking" },
   { key: "leave",     label: "Leave Balance" },
   { key: "reviews",   label: "Reviews" },
+  { key: "assets",    label: "My Assets" },
   { key: "password",  label: "Password" },
   { key: "avatar",    label: "Avatar" },
 ];
@@ -846,6 +849,14 @@ function ReviewsTab({ reviews }) {
   );
 }
 
+function AssetsTab() {
+  return (
+    <SectionCard title="My Assets" subtitle="Items assigned to you by SuperAdmin" accent={C.brand}>
+      <MyAssetsWidget useMyAssets={useGetMyAssetsAdmin} title="Assigned to me" accent={C.brand} />
+    </SectionCard>
+  );
+}
+
 function PasswordTab({ onSuccess, onError }) {
   const { mutate, isPending } = useChangeAdminPassword();
   const [show, setShow] = useState(false);
@@ -1188,6 +1199,7 @@ export default function AdminSettingsPage() {
               {tab === "documents" && <DocumentsBankingTab adminData={adminData} onSuccess={showSuccess} onError={showError} />}
               {tab === "leave"     && <LeaveTab leaveBalance={leaveBalance} />}
               {tab === "reviews"   && <ReviewsTab reviews={reviews} />}
+              {tab === "assets"    && <AssetsTab />}
               {tab === "password"  && <PasswordTab onSuccess={showSuccess} onError={showError} />}
               {tab === "avatar"    && <AvatarTab adminData={adminData} onSuccess={showSuccess} onError={showError} />}
 
