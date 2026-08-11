@@ -73,4 +73,8 @@ managerrouter.get(
 // Help & Support form — no permission gate, every logged-in manager can reach support.
 managerrouter.post("/contact-support", managermiddleware, supportUpload.array("attachments", 5), asyncHandler(sendSupportRequest));
 
+// Assets assigned to the logged-in manager (Dashboard / Settings "My Assets" widget)
+const { getMyAssets } = require("../controllers/asset.controller");
+managerrouter.get("/my-assets", managermiddleware, asyncHandler(getMyAssets));
+
 module.exports = managerrouter;
