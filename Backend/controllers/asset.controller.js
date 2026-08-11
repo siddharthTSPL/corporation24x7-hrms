@@ -916,7 +916,77 @@ const getEmployeeAssetHistory = async (req, res, next) => {
   }
 };
 
+// Self-service: lets a logged-in Admin, Manager, or User fetch the list of
+// assets currently assigned to them (used by their own Dashboard/Settings
+// "My Assets" widget). Not for looking up someone else — that's getAssetsOfPerson.
+const getMyAssets = async (req, res, next) => {
+  try {
+    let person, person_model;
+    if (req.employee) {
+      person = req.employee;
+      person_model = "User";
+    } else if (req.manager) {
+      person = req.manager;
+      person_model = "Manager";
+    } else if (req.admin) {
+      person = req.admin;
+      person_model = "Admin";
+    } else {
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+    }
+
+    const organisation_id = person.organisation_id;
+
+    const assets = await AssetModel.find({
+      organisation_id,
+      assignments: {
+        $elemMatch: { assigned_to: person._id, assigned_to_model: person_model, is_returned: false },
+      },
+    })
+      .select("asset_id asset_name asset_type status serial_number brand model_number assignments")
+      .lean();
+
+    const myAssets = [];
+    assets.forEach((a) => {
+      (a.assignments || [])
+        .filter(
+          (x) =>
+            String(x.assigned_to) === String(person._id) &&
+            x.assigned_to_model === person_model &&
+            !x.is_returned
+        )
+        .forEach((x) => {
+          myAssets.push({
+            assignment_id: x._id,
+            asset_id: a._id,
+            asset_code: a.asset_id,
+            asset_name: a.asset_name,
+            asset_type: a.asset_type,
+            serial_number: a.serial_number,
+            brand: a.brand,
+            model_number: a.model_number,
+            asset_status: a.status,
+            quantity: x.quantity,
+            assigned_date: x.assigned_date,
+          });
+        });
+    });
+
+    myAssets.sort((a, b) => new Date(b.assigned_date) - new Date(a.assigned_date));
+
+    return res.status(200).json({
+      success: true,
+      total: myAssets.length,
+      total_units: myAssets.reduce((sum, x) => sum + x.quantity, 0),
+      assets: myAssets,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
+  getMyAssets,
   createAssetSuperAdmin,
   updateAssetSuperAdmin,
   assignAssetToAdminSuperAdmin,
