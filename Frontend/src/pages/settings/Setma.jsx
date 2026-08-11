@@ -4,6 +4,8 @@ import { useGetMeManager } from "../../auth/server-state/manager/managerauth/man
 import { uploadManagerDocument } from "../../../src/auth/api/managerapi/document/madocument.api";
 import { useUpdateProfile, useUpdatePassword } from "../../auth/server-state/manager/managgerother/managerother.hook";
 import { Country, State, City } from "country-state-city";
+import MyAssetsWidget from "../asset/MyAssetsWidget";
+import { useGetMyAssetsManager } from "../../auth/server-state/manager/managerasset/managerasset.hook";
 
 
 const DEFAULT_COUNTRY_ISO = "IN";
@@ -30,6 +32,7 @@ const SETTINGS_TABS = [
   { key: "identity", label: "Identity" },
   { key: "leave", label: "Leave Balance" },
   { key: "reviews", label: "Reviews" },
+  { key: "assets", label: "My Assets" },
   { key: "password", label: "Password" },
   { key: "avatar", label: "Avatar" },
 ];
@@ -375,6 +378,9 @@ function Sidebar({ tab, setTab, manager, initials }) {
     )},
     { key: "reviews", label: "Reviews", icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><polygon points="8,1.5 9.9,5.4 14,6 11,9 11.8,13.5 8,11.4 4.2,13.5 5,9 2,6 6.1,5.4" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/></svg>
+    )},
+    { key: "assets", label: "My Assets", icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="5" width="12" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M2 5l1.5-3h9L14 5" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><path d="M6 8h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
     )},
     { key: "password", label: "Password", icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="4" y="7" width="8" height="6" rx="2" stroke="currentColor" strokeWidth="1.4"/><path d="M6 7V5a2 2 0 0 1 4 0v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
@@ -1017,6 +1023,14 @@ function ReviewsTab({ reviews }) {
   );
 }
 
+function AssetsTab() {
+  return (
+    <SectionCard title="My Assets" subtitle="Items currently assigned to you" accent={C.brand}>
+      <MyAssetsWidget useMyAssets={useGetMyAssetsManager} title="Assigned to me" accent={C.brand} />
+    </SectionCard>
+  );
+}
+
 function PasswordTab({ onSuccess, onError }) {
   const updatePassword = useUpdatePassword();
   const [show, setShow] = useState(false);
@@ -1351,6 +1365,7 @@ export default function ManagerSettingsPage() {
             {tab === "documents" && <DocumentsBankingTab manager={manager} onSuccess={showSuccess} onError={showError} />}
             {tab === "leave"     && <LeaveTab     leaveBalance={leaveBalance} />}
             {tab === "reviews"   && <ReviewsTab   reviews={reviews} />}
+            {tab === "assets"    && <AssetsTab />}
             {tab === "password"  && <PasswordTab  onSuccess={showSuccess} onError={showError} />}
             {tab === "avatar"    && <AvatarTab    manager={manager} onSuccess={showSuccess} onError={showError} />}
 
