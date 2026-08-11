@@ -1,71 +1,149 @@
-import axios from 'axios';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  createAssetAdmin,
+  getAllAssetsAdmin,
+  getAssetByIdAdmin,
+  updateAssetAdmin,
+  deleteAssetAdmin,
+  assignAssetToEmployee,
+  assignAssetToManager,
+  revokeAssetAdmin,
+  getAssetsOfPersonAdmin,
+  getEmployeesWithAssetsAdmin,
+  getEmployeeAssetHistoryAdmin,
+  getMyAssetsAdmin,
+} from "../../api/adminapi/asset/adminasset.api";
 
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/',
-  withCredentials: true,
-});
-
-// ── Asset Management (Admin) ──────────────────────────────────────────────────
-
-export const createAssetAdmin = async (data) => {
-  const res = await api.post('admin/assets', data);
-  return res.data;
+export const useGetAllAssetsAdmin = (params) => {
+  return useQuery({
+    queryKey: ["admin-assets", params],
+    queryFn: () => getAllAssetsAdmin(params),
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
 };
 
-export const getAllAssetsAdmin = async (params) => {
-  const res = await api.get('admin/assets', { params });
-  return res.data;
+export const useGetAssetByIdAdmin = (id) => {
+  return useQuery({
+    queryKey: ["admin-asset", id],
+    queryFn: () => getAssetByIdAdmin(id),
+    enabled: !!id,
+    staleTime: 0,
+  });
 };
 
-export const getAssetByIdAdmin = async (id) => {
-  const res = await api.get(`admin/assets/${id}`);
-  return res.data;
+export const useGetAssetsOfPersonAdmin = (person_id, person_model) => {
+  return useQuery({
+    queryKey: ["admin-assets-person", person_id, person_model],
+    queryFn: () => getAssetsOfPersonAdmin(person_id, person_model),
+    enabled: !!person_id && !!person_model,
+    staleTime: 0,
+  });
 };
 
-export const updateAssetAdmin = async (id, data) => {
-  const res = await api.put(`admin/assets/${id}`, data);
-  return res.data;
+export const useGetEmployeesWithAssetsAdmin = () => {
+  return useQuery({
+    queryKey: ["admin-assets-employees"],
+    queryFn: () => getEmployeesWithAssetsAdmin(),
+    staleTime: 0,
+    refetchOnMount: true,
+  });
 };
 
-export const deleteAssetAdmin = async (id) => {
-  const res = await api.delete(`admin/assets/${id}`);
-  return res.data;
+export const useGetEmployeeAssetHistoryAdmin = (person_id, person_model) => {
+  return useQuery({
+    queryKey: ["admin-assets-employee-history", person_id, person_model],
+    queryFn: () => getEmployeeAssetHistoryAdmin(person_id, person_model),
+    enabled: !!person_id && !!person_model,
+    staleTime: 0,
+  });
 };
 
-export const assignAssetToEmployee = async (id, employee_id, quantity = 1) => {
-  const res = await api.patch(`admin/assets/${id}/assign-employee`, { employee_id, quantity });
-  return res.data;
+export const useGetMyAssetsAdmin = () => {
+  return useQuery({
+    queryKey: ["my-assets-admin"],
+    queryFn: () => getMyAssetsAdmin(),
+    staleTime: 60 * 1000,
+    retry: false,
+  });
 };
 
-export const assignAssetToManager = async (id, manager_id, quantity = 1) => {
-  const res = await api.patch(`admin/assets/${id}/assign-manager`, { manager_id, quantity });
-  return res.data;
+export const useCreateAssetAdmin = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createAssetAdmin,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-assets"] });
+    },
+  });
 };
 
-export const revokeAssetAdmin = async (id, data = {}) => {
-  const res = await api.patch(`admin/assets/${id}/revoke`, data);
-  return res.data;
+export const useUpdateAssetAdmin = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }) => updateAssetAdmin(id, data),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-assets"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-asset", id] });
+    },
+  });
 };
 
-export const getAssetsOfPersonAdmin = async (person_id, person_model) => {
-  const res = await api.get(`admin/assets/person/${person_id}/${person_model}`);
-  return res.data;
+export const useDeleteAssetAdmin = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteAssetAdmin,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-assets"] });
+    },
+  });
 };
 
-// List of employees/managers who currently hold at least one asset, with a summary count.
-export const getEmployeesWithAssetsAdmin = async () => {
-  const res = await api.get('admin/assets/employees');
-  return res.data;
+export const useAssignAssetToEmployee = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, employee_id, quantity }) =>
+      assignAssetToEmployee(id, employee_id, quantity),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-assets"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-asset", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-assets-employees"] });
+      queryClient.invalidateQueries({
+        queryKey: ["admin-assets-employee-history"],
+      });
+    },
+  });
 };
 
-// Full assign/revoke history (active + returned) for a single employee.
-export const getEmployeeAssetHistoryAdmin = async (person_id, person_model) => {
-  const res = await api.get(`admin/assets/employees/${person_id}/${person_model}/history`);
-  return res.data;
+export const useAssignAssetToManager = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, manager_id, quantity }) =>
+      assignAssetToManager(id, manager_id, quantity),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-assets"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-asset", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-assets-employees"] });
+      queryClient.invalidateQueries({
+        queryKey: ["admin-assets-employee-history"],
+      });
+    },
+  });
 };
 
-// Assets currently assigned to the logged-in admin themself (e.g. by SuperAdmin).
-export const getMyAssetsAdmin = async () => {
-  const res = await api.get('admin/my-assets');
-  return res.data;
+export const useRevokeAssetAdmin = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }) => revokeAssetAdmin(id, data),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-assets"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-asset", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-assets-person"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-assets-employees"] });
+      queryClient.invalidateQueries({
+        queryKey: ["admin-assets-employee-history"],
+      });
+    },
+  });
 };
