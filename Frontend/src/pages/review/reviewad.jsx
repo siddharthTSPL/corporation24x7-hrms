@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useFindAllManagerswithoutAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
-import { useReviewToManager } from "../../auth/server-state/adminother/adminother.hook";
+import { useReviewToManager, useGetAllReviews } from "../../auth/server-state/adminother/adminother.hook";
+import ReviewHistoryPanel from "./Reviewhistorypanel";
 
 const BRAND = {
   pink: "#8B1A4A",
@@ -160,6 +161,7 @@ export default function ReviewManager() {
   const [comment, setComment] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [view, setView] = useState("form");
 
   const assignedNum = Number(assignedDays);
   const actualNum = Number(actualDays);
@@ -238,6 +240,44 @@ export default function ReviewManager() {
           </p>
         </div>
 
+        <div className="flex justify-center gap-2 mb-6 sm:mb-8">
+          <button
+            type="button"
+            onClick={() => setView("form")}
+            className="py-2 px-4 rounded-full text-[13px] font-medium transition-all duration-200 border cursor-pointer"
+            style={{
+              background: view === "form" ? `linear-gradient(135deg, ${BRAND.maroon}, ${BRAND.pink})` : "#FFFFFF",
+              color: view === "form" ? "#FFFFFF" : BRAND.mutedText,
+              borderColor: view === "form" ? BRAND.pink : BRAND.cardBorder,
+            }}
+          >
+            Give Review
+          </button>
+          <button
+            type="button"
+            onClick={() => setView("history")}
+            className="py-2 px-4 rounded-full text-[13px] font-medium transition-all duration-200 border cursor-pointer"
+            style={{
+              background: view === "history" ? `linear-gradient(135deg, ${BRAND.maroon}, ${BRAND.pink})` : "#FFFFFF",
+              color: view === "history" ? "#FFFFFF" : BRAND.mutedText,
+              borderColor: view === "history" ? BRAND.pink : BRAND.cardBorder,
+            }}
+          >
+            Review History
+          </button>
+        </div>
+
+        {view === "history" && (
+          <ReviewHistoryPanel
+            useGetAllReviews={useGetAllReviews}
+            revieweeRoleModel="Manager"
+            revieweeLabel="Manager"
+            csvFilePrefix="manager-reviews"
+          />
+        )}
+
+        {view === "form" && (
+        <>
         {submitted && (
           <div
             className="p-4 rounded-xl border mb-6 flex items-center gap-3 text-sm"
@@ -524,6 +564,8 @@ export default function ReviewManager() {
             </div>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       <style>{`

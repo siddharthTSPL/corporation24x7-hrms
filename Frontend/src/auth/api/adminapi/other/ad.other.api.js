@@ -101,6 +101,11 @@ export const reviewToManager = async (data) => {
   return res.data;
 };
 
+export const getAllReviews = async (params = {}) => {
+  const res = await api.get("/admin/allreviews", { params });
+  return res.data;
+};
+
 export const getparticularEmployeeStats = async (id) => {
   const res = await api.get(`/admin/getperticularemployee/${id}`);
   return res.data;

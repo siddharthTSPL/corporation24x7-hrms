@@ -2,7 +2,9 @@ import React, { useState } from "react";
 import {
   useGetAllAdmins,
   useReviewToAdmin,
+  useGetAllReviews,
 } from "../../auth/server-state/superadmin/other/suother.hook";
+import ReviewHistoryPanel from "./Reviewhistorypanel";
 
 /* ─────────────────────────────────────────────
    BRAND TOKENS  
@@ -150,6 +152,7 @@ export default function ReviewAdmin() {
   const [comment,        setComment]        = useState("");
   const [submitted,      setSubmitted]      = useState(false);
   const [search,         setSearch]         = useState("");
+  const [view,           setView]           = useState("form");
 
   const filtered = admins.filter((a) =>
     getFullName(a).toLowerCase().includes(search.toLowerCase()) ||
@@ -224,6 +227,45 @@ export default function ReviewAdmin() {
           </p>
         </div>
 
+        {/* ── Form / History Toggle ── */}
+        <div className="flex justify-center gap-2 mb-8 sm:mb-12">
+          <button
+            type="button"
+            onClick={() => setView("form")}
+            className="py-2 px-4 rounded-full text-[13px] font-medium transition-all duration-200 border cursor-pointer"
+            style={{
+              background: view === "form" ? `linear-gradient(135deg,${BRAND.maroon},${BRAND.pink})` : "#FFFFFF",
+              color: view === "form" ? "#FFFFFF" : BRAND.mutedText,
+              borderColor: view === "form" ? BRAND.pink : BRAND.cardBorder,
+            }}
+          >
+            Give Review
+          </button>
+          <button
+            type="button"
+            onClick={() => setView("history")}
+            className="py-2 px-4 rounded-full text-[13px] font-medium transition-all duration-200 border cursor-pointer"
+            style={{
+              background: view === "history" ? `linear-gradient(135deg,${BRAND.maroon},${BRAND.pink})` : "#FFFFFF",
+              color: view === "history" ? "#FFFFFF" : BRAND.mutedText,
+              borderColor: view === "history" ? BRAND.pink : BRAND.cardBorder,
+            }}
+          >
+            Review History
+          </button>
+        </div>
+
+        {view === "history" && (
+          <ReviewHistoryPanel
+            useGetAllReviews={useGetAllReviews}
+            revieweeRoleModel="Admin"
+            revieweeLabel="Admin"
+            csvFilePrefix="admin-reviews"
+          />
+        )}
+
+        {view === "form" && (
+        <>
         {/* ── Success Toast ── */}
         {submitted && (
           <div className="bg-gradient-to-br from-[#EDD5E3] to-[#F5E8EF] border border-[#8B1A4A]/50 rounded-xl p-4 mb-7 flex items-center gap-3 text-[#2D0A1A] text-sm">
@@ -519,6 +561,8 @@ export default function ReviewAdmin() {
             </div>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       <style>{`

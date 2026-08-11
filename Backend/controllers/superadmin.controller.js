@@ -1860,6 +1860,26 @@ const reviewtoadmin = async (req, res, next) => {
   }
 };
 
+const getAllReviewsForSuperAdmin = async (req, res, next) => {
+  if (!req.superAdmin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const organisation_id = req.superAdmin._id;
+  const { revieweeRoleModel, monthYear } = req.query;
+
+  const filter = { organisation_id };
+  if (revieweeRoleModel) filter.revieweeRoleModel = revieweeRoleModel;
+  if (monthYear) filter.monthYear = monthYear;
+
+  const reviews = await Review.find(filter)
+    .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+    .populate({ path: "reviewee", select: "f_name l_name work_email role designation department" })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  res.status(200).json({ success: true, count: reviews.length, reviews });
+};
+
 const getTodayCheckins = async (req, res, next) => {
   const organisation_id = req.superAdmin._id;
 
@@ -2865,6 +2885,7 @@ module.exports = {
   updateAnnouncement,
   deleteAnnouncement,
   reviewtoadmin,
+  getAllReviewsForSuperAdmin,
   getTodayCheckins,
   getAttendanceOverview,
   getAttendanceHistory,
