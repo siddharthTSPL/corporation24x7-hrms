@@ -8,6 +8,8 @@ import { useGetMyLeavesManager } from "../../auth/server-state/manager/managerle
 import { useCalendarMeta, useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
 import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus, isPastShiftEnd } from "../../pages/utils/attendance";
 import NotificationBell from "../../components/notifications/NotificationBell";
+import MyAssetsWidget from "../asset/MyAssetsWidget";
+import { useGetMyAssetsManager } from "../../auth/server-state/manager/managerasset/managerasset.hook";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS   = ["S","M","T","W","T","F","S"];
@@ -1432,7 +1434,9 @@ export default function ManagerDashboard() {
         </div>
       </div>
 
-    
+      <div style={{ marginTop: 14 }}>
+        <MyAssetsWidget useMyAssets={useGetMyAssetsManager} title="My Assets" accent="#2563eb" />
+      </div>
 
     </div>
   );
