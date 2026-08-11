@@ -38,6 +38,7 @@ const {
   updateAnnouncement,
   deleteAnnouncement,
   reviewtoadmin,
+  getAllReviewsForSuperAdmin,
   getTodayCheckins,
   getAttendanceOverview,
   getAttendanceHistory,
@@ -202,6 +203,12 @@ superAdminRouter.post(
   "/reviewtoadmin",
   superAdminAuth,
   asyncHandler(reviewtoadmin),
+);
+
+superAdminRouter.get(
+  "/allreviews",
+  superAdminAuth,
+  asyncHandler(getAllReviewsForSuperAdmin),
 );
 superAdminRouter.get(
   "/gettodaycheckins",

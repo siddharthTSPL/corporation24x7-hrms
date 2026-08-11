@@ -44,6 +44,7 @@ const {
   updateAnnouncement,
   deleteAnnouncement,
   reviewtomanager,
+  getAllReviewsForAdmin,
   forgetpasswordloginotp,
   verifyAotp,
   resetAdminPassword,
@@ -257,6 +258,12 @@ adminrouter.post(
   "/reviewtomanager",
   adminauthmiddleware,
   asyncHandler(reviewtomanager),
+);
+
+adminrouter.get(
+  "/allreviews",
+  adminauthmiddleware,
+  asyncHandler(getAllReviewsForAdmin),
 );
 
 adminrouter.get(

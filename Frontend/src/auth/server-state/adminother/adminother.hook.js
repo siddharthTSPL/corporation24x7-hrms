@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  getAllEmployee, getMyTeamOverview, getParticularEmployee, deleteUser, getEmployeeStats, reviewToManager,
+  getAllEmployee, getMyTeamOverview, getParticularEmployee, deleteUser, getEmployeeStats, reviewToManager, getAllReviews,
   editEmployee, editManager, getparticularEmployeeStats, getParticularManager,
   getTodayCheckins, getAttendanceOverview, getEmployeeAttendanceHistory, getOrgInfo, changeManagerRole, demoteManagerToEmployee,
   demoteAdminToManager, demoteAdminToEmployee, promoteEmployeeToManager,
@@ -180,6 +180,16 @@ export const useChangeManagerRole = () => {
 
 export const useReviewToManager = () => {
   return useMutation({ mutationFn: reviewToManager });
+};
+
+export const useGetAllReviews = (params = {}) => {
+  return useQuery({
+    queryKey: ["allReviews", params],
+    queryFn: () => getAllReviews(params),
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
 };
 
 export const useGetEmployeeStats = () => {
