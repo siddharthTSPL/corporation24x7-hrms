@@ -4,6 +4,8 @@ import { useUpdateProfile, useUpdatePassword, useGetMeUser } from "../../auth/se
 import { uploadDocument } from "../../../src/auth/api/employeeapi/other/em.other.api";
 import { useQueryClient } from "@tanstack/react-query";
 import { Country, State, City } from "country-state-city";
+import MyAssetsWidget from "../asset/MyAssetsWidget";
+import { useGetMyAssetsEmployee } from "../../auth/server-state/employee/employeeasset/employeeasset.hook";
 
 const DEFAULT_COUNTRY_ISO = "IN";
 const ALL_COUNTRIES = Country.getAllCountries();
@@ -29,6 +31,7 @@ const SETTINGS_TABS = [
   { key: "documents", label: "Documents & Banking" },
   { key: "leave", label: "Leave Balance" },
   { key: "reviews", label: "Reviews" },
+  { key: "assets", label: "My Assets" },
   { key: "password", label: "Password" },
   { key: "avatar", label: "Avatar" },
 ];
@@ -1011,6 +1014,14 @@ function ReviewsTab({ reviews }) {
   );
 }
 
+function AssetsTab() {
+  return (
+    <SectionCard title="My Assets" subtitle="Items currently assigned to you by your admin" accent={C.brand}>
+      <MyAssetsWidget useMyAssets={useGetMyAssetsEmployee} title="Assigned to me" accent={C.brand} />
+    </SectionCard>
+  );
+}
+
 function PasswordTab({ onSuccess, onError }) {
   const updatePassword = useUpdatePassword();
   const [show, setShow] = useState(false);
@@ -1342,6 +1353,7 @@ export default function EmployeeSettingsPage() {
             {tab === "documents" && <DocumentsBankingTab employee={employee} onSuccess={showSuccess} onError={showError} />}
             {tab === "leave"     && <LeaveTab     leaveBalance={leaveBalance} />}
             {tab === "reviews"   && <ReviewsTab   reviews={reviews} />}
+            {tab === "assets"    && <AssetsTab />}
             {tab === "password"  && <PasswordTab  onSuccess={showSuccess} onError={showError} />}
             {tab === "avatar"    && <AvatarTab    employee={employee} onSuccess={showSuccess} onError={showError} />}
 
