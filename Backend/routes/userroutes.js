@@ -39,6 +39,8 @@ const {
   getPersonalDocuments
 } = require("../controllers/user.controller");
 
+const { getMyAssets } = require("../controllers/asset.controller");
+
 const {
   uploadDocument,
   getDocuments,
@@ -84,6 +86,9 @@ userrouter.get("/getTicketDetail/:ticketNumber", employeemiddleware, checkPermis
 
 userrouter.get("/getExpenseDocuments", employeemiddleware, checkPermission("documents.can_view_all_documents"), asyncHandler(getExpenseDocuments));
 userrouter.get("/getPersonalDocuments", employeemiddleware, checkPermission("documents.can_view_all_documents"), asyncHandler(getPersonalDocuments));
+
+// Assets assigned to the logged-in employee (Dashboard / Settings "My Assets" widget)
+userrouter.get("/my-assets", employeemiddleware, asyncHandler(getMyAssets));
 
 // Help & Support form — no permission gate, every logged-in employee can reach support.
 userrouter.post("/contact-support", employeemiddleware, supportUpload.array("attachments", 5), asyncHandler(sendSupportRequest));
