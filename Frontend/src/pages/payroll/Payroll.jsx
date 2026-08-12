@@ -1520,8 +1520,32 @@ function RecordsTab({ notify, directory }) {
 }
 
 
+const TAB_ICONS = {
+  schedule: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="3" stroke="currentColor" strokeWidth="2"/><path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+  ),
+  statutory: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3l8 4v5c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V7l8-4z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+  ),
+  components: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="2"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="2"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="2"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="2"/></svg>
+  ),
+  claims: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M7 3h8l4 4v14H7V3z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="M9 12h6M9 16h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+  ),
+  structures: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 20V10M9 20V4M15 20v-7M21 20V8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+  ),
+  generate: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+  ),
+  records: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 4h16v16H4V4z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="M8 9h8M8 13h8M8 17h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+  ),
+};
+
 export default function Payroll() {
-  const [tab, setTab] = useState("policy");
+  const [tab, setTab] = useState(TABS[0].key);
   const [toast, setToast] = useState({ message: "", type: "" });
   const notify = (message, type = "success") => setToast({ message, type });
   const directory = useEmployeeDirectory();
@@ -1534,35 +1558,65 @@ export default function Payroll() {
       <style>{`
         @keyframes payroll-spin { to { transform: rotate(360deg); } }
         @keyframes payroll-slideIn { from { transform: translateX(12px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes payroll-fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
       <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: "", type: "" })} />
 
       <div className="max-w-[1200px] mx-auto min-w-0">
-        <div className="mb-5">
-          <h1 className="text-lg sm:text-xl lg:text-[22px]" style={{ fontWeight: 700, margin: 0, color: C.text }}>Payroll</h1>
-          <p style={{ fontSize: 13, color: C.muted, marginTop: 3, marginBottom: 0 }}>Configure policy, manage salary structures, and generate payslips</p>
+        <div className="mb-6 flex items-center gap-3">
+          <div
+            style={{
+              width: 42, height: 42, borderRadius: 12, flexShrink: 0,
+              background: `linear-gradient(135deg, ${C.brand}, ${C.brandDark})`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: `0 6px 16px -6px ${C.brand}88`,
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-lg sm:text-xl lg:text-[22px]" style={{ fontWeight: 800, margin: 0, color: C.text, letterSpacing: -0.3 }}>Payroll</h1>
+            <p style={{ fontSize: 13, color: C.muted, marginTop: 2, marginBottom: 0 }}>Configure policy, manage salary structures, and generate payslips</p>
+          </div>
         </div>
 
-        <div className="flex gap-1.5 mb-5 flex-wrap overflow-x-auto" style={{ borderBottom: `1px solid ${C.border}` }}>
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className="whitespace-nowrap"
-              style={{
-                padding: "9px 14px", border: "none", background: "none", cursor: "pointer",
-                fontSize: 13, fontWeight: 700, fontFamily: "inherit",
-                color: tab === t.key ? C.brandDark : C.muted,
-                borderBottom: tab === t.key ? `2.5px solid ${C.brand}` : "2.5px solid transparent",
-                marginBottom: -1,
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div
+          className="flex gap-1.5 mb-6 flex-wrap overflow-x-auto"
+          style={{
+            background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14,
+            padding: 6, boxShadow: "0 1px 2px rgba(42,26,22,0.04)",
+          }}
+        >
+          {TABS.map((t) => {
+            const active = tab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className="whitespace-nowrap flex items-center gap-1.5"
+                style={{
+                  padding: "9px 14px", border: "none", cursor: "pointer",
+                  fontSize: 13, fontWeight: 700, fontFamily: "inherit",
+                  borderRadius: 10,
+                  color: active ? "#fff" : C.muted,
+                  background: active ? `linear-gradient(135deg, ${C.brand}, ${C.brandDark})` : "transparent",
+                  boxShadow: active ? `0 4px 12px -4px ${C.brand}99` : "none",
+                  transition: "background .18s, color .18s, box-shadow .18s",
+                }}
+                onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = C.brandLight; }}
+                onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}
+              >
+                <span style={{ display: "flex", opacity: active ? 1 : 0.7 }}>{TAB_ICONS[t.key]}</span>
+                {t.label}
+              </button>
+            );
+          })}
         </div>
 
+        <div key={tab} style={{ animation: "payroll-fadeUp .22s ease" }}>
         {tab === "schedule" && <PayScheduleTab notify={notify} />}
         {tab === "statutory" && <StatutoryTab notify={notify} />}
         {tab === "components" && <ComponentsTab notify={notify} />}
@@ -1570,6 +1624,7 @@ export default function Payroll() {
         {tab === "structures" && <StructuresTab notify={notify} directory={directory} />}
         {tab === "generate" && <GenerateTab notify={notify} directory={directory} />}
         {tab === "records" && <RecordsTab notify={notify} directory={directory} />}
+        </div>
       </div>
     </div>
   );
