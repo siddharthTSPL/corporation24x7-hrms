@@ -6,6 +6,8 @@ import {
   useAddPayrollAllowance,
   useUpdatePayrollAllowance,
   useRemovePayrollAllowance,
+  useGetPaySchedule,
+  useSetPaySchedule,
   useListSalaryStructures,
   useSetEmployeeCTC,
   useReapplyPolicy,
@@ -40,6 +42,7 @@ const C = {
 };
 
 const TABS = [
+  { key: "schedule", label: "Pay Schedule" },
   { key: "policy", label: "Payroll Policy" },
   { key: "structures", label: "Salary Structures" },
   { key: "generate", label: "Generate Payroll" },
@@ -52,6 +55,11 @@ const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+function daysInMonthClient(month, year) {
+  return new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate();
+}
 
 function fmtINR(n) {
   const num = Number(n) || 0;
@@ -284,6 +292,152 @@ function resolveName(directory, id, fallbackModel) {
   const person = directory.byId.get(String(id));
   if (person) return `${person.name} (${person.uid})`;
   return `${MODEL_LABEL[fallbackModel] || fallbackModel} — ${String(id).slice(-6)}`;
+}
+
+
+function PayScheduleTab({ notify }) {
+  const { data, isLoading } = useGetPaySchedule();
+  const { mutate: save, isPending: saving } = useSetPaySchedule();
+
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState(null);
+
+  useEffect(() => {
+    if (data?.paySchedule) setForm(JSON.parse(JSON.stringify(data.paySchedule)));
+  }, [data]);
+
+  if (isLoading || !form) {
+    return <Card title="Pay Schedule"><div className="flex items-center gap-2" style={{ color: C.muted, fontSize: 13 }}><Spinner size={14} color={C.brand} /> Loading pay schedule…</div></Card>;
+  }
+
+  const locked = !!data?.paySchedule?.locked;
+
+  const toggleWorkingDay = (day) => {
+    setForm((prev) => {
+      const has = prev.workingDays.includes(day);
+      const workingDays = has ? prev.workingDays.filter((d) => d !== day) : [...prev.workingDays, day];
+      return { ...prev, workingDays };
+    });
+  };
+
+  const handleSave = () => {
+    save(
+      {
+        workingDays: form.workingDays,
+        payDay: Number(form.payDay),
+        firstPayPeriodMonth: form.firstPayPeriodMonth ? Number(form.firstPayPeriodMonth) : undefined,
+        firstPayPeriodYear: form.firstPayPeriodYear ? Number(form.firstPayPeriodYear) : undefined,
+        firstPayDate: form.firstPayDate || undefined,
+        noOfWorkingDays: Number(form.noOfWorkingDays),
+      },
+      {
+        onSuccess: () => {
+          notify("Pay Schedule saved", "success");
+          setEditing(false);
+        },
+        onError: (e) => notify(getErrorMessage(e), "error"),
+      }
+    );
+  };
+
+  return (
+    <Card
+      title="Pay Schedule"
+      subtitle="Fixed, organisation-wide payroll run schedule"
+      right={
+        !locked && (
+          editing ? (
+            <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+              <GhostButton onClick={() => { setForm(JSON.parse(JSON.stringify(data.paySchedule))); setEditing(false); }} className="flex-1 sm:flex-none justify-center">Cancel</GhostButton>
+              <PrimaryButton onClick={handleSave} loading={saving} className="flex-1 sm:flex-none">Save Schedule</PrimaryButton>
+            </div>
+          ) : (
+            <GhostButton onClick={() => setEditing(true)}>Edit</GhostButton>
+          )
+        )
+      }
+    >
+      {locked && (
+        <div style={{ background: C.amberBg, border: `1px solid #ecd6a8`, borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12.5, color: "#7a5710" }}>
+          <strong>Note:</strong> Pay Schedule cannot be edited once you process the first pay run.
+        </div>
+      )}
+
+      {!editing ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+          <div>
+            <p style={{ fontSize: 11.5, color: C.muted, marginBottom: 3 }}>Pay Frequency</p>
+            <p style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: 0 }}>{form.payFrequency || "Monthly"}</p>
+          </div>
+          <div>
+            <p style={{ fontSize: 11.5, color: C.muted, marginBottom: 3 }}>Working Days</p>
+            <p style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: 0 }}>{(form.workingDays || []).join(", ") || "—"}</p>
+          </div>
+          <div>
+            <p style={{ fontSize: 11.5, color: C.muted, marginBottom: 3 }}>Pay Day</p>
+            <p style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: 0 }}>{form.payDay ? `${form.payDay}${["th","st","nd","rd"][(form.payDay % 10 > 3 || Math.floor(form.payDay/10) === 1) ? 0 : form.payDay % 10]} of every month` : "—"}</p>
+          </div>
+          <div>
+            <p style={{ fontSize: 11.5, color: C.muted, marginBottom: 3 }}>No. of Working Days</p>
+            <p style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: 0 }}>{form.noOfWorkingDays ?? "—"}</p>
+          </div>
+          <div>
+            <p style={{ fontSize: 11.5, color: C.muted, marginBottom: 3 }}>First Pay Period</p>
+            <p style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: 0 }}>
+              {form.firstPayPeriodMonth ? `${MONTH_NAMES[form.firstPayPeriodMonth - 1]} ${form.firstPayPeriodYear || ""}` : "Not set"}
+            </p>
+          </div>
+          <div>
+            <p style={{ fontSize: 11.5, color: C.muted, marginBottom: 3 }}>First Pay Date</p>
+            <p style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: 0 }}>
+              {form.firstPayDate ? new Date(form.firstPayDate).toLocaleDateString("en-IN") : "Not set"}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <Field label="Working Days" hint="Days counted as working days each week">
+            <div className="flex items-center gap-2 flex-wrap">
+              {WEEKDAYS.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => toggleWorkingDay(d)}
+                  style={{
+                    padding: "6px 12px", borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+                    border: `1px solid ${form.workingDays.includes(d) ? C.brand : C.border}`,
+                    background: form.workingDays.includes(d) ? C.brandLight : "#fff",
+                    color: form.workingDays.includes(d) ? C.brandDark : C.muted,
+                  }}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Pay Day" hint="Day of month payroll is paid out">
+            <TextInput type="number" min={1} max={31} value={form.payDay ?? 1} onChange={(e) => setForm((p) => ({ ...p, payDay: e.target.value }))} />
+          </Field>
+          <Field label="No. of Working Days" hint="Fixed denominator used for per-day rate / LOP math, e.g. 30">
+            <TextInput type="number" min={1} max={31} value={form.noOfWorkingDays ?? 30} onChange={(e) => setForm((p) => ({ ...p, noOfWorkingDays: e.target.value }))} />
+          </Field>
+          <div />
+          <Field label="First Pay Period Month">
+            <Select value={form.firstPayPeriodMonth || ""} onChange={(e) => setForm((p) => ({ ...p, firstPayPeriodMonth: e.target.value }))}>
+              <option value="">Not set</option>
+              {MONTH_NAMES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+            </Select>
+          </Field>
+          <Field label="First Pay Period Year">
+            <TextInput type="number" value={form.firstPayPeriodYear || ""} onChange={(e) => setForm((p) => ({ ...p, firstPayPeriodYear: e.target.value }))} placeholder="e.g. 2026" />
+          </Field>
+          <Field label="First Pay Date">
+            <TextInput type="date" value={form.firstPayDate ? String(form.firstPayDate).slice(0, 10) : ""} onChange={(e) => setForm((p) => ({ ...p, firstPayDate: e.target.value }))} />
+          </Field>
+        </div>
+      )}
+    </Card>
+  );
 }
 
 
@@ -646,10 +800,15 @@ function GenerateTab({ notify, directory }) {
   const now = new Date();
   const { mutate: generate, isPending: generating } = useGeneratePayroll();
   const { mutate: bulkGenerate, isPending: bulkGenerating } = useBulkGeneratePayroll();
+  const { data: scheduleData } = useGetPaySchedule();
+  const scheduleWorkingDays = scheduleData?.paySchedule?.noOfWorkingDays || 30;
 
   const [single, setSingle] = useState({
     employeeModel: "User", employee: "", month: now.getMonth() + 1, year: now.getFullYear(),
-    bonus: "", incentive: "", overtime: "", otherEarnings: "", loan: "", advance: "", otherDeductions: "", remarks: "", force: false,
+    calendarDays: String(daysInMonthClient(now.getMonth() + 1, now.getFullYear())),
+    workingDays: String(scheduleWorkingDays),
+    paidDays: "",
+    bonus: "", incentive: "", overtime: "", reimbursement: "", otherEarnings: "", loan: "", advance: "", otherDeductions: "", remarks: "", force: false,
   });
   const [bulk, setBulk] = useState({ employeeModel: "User", month: now.getMonth() + 1, year: now.getFullYear(), force: false });
   const [singleResult, setSingleResult] = useState(null);
@@ -659,9 +818,27 @@ function GenerateTab({ notify, directory }) {
 
   const numOrUndef = (v) => (v === "" || v === null || v === undefined ? undefined : Number(v));
 
+  // Keep Calendar/Working Days sensible defaults when month/year change,
+  // unless the admin already typed something different in by hand.
+  const handleMonthYear = (field, value) => {
+    setSingle((p) => {
+      const next = { ...p, [field]: value };
+      const cd = daysInMonthClient(next.month, next.year);
+      return { ...next, calendarDays: String(cd), workingDays: p.workingDays || String(scheduleWorkingDays) };
+    });
+  };
+
+  const lopDaysPreview = (() => {
+    const wd = Number(single.workingDays);
+    const pd = Number(single.paidDays);
+    if (!wd || single.paidDays === "" || Number.isNaN(pd)) return null;
+    return Math.max(0, Math.round((wd - pd) * 100) / 100);
+  })();
+
   const handleSingle = (e) => {
     e.preventDefault();
     if (!single.employee) return notify("Select an employee", "error");
+    if (single.paidDays === "" || single.paidDays === null) return notify("Enter Paid Days for this month", "error");
     setSingleResult(null);
     generate(
       {
@@ -669,9 +846,13 @@ function GenerateTab({ notify, directory }) {
         employeeModel: single.employeeModel,
         month: Number(single.month),
         year: Number(single.year),
+        paidDays: Number(single.paidDays),
+        workingDays: numOrUndef(single.workingDays),
+        calendarDays: numOrUndef(single.calendarDays),
         bonus: numOrUndef(single.bonus),
         incentive: numOrUndef(single.incentive),
         overtime: numOrUndef(single.overtime),
+        reimbursement: numOrUndef(single.reimbursement),
         otherEarnings: numOrUndef(single.otherEarnings),
         loan: numOrUndef(single.loan),
         advance: numOrUndef(single.advance),
@@ -706,58 +887,83 @@ function GenerateTab({ notify, directory }) {
 
   return (
     <>
-      <Card title="Generate Payroll — Single Employee" subtitle="Requires a salary structure (set CTC first) and pulls the employee's attendance summary for the month">
-        <form onSubmit={handleSingle} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
-          <Field label="Employee Type">
-            <Select value={single.employeeModel} onChange={(e) => setSingle((p) => ({ ...p, employeeModel: e.target.value, employee: "" }))}>
-              {MODELS.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
-            </Select>
-          </Field>
-          <Field label="Employee">
-            <Select value={single.employee} onChange={(e) => setSingle((p) => ({ ...p, employee: e.target.value }))}>
-              <option value="">Select employee</option>
-              {people.map((p) => <option key={p._id} value={p._id}>{p.name} ({p.uid})</option>)}
-            </Select>
-          </Field>
-          <Field label="Month">
-            <Select value={single.month} onChange={(e) => setSingle((p) => ({ ...p, month: e.target.value }))}>
-              {MONTH_NAMES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-            </Select>
-          </Field>
-          <Field label="Year">
-            <TextInput type="number" value={single.year} onChange={(e) => setSingle((p) => ({ ...p, year: e.target.value }))} />
-          </Field>
-          <Field label="Bonus (₹)"><TextInput type="number" min={0} value={single.bonus} onChange={(e) => setSingle((p) => ({ ...p, bonus: e.target.value }))} /></Field>
-          <Field label="Incentive (₹)"><TextInput type="number" min={0} value={single.incentive} onChange={(e) => setSingle((p) => ({ ...p, incentive: e.target.value }))} /></Field>
-          <Field label="Overtime (₹)"><TextInput type="number" min={0} value={single.overtime} onChange={(e) => setSingle((p) => ({ ...p, overtime: e.target.value }))} /></Field>
-          <Field label="Other Earnings (₹)"><TextInput type="number" min={0} value={single.otherEarnings} onChange={(e) => setSingle((p) => ({ ...p, otherEarnings: e.target.value }))} /></Field>
-          <Field label="Loan Deduction (₹)"><TextInput type="number" min={0} value={single.loan} onChange={(e) => setSingle((p) => ({ ...p, loan: e.target.value }))} /></Field>
-          <Field label="Advance Deduction (₹)"><TextInput type="number" min={0} value={single.advance} onChange={(e) => setSingle((p) => ({ ...p, advance: e.target.value }))} /></Field>
-          <Field label="Other Deductions (₹)"><TextInput type="number" min={0} value={single.otherDeductions} onChange={(e) => setSingle((p) => ({ ...p, otherDeductions: e.target.value }))} /></Field>
-          <Field label="Remarks"><TextInput value={single.remarks} onChange={(e) => setSingle((p) => ({ ...p, remarks: e.target.value }))} /></Field>
+      <Card title="Generate Payroll — Single Employee" subtitle="Requires a salary structure (set CTC first). Enter Paid Days by hand each month — no auto attendance pull, no email sent.">
+        <form onSubmit={handleSingle}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end mb-5">
+            <Field label="Employee Type">
+              <Select value={single.employeeModel} onChange={(e) => setSingle((p) => ({ ...p, employeeModel: e.target.value, employee: "" }))}>
+                {MODELS.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
+              </Select>
+            </Field>
+            <Field label="Employee">
+              <Select value={single.employee} onChange={(e) => setSingle((p) => ({ ...p, employee: e.target.value }))}>
+                <option value="">Select employee</option>
+                {people.map((p) => <option key={p._id} value={p._id}>{p.name} ({p.uid})</option>)}
+              </Select>
+            </Field>
+            <Field label="Month">
+              <Select value={single.month} onChange={(e) => handleMonthYear("month", e.target.value)}>
+                {MONTH_NAMES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+              </Select>
+            </Field>
+            <Field label="Year">
+              <TextInput type="number" value={single.year} onChange={(e) => handleMonthYear("year", e.target.value)} />
+            </Field>
+          </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <p style={{ fontSize: 12.5, fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 10 }}>Attendance</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 items-end mb-5 pb-5" style={{ borderBottom: `1px dashed ${C.border}` }}>
+            <Field label="Calendar Days" hint="Days in the month">
+              <TextInput type="number" min={1} max={31} value={single.calendarDays} onChange={(e) => setSingle((p) => ({ ...p, calendarDays: e.target.value }))} />
+            </Field>
+            <Field label="Working Days" hint="From Pay Schedule">
+              <TextInput type="number" min={1} max={31} value={single.workingDays} onChange={(e) => setSingle((p) => ({ ...p, workingDays: e.target.value }))} />
+            </Field>
+            <Field label="Paid Days" hint="Kitne din present — manual entry">
+              <TextInput type="number" min={0} step="0.5" value={single.paidDays} onChange={(e) => setSingle((p) => ({ ...p, paidDays: e.target.value }))} placeholder="e.g. 27" required />
+            </Field>
+            <Field label="LOP Days" hint="Auto-calculated">
+              <div style={{ ...inputStyle, background: "#f7f3f1", color: C.muted, display: "flex", alignItems: "center" }}>
+                {lopDaysPreview === null ? "—" : lopDaysPreview}
+              </div>
+            </Field>
+          </div>
+
+          <p style={{ fontSize: 12.5, fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 10 }}>Earnings &amp; Deductions (this month only)</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
+            <Field label="Bonus (₹)"><TextInput type="number" min={0} value={single.bonus} onChange={(e) => setSingle((p) => ({ ...p, bonus: e.target.value }))} /></Field>
+            <Field label="Incentive (₹)"><TextInput type="number" min={0} value={single.incentive} onChange={(e) => setSingle((p) => ({ ...p, incentive: e.target.value }))} /></Field>
+            <Field label="Overtime (₹)"><TextInput type="number" min={0} value={single.overtime} onChange={(e) => setSingle((p) => ({ ...p, overtime: e.target.value }))} /></Field>
+            <Field label="Reimbursement (₹)"><TextInput type="number" min={0} value={single.reimbursement} onChange={(e) => setSingle((p) => ({ ...p, reimbursement: e.target.value }))} /></Field>
+            <Field label="Other Earnings (₹)"><TextInput type="number" min={0} value={single.otherEarnings} onChange={(e) => setSingle((p) => ({ ...p, otherEarnings: e.target.value }))} /></Field>
+            <Field label="Loan EMI (₹)"><TextInput type="number" min={0} value={single.loan} onChange={(e) => setSingle((p) => ({ ...p, loan: e.target.value }))} /></Field>
+            <Field label="Advance Deduction (₹)"><TextInput type="number" min={0} value={single.advance} onChange={(e) => setSingle((p) => ({ ...p, advance: e.target.value }))} /></Field>
+            <Field label="Other Deduction (₹)"><TextInput type="number" min={0} value={single.otherDeductions} onChange={(e) => setSingle((p) => ({ ...p, otherDeductions: e.target.value }))} /></Field>
+            <Field label="Remarks"><TextInput value={single.remarks} onChange={(e) => setSingle((p) => ({ ...p, remarks: e.target.value }))} /></Field>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap mt-4">
             <input id="single-force" type="checkbox" checked={single.force} onChange={(e) => setSingle((p) => ({ ...p, force: e.target.checked }))} />
             <label htmlFor="single-force" style={{ fontSize: 12.5, color: C.muted }}>Force overwrite if approved/paid</label>
           </div>
 
-          <PrimaryButton type="submit" loading={generating}>Generate Payroll</PrimaryButton>
+          <PrimaryButton type="submit" loading={generating} className="mt-4">Generate Payroll</PrimaryButton>
         </form>
 
         {singleResult && (
           <div className="mt-4 pt-4" style={{ borderTop: `1px dashed ${C.border}` }}>
             <div className="flex flex-wrap gap-x-8 gap-y-2">
-              <span style={{ fontSize: 13 }}><strong>Gross:</strong> {fmtINR(singleResult.earnings?.gross)}</span>
+              <span style={{ fontSize: 13 }}><strong>Gross Earnings:</strong> {fmtINR(singleResult.earnings?.gross)}</span>
               <span style={{ fontSize: 13 }}><strong>Total Earnings:</strong> {fmtINR(singleResult.earnings?.totalEarnings)}</span>
               <span style={{ fontSize: 13 }}><strong>Total Deductions:</strong> {fmtINR(singleResult.deductions?.totalDeductions)}</span>
-              <span style={{ fontSize: 13.5, fontWeight: 700, color: C.brandDark }}><strong>Net Salary:</strong> {fmtINR(singleResult.netSalary)}</span>
+              <span style={{ fontSize: 13.5, fontWeight: 700, color: C.brandDark }}><strong>Net Pay:</strong> {fmtINR(singleResult.netSalary)}</span>
               {statusBadge(singleResult.status)}
             </div>
           </div>
         )}
       </Card>
 
-      <Card title="Bulk Generate — Whole Organisation" subtitle="Generates payroll for every active employee (of the chosen type) who already has a salary structure">
+      <Card title="Bulk Generate — Whole Organisation" subtitle="Generates payroll for every active employee (of the chosen type) who already has a salary structure, using their attendance summary for the month">
         <form onSubmit={handleBulk} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
           <Field label="Employee Type">
             <Select value={bulk.employeeModel} onChange={(e) => setBulk((p) => ({ ...p, employeeModel: e.target.value }))}>
@@ -799,8 +1005,34 @@ function GenerateTab({ notify, directory }) {
 }
 
 
+function PayslipRow({ label, value, bold }) {
+  return (
+    <>
+      <span style={{ fontSize: bold ? 13 : 12.5, color: bold ? C.text : C.muted, fontWeight: bold ? 700 : 400 }} className="break-words">{label}</span>
+      <span style={{ fontSize: bold ? 13 : 13, fontWeight: bold ? 700 : 400, textAlign: "right" }}>{value}</span>
+    </>
+  );
+}
+
+function PayslipSection({ title, children }) {
+  return (
+    <div className="mb-4 pt-3" style={{ borderTop: `1px dashed ${C.border}` }}>
+      <p style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>{title}</p>
+      <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1.5">{children}</div>
+    </div>
+  );
+}
+
 function PayslipModal({ payroll, directory, onClose }) {
   if (!payroll) return null;
+  const snap = payroll.employeeSnapshot || {};
+  const person = directory.byId.get(String(payroll.employee));
+  const name = snap.name || person?.name || resolveName(directory, payroll.employee, payroll.employeeModel);
+  const employeeId = snap.employeeId || person?.uid || "—";
+  const department = snap.department || "—";
+  const designation = snap.designation || "—";
+  const att = payroll.attendance || {};
+
   return (
     <div className="fixed inset-0 z-[998] flex items-center justify-center p-3 sm:p-4 overscroll-contain" style={{ background: "rgba(0,0,0,0.45)" }} onClick={onClose}>
       <div
@@ -812,45 +1044,65 @@ function PayslipModal({ payroll, directory, onClose }) {
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: C.text }}>Payslip</h3>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: C.muted, flexShrink: 0 }}>×</button>
         </div>
-        <p style={{ fontSize: 13, color: C.muted, marginBottom: 2 }} className="break-words">{resolveName(directory, payroll.employee, payroll.employeeModel)}</p>
-        <p style={{ fontSize: 13, color: C.muted, marginBottom: 12 }} className="flex items-center gap-2 flex-wrap">{MONTH_NAMES[payroll.month - 1]} {payroll.year} {statusBadge(payroll.status)}</p>
 
-        <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1.5 mb-3">
-          <span style={{ fontSize: 12.5, color: C.muted }}>Basic</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.breakup?.basic)}</span>
-          <span style={{ fontSize: 12.5, color: C.muted }}>HRA</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.breakup?.hra)}</span>
+        {/* Employee details */}
+        <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1.5 mb-3 pb-3" style={{ borderBottom: `1px dashed ${C.border}` }}>
+          <PayslipRow label="Employee" value={<span className="break-words">{name}</span>} />
+          <PayslipRow label="Employee ID" value={employeeId} />
+          <PayslipRow label="Department" value={department} />
+          <PayslipRow label="Designation" value={designation} />
+          <PayslipRow label="Pay Period" value={<span className="flex items-center gap-2 justify-end flex-wrap">{MONTH_NAMES[payroll.month - 1]} {payroll.year} {statusBadge(payroll.status)}</span>} />
+        </div>
+
+        {/* Attendance */}
+        <PayslipSection title="Attendance">
+          <PayslipRow label="Calendar Days" value={att.calendarDays ?? att.daysInMonth ?? "—"} />
+          <PayslipRow label="Working Days" value={att.workingDays ?? "—"} />
+          <PayslipRow label="Paid Days" value={att.paidDays ?? "—"} />
+          <PayslipRow label="LOP Days" value={att.lopDays ?? "—"} />
+        </PayslipSection>
+
+        {/* Earnings */}
+        <PayslipSection title="Earnings">
+          <PayslipRow label="Basic" value={fmtINR(payroll.breakup?.basic)} />
+          <PayslipRow label="HRA" value={fmtINR(payroll.breakup?.hra)} />
           {(payroll.breakup?.allowances || []).map((a) => (
-            <Fragment key={a.name}>
-              <span style={{ fontSize: 12.5, color: C.muted }} className="break-words">{a.name}</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(a.amount)}</span>
-            </Fragment>
+            <Fragment key={a.name}><PayslipRow label={a.name} value={fmtINR(a.amount)} /></Fragment>
           ))}
-          <span style={{ fontSize: 12.5, color: C.muted }}>Bonus</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.earnings?.bonus)}</span>
-          <span style={{ fontSize: 12.5, color: C.muted }}>Incentive</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.earnings?.incentive)}</span>
-          <span style={{ fontSize: 12.5, color: C.muted }}>Overtime</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.earnings?.overtime)}</span>
-          <span style={{ fontSize: 12.5, color: C.muted }}>Other</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.earnings?.other)}</span>
-          <span style={{ fontSize: 13, fontWeight: 700 }}>Total Earnings</span><span style={{ fontSize: 13, fontWeight: 700, textAlign: "right" }}>{fmtINR(payroll.earnings?.totalEarnings)}</span>
-        </div>
+          <PayslipRow label="Bonus" value={fmtINR(payroll.earnings?.bonus)} />
+          <PayslipRow label="Overtime" value={fmtINR(payroll.earnings?.overtime)} />
+          <PayslipRow label="Reimbursement" value={fmtINR(payroll.earnings?.reimbursement)} />
+          <div className="col-span-2 pt-1.5 mt-1" style={{ borderTop: `1px solid ${C.border}` }} />
+          <PayslipRow label="GROSS EARNINGS" value={fmtINR(payroll.earnings?.totalEarnings)} bold />
+        </PayslipSection>
 
-        <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1.5 mb-3 pt-3" style={{ borderTop: `1px dashed ${C.border}` }}>
-          <span style={{ fontSize: 12.5, color: C.muted }}>PF</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.deductions?.pf)}</span>
-          <span style={{ fontSize: 12.5, color: C.muted }}>ESI</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.deductions?.esi)}</span>
-          <span style={{ fontSize: 12.5, color: C.muted }}>Professional Tax</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.deductions?.professionalTax)}</span>
-          <span style={{ fontSize: 12.5, color: C.muted }}>TDS</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.deductions?.tds)}</span>
-          <span style={{ fontSize: 12.5, color: C.muted }}>Loss of Pay</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.deductions?.lossOfPay)}</span>
-          <span style={{ fontSize: 12.5, color: C.muted }}>Loan</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.deductions?.loan)}</span>
-          <span style={{ fontSize: 12.5, color: C.muted }}>Advance</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.deductions?.advance)}</span>
-          <span style={{ fontSize: 12.5, color: C.muted }}>Other</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.deductions?.other)}</span>
-          <span style={{ fontSize: 13, fontWeight: 700 }}>Total Deductions</span><span style={{ fontSize: 13, fontWeight: 700, textAlign: "right" }}>{fmtINR(payroll.deductions?.totalDeductions)}</span>
-        </div>
+        {/* Deductions */}
+        <PayslipSection title="Deductions">
+          <PayslipRow label="Employee PF" value={fmtINR(payroll.deductions?.pf)} />
+          <PayslipRow label="ESI" value={fmtINR(payroll.deductions?.esi)} />
+          <PayslipRow label="Professional Tax" value={fmtINR(payroll.deductions?.professionalTax)} />
+          <PayslipRow label="TDS" value={fmtINR(payroll.deductions?.tds)} />
+          <PayslipRow label="Loan EMI" value={fmtINR(payroll.deductions?.loan)} />
+          <PayslipRow label="Other Deduction" value={fmtINR((payroll.deductions?.advance || 0) + (payroll.deductions?.other || 0))} />
+          <div className="col-span-2 pt-1.5 mt-1" style={{ borderTop: `1px solid ${C.border}` }} />
+          <PayslipRow label="TOTAL DEDUCTIONS" value={fmtINR(payroll.deductions?.totalDeductions)} bold />
+        </PayslipSection>
 
-        <div className="flex items-center justify-between pt-3 gap-3" style={{ borderTop: `2px solid ${C.border}` }}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Net Salary</span>
+        {/* Net pay */}
+        <div className="flex items-center justify-between py-3 mb-1" style={{ borderTop: `2px solid ${C.border}`, borderBottom: `2px solid ${C.border}` }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>NET PAY</span>
           <span style={{ fontSize: 17, fontWeight: 800, color: C.brandDark }}>{fmtINR(payroll.netSalary)}</span>
         </div>
 
-        {payroll.attendance && (
-          <p style={{ fontSize: 11.5, color: C.muted, marginTop: 12 }}>
-            Paid days: {payroll.attendance.paidDays} / {payroll.attendance.daysInMonth} · Absent: {payroll.attendance.absentDays} · Half-days: {payroll.attendance.halfDays}
-          </p>
+        {/* Employer contributions */}
+        <PayslipSection title="Employer Contributions">
+          <PayslipRow label="Employer PF" value={fmtINR(payroll.employerContribution?.pf)} />
+          <PayslipRow label="Employer ESI" value={fmtINR(payroll.employerContribution?.esi)} />
+          <PayslipRow label="Gratuity" value={fmtINR(payroll.employerContribution?.gratuity)} />
+        </PayslipSection>
+
+        {att.manualEntry && (
+          <p style={{ fontSize: 11, color: C.muted, marginTop: -4, marginBottom: 8 }}>Paid Days entered manually for this pay run.</p>
         )}
         {payroll.remarks && <p style={{ fontSize: 12, color: C.muted, marginTop: 6 }} className="break-words">Remarks: {payroll.remarks}</p>}
       </div>
@@ -992,6 +1244,7 @@ export default function Payroll() {
           ))}
         </div>
 
+        {tab === "schedule" && <PayScheduleTab notify={notify} />}
         {tab === "policy" && <PolicyTab notify={notify} />}
         {tab === "structures" && <StructuresTab notify={notify} directory={directory} />}
         {tab === "generate" && <GenerateTab notify={notify} directory={directory} />}
