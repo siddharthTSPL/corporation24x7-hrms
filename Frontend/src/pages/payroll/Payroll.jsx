@@ -43,10 +43,26 @@ const C = {
 
 const TABS = [
   { key: "schedule", label: "Pay Schedule" },
-  { key: "policy", label: "Payroll Policy" },
+  { key: "statutory", label: "Statutory Components" },
+  { key: "components", label: "Salary Components" },
+  { key: "claims", label: "Claims & Declarations" },
   { key: "structures", label: "Salary Structures" },
   { key: "generate", label: "Generate Payroll" },
   { key: "records", label: "Payroll Records" },
+];
+
+const COMPONENT_CATEGORIES = [
+  { key: "earning", label: "Earnings" },
+  { key: "deduction", label: "Deductions" },
+  { key: "benefit", label: "Benefits" },
+  { key: "reimbursement", label: "Reimbursements" },
+];
+
+const CALC_TYPES = [
+  { key: "flat", label: "Flat Amount" },
+  { key: "percentOfBasic", label: "% of Basic" },
+  { key: "percentOfCTC", label: "% of CTC" },
+  { key: "formula", label: "Custom Formula" },
 ];
 
 const MODEL_LABEL = { User: "Employee", Manager: "Manager", Admin: "Admin" };
@@ -210,6 +226,32 @@ function Badge({ children, color, bg }) {
     <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 999, fontSize: 11.5, fontWeight: 700, color, background: bg, whiteSpace: "nowrap" }}>
       {children}
     </span>
+  );
+}
+
+// Inner sub-tab strip used inside Statutory Components / Salary Components /
+// Claims & Declarations — mirrors Zoho's secondary tab row (e.g. EPF | ESI |
+// Professional Tax | ...).
+function SubTabs({ items, active, onChange }) {
+  return (
+    <div className="flex items-center gap-1 flex-wrap mb-5" style={{ borderBottom: `1px solid ${C.border}` }}>
+      {items.map((it) => (
+        <button
+          key={it.key}
+          type="button"
+          onClick={() => onChange(it.key)}
+          style={{
+            background: "none", border: "none", cursor: "pointer", fontFamily: "inherit",
+            padding: "8px 14px 10px", fontSize: 13, fontWeight: 600,
+            color: active === it.key ? C.brand : C.muted,
+            borderBottom: active === it.key ? `2px solid ${C.brand}` : "2px solid transparent",
+            marginBottom: -1,
+          }}
+        >
+          {it.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -441,23 +483,30 @@ function PayScheduleTab({ notify }) {
 }
 
 
-function PolicyTab({ notify }) {
+// ---------- Statutory Components (EPF / ESI / Professional Tax / LWF / Statutory Bonus) ----------
+
+const STATUTORY_SUBTABS = [
+  { key: "epf", label: "EPF" },
+  { key: "esi", label: "ESI" },
+  { key: "pt", label: "Professional Tax" },
+  { key: "lwf", label: "Labour Welfare Fund" },
+  { key: "bonus", label: "Statutory Bonus" },
+];
+
+function StatutoryTab({ notify }) {
   const { data, isLoading } = useGetPayrollPolicy();
   const { mutate: savePolicy, isPending: saving } = useSetPayrollPolicy();
   const { mutate: resetPolicy, isPending: resetting } = useResetPayrollPolicy();
-  const { mutate: addAllowance, isPending: adding } = useAddPayrollAllowance();
-  const { mutate: updateAllowance } = useUpdatePayrollAllowance();
-  const { mutate: removeAllowance } = useRemovePayrollAllowance();
 
   const [form, setForm] = useState(null);
-  const [newAllowance, setNewAllowance] = useState({ name: "", percentOfBasic: 0, flatAmount: 0 });
+  const [sub, setSub] = useState("epf");
 
   useEffect(() => {
     if (data?.policy) setForm(JSON.parse(JSON.stringify(data.policy)));
   }, [data]);
 
   if (isLoading || !form) {
-    return <Card title="Payroll Policy"><div className="flex items-center gap-2" style={{ color: C.muted, fontSize: 13 }}><Spinner size={14} color={C.brand} /> Loading policy…</div></Card>;
+    return <Card title="Statutory Components"><div className="flex items-center gap-2" style={{ color: C.muted, fontSize: 13 }}><Spinner size={14} color={C.brand} /> Loading…</div></Card>;
   }
 
   const set = (path, value) => {
@@ -483,9 +532,11 @@ function PolicyTab({ notify }) {
         esi: form.esi,
         professionalTax: form.professionalTax,
         tds: form.tds,
+        lwf: form.lwf,
+        statutoryBonus: form.statutoryBonus,
       },
       {
-        onSuccess: () => notify("Payroll policy updated", "success"),
+        onSuccess: () => notify("Statutory components updated", "success"),
         onError: (e) => notify(getErrorMessage(e), "error"),
       }
     );
@@ -499,114 +550,136 @@ function PolicyTab({ notify }) {
     });
   };
 
-  const handleAddAllowance = () => {
-    if (!newAllowance.name.trim()) return notify("Allowance name is required", "error");
-    addAllowance(newAllowance, {
-      onSuccess: () => {
-        notify("Allowance added", "success");
-        setNewAllowance({ name: "", percentOfBasic: 0, flatAmount: 0 });
-      },
-      onError: (e) => notify(getErrorMessage(e), "error"),
-    });
-  };
-
-  const handleAllowanceField = (name, field, value) => {
-    setForm((prev) => ({
-      ...prev,
-      allowances: prev.allowances.map((a) => (a.name === name ? { ...a, [field]: value } : a)),
-    }));
-  };
-
-  const commitAllowance = (allowance) => {
-    updateAllowance(
-      { name: allowance.name, data: { percentOfBasic: allowance.percentOfBasic, flatAmount: allowance.flatAmount, enabled: allowance.enabled } },
-      { onSuccess: () => notify(`"${allowance.name}" updated`, "success"), onError: (e) => notify(getErrorMessage(e), "error") }
-    );
-  };
-
-  const handleDeleteAllowance = (allowance) => {
-    if (allowance.isBalancing) return;
-    if (!window.confirm(`Remove allowance "${allowance.name}"?`)) return;
-    removeAllowance(allowance.name, {
-      onSuccess: () => notify("Allowance removed", "success"),
-      onError: (e) => notify(getErrorMessage(e), "error"),
-    });
-  };
-
   return (
     <>
       <Card
         title="Salary Structure Rules"
-        subtitle="Applies to all future salary structures for this organisation"
-        right={
-          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
-            <GhostButton onClick={handleReset} disabled={resetting} className="flex-1 sm:flex-none justify-center">{resetting ? "Resetting…" : "Reset to Standard"}</GhostButton>
-            <PrimaryButton onClick={handleSave} loading={saving} className="flex-1 sm:flex-none">Save Policy</PrimaryButton>
-          </div>
-        }
+        subtitle="Basic and HRA — the base every other Salary Component and statutory deduction is computed from"
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <Field label="Basic % of Gross" hint="1–100">
-            <TextInput
-              type="number" min={1} max={100} value={form.basic?.percentOfGross ?? 0}
-              onChange={(e) => set("basic.percentOfGross", Number(e.target.value))}
-            />
+            <TextInput type="number" min={1} max={100} value={form.basic?.percentOfGross ?? 0} onChange={(e) => set("basic.percentOfGross", Number(e.target.value))} />
           </Field>
-
           <Field label="HRA">
             <div className="flex items-center gap-3 flex-wrap">
               <Toggle checked={!!form.hra?.enabled} onChange={(v) => set("hra.enabled", v)} />
-              <TextInput
-                type="number" min={0} max={100} disabled={!form.hra?.enabled}
-                value={form.hra?.percentOfBasic ?? 0}
-                onChange={(e) => set("hra.percentOfBasic", Number(e.target.value))}
-                style={{ maxWidth: 130 }}
-              />
+              <TextInput type="number" min={0} max={100} disabled={!form.hra?.enabled} value={form.hra?.percentOfBasic ?? 0} onChange={(e) => set("hra.percentOfBasic", Number(e.target.value))} style={{ maxWidth: 130 }} />
               <span style={{ fontSize: 12.5, color: C.muted }}>% of Basic</span>
             </div>
           </Field>
+        </div>
+      </Card>
 
-          <Field label="Provident Fund (PF)">
-            <div className="flex items-center gap-3 flex-wrap">
+      <Card
+        title="Statutory Components"
+        right={
+          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+            <GhostButton onClick={handleReset} disabled={resetting} className="flex-1 sm:flex-none justify-center">{resetting ? "Resetting…" : "Reset to Standard"}</GhostButton>
+            <PrimaryButton onClick={handleSave} loading={saving} className="flex-1 sm:flex-none">Save</PrimaryButton>
+          </div>
+        }
+      >
+        <SubTabs items={STATUTORY_SUBTABS} active={sub} onChange={setSub} />
+
+        {sub === "epf" && (
+          <div>
+            <p style={{ fontSize: 13, color: C.muted, marginBottom: 16 }}>
+              Any organisation with 20 or more employees must register for the Employee Provident Fund (EPF) scheme, a retirement benefit plan for all salaried employees.
+            </p>
+            <div className="flex items-center gap-3 flex-wrap mb-3">
               <Toggle checked={!!form.pf?.enabled} onChange={(v) => set("pf.enabled", v)} />
-              <TextInput type="number" min={0} max={100} disabled={!form.pf?.enabled} value={form.pf?.employeePercent ?? 0} onChange={(e) => set("pf.employeePercent", Number(e.target.value))} style={{ maxWidth: 90 }} />
-              <span style={{ fontSize: 12, color: C.muted }}>Employee %</span>
-              <TextInput type="number" min={0} max={100} disabled={!form.pf?.enabled} value={form.pf?.employerPercent ?? 0} onChange={(e) => set("pf.employerPercent", Number(e.target.value))} style={{ maxWidth: 90 }} />
-              <span style={{ fontSize: 12, color: C.muted }}>Employer %</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Registered for EPF</span>
             </div>
-            <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Employee Contribution (%)">
+                <TextInput type="number" min={0} max={100} disabled={!form.pf?.enabled} value={form.pf?.employeePercent ?? 0} onChange={(e) => set("pf.employeePercent", Number(e.target.value))} />
+              </Field>
+              <Field label="Employer Contribution (%)">
+                <TextInput type="number" min={0} max={100} disabled={!form.pf?.enabled} value={form.pf?.employerPercent ?? 0} onChange={(e) => set("pf.employerPercent", Number(e.target.value))} />
+              </Field>
+            </div>
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
               <Toggle checked={!!form.pf?.applyWageCeiling} onChange={(v) => set("pf.applyWageCeiling", v)} disabled={!form.pf?.enabled} />
-              <span style={{ fontSize: 12, color: C.muted }}>Apply wage ceiling</span>
-              <TextInput
-                type="number" min={0} disabled={!form.pf?.enabled || !form.pf?.applyWageCeiling}
-                value={form.pf?.wageCeiling ?? 0} onChange={(e) => set("pf.wageCeiling", Number(e.target.value))}
-                style={{ maxWidth: 120 }}
-              />
+              <span style={{ fontSize: 12.5, color: C.muted }}>Apply statutory wage ceiling</span>
+              <TextInput type="number" min={0} disabled={!form.pf?.enabled || !form.pf?.applyWageCeiling} value={form.pf?.wageCeiling ?? 0} onChange={(e) => set("pf.wageCeiling", Number(e.target.value))} style={{ maxWidth: 120 }} />
             </div>
-          </Field>
+          </div>
+        )}
 
-          <Field label="ESI">
-            <div className="flex items-center gap-3 flex-wrap">
+        {sub === "esi" && (
+          <div>
+            <p style={{ fontSize: 13, color: C.muted, marginBottom: 16 }}>
+              Employee State Insurance (ESI) applies only to employees whose monthly gross is at or below the wage threshold set by the government.
+            </p>
+            <div className="flex items-center gap-3 flex-wrap mb-3">
               <Toggle checked={!!form.esi?.enabled} onChange={(v) => set("esi.enabled", v)} />
-              <TextInput type="number" step="0.01" min={0} max={100} disabled={!form.esi?.enabled} value={form.esi?.employeePercent ?? 0} onChange={(e) => set("esi.employeePercent", Number(e.target.value))} style={{ maxWidth: 90 }} />
-              <span style={{ fontSize: 12, color: C.muted }}>Employee %</span>
-              <TextInput type="number" step="0.01" min={0} max={100} disabled={!form.esi?.enabled} value={form.esi?.employerPercent ?? 0} onChange={(e) => set("esi.employerPercent", Number(e.target.value))} style={{ maxWidth: 90 }} />
-              <span style={{ fontSize: 12, color: C.muted }}>Employer %</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Registered for ESI</span>
             </div>
-            <div className="flex items-center gap-2 mt-2 flex-wrap">
-              <span style={{ fontSize: 12, color: C.muted }}>Wage threshold</span>
-              <TextInput type="number" min={0} disabled={!form.esi?.enabled} value={form.esi?.wageThreshold ?? 0} onChange={(e) => set("esi.wageThreshold", Number(e.target.value))} style={{ maxWidth: 120 }} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Employee Contribution (%)">
+                <TextInput type="number" step="0.01" min={0} max={100} disabled={!form.esi?.enabled} value={form.esi?.employeePercent ?? 0} onChange={(e) => set("esi.employeePercent", Number(e.target.value))} />
+              </Field>
+              <Field label="Employer Contribution (%)">
+                <TextInput type="number" step="0.01" min={0} max={100} disabled={!form.esi?.enabled} value={form.esi?.employerPercent ?? 0} onChange={(e) => set("esi.employerPercent", Number(e.target.value))} />
+              </Field>
+              <Field label="Wage Threshold (₹/month)" hint="ESI only applies at or below this gross">
+                <TextInput type="number" min={0} disabled={!form.esi?.enabled} value={form.esi?.wageThreshold ?? 0} onChange={(e) => set("esi.wageThreshold", Number(e.target.value))} />
+              </Field>
             </div>
-          </Field>
+          </div>
+        )}
 
-          <Field label="Professional Tax">
-            <div className="flex items-center gap-3 flex-wrap">
+        {sub === "pt" && (
+          <div>
+            <p style={{ fontSize: 13, color: C.muted, marginBottom: 16 }}>
+              Professional Tax is a state-specific tax deducted from salary each month. Set your state's flat monthly slab amount.
+            </p>
+            <div className="flex items-center gap-3 flex-wrap mb-3">
               <Toggle checked={!!form.professionalTax?.enabled} onChange={(v) => set("professionalTax.enabled", v)} />
-              <TextInput type="number" min={0} disabled={!form.professionalTax?.enabled} value={form.professionalTax?.monthlyAmount ?? 0} onChange={(e) => set("professionalTax.monthlyAmount", Number(e.target.value))} style={{ maxWidth: 130 }} />
-              <span style={{ fontSize: 12.5, color: C.muted }}>₹ / month</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Applicable</span>
             </div>
-          </Field>
+            <Field label="Monthly Amount (₹)">
+              <TextInput type="number" min={0} disabled={!form.professionalTax?.enabled} value={form.professionalTax?.monthlyAmount ?? 0} onChange={(e) => set("professionalTax.monthlyAmount", Number(e.target.value))} style={{ maxWidth: 200 }} />
+            </Field>
+          </div>
+        )}
 
+        {sub === "lwf" && (
+          <div>
+            <p style={{ fontSize: 13, color: C.muted, marginBottom: 16 }}>
+              Labour Welfare Fund (LWF) is a small, state-specific contribution shared by employee and employer. Many small organisations don't register for it.
+            </p>
+            <div className="flex items-center gap-3 flex-wrap mb-3">
+              <Toggle checked={!!form.lwf?.enabled} onChange={(v) => set("lwf.enabled", v)} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Registered for LWF</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Employee Contribution (₹)">
+                <TextInput type="number" min={0} disabled={!form.lwf?.enabled} value={form.lwf?.employeeAmount ?? 0} onChange={(e) => set("lwf.employeeAmount", Number(e.target.value))} />
+              </Field>
+              <Field label="Employer Contribution (₹)">
+                <TextInput type="number" min={0} disabled={!form.lwf?.enabled} value={form.lwf?.employerAmount ?? 0} onChange={(e) => set("lwf.employerAmount", Number(e.target.value))} />
+              </Field>
+            </div>
+          </div>
+        )}
+
+        {sub === "bonus" && (
+          <div>
+            <p style={{ fontSize: 13, color: C.muted, marginBottom: 16 }}>
+              Statutory Bonus under the Payment of Bonus Act — an employer-cost accrual of 8.33% to 20% of Basic. Shown as an employer contribution; it is not deducted from the employee.
+            </p>
+            <div className="flex items-center gap-3 flex-wrap mb-3">
+              <Toggle checked={!!form.statutoryBonus?.enabled} onChange={(v) => set("statutoryBonus.enabled", v)} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Applicable</span>
+            </div>
+            <Field label="% of Basic" hint="8.33 – 20">
+              <TextInput type="number" step="0.01" min={0} max={20} disabled={!form.statutoryBonus?.enabled} value={form.statutoryBonus?.percentOfBasic ?? 0} onChange={(e) => set("statutoryBonus.percentOfBasic", Number(e.target.value))} style={{ maxWidth: 160 }} />
+            </Field>
+          </div>
+        )}
+
+        <div className="flex items-center gap-3 flex-wrap mt-6 pt-5" style={{ borderTop: `1px dashed ${C.border}` }}>
           <Field label="TDS (Income Tax)" hint="Uses each employee's annualTaxEstimate ÷ 12">
             <div className="flex items-center gap-3 flex-wrap">
               <Toggle checked={!!form.tds?.enabled} onChange={(v) => set("tds.enabled", v)} />
@@ -615,62 +688,308 @@ function PolicyTab({ notify }) {
           </Field>
         </div>
       </Card>
-
-      <Card title="Allowances" subtitle='The "balancing" allowance absorbs whatever gross remains after Basic, HRA and other allowances'>
-        <div className="overflow-x-auto overscroll-x-contain -mx-1">
-          <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 560 }}>
-            <thead>
-              <tr style={{ textAlign: "left", fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>
-                <th style={{ padding: "6px 10px" }}>Name</th>
-                <th style={{ padding: "6px 10px" }}>% of Basic</th>
-                <th style={{ padding: "6px 10px" }}>Flat Amount (₹)</th>
-                <th style={{ padding: "6px 10px" }}>Enabled</th>
-                <th style={{ padding: "6px 10px" }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {(form.allowances || []).map((a) => (
-                <tr key={a.name} style={{ borderTop: `1px solid ${C.border}` }}>
-                  <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>
-                    <span className="break-words">{a.name}</span> {a.isBalancing && <Badge color={C.blue} bg={C.blueBg}>Balancing</Badge>}
-                  </td>
-                  <td style={{ padding: "8px 10px" }}>
-                    <TextInput type="number" min={0} max={100} value={a.percentOfBasic ?? 0} onChange={(e) => handleAllowanceField(a.name, "percentOfBasic", Number(e.target.value))} style={{ maxWidth: 100 }} />
-                  </td>
-                  <td style={{ padding: "8px 10px" }}>
-                    <TextInput type="number" min={0} value={a.flatAmount ?? 0} onChange={(e) => handleAllowanceField(a.name, "flatAmount", Number(e.target.value))} style={{ maxWidth: 120 }} />
-                  </td>
-                  <td style={{ padding: "8px 10px" }}>
-                    <Toggle checked={!!a.enabled} onChange={(v) => handleAllowanceField(a.name, "enabled", v)} disabled={a.isBalancing} />
-                  </td>
-                  <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
-                    <GhostButton onClick={() => commitAllowance(a)} style={{ marginRight: 8 }}>Save</GhostButton>
-                    {!a.isBalancing && (
-                      <button onClick={() => handleDeleteAllowance(a)} style={{ background: "none", border: "none", color: C.red, cursor: "pointer", fontSize: 12.5, fontWeight: 600 }}>
-                        Remove
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="flex items-end gap-3 flex-wrap mt-4 pt-4" style={{ borderTop: `1px dashed ${C.border}` }}>
-          <Field label="New allowance name">
-            <TextInput value={newAllowance.name} onChange={(e) => setNewAllowance((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Meal Allowance" style={{ maxWidth: 180 }} />
-          </Field>
-          <Field label="% of Basic">
-            <TextInput type="number" min={0} max={100} value={newAllowance.percentOfBasic} onChange={(e) => setNewAllowance((p) => ({ ...p, percentOfBasic: Number(e.target.value) }))} style={{ maxWidth: 100 }} />
-          </Field>
-          <Field label="Flat Amount (₹)">
-            <TextInput type="number" min={0} value={newAllowance.flatAmount} onChange={(e) => setNewAllowance((p) => ({ ...p, flatAmount: Number(e.target.value) }))} style={{ maxWidth: 120 }} />
-          </Field>
-          <PrimaryButton onClick={handleAddAllowance} loading={adding}>Add Allowance</PrimaryButton>
-        </div>
-      </Card>
     </>
+  );
+}
+
+// ---------- Salary Components (Earnings / Deductions / Benefits / Reimbursements) ----------
+
+function emptyComponentForm(category) {
+  return {
+    name: "", category, calculationType: "flat",
+    percentOfBasic: 0, percentOfCTC: 0, flatAmount: 0, formula: "",
+    considerForEPF: true, considerForESI: true, isFBP: false,
+  };
+}
+
+function ComponentValueFields({ value, onChange, disabled }) {
+  return (
+    <div className="flex items-center gap-3 flex-wrap">
+      <Select value={value.calculationType} onChange={(e) => onChange({ ...value, calculationType: e.target.value })} disabled={disabled} style={{ maxWidth: 160 }}>
+        {CALC_TYPES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+      </Select>
+      {value.calculationType === "flat" && (
+        <TextInput type="number" min={0} disabled={disabled} value={value.flatAmount ?? 0} onChange={(e) => onChange({ ...value, flatAmount: Number(e.target.value) })} placeholder="₹ / month" style={{ maxWidth: 130 }} />
+      )}
+      {value.calculationType === "percentOfBasic" && (
+        <TextInput type="number" min={0} max={100} disabled={disabled} value={value.percentOfBasic ?? 0} onChange={(e) => onChange({ ...value, percentOfBasic: Number(e.target.value) })} placeholder="% of Basic" style={{ maxWidth: 130 }} />
+      )}
+      {value.calculationType === "percentOfCTC" && (
+        <TextInput type="number" min={0} max={100} disabled={disabled} value={value.percentOfCTC ?? 0} onChange={(e) => onChange({ ...value, percentOfCTC: Number(e.target.value) })} placeholder="% of CTC" style={{ maxWidth: 130 }} />
+      )}
+      {value.calculationType === "formula" && (
+        <TextInput disabled={disabled} value={value.formula ?? ""} onChange={(e) => onChange({ ...value, formula: e.target.value })} placeholder="e.g. basic*0.1 + 500" style={{ maxWidth: 220 }} />
+      )}
+    </div>
+  );
+}
+
+function ComponentsTab({ notify }) {
+  const { data, isLoading } = useGetPayrollPolicy();
+  const { mutate: addAllowance, isPending: adding } = useAddPayrollAllowance();
+  const { mutate: updateAllowance } = useUpdatePayrollAllowance();
+  const { mutate: removeAllowance } = useRemovePayrollAllowance();
+
+  const [form, setForm] = useState(null);
+  const [category, setCategory] = useState("earning");
+  const [showAdd, setShowAdd] = useState(false);
+  const [newComponent, setNewComponent] = useState(emptyComponentForm("earning"));
+
+  useEffect(() => {
+    if (data?.policy) setForm(JSON.parse(JSON.stringify(data.policy)));
+  }, [data]);
+
+  useEffect(() => {
+    setShowAdd(false);
+    setNewComponent(emptyComponentForm(category));
+  }, [category]);
+
+  if (isLoading || !form) {
+    return <Card title="Salary Components"><div className="flex items-center gap-2" style={{ color: C.muted, fontSize: 13 }}><Spinner size={14} color={C.brand} /> Loading…</div></Card>;
+  }
+
+  const rows = (form.allowances || []).filter((a) => (a.category || "earning") === category);
+
+  const handleField = (name, patch) => {
+    setForm((prev) => ({
+      ...prev,
+      allowances: prev.allowances.map((a) => (a.name === name ? { ...a, ...patch } : a)),
+    }));
+  };
+
+  const commit = (a) => {
+    updateAllowance(
+      {
+        name: a.name,
+        data: {
+          calculationType: a.calculationType || "flat",
+          percentOfBasic: a.percentOfBasic,
+          percentOfCTC: a.percentOfCTC,
+          flatAmount: a.flatAmount,
+          formula: a.formula,
+          enabled: a.enabled,
+          considerForEPF: a.considerForEPF,
+          considerForESI: a.considerForESI,
+          isFBP: a.isFBP,
+        },
+      },
+      { onSuccess: () => notify(`"${a.name}" updated`, "success"), onError: (e) => notify(getErrorMessage(e), "error") }
+    );
+  };
+
+  const handleDelete = (a) => {
+    if (a.isBalancing) return;
+    if (!window.confirm(`Remove component "${a.name}"?`)) return;
+    removeAllowance(a.name, {
+      onSuccess: () => notify("Component removed", "success"),
+      onError: (e) => notify(getErrorMessage(e), "error"),
+    });
+  };
+
+  const handleAdd = () => {
+    if (!newComponent.name.trim()) return notify("Component name is required", "error");
+    if (newComponent.calculationType === "formula" && !newComponent.formula.trim())
+      return notify("Enter a formula, e.g. basic*0.1 + 500", "error");
+    addAllowance(newComponent, {
+      onSuccess: () => {
+        notify("Component added", "success");
+        setNewComponent(emptyComponentForm(category));
+        setShowAdd(false);
+      },
+      onError: (e) => notify(getErrorMessage(e), "error"),
+    });
+  };
+
+  const showEpfEsiCols = category === "earning";
+  const showFbpCol = category === "reimbursement";
+
+  return (
+    <Card
+      title="Salary Components"
+      right={
+        <PrimaryButton onClick={() => setShowAdd((v) => !v)} className="flex-1 sm:flex-none">
+          {showAdd ? "Cancel" : "+ Add Component"}
+        </PrimaryButton>
+      }
+    >
+      <SubTabs items={COMPONENT_CATEGORIES} active={category} onChange={setCategory} />
+
+      {category === "earning" && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5 pb-5" style={{ borderBottom: `1px dashed ${C.border}` }}>
+          <Field label="Basic" hint="Fixed; % of Gross — edit under Statutory Components">
+            <div style={{ ...inputStyle, background: "#f7f3f1", color: C.muted }}>{form.basic?.percentOfGross ?? 0}% of Gross</div>
+          </Field>
+          <Field label="House Rent Allowance" hint="Fixed; % of Basic — edit under Statutory Components">
+            <div style={{ ...inputStyle, background: "#f7f3f1", color: C.muted }}>
+              {form.hra?.enabled ? `${form.hra?.percentOfBasic ?? 0}% of Basic` : "Disabled"}
+            </div>
+          </Field>
+        </div>
+      )}
+
+      {showAdd && (
+        <div className="mb-5 pb-5" style={{ borderBottom: `1px dashed ${C.border}` }}>
+          <p style={{ fontSize: 12.5, fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 10 }}>
+            New {COMPONENT_CATEGORIES.find((c) => c.key === category)?.label.replace(/s$/, "")} Component
+          </p>
+          <div className="flex items-end gap-3 flex-wrap">
+            <Field label="Name">
+              <TextInput value={newComponent.name} onChange={(e) => setNewComponent((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Special Allowance" style={{ maxWidth: 200 }} />
+            </Field>
+            <Field label="Calculation">
+              <ComponentValueFields value={newComponent} onChange={setNewComponent} />
+            </Field>
+            {category === "reimbursement" && (
+              <Field label="Flexible Benefit Plan">
+                <div className="flex items-center gap-2">
+                  <Toggle checked={!!newComponent.isFBP} onChange={(v) => setNewComponent((p) => ({ ...p, isFBP: v }))} />
+                  <span style={{ fontSize: 12, color: C.muted }}>Mark as FBP</span>
+                </div>
+              </Field>
+            )}
+            <PrimaryButton onClick={handleAdd} loading={adding}>Add Component</PrimaryButton>
+          </div>
+          {newComponent.calculationType === "formula" && (
+            <p style={{ fontSize: 11.5, color: C.muted, marginTop: 8 }}>
+              Available variables: <code>basic</code>, <code>gross</code> (monthly gross), <code>ctc</code> (annual), <code>hra</code>. Example: <code>basic*0.1 + 500</code>
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="overflow-x-auto overscroll-x-contain -mx-1">
+        <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 640 }}>
+          <thead>
+            <tr style={{ textAlign: "left", fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>
+              <th style={{ padding: "6px 10px" }}>Name</th>
+              <th style={{ padding: "6px 10px" }}>Calculation</th>
+              {showEpfEsiCols && <th style={{ padding: "6px 10px" }}>Consider for EPF</th>}
+              {showEpfEsiCols && <th style={{ padding: "6px 10px" }}>Consider for ESI</th>}
+              {showFbpCol && <th style={{ padding: "6px 10px" }}>FBP</th>}
+              <th style={{ padding: "6px 10px" }}>Status</th>
+              <th style={{ padding: "6px 10px" }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && !showAdd && (
+              <tr>
+                <td colSpan={showEpfEsiCols || showFbpCol ? 6 : 4} style={{ padding: "14px 10px", fontSize: 13, color: C.muted }}>
+                  No {COMPONENT_CATEGORIES.find((c) => c.key === category)?.label.toLowerCase()} configured yet.
+                </td>
+              </tr>
+            )}
+            {rows.map((a) => (
+              <tr key={a.name} style={{ borderTop: `1px solid ${C.border}` }}>
+                <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text, verticalAlign: "top" }}>
+                  <span className="break-words">{a.name}</span> {a.isBalancing && <Badge color={C.blue} bg={C.blueBg}>Balancing</Badge>}
+                </td>
+                <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
+                  <ComponentValueFields value={a} onChange={(patch) => handleField(a.name, patch)} disabled={false} />
+                </td>
+                {showEpfEsiCols && (
+                  <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
+                    <Toggle checked={a.considerForEPF !== false} onChange={(v) => handleField(a.name, { considerForEPF: v })} />
+                  </td>
+                )}
+                {showEpfEsiCols && (
+                  <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
+                    <Toggle checked={a.considerForESI !== false} onChange={(v) => handleField(a.name, { considerForESI: v })} />
+                  </td>
+                )}
+                {showFbpCol && (
+                  <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
+                    <Toggle checked={!!a.isFBP} onChange={(v) => handleField(a.name, { isFBP: v })} />
+                  </td>
+                )}
+                <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
+                  <Toggle checked={!!a.enabled} onChange={(v) => handleField(a.name, { enabled: v })} disabled={a.isBalancing} />
+                </td>
+                <td style={{ padding: "8px 10px", whiteSpace: "nowrap", verticalAlign: "top" }}>
+                  <GhostButton onClick={() => commit(a)} style={{ marginRight: 8 }}>Save</GhostButton>
+                  {!a.isBalancing && (
+                    <button onClick={() => handleDelete(a)} style={{ background: "none", border: "none", color: C.red, cursor: "pointer", fontSize: 12.5, fontWeight: 600 }}>
+                      Remove
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {category === "earning" && (
+        <p style={{ fontSize: 11.5, color: C.muted, marginTop: 12 }}>
+          The "Balancing" earning absorbs whatever gross remains after Basic, HRA and every other earning — it always stays enabled.
+        </p>
+      )}
+    </Card>
+  );
+}
+
+// ---------- Claims & Declarations ----------
+
+const CLAIMS_SUBTABS = [
+  { key: "fbp", label: "Flexible Benefit Plan" },
+  { key: "reimbursement", label: "Reimbursement Claims" },
+  { key: "itd", label: "Income Tax Declaration" },
+  { key: "poi", label: "Proof Of Investments" },
+];
+
+function ClaimsTab({ notify }) {
+  const { data, isLoading } = useGetPayrollPolicy();
+  const [sub, setSub] = useState("fbp");
+
+  const fbpComponents = (data?.policy?.allowances || []).filter((a) => a.category === "reimbursement" && a.isFBP);
+
+  return (
+    <Card title="Claims and Declarations">
+      <SubTabs items={CLAIMS_SUBTABS} active={sub} onChange={setSub} />
+
+      {sub === "fbp" && (
+        <>
+          {isLoading ? (
+            <div className="flex items-center gap-2" style={{ color: C.muted, fontSize: 13 }}><Spinner size={14} color={C.brand} /> Loading…</div>
+          ) : fbpComponents.length === 0 ? (
+            <div className="flex flex-col items-center text-center py-10 px-4">
+              <p style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 8 }}>No Active FBP component</p>
+              <p style={{ fontSize: 13, color: C.muted, maxWidth: 480 }}>
+                Your organisation does not have an active FBP component associated to an employee. Mark a reimbursement as FBP component under Settings &gt; Salary Components &gt; Reimbursements.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto overscroll-x-contain -mx-1">
+              <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 420 }}>
+                <thead>
+                  <tr style={{ textAlign: "left", fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                    <th style={{ padding: "6px 10px" }}>Name</th>
+                    <th style={{ padding: "6px 10px" }}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fbpComponents.map((c) => (
+                    <tr key={c.name} style={{ borderTop: `1px solid ${C.border}` }}>
+                      <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>{c.name}</td>
+                      <td style={{ padding: "8px 10px" }}>{c.enabled !== false ? <Badge color={C.green} bg={C.greenBg}>Active</Badge> : <Badge color={C.muted} bg="#f2ece9">Inactive</Badge>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+
+      {sub !== "fbp" && (
+        <div className="flex flex-col items-center text-center py-10 px-4">
+          <p style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 8 }}>
+            {CLAIMS_SUBTABS.find((s) => s.key === sub)?.label}
+          </p>
+          <p style={{ fontSize: 13, color: C.muted, maxWidth: 480 }}>
+            This section isn't set up yet for this organisation.
+          </p>
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -1245,7 +1564,9 @@ export default function Payroll() {
         </div>
 
         {tab === "schedule" && <PayScheduleTab notify={notify} />}
-        {tab === "policy" && <PolicyTab notify={notify} />}
+        {tab === "statutory" && <StatutoryTab notify={notify} />}
+        {tab === "components" && <ComponentsTab notify={notify} />}
+        {tab === "claims" && <ClaimsTab notify={notify} />}
         {tab === "structures" && <StructuresTab notify={notify} directory={directory} />}
         {tab === "generate" && <GenerateTab notify={notify} directory={directory} />}
         {tab === "records" && <RecordsTab notify={notify} directory={directory} />}
