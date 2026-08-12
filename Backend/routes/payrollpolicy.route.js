@@ -20,8 +20,12 @@ payrollpolicyrouter.get("/policy", adminauthmiddleware, asyncHandler(getPolicy))
 payrollpolicyrouter.put("/policy", adminauthmiddleware, asyncHandler(setPolicy));
 payrollpolicyrouter.post("/policy/reset", adminauthmiddleware, asyncHandler(resetToStandard));
 
-// Allowance line items (Medical, Conveyance, custom ones, and the balancing
-// "Special Allowance" that soaks up whatever gross is left over)
+// Salary Components (Zoho-style): Earnings, Deductions, Benefits and
+// Reimbursements all share these same three endpoints — pass
+// category: "earning" | "deduction" | "benefit" | "reimbursement" in the
+// body to place a component in the right tab. Also covers Medical,
+// Conveyance, custom ones, and the balancing "Special Allowance" that soaks
+// up whatever gross is left over.
 payrollpolicyrouter.post("/policy/allowance", adminauthmiddleware, asyncHandler(addAllowance));
 payrollpolicyrouter.put("/policy/allowance/:name", adminauthmiddleware, asyncHandler(updateAllowance));
 payrollpolicyrouter.delete("/policy/allowance/:name", adminauthmiddleware, asyncHandler(removeAllowance));
