@@ -6,6 +6,8 @@ import {
   addPayrollAllowance,
   updatePayrollAllowance,
   removePayrollAllowance,
+  getPaySchedule,
+  setPaySchedule,
   setEmployeeCTC,
   listSalaryStructures,
   getSalaryStructure,
@@ -75,6 +77,28 @@ export const useRemovePayrollAllowance = () => {
     mutationFn: (name) => removePayrollAllowance(name),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payroll-policy"] });
+    },
+  });
+};
+
+// ── Pay Schedule ─────────────────────────────────────────────────────────────
+
+export const useGetPaySchedule = () => {
+  return useQuery({
+    queryKey: ["pay-schedule"],
+    queryFn: getPaySchedule,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
+};
+
+export const useSetPaySchedule = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: setPaySchedule,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pay-schedule"] });
     },
   });
 };
