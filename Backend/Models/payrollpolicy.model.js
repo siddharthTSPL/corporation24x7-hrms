@@ -84,6 +84,32 @@ const payrollPolicySchema = new mongoose.Schema(
       enabled: { type: Boolean, default: false },
     },
 
+    // Fixed, organisation-wide pay run schedule (mirrors the standard
+    // "Pay Schedule" screen every payroll product has: how often people are
+    // paid, which calendar days count as working days, which day of the
+    // month salary is paid on, and the fixed "No. of Working Days" used as
+    // the denominator for per-day / LOP calculations — set once, then
+    // locked so it can't quietly change under payroll already run against it).
+    paySchedule: {
+      payFrequency: { type: String, enum: ["Monthly"], default: "Monthly" },
+      workingDays: {
+        type: [String],
+        default: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+      },
+      payDay: { type: Number, default: 1, min: 1, max: 31 }, // day of month salary is paid out
+      firstPayPeriodMonth: { type: Number, default: null, min: 1, max: 12 },
+      firstPayPeriodYear: { type: Number, default: null },
+      firstPayDate: { type: Date, default: null },
+      // Fixed denominator used for per-day rate / LOP math (standard payroll
+      // practice: e.g. 30, regardless of the actual number of days in a
+      // given calendar month). Admin/SuperAdmin sets this once.
+      noOfWorkingDays: { type: Number, default: 30, min: 1, max: 31 },
+      // Once the first payroll has actually been generated against this
+      // schedule, it locks — same behaviour as "Pay Schedule cannot be
+      // edited once you process the first pay run."
+      locked: { type: Boolean, default: false },
+    },
+
     updatedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
     updatedByModel: { type: String, enum: ["Admin", "SuperAdmin"], default: null },
   },
