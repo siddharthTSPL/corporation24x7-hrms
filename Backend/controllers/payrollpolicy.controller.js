@@ -1,4 +1,5 @@
 const PayrollPolicy = require("../Models/payrollpolicy.model");
+const { evaluateFormula } = require("../utils/payroll.utils");
 
 // Same shape as the schema defaults — used by resetToStandard() and by
 // getPolicy() the very first time an org asks (so the frontend always has
@@ -16,6 +17,8 @@ const STANDARD_DEFAULTS = {
   esi: { enabled: false, employeePercent: 0.75, employerPercent: 3.25, wageThreshold: 21000 },
   professionalTax: { enabled: true, monthlyAmount: 200 },
   tds: { enabled: false },
+  lwf: { enabled: false, employeeAmount: 0, employerAmount: 0 },
+  statutoryBonus: { enabled: false, percentOfBasic: 8.33 },
 };
 
 // Every payroll calculation needs a policy to read from — this creates one
@@ -40,7 +43,7 @@ const getPolicy = async (req, res) => {
 // so the frontend can send just the one toggle/percentage that changed.
 const setPolicy = async (req, res) => {
   const organisation_id = req.admin.organisation_id;
-  const { basic, hra, pf, esi, professionalTax, tds } = req.body;
+  const { basic, hra, pf, esi, professionalTax, tds, lwf, statutoryBonus } = req.body;
 
   const policy = await getOrCreatePolicy(organisation_id);
 
@@ -78,6 +81,17 @@ const setPolicy = async (req, res) => {
 
   if (tds && typeof tds.enabled === "boolean") policy.tds.enabled = tds.enabled;
 
+  if (lwf) {
+    if (typeof lwf.enabled === "boolean") policy.lwf.enabled = lwf.enabled;
+    if (typeof lwf.employeeAmount === "number") policy.lwf.employeeAmount = lwf.employeeAmount;
+    if (typeof lwf.employerAmount === "number") policy.lwf.employerAmount = lwf.employerAmount;
+  }
+
+  if (statutoryBonus) {
+    if (typeof statutoryBonus.enabled === "boolean") policy.statutoryBonus.enabled = statutoryBonus.enabled;
+    if (typeof statutoryBonus.percentOfBasic === "number") policy.statutoryBonus.percentOfBasic = statutoryBonus.percentOfBasic;
+  }
+
   policy.updatedBy = req.admin._id;
   policy.updatedByModel = req.actorModel || "Admin";
   await policy.save();
@@ -85,21 +99,64 @@ const setPolicy = async (req, res) => {
   res.status(200).json({ success: true, policy });
 };
 
-// ---------- Allowances (Medical, Conveyance, Special, or any custom one) ----------
+// ---------- Salary Components ----------
+// One list (`policy.allowances`, kept as-is for backward compatibility)
+// covers all four Zoho-style tabs: Earnings, Deductions, Benefits and
+// Reimbursements — `category` decides which tab a component shows up in.
+// Every component can be a flat amount, a % of Basic, a % of CTC, or a
+// custom formula (see evaluateFormula in payroll.utils.js).
+
+const ALLOWED_CATEGORIES = ["earning", "deduction", "benefit", "reimbursement"];
+const ALLOWED_CALC_TYPES = ["flat", "percentOfBasic", "percentOfCTC", "formula"];
 
 const addAllowance = async (req, res) => {
   const organisation_id = req.admin.organisation_id;
-  const { name, percentOfBasic, flatAmount, enabled } = req.body;
+  const {
+    name,
+    category,
+    calculationType,
+    percentOfBasic,
+    percentOfCTC,
+    flatAmount,
+    formula,
+    enabled,
+    considerForEPF,
+    considerForESI,
+    isFBP,
+  } = req.body;
 
   if (!name) return res.status(400).json({ success: false, message: "name is required" });
+
+  if (category && !ALLOWED_CATEGORIES.includes(category))
+    return res.status(400).json({ success: false, message: `category must be one of ${ALLOWED_CATEGORIES.join(", ")}` });
+
+  if (calculationType && !ALLOWED_CALC_TYPES.includes(calculationType))
+    return res.status(400).json({ success: false, message: `calculationType must be one of ${ALLOWED_CALC_TYPES.join(", ")}` });
+
+  if (calculationType === "formula") {
+    if (!formula || !formula.trim())
+      return res.status(400).json({ success: false, message: "formula is required when calculationType is formula" });
+    try {
+      evaluateFormula(formula, { basic: 1000, gross: 2500, ctc: 300000, hra: 500 });
+    } catch (e) {
+      return res.status(400).json({ success: false, message: `Invalid formula: ${e.message}` });
+    }
+  }
 
   const policy = await getOrCreatePolicy(organisation_id);
   policy.allowances.push({
     name,
+    category: category || "earning",
+    calculationType: calculationType || "flat",
     percentOfBasic: percentOfBasic || 0,
+    percentOfCTC: percentOfCTC || 0,
     flatAmount: flatAmount || 0,
+    formula: formula || "",
     enabled: enabled !== false,
-    isBalancing: false, // custom allowances are never the balancing one
+    considerForEPF: considerForEPF !== false,
+    considerForESI: considerForESI !== false,
+    isFBP: !!isFBP,
+    isBalancing: false, // custom components are never the balancing one
   });
   policy.updatedBy = req.admin._id;
   policy.updatedByModel = req.actorModel || "Admin";
@@ -111,14 +168,46 @@ const addAllowance = async (req, res) => {
 const updateAllowance = async (req, res) => {
   const organisation_id = req.admin.organisation_id;
   const { name } = req.params;
-  const { percentOfBasic, flatAmount, enabled, newName } = req.body;
+  const {
+    percentOfBasic,
+    percentOfCTC,
+    flatAmount,
+    calculationType,
+    formula,
+    enabled,
+    newName,
+    considerForEPF,
+    considerForESI,
+    isFBP,
+  } = req.body;
 
   const policy = await getOrCreatePolicy(organisation_id);
   const allowance = policy.allowances.find((a) => a.name === name);
   if (!allowance) return res.status(404).json({ success: false, message: "Allowance not found" });
 
+  if (calculationType) {
+    if (!ALLOWED_CALC_TYPES.includes(calculationType))
+      return res.status(400).json({ success: false, message: `calculationType must be one of ${ALLOWED_CALC_TYPES.join(", ")}` });
+    if (calculationType === "formula") {
+      const f = formula !== undefined ? formula : allowance.formula;
+      if (!f || !f.trim())
+        return res.status(400).json({ success: false, message: "formula is required when calculationType is formula" });
+      try {
+        evaluateFormula(f, { basic: 1000, gross: 2500, ctc: 300000, hra: 500 });
+      } catch (e) {
+        return res.status(400).json({ success: false, message: `Invalid formula: ${e.message}` });
+      }
+    }
+    allowance.calculationType = calculationType;
+  }
+
   if (typeof percentOfBasic === "number") allowance.percentOfBasic = percentOfBasic;
+  if (typeof percentOfCTC === "number") allowance.percentOfCTC = percentOfCTC;
   if (typeof flatAmount === "number") allowance.flatAmount = flatAmount;
+  if (typeof formula === "string") allowance.formula = formula;
+  if (typeof considerForEPF === "boolean") allowance.considerForEPF = considerForEPF;
+  if (typeof considerForESI === "boolean") allowance.considerForESI = considerForESI;
+  if (typeof isFBP === "boolean") allowance.isFBP = isFBP;
   if (typeof enabled === "boolean") {
     if (allowance.isBalancing && enabled === false)
       return res.status(400).json({ success: false, message: "The balancing allowance can't be disabled" });
