@@ -10,6 +10,8 @@ const {
   updateAllowance,
   removeAllowance,
   resetToStandard,
+  getPaySchedule,
+  setPaySchedule,
 } = require("../controllers/payrollpolicy.controller");
 
 // Org-wide payroll policy: Basic %, HRA enable+%, PF enable+%, ESI enable+%,
@@ -23,5 +25,9 @@ payrollpolicyrouter.post("/policy/reset", adminauthmiddleware, asyncHandler(rese
 payrollpolicyrouter.post("/policy/allowance", adminauthmiddleware, asyncHandler(addAllowance));
 payrollpolicyrouter.put("/policy/allowance/:name", adminauthmiddleware, asyncHandler(updateAllowance));
 payrollpolicyrouter.delete("/policy/allowance/:name", adminauthmiddleware, asyncHandler(removeAllowance));
+
+// Fixed org-wide Pay Schedule — locks after the first pay run is processed
+payrollpolicyrouter.get("/pay-schedule", adminauthmiddleware, asyncHandler(getPaySchedule));
+payrollpolicyrouter.put("/pay-schedule", adminauthmiddleware, asyncHandler(setPaySchedule));
 
 module.exports = payrollpolicyrouter;
