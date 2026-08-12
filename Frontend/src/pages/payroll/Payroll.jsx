@@ -1238,7 +1238,7 @@ function GenerateTab({ notify, directory }) {
             <Field label="Working Days" hint="From Pay Schedule">
               <TextInput type="number" min={1} max={31} value={single.workingDays} onChange={(e) => setSingle((p) => ({ ...p, workingDays: e.target.value }))} />
             </Field>
-            <Field label="Paid Days" hint="Kitne din present — manual entry">
+            <Field label="Paid Days" hint=" present — manual entry">
               <TextInput type="number" min={0} step="0.5" value={single.paidDays} onChange={(e) => setSingle((p) => ({ ...p, paidDays: e.target.value }))} placeholder="e.g. 27" required />
             </Field>
             <Field label="LOP Days" hint="Auto-calculated">
