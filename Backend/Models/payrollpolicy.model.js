@@ -11,16 +11,52 @@ const mongoose = require("mongoose");
 // calculation (contributes 0, doesn't show up in the payslip breakdown).
 
 
+// A single "Salary Component" — despite the field name `allowances` (kept
+// for backward compatibility with existing org data), this now covers all
+// four Zoho-style component categories: Earnings, Deductions, Benefits and
+// Reimbursements. `category` decides which tab/bucket it shows up in and
+// how it's folded into the payroll total; everything else about how its
+// amount is computed (flat / % of Basic / % of CTC / a custom formula) is
+// shared across categories.
 const allowanceSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
-    percentOfBasic: { type: Number, default: 0, min: 0 }, // used when flatAmount is 0
-    flatAmount: { type: Number, default: 0, min: 0 }, // flat rupees/month, takes priority over percentOfBasic if > 0
+    category: {
+      type: String,
+      enum: ["earning", "deduction", "benefit", "reimbursement"],
+      default: "earning",
+    },
+    // How this component's monthly amount is computed. Left unset on old
+    // records on purpose — payroll.utils falls back to the original
+    // "flatAmount if >0, else percentOfBasic" behaviour when this is empty,
+    // so nothing that already ran breaks.
+    calculationType: {
+      type: String,
+      enum: ["flat", "percentOfBasic", "percentOfCTC", "formula"],
+      default: "flat",
+    },
+    percentOfBasic: { type: Number, default: 0, min: 0 }, // used when calculationType is percentOfBasic (or legacy: flatAmount is 0)
+    percentOfCTC: { type: Number, default: 0, min: 0 }, // used when calculationType is percentOfCTC
+    flatAmount: { type: Number, default: 0, min: 0 }, // flat rupees/month
+    // Custom formula, e.g. "basic*0.1 + 500". Only these variables are
+    // available: basic, gross (monthly gross), ctc (annual), hra.
+    // Evaluated by the sandboxed evaluateFormula() in payroll.utils.js —
+    // never passed to eval/new Function without being sanitised first.
+    formula: { type: String, default: "", trim: true, maxlength: 300 },
     enabled: { type: Boolean, default: true },
+    // Informational, Zoho-style "Consider for EPF/ESI" flags shown in the
+    // Salary Components table. Statutory PF/ESI math in this app is fixed
+    // to run on Basic (PF) and full earned gross (ESI) regardless of these
+    // flags — they don't change the calculation, only the displayed label.
+    considerForEPF: { type: Boolean, default: true },
+    considerForESI: { type: Boolean, default: true },
+    // Marks a Reimbursement component as part of the org's Flexible
+    // Benefit Plan (mirrors Zoho's "mark a reimbursement as FBP component").
+    isFBP: { type: Boolean, default: false },
     // The balancing allowance absorbs whatever is left of the gross after
-    // Basic + HRA + every other named allowance is accounted for, so the
+    // Basic + HRA + every other named EARNING is accounted for, so the
     // components always add back up to the monthly gross exactly.
-    // Exactly one allowance in the array should have isBalancing: true.
+    // Exactly one earning in the array should have isBalancing: true.
     isBalancing: { type: Boolean, default: false },
   },
   { _id: false }
@@ -82,6 +118,23 @@ const payrollPolicySchema = new mongoose.Schema(
       // `annualTaxEstimate` (set on their SalaryStructure) divided by 12.
       // No org-wide percentage — there isn't one that's correct.
       enabled: { type: Boolean, default: false },
+    },
+
+    // Labour Welfare Fund — small state-specific contribution, employee +
+    // employer share. Off by default since it's state-specific and many
+    // orgs don't register for it (mirrors Zoho's Statutory Components tab).
+    lwf: {
+      enabled: { type: Boolean, default: false },
+      employeeAmount: { type: Number, default: 0, min: 0 }, // deducted from employee, per Pay Schedule cycle
+      employerAmount: { type: Number, default: 0, min: 0 }, // employer contribution, informational
+    },
+
+    // Statutory Bonus (Payment of Bonus Act) — an employer-cost accrual,
+    // 8.33%–20% of Basic, not deducted from the employee. Shown as an
+    // employer contribution line, same treatment as gratuity.
+    statutoryBonus: {
+      enabled: { type: Boolean, default: false },
+      percentOfBasic: { type: Number, default: 8.33, min: 0, max: 20 },
     },
 
     // Fixed, organisation-wide pay run schedule (mirrors the standard
