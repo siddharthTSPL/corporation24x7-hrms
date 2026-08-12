@@ -940,7 +940,7 @@ export default function ManagerDashboard() {
   const lb        = meData?.leavebalance?.[0] ?? null;
   const reportingManager = meData?.reportingManager ?? null; 
   const announcements = annData?.announcements ?? (Array.isArray(annData) ? annData : []);
-  const reviews = meData?.review ?? [];
+  const reviews = meData?.reviews ?? [];
 
   const myOwnAppliedLeaves = useMemo(() => {
     const raw = Array.isArray(myLeaveData) ? myLeaveData : [];
