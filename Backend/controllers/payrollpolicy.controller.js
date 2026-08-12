@@ -150,6 +150,63 @@ const removeAllowance = async (req, res) => {
   res.status(200).json({ success: true, policy });
 };
 
+// ---------- Pay Schedule (fixed org-wide run schedule) ----------
+
+const STANDARD_PAY_SCHEDULE = {
+  payFrequency: "Monthly",
+  workingDays: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+  payDay: 1,
+  firstPayPeriodMonth: null,
+  firstPayPeriodYear: null,
+  firstPayDate: null,
+  noOfWorkingDays: 30,
+  locked: false,
+};
+
+const getPaySchedule = async (req, res) => {
+  const organisation_id = req.admin.organisation_id;
+  const policy = await getOrCreatePolicy(organisation_id);
+  const paySchedule = policy.paySchedule?.toObject ? policy.paySchedule.toObject() : policy.paySchedule || STANDARD_PAY_SCHEDULE;
+  res.status(200).json({ success: true, paySchedule });
+};
+
+// Once locked (first payroll run processed against it), the schedule can
+// only be viewed, not edited — matches "Pay Schedule cannot be edited once
+// you process the first pay run."
+const setPaySchedule = async (req, res) => {
+  const organisation_id = req.admin.organisation_id;
+  const { workingDays, payDay, firstPayPeriodMonth, firstPayPeriodYear, firstPayDate, noOfWorkingDays } = req.body;
+
+  const policy = await getOrCreatePolicy(organisation_id);
+
+  if (policy.paySchedule?.locked) {
+    return res.status(409).json({
+      success: false,
+      message: "Pay Schedule cannot be edited once you process the first pay run.",
+    });
+  }
+
+  if (Array.isArray(workingDays)) policy.paySchedule.workingDays = workingDays;
+  if (typeof payDay === "number") {
+    if (payDay < 1 || payDay > 31) return res.status(400).json({ success: false, message: "payDay must be between 1 and 31" });
+    policy.paySchedule.payDay = payDay;
+  }
+  if (typeof firstPayPeriodMonth === "number") policy.paySchedule.firstPayPeriodMonth = firstPayPeriodMonth;
+  if (typeof firstPayPeriodYear === "number") policy.paySchedule.firstPayPeriodYear = firstPayPeriodYear;
+  if (firstPayDate) policy.paySchedule.firstPayDate = new Date(firstPayDate);
+  if (typeof noOfWorkingDays === "number") {
+    if (noOfWorkingDays < 1 || noOfWorkingDays > 31)
+      return res.status(400).json({ success: false, message: "noOfWorkingDays must be between 1 and 31" });
+    policy.paySchedule.noOfWorkingDays = noOfWorkingDays;
+  }
+
+  policy.updatedBy = req.admin._id;
+  policy.updatedByModel = req.actorModel || "Admin";
+  await policy.save();
+
+  res.status(200).json({ success: true, paySchedule: policy.paySchedule });
+};
+
 // ---------- Reset ----------
 
 const resetToStandard = async (req, res) => {
@@ -178,4 +235,6 @@ module.exports = {
   updateAllowance,
   removeAllowance,
   resetToStandard,
+  getPaySchedule,
+  setPaySchedule,
 };
