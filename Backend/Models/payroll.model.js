@@ -41,6 +41,12 @@ const payrollSchema = new mongoose.Schema(
       basic: { type: Number, default: 0 },
       hra: { type: Number, default: 0 },
       allowances: [{ name: String, amount: Number, _id: false }],
+      // Custom Deduction / Benefit / Reimbursement Salary Components active
+      // at generation time (Zoho-style Salary Components tabs), snapshotted
+      // here the same way `allowances` snapshots earnings.
+      deductionComponents: [{ name: String, amount: Number, _id: false }],
+      benefitComponents: [{ name: String, amount: Number, _id: false }],
+      reimbursementComponents: [{ name: String, amount: Number, isFBP: Boolean, _id: false }],
     },
 
     attendance: {
@@ -68,6 +74,8 @@ const payrollSchema = new mongoose.Schema(
       overtime: { type: Number, default: 0 },
       reimbursement: { type: Number, default: 0 },
       other: { type: Number, default: 0 },
+      benefits: { type: Number, default: 0 }, // total of active "benefit" Salary Components
+      reimbursementComponents: { type: Number, default: 0 }, // total of active "reimbursement" Salary Components
       totalEarnings: { type: Number, default: 0 },
     },
 
@@ -76,10 +84,12 @@ const payrollSchema = new mongoose.Schema(
       esi: { type: Number, default: 0 },
       professionalTax: { type: Number, default: 0 },
       tds: { type: Number, default: 0 },
+      lwf: { type: Number, default: 0 },
       lossOfPay: { type: Number, default: 0 },
       loan: { type: Number, default: 0 },
       advance: { type: Number, default: 0 },
       other: { type: Number, default: 0 },
+      components: { type: Number, default: 0 }, // total of active "deduction" Salary Components
       totalDeductions: { type: Number, default: 0 },
     },
 
@@ -87,6 +97,8 @@ const payrollSchema = new mongoose.Schema(
       pf: { type: Number, default: 0 },
       esi: { type: Number, default: 0 },
       gratuity: { type: Number, default: 0 }, // informational estimate, not deducted from employee
+      lwf: { type: Number, default: 0 },
+      statutoryBonus: { type: Number, default: 0 }, // informational estimate, not deducted from employee
     },
 
     netSalary: { type: Number, default: 0 },
