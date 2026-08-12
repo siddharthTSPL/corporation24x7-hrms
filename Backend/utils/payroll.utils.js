@@ -82,37 +82,76 @@ function calculateSalaryBreakup(ctc, policy) {
 /**
  * Computes a full month's payroll for one employee from their cached
  * SalaryStructure.breakup, the org's PayrollPolicy (for deduction rates),
- * and their AttendanceSummary for that month. `extras` carries one-off
+ * and either their AttendanceSummary for that month OR a manually typed-in
+ * "Paid Days" count (`manualAttendance`) for orgs that don't want to rely on
+ * the automatic attendance system for payroll. `extras` carries one-off
  * manual inputs entered at generation time (bonus, loan EMI, etc).
+ *
+ * manualAttendance (optional): { paidDays, workingDays?, calendarDays? }
+ *   When paidDays is a finite number, it wins over attendanceSummary
+ *   entirely — the admin is telling the system exactly how many days this
+ *   person is being paid for.
  */
-function calculatePayrollForMonth({ structure, policy, attendanceSummary, month, year, extras = {} }) {
+function calculatePayrollForMonth({ structure, policy, attendanceSummary, month, year, extras = {}, manualAttendance = null }) {
   const { monthlyGross, basic, hra, allowances } = structure.breakup;
 
-  const totalDays = daysInMonth(month, year);
-  const presentDays = attendanceSummary?.presentDays ?? totalDays; // no attendance record yet -> assume fully present
-  const halfDays = attendanceSummary?.halfDays ?? 0;
-  const absentDays = attendanceSummary?.absentDays ?? 0;
+  const calendarDaysInMonth = daysInMonth(month, year);
+  // Fixed denominator for per-day rate, matching standard payroll practice
+  // (e.g. a flat 30 "No. of Working Days" every month, set once on the
+  // org's Pay Schedule, rather than the actual day count of that month).
+  const scheduleWorkingDays = policy?.paySchedule?.noOfWorkingDays || calendarDaysInMonth;
 
-  // A half day counts as 0.5 day unpaid, same as half a day's absence.
-  const unpaidDays = absentDays + halfDays * 0.5;
-  const paidDays = Math.max(0, totalDays - unpaidDays);
+  const manualEntry = manualAttendance && Number.isFinite(Number(manualAttendance.paidDays));
 
-  const perDayRate = totalDays > 0 ? monthlyGross / totalDays : 0;
-  const lossOfPay = round2(perDayRate * unpaidDays);
+  let calendarDays, workingDays, paidDays, lopDays, halfDays, absentDays;
 
-  // ---- Deductions ----
+  if (manualEntry) {
+    calendarDays = Number.isFinite(Number(manualAttendance.calendarDays))
+      ? Number(manualAttendance.calendarDays)
+      : calendarDaysInMonth;
+    workingDays = Number.isFinite(Number(manualAttendance.workingDays))
+      ? Number(manualAttendance.workingDays)
+      : scheduleWorkingDays;
+    paidDays = Math.max(0, Number(manualAttendance.paidDays));
+    lopDays = Math.max(0, round2(workingDays - paidDays));
+    halfDays = 0;
+    absentDays = lopDays;
+  } else {
+    calendarDays = calendarDaysInMonth;
+    workingDays = scheduleWorkingDays;
+    const presentDays = attendanceSummary?.presentDays ?? workingDays; // no attendance record yet -> assume fully present
+    halfDays = attendanceSummary?.halfDays ?? 0;
+    absentDays = attendanceSummary?.absentDays ?? 0;
+    // A half day counts as 0.5 day unpaid, same as half a day's absence.
+    const unpaidDays = absentDays + halfDays * 0.5;
+    paidDays = Math.max(0, workingDays - unpaidDays);
+    lopDays = round2(unpaidDays);
+  }
+
+  // Pro-rate Basic/HRA/allowances down to what's actually earned for the
+  // paid days this month (LOP shows up here, in reduced Gross Earnings, the
+  // way a real payslip reads — not as a separate deduction line item).
+  const proration = workingDays > 0 ? Math.min(1, paidDays / workingDays) : 1;
+  const earnedBasic = round2(basic * proration);
+  const earnedHra = round2(hra * proration);
+  const earnedAllowances = (allowances || []).map((a) => ({ name: a.name, amount: round2(a.amount * proration) }));
+  const earnedGross = round2(earnedBasic + earnedHra + earnedAllowances.reduce((s, a) => s + a.amount, 0));
+  const lossOfPay = round2(monthlyGross - earnedGross);
+
+  // ---- Deductions (statutory deductions run on the EARNED basic, i.e.
+  // already reflect LOP for that month — standard practice) ----
   const pfEnabled = policy?.pf?.enabled !== false;
   const pfWage =
     pfEnabled && policy?.pf?.applyWageCeiling && policy?.pf?.wageCeiling
-      ? Math.min(basic, policy.pf.wageCeiling)
-      : basic;
+      ? Math.min(earnedBasic, policy.pf.wageCeiling)
+      : earnedBasic;
   const employeePF = pfEnabled ? round2(((policy?.pf?.employeePercent ?? 12) / 100) * pfWage) : 0;
   const employerPF = pfEnabled ? round2(((policy?.pf?.employerPercent ?? 12) / 100) * pfWage) : 0;
 
   const esiEligible = monthlyGross <= (policy?.esi?.wageThreshold ?? 21000);
   const esiEnabled = policy?.esi?.enabled === true && esiEligible;
-  const employeeESI = esiEnabled ? round2(((policy?.esi?.employeePercent ?? 0.75) / 100) * monthlyGross) : 0;
-  const employerESI = esiEnabled ? round2(((policy?.esi?.employerPercent ?? 3.25) / 100) * monthlyGross) : 0;
+  const employeeESI = esiEnabled ? round2(((policy?.esi?.employeePercent ?? 0.75) / 100) * earnedGross) : 0;
+  const employerESI = esiEnabled ? round2(((policy?.esi?.employerPercent ?? 3.25) / 100) * earnedGross) : 0;
 
   const professionalTax = policy?.professionalTax?.enabled !== false ? policy?.professionalTax?.monthlyAmount ?? 0 : 0;
 
@@ -122,21 +161,37 @@ function calculatePayrollForMonth({ structure, policy, attendanceSummary, month,
   const bonus = round2(extras.bonus || 0);
   const incentive = round2(extras.incentive || 0);
   const overtime = round2(extras.overtime || 0);
+  const reimbursement = round2(extras.reimbursement || 0);
   const otherEarnings = round2(extras.otherEarnings || 0);
   const loan = round2(extras.loan || 0);
   const advance = round2(extras.advance || 0);
   const otherDeductions = round2(extras.otherDeductions || 0);
 
-  const totalEarnings = round2(monthlyGross + bonus + incentive + overtime + otherEarnings);
+  const totalEarnings = round2(earnedGross + bonus + incentive + overtime + reimbursement + otherEarnings);
   const totalDeductions = round2(
-    employeePF + employeeESI + professionalTax + tds + lossOfPay + loan + advance + otherDeductions
+    employeePF + employeeESI + professionalTax + tds + loan + advance + otherDeductions
   );
   const netSalary = round2(totalEarnings - totalDeductions);
 
+  // Standard gratuity estimate (informational, employer cost only — not
+  // deducted from the employee): 15 days' basic per year of service,
+  // approximated monthly as 4.81% of Basic.
+  const gratuity = round2(earnedBasic * 0.0481);
+
   return {
-    breakup: { monthlyGross, basic, hra, allowances },
-    attendance: { daysInMonth: totalDays, presentDays, halfDays, absentDays, paidDays },
-    earnings: { gross: monthlyGross, bonus, incentive, overtime, other: otherEarnings, totalEarnings },
+    breakup: { monthlyGross, basic: earnedBasic, hra: earnedHra, allowances: earnedAllowances },
+    attendance: {
+      daysInMonth: calendarDays,
+      presentDays: paidDays,
+      halfDays,
+      absentDays,
+      paidDays,
+      calendarDays,
+      workingDays,
+      lopDays,
+      manualEntry: !!manualEntry,
+    },
+    earnings: { gross: earnedGross, bonus, incentive, overtime, reimbursement, other: otherEarnings, totalEarnings },
     deductions: {
       pf: employeePF,
       esi: employeeESI,
@@ -148,7 +203,7 @@ function calculatePayrollForMonth({ structure, policy, attendanceSummary, month,
       other: otherDeductions,
       totalDeductions,
     },
-    employerContribution: { pf: employerPF, esi: employerESI },
+    employerContribution: { pf: employerPF, esi: employerESI, gratuity },
     netSalary,
   };
 }
