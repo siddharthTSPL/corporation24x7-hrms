@@ -31,6 +31,14 @@ const resolveOrganisationId = async (user) => {
 
 const displayMinutes = (mins) => Math.round(mins || 0);
 
+// A channel's last-known status stays "valid" for this long after its own
+// last ping before we stop trusting it for the OR-merge below. Set to 1.5x
+// the ping interval (60s) both clients use, so one normally-timed ping
+// from a channel is always still fresh, but a channel that has actually
+// stopped (agent closed, tab closed) doesn't get treated as "active"
+// forever off a stale reading.
+const CHANNEL_STALE_MS = 90_000;
+
 // Status must be judged differently depending on WHETHER a channel is even
 // capable of measuring active work:
 //   - manual/system: the desktop agent sends periodic /activity heartbeat
@@ -267,28 +275,43 @@ const activity = async (req, res) => {
 
     const now = Date.now();
 
-    // Credit elapsed time against THIS channel's own last ping, not a
-    // single shared `lastUpdated`. Previously both channels overwrote the
-    // same field, so whichever ping happened to land last "won" the whole
-    // gap - a race condition that could silently flip a real idle stretch
-    // to active (or vice versa) depending on network timing alone.
-    // Each channel now accrues strictly its own elapsed time, so a slow/
-    // delayed ping from one channel can no longer eat or overwrite the
-    // other channel's window. Behaviour stays exactly as lenient as
-    // before (still OR-based: either channel reporting "active" credits
-    // active for its own slice) - this only fixes attribution, not the
-    // detection strictness.
     if (!attendance.channelPings) attendance.channelPings = {};
-    const prevChannelUpdate = attendance.channelPings[channel]?.lastUpdated || attendance.lastUpdated || now;
-    const elapsedMs = now - prevChannelUpdate;
+
+    // Credit elapsed wall-clock time against ONE shared clock
+    // (lastAccountedAt), not per-channel. The previous version accrued
+    // each channel's own elapsed-since-its-own-last-ping separately into
+    // the same activeMinutes/idleMinutes totals - that fixed the old
+    // "whichever ping lands last wins" race, but it meant that whenever
+    // both the browser tab AND the desktop (.exe) agent were pinging
+    // during the same session (the normal case, not an edge case), the
+    // same real minute got credited TWICE - once from each channel. That
+    // is why activeMinutes + idleMinutes could add up to well more than
+    // the actual session duration (e.g. 39m of active+idle inside a 29m
+    // session).
+    //
+    // Fix: only ONE clock ever advances and gets time credited against
+    // it. Whichever channel's ping happens to arrive first for a given
+    // window claims that slice; the OTHER channel's still-fresh status
+    // (from channelPings, within CHANNEL_STALE_MS of its own last ping)
+    // is OR'd in purely to decide active-vs-idle for that slice, exactly
+    // like before - it just no longer ALSO adds its own separate slice of
+    // minutes on top.
+    const prevAccountedAt = attendance.lastAccountedAt || attendance.lastUpdated || now;
+    const elapsedMs = now - prevAccountedAt;
     const elapsedMinutes = Math.min(Math.max(elapsedMs, 0) / 60000, 3);
 
+    const otherChannel = channel === "browser" ? "agent" : "browser";
+    const other = attendance.channelPings[otherChannel];
+    const otherIsFresh = !!other?.lastUpdated && now - other.lastUpdated <= CHANNEL_STALE_MS;
+    const mergedStatus = status === "active" || (otherIsFresh && other.status === "active") ? "active" : "idle";
+
     if (attendance.source === "manual") {
-      if (status === "active") attendance.activeMinutes += elapsedMinutes;
+      if (mergedStatus === "active") attendance.activeMinutes += elapsedMinutes;
       else attendance.idleMinutes += elapsedMinutes;
     }
 
     attendance.channelPings[channel] = { lastUpdated: now, status };
+    attendance.lastAccountedAt = now;
     attendance.lastUpdated = now; // kept for display/back-compat only
     attendance.markModified("channelPings");
     await attendance.save();
