@@ -4,18 +4,27 @@ const Manager = require("../Models/manager.model");
 const Admin = require("../Models/Admin.model");
 const User = require("../Models/user.model");
 const { resolveActor, resolveOrgId, httpError } = require("../utils/heirarchy.utils");
+const { getISTDateParts, istDateFromYMD, parseISTDateOnly } = require("../utils/Istdate.utils");
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
+// Computes Monday 00:00 IST .. next Monday 00:00 IST for the IST calendar
+// week that `anyDateInWeek` falls in. Built on the IST date utils instead of
+// Date.getDay()/setDate()/setHours(), which read/write the SERVER PROCESS's
+// local timezone - correct on a box set to Asia/Kolkata, wrong (usually UTC)
+// on a virtual server, which shifts week boundaries and drops time logs.
 const getWeekBounds = (anyDateInWeek) => {
-  const date = new Date(anyDateInWeek);
-  const day = date.getDay();
-  const diffToMonday = day === 0 ? -6 : 1 - day;
-  const start = new Date(date);
-  start.setDate(date.getDate() + diffToMonday);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 7);
+  const anchor =
+    typeof anyDateInWeek === "string" && /^\d{4}-\d{2}-\d{2}/.test(anyDateInWeek)
+      ? parseISTDateOnly(anyDateInWeek)
+      : new Date(anyDateInWeek);
+
+  const { year, month, day, weekday } = getISTDateParts(anchor);
+  const diffToMonday = weekday === 0 ? -6 : 1 - weekday;
+
+  const mondayUTCInstant = istDateFromYMD(year, month, day).getTime() + diffToMonday * 24 * 60 * 60 * 1000;
+  const start = new Date(mondayUTCInstant);
+  const end = new Date(mondayUTCInstant + 7 * 24 * 60 * 60 * 1000);
   return { start, end };
 };
 
