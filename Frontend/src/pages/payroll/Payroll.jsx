@@ -681,7 +681,26 @@ function emptyComponentForm(category) {
   };
 }
 
-function ComponentValueFields({ value, onChange, disabled }) {
+function ComponentValueFields({ value, onChange, disabled, onUnlock }) {
+  // A component still flagged isBalancing always absorbs whatever gross is
+  // left over — its calculationType/formula is never actually used, so
+  // don't offer a dropdown that would look editable but silently do
+  // nothing. Offer a one-click way to convert it into a normal component.
+  if (value.isBalancing) {
+    return (
+      <div className="flex items-center gap-2 flex-wrap">
+        <span style={{ fontSize: 12.5, color: "#b0948a", fontStyle: "italic" }}>Auto — fills remaining gross</span>
+        {onUnlock && (
+          <button
+            onClick={onUnlock}
+            style={{ background: "none", border: "none", color: "#378ADD", cursor: "pointer", fontSize: 12, fontWeight: 600, padding: 0 }}
+          >
+            Make it a normal allowance
+          </button>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="flex items-center gap-3 flex-wrap">
       <Select value={value.calculationType} onChange={(e) => onChange({ ...value, calculationType: e.target.value })} disabled={disabled} style={{ maxWidth: 160 }}>
@@ -713,7 +732,14 @@ function ComponentsTab({ notify }) {
   const [newComponent, setNewComponent] = useState(emptyComponentForm("earning"));
 
   useEffect(() => {
-    if (data?.policy) setForm(JSON.parse(JSON.stringify(data.policy)));
+    if (data?.policy) {
+      const policy = JSON.parse(JSON.stringify(data.policy));
+      // Stable client-side key = the name this component was saved under,
+      // so renaming the "name" field in the input doesn't lose track of
+      // which server-side record to PUT/rename.
+      policy.allowances = (policy.allowances || []).map((a) => ({ ...a, _key: a.name }));
+      setForm(policy);
+    }
   }, [data]);
 
   useEffect(() => {
@@ -758,21 +784,27 @@ function ComponentsTab({ notify }) {
     );
   };
 
+  // Natural order (whatever order they were added in) — nothing is forced
+  // to the top.
   const rows = (form.allowances || []).filter((a) => (a.category || "earning") === category);
 
-  const handleField = (name, patch) => {
+  const handleField = (key, patch) => {
     setForm((prev) => ({
       ...prev,
-      allowances: prev.allowances.map((a) => (a.name === name ? { ...a, ...patch } : a)),
+      allowances: prev.allowances.map((a) => (a._key === key ? { ...a, ...patch } : a)),
     }));
   };
 
   const commit = (a) => {
+    const renamed = a.name !== a._key;
+    if (renamed && !a.name.trim()) return notify("Component name can't be empty", "error");
     updateAllowance(
       {
-        name: a.name,
+        name: a._key,
         data: {
           calculationType: a.calculationType || "flat",
+          percentOfBasic: a.percentOfBasic,
+          percentOfCTC: a.percentOfCTC,
           percentOfGross: a.percentOfGross,
           flatAmount: a.flatAmount,
           formula: a.formula,
@@ -780,16 +812,39 @@ function ComponentsTab({ notify }) {
           considerForEPF: a.considerForEPF,
           considerForESI: a.considerForESI,
           isFBP: a.isFBP,
+          ...(renamed ? { newName: a.name } : {}),
         },
       },
-      { onSuccess: () => notify(`"${a.name}" updated`, "success"), onError: (e) => notify(getErrorMessage(e), "error") }
+      {
+        onSuccess: () => {
+          notify(`"${a.name}" updated`, "success");
+          if (renamed) setForm((prev) => ({ ...prev, allowances: prev.allowances.map((x) => (x._key === a._key ? { ...x, _key: a.name } : x)) }));
+        },
+        onError: (e) => notify(getErrorMessage(e), "error"),
+      }
+    );
+  };
+
+  // Converts a legacy locked/auto-balancing component (e.g. an old "Special
+  // Allowance") into a normal one, so its calculation type/formula actually
+  // takes effect from then on.
+  const handleUnlock = (a) => {
+    updateAllowance(
+      { name: a._key, data: { isBalancing: false } },
+      {
+        onSuccess: () => {
+          notify(`"${a.name}" is now a normal, editable allowance`, "success");
+          setForm((prev) => ({ ...prev, allowances: prev.allowances.map((x) => (x._key === a._key ? { ...x, isBalancing: false } : x)) }));
+        },
+        onError: (e) => notify(getErrorMessage(e), "error"),
+      }
     );
   };
 
   const handleDelete = (a) => {
     if (a.isBalancing) return;
     if (!window.confirm(`Remove component "${a.name}"?`)) return;
-    removeAllowance(a.name, {
+    removeAllowance(a._key, {
       onSuccess: () => notify("Component removed", "success"),
       onError: (e) => notify(getErrorMessage(e), "error"),
     });
@@ -896,30 +951,37 @@ function ComponentsTab({ notify }) {
               </tr>
             )}
             {rows.map((a) => (
-              <tr key={a.name} style={{ borderTop: `1px solid ${C.border}` }}>
-                <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text, verticalAlign: "top" }}>
-                  <span className="break-words">{a.name}</span> {a.isBalancing && <Badge color={C.blue} bg={C.blueBg}>Balancing</Badge>}
+              <tr key={a._key} style={{ borderTop: `1px solid ${C.border}` }}>
+                <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <TextInput
+                      value={a.name}
+                      onChange={(e) => handleField(a._key, { name: e.target.value })}
+                      style={{ maxWidth: 160, fontWeight: 600 }}
+                    />
+                    {a.isBalancing && <Badge color={C.blue} bg={C.blueBg}>Locked</Badge>}
+                  </div>
                 </td>
                 <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
-                  <ComponentValueFields value={a} onChange={(patch) => handleField(a.name, patch)} disabled={false} />
+                  <ComponentValueFields value={a} onChange={(patch) => handleField(a._key, patch)} disabled={false} onUnlock={a.isBalancing ? () => handleUnlock(a) : undefined} />
                 </td>
                 {showEpfEsiCols && (
                   <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
-                    <Toggle checked={a.considerForEPF !== false} onChange={(v) => handleField(a.name, { considerForEPF: v })} />
+                    <Toggle checked={a.considerForEPF !== false} onChange={(v) => handleField(a._key, { considerForEPF: v })} />
                   </td>
                 )}
                 {showEpfEsiCols && (
                   <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
-                    <Toggle checked={a.considerForESI !== false} onChange={(v) => handleField(a.name, { considerForESI: v })} />
+                    <Toggle checked={a.considerForESI !== false} onChange={(v) => handleField(a._key, { considerForESI: v })} />
                   </td>
                 )}
                 {showFbpCol && (
                   <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
-                    <Toggle checked={!!a.isFBP} onChange={(v) => handleField(a.name, { isFBP: v })} />
+                    <Toggle checked={!!a.isFBP} onChange={(v) => handleField(a._key, { isFBP: v })} />
                   </td>
                 )}
                 <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
-                  <Toggle checked={!!a.enabled} onChange={(v) => handleField(a.name, { enabled: v })} disabled={a.isBalancing} />
+                  <Toggle checked={!!a.enabled} onChange={(v) => handleField(a._key, { enabled: v })} disabled={a.isBalancing} />
                 </td>
                 <td style={{ padding: "8px 10px", whiteSpace: "nowrap", verticalAlign: "top" }}>
                   <GhostButton onClick={() => commit(a)} style={{ marginRight: 8 }}>Save</GhostButton>
@@ -936,7 +998,10 @@ function ComponentsTab({ notify }) {
       </div>
       {category === "earning" && (
         <p style={{ fontSize: 11.5, color: C.muted, marginTop: 12 }}>
-          The "Balancing" earning absorbs whatever gross remains after Basic, HRA and every other earning — it always stays enabled.
+          Every earning here — including "Fixed Allowance" — can be flat, % of Gross/Basic/CTC, or a custom formula (e.g.{" "}
+          <code>basic*0.1 + 500</code>), and it's actually used when payroll runs. Any part of the gross nothing accounts for
+          shows up automatically as "Other Allowance". A <Badge color={C.blue} bg={C.blueBg}>Locked</Badge> row is a legacy
+          auto-balancing component — click "Make it a normal allowance" to free it up.
         </p>
       )}
     </Card>
@@ -1355,6 +1420,94 @@ function PayslipSection({ title, children }) {
   );
 }
 
+// Opens a print-formatted payslip in a new tab and triggers the browser's
+// print dialog, where "Save as PDF" gives a real downloadable file — no
+// extra PDF library/dependency needed.
+function downloadPayslip({ payroll, name, employeeId, department, designation }) {
+  const att = payroll.attendance || {};
+  const allowanceRows = (payroll.breakup?.allowances || [])
+    .map((a) => `<tr><td>${a.name}</td><td class="amt">${fmtINR(a.amount)}</td></tr>`)
+    .join("");
+  const period = `${MONTH_NAMES[payroll.month - 1]} ${payroll.year}`;
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Payslip - ${name} - ${period}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #2a1a16; padding: 32px; max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { color: #8a7a74; font-size: 12px; margin-bottom: 20px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+  th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px; color: #8a7a74; padding: 4px 0; border-bottom: 1px solid #ede5e0; }
+  td { font-size: 13px; padding: 5px 0; border-bottom: 1px solid #f3ede9; }
+  td.amt, th.amt { text-align: right; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; margin-bottom: 20px; font-size: 13px; }
+  .grid .lbl { color: #8a7a74; }
+  .total-row td { font-weight: 700; border-top: 2px solid #2a1a16; border-bottom: none; }
+  .net { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-top: 2px solid #2a1a16; border-bottom: 2px solid #2a1a16; margin: 18px 0; }
+  .net .lbl { font-size: 14px; font-weight: 700; }
+  .net .val { font-size: 18px; font-weight: 800; }
+  @media print { body { padding: 0; } }
+</style>
+</head>
+<body>
+  <h1>Payslip</h1>
+  <div class="sub">Pay Period: ${period}${payroll.status ? " · " + payroll.status.toUpperCase().replace("_", " ") : ""}</div>
+
+  <div class="grid">
+    <div><span class="lbl">Employee: </span>${name}</div>
+    <div><span class="lbl">Employee ID: </span>${employeeId}</div>
+    <div><span class="lbl">Department: </span>${department}</div>
+    <div><span class="lbl">Designation: </span>${designation}</div>
+    <div><span class="lbl">Paid Days: </span>${att.paidDays ?? "—"} / ${att.workingDays ?? "—"}</div>
+    <div><span class="lbl">LOP Days: </span>${att.lopDays ?? "—"}</div>
+  </div>
+
+  <table>
+    <thead><tr><th>Earnings</th><th class="amt">Amount</th></tr></thead>
+    <tbody>
+      <tr><td>Basic</td><td class="amt">${fmtINR(payroll.breakup?.basic)}</td></tr>
+      <tr><td>HRA</td><td class="amt">${fmtINR(payroll.breakup?.hra)}</td></tr>
+      ${allowanceRows}
+      <tr><td>Bonus</td><td class="amt">${fmtINR(payroll.earnings?.bonus)}</td></tr>
+      <tr><td>Overtime</td><td class="amt">${fmtINR(payroll.earnings?.overtime)}</td></tr>
+      <tr><td>Reimbursement</td><td class="amt">${fmtINR(payroll.earnings?.reimbursement)}</td></tr>
+      <tr class="total-row"><td>GROSS EARNINGS</td><td class="amt">${fmtINR(payroll.earnings?.totalEarnings)}</td></tr>
+    </tbody>
+  </table>
+
+  <table>
+    <thead><tr><th>Deductions</th><th class="amt">Amount</th></tr></thead>
+    <tbody>
+      <tr><td>Employee PF</td><td class="amt">${fmtINR(payroll.deductions?.pf)}</td></tr>
+      <tr><td>ESI</td><td class="amt">${fmtINR(payroll.deductions?.esi)}</td></tr>
+      <tr><td>Professional Tax</td><td class="amt">${fmtINR(payroll.deductions?.professionalTax)}</td></tr>
+      <tr><td>TDS</td><td class="amt">${fmtINR(payroll.deductions?.tds)}</td></tr>
+      <tr><td>Loan EMI</td><td class="amt">${fmtINR(payroll.deductions?.loan)}</td></tr>
+      <tr><td>Other Deduction</td><td class="amt">${fmtINR((payroll.deductions?.advance || 0) + (payroll.deductions?.other || 0))}</td></tr>
+      <tr class="total-row"><td>TOTAL DEDUCTIONS</td><td class="amt">${fmtINR(payroll.deductions?.totalDeductions)}</td></tr>
+    </tbody>
+  </table>
+
+  <div class="net">
+    <span class="lbl">NET PAY</span>
+    <span class="val">${fmtINR(payroll.netSalary)}</span>
+  </div>
+
+  <script>window.onload = function() { window.print(); };</script>
+</body>
+</html>`;
+
+  const win = window.open("", "_blank");
+  if (!win) return;
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+}
+
 function PayslipModal({ payroll, directory, onClose }) {
   if (!payroll) return null;
   const snap = payroll.employeeSnapshot || {};
@@ -1374,7 +1527,14 @@ function PayslipModal({ payroll, directory, onClose }) {
       >
         <div className="flex items-center justify-between mb-3 gap-3">
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: C.text }}>Payslip</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: C.muted, flexShrink: 0 }}>×</button>
+          <div className="flex items-center gap-2">
+            {payroll.status === "paid" && (
+              <GhostButton onClick={() => downloadPayslip({ payroll, name, employeeId, department, designation })}>
+                Download
+              </GhostButton>
+            )}
+            <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: C.muted, flexShrink: 0 }}>×</button>
+          </div>
         </div>
 
         {/* Employee details */}
@@ -1515,6 +1675,24 @@ function RecordsTab({ notify, directory }) {
                   <td style={{ padding: "8px 10px" }}>{statusBadge(p.status)}</td>
                   <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
                     <GhostButton onClick={() => setSelected(p)} style={{ marginRight: 8 }}>View Payslip</GhostButton>
+                    {p.status === "paid" && (
+                      <GhostButton
+                        onClick={() => {
+                          const snap = p.employeeSnapshot || {};
+                          const person = directory.byId.get(String(p.employee));
+                          downloadPayslip({
+                            payroll: p,
+                            name: snap.name || person?.name || resolveName(directory, p.employee, p.employeeModel),
+                            employeeId: snap.employeeId || person?.uid || "—",
+                            department: snap.department || "—",
+                            designation: snap.designation || "—",
+                          });
+                        }}
+                        style={{ marginRight: 8 }}
+                      >
+                        Download
+                      </GhostButton>
+                    )}
                     {p.status === "generated" && <GhostButton onClick={() => handleStatus(p._id, "approved")} style={{ marginRight: 8 }}>Approve</GhostButton>}
                     {p.status === "approved" && <GhostButton onClick={() => handleStatus(p._id, "paid")} style={{ marginRight: 8 }}>Mark Paid</GhostButton>}
                     {p.status !== "on_hold" && p.status !== "paid" && <GhostButton onClick={() => handleStatus(p._id, "on_hold")}>Hold</GhostButton>}

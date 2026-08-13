@@ -32,11 +32,12 @@ const allowanceSchema = new mongoose.Schema(
     // so nothing that already ran breaks.
     calculationType: {
       type: String,
-      enum: ["flat", "percentOfBasic", "percentOfCTC", "formula"],
+      enum: ["flat", "percentOfBasic", "percentOfCTC", "percentOfGross", "formula"],
       default: "flat",
     },
     percentOfBasic: { type: Number, default: 0, min: 0 }, // used when calculationType is percentOfBasic (or legacy: flatAmount is 0)
     percentOfCTC: { type: Number, default: 0, min: 0 }, // used when calculationType is percentOfCTC
+    percentOfGross: { type: Number, default: 0, min: 0 }, // used when calculationType is percentOfGross
     flatAmount: { type: Number, default: 0, min: 0 }, // flat rupees/month
     // Custom formula, e.g. "basic*0.1 + 500". Only these variables are
     // available: basic, gross (monthly gross), ctc (annual), hra.
@@ -86,7 +87,13 @@ const payrollPolicySchema = new mongoose.Schema(
       default: [
         { name: "Medical Allowance", flatAmount: 1250, enabled: true, isBalancing: false },
         { name: "Conveyance Allowance", flatAmount: 1600, enabled: true, isBalancing: false },
-        { name: "Special Allowance", flatAmount: 0, enabled: true, isBalancing: true },
+        // Fully editable earning — flat / % of Basic / % of Gross / % of CTC /
+        // custom formula, whichever the admin picks. NOT a balancing
+        // component, so its calculationType/formula is always actually used
+        // when payroll is computed. Any leftover gross that nothing accounts
+        // for is automatically shown as its own "Other Allowance" line by
+        // calculateSalaryBreakup — no locked/forced component needed.
+        { name: "Fixed Allowance", flatAmount: 0, enabled: true, isBalancing: false },
       ],
     },
 
