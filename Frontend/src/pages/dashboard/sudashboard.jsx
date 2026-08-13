@@ -1782,9 +1782,11 @@ function SuperAdminDashboard() {
         .animate-\\[modalUp_0\\.22s_ease-out\\] { animation: modalUp 0.22s ease-out; }
       `}</style>
 
-      <div className="relative bg-gradient-to-br from-[#2a0017] via-[#730042] to-[#cd166e] rounded-2xl p-4 sm:p-8 lg:p-10 mb-5 sm:mb-6 overflow-hidden shadow-xl">
-        <div className="absolute top-0 right-0 w-40 sm:w-64 h-40 sm:h-64 rounded-full bg-white/5 -translate-y-1/3 translate-x-1/4 pointer-events-none" />
-        <div className="absolute bottom-0 left-1/3 w-32 sm:w-48 h-32 sm:h-48 rounded-full bg-white/3 translate-y-1/2 pointer-events-none" />
+      <div className="relative bg-gradient-to-br from-[#2a0017] via-[#730042] to-[#cd166e] rounded-2xl p-4 sm:p-8 lg:p-10 mb-5 sm:mb-6 shadow-xl">
+        <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
+          <div className="absolute top-0 right-0 w-40 sm:w-64 h-40 sm:h-64 rounded-full bg-white/5 -translate-y-1/3 translate-x-1/4" />
+          <div className="absolute bottom-0 left-1/3 w-32 sm:w-48 h-32 sm:h-48 rounded-full bg-white/3 translate-y-1/2" />
+        </div>
 
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-3 sm:mb-4">
