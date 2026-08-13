@@ -32,12 +32,11 @@ const allowanceSchema = new mongoose.Schema(
     // so nothing that already ran breaks.
     calculationType: {
       type: String,
-      enum: ["flat", "percentOfBasic", "percentOfCTC", "percentOfGross", "formula"],
+      enum: ["flat", "percentOfBasic", "percentOfCTC", "formula"],
       default: "flat",
     },
     percentOfBasic: { type: Number, default: 0, min: 0 }, // used when calculationType is percentOfBasic (or legacy: flatAmount is 0)
     percentOfCTC: { type: Number, default: 0, min: 0 }, // used when calculationType is percentOfCTC
-    percentOfGross: { type: Number, default: 0, min: 0 }, // used when calculationType is percentOfGross
     flatAmount: { type: Number, default: 0, min: 0 }, // flat rupees/month
     // Custom formula, e.g. "basic*0.1 + 500". Only these variables are
     // available: basic, gross (monthly gross), ctc (annual), hra.
@@ -87,18 +86,7 @@ const payrollPolicySchema = new mongoose.Schema(
       default: [
         { name: "Medical Allowance", flatAmount: 1250, enabled: true, isBalancing: false },
         { name: "Conveyance Allowance", flatAmount: 1600, enabled: true, isBalancing: false },
-        // Fully editable — flat / % of Basic / % of Gross / % of CTC / custom
-        // formula, whichever the admin picks. This is a normal named earning,
-        // NOT the balancing one, so its calculationType/formula is always
-        // actually used when payroll is computed.
-        { name: "Fixed Allowance", flatAmount: 0, enabled: true, isBalancing: false },
-        // The ONE component that must always exist and stays locked on:
-        // it silently absorbs whatever gross is left over after Basic, HRA
-        // and every other earning above, so the breakup always reconciles
-        // back to the monthly gross exactly. Because of that, its own
-        // calculationType/formula is intentionally never evaluated — see
-        // computeComponentAmount / calculateSalaryBreakup in payroll.utils.js.
-        { name: "Top-up Allowance", flatAmount: 0, enabled: true, isBalancing: true },
+        { name: "Special Allowance", flatAmount: 0, enabled: true, isBalancing: true },
       ],
     },
 
