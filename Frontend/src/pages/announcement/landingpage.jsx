@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   FiMenu, FiX, FiArrowRight, FiCheck,
@@ -1033,13 +1033,12 @@ function LegalModal({ docKey, onClose }) {
 function Footer() {
   const cols = [
     { title: 'Product', links: [
-     { label: 'Talent', href: 'https://torchxsuite.com/talent/' },
+      { label: 'Talent', href: 'https://torchxsuite.com/talent/' },
       { label: 'Engage', href: '' },
       { label: 'Finance', href: '' },
       { label: 'Inventory', href: '' },
       { label: 'Payroll', href: '' },
     ] },
-
     { title: 'Solutions', links: [
       { label: 'Features', href: '#features' },
       { label: 'Pricing', href: '#pricing' },
@@ -1070,7 +1069,9 @@ function Footer() {
               <div className="flex gap-2.5">
                 {socials.map((s, i) => (
                   <a
-                    key={i} href={s.href} aria-label={s.label}
+                    key={i}
+                    href={s.href}
+                    aria-label={s.label}
                     className="text-[#7A004B] text-lg no-underline w-[34px] h-[34px] rounded-full flex items-center justify-center transition-all hover:-translate-y-0.5 hover:text-[#5a0033]"
                   >
                     {s.icon}
@@ -1085,12 +1086,21 @@ function Footer() {
                 <ul className="list-none p-0 m-0 flex flex-col gap-3">
                   {col.links.map(l => (
                     <li key={l.label}>
-                      <a
-                        href={l.href}
-                        className="text-base text-[#7A004B] no-underline transition-colors hover:text-[#5a0033]"
-                      >
-                        {l.label}
-                      </a>
+                      {l.href ? (
+                        <a
+                          href={l.href}
+                          className="text-base text-[#7A004B] no-underline transition-colors hover:text-[#5a0033]"
+                        >
+                          {l.label}
+                        </a>
+                      ) : (
+                        <Link
+                          to={`/coming-soon?product=${encodeURIComponent(l.label)}`}
+                          className="text-base text-[#7A004B] no-underline transition-colors hover:text-[#5a0033]"
+                        >
+                          {l.label}
+                        </Link>
+                      )}
                     </li>
                   ))}
                 </ul>

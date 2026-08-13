@@ -7,6 +7,8 @@ import LandingPage from "./pages/announcement/landingpage";
 const Login = lazy(() => import("./pages/auth/Login"));
 const Signup = lazy(() => import("./pages/auth/Signup"));
 
+const ComingSoon = lazy(() => import("./components/ComingSoon"));
+
 const FaceKiosk = lazy(() => import("./pages/attendance/FaceKiosk"));
 const FaceEnrollment = lazy(() => import("./pages/attendance/FaceEnrollment"));
 
@@ -170,6 +172,7 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/coming-soon" element={<ComingSoon />} /> 
           <Route path="/redirect" element={<RoleBasedRedirect />} />
 
           {/* Public — this is a shared kiosk device, not a logged-in person.
