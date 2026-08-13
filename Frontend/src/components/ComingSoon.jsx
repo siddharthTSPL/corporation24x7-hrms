@@ -33,21 +33,21 @@ const PRODUCT_COPY = {
     'Automated payroll runs, payslips, and compliance — without the spreadsheet juggling.',
 }
 
-// Different colors for every letter
+// Different color for every letter
 const LETTER_COLORS = [
-  '#7A004B', // C - Beetroot
-  '#CD166E', // O - Magenta
-  '#F2794F', // M - Orange
-  '#5A0033', // I - Dark Beetroot
-  '#B85A86', // N - Dusty Pink
-  '#FF9457', // G - Peach
-  '#7A004B', // S - Beetroot
-  '#CD166E', // O - Pink
-  '#F2794F', // O - Orange
-  '#eb002b', // N - Dark Beetroot
+  '#7A004B',
+  '#CD166E',
+  '#F2794F',
+  '#5A0033',
+  '#B85A86',
+  '#FF9457',
+  '#7A004B',
+  '#CD166E',
+  '#F2794F',
+  '#EB002B',
 ]
 
-// Floating colorful balls
+// Floating balls
 const BALLS = [
   {
     size: 130,
@@ -134,10 +134,14 @@ function FloatingBalls() {
         <motion.div
           key={i}
           aria-hidden
-          className="absolute rounded-full pointer-events-none"
+          className="
+            absolute
+            rounded-full
+            pointer-events-none
+          "
           style={{
-            width: b.size,
-            height: b.size,
+            width: `clamp(${Math.max(b.size * 0.45, 18)}px, ${b.size / 2}px, ${b.size}px)`,
+            height: `clamp(${Math.max(b.size * 0.45, 18)}px, ${b.size / 2}px, ${b.size}px)`,
             top: b.top,
             left: b.left,
             background: `radial-gradient(
@@ -180,115 +184,201 @@ export default function ComingSoon() {
   const title = 'COMING SOON'
 
   return (
-    <div className="min-h-screen bg-[#EFE6F2] relative overflow-hidden cs-body">
+    <div
+      className="
+        min-h-[100svh]
+        bg-[#EFE6F2]
+        relative
+        overflow-x-hidden
+        overflow-y-hidden
+        cs-body
+      "
+    >
       <style>{fontStyles}</style>
 
       {/* Floating colorful balls */}
       <FloatingBalls />
 
-      <div className="relative z-10 flex flex-col min-h-screen">
+      <div className="relative z-10 flex flex-col min-h-[100svh]">
 
-        {/* Header */}
-        <header className="flex items-center justify-between px-6 sm:px-12 pt-6">
+        {/* ================= HEADER ================= */}
+        <header
+          className="
+            flex
+            items-center
+            justify-between
+
+            px-4
+            py-5
+
+            sm:px-8
+            sm:py-6
+
+            md:px-10
+
+            lg:px-14
+            lg:py-7
+
+            xl:px-16
+          "
+        >
           <img
             src={logo}
             alt="TorchX"
-            className="h-8 sm:h-9 w-auto object-contain"
+            className="
+              h-7
+              w-auto
+
+              sm:h-8
+
+              md:h-9
+
+              lg:h-10
+            "
           />
 
           <Link
             to="/"
             className="
               cs-ui
-              text-sm
+              text-xs
               font-semibold
               text-[#7A004B]
+
               underline
               underline-offset-4
               decoration-[#7A004B]/50
-              hover:text-[#5a0033]
+
+              hover:text-[#5A0033]
+
               transition-colors
+              duration-200
+
+              sm:text-sm
+
+              md:text-base
             "
           >
             Home
           </Link>
         </header>
 
-        {/* Main Content */}
-        <main className="flex-1 flex flex-col justify-center px-5 sm:px-10 lg:px-16">
+        {/* ================= MAIN ================= */}
+        <main
+          className="
+            flex-1
+            flex
+            flex-col
+            justify-center
 
-          {/* COMING SOON */}
-          <motion.h1
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{
-              duration: 0.5,
-              ease: 'easeOut',
-            }}
-            className="
-              cs-display
-              font-black
-              leading-[0.92]
-              text-center
-              tracking-tight
-              select-none
-              text-[16vw]
-              sm:text-[11vw]
-              lg:text-[9.5vw]
-              whitespace-nowrap
-            "
-          >
-            {title.split('').map((letter, index) => {
-              // Keep the space between COMING and SOON
-              if (letter === ' ') {
-                return (
-                  <span
-                    key={index}
-                    className="inline-block w-[0.25em]"
-                    aria-hidden
-                  >
-                    &nbsp;
-                  </span>
-                )
-              }
+            px-4
 
-              return (
-                <motion.span
-                  key={index}
-                  className="inline-block"
-                  style={{
-                    color: LETTER_COLORS[index],
-                  }}
-                  initial={{
-                    opacity: 0,
-                    y: 30,
-                    scale: 0.92,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                    scale: 1,
-                  }}
-                  transition={{
-                    duration: 0.45,
-                    delay: index * 0.07,
-                    ease: [0.22, 1, 0.36, 1],
-                  }}
-                  whileHover={{
-                    y: -8,
-                    scale: 1.04,
-                    transition: {
-                      duration: 0.2,
-                    },
-                  }}
-                >
-                  {letter}
-                </motion.span>
-              )
-            })}
-          </motion.h1>
+            sm:px-8
 
-          {/* Product Message */}
+            md:px-10
+
+            lg:px-14
+
+            xl:px-16
+          "
+        >
+
+          {/* ================= COMING SOON ================= */}
+         <motion.h1
+  initial={{ opacity: 0 }}
+  animate={{ opacity: 1 }}
+  transition={{
+    duration: 0.5,
+    ease: 'easeOut',
+  }}
+  className="
+    cs-display
+    font-black
+    leading-[0.88]
+    text-center
+    tracking-[-0.055em]
+    select-none
+    w-full
+    mx-auto
+
+    text-[18vw]
+
+    sm:text-[11vw]
+    md:text-[10vw]
+    lg:text-[8.5vw]
+    xl:text-[8vw]
+    2xl:text-[7.5vw]
+  "
+>
+  {/* COMING */}
+  <span className="block whitespace-nowrap">
+    {'COMING'.split('').map((letter, index) => (
+      <motion.span
+        key={`coming-${index}`}
+        className="inline-block"
+        style={{
+          color: LETTER_COLORS[index],
+        }}
+        initial={{
+          opacity: 0,
+          y: 30,
+          scale: 0.92,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          delay: index * 0.07,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+        whileHover={{
+          y: -8,
+          scale: 1.04,
+        }}
+      >
+        {letter}
+      </motion.span>
+    ))}
+  </span>
+
+  {/* SOON */}
+ <span className="block whitespace-nowrap sm:inline-block">
+    {'SOON'.split('').map((letter, index) => (
+      <motion.span
+        key={`soon-${index}`}
+        className="inline-block"
+        style={{
+          color: LETTER_COLORS[index + 6],
+        }}
+        initial={{
+          opacity: 0,
+          y: 30,
+          scale: 0.92,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          delay: (index + 6) * 0.07,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+        whileHover={{
+          y: -8,
+          scale: 1.04,
+        }}
+      >
+        {letter}
+      </motion.span>
+    ))}
+  </span>
+</motion.h1>
+          {/* ================= PRODUCT MESSAGE ================= */}
           <motion.div
             initial={{
               opacity: 0,
@@ -304,26 +394,45 @@ export default function ComingSoon() {
               ease: 'easeOut',
             }}
             className="
-              max-w-[700px]
-              mx-auto
               w-full
-              mt-8
-              sm:mt-6
+              mx-auto
+
               flex
               flex-col
               items-center
               text-center
-              gap-3
+
+              gap-2
+
+              mt-6
+
+              sm:mt-7
+              sm:gap-3
+
+              md:mt-8
+
+              lg:mt-9
+
+              max-w-[90vw]
+              sm:max-w-[650px]
+              lg:max-w-[700px]
             "
           >
+            {/* Product Heading */}
             <h2
               className="
                 cs-display
                 font-extrabold
                 text-[#7A004B]
-                text-xl
-                sm:text-2xl
                 leading-tight
+
+                text-base
+
+                sm:text-xl
+
+                md:text-2xl
+
+                lg:text-2xl
               "
             >
               {product ? (
@@ -335,14 +444,21 @@ export default function ComingSoon() {
               )}
             </h2>
 
+            {/* Description */}
             <p
               className="
                 cs-body
                 text-[#7A004B]/90
-                text-sm
-                sm:text-base
-                max-w-[440px]
                 leading-relaxed
+
+                text-xs
+                max-w-[320px]
+
+                sm:text-sm
+                sm:max-w-[400px]
+
+                md:text-base
+                md:max-w-[440px]
               "
             >
               {blurb}
@@ -350,8 +466,18 @@ export default function ComingSoon() {
           </motion.div>
         </main>
 
-        {/* Bottom spacing */}
-        <div className="h-[30vh] sm:h-[22vh]" />
+        {/* ================= BOTTOM SPACING ================= */}
+        <div
+          className="
+            h-[18vh]
+
+            sm:h-[20vh]
+
+            md:h-[21vh]
+
+            lg:h-[22vh]
+          "
+        />
       </div>
     </div>
   )
