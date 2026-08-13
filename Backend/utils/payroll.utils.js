@@ -60,8 +60,6 @@ function computeComponentAmount(comp, ctx) {
       }
     case "percentOfCTC":
       return round2(((comp?.percentOfCTC || 0) / 100) * (ctx.ctc / 12));
-    case "percentOfGross":
-      return round2(((comp?.percentOfGross || 0) / 100) * ctx.gross);
     case "percentOfBasic":
       return round2(((comp?.percentOfBasic || 0) / 100) * ctx.basic);
     case "flat":

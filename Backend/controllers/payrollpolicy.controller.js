@@ -11,13 +11,7 @@ const STANDARD_DEFAULTS = {
   allowances: [
     { name: "Medical Allowance", percentOfBasic: 0, flatAmount: 1250, enabled: true, isBalancing: false },
     { name: "Conveyance Allowance", percentOfBasic: 0, flatAmount: 1600, enabled: true, isBalancing: false },
-    // Normal, fully editable earning — flat / % of Basic / % of Gross /
-    // % of CTC / custom formula. Not the balancing one, so whatever
-    // calculationType is picked for it is actually used every payroll run.
-    { name: "Fixed Allowance", percentOfBasic: 0, flatAmount: 0, enabled: true, isBalancing: false },
-    // The one required balancing earning — always absorbs leftover gross,
-    // its own calculationType/formula is intentionally never evaluated.
-    { name: "Top-up Allowance", percentOfBasic: 0, flatAmount: 0, enabled: true, isBalancing: true },
+    { name: "Special Allowance", percentOfBasic: 0, flatAmount: 0, enabled: true, isBalancing: true },
   ],
   pf: { enabled: true, employeePercent: 12, employerPercent: 12, applyWageCeiling: false, wageCeiling: 15000 },
   esi: { enabled: false, employeePercent: 0.75, employerPercent: 3.25, wageThreshold: 21000 },
@@ -113,7 +107,7 @@ const setPolicy = async (req, res) => {
 // custom formula (see evaluateFormula in payroll.utils.js).
 
 const ALLOWED_CATEGORIES = ["earning", "deduction", "benefit", "reimbursement"];
-const ALLOWED_CALC_TYPES = ["flat", "percentOfBasic", "percentOfCTC", "percentOfGross", "formula"];
+const ALLOWED_CALC_TYPES = ["flat", "percentOfBasic", "percentOfCTC", "formula"];
 
 const addAllowance = async (req, res) => {
   const organisation_id = req.admin.organisation_id;
@@ -123,7 +117,6 @@ const addAllowance = async (req, res) => {
     calculationType,
     percentOfBasic,
     percentOfCTC,
-    percentOfGross,
     flatAmount,
     formula,
     enabled,
@@ -157,7 +150,6 @@ const addAllowance = async (req, res) => {
     calculationType: calculationType || "flat",
     percentOfBasic: percentOfBasic || 0,
     percentOfCTC: percentOfCTC || 0,
-    percentOfGross: percentOfGross || 0,
     flatAmount: flatAmount || 0,
     formula: formula || "",
     enabled: enabled !== false,
@@ -179,7 +171,6 @@ const updateAllowance = async (req, res) => {
   const {
     percentOfBasic,
     percentOfCTC,
-    percentOfGross,
     flatAmount,
     calculationType,
     formula,
@@ -193,18 +184,6 @@ const updateAllowance = async (req, res) => {
   const policy = await getOrCreatePolicy(organisation_id);
   const allowance = policy.allowances.find((a) => a.name === name);
   if (!allowance) return res.status(404).json({ success: false, message: "Allowance not found" });
-
-  // The balancing earning always absorbs leftover gross — its amount is
-  // never computed from calculationType/formula (see calculateSalaryBreakup).
-  // Silently accepting a formula here would look saved but never actually
-  // run, which is confusing — reject it up front instead.
-  if (allowance.isBalancing && calculationType && calculationType !== "flat") {
-    return res.status(400).json({
-      success: false,
-      message:
-        "This is the balancing allowance — it always auto-fills the remaining gross and can't use % / formula. Add a separate Fixed Allowance component instead.",
-    });
-  }
 
   if (calculationType) {
     if (!ALLOWED_CALC_TYPES.includes(calculationType))
@@ -224,7 +203,6 @@ const updateAllowance = async (req, res) => {
 
   if (typeof percentOfBasic === "number") allowance.percentOfBasic = percentOfBasic;
   if (typeof percentOfCTC === "number") allowance.percentOfCTC = percentOfCTC;
-  if (typeof percentOfGross === "number") allowance.percentOfGross = percentOfGross;
   if (typeof flatAmount === "number") allowance.flatAmount = flatAmount;
   if (typeof formula === "string") allowance.formula = formula;
   if (typeof considerForEPF === "boolean") allowance.considerForEPF = considerForEPF;
