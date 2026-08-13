@@ -259,16 +259,38 @@ const activity = async (req, res) => {
     if (attendance.checkOut)
       return res.status(400).json({ message: "Already checked out" });
 
+    // Which channel is this ping from? The browser tab authenticates via
+    // cookie; the desktop (.exe) agent authenticates via Bearer header (see
+    // employee.middleware.js) - no change to either client needed, the
+    // signal is already there in how they auth.
+    const channel = req.cookies?.token ? "browser" : "agent";
+
     const now = Date.now();
-    const elapsedMs = now - (attendance.lastUpdated || now);
-    const elapsedMinutes = Math.min(elapsedMs / 60000, 3);
+
+    // Credit elapsed time against THIS channel's own last ping, not a
+    // single shared `lastUpdated`. Previously both channels overwrote the
+    // same field, so whichever ping happened to land last "won" the whole
+    // gap - a race condition that could silently flip a real idle stretch
+    // to active (or vice versa) depending on network timing alone.
+    // Each channel now accrues strictly its own elapsed time, so a slow/
+    // delayed ping from one channel can no longer eat or overwrite the
+    // other channel's window. Behaviour stays exactly as lenient as
+    // before (still OR-based: either channel reporting "active" credits
+    // active for its own slice) - this only fixes attribution, not the
+    // detection strictness.
+    if (!attendance.channelPings) attendance.channelPings = {};
+    const prevChannelUpdate = attendance.channelPings[channel]?.lastUpdated || attendance.lastUpdated || now;
+    const elapsedMs = now - prevChannelUpdate;
+    const elapsedMinutes = Math.min(Math.max(elapsedMs, 0) / 60000, 3);
 
     if (attendance.source === "manual") {
       if (status === "active") attendance.activeMinutes += elapsedMinutes;
       else attendance.idleMinutes += elapsedMinutes;
     }
 
-    attendance.lastUpdated = now;
+    attendance.channelPings[channel] = { lastUpdated: now, status };
+    attendance.lastUpdated = now; // kept for display/back-compat only
+    attendance.markModified("channelPings");
     await attendance.save();
 
     res.json({
