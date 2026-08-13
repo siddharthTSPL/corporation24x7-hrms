@@ -2,7 +2,11 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useTodayAttendance, useCheckin, useActivity, useCheckout } from "../../auth/server-state/attendance/attendance.hook";
 
 const PING_INTERVAL_MS      = 60_000;
-const IDLE_DETECTION_MS     = 120_000;
+// How long with zero mouse/keyboard/scroll activity before we call it idle.
+// Any single event (mousemove/keydown/scroll/etc, see ACTIVITY_EVENTS)
+// still flips status back to "active" immediately - this only controls
+// how fast it flips the OTHER way, to idle, once nothing happens.
+const IDLE_DETECTION_MS     = 30_000;
 const FOCUS_GRACE_PERIOD_MS = 600_000;
 const STILL_WORKING_AFTER   = 300_000;
 const STORAGE_KEY           = "attendance_session";
@@ -116,7 +120,15 @@ export const useAttendanceTracker = () => {
   }, [computeActivityStatus]);
 
   const sendActivityPing = useCallback(async () => {
-    const status = wasActiveThisMinuteRef.current ? "active" : computeActivityStatus();
+    // Judge purely on how recently the last mouse/keyboard/scroll event
+    // happened (computeActivityStatus, via IDLE_DETECTION_MS) - NOT on
+    // whether any activity happened at some point during the whole 60s
+    // ping window. The old "any event this window = active" check meant
+    // one click 55s ago still reported active even after 55s of nothing,
+    // which is the opposite of what should happen: any event should flip
+    // to active immediately, and it should flip back to idle quickly once
+    // nothing is happening, independent of when the ping happens to fire.
+    const status = computeActivityStatus();
     wasActiveThisMinuteRef.current = false;
     setActivityStatus(status);
 
