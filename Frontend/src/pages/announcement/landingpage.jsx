@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -70,7 +70,7 @@ function Divider() {
   )
 }
 
-function Navbar({ accountLabel, onAccountClick }) {
+function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const links = ['Features', 'Testimonials', 'Pricing', 'About']
@@ -80,6 +80,15 @@ function Navbar({ accountLabel, onAccountClick }) {
     window.addEventListener('scroll', fn)
     return () => window.removeEventListener('scroll', fn)
   }, [])
+
+  const scrollToTop = () => {
+    // Jo bhi actually scroll ho raha ho — ref wala div, ya window/document —
+    // sabko try karo taaki chahe jahan bhi scrolling ho rahi ho, kaam kare.
+    scrollContainerRef?.current?.scrollTo({ top: 0, behavior: 'smooth' })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    document.documentElement.scrollTo({ top: 0, behavior: 'smooth' })
+    document.body.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   return (
     <nav
@@ -94,7 +103,13 @@ function Navbar({ accountLabel, onAccountClick }) {
           {links.map(l => (
             <a
               key={l}
-              href={`#${l.toLowerCase()}`}
+              href={l === 'About' ? '#' : `#${l.toLowerCase()}`}
+              onClick={(e) => {
+                if (l === 'About') {
+                  e.preventDefault()
+                  scrollToTop()
+                }
+              }}
               className="text-[15px] font-ui font-medium text-[#5C5C5C] no-underline transition-colors hover:text-[#7A004B]"
             >
               {l}
@@ -122,8 +137,14 @@ function Navbar({ accountLabel, onAccountClick }) {
           {links.map(l => (
             <a
               key={l}
-              href={`#${l.toLowerCase()}`}
-              onClick={() => setOpen(false)}
+              href={l === 'About' ? '#' : `#${l.toLowerCase()}`}
+              onClick={(e) => {
+                if (l === 'About') {
+                  e.preventDefault()
+                  scrollToTop()
+                }
+                setOpen(false)
+              }}
               className="text-[15px] font-ui font-medium text-[#5C5C5C] no-underline"
             >
               {l}
@@ -703,7 +724,19 @@ function Pricing() {
   const plans = [
     { name: 'Basic', desc: 'Perfect for small teams getting started', price: '₹47', features: ['Employee database','Attendance tracking','Leave management','Basic payroll','Employee self-service portal','Email support 24x7'] },
     { name: 'Advance', desc: 'For growing businesses that need more. Everything in Starter +', price: '₹119', popular: true, features: ['Recruitment / Applicant tracking','Performance management','Advanced payroll','Custom policies/workflows','Reports & analytics','Priority support'] },
-    { name: 'Enterprise', desc: 'Ultimate power and flexibility.Everything in Growth +', price: '₹199', features: ['Multi-company support','Role-based permissions','SSO','API access','Custom integrations','Dedicated account manager'] },
+    {
+  name: 'Enterprise',
+  desc: 'Ultimate power and flexibility. Everything in Growth +',
+  price: 'Custom',
+  features: [
+    'Multi-company support',
+    'Role-based permissions',
+    'SSO',
+    'API access',
+    'Custom integrations',
+    'Dedicated account manager',
+  ],
+}
   ]
   const badges = [
     { icon: <FiShield size={20} />, label: 'Secure & Compliant', desc: 'Enterprise-grade security with regular backups.' },
@@ -743,7 +776,7 @@ function Pricing() {
                 </div>
                 <div>
                   <span className="text-[38px] font-display font-extrabold text-[#111]">{p.price}</span>
-                  <span className="text-xs font-body text-[#aaa] ml-1">/user/mo</span>
+                  
                 </div>
                 <ul className="list-none p-0 m-0 flex flex-col gap-2.5">
                   {p.features.map(f => (
@@ -1004,7 +1037,7 @@ function Footer() {
       { label: 'Engage', href: '' },
       { label: 'Finance', href: '' },
       { label: 'Inventory', href: '' },
-      { label: 'Pay', href: '' },
+      { label: 'Payroll', href: '' },
     ] },
 
     { title: 'Solutions', links: [
@@ -1102,6 +1135,7 @@ export default function LandingPage() {
   const navigate = useNavigate()
   const { data: auth } = useAuth()
   const isAuthenticated = !!auth
+  const scrollContainerRef = useRef(null)
 
   // "Access Your Talent Account" when a live session is found; falls back to
   // "Sign in to your Talent Account" while auth is still resolving/expired
@@ -1117,9 +1151,9 @@ export default function LandingPage() {
   }
 
   return (
-    <div style={{ height: '100vh', overflowY: 'auto' }}>
+    <div ref={scrollContainerRef} style={{ height: '100vh', overflowY: 'auto' }}>
       <style>{fontStyles}</style>
-      <Navbar accountLabel={accountLabel} onAccountClick={handleAccountClick} />
+      <Navbar accountLabel={accountLabel} onAccountClick={handleAccountClick} scrollContainerRef={scrollContainerRef} />
       <Hero />
       <Stats />
       <Divider />
