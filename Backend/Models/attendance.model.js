@@ -76,6 +76,21 @@ const attendanceSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    // Per-channel ping tracking so the browser tab and the desktop (.exe)
+    // agent no longer clobber each other's timestamp. Each channel accrues
+    // minutes against its OWN last-ping time, not a single shared field -
+    // this fixes the "whichever ping lands last wins" race, without
+    // changing what either channel sends (still just active/idle).
+    channelPings: {
+      browser: {
+        lastUpdated: { type: Number, default: 0 },
+        status: { type: String, enum: ["active", "idle", null], default: null },
+      },
+      agent: {
+        lastUpdated: { type: Number, default: 0 },
+        status: { type: String, enum: ["active", "idle", null], default: null },
+      },
+    },
     source: {
       type: String,
       enum: ["manual", "agent", "face"],
