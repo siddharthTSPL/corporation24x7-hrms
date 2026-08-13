@@ -682,6 +682,16 @@ function emptyComponentForm(category) {
 }
 
 function ComponentValueFields({ value, onChange, disabled }) {
+  // The balancing (auto top-up) component always absorbs whatever gross is
+  // left over — its calculationType/formula is never actually used, so
+  // don't offer a dropdown that would look editable but silently do nothing.
+  if (value.isBalancing) {
+    return (
+      <span style={{ fontSize: 12.5, color: "#b0948a", fontStyle: "italic" }}>
+        Auto — fills remaining gross
+      </span>
+    );
+  }
   return (
     <div className="flex items-center gap-3 flex-wrap">
       <Select value={value.calculationType} onChange={(e) => onChange({ ...value, calculationType: e.target.value })} disabled={disabled} style={{ maxWidth: 160 }}>
@@ -713,7 +723,14 @@ function ComponentsTab({ notify }) {
   const [newComponent, setNewComponent] = useState(emptyComponentForm("earning"));
 
   useEffect(() => {
-    if (data?.policy) setForm(JSON.parse(JSON.stringify(data.policy)));
+    if (data?.policy) {
+      const policy = JSON.parse(JSON.stringify(data.policy));
+      // Stable client-side key = the name this component was saved under,
+      // so renaming the "name" field in the input doesn't lose track of
+      // which server-side record to PUT/rename.
+      policy.allowances = (policy.allowances || []).map((a) => ({ ...a, _key: a.name }));
+      setForm(policy);
+    }
   }, [data]);
 
   useEffect(() => {
@@ -758,21 +775,30 @@ function ComponentsTab({ notify }) {
     );
   };
 
-  const rows = (form.allowances || []).filter((a) => (a.category || "earning") === category);
+  // "On top" (the balancing / auto top-up earning) first, then every
+  // regular named component below it in whatever order they were added.
+  const rows = (form.allowances || [])
+    .filter((a) => (a.category || "earning") === category)
+    .slice()
+    .sort((a, b) => (b.isBalancing ? 1 : 0) - (a.isBalancing ? 1 : 0));
 
-  const handleField = (name, patch) => {
+  const handleField = (key, patch) => {
     setForm((prev) => ({
       ...prev,
-      allowances: prev.allowances.map((a) => (a.name === name ? { ...a, ...patch } : a)),
+      allowances: prev.allowances.map((a) => (a._key === key ? { ...a, ...patch } : a)),
     }));
   };
 
   const commit = (a) => {
+    const renamed = a.name !== a._key;
+    if (renamed && !a.name.trim()) return notify("Component name can't be empty", "error");
     updateAllowance(
       {
-        name: a.name,
+        name: a._key,
         data: {
           calculationType: a.calculationType || "flat",
+          percentOfBasic: a.percentOfBasic,
+          percentOfCTC: a.percentOfCTC,
           percentOfGross: a.percentOfGross,
           flatAmount: a.flatAmount,
           formula: a.formula,
@@ -780,16 +806,23 @@ function ComponentsTab({ notify }) {
           considerForEPF: a.considerForEPF,
           considerForESI: a.considerForESI,
           isFBP: a.isFBP,
+          ...(renamed ? { newName: a.name } : {}),
         },
       },
-      { onSuccess: () => notify(`"${a.name}" updated`, "success"), onError: (e) => notify(getErrorMessage(e), "error") }
+      {
+        onSuccess: () => {
+          notify(`"${a.name}" updated`, "success");
+          if (renamed) setForm((prev) => ({ ...prev, allowances: prev.allowances.map((x) => (x._key === a._key ? { ...x, _key: a.name } : x)) }));
+        },
+        onError: (e) => notify(getErrorMessage(e), "error"),
+      }
     );
   };
 
   const handleDelete = (a) => {
     if (a.isBalancing) return;
     if (!window.confirm(`Remove component "${a.name}"?`)) return;
-    removeAllowance(a.name, {
+    removeAllowance(a._key, {
       onSuccess: () => notify("Component removed", "success"),
       onError: (e) => notify(getErrorMessage(e), "error"),
     });
@@ -896,30 +929,37 @@ function ComponentsTab({ notify }) {
               </tr>
             )}
             {rows.map((a) => (
-              <tr key={a.name} style={{ borderTop: `1px solid ${C.border}` }}>
-                <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text, verticalAlign: "top" }}>
-                  <span className="break-words">{a.name}</span> {a.isBalancing && <Badge color={C.blue} bg={C.blueBg}>Balancing</Badge>}
+              <tr key={a._key} style={{ borderTop: `1px solid ${C.border}` }}>
+                <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <TextInput
+                      value={a.name}
+                      onChange={(e) => handleField(a._key, { name: e.target.value })}
+                      style={{ maxWidth: 160, fontWeight: 600 }}
+                    />
+                    {a.isBalancing && <Badge color={C.blue} bg={C.blueBg}>On top</Badge>}
+                  </div>
                 </td>
                 <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
-                  <ComponentValueFields value={a} onChange={(patch) => handleField(a.name, patch)} disabled={false} />
+                  <ComponentValueFields value={a} onChange={(patch) => handleField(a._key, patch)} disabled={false} />
                 </td>
                 {showEpfEsiCols && (
                   <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
-                    <Toggle checked={a.considerForEPF !== false} onChange={(v) => handleField(a.name, { considerForEPF: v })} />
+                    <Toggle checked={a.considerForEPF !== false} onChange={(v) => handleField(a._key, { considerForEPF: v })} />
                   </td>
                 )}
                 {showEpfEsiCols && (
                   <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
-                    <Toggle checked={a.considerForESI !== false} onChange={(v) => handleField(a.name, { considerForESI: v })} />
+                    <Toggle checked={a.considerForESI !== false} onChange={(v) => handleField(a._key, { considerForESI: v })} />
                   </td>
                 )}
                 {showFbpCol && (
                   <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
-                    <Toggle checked={!!a.isFBP} onChange={(v) => handleField(a.name, { isFBP: v })} />
+                    <Toggle checked={!!a.isFBP} onChange={(v) => handleField(a._key, { isFBP: v })} />
                   </td>
                 )}
                 <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
-                  <Toggle checked={!!a.enabled} onChange={(v) => handleField(a.name, { enabled: v })} disabled={a.isBalancing} />
+                  <Toggle checked={!!a.enabled} onChange={(v) => handleField(a._key, { enabled: v })} disabled={a.isBalancing} />
                 </td>
                 <td style={{ padding: "8px 10px", whiteSpace: "nowrap", verticalAlign: "top" }}>
                   <GhostButton onClick={() => commit(a)} style={{ marginRight: 8 }}>Save</GhostButton>
@@ -936,7 +976,9 @@ function ComponentsTab({ notify }) {
       </div>
       {category === "earning" && (
         <p style={{ fontSize: 11.5, color: C.muted, marginTop: 12 }}>
-          The "Balancing" earning absorbs whatever gross remains after Basic, HRA and every other earning — it always stays enabled.
+          The <b>"On top"</b> earning always stays enabled and just soaks up whatever gross is left after Basic, HRA and every
+          other earning — you can rename it, but its amount can't be set to a % or formula. For an amount you control (flat, %
+          of Gross/Basic/CTC, or a custom formula like <code>basic*0.1 + 500</code>), add or edit any other earning, e.g. "Fixed Allowance".
         </p>
       )}
     </Card>
