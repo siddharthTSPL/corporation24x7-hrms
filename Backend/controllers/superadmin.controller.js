@@ -12,6 +12,7 @@ const leavebalanceModel = require("../Models/leavebalance.model");
 const reviewModel = require("../Models/review.model");
 const Attendance = require("../Models/attendance.model");
 const AttendanceSummary = require("../Models/attendancesummary.model");
+const { computeTaskSubmission, computeBehaviour, computeAttendance, computeOverall } = require("../utils/reviewScoring.utils");
 const { startOfDay } = require("../automatic/weekoffcalendar");
 const generateUID = require("../automatic/uidgeneration");
 const assignDefaultLeave = require("../automatic/bydefaultleaveset");
@@ -1302,19 +1303,19 @@ const getallemployee = async (req, res, next) => {
     const [admins, managers, users] = await Promise.all([
       AdminModel.find({ organisation_id, working_status: "working" })
         .select(
-          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact marital_status",
+          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact marital_status profile_image",
         )
         .lean(),
 
       Managermodel.find({ organisation_id, working_status: "working" })
         .select(
-          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact marital_status",
+          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact marital_status profile_image",
         )
         .lean(),
 
       Usermodel.find({ organisation_id, working_status: "working" })
         .select(
-          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact marital_status Under_manager",
+          "empid uid f_name l_name work_email role department designation office_location organisation_id gender personal_contact marital_status Under_manager profile_image",
         )
         .populate({
           path: "Under_manager",
@@ -1761,12 +1762,12 @@ const deleteAnnouncement = async (req, res, next) => {
 };
 
 const reviewtoadmin = async (req, res, next) => {
-  const { adminid, rating, comment } = req.body;
+  const { adminid, assignedDays, actualDays, behaviourScore, comment } = req.body;
   const organisation_id = req.superAdmin._id;
 
-  if (!adminid || !rating || !comment)
+  if (!adminid || !assignedDays || !actualDays || behaviourScore === undefined || behaviourScore === null)
     return next(
-      Object.assign(new Error("adminid, rating and comment are required"), {
+      Object.assign(new Error("adminid, assignedDays, actualDays and behaviourScore are required"), {
         statusCode: 400,
       }),
     );
@@ -1786,7 +1787,9 @@ const reviewtoadmin = async (req, res, next) => {
     );
 
   const now = new Date();
-  const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const month = now.getMonth() + 1;
+  const year = now.getFullYear();
+  const monthYear = `${year}-${String(month).padStart(2, "0")}`;
 
   const existingreview = await Review.findOne({
     organisation_id,
@@ -1804,24 +1807,77 @@ const reviewtoadmin = async (req, res, next) => {
       ),
     );
 
-  const review = await Review.create({
-    organisation_id,
-    reviewerRole: "super_admin",
-    reviewer: req.superAdmin._id,
-    reviewerRoleModel: "SuperAdmin",
-    revieweeRole: "admin",
-    reviewee: adminid,
-    revieweeRoleModel: "Admin",
-    rating,
-    comment,
-    monthYear,
-  });
+  try {
+    const taskSubmission = computeTaskSubmission(assignedDays, actualDays);
+    const behaviourEthics = computeBehaviour(behaviourScore);
 
-  res.status(201).json({
-    success: true,
-    message: "Review submitted successfully",
-    review,
-  });
+    const summary = await AttendanceSummary.findOne({
+      employee: adminid,
+      role: "admin",
+      month,
+      year,
+    }).lean();
+    const attendance = computeAttendance({
+      presentDays: summary?.presentDays ?? 0,
+      halfDays: summary?.halfDays ?? 0,
+      absentDays: summary?.absentDays ?? 0,
+    });
+
+    const overall = computeOverall({
+      taskScore: taskSubmission.score,
+      behaviourScore: behaviourEthics.score,
+      attendanceScore: attendance.score,
+    });
+
+    const review = await Review.create({
+      organisation_id,
+      reviewerRole: "super_admin",
+      reviewer: req.superAdmin._id,
+      reviewerRoleModel: "SuperAdmin",
+      revieweeRole: "admin",
+      reviewee: adminid,
+      revieweeRoleModel: "Admin",
+      taskSubmission,
+      behaviourEthics,
+      attendance,
+      overallScore: overall.score,
+      overallRating: overall.rating,
+      comment: comment || "",
+      monthYear,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Review submitted successfully",
+      review,
+    });
+  } catch (err) {
+    if (err.code === 11000)
+      return next(
+        Object.assign(new Error("You have already reviewed this admin this month."), { statusCode: 400 }),
+      );
+    next(err);
+  }
+};
+
+const getAllReviewsForSuperAdmin = async (req, res, next) => {
+  if (!req.superAdmin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const organisation_id = req.superAdmin._id;
+  const { revieweeRoleModel, monthYear } = req.query;
+
+  const filter = { organisation_id };
+  if (revieweeRoleModel) filter.revieweeRoleModel = revieweeRoleModel;
+  if (monthYear) filter.monthYear = monthYear;
+
+  const reviews = await Review.find(filter)
+    .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+    .populate({ path: "reviewee", select: "f_name l_name work_email role designation department" })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  res.status(200).json({ success: true, count: reviews.length, reviews });
 };
 
 const getTodayCheckins = async (req, res, next) => {
@@ -2163,6 +2219,7 @@ function buildManagerNode(manager, allManagers, allEmployees) {
     designation: manager.designation,
     department: manager.department,
     office_location: manager.office_location,
+    profile_image: manager.profile_image || null,
     role: manager.role,
     reportsTo: manager.reporting_manager_model,
     employees: directEmployees.map((emp) => ({
@@ -2173,6 +2230,7 @@ function buildManagerNode(manager, allManagers, allEmployees) {
       designation: emp.designation,
       department: emp.department,
       office_location: emp.office_location,
+      profile_image: emp.profile_image || null,
     })),
     subManagers: directReports.map((sub) =>
       buildManagerNode(sub, allManagers, allEmployees)
@@ -2216,17 +2274,17 @@ const getOrgInfo = async (req, res, next) => {
     const [admins, managers, employees] = await Promise.all([
       AdminModel.find({ organisation_id })
         .select(
-          "empid f_name l_name work_email designation department office_location role reporting_manager reporting_manager_model"
+          "empid f_name l_name work_email designation department office_location role reporting_manager reporting_manager_model profile_image"
         )
         .lean(),
       Managermodel.find({ organisation_id })
         .select(
-          "empid f_name l_name work_email designation department office_location role reporting_manager reporting_manager_model"
+          "empid f_name l_name work_email designation department office_location role reporting_manager reporting_manager_model profile_image"
         )
         .lean(),
       Usermodel.find({ organisation_id })
         .select(
-          "empid f_name l_name work_email designation department office_location Under_manager"
+          "empid f_name l_name work_email designation department office_location Under_manager profile_image"
         )
         .lean(),
     ]);
@@ -2249,6 +2307,7 @@ const getOrgInfo = async (req, res, next) => {
         designation: admin.designation,
         department: admin.department,
         office_location: admin.office_location,
+        profile_image: admin.profile_image || null,
         role: admin.role,
         managers: directManagers.map((mgr) =>
           buildManagerNode(mgr, managers, employees)
@@ -2297,6 +2356,7 @@ const getOrgInfo = async (req, res, next) => {
         id: superAdmin._id,
         name: `${superAdmin.f_name} ${superAdmin.l_name}`,
         email: superAdmin.email,
+        profile_image: superAdmin.profile_image || null,
       },
 
       totals: {
@@ -2316,6 +2376,7 @@ const getOrgInfo = async (req, res, next) => {
         designation: emp.designation,
         department: emp.department,
         office_location: emp.office_location,
+        profile_image: emp.profile_image || null,
       })),
     });
   } catch (error) {
@@ -2824,6 +2885,7 @@ module.exports = {
   updateAnnouncement,
   deleteAnnouncement,
   reviewtoadmin,
+  getAllReviewsForSuperAdmin,
   getTodayCheckins,
   getAttendanceOverview,
   getAttendanceHistory,

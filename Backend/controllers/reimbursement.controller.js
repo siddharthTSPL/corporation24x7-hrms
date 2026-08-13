@@ -149,7 +149,7 @@ const updateClaim = async ({ actor, model, id, body, files }) => {
   if (newReceipts.length) claim.receipts.push(...newReceipts);
   if (newSupportingDocuments.length) claim.supportingDocuments.push(...newSupportingDocuments);
 
-  if (body.submit === "true" || body.submit === true) {
+  if (body.status === "submitted") {
     const validationError = validateClaimBody(claim.toObject());
     if (validationError) throw err(validationError);
     if (!hasBankDetails(actor))

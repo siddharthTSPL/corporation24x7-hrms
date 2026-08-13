@@ -51,6 +51,18 @@ export const removePayrollAllowance = async (name) => {
   return res.data;
 };
 
+// ── Pay Schedule (fixed org-wide run schedule) ──────────────────────────────
+
+export const getPaySchedule = async () => {
+  const res = await api.get("admin/payroll/pay-schedule");
+  return res.data;
+};
+
+export const setPaySchedule = async (data) => {
+  const res = await api.put("admin/payroll/pay-schedule", data);
+  return res.data;
+};
+
 // ── Salary Structure ────────────────────────────────────────────────────────
 
 export const setEmployeeCTC = async (data) => {

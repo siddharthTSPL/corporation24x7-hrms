@@ -62,7 +62,19 @@ function Sk({ w, h, r = 8 }) {
   );
 }
 
-function Avatar({ name, size = 40, bg, color }) {
+function Avatar({ name, size = 40, bg, color, image }) {
+  const [errored, setErrored] = useState(false);
+  if (image && !errored) {
+    return (
+      <img
+        src={image}
+        alt={name}
+        className="shrink-0 rounded-full object-cover"
+        style={{ width: size, height: size }}
+        onError={() => setErrored(true)}
+      />
+    );
+  }
   return (
     <div className={`${bg} ${color} shrink-0 flex items-center justify-center rounded-full text-[13px] font-bold font-['Syne',sans-serif]`} style={{ width: size, height: size }}>
       {initials(name)}
@@ -96,7 +108,7 @@ const CFG = {
 };
 const OFF = { accent: "bg-gray-300", avBg: "bg-gray-100", avColor: "text-gray-400" };
 
-function Card({ level, name, department, designation, empid, isOrg, width = 172, delay = 0, dim, hl, chain, q, you = false, empCount }) {
+function Card({ level, name, department, designation, empid, isOrg, width = 172, delay = 0, dim, hl, chain, q, you = false, empCount, image }) {
   const c = CFG[level] || CFG.emp;
   const accentCls  = chain ? c.accentOn  : OFF.accent;
   const avBgCls    = chain ? c.avBgOn    : OFF.avBg;
@@ -117,7 +129,7 @@ function Card({ level, name, department, designation, empid, isOrg, width = 172,
       >
         {you && <YouPill />}
         <div className={`absolute top-0 left-0 right-0 h-[3px] rounded-t-[11px] ${you ? "bg-gradient-to-r from-[#730042] to-[#CD166E]" : accentCls}`} />
-        <Avatar name={name} size={38} bg={you ? "bg-[#fce7f3]" : avBgCls} color={you ? "text-[#730042]" : avColorCls} />
+        <Avatar name={name} size={38} bg={you ? "bg-[#fce7f3]" : avBgCls} color={you ? "text-[#730042]" : avColorCls} image={image} />
         <div className="mt-2 mb-1.5 text-center w-full">
           <Hi text={name} q={q} className={`block text-xs font-semibold leading-[1.3] font-['Syne',sans-serif] truncate ${chain ? "text-[#1a0d14]" : "text-gray-400"}`} />
           {!isOrg && (
@@ -239,6 +251,7 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, chainIds, isSubMgr = fa
         department={mgr.department ? getDepartmentName(mgr.department) : "—"}
         designation={mgr.designation || "—"}
         empid={mgr.empid}
+        image={mgr.profile_image}
         width={CARD_W}
         delay={mDelay}
         dim={dim(key)}
@@ -291,6 +304,7 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, chainIds, isSubMgr = fa
                   department={emp.department ? getDepartmentName(emp.department) : "—"}
                   designation={emp.designation || "—"}
                   empid={emp.empid}
+                  image={emp.profile_image}
                   width={EMP_W}
                   delay={eDelay}
                   dim={dim(eKey)}
@@ -367,13 +381,13 @@ function OrgTree({ data, loading, q }) {
   return (
     <div className="flex flex-col items-center min-w-max">
       <div>
-        <Card level="org" name={data.organisation_name || "Organisation"} department="—" designation={data.super_admin?.name || "—"} isOrg width={CARD_W} delay={0} dim={dim("org")} hl={matches.has("org")} chain={chainIds.has("org")} q={q} />
+        <Card level="org" name={data.organisation_name || "Organisation"} department="—" designation={data.super_admin?.name || "—"} image={data.organisation_logo} isOrg width={CARD_W} delay={0} dim={dim("org")} hl={matches.has("org")} chain={chainIds.has("org")} q={q} />
       </div>
       <VLine h={22} />
 
       {data.admin && (
         <>
-          <Card level="admin" name={data.admin.name} department={data.admin.department ? getDepartmentName(data.admin.department) : "—"} designation={data.admin.designation || "—"} empid={data.admin.empid} width={CARD_W} delay={80} dim={dim("admin")} hl={matches.has("admin")} chain={chainIds.has("admin")} q={q} />
+          <Card level="admin" name={data.admin.name} department={data.admin.department ? getDepartmentName(data.admin.department) : "—"} designation={data.admin.designation || "—"} empid={data.admin.empid} image={data.admin.profile_image} width={CARD_W} delay={80} dim={dim("admin")} hl={matches.has("admin")} chain={chainIds.has("admin")} q={q} />
           <VLine h={22} />
         </>
       )}

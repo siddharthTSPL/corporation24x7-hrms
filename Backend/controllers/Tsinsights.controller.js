@@ -1,6 +1,7 @@
 const TimeLog = require("../Models/Timelog.model");
 const TSJob = require("../Models/Tsjob.model");
 const { resolveActor, resolveOrgId, getDirectReportIds, httpError } = require("../utils/heirarchy.utils");
+const { parseISTDateOnly } = require("../utils/Istdate.utils");
 
 const DAILY_CAPACITY_MINUTES = 480;
 
@@ -21,10 +22,8 @@ const getTeamWorkloadHeatmap = async (req, res, next) => {
     return res.status(200).json({ success: true, heatmap: [] });
   }
 
-  const start = new Date(week_start);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 7);
+  const start = parseISTDateOnly(week_start);
+  const end = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   const logs = await TimeLog.aggregate([
     {
@@ -38,7 +37,9 @@ const getTeamWorkloadHeatmap = async (req, res, next) => {
       $group: {
         _id: {
           logged_by: "$logged_by",
-          day: { $dateToString: { format: "%Y-%m-%d", date: "$log_date" } },
+          // Without an explicit timezone, $dateToString buckets in UTC,
+          // shifting entries logged before ~5:30am IST into the previous day.
+          day: { $dateToString: { format: "%Y-%m-%d", date: "$log_date", timezone: "Asia/Kolkata" } },
         },
         totalMinutes: { $sum: "$duration_minutes" },
       },
@@ -124,10 +125,8 @@ const getMyProductivitySummary = async (req, res, next) => {
 
   if (!week_start) return next(httpError("week_start query param is required", 400));
 
-  const start = new Date(week_start);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 7);
+  const start = parseISTDateOnly(week_start);
+  const end = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   const logs = await TimeLog.find({
     organisation_id,

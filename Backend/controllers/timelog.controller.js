@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const TimeLog = require("../Models/Timelog.model");
 const TSJob = require("../Models/Tsjob.model");
 const { resolveActor, resolveOrgId, httpError } = require("../utils/heirarchy.utils");
+const { parseISTDateOnly, endOfISTDay, toISTKey } = require("../utils/Istdate.utils");
 
 // BUG FIX: aggregate $match on an ObjectId field requires an actual ObjectId,
 // not a plain string. When jobId arrives as a string (e.g. from stopTimer
@@ -85,13 +86,19 @@ const logTime = async (req, res, next) => {
     await jobDoc.save();
   }
 
+  // log_date arrives as "YYYY-MM-DD" from the date picker. Letting Mongoose
+  // cast that string directly parses it as UTC midnight, which is 5:30am IST
+  // - fine while the server happens to run in IST, but on a UTC virtual
+  // server every downstream IST day/week bucket sees the entry a day early.
+  const resolvedLogDate = parseISTDateOnly(log_date);
+
   const timeLog = await TimeLog.create({
     organisation_id,
     job,
     project: jobDoc.project,
     logged_by: actor.id,
     logged_by_model: actor.model,
-    log_date,
+    log_date: resolvedLogDate,
     entry_mode: "manual",
     duration_minutes,
     note: note || "",
@@ -112,10 +119,8 @@ const getMyDayLog = async (req, res, next) => {
 
   if (!date) return next(httpError("date query param is required", 400));
 
-  const dayStart = new Date(date);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(date);
-  dayEnd.setHours(23, 59, 59, 999);
+  const dayStart = parseISTDateOnly(date);
+  const dayEnd = endOfISTDay(dayStart);
 
   const logs = await TimeLog.find({
     organisation_id,
@@ -140,10 +145,8 @@ const getMyWeekLog = async (req, res, next) => {
   if (!week_start)
     return next(httpError("week_start query param is required", 400));
 
-  const start = new Date(week_start);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 7);
+  const start = parseISTDateOnly(week_start);
+  const end = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   const logs = await TimeLog.find({
     organisation_id,
@@ -155,18 +158,18 @@ const getMyWeekLog = async (req, res, next) => {
     .sort({ log_date: 1 })
     .lean();
 
-  // BUG FIX: original code used toISOString().slice(0,10) to bucket by day,
-  // which gives UTC dates. If the server runs in a non-UTC timezone and
-  // log_date was stored with a local midnight, the ISO string shifts to the
-  // previous day. Use a locale-independent approach: compare the raw Date
-  // objects against each day boundary to avoid off-by-one day buckets.
+  // Bucket by IST calendar day. toISOString().slice(0,10) gives the UTC
+  // date, which is a different calendar day from ~00:00 to ~05:30 IST -
+  // that previously bucketed early-morning IST entries into the wrong day
+  // (and onto the wrong side of week/month boundaries). toISTKey/day math
+  // here stays in IST throughout, independent of server timezone.
   const dayBuckets = {};
   const dayKeys = [];
   for (let i = 0; i < 7; i++) {
-    const day = new Date(start);
-    day.setDate(day.getDate() + i);
-    const key = day.toISOString().slice(0, 10);
-    dayKeys.push({ key, from: day, to: new Date(day.getTime() + 86400000) });
+    const from = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
+    const to = new Date(from.getTime() + 24 * 60 * 60 * 1000);
+    const key = toISTKey(from);
+    dayKeys.push({ key, from, to });
     dayBuckets[key] = { totalMinutes: 0, logs: [] };
   }
 
@@ -301,12 +304,12 @@ const getAllTimeLogs = async (req, res, next) => {
   if (status) filter.status = status;
 
   if (date) {
-    const dayStart = new Date(date); dayStart.setHours(0, 0, 0, 0);
-    const dayEnd   = new Date(date); dayEnd.setHours(23, 59, 59, 999);
+    const dayStart = parseISTDateOnly(date);
+    const dayEnd = endOfISTDay(dayStart);
     filter.log_date = { $gte: dayStart, $lte: dayEnd };
   } else if (week_start) {
-    const start = new Date(week_start); start.setHours(0, 0, 0, 0);
-    const end   = new Date(start);      end.setDate(end.getDate() + 7);
+    const start = parseISTDateOnly(week_start);
+    const end = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
     filter.log_date = { $gte: start, $lt: end };
   }
 
