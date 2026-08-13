@@ -8,6 +8,8 @@ import { useGetMyLeavesManager } from "../../auth/server-state/manager/managerle
 import { useCalendarMeta, useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
 import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus, isPastShiftEnd } from "../../pages/utils/attendance";
 import NotificationBell from "../../components/notifications/NotificationBell";
+import MyAssetsWidget from "../asset/MyAssetsWidget";
+import { useGetMyAssetsManager } from "../../auth/server-state/manager/managerasset/managerasset.hook";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS   = ["S","M","T","W","T","F","S"];
@@ -852,11 +854,12 @@ function ReviewCard({ reviews = [], loading }) {
   );
 
   const avg    = reviews.length
-    ? (reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length)
+    ? (reviews.reduce((s, r) => s + (r.overallScore || 0), 0) / reviews.length)
     : null;
   const latest = reviews[0];
   const thisMonth = new Date().toISOString().slice(0, 7);
   const newThisMonth = reviews.filter(r => r.monthYear === thisMonth).length;
+  const RATING_ORDER = ["Excellent", "Very Good", "Good", "Average", "Poor"];
 
   return (
     <div style={{ padding:"14px 18px 16px" }}>
@@ -867,21 +870,20 @@ function ReviewCard({ reviews = [], loading }) {
               {avg.toFixed(1)}
             </span>
             <div>
-              <StarRating rating={avg} size={15}/>
+              <StarRating rating={avg / 2} size={15}/>
               <div style={{ fontSize:10, color:"#b0948a", marginTop:3, fontFamily:"'DM Sans',sans-serif" }}>
-                {reviews.length} review{reviews.length !== 1 ? "s" : ""} given
+                {reviews.length} review{reviews.length !== 1 ? "s" : ""} given · avg out of 10
               </div>
             </div>
           </div>
 
           <div style={{ display:"flex", flexDirection:"column", gap:4, marginBottom:12 }}>
-            {[5,4,3,2,1].map(star => {
-              const cnt = reviews.filter(r => Math.round(r.rating) === star).length;
+            {RATING_ORDER.map(label => {
+              const cnt = reviews.filter(r => r.overallRating === label).length;
               const pct = reviews.length > 0 ? (cnt / reviews.length) * 100 : 0;
               return (
-                <div key={star} style={{ display:"flex", alignItems:"center", gap:6 }}>
-                  <span style={{ fontSize:10, color:"#b0948a", width:8, fontFamily:"'DM Sans',sans-serif" }}>{star}</span>
-                  <svg width="10" height="10" viewBox="0 0 16 16" fill="#e8b84b"><path d="M8 1l1.8 3.6L14 5.4l-3 2.9.7 4.1L8 10.4l-3.7 2 .7-4.1-3-2.9 4.2-.8z"/></svg>
+                <div key={label} style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <span style={{ fontSize:10, color:"#b0948a", width:56, fontFamily:"'DM Sans',sans-serif" }}>{label}</span>
                   <div style={{ flex:1, height:5, borderRadius:4, background:"#f0e8e4", overflow:"hidden" }}>
                     <div className="md-progress-bar" style={{ width:`${pct}%`, background:"#e8b84b" }}/>
                   </div>
@@ -938,7 +940,7 @@ export default function ManagerDashboard() {
   const lb        = meData?.leavebalance?.[0] ?? null;
   const reportingManager = meData?.reportingManager ?? null; 
   const announcements = annData?.announcements ?? (Array.isArray(annData) ? annData : []);
-  const reviews = meData?.review ?? [];
+  const reviews = meData?.reviews ?? [];
 
   const myOwnAppliedLeaves = useMemo(() => {
     const raw = Array.isArray(myLeaveData) ? myLeaveData : [];
@@ -1367,7 +1369,7 @@ export default function ManagerDashboard() {
               <div style={{ marginTop:5, display:"flex", gap:5, flexWrap:"wrap" }}>
                 <Badge variant="green">Active</Badge>
                 <Badge variant="blue">{manager?.empid ?? "—"}</Badge>
-                {reviews.length > 0 && <StarRating rating={reviews.reduce((s, r) => s + r.rating, 0) / reviews.length} size={12}/>}
+                {reviews.length > 0 && <StarRating rating={reviews.reduce((s, r) => s + (r.overallScore || 0), 0) / reviews.length / 2} size={12}/>}
               </div>
             </div>
           </div>
@@ -1432,7 +1434,9 @@ export default function ManagerDashboard() {
         </div>
       </div>
 
-    
+      <div style={{ marginTop: 14 }}>
+        <MyAssetsWidget useMyAssets={useGetMyAssetsManager} title="My Assets" accent="#2563eb" />
+      </div>
 
     </div>
   );

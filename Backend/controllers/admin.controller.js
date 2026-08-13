@@ -15,6 +15,7 @@ const LeavePolicy = require("../Models/Leavepolicy.model");
 const PermissionModel = require("../Models/permission.model");
 const Leave = require("../Models/leave.model");
 const Review = require("../Models/review.model");
+const { computeTaskSubmission, computeBehaviour, computeAttendance, computeOverall } = require("../utils/reviewScoring.utils");
 const generateOTP = require("../automatic/otpgenerator");
 const OtpModel = require("../Models/otpbasedlogin.model");
 const leavebalanceModel = require("../Models/leavebalance.model");
@@ -2535,13 +2536,15 @@ const reviewtomanager = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
-  const { managerid, rating, comment } = req.body;
-  if (!managerid || !rating || !comment)
-    return next(Object.assign(new Error("managerid, rating and comment are required"), { statusCode: 400 }));
+  const { managerid, assignedDays, actualDays, behaviourScore, comment } = req.body;
+  if (!managerid || !assignedDays || !actualDays || behaviourScore === undefined || behaviourScore === null)
+    return next(Object.assign(new Error("managerid, assignedDays, actualDays and behaviourScore are required"), { statusCode: 400 }));
 
   const organisation_id = req.admin.organisation_id;
   const now = new Date();
-  const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const month = now.getMonth() + 1;
+  const year = now.getFullYear();
+  const monthYear = `${year}-${String(month).padStart(2, "0")}`;
 
   const [manager, existingreview] = await Promise.all([
     Managermodel.findOne({ _id: managerid, organisation_id }).select("role").lean(),
@@ -2555,20 +2558,71 @@ const reviewtomanager = async (req, res, next) => {
   if (existingreview)
     return next(Object.assign(new Error("You have already reviewed this manager this month."), { statusCode: 400 }));
 
-  const review = await Review.create({
-    organisation_id,
-    reviewerRole: "admin",
-    reviewer: req.admin._id,
-    reviewerRoleModel: "Admin",
-    revieweeRole: manager.role,
-    reviewee: managerid,
-    revieweeRoleModel: "Manager",
-    rating,
-    comment,
-    monthYear,
-  });
+  try {
+    const taskSubmission = computeTaskSubmission(assignedDays, actualDays);
+    const behaviourEthics = computeBehaviour(behaviourScore);
 
-  res.status(201).json({ message: "Review submitted successfully", review });
+    const summary = await AttendanceSummary.findOne({
+      employee: managerid,
+      role: "manager",
+      month,
+      year,
+    }).lean();
+    const attendance = computeAttendance({
+      presentDays: summary?.presentDays ?? 0,
+      halfDays: summary?.halfDays ?? 0,
+      absentDays: summary?.absentDays ?? 0,
+    });
+
+    const overall = computeOverall({
+      taskScore: taskSubmission.score,
+      behaviourScore: behaviourEthics.score,
+      attendanceScore: attendance.score,
+    });
+
+    const review = await Review.create({
+      organisation_id,
+      reviewerRole: "admin",
+      reviewer: req.admin._id,
+      reviewerRoleModel: "Admin",
+      revieweeRole: manager.role,
+      reviewee: managerid,
+      revieweeRoleModel: "Manager",
+      taskSubmission,
+      behaviourEthics,
+      attendance,
+      overallScore: overall.score,
+      overallRating: overall.rating,
+      comment: comment || "",
+      monthYear,
+    });
+
+    res.status(201).json({ message: "Review submitted successfully", review });
+  } catch (err) {
+    if (err.code === 11000)
+      return next(Object.assign(new Error("You have already reviewed this manager this month."), { statusCode: 400 }));
+    next(err);
+  }
+};
+
+const getAllReviewsForAdmin = async (req, res, next) => {
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const organisation_id = req.admin.organisation_id;
+  const { revieweeRoleModel, monthYear } = req.query;
+
+  const filter = { organisation_id };
+  if (revieweeRoleModel) filter.revieweeRoleModel = revieweeRoleModel;
+  if (monthYear) filter.monthYear = monthYear;
+
+  const reviews = await Review.find(filter)
+    .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+    .populate({ path: "reviewee", select: "f_name l_name work_email role designation department" })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  res.status(200).json({ success: true, count: reviews.length, reviews });
 };
 
 const forgetpasswordloginotp = async (req, res, next) => {
@@ -3226,7 +3280,7 @@ const getOrgInfo = async (req, res, next) => {
 
     const admin = await Adminmodel.findById(req.admin._id)
       .select(
-        "empid f_name l_name work_email designation department office_location organisation_id"
+        "empid f_name l_name work_email designation department office_location organisation_id profile_image"
       )
       .lean();
 
@@ -3241,7 +3295,7 @@ const getOrgInfo = async (req, res, next) => {
 
     const managers = await Managermodel.find({ organisation_id })
       .select(
-        "empid f_name l_name work_email designation department office_location reporting_manager reporting_manager_model"
+        "empid f_name l_name work_email designation department office_location reporting_manager reporting_manager_model profile_image"
       )
       .lean();
 
@@ -3251,7 +3305,7 @@ const getOrgInfo = async (req, res, next) => {
         Under_manager: { $in: managers.map((m) => m._id) },
       })
       .select(
-        "empid f_name l_name work_email designation department office_location Under_manager"
+        "empid f_name l_name work_email designation department office_location Under_manager profile_image"
       )
       .lean();
 
@@ -3269,6 +3323,7 @@ const getOrgInfo = async (req, res, next) => {
         designation: mgr.designation,
         department: mgr.department,
         office_location: mgr.office_location,
+        profile_image: mgr.profile_image || null,
         employees: employees
           .filter((emp) => emp.Under_manager?.toString() === mgr._id.toString())
           .map((emp) => ({
@@ -3278,6 +3333,7 @@ const getOrgInfo = async (req, res, next) => {
             email: emp.work_email,
             designation: emp.designation,
             department: emp.department,
+            profile_image: emp.profile_image || null,
           })),
         subManagers: buildManagerTree(managers, mgr._id, "Manager", employees),
       }));
@@ -3292,6 +3348,7 @@ const getOrgInfo = async (req, res, next) => {
             id: superAdmin._id,
             name: `${superAdmin.f_name} ${superAdmin.l_name}`,
             email: superAdmin.email,
+            profile_image: superAdmin.profile_image || null,
           }
         : null,
       admin: {
@@ -3302,6 +3359,7 @@ const getOrgInfo = async (req, res, next) => {
         designation: admin.designation,
         department: admin.department,
         office_location: admin.office_location,
+        profile_image: admin.profile_image || null,
       },
       managers: topLevelManagers,
     });
@@ -3325,6 +3383,7 @@ const buildManagerTree = (managers, parentId, parentModel, employees) => {
       designation: mgr.designation,
       department: mgr.department,
       office_location: mgr.office_location,
+      profile_image: mgr.profile_image || null,
       _raw: mgr,
       employees: employees
         .filter((emp) => emp.Under_manager?.toString() === mgr._id.toString())
@@ -3335,6 +3394,7 @@ const buildManagerTree = (managers, parentId, parentModel, employees) => {
           email: emp.work_email,
           designation: emp.designation,
           department: emp.department,
+          profile_image: emp.profile_image || null,
           isCurrentUser: false,
         })),
       subManagers: buildManagerTree(managers, mgr._id, "Manager", employees),
@@ -3364,6 +3424,7 @@ const buildManagerTreeWithCurrentFlags = (
       designation: mgr.designation,
       department: mgr.department,
       office_location: mgr.office_location,
+      profile_image: mgr.profile_image || null,
       isCurrentManager: currentManagerId
         ? mgr._id.toString() === currentManagerId.toString()
         : false,
@@ -3382,6 +3443,7 @@ const buildManagerTreeWithCurrentFlags = (
           email: emp.work_email,
           designation: emp.designation,
           department: emp.department,
+          profile_image: emp.profile_image || null,
           isCurrentUser: currentEmployeeId
             ? emp._id.toString() === currentEmployeeId.toString()
             : false,
@@ -4040,6 +4102,7 @@ module.exports = {
   updateAnnouncement,
   deleteAnnouncement,
   reviewtomanager,
+  getAllReviewsForAdmin,
   forgetpasswordloginotp,
   verifyAotp,
   resetAdminPassword,

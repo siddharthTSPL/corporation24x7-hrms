@@ -76,6 +76,35 @@ const attendanceSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    // The single shared clock that activeMinutes/idleMinutes are actually
+    // credited against. There is exactly ONE of these per session - unlike
+    // channelPings below (which is per-channel and only used to know each
+    // channel's latest reported status), this field is never duplicated
+    // per-channel. That's what stops the browser tab and the desktop
+    // (.exe) agent from each separately crediting the same wall-clock
+    // minute, which is what let activeMinutes + idleMinutes add up to
+    // MORE than the real elapsed session time when both were running at
+    // once.
+    lastAccountedAt: {
+      type: Number,
+      default: 0,
+    },
+    // Per-channel ping tracking so the browser tab and the desktop (.exe)
+    // agent no longer clobber each other's timestamp. Each channel records
+    // its OWN latest status/ping-time here - used only to merge ("OR")
+    // the two channels' statuses together when crediting time against
+    // lastAccountedAt above. It is NOT used to accrue minutes on its own
+    // anymore (see activity() in attendance.controller.js).
+    channelPings: {
+      browser: {
+        lastUpdated: { type: Number, default: 0 },
+        status: { type: String, enum: ["active", "idle", null], default: null },
+      },
+      agent: {
+        lastUpdated: { type: Number, default: 0 },
+        status: { type: String, enum: ["active", "idle", null], default: null },
+      },
+    },
     source: {
       type: String,
       enum: ["manual", "agent", "face"],

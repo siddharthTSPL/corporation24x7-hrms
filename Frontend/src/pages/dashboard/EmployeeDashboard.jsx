@@ -6,6 +6,8 @@ import { useGetAttendance } from "../../auth/server-state/employee/employeeother
 import { useCalendarMeta, useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
 import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus, isPastShiftEnd } from "../../pages/utils/attendance";
 import NotificationBell from "../../components/notifications/NotificationBell";
+import MyAssetsWidget from "../asset/MyAssetsWidget";
+import { useGetMyAssetsEmployee } from "../../auth/server-state/employee/employeeasset/employeeasset.hook";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS = ["S","M","T","W","T","F","S"];
@@ -540,9 +542,10 @@ function ReviewCard({ reviews=[], loading }) {
       <Skeleton className="h-4 w-3/5" /><Skeleton className="h-8 w-2/5" /><Skeleton className="h-3 w-4/5" />
     </div>
   );
-  const avg=reviews.length?(reviews.reduce((s,r)=>s+(r.rating||0),0)/reviews.length):null;
+  const avg=reviews.length?(reviews.reduce((s,r)=>s+(r.overallScore||0),0)/reviews.length):null;
   const thisMonth=new Date().toISOString().slice(0,7);
   const newThisMonth=reviews.filter(r=>r.monthYear===thisMonth).length;
+  const RATING_ORDER=["Excellent","Very Good","Good","Average","Poor"];
   return (
     <div className="p-4 pb-5">
       {avg!==null ? (
@@ -550,18 +553,17 @@ function ReviewCard({ reviews=[], loading }) {
           <div className="flex items-end gap-2.5 mb-3">
             <span className="text-4xl font-bold text-[#e8b84b] leading-none" style={{ fontFamily:"'Lora',serif" }}>{avg.toFixed(1)}</span>
             <div>
-              <StarRating rating={avg} size={15} />
-              <div className="text-[10px] text-[#b0948a] mt-1 font-sans">from {reviews.length} review{reviews.length!==1?"s":""}</div>
+              <StarRating rating={avg / 2} size={15} />
+              <div className="text-[10px] text-[#b0948a] mt-1 font-sans">from {reviews.length} review{reviews.length!==1?"s":""} · out of 10</div>
             </div>
           </div>
           <div className="flex flex-col gap-1 mb-3">
-            {[5,4,3,2,1].map(star => {
-              const cnt=reviews.filter(r=>Math.round(r.rating)===star).length;
+            {RATING_ORDER.map(label => {
+              const cnt=reviews.filter(r=>r.overallRating===label).length;
               const pct=reviews.length>0?(cnt/reviews.length)*100:0;
               return (
-                <div key={star} className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-[#b0948a] w-2 font-sans">{star}</span>
-                  <svg width="10" height="10" viewBox="0 0 16 16" fill="#e8b84b"><path d="M8 1l1.8 3.6L14 5.4l-3 2.9.7 4.1L8 10.4l-3.7 2 .7-4.1-3-2.9 4.2-.8z"/></svg>
+                <div key={label} className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-[#b0948a] w-14 font-sans">{label}</span>
                   <div className="flex-1 h-1.5 rounded-full bg-[#f0e8e4] overflow-hidden">
                     <div className="h-full rounded-full bg-[#e8b84b] transition-all duration-700" style={{ width:`${pct}%` }} />
                   </div>
@@ -914,7 +916,7 @@ export default function EmployeeDashboard() {
                 <div className="mt-1.5 flex gap-1.5 flex-wrap">
                   <Badge variant="green">Active</Badge>
                   <Badge variant="blue">{employee?.empid??"—"}</Badge>
-                  {reviews.length>0 && <StarRating rating={reviews.reduce((s,r)=>s+r.rating,0)/reviews.length} size={12} />}
+                  {reviews.length>0 && <StarRating rating={reviews.reduce((s,r)=>s+(r.overallScore||0),0)/reviews.length/2} size={12} />}
                 </div>
               </div>
             </div>
@@ -981,7 +983,11 @@ export default function EmployeeDashboard() {
           </div>
         </div>
 
-     
+        {/* My Assets */}
+        <div className="grid grid-cols-1 gap-3.5 mb-3.5">
+          <MyAssetsWidget useMyAssets={useGetMyAssetsEmployee} title="My Assets" accent="#730042" />
+        </div>
+
       </div>
     </div>
   );

@@ -1,8 +1,29 @@
 const SalaryStructure = require("../Models/salarystructure.model");
 const Payroll = require("../Models/payroll.model");
 const AttendanceSummary = require("../Models/attendancesummary.model");
+const User = require("../Models/user.model");
+const Manager = require("../Models/manager.model");
+const Admin = require("../Models/Admin.model");
 const { getOrCreatePolicy } = require("./payrollpolicy.controller");
 const { calculateSalaryBreakup, calculatePayrollForMonth } = require("../utils/payroll.utils");
+
+const EMPLOYEE_MODEL_MAP = { User, Manager, Admin };
+
+// Small snapshot of who this payslip belongs to, taken at generation time,
+// so the payslip keeps reading correctly even if department/designation
+// change later. Never throws — a missing snapshot just prints blank.
+const getEmployeeSnapshot = async (employeeModel, employeeId) => {
+  const Model = EMPLOYEE_MODEL_MAP[employeeModel];
+  if (!Model) return { name: "", employeeId: "", department: "", designation: "" };
+  const person = await Model.findById(employeeId).select("f_name l_name uid department designation").lean();
+  if (!person) return { name: "", employeeId: "", department: "", designation: "" };
+  return {
+    name: `${person.f_name || ""} ${person.l_name || ""}`.trim(),
+    employeeId: person.uid || "",
+    department: person.department || "",
+    designation: person.designation || "",
+  };
+};
 
 // ---------- Salary structure (one-time CTC set, auto-computed breakup) ----------
 
@@ -138,12 +159,18 @@ const generatePayroll = async (req, res) => {
     bonus,
     incentive,
     overtime,
+    reimbursement,
     otherEarnings,
     loan,
     advance,
     otherDeductions,
     remarks,
     force,
+    // Manual attendance override — "kitne din wo aaya" this month. When
+    // paidDays is sent, it's used instead of pulling AttendanceSummary.
+    paidDays,
+    workingDays,
+    calendarDays,
   } = req.body;
 
   if (!employee || !employeeModel || !month || !year)
@@ -165,7 +192,20 @@ const generatePayroll = async (req, res) => {
   const policy = await getOrCreatePolicy(organisation_id);
 
   const role = employeeModel === "User" ? "employee" : employeeModel.toLowerCase();
-  const attendanceSummary = await AttendanceSummary.findOne({ employee, role, month: Number(month), year: Number(year) }).lean();
+
+  // Manual attendance wins over AttendanceSummary whenever paidDays is sent.
+  const hasManualPaidDays = paidDays !== undefined && paidDays !== null && paidDays !== "";
+  const manualAttendance = hasManualPaidDays
+    ? {
+        paidDays: Number(paidDays),
+        workingDays: workingDays !== undefined && workingDays !== "" ? Number(workingDays) : undefined,
+        calendarDays: calendarDays !== undefined && calendarDays !== "" ? Number(calendarDays) : undefined,
+      }
+    : null;
+
+  const attendanceSummary = manualAttendance
+    ? null
+    : await AttendanceSummary.findOne({ employee, role, month: Number(month), year: Number(year) }).lean();
 
   const result = calculatePayrollForMonth({
     structure,
@@ -173,8 +213,11 @@ const generatePayroll = async (req, res) => {
     attendanceSummary,
     month: Number(month),
     year: Number(year),
-    extras: { bonus, incentive, overtime, otherEarnings, loan, advance, otherDeductions },
+    extras: { bonus, incentive, overtime, reimbursement, otherEarnings, loan, advance, otherDeductions },
+    manualAttendance,
   });
+
+  const employeeSnapshot = await getEmployeeSnapshot(employeeModel, employee);
 
   const payroll = await Payroll.findOneAndUpdate(
     { employee, month: Number(month), year: Number(year) },
@@ -182,6 +225,7 @@ const generatePayroll = async (req, res) => {
       $set: {
         organisation_id,
         employeeModel,
+        employeeSnapshot,
         ctc: structure.ctc,
         ...result,
         policySnapshot: structure.policySnapshot,
@@ -194,7 +238,30 @@ const generatePayroll = async (req, res) => {
     { upsert: true, new: true }
   );
 
+  // First payroll ever run for this org locks the Pay Schedule, same as
+  // "Pay Schedule cannot be edited once you process the first pay run."
+  await lockPayScheduleIfFirstRun(organisation_id, Number(month), Number(year));
+
   res.status(200).json({ success: true, payroll, message: "Payroll generated" });
+};
+
+// Locks paySchedule (and back-fills firstPayPeriod/firstPayDate if unset)
+// the first time payroll is ever generated for an organisation.
+const lockPayScheduleIfFirstRun = async (organisation_id, month, year) => {
+  const policy = await getOrCreatePolicy(organisation_id);
+  if (policy.paySchedule?.locked) return;
+
+  // The record just written already counts, so "first run" = exactly one
+  // payroll document exists for this org so far.
+  const totalPayrolls = await Payroll.countDocuments({ organisation_id });
+  if (totalPayrolls !== 1) return;
+
+  policy.paySchedule = policy.paySchedule || {};
+  if (!policy.paySchedule.firstPayPeriodMonth) policy.paySchedule.firstPayPeriodMonth = month;
+  if (!policy.paySchedule.firstPayPeriodYear) policy.paySchedule.firstPayPeriodYear = year;
+  if (!policy.paySchedule.firstPayDate) policy.paySchedule.firstPayDate = new Date();
+  policy.paySchedule.locked = true;
+  await policy.save();
 };
 
 // One click for the whole org (or one employeeModel bucket) for a given
@@ -262,6 +329,8 @@ const bulkGeneratePayroll = async (req, res) => {
       extras: {},
     });
 
+    const employeeSnapshot = await getEmployeeSnapshot(model, structure.employee);
+
     ops.push({
       updateOne: {
         filter: { employee: structure.employee, month: Number(month), year: Number(year) },
@@ -269,6 +338,7 @@ const bulkGeneratePayroll = async (req, res) => {
           $set: {
             organisation_id,
             employeeModel: model,
+            employeeSnapshot,
             ctc: structure.ctc,
             ...result,
             policySnapshot: structure.policySnapshot,
@@ -283,6 +353,8 @@ const bulkGeneratePayroll = async (req, res) => {
   }
 
   const bulkResult = ops.length ? await Payroll.bulkWrite(ops) : { upsertedCount: 0, modifiedCount: 0 };
+
+  if (ops.length) await lockPayScheduleIfFirstRun(organisation_id, Number(month), Number(year));
 
   res.status(200).json({
     success: true,

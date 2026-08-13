@@ -18,6 +18,22 @@ const formatDuration = (ms) => {
 const saveSession  = (data) => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (_) {} };
 const clearSession = ()     => { try { localStorage.removeItem(STORAGE_KEY); } catch (_) {} };
 
+// Widened on purpose to catch every realistic input channel: mouse
+// (wired/wireless/trackpad - the browser can't tell these apart anyway,
+// they all surface as the same DOM events), pen/stylus, touch, and
+// keyboard. "wheel" is separate from "scroll" because scroll only fires
+// on an actually-scrollable element/page; wheel fires on any mouse-wheel
+// nudge even if the page has nothing to scroll. "pointer*" events catch
+// pen/touch input that doesn't always also fire a mouse event.
+const ACTIVITY_EVENTS = [
+  "mousemove", "mousedown", "mouseup",
+  "keydown", "keyup",
+  "scroll", "wheel",
+  "click", "dblclick",
+  "touchstart", "touchmove",
+  "pointerdown", "pointermove",
+];
+
 export const useAttendanceTracker = () => {
   const [isCheckedIn,      setIsCheckedIn]      = useState(false);
   const [checkInTime,      setCheckInTime]      = useState(null);
@@ -127,8 +143,7 @@ export const useAttendanceTracker = () => {
   }, [activityMutation, computeActivityStatus]);
 
   const startTracking = useCallback((checkInISO) => {
-    const EVENTS = ["mousemove", "mousedown", "keydown", "scroll", "click", "touchstart"];
-    EVENTS.forEach((e) => window.addEventListener(e, handleBrowserActivity, { passive: true }));
+    ACTIVITY_EVENTS.forEach((e) => window.addEventListener(e, handleBrowserActivity, { passive: true }));
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     pingIntervalRef.current  = setInterval(sendActivityPing, PING_INTERVAL_MS);
@@ -144,8 +159,7 @@ export const useAttendanceTracker = () => {
   }, [handleBrowserActivity, handleVisibilityChange, sendActivityPing, computeActivityStatus]);
 
   const stopTracking = useCallback(() => {
-    const EVENTS = ["mousemove", "mousedown", "keydown", "scroll", "click", "touchstart"];
-    EVENTS.forEach((e) => window.removeEventListener(e, handleBrowserActivity));
+    ACTIVITY_EVENTS.forEach((e) => window.removeEventListener(e, handleBrowserActivity));
     document.removeEventListener("visibilitychange", handleVisibilityChange);
     clearInterval(pingIntervalRef.current);
     clearInterval(clockIntervalRef.current);

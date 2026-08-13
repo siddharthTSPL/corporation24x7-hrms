@@ -11,6 +11,7 @@ import {
   getAssetsOfPersonAdmin,
   getEmployeesWithAssetsAdmin,
   getEmployeeAssetHistoryAdmin,
+  getMyAssetsAdmin,
 } from "../../api/adminapi/asset/adminasset.api";
 
 export const useGetAllAssetsAdmin = (params) => {
@@ -56,6 +57,15 @@ export const useGetEmployeeAssetHistoryAdmin = (person_id, person_model) => {
     queryFn: () => getEmployeeAssetHistoryAdmin(person_id, person_model),
     enabled: !!person_id && !!person_model,
     staleTime: 0,
+  });
+};
+
+export const useGetMyAssetsAdmin = () => {
+  return useQuery({
+    queryKey: ["my-assets-admin"],
+    queryFn: getMyAssetsAdmin,
+    staleTime: 60 * 1000,
+    retry: false,
   });
 };
 

@@ -112,7 +112,18 @@ function Sk({ w, h, r = 8 }) {
   );
 }
 
-function Avatar({ name, size = 40, bg, color }) {
+function Avatar({ name, size = 40, bg, color, image }) {
+  const [errored, setErrored] = useState(false);
+  if (image && !errored) {
+    return (
+      <img
+        src={image}
+        alt={name}
+        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0, background: bg }}
+        onError={() => setErrored(true)}
+      />
+    );
+  }
   return (
     <div style={{ width: size, height: size, borderRadius: "50%", background: bg, color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0, fontFamily: "'Syne',sans-serif" }}>
       {initials(name)}
@@ -145,7 +156,7 @@ const CFG = {
   emp:     { accent: "#94a3b8", avBg: "#f8fafc", avColor: "#64748b" },
 };
 
-function Card({ level, name, department, designation, empid, isOrg, width = 172, delay = 0, dim, hl, q, you, empCount }) {
+function Card({ level, name, department, designation, empid, isOrg, width = 172, delay = 0, dim, hl, q, you, empCount, image }) {
   const c = CFG[level] || CFG.emp;
   return (
     <div style={{ animation: `scaleIn 0.26s ease ${delay}ms forwards`, opacity: 0, flexShrink: 0 }}>
@@ -155,7 +166,7 @@ function Card({ level, name, department, designation, empid, isOrg, width = 172,
       >
         {you && <YouPill />}
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: c.accent, borderRadius: "11px 11px 0 0" }} />
-        <Avatar name={name} size={38} bg={c.avBg} color={c.avColor} />
+        <Avatar name={name} size={38} bg={c.avBg} color={c.avColor} image={image} />
         <div style={{ marginTop: 8, marginBottom: 6, textAlign: "center", width: "100%" }}>
           <Hi text={name} q={q} style={{ fontSize: 12, fontWeight: 600, color: "#0f172a", display: "block", lineHeight: 1.3, fontFamily: "'Syne',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />
           {!isOrg && (
@@ -245,6 +256,7 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
         department={mgr.department ? getDepartmentName(mgr.department) : "—"}
         designation={mgr.designation || "—"}
         empid={mgr.empid}
+        image={mgr.profile_image}
         width={CARD_W}
         delay={mDelay}
         dim={dim(key)}
@@ -295,6 +307,7 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
                   department={emp.department ? getDepartmentName(emp.department) : "—"}
                   designation={emp.designation || "—"}
                   empid={emp.empid}
+                  image={emp.profile_image}
                   width={EMP_W}
                   delay={eDelay}
                   dim={dim(eKey)}
@@ -365,7 +378,7 @@ function OrgTree({ data, loading, q }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: "max-content" }}>
       <div style={{ animation: `scaleIn 0.26s ease 40ms forwards`, opacity: 0 }}>
-        <Card level="org" name={data.organisation_name || "Organisation"} department="—" designation={data.super_admin?.name || "—"} isOrg width={CARD_W} delay={0} dim={dim("org")} hl={matches.has("org")} q={q} />
+        <Card level="org" name={data.organisation_name || "Organisation"} department="—" designation={data.super_admin?.name || "—"} image={data.organisation_logo} isOrg width={CARD_W} delay={0} dim={dim("org")} hl={matches.has("org")} q={q} />
       </div>
       <VLine h={22} />
 
@@ -377,6 +390,7 @@ function OrgTree({ data, loading, q }) {
             department={data.admin.department ? getDepartmentName(data.admin.department) : "—"}
             designation={data.admin.designation || "—"}
             empid={data.admin.empid}
+            image={data.admin.profile_image}
             width={CARD_W}
             delay={80}
             dim={dim("admin")}

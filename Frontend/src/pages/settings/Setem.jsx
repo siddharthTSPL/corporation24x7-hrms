@@ -4,6 +4,8 @@ import { useUpdateProfile, useUpdatePassword, useGetMeUser } from "../../auth/se
 import { uploadDocument } from "../../../src/auth/api/employeeapi/other/em.other.api";
 import { useQueryClient } from "@tanstack/react-query";
 import { Country, State, City } from "country-state-city";
+import MyAssetsWidget from "../asset/MyAssetsWidget";
+import { useGetMyAssetsEmployee } from "../../auth/server-state/employee/employeeasset/employeeasset.hook";
 
 const DEFAULT_COUNTRY_ISO = "IN";
 const ALL_COUNTRIES = Country.getAllCountries();
@@ -29,6 +31,7 @@ const SETTINGS_TABS = [
   { key: "documents", label: "Documents & Banking" },
   { key: "leave", label: "Leave Balance" },
   { key: "reviews", label: "Reviews" },
+  { key: "assets", label: "My Assets" },
   { key: "password", label: "Password" },
   { key: "avatar", label: "Avatar" },
 ];
@@ -358,6 +361,9 @@ function Sidebar({ tab, setTab, employee, initials }) {
     )},
     { key: "reviews", label: "Reviews", icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><polygon points="8,1.5 9.9,5.4 14,6 11,9 11.8,13.5 8,11.4 4.2,13.5 5,9 2,6 6.1,5.4" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/></svg>
+    )},
+        { key: "assets", label: "My Assets", icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="5" width="12" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M2 5l1.5-3h9L14 5" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><path d="M6 8h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
     )},
     { key: "password", label: "Password", icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="4" y="7" width="8" height="6" rx="2" stroke="currentColor" strokeWidth="1.4"/><path d="M6 7V5a2 2 0 0 1 4 0v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
@@ -954,10 +960,17 @@ function ReviewsTab({ reviews }) {
     );
   }
 
-  const avg = (reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length).toFixed(1);
+  const avg = (reviews.reduce((s, r) => s + (r.overallScore || 0), 0) / reviews.length).toFixed(1);
+
+  const ratingBadgeColor = (rating) => {
+    if (rating === "Excellent" || rating === "Very Good") return C.green || "#1E7A3D";
+    if (rating === "Good") return C.brand;
+    if (rating === "Average") return C.amber || "#B8860B";
+    return C.red || "#B0233A";
+  };
 
   return (
-    <SectionCard title="My Reviews" subtitle={`${reviews.length} review${reviews.length !== 1 ? "s" : ""} · avg ${avg}/5`} accent={C.brand}>
+    <SectionCard title="My Reviews" subtitle={`${reviews.length} review${reviews.length !== 1 ? "s" : ""} · avg ${avg}/10`} accent={C.brand}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {reviews.map((r, i) => (
           <div key={r._id || i} style={{ padding: "14px 16px", borderRadius: 10, border: `0.5px solid ${C.border}`, background: C.surface, minWidth: 0 }}>
@@ -968,16 +981,30 @@ function ReviewsTab({ reviews }) {
                 </div>
                 <div style={{ fontSize: 11, color: C.muted }}>{r.reviewer?.role || ""} · {r.monthYear || (r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "")}</div>
               </div>
-              <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
-                {[1,2,3,4,5].map(s => (
-                  <svg key={s} width="14" height="14" viewBox="0 0 24 24">
-                    <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
-                      fill={s <= (r.rating || 0) ? "#f59e0b" : "transparent"}
-                      stroke="#f59e0b" strokeWidth="1.5" strokeLinejoin="round" />
-                  </svg>
-                ))}
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: ratingBadgeColor(r.overallRating) }}>
+                  {r.overallScore != null ? r.overallScore.toFixed(1) : "–"}/10
+                </span>
+                {r.overallRating && (
+                  <span style={{ fontSize: 11, color: C.muted }}>· {r.overallRating}</span>
+                )}
               </div>
             </div>
+
+            {(r.taskSubmission || r.behaviourEthics || r.attendance) && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: r.comment ? 8 : 0, fontSize: 11, color: C.muted }}>
+                {r.taskSubmission && (
+                  <span>Task: {r.taskSubmission.percentage}% ({r.taskSubmission.rating})</span>
+                )}
+                {r.behaviourEthics && (
+                  <span>Behaviour: {r.behaviourEthics.score}/10 ({r.behaviourEthics.rating})</span>
+                )}
+                {r.attendance && (
+                  <span>Attendance: {r.attendance.percentage}% ({r.attendance.rating})</span>
+                )}
+              </div>
+            )}
+
             {r.comment && (
               <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, fontStyle: "italic", wordBreak: "break-word" }}>
                 "{r.comment}"
@@ -986,6 +1013,14 @@ function ReviewsTab({ reviews }) {
           </div>
         ))}
       </div>
+    </SectionCard>
+  );
+}
+
+function AssetsTab() {
+  return (
+    <SectionCard title="My Assets" subtitle="Items currently assigned to you by your admin" accent={C.brand}>
+      <MyAssetsWidget useMyAssets={useGetMyAssetsEmployee} title="Assigned to me" accent={C.brand} />
     </SectionCard>
   );
 }
@@ -1321,6 +1356,7 @@ export default function EmployeeSettingsPage() {
             {tab === "documents" && <DocumentsBankingTab employee={employee} onSuccess={showSuccess} onError={showError} />}
             {tab === "leave"     && <LeaveTab     leaveBalance={leaveBalance} />}
             {tab === "reviews"   && <ReviewsTab   reviews={reviews} />}
+            {tab === "assets"    && <AssetsTab />}
             {tab === "password"  && <PasswordTab  onSuccess={showSuccess} onError={showError} />}
             {tab === "avatar"    && <AvatarTab    employee={employee} onSuccess={showSuccess} onError={showError} />}
 

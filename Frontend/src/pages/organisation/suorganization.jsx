@@ -239,7 +239,19 @@ function OrgConnectorGroup({ parentRef, children, gapClassName = "gap-4" }) {
   );
 }
 
-function Avatar({ initials, sizeClass = "w-11 h-11 sm:w-12 sm:h-12", textClass = "text-sm sm:text-base", bg = BRAND }) {
+function Avatar({ initials, sizeClass = "w-11 h-11 sm:w-12 sm:h-12", textClass = "text-sm sm:text-base", bg = BRAND, image }) {
+  const [errored, setErrored] = useState(false);
+  if (image && !errored) {
+    return (
+      <img
+        src={image}
+        alt={initials}
+        className={`rounded-full object-cover shrink-0 ${sizeClass}`}
+        style={{ boxShadow: `0 2px 8px ${bg}40` }}
+        onError={() => setErrored(true)}
+      />
+    );
+  }
   return (
     <div
       className={`flex items-center justify-center rounded-full font-bold text-white shrink-0 ${sizeClass} ${textClass}`}
@@ -274,7 +286,7 @@ function YouPill() {
   return <span className="su-you-pill"></span>;
 }
 
-const SuperAdminNode = ({ nodeRef, name, role, initials, delay = 0, onClick, isYou }) => {
+const SuperAdminNode = ({ nodeRef, name, role, initials, image, delay = 0, onClick, isYou }) => {
   return (
     <div ref={nodeRef} className="opacity-0 shrink-0" style={{ animation: `scaleIn 0.4s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms forwards` }}>
       <div
@@ -285,6 +297,7 @@ const SuperAdminNode = ({ nodeRef, name, role, initials, delay = 0, onClick, isY
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#0f172a] to-[#334155] rounded-t-2xl" />
         <Avatar
           initials={initials}
+          image={image}
           sizeClass="w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 lg:w-[52px] lg:h-[52px]"
           textClass="text-sm sm:text-base md:text-lg"
           bg={NODE_COLOR.sa}
@@ -307,6 +320,7 @@ const AdminNode = ({ nodeRef, admin, delay = 0, dimmed, highlighted, onClick }) 
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-slate-500 to-slate-400 rounded-t-xl" />
         <Avatar
           initials={getInitials(admin.f_name, admin.l_name)}
+          image={admin.profile_image}
           sizeClass="w-9 h-9 sm:w-10 sm:h-10 md:w-10 md:h-10 lg:w-11 lg:h-11"
           textClass="text-xs sm:text-[13px]"
           bg={NODE_COLOR.admin}
@@ -331,6 +345,7 @@ const ManagerNode = ({ nodeRef, manager, delay = 0, dimmed, highlighted, onClick
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-slate-400 to-slate-300 rounded-t-lg" />
         <Avatar
           initials={getInitials(manager.f_name, manager.l_name)}
+          image={manager.profile_image}
           sizeClass="w-7 h-7 sm:w-8 sm:h-8 md:w-[34px] md:h-[34px]"
           textClass="text-[10px] sm:text-[11px] md:text-xs"
           bg={NODE_COLOR.manager}
@@ -354,6 +369,7 @@ const EmployeeNode = ({ nodeRef, employee, delay = 0, dimmed, highlighted, onCli
       >
         <Avatar
           initials={getInitials(employee.f_name, employee.l_name)}
+          image={employee.profile_image}
           sizeClass="w-6 h-6 sm:w-7 sm:h-7 md:w-7 md:h-7"
           textClass="text-[8px] sm:text-[9px]"
           bg={NODE_COLOR.employee}
@@ -735,16 +751,22 @@ function ReviewsTab({ uid, role }) {
     <div className="flex flex-col gap-3 min-w-0">
       {reviews.map((r) => (
         <div key={r._id} className="bg-[#fafbfc] rounded-xl border border-gray-100 p-3 sm:p-4 min-w-0">
-          <div className="flex justify-between items-start mb-2 gap-2">
+          <div className="flex justify-between items-start mb-2 gap-2 flex-wrap">
             <span className="text-xs sm:text-sm font-semibold text-slate-900 truncate min-w-0">
               {r.reviewer?.f_name} {r.reviewer?.l_name}
             </span>
-            <div className="flex gap-0.5 shrink-0">
-              {[1,2,3,4,5].map(s => (
-                <span key={s} className="text-sm" style={{ color: s <= r.rating ? "#f59e0b" : "#e2e8f0" }}>★</span>
-              ))}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-xs sm:text-sm font-bold text-slate-900">{r.overallScore!=null?r.overallScore.toFixed(1):"–"}/10</span>
+              {r.overallRating && <span className="text-[11px] text-gray-400">· {r.overallRating}</span>}
             </div>
           </div>
+          {(r.taskSubmission||r.behaviourEthics||r.attendance) && (
+            <div className="flex flex-wrap gap-2 mb-1.5 text-[11px] text-gray-500">
+              {r.taskSubmission && <span>Task: {r.taskSubmission.percentage}% ({r.taskSubmission.rating})</span>}
+              {r.behaviourEthics && <span>Behaviour: {r.behaviourEthics.score}/10</span>}
+              {r.attendance && <span>Attendance: {r.attendance.percentage}%</span>}
+            </div>
+          )}
           <p className="text-xs sm:text-sm text-gray-600 m-0 leading-relaxed break-words">{r.comment}</p>
           <div className="text-[11px] text-gray-400 mt-1.5">{r.monthYear}</div>
         </div>
@@ -887,6 +909,7 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
         name={fullName(superAdmin) || "Super Admin"}
         role={superAdmin?.organisation_name || "Super Admin"}
         initials={getInitials(superAdmin?.f_name, superAdmin?.l_name)}
+        image={superAdmin?.profile_image}
         delay={60}
         isYou
         onClick={() => onNodeClick(superAdmin, "superadmin")}
