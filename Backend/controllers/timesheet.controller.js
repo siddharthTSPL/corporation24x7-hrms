@@ -100,6 +100,8 @@ const submitTimesheet = async (req, res, next) => {
   }
 
   const totalMinutes = logs.reduce((s, l) => s + l.duration_minutes, 0);
+  const workingMinutes = logs.reduce((s, l) => s + (l.regular_minutes ?? l.duration_minutes), 0);
+  const overtimeMinutes = logs.reduce((s, l) => s + (l.overtime_minutes || 0), 0);
   const billableMinutes = logs.filter((l) => l.billable).reduce((s, l) => s + l.duration_minutes, 0);
   const totalBilledAmount = logs.reduce((s, l) => s + (l.billed_amount || 0), 0);
 
@@ -129,6 +131,8 @@ const submitTimesheet = async (req, res, next) => {
 
   timesheet.time_logs = logs.map((l) => l._id);
   timesheet.total_minutes = totalMinutes;
+  timesheet.working_minutes = workingMinutes;
+  timesheet.overtime_minutes = overtimeMinutes;
   timesheet.billable_minutes = billableMinutes;
   timesheet.total_billed_amount = Math.round(totalBilledAmount * 100) / 100;
   timesheet.currentHandler = routing?.handler || null;
