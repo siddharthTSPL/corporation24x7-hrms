@@ -1054,7 +1054,7 @@ export default function SuperAdminTimesheet() {
                         {orgLogs.map(log => (
                           <tr key={log._id} className="border-b border-[#E4E6EF] hover:bg-[#F8F9FC] transition-colors">
                             <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">{log.logged_by?.f_name || "—"} {log.logged_by?.l_name || ""}</td>
-                            <td className="px-4 py-3"><Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{log.logged_by_model}</Badge></td>
+                            <td className="px-4 py-3"><Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{log.logged_by_model === "User" ? "Employee" : log.logged_by_model}</Badge></td>
                             <td className="px-4 py-3 max-w-[180px] truncate text-gray-700">{log.job?.title || "—"}</td>
                             <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{fmtDate(log.log_date)}</td>
                             <td className="px-4 py-3 font-semibold text-emerald-600 whitespace-nowrap">{fmtDuration(log.duration_minutes)}</td>
@@ -1079,7 +1079,7 @@ export default function SuperAdminTimesheet() {
                           <div className="font-bold text-[13px] text-gray-900 truncate">{log.logged_by?.f_name || "—"} {log.logged_by?.l_name || ""}</div>
                           <div className="text-[11px] text-gray-400 truncate">{log.job?.title || "—"}</div>
                         </div>
-                        <Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{log.logged_by_model}</Badge>
+                        <Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{log.logged_by_model === "User" ? "Employee" : log.logged_by_model}</Badge>
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-[11px] text-gray-500 mb-2">
                         <div>Date: <span className="font-semibold text-gray-700">{fmtDate(log.log_date)}</span></div>
