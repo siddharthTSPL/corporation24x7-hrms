@@ -3,6 +3,7 @@ import {
   useMyAssignedJobs,
   useJobsCreatedByMe,
   useCreateJob,
+  useUpdateJob,
   useAssignableTargets,
   useUpdateJobStatus,
   useArchiveJob,
@@ -592,6 +593,8 @@ export default function AdminTimesheet() {
   const [jobDetailOpen, setJobDetailOpen] = useState(false);
   const [jobForm, setJobForm] = useState({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: false, hourly_rate: "", due_date: "" });
   const [logForm, setLogForm] = useState({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" });
+  const [editJobModal, setEditJobModal] = useState(false);
+  const [editJobForm, setEditJobForm] = useState({ id: "", title: "", description: "", priority: "medium", estimated_hours: "", billable: false, hourly_rate: "", due_date: "" });
 
   const { data: assignedJobsData } = useMyAssignedJobs();
   const assignedJobs = assignedJobsData?.jobs || [];
@@ -636,6 +639,7 @@ export default function AdminTimesheet() {
   const orgSheets = orgSheetsData?.timesheets ?? [];
 
   const createJob = useCreateJob();
+  const updateJob = useUpdateJob();
   const updateJobStatus = useUpdateJobStatus();
   const archiveJob = useArchiveJob();
   const logTime = useLogTime();
@@ -683,6 +687,38 @@ export default function AdminTimesheet() {
         setLogForm({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" });
         refetchWeek();
       },
+    });
+  };
+
+  const openEditJob = (job) => {
+    setEditJobForm({
+      id: job._id,
+      title: job.title || "",
+      description: job.description || "",
+      priority: job.priority || "medium",
+      estimated_hours: job.estimated_hours || "",
+      billable: !!job.billable,
+      hourly_rate: job.hourly_rate || "",
+      due_date: job.due_date ? job.due_date.slice(0, 10) : "",
+    });
+    setEditJobModal(true);
+  };
+
+  const handleUpdateJob = () => {
+    if (!editJobForm.title) return;
+    updateJob.mutate({
+      id: editJobForm.id,
+      data: {
+        title: editJobForm.title,
+        description: editJobForm.description,
+        priority: editJobForm.priority,
+        estimated_hours: Number(editJobForm.estimated_hours) || 0,
+        billable: editJobForm.billable,
+        hourly_rate: Number(editJobForm.hourly_rate) || 0,
+        due_date: editJobForm.due_date || null,
+      },
+    }, {
+      onSuccess: () => { setEditJobModal(false); refetchCreated(); },
     });
   };
 
@@ -928,6 +964,7 @@ export default function AdminTimesheet() {
                       </div>
                       <div className="flex gap-1.5 flex-wrap flex-shrink-0 sm:self-start">
                         <button onClick={() => openJobDetail(j._id)} className="bg-gray-50 text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-[11px] font-semibold cursor-pointer">View</button>
+                        <button onClick={() => openEditJob(j)} className="bg-blue-50 text-blue-600 border border-blue-200 rounded-lg px-3 py-1.5 min-h-[36px] text-[11px] font-semibold cursor-pointer">Edit</button>
                         {!["completed", "cancelled"].includes(j.status) && (
                           <button onClick={() => updateJobStatus.mutate({ id: j._id, status: "completed" }, { onSuccess: refetchCreated })} className="bg-emerald-50 text-emerald-600 border-none rounded-lg px-3 py-1.5 min-h-[36px] text-[11px] font-semibold cursor-pointer">Complete</button>
                         )}
@@ -1371,6 +1408,36 @@ export default function AdminTimesheet() {
             <Btn variant="ghost" onClick={() => setJobModal(false)} className="w-full sm:w-auto">Cancel</Btn>
             <Btn onClick={handleCreateJob} disabled={!jobForm.title || !jobForm.assigned_to || createJob.isPending} className="w-full sm:w-auto">
               {createJob.isPending ? "Creating…" : "Create Job"}
+            </Btn>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={editJobModal} onClose={() => setEditJobModal(false)} title="Edit Job">
+        <div className="flex flex-col gap-4">
+          <Input label="Job Title *" placeholder="e.g. Design Login Page" value={editJobForm.title} onChange={(e) => setEditJobForm((p) => ({ ...p, title: e.target.value }))} />
+          <Input label="Description" placeholder="Job details…" value={editJobForm.description} onChange={(e) => setEditJobForm((p) => ({ ...p, description: e.target.value }))} />
+          <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
+            <Sel label="Priority" value={editJobForm.priority} onChange={(e) => setEditJobForm((p) => ({ ...p, priority: e.target.value }))}>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </Sel>
+            <Input label="Est. Hours" type="number" placeholder="0" value={editJobForm.estimated_hours} onChange={(e) => setEditJobForm((p) => ({ ...p, estimated_hours: e.target.value }))} />
+          </div>
+          <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
+            <Input label="Hourly Rate (₹)" type="number" placeholder="0" value={editJobForm.hourly_rate} onChange={(e) => setEditJobForm((p) => ({ ...p, hourly_rate: e.target.value }))} />
+            <Input label="Due Date" type="date" value={editJobForm.due_date} onChange={(e) => setEditJobForm((p) => ({ ...p, due_date: e.target.value }))} />
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={editJobForm.billable} onChange={(e) => setEditJobForm((p) => ({ ...p, billable: e.target.checked }))} className="w-[15px] h-[15px] accent-[#730042] flex-shrink-0" />
+            <span className="text-[13px] text-gray-700">Billable job</span>
+          </label>
+          <div className="flex flex-col sm:flex-row gap-2 justify-end">
+            <Btn variant="ghost" onClick={() => setEditJobModal(false)} className="w-full sm:w-auto">Cancel</Btn>
+            <Btn onClick={handleUpdateJob} disabled={!editJobForm.title || updateJob.isPending} className="w-full sm:w-auto">
+              {updateJob.isPending ? "Saving…" : "Save Changes"}
             </Btn>
           </div>
         </div>

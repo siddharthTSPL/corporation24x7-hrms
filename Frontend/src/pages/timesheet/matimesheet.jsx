@@ -3,6 +3,7 @@ import {
   useMyAssignedJobs,
   useJobsCreatedByMe,
   useCreateJob,
+  useUpdateJob,
   useAssignableTargets,
   useUpdateJobStatus,
   useArchiveJob,
@@ -468,6 +469,8 @@ export default function ManagerTimesheet() {
   const [rejectReason, setRejectReason] = useState("");
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [jobDetailOpen, setJobDetailOpen] = useState(false);
+  const [editJobModal, setEditJobModal] = useState(false);
+  const [editJobForm, setEditJobForm] = useState({ id: "", title: "", description: "", priority: "medium", estimated_hours: "", billable: false, hourly_rate: "", due_date: "" });
 
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 6);
@@ -497,6 +500,7 @@ export default function ManagerTimesheet() {
   const updateTimeLog = useUpdateTimeLog();
   const deleteTimeLog = useDeleteTimeLog();
   const createJob = useCreateJob();
+  const updateJob = useUpdateJob();
   const updateJobStatus = useUpdateJobStatus();
   const archiveJob = useArchiveJob();
   const submitTS = useSubmitTimesheet();
@@ -541,6 +545,38 @@ export default function ManagerTimesheet() {
       due_date: jobForm.due_date || null,
     }, {
       onSuccess: () => { setJobModal(false); setJobForm({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: false, hourly_rate: "", due_date: "" }); refetchCreated(); }
+    });
+  };
+
+  const openEditJob = (job) => {
+    setEditJobForm({
+      id: job._id,
+      title: job.title || "",
+      description: job.description || "",
+      priority: job.priority || "medium",
+      estimated_hours: job.estimated_hours || "",
+      billable: !!job.billable,
+      hourly_rate: job.hourly_rate || "",
+      due_date: job.due_date ? job.due_date.slice(0, 10) : "",
+    });
+    setEditJobModal(true);
+  };
+
+  const handleUpdateJob = () => {
+    if (!editJobForm.title) return;
+    updateJob.mutate({
+      id: editJobForm.id,
+      data: {
+        title: editJobForm.title,
+        description: editJobForm.description,
+        priority: editJobForm.priority,
+        estimated_hours: Number(editJobForm.estimated_hours) || 0,
+        billable: editJobForm.billable,
+        hourly_rate: Number(editJobForm.hourly_rate) || 0,
+        due_date: editJobForm.due_date || null,
+      },
+    }, {
+      onSuccess: () => { setEditJobModal(false); refetchCreated(); },
     });
   };
 
@@ -700,6 +736,7 @@ export default function ManagerTimesheet() {
                           )}
                         </div>
                         <div className="flex flex-wrap gap-1.5">
+                          <button onClick={() => openEditJob(j)} className="text-[11px] font-semibold rounded-lg px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors">Edit</button>
                           <Sel value={j.status} onChange={(e) => updateJobStatus.mutate({ id: j._id, status: e.target.value }, { onSuccess: refetchCreated })}
                             className="text-[11px] py-1 px-2 w-full sm:w-auto sm:min-w-[100px]">
                             {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map((s) => (
@@ -957,6 +994,36 @@ export default function ManagerTimesheet() {
             <Btn variant="ghost" onClick={() => setJobModal(false)}>Cancel</Btn>
             <Btn onClick={handleCreateJob} disabled={!jobForm.title || !jobForm.assigned_to || createJob.isPending}>
               {createJob.isPending ? "Creating…" : "Create Job"}
+            </Btn>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={editJobModal} onClose={() => setEditJobModal(false)} title="Edit Job" width="max-w-[560px]">
+        <div className="flex flex-col gap-3.5">
+          <Input label="Title" placeholder="Job title" value={editJobForm.title} onChange={(e) => setEditJobForm((p) => ({ ...p, title: e.target.value }))} />
+          <Input label="Description" placeholder="Optional description" value={editJobForm.description} onChange={(e) => setEditJobForm((p) => ({ ...p, description: e.target.value }))} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Sel label="Priority" value={editJobForm.priority} onChange={(e) => setEditJobForm((p) => ({ ...p, priority: e.target.value }))}>
+              {["low", "medium", "high", "urgent"].map((p) => <option key={p} value={p}>{PRIORITY_META[p]?.label || p}</option>)}
+            </Sel>
+            <Input label="Estimated Hours" type="number" placeholder="0" value={editJobForm.estimated_hours} onChange={(e) => setEditJobForm((p) => ({ ...p, estimated_hours: e.target.value }))} />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Billable</label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={editJobForm.billable} onChange={(e) => setEditJobForm((p) => ({ ...p, billable: e.target.checked }))} className="rounded border-gray-300" />
+                <span className="text-[13px] text-gray-700">Yes</span>
+              </label>
+            </div>
+            <Input label="Hourly Rate" type="number" placeholder="0" value={editJobForm.hourly_rate} onChange={(e) => setEditJobForm((p) => ({ ...p, hourly_rate: e.target.value }))} disabled={!editJobForm.billable} />
+          </div>
+          <Input label="Due Date" type="date" value={editJobForm.due_date} onChange={(e) => setEditJobForm((p) => ({ ...p, due_date: e.target.value }))} />
+          <div className="flex gap-2 justify-end flex-wrap">
+            <Btn variant="ghost" onClick={() => setEditJobModal(false)}>Cancel</Btn>
+            <Btn onClick={handleUpdateJob} disabled={!editJobForm.title || updateJob.isPending}>
+              {updateJob.isPending ? "Saving…" : "Save Changes"}
             </Btn>
           </div>
         </div>
