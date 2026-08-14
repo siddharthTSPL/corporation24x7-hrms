@@ -4,18 +4,27 @@ const Manager = require("../Models/manager.model");
 const Admin = require("../Models/Admin.model");
 const User = require("../Models/user.model");
 const { resolveActor, resolveOrgId, httpError } = require("../utils/heirarchy.utils");
+const { getISTDateParts, istDateFromYMD, parseISTDateOnly } = require("../utils/Istdate.utils");
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
+// Computes Monday 00:00 IST .. next Monday 00:00 IST for the IST calendar
+// week that `anyDateInWeek` falls in. Built on the IST date utils instead of
+// Date.getDay()/setDate()/setHours(), which read/write the SERVER PROCESS's
+// local timezone - correct on a box set to Asia/Kolkata, wrong (usually UTC)
+// on a virtual server, which shifts week boundaries and drops time logs.
 const getWeekBounds = (anyDateInWeek) => {
-  const date = new Date(anyDateInWeek);
-  const day = date.getDay();
-  const diffToMonday = day === 0 ? -6 : 1 - day;
-  const start = new Date(date);
-  start.setDate(date.getDate() + diffToMonday);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 7);
+  const anchor =
+    typeof anyDateInWeek === "string" && /^\d{4}-\d{2}-\d{2}/.test(anyDateInWeek)
+      ? parseISTDateOnly(anyDateInWeek)
+      : new Date(anyDateInWeek);
+
+  const { year, month, day, weekday } = getISTDateParts(anchor);
+  const diffToMonday = weekday === 0 ? -6 : 1 - weekday;
+
+  const mondayUTCInstant = istDateFromYMD(year, month, day).getTime() + diffToMonday * 24 * 60 * 60 * 1000;
+  const start = new Date(mondayUTCInstant);
+  const end = new Date(mondayUTCInstant + 7 * 24 * 60 * 60 * 1000);
   return { start, end };
 };
 
@@ -91,6 +100,8 @@ const submitTimesheet = async (req, res, next) => {
   }
 
   const totalMinutes = logs.reduce((s, l) => s + l.duration_minutes, 0);
+  const workingMinutes = logs.reduce((s, l) => s + (l.regular_minutes ?? l.duration_minutes), 0);
+  const overtimeMinutes = logs.reduce((s, l) => s + (l.overtime_minutes || 0), 0);
   const billableMinutes = logs.filter((l) => l.billable).reduce((s, l) => s + l.duration_minutes, 0);
   const totalBilledAmount = logs.reduce((s, l) => s + (l.billed_amount || 0), 0);
 
@@ -120,6 +131,8 @@ const submitTimesheet = async (req, res, next) => {
 
   timesheet.time_logs = logs.map((l) => l._id);
   timesheet.total_minutes = totalMinutes;
+  timesheet.working_minutes = workingMinutes;
+  timesheet.overtime_minutes = overtimeMinutes;
   timesheet.billable_minutes = billableMinutes;
   timesheet.total_billed_amount = Math.round(totalBilledAmount * 100) / 100;
   timesheet.currentHandler = routing?.handler || null;

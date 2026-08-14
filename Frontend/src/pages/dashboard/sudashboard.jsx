@@ -26,6 +26,7 @@ import { useGetAllAnnouncements, useCreateAnnouncement, useUpdateAnnouncement, u
 import { useGetAllAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin, useReviewToAdmin } from "../../auth/server-state/superadmin/other/suother.hook";
 import AttendanceDetailsModal from "./AttendanceDetailsModal";
 import { getAttendanceHistory as fetchEmployeeAttendanceHistory } from "../../auth/api/superadmin/other/su.other";
+import NotificationBell from "../../components/notifications/NotificationBell";
 
 const DEPT_OPTIONS = [ "OPR","BPO", "ENG", "HR", "MGMT"];
 export const DEPT_FULL_FORMS = {
@@ -1781,9 +1782,11 @@ function SuperAdminDashboard() {
         .animate-\\[modalUp_0\\.22s_ease-out\\] { animation: modalUp 0.22s ease-out; }
       `}</style>
 
-      <div className="relative bg-gradient-to-br from-[#2a0017] via-[#730042] to-[#cd166e] rounded-2xl p-4 sm:p-8 lg:p-10 mb-5 sm:mb-6 overflow-hidden shadow-xl">
-        <div className="absolute top-0 right-0 w-40 sm:w-64 h-40 sm:h-64 rounded-full bg-white/5 -translate-y-1/3 translate-x-1/4 pointer-events-none" />
-        <div className="absolute bottom-0 left-1/3 w-32 sm:w-48 h-32 sm:h-48 rounded-full bg-white/3 translate-y-1/2 pointer-events-none" />
+      <div className="relative bg-gradient-to-br from-[#2a0017] via-[#730042] to-[#cd166e] rounded-2xl p-4 sm:p-8 lg:p-10 mb-5 sm:mb-6 shadow-xl">
+        <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
+          <div className="absolute top-0 right-0 w-40 sm:w-64 h-40 sm:h-64 rounded-full bg-white/5 -translate-y-1/3 translate-x-1/4" />
+          <div className="absolute bottom-0 left-1/3 w-32 sm:w-48 h-32 sm:h-48 rounded-full bg-white/3 translate-y-1/2" />
+        </div>
 
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-3 sm:mb-4">
@@ -1798,6 +1801,9 @@ function SuperAdminDashboard() {
               <p className="text-xs sm:text-sm text-white/60 max-w-lg leading-relaxed mb-4 sm:mb-5">"{thought}"</p>
             </div>
             <div className="hidden sm:flex items-center gap-2 flex-shrink-0 mt-1">
+              <div className="bg-white rounded-full shadow-md">
+                <NotificationBell />
+              </div>
               <AddAdminButton isAtLimit={isAtLimit} onClick={() => setAdminModal({ open: true, editing: null })} variant="hero" />
               <button onClick={() => setReviewModal(true)} className="flex items-center gap-1.5 bg-white/15 border border-white/25 text-white px-3 py-2 rounded-xl text-[12px] font-semibold hover:bg-white/25 transition-colors backdrop-blur-sm min-h-[44px]">
                 <FaStar size={9} /> Review
@@ -1816,7 +1822,10 @@ function SuperAdminDashboard() {
             <span className="hidden md:inline-flex bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-[11px] text-white/90 font-medium">📆 {today}</span>
           </div>
 
-          <div className="flex sm:hidden gap-2 mt-3">
+          <div className="flex sm:hidden gap-2 mt-3 items-center">
+            <div className="bg-white rounded-full shadow-md flex-shrink-0">
+              <NotificationBell />
+            </div>
             <AddAdminButton isAtLimit={isAtLimit} onClick={() => setAdminModal({ open: true, editing: null })} variant="heroMobile" />
             <button onClick={() => setReviewModal(true)} className="flex-1 flex items-center justify-center gap-1.5 bg-white/15 border border-white/25 text-white px-3 py-2.5 rounded-xl text-[12px] font-semibold hover:bg-white/25 transition-colors backdrop-blur-sm min-h-[44px]">
               <FaStar size={9} /> Review

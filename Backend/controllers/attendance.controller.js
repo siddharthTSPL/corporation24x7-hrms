@@ -2,7 +2,7 @@ const Attendance = require("../Models/attendance.model");
 const AdminModel = require("../Models/Admin.model");
 const Shift = require("../Models/shift.model");
 const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
-const { resolveEmployeeShift, evaluateCheckinWindow, evaluateCheckoutWindow, getShiftThresholds, getForceCheckoutInstant } = require("../utils/shift.utils");
+const { resolveEmployeeShift, evaluateCheckinWindow, evaluateCheckoutWindow, getShiftThresholds, getForceCheckoutInstant, calculateFaceStatus } = require("../utils/shift.utils");
 const { isHoliday, isWeekOff, startOfDay, getWeekOffMapForRange } = require("../automatic/weekoffcalendar");
 const { getISTDateParts, istDateFromYMD, toISTKey } = require("../utils/Istdate.utils");
 
@@ -30,6 +30,35 @@ const resolveOrganisationId = async (user) => {
 };
 
 const displayMinutes = (mins) => Math.round(mins || 0);
+
+// A channel's last-known status stays "valid" for this long after its own
+// last ping before we stop trusting it for the OR-merge below. Set to 1.5x
+// the ping interval (60s) both clients use, so one normally-timed ping
+// from a channel is always still fresh, but a channel that has actually
+// stopped (agent closed, tab closed) doesn't get treated as "active"
+// forever off a stale reading.
+const CHANNEL_STALE_MS = 90_000;
+
+// Status must be judged differently depending on WHETHER a channel is even
+// capable of measuring active work:
+//   - manual/system: the desktop agent sends periodic /activity heartbeat
+//     pings, so activeMinutes is a real, trustworthy measurement of actual
+//     work done. If it's low/zero, that's real signal (agent wasn't
+//     running / person wasn't working) - it must NOT be overridden by the
+//     raw checkIn->checkOut clock gap, no matter how long that gap is.
+//     Simply being logged in for 8 hours with the tracker off is not
+//     "present".
+//   - face: the kiosk only records a check-in scan and a check-out scan -
+//     there is no heartbeat mechanism at all, by design. activeMinutes is
+//     always 0 here, so the only fair signal is the raw duration, judged
+//     as a % of the shift's length (same as calculateFaceStatus already
+//     does elsewhere for Face check-ins/checkouts).
+const resolveSessionStatus = ({ source, activeMinutes, thresholds, elapsedSessionMinutes, shift }) => {
+  if (source === "face") {
+    return calculateFaceStatus(elapsedSessionMinutes, shift);
+  }
+  return calculateStatus(activeMinutes, thresholds);
+};
 
 const checkin = async (req, res) => {
   try {
@@ -238,16 +267,53 @@ const activity = async (req, res) => {
     if (attendance.checkOut)
       return res.status(400).json({ message: "Already checked out" });
 
+    // Which channel is this ping from? The browser tab authenticates via
+    // cookie; the desktop (.exe) agent authenticates via Bearer header (see
+    // employee.middleware.js) - no change to either client needed, the
+    // signal is already there in how they auth.
+    const channel = req.cookies?.token ? "browser" : "agent";
+
     const now = Date.now();
-    const elapsedMs = now - (attendance.lastUpdated || now);
-    const elapsedMinutes = Math.min(elapsedMs / 60000, 3);
+
+    if (!attendance.channelPings) attendance.channelPings = {};
+
+    // Credit elapsed wall-clock time against ONE shared clock
+    // (lastAccountedAt), not per-channel. The previous version accrued
+    // each channel's own elapsed-since-its-own-last-ping separately into
+    // the same activeMinutes/idleMinutes totals - that fixed the old
+    // "whichever ping lands last wins" race, but it meant that whenever
+    // both the browser tab AND the desktop (.exe) agent were pinging
+    // during the same session (the normal case, not an edge case), the
+    // same real minute got credited TWICE - once from each channel. That
+    // is why activeMinutes + idleMinutes could add up to well more than
+    // the actual session duration (e.g. 39m of active+idle inside a 29m
+    // session).
+    //
+    // Fix: only ONE clock ever advances and gets time credited against
+    // it. Whichever channel's ping happens to arrive first for a given
+    // window claims that slice; the OTHER channel's still-fresh status
+    // (from channelPings, within CHANNEL_STALE_MS of its own last ping)
+    // is OR'd in purely to decide active-vs-idle for that slice, exactly
+    // like before - it just no longer ALSO adds its own separate slice of
+    // minutes on top.
+    const prevAccountedAt = attendance.lastAccountedAt || attendance.lastUpdated || now;
+    const elapsedMs = now - prevAccountedAt;
+    const elapsedMinutes = Math.min(Math.max(elapsedMs, 0) / 60000, 3);
+
+    const otherChannel = channel === "browser" ? "agent" : "browser";
+    const other = attendance.channelPings[otherChannel];
+    const otherIsFresh = !!other?.lastUpdated && now - other.lastUpdated <= CHANNEL_STALE_MS;
+    const mergedStatus = status === "active" || (otherIsFresh && other.status === "active") ? "active" : "idle";
 
     if (attendance.source === "manual") {
-      if (status === "active") attendance.activeMinutes += elapsedMinutes;
+      if (mergedStatus === "active") attendance.activeMinutes += elapsedMinutes;
       else attendance.idleMinutes += elapsedMinutes;
     }
 
-    attendance.lastUpdated = now;
+    attendance.channelPings[channel] = { lastUpdated: now, status };
+    attendance.lastAccountedAt = now;
+    attendance.lastUpdated = now; // kept for display/back-compat only
+    attendance.markModified("channelPings");
     await attendance.save();
 
     res.json({
@@ -302,19 +368,19 @@ const checkout = async (req, res) => {
     }
 
     attendance.checkOut = now;
-    // activeMinutes only grows via periodic /activity heartbeat pings (see
-    // activity() above). If that heartbeat never fired during this session
-    // (e.g. checked in/out without the tracker running), activeMinutes sits
-    // at 0 even though the person was genuinely checked in for hours -
-    // calculateStatus would then wrongly call a real session "absent".
-    // Fall back to the raw checkIn->checkOut duration in that case; if any
-    // real heartbeat data exists, keep trusting it as-is.
     const elapsedSessionMinutes = attendance.checkIn
       ? (now.getTime() - new Date(attendance.checkIn).getTime()) / 60000
       : 0;
-    const effectiveActiveMinutes =
-      attendance.activeMinutes > 0 ? attendance.activeMinutes : elapsedSessionMinutes;
-    const status = calculateStatus(effectiveActiveMinutes, thresholds);
+    // checkout() only ever runs for source "manual" (agent/face are blocked
+    // above), so this always judges by real, measured activeMinutes - no
+    // duration fallback. See resolveSessionStatus for why.
+    const status = resolveSessionStatus({
+      source: attendance.source,
+      activeMinutes: attendance.activeMinutes,
+      elapsedSessionMinutes,
+      thresholds,
+      shift: shiftDoc,
+    });
     const { remark, isOvertime, overtimeMinutes } = checkoutWindow;
     attendance.status = status;
     attendance.checkoutRemark = remark;
@@ -383,7 +449,7 @@ const autoCheckoutAll = async () => {
       source: { $in: ["manual", "face"] },
       checkIn: { $exists: true },
       checkOut: { $exists: false },
-    }).select("_id activeMinutes organisation_id shift employee role date checkIn").lean();
+    }).select("_id activeMinutes idleMinutes source organisation_id shift employee role date checkIn").lean();
 
     if (!openSessions.length) return;
 
@@ -407,19 +473,33 @@ const autoCheckoutAll = async () => {
       const shift = await getShiftFor(a);
       if (!shift) continue;
 
-      const forceCheckoutAt = getForceCheckoutInstant(shift, a.date);
+      const forceCheckoutAt = getForceCheckoutInstant(shift, a.date, a.checkIn);
       if (now < forceCheckoutAt) continue; // overtime cutoff not reached yet
 
       const thresholds = getShiftThresholds(shift);
-      // Same fallback as checkout() above: if activeMinutes never got any
-      // heartbeat data (still 0), use the raw checkIn->cutoff duration
-      // instead of auto-marking a genuine multi-hour session "absent".
+      // Same source-aware resolver as checkout() above - manual/system
+      // sessions are judged strictly on measured activeMinutes; only face
+      // (no heartbeat mechanism) falls back to duration %.
       const elapsedSessionMinutes = a.checkIn
         ? (forceCheckoutAt.getTime() - new Date(a.checkIn).getTime()) / 60000
         : 0;
-      const effectiveActiveMinutes = a.activeMinutes > 0 ? a.activeMinutes : elapsedSessionMinutes;
-      const status = calculateStatus(effectiveActiveMinutes, thresholds);
+      const status = resolveSessionStatus({
+        source: a.source,
+        activeMinutes: a.activeMinutes,
+        elapsedSessionMinutes,
+        thresholds,
+        shift,
+      });
       const checkoutWindow = evaluateCheckoutWindow(shift, forceCheckoutAt, a.checkIn);
+
+      // scanFace() stores durationMinutes into activeMinutes for a manual
+      // face checkout (display purposes - face has no real activity
+      // tracking). Auto-checkout must do the same for face sessions,
+      // otherwise a force-closed face session shows "0 min" in history
+      // despite being correctly marked present/half_day from duration.
+      // Manual/system activeMinutes is real tracked data - never overwrite it.
+      const activeMinutesUpdate =
+        a.source === "face" ? { activeMinutes: Math.round(elapsedSessionMinutes) } : {};
 
       ops.push({
         updateOne: {
@@ -431,6 +511,7 @@ const autoCheckoutAll = async () => {
               checkoutRemark: "auto_overtime",
               overtimeMinutes: checkoutWindow.overtimeMinutes ?? 0,
               autoCheckedOut: true,
+              ...activeMinutesUpdate,
             },
           },
         },

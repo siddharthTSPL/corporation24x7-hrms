@@ -7,6 +7,8 @@ import LandingPage from "./pages/announcement/landingpage";
 const Login = lazy(() => import("./pages/auth/Login"));
 const Signup = lazy(() => import("./pages/auth/Signup"));
 
+const ComingSoon = lazy(() => import("./components/ComingSoon"));
+
 const FaceKiosk = lazy(() => import("./pages/attendance/FaceKiosk"));
 const FaceEnrollment = lazy(() => import("./pages/attendance/FaceEnrollment"));
 
@@ -82,6 +84,9 @@ const ReimbursementSuperadmin = lazy(() => import("./pages/reimbursement/Reimbur
 // would render as an unrecognized custom element, not your component).
 const AdminManagement = lazy(() => import("./pages/torchx-management/adminmanagement"));
 const SuperAdminManagement = lazy(() => import("./pages/torchx-management/superadminmanagement"));
+
+const HelpCenter = lazy(() => import("./components/help/Helpcenter"));
+const NotificationsPage = lazy(() => import("./pages/notifications/NotificationsPage"));
 
 function PageSkeleton() {
   const [animationData, setAnimationData] = useState(null);
@@ -167,6 +172,7 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/coming-soon" element={<ComingSoon />} /> 
           <Route path="/redirect" element={<RoleBasedRedirect />} />
 
           {/* Public — this is a shared kiosk device, not a logged-in person.
@@ -221,6 +227,8 @@ function App() {
             <Route path="/manager-timesheet"        element={<Managertimesheet />} />
             <Route path="/employee-timesheet"       element={<Employeetimesheet />} />
             <Route path="/admin-asset-management"   element={<Adminasset />} />
+            <Route path="/help-center"               element={<HelpCenter />} />
+            <Route path="/notifications"             element={<NotificationsPage />} />
 
             <Route
               path="/reimbursement-admin"
@@ -423,6 +431,8 @@ function App() {
             <Route path="/superadmin-management"          element={<SuperAdminManagement />} />
             <Route path="/superadmin-payroll"              element={<Payroll />} />
             <Route path="/superadmin-reimbursement"        element={<ReimbursementSuperadmin />} />
+            <Route path="/help-center"                     element={<HelpCenter />} />
+            <Route path="/notifications"                   element={<NotificationsPage />} />
           </Route>
 
           <Route path="*" element={<Pagenotfound />} />

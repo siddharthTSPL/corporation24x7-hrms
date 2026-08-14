@@ -1,8 +1,11 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import React from "react";
 import { useUpdateProfile, useUpdatePassword, useGetMeUser } from "../../auth/server-state/employee/employeeauth/employeeauth.hook";
+import { uploadDocument } from "../../../src/auth/api/employeeapi/other/em.other.api";
 import { useQueryClient } from "@tanstack/react-query";
 import { Country, State, City } from "country-state-city";
+import MyAssetsWidget from "../asset/MyAssetsWidget";
+import { useGetMyAssetsEmployee } from "../../auth/server-state/employee/employeeasset/employeeasset.hook";
 
 const DEFAULT_COUNTRY_ISO = "IN";
 const ALL_COUNTRIES = Country.getAllCountries();
@@ -28,6 +31,7 @@ const SETTINGS_TABS = [
   { key: "documents", label: "Documents & Banking" },
   { key: "leave", label: "Leave Balance" },
   { key: "reviews", label: "Reviews" },
+  { key: "assets", label: "My Assets" },
   { key: "password", label: "Password" },
   { key: "avatar", label: "Avatar" },
 ];
@@ -243,6 +247,98 @@ function PrimaryButton({ onClick, disabled, loading, children, color = C.brand }
   );
 }
 
+function FileUploadField({ label, value, onChange, hint, accept = ".pdf,.jpg,.jpeg,.png" }) {
+  const inputRef = useRef();
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const fileName = value ? decodeURIComponent(value.split("/").pop().split("?")[0]) : "";
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadError("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await uploadDocument(formData);
+      const url =
+        res?.url ||
+        res?.data?.url ||
+        res?.document?.url ||
+        res?.data?.document?.url ||
+        res?.fileUrl ||
+        res?.data?.fileUrl;
+      if (!url) {
+        console.warn("Upload response did not contain a recognizable URL field:", res);
+        throw new Error("No URL returned from upload");
+      }
+      onChange(url);
+    } catch (err) {
+      setUploadError(err?.response?.data?.message || err?.message || "Upload failed. Try again.");
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  const handleRemove = () => {
+    onChange("");
+    setUploadError("");
+  };
+
+  return (
+    <div style={{ marginBottom: 16, minWidth: 0 }}>
+      <FieldLabel>{label}</FieldLabel>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        onChange={handleFileSelect}
+        style={{ display: "none" }}
+        id={`file-upload-emp-${label}`}
+      />
+      {value ? (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8,
+          padding: "10px 14px", borderRadius: 10,
+          border: `0.5px solid ${C.border}`, background: C.page,
+        }}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+            <path d="M4 1.5h6l3 3v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1z" stroke={C.brand} strokeWidth="1.2"/>
+          </svg>
+          <a href={value} target="_blank" rel="noopener noreferrer"
+            style={{ fontSize: 13, color: C.brand, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: "none", fontWeight: 500 }}>
+            {fileName || "View file"}
+          </a>
+          <button type="button" onClick={handleRemove}
+            style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: 16, lineHeight: 1, padding: 0, flexShrink: 0 }}>
+            ×
+          </button>
+        </div>
+      ) : (
+        <label
+          htmlFor={`file-upload-emp-${label}`}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            width: "100%", padding: "10px 14px", borderRadius: 10,
+            border: `1px dashed ${C.border}`, background: C.surface,
+            fontSize: 13, color: C.muted, cursor: uploading ? "not-allowed" : "pointer",
+            opacity: uploading ? 0.6 : 1, fontFamily: "inherit", boxSizing: "border-box",
+          }}
+        >
+          {uploading ? "Uploading…" : "+ Upload file"}
+        </label>
+      )}
+      {(hint || uploadError) && (
+        <div style={{ fontSize: 11, color: uploadError ? C.red : C.mutedMid, marginTop: 4 }}>
+          {uploadError || hint}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Sidebar({ tab, setTab, employee, initials }) {
   const tabs = [
     { key: "profile", label: "Profile", icon: (
@@ -265,6 +361,9 @@ function Sidebar({ tab, setTab, employee, initials }) {
     )},
     { key: "reviews", label: "Reviews", icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><polygon points="8,1.5 9.9,5.4 14,6 11,9 11.8,13.5 8,11.4 4.2,13.5 5,9 2,6 6.1,5.4" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/></svg>
+    )},
+        { key: "assets", label: "My Assets", icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="5" width="12" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M2 5l1.5-3h9L14 5" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><path d="M6 8h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
     )},
     { key: "password", label: "Password", icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="4" y="7" width="8" height="6" rx="2" stroke="currentColor" strokeWidth="1.4"/><path d="M6 7V5a2 2 0 0 1 4 0v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
@@ -342,6 +441,7 @@ function Sidebar({ tab, setTab, employee, initials }) {
 function ProfileTab({ employee }) {
   const joined = employee?.date_of_joining || employee?.createdAt;
   const joinedFmt = joined ? new Date(joined).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—";
+  const dobFmt = employee?.date_of_birth ? new Date(employee.date_of_birth).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "Not set";
   const pwUpdated = employee?.passwordupdatedAt ? new Date(employee.passwordupdatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—";
 
   const deptMap = {
@@ -369,6 +469,7 @@ function ProfileTab({ employee }) {
           <ReadonlyField label="Employee ID" value={employee?.empid} />
           <ReadonlyField label="Gender" value={employee?.gender} />
           <ReadonlyField label="Marital status" value={employee?.marital_status} />
+          <ReadonlyField label="Date of birth" value={dobFmt} />
         </div>
       </SectionCard>
 
@@ -448,6 +549,7 @@ function ContactTab({ employee, onSuccess, onError }) {
     marital_status: employee?.marital_status || "single",
     gender: employee?.gender || "male",
     date_of_joining: toDateInputValue(employee?.date_of_joining),
+    date_of_birth: toDateInputValue(employee?.date_of_birth),
     countryIso: DEFAULT_COUNTRY_ISO,
     stateIso: "",
     city: employee?.office_location || "",
@@ -468,19 +570,10 @@ const cityOptions = useMemo(
   [form.city, cities]
 );
 
-  useEffect(() => {
+ useEffect(() => {
     if (!employee) return;
 
     const cityName = employee.office_location || "";
-    const match = findLocationByCityName(cityName);
-
-    let countryIso = match?.countryIso || DEFAULT_COUNTRY_ISO;
-    let stateIso = match?.stateIso || "";
-
-    if (!stateIso) {
-      const defaultStates = State.getStatesOfCountry(countryIso);
-      stateIso = defaultStates[0]?.isoCode || "";
-    }
 
     setForm({
       personal_contact: employee.personal_contact || "",
@@ -488,10 +581,26 @@ const cityOptions = useMemo(
       marital_status: employee.marital_status || "single",
       gender: employee.gender || "male",
       date_of_joining: toDateInputValue(employee.date_of_joining),
-      countryIso,
-      stateIso,
+      date_of_birth: toDateInputValue(employee.date_of_birth),
+      countryIso: DEFAULT_COUNTRY_ISO,
+      stateIso: "",
       city: cityName,
     });
+
+    const timer = setTimeout(() => {
+      const match = findLocationByCityName(cityName);
+      let countryIso = match?.countryIso || DEFAULT_COUNTRY_ISO;
+      let stateIso = match?.stateIso || "";
+
+      if (!stateIso) {
+        const defaultStates = State.getStatesOfCountry(countryIso);
+        stateIso = defaultStates[0]?.isoCode || "";
+      }
+
+      setForm(p => ({ ...p, countryIso, stateIso }));
+    }, 0);
+
+    return () => clearTimeout(timer);
   }, [employee]);
 
   const setCountry = (e) => {
@@ -512,12 +621,17 @@ const cityOptions = useMemo(
 
   const handleSave = () => {
     if (!form.personal_contact) { onError("Personal contact is required"); return; }
+    if (form.date_of_birth && new Date(form.date_of_birth) > new Date()) {
+      onError("Date of birth cannot be in the future");
+      return;
+    }
     const payload = {
       personal_contact: form.personal_contact,
       e_contact: form.e_contact,
       marital_status: form.marital_status,
       gender: form.gender,
       date_of_joining: form.date_of_joining,
+      date_of_birth: form.date_of_birth,
       office_location: form.city,
     };
     updateProfile.mutate(payload, {
@@ -560,6 +674,13 @@ const cityOptions = useMemo(
         value={form.date_of_joining}
         onChange={e => setForm(p => ({ ...p, date_of_joining: e.target.value }))}
         hint="Shown on your dashboard in place of your account creation date"
+      />
+      <InputField
+        label="Date of birth"
+        type="date"
+        value={form.date_of_birth}
+        onChange={e => setForm(p => ({ ...p, date_of_birth: e.target.value }))}
+        hint="Used to wish you (and the team) on your birthday"
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-0 sm:gap-x-3 gap-y-0 min-w-0 w-full max-w-full mb-4">
@@ -742,11 +863,11 @@ function DocumentsBankingTab({ employee, onSuccess, onError }) {
 
   return (
     <>
-      <SectionCard title="Documents" subtitle="Paste a link to each uploaded file" accent={C.blue}>
-        <InputField label="Resume" value={form.resume} onChange={set("resume")} placeholder="https://…" />
-        <InputField label="Aadhaar card" value={form.aadhaar_card} onChange={set("aadhaar_card")} placeholder="https://…" />
-        <InputField label="PAN card" value={form.pan_card} onChange={set("pan_card")} placeholder="https://…" />
-        <InputField label="Experience letter" value={form.experience_letter} onChange={set("experience_letter")} placeholder="https://…" />
+      <SectionCard title="Documents" subtitle="Upload your documents" accent={C.blue}>
+        <FileUploadField label="Resume" value={form.resume} onChange={(url) => setForm(p => ({ ...p, resume: url }))} />
+        <FileUploadField label="Aadhaar card" value={form.aadhaar_card} onChange={(url) => setForm(p => ({ ...p, aadhaar_card: url }))} />
+        <FileUploadField label="PAN card" value={form.pan_card} onChange={(url) => setForm(p => ({ ...p, pan_card: url }))} />
+        <FileUploadField label="Experience letter" value={form.experience_letter} onChange={(url) => setForm(p => ({ ...p, experience_letter: url }))} />
         <PrimaryButton onClick={handleSaveDocs} loading={updateProfile.isPending}>Save documents</PrimaryButton>
       </SectionCard>
 
@@ -757,7 +878,7 @@ function DocumentsBankingTab({ employee, onSuccess, onError }) {
           <InputField label="Account number" value={form.account_number} onChange={set("account_number")} placeholder="9-18 digit account number" />
           <InputField label="IFSC code" value={form.ifsc_code} onChange={(e) => setForm(p => ({ ...p, ifsc_code: e.target.value.toUpperCase() }))} placeholder="ABCD0123456" />
         </div>
-        <PrimaryButton onClick={handleSaveBanking} loading={updateProfile.isPending} color={C.green}>Save banking details</PrimaryButton>
+        <PrimaryButton onClick={handleSaveBanking} loading={updateProfile.isPending} color={C.brand}>Save banking details</PrimaryButton>
       </SectionCard>
     </>
   );
@@ -839,10 +960,17 @@ function ReviewsTab({ reviews }) {
     );
   }
 
-  const avg = (reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length).toFixed(1);
+  const avg = (reviews.reduce((s, r) => s + (r.overallScore || 0), 0) / reviews.length).toFixed(1);
+
+  const ratingBadgeColor = (rating) => {
+    if (rating === "Excellent" || rating === "Very Good") return C.green || "#1E7A3D";
+    if (rating === "Good") return C.brand;
+    if (rating === "Average") return C.amber || "#B8860B";
+    return C.red || "#B0233A";
+  };
 
   return (
-    <SectionCard title="My Reviews" subtitle={`${reviews.length} review${reviews.length !== 1 ? "s" : ""} · avg ${avg}/5`} accent={C.brand}>
+    <SectionCard title="My Reviews" subtitle={`${reviews.length} review${reviews.length !== 1 ? "s" : ""} · avg ${avg}/10`} accent={C.brand}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {reviews.map((r, i) => (
           <div key={r._id || i} style={{ padding: "14px 16px", borderRadius: 10, border: `0.5px solid ${C.border}`, background: C.surface, minWidth: 0 }}>
@@ -853,16 +981,30 @@ function ReviewsTab({ reviews }) {
                 </div>
                 <div style={{ fontSize: 11, color: C.muted }}>{r.reviewer?.role || ""} · {r.monthYear || (r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "")}</div>
               </div>
-              <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
-                {[1,2,3,4,5].map(s => (
-                  <svg key={s} width="14" height="14" viewBox="0 0 24 24">
-                    <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
-                      fill={s <= (r.rating || 0) ? "#f59e0b" : "transparent"}
-                      stroke="#f59e0b" strokeWidth="1.5" strokeLinejoin="round" />
-                  </svg>
-                ))}
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: ratingBadgeColor(r.overallRating) }}>
+                  {r.overallScore != null ? r.overallScore.toFixed(1) : "–"}/10
+                </span>
+                {r.overallRating && (
+                  <span style={{ fontSize: 11, color: C.muted }}>· {r.overallRating}</span>
+                )}
               </div>
             </div>
+
+            {(r.taskSubmission || r.behaviourEthics || r.attendance) && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: r.comment ? 8 : 0, fontSize: 11, color: C.muted }}>
+                {r.taskSubmission && (
+                  <span>Task: {r.taskSubmission.percentage}% ({r.taskSubmission.rating})</span>
+                )}
+                {r.behaviourEthics && (
+                  <span>Behaviour: {r.behaviourEthics.score}/10 ({r.behaviourEthics.rating})</span>
+                )}
+                {r.attendance && (
+                  <span>Attendance: {r.attendance.percentage}% ({r.attendance.rating})</span>
+                )}
+              </div>
+            )}
+
             {r.comment && (
               <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, fontStyle: "italic", wordBreak: "break-word" }}>
                 "{r.comment}"
@@ -871,6 +1013,14 @@ function ReviewsTab({ reviews }) {
           </div>
         ))}
       </div>
+    </SectionCard>
+  );
+}
+
+function AssetsTab() {
+  return (
+    <SectionCard title="My Assets" subtitle="Items currently assigned to you by your admin" accent={C.brand}>
+      <MyAssetsWidget useMyAssets={useGetMyAssetsEmployee} title="Assigned to me" accent={C.brand} />
     </SectionCard>
   );
 }
@@ -1206,6 +1356,7 @@ export default function EmployeeSettingsPage() {
             {tab === "documents" && <DocumentsBankingTab employee={employee} onSuccess={showSuccess} onError={showError} />}
             {tab === "leave"     && <LeaveTab     leaveBalance={leaveBalance} />}
             {tab === "reviews"   && <ReviewsTab   reviews={reviews} />}
+            {tab === "assets"    && <AssetsTab />}
             {tab === "password"  && <PasswordTab  onSuccess={showSuccess} onError={showError} />}
             {tab === "avatar"    && <AvatarTab    employee={employee} onSuccess={showSuccess} onError={showError} />}
 

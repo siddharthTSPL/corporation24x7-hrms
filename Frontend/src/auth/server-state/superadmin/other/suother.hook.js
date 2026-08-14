@@ -7,6 +7,7 @@ import { toast } from "react-hot-toast";
 
 import {
   reviewToAdmin,
+  getAllReviews,
   getTodayCheckins,
   getAttendanceOverview,
   getAttendanceHistory,
@@ -48,6 +49,16 @@ import {
 export const useReviewToAdmin = () => {
   return useMutation({
     mutationFn: reviewToAdmin,
+  });
+};
+
+export const useGetAllReviews = (params = {}) => {
+  return useQuery({
+    queryKey: ["allReviews", params],
+    queryFn: () => getAllReviews(params),
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 };
 

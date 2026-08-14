@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
-  useMyProjects, useCreateProject, useAssignableTargets,
-  useCreateJob, useJobsCreatedByMe, useUpdateJobStatus, useArchiveJob,
+  useMyProjects, useCreateProject, useAddProjectMembers, useRemoveProjectMember, useAssignableTargets,
+  useCreateJob, useUpdateJob, useJobsCreatedByMe, useUpdateJobStatus, useArchiveJob,
   useOverrunRiskJobs, useIdleJobs, useTeamWorkloadHeatmap,
   usePendingApprovals, useApproveTimesheet, useRejectTimesheet,
   useOrgAllTimeLogs, useOrgAllTimesheets,
@@ -73,6 +73,12 @@ const NAV_TABS = [
 ];
 
 function cn(...args) { return args.filter(Boolean).join(" "); }
+
+const CURRENCY_SYMBOLS = { INR: "₹", USD: "$", EUR: "€" };
+function fmtRate(rate, currency) {
+  const symbol = CURRENCY_SYMBOLS[currency] || `${currency || ""} `;
+  return `${symbol}${rate}/hr`;
+}
 
 function Badge({ tw = "text-gray-400 bg-gray-100 border-gray-200", children }) {
   return (
@@ -202,12 +208,12 @@ function JobDetailModal({ jobId, open, onClose }) {
             <div className="bg-[#F8F9FC] rounded-xl p-3 min-w-0">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Assigned To</div>
               <div className="text-[13px] font-bold text-gray-900 truncate">{job.assigned_to_info?.name || "—"}</div>
-              <div className="text-[11px] text-[#730042] font-semibold truncate">{job.assigned_to_info?.role || job.assigned_to_info?.model || ""}</div>
+              <div className="text-[11px] text-[#730042] font-semibold truncate">{job.assigned_to_info?.model === "User" ? "Employee" : (job.assigned_to_info?.role || job.assigned_to_info?.model || "")}</div>
             </div>
             <div className="bg-[#F8F9FC] rounded-xl p-3 min-w-0">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Assigned By</div>
               <div className="text-[13px] font-bold text-gray-900 truncate">{job.assigned_by_info?.name || "—"}</div>
-              <div className="text-[11px] text-[#730042] font-semibold truncate">{job.assigned_by_info?.role || job.assigned_by_info?.model || ""}</div>
+              <div className="text-[11px] text-[#730042] font-semibold truncate">{job.assigned_by_info?.model === "User" ? "Employee" : (job.assigned_by_info?.role || job.assigned_by_info?.model || "")}</div>
             </div>
             <div className="bg-[#F8F9FC] rounded-xl p-3 min-w-0">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Status</div>
@@ -265,7 +271,7 @@ function JobDetailModal({ jobId, open, onClose }) {
           {job.billable && (
             <div className="flex items-center gap-2 flex-wrap">
               <Badge tw="text-emerald-600 bg-emerald-50 border-emerald-200">Billable</Badge>
-              {job.hourly_rate > 0 && <span className="text-[12px] text-gray-500">₹{job.hourly_rate}/hr · {job.currency}</span>}
+              {job.hourly_rate > 0 && <span className="text-[12px] text-gray-500">{fmtRate(job.hourly_rate, job.currency)}</span>}
             </div>
           )}
           {job.overrun_flagged && (
@@ -470,9 +476,13 @@ export default function SuperAdminTimesheet() {
   const [jobDetailOpen, setJobDetailOpen] = useState(false);
   const [logModal, setLogModal] = useState(false);
   const [logForm, setLogForm] = useState({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" });
+  const [editJobOpen, setEditJobOpen] = useState(false);
+  const [editJobForm, setEditJobForm] = useState({ id: "", title: "", description: "", priority: "medium", estimated_hours: "", max_hours_per_day: "", billable: true, hourly_rate: "", currency: "INR", due_date: "" });
 
-  const [projectForm, setProjectForm] = useState({ name: "", description: "", billing_type: "hourly", currency: "INR", default_hourly_rate: "" });
-  const [jobForm, setJobForm] = useState({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: true, hourly_rate: "", currency: "INR" });
+  const [projectForm, setProjectForm] = useState({ name: "", description: "", billing_type: "billable", currency: "INR", default_hourly_rate: "", member_ids: [] });
+  const [jobForm, setJobForm] = useState({ title: "", description: "", project: "", assigned_to: "", priority: "medium", estimated_hours: "", max_hours_per_day: "", billable: true, hourly_rate: "", currency: "INR" });
+  const [membersModal, setMembersModal] = useState(null);
+  const [membersSelection, setMembersSelection] = useState([]);
 
   const [weekStart, setWeekStart] = useState(getMonday());
   const [logsWeek, setLogsWeek] = useState(getMonday());
@@ -488,7 +498,7 @@ export default function SuperAdminTimesheet() {
     setWeekStart(d.toISOString().slice(0, 10));
   };
 
-  const { data: projectsData }  = useMyProjects();
+  const { data: projectsData, refetch: refetchProjects }  = useMyProjects();
   const { data: jobsData, refetch: refetchJobs } = useJobsCreatedByMe();
   const { data: approvalsData, refetch: refetchApprovals } = usePendingApprovals();
   const { data: overrunData }   = useOverrunRiskJobs();
@@ -506,7 +516,10 @@ export default function SuperAdminTimesheet() {
   const { data: prodData } = useMyProductivitySummary(weekStart);
 
   const createProject   = useCreateProject();
+  const addProjectMembers = useAddProjectMembers();
+  const removeProjectMember = useRemoveProjectMember();
   const createJob       = useCreateJob();
+  const updateJob       = useUpdateJob();
   const approveTS       = useApproveTimesheet();
   const rejectTS        = useRejectTimesheet();
   const archiveJob      = useArchiveJob();
@@ -543,20 +556,83 @@ export default function SuperAdminTimesheet() {
   const handleCreateProject = async () => {
     await createProject.mutateAsync({ ...projectForm, default_hourly_rate: Number(projectForm.default_hourly_rate) || 0 });
     setCreateProjectOpen(false);
-    setProjectForm({ name: "", description: "", billing_type: "hourly", currency: "INR", default_hourly_rate: "" });
+    setProjectForm({ name: "", description: "", billing_type: "billable", currency: "INR", default_hourly_rate: "", member_ids: [] });
+    refetchProjects();
   };
 
   const handleCreateJob = async () => {
     const target = targets.find(t => t.id.toString() === jobForm.assigned_to);
     await createJob.mutateAsync({
       ...jobForm,
+      project: jobForm.project || null,
       assigned_to_model: target?.model || "Admin",
       estimated_hours: Number(jobForm.estimated_hours) || 0,
+      max_hours_per_day: jobForm.max_hours_per_day === "" ? null : Number(jobForm.max_hours_per_day),
       hourly_rate: Number(jobForm.hourly_rate) || 0,
     });
     setCreateJobOpen(false);
-    setJobForm({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: true, hourly_rate: "", currency: "INR" });
+    setJobForm({ title: "", description: "", project: "", assigned_to: "", priority: "medium", estimated_hours: "", max_hours_per_day: "", billable: true, hourly_rate: "", currency: "INR" });
     refetchJobs();
+  };
+
+  const openEditJob = (job) => {
+    setEditJobForm({
+      id: job._id,
+      title: job.title || "",
+      description: job.description || "",
+      priority: job.priority || "medium",
+      estimated_hours: job.estimated_hours || "",
+      max_hours_per_day: job.max_hours_per_day || "",
+      billable: !!job.billable,
+      hourly_rate: job.hourly_rate || "",
+      currency: job.currency || "INR",
+      due_date: job.due_date ? job.due_date.slice(0, 10) : "",
+    });
+    setEditJobOpen(true);
+  };
+
+  const handleUpdateJob = async () => {
+    if (!editJobForm.title) return;
+    await updateJob.mutateAsync({
+      id: editJobForm.id,
+      data: {
+        title: editJobForm.title,
+        description: editJobForm.description,
+        priority: editJobForm.priority,
+        estimated_hours: Number(editJobForm.estimated_hours) || 0,
+        max_hours_per_day: editJobForm.max_hours_per_day === "" ? null : Number(editJobForm.max_hours_per_day),
+        billable: editJobForm.billable,
+        hourly_rate: Number(editJobForm.hourly_rate) || 0,
+        currency: editJobForm.currency,
+        due_date: editJobForm.due_date || null,
+      },
+    });
+    setEditJobOpen(false);
+    refetchJobs();
+  };
+
+  const openMembersModal = (project) => {
+    setMembersModal(project);
+    setMembersSelection([]);
+  };
+
+  const toggleMemberSelection = (id) => {
+    setMembersSelection(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const handleAddMembers = async () => {
+    if (!membersModal || !membersSelection.length) return;
+    const updated = await addProjectMembers.mutateAsync({ id: membersModal._id, member_ids: membersSelection });
+    setMembersSelection([]);
+    setMembersModal(updated?.project || membersModal);
+    refetchProjects();
+  };
+
+  const handleRemoveMember = async (memberId) => {
+    if (!membersModal) return;
+    await removeProjectMember.mutateAsync({ id: membersModal._id, memberId });
+    setMembersModal(prev => prev ? { ...prev, members: (prev.members || []).filter(m => (m.member?._id || m.member)?.toString() !== memberId) } : prev);
+    refetchProjects();
   };
 
   const handleApprove = async (ts) => {
@@ -791,6 +867,7 @@ export default function SuperAdminTimesheet() {
                       <Badge tw="text-amber-600 bg-amber-50 border-amber-200">{p.members?.length || 0} members</Badge>
                     </div>
                     {p.description && <div className="text-[12px] text-gray-400 mt-3 line-clamp-2">{p.description}</div>}
+                    <Btn variant="ghost" onClick={() => openMembersModal(p)} className="mt-3 w-full text-[12px]">Manage Members</Btn>
                   </Card>
                 ))}
               </div>
@@ -832,6 +909,7 @@ export default function SuperAdminTimesheet() {
                       </div>
                       <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
                         <button onClick={() => openJobDetail(job._id)} className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-2.5 py-2 text-[11px] font-semibold text-gray-700 cursor-pointer min-h-[36px]">View</button>
+                        <button onClick={() => openEditJob(job)} className="bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-2 text-[11px] font-semibold text-blue-600 cursor-pointer min-h-[36px]">Edit</button>
                         <select value={job.status} onChange={e => updateJobStatus.mutate({ id: job._id, status: e.target.value }, { onSuccess: refetchJobs })}
                           className={cn("bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-2.5 py-2 text-[11px] font-semibold outline-none cursor-pointer min-h-[36px]", JOB_STATUS_TW[job.status] || "text-gray-900")}>
                           {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map(s => (
@@ -866,10 +944,11 @@ export default function SuperAdminTimesheet() {
                     <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-[15px] text-gray-900 truncate">{ts.owner?.f_name} {ts.owner?.l_name}</div>
-                        <div className="text-[12px] text-gray-400 mt-0.5 truncate">{ts.owner?.work_email} · {ts.owner_model}</div>
+                        <div className="text-[12px] text-gray-400 mt-0.5 truncate">{ts.owner?.work_email} · {ts.owner_model === "User" ? "Employee" : ts.owner_model}</div>
                         <div className="text-[12px] text-gray-400 mt-1">Week: {fmtDate(ts.week_start)} — {fmtDate(ts.week_end)}</div>
                         <div className="flex items-center gap-3 mt-2 flex-wrap text-[12px]">
                           <span className="text-[#730042] font-semibold">{fmtDuration(ts.total_minutes)} total</span>
+                          {ts.overtime_minutes > 0 && <span className="text-amber-600 font-semibold">{fmtDuration(ts.overtime_minutes)} overtime</span>}
                           <span className="text-emerald-600">{fmtDuration(ts.billable_minutes)} billable</span>
                           <Badge tw={(STATUS_STYLE[ts.status] || STATUS_STYLE.draft).tw}>{(STATUS_STYLE[ts.status] || STATUS_STYLE.draft).label}</Badge>
                         </div>
@@ -975,7 +1054,7 @@ export default function SuperAdminTimesheet() {
                         {orgLogs.map(log => (
                           <tr key={log._id} className="border-b border-[#E4E6EF] hover:bg-[#F8F9FC] transition-colors">
                             <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">{log.logged_by?.f_name || "—"} {log.logged_by?.l_name || ""}</td>
-                            <td className="px-4 py-3"><Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{log.logged_by_model}</Badge></td>
+                            <td className="px-4 py-3"><Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{log.logged_by_model === "User" ? "Employee" : log.logged_by_model}</Badge></td>
                             <td className="px-4 py-3 max-w-[180px] truncate text-gray-700">{log.job?.title || "—"}</td>
                             <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{fmtDate(log.log_date)}</td>
                             <td className="px-4 py-3 font-semibold text-emerald-600 whitespace-nowrap">{fmtDuration(log.duration_minutes)}</td>
@@ -1000,7 +1079,7 @@ export default function SuperAdminTimesheet() {
                           <div className="font-bold text-[13px] text-gray-900 truncate">{log.logged_by?.f_name || "—"} {log.logged_by?.l_name || ""}</div>
                           <div className="text-[11px] text-gray-400 truncate">{log.job?.title || "—"}</div>
                         </div>
-                        <Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{log.logged_by_model}</Badge>
+                        <Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{log.logged_by_model === "User" ? "Employee" : log.logged_by_model}</Badge>
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-[11px] text-gray-500 mb-2">
                         <div>Date: <span className="font-semibold text-gray-700">{fmtDate(log.log_date)}</span></div>
@@ -1052,7 +1131,7 @@ export default function SuperAdminTimesheet() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
                             <span className="font-bold text-[14px] text-gray-900 truncate">{ts.owner?.f_name} {ts.owner?.l_name}</span>
-                            <Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{ts.owner_model}</Badge>
+                            <Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{ts.owner_model === "User" ? "Employee" : ts.owner_model}</Badge>
                             <Badge tw={ss.tw}>{ss.label}</Badge>
                           </div>
                           <div className="text-[12px] text-gray-400 truncate">{ts.owner?.work_email} · Week: {fmtDate(ts.week_start)} — {fmtDate(ts.week_end)}</div>
@@ -1140,8 +1219,8 @@ export default function SuperAdminTimesheet() {
           <Input label="Description" placeholder="Brief description…" value={projectForm.description} onChange={e => setProjectForm(p => ({ ...p, description: e.target.value }))} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <Select label="Billing Type" value={projectForm.billing_type} onChange={e => setProjectForm(p => ({ ...p, billing_type: e.target.value }))}>
-              <option value="hourly">Hourly</option>
-              <option value="fixed">Fixed</option>
+              <option value="billable">Hourly</option>
+              <option value="fixed_cost">Fixed</option>
               <option value="non_billable">Non Billable</option>
             </Select>
             <Select label="Currency" value={projectForm.currency} onChange={e => setProjectForm(p => ({ ...p, currency: e.target.value }))}>
@@ -1151,6 +1230,29 @@ export default function SuperAdminTimesheet() {
             </Select>
           </div>
           <Input label="Default Hourly Rate" type="number" placeholder="0.00" value={projectForm.default_hourly_rate} onChange={e => setProjectForm(p => ({ ...p, default_hourly_rate: e.target.value }))} />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Add Members (optional)</label>
+            <div className="border border-[#E4E6EF] rounded-[10px] max-h-[160px] overflow-y-auto p-2 flex flex-col gap-1">
+              {targets.length === 0 ? (
+                <div className="text-[12px] text-gray-400 px-1.5 py-1">No team members found</div>
+              ) : targets.map(t => (
+                <label key={t.id} className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer min-h-[32px]">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 accent-[#730042]"
+                    checked={projectForm.member_ids.includes(t.id.toString())}
+                    onChange={() => setProjectForm(p => ({
+                      ...p,
+                      member_ids: p.member_ids.includes(t.id.toString())
+                        ? p.member_ids.filter(id => id !== t.id.toString())
+                        : [...p.member_ids, t.id.toString()],
+                    }))}
+                  />
+                  <span className="text-[13px] text-gray-700 truncate">{t.name} — {t.model === "User" ? "Employee" : (t.role || t.model)}</span>
+                </label>
+              ))}
+            </div>
+          </div>
           <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-1">
             <Btn variant="ghost" onClick={() => setCreateProjectOpen(false)} className="w-full sm:w-auto">Cancel</Btn>
             <Btn onClick={handleCreateProject} disabled={!projectForm.name || createProject.isPending} className="w-full sm:w-auto">
@@ -1160,14 +1262,63 @@ export default function SuperAdminTimesheet() {
         </div>
       </Modal>
 
+      <Modal open={!!membersModal} onClose={() => { setMembersModal(null); setMembersSelection([]); }} title={`Manage Members — ${membersModal?.name || ""}`}>
+        <div className="flex flex-col gap-3.5">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Current Members</label>
+            {(!membersModal?.members || membersModal.members.length === 0) ? (
+              <div className="text-[12px] text-gray-400 px-1">No members yet</div>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {membersModal.members.map((m) => {
+                  const mid = (m.member?._id || m.member || "").toString();
+                  const info = targets.find(t => t.id.toString() === mid);
+                  return (
+                    <div key={mid} className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-[#F8F9FC] border border-[#E4E6EF]">
+                      <span className="text-[13px] text-gray-700 truncate">{info?.name || mid} — {m.member_model}</span>
+                      <button onClick={() => handleRemoveMember(mid)} className="text-red-500 hover:text-red-700 text-[12px] font-semibold ml-2 shrink-0">Remove</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Add Members</label>
+            <div className="border border-[#E4E6EF] rounded-[10px] max-h-[160px] overflow-y-auto p-2 flex flex-col gap-1">
+              {targets
+                .filter(t => !(membersModal?.members || []).some(m => (m.member?._id || m.member || "").toString() === t.id.toString()))
+                .map(t => (
+                  <label key={t.id} className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer min-h-[32px]">
+                    <input type="checkbox" className="w-4 h-4 accent-[#730042]" checked={membersSelection.includes(t.id.toString())} onChange={() => toggleMemberSelection(t.id.toString())} />
+                    <span className="text-[13px] text-gray-700 truncate">{t.name} — {t.model === "User" ? "Employee" : (t.role || t.model)}</span>
+                  </label>
+                ))}
+            </div>
+          </div>
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-1">
+            <Btn variant="ghost" onClick={() => { setMembersModal(null); setMembersSelection([]); }} className="w-full sm:w-auto">Close</Btn>
+            <Btn onClick={handleAddMembers} disabled={!membersSelection.length || addProjectMembers.isPending} className="w-full sm:w-auto">
+              {addProjectMembers.isPending ? "Adding…" : "Add Selected"}
+            </Btn>
+          </div>
+        </div>
+      </Modal>
+
       <Modal open={createJobOpen} onClose={() => setCreateJobOpen(false)} title="Create Job">
         <div className="flex flex-col gap-3.5">
           <Input label="Job Title" placeholder="e.g. Design Login Page" value={jobForm.title} onChange={e => setJobForm(p => ({ ...p, title: e.target.value }))} />
           <Input label="Description" placeholder="Job details…" value={jobForm.description} onChange={e => setJobForm(p => ({ ...p, description: e.target.value }))} />
+          <Select label="Project (optional)" value={jobForm.project} onChange={e => setJobForm(p => ({ ...p, project: e.target.value }))}>
+            <option value="">No project</option>
+            {projects.map(pr => (
+              <option key={pr._id} value={pr._id}>{pr.name}</option>
+            ))}
+          </Select>
           <Select label="Assign To" value={jobForm.assigned_to} onChange={e => setJobForm(p => ({ ...p, assigned_to: e.target.value }))}>
             <option value="">Select team member…</option>
             {targets.map(t => (
-              <option key={t.id} value={t.id}>{t.name} — {t.role || t.model}</option>
+              <option key={t.id} value={t.id}>{t.name} — {t.model === "User" ? "Employee" : (t.role || t.model)}</option>
             ))}
           </Select>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -1187,6 +1338,10 @@ export default function SuperAdminTimesheet() {
               <option value="EUR">EUR</option>
             </Select>
           </div>
+          <div>
+            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={jobForm.max_hours_per_day} onChange={e => setJobForm(p => ({ ...p, max_hours_per_day: e.target.value }))} />
+            <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day counts as overtime. Leave blank to use the employee's shift hours instead.</p>
+          </div>
           <label className="flex items-center gap-2.5 cursor-pointer min-h-[24px]">
             <input type="checkbox" checked={jobForm.billable} onChange={e => setJobForm(p => ({ ...p, billable: e.target.checked }))} className="w-4 h-4 accent-[#730042]" />
             <span className="text-[13px] text-gray-600">Billable job</span>
@@ -1195,6 +1350,45 @@ export default function SuperAdminTimesheet() {
             <Btn variant="ghost" onClick={() => setCreateJobOpen(false)} className="w-full sm:w-auto">Cancel</Btn>
             <Btn onClick={handleCreateJob} disabled={!jobForm.title || !jobForm.assigned_to || createJob.isPending} className="w-full sm:w-auto">
               {createJob.isPending ? "Creating…" : "Create Job"}
+            </Btn>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={editJobOpen} onClose={() => setEditJobOpen(false)} title="Edit Job">
+        <div className="flex flex-col gap-3.5">
+          <Input label="Job Title" placeholder="e.g. Design Login Page" value={editJobForm.title} onChange={e => setEditJobForm(p => ({ ...p, title: e.target.value }))} />
+          <Input label="Description" placeholder="Job details…" value={editJobForm.description} onChange={e => setEditJobForm(p => ({ ...p, description: e.target.value }))} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <Select label="Priority" value={editJobForm.priority} onChange={e => setEditJobForm(p => ({ ...p, priority: e.target.value }))}>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </Select>
+            <Input label="Estimated Hours" type="number" placeholder="0" value={editJobForm.estimated_hours} onChange={e => setEditJobForm(p => ({ ...p, estimated_hours: e.target.value }))} />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <Input label="Hourly Rate" type="number" placeholder="0.00" value={editJobForm.hourly_rate} onChange={e => setEditJobForm(p => ({ ...p, hourly_rate: e.target.value }))} />
+            <Select label="Currency" value={editJobForm.currency} onChange={e => setEditJobForm(p => ({ ...p, currency: e.target.value }))}>
+              <option value="INR">INR</option>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+            </Select>
+          </div>
+          <Input label="Due Date" type="date" value={editJobForm.due_date} onChange={e => setEditJobForm(p => ({ ...p, due_date: e.target.value }))} />
+          <div>
+            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={editJobForm.max_hours_per_day} onChange={e => setEditJobForm(p => ({ ...p, max_hours_per_day: e.target.value }))} />
+            <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day counts as overtime. Leave blank to use the employee's shift hours instead.</p>
+          </div>
+          <label className="flex items-center gap-2.5 cursor-pointer min-h-[24px]">
+            <input type="checkbox" checked={editJobForm.billable} onChange={e => setEditJobForm(p => ({ ...p, billable: e.target.checked }))} className="w-4 h-4 accent-[#730042]" />
+            <span className="text-[13px] text-gray-600">Billable job</span>
+          </label>
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-1">
+            <Btn variant="ghost" onClick={() => setEditJobOpen(false)} className="w-full sm:w-auto">Cancel</Btn>
+            <Btn onClick={handleUpdateJob} disabled={!editJobForm.title || updateJob.isPending} className="w-full sm:w-auto">
+              {updateJob.isPending ? "Saving…" : "Save Changes"}
             </Btn>
           </div>
         </div>

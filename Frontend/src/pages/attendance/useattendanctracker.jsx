@@ -2,7 +2,11 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useTodayAttendance, useCheckin, useActivity, useCheckout } from "../../auth/server-state/attendance/attendance.hook";
 
 const PING_INTERVAL_MS      = 60_000;
-const IDLE_DETECTION_MS     = 120_000;
+// How long with zero mouse/keyboard/scroll activity before we call it idle.
+// Any single event (mousemove/keydown/scroll/etc, see ACTIVITY_EVENTS)
+// still flips status back to "active" immediately - this only controls
+// how fast it flips the OTHER way, to idle, once nothing happens.
+const IDLE_DETECTION_MS     = 30_000;
 const FOCUS_GRACE_PERIOD_MS = 600_000;
 const STILL_WORKING_AFTER   = 300_000;
 const STORAGE_KEY           = "attendance_session";
@@ -17,6 +21,22 @@ const formatDuration = (ms) => {
 
 const saveSession  = (data) => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (_) {} };
 const clearSession = ()     => { try { localStorage.removeItem(STORAGE_KEY); } catch (_) {} };
+
+// Widened on purpose to catch every realistic input channel: mouse
+// (wired/wireless/trackpad - the browser can't tell these apart anyway,
+// they all surface as the same DOM events), pen/stylus, touch, and
+// keyboard. "wheel" is separate from "scroll" because scroll only fires
+// on an actually-scrollable element/page; wheel fires on any mouse-wheel
+// nudge even if the page has nothing to scroll. "pointer*" events catch
+// pen/touch input that doesn't always also fire a mouse event.
+const ACTIVITY_EVENTS = [
+  "mousemove", "mousedown", "mouseup",
+  "keydown", "keyup",
+  "scroll", "wheel",
+  "click", "dblclick",
+  "touchstart", "touchmove",
+  "pointerdown", "pointermove",
+];
 
 export const useAttendanceTracker = () => {
   const [isCheckedIn,      setIsCheckedIn]      = useState(false);
@@ -100,7 +120,15 @@ export const useAttendanceTracker = () => {
   }, [computeActivityStatus]);
 
   const sendActivityPing = useCallback(async () => {
-    const status = wasActiveThisMinuteRef.current ? "active" : computeActivityStatus();
+    // Judge purely on how recently the last mouse/keyboard/scroll event
+    // happened (computeActivityStatus, via IDLE_DETECTION_MS) - NOT on
+    // whether any activity happened at some point during the whole 60s
+    // ping window. The old "any event this window = active" check meant
+    // one click 55s ago still reported active even after 55s of nothing,
+    // which is the opposite of what should happen: any event should flip
+    // to active immediately, and it should flip back to idle quickly once
+    // nothing is happening, independent of when the ping happens to fire.
+    const status = computeActivityStatus();
     wasActiveThisMinuteRef.current = false;
     setActivityStatus(status);
 
@@ -127,8 +155,7 @@ export const useAttendanceTracker = () => {
   }, [activityMutation, computeActivityStatus]);
 
   const startTracking = useCallback((checkInISO) => {
-    const EVENTS = ["mousemove", "mousedown", "keydown", "scroll", "click", "touchstart"];
-    EVENTS.forEach((e) => window.addEventListener(e, handleBrowserActivity, { passive: true }));
+    ACTIVITY_EVENTS.forEach((e) => window.addEventListener(e, handleBrowserActivity, { passive: true }));
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     pingIntervalRef.current  = setInterval(sendActivityPing, PING_INTERVAL_MS);
@@ -144,8 +171,7 @@ export const useAttendanceTracker = () => {
   }, [handleBrowserActivity, handleVisibilityChange, sendActivityPing, computeActivityStatus]);
 
   const stopTracking = useCallback(() => {
-    const EVENTS = ["mousemove", "mousedown", "keydown", "scroll", "click", "touchstart"];
-    EVENTS.forEach((e) => window.removeEventListener(e, handleBrowserActivity));
+    ACTIVITY_EVENTS.forEach((e) => window.removeEventListener(e, handleBrowserActivity));
     document.removeEventListener("visibilitychange", handleVisibilityChange);
     clearInterval(pingIntervalRef.current);
     clearInterval(clockIntervalRef.current);

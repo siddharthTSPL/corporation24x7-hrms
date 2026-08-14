@@ -127,33 +127,41 @@ const userlogin = async (req, res, next) => {
       `https://corporation24x7-hrms.onrender.com/user/change-password?token=${resetToken}`;
   }
 
-  const superAdmin = await SuperAdminModel.findOne({
-    company_domain: user.work_email.split("@")[1].toLowerCase().trim(),
-  });
+  let superAdmin = user.organisation_id
+    ? await SuperAdminModel.findById(user.organisation_id)
+    : null;
 
-  if (superAdmin) {
-    const trialValid = superAdmin.isTrialValid();
+  if (!superAdmin) {
+    // Fallback for any legacy records where organisation_id wasn't set correctly
+    superAdmin = await SuperAdminModel.findOne({
+      company_domain: user.work_email.split("@")[1].toLowerCase().trim(),
+    });
+  }
 
-    const hasTalentLicense = superAdmin.licenses.some(
-      (l) =>
-        l.product === "torchx_talent" &&
-        l.isActive &&
-        new Date(l.expiresAt) > new Date()
+  if (!superAdmin)
+    return next(Object.assign(new Error("Organisation not found. Please contact support."), { statusCode: 404 }));
+
+  const trialValid = superAdmin.isTrialValid();
+
+  const hasTalentLicense = superAdmin.licenses.some(
+    (l) =>
+      l.product === "torchx_talent" &&
+      l.isActive &&
+      new Date(l.expiresAt) > new Date()
+  );
+
+  if (!trialValid && !hasTalentLicense) {
+    return next(
+      Object.assign(
+        new Error(
+          "Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."
+        ),
+        {
+          statusCode: 403,
+          code: "SERVICE_STOPPED",
+        }
+      )
     );
-
-    if (!trialValid && !hasTalentLicense) {
-      return next(
-        Object.assign(
-          new Error(
-            "Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."
-          ),
-          {
-            statusCode: 403,
-            code: "SERVICE_STOPPED",
-          }
-        )
-      );
-    }
   }
 
 const token = jwt.sign(
@@ -759,7 +767,7 @@ const editprofile = async (req, res, next) => {
   const {
     personal_contact, e_contact, marital_status, profile_image, gender, office_location,
     resume, aadhaar_card, pan_card, experience_letter,
-    bank_name, account_holder_name, account_number, ifsc_code, date_of_joining,
+    bank_name, account_holder_name, account_number, ifsc_code, date_of_joining, date_of_birth,
   } = req.body;
   let leaveUpdateRequired = false;
 
@@ -771,6 +779,19 @@ const editprofile = async (req, res, next) => {
       if (isNaN(parsedDOJ.getTime()))
         return next(Object.assign(new Error("Invalid date of joining"), { statusCode: 400 }));
       employee.date_of_joining = parsedDOJ;
+    }
+  }
+
+  if (date_of_birth !== undefined) {
+    if (date_of_birth === null || date_of_birth === "") {
+      employee.date_of_birth = null;
+    } else {
+      const parsedDOB = new Date(date_of_birth);
+      if (isNaN(parsedDOB.getTime()))
+        return next(Object.assign(new Error("Invalid date of birth"), { statusCode: 400 }));
+      if (parsedDOB > new Date())
+        return next(Object.assign(new Error("Date of birth cannot be in the future"), { statusCode: 400 }));
+      employee.date_of_birth = parsedDOB;
     }
   }
 
@@ -913,6 +934,7 @@ const editprofile = async (req, res, next) => {
       account_number: employee.account_number,
       ifsc_code: employee.ifsc_code,
       date_of_joining: employee.date_of_joining,
+      date_of_birth: employee.date_of_birth,
     },
   });
 };
@@ -1098,12 +1120,12 @@ const getOrgInfo = async (req, res, next) => {
       .lean();
  
     const admins = await Adminmodel.find({ organisation_id, working_status: "working" })
-      .select("f_name l_name work_email designation")
+      .select("f_name l_name work_email designation profile_image")
       .lean();
  
     const managers = await Managermodel.find({ organisation_id, working_status: "working" })
       .select(
-        "f_name l_name work_email designation department office_location reporting_manager reporting_manager_model"
+        "f_name l_name work_email designation department office_location reporting_manager reporting_manager_model profile_image"
       )
       .lean();
  
@@ -1115,7 +1137,7 @@ const getOrgInfo = async (req, res, next) => {
             working_status: "working",
           })
           .select(
-            "f_name l_name work_email designation department office_location Under_manager"
+            "f_name l_name work_email designation department office_location Under_manager profile_image"
           )
           .lean()
       : [];
@@ -1132,6 +1154,7 @@ const getOrgInfo = async (req, res, next) => {
         email: mgr.work_email,
         designation: mgr.designation,
         department: mgr.department,
+        profile_image: mgr.profile_image || null,
         isCurrentUserManager:
           req.employee.Under_manager?.toString() === mgr._id.toString(),
         employees: employees
@@ -1142,6 +1165,7 @@ const getOrgInfo = async (req, res, next) => {
             email: emp.work_email,
             designation: emp.designation,
             department: emp.department,
+            profile_image: emp.profile_image || null,
             isCurrentUser:
               emp._id.toString() === req.employee._id.toString(),
           })),
@@ -1164,6 +1188,7 @@ const getOrgInfo = async (req, res, next) => {
             id: superAdmin._id,
             name: `${superAdmin.f_name} ${superAdmin.l_name}`,
             email: superAdmin.email,
+            profile_image: superAdmin.profile_image || null,
           }
         : null,
       admin: admins[0]
@@ -1172,6 +1197,7 @@ const getOrgInfo = async (req, res, next) => {
             name: `${admins[0].f_name} ${admins[0].l_name}`,
             email: admins[0].work_email,
             designation: admins[0].designation,
+            profile_image: admins[0].profile_image || null,
           }
         : null,
       managers: topLevelManagers,
@@ -1196,6 +1222,7 @@ const buildManagerTree = (managers, parentId, parentModel, employees) => {
       designation: mgr.designation,
       department: mgr.department,
       office_location: mgr.office_location,
+      profile_image: mgr.profile_image || null,
       _raw: mgr,
       employees: employees
         .filter((emp) => emp.Under_manager?.toString() === mgr._id.toString())
@@ -1205,6 +1232,7 @@ const buildManagerTree = (managers, parentId, parentModel, employees) => {
           email: emp.work_email,
           designation: emp.designation,
           department: emp.department,
+          profile_image: emp.profile_image || null,
           isCurrentUser: false,
         })),
       subManagers: buildManagerTree(managers, mgr._id, "Manager", employees),
@@ -1234,6 +1262,7 @@ const buildManagerTreeWithCurrentFlags = (
       designation: mgr.designation,
       department: mgr.department,
       office_location: mgr.office_location,
+      profile_image: mgr.profile_image || null,
       isCurrentManager: currentManagerId
         ? mgr._id.toString() === currentManagerId.toString()
         : false,
@@ -1252,6 +1281,7 @@ const buildManagerTreeWithCurrentFlags = (
           email: emp.work_email,
           designation: emp.designation,
           department: emp.department,
+          profile_image: emp.profile_image || null,
           isCurrentUser: currentEmployeeId
             ? emp._id.toString() === currentEmployeeId.toString()
             : false,

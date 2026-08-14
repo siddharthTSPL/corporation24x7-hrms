@@ -68,6 +68,11 @@ cron.schedule("0 0 1 * *", async () => {
   }
 });
 
-cron.schedule("0 19 * * *", () => {
+// Every 5 minutes - see the comment on autoCheckoutAll() in
+// attendance.controller.js. A fixed once-a-day time can't catch every
+// shift's own "end + maxOvertimeMinutes" instant, and any missed run left
+// open sessions stuck for a full extra day.
+cron.schedule("*/5 * * * *", () => {
   autoCheckoutAll();
 });
+

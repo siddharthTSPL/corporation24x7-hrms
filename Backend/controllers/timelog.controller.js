@@ -2,6 +2,69 @@ const mongoose = require("mongoose");
 const TimeLog = require("../Models/Timelog.model");
 const TSJob = require("../Models/Tsjob.model");
 const { resolveActor, resolveOrgId, httpError } = require("../utils/heirarchy.utils");
+const { parseISTDateOnly, endOfISTDay, toISTKey } = require("../utils/Istdate.utils");
+const { resolveEmployeeShift, getShiftDurationMinutes } = require("../utils/shift.utils");
+
+// ─── overtime helpers ────────────────────────────────────────────────────────
+// A job can set its own per-day working-hour cap (max_hours_per_day). If it
+// doesn't, we fall back to the assignee's shift length (end - start) as the
+// day's regular-working-hour baseline. Anything logged past that cap on a
+// given IST day is overtime instead of regular working time.
+
+const getActorDoc = (req) => req.employee || req.manager || req.admin || null;
+
+const resolveDailyLimitMinutes = async (jobDoc, req, organisation_id) => {
+  if (jobDoc.max_hours_per_day) {
+    return Math.round(jobDoc.max_hours_per_day * 60);
+  }
+  const actorDoc = getActorDoc(req);
+  if (!actorDoc) return null;
+  const shift = await resolveEmployeeShift(actorDoc, organisation_id);
+  if (!shift) return null;
+  return getShiftDurationMinutes(shift);
+};
+
+// Given minutes already logged today (existingMinutes) and a new/updated
+// entry of entryMinutes, splits the entry itself across the regular/overtime
+// boundary defined by limitMinutes.
+const splitRegularOvertime = (existingMinutes, entryMinutes, limitMinutes) => {
+  if (!limitMinutes || limitMinutes <= 0) {
+    return { regular: entryMinutes, overtime: 0 };
+  }
+  if (existingMinutes >= limitMinutes) {
+    return { regular: 0, overtime: entryMinutes };
+  }
+  const remainingRegular = limitMinutes - existingMinutes;
+  if (entryMinutes <= remainingRegular) {
+    return { regular: entryMinutes, overtime: 0 };
+  }
+  return { regular: remainingRegular, overtime: entryMinutes - remainingRegular };
+};
+
+const getExistingDayMinutes = async ({ organisation_id, actor, dayStart, dayEnd, excludeLogId }) => {
+  const match = {
+    organisation_id,
+    logged_by: actor.id,
+    logged_by_model: actor.model,
+    log_date: { $gte: dayStart, $lte: dayEnd },
+    status: { $ne: "rejected" },
+  };
+  if (excludeLogId) match._id = { $ne: excludeLogId };
+
+  const agg = await TimeLog.aggregate([
+    { $match: match },
+    { $group: { _id: null, total: { $sum: "$duration_minutes" } } },
+  ]);
+  return agg[0]?.total || 0;
+};
+
+const buildOvertimeWarning = ({ overtime, entryMinutes, dailyLimitMinutes, usedJobCap }) => {
+  if (overtime <= 0) return null;
+  const limitHoursLabel = dailyLimitMinutes ? (dailyLimitMinutes / 60).toFixed(1) : "?";
+  const source = usedJobCap ? "for this job" : "based on your shift timing";
+  const scope = overtime === entryMinutes ? "This entire entry is" : `${overtime} minute(s) of this entry are`;
+  return `Today's logged time has crossed the ${limitHoursLabel}h working-hour limit ${source}. ${scope} recorded as overtime. Whether overtime is paid out is at the company's discretion.`;
+};
 
 // BUG FIX: aggregate $match on an ObjectId field requires an actual ObjectId,
 // not a plain string. When jobId arrives as a string (e.g. from stopTimer
@@ -79,15 +142,47 @@ const logTime = async (req, res, next) => {
   const isBillable =
     billable !== undefined ? !!billable : jobDoc.billable;
 
+  // Auto-move job out of "not_started" the moment work is actually logged against it
+  if (jobDoc.status === "not_started") {
+    jobDoc.status = "in_progress";
+    await jobDoc.save();
+  }
+
+  // log_date arrives as "YYYY-MM-DD" from the date picker. Letting Mongoose
+  // cast that string directly parses it as UTC midnight, which is 5:30am IST
+  // - fine while the server happens to run in IST, but on a UTC virtual
+  // server every downstream IST day/week bucket sees the entry a day early.
+  const resolvedLogDate = parseISTDateOnly(log_date);
+
+  // Regular vs overtime split, against everything else already logged today.
+  const dayStart = resolvedLogDate;
+  const dayEnd = endOfISTDay(dayStart);
+  const dailyLimitMinutes = await resolveDailyLimitMinutes(jobDoc, req, organisation_id);
+  const existingMinutes = await getExistingDayMinutes({
+    organisation_id,
+    actor,
+    dayStart,
+    dayEnd,
+  });
+  const { regular, overtime } = splitRegularOvertime(
+    existingMinutes,
+    duration_minutes,
+    dailyLimitMinutes
+  );
+
   const timeLog = await TimeLog.create({
     organisation_id,
     job,
     project: jobDoc.project,
     logged_by: actor.id,
     logged_by_model: actor.model,
-    log_date,
+    log_date: resolvedLogDate,
     entry_mode: "manual",
     duration_minutes,
+    regular_minutes: regular,
+    overtime_minutes: overtime,
+    is_overtime: overtime > 0,
+    daily_limit_minutes_at_log: dailyLimitMinutes,
     note: note || "",
     billable: isBillable,
     hourly_rate: jobDoc.hourly_rate,
@@ -96,7 +191,14 @@ const logTime = async (req, res, next) => {
 
   await recomputeJobHours(jobDoc._id);
 
-  res.status(201).json({ success: true, message: "Time logged", timeLog });
+  const warning = buildOvertimeWarning({
+    overtime,
+    entryMinutes: duration_minutes,
+    dailyLimitMinutes,
+    usedJobCap: !!jobDoc.max_hours_per_day,
+  });
+
+  res.status(201).json({ success: true, message: "Time logged", timeLog, warning });
 };
 
 const getMyDayLog = async (req, res, next) => {
@@ -106,10 +208,8 @@ const getMyDayLog = async (req, res, next) => {
 
   if (!date) return next(httpError("date query param is required", 400));
 
-  const dayStart = new Date(date);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(date);
-  dayEnd.setHours(23, 59, 59, 999);
+  const dayStart = parseISTDateOnly(date);
+  const dayEnd = endOfISTDay(dayStart);
 
   const logs = await TimeLog.find({
     organisation_id,
@@ -122,8 +222,10 @@ const getMyDayLog = async (req, res, next) => {
     .lean();
 
   const totalMinutes = logs.reduce((sum, l) => sum + l.duration_minutes, 0);
+  const workingMinutes = logs.reduce((sum, l) => sum + (l.regular_minutes ?? l.duration_minutes), 0);
+  const overtimeMinutes = logs.reduce((sum, l) => sum + (l.overtime_minutes || 0), 0);
 
-  res.status(200).json({ success: true, date, totalMinutes, logs });
+  res.status(200).json({ success: true, date, totalMinutes, workingMinutes, overtimeMinutes, logs });
 };
 
 const getMyWeekLog = async (req, res, next) => {
@@ -134,10 +236,8 @@ const getMyWeekLog = async (req, res, next) => {
   if (!week_start)
     return next(httpError("week_start query param is required", 400));
 
-  const start = new Date(week_start);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 7);
+  const start = parseISTDateOnly(week_start);
+  const end = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   const logs = await TimeLog.find({
     organisation_id,
@@ -149,19 +249,19 @@ const getMyWeekLog = async (req, res, next) => {
     .sort({ log_date: 1 })
     .lean();
 
-  // BUG FIX: original code used toISOString().slice(0,10) to bucket by day,
-  // which gives UTC dates. If the server runs in a non-UTC timezone and
-  // log_date was stored with a local midnight, the ISO string shifts to the
-  // previous day. Use a locale-independent approach: compare the raw Date
-  // objects against each day boundary to avoid off-by-one day buckets.
+  // Bucket by IST calendar day. toISOString().slice(0,10) gives the UTC
+  // date, which is a different calendar day from ~00:00 to ~05:30 IST -
+  // that previously bucketed early-morning IST entries into the wrong day
+  // (and onto the wrong side of week/month boundaries). toISTKey/day math
+  // here stays in IST throughout, independent of server timezone.
   const dayBuckets = {};
   const dayKeys = [];
   for (let i = 0; i < 7; i++) {
-    const day = new Date(start);
-    day.setDate(day.getDate() + i);
-    const key = day.toISOString().slice(0, 10);
-    dayKeys.push({ key, from: day, to: new Date(day.getTime() + 86400000) });
-    dayBuckets[key] = { totalMinutes: 0, logs: [] };
+    const from = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
+    const to = new Date(from.getTime() + 24 * 60 * 60 * 1000);
+    const key = toISTKey(from);
+    dayKeys.push({ key, from, to });
+    dayBuckets[key] = { totalMinutes: 0, workingMinutes: 0, overtimeMinutes: 0, logs: [] };
   }
 
   for (const log of logs) {
@@ -171,14 +271,23 @@ const getMyWeekLog = async (req, res, next) => {
     );
     if (!bucket) continue;
     dayBuckets[bucket.key].totalMinutes += log.duration_minutes;
+    dayBuckets[bucket.key].workingMinutes += log.regular_minutes ?? log.duration_minutes;
+    dayBuckets[bucket.key].overtimeMinutes += log.overtime_minutes || 0;
     dayBuckets[bucket.key].logs.push(log);
   }
 
   const totalMinutes = logs.reduce((sum, l) => sum + l.duration_minutes, 0);
+  const totalWorkingMinutes = logs.reduce((sum, l) => sum + (l.regular_minutes ?? l.duration_minutes), 0);
+  const totalOvertimeMinutes = logs.reduce((sum, l) => sum + (l.overtime_minutes || 0), 0);
 
-  res
-    .status(200)
-    .json({ success: true, week_start: start, totalMinutes, days: dayBuckets });
+  res.status(200).json({
+    success: true,
+    week_start: start,
+    totalMinutes,
+    totalWorkingMinutes,
+    totalOvertimeMinutes,
+    days: dayBuckets,
+  });
 };
 
 const updateTimeLog = async (req, res, next) => {
@@ -213,6 +322,8 @@ const updateTimeLog = async (req, res, next) => {
     );
   }
 
+  let warning = null;
+
   if (
     duration_minutes !== undefined &&
     duration_minutes !== timeLog.duration_minutes
@@ -232,6 +343,39 @@ const updateTimeLog = async (req, res, next) => {
     });
 
     timeLog.duration_minutes = duration_minutes;
+
+    // Recompute the regular/overtime split for this entry against the rest
+    // of that same IST day (excluding itself).
+    const jobDoc = await TSJob.findById(timeLog.job);
+    const dayStart = timeLog.log_date;
+    const dayEnd = endOfISTDay(dayStart);
+    const dailyLimitMinutes = jobDoc
+      ? await resolveDailyLimitMinutes(jobDoc, req, organisation_id)
+      : timeLog.daily_limit_minutes_at_log;
+    const existingMinutes = await getExistingDayMinutes({
+      organisation_id,
+      actor,
+      dayStart,
+      dayEnd,
+      excludeLogId: timeLog._id,
+    });
+    const { regular, overtime } = splitRegularOvertime(
+      existingMinutes,
+      duration_minutes,
+      dailyLimitMinutes
+    );
+
+    timeLog.regular_minutes = regular;
+    timeLog.overtime_minutes = overtime;
+    timeLog.is_overtime = overtime > 0;
+    timeLog.daily_limit_minutes_at_log = dailyLimitMinutes;
+
+    warning = buildOvertimeWarning({
+      overtime,
+      entryMinutes: duration_minutes,
+      dailyLimitMinutes,
+      usedJobCap: !!jobDoc?.max_hours_per_day,
+    });
   }
 
   if (note !== undefined) timeLog.note = note;
@@ -241,7 +385,7 @@ const updateTimeLog = async (req, res, next) => {
 
   res
     .status(200)
-    .json({ success: true, message: "Time log updated", timeLog });
+    .json({ success: true, message: "Time log updated", timeLog, warning });
 };
 
 const deleteTimeLog = async (req, res, next) => {
@@ -295,12 +439,12 @@ const getAllTimeLogs = async (req, res, next) => {
   if (status) filter.status = status;
 
   if (date) {
-    const dayStart = new Date(date); dayStart.setHours(0, 0, 0, 0);
-    const dayEnd   = new Date(date); dayEnd.setHours(23, 59, 59, 999);
+    const dayStart = parseISTDateOnly(date);
+    const dayEnd = endOfISTDay(dayStart);
     filter.log_date = { $gte: dayStart, $lte: dayEnd };
   } else if (week_start) {
-    const start = new Date(week_start); start.setHours(0, 0, 0, 0);
-    const end   = new Date(start);      end.setDate(end.getDate() + 7);
+    const start = parseISTDateOnly(week_start);
+    const end = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
     filter.log_date = { $gte: start, $lt: end };
   }
 

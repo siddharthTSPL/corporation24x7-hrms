@@ -1,8 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEditAdminProfile, useChangeAdminPassword } from "../../auth/server-state/adminauth/adminauth.hook";
+import { uploadDocument } from "../../../src/auth/api/adminapi/document/addocument.api";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import { Country, State, City } from "country-state-city";
+import MyAssetsWidget from "../asset/MyAssetsWidget";
+import { useGetMyAssetsAdmin } from "../../auth/server-state/adminasset/adminasset.hook";
 
 const DEFAULT_COUNTRY_ISO = "IN";
 const AVATAR_STYLES = [
@@ -75,6 +78,7 @@ const TABS = [
   { key: "documents", label: "Documents & Banking" },
   { key: "leave",     label: "Leave Balance" },
   { key: "reviews",   label: "Reviews" },
+  { key: "assets",    label: "My Assets" },
   { key: "password",  label: "Password" },
   { key: "avatar",    label: "Avatar" },
 ];
@@ -96,10 +100,106 @@ function toDateInputValue(date) {
   return d.toISOString().slice(0, 10);
 }
 
+function FileUploadField({ label, value, onChange, hint, accept = ".pdf,.jpg,.jpeg,.png" }) {
+  const inputRef = useRef();
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const fileName = value ? decodeURIComponent(value.split("/").pop().split("?")[0]) : "";
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadError("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await uploadDocument(formData);
+      const url =
+        res?.url ||
+        res?.data?.url ||
+        res?.document?.url ||
+        res?.data?.document?.url ||
+        res?.fileUrl ||
+        res?.data?.fileUrl;
+      if (!url) {
+        console.warn("Upload response did not contain a recognizable URL field:", res);
+        throw new Error("No URL returned from upload");
+      }
+      onChange(url);
+    } catch (err) {
+      setUploadError(err?.response?.data?.message || err?.message || "Upload failed. Try again.");
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  const handleRemove = () => {
+    onChange("");
+    setUploadError("");
+  };
+
+  return (
+    <div className="min-w-0" style={{ marginBottom: 14 }}>
+      <FieldLabel>{label}</FieldLabel>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        onChange={handleFileSelect}
+        style={{ display: "none" }}
+        id={`file-upload-${label}`}
+      />
+      {value ? (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8,
+          padding: "9px 12px", borderRadius: 8,
+          border: `1px solid ${C.border}`, background: C.page,
+        }}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+            <path d="M4 1.5h6l3 3v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1z" stroke={C.brand} strokeWidth="1.2"/>
+          </svg>
+          <a href={value} target="_blank" rel="noopener noreferrer"
+            className="truncate"
+            style={{ fontSize: 13, color: C.brand, flex: 1, minWidth: 0, textDecoration: "none", fontWeight: 500 }}>
+            {fileName || "View file"}
+          </a>
+          <button type="button" onClick={handleRemove}
+            style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: 16, lineHeight: 1, padding: 0, flexShrink: 0 }}>
+            ×
+          </button>
+        </div>
+      ) : (
+        <label
+          htmlFor={`file-upload-${label}`}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            width: "100%", padding: "9px 12px", borderRadius: 8,
+            border: `1px dashed ${C.border}`, background: C.surface,
+            fontSize: 13, color: C.muted, cursor: uploading ? "not-allowed" : "pointer",
+            opacity: uploading ? 0.6 : 1, fontFamily: "inherit", boxSizing: "border-box",
+          }}
+        >
+          {uploading ? "Uploading…" : "+ Upload file"}
+        </label>
+      )}
+      {(hint || uploadError) && (
+        <div style={{ fontSize: 11, color: uploadError ? C.red : C.muted, marginTop: 3 }}>
+          {uploadError || hint}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function fmtDate(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
 }
+
+
 
 
 // AFTER
@@ -110,8 +210,22 @@ function findLocationByCityName(cityName) {
   if (locationLookupCache.has(cityName)) return locationLookupCache.get(cityName);
 
   let result = null;
+
+  // Fast path: check India first — covers the overwhelming majority of records
+  const defaultStates = State.getStatesOfCountry(DEFAULT_COUNTRY_ISO);
+  for (const state of defaultStates) {
+    const cities = City.getCitiesOfState(DEFAULT_COUNTRY_ISO, state.isoCode);
+    if (cities.some(c => c.name === cityName)) {
+      result = { countryIso: DEFAULT_COUNTRY_ISO, stateIso: state.isoCode };
+      locationLookupCache.set(cityName, result);
+      return result;
+    }
+  }
+
+  // Slow path: only scan the rest of the world if not found in India
   const countries = Country.getAllCountries();
   outer: for (const country of countries) {
+    if (country.isoCode === DEFAULT_COUNTRY_ISO) continue; // already checked above
     const states = State.getStatesOfCountry(country.isoCode);
     for (const state of states) {
       const cities = City.getCitiesOfState(country.isoCode, state.isoCode);
@@ -314,6 +428,7 @@ function ProfileTab({ adminData }) {
           <ReadonlyField label="Employee ID" value={adminData?.empid} />
           <ReadonlyField label="Gender" value={adminData?.gender} />
           <ReadonlyField label="Marital status" value={adminData?.marital_status} />
+          <ReadonlyField label="Date of birth" value={adminData?.date_of_birth ? fmtDate(adminData.date_of_birth) : "Not set"} />
           <ReadonlyField label="Country" value={adminData?.country} />
           <ReadonlyField label="Account status" value={adminData?.status || "active"} />
         </Grid>
@@ -358,6 +473,7 @@ function ContactTab({ adminData, onSuccess, onError }) {
     stateIso: "",
     city: "",
     date_of_joining: "",
+    date_of_birth: "",
   });
 
   const countries = Country.getAllCountries();
@@ -385,6 +501,7 @@ function ContactTab({ adminData, onSuccess, onError }) {
       stateIso,
       city: cityName,
       date_of_joining: toDateInputValue(adminData.date_of_joining),
+      date_of_birth: toDateInputValue(adminData.date_of_birth),
     });
   }, [adminData]);
 
@@ -413,8 +530,9 @@ function ContactTab({ adminData, onSuccess, onError }) {
   const handleSave = () => {
     if (!PHONE_REGEX.test(form.personal_contact)) { onError("Phone number must be a valid 10-digit number"); return; }
     if (form.e_contact && !PHONE_REGEX.test(form.e_contact)) { onError("Emergency contact must be a valid 10-digit number"); return; }
+    if (form.date_of_birth && new Date(form.date_of_birth) > new Date()) { onError("Date of birth cannot be in the future"); return; }
     mutate(
-      { personal_contact: form.personal_contact, e_contact: form.e_contact, office_location: form.city, date_of_joining: form.date_of_joining },
+      { personal_contact: form.personal_contact, e_contact: form.e_contact, office_location: form.city, date_of_joining: form.date_of_joining, date_of_birth: form.date_of_birth },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["auth"] });
@@ -455,6 +573,13 @@ function ContactTab({ adminData, onSuccess, onError }) {
         value={form.date_of_joining}
         onChange={e => setForm(p => ({ ...p, date_of_joining: e.target.value }))}
         hint="Shown on your dashboard in place of your account creation date"
+      />
+      <InputField
+        label="Date of birth"
+        type="date"
+        value={form.date_of_birth}
+        onChange={e => setForm(p => ({ ...p, date_of_birth: e.target.value }))}
+        hint="Used to wish you (and the team) on your birthday"
       />
      <PrimaryButton onClick={handleSave} loading={isPending} color={C.brandDark}>Save contact info</PrimaryButton>
     </SectionCard>
@@ -554,11 +679,11 @@ function DocumentsBankingTab({ adminData, onSuccess, onError }) {
 
   return (
     <>
-      <SectionCard title="Documents" subtitle="Paste a link to each uploaded file" accent={C.blue}>
-        <InputField label="Resume" value={form.resume} onChange={set("resume")} placeholder="https://…" />
-        <InputField label="Aadhaar card" value={form.aadhaar_card} onChange={set("aadhaar_card")} placeholder="https://…" />
-        <InputField label="PAN card" value={form.pan_card} onChange={set("pan_card")} placeholder="https://…" />
-        <InputField label="Experience letter" value={form.experience_letter} onChange={set("experience_letter")} placeholder="https://…" />
+      <SectionCard title="Documents" subtitle="Upload your documents" accent={C.blue}>
+        <FileUploadField label="Resume" value={form.resume} onChange={(url) => setForm(p => ({ ...p, resume: url }))} />
+        <FileUploadField label="Aadhaar card" value={form.aadhaar_card} onChange={(url) => setForm(p => ({ ...p, aadhaar_card: url }))} />
+        <FileUploadField label="PAN card" value={form.pan_card} onChange={(url) => setForm(p => ({ ...p, pan_card: url }))} />
+        <FileUploadField label="Experience letter" value={form.experience_letter} onChange={(url) => setForm(p => ({ ...p, experience_letter: url }))} />
         <PrimaryButton onClick={handleSaveDocs} loading={isPending} color={C.brandDark}>Save documents</PrimaryButton>
       </SectionCard>
 
@@ -664,10 +789,17 @@ function ReviewsTab({ reviews }) {
     );
   }
 
-  const avg = (reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length).toFixed(1);
+  const avg = (reviews.reduce((s, r) => s + (r.overallScore || 0), 0) / reviews.length).toFixed(1);
+
+  const ratingBadgeColor = (rating) => {
+    if (rating === "Excellent" || rating === "Very Good") return C.green || "#1E7A3D";
+    if (rating === "Good") return C.brand;
+    if (rating === "Average") return C.amber || "#B8860B";
+    return C.red || "#B0233A";
+  };
 
   return (
-    <SectionCard title="My Reviews" subtitle={`${reviews.length} review${reviews.length !== 1 ? "s" : ""} · avg ${avg}/5`} accent={C.brand}>
+    <SectionCard title="My Reviews" subtitle={`${reviews.length} review${reviews.length !== 1 ? "s" : ""} · avg ${avg}/10`} accent={C.brand}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {reviews.map((r, i) => (
           <div key={r._id || i} className="min-w-0" style={{
@@ -681,16 +813,30 @@ function ReviewsTab({ reviews }) {
                 </div>
                 <div style={{ fontSize: 11, color: C.muted }}>{r.reviewer?.role || ""} · {r.monthYear || fmtDate(r.createdAt)}</div>
               </div>
-              <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
-                {[1,2,3,4,5].map(s => (
-                  <svg key={s} width="14" height="14" viewBox="0 0 24 24">
-                    <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
-                      fill={s <= (r.rating || 0) ? "#f59e0b" : "transparent"}
-                      stroke="#f59e0b" strokeWidth="1.5" strokeLinejoin="round" />
-                  </svg>
-                ))}
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: ratingBadgeColor(r.overallRating) }}>
+                  {r.overallScore != null ? r.overallScore.toFixed(1) : "–"}/10
+                </span>
+                {r.overallRating && (
+                  <span style={{ fontSize: 11, color: C.muted }}>· {r.overallRating}</span>
+                )}
               </div>
             </div>
+
+            {(r.taskSubmission || r.behaviourEthics || r.attendance) && (
+              <div className="flex-wrap" style={{ display: "flex", gap: 12, marginBottom: r.comment ? 8 : 0, fontSize: 11, color: C.muted }}>
+                {r.taskSubmission && (
+                  <span>Task: {r.taskSubmission.percentage}% ({r.taskSubmission.rating})</span>
+                )}
+                {r.behaviourEthics && (
+                  <span>Behaviour: {r.behaviourEthics.score}/10 ({r.behaviourEthics.rating})</span>
+                )}
+                {r.attendance && (
+                  <span>Attendance: {r.attendance.percentage}% ({r.attendance.rating})</span>
+                )}
+              </div>
+            )}
+
             {r.comment && (
               <div className="break-words" style={{ fontSize: 13, color: C.text, lineHeight: 1.6, fontStyle: "italic" }}>
                 "{r.comment}"
@@ -699,6 +845,14 @@ function ReviewsTab({ reviews }) {
           </div>
         ))}
       </div>
+    </SectionCard>
+  );
+}
+
+function AssetsTab() {
+  return (
+    <SectionCard title="My Assets" subtitle="Items assigned to you by SuperAdmin" accent={C.brand}>
+      <MyAssetsWidget useMyAssets={useGetMyAssetsAdmin} title="Assigned to me" accent={C.brand} />
     </SectionCard>
   );
 }
@@ -1045,6 +1199,7 @@ export default function AdminSettingsPage() {
               {tab === "documents" && <DocumentsBankingTab adminData={adminData} onSuccess={showSuccess} onError={showError} />}
               {tab === "leave"     && <LeaveTab leaveBalance={leaveBalance} />}
               {tab === "reviews"   && <ReviewsTab reviews={reviews} />}
+              {tab === "assets"    && <AssetsTab />}
               {tab === "password"  && <PasswordTab onSuccess={showSuccess} onError={showError} />}
               {tab === "avatar"    && <AvatarTab adminData={adminData} onSuccess={showSuccess} onError={showError} />}
 

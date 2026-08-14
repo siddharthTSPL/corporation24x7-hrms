@@ -44,6 +44,7 @@ const {
   updateAnnouncement,
   deleteAnnouncement,
   reviewtomanager,
+  getAllReviewsForAdmin,
   forgetpasswordloginotp,
   verifyAotp,
   resetAdminPassword,
@@ -91,6 +92,7 @@ const {
   getAssetsOfPerson,
   getEmployeesWithAssets,
   getEmployeeAssetHistory,
+  getMyAssets,
 } = require("../controllers/asset.controller");
 
 adminrouter.get("/verify/:token", asyncHandler(verifyAdmin));
@@ -259,6 +261,12 @@ adminrouter.post(
 );
 
 adminrouter.get(
+  "/allreviews",
+  adminauthmiddleware,
+  asyncHandler(getAllReviewsForAdmin),
+);
+
+adminrouter.get(
   "/getallannouncement",
   adminauthmiddleware,
   checkPermission("announcements.can_view_announcements"),
@@ -393,6 +401,9 @@ adminrouter.patch("/assets/:id/assign-employee", adminauthmiddleware, asyncHandl
 adminrouter.patch("/assets/:id/assign-manager", adminauthmiddleware, asyncHandler(assignAssetToManager));
 adminrouter.patch("/assets/:id/revoke", adminauthmiddleware, asyncHandler(revokeAssetAdmin));
 adminrouter.get("/assets/person/:person_id/:person_model", adminauthmiddleware, asyncHandler(getAssetsOfPerson));
+
+// Assets assigned to the logged-in admin themself (e.g. by SuperAdmin) — Dashboard / Settings "My Assets" widget
+adminrouter.get("/my-assets", adminauthmiddleware, asyncHandler(getMyAssets));
 
 // Help & Support form — no permission gate, every logged-in admin can reach support.
 adminrouter.post("/contact-support", adminauthmiddleware, supportUpload.array("attachments", 5), asyncHandler(sendSupportRequest));

@@ -22,6 +22,7 @@ export const getAssetByIdAdmin = async (id) => {
   return res.data;
 };
 
+
 export const updateAssetAdmin = async (id, data) => {
   const res = await api.put(`admin/assets/${id}`, data);
   return res.data;
@@ -61,5 +62,11 @@ export const getEmployeesWithAssetsAdmin = async () => {
 // Full assign/revoke history (active + returned) for a single employee.
 export const getEmployeeAssetHistoryAdmin = async (person_id, person_model) => {
   const res = await api.get(`admin/assets/employees/${person_id}/${person_model}/history`);
+  return res.data;
+};
+
+// Assets currently assigned to the logged-in admin themself (e.g. by SuperAdmin).
+export const getMyAssetsAdmin = async () => {
+  const res = await api.get('admin/my-assets');
   return res.data;
 };

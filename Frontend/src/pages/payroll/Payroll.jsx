@@ -6,6 +6,8 @@ import {
   useAddPayrollAllowance,
   useUpdatePayrollAllowance,
   useRemovePayrollAllowance,
+  useGetPaySchedule,
+  useSetPaySchedule,
   useListSalaryStructures,
   useSetEmployeeCTC,
   useReapplyPolicy,
@@ -40,10 +42,26 @@ const C = {
 };
 
 const TABS = [
-  { key: "policy", label: "Payroll Policy" },
+  { key: "schedule", label: "Pay Schedule" },
+  { key: "statutory", label: "Statutory Components" },
+  { key: "components", label: "Salary Components" },
+  { key: "claims", label: "Claims & Declarations" },
   { key: "structures", label: "Salary Structures" },
   { key: "generate", label: "Generate Payroll" },
   { key: "records", label: "Payroll Records" },
+];
+
+const COMPONENT_CATEGORIES = [
+  { key: "earning", label: "Earnings" },
+  { key: "deduction", label: "Deductions" },
+  { key: "benefit", label: "Benefits" },
+  { key: "reimbursement", label: "Reimbursements" },
+];
+
+const CALC_TYPES = [
+  { key: "flat", label: "Flat Amount" },
+  { key: "percentOfGross", label: "% of Gross" },
+  { key: "formula", label: "Custom Formula" },
 ];
 
 const MODEL_LABEL = { User: "Employee", Manager: "Manager", Admin: "Admin" };
@@ -52,6 +70,11 @@ const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+function daysInMonthClient(month, year) {
+  return new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate();
+}
 
 function fmtINR(n) {
   const num = Number(n) || 0;
@@ -205,6 +228,32 @@ function Badge({ children, color, bg }) {
   );
 }
 
+// Inner sub-tab strip used inside Statutory Components / Salary Components /
+// Claims & Declarations — mirrors Zoho's secondary tab row (e.g. EPF | ESI |
+// Professional Tax | ...).
+function SubTabs({ items, active, onChange }) {
+  return (
+    <div className="flex items-center gap-1 flex-wrap mb-5" style={{ borderBottom: `1px solid ${C.border}` }}>
+      {items.map((it) => (
+        <button
+          key={it.key}
+          type="button"
+          onClick={() => onChange(it.key)}
+          style={{
+            background: "none", border: "none", cursor: "pointer", fontFamily: "inherit",
+            padding: "8px 14px 10px", fontSize: 13, fontWeight: 600,
+            color: active === it.key ? C.brand : C.muted,
+            borderBottom: active === it.key ? `2px solid ${C.brand}` : "2px solid transparent",
+            marginBottom: -1,
+          }}
+        >
+          {it.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function statusBadge(status) {
   const map = {
     generated: { label: "Generated", color: C.blue, bg: C.blueBg },
@@ -287,23 +336,176 @@ function resolveName(directory, id, fallbackModel) {
 }
 
 
-function PolicyTab({ notify }) {
+function PayScheduleTab({ notify }) {
+  const { data, isLoading } = useGetPaySchedule();
+  const { mutate: save, isPending: saving } = useSetPaySchedule();
+
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState(null);
+
+  useEffect(() => {
+    if (data?.paySchedule) setForm(JSON.parse(JSON.stringify(data.paySchedule)));
+  }, [data]);
+
+  if (isLoading || !form) {
+    return <Card title="Pay Schedule"><div className="flex items-center gap-2" style={{ color: C.muted, fontSize: 13 }}><Spinner size={14} color={C.brand} /> Loading pay schedule…</div></Card>;
+  }
+
+  const locked = !!data?.paySchedule?.locked;
+
+  const toggleWorkingDay = (day) => {
+    setForm((prev) => {
+      const has = prev.workingDays.includes(day);
+      const workingDays = has ? prev.workingDays.filter((d) => d !== day) : [...prev.workingDays, day];
+      return { ...prev, workingDays };
+    });
+  };
+
+  const handleSave = () => {
+    save(
+      {
+        workingDays: form.workingDays,
+        payDay: Number(form.payDay),
+        firstPayPeriodMonth: form.firstPayPeriodMonth ? Number(form.firstPayPeriodMonth) : undefined,
+        firstPayPeriodYear: form.firstPayPeriodYear ? Number(form.firstPayPeriodYear) : undefined,
+        firstPayDate: form.firstPayDate || undefined,
+        noOfWorkingDays: Number(form.noOfWorkingDays),
+      },
+      {
+        onSuccess: () => {
+          notify("Pay Schedule saved", "success");
+          setEditing(false);
+        },
+        onError: (e) => notify(getErrorMessage(e), "error"),
+      }
+    );
+  };
+
+  return (
+    <Card
+      title="Pay Schedule"
+      subtitle="Fixed, organisation-wide payroll run schedule"
+      right={
+        !locked && (
+          editing ? (
+            <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+              <GhostButton onClick={() => { setForm(JSON.parse(JSON.stringify(data.paySchedule))); setEditing(false); }} className="flex-1 sm:flex-none justify-center">Cancel</GhostButton>
+              <PrimaryButton onClick={handleSave} loading={saving} className="flex-1 sm:flex-none">Save Schedule</PrimaryButton>
+            </div>
+          ) : (
+            <GhostButton onClick={() => setEditing(true)}>Edit</GhostButton>
+          )
+        )
+      }
+    >
+      {locked && (
+        <div style={{ background: C.amberBg, border: `1px solid #ecd6a8`, borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12.5, color: "#7a5710" }}>
+          <strong>Note:</strong> Pay Schedule cannot be edited once you process the first pay run.
+        </div>
+      )}
+
+      {!editing ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+          <div>
+            <p style={{ fontSize: 11.5, color: C.muted, marginBottom: 3 }}>Pay Frequency</p>
+            <p style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: 0 }}>{form.payFrequency || "Monthly"}</p>
+          </div>
+          <div>
+            <p style={{ fontSize: 11.5, color: C.muted, marginBottom: 3 }}>Working Days</p>
+            <p style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: 0 }}>{(form.workingDays || []).join(", ") || "—"}</p>
+          </div>
+          <div>
+            <p style={{ fontSize: 11.5, color: C.muted, marginBottom: 3 }}>Pay Day</p>
+            <p style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: 0 }}>{form.payDay ? `${form.payDay}${["th","st","nd","rd"][(form.payDay % 10 > 3 || Math.floor(form.payDay/10) === 1) ? 0 : form.payDay % 10]} of every month` : "—"}</p>
+          </div>
+          <div>
+            <p style={{ fontSize: 11.5, color: C.muted, marginBottom: 3 }}>No. of Working Days</p>
+            <p style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: 0 }}>{form.noOfWorkingDays ?? "—"}</p>
+          </div>
+          <div>
+            <p style={{ fontSize: 11.5, color: C.muted, marginBottom: 3 }}>First Pay Period</p>
+            <p style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: 0 }}>
+              {form.firstPayPeriodMonth ? `${MONTH_NAMES[form.firstPayPeriodMonth - 1]} ${form.firstPayPeriodYear || ""}` : "Not set"}
+            </p>
+          </div>
+          <div>
+            <p style={{ fontSize: 11.5, color: C.muted, marginBottom: 3 }}>First Pay Date</p>
+            <p style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: 0 }}>
+              {form.firstPayDate ? new Date(form.firstPayDate).toLocaleDateString("en-IN") : "Not set"}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <Field label="Working Days" hint="Days counted as working days each week">
+            <div className="flex items-center gap-2 flex-wrap">
+              {WEEKDAYS.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => toggleWorkingDay(d)}
+                  style={{
+                    padding: "6px 12px", borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+                    border: `1px solid ${form.workingDays.includes(d) ? C.brand : C.border}`,
+                    background: form.workingDays.includes(d) ? C.brandLight : "#fff",
+                    color: form.workingDays.includes(d) ? C.brandDark : C.muted,
+                  }}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Pay Day" hint="Day of month payroll is paid out">
+            <TextInput type="number" min={1} max={31} value={form.payDay ?? 1} onChange={(e) => setForm((p) => ({ ...p, payDay: e.target.value }))} />
+          </Field>
+          <Field label="No. of Working Days" hint="Fixed denominator used for per-day rate / LOP math, e.g. 30">
+            <TextInput type="number" min={1} max={31} value={form.noOfWorkingDays ?? 30} onChange={(e) => setForm((p) => ({ ...p, noOfWorkingDays: e.target.value }))} />
+          </Field>
+          <div />
+          <Field label="First Pay Period Month">
+            <Select value={form.firstPayPeriodMonth || ""} onChange={(e) => setForm((p) => ({ ...p, firstPayPeriodMonth: e.target.value }))}>
+              <option value="">Not set</option>
+              {MONTH_NAMES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+            </Select>
+          </Field>
+          <Field label="First Pay Period Year">
+            <TextInput type="number" value={form.firstPayPeriodYear || ""} onChange={(e) => setForm((p) => ({ ...p, firstPayPeriodYear: e.target.value }))} placeholder="e.g. 2026" />
+          </Field>
+          <Field label="First Pay Date">
+            <TextInput type="date" value={form.firstPayDate ? String(form.firstPayDate).slice(0, 10) : ""} onChange={(e) => setForm((p) => ({ ...p, firstPayDate: e.target.value }))} />
+          </Field>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+
+// ---------- Statutory Components (EPF / ESI / Professional Tax / LWF / Statutory Bonus) ----------
+
+const STATUTORY_SUBTABS = [
+  { key: "epf", label: "EPF" },
+  { key: "esi", label: "ESI" },
+  { key: "pt", label: "Professional Tax" },
+  { key: "lwf", label: "Labour Welfare Fund" },
+  { key: "bonus", label: "Statutory Bonus" },
+];
+
+function StatutoryTab({ notify }) {
   const { data, isLoading } = useGetPayrollPolicy();
   const { mutate: savePolicy, isPending: saving } = useSetPayrollPolicy();
   const { mutate: resetPolicy, isPending: resetting } = useResetPayrollPolicy();
-  const { mutate: addAllowance, isPending: adding } = useAddPayrollAllowance();
-  const { mutate: updateAllowance } = useUpdatePayrollAllowance();
-  const { mutate: removeAllowance } = useRemovePayrollAllowance();
 
   const [form, setForm] = useState(null);
-  const [newAllowance, setNewAllowance] = useState({ name: "", percentOfBasic: 0, flatAmount: 0 });
+  const [sub, setSub] = useState("epf");
 
   useEffect(() => {
     if (data?.policy) setForm(JSON.parse(JSON.stringify(data.policy)));
   }, [data]);
 
   if (isLoading || !form) {
-    return <Card title="Payroll Policy"><div className="flex items-center gap-2" style={{ color: C.muted, fontSize: 13 }}><Spinner size={14} color={C.brand} /> Loading policy…</div></Card>;
+    return <Card title="Statutory Components"><div className="flex items-center gap-2" style={{ color: C.muted, fontSize: 13 }}><Spinner size={14} color={C.brand} /> Loading…</div></Card>;
   }
 
   const set = (path, value) => {
@@ -329,9 +531,11 @@ function PolicyTab({ notify }) {
         esi: form.esi,
         professionalTax: form.professionalTax,
         tds: form.tds,
+        lwf: form.lwf,
+        statutoryBonus: form.statutoryBonus,
       },
       {
-        onSuccess: () => notify("Payroll policy updated", "success"),
+        onSuccess: () => notify("Statutory components updated", "success"),
         onError: (e) => notify(getErrorMessage(e), "error"),
       }
     );
@@ -345,178 +549,529 @@ function PolicyTab({ notify }) {
     });
   };
 
-  const handleAddAllowance = () => {
-    if (!newAllowance.name.trim()) return notify("Allowance name is required", "error");
-    addAllowance(newAllowance, {
+  return (
+    <Card
+      title="Statutory Components"
+      right={
+        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+          <GhostButton onClick={handleReset} disabled={resetting} className="flex-1 sm:flex-none justify-center">{resetting ? "Resetting…" : "Reset to Standard"}</GhostButton>
+          <PrimaryButton onClick={handleSave} loading={saving} className="flex-1 sm:flex-none">Save</PrimaryButton>
+        </div>
+      }
+    >
+      <SubTabs items={STATUTORY_SUBTABS} active={sub} onChange={setSub} />
+
+      {sub === "epf" && (
+        <div>
+          <p style={{ fontSize: 13, color: C.muted, marginBottom: 16 }}>
+            Any organisation with 20 or more employees must register for the Employee Provident Fund (EPF) scheme, a retirement benefit plan for all salaried employees.
+          </p>
+          <div className="flex items-center gap-3 flex-wrap mb-3">
+            <Toggle checked={!!form.pf?.enabled} onChange={(v) => set("pf.enabled", v)} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Registered for EPF</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Employee Contribution (%)">
+              <TextInput type="number" min={0} max={100} disabled={!form.pf?.enabled} value={form.pf?.employeePercent ?? 0} onChange={(e) => set("pf.employeePercent", Number(e.target.value))} />
+            </Field>
+            <Field label="Employer Contribution (%)">
+              <TextInput type="number" min={0} max={100} disabled={!form.pf?.enabled} value={form.pf?.employerPercent ?? 0} onChange={(e) => set("pf.employerPercent", Number(e.target.value))} />
+            </Field>
+          </div>
+          <div className="flex items-center gap-2 mt-3 flex-wrap">
+            <Toggle checked={!!form.pf?.applyWageCeiling} onChange={(v) => set("pf.applyWageCeiling", v)} disabled={!form.pf?.enabled} />
+            <span style={{ fontSize: 12.5, color: C.muted }}>Apply statutory wage ceiling</span>
+            <TextInput type="number" min={0} disabled={!form.pf?.enabled || !form.pf?.applyWageCeiling} value={form.pf?.wageCeiling ?? 0} onChange={(e) => set("pf.wageCeiling", Number(e.target.value))} style={{ maxWidth: 120 }} />
+          </div>
+        </div>
+      )}
+
+      {sub === "esi" && (
+        <div>
+          <p style={{ fontSize: 13, color: C.muted, marginBottom: 16 }}>
+            Employee State Insurance (ESI) applies only to employees whose monthly gross is at or below the wage threshold set by the government.
+          </p>
+          <div className="flex items-center gap-3 flex-wrap mb-3">
+            <Toggle checked={!!form.esi?.enabled} onChange={(v) => set("esi.enabled", v)} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Registered for ESI</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Employee Contribution (%)">
+              <TextInput type="number" step="0.01" min={0} max={100} disabled={!form.esi?.enabled} value={form.esi?.employeePercent ?? 0} onChange={(e) => set("esi.employeePercent", Number(e.target.value))} />
+            </Field>
+            <Field label="Employer Contribution (%)">
+              <TextInput type="number" step="0.01" min={0} max={100} disabled={!form.esi?.enabled} value={form.esi?.employerPercent ?? 0} onChange={(e) => set("esi.employerPercent", Number(e.target.value))} />
+            </Field>
+            <Field label="Wage Threshold (₹/month)" hint="ESI only applies at or below this gross">
+              <TextInput type="number" min={0} disabled={!form.esi?.enabled} value={form.esi?.wageThreshold ?? 0} onChange={(e) => set("esi.wageThreshold", Number(e.target.value))} />
+            </Field>
+          </div>
+        </div>
+      )}
+
+      {sub === "pt" && (
+        <div>
+          <p style={{ fontSize: 13, color: C.muted, marginBottom: 16 }}>
+            Professional Tax is a state-specific tax deducted from salary each month. Set your state's flat monthly slab amount.
+          </p>
+          <div className="flex items-center gap-3 flex-wrap mb-3">
+            <Toggle checked={!!form.professionalTax?.enabled} onChange={(v) => set("professionalTax.enabled", v)} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Applicable</span>
+          </div>
+          <Field label="Monthly Amount (₹)">
+            <TextInput type="number" min={0} disabled={!form.professionalTax?.enabled} value={form.professionalTax?.monthlyAmount ?? 0} onChange={(e) => set("professionalTax.monthlyAmount", Number(e.target.value))} style={{ maxWidth: 200 }} />
+          </Field>
+        </div>
+      )}
+
+      {sub === "lwf" && (
+        <div>
+          <p style={{ fontSize: 13, color: C.muted, marginBottom: 16 }}>
+            Labour Welfare Fund (LWF) is a small, state-specific contribution shared by employee and employer. Many small organisations don't register for it.
+          </p>
+          <div className="flex items-center gap-3 flex-wrap mb-3">
+            <Toggle checked={!!form.lwf?.enabled} onChange={(v) => set("lwf.enabled", v)} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Registered for LWF</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Employee Contribution (₹)">
+              <TextInput type="number" min={0} disabled={!form.lwf?.enabled} value={form.lwf?.employeeAmount ?? 0} onChange={(e) => set("lwf.employeeAmount", Number(e.target.value))} />
+            </Field>
+            <Field label="Employer Contribution (₹)">
+              <TextInput type="number" min={0} disabled={!form.lwf?.enabled} value={form.lwf?.employerAmount ?? 0} onChange={(e) => set("lwf.employerAmount", Number(e.target.value))} />
+            </Field>
+          </div>
+        </div>
+      )}
+
+      {sub === "bonus" && (
+        <div>
+          <p style={{ fontSize: 13, color: C.muted, marginBottom: 16 }}>
+            Statutory Bonus under the Payment of Bonus Act — an employer-cost accrual of 8.33% to 20% of Basic. Shown as an employer contribution; it is not deducted from the employee.
+          </p>
+          <div className="flex items-center gap-3 flex-wrap mb-3">
+            <Toggle checked={!!form.statutoryBonus?.enabled} onChange={(v) => set("statutoryBonus.enabled", v)} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Applicable</span>
+          </div>
+          <Field label="% of Basic" hint="8.33 – 20">
+            <TextInput type="number" step="0.01" min={0} max={20} disabled={!form.statutoryBonus?.enabled} value={form.statutoryBonus?.percentOfBasic ?? 0} onChange={(e) => set("statutoryBonus.percentOfBasic", Number(e.target.value))} style={{ maxWidth: 160 }} />
+          </Field>
+        </div>
+      )}
+
+      <div className="flex items-center gap-3 flex-wrap mt-6 pt-5" style={{ borderTop: `1px dashed ${C.border}` }}>
+        <Field label="TDS (Income Tax)" hint="Uses each employee's annualTaxEstimate ÷ 12">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Toggle checked={!!form.tds?.enabled} onChange={(v) => set("tds.enabled", v)} />
+            <span style={{ fontSize: 12.5, color: C.muted }}>{form.tds?.enabled ? "Enabled" : "Disabled"}</span>
+          </div>
+        </Field>
+      </div>
+    </Card>
+  );
+}
+
+// ---------- Salary Components (Earnings / Deductions / Benefits / Reimbursements) ----------
+
+function emptyComponentForm(category) {
+  return {
+    name: "", category, calculationType: "flat",
+    percentOfGross: 0, flatAmount: 0, formula: "",
+    considerForEPF: true, considerForESI: true, isFBP: false,
+  };
+}
+
+function ComponentValueFields({ value, onChange, disabled, onUnlock }) {
+  // A component still flagged isBalancing always absorbs whatever gross is
+  // left over — its calculationType/formula is never actually used, so
+  // don't offer a dropdown that would look editable but silently do
+  // nothing. Offer a one-click way to convert it into a normal component.
+  if (value.isBalancing) {
+    return (
+      <div className="flex items-center gap-2 flex-wrap">
+        <span style={{ fontSize: 12.5, color: "#b0948a", fontStyle: "italic" }}>Auto — fills remaining gross</span>
+        {onUnlock && (
+          <button
+            onClick={onUnlock}
+            style={{ background: "none", border: "none", color: "#378ADD", cursor: "pointer", fontSize: 12, fontWeight: 600, padding: 0 }}
+          >
+            Make it a normal allowance
+          </button>
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-3 flex-wrap">
+      <Select value={value.calculationType} onChange={(e) => onChange({ ...value, calculationType: e.target.value })} disabled={disabled} style={{ maxWidth: 160 }}>
+        {CALC_TYPES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+      </Select>
+      {value.calculationType === "flat" && (
+        <TextInput type="number" min={0} disabled={disabled} value={value.flatAmount ?? 0} onChange={(e) => onChange({ ...value, flatAmount: Number(e.target.value) })} placeholder="₹ / month" style={{ maxWidth: 130 }} />
+      )}
+      {value.calculationType === "percentOfGross" && (
+        <TextInput type="number" min={0} max={100} disabled={disabled} value={value.percentOfGross ?? 0} onChange={(e) => onChange({ ...value, percentOfGross: Number(e.target.value) })} placeholder="% of Gross" style={{ maxWidth: 130 }} />
+      )}
+      {value.calculationType === "formula" && (
+        <TextInput disabled={disabled} value={value.formula ?? ""} onChange={(e) => onChange({ ...value, formula: e.target.value })} placeholder="e.g. basic*0.1 + 500" style={{ maxWidth: 220 }} />
+      )}
+    </div>
+  );
+}
+
+function ComponentsTab({ notify }) {
+  const { data, isLoading } = useGetPayrollPolicy();
+  const { mutate: addAllowance, isPending: adding } = useAddPayrollAllowance();
+  const { mutate: updateAllowance } = useUpdatePayrollAllowance();
+  const { mutate: removeAllowance } = useRemovePayrollAllowance();
+  const { mutate: savePolicy, isPending: savingRules } = useSetPayrollPolicy();
+
+  const [form, setForm] = useState(null);
+  const [category, setCategory] = useState("earning");
+  const [showAdd, setShowAdd] = useState(false);
+  const [newComponent, setNewComponent] = useState(emptyComponentForm("earning"));
+
+  useEffect(() => {
+    if (data?.policy) {
+      const policy = JSON.parse(JSON.stringify(data.policy));
+      // Stable client-side key = the name this component was saved under,
+      // so renaming the "name" field in the input doesn't lose track of
+      // which server-side record to PUT/rename.
+      policy.allowances = (policy.allowances || []).map((a) => ({ ...a, _key: a.name }));
+      setForm(policy);
+    }
+  }, [data]);
+
+  useEffect(() => {
+    setShowAdd(false);
+    setNewComponent(emptyComponentForm(category));
+  }, [category]);
+
+  if (isLoading || !form) {
+    return <Card title="Salary Components"><div className="flex items-center gap-2" style={{ color: C.muted, fontSize: 13 }}><Spinner size={14} color={C.brand} /> Loading…</div></Card>;
+  }
+
+  const set = (path, value) => {
+    setForm((prev) => {
+      const next = { ...prev };
+      const keys = path.split(".");
+      let cur = next;
+      for (let i = 0; i < keys.length - 1; i++) {
+        cur[keys[i]] = { ...cur[keys[i]] };
+        cur = cur[keys[i]];
+      }
+      cur[keys[keys.length - 1]] = value;
+      return next;
+    });
+  };
+
+  const handleSaveRules = () => {
+    savePolicy(
+      {
+        basic: form.basic,
+        hra: form.hra,
+        pf: form.pf,
+        esi: form.esi,
+        professionalTax: form.professionalTax,
+        tds: form.tds,
+        lwf: form.lwf,
+        statutoryBonus: form.statutoryBonus,
+      },
+      {
+        onSuccess: () => notify("Salary Structure Rules updated", "success"),
+        onError: (e) => notify(getErrorMessage(e), "error"),
+      }
+    );
+  };
+
+  // Natural order (whatever order they were added in) — nothing is forced
+  // to the top.
+  const rows = (form.allowances || []).filter((a) => (a.category || "earning") === category);
+
+  const handleField = (key, patch) => {
+    setForm((prev) => ({
+      ...prev,
+      allowances: prev.allowances.map((a) => (a._key === key ? { ...a, ...patch } : a)),
+    }));
+  };
+
+  const commit = (a) => {
+    const renamed = a.name !== a._key;
+    if (renamed && !a.name.trim()) return notify("Component name can't be empty", "error");
+    updateAllowance(
+      {
+        name: a._key,
+        data: {
+          calculationType: a.calculationType || "flat",
+          percentOfBasic: a.percentOfBasic,
+          percentOfCTC: a.percentOfCTC,
+          percentOfGross: a.percentOfGross,
+          flatAmount: a.flatAmount,
+          formula: a.formula,
+          enabled: a.enabled,
+          considerForEPF: a.considerForEPF,
+          considerForESI: a.considerForESI,
+          isFBP: a.isFBP,
+          ...(renamed ? { newName: a.name } : {}),
+        },
+      },
+      {
+        onSuccess: () => {
+          notify(`"${a.name}" updated`, "success");
+          if (renamed) setForm((prev) => ({ ...prev, allowances: prev.allowances.map((x) => (x._key === a._key ? { ...x, _key: a.name } : x)) }));
+        },
+        onError: (e) => notify(getErrorMessage(e), "error"),
+      }
+    );
+  };
+
+  // Converts a legacy locked/auto-balancing component (e.g. an old "Special
+  // Allowance") into a normal one, so its calculation type/formula actually
+  // takes effect from then on.
+  const handleUnlock = (a) => {
+    updateAllowance(
+      { name: a._key, data: { isBalancing: false } },
+      {
+        onSuccess: () => {
+          notify(`"${a.name}" is now a normal, editable allowance`, "success");
+          setForm((prev) => ({ ...prev, allowances: prev.allowances.map((x) => (x._key === a._key ? { ...x, isBalancing: false } : x)) }));
+        },
+        onError: (e) => notify(getErrorMessage(e), "error"),
+      }
+    );
+  };
+
+  const handleDelete = (a) => {
+    if (a.isBalancing) return;
+    if (!window.confirm(`Remove component "${a.name}"?`)) return;
+    removeAllowance(a._key, {
+      onSuccess: () => notify("Component removed", "success"),
+      onError: (e) => notify(getErrorMessage(e), "error"),
+    });
+  };
+
+  const handleAdd = () => {
+    if (!newComponent.name.trim()) return notify("Component name is required", "error");
+    if (newComponent.calculationType === "formula" && !newComponent.formula.trim())
+      return notify("Enter a formula, e.g. basic*0.1 + 500", "error");
+    addAllowance(newComponent, {
       onSuccess: () => {
-        notify("Allowance added", "success");
-        setNewAllowance({ name: "", percentOfBasic: 0, flatAmount: 0 });
+        notify("Component added", "success");
+        setNewComponent(emptyComponentForm(category));
+        setShowAdd(false);
       },
       onError: (e) => notify(getErrorMessage(e), "error"),
     });
   };
 
-  const handleAllowanceField = (name, field, value) => {
-    setForm((prev) => ({
-      ...prev,
-      allowances: prev.allowances.map((a) => (a.name === name ? { ...a, [field]: value } : a)),
-    }));
-  };
-
-  const commitAllowance = (allowance) => {
-    updateAllowance(
-      { name: allowance.name, data: { percentOfBasic: allowance.percentOfBasic, flatAmount: allowance.flatAmount, enabled: allowance.enabled } },
-      { onSuccess: () => notify(`"${allowance.name}" updated`, "success"), onError: (e) => notify(getErrorMessage(e), "error") }
-    );
-  };
-
-  const handleDeleteAllowance = (allowance) => {
-    if (allowance.isBalancing) return;
-    if (!window.confirm(`Remove allowance "${allowance.name}"?`)) return;
-    removeAllowance(allowance.name, {
-      onSuccess: () => notify("Allowance removed", "success"),
-      onError: (e) => notify(getErrorMessage(e), "error"),
-    });
-  };
+  const showEpfEsiCols = category === "earning";
+  const showFbpCol = category === "reimbursement";
 
   return (
-    <>
-      <Card
-        title="Salary Structure Rules"
-        subtitle="Applies to all future salary structures for this organisation"
-        right={
-          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
-            <GhostButton onClick={handleReset} disabled={resetting} className="flex-1 sm:flex-none justify-center">{resetting ? "Resetting…" : "Reset to Standard"}</GhostButton>
-            <PrimaryButton onClick={handleSave} loading={saving} className="flex-1 sm:flex-none">Save Policy</PrimaryButton>
+    <Card
+      title="Salary Components"
+      right={
+        <PrimaryButton onClick={() => setShowAdd((v) => !v)} className="flex-1 sm:flex-none">
+          {showAdd ? "Cancel" : "+ Add Component"}
+        </PrimaryButton>
+      }
+    >
+      <SubTabs items={COMPONENT_CATEGORIES} active={category} onChange={setCategory} />
+
+      {category === "earning" && (
+        <div className="mb-5 pb-5" style={{ borderBottom: `1px dashed ${C.border}` }}>
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+            <p style={{ fontSize: 12.5, fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: 0.4, margin: 0 }}>Salary Structure Rules</p>
+            <PrimaryButton onClick={handleSaveRules} loading={savingRules}>Save</PrimaryButton>
           </div>
-        }
-      >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <Field label="Basic % of Gross" hint="1–100">
-            <TextInput
-              type="number" min={1} max={100} value={form.basic?.percentOfGross ?? 0}
-              onChange={(e) => set("basic.percentOfGross", Number(e.target.value))}
-            />
-          </Field>
-
-          <Field label="HRA">
-            <div className="flex items-center gap-3 flex-wrap">
-              <Toggle checked={!!form.hra?.enabled} onChange={(v) => set("hra.enabled", v)} />
-              <TextInput
-                type="number" min={0} max={100} disabled={!form.hra?.enabled}
-                value={form.hra?.percentOfBasic ?? 0}
-                onChange={(e) => set("hra.percentOfBasic", Number(e.target.value))}
-                style={{ maxWidth: 130 }}
-              />
-              <span style={{ fontSize: 12.5, color: C.muted }}>% of Basic</span>
-            </div>
-          </Field>
-
-          <Field label="Provident Fund (PF)">
-            <div className="flex items-center gap-3 flex-wrap">
-              <Toggle checked={!!form.pf?.enabled} onChange={(v) => set("pf.enabled", v)} />
-              <TextInput type="number" min={0} max={100} disabled={!form.pf?.enabled} value={form.pf?.employeePercent ?? 0} onChange={(e) => set("pf.employeePercent", Number(e.target.value))} style={{ maxWidth: 90 }} />
-              <span style={{ fontSize: 12, color: C.muted }}>Employee %</span>
-              <TextInput type="number" min={0} max={100} disabled={!form.pf?.enabled} value={form.pf?.employerPercent ?? 0} onChange={(e) => set("pf.employerPercent", Number(e.target.value))} style={{ maxWidth: 90 }} />
-              <span style={{ fontSize: 12, color: C.muted }}>Employer %</span>
-            </div>
-            <div className="flex items-center gap-2 mt-2 flex-wrap">
-              <Toggle checked={!!form.pf?.applyWageCeiling} onChange={(v) => set("pf.applyWageCeiling", v)} disabled={!form.pf?.enabled} />
-              <span style={{ fontSize: 12, color: C.muted }}>Apply wage ceiling</span>
-              <TextInput
-                type="number" min={0} disabled={!form.pf?.enabled || !form.pf?.applyWageCeiling}
-                value={form.pf?.wageCeiling ?? 0} onChange={(e) => set("pf.wageCeiling", Number(e.target.value))}
-                style={{ maxWidth: 120 }}
-              />
-            </div>
-          </Field>
-
-          <Field label="ESI">
-            <div className="flex items-center gap-3 flex-wrap">
-              <Toggle checked={!!form.esi?.enabled} onChange={(v) => set("esi.enabled", v)} />
-              <TextInput type="number" step="0.01" min={0} max={100} disabled={!form.esi?.enabled} value={form.esi?.employeePercent ?? 0} onChange={(e) => set("esi.employeePercent", Number(e.target.value))} style={{ maxWidth: 90 }} />
-              <span style={{ fontSize: 12, color: C.muted }}>Employee %</span>
-              <TextInput type="number" step="0.01" min={0} max={100} disabled={!form.esi?.enabled} value={form.esi?.employerPercent ?? 0} onChange={(e) => set("esi.employerPercent", Number(e.target.value))} style={{ maxWidth: 90 }} />
-              <span style={{ fontSize: 12, color: C.muted }}>Employer %</span>
-            </div>
-            <div className="flex items-center gap-2 mt-2 flex-wrap">
-              <span style={{ fontSize: 12, color: C.muted }}>Wage threshold</span>
-              <TextInput type="number" min={0} disabled={!form.esi?.enabled} value={form.esi?.wageThreshold ?? 0} onChange={(e) => set("esi.wageThreshold", Number(e.target.value))} style={{ maxWidth: 120 }} />
-            </div>
-          </Field>
-
-          <Field label="Professional Tax">
-            <div className="flex items-center gap-3 flex-wrap">
-              <Toggle checked={!!form.professionalTax?.enabled} onChange={(v) => set("professionalTax.enabled", v)} />
-              <TextInput type="number" min={0} disabled={!form.professionalTax?.enabled} value={form.professionalTax?.monthlyAmount ?? 0} onChange={(e) => set("professionalTax.monthlyAmount", Number(e.target.value))} style={{ maxWidth: 130 }} />
-              <span style={{ fontSize: 12.5, color: C.muted }}>₹ / month</span>
-            </div>
-          </Field>
-
-          <Field label="TDS (Income Tax)" hint="Uses each employee's annualTaxEstimate ÷ 12">
-            <div className="flex items-center gap-3 flex-wrap">
-              <Toggle checked={!!form.tds?.enabled} onChange={(v) => set("tds.enabled", v)} />
-              <span style={{ fontSize: 12.5, color: C.muted }}>{form.tds?.enabled ? "Enabled" : "Disabled"}</span>
-            </div>
-          </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Basic % of Gross" hint="1–100">
+              <TextInput type="number" min={1} max={100} value={form.basic?.percentOfGross ?? 0} onChange={(e) => set("basic.percentOfGross", Number(e.target.value))} />
+            </Field>
+            <Field label="HRA">
+              <div className="flex items-center gap-3 flex-wrap">
+                <Toggle checked={!!form.hra?.enabled} onChange={(v) => set("hra.enabled", v)} />
+                <TextInput type="number" min={0} max={100} disabled={!form.hra?.enabled} value={form.hra?.percentOfBasic ?? 0} onChange={(e) => set("hra.percentOfBasic", Number(e.target.value))} style={{ maxWidth: 130 }} />
+                <span style={{ fontSize: 12.5, color: C.muted }}>% of Basic</span>
+              </div>
+            </Field>
+          </div>
         </div>
-      </Card>
+      )}
 
-      <Card title="Allowances" subtitle='The "balancing" allowance absorbs whatever gross remains after Basic, HRA and other allowances'>
-        <div className="overflow-x-auto overscroll-x-contain -mx-1">
-          <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 560 }}>
-            <thead>
-              <tr style={{ textAlign: "left", fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>
-                <th style={{ padding: "6px 10px" }}>Name</th>
-                <th style={{ padding: "6px 10px" }}>% of Basic</th>
-                <th style={{ padding: "6px 10px" }}>Flat Amount (₹)</th>
-                <th style={{ padding: "6px 10px" }}>Enabled</th>
-                <th style={{ padding: "6px 10px" }}></th>
+      {showAdd && (
+        <div className="mb-5 pb-5" style={{ borderBottom: `1px dashed ${C.border}` }}>
+          <p style={{ fontSize: 12.5, fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 10 }}>
+            New {COMPONENT_CATEGORIES.find((c) => c.key === category)?.label.replace(/s$/, "")} Component
+          </p>
+          <div className="flex items-end gap-3 flex-wrap">
+            <Field label="Name" hint="e.g. add Conveyance first, then Fixed Conveyance">
+              <TextInput value={newComponent.name} onChange={(e) => setNewComponent((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Conveyance" style={{ maxWidth: 200 }} />
+            </Field>
+            <Field label="Calculation">
+              <ComponentValueFields value={newComponent} onChange={setNewComponent} />
+            </Field>
+            {category === "reimbursement" && (
+              <Field label="Flexible Benefit Plan">
+                <div className="flex items-center gap-2">
+                  <Toggle checked={!!newComponent.isFBP} onChange={(v) => setNewComponent((p) => ({ ...p, isFBP: v }))} />
+                  <span style={{ fontSize: 12, color: C.muted }}>Mark as FBP</span>
+                </div>
+              </Field>
+            )}
+            <PrimaryButton onClick={handleAdd} loading={adding}>Add Component</PrimaryButton>
+          </div>
+          {newComponent.calculationType === "formula" && (
+            <p style={{ fontSize: 11.5, color: C.muted, marginTop: 8 }}>
+              Available variables: <code>basic</code>, <code>gross</code> (monthly gross), <code>ctc</code> (annual), <code>hra</code>. Example: <code>basic*0.1 + 500</code>
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="overflow-x-auto overscroll-x-contain -mx-1">
+        <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 640 }}>
+          <thead>
+            <tr style={{ textAlign: "left", fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>
+              <th style={{ padding: "6px 10px" }}>Name</th>
+              <th style={{ padding: "6px 10px" }}>Calculation</th>
+              {showEpfEsiCols && <th style={{ padding: "6px 10px" }}>Consider for EPF</th>}
+              {showEpfEsiCols && <th style={{ padding: "6px 10px" }}>Consider for ESI</th>}
+              {showFbpCol && <th style={{ padding: "6px 10px" }}>FBP</th>}
+              <th style={{ padding: "6px 10px" }}>Status</th>
+              <th style={{ padding: "6px 10px" }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && !showAdd && (
+              <tr>
+                <td colSpan={showEpfEsiCols || showFbpCol ? 6 : 4} style={{ padding: "14px 10px", fontSize: 13, color: C.muted }}>
+                  No {COMPONENT_CATEGORIES.find((c) => c.key === category)?.label.toLowerCase()} configured yet.
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {(form.allowances || []).map((a) => (
-                <tr key={a.name} style={{ borderTop: `1px solid ${C.border}` }}>
-                  <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>
-                    <span className="break-words">{a.name}</span> {a.isBalancing && <Badge color={C.blue} bg={C.blueBg}>Balancing</Badge>}
+            )}
+            {rows.map((a) => (
+              <tr key={a._key} style={{ borderTop: `1px solid ${C.border}` }}>
+                <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <TextInput
+                      value={a.name}
+                      onChange={(e) => handleField(a._key, { name: e.target.value })}
+                      style={{ maxWidth: 160, fontWeight: 600 }}
+                    />
+                    {a.isBalancing && <Badge color={C.blue} bg={C.blueBg}>Locked</Badge>}
+                  </div>
+                </td>
+                <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
+                  <ComponentValueFields value={a} onChange={(patch) => handleField(a._key, patch)} disabled={false} onUnlock={a.isBalancing ? () => handleUnlock(a) : undefined} />
+                </td>
+                {showEpfEsiCols && (
+                  <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
+                    <Toggle checked={a.considerForEPF !== false} onChange={(v) => handleField(a._key, { considerForEPF: v })} />
                   </td>
-                  <td style={{ padding: "8px 10px" }}>
-                    <TextInput type="number" min={0} max={100} value={a.percentOfBasic ?? 0} onChange={(e) => handleAllowanceField(a.name, "percentOfBasic", Number(e.target.value))} style={{ maxWidth: 100 }} />
+                )}
+                {showEpfEsiCols && (
+                  <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
+                    <Toggle checked={a.considerForESI !== false} onChange={(v) => handleField(a._key, { considerForESI: v })} />
                   </td>
-                  <td style={{ padding: "8px 10px" }}>
-                    <TextInput type="number" min={0} value={a.flatAmount ?? 0} onChange={(e) => handleAllowanceField(a.name, "flatAmount", Number(e.target.value))} style={{ maxWidth: 120 }} />
+                )}
+                {showFbpCol && (
+                  <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
+                    <Toggle checked={!!a.isFBP} onChange={(v) => handleField(a._key, { isFBP: v })} />
                   </td>
-                  <td style={{ padding: "8px 10px" }}>
-                    <Toggle checked={!!a.enabled} onChange={(v) => handleAllowanceField(a.name, "enabled", v)} disabled={a.isBalancing} />
-                  </td>
-                  <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
-                    <GhostButton onClick={() => commitAllowance(a)} style={{ marginRight: 8 }}>Save</GhostButton>
-                    {!a.isBalancing && (
-                      <button onClick={() => handleDeleteAllowance(a)} style={{ background: "none", border: "none", color: C.red, cursor: "pointer", fontSize: 12.5, fontWeight: 600 }}>
-                        Remove
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                )}
+                <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
+                  <Toggle checked={!!a.enabled} onChange={(v) => handleField(a._key, { enabled: v })} disabled={a.isBalancing} />
+                </td>
+                <td style={{ padding: "8px 10px", whiteSpace: "nowrap", verticalAlign: "top" }}>
+                  <GhostButton onClick={() => commit(a)} style={{ marginRight: 8 }}>Save</GhostButton>
+                  {!a.isBalancing && (
+                    <button onClick={() => handleDelete(a)} style={{ background: "none", border: "none", color: C.red, cursor: "pointer", fontSize: 12.5, fontWeight: 600 }}>
+                      Remove
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {category === "earning" && (
+        <p style={{ fontSize: 11.5, color: C.muted, marginTop: 12 }}>
+          Every earning here — including "Fixed Allowance" — can be flat, % of Gross/Basic/CTC, or a custom formula (e.g.{" "}
+          <code>basic*0.1 + 500</code>), and it's actually used when payroll runs. Any part of the gross nothing accounts for
+          shows up automatically as "Other Allowance". A <Badge color={C.blue} bg={C.blueBg}>Locked</Badge> row is a legacy
+          auto-balancing component — click "Make it a normal allowance" to free it up.
+        </p>
+      )}
+    </Card>
+  );
+}
 
-        <div className="flex items-end gap-3 flex-wrap mt-4 pt-4" style={{ borderTop: `1px dashed ${C.border}` }}>
-          <Field label="New allowance name">
-            <TextInput value={newAllowance.name} onChange={(e) => setNewAllowance((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Meal Allowance" style={{ maxWidth: 180 }} />
-          </Field>
-          <Field label="% of Basic">
-            <TextInput type="number" min={0} max={100} value={newAllowance.percentOfBasic} onChange={(e) => setNewAllowance((p) => ({ ...p, percentOfBasic: Number(e.target.value) }))} style={{ maxWidth: 100 }} />
-          </Field>
-          <Field label="Flat Amount (₹)">
-            <TextInput type="number" min={0} value={newAllowance.flatAmount} onChange={(e) => setNewAllowance((p) => ({ ...p, flatAmount: Number(e.target.value) }))} style={{ maxWidth: 120 }} />
-          </Field>
-          <PrimaryButton onClick={handleAddAllowance} loading={adding}>Add Allowance</PrimaryButton>
+// ---------- Claims & Declarations ----------
+
+const CLAIMS_SUBTABS = [
+  { key: "fbp", label: "Flexible Benefit Plan" },
+  { key: "reimbursement", label: "Reimbursement Claims" },
+  { key: "itd", label: "Income Tax Declaration" },
+  { key: "poi", label: "Proof Of Investments" },
+];
+
+function ClaimsTab({ notify }) {
+  const { data, isLoading } = useGetPayrollPolicy();
+  const [sub, setSub] = useState("fbp");
+
+  const fbpComponents = (data?.policy?.allowances || []).filter((a) => a.category === "reimbursement" && a.isFBP);
+
+  return (
+    <Card title="Claims and Declarations">
+      <SubTabs items={CLAIMS_SUBTABS} active={sub} onChange={setSub} />
+
+      {sub === "fbp" && (
+        <>
+          {isLoading ? (
+            <div className="flex items-center gap-2" style={{ color: C.muted, fontSize: 13 }}><Spinner size={14} color={C.brand} /> Loading…</div>
+          ) : fbpComponents.length === 0 ? (
+            <div className="flex flex-col items-center text-center py-10 px-4">
+              <p style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 8 }}>No Active FBP component</p>
+              <p style={{ fontSize: 13, color: C.muted, maxWidth: 480 }}>
+                Your organisation does not have an active FBP component associated to an employee. Mark a reimbursement as FBP component under Settings &gt; Salary Components &gt; Reimbursements.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto overscroll-x-contain -mx-1">
+              <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 420 }}>
+                <thead>
+                  <tr style={{ textAlign: "left", fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                    <th style={{ padding: "6px 10px" }}>Name</th>
+                    <th style={{ padding: "6px 10px" }}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fbpComponents.map((c) => (
+                    <tr key={c.name} style={{ borderTop: `1px solid ${C.border}` }}>
+                      <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>{c.name}</td>
+                      <td style={{ padding: "8px 10px" }}>{c.enabled !== false ? <Badge color={C.green} bg={C.greenBg}>Active</Badge> : <Badge color={C.muted} bg="#f2ece9">Inactive</Badge>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+
+      {sub !== "fbp" && (
+        <div className="flex flex-col items-center text-center py-10 px-4">
+          <p style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 8 }}>
+            {CLAIMS_SUBTABS.find((s) => s.key === sub)?.label}
+          </p>
+          <p style={{ fontSize: 13, color: C.muted, maxWidth: 480 }}>
+            This section isn't set up yet for this organisation.
+          </p>
         </div>
-      </Card>
-    </>
+      )}
+    </Card>
   );
 }
 
@@ -527,7 +1082,7 @@ function StructuresTab({ notify, directory }) {
   const { mutate: setCTC, isPending: saving } = useSetEmployeeCTC();
   const { mutate: reapply } = useReapplyPolicy();
 
-  const [form, setForm] = useState({ employeeModel: "User", employee: "", ctc: "", annualTaxEstimate: "", effectiveFrom: "" });
+  const [form, setForm] = useState({ employeeModel: "User", employee: "", ctc: "", effectiveFrom: "" });
 
   const people = directory.byModel[form.employeeModel] || [];
 
@@ -539,13 +1094,12 @@ function StructuresTab({ notify, directory }) {
         employee: form.employee,
         employeeModel: form.employeeModel,
         ctc: Number(form.ctc),
-        annualTaxEstimate: form.annualTaxEstimate ? Number(form.annualTaxEstimate) : undefined,
         effectiveFrom: form.effectiveFrom || undefined,
       },
       {
         onSuccess: (res) => {
           notify(res?.message || "Salary structure saved", "success");
-          setForm({ employeeModel: form.employeeModel, employee: "", ctc: "", annualTaxEstimate: "", effectiveFrom: "" });
+          setForm({ employeeModel: form.employeeModel, employee: "", ctc: "", effectiveFrom: "" });
         },
         onError: (err) => notify(getErrorMessage(err), "error"),
       }
@@ -576,11 +1130,8 @@ function StructuresTab({ notify, directory }) {
               {people.map((p) => <option key={p._id} value={p._id}>{p.name} ({p.uid})</option>)}
             </Select>
           </Field>
-          <Field label="Annual CTC (₹)">
+          <Field label="Fixed Annual CTC (₹)">
             <TextInput type="number" min={1} value={form.ctc} onChange={(e) => setForm((p) => ({ ...p, ctc: e.target.value }))} placeholder="e.g. 600000" />
-          </Field>
-          <Field label="Annual Tax Estimate (₹)" hint="Optional — used only if TDS is enabled">
-            <TextInput type="number" min={0} value={form.annualTaxEstimate} onChange={(e) => setForm((p) => ({ ...p, annualTaxEstimate: e.target.value }))} />
           </Field>
           <Field label="Effective From" hint="Defaults to today">
             <TextInput type="date" value={form.effectiveFrom} onChange={(e) => setForm((p) => ({ ...p, effectiveFrom: e.target.value }))} />
@@ -646,10 +1197,15 @@ function GenerateTab({ notify, directory }) {
   const now = new Date();
   const { mutate: generate, isPending: generating } = useGeneratePayroll();
   const { mutate: bulkGenerate, isPending: bulkGenerating } = useBulkGeneratePayroll();
+  const { data: scheduleData } = useGetPaySchedule();
+  const scheduleWorkingDays = scheduleData?.paySchedule?.noOfWorkingDays || 30;
 
   const [single, setSingle] = useState({
     employeeModel: "User", employee: "", month: now.getMonth() + 1, year: now.getFullYear(),
-    bonus: "", incentive: "", overtime: "", otherEarnings: "", loan: "", advance: "", otherDeductions: "", remarks: "", force: false,
+    calendarDays: String(daysInMonthClient(now.getMonth() + 1, now.getFullYear())),
+    workingDays: String(scheduleWorkingDays),
+    paidDays: "",
+    bonus: "", incentive: "", overtime: "", reimbursement: "", otherEarnings: "", loan: "", advance: "", otherDeductions: "", remarks: "", force: false,
   });
   const [bulk, setBulk] = useState({ employeeModel: "User", month: now.getMonth() + 1, year: now.getFullYear(), force: false });
   const [singleResult, setSingleResult] = useState(null);
@@ -659,9 +1215,27 @@ function GenerateTab({ notify, directory }) {
 
   const numOrUndef = (v) => (v === "" || v === null || v === undefined ? undefined : Number(v));
 
+  // Keep Calendar/Working Days sensible defaults when month/year change,
+  // unless the admin already typed something different in by hand.
+  const handleMonthYear = (field, value) => {
+    setSingle((p) => {
+      const next = { ...p, [field]: value };
+      const cd = daysInMonthClient(next.month, next.year);
+      return { ...next, calendarDays: String(cd), workingDays: p.workingDays || String(scheduleWorkingDays) };
+    });
+  };
+
+  const lopDaysPreview = (() => {
+    const wd = Number(single.workingDays);
+    const pd = Number(single.paidDays);
+    if (!wd || single.paidDays === "" || Number.isNaN(pd)) return null;
+    return Math.max(0, Math.round((wd - pd) * 100) / 100);
+  })();
+
   const handleSingle = (e) => {
     e.preventDefault();
     if (!single.employee) return notify("Select an employee", "error");
+    if (single.paidDays === "" || single.paidDays === null) return notify("Enter Paid Days for this month", "error");
     setSingleResult(null);
     generate(
       {
@@ -669,9 +1243,13 @@ function GenerateTab({ notify, directory }) {
         employeeModel: single.employeeModel,
         month: Number(single.month),
         year: Number(single.year),
+        paidDays: Number(single.paidDays),
+        workingDays: numOrUndef(single.workingDays),
+        calendarDays: numOrUndef(single.calendarDays),
         bonus: numOrUndef(single.bonus),
         incentive: numOrUndef(single.incentive),
         overtime: numOrUndef(single.overtime),
+        reimbursement: numOrUndef(single.reimbursement),
         otherEarnings: numOrUndef(single.otherEarnings),
         loan: numOrUndef(single.loan),
         advance: numOrUndef(single.advance),
@@ -706,58 +1284,83 @@ function GenerateTab({ notify, directory }) {
 
   return (
     <>
-      <Card title="Generate Payroll — Single Employee" subtitle="Requires a salary structure (set CTC first) and pulls the employee's attendance summary for the month">
-        <form onSubmit={handleSingle} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
-          <Field label="Employee Type">
-            <Select value={single.employeeModel} onChange={(e) => setSingle((p) => ({ ...p, employeeModel: e.target.value, employee: "" }))}>
-              {MODELS.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
-            </Select>
-          </Field>
-          <Field label="Employee">
-            <Select value={single.employee} onChange={(e) => setSingle((p) => ({ ...p, employee: e.target.value }))}>
-              <option value="">Select employee</option>
-              {people.map((p) => <option key={p._id} value={p._id}>{p.name} ({p.uid})</option>)}
-            </Select>
-          </Field>
-          <Field label="Month">
-            <Select value={single.month} onChange={(e) => setSingle((p) => ({ ...p, month: e.target.value }))}>
-              {MONTH_NAMES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-            </Select>
-          </Field>
-          <Field label="Year">
-            <TextInput type="number" value={single.year} onChange={(e) => setSingle((p) => ({ ...p, year: e.target.value }))} />
-          </Field>
-          <Field label="Bonus (₹)"><TextInput type="number" min={0} value={single.bonus} onChange={(e) => setSingle((p) => ({ ...p, bonus: e.target.value }))} /></Field>
-          <Field label="Incentive (₹)"><TextInput type="number" min={0} value={single.incentive} onChange={(e) => setSingle((p) => ({ ...p, incentive: e.target.value }))} /></Field>
-          <Field label="Overtime (₹)"><TextInput type="number" min={0} value={single.overtime} onChange={(e) => setSingle((p) => ({ ...p, overtime: e.target.value }))} /></Field>
-          <Field label="Other Earnings (₹)"><TextInput type="number" min={0} value={single.otherEarnings} onChange={(e) => setSingle((p) => ({ ...p, otherEarnings: e.target.value }))} /></Field>
-          <Field label="Loan Deduction (₹)"><TextInput type="number" min={0} value={single.loan} onChange={(e) => setSingle((p) => ({ ...p, loan: e.target.value }))} /></Field>
-          <Field label="Advance Deduction (₹)"><TextInput type="number" min={0} value={single.advance} onChange={(e) => setSingle((p) => ({ ...p, advance: e.target.value }))} /></Field>
-          <Field label="Other Deductions (₹)"><TextInput type="number" min={0} value={single.otherDeductions} onChange={(e) => setSingle((p) => ({ ...p, otherDeductions: e.target.value }))} /></Field>
-          <Field label="Remarks"><TextInput value={single.remarks} onChange={(e) => setSingle((p) => ({ ...p, remarks: e.target.value }))} /></Field>
+      <Card title="Generate Payroll — Single Employee" subtitle="Requires a salary structure (set CTC first). Enter Paid Days by hand each month — no auto attendance pull, no email sent.">
+        <form onSubmit={handleSingle}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end mb-5">
+            <Field label="Employee Type">
+              <Select value={single.employeeModel} onChange={(e) => setSingle((p) => ({ ...p, employeeModel: e.target.value, employee: "" }))}>
+                {MODELS.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
+              </Select>
+            </Field>
+            <Field label="Employee">
+              <Select value={single.employee} onChange={(e) => setSingle((p) => ({ ...p, employee: e.target.value }))}>
+                <option value="">Select employee</option>
+                {people.map((p) => <option key={p._id} value={p._id}>{p.name} ({p.uid})</option>)}
+              </Select>
+            </Field>
+            <Field label="Month">
+              <Select value={single.month} onChange={(e) => handleMonthYear("month", e.target.value)}>
+                {MONTH_NAMES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+              </Select>
+            </Field>
+            <Field label="Year">
+              <TextInput type="number" value={single.year} onChange={(e) => handleMonthYear("year", e.target.value)} />
+            </Field>
+          </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <p style={{ fontSize: 12.5, fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 10 }}>Attendance</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 items-end mb-5 pb-5" style={{ borderBottom: `1px dashed ${C.border}` }}>
+            <Field label="Calendar Days" hint="Days in the month">
+              <TextInput type="number" min={1} max={31} value={single.calendarDays} onChange={(e) => setSingle((p) => ({ ...p, calendarDays: e.target.value }))} />
+            </Field>
+            <Field label="Working Days" hint="From Pay Schedule">
+              <TextInput type="number" min={1} max={31} value={single.workingDays} onChange={(e) => setSingle((p) => ({ ...p, workingDays: e.target.value }))} />
+            </Field>
+            <Field label="Paid Days" hint=" present — manual entry">
+              <TextInput type="number" min={0} step="0.5" value={single.paidDays} onChange={(e) => setSingle((p) => ({ ...p, paidDays: e.target.value }))} placeholder="e.g. 27" required />
+            </Field>
+            <Field label="LOP Days" hint="Auto-calculated">
+              <div style={{ ...inputStyle, background: "#f7f3f1", color: C.muted, display: "flex", alignItems: "center" }}>
+                {lopDaysPreview === null ? "—" : lopDaysPreview}
+              </div>
+            </Field>
+          </div>
+
+          <p style={{ fontSize: 12.5, fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 10 }}>Earnings &amp; Deductions (this month only)</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
+            <Field label="Bonus (₹)"><TextInput type="number" min={0} value={single.bonus} onChange={(e) => setSingle((p) => ({ ...p, bonus: e.target.value }))} /></Field>
+            <Field label="Incentive (₹)"><TextInput type="number" min={0} value={single.incentive} onChange={(e) => setSingle((p) => ({ ...p, incentive: e.target.value }))} /></Field>
+            <Field label="Overtime (₹)"><TextInput type="number" min={0} value={single.overtime} onChange={(e) => setSingle((p) => ({ ...p, overtime: e.target.value }))} /></Field>
+            <Field label="Reimbursement (₹)"><TextInput type="number" min={0} value={single.reimbursement} onChange={(e) => setSingle((p) => ({ ...p, reimbursement: e.target.value }))} /></Field>
+            <Field label="Other Earnings (₹)"><TextInput type="number" min={0} value={single.otherEarnings} onChange={(e) => setSingle((p) => ({ ...p, otherEarnings: e.target.value }))} /></Field>
+            <Field label="Loan EMI (₹)"><TextInput type="number" min={0} value={single.loan} onChange={(e) => setSingle((p) => ({ ...p, loan: e.target.value }))} /></Field>
+            <Field label="Advance Deduction (₹)"><TextInput type="number" min={0} value={single.advance} onChange={(e) => setSingle((p) => ({ ...p, advance: e.target.value }))} /></Field>
+            <Field label="Other Deduction (₹)"><TextInput type="number" min={0} value={single.otherDeductions} onChange={(e) => setSingle((p) => ({ ...p, otherDeductions: e.target.value }))} /></Field>
+            <Field label="Remarks"><TextInput value={single.remarks} onChange={(e) => setSingle((p) => ({ ...p, remarks: e.target.value }))} /></Field>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap mt-4">
             <input id="single-force" type="checkbox" checked={single.force} onChange={(e) => setSingle((p) => ({ ...p, force: e.target.checked }))} />
             <label htmlFor="single-force" style={{ fontSize: 12.5, color: C.muted }}>Force overwrite if approved/paid</label>
           </div>
 
-          <PrimaryButton type="submit" loading={generating}>Generate Payroll</PrimaryButton>
+          <PrimaryButton type="submit" loading={generating} className="mt-4">Generate Payroll</PrimaryButton>
         </form>
 
         {singleResult && (
           <div className="mt-4 pt-4" style={{ borderTop: `1px dashed ${C.border}` }}>
             <div className="flex flex-wrap gap-x-8 gap-y-2">
-              <span style={{ fontSize: 13 }}><strong>Gross:</strong> {fmtINR(singleResult.earnings?.gross)}</span>
+              <span style={{ fontSize: 13 }}><strong>Gross Earnings:</strong> {fmtINR(singleResult.earnings?.gross)}</span>
               <span style={{ fontSize: 13 }}><strong>Total Earnings:</strong> {fmtINR(singleResult.earnings?.totalEarnings)}</span>
               <span style={{ fontSize: 13 }}><strong>Total Deductions:</strong> {fmtINR(singleResult.deductions?.totalDeductions)}</span>
-              <span style={{ fontSize: 13.5, fontWeight: 700, color: C.brandDark }}><strong>Net Salary:</strong> {fmtINR(singleResult.netSalary)}</span>
+              <span style={{ fontSize: 13.5, fontWeight: 700, color: C.brandDark }}><strong>Net Pay:</strong> {fmtINR(singleResult.netSalary)}</span>
               {statusBadge(singleResult.status)}
             </div>
           </div>
         )}
       </Card>
 
-      <Card title="Bulk Generate — Whole Organisation" subtitle="Generates payroll for every active employee (of the chosen type) who already has a salary structure">
+      <Card title="Bulk Generate — Whole Organisation" subtitle="Generates payroll for every active employee (of the chosen type) who already has a salary structure, using their attendance summary for the month">
         <form onSubmit={handleBulk} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
           <Field label="Employee Type">
             <Select value={bulk.employeeModel} onChange={(e) => setBulk((p) => ({ ...p, employeeModel: e.target.value }))}>
@@ -799,8 +1402,181 @@ function GenerateTab({ notify, directory }) {
 }
 
 
+function PayslipRow({ label, value, bold }) {
+  return (
+    <>
+      <span style={{ fontSize: bold ? 13 : 12.5, color: bold ? C.text : C.muted, fontWeight: bold ? 700 : 400 }} className="break-words">{label}</span>
+      <span style={{ fontSize: bold ? 13 : 13, fontWeight: bold ? 700 : 400, textAlign: "right" }}>{value}</span>
+    </>
+  );
+}
+
+function PayslipSection({ title, children }) {
+  return (
+    <div className="mb-4 pt-3" style={{ borderTop: `1px dashed ${C.border}` }}>
+      <p style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>{title}</p>
+      <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1.5">{children}</div>
+    </div>
+  );
+}
+
+// Turns a camelCase field name into a readable label when we don't have a
+// nicer override for it, e.g. "otherEarnings" -> "Other Earnings". This is
+// what lets a brand-new field the backend starts sending show up on the
+// payslip with a sane label, with zero frontend changes needed.
+function humanizeKey(key) {
+  const spaced = String(key).replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+// Nicer labels for known fields; anything not listed here falls back to
+// humanizeKey() automatically, so unknown/future fields still get a
+// reasonable label instead of being skipped.
+const EARNINGS_LABELS = { other: "Other Earnings" };
+const DEDUCTIONS_LABELS = {
+  pf: "Employee PF",
+  esi: "ESI",
+  professionalTax: "Professional Tax",
+  tds: "TDS",
+  lwf: "LWF",
+  loan: "Loan EMI",
+  advance: "Advance",
+  other: "Other Deduction",
+};
+const EMPLOYER_LABELS = { pf: "Employer PF", esi: "Employer ESI", lwf: "Employer LWF", statutoryBonus: "Statutory Bonus" };
+
+// Aggregate/derived fields that shouldn't appear as their own line item
+// (they're either shown as the section's Total row, or they're the sum of
+// components we already itemize elsewhere, e.g. `benefits` = total of
+// breakup.benefitComponents).
+const EARNINGS_EXCLUDE = ["gross", "benefits", "reimbursementComponents", "totalEarnings"];
+const DEDUCTIONS_EXCLUDE = ["lossOfPay", "components", "totalDeductions"];
+
+// Reads every numeric, non-zero field off a payroll sub-object (earnings /
+// deductions / employerContribution) and turns it into a {label, amount}
+// row — no fixed list of field names, so anything the backend starts
+// filling in (a new manual-entry field, a new statutory line, etc.) shows
+// up on the payslip automatically instead of needing a matching JSX row
+// added by hand every time.
+function dynamicRows(obj, excludeKeys, labelOverrides) {
+  return Object.entries(obj || {})
+    .filter(([key, value]) => !excludeKeys.includes(key) && typeof value === "number" && value !== 0)
+    .map(([key, value]) => ({ label: labelOverrides[key] || humanizeKey(key), amount: value }));
+}
+
+// Builds the full set of Earnings / Deductions / Employer Contribution line
+// items for one payroll record. Used by both the on-screen PayslipModal and
+// the downloadable/print HTML, so the two never drift out of sync.
+function getPayslipLineItems(payroll) {
+  const breakup = payroll.breakup || {};
+
+  const earnings = [
+    { label: "Basic", amount: breakup.basic || 0 },
+    { label: "HRA", amount: breakup.hra || 0 },
+    ...(breakup.allowances || []).map((a) => ({ label: a.name, amount: a.amount })),
+    ...dynamicRows(payroll.earnings, EARNINGS_EXCLUDE, EARNINGS_LABELS),
+    ...(breakup.benefitComponents || []).map((c) => ({ label: c.name, amount: c.amount })),
+    ...(breakup.reimbursementComponents || []).map((c) => ({ label: c.name, amount: c.amount })),
+  ];
+
+  const deductions = [
+    ...dynamicRows(payroll.deductions, DEDUCTIONS_EXCLUDE, DEDUCTIONS_LABELS),
+    ...(breakup.deductionComponents || []).map((c) => ({ label: c.name, amount: c.amount })),
+  ];
+
+  const employerContribution = dynamicRows(payroll.employerContribution, [], EMPLOYER_LABELS);
+
+  return { earnings, deductions, employerContribution };
+}
+
+// Opens a print-formatted payslip in a new tab and triggers the browser's
+// print dialog, where "Save as PDF" gives a real downloadable file — no
+// extra PDF library/dependency needed.
+function downloadPayslip({ payroll, name, employeeId, department, designation }) {
+  const att = payroll.attendance || {};
+  const { earnings, deductions, employerContribution } = getPayslipLineItems(payroll);
+  const rowsHtml = (items) => items.map((r) => `<tr><td>${r.label}</td><td class="amt">${fmtINR(r.amount)}</td></tr>`).join("");
+  const period = `${MONTH_NAMES[payroll.month - 1]} ${payroll.year}`;
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Payslip - ${name} - ${period}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #2a1a16; padding: 32px; max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { color: #8a7a74; font-size: 12px; margin-bottom: 20px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+  th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px; color: #8a7a74; padding: 4px 0; border-bottom: 1px solid #ede5e0; }
+  td { font-size: 13px; padding: 5px 0; border-bottom: 1px solid #f3ede9; }
+  td.amt, th.amt { text-align: right; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; margin-bottom: 20px; font-size: 13px; }
+  .grid .lbl { color: #8a7a74; }
+  .total-row td { font-weight: 700; border-top: 2px solid #2a1a16; border-bottom: none; }
+  .net { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-top: 2px solid #2a1a16; border-bottom: 2px solid #2a1a16; margin: 18px 0; }
+  .net .lbl { font-size: 14px; font-weight: 700; }
+  .net .val { font-size: 18px; font-weight: 800; }
+  @media print { body { padding: 0; } }
+</style>
+</head>
+<body>
+  <h1>Payslip</h1>
+  <div class="sub">Pay Period: ${period}${payroll.status ? " · " + payroll.status.toUpperCase().replace("_", " ") : ""}</div>
+
+  <div class="grid">
+    <div><span class="lbl">Employee: </span>${name}</div>
+    <div><span class="lbl">Employee ID: </span>${employeeId}</div>
+    <div><span class="lbl">Department: </span>${department}</div>
+    <div><span class="lbl">Designation: </span>${designation}</div>
+    <div><span class="lbl">Paid Days: </span>${att.paidDays ?? "—"} / ${att.workingDays ?? "—"}</div>
+    <div><span class="lbl">LOP Days: </span>${att.lopDays ?? "—"}</div>
+  </div>
+
+  <table>
+    <thead><tr><th>Earnings</th><th class="amt">Amount</th></tr></thead>
+    <tbody>
+      ${rowsHtml(earnings)}
+      <tr class="total-row"><td>GROSS EARNINGS</td><td class="amt">${fmtINR(payroll.earnings?.totalEarnings)}</td></tr>
+    </tbody>
+  </table>
+
+  <table>
+    <thead><tr><th>Deductions</th><th class="amt">Amount</th></tr></thead>
+    <tbody>
+      ${rowsHtml(deductions)}
+      <tr class="total-row"><td>TOTAL DEDUCTIONS</td><td class="amt">${fmtINR(payroll.deductions?.totalDeductions)}</td></tr>
+    </tbody>
+  </table>
+
+  <div class="net">
+    <span class="lbl">NET PAY</span>
+    <span class="val">${fmtINR(payroll.netSalary)}</span>
+  </div>
+
+  <script>window.onload = function() { window.print(); };</script>
+</body>
+</html>`;
+
+  const win = window.open("", "_blank");
+  if (!win) return;
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+}
+
 function PayslipModal({ payroll, directory, onClose }) {
   if (!payroll) return null;
+  const snap = payroll.employeeSnapshot || {};
+  const person = directory.byId.get(String(payroll.employee));
+  const name = snap.name || person?.name || resolveName(directory, payroll.employee, payroll.employeeModel);
+  const employeeId = snap.employeeId || person?.uid || "—";
+  const department = snap.department || "—";
+  const designation = snap.designation || "—";
+  const att = payroll.attendance || {};
+  const { earnings, deductions, employerContribution } = getPayslipLineItems(payroll);
+
   return (
     <div className="fixed inset-0 z-[998] flex items-center justify-center p-3 sm:p-4 overscroll-contain" style={{ background: "rgba(0,0,0,0.45)" }} onClick={onClose}>
       <div
@@ -810,47 +1586,69 @@ function PayslipModal({ payroll, directory, onClose }) {
       >
         <div className="flex items-center justify-between mb-3 gap-3">
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: C.text }}>Payslip</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: C.muted, flexShrink: 0 }}>×</button>
+          <div className="flex items-center gap-2">
+            {payroll.status === "paid" && (
+              <GhostButton onClick={() => downloadPayslip({ payroll, name, employeeId, department, designation })}>
+                Download
+              </GhostButton>
+            )}
+            <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: C.muted, flexShrink: 0 }}>×</button>
+          </div>
         </div>
-        <p style={{ fontSize: 13, color: C.muted, marginBottom: 2 }} className="break-words">{resolveName(directory, payroll.employee, payroll.employeeModel)}</p>
-        <p style={{ fontSize: 13, color: C.muted, marginBottom: 12 }} className="flex items-center gap-2 flex-wrap">{MONTH_NAMES[payroll.month - 1]} {payroll.year} {statusBadge(payroll.status)}</p>
 
-        <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1.5 mb-3">
-          <span style={{ fontSize: 12.5, color: C.muted }}>Basic</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.breakup?.basic)}</span>
-          <span style={{ fontSize: 12.5, color: C.muted }}>HRA</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.breakup?.hra)}</span>
-          {(payroll.breakup?.allowances || []).map((a) => (
-            <Fragment key={a.name}>
-              <span style={{ fontSize: 12.5, color: C.muted }} className="break-words">{a.name}</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(a.amount)}</span>
-            </Fragment>
+        {/* Employee details */}
+        <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1.5 mb-3 pb-3" style={{ borderBottom: `1px dashed ${C.border}` }}>
+          <PayslipRow label="Employee" value={<span className="break-words">{name}</span>} />
+          <PayslipRow label="Employee ID" value={employeeId} />
+          <PayslipRow label="Department" value={department} />
+          <PayslipRow label="Designation" value={designation} />
+          <PayslipRow label="Pay Period" value={<span className="flex items-center gap-2 justify-end flex-wrap">{MONTH_NAMES[payroll.month - 1]} {payroll.year} {statusBadge(payroll.status)}</span>} />
+        </div>
+
+        {/* Attendance */}
+        <PayslipSection title="Attendance">
+          <PayslipRow label="Calendar Days" value={att.calendarDays ?? att.daysInMonth ?? "—"} />
+          <PayslipRow label="Working Days" value={att.workingDays ?? "—"} />
+          <PayslipRow label="Paid Days" value={att.paidDays ?? "—"} />
+          <PayslipRow label="LOP Days" value={att.lopDays ?? "—"} />
+        </PayslipSection>
+
+        {/* Earnings */}
+        <PayslipSection title="Earnings">
+          {earnings.map((r, i) => (
+            <Fragment key={`e-${i}-${r.label}`}><PayslipRow label={r.label} value={fmtINR(r.amount)} /></Fragment>
           ))}
-          <span style={{ fontSize: 12.5, color: C.muted }}>Bonus</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.earnings?.bonus)}</span>
-          <span style={{ fontSize: 12.5, color: C.muted }}>Incentive</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.earnings?.incentive)}</span>
-          <span style={{ fontSize: 12.5, color: C.muted }}>Overtime</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.earnings?.overtime)}</span>
-          <span style={{ fontSize: 12.5, color: C.muted }}>Other</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.earnings?.other)}</span>
-          <span style={{ fontSize: 13, fontWeight: 700 }}>Total Earnings</span><span style={{ fontSize: 13, fontWeight: 700, textAlign: "right" }}>{fmtINR(payroll.earnings?.totalEarnings)}</span>
-        </div>
+          <div className="col-span-2 pt-1.5 mt-1" style={{ borderTop: `1px solid ${C.border}` }} />
+          <PayslipRow label="GROSS EARNINGS" value={fmtINR(payroll.earnings?.totalEarnings)} bold />
+        </PayslipSection>
 
-        <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1.5 mb-3 pt-3" style={{ borderTop: `1px dashed ${C.border}` }}>
-          <span style={{ fontSize: 12.5, color: C.muted }}>PF</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.deductions?.pf)}</span>
-          <span style={{ fontSize: 12.5, color: C.muted }}>ESI</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.deductions?.esi)}</span>
-          <span style={{ fontSize: 12.5, color: C.muted }}>Professional Tax</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.deductions?.professionalTax)}</span>
-          <span style={{ fontSize: 12.5, color: C.muted }}>TDS</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.deductions?.tds)}</span>
-          <span style={{ fontSize: 12.5, color: C.muted }}>Loss of Pay</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.deductions?.lossOfPay)}</span>
-          <span style={{ fontSize: 12.5, color: C.muted }}>Loan</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.deductions?.loan)}</span>
-          <span style={{ fontSize: 12.5, color: C.muted }}>Advance</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.deductions?.advance)}</span>
-          <span style={{ fontSize: 12.5, color: C.muted }}>Other</span><span style={{ fontSize: 13, textAlign: "right" }}>{fmtINR(payroll.deductions?.other)}</span>
-          <span style={{ fontSize: 13, fontWeight: 700 }}>Total Deductions</span><span style={{ fontSize: 13, fontWeight: 700, textAlign: "right" }}>{fmtINR(payroll.deductions?.totalDeductions)}</span>
-        </div>
+        {/* Deductions */}
+        <PayslipSection title="Deductions">
+          {deductions.map((r, i) => (
+            <Fragment key={`d-${i}-${r.label}`}><PayslipRow label={r.label} value={fmtINR(r.amount)} /></Fragment>
+          ))}
+          <div className="col-span-2 pt-1.5 mt-1" style={{ borderTop: `1px solid ${C.border}` }} />
+          <PayslipRow label="TOTAL DEDUCTIONS" value={fmtINR(payroll.deductions?.totalDeductions)} bold />
+        </PayslipSection>
 
-        <div className="flex items-center justify-between pt-3 gap-3" style={{ borderTop: `2px solid ${C.border}` }}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Net Salary</span>
+        {/* Net pay */}
+        <div className="flex items-center justify-between py-3 mb-1" style={{ borderTop: `2px solid ${C.border}`, borderBottom: `2px solid ${C.border}` }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>NET PAY</span>
           <span style={{ fontSize: 17, fontWeight: 800, color: C.brandDark }}>{fmtINR(payroll.netSalary)}</span>
         </div>
 
-        {payroll.attendance && (
-          <p style={{ fontSize: 11.5, color: C.muted, marginTop: 12 }}>
-            Paid days: {payroll.attendance.paidDays} / {payroll.attendance.daysInMonth} · Absent: {payroll.attendance.absentDays} · Half-days: {payroll.attendance.halfDays}
-          </p>
+        {/* Employer contributions */}
+        <PayslipSection title="Employer Contributions">
+          {employerContribution.map((r, i) => (
+            <Fragment key={`ec-${i}-${r.label}`}><PayslipRow label={r.label} value={fmtINR(r.amount)} /></Fragment>
+          ))}
+          {employerContribution.length === 0 && (
+            <span style={{ fontSize: 12.5, color: C.muted, gridColumn: "1 / -1" }}>No employer contributions for this pay run.</span>
+          )}
+        </PayslipSection>
+
+        {att.manualEntry && (
+          <p style={{ fontSize: 11, color: C.muted, marginTop: -4, marginBottom: 8 }}>Paid Days entered manually for this pay run.</p>
         )}
         {payroll.remarks && <p style={{ fontSize: 12, color: C.muted, marginTop: 6 }} className="break-words">Remarks: {payroll.remarks}</p>}
       </div>
@@ -931,6 +1729,24 @@ function RecordsTab({ notify, directory }) {
                   <td style={{ padding: "8px 10px" }}>{statusBadge(p.status)}</td>
                   <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
                     <GhostButton onClick={() => setSelected(p)} style={{ marginRight: 8 }}>View Payslip</GhostButton>
+                    {p.status === "paid" && (
+                      <GhostButton
+                        onClick={() => {
+                          const snap = p.employeeSnapshot || {};
+                          const person = directory.byId.get(String(p.employee));
+                          downloadPayslip({
+                            payroll: p,
+                            name: snap.name || person?.name || resolveName(directory, p.employee, p.employeeModel),
+                            employeeId: snap.employeeId || person?.uid || "—",
+                            department: snap.department || "—",
+                            designation: snap.designation || "—",
+                          });
+                        }}
+                        style={{ marginRight: 8 }}
+                      >
+                        Download
+                      </GhostButton>
+                    )}
                     {p.status === "generated" && <GhostButton onClick={() => handleStatus(p._id, "approved")} style={{ marginRight: 8 }}>Approve</GhostButton>}
                     {p.status === "approved" && <GhostButton onClick={() => handleStatus(p._id, "paid")} style={{ marginRight: 8 }}>Mark Paid</GhostButton>}
                     {p.status !== "on_hold" && p.status !== "paid" && <GhostButton onClick={() => handleStatus(p._id, "on_hold")}>Hold</GhostButton>}
@@ -949,8 +1765,32 @@ function RecordsTab({ notify, directory }) {
 }
 
 
+const TAB_ICONS = {
+  schedule: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="3" stroke="currentColor" strokeWidth="2"/><path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+  ),
+  statutory: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3l8 4v5c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V7l8-4z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+  ),
+  components: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="2"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="2"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="2"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="2"/></svg>
+  ),
+  claims: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M7 3h8l4 4v14H7V3z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="M9 12h6M9 16h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+  ),
+  structures: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 20V10M9 20V4M15 20v-7M21 20V8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+  ),
+  generate: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+  ),
+  records: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 4h16v16H4V4z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="M8 9h8M8 13h8M8 17h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+  ),
+};
+
 export default function Payroll() {
-  const [tab, setTab] = useState("policy");
+  const [tab, setTab] = useState(TABS[0].key);
   const [toast, setToast] = useState({ message: "", type: "" });
   const notify = (message, type = "success") => setToast({ message, type });
   const directory = useEmployeeDirectory();
@@ -963,39 +1803,73 @@ export default function Payroll() {
       <style>{`
         @keyframes payroll-spin { to { transform: rotate(360deg); } }
         @keyframes payroll-slideIn { from { transform: translateX(12px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes payroll-fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
       <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: "", type: "" })} />
 
       <div className="max-w-[1200px] mx-auto min-w-0">
-        <div className="mb-5">
-          <h1 className="text-lg sm:text-xl lg:text-[22px]" style={{ fontWeight: 700, margin: 0, color: C.text }}>Payroll</h1>
-          <p style={{ fontSize: 13, color: C.muted, marginTop: 3, marginBottom: 0 }}>Configure policy, manage salary structures, and generate payslips</p>
+        <div className="mb-6 flex items-center gap-3">
+          <div
+            style={{
+              width: 42, height: 42, borderRadius: 12, flexShrink: 0,
+              background: `linear-gradient(135deg, ${C.brand}, ${C.brandDark})`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: `0 6px 16px -6px ${C.brand}88`,
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-lg sm:text-xl lg:text-[22px]" style={{ fontWeight: 800, margin: 0, color: C.text, letterSpacing: -0.3 }}>Payroll</h1>
+            <p style={{ fontSize: 13, color: C.muted, marginTop: 2, marginBottom: 0 }}>Configure policy, manage salary structures, and generate payslips</p>
+          </div>
         </div>
 
-        <div className="flex gap-1.5 mb-5 flex-wrap overflow-x-auto" style={{ borderBottom: `1px solid ${C.border}` }}>
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className="whitespace-nowrap"
-              style={{
-                padding: "9px 14px", border: "none", background: "none", cursor: "pointer",
-                fontSize: 13, fontWeight: 700, fontFamily: "inherit",
-                color: tab === t.key ? C.brandDark : C.muted,
-                borderBottom: tab === t.key ? `2.5px solid ${C.brand}` : "2.5px solid transparent",
-                marginBottom: -1,
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div
+          className="flex gap-1.5 mb-6 flex-wrap overflow-x-auto"
+          style={{
+            background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14,
+            padding: 6, boxShadow: "0 1px 2px rgba(42,26,22,0.04)",
+          }}
+        >
+          {TABS.map((t) => {
+            const active = tab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className="whitespace-nowrap flex items-center gap-1.5"
+                style={{
+                  padding: "9px 14px", border: "none", cursor: "pointer",
+                  fontSize: 13, fontWeight: 700, fontFamily: "inherit",
+                  borderRadius: 10,
+                  color: active ? "#fff" : C.muted,
+                  background: active ? `linear-gradient(135deg, ${C.brand}, ${C.brandDark})` : "transparent",
+                  boxShadow: active ? `0 4px 12px -4px ${C.brand}99` : "none",
+                  transition: "background .18s, color .18s, box-shadow .18s",
+                }}
+                onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = C.brandLight; }}
+                onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}
+              >
+                <span style={{ display: "flex", opacity: active ? 1 : 0.7 }}>{TAB_ICONS[t.key]}</span>
+                {t.label}
+              </button>
+            );
+          })}
         </div>
 
-        {tab === "policy" && <PolicyTab notify={notify} />}
+        <div key={tab} style={{ animation: "payroll-fadeUp .22s ease" }}>
+        {tab === "schedule" && <PayScheduleTab notify={notify} />}
+        {tab === "statutory" && <StatutoryTab notify={notify} />}
+        {tab === "components" && <ComponentsTab notify={notify} />}
+        {tab === "claims" && <ClaimsTab notify={notify} />}
         {tab === "structures" && <StructuresTab notify={notify} directory={directory} />}
         {tab === "generate" && <GenerateTab notify={notify} directory={directory} />}
         {tab === "records" && <RecordsTab notify={notify} directory={directory} />}
+        </div>
       </div>
     </div>
   );

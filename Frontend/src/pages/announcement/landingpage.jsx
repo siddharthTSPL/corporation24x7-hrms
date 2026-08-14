@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   FiMenu, FiX, FiArrowRight, FiCheck,
@@ -70,7 +70,7 @@ function Divider() {
   )
 }
 
-function Navbar({ accountLabel, onAccountClick }) {
+function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const links = ['Features', 'Testimonials', 'Pricing', 'About']
@@ -80,6 +80,15 @@ function Navbar({ accountLabel, onAccountClick }) {
     window.addEventListener('scroll', fn)
     return () => window.removeEventListener('scroll', fn)
   }, [])
+
+  const scrollToTop = () => {
+    // Jo bhi actually scroll ho raha ho — ref wala div, ya window/document —
+    // sabko try karo taaki chahe jahan bhi scrolling ho rahi ho, kaam kare.
+    scrollContainerRef?.current?.scrollTo({ top: 0, behavior: 'smooth' })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    document.documentElement.scrollTo({ top: 0, behavior: 'smooth' })
+    document.body.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   return (
     <nav
@@ -94,7 +103,13 @@ function Navbar({ accountLabel, onAccountClick }) {
           {links.map(l => (
             <a
               key={l}
-              href={`#${l.toLowerCase()}`}
+              href={l === 'About' ? '#' : `#${l.toLowerCase()}`}
+              onClick={(e) => {
+                if (l === 'About') {
+                  e.preventDefault()
+                  scrollToTop()
+                }
+              }}
               className="text-[15px] font-ui font-medium text-[#5C5C5C] no-underline transition-colors hover:text-[#7A004B]"
             >
               {l}
@@ -122,8 +137,14 @@ function Navbar({ accountLabel, onAccountClick }) {
           {links.map(l => (
             <a
               key={l}
-              href={`#${l.toLowerCase()}`}
-              onClick={() => setOpen(false)}
+              href={l === 'About' ? '#' : `#${l.toLowerCase()}`}
+              onClick={(e) => {
+                if (l === 'About') {
+                  e.preventDefault()
+                  scrollToTop()
+                }
+                setOpen(false)
+              }}
               className="text-[15px] font-ui font-medium text-[#5C5C5C] no-underline"
             >
               {l}
@@ -184,6 +205,31 @@ function AnalyticsCard() {
         </div>
       </div>
     </div>
+  )
+}
+
+function TalkToExpertButton({ phone = '+917017415604', className }) {
+  const [copied, setCopied] = useState(false)
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+
+  const handleClick = (e) => {
+    if (!isMobile) {
+      e.preventDefault()
+      navigator.clipboard.writeText(phone)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+    // mobile pe default tel: link behavior chalne do
+  }
+
+  return (
+     <a
+      href={`tel:${phone}`}
+      onClick={handleClick}
+      className={className}
+    >
+      {copied ? `Copied: ${phone}` : 'Talk To Expert'}
+    </a>
   )
 }
 
@@ -410,11 +456,11 @@ function Hero() {
                 Sign Up for Talent Account <FiArrowRight />
               </a>
               <a
-                href="#expert"
-                className="inline-flex items-center gap-2 border-2 border-[#7A004B] text-[#7A004B] bg-transparent text-[15px] font-ui font-semibold px-7 py-3.5 rounded-full no-underline transition-all hover:bg-[#FDF4F8] hover:-translate-y-0.5"
-              >
-                Talk To Expert
-              </a>
+                href="tel:+917454098820"
+  className="inline-flex items-center gap-2 border-2 border-[#7A004B] text-[#7A004B] bg-transparent text-[15px] font-ui font-semibold px-7 py-3.5 rounded-full no-underline transition-all hover:bg-[#FDF4F8] hover:-translate-y-0.5"
+>
+  Talk To Expert
+</a>
             </div>
           </motion.div>
 
@@ -676,9 +722,21 @@ function Features() {
 
 function Pricing() {
   const plans = [
-    { name: 'Basic', desc: 'Perfect for small teams getting started', price: '₹47', features: ['Employee database','Attendance tracking','Leave management','Basic payroll','Employee self-service portal','Email support'] },
+    { name: 'Basic', desc: 'Perfect for small teams getting started', price: '₹47', features: ['Employee database','Attendance tracking','Leave management','Basic payroll','Employee self-service portal','Email support 24x7'] },
     { name: 'Advance', desc: 'For growing businesses that need more. Everything in Starter +', price: '₹119', popular: true, features: ['Recruitment / Applicant tracking','Performance management','Advanced payroll','Custom policies/workflows','Reports & analytics','Priority support'] },
-    { name: 'Enterprise', desc: 'Ultimate power and flexibility. Everything in Growth +', price: '₹199', features: ['Multi-company support','Role-based permissions','SSO','API access','Custom integrations','Dedicated account manager'] },
+    {
+  name: 'Enterprise',
+  desc: 'Ultimate power and flexibility. Everything in Growth +',
+  price: 'Custom',
+  features: [
+    'Multi-company support',
+    'Role-based permissions',
+    'SSO',
+    'API access',
+    'Custom integrations',
+    'Dedicated account manager',
+  ],
+}
   ]
   const badges = [
     { icon: <FiShield size={20} />, label: 'Secure & Compliant', desc: 'Enterprise-grade security with regular backups.' },
@@ -718,7 +776,7 @@ function Pricing() {
                 </div>
                 <div>
                   <span className="text-[38px] font-display font-extrabold text-[#111]">{p.price}</span>
-                  <span className="text-xs font-body text-[#aaa] ml-1">/user/mo</span>
+                  
                 </div>
                 <ul className="list-none p-0 m-0 flex flex-col gap-2.5">
                   {p.features.map(f => (
@@ -727,9 +785,12 @@ function Pricing() {
                     </li>
                   ))}
                 </ul>
-                <button className="mt-auto w-full py-3 rounded-full text-sm font-ui font-bold cursor-pointer bg-[#7A004B] text-white border-none transition-all hover:bg-[#5a0033]">
-                  Start Free Trial
-                </button>
+             <a   
+  href="https://torchxsuite.com/signup"
+  className="mt-auto w-full py-3 rounded-full text-sm font-ui font-bold cursor-pointer bg-[#7A004B] text-white border-none transition-all hover:bg-[#5a0033] text-center no-underline inline-block"
+>
+  Start Free Trial
+</a>
               </div>
             ))}
           </div>
@@ -776,11 +837,11 @@ function Pricing() {
               </div>
             </div>
             <a
-              href="#expert"
-              className="inline-flex items-center gap-2 bg-[#7A004B] text-white text-[13px] font-ui font-bold px-6 py-3 rounded-full no-underline whitespace-nowrap transition-colors hover:bg-[#5a0033]"
-            >
-              Talk to an Expert <FiArrowRight />
-            </a>
+             href="tel:+917454098820 "
+  className="inline-flex items-center gap-2 border-2 border-[#7A004B] text-[#7A004B] bg-transparent text-[15px] font-ui font-semibold px-7 py-3.5 rounded-full no-underline transition-all hover:bg-[#FDF4F8] hover:-translate-y-0.5"
+>
+  Talk To Expert
+</a>
           </div>
         </motion.div>
       </Wrap>
@@ -876,7 +937,7 @@ function Testimonials() {
               </div>
             </div>
             <a
-              href="#trial"
+              href="https://torchxsuite.com/signup"
               className="inline-flex items-center gap-2 bg-gradient-to-br from-[#7A004B] to-[#A60062] text-white text-[13px] font-ui font-bold px-6.5 py-3.5 rounded-xl no-underline whitespace-nowrap transition-all shadow-[0_8px_20px_rgba(122,0,75,0.25)] hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(122,0,75,0.35)]"
             >
               Book For Free Trial <FiArrowRight />
@@ -972,18 +1033,18 @@ function LegalModal({ docKey, onClose }) {
 function Footer() {
   const cols = [
     { title: 'Product', links: [
+      { label: 'Talent', href: 'https://torchxsuite.com/talent/' },
+      { label: 'Engage', href: '' },
+      { label: 'Finance', href: '' },
+      { label: 'Inventory', href: '' },
+      { label: 'Payroll', href: '' },
+    ] },
+    { title: 'Solutions', links: [
       { label: 'Features', href: '#features' },
       { label: 'Pricing', href: '#pricing' },
     ] },
-    { title: 'Solutions', links: [
-      { label: 'Talent', href: 'https://torchxsuite.com/talent/' },
-      { label: 'Engage', href: 'https://torchxsuite.com/engage/' },
-      { label: 'Finance', href: 'https://torchxsuite.com/finance/' },
-      { label: 'Inventory', href: 'https://torchxsuite.com/inventory/' },
-      { label: 'Pay', href: 'https://torchxsuite.com/pay/' },
-    ] },
     { title: 'Resources', links: [
-      { label: 'Documentation', href: 'https://torchxsuite.com/docs/' },
+      { label: 'Documentation', href: '' },
     ] },
   ]
   const socials = [
@@ -1008,7 +1069,9 @@ function Footer() {
               <div className="flex gap-2.5">
                 {socials.map((s, i) => (
                   <a
-                    key={i} href={s.href} aria-label={s.label}
+                    key={i}
+                    href={s.href}
+                    aria-label={s.label}
                     className="text-[#7A004B] text-lg no-underline w-[34px] h-[34px] rounded-full flex items-center justify-center transition-all hover:-translate-y-0.5 hover:text-[#5a0033]"
                   >
                     {s.icon}
@@ -1023,12 +1086,21 @@ function Footer() {
                 <ul className="list-none p-0 m-0 flex flex-col gap-3">
                   {col.links.map(l => (
                     <li key={l.label}>
-                      <a
-                        href={l.href}
-                        className="text-base text-[#7A004B] no-underline transition-colors hover:text-[#5a0033]"
-                      >
-                        {l.label}
-                      </a>
+                      {l.href ? (
+                        <a
+                          href={l.href}
+                          className="text-base text-[#7A004B] no-underline transition-colors hover:text-[#5a0033]"
+                        >
+                          {l.label}
+                        </a>
+                      ) : (
+                        <Link
+                          to={`/coming-soon?product=${encodeURIComponent(l.label)}`}
+                          className="text-base text-[#7A004B] no-underline transition-colors hover:text-[#5a0033]"
+                        >
+                          {l.label}
+                        </Link>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -1073,6 +1145,7 @@ export default function LandingPage() {
   const navigate = useNavigate()
   const { data: auth } = useAuth()
   const isAuthenticated = !!auth
+  const scrollContainerRef = useRef(null)
 
   // "Access Your Talent Account" when a live session is found; falls back to
   // "Sign in to your Talent Account" while auth is still resolving/expired
@@ -1088,9 +1161,9 @@ export default function LandingPage() {
   }
 
   return (
-    <div style={{ height: '100vh', overflowY: 'auto' }}>
+    <div ref={scrollContainerRef} style={{ height: '100vh', overflowY: 'auto' }}>
       <style>{fontStyles}</style>
-      <Navbar accountLabel={accountLabel} onAccountClick={handleAccountClick} />
+      <Navbar accountLabel={accountLabel} onAccountClick={handleAccountClick} scrollContainerRef={scrollContainerRef} />
       <Hero />
       <Stats />
       <Divider />

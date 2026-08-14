@@ -11,6 +11,11 @@ export const reviewToAdmin = async (data) => {
   return res.data;
 };
 
+export const getAllReviews = async (params = {}) => {
+  const res = await api.get("superadmin/allreviews", { params });
+  return res.data;
+};
+
 export const getTodayCheckins = async () => {
   const res = await api.get("superadmin/getTodayCheckins");
   return res.data;

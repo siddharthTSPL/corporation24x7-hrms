@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
+import toast from "react-hot-toast";
 import {
   useMyAssignedJobs,
   useJobsCreatedByMe,
   useCreateJob,
+  useUpdateJob,
   useAssignableTargets,
   useUpdateJobStatus,
   useArchiveJob,
@@ -96,6 +98,12 @@ const TABS = [
 ];
 
 function cn(...a) { return a.filter(Boolean).join(" "); }
+
+const CURRENCY_SYMBOLS = { INR: "₹", USD: "$", EUR: "€" };
+function fmtRate(rate, currency) {
+  const symbol = CURRENCY_SYMBOLS[currency] || `${currency || ""} `;
+  return `${symbol}${rate}/hr`;
+}
 
 function StatusBadge({ status }) {
   const m = STATUS_META[status] || STATUS_META.draft;
@@ -255,7 +263,7 @@ function JobDetailModal({ jobId, open, onClose }) {
           {job.billable && (
             <div className="flex items-center gap-2 text-[12px] flex-wrap">
               <Chip color="green">Billable</Chip>
-              {job.hourly_rate > 0 && <span className="text-gray-500">₹{job.hourly_rate}/hr · {job.currency}</span>}
+              {job.hourly_rate > 0 && <span className="text-gray-500">{fmtRate(job.hourly_rate, job.currency)}</span>}
             </div>
           )}
           {job.overrun_flagged && (
@@ -457,11 +465,13 @@ export default function ManagerTimesheet() {
   const [editLog, setEditLog] = useState(null);
   const [editForm, setEditForm] = useState({ duration_minutes: "", note: "", reason: "" });
   const [jobModal, setJobModal] = useState(false);
-  const [jobForm, setJobForm] = useState({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: false, hourly_rate: "", due_date: "" });
+  const [jobForm, setJobForm] = useState({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", max_hours_per_day: "", billable: false, hourly_rate: "", due_date: "" });
   const [rejectModal, setRejectModal] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [jobDetailOpen, setJobDetailOpen] = useState(false);
+  const [editJobModal, setEditJobModal] = useState(false);
+  const [editJobForm, setEditJobForm] = useState({ id: "", title: "", description: "", priority: "medium", estimated_hours: "", max_hours_per_day: "", billable: false, hourly_rate: "", due_date: "" });
 
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 6);
@@ -491,6 +501,7 @@ export default function ManagerTimesheet() {
   const updateTimeLog = useUpdateTimeLog();
   const deleteTimeLog = useDeleteTimeLog();
   const createJob = useCreateJob();
+  const updateJob = useUpdateJob();
   const updateJobStatus = useUpdateJobStatus();
   const archiveJob = useArchiveJob();
   const submitTS = useSubmitTimesheet();
@@ -508,14 +519,20 @@ export default function ManagerTimesheet() {
   const handleLogTime = () => {
     if (!logForm.job || !logForm.duration_minutes) return;
     logTime.mutate({ job: logForm.job, log_date: logForm.log_date, duration_minutes: Number(logForm.duration_minutes), note: logForm.note }, {
-      onSuccess: () => { setLogModal(false); setLogForm({ job: "", log_date: "", duration_minutes: "", note: "" }); refetchWeek(); }
+      onSuccess: (res) => {
+        setLogModal(false); setLogForm({ job: "", log_date: "", duration_minutes: "", note: "" }); refetchWeek();
+        if (res?.warning) toast(res.warning, { icon: "⏱️", duration: 6000 });
+      }
     });
   };
 
   const handleUpdateLog = () => {
     if (!editLog) return;
     updateTimeLog.mutate({ id: editLog._id, data: { duration_minutes: Number(editForm.duration_minutes), note: editForm.note, reason: editForm.reason } }, {
-      onSuccess: () => { setEditLog(null); refetchWeek(); }
+      onSuccess: (res) => {
+        setEditLog(null); refetchWeek();
+        if (res?.warning) toast(res.warning, { icon: "⏱️", duration: 6000 });
+      }
     });
   };
 
@@ -531,10 +548,45 @@ export default function ManagerTimesheet() {
       title: jobForm.title, description: jobForm.description,
       assigned_to: jobForm.assigned_to, assigned_to_model: target?.model || "User",
       priority: jobForm.priority, estimated_hours: Number(jobForm.estimated_hours) || 0,
+      max_hours_per_day: jobForm.max_hours_per_day === "" ? null : Number(jobForm.max_hours_per_day),
       billable: jobForm.billable, hourly_rate: Number(jobForm.hourly_rate) || 0,
       due_date: jobForm.due_date || null,
     }, {
-      onSuccess: () => { setJobModal(false); setJobForm({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: false, hourly_rate: "", due_date: "" }); refetchCreated(); }
+      onSuccess: () => { setJobModal(false); setJobForm({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", max_hours_per_day: "", billable: false, hourly_rate: "", due_date: "" }); refetchCreated(); }
+    });
+  };
+
+  const openEditJob = (job) => {
+    setEditJobForm({
+      id: job._id,
+      title: job.title || "",
+      description: job.description || "",
+      priority: job.priority || "medium",
+      estimated_hours: job.estimated_hours || "",
+      max_hours_per_day: job.max_hours_per_day || "",
+      billable: !!job.billable,
+      hourly_rate: job.hourly_rate || "",
+      due_date: job.due_date ? job.due_date.slice(0, 10) : "",
+    });
+    setEditJobModal(true);
+  };
+
+  const handleUpdateJob = () => {
+    if (!editJobForm.title) return;
+    updateJob.mutate({
+      id: editJobForm.id,
+      data: {
+        title: editJobForm.title,
+        description: editJobForm.description,
+        priority: editJobForm.priority,
+        estimated_hours: Number(editJobForm.estimated_hours) || 0,
+        max_hours_per_day: editJobForm.max_hours_per_day === "" ? null : Number(editJobForm.max_hours_per_day),
+        billable: editJobForm.billable,
+        hourly_rate: Number(editJobForm.hourly_rate) || 0,
+        due_date: editJobForm.due_date || null,
+      },
+    }, {
+      onSuccess: () => { setEditJobModal(false); refetchCreated(); },
     });
   };
 
@@ -673,7 +725,7 @@ export default function ManagerTimesheet() {
                           {j.assigned_to_name && (
                             <div className="text-[11px] text-gray-400 mb-1.5">
                               Assigned to <span className="font-semibold text-gray-700">{j.assigned_to_name}</span>
-                              {j.assigned_to_model && <span className="text-[#730042]"> · {j.assigned_to_model}</span>}
+                              {j.assigned_to_model && <span className="text-[#730042]"> · {j.assigned_to_model === "User" ? "Employee" : j.assigned_to_model}</span>}
                             </div>
                           )}
                           <div className="flex items-center gap-1.5 flex-wrap">
@@ -694,6 +746,7 @@ export default function ManagerTimesheet() {
                           )}
                         </div>
                         <div className="flex flex-wrap gap-1.5">
+                          <button onClick={() => openEditJob(j)} className="text-[11px] font-semibold rounded-lg px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors">Edit</button>
                           <Sel value={j.status} onChange={(e) => updateJobStatus.mutate({ id: j._id, status: e.target.value }, { onSuccess: refetchCreated })}
                             className="text-[11px] py-1 px-2 w-full sm:w-auto sm:min-w-[100px]">
                             {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map((s) => (
@@ -708,6 +761,49 @@ export default function ManagerTimesheet() {
                 })}
               </div>
             )}
+
+            <div className="mt-6">
+              <div className="font-bold text-[16px] sm:text-[17px] text-gray-900 mb-0.5">My Jobs</div>
+              <div className="text-[12px] text-gray-400 mb-3">{assignedJobs.length} job{assignedJobs.length !== 1 ? "s" : ""} assigned to you</div>
+              {assignedJobs.length === 0 ? (
+                <div className="bg-white border border-gray-200 rounded-2xl py-12 text-center px-4">
+                  <div className="text-3xl mb-2">📭</div>
+                  <div className="font-semibold text-gray-700">No jobs assigned to you</div>
+                  <div className="text-[12px] text-gray-400 mt-1">Jobs assigned to you will show up here</div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  {assignedJobs.map((j) => {
+                    const pct = j.estimated_hours > 0 ? Math.round((j.logged_hours_cache / j.estimated_hours) * 100) : 0;
+                    return (
+                      <div key={j._id} className="bg-white border border-gray-200 rounded-2xl p-4 hover:border-[#730042]/20 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                            <span className="font-semibold text-[14px] text-gray-900 break-words">{j.title}</span>
+                            {j.overrun_flagged && <Chip color="red" size="xs">Overrun ⚠</Chip>}
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Chip size="xs" color={j.status === "in_progress" ? "blue" : j.status === "completed" ? "green" : j.status === "on_hold" ? "amber" : j.status === "cancelled" ? "red" : "gray"}>
+                              {JOB_STATUS_META[j.status]?.label || j.status}
+                            </Chip>
+                            <Chip size="xs" color={j.priority === "urgent" ? "brand" : j.priority === "high" ? "red" : j.priority === "medium" ? "amber" : "gray"}>{j.priority}</Chip>
+                            {j.estimated_hours > 0 && <Chip size="xs" color="blue">{j.logged_hours_cache?.toFixed(1)}h / {j.estimated_hours}h</Chip>}
+                            {j.due_date && <span className="text-[11px] text-gray-400">Due {fmtDate(j.due_date)}</span>}
+                          </div>
+                          {j.estimated_hours > 0 && (
+                            <div className="mt-2">
+                              <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                                <div className={cn("h-full rounded-full", j.overrun_flagged ? "bg-red-500" : "bg-[#730042]")} style={{ width: `${Math.min(100, pct)}%` }} />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -735,6 +831,7 @@ export default function ManagerTimesheet() {
                       <div className="text-[11px] text-gray-400">Week: {fmtDate(ts.week_start)} – {fmtDate(ts.week_end)}</div>
                       <div className="flex gap-2 mt-2 flex-wrap">
                         <Chip color="brand">{fmtDuration(ts.total_minutes)}</Chip>
+                        {ts.overtime_minutes > 0 && <Chip color="amber">{fmtDuration(ts.overtime_minutes)} overtime</Chip>}
                         {ts.billable_minutes > 0 && <Chip color="green">{fmtDuration(ts.billable_minutes)} billable</Chip>}
                         <StatusBadge status={ts.status} />
                       </div>
@@ -864,6 +961,7 @@ export default function ManagerTimesheet() {
                           </div>
                           <div className="flex gap-3 text-[12px] flex-wrap">
                             <span className="font-semibold text-[#730042]">{fmtDuration(ts.total_minutes)}</span>
+                            {ts.overtime_minutes > 0 && <span className="font-semibold text-amber-600">{fmtDuration(ts.overtime_minutes)} overtime</span>}
                             {ts.billable_minutes > 0 && <span className="text-emerald-600">{fmtDuration(ts.billable_minutes)} billable</span>}
                             <span className="text-gray-400">{fmtDate(ts.week_start)} – {fmtDate(ts.week_end)}</span>
                           </div>
@@ -928,7 +1026,7 @@ export default function ManagerTimesheet() {
           <Input label="Description" placeholder="Optional description" value={jobForm.description} onChange={(e) => setJobForm((p) => ({ ...p, description: e.target.value }))} />
           <Sel label="Assign To" value={jobForm.assigned_to} onChange={(e) => setJobForm((p) => ({ ...p, assigned_to: e.target.value }))}>
             <option value="">Select target…</option>
-            {targets.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.model})</option>)}
+            {targets.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.model === "User" ? "Employee" : t.model})</option>)}
           </Sel>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Sel label="Priority" value={jobForm.priority} onChange={(e) => setJobForm((p) => ({ ...p, priority: e.target.value }))}>
@@ -947,10 +1045,48 @@ export default function ManagerTimesheet() {
             <Input label="Hourly Rate" type="number" placeholder="0" value={jobForm.hourly_rate} onChange={(e) => setJobForm((p) => ({ ...p, hourly_rate: e.target.value }))} disabled={!jobForm.billable} />
           </div>
           <Input label="Due Date" type="date" value={jobForm.due_date} onChange={(e) => setJobForm((p) => ({ ...p, due_date: e.target.value }))} />
+          <div>
+            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={jobForm.max_hours_per_day} onChange={(e) => setJobForm((p) => ({ ...p, max_hours_per_day: e.target.value }))} />
+            <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day counts as overtime. Leave blank to use the employee's shift hours instead.</p>
+          </div>
           <div className="flex gap-2 justify-end flex-wrap">
             <Btn variant="ghost" onClick={() => setJobModal(false)}>Cancel</Btn>
             <Btn onClick={handleCreateJob} disabled={!jobForm.title || !jobForm.assigned_to || createJob.isPending}>
               {createJob.isPending ? "Creating…" : "Create Job"}
+            </Btn>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={editJobModal} onClose={() => setEditJobModal(false)} title="Edit Job" width="max-w-[560px]">
+        <div className="flex flex-col gap-3.5">
+          <Input label="Title" placeholder="Job title" value={editJobForm.title} onChange={(e) => setEditJobForm((p) => ({ ...p, title: e.target.value }))} />
+          <Input label="Description" placeholder="Optional description" value={editJobForm.description} onChange={(e) => setEditJobForm((p) => ({ ...p, description: e.target.value }))} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Sel label="Priority" value={editJobForm.priority} onChange={(e) => setEditJobForm((p) => ({ ...p, priority: e.target.value }))}>
+              {["low", "medium", "high", "urgent"].map((p) => <option key={p} value={p}>{PRIORITY_META[p]?.label || p}</option>)}
+            </Sel>
+            <Input label="Estimated Hours" type="number" placeholder="0" value={editJobForm.estimated_hours} onChange={(e) => setEditJobForm((p) => ({ ...p, estimated_hours: e.target.value }))} />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Billable</label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={editJobForm.billable} onChange={(e) => setEditJobForm((p) => ({ ...p, billable: e.target.checked }))} className="rounded border-gray-300" />
+                <span className="text-[13px] text-gray-700">Yes</span>
+              </label>
+            </div>
+            <Input label="Hourly Rate" type="number" placeholder="0" value={editJobForm.hourly_rate} onChange={(e) => setEditJobForm((p) => ({ ...p, hourly_rate: e.target.value }))} disabled={!editJobForm.billable} />
+          </div>
+          <Input label="Due Date" type="date" value={editJobForm.due_date} onChange={(e) => setEditJobForm((p) => ({ ...p, due_date: e.target.value }))} />
+          <div>
+            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={editJobForm.max_hours_per_day} onChange={(e) => setEditJobForm((p) => ({ ...p, max_hours_per_day: e.target.value }))} />
+            <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day counts as overtime. Leave blank to use the employee's shift hours instead.</p>
+          </div>
+          <div className="flex gap-2 justify-end flex-wrap">
+            <Btn variant="ghost" onClick={() => setEditJobModal(false)}>Cancel</Btn>
+            <Btn onClick={handleUpdateJob} disabled={!editJobForm.title || updateJob.isPending}>
+              {updateJob.isPending ? "Saving…" : "Save Changes"}
             </Btn>
           </div>
         </div>

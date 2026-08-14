@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import toast from "react-hot-toast";
 import {
   useMyAssignedJobs,
   useMyWeekLog,
@@ -294,9 +295,6 @@ function JobDetailModal({ jobId, open, onClose }) {
           {job.billable && (
             <div className="flex items-center gap-2 text-[12px]">
               <Chip color="green">Billable</Chip>
-              {job.hourly_rate > 0 && (
-                <span className="text-gray-500">₹{job.hourly_rate}/hr · {job.currency}</span>
-              )}
             </div>
           )}
 
@@ -515,6 +513,7 @@ function WeekGrid({ weekStart, weekDays, onAddLog, onEditLog, onDeleteLog }) {
           const iso = d.toISOString().slice(0, 10);
           const isToday = iso === todayISO;
           const mins = weekDays[iso]?.totalMinutes || 0;
+          const otMins = weekDays[iso]?.overtimeMinutes || 0;
           return (
             <div
               key={iso}
@@ -534,6 +533,11 @@ function WeekGrid({ weekStart, weekDays, onAddLog, onEditLog, onDeleteLog }) {
                 </div>
               ) : (
                 <div className="mt-1 h-[18px]" />
+              )}
+              {otMins > 0 && (
+                <div className="mt-1 text-[9px] font-bold text-amber-700 bg-amber-100 rounded px-1 py-0.5">
+                  +{fmtDuration(otMins)} OT
+                </div>
               )}
             </div>
           );
@@ -628,6 +632,8 @@ export default function EmployeeTimesheet() {
   const { data: weekData, refetch: refetchWeek } = useMyWeekLog(weekStart);
   const weekDays = weekData?.days || {};
   const totalWeekMins = weekData?.totalMinutes || 0;
+  const totalWorkingMins = weekData?.totalWorkingMinutes ?? totalWeekMins;
+  const totalOvertimeMins = weekData?.totalOvertimeMinutes || 0;
 
   const { data: tsData, refetch: refetchTS } = useMyTimesheets();
   const timesheets = tsData?.timesheets || [];
@@ -664,10 +670,11 @@ export default function EmployeeTimesheet() {
       duration_minutes: Number(logForm.duration_minutes),
       note: logForm.note,
     }, {
-      onSuccess: () => {
+      onSuccess: (res) => {
         setLogModal(false);
         setLogForm({ job: "", log_date: "", duration_minutes: "", note: "" });
         refetchWeek();
+        if (res?.warning) toast(res.warning, { icon: "⏱️", duration: 6000 });
       }
     });
   };
@@ -682,9 +689,10 @@ export default function EmployeeTimesheet() {
         reason: editForm.reason,
       }
     }, {
-      onSuccess: () => {
+      onSuccess: (res) => {
         setEditLog(null);
         refetchWeek();
+        if (res?.warning) toast(res.warning, { icon: "⏱️", duration: 6000 });
       }
     });
   };
@@ -789,6 +797,20 @@ export default function EmployeeTimesheet() {
                 sub={`${prodData?.capacityPercent || Math.round((totalWeekMins / 2400) * 100)}% capacity`}
                 valueColor="text-[#730042]"
               />
+              <StatCard
+                label="Working Hours"
+                value={fmtDuration(totalWorkingMins)}
+                valueColor="text-emerald-600"
+              />
+              <StatCard
+                label="Overtime"
+                value={fmtDuration(totalOvertimeMins)}
+                sub={totalOvertimeMins > 0 ? "Pay is per company policy" : undefined}
+                valueColor={totalOvertimeMins > 0 ? "text-amber-600" : "text-gray-600"}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
               <StatCard
                 label="Billable"
                 value={fmtDuration(prodData?.billableMinutes || 0)}
@@ -1000,6 +1022,9 @@ export default function EmployeeTimesheet() {
                         </div>
                         <div className="flex items-center gap-3 text-[12px] text-gray-500 flex-wrap">
                           <span className="font-semibold text-[#730042]">{fmtDuration(ts.total_minutes)}</span>
+                          {ts.overtime_minutes > 0 && (
+                            <span className="text-amber-600 font-semibold">{fmtDuration(ts.overtime_minutes)} overtime</span>
+                          )}
                           {ts.billable_minutes > 0 && (
                             <span className="text-emerald-600">{fmtDuration(ts.billable_minutes)} billable</span>
                           )}

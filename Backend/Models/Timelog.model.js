@@ -61,6 +61,16 @@ const timeLogSchema = new mongoose.Schema(
 
     duration_minutes: { type: Number, required: true, min: 0 },
 
+    // Split of duration_minutes against that day's working-hour cap
+    // (job.max_hours_per_day, falling back to the assignee's shift length).
+    // regular_minutes + overtime_minutes always equals duration_minutes.
+    regular_minutes: { type: Number, default: 0, min: 0 },
+    overtime_minutes: { type: Number, default: 0, min: 0 },
+    is_overtime: { type: Boolean, default: false },
+    // Snapshot of the per-day cap (minutes) that was in effect when this
+    // entry was logged/last recalculated, kept for audit/report clarity.
+    daily_limit_minutes_at_log: { type: Number, default: null },
+
     note: { type: String, trim: true, maxlength: 500, default: "" },
 
     billable: { type: Boolean, default: false },

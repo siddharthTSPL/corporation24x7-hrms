@@ -7,6 +7,9 @@ import { useGetAttendance } from "../../auth/server-state/manager/managgerother/
 import { useGetMyLeavesManager } from "../../auth/server-state/manager/managerleave/managerleave.hook";
 import { useCalendarMeta, useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
 import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus, isPastShiftEnd } from "../../pages/utils/attendance";
+import NotificationBell from "../../components/notifications/NotificationBell";
+import MyAssetsWidget from "../asset/MyAssetsWidget";
+import { useGetMyAssetsManager } from "../../auth/server-state/manager/managerasset/managerasset.hook";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS   = ["S","M","T","W","T","F","S"];
@@ -851,11 +854,12 @@ function ReviewCard({ reviews = [], loading }) {
   );
 
   const avg    = reviews.length
-    ? (reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length)
+    ? (reviews.reduce((s, r) => s + (r.overallScore || 0), 0) / reviews.length)
     : null;
   const latest = reviews[0];
   const thisMonth = new Date().toISOString().slice(0, 7);
   const newThisMonth = reviews.filter(r => r.monthYear === thisMonth).length;
+  const RATING_ORDER = ["Excellent", "Very Good", "Good", "Average", "Poor"];
 
   return (
     <div style={{ padding:"14px 18px 16px" }}>
@@ -866,21 +870,20 @@ function ReviewCard({ reviews = [], loading }) {
               {avg.toFixed(1)}
             </span>
             <div>
-              <StarRating rating={avg} size={15}/>
+              <StarRating rating={avg / 2} size={15}/>
               <div style={{ fontSize:10, color:"#b0948a", marginTop:3, fontFamily:"'DM Sans',sans-serif" }}>
-                {reviews.length} review{reviews.length !== 1 ? "s" : ""} given
+                {reviews.length} review{reviews.length !== 1 ? "s" : ""} given · avg out of 10
               </div>
             </div>
           </div>
 
           <div style={{ display:"flex", flexDirection:"column", gap:4, marginBottom:12 }}>
-            {[5,4,3,2,1].map(star => {
-              const cnt = reviews.filter(r => Math.round(r.rating) === star).length;
+            {RATING_ORDER.map(label => {
+              const cnt = reviews.filter(r => r.overallRating === label).length;
               const pct = reviews.length > 0 ? (cnt / reviews.length) * 100 : 0;
               return (
-                <div key={star} style={{ display:"flex", alignItems:"center", gap:6 }}>
-                  <span style={{ fontSize:10, color:"#b0948a", width:8, fontFamily:"'DM Sans',sans-serif" }}>{star}</span>
-                  <svg width="10" height="10" viewBox="0 0 16 16" fill="#e8b84b"><path d="M8 1l1.8 3.6L14 5.4l-3 2.9.7 4.1L8 10.4l-3.7 2 .7-4.1-3-2.9 4.2-.8z"/></svg>
+                <div key={label} style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <span style={{ fontSize:10, color:"#b0948a", width:56, fontFamily:"'DM Sans',sans-serif" }}>{label}</span>
                   <div style={{ flex:1, height:5, borderRadius:4, background:"#f0e8e4", overflow:"hidden" }}>
                     <div className="md-progress-bar" style={{ width:`${pct}%`, background:"#e8b84b" }}/>
                   </div>
@@ -935,8 +938,9 @@ export default function ManagerDashboard() {
 
   const manager   = meData?.manager      ?? null;
   const lb        = meData?.leavebalance?.[0] ?? null;
+  const reportingManager = meData?.reportingManager ?? null; 
   const announcements = annData?.announcements ?? (Array.isArray(annData) ? annData : []);
-  const reviews = meData?.review ?? [];
+  const reviews = meData?.reviews ?? [];
 
   const myOwnAppliedLeaves = useMemo(() => {
     const raw = Array.isArray(myLeaveData) ? myLeaveData : [];
@@ -1074,7 +1078,7 @@ export default function ManagerDashboard() {
             Dashboard
           </h1>
           <p style={{ fontSize:12, color:"#b0948a", marginTop:2, fontFamily:"'DM Sans',sans-serif" }}>
-            {manager ? `Welcome back, ${manager.f_name} · ${manager.uid}` : "Welcome back"}
+            {manager ? `Welcome back, ${manager.f_name} · ${manager.empid}` : "Welcome back"}
           </p>
         </div>
 
@@ -1086,16 +1090,7 @@ export default function ManagerDashboard() {
             </div>
           )}
 
-          <div style={{ width:36, height:36, borderRadius:8, border:"0.5px solid #ede5e0", background:"#fff",
-            display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", position:"relative", flexShrink:0 }}>
-            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-              <path d="M7.5 1.5a4 4 0 0 0-4 4V7L2 8.5V9.5h11V8.5L11.5 7V5.5a4 4 0 0 0-4-4zM7.5 13.5a1.5 1.5 0 0 1-1.5-1.5h3a1.5 1.5 0 0 1-1.5 1.5z" fill="#730042"/>
-            </svg>
-            {announcements.filter(a => a.priority === "high").length > 0 && (
-              <div style={{ position:"absolute", top:5, right:5, width:7, height:7, borderRadius:"50%",
-                background:"#E24B4A", border:"1.5px solid #f9f8f2" }}/>
-            )}
-          </div>
+          <NotificationBell />
 
           <div style={{ position:"relative", flexShrink:0 }}>
             <Avatar
@@ -1150,7 +1145,7 @@ export default function ManagerDashboard() {
                   </div>
                 </div>
                 <div style={{ display:"flex", alignItems:"center", gap:5, flexWrap:"wrap" }}>
-                  <Badge variant="brand">{manager?.uid ?? "—"}</Badge>
+                  <Badge variant="brand">{manager?.empid ?? "—"}</Badge>
                   <Badge variant="green">Active</Badge>
                   <Badge variant="blue">{getDeptFullForm(manager?.department)}</Badge>
                 </div>
@@ -1200,43 +1195,52 @@ export default function ManagerDashboard() {
           </div>
         </div>
 
-        <div className="md-card" style={{ animationDelay:".15s", background:"#730042", border:"0.5px solid #5a0033" }}>
-          <div style={{ position:"absolute", top:-20, right:-20, width:80, height:80, borderRadius:"50%", background:"rgba(255,255,255,0.06)" }}/>
-          <div style={{ position:"absolute", bottom:-10, left:-10, width:60, height:60, borderRadius:"50%", background:"rgba(255,255,255,0.04)" }}/>
-          <div style={{ padding:"16px 18px" }}>
-            <div style={{ fontSize:11, color:"rgba(249,248,242,0.6)", fontWeight:500, letterSpacing:".3px",
-              marginBottom:10, fontFamily:"'DM Sans',sans-serif" }}>Reporting to admin</div>
-            {meLoading ? (
-              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                <Skeleton h={18} w="60%" radius={4}/><Skeleton h={14} w="80%" radius={4}/>
-              </div>
-            ) : (
-              <>
-                <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
-                  <Avatar src={manager?.profile_image} initials={mgrInitials} size={42}
-                    style={{ background:"rgba(249,248,242,0.15)" }}/>
-                  <div style={{ minWidth:0 }}>
-                    <div style={{ fontSize:14, fontWeight:600, color:"#f9f8f2", fontFamily:"'Lora',serif" }}>{fullName}</div>
-                    <div style={{ fontSize:11, color:"rgba(249,248,242,0.6)", marginTop:2, fontFamily:"'DM Sans',sans-serif" }}>
-                      {getRoleFullForm(manager?.role) ?? "Manager"}
-                    </div>
-                  </div>
-                </div>
-                <div style={{ height:"0.5px", background:"rgba(249,248,242,0.15)", marginBottom:10 }}/>
-                <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, fontFamily:"'DM Sans',sans-serif" }}>
-                  <span style={{ color:"rgba(249,248,242,0.5)" }}>Manager ID</span>
-                  <span style={{ fontWeight:500, color:"rgba(249,248,242,0.7)" }}>{manager?.uid ?? "—"}</span>
-                </div>
-                <div style={{ marginTop:8 }}>
-                  <div style={{ fontSize:10, color:"rgba(249,248,242,0.4)", fontFamily:"'DM Sans',sans-serif", marginBottom:2 }}>Work email</div>
-                  <div style={{ fontSize:11, fontWeight:500, color:"rgba(249,248,242,0.6)", wordBreak:"break-word", fontFamily:"'DM Sans',sans-serif" }}>
-                    {manager?.work_email ?? "—"}
-                  </div>
-                </div>
-              </>
-            )}
+       <div className="md-card" style={{ animationDelay:".15s", background:"#730042", border:"0.5px solid #5a0033" }}>
+  <div style={{ position:"absolute", top:-20, right:-20, width:80, height:80, borderRadius:"50%", background:"rgba(255,255,255,0.06)" }}/>
+  <div style={{ position:"absolute", bottom:-10, left:-10, width:60, height:60, borderRadius:"50%", background:"rgba(255,255,255,0.04)" }}/>
+  <div style={{ padding:"16px 18px" }}>
+    <div style={{ fontSize:11, color:"rgba(249,248,242,0.6)", fontWeight:500, letterSpacing:".3px",
+      marginBottom:10, fontFamily:"'DM Sans',sans-serif" }}>Reporting to</div>
+    {meLoading ? (
+      <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+        <Skeleton h={18} w="60%" radius={4}/><Skeleton h={14} w="80%" radius={4}/>
+      </div>
+    ) : reportingManager ? (
+      <>
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+          <Avatar src={reportingManager.profile_image}
+            initials={getInitials(reportingManager.f_name, reportingManager.l_name)}
+            size={42} style={{ background:"rgba(249,248,242,0.15)" }}/>
+          <div style={{ minWidth:0 }}>
+            <div style={{ fontSize:14, fontWeight:600, color:"#f9f8f2", fontFamily:"'Lora',serif" }}>
+              {reportingManager.f_name} {reportingManager.l_name}
+            </div>
+            <div style={{ fontSize:11, color:"rgba(249,248,242,0.6)", marginTop:2, fontFamily:"'DM Sans',sans-serif" }}>
+              {getRoleFullForm(reportingManager.role) ?? (reportingManager.model === "Admin" ? "Admin" : "Manager")}
+            </div>
           </div>
         </div>
+        <div style={{ height:"0.5px", background:"rgba(249,248,242,0.15)", marginBottom:10 }}/>
+        <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, fontFamily:"'DM Sans',sans-serif" }}>
+          <span style={{ color:"rgba(249,248,242,0.5)" }}>
+            {reportingManager.model === "Admin" ? "Admin ID" : "Manager ID"}
+          </span>
+          <span style={{ fontWeight:500, color:"rgba(249,248,242,0.7)" }}>{reportingManager.empid ?? "—"}</span>
+        </div>
+        <div style={{ marginTop:8 }}>
+          <div style={{ fontSize:10, color:"rgba(249,248,242,0.4)", fontFamily:"'DM Sans',sans-serif", marginBottom:2 }}>Work email</div>
+          <div style={{ fontSize:11, fontWeight:500, color:"rgba(249,248,242,0.6)", wordBreak:"break-word", fontFamily:"'DM Sans',sans-serif" }}>
+            {reportingManager.work_email ?? "—"}
+          </div>
+        </div>
+      </>
+    ) : (
+      <div style={{ fontSize:12, color:"rgba(249,248,242,0.6)", fontFamily:"'DM Sans',sans-serif" }}>
+        No reporting manager assigned
+      </div>
+    )}
+  </div>
+</div>
       </div>
 
       <div className="md-two-col-grid">
@@ -1364,8 +1368,8 @@ export default function ManagerDashboard() {
               </div>
               <div style={{ marginTop:5, display:"flex", gap:5, flexWrap:"wrap" }}>
                 <Badge variant="green">Active</Badge>
-                <Badge variant="blue">{manager?.uid ?? "—"}</Badge>
-                {reviews.length > 0 && <StarRating rating={reviews.reduce((s, r) => s + r.rating, 0) / reviews.length} size={12}/>}
+                <Badge variant="blue">{manager?.empid ?? "—"}</Badge>
+                {reviews.length > 0 && <StarRating rating={reviews.reduce((s, r) => s + (r.overallScore || 0), 0) / reviews.length / 2} size={12}/>}
               </div>
             </div>
           </div>
@@ -1430,7 +1434,9 @@ export default function ManagerDashboard() {
         </div>
       </div>
 
-    
+      <div style={{ marginTop: 14 }}>
+        <MyAssetsWidget useMyAssets={useGetMyAssetsManager} title="My Assets" accent="#2563eb" />
+      </div>
 
     </div>
   );

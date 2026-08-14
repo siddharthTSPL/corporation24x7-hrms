@@ -32,6 +32,7 @@ import { clearAgentToken } from "../pages/utils/Desktopagent";
 import HelpTour from "./help/HelpTour";
 import FloatingHelp from "./help/FloatingHelp";
 import TechnicalSupportModal from "./help/TechnicalSupportModal";
+import DocumentationModal from "./help/DocumentationModal";
 
 const superAdminMenu = [
   { name: "Dashboard",      path: "/superadmin-dashboard",     icon: <FaHome />, blurb: "Overview of every organisation — usage, activity, and platform health." },
@@ -136,6 +137,7 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
   const [mobileOpen,  setMobileOpen]  = useState(false);
   const [showTour,    setShowTour]    = useState(false);
   const [showSupport, setShowSupport] = useState(false);
+  const [showDocs,    setShowDocs]    = useState(false);
 
   const menu = menuByRole[role] ?? employeeMenu;
 
@@ -192,6 +194,10 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
 
   const openSupportForm = () => {
     setShowSupport(true);
+  };
+
+  const openDocumentation = () => {
+    setShowDocs(true);
   };
 
   const handleLogout = () => {
@@ -340,9 +346,10 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
         )}
       </div>
 
-      <FloatingHelp onTakeTour={startTour} onTechnicalSupport={openSupportForm} />
+      <FloatingHelp onTakeTour={startTour} onTechnicalSupport={openSupportForm} onDocumentation={openDocumentation} />
       {showTour && <HelpTour steps={tourSteps} onClose={() => setShowTour(false)} />}
       {showSupport && <TechnicalSupportModal role={role} onClose={() => setShowSupport(false)} />}
+      {showDocs && <DocumentationModal onClose={() => setShowDocs(false)} />}
     </>
   );
 }
