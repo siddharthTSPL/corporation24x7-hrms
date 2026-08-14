@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
+import toast from "react-hot-toast";
 import {
   useMyAssignedJobs,
   useJobsCreatedByMe,
@@ -591,10 +592,10 @@ export default function AdminTimesheet() {
   const [rejectReason, setRejectReason] = useState("");
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [jobDetailOpen, setJobDetailOpen] = useState(false);
-  const [jobForm, setJobForm] = useState({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: false, hourly_rate: "", due_date: "" });
+  const [jobForm, setJobForm] = useState({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", max_hours_per_day: "", billable: false, hourly_rate: "", due_date: "" });
   const [logForm, setLogForm] = useState({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" });
   const [editJobModal, setEditJobModal] = useState(false);
-  const [editJobForm, setEditJobForm] = useState({ id: "", title: "", description: "", priority: "medium", estimated_hours: "", billable: false, hourly_rate: "", due_date: "" });
+  const [editJobForm, setEditJobForm] = useState({ id: "", title: "", description: "", priority: "medium", estimated_hours: "", max_hours_per_day: "", billable: false, hourly_rate: "", due_date: "" });
 
   const { data: assignedJobsData } = useMyAssignedJobs();
   const assignedJobs = assignedJobsData?.jobs || [];
@@ -669,12 +670,13 @@ export default function AdminTimesheet() {
       title: jobForm.title, description: jobForm.description,
       assigned_to: jobForm.assigned_to, assigned_to_model: target?.model || "Manager",
       priority: jobForm.priority, estimated_hours: Number(jobForm.estimated_hours) || 0,
+      max_hours_per_day: jobForm.max_hours_per_day === "" ? null : Number(jobForm.max_hours_per_day),
       billable: jobForm.billable, hourly_rate: Number(jobForm.hourly_rate) || 0,
       due_date: jobForm.due_date || null,
     }, {
       onSuccess: () => {
         setJobModal(false);
-        setJobForm({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: false, hourly_rate: "", due_date: "" });
+        setJobForm({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", max_hours_per_day: "", billable: false, hourly_rate: "", due_date: "" });
         refetchCreated();
       },
     });
@@ -682,10 +684,11 @@ export default function AdminTimesheet() {
 
   const handleLogTime = () => {
     logTime.mutate({ ...logForm, duration_minutes: Number(logForm.duration_minutes) }, {
-      onSuccess: () => {
+      onSuccess: (res) => {
         setLogModal(false);
         setLogForm({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" });
         refetchWeek();
+        if (res?.warning) toast(res.warning, { icon: "⏱️", duration: 6000 });
       },
     });
   };
@@ -697,6 +700,7 @@ export default function AdminTimesheet() {
       description: job.description || "",
       priority: job.priority || "medium",
       estimated_hours: job.estimated_hours || "",
+      max_hours_per_day: job.max_hours_per_day || "",
       billable: !!job.billable,
       hourly_rate: job.hourly_rate || "",
       due_date: job.due_date ? job.due_date.slice(0, 10) : "",
@@ -713,6 +717,7 @@ export default function AdminTimesheet() {
         description: editJobForm.description,
         priority: editJobForm.priority,
         estimated_hours: Number(editJobForm.estimated_hours) || 0,
+        max_hours_per_day: editJobForm.max_hours_per_day === "" ? null : Number(editJobForm.max_hours_per_day),
         billable: editJobForm.billable,
         hourly_rate: Number(editJobForm.hourly_rate) || 0,
         due_date: editJobForm.due_date || null,
@@ -1004,6 +1009,7 @@ export default function AdminTimesheet() {
                           <div className="text-xs text-gray-400 mt-0.5">Week: {fmtDate(ts.week_start)} – {fmtDate(ts.week_end)}</div>
                           <div className="flex gap-2 mt-2.5 flex-wrap">
                             <Chip color="brand">{fmtDuration(ts.total_minutes)}</Chip>
+                            {ts.overtime_minutes > 0 && <Chip color="amber">{fmtDuration(ts.overtime_minutes)} overtime</Chip>}
                             {ts.billable_minutes > 0 && <Chip color="green">{fmtDuration(ts.billable_minutes)} billable</Chip>}
                             <Badge status={ts.status} />
                           </div>
@@ -1348,7 +1354,7 @@ export default function AdminTimesheet() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="font-bold text-[15px] text-gray-900 truncate">{ts.owner?.f_name} {ts.owner?.l_name}</span>
-                          <Chip color="brand">{ts.owner_model}</Chip>
+                          <Chip color="brand">{ts.owner_model === "User" ? "Employee" : ts.owner_model}</Chip>
                           <Badge status={ts.status} />
                         </div>
                         <div className="text-xs text-gray-400 break-all">{ts.owner?.work_email} · Week of {fmtDate(ts.week_start)}</div>
@@ -1359,6 +1365,12 @@ export default function AdminTimesheet() {
                           <div className="text-base sm:text-lg font-extrabold text-[#730042]">{fmtDuration(ts.total_minutes)}</div>
                           <div className="text-[11px] text-gray-400">total</div>
                         </div>
+                        {ts.overtime_minutes > 0 && (
+                          <div className="text-right">
+                            <div className="text-base sm:text-lg font-extrabold text-amber-600">{fmtDuration(ts.overtime_minutes)}</div>
+                            <div className="text-[11px] text-gray-400">overtime</div>
+                          </div>
+                        )}
                         {ts.billable_minutes > 0 && (
                           <div className="text-right">
                             <div className="text-base sm:text-lg font-extrabold text-emerald-600">{fmtDuration(ts.billable_minutes)}</div>
@@ -1400,6 +1412,10 @@ export default function AdminTimesheet() {
             <Input label="Hourly Rate (₹)" type="number" placeholder="0" value={jobForm.hourly_rate} onChange={(e) => setJobForm((p) => ({ ...p, hourly_rate: e.target.value }))} />
             <Input label="Due Date" type="date" value={jobForm.due_date} onChange={(e) => setJobForm((p) => ({ ...p, due_date: e.target.value }))} />
           </div>
+          <div>
+            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={jobForm.max_hours_per_day} onChange={(e) => setJobForm((p) => ({ ...p, max_hours_per_day: e.target.value }))} />
+            <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day is counted as overtime. Leave blank to use the employee's shift hours instead.</p>
+          </div>
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={jobForm.billable} onChange={(e) => setJobForm((p) => ({ ...p, billable: e.target.checked }))} className="w-[15px] h-[15px] accent-[#730042] flex-shrink-0" />
             <span className="text-[13px] text-gray-700">Billable job</span>
@@ -1429,6 +1445,10 @@ export default function AdminTimesheet() {
           <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
             <Input label="Hourly Rate (₹)" type="number" placeholder="0" value={editJobForm.hourly_rate} onChange={(e) => setEditJobForm((p) => ({ ...p, hourly_rate: e.target.value }))} />
             <Input label="Due Date" type="date" value={editJobForm.due_date} onChange={(e) => setEditJobForm((p) => ({ ...p, due_date: e.target.value }))} />
+          </div>
+          <div>
+            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={editJobForm.max_hours_per_day} onChange={(e) => setEditJobForm((p) => ({ ...p, max_hours_per_day: e.target.value }))} />
+            <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day is counted as overtime. Leave blank to use the employee's shift hours instead.</p>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={editJobForm.billable} onChange={(e) => setEditJobForm((p) => ({ ...p, billable: e.target.checked }))} className="w-[15px] h-[15px] accent-[#730042] flex-shrink-0" />
