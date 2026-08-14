@@ -56,11 +56,20 @@ const createJob = async (req, res, next) => {
     due_date,
     work_items,
     tags,
+    max_hours_per_day,
   } = req.body;
 
   if (!title) return next(httpError("Job title is required", 400));
   if (!assigned_to || !assigned_to_model) {
     return next(httpError("assigned_to and assigned_to_model are required", 400));
+  }
+
+  let maxHoursPerDay = null;
+  if (max_hours_per_day !== undefined && max_hours_per_day !== null && max_hours_per_day !== "") {
+    maxHoursPerDay = Number(max_hours_per_day);
+    if (Number.isNaN(maxHoursPerDay) || maxHoursPerDay < 0.5 || maxHoursPerDay > 24) {
+      return next(httpError("max_hours_per_day must be between 0.5 and 24", 400));
+    }
   }
 
   if (project) {
@@ -102,6 +111,7 @@ const createJob = async (req, res, next) => {
     hourly_rate: hourly_rate || 0,
     currency: currency || "INR",
     estimated_hours: estimated_hours || 0,
+    max_hours_per_day: maxHoursPerDay,
     due_date: due_date || null,
     work_items: Array.isArray(work_items) ? work_items.map((w) => ({ name: w })) : [],
     tags: Array.isArray(tags) ? tags : [],
@@ -260,6 +270,19 @@ const updateJob = async (req, res, next) => {
 
   for (const field of allowedFields) {
     if (field in req.body) job[field] = req.body[field];
+  }
+
+  if ("max_hours_per_day" in req.body) {
+    const raw = req.body.max_hours_per_day;
+    if (raw === null || raw === "" || raw === undefined) {
+      job.max_hours_per_day = null;
+    } else {
+      const val = Number(raw);
+      if (Number.isNaN(val) || val < 0.5 || val > 24) {
+        return next(httpError("max_hours_per_day must be between 0.5 and 24", 400));
+      }
+      job.max_hours_per_day = val;
+    }
   }
 
   await job.save();
