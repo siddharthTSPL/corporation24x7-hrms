@@ -55,6 +55,13 @@ const jobSchema = new mongoose.Schema(
     estimated_hours: { type: Number, default: 0, min: 0 },
     logged_hours_cache: { type: Number, default: 0, min: 0 },
 
+    // Per-day working-hour cap for this job. Anything logged on a given IST
+    // day beyond this (across all of the assignee's jobs, not just this one)
+    // is treated as overtime instead of regular working time. Null/0 means
+    // "not set" -> the assignee's shift duration (end - start) is used as
+    // the fallback daily cap at log-time.
+    max_hours_per_day: { type: Number, default: null, min: 0.5, max: 24 },
+
     due_date: { type: Date, default: null },
 
     status: {
