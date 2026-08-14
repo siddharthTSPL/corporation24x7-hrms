@@ -1485,8 +1485,10 @@ function downloadPayslip({ payroll, name, employeeId, department, designation })
       <tr><td>HRA</td><td class="amt">${fmtINR(payroll.breakup?.hra)}</td></tr>
       ${allowanceRows}
       <tr><td>Bonus</td><td class="amt">${fmtINR(payroll.earnings?.bonus)}</td></tr>
+      <tr><td>Incentive</td><td class="amt">${fmtINR(payroll.earnings?.incentive)}</td></tr>
       <tr><td>Overtime</td><td class="amt">${fmtINR(payroll.earnings?.overtime)}</td></tr>
       <tr><td>Reimbursement</td><td class="amt">${fmtINR(payroll.earnings?.reimbursement)}</td></tr>
+      <tr><td>Other Earnings</td><td class="amt">${fmtINR(payroll.earnings?.other)}</td></tr>
       ${benefitRows}
       ${reimbursementComponentRows}
       <tr class="total-row"><td>GROSS EARNINGS</td><td class="amt">${fmtINR(payroll.earnings?.totalEarnings)}</td></tr>
@@ -1500,6 +1502,7 @@ function downloadPayslip({ payroll, name, employeeId, department, designation })
       <tr><td>ESI</td><td class="amt">${fmtINR(payroll.deductions?.esi)}</td></tr>
       <tr><td>Professional Tax</td><td class="amt">${fmtINR(payroll.deductions?.professionalTax)}</td></tr>
       <tr><td>TDS</td><td class="amt">${fmtINR(payroll.deductions?.tds)}</td></tr>
+      <tr><td>LWF</td><td class="amt">${fmtINR(payroll.deductions?.lwf)}</td></tr>
       <tr><td>Loan EMI</td><td class="amt">${fmtINR(payroll.deductions?.loan)}</td></tr>
       <tr><td>Other Deduction</td><td class="amt">${fmtINR((payroll.deductions?.advance || 0) + (payroll.deductions?.other || 0))}</td></tr>
       ${deductionComponentRows}
@@ -1577,8 +1580,10 @@ function PayslipModal({ payroll, directory, onClose }) {
             <Fragment key={`al-${a.name}`}><PayslipRow label={a.name} value={fmtINR(a.amount)} /></Fragment>
           ))}
           <PayslipRow label="Bonus" value={fmtINR(payroll.earnings?.bonus)} />
+          <PayslipRow label="Incentive" value={fmtINR(payroll.earnings?.incentive)} />
           <PayslipRow label="Overtime" value={fmtINR(payroll.earnings?.overtime)} />
           <PayslipRow label="Reimbursement" value={fmtINR(payroll.earnings?.reimbursement)} />
+          <PayslipRow label="Other Earnings" value={fmtINR(payroll.earnings?.other)} />
           {(payroll.breakup?.benefitComponents || []).map((c) => (
             <Fragment key={`bn-${c.name}`}><PayslipRow label={c.name} value={fmtINR(c.amount)} /></Fragment>
           ))}
@@ -1595,6 +1600,7 @@ function PayslipModal({ payroll, directory, onClose }) {
           <PayslipRow label="ESI" value={fmtINR(payroll.deductions?.esi)} />
           <PayslipRow label="Professional Tax" value={fmtINR(payroll.deductions?.professionalTax)} />
           <PayslipRow label="TDS" value={fmtINR(payroll.deductions?.tds)} />
+          <PayslipRow label="LWF" value={fmtINR(payroll.deductions?.lwf)} />
           <PayslipRow label="Loan EMI" value={fmtINR(payroll.deductions?.loan)} />
           <PayslipRow label="Other Deduction" value={fmtINR((payroll.deductions?.advance || 0) + (payroll.deductions?.other || 0))} />
           {(payroll.breakup?.deductionComponents || []).map((c) => (
@@ -1614,6 +1620,8 @@ function PayslipModal({ payroll, directory, onClose }) {
         <PayslipSection title="Employer Contributions">
           <PayslipRow label="Employer PF" value={fmtINR(payroll.employerContribution?.pf)} />
           <PayslipRow label="Employer ESI" value={fmtINR(payroll.employerContribution?.esi)} />
+          <PayslipRow label="Employer LWF" value={fmtINR(payroll.employerContribution?.lwf)} />
+          <PayslipRow label="Statutory Bonus" value={fmtINR(payroll.employerContribution?.statutoryBonus)} />
           <PayslipRow label="Gratuity" value={fmtINR(payroll.employerContribution?.gratuity)} />
         </PayslipSection>
 
