@@ -941,10 +941,11 @@ export default function SuperAdminTimesheet() {
                     <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-[15px] text-gray-900 truncate">{ts.owner?.f_name} {ts.owner?.l_name}</div>
-                        <div className="text-[12px] text-gray-400 mt-0.5 truncate">{ts.owner?.work_email} · {ts.owner_model}</div>
+                        <div className="text-[12px] text-gray-400 mt-0.5 truncate">{ts.owner?.work_email} · {ts.owner_model === "User" ? "Employee" : ts.owner_model}</div>
                         <div className="text-[12px] text-gray-400 mt-1">Week: {fmtDate(ts.week_start)} — {fmtDate(ts.week_end)}</div>
                         <div className="flex items-center gap-3 mt-2 flex-wrap text-[12px]">
                           <span className="text-[#730042] font-semibold">{fmtDuration(ts.total_minutes)} total</span>
+                          {ts.overtime_minutes > 0 && <span className="text-amber-600 font-semibold">{fmtDuration(ts.overtime_minutes)} overtime</span>}
                           <span className="text-emerald-600">{fmtDuration(ts.billable_minutes)} billable</span>
                           <Badge tw={(STATUS_STYLE[ts.status] || STATUS_STYLE.draft).tw}>{(STATUS_STYLE[ts.status] || STATUS_STYLE.draft).label}</Badge>
                         </div>
@@ -1127,7 +1128,7 @@ export default function SuperAdminTimesheet() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
                             <span className="font-bold text-[14px] text-gray-900 truncate">{ts.owner?.f_name} {ts.owner?.l_name}</span>
-                            <Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{ts.owner_model}</Badge>
+                            <Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{ts.owner_model === "User" ? "Employee" : ts.owner_model}</Badge>
                             <Badge tw={ss.tw}>{ss.label}</Badge>
                           </div>
                           <div className="text-[12px] text-gray-400 truncate">{ts.owner?.work_email} · Week: {fmtDate(ts.week_start)} — {fmtDate(ts.week_end)}</div>
