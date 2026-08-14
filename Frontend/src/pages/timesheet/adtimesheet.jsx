@@ -1495,6 +1495,7 @@ export default function AdminTimesheet() {
               className="w-full sm:w-auto"
             >
               {rejectTS.isPending ? "Rejecting…" : "Reject"}
+              
             </Btn>
           </div>
         </div>
