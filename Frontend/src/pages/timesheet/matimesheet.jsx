@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import toast from "react-hot-toast";
 import {
   useMyAssignedJobs,
   useJobsCreatedByMe,
@@ -464,13 +465,13 @@ export default function ManagerTimesheet() {
   const [editLog, setEditLog] = useState(null);
   const [editForm, setEditForm] = useState({ duration_minutes: "", note: "", reason: "" });
   const [jobModal, setJobModal] = useState(false);
-  const [jobForm, setJobForm] = useState({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: false, hourly_rate: "", due_date: "" });
+  const [jobForm, setJobForm] = useState({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", max_hours_per_day: "", billable: false, hourly_rate: "", due_date: "" });
   const [rejectModal, setRejectModal] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [jobDetailOpen, setJobDetailOpen] = useState(false);
   const [editJobModal, setEditJobModal] = useState(false);
-  const [editJobForm, setEditJobForm] = useState({ id: "", title: "", description: "", priority: "medium", estimated_hours: "", billable: false, hourly_rate: "", due_date: "" });
+  const [editJobForm, setEditJobForm] = useState({ id: "", title: "", description: "", priority: "medium", estimated_hours: "", max_hours_per_day: "", billable: false, hourly_rate: "", due_date: "" });
 
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 6);
@@ -518,14 +519,20 @@ export default function ManagerTimesheet() {
   const handleLogTime = () => {
     if (!logForm.job || !logForm.duration_minutes) return;
     logTime.mutate({ job: logForm.job, log_date: logForm.log_date, duration_minutes: Number(logForm.duration_minutes), note: logForm.note }, {
-      onSuccess: () => { setLogModal(false); setLogForm({ job: "", log_date: "", duration_minutes: "", note: "" }); refetchWeek(); }
+      onSuccess: (res) => {
+        setLogModal(false); setLogForm({ job: "", log_date: "", duration_minutes: "", note: "" }); refetchWeek();
+        if (res?.warning) toast(res.warning, { icon: "⏱️", duration: 6000 });
+      }
     });
   };
 
   const handleUpdateLog = () => {
     if (!editLog) return;
     updateTimeLog.mutate({ id: editLog._id, data: { duration_minutes: Number(editForm.duration_minutes), note: editForm.note, reason: editForm.reason } }, {
-      onSuccess: () => { setEditLog(null); refetchWeek(); }
+      onSuccess: (res) => {
+        setEditLog(null); refetchWeek();
+        if (res?.warning) toast(res.warning, { icon: "⏱️", duration: 6000 });
+      }
     });
   };
 
@@ -541,10 +548,11 @@ export default function ManagerTimesheet() {
       title: jobForm.title, description: jobForm.description,
       assigned_to: jobForm.assigned_to, assigned_to_model: target?.model || "User",
       priority: jobForm.priority, estimated_hours: Number(jobForm.estimated_hours) || 0,
+      max_hours_per_day: jobForm.max_hours_per_day === "" ? null : Number(jobForm.max_hours_per_day),
       billable: jobForm.billable, hourly_rate: Number(jobForm.hourly_rate) || 0,
       due_date: jobForm.due_date || null,
     }, {
-      onSuccess: () => { setJobModal(false); setJobForm({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", billable: false, hourly_rate: "", due_date: "" }); refetchCreated(); }
+      onSuccess: () => { setJobModal(false); setJobForm({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", max_hours_per_day: "", billable: false, hourly_rate: "", due_date: "" }); refetchCreated(); }
     });
   };
 
@@ -555,6 +563,7 @@ export default function ManagerTimesheet() {
       description: job.description || "",
       priority: job.priority || "medium",
       estimated_hours: job.estimated_hours || "",
+      max_hours_per_day: job.max_hours_per_day || "",
       billable: !!job.billable,
       hourly_rate: job.hourly_rate || "",
       due_date: job.due_date ? job.due_date.slice(0, 10) : "",
@@ -571,6 +580,7 @@ export default function ManagerTimesheet() {
         description: editJobForm.description,
         priority: editJobForm.priority,
         estimated_hours: Number(editJobForm.estimated_hours) || 0,
+        max_hours_per_day: editJobForm.max_hours_per_day === "" ? null : Number(editJobForm.max_hours_per_day),
         billable: editJobForm.billable,
         hourly_rate: Number(editJobForm.hourly_rate) || 0,
         due_date: editJobForm.due_date || null,
@@ -778,6 +788,7 @@ export default function ManagerTimesheet() {
                       <div className="text-[11px] text-gray-400">Week: {fmtDate(ts.week_start)} – {fmtDate(ts.week_end)}</div>
                       <div className="flex gap-2 mt-2 flex-wrap">
                         <Chip color="brand">{fmtDuration(ts.total_minutes)}</Chip>
+                        {ts.overtime_minutes > 0 && <Chip color="amber">{fmtDuration(ts.overtime_minutes)} overtime</Chip>}
                         {ts.billable_minutes > 0 && <Chip color="green">{fmtDuration(ts.billable_minutes)} billable</Chip>}
                         <StatusBadge status={ts.status} />
                       </div>
@@ -907,6 +918,7 @@ export default function ManagerTimesheet() {
                           </div>
                           <div className="flex gap-3 text-[12px] flex-wrap">
                             <span className="font-semibold text-[#730042]">{fmtDuration(ts.total_minutes)}</span>
+                            {ts.overtime_minutes > 0 && <span className="font-semibold text-amber-600">{fmtDuration(ts.overtime_minutes)} overtime</span>}
                             {ts.billable_minutes > 0 && <span className="text-emerald-600">{fmtDuration(ts.billable_minutes)} billable</span>}
                             <span className="text-gray-400">{fmtDate(ts.week_start)} – {fmtDate(ts.week_end)}</span>
                           </div>
@@ -971,7 +983,7 @@ export default function ManagerTimesheet() {
           <Input label="Description" placeholder="Optional description" value={jobForm.description} onChange={(e) => setJobForm((p) => ({ ...p, description: e.target.value }))} />
           <Sel label="Assign To" value={jobForm.assigned_to} onChange={(e) => setJobForm((p) => ({ ...p, assigned_to: e.target.value }))}>
             <option value="">Select target…</option>
-            {targets.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.model})</option>)}
+            {targets.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.model === "User" ? "Employee" : t.model})</option>)}
           </Sel>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Sel label="Priority" value={jobForm.priority} onChange={(e) => setJobForm((p) => ({ ...p, priority: e.target.value }))}>
@@ -990,6 +1002,10 @@ export default function ManagerTimesheet() {
             <Input label="Hourly Rate" type="number" placeholder="0" value={jobForm.hourly_rate} onChange={(e) => setJobForm((p) => ({ ...p, hourly_rate: e.target.value }))} disabled={!jobForm.billable} />
           </div>
           <Input label="Due Date" type="date" value={jobForm.due_date} onChange={(e) => setJobForm((p) => ({ ...p, due_date: e.target.value }))} />
+          <div>
+            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={jobForm.max_hours_per_day} onChange={(e) => setJobForm((p) => ({ ...p, max_hours_per_day: e.target.value }))} />
+            <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day counts as overtime. Leave blank to use the employee's shift hours instead.</p>
+          </div>
           <div className="flex gap-2 justify-end flex-wrap">
             <Btn variant="ghost" onClick={() => setJobModal(false)}>Cancel</Btn>
             <Btn onClick={handleCreateJob} disabled={!jobForm.title || !jobForm.assigned_to || createJob.isPending}>
@@ -1020,6 +1036,10 @@ export default function ManagerTimesheet() {
             <Input label="Hourly Rate" type="number" placeholder="0" value={editJobForm.hourly_rate} onChange={(e) => setEditJobForm((p) => ({ ...p, hourly_rate: e.target.value }))} disabled={!editJobForm.billable} />
           </div>
           <Input label="Due Date" type="date" value={editJobForm.due_date} onChange={(e) => setEditJobForm((p) => ({ ...p, due_date: e.target.value }))} />
+          <div>
+            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={editJobForm.max_hours_per_day} onChange={(e) => setEditJobForm((p) => ({ ...p, max_hours_per_day: e.target.value }))} />
+            <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day counts as overtime. Leave blank to use the employee's shift hours instead.</p>
+          </div>
           <div className="flex gap-2 justify-end flex-wrap">
             <Btn variant="ghost" onClick={() => setEditJobModal(false)}>Cancel</Btn>
             <Btn onClick={handleUpdateJob} disabled={!editJobForm.title || updateJob.isPending}>
