@@ -286,12 +286,12 @@ function JobDetailModal({ jobId, open, onClose }) {
             <div className="bg-gray-50 rounded-xl p-3 min-w-0">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Assigned To</div>
               <div className="text-[13px] font-bold text-gray-900 truncate">{job.assigned_to_info?.name || "—"}</div>
-              <div className="text-[11px] text-[#730042] font-semibold truncate">{job.assigned_to_info?.role || job.assigned_to_info?.model || ""}</div>
+              <div className="text-[11px] text-[#730042] font-semibold truncate">{job.assigned_to_info?.model === "User" ? "Employee" : (job.assigned_to_info?.role || job.assigned_to_info?.model || "")}</div>
             </div>
             <div className="bg-gray-50 rounded-xl p-3 min-w-0">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Assigned By</div>
               <div className="text-[13px] font-bold text-gray-900 truncate">{job.assigned_by_info?.name || "—"}</div>
-              <div className="text-[11px] text-[#730042] font-semibold truncate">{job.assigned_by_info?.role || job.assigned_by_info?.model || ""}</div>
+              <div className="text-[11px] text-[#730042] font-semibold truncate">{job.assigned_by_info?.model === "User" ? "Employee" : (job.assigned_by_info?.role || job.assigned_by_info?.model || "")}</div>
             </div>
             <div className="bg-gray-50 rounded-xl p-3 min-w-0">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Status</div>
@@ -1395,7 +1395,7 @@ export default function AdminTimesheet() {
             <option value="">Select team member…</option>
             {targets.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.name} — {t.role || t.model}
+                {t.name} — {t.model === "User" ? "Employee" : (t.role || t.model)}
               </option>
             ))}
           </Sel>
