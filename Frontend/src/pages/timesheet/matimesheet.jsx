@@ -725,7 +725,7 @@ export default function ManagerTimesheet() {
                           {j.assigned_to_name && (
                             <div className="text-[11px] text-gray-400 mb-1.5">
                               Assigned to <span className="font-semibold text-gray-700">{j.assigned_to_name}</span>
-                              {j.assigned_to_model && <span className="text-[#730042]"> · {j.assigned_to_model}</span>}
+                              {j.assigned_to_model && <span className="text-[#730042]"> · {j.assigned_to_model === "User" ? "Employee" : j.assigned_to_model}</span>}
                             </div>
                           )}
                           <div className="flex items-center gap-1.5 flex-wrap">
@@ -761,6 +761,49 @@ export default function ManagerTimesheet() {
                 })}
               </div>
             )}
+
+            <div className="mt-6">
+              <div className="font-bold text-[16px] sm:text-[17px] text-gray-900 mb-0.5">My Jobs</div>
+              <div className="text-[12px] text-gray-400 mb-3">{assignedJobs.length} job{assignedJobs.length !== 1 ? "s" : ""} assigned to you</div>
+              {assignedJobs.length === 0 ? (
+                <div className="bg-white border border-gray-200 rounded-2xl py-12 text-center px-4">
+                  <div className="text-3xl mb-2">📭</div>
+                  <div className="font-semibold text-gray-700">No jobs assigned to you</div>
+                  <div className="text-[12px] text-gray-400 mt-1">Jobs assigned to you will show up here</div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  {assignedJobs.map((j) => {
+                    const pct = j.estimated_hours > 0 ? Math.round((j.logged_hours_cache / j.estimated_hours) * 100) : 0;
+                    return (
+                      <div key={j._id} className="bg-white border border-gray-200 rounded-2xl p-4 hover:border-[#730042]/20 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                            <span className="font-semibold text-[14px] text-gray-900 break-words">{j.title}</span>
+                            {j.overrun_flagged && <Chip color="red" size="xs">Overrun ⚠</Chip>}
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Chip size="xs" color={j.status === "in_progress" ? "blue" : j.status === "completed" ? "green" : j.status === "on_hold" ? "amber" : j.status === "cancelled" ? "red" : "gray"}>
+                              {JOB_STATUS_META[j.status]?.label || j.status}
+                            </Chip>
+                            <Chip size="xs" color={j.priority === "urgent" ? "brand" : j.priority === "high" ? "red" : j.priority === "medium" ? "amber" : "gray"}>{j.priority}</Chip>
+                            {j.estimated_hours > 0 && <Chip size="xs" color="blue">{j.logged_hours_cache?.toFixed(1)}h / {j.estimated_hours}h</Chip>}
+                            {j.due_date && <span className="text-[11px] text-gray-400">Due {fmtDate(j.due_date)}</span>}
+                          </div>
+                          {j.estimated_hours > 0 && (
+                            <div className="mt-2">
+                              <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                                <div className={cn("h-full rounded-full", j.overrun_flagged ? "bg-red-500" : "bg-[#730042]")} style={{ width: `${Math.min(100, pct)}%` }} />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
