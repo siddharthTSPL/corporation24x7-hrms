@@ -1274,7 +1274,7 @@ export default function AdminTimesheet() {
                       <div className="text-[12px] text-gray-700 mb-2 truncate">{log.job?.title || "—"}</div>
                       <div className="flex items-center justify-between flex-wrap gap-1.5">
                         <div className="flex gap-1.5 flex-wrap">
-                          <Chip color="brand">{log.logged_by_model}</Chip>
+                          <Chip color="brand">{log.logged_by_model === "User" ? "Employee" : log.logged_by_model}</Chip>
                           <Chip color={log.entry_mode === "timer" ? "blue" : "gray"}>{log.entry_mode}</Chip>
                         </div>
                         <div className="flex items-center gap-2 text-[11px]">
@@ -1302,7 +1302,7 @@ export default function AdminTimesheet() {
                             <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">
                               {log.logged_by?.f_name || "—"} {log.logged_by?.l_name || ""}
                             </td>
-                            <td className="px-4 py-3"><Chip color="brand">{log.logged_by_model}</Chip></td>
+                            <td className="px-4 py-3"><Chip color="brand">{log.logged_by_model === "User" ? "Employee" : log.logged_by_model}</Chip></td>
                             <td className="px-4 py-3 max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap text-gray-700">{log.job?.title || "—"}</td>
                             <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{fmtDate(log.log_date)}</td>
                             <td className="px-4 py-3 font-bold text-emerald-600 whitespace-nowrap">{fmtDuration(log.duration_minutes)}</td>
