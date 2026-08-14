@@ -37,6 +37,11 @@ const timesheetSchema = new mongoose.Schema(
     ],
 
     total_minutes: { type: Number, default: 0, min: 0 },
+    // Weekly working vs overtime split, summed from each log's
+    // regular_minutes / overtime_minutes. working_minutes + overtime_minutes
+    // always equals total_minutes.
+    working_minutes: { type: Number, default: 0, min: 0 },
+    overtime_minutes: { type: Number, default: 0, min: 0 },
     billable_minutes: { type: Number, default: 0, min: 0 },
     total_billed_amount: { type: Number, default: 0, min: 0 },
     currency: { type: String, default: "INR" },
