@@ -1130,7 +1130,7 @@ function StructuresTab({ notify, directory }) {
               {people.map((p) => <option key={p._id} value={p._id}>{p.name} ({p.uid})</option>)}
             </Select>
           </Field>
-          <Field label="Annual CTC (₹)">
+          <Field label="Fixed Annual CTC (₹)">
             <TextInput type="number" min={1} value={form.ctc} onChange={(e) => setForm((p) => ({ ...p, ctc: e.target.value }))} placeholder="e.g. 600000" />
           </Field>
           <Field label="Effective From" hint="Defaults to today">
