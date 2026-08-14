@@ -1420,26 +1420,82 @@ function PayslipSection({ title, children }) {
   );
 }
 
+// Turns a camelCase field name into a readable label when we don't have a
+// nicer override for it, e.g. "otherEarnings" -> "Other Earnings". This is
+// what lets a brand-new field the backend starts sending show up on the
+// payslip with a sane label, with zero frontend changes needed.
+function humanizeKey(key) {
+  const spaced = String(key).replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+// Nicer labels for known fields; anything not listed here falls back to
+// humanizeKey() automatically, so unknown/future fields still get a
+// reasonable label instead of being skipped.
+const EARNINGS_LABELS = { other: "Other Earnings" };
+const DEDUCTIONS_LABELS = {
+  pf: "Employee PF",
+  esi: "ESI",
+  professionalTax: "Professional Tax",
+  tds: "TDS",
+  lwf: "LWF",
+  loan: "Loan EMI",
+  advance: "Advance",
+  other: "Other Deduction",
+};
+const EMPLOYER_LABELS = { pf: "Employer PF", esi: "Employer ESI", lwf: "Employer LWF", statutoryBonus: "Statutory Bonus" };
+
+// Aggregate/derived fields that shouldn't appear as their own line item
+// (they're either shown as the section's Total row, or they're the sum of
+// components we already itemize elsewhere, e.g. `benefits` = total of
+// breakup.benefitComponents).
+const EARNINGS_EXCLUDE = ["gross", "benefits", "reimbursementComponents", "totalEarnings"];
+const DEDUCTIONS_EXCLUDE = ["lossOfPay", "components", "totalDeductions"];
+
+// Reads every numeric, non-zero field off a payroll sub-object (earnings /
+// deductions / employerContribution) and turns it into a {label, amount}
+// row — no fixed list of field names, so anything the backend starts
+// filling in (a new manual-entry field, a new statutory line, etc.) shows
+// up on the payslip automatically instead of needing a matching JSX row
+// added by hand every time.
+function dynamicRows(obj, excludeKeys, labelOverrides) {
+  return Object.entries(obj || {})
+    .filter(([key, value]) => !excludeKeys.includes(key) && typeof value === "number" && value !== 0)
+    .map(([key, value]) => ({ label: labelOverrides[key] || humanizeKey(key), amount: value }));
+}
+
+// Builds the full set of Earnings / Deductions / Employer Contribution line
+// items for one payroll record. Used by both the on-screen PayslipModal and
+// the downloadable/print HTML, so the two never drift out of sync.
+function getPayslipLineItems(payroll) {
+  const breakup = payroll.breakup || {};
+
+  const earnings = [
+    { label: "Basic", amount: breakup.basic || 0 },
+    { label: "HRA", amount: breakup.hra || 0 },
+    ...(breakup.allowances || []).map((a) => ({ label: a.name, amount: a.amount })),
+    ...dynamicRows(payroll.earnings, EARNINGS_EXCLUDE, EARNINGS_LABELS),
+    ...(breakup.benefitComponents || []).map((c) => ({ label: c.name, amount: c.amount })),
+    ...(breakup.reimbursementComponents || []).map((c) => ({ label: c.name, amount: c.amount })),
+  ];
+
+  const deductions = [
+    ...dynamicRows(payroll.deductions, DEDUCTIONS_EXCLUDE, DEDUCTIONS_LABELS),
+    ...(breakup.deductionComponents || []).map((c) => ({ label: c.name, amount: c.amount })),
+  ];
+
+  const employerContribution = dynamicRows(payroll.employerContribution, [], EMPLOYER_LABELS);
+
+  return { earnings, deductions, employerContribution };
+}
+
 // Opens a print-formatted payslip in a new tab and triggers the browser's
 // print dialog, where "Save as PDF" gives a real downloadable file — no
 // extra PDF library/dependency needed.
 function downloadPayslip({ payroll, name, employeeId, department, designation }) {
   const att = payroll.attendance || {};
-  const allowanceRows = (payroll.breakup?.allowances || [])
-    .map((a) => `<tr><td>${a.name}</td><td class="amt">${fmtINR(a.amount)}</td></tr>`)
-    .join("");
-  // Custom Benefit / Reimbursement Salary Components the org has created —
-  // shown as their own earnings line items, same as `allowanceRows` above.
-  const benefitRows = (payroll.breakup?.benefitComponents || [])
-    .map((c) => `<tr><td>${c.name}</td><td class="amt">${fmtINR(c.amount)}</td></tr>`)
-    .join("");
-  const reimbursementComponentRows = (payroll.breakup?.reimbursementComponents || [])
-    .map((c) => `<tr><td>${c.name}</td><td class="amt">${fmtINR(c.amount)}</td></tr>`)
-    .join("");
-  // Custom Deduction Salary Components the org has created.
-  const deductionComponentRows = (payroll.breakup?.deductionComponents || [])
-    .map((c) => `<tr><td>${c.name}</td><td class="amt">${fmtINR(c.amount)}</td></tr>`)
-    .join("");
+  const { earnings, deductions, employerContribution } = getPayslipLineItems(payroll);
+  const rowsHtml = (items) => items.map((r) => `<tr><td>${r.label}</td><td class="amt">${fmtINR(r.amount)}</td></tr>`).join("");
   const period = `${MONTH_NAMES[payroll.month - 1]} ${payroll.year}`;
 
   const html = `<!DOCTYPE html>
@@ -1481,16 +1537,7 @@ function downloadPayslip({ payroll, name, employeeId, department, designation })
   <table>
     <thead><tr><th>Earnings</th><th class="amt">Amount</th></tr></thead>
     <tbody>
-      <tr><td>Basic</td><td class="amt">${fmtINR(payroll.breakup?.basic)}</td></tr>
-      <tr><td>HRA</td><td class="amt">${fmtINR(payroll.breakup?.hra)}</td></tr>
-      ${allowanceRows}
-      <tr><td>Bonus</td><td class="amt">${fmtINR(payroll.earnings?.bonus)}</td></tr>
-      <tr><td>Incentive</td><td class="amt">${fmtINR(payroll.earnings?.incentive)}</td></tr>
-      <tr><td>Overtime</td><td class="amt">${fmtINR(payroll.earnings?.overtime)}</td></tr>
-      <tr><td>Reimbursement</td><td class="amt">${fmtINR(payroll.earnings?.reimbursement)}</td></tr>
-      <tr><td>Other Earnings</td><td class="amt">${fmtINR(payroll.earnings?.other)}</td></tr>
-      ${benefitRows}
-      ${reimbursementComponentRows}
+      ${rowsHtml(earnings)}
       <tr class="total-row"><td>GROSS EARNINGS</td><td class="amt">${fmtINR(payroll.earnings?.totalEarnings)}</td></tr>
     </tbody>
   </table>
@@ -1498,14 +1545,7 @@ function downloadPayslip({ payroll, name, employeeId, department, designation })
   <table>
     <thead><tr><th>Deductions</th><th class="amt">Amount</th></tr></thead>
     <tbody>
-      <tr><td>Employee PF</td><td class="amt">${fmtINR(payroll.deductions?.pf)}</td></tr>
-      <tr><td>ESI</td><td class="amt">${fmtINR(payroll.deductions?.esi)}</td></tr>
-      <tr><td>Professional Tax</td><td class="amt">${fmtINR(payroll.deductions?.professionalTax)}</td></tr>
-      <tr><td>TDS</td><td class="amt">${fmtINR(payroll.deductions?.tds)}</td></tr>
-      <tr><td>LWF</td><td class="amt">${fmtINR(payroll.deductions?.lwf)}</td></tr>
-      <tr><td>Loan EMI</td><td class="amt">${fmtINR(payroll.deductions?.loan)}</td></tr>
-      <tr><td>Other Deduction</td><td class="amt">${fmtINR((payroll.deductions?.advance || 0) + (payroll.deductions?.other || 0))}</td></tr>
-      ${deductionComponentRows}
+      ${rowsHtml(deductions)}
       <tr class="total-row"><td>TOTAL DEDUCTIONS</td><td class="amt">${fmtINR(payroll.deductions?.totalDeductions)}</td></tr>
     </tbody>
   </table>
@@ -1535,6 +1575,7 @@ function PayslipModal({ payroll, directory, onClose }) {
   const department = snap.department || "—";
   const designation = snap.designation || "—";
   const att = payroll.attendance || {};
+  const { earnings, deductions, employerContribution } = getPayslipLineItems(payroll);
 
   return (
     <div className="fixed inset-0 z-[998] flex items-center justify-center p-3 sm:p-4 overscroll-contain" style={{ background: "rgba(0,0,0,0.45)" }} onClick={onClose}>
@@ -1574,21 +1615,8 @@ function PayslipModal({ payroll, directory, onClose }) {
 
         {/* Earnings */}
         <PayslipSection title="Earnings">
-          <PayslipRow label="Basic" value={fmtINR(payroll.breakup?.basic)} />
-          <PayslipRow label="HRA" value={fmtINR(payroll.breakup?.hra)} />
-          {(payroll.breakup?.allowances || []).map((a) => (
-            <Fragment key={`al-${a.name}`}><PayslipRow label={a.name} value={fmtINR(a.amount)} /></Fragment>
-          ))}
-          <PayslipRow label="Bonus" value={fmtINR(payroll.earnings?.bonus)} />
-          <PayslipRow label="Incentive" value={fmtINR(payroll.earnings?.incentive)} />
-          <PayslipRow label="Overtime" value={fmtINR(payroll.earnings?.overtime)} />
-          <PayslipRow label="Reimbursement" value={fmtINR(payroll.earnings?.reimbursement)} />
-          <PayslipRow label="Other Earnings" value={fmtINR(payroll.earnings?.other)} />
-          {(payroll.breakup?.benefitComponents || []).map((c) => (
-            <Fragment key={`bn-${c.name}`}><PayslipRow label={c.name} value={fmtINR(c.amount)} /></Fragment>
-          ))}
-          {(payroll.breakup?.reimbursementComponents || []).map((c) => (
-            <Fragment key={`rc-${c.name}`}><PayslipRow label={c.name} value={fmtINR(c.amount)} /></Fragment>
+          {earnings.map((r, i) => (
+            <Fragment key={`e-${i}-${r.label}`}><PayslipRow label={r.label} value={fmtINR(r.amount)} /></Fragment>
           ))}
           <div className="col-span-2 pt-1.5 mt-1" style={{ borderTop: `1px solid ${C.border}` }} />
           <PayslipRow label="GROSS EARNINGS" value={fmtINR(payroll.earnings?.totalEarnings)} bold />
@@ -1596,15 +1624,8 @@ function PayslipModal({ payroll, directory, onClose }) {
 
         {/* Deductions */}
         <PayslipSection title="Deductions">
-          <PayslipRow label="Employee PF" value={fmtINR(payroll.deductions?.pf)} />
-          <PayslipRow label="ESI" value={fmtINR(payroll.deductions?.esi)} />
-          <PayslipRow label="Professional Tax" value={fmtINR(payroll.deductions?.professionalTax)} />
-          <PayslipRow label="TDS" value={fmtINR(payroll.deductions?.tds)} />
-          <PayslipRow label="LWF" value={fmtINR(payroll.deductions?.lwf)} />
-          <PayslipRow label="Loan EMI" value={fmtINR(payroll.deductions?.loan)} />
-          <PayslipRow label="Other Deduction" value={fmtINR((payroll.deductions?.advance || 0) + (payroll.deductions?.other || 0))} />
-          {(payroll.breakup?.deductionComponents || []).map((c) => (
-            <Fragment key={`dc-${c.name}`}><PayslipRow label={c.name} value={fmtINR(c.amount)} /></Fragment>
+          {deductions.map((r, i) => (
+            <Fragment key={`d-${i}-${r.label}`}><PayslipRow label={r.label} value={fmtINR(r.amount)} /></Fragment>
           ))}
           <div className="col-span-2 pt-1.5 mt-1" style={{ borderTop: `1px solid ${C.border}` }} />
           <PayslipRow label="TOTAL DEDUCTIONS" value={fmtINR(payroll.deductions?.totalDeductions)} bold />
@@ -1618,11 +1639,12 @@ function PayslipModal({ payroll, directory, onClose }) {
 
         {/* Employer contributions */}
         <PayslipSection title="Employer Contributions">
-          <PayslipRow label="Employer PF" value={fmtINR(payroll.employerContribution?.pf)} />
-          <PayslipRow label="Employer ESI" value={fmtINR(payroll.employerContribution?.esi)} />
-          <PayslipRow label="Employer LWF" value={fmtINR(payroll.employerContribution?.lwf)} />
-          <PayslipRow label="Statutory Bonus" value={fmtINR(payroll.employerContribution?.statutoryBonus)} />
-          <PayslipRow label="Gratuity" value={fmtINR(payroll.employerContribution?.gratuity)} />
+          {employerContribution.map((r, i) => (
+            <Fragment key={`ec-${i}-${r.label}`}><PayslipRow label={r.label} value={fmtINR(r.amount)} /></Fragment>
+          ))}
+          {employerContribution.length === 0 && (
+            <span style={{ fontSize: 12.5, color: C.muted, gridColumn: "1 / -1" }}>No employer contributions for this pay run.</span>
+          )}
         </PayslipSection>
 
         {att.manualEntry && (
