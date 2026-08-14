@@ -1428,6 +1428,18 @@ function downloadPayslip({ payroll, name, employeeId, department, designation })
   const allowanceRows = (payroll.breakup?.allowances || [])
     .map((a) => `<tr><td>${a.name}</td><td class="amt">${fmtINR(a.amount)}</td></tr>`)
     .join("");
+  // Custom Benefit / Reimbursement Salary Components the org has created —
+  // shown as their own earnings line items, same as `allowanceRows` above.
+  const benefitRows = (payroll.breakup?.benefitComponents || [])
+    .map((c) => `<tr><td>${c.name}</td><td class="amt">${fmtINR(c.amount)}</td></tr>`)
+    .join("");
+  const reimbursementComponentRows = (payroll.breakup?.reimbursementComponents || [])
+    .map((c) => `<tr><td>${c.name}</td><td class="amt">${fmtINR(c.amount)}</td></tr>`)
+    .join("");
+  // Custom Deduction Salary Components the org has created.
+  const deductionComponentRows = (payroll.breakup?.deductionComponents || [])
+    .map((c) => `<tr><td>${c.name}</td><td class="amt">${fmtINR(c.amount)}</td></tr>`)
+    .join("");
   const period = `${MONTH_NAMES[payroll.month - 1]} ${payroll.year}`;
 
   const html = `<!DOCTYPE html>
@@ -1475,6 +1487,8 @@ function downloadPayslip({ payroll, name, employeeId, department, designation })
       <tr><td>Bonus</td><td class="amt">${fmtINR(payroll.earnings?.bonus)}</td></tr>
       <tr><td>Overtime</td><td class="amt">${fmtINR(payroll.earnings?.overtime)}</td></tr>
       <tr><td>Reimbursement</td><td class="amt">${fmtINR(payroll.earnings?.reimbursement)}</td></tr>
+      ${benefitRows}
+      ${reimbursementComponentRows}
       <tr class="total-row"><td>GROSS EARNINGS</td><td class="amt">${fmtINR(payroll.earnings?.totalEarnings)}</td></tr>
     </tbody>
   </table>
@@ -1488,6 +1502,7 @@ function downloadPayslip({ payroll, name, employeeId, department, designation })
       <tr><td>TDS</td><td class="amt">${fmtINR(payroll.deductions?.tds)}</td></tr>
       <tr><td>Loan EMI</td><td class="amt">${fmtINR(payroll.deductions?.loan)}</td></tr>
       <tr><td>Other Deduction</td><td class="amt">${fmtINR((payroll.deductions?.advance || 0) + (payroll.deductions?.other || 0))}</td></tr>
+      ${deductionComponentRows}
       <tr class="total-row"><td>TOTAL DEDUCTIONS</td><td class="amt">${fmtINR(payroll.deductions?.totalDeductions)}</td></tr>
     </tbody>
   </table>
@@ -1559,11 +1574,17 @@ function PayslipModal({ payroll, directory, onClose }) {
           <PayslipRow label="Basic" value={fmtINR(payroll.breakup?.basic)} />
           <PayslipRow label="HRA" value={fmtINR(payroll.breakup?.hra)} />
           {(payroll.breakup?.allowances || []).map((a) => (
-            <Fragment key={a.name}><PayslipRow label={a.name} value={fmtINR(a.amount)} /></Fragment>
+            <Fragment key={`al-${a.name}`}><PayslipRow label={a.name} value={fmtINR(a.amount)} /></Fragment>
           ))}
           <PayslipRow label="Bonus" value={fmtINR(payroll.earnings?.bonus)} />
           <PayslipRow label="Overtime" value={fmtINR(payroll.earnings?.overtime)} />
           <PayslipRow label="Reimbursement" value={fmtINR(payroll.earnings?.reimbursement)} />
+          {(payroll.breakup?.benefitComponents || []).map((c) => (
+            <Fragment key={`bn-${c.name}`}><PayslipRow label={c.name} value={fmtINR(c.amount)} /></Fragment>
+          ))}
+          {(payroll.breakup?.reimbursementComponents || []).map((c) => (
+            <Fragment key={`rc-${c.name}`}><PayslipRow label={c.name} value={fmtINR(c.amount)} /></Fragment>
+          ))}
           <div className="col-span-2 pt-1.5 mt-1" style={{ borderTop: `1px solid ${C.border}` }} />
           <PayslipRow label="GROSS EARNINGS" value={fmtINR(payroll.earnings?.totalEarnings)} bold />
         </PayslipSection>
@@ -1576,6 +1597,9 @@ function PayslipModal({ payroll, directory, onClose }) {
           <PayslipRow label="TDS" value={fmtINR(payroll.deductions?.tds)} />
           <PayslipRow label="Loan EMI" value={fmtINR(payroll.deductions?.loan)} />
           <PayslipRow label="Other Deduction" value={fmtINR((payroll.deductions?.advance || 0) + (payroll.deductions?.other || 0))} />
+          {(payroll.breakup?.deductionComponents || []).map((c) => (
+            <Fragment key={`dc-${c.name}`}><PayslipRow label={c.name} value={fmtINR(c.amount)} /></Fragment>
+          ))}
           <div className="col-span-2 pt-1.5 mt-1" style={{ borderTop: `1px solid ${C.border}` }} />
           <PayslipRow label="TOTAL DEDUCTIONS" value={fmtINR(payroll.deductions?.totalDeductions)} bold />
         </PayslipSection>
