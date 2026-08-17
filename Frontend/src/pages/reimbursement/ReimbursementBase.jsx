@@ -93,6 +93,7 @@ const CLAIM_CSV_COLUMNS = [
   { key: "reimbursementType", label: "Reimbursement Type" },
   { key: "expenseDate", label: "Expense Date" },
   { key: "amountClaimed", label: "Amount Claimed" },
+  { key: "currency", label: "Currency" },
   { key: "project", label: "Project / Client" },
   { key: "costCenter", label: "Cost Center" },
   { key: "paymentMethod", label: "Payment Method" },
@@ -109,7 +110,15 @@ const CLAIM_CSV_COLUMNS = [
 ];
 
 function buildClaimCsvRows(claims) {
-  return claims.map((claim) => ({
+  // Sort newest expense first so the exported file reads chronologically —
+  // easier to scan than raw API/insertion order.
+  const sorted = [...claims].sort((a, b) => {
+    const bd = new Date(b.expenseDate || b.createdAt || 0).getTime();
+    const ad = new Date(a.expenseDate || a.createdAt || 0).getTime();
+    return bd - ad;
+  });
+
+  const rows = sorted.map((claim) => ({
     claimNumber: claim.claimNumber || "",
     employeeName: claim.employeeName || "",
     empid: claim.empid || "",
@@ -118,7 +127,11 @@ function buildClaimCsvRows(claims) {
     designation: claim.designation || "",
     reimbursementType: claim.reimbursementType || "",
     expenseDate: fmtDate(claim.expenseDate),
-    amountClaimed: fmtMoney(claim.amountClaimed, claim.currency),
+    // Plain number (not a formatted currency string) so the column can be
+    // summed / pivoted directly in Excel/Sheets. Currency lives in its own
+    // column right next to it.
+    amountClaimed: (Number(claim.amountClaimed) || 0).toFixed(2),
+    currency: claim.currency || "INR",
     project: claim.project || "",
     costCenter: claim.costCenter || "",
     paymentMethod: claim.paymentMethod || "",
@@ -133,6 +146,44 @@ function buildClaimCsvRows(claims) {
     paymentReference: claim.paymentReference || "",
     description: claim.description || "",
   }));
+
+  // Trailing totals row(s) — one per currency in the export, so a reader
+  // gets the grand total(s) without having to open a formula bar.
+  const totalsByCurrency = sorted.reduce((acc, claim) => {
+    const currency = claim.currency || "INR";
+    acc[currency] = (acc[currency] || 0) + (Number(claim.amountClaimed) || 0);
+    return acc;
+  }, {});
+
+  Object.entries(totalsByCurrency).forEach(([currency, total]) => {
+    rows.push({
+      claimNumber: "TOTAL",
+      employeeName: "",
+      empid: "",
+      submitterModel: "",
+      department: "",
+      designation: "",
+      reimbursementType: "",
+      expenseDate: "",
+      amountClaimed: total.toFixed(2),
+      currency,
+      project: "",
+      costCenter: "",
+      paymentMethod: "",
+      statusLabel: `${sorted.length} claim${sorted.length === 1 ? "" : "s"}`,
+      submissionDate: "",
+      approvedAt: "",
+      rejectedAt: "",
+      paidAt: "",
+      approverComments: "",
+      rejectionReason: "",
+      financeNotes: "",
+      paymentReference: "",
+      description: "",
+    });
+  });
+
+  return rows;
 }
 
 function Spinner({ size = 16, color = "#fff" }) {
@@ -718,6 +769,16 @@ export default function ReimbursementBase({
     flash(`${selectedReviewBucket.label} claims exported.`);
   };
 
+  // Shared by the "My Claims" and "Review Queue" tabs — same column set,
+  // just a different source array and filename prefix.
+  const handleExportClaims = (claims, label) => {
+    if (!claims.length) return;
+    const safeLabel = label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const filename = `reimbursements-${safeLabel}-${new Date().toISOString().slice(0, 10)}.csv`;
+    downloadCsv(filename, CLAIM_CSV_COLUMNS, buildClaimCsvRows(claims));
+    flash(`${label} exported.`);
+  };
+
   const tabBtn = (key, label) => (
     <button
       onClick={() => setTab(key)}
@@ -771,6 +832,17 @@ export default function ReimbursementBase({
               <div style={{ padding: 40, textAlign: "center", color: C.muted }}>Loading…</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {my.length > 0 && (
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <Btn
+                      variant="outline"
+                      onClick={() => handleExportClaims(my, "my-claims")}
+                      style={{ background: "#fff", color: C.brand }}
+                    >
+                      Export CSV
+                    </Btn>
+                  </div>
+                )}
                 <ClaimsTable claims={my} onView={(c) => { setViewClaim(c); setViewIsReview(false); }} emptyText="You haven't submitted any claims yet." />
               </div>
             )}
@@ -782,7 +854,20 @@ export default function ReimbursementBase({
             {reviewQueue.pending?.isLoading ? (
               <div style={{ padding: 40, textAlign: "center", color: C.muted }}>Loading…</div>
             ) : (
-              <ClaimsTable claims={pending} onView={(c) => { setViewClaim(c); setViewIsReview(true); }} showSubmitter emptyText="Nothing pending review right now." />
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {pending.length > 0 && (
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <Btn
+                      variant="outline"
+                      onClick={() => handleExportClaims(pending, "review-queue")}
+                      style={{ background: "#fff", color: C.brand }}
+                    >
+                      Export CSV
+                    </Btn>
+                  </div>
+                )}
+                <ClaimsTable claims={pending} onView={(c) => { setViewClaim(c); setViewIsReview(true); }} showSubmitter emptyText="Nothing pending review right now." />
+              </div>
             )}
           </>
         )}
