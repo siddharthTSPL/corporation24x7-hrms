@@ -196,10 +196,12 @@ const listMyClaims = async ({ actor, model }) => {
     .lean();
 };
 
-// Admin reviews claims raised by User/Manager. SuperAdmin reviews claims
-// raised by Admin, and can additionally see/act on everything.
+// Admin reviews claims raised by User/Manager. SuperAdmin can review claims
+// raised by Admin, Manager, or Employee — i.e. everything org-wide.
+// `approverModel` may be a single role string or an array of roles.
 const listQueueForApprover = async ({ organisation_id, approverModel, status }) => {
-  const query = { organisation_id, approverModel, isDeleted: false };
+  const query = { organisation_id, isDeleted: false };
+  query.approverModel = Array.isArray(approverModel) ? { $in: approverModel } : approverModel;
   if (status) query.status = status;
   return Reimbursement.find(query)
     .sort({ createdAt: -1 })
@@ -420,7 +422,9 @@ const adminMarkPaid = async (req, res) => {
 const superadminGetPending = async (req, res) => {
   const reimbursements = await listQueueForApprover({
     organisation_id: req.superAdmin._id,
-    approverModel: "SuperAdmin",
+    // SuperAdmin can act on every claim in the org, not just claims raised
+    // by Admins — so the pending queue spans both approver buckets.
+    approverModel: ["SuperAdmin", "Admin"],
     status: "submitted",
   });
   res.status(200).json({ success: true, count: reimbursements.length, reimbursements });
@@ -447,10 +451,12 @@ const superadminApprove = async (req, res) => {
     actorId: req.superAdmin._id,
     actorModel: "SuperAdmin",
     comments: req.body.comments,
-    // SuperAdmin can approve Admin claims via the normal queue; org-wide
-    // override for Employee/Manager claims is intentionally not exposed
-    // here to keep Admin as the single approver for those, per spec.
-    allowedApproverModels: ["SuperAdmin"],
+    // SuperAdmin is the org-wide override approver: can act on Admin's own
+    // claims (approverModel "SuperAdmin") as well as Manager/Employee
+    // claims that normally go to an Admin (approverModel "Admin"). Admin
+    // itself stays restricted to only ["Admin"] — never Admin-submitted
+    // claims — see adminApprove/adminReject/adminMarkPaid below.
+    allowedApproverModels: ["SuperAdmin", "Admin"],
   });
   res.status(200).json({ success: true, message: "Reimbursement claim approved", reimbursement: claim });
 };
@@ -463,7 +469,7 @@ const superadminReject = async (req, res) => {
     actorId: req.superAdmin._id,
     actorModel: "SuperAdmin",
     reason: req.body.reason,
-    allowedApproverModels: ["SuperAdmin"],
+    allowedApproverModels: ["SuperAdmin", "Admin"],
   });
   res.status(200).json({ success: true, message: "Reimbursement claim rejected", reimbursement: claim });
 };
@@ -476,7 +482,7 @@ const superadminMarkPaid = async (req, res) => {
     actorModel: "SuperAdmin",
     paymentReference: req.body.paymentReference,
     financeNotes: req.body.financeNotes,
-    allowedApproverModels: ["SuperAdmin"],
+    allowedApproverModels: ["SuperAdmin", "Admin"],
   });
   res.status(200).json({ success: true, message: "Reimbursement claim marked as paid", reimbursement: claim });
 };
