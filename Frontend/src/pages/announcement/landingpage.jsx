@@ -1049,8 +1049,8 @@ function Footer() {
   ]
   const socials = [
     { icon: <FiLinkedin />, href: 'https://www.linkedin.com/company/103362190/admin/dashboard/', label: 'LinkedIn' },
-    { icon: <FiInstagram />, href: '#', label: 'Instagram' },
-    { icon: <FiTwitter />, href: '#', label: 'Twitter' },
+    { icon: <FiInstagram />, href: 'https://www.instagram.com/?hl=en', label: 'Instagram' },
+    { icon: <FiTwitter />, href: 'https://x.com/home', label: 'Twitter' },
     { icon: <FiMail />, href: '#', label: 'Email' },
   ]
   const [activeDoc, setActiveDoc] = useState(null)
