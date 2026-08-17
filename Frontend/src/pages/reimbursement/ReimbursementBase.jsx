@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
+import { downloadCsv } from "../dashboard/Exportcsv";
 
 // ---------------------------------------------------------------------------
 // Shared design tokens — mirrors pages/payroll/Payroll.jsx so this module
@@ -60,6 +61,80 @@ function getErrorMessage(e) {
   return e?.response?.data?.message || e?.message || "Something went wrong";
 }
 
+function fmtDateTime(d) {
+  if (!d) return "";
+  return new Date(d).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function claimAmountSummary(claims) {
+  const totals = claims.reduce((acc, claim) => {
+    const currency = claim?.currency || "INR";
+    acc[currency] = (acc[currency] || 0) + (Number(claim?.amountClaimed) || 0);
+    return acc;
+  }, {});
+  const entries = Object.entries(totals);
+  if (!entries.length) return fmtMoney(0, "INR");
+  return entries.map(([currency, amount]) => fmtMoney(amount, currency)).join(" + ");
+}
+
+const CLAIM_CSV_COLUMNS = [
+  { key: "claimNumber", label: "Claim Number" },
+  { key: "employeeName", label: "Employee" },
+  { key: "empid", label: "Employee ID" },
+  { key: "submitterModel", label: "Submitted By Role" },
+  { key: "department", label: "Department" },
+  { key: "designation", label: "Designation" },
+  { key: "reimbursementType", label: "Reimbursement Type" },
+  { key: "expenseDate", label: "Expense Date" },
+  { key: "amountClaimed", label: "Amount Claimed" },
+  { key: "project", label: "Project / Client" },
+  { key: "costCenter", label: "Cost Center" },
+  { key: "paymentMethod", label: "Payment Method" },
+  { key: "statusLabel", label: "Status" },
+  { key: "submissionDate", label: "Submitted On" },
+  { key: "approvedAt", label: "Approved On" },
+  { key: "rejectedAt", label: "Rejected On" },
+  { key: "paidAt", label: "Paid On" },
+  { key: "approverComments", label: "Approver Comments" },
+  { key: "rejectionReason", label: "Rejection Reason" },
+  { key: "financeNotes", label: "Finance Notes" },
+  { key: "paymentReference", label: "Payment Reference" },
+  { key: "description", label: "Description" },
+];
+
+function buildClaimCsvRows(claims) {
+  return claims.map((claim) => ({
+    claimNumber: claim.claimNumber || "",
+    employeeName: claim.employeeName || "",
+    empid: claim.empid || "",
+    submitterModel: claim.submitterModel || "",
+    department: claim.department || "",
+    designation: claim.designation || "",
+    reimbursementType: claim.reimbursementType || "",
+    expenseDate: fmtDate(claim.expenseDate),
+    amountClaimed: fmtMoney(claim.amountClaimed, claim.currency),
+    project: claim.project || "",
+    costCenter: claim.costCenter || "",
+    paymentMethod: claim.paymentMethod || "",
+    statusLabel: STATUS_META[claim.status]?.label || claim.status || "",
+    submissionDate: fmtDateTime(claim.submissionDate || claim.createdAt),
+    approvedAt: fmtDateTime(claim.approvedAt),
+    rejectedAt: fmtDateTime(claim.rejectedAt),
+    paidAt: fmtDateTime(claim.paidAt),
+    approverComments: claim.approverComments || "",
+    rejectionReason: claim.rejectionReason || "",
+    financeNotes: claim.financeNotes || "",
+    paymentReference: claim.paymentReference || "",
+    description: claim.description || "",
+  }));
+}
+
 function Spinner({ size = 16, color = "#fff" }) {
   return (
     <div
@@ -98,7 +173,7 @@ function StatusBadge({ status }) {
   );
 }
 
-function Btn({ children, onClick, variant = "primary", disabled, loading, type = "button", style }) {
+function Btn({ children, onClick, variant = "primary", disabled, loading, type = "button", style, ...rest }) {
   const variants = {
     primary: { background: C.brand, color: "#fff", border: `1px solid ${C.brand}` },
     outline: { background: "#fff", color: C.brand, border: `1px solid ${C.brand}` },
@@ -111,6 +186,7 @@ function Btn({ children, onClick, variant = "primary", disabled, loading, type =
       type={type}
       onClick={onClick}
       disabled={disabled || loading}
+      {...rest}
       style={{
         ...variants[variant],
         padding: "8px 16px",
@@ -558,6 +634,7 @@ export default function ReimbursementBase({
   const [deciding, setDeciding] = useState(null);
   const [reviewFilter, setReviewFilter] = useState("submitted");
   const [banner, setBanner] = useState(null);
+  const [isExportHovered, setIsExportHovered] = useState(false);
 
   const { data: authData } = useAuth();
   const person =
@@ -614,6 +691,32 @@ export default function ReimbursementBase({
     if (!reviewFilter) return all;
     return all.filter((c) => c.status === reviewFilter);
   }, [all, reviewFilter]);
+
+  const reviewBuckets = useMemo(
+    () =>
+      ["", "draft", "submitted", "approved", "rejected", "paid"].map((status) => {
+        const claims = status ? all.filter((claim) => claim.status === status) : all;
+        return {
+          key: status,
+          label: status ? STATUS_META[status].label : "All",
+          claims,
+          count: claims.length,
+          totalAmount: claimAmountSummary(claims),
+        };
+      }),
+    [all]
+  );
+
+  const selectedReviewBucket =
+    reviewBuckets.find((bucket) => bucket.key === reviewFilter) || reviewBuckets[0];
+
+  const handleExportAllClaims = () => {
+    if (!filteredAll.length) return;
+    const safeLabel = selectedReviewBucket.label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const filename = `reimbursements-${safeLabel}-${new Date().toISOString().slice(0, 10)}.csv`;
+    downloadCsv(filename, CLAIM_CSV_COLUMNS, buildClaimCsvRows(filteredAll));
+    flash(`${selectedReviewBucket.label} claims exported.`);
+  };
 
   const tabBtn = (key, label) => (
     <button
@@ -686,7 +789,56 @@ export default function ReimbursementBase({
 
         {tab === "all" && reviewQueue && (
           <>
-            <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+                marginBottom: 16,
+                flexWrap: "wrap",
+              }}
+            >
+              <Btn
+                variant="outline"
+                onClick={handleExportAllClaims}
+                disabled={!filteredAll.length || reviewQueue.all?.isLoading}
+                onMouseEnter={() => setIsExportHovered(true)}
+                onMouseLeave={() => setIsExportHovered(false)}
+                style={{
+                  background: isExportHovered ? C.brand : "#fff",
+                  color: isExportHovered ? "#fff" : C.brand,
+                }}
+              >
+                Export CSV
+              </Btn>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  flexWrap: "wrap",
+                  marginLeft: "auto",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: C.brandDark,
+                    background: C.brandLight,
+                    padding: "7px 12px",
+                    borderRadius: 999,
+                  }}
+                >
+                  {selectedReviewBucket.label}: {selectedReviewBucket.totalAmount}
+                </span>
+                <span style={{ fontSize: 12, color: C.muted }}>
+                  {selectedReviewBucket.count} claim{selectedReviewBucket.count === 1 ? "" : "s"}
+                </span>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
               {["", "draft", "submitted", "approved", "rejected", "paid"].map((s) => (
                 <button
                   key={s || "any"}
