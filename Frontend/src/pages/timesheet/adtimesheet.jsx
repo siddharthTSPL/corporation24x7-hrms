@@ -54,6 +54,13 @@ const fmtSeconds = (s) => {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
 };
 
+const nonNegative = (v) => {
+  if (v === "") return "";
+  const n = Number(v);
+  if (Number.isNaN(n)) return v;
+  return n < 0 ? "0" : v;
+};
+
 const STATUS_STYLE = {
   draft: { text: "text-gray-400", bg: "bg-gray-50", label: "Draft" },
   pending_manager: { text: "text-amber-600", bg: "bg-amber-50", label: "Pending Manager" },
@@ -729,15 +736,6 @@ export default function AdminTimesheet() {
 
   const rootRef = useRef(null);
 
-  // Lock every scrollable ancestor VERTICALLY only (html, body, and any
-  // wrapper div in the surrounding app shell — e.g. a sidebar layout
-  // container with its own overflow-auto) so nothing outside this component
-  // double-scrolls vertically. Only <main> below scrolls. Horizontal overflow
-  // on ancestors is intentionally left untouched — this component's own
-  // content is fully responsive and needs no horizontal scroll, so forcing
-  // overflow-x hidden on a parent could clip content there with no way to
-  // reach it. Everything is restored on unmount so other routes/pages using
-  // the same shell are unaffected.
   useEffect(() => {
     const locked = [];
     const lock = (el) => {
@@ -788,15 +786,12 @@ export default function AdminTimesheet() {
   <div className="w-full max-w-screen-2xl mx-auto px-3 sm:px-6 lg:px-8">
     <div className="flex items-center h-14 sm:h-16 gap-3">
 
-      {/* Logo */}
       <div className="flex-shrink-0">
         <TorchXLogo />
       </div>
 
-      {/* Divider */}
       <div className="hidden md:block w-px h-8 bg-gray-200 flex-shrink-0" />
 
-      {/* Navigation */}
       <div className="flex-1 min-w-0 overflow-hidden">
         <nav className="flex items-center gap-1 overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth">
           {TABS.map((t) => (
@@ -823,7 +818,6 @@ export default function AdminTimesheet() {
 
      
      
-      {/* Create Job Button */}
 <div className="flex-shrink-0">
   <button
     onClick={() => setJobModal(true)}
@@ -1461,14 +1455,14 @@ export default function AdminTimesheet() {
               <option value="high">High</option>
               <option value="urgent">Urgent</option>
             </Sel>
-            <Input label="Est. Hours" type="number" placeholder="0" value={jobForm.estimated_hours} onChange={(e) => setJobForm((p) => ({ ...p, estimated_hours: e.target.value }))} />
+            <Input label="Est. Hours" type="number" min="0" placeholder="0" value={jobForm.estimated_hours} onChange={(e) => setJobForm((p) => ({ ...p, estimated_hours: nonNegative(e.target.value) }))} />
           </div>
           <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
-            <Input label="Hourly Rate (₹)" type="number" placeholder="0" value={jobForm.hourly_rate} onChange={(e) => setJobForm((p) => ({ ...p, hourly_rate: e.target.value }))} />
+            <Input label="Hourly Rate (₹)" type="number" min="0" placeholder="0" value={jobForm.hourly_rate} onChange={(e) => setJobForm((p) => ({ ...p, hourly_rate: nonNegative(e.target.value) }))} />
             <Input label="Due Date" type="date" value={jobForm.due_date} onChange={(e) => setJobForm((p) => ({ ...p, due_date: e.target.value }))} />
           </div>
           <div>
-            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={jobForm.max_hours_per_day} onChange={(e) => setJobForm((p) => ({ ...p, max_hours_per_day: e.target.value }))} />
+            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={jobForm.max_hours_per_day} onChange={(e) => setJobForm((p) => ({ ...p, max_hours_per_day: nonNegative(e.target.value) }))} />
             <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day is counted as overtime. Leave blank to use the employee's shift hours instead.</p>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
@@ -1495,14 +1489,14 @@ export default function AdminTimesheet() {
               <option value="high">High</option>
               <option value="urgent">Urgent</option>
             </Sel>
-            <Input label="Est. Hours" type="number" placeholder="0" value={editJobForm.estimated_hours} onChange={(e) => setEditJobForm((p) => ({ ...p, estimated_hours: e.target.value }))} />
+            <Input label="Est. Hours" type="number" min="0" placeholder="0" value={editJobForm.estimated_hours} onChange={(e) => setEditJobForm((p) => ({ ...p, estimated_hours: nonNegative(e.target.value) }))} />
           </div>
           <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
-            <Input label="Hourly Rate (₹)" type="number" placeholder="0" value={editJobForm.hourly_rate} onChange={(e) => setEditJobForm((p) => ({ ...p, hourly_rate: e.target.value }))} />
+            <Input label="Hourly Rate (₹)" type="number" min="0" placeholder="0" value={editJobForm.hourly_rate} onChange={(e) => setEditJobForm((p) => ({ ...p, hourly_rate: nonNegative(e.target.value) }))} />
             <Input label="Due Date" type="date" value={editJobForm.due_date} onChange={(e) => setEditJobForm((p) => ({ ...p, due_date: e.target.value }))} />
           </div>
           <div>
-            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={editJobForm.max_hours_per_day} onChange={(e) => setEditJobForm((p) => ({ ...p, max_hours_per_day: e.target.value }))} />
+            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={editJobForm.max_hours_per_day} onChange={(e) => setEditJobForm((p) => ({ ...p, max_hours_per_day: nonNegative(e.target.value) }))} />
             <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day is counted as overtime. Leave blank to use the employee's shift hours instead.</p>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
@@ -1524,8 +1518,10 @@ export default function AdminTimesheet() {
             <option value="">Select job…</option>
             {assignedJobs.map((j) => <option key={j._id} value={j._id}>{j.title}</option>)}
           </Sel>
-          <Input label="Date" type="date" value={logForm.log_date} onChange={(e) => setLogForm((p) => ({ ...p, log_date: e.target.value }))} />
-          <Input label="Duration (minutes)" type="number" placeholder="e.g. 90" value={logForm.duration_minutes} onChange={(e) => setLogForm((p) => ({ ...p, duration_minutes: e.target.value }))} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input label="Date" type="date" value={logForm.log_date} onChange={(e) => setLogForm((p) => ({ ...p, log_date: e.target.value }))} />
+            <Input label="Duration (minutes)" type="number" min="1" placeholder="e.g. 90" value={logForm.duration_minutes} onChange={(e) => setLogForm((p) => ({ ...p, duration_minutes: nonNegative(e.target.value) }))} />
+          </div>
           <Input label="Note" placeholder="What did you work on?" value={logForm.note} onChange={(e) => setLogForm((p) => ({ ...p, note: e.target.value }))} />
           <div className="flex flex-col sm:flex-row gap-2 justify-end">
             <Btn variant="ghost" onClick={() => setLogModal(false)} className="w-full sm:w-auto">Cancel</Btn>
