@@ -420,41 +420,75 @@ function WeekGrid({ weekStart, weekDays, onAddLog }) {
   const todayISO = new Date().toISOString().slice(0, 10);
   return (
     <div className="bg-white border border-[#E4E6EF] rounded-2xl overflow-hidden">
-      <div className="overflow-x-auto">
-        <div className="grid grid-cols-7 border-b border-[#E4E6EF] min-w-[560px]">
+      {/* Mobile: stacked day-by-day list — no horizontal scroll needed */}
+      <div className="flex flex-col divide-y divide-[#E4E6EF] sm:hidden">
+        {days.map((d, i) => {
+          const iso = d.toISOString().slice(0, 10);
+          const isToday = iso === todayISO;
+          const mins = weekDays[iso]?.totalMinutes || 0;
+          const logs = weekDays[iso]?.logs || [];
+          return (
+            <div key={iso} className={cn("p-3", isToday ? "bg-[#730042]/[0.04]" : "")}>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={cn("text-[11px] font-bold uppercase tracking-wide shrink-0", isToday ? "text-[#730042]" : "text-gray-400")}>{DAY_NAMES[i]}</span>
+                  <span className={cn("text-[14px] font-extrabold shrink-0", isToday ? "text-[#730042]" : "text-gray-800")}>{d.getDate()}</span>
+                </div>
+                {mins > 0 && <span className="text-[10px] font-bold text-[#730042] bg-[#730042]/[0.08] rounded px-1.5 py-0.5 shrink-0">{fmtDuration(mins)}</span>}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                {logs.map((log) => (
+                  <div key={log._id}
+                    className={cn("border rounded-lg px-2.5 py-2 flex items-center justify-between gap-2 min-w-0",
+                      log.billable ? "bg-emerald-50 border-emerald-200 border-l-[3px] border-l-emerald-500"
+                        : "bg-[#730042]/[0.06] border-[#730042]/20 border-l-[3px] border-l-[#730042]")}>
+                    <div className="text-[12px] font-semibold text-gray-900 truncate min-w-0">{log.job?.title || "—"}</div>
+                    <div className={cn("text-[11px] font-bold shrink-0", log.billable ? "text-emerald-600" : "text-[#730042]")}>{fmtDuration(log.duration_minutes)}</div>
+                  </div>
+                ))}
+                <button onClick={() => onAddLog(iso)} className="w-full border border-dashed border-gray-200 rounded-lg py-1.5 text-[11px] text-gray-400 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors min-h-[32px]">+ Add</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Tablet/desktop: 7-column grid */}
+      <div className="hidden sm:block">
+        <div className="grid grid-cols-7 border-b border-[#E4E6EF]">
           {days.map((d, i) => {
             const iso = d.toISOString().slice(0, 10);
             const isToday = iso === todayISO;
             const mins = weekDays[iso]?.totalMinutes || 0;
             return (
-              <div key={iso} className={cn("px-2 pt-3 pb-2 text-center", i < 6 ? "border-r border-[#E4E6EF]" : "", isToday ? "bg-[#730042]/[0.05]" : "")}>
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{DAY_NAMES[i]}</div>
-                <div className={cn("text-lg font-extrabold mt-0.5", isToday ? "text-[#730042]" : "text-gray-800")}>{d.getDate()}</div>
+              <div key={iso} className={cn("px-1 sm:px-2 pt-3 pb-2 text-center min-w-0", i < 6 ? "border-r border-[#E4E6EF]" : "", isToday ? "bg-[#730042]/[0.05]" : "")}>
+                <div className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wide">{DAY_NAMES[i]}</div>
+                <div className={cn("text-base sm:text-lg font-extrabold mt-0.5", isToday ? "text-[#730042]" : "text-gray-800")}>{d.getDate()}</div>
                 {mins > 0
-                  ? <div className="mt-1 text-[10px] font-bold text-[#730042] bg-[#730042]/[0.08] rounded px-1 py-0.5">{fmtDuration(mins)}</div>
+                  ? <div className="mt-1 text-[9px] sm:text-[10px] font-bold text-[#730042] bg-[#730042]/[0.08] rounded px-1 py-0.5 truncate">{fmtDuration(mins)}</div>
                   : <div className="mt-1 h-[18px]" />}
               </div>
             );
           })}
         </div>
-        <div className="grid grid-cols-7 min-w-[560px]" style={{ minHeight: 120 }}>
+        <div className="grid grid-cols-7" style={{ minHeight: 120 }}>
           {days.map((d, i) => {
             const iso = d.toISOString().slice(0, 10);
             const logs = weekDays[iso]?.logs || [];
             const isToday = iso === todayISO;
             return (
-              <div key={iso} className={cn("px-1.5 py-2 flex flex-col gap-1", i < 6 ? "border-r border-[#E4E6EF]" : "", isToday ? "bg-[#730042]/[0.02]" : "")}>
+              <div key={iso} className={cn("px-1 sm:px-1.5 py-2 flex flex-col gap-1 min-w-0", i < 6 ? "border-r border-[#E4E6EF]" : "", isToday ? "bg-[#730042]/[0.02]" : "")}>
                 {logs.map((log) => (
                   <div key={log._id}
-                    className={cn("border rounded-lg px-2 py-1.5 cursor-default",
+                    className={cn("border rounded-lg px-1.5 sm:px-2 py-1.5 cursor-default min-w-0",
                       log.billable ? "bg-emerald-50 border-emerald-200 border-l-[3px] border-l-emerald-500"
                         : "bg-[#730042]/[0.06] border-[#730042]/20 border-l-[3px] border-l-[#730042]")}
                     title={`${log.job?.title || "—"} · ${fmtDuration(log.duration_minutes)}`}>
-                    <div className="text-[11px] font-semibold text-gray-900 truncate leading-tight">{log.job?.title || "—"}</div>
-                    <div className={cn("text-[10px] font-bold mt-0.5", log.billable ? "text-emerald-600" : "text-[#730042]")}>{fmtDuration(log.duration_minutes)}</div>
+                    <div className="text-[10px] sm:text-[11px] font-semibold text-gray-900 truncate leading-tight">{log.job?.title || "—"}</div>
+                    <div className={cn("text-[9px] sm:text-[10px] font-bold mt-0.5", log.billable ? "text-emerald-600" : "text-[#730042]")}>{fmtDuration(log.duration_minutes)}</div>
                   </div>
                 ))}
-                <button onClick={() => onAddLog(iso)} className="mt-auto w-full border border-dashed border-gray-200 rounded-lg py-1 text-[11px] text-gray-300 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors min-h-[28px]">+ Add</button>
+                <button onClick={() => onAddLog(iso)} className="mt-auto w-full border border-dashed border-gray-200 rounded-lg py-1 text-[10px] sm:text-[11px] text-gray-300 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors min-h-[28px]">+ Add</button>
               </div>
             );
           })}
@@ -665,11 +699,69 @@ export default function SuperAdminTimesheet() {
   };
 
   const currentTabLabel = NAV_TABS.find(t => t.id === tab)?.label ?? "";
+  const rootRef = useRef(null);
+
+  // Lock every scrollable ancestor (html, body, and any wrapper div in the
+  // surrounding app shell — e.g. a sidebar layout container with its own
+  // overflow-auto) so NOTHING outside this component can scroll, horizontally
+  // or vertically. Only <main> below scrolls. Everything is restored on
+  // unmount so other routes/pages using the same shell are unaffected.
+  useEffect(() => {
+    const locked = [];
+    const lock = (el) => {
+      if (!el) return;
+      locked.push({
+        el,
+        overflow: el.style.overflow,
+        overflowX: el.style.overflowX,
+        overflowY: el.style.overflowY,
+        height: el.style.height,
+        maxHeight: el.style.maxHeight,
+        margin: el.style.margin,
+      });
+      el.style.overflow = "hidden";
+      el.style.overflowX = "hidden";
+      el.style.overflowY = "hidden";
+      el.style.height = "100%";
+      el.style.maxHeight = "100%";
+    };
+
+    lock(document.documentElement);
+    lock(document.body);
+    document.body.style.margin = "0";
+
+    // Walk up from this component's root, locking any ancestor that is
+    // actually scrollable (scroll size exceeds visible size, or it has
+    // overflow auto/scroll set) — this is what catches app-shell wrappers.
+    let el = rootRef.current ? rootRef.current.parentElement : null;
+    while (el && el !== document.body) {
+      const cs = window.getComputedStyle(el);
+      const isScrollable =
+        el.scrollHeight > el.clientHeight + 1 ||
+        el.scrollWidth > el.clientWidth + 1 ||
+        ["auto", "scroll"].includes(cs.overflow) ||
+        ["auto", "scroll"].includes(cs.overflowY) ||
+        ["auto", "scroll"].includes(cs.overflowX);
+      if (isScrollable) lock(el);
+      el = el.parentElement;
+    }
+
+    return () => {
+      locked.forEach(({ el, overflow, overflowX, overflowY, height, maxHeight, margin }) => {
+        el.style.overflow = overflow;
+        el.style.overflowX = overflowX;
+        el.style.overflowY = overflowY;
+        el.style.height = height;
+        el.style.maxHeight = maxHeight;
+        if (margin !== undefined) el.style.margin = margin;
+      });
+    };
+  }, []);
 
   return (
-    <div className="min-h-screen bg-[#F4F5F9]" style={{ fontFamily: "'Inter', sans-serif" }}>
+    <div ref={rootRef} className="h-full w-full min-h-0 min-w-0 bg-[#F4F5F9] flex flex-col overflow-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      <header className="bg-white border-b border-[#E4E6EF] sticky top-0 z-20">
+      <header className="bg-white border-b border-[#E4E6EF] shrink-0 z-20">
         <div className="flex items-center gap-0 px-3 sm:px-6 overflow-x-auto scrollbar-none">
           <div className="flex items-center gap-2 sm:gap-2.5 pr-3 sm:pr-6 border-r border-[#E4E6EF] mr-1 sm:mr-2 shrink-0 py-2.5 sm:py-3">
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-[#730042] flex items-center justify-center shrink-0">
@@ -735,12 +827,12 @@ export default function SuperAdminTimesheet() {
         )}
       </header>
 
-      <div className="bg-[#730042]/[0.07] border-b border-[#730042]/[0.18] px-3 sm:px-6 py-1.5 flex items-center gap-2 overflow-hidden">
+      <div className="bg-[#730042]/[0.07] border-b border-[#730042]/[0.18] px-3 sm:px-6 py-1.5 flex items-center gap-2 shrink-0 overflow-hidden">
         <span className="text-[11px] font-bold text-[#730042] shrink-0">⬡ Super Admin</span>
         <span className="text-[11px] text-[#730042]/70 hidden sm:inline truncate">— Organisation-wide visibility across all roles</span>
       </div>
 
-      <main className="px-3 sm:px-6 py-4 sm:py-7 max-w-[1280px] mx-auto">
+      <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 sm:px-6 py-4 sm:py-7 w-full max-w-[1280px] mx-auto">
 
         {tab === "overview" && (
           <div className="flex flex-col gap-4 sm:gap-5">
@@ -802,44 +894,78 @@ export default function SuperAdminTimesheet() {
               {heatmap.length === 0 ? (
                 <EmptyState icon="◎" title="No team data" sub="No time logs found for this week" />
               ) : (
-                <div className="overflow-x-auto -mx-1">
-                  <table className="w-full border-collapse text-[12px] min-w-[480px]">
-                    <thead>
-                      <tr>
-                        <th className="text-left py-2 pr-4 pl-1 text-gray-400 font-semibold sticky left-0 bg-white">Member</th>
-                        {DAY_NAMES.map(d => (
-                          <th key={d} className="text-center py-2 px-1.5 text-gray-400 font-semibold">{d}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {heatmap.map((row, i) => {
-                        const days = Array.from({ length: 7 }, (_, idx) => {
-                          const d = new Date(weekStart);
-                          d.setDate(d.getDate() + idx);
-                          return row.days?.[d.toISOString().slice(0, 10)];
-                        });
-                        const memberName = row.name || row.member_name || `Member ${i + 1}`;
-                        return (
-                          <tr key={i} className="border-t border-[#E4E6EF]">
-                            <td className="py-2.5 pr-4 pl-1 text-gray-700 font-medium truncate max-w-[100px] sticky left-0 bg-white">{memberName}</td>
+                <>
+                  {/* Mobile: one card per member, 7 cells sized in fr units so they always fit the screen width — no horizontal scroll */}
+                  <div className="flex flex-col gap-3 sm:hidden">
+                    {heatmap.map((row, i) => {
+                      const days = Array.from({ length: 7 }, (_, idx) => {
+                        const d = new Date(weekStart);
+                        d.setDate(d.getDate() + idx);
+                        return row.days?.[d.toISOString().slice(0, 10)];
+                      });
+                      const memberName = row.name || row.member_name || `Member ${i + 1}`;
+                      return (
+                        <div key={i} className="min-w-0">
+                          <div className="text-[12px] font-semibold text-gray-700 truncate mb-1.5">{memberName}</div>
+                          <div className="grid grid-cols-7 gap-1">
                             {days.map((day, j) => {
                               const pct = day?.loadPercent ?? 0;
                               const cellClass = pct === 0 ? "bg-[#F8F9FC] text-gray-400" : pct < 50 ? "bg-emerald-50 text-emerald-600" : pct < 80 ? "bg-amber-50 text-amber-600" : "bg-red-50 text-red-600";
                               return (
-                                <td key={j} className="text-center py-1.5 px-1.5">
-                                  <div className={cn("rounded-lg py-1.5 px-1 text-[11px] font-bold", cellClass)}>
+                                <div key={j} className="min-w-0 text-center">
+                                  <div className="text-[8px] font-bold text-gray-400 mb-0.5">{DAY_NAMES[j][0]}</div>
+                                  <div className={cn("rounded-md py-1 px-0.5 text-[9px] font-bold truncate", cellClass)}>
                                     {pct > 0 ? `${pct}%` : "—"}
                                   </div>
-                                </td>
+                                </div>
                               );
                             })}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Tablet/desktop: full table */}
+                  <div className="hidden sm:block overflow-x-auto -mx-1">
+                    <table className="w-full border-collapse text-[12px] min-w-[480px]">
+                      <thead>
+                        <tr>
+                          <th className="text-left py-2 pr-4 pl-1 text-gray-400 font-semibold sticky left-0 bg-white">Member</th>
+                          {DAY_NAMES.map(d => (
+                            <th key={d} className="text-center py-2 px-1.5 text-gray-400 font-semibold">{d}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {heatmap.map((row, i) => {
+                          const days = Array.from({ length: 7 }, (_, idx) => {
+                            const d = new Date(weekStart);
+                            d.setDate(d.getDate() + idx);
+                            return row.days?.[d.toISOString().slice(0, 10)];
+                          });
+                          const memberName = row.name || row.member_name || `Member ${i + 1}`;
+                          return (
+                            <tr key={i} className="border-t border-[#E4E6EF]">
+                              <td className="py-2.5 pr-4 pl-1 text-gray-700 font-medium truncate max-w-[100px] sticky left-0 bg-white">{memberName}</td>
+                              {days.map((day, j) => {
+                                const pct = day?.loadPercent ?? 0;
+                                const cellClass = pct === 0 ? "bg-[#F8F9FC] text-gray-400" : pct < 50 ? "bg-emerald-50 text-emerald-600" : pct < 80 ? "bg-amber-50 text-amber-600" : "bg-red-50 text-red-600";
+                                return (
+                                  <td key={j} className="text-center py-1.5 px-1.5">
+                                    <div className={cn("rounded-lg py-1.5 px-1 text-[11px] font-bold", cellClass)}>
+                                      {pct > 0 ? `${pct}%` : "—"}
+                                    </div>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </Card>
           </div>
