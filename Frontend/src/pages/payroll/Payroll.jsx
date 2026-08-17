@@ -1489,9 +1489,10 @@ function getPayslipLineItems(payroll) {
   return { earnings, deductions, employerContribution };
 }
 
-// Opens a print-formatted payslip in a new tab and triggers the browser's
-// print dialog, where "Save as PDF" gives a real downloadable file — no
-// extra PDF library/dependency needed.
+// Opens a print-formatted payslip in a new tab (via a Blob URL, not
+// document.write — see note below) and triggers the browser's print
+// dialog, where "Save as PDF" gives a real downloadable file — no extra
+// PDF library/dependency needed.
 function downloadPayslip({ payroll, name, employeeId, department, designation, orgName }) {
   const att = payroll.attendance || {};
   const { earnings, deductions, employerContribution } = getPayslipLineItems(payroll);
@@ -1561,11 +1562,28 @@ function downloadPayslip({ payroll, name, employeeId, department, designation, o
 </body>
 </html>`;
 
-  const win = window.open("", "_blank");
-  if (!win) return;
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
+  // Open via a Blob URL rather than window.open("") + document.write().
+  // The write-into-blank-tab approach breaks (leaves an empty "about:blank"
+  // tab) on browsers that enforce Cross-Origin-Opener-Policy, which severs
+  // the reference to the new tab right after it opens. A Blob URL is a real,
+  // same-document navigation target, so it always renders.
+  const blob = new Blob([html], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, "_blank");
+
+  if (!win) {
+    // Popup blocked entirely — fall back to a direct file download so the
+    // person still gets their payslip.
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Payslip - ${name} - ${period}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // Release the blob once the tab/download has had time to load it.
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 function PayslipModal({ payroll, directory, onClose }) {
