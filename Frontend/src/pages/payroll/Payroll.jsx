@@ -20,7 +20,6 @@ import {
   useGetAllEmployee,
   useGetAllAdmins,
 } from "../../auth/server-state/adminother/adminother.hook";
-import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 
 const C = {
   brand: "#CD166E",
@@ -1569,8 +1568,9 @@ function downloadPayslip({ payroll, name, employeeId, department, designation, o
   win.document.close();
 }
 
-function PayslipModal({ payroll, directory, onClose, orgName }) {
+function PayslipModal({ payroll, directory, onClose }) {
   if (!payroll) return null;
+  const orgName = payroll.organisationSnapshot?.name || "";
   const snap = payroll.employeeSnapshot || {};
   const person = directory.byId.get(String(payroll.employee));
   const name = snap.name || person?.name || resolveName(directory, payroll.employee, payroll.employeeModel);
@@ -1663,8 +1663,6 @@ function PayslipModal({ payroll, directory, onClose, orgName }) {
 }
 
 function RecordsTab({ notify, directory }) {
-  const { data: auth } = useAuth();
-  const orgName = auth?.data?.organisation_name || "";
   const now = new Date();
   const [filters, setFilters] = useState({ month: "", year: String(now.getFullYear()), employeeModel: "", status: "" });
   const { data, isLoading } = useListPayrolls({
@@ -1748,7 +1746,7 @@ function RecordsTab({ notify, directory }) {
                             employeeId: snap.employeeId || person?.uid || "—",
                             department: snap.department || "—",
                             designation: snap.designation || "—",
-                            orgName,
+                            orgName: p.organisationSnapshot?.name || "",
                           });
                         }}
                         style={{ marginRight: 8 }}
@@ -1768,7 +1766,7 @@ function RecordsTab({ notify, directory }) {
         </div>
       )}
 
-      <PayslipModal payroll={selected} directory={directory} onClose={() => setSelected(null)} orgName={orgName} />
+      <PayslipModal payroll={selected} directory={directory} onClose={() => setSelected(null)} />
     </Card>
   );
 }
