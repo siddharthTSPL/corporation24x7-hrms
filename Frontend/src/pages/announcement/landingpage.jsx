@@ -722,8 +722,8 @@ function Features() {
 
 function Pricing() {
   const plans = [
-    { name: 'Basic', desc: 'Perfect for small teams getting started', price: '₹47', features: ['Employee database','Attendance tracking','Leave management','Basic payroll','Employee self-service portal','Email support 24x7'] },
-    { name: 'Advance', desc: 'For growing businesses that need more. Everything in Starter +', price: '₹119', popular: true, features: ['Recruitment / Applicant tracking','Performance management','Advanced payroll','Custom policies/workflows','Reports & analytics','Priority support'] },
+    { name: 'Basic', desc: 'Perfect for small teams getting started', price: '₹47', features: ['Employee database','Attendance tracking','Leave management','Basic payroll','Employee self-service portal','Email support (24/7)'] },
+    { name: 'Advance', desc: 'For growing businesses that need more. Everything in Starter +', price: '₹119', popular: true, features: ['Recruitment / Applicant tracking','Performance management','Advanced payroll','Custom policies/workflows','Reports & analytics','Telephonic support (24/7)'] },
     {
   name: 'Enterprise',
   desc: 'Ultimate power and flexibility. Everything in Growth +',
