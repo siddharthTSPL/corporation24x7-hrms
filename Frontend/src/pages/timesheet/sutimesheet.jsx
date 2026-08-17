@@ -34,6 +34,15 @@ const fmtSeconds = (s) => {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
 };
 
+// Guard used on numeric inputs (Estimated Hours / Hourly Rate / Default Hourly Rate)
+// so a user can never type or paste a negative number into these fields.
+const nonNegative = (v) => {
+  if (v === "") return "";
+  const n = Number(v);
+  if (Number.isNaN(n)) return v;
+  return n < 0 ? "0" : v;
+};
+
 const STATUS_STYLE = {
   draft:                     { tw: "text-gray-400 bg-gray-100 border-gray-200",              label: "Draft" },
   pending_manager:           { tw: "text-amber-600 bg-amber-50 border-amber-200",            label: "Pending Manager" },
@@ -1354,7 +1363,7 @@ export default function SuperAdminTimesheet() {
               <option value="EUR">EUR</option>
             </Select>
           </div>
-          <Input label="Default Hourly Rate" type="number" placeholder="0.00" value={projectForm.default_hourly_rate} onChange={e => setProjectForm(p => ({ ...p, default_hourly_rate: e.target.value }))} />
+          <Input label="Default Hourly Rate" type="number" min="0" placeholder="0.00" value={projectForm.default_hourly_rate} onChange={e => setProjectForm(p => ({ ...p, default_hourly_rate: nonNegative(e.target.value) }))} />
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Add Members (optional)</label>
             <div className="border border-[#E4E6EF] rounded-[10px] max-h-[160px] overflow-y-auto p-2 flex flex-col gap-1">
@@ -1453,10 +1462,10 @@ export default function SuperAdminTimesheet() {
               <option value="high">High</option>
               <option value="urgent">Urgent</option>
             </Select>
-            <Input label="Estimated Hours" type="number" placeholder="0" value={jobForm.estimated_hours} onChange={e => setJobForm(p => ({ ...p, estimated_hours: e.target.value }))} />
+            <Input label="Estimated Hours" type="number" min="0" placeholder="0" value={jobForm.estimated_hours} onChange={e => setJobForm(p => ({ ...p, estimated_hours: nonNegative(e.target.value) }))} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <Input label="Hourly Rate" type="number" placeholder="0.00" value={jobForm.hourly_rate} onChange={e => setJobForm(p => ({ ...p, hourly_rate: e.target.value }))} />
+            <Input label="Hourly Rate" type="number" min="0" placeholder="0.00" value={jobForm.hourly_rate} onChange={e => setJobForm(p => ({ ...p, hourly_rate: nonNegative(e.target.value) }))} />
             <Select label="Currency" value={jobForm.currency} onChange={e => setJobForm(p => ({ ...p, currency: e.target.value }))}>
               <option value="INR">INR</option>
               <option value="USD">USD</option>
@@ -1491,10 +1500,10 @@ export default function SuperAdminTimesheet() {
               <option value="high">High</option>
               <option value="urgent">Urgent</option>
             </Select>
-            <Input label="Estimated Hours" type="number" placeholder="0" value={editJobForm.estimated_hours} onChange={e => setEditJobForm(p => ({ ...p, estimated_hours: e.target.value }))} />
+            <Input label="Estimated Hours" type="number" min="0" placeholder="0" value={editJobForm.estimated_hours} onChange={e => setEditJobForm(p => ({ ...p, estimated_hours: nonNegative(e.target.value) }))} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <Input label="Hourly Rate" type="number" placeholder="0.00" value={editJobForm.hourly_rate} onChange={e => setEditJobForm(p => ({ ...p, hourly_rate: e.target.value }))} />
+            <Input label="Hourly Rate" type="number" min="0" placeholder="0.00" value={editJobForm.hourly_rate} onChange={e => setEditJobForm(p => ({ ...p, hourly_rate: nonNegative(e.target.value) }))} />
             <Select label="Currency" value={editJobForm.currency} onChange={e => setEditJobForm(p => ({ ...p, currency: e.target.value }))}>
               <option value="INR">INR</option>
               <option value="USD">USD</option>
