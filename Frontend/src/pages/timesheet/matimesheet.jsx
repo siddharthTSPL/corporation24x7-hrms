@@ -58,10 +58,15 @@ const fmtSeconds = (s) => {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
 };
 
+const nonNegative = (v) => {
+  if (v === "") return "";
+  const n = Number(v);
+  if (Number.isNaN(n)) return v;
+  return n < 0 ? "0" : v;
+};
+
 const DAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-// Shared responsive container classes used by the header and main content,
-// so the page scales cleanly from small phones up through ultra-wide monitors.
 const CONTAINER = "max-w-[1100px] lg:max-w-[1200px] xl:max-w-[1320px] 2xl:max-w-[1500px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8";
 
 const STATUS_META = {
@@ -397,7 +402,6 @@ function WeekGrid({ weekStart, weekDays, onAddLog, onEditLog, onDeleteLog }) {
   const todayISO = new Date().toISOString().slice(0, 10);
   return (
     <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-      {/* min-w only kicks in below md — tablets and up show the full 7-day grid without scrolling */}
       <div className="grid grid-cols-7 border-b border-gray-100 min-w-[560px] md:min-w-0">
         {days.map((d, i) => {
           const iso = d.toISOString().slice(0, 10);
@@ -979,7 +983,6 @@ export default function ManagerTimesheet() {
         )}
       </main>
 
-      {/* Mobile-only floating "Create Job" button so managers on phones aren't stuck with only the header's "+" (Log) action */}
       <button
         onClick={() => setJobModal(true)}
         className="md:hidden fixed bottom-5 right-4 z-40 w-12 h-12 rounded-full bg-[#730042] text-white shadow-lg shadow-[#730042]/30 flex items-center justify-center text-xl font-bold active:scale-95 transition-transform"
@@ -994,8 +997,10 @@ export default function ManagerTimesheet() {
             <option value="">Select a job…</option>
             {assignedJobs.map((j) => <option key={j._id} value={j._id}>{j.title}</option>)}
           </Sel>
-          <Input label="Date" type="date" value={logForm.log_date} onChange={(e) => setLogForm((p) => ({ ...p, log_date: e.target.value }))} />
-          <Input label="Duration (minutes)" type="number" placeholder="e.g. 60" value={logForm.duration_minutes} onChange={(e) => setLogForm((p) => ({ ...p, duration_minutes: e.target.value }))} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input label="Date" type="date" value={logForm.log_date} onChange={(e) => setLogForm((p) => ({ ...p, log_date: e.target.value }))} />
+            <Input label="Duration (minutes)" type="number" min="1" placeholder="e.g. 60" value={logForm.duration_minutes} onChange={(e) => setLogForm((p) => ({ ...p, duration_minutes: nonNegative(e.target.value) }))} />
+          </div>
           <Input label="Note (optional)" placeholder="What did you work on?" value={logForm.note} onChange={(e) => setLogForm((p) => ({ ...p, note: e.target.value }))} />
           <div className="flex gap-2 justify-end flex-wrap">
             <Btn variant="ghost" onClick={() => setLogModal(false)}>Cancel</Btn>
@@ -1008,7 +1013,7 @@ export default function ManagerTimesheet() {
 
       <Modal open={!!editLog} onClose={() => setEditLog(null)} title="Edit Time Log">
         <div className="flex flex-col gap-3.5">
-          <Input label="Duration (minutes)" type="number" value={editForm.duration_minutes} onChange={(e) => setEditForm((p) => ({ ...p, duration_minutes: e.target.value }))} />
+          <Input label="Duration (minutes)" type="number" min="1" value={editForm.duration_minutes} onChange={(e) => setEditForm((p) => ({ ...p, duration_minutes: nonNegative(e.target.value) }))} />
           <Input label="Note" value={editForm.note} onChange={(e) => setEditForm((p) => ({ ...p, note: e.target.value }))} />
           <Input label="Reason for change" value={editForm.reason} onChange={(e) => setEditForm((p) => ({ ...p, reason: e.target.value }))} />
           <div className="flex gap-2 justify-end flex-wrap">
@@ -1032,7 +1037,7 @@ export default function ManagerTimesheet() {
             <Sel label="Priority" value={jobForm.priority} onChange={(e) => setJobForm((p) => ({ ...p, priority: e.target.value }))}>
               {["low", "medium", "high", "urgent"].map((p) => <option key={p} value={p}>{PRIORITY_META[p]?.label || p}</option>)}
             </Sel>
-            <Input label="Estimated Hours" type="number" placeholder="0" value={jobForm.estimated_hours} onChange={(e) => setJobForm((p) => ({ ...p, estimated_hours: e.target.value }))} />
+            <Input label="Estimated Hours" type="number" min="0" placeholder="0" value={jobForm.estimated_hours} onChange={(e) => setJobForm((p) => ({ ...p, estimated_hours: nonNegative(e.target.value) }))} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
@@ -1042,11 +1047,11 @@ export default function ManagerTimesheet() {
                 <span className="text-[13px] text-gray-700">Yes</span>
               </label>
             </div>
-            <Input label="Hourly Rate" type="number" placeholder="0" value={jobForm.hourly_rate} onChange={(e) => setJobForm((p) => ({ ...p, hourly_rate: e.target.value }))} disabled={!jobForm.billable} />
+            <Input label="Hourly Rate" type="number" min="0" placeholder="0" value={jobForm.hourly_rate} onChange={(e) => setJobForm((p) => ({ ...p, hourly_rate: nonNegative(e.target.value) }))} disabled={!jobForm.billable} />
           </div>
           <Input label="Due Date" type="date" value={jobForm.due_date} onChange={(e) => setJobForm((p) => ({ ...p, due_date: e.target.value }))} />
           <div>
-            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={jobForm.max_hours_per_day} onChange={(e) => setJobForm((p) => ({ ...p, max_hours_per_day: e.target.value }))} />
+            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={jobForm.max_hours_per_day} onChange={(e) => setJobForm((p) => ({ ...p, max_hours_per_day: nonNegative(e.target.value) }))} />
             <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day counts as overtime. Leave blank to use the employee's shift hours instead.</p>
           </div>
           <div className="flex gap-2 justify-end flex-wrap">
@@ -1066,7 +1071,7 @@ export default function ManagerTimesheet() {
             <Sel label="Priority" value={editJobForm.priority} onChange={(e) => setEditJobForm((p) => ({ ...p, priority: e.target.value }))}>
               {["low", "medium", "high", "urgent"].map((p) => <option key={p} value={p}>{PRIORITY_META[p]?.label || p}</option>)}
             </Sel>
-            <Input label="Estimated Hours" type="number" placeholder="0" value={editJobForm.estimated_hours} onChange={(e) => setEditJobForm((p) => ({ ...p, estimated_hours: e.target.value }))} />
+            <Input label="Estimated Hours" type="number" min="0" placeholder="0" value={editJobForm.estimated_hours} onChange={(e) => setEditJobForm((p) => ({ ...p, estimated_hours: nonNegative(e.target.value) }))} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
@@ -1076,11 +1081,11 @@ export default function ManagerTimesheet() {
                 <span className="text-[13px] text-gray-700">Yes</span>
               </label>
             </div>
-            <Input label="Hourly Rate" type="number" placeholder="0" value={editJobForm.hourly_rate} onChange={(e) => setEditJobForm((p) => ({ ...p, hourly_rate: e.target.value }))} disabled={!editJobForm.billable} />
+            <Input label="Hourly Rate" type="number" min="0" placeholder="0" value={editJobForm.hourly_rate} onChange={(e) => setEditJobForm((p) => ({ ...p, hourly_rate: nonNegative(e.target.value) }))} disabled={!editJobForm.billable} />
           </div>
           <Input label="Due Date" type="date" value={editJobForm.due_date} onChange={(e) => setEditJobForm((p) => ({ ...p, due_date: e.target.value }))} />
           <div>
-            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={editJobForm.max_hours_per_day} onChange={(e) => setEditJobForm((p) => ({ ...p, max_hours_per_day: e.target.value }))} />
+            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={editJobForm.max_hours_per_day} onChange={(e) => setEditJobForm((p) => ({ ...p, max_hours_per_day: nonNegative(e.target.value) }))} />
             <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day counts as overtime. Leave blank to use the employee's shift hours instead.</p>
           </div>
           <div className="flex gap-2 justify-end flex-wrap">
