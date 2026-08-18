@@ -3,12 +3,13 @@ import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   FiMenu, FiX, FiArrowRight, FiCheck,
-  FiLinkedin, FiInstagram, FiTwitter, FiMail,
+  FiLinkedin, FiInstagram, FiMail,
   FiShield, FiLink, FiActivity, FiBookOpen,
   FiUser, FiFileText, FiBell, FiHardDrive,
   FiUsers, FiStar, FiBarChart2,
   FiLogOut, FiSettings, FiMessageSquare
 } from 'react-icons/fi'
+import { FaXTwitter } from "react-icons/fa6";
 import { HiOutlineSparkles } from 'react-icons/hi'
 import { BsPeopleFill, BsGraphUp, BsPersonBadge } from 'react-icons/bs'
 import {
@@ -1049,8 +1050,8 @@ function Footer() {
   ]
   const socials = [
     { icon: <FiLinkedin />, href: 'https://www.linkedin.com/company/103362190/admin/dashboard/', label: 'LinkedIn' },
-    { icon: <FiInstagram />, href: '#', label: 'Instagram' },
-    { icon: <FiTwitter />, href: '#', label: 'Twitter' },
+    { icon: <FiInstagram />, href: 'https://www.instagram.com/?hl=en', label: 'Instagram' },
+    { icon: <FaXTwitter />, href: 'https://x.com/home', label: 'X' },
     { icon: <FiMail />, href: '#', label: 'Email' },
   ]
   const [activeDoc, setActiveDoc] = useState(null)

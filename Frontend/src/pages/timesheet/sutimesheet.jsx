@@ -34,6 +34,15 @@ const fmtSeconds = (s) => {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
 };
 
+// Guard used on numeric inputs (Estimated Hours / Hourly Rate / Default Hourly Rate)
+// so a user can never type or paste a negative number into these fields.
+const nonNegative = (v) => {
+  if (v === "") return "";
+  const n = Number(v);
+  if (Number.isNaN(n)) return v;
+  return n < 0 ? "0" : v;
+};
+
 const STATUS_STYLE = {
   draft:                     { tw: "text-gray-400 bg-gray-100 border-gray-200",              label: "Draft" },
   pending_manager:           { tw: "text-amber-600 bg-amber-50 border-amber-200",            label: "Pending Manager" },
@@ -703,9 +712,13 @@ export default function SuperAdminTimesheet() {
 
   // Lock every scrollable ancestor (html, body, and any wrapper div in the
   // surrounding app shell — e.g. a sidebar layout container with its own
-  // overflow-auto) so NOTHING outside this component can scroll, horizontally
-  // or vertically. Only <main> below scrolls. Everything is restored on
-  // unmount so other routes/pages using the same shell are unaffected.
+  // overflow-auto) so nothing outside this component scrolls VERTICALLY.
+  // Horizontal overflow on ancestors is intentionally left alone here — this
+  // component's own content is fully responsive (nothing inside it needs
+  // horizontal scroll), so if a parent still scrolls sideways the fix
+  // belongs in that layout file, not here; hiding it blindly only clips
+  // content with no way to reach it. Everything is restored on unmount so
+  // other routes/pages using the same shell are unaffected.
   useEffect(() => {
     const locked = [];
     const lock = (el) => {
@@ -713,14 +726,12 @@ export default function SuperAdminTimesheet() {
       locked.push({
         el,
         overflow: el.style.overflow,
-        overflowX: el.style.overflowX,
         overflowY: el.style.overflowY,
         height: el.style.height,
         maxHeight: el.style.maxHeight,
         margin: el.style.margin,
       });
-      el.style.overflow = "hidden";
-      el.style.overflowX = "hidden";
+      el.style.overflow = "";
       el.style.overflowY = "hidden";
       el.style.height = "100%";
       el.style.maxHeight = "100%";
@@ -730,26 +741,23 @@ export default function SuperAdminTimesheet() {
     lock(document.body);
     document.body.style.margin = "0";
 
-    // Walk up from this component's root, locking any ancestor that is
-    // actually scrollable (scroll size exceeds visible size, or it has
-    // overflow auto/scroll set) — this is what catches app-shell wrappers.
+    // Walk up from this component's root, locking (vertically only) any
+    // ancestor that is actually scrolling vertically — this is what catches
+    // app-shell wrappers without touching their horizontal layout.
     let el = rootRef.current ? rootRef.current.parentElement : null;
     while (el && el !== document.body) {
       const cs = window.getComputedStyle(el);
-      const isScrollable =
+      const isVerticallyScrollable =
         el.scrollHeight > el.clientHeight + 1 ||
-        el.scrollWidth > el.clientWidth + 1 ||
-        ["auto", "scroll"].includes(cs.overflow) ||
         ["auto", "scroll"].includes(cs.overflowY) ||
-        ["auto", "scroll"].includes(cs.overflowX);
-      if (isScrollable) lock(el);
+        ["auto", "scroll"].includes(cs.overflow);
+      if (isVerticallyScrollable) lock(el);
       el = el.parentElement;
     }
 
     return () => {
-      locked.forEach(({ el, overflow, overflowX, overflowY, height, maxHeight, margin }) => {
+      locked.forEach(({ el, overflow, overflowY, height, maxHeight, margin }) => {
         el.style.overflow = overflow;
-        el.style.overflowX = overflowX;
         el.style.overflowY = overflowY;
         el.style.height = height;
         el.style.maxHeight = maxHeight;
@@ -832,7 +840,7 @@ export default function SuperAdminTimesheet() {
         <span className="text-[11px] text-[#730042]/70 hidden sm:inline truncate">— Organisation-wide visibility across all roles</span>
       </div>
 
-      <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 sm:px-6 py-4 sm:py-7 w-full max-w-[1280px] mx-auto">
+      <main className="flex-1 min-h-0 overflow-y-auto overflow-x-auto px-3 sm:px-6 py-4 sm:py-7 w-full max-w-[1280px] mx-auto">
 
         {tab === "overview" && (
           <div className="flex flex-col gap-4 sm:gap-5">
@@ -1033,7 +1041,7 @@ export default function SuperAdminTimesheet() {
                           {job.due_date && <span>Due {fmtDate(job.due_date)}</span>}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap">
                         <button onClick={() => openJobDetail(job._id)} className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-2.5 py-2 text-[11px] font-semibold text-gray-700 cursor-pointer min-h-[36px]">View</button>
                         <button onClick={() => openEditJob(job)} className="bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-2 text-[11px] font-semibold text-blue-600 cursor-pointer min-h-[36px]">Edit</button>
                         <select value={job.status} onChange={e => updateJobStatus.mutate({ id: job._id, status: e.target.value }, { onSuccess: refetchJobs })}
@@ -1355,7 +1363,7 @@ export default function SuperAdminTimesheet() {
               <option value="EUR">EUR</option>
             </Select>
           </div>
-          <Input label="Default Hourly Rate" type="number" placeholder="0.00" value={projectForm.default_hourly_rate} onChange={e => setProjectForm(p => ({ ...p, default_hourly_rate: e.target.value }))} />
+          <Input label="Default Hourly Rate" type="number" min="0" placeholder="0.00" value={projectForm.default_hourly_rate} onChange={e => setProjectForm(p => ({ ...p, default_hourly_rate: nonNegative(e.target.value) }))} />
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Add Members (optional)</label>
             <div className="border border-[#E4E6EF] rounded-[10px] max-h-[160px] overflow-y-auto p-2 flex flex-col gap-1">
@@ -1454,10 +1462,10 @@ export default function SuperAdminTimesheet() {
               <option value="high">High</option>
               <option value="urgent">Urgent</option>
             </Select>
-            <Input label="Estimated Hours" type="number" placeholder="0" value={jobForm.estimated_hours} onChange={e => setJobForm(p => ({ ...p, estimated_hours: e.target.value }))} />
+            <Input label="Estimated Hours" type="number" min="0" placeholder="0" value={jobForm.estimated_hours} onChange={e => setJobForm(p => ({ ...p, estimated_hours: nonNegative(e.target.value) }))} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <Input label="Hourly Rate" type="number" placeholder="0.00" value={jobForm.hourly_rate} onChange={e => setJobForm(p => ({ ...p, hourly_rate: e.target.value }))} />
+            <Input label="Hourly Rate" type="number" min="0" placeholder="0.00" value={jobForm.hourly_rate} onChange={e => setJobForm(p => ({ ...p, hourly_rate: nonNegative(e.target.value) }))} />
             <Select label="Currency" value={jobForm.currency} onChange={e => setJobForm(p => ({ ...p, currency: e.target.value }))}>
               <option value="INR">INR</option>
               <option value="USD">USD</option>
@@ -1492,10 +1500,10 @@ export default function SuperAdminTimesheet() {
               <option value="high">High</option>
               <option value="urgent">Urgent</option>
             </Select>
-            <Input label="Estimated Hours" type="number" placeholder="0" value={editJobForm.estimated_hours} onChange={e => setEditJobForm(p => ({ ...p, estimated_hours: e.target.value }))} />
+            <Input label="Estimated Hours" type="number" min="0" placeholder="0" value={editJobForm.estimated_hours} onChange={e => setEditJobForm(p => ({ ...p, estimated_hours: nonNegative(e.target.value) }))} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <Input label="Hourly Rate" type="number" placeholder="0.00" value={editJobForm.hourly_rate} onChange={e => setEditJobForm(p => ({ ...p, hourly_rate: e.target.value }))} />
+            <Input label="Hourly Rate" type="number" min="0" placeholder="0.00" value={editJobForm.hourly_rate} onChange={e => setEditJobForm(p => ({ ...p, hourly_rate: nonNegative(e.target.value) }))} />
             <Select label="Currency" value={editJobForm.currency} onChange={e => setEditJobForm(p => ({ ...p, currency: e.target.value }))}>
               <option value="INR">INR</option>
               <option value="USD">USD</option>
