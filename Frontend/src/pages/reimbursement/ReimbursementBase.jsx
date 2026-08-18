@@ -205,6 +205,13 @@ const DEFAULT_CLAIM_FILTERS = {
   sortBy: "newest", // newest | oldest | amount_desc | amount_asc
 };
 
+// Submitter roles a claim can come from. Kept as a fixed list (rather than
+// deriving purely from the currently loaded claims) so the Role dropdown
+// always offers every possible role, even when the current data set happens
+// to only contain claims from one of them (e.g. Review Queue showing only
+// Manager submissions right now shouldn't hide the Employee/Admin options).
+const SUBMITTER_ROLES = ["Employee", "Manager", "Admin"];
+
 function getUniqueValues(claims, key) {
   return Array.from(new Set((claims || []).map((c) => c?.[key]).filter(Boolean))).sort((a, b) =>
     String(a).localeCompare(String(b))
@@ -689,7 +696,13 @@ function ClaimsTable({ claims, onView, showSubmitter, emptyText }) {
 // values.
 // ---------------------------------------------------------------------------
 function FilterBar({ claims, filters, onChange }) {
-  const roles = useMemo(() => getUniqueValues(claims, "submitterModel"), [claims]);
+  // Role options: fixed list ∪ anything unexpected found in the data, so the
+  // dropdown always shows all roles but still surfaces any extra value the
+  // backend sends that isn't one of the three standard roles.
+  const roles = useMemo(() => {
+    const extra = getUniqueValues(claims, "submitterModel").filter((r) => !SUBMITTER_ROLES.includes(r));
+    return [...SUBMITTER_ROLES, ...extra];
+  }, [claims]);
   const departments = useMemo(() => getUniqueValues(claims, "department"), [claims]);
   const designations = useMemo(() => getUniqueValues(claims, "designation"), [claims]);
   const currencies = useMemo(() => getUniqueValues(claims, "currency"), [claims]);
