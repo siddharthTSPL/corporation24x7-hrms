@@ -48,10 +48,9 @@ const createProject = async (req, res, next) => {
     }
   }
 
-  const project = await TSProject.create({
+  const projectData = {
     organisation_id,
     name,
-    code,
     description,
     client: client || null,
     created_by: actor.id,
@@ -68,7 +67,17 @@ const createProject = async (req, res, next) => {
     end_date: end_date || null,
     color_tag: color_tag || "#730042",
     visibility: visibility || "restricted",
-  });
+  };
+
+  // Only set `code` when a real value is given. Leaving the key out
+  // entirely (instead of setting it to null/undefined) is what lets the
+  // sparse unique index on { organisation_id, code } actually skip this
+  // document, so multiple no-code projects can exist in the same org.
+  if (code && code.trim()) {
+    projectData.code = code.trim().toUpperCase();
+  }
+
+  const project = await TSProject.create(projectData);
 
   res.status(201).json({ success: true, message: "Project created", project });
 };
@@ -123,7 +132,22 @@ const updateProject = async (req, res, next) => {
   ];
 
   for (const field of allowedFields) {
-    if (field in req.body) project[field] = req.body[field];
+    if (!(field in req.body)) continue;
+
+    if (field === "code") {
+      // Same sparse-index reasoning as createProject: an empty/blank code
+      // must remove the field entirely, not set it to "" or null, or the
+      // unique index will collide with every other no-code project.
+      const value = req.body.code;
+      if (value && String(value).trim()) {
+        project.code = String(value).trim().toUpperCase();
+      } else {
+        project.code = undefined;
+      }
+      continue;
+    }
+
+    project[field] = req.body[field];
   }
 
   await project.save();

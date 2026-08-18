@@ -1489,10 +1489,11 @@ function getPayslipLineItems(payroll) {
   return { earnings, deductions, employerContribution };
 }
 
-// Opens a print-formatted payslip in a new tab and triggers the browser's
-// print dialog, where "Save as PDF" gives a real downloadable file — no
-// extra PDF library/dependency needed.
-function downloadPayslip({ payroll, name, employeeId, department, designation }) {
+// Opens a print-formatted payslip in a new tab (via a Blob URL, not
+// document.write — see note below) and triggers the browser's print
+// dialog, where "Save as PDF" gives a real downloadable file — no extra
+// PDF library/dependency needed.
+function downloadPayslip({ payroll, name, employeeId, department, designation, orgName }) {
   const att = payroll.attendance || {};
   const { earnings, deductions, employerContribution } = getPayslipLineItems(payroll);
   const rowsHtml = (items) => items.map((r) => `<tr><td>${r.label}</td><td class="amt">${fmtINR(r.amount)}</td></tr>`).join("");
@@ -1502,11 +1503,12 @@ function downloadPayslip({ payroll, name, employeeId, department, designation })
 <html>
 <head>
 <meta charset="utf-8" />
-<title>Payslip - ${name} - ${period}</title>
+<title>${orgName ? orgName + " - " : ""}Payslip - ${name} - ${period}</title>
 <style>
   * { box-sizing: border-box; }
   body { font-family: Arial, Helvetica, sans-serif; color: #2a1a16; padding: 32px; max-width: 640px; margin: 0 auto; }
   h1 { font-size: 18px; margin: 0 0 4px; }
+  .org { font-size: 14px; font-weight: 700; color: #CD166E; margin: 0 0 2px; }
   .sub { color: #8a7a74; font-size: 12px; margin-bottom: 20px; }
   table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
   th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px; color: #8a7a74; padding: 4px 0; border-bottom: 1px solid #ede5e0; }
@@ -1522,6 +1524,7 @@ function downloadPayslip({ payroll, name, employeeId, department, designation })
 </style>
 </head>
 <body>
+  ${orgName ? `<p class="org">${orgName}</p>` : ""}
   <h1>Payslip</h1>
   <div class="sub">Pay Period: ${period}${payroll.status ? " · " + payroll.status.toUpperCase().replace("_", " ") : ""}</div>
 
@@ -1559,15 +1562,33 @@ function downloadPayslip({ payroll, name, employeeId, department, designation })
 </body>
 </html>`;
 
-  const win = window.open("", "_blank");
-  if (!win) return;
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
+  // Open via a Blob URL rather than window.open("") + document.write().
+  // The write-into-blank-tab approach breaks (leaves an empty "about:blank"
+  // tab) on browsers that enforce Cross-Origin-Opener-Policy, which severs
+  // the reference to the new tab right after it opens. A Blob URL is a real,
+  // same-document navigation target, so it always renders.
+  const blob = new Blob([html], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, "_blank");
+
+  if (!win) {
+    // Popup blocked entirely — fall back to a direct file download so the
+    // person still gets their payslip.
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Payslip - ${name} - ${period}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // Release the blob once the tab/download has had time to load it.
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 function PayslipModal({ payroll, directory, onClose }) {
   if (!payroll) return null;
+  const orgName = payroll.organisationSnapshot?.name || "";
   const snap = payroll.employeeSnapshot || {};
   const person = directory.byId.get(String(payroll.employee));
   const name = snap.name || person?.name || resolveName(directory, payroll.employee, payroll.employeeModel);
@@ -1585,10 +1606,13 @@ function PayslipModal({ payroll, directory, onClose }) {
         style={{ background: "#fff", borderRadius: 14, maxWidth: 520, width: "100%", maxHeight: "88vh", overflowY: "auto" }}
       >
         <div className="flex items-center justify-between mb-3 gap-3">
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: C.text }}>Payslip</h3>
+          <div>
+            {orgName && <p style={{ margin: "0 0 2px", fontSize: 13, fontWeight: 700, color: C.brand }}>{orgName}</p>}
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: C.text }}>Payslip</h3>
+          </div>
           <div className="flex items-center gap-2">
             {payroll.status === "paid" && (
-              <GhostButton onClick={() => downloadPayslip({ payroll, name, employeeId, department, designation })}>
+              <GhostButton onClick={() => downloadPayslip({ payroll, name, employeeId, department, designation, orgName })}>
                 Download
               </GhostButton>
             )}
@@ -1740,6 +1764,7 @@ function RecordsTab({ notify, directory }) {
                             employeeId: snap.employeeId || person?.uid || "—",
                             department: snap.department || "—",
                             designation: snap.designation || "—",
+                            orgName: p.organisationSnapshot?.name || "",
                           });
                         }}
                         style={{ marginRight: 8 }}
@@ -1873,4 +1898,5 @@ export default function Payroll() {
       </div>
     </div>
   );
+  
 }
