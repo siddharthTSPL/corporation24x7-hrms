@@ -1093,24 +1093,20 @@ export default function ReimbursementBase({
               <div style={{ padding: 40, textAlign: "center", color: C.muted }}>Loading…</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {pending.length > 0 && (
-                  <>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 12, color: C.muted }}>
-                        Showing {filteredPending.length} of {pending.length} pending claim{pending.length === 1 ? "" : "s"}
-                      </span>
-                      <Btn
-                        variant="outline"
-                        onClick={() => handleExportClaims(filteredPending, "review-queue")}
-                        disabled={!filteredPending.length}
-                        style={{ background: "#fff", color: C.brand }}
-                      >
-                        Export CSV
-                      </Btn>
-                    </div>
-                    <FilterBar claims={pending} filters={reviewQueueFilters} onChange={setReviewQueueFilters} />
-                  </>
-                )}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 12, color: C.muted }}>
+                    Showing {filteredPending.length} of {pending.length} pending claim{pending.length === 1 ? "" : "s"}
+                  </span>
+                  <Btn
+                    variant="outline"
+                    onClick={() => handleExportClaims(filteredPending, "review-queue")}
+                    disabled={!filteredPending.length}
+                    style={{ background: "#fff", color: C.brand }}
+                  >
+                    Export CSV
+                  </Btn>
+                </div>
+                <FilterBar claims={pending} filters={reviewQueueFilters} onChange={setReviewQueueFilters} />
                 <ClaimsTable claims={filteredPending} onView={(c) => { setViewClaim(c); setViewIsReview(true); }} showSubmitter emptyText="Nothing pending review right now." />
               </div>
             )}
@@ -1188,14 +1184,10 @@ export default function ReimbursementBase({
                 </button>
               ))}
             </div>
-            {all.length > 0 && (
-              <>
-                <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>
-                  Showing {filteredAll.length} of {statusFilteredAll.length} claim{statusFilteredAll.length === 1 ? "" : "s"}
-                </div>
-                <FilterBar claims={statusFilteredAll} filters={allClaimsFilters} onChange={setAllClaimsFilters} />
-              </>
-            )}
+            <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>
+              Showing {filteredAll.length} of {statusFilteredAll.length} claim{statusFilteredAll.length === 1 ? "" : "s"}
+            </div>
+            <FilterBar claims={statusFilteredAll} filters={allClaimsFilters} onChange={setAllClaimsFilters} />
             {reviewQueue.all?.isLoading ? (
               <div style={{ padding: 40, textAlign: "center", color: C.muted }}>Loading…</div>
             ) : (
