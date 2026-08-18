@@ -83,88 +83,6 @@ function claimAmountSummary(claims) {
   return entries.map(([currency, amount]) => fmtMoney(amount, currency)).join(" + ");
 }
 
-// ---------------------------------------------------------------------------
-// Filtering / sorting shared by the "Review Queue" and "All Claims" tabs
-// ---------------------------------------------------------------------------
-const DEFAULT_CLAIM_FILTERS = {
-  search: "",
-  role: "",
-  department: "",
-  designation: "",
-  type: "",
-  paymentMethod: "",
-  currency: "",
-  minAmount: "",
-  maxAmount: "",
-  dateFrom: "",
-  dateTo: "",
-  sortBy: "date_desc",
-};
-
-function applyClaimFilters(claims, filters) {
-  const term = filters.search.trim().toLowerCase();
-  return claims.filter((c) => {
-    if (term) {
-      const haystack = `${c.employeeName || ""} ${c.empid || ""} ${c.claimNumber || ""} ${c.description || ""}`.toLowerCase();
-      if (!haystack.includes(term)) return false;
-    }
-    if (filters.role && c.submitterModel !== filters.role) return false;
-    if (filters.department && c.department !== filters.department) return false;
-    if (filters.designation && c.designation !== filters.designation) return false;
-    if (filters.type && c.reimbursementType !== filters.type) return false;
-    if (filters.paymentMethod && c.paymentMethod !== filters.paymentMethod) return false;
-    if (filters.currency && (c.currency || "INR") !== filters.currency) return false;
-
-    const amount = Number(c.amountClaimed) || 0;
-    if (filters.minAmount !== "" && amount < Number(filters.minAmount)) return false;
-    if (filters.maxAmount !== "" && amount > Number(filters.maxAmount)) return false;
-
-    if (filters.dateFrom || filters.dateTo) {
-      const expDate = c.expenseDate ? new Date(c.expenseDate) : null;
-      if (!expDate) return false;
-      if (filters.dateFrom && expDate < new Date(filters.dateFrom)) return false;
-      if (filters.dateTo && expDate > new Date(`${filters.dateTo}T23:59:59`)) return false;
-    }
-
-    return true;
-  });
-}
-
-function sortClaims(claims, sortBy) {
-  const sorted = [...claims];
-  switch (sortBy) {
-    case "amount_desc":
-      sorted.sort((a, b) => (Number(b.amountClaimed) || 0) - (Number(a.amountClaimed) || 0));
-      break;
-    case "amount_asc":
-      sorted.sort((a, b) => (Number(a.amountClaimed) || 0) - (Number(b.amountClaimed) || 0));
-      break;
-    case "date_asc":
-      sorted.sort((a, b) => new Date(a.expenseDate || 0) - new Date(b.expenseDate || 0));
-      break;
-    case "date_desc":
-    default:
-      sorted.sort((a, b) => new Date(b.expenseDate || 0) - new Date(a.expenseDate || 0));
-  }
-  return sorted;
-}
-
-function countActiveFilters(filters) {
-  let n = 0;
-  if (filters.search.trim()) n++;
-  if (filters.role) n++;
-  if (filters.department) n++;
-  if (filters.designation) n++;
-  if (filters.type) n++;
-  if (filters.paymentMethod) n++;
-  if (filters.currency) n++;
-  if (filters.minAmount !== "") n++;
-  if (filters.maxAmount !== "") n++;
-  if (filters.dateFrom) n++;
-  if (filters.dateTo) n++;
-  return n;
-}
-
 const CLAIM_CSV_COLUMNS = [
   { key: "claimNumber", label: "Claim Number" },
   { key: "employeeName", label: "Employee" },
@@ -266,6 +184,102 @@ function buildClaimCsvRows(claims) {
   });
 
   return rows;
+}
+
+// ---------------------------------------------------------------------------
+// Filtering / sorting helpers — used by the "Review Queue" and "All Claims"
+// filter bars below. Kept pure so they're easy to unit test / reuse.
+// ---------------------------------------------------------------------------
+const DEFAULT_CLAIM_FILTERS = {
+  search: "",
+  role: "",
+  department: "",
+  designation: "",
+  type: "",
+  paymentMethod: "",
+  currency: "",
+  amountMin: "",
+  amountMax: "",
+  dateFrom: "",
+  dateTo: "",
+  sortBy: "newest", // newest | oldest | amount_desc | amount_asc
+};
+
+function getUniqueValues(claims, key) {
+  return Array.from(new Set((claims || []).map((c) => c?.[key]).filter(Boolean))).sort((a, b) =>
+    String(a).localeCompare(String(b))
+  );
+}
+
+function sortClaims(claims, sortBy) {
+  const sorted = [...claims];
+  switch (sortBy) {
+    case "oldest":
+      sorted.sort((a, b) => new Date(a.expenseDate || a.createdAt || 0) - new Date(b.expenseDate || b.createdAt || 0));
+      break;
+    case "amount_desc":
+      sorted.sort((a, b) => (Number(b.amountClaimed) || 0) - (Number(a.amountClaimed) || 0));
+      break;
+    case "amount_asc":
+      sorted.sort((a, b) => (Number(a.amountClaimed) || 0) - (Number(b.amountClaimed) || 0));
+      break;
+    case "newest":
+    default:
+      sorted.sort((a, b) => new Date(b.expenseDate || b.createdAt || 0) - new Date(a.expenseDate || a.createdAt || 0));
+  }
+  return sorted;
+}
+
+function applyClaimFilters(claims, filters) {
+  const f = { ...DEFAULT_CLAIM_FILTERS, ...filters };
+  const result = (claims || []).filter((c) => {
+    if (f.search) {
+      const q = f.search.trim().toLowerCase();
+      const hay = `${c.employeeName || ""} ${c.empid || ""} ${c.claimNumber || ""}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (f.role && c.submitterModel !== f.role) return false;
+    if (f.department && c.department !== f.department) return false;
+    if (f.designation && c.designation !== f.designation) return false;
+    if (f.type && c.reimbursementType !== f.type) return false;
+    if (f.paymentMethod && c.paymentMethod !== f.paymentMethod) return false;
+    if (f.currency && (c.currency || "INR") !== f.currency) return false;
+
+    const amount = Number(c.amountClaimed) || 0;
+    if (f.amountMin !== "" && f.amountMin != null && amount < Number(f.amountMin)) return false;
+    if (f.amountMax !== "" && f.amountMax != null && amount > Number(f.amountMax)) return false;
+
+    if (f.dateFrom) {
+      const d = new Date(c.expenseDate);
+      if (isNaN(d) || d < new Date(f.dateFrom)) return false;
+    }
+    if (f.dateTo) {
+      const d = new Date(c.expenseDate);
+      const to = new Date(f.dateTo);
+      to.setHours(23, 59, 59, 999);
+      if (isNaN(d) || d > to) return false;
+    }
+    return true;
+  });
+
+  return sortClaims(result, f.sortBy);
+}
+
+function countActiveClaimFilters(filters) {
+  const f = { ...DEFAULT_CLAIM_FILTERS, ...filters };
+  let n = 0;
+  if (f.search) n++;
+  if (f.role) n++;
+  if (f.department) n++;
+  if (f.designation) n++;
+  if (f.type) n++;
+  if (f.paymentMethod) n++;
+  if (f.currency) n++;
+  if (f.amountMin !== "") n++;
+  if (f.amountMax !== "") n++;
+  if (f.dateFrom) n++;
+  if (f.dateTo) n++;
+  return n;
 }
 
 function Spinner({ size = 16, color = "#fff" }) {
@@ -668,67 +682,73 @@ function ClaimsTable({ claims, onView, showSubmitter, emptyText }) {
 }
 
 // ---------------------------------------------------------------------------
-// Filter bar — search + role/department/designation/type/payment/currency
-// dropdowns + amount range + expense-date range + sort, with a clear button.
-// Shared by the "Review Queue" and "All Claims" tabs.
+// Filter bar — search + dropdowns (role, dept, designation, type, payment
+// method, currency) + amount range + expense-date range + sort. Options for
+// role/department/designation/currency are derived dynamically from the
+// claims currently in view so the dropdowns never show stale/irrelevant
+// values.
 // ---------------------------------------------------------------------------
-function FilterBar({ filters, setFilters, departments, designations, currencies, activeCount, onClear }) {
-  const set = (key) => (e) => setFilters((f) => ({ ...f, [key]: e.target.value }));
-  const selectStyle = { ...inputStyle, width: "auto", minWidth: 130 };
-  const narrowInput = { ...inputStyle, width: 110 };
-  const dateInput = { ...inputStyle, width: 150 };
+function FilterBar({ claims, filters, onChange }) {
+  const roles = useMemo(() => getUniqueValues(claims, "submitterModel"), [claims]);
+  const departments = useMemo(() => getUniqueValues(claims, "department"), [claims]);
+  const designations = useMemo(() => getUniqueValues(claims, "designation"), [claims]);
+  const currencies = useMemo(() => getUniqueValues(claims, "currency"), [claims]);
+  const activeCount = countActiveClaimFilters(filters);
+
+  const set = (key) => (e) => onChange({ ...filters, [key]: e.target.value });
+  const selectStyle = { ...inputStyle, cursor: "pointer" };
 
   return (
     <div
       style={{
         background: C.slateBg,
-        border: `1px solid ${C.border}`,
         borderRadius: 12,
+        border: `1px solid ${C.border}`,
         padding: 14,
-        marginBottom: 14,
+        marginBottom: 16,
         display: "flex",
         flexDirection: "column",
-        gap: 12,
+        gap: 10,
       }}
     >
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <input
-          style={{ ...inputStyle, maxWidth: 240 }}
-          placeholder="Search name, employee ID, claim #…"
+          style={{ ...inputStyle, flex: "2 1 220px", minWidth: 200, background: "#fff" }}
+          placeholder="Search by name, employee ID, or claim #"
           value={filters.search}
           onChange={set("search")}
         />
-        <select style={selectStyle} value={filters.role} onChange={set("role")}>
+        <select style={{ ...selectStyle, flex: "1 1 140px", minWidth: 130 }} value={filters.role} onChange={set("role")}>
           <option value="">All Roles</option>
-          <option value="Employee">Employee</option>
-          <option value="Manager">Manager</option>
-          <option value="Admin">Admin</option>
+          {roles.map((r) => (
+            <option key={r} value={r}>{r}</option>
+          ))}
         </select>
-        <select style={selectStyle} value={filters.department} onChange={set("department")}>
+        <select style={{ ...selectStyle, flex: "1 1 150px", minWidth: 140 }} value={filters.department} onChange={set("department")}>
           <option value="">All Departments</option>
           {departments.map((d) => (
             <option key={d} value={d}>{d}</option>
           ))}
         </select>
-        <select style={selectStyle} value={filters.designation} onChange={set("designation")}>
+        <select style={{ ...selectStyle, flex: "1 1 150px", minWidth: 140 }} value={filters.designation} onChange={set("designation")}>
           <option value="">All Designations</option>
           {designations.map((d) => (
             <option key={d} value={d}>{d}</option>
           ))}
         </select>
-        <select style={selectStyle} value={filters.type} onChange={set("type")}>
+        <select style={{ ...selectStyle, flex: "1 1 150px", minWidth: 140 }} value={filters.type} onChange={set("type")}>
           <option value="">All Types</option>
           {TYPES.map((t) => (
             <option key={t} value={t}>{t}</option>
           ))}
         </select>
-        <select style={selectStyle} value={filters.paymentMethod} onChange={set("paymentMethod")}>
+        <select style={{ ...selectStyle, flex: "1 1 160px", minWidth: 150 }} value={filters.paymentMethod} onChange={set("paymentMethod")}>
           <option value="">All Payment Methods</option>
           {PAYMENT_METHODS.map((p) => (
             <option key={p} value={p}>{p}</option>
           ))}
         </select>
-        <select style={selectStyle} value={filters.currency} onChange={set("currency")}>
+        <select style={{ ...selectStyle, flex: "1 1 120px", minWidth: 110 }} value={filters.currency} onChange={set("currency")}>
           <option value="">All Currencies</option>
           {currencies.map((c) => (
             <option key={c} value={c}>{c}</option>
@@ -736,32 +756,50 @@ function FilterBar({ filters, setFilters, departments, designations, currencies,
         </select>
       </div>
 
-      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-end" }}>
-        <Field label="Min Amount">
-          <input type="number" min="0" style={narrowInput} value={filters.minAmount} onChange={set("minAmount")} placeholder="0" />
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <Field label="Amount Min">
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            style={{ ...inputStyle, width: 110, background: "#fff" }}
+            value={filters.amountMin}
+            onChange={set("amountMin")}
+            placeholder="0"
+          />
         </Field>
-        <Field label="Max Amount">
-          <input type="number" min="0" style={narrowInput} value={filters.maxAmount} onChange={set("maxAmount")} placeholder="Any" />
+        <Field label="Amount Max">
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            style={{ ...inputStyle, width: 110, background: "#fff" }}
+            value={filters.amountMax}
+            onChange={set("amountMax")}
+            placeholder="Any"
+          />
         </Field>
         <Field label="Expense From">
-          <input type="date" style={dateInput} value={filters.dateFrom} onChange={set("dateFrom")} />
+          <input type="date" style={{ ...inputStyle, width: 150, background: "#fff" }} value={filters.dateFrom} onChange={set("dateFrom")} />
         </Field>
         <Field label="Expense To">
-          <input type="date" style={dateInput} value={filters.dateTo} onChange={set("dateTo")} />
+          <input type="date" style={{ ...inputStyle, width: 150, background: "#fff" }} value={filters.dateTo} onChange={set("dateTo")} />
         </Field>
         <Field label="Sort By">
-          <select style={{ ...inputStyle, width: 170 }} value={filters.sortBy} onChange={set("sortBy")}>
-            <option value="date_desc">Newest First</option>
-            <option value="date_asc">Oldest First</option>
+          <select style={{ ...selectStyle, width: 170, background: "#fff" }} value={filters.sortBy} onChange={set("sortBy")}>
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
             <option value="amount_desc">Amount: High to Low</option>
             <option value="amount_asc">Amount: Low to High</option>
           </select>
         </Field>
-        {activeCount > 0 && (
-          <Btn variant="ghost" onClick={onClear} style={{ background: "#fff" }}>
-            Clear Filters ({activeCount})
-          </Btn>
-        )}
+        <Btn
+          variant="outline"
+          onClick={() => onChange(DEFAULT_CLAIM_FILTERS)}
+          style={{ background: "#fff", color: C.brand, height: 38 }}
+        >
+          Clear Filters{activeCount ? ` (${activeCount})` : ""}
+        </Btn>
       </div>
     </div>
   );
@@ -868,6 +906,10 @@ export default function ReimbursementBase({
   const [reviewFilter, setReviewFilter] = useState("submitted");
   const [banner, setBanner] = useState(null);
   const [isExportHovered, setIsExportHovered] = useState(false);
+  // Separate filter state per tab — Review Queue and All Claims are viewed
+  // independently, so clearing one shouldn't reset the other.
+  const [reviewQueueFilters, setReviewQueueFilters] = useState(DEFAULT_CLAIM_FILTERS);
+  const [allClaimsFilters, setAllClaimsFilters] = useState(DEFAULT_CLAIM_FILTERS);
 
   const { data: authData } = useAuth();
   const person =
@@ -920,10 +962,24 @@ export default function ReimbursementBase({
     flash("Draft deleted.");
   };
 
-  const filteredAll = useMemo(() => {
+  const statusFilteredAll = useMemo(() => {
     if (!reviewFilter) return all;
     return all.filter((c) => c.status === reviewFilter);
   }, [all, reviewFilter]);
+
+  // "All Claims" tab: status pill filter, then the full filter bar (search,
+  // role, department, designation, type, payment method, currency, amount
+  // range, expense-date range, sort).
+  const filteredAll = useMemo(
+    () => applyClaimFilters(statusFilteredAll, allClaimsFilters),
+    [statusFilteredAll, allClaimsFilters]
+  );
+
+  // "Review Queue" tab: same filter bar applied to the pending list.
+  const filteredPending = useMemo(
+    () => applyClaimFilters(pending, reviewQueueFilters),
+    [pending, reviewQueueFilters]
+  );
 
   const reviewBuckets = useMemo(
     () =>
@@ -1038,17 +1094,24 @@ export default function ReimbursementBase({
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {pending.length > 0 && (
-                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                    <Btn
-                      variant="outline"
-                      onClick={() => handleExportClaims(pending, "review-queue")}
-                      style={{ background: "#fff", color: C.brand }}
-                    >
-                      Export CSV
-                    </Btn>
-                  </div>
+                  <>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 12, color: C.muted }}>
+                        Showing {filteredPending.length} of {pending.length} pending claim{pending.length === 1 ? "" : "s"}
+                      </span>
+                      <Btn
+                        variant="outline"
+                        onClick={() => handleExportClaims(filteredPending, "review-queue")}
+                        disabled={!filteredPending.length}
+                        style={{ background: "#fff", color: C.brand }}
+                      >
+                        Export CSV
+                      </Btn>
+                    </div>
+                    <FilterBar claims={pending} filters={reviewQueueFilters} onChange={setReviewQueueFilters} />
+                  </>
                 )}
-                <ClaimsTable claims={pending} onView={(c) => { setViewClaim(c); setViewIsReview(true); }} showSubmitter emptyText="Nothing pending review right now." />
+                <ClaimsTable claims={filteredPending} onView={(c) => { setViewClaim(c); setViewIsReview(true); }} showSubmitter emptyText="Nothing pending review right now." />
               </div>
             )}
           </>
@@ -1125,6 +1188,14 @@ export default function ReimbursementBase({
                 </button>
               ))}
             </div>
+            {all.length > 0 && (
+              <>
+                <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>
+                  Showing {filteredAll.length} of {statusFilteredAll.length} claim{statusFilteredAll.length === 1 ? "" : "s"}
+                </div>
+                <FilterBar claims={statusFilteredAll} filters={allClaimsFilters} onChange={setAllClaimsFilters} />
+              </>
+            )}
             {reviewQueue.all?.isLoading ? (
               <div style={{ padding: 40, textAlign: "center", color: C.muted }}>Loading…</div>
             ) : (
