@@ -138,6 +138,7 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
   const [showTour,    setShowTour]    = useState(false);
   const [showSupport, setShowSupport] = useState(false);
   const [showDocs,    setShowDocs]    = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const menu = menuByRole[role] ?? employeeMenu;
 
@@ -200,8 +201,19 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
     setShowDocs(true);
   };
 
+  const openLogoutConfirm = () => {
+    if (isPending) return;
+    setShowLogoutConfirm(true);
+  };
+
+  const closeLogoutConfirm = () => {
+    if (isPending) return;
+    setShowLogoutConfirm(false);
+  };
+
   const handleLogout = () => {
     const onSuccess = async () => {
+      setShowLogoutConfirm(false);
       localStorage.removeItem("role");
       clearPermissions();
       clearAgentToken();
@@ -316,7 +328,7 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
               })}
 
               <button
-                onClick={handleLogout}
+                onClick={openLogoutConfirm}
                 disabled={isPending}
                 className="flex items-center gap-3 p-3 rounded-lg hover:bg-red-100 text-gray-800 transition-colors"
               >
@@ -350,6 +362,47 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
       {showTour && <HelpTour steps={tourSteps} onClose={() => setShowTour(false)} />}
       {showSupport && <TechnicalSupportModal role={role} onClose={() => setShowSupport(false)} />}
       {showDocs && <DocumentationModal onClose={() => setShowDocs(false)} />}
+      {showLogoutConfirm && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center px-4"
+          style={{ background: "rgba(115,0,66,0.32)", backdropFilter: "blur(2px)" }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeLogoutConfirm();
+          }}
+        >
+          <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-[#F4C0D1] bg-white shadow-2xl">
+            <div className="px-6 pt-6 pb-4" style={{ background: "#FBEAF0" }}>
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-[#F7C1C1]" style={{ background: "#fff" }}>
+                <FaSignOutAlt className="text-[#730042]" size={16} />
+              </div>
+              <h3 className="text-center text-[15px] font-semibold text-[#730042]">Are you sure you want to logout?</h3>
+              <p className="mt-1 text-center text-[12px] leading-relaxed text-[#993556]">
+                If you continue, your current session will be closed.
+              </p>
+            </div>
+
+            <div className="flex gap-3 px-6 py-5">
+              <button
+                type="button"
+                onClick={closeLogoutConfirm}
+                disabled={isPending}
+                className="flex-1 rounded-xl border border-[#F4C0D1] py-2.5 text-[12px] font-medium text-[#730042] transition-colors hover:bg-[#FBEAF0] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={isPending}
+                className="flex-1 rounded-xl py-2.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ background: "#730042" }}
+              >
+                {isPending ? "Logging out..." : "Yes, Logout"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
