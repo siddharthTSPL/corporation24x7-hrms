@@ -53,6 +53,8 @@ const fmtSeconds = (s) => {
 
 const DAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+const CONTAINER = "max-w-3xl lg:max-w-5xl mx-auto px-3 sm:px-5 lg:px-6";
+
 const STATUS_META = {
   draft:                     { label: "Draft",           color: "text-gray-500",    bg: "bg-gray-100",     dot: "bg-gray-400"    },
   pending_manager:           { label: "Pending Manager", color: "text-amber-600",   bg: "bg-amber-50",     dot: "bg-amber-500"   },
@@ -90,7 +92,7 @@ function StatusBadge({ status }) {
   const m = STATUS_META[status] || STATUS_META.draft;
   return (
     <span className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold", m.color, m.bg)}>
-      <span className={cn("w-1.5 h-1.5 rounded-full", m.dot)} />
+      <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", m.dot)} />
       {m.label}
     </span>
   );
@@ -121,10 +123,10 @@ function Btn({ children, variant = "primary", onClick, disabled, type = "button"
   const base = cn(
     "inline-flex items-center justify-center gap-1.5 rounded-lg font-semibold transition-all whitespace-nowrap",
     "disabled:opacity-50 disabled:cursor-not-allowed",
-    size === "sm" ? "text-[12px] px-3 py-1.5" : "text-[13px] px-4 py-2"
+    size === "sm" ? "text-[12px] px-3 py-1.5 min-h-[34px]" : "text-[13px] px-4 py-2 min-h-[40px]"
   );
   const variants = {
-    primary: "bg-[#730042] text-white hover:bg-[#5a0033]",
+    primary: "bg-gradient-to-r from-[#730042] to-[#8f0050] text-white shadow-sm hover:shadow-md hover:brightness-110",
     ghost:   "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50",
     danger:  "bg-red-50 text-red-600 border border-red-200 hover:bg-red-100",
     success: "bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100",
@@ -139,13 +141,13 @@ function Btn({ children, variant = "primary", onClick, disabled, type = "button"
 
 function Input({ label, error, className = "", ...props }) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1 min-w-0">
       {label && <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{label}</label>}
       <input
         {...props}
         className={cn(
-          "bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-[13px] text-gray-900 outline-none w-full",
-          "focus:border-[#730042] focus:ring-1 focus:ring-[#730042]/20 transition-all",
+          "bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-[13px] text-gray-900 outline-none w-full min-w-0",
+          "focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/15 transition-all",
           "placeholder:text-gray-300",
           error && "border-red-300",
           className
@@ -158,13 +160,13 @@ function Input({ label, error, className = "", ...props }) {
 
 function Select({ label, children, className = "", ...props }) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1 min-w-0">
       {label && <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{label}</label>}
       <select
         {...props}
         className={cn(
-          "bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-[13px] text-gray-900 outline-none w-full",
-          "focus:border-[#730042] focus:ring-1 focus:ring-[#730042]/20 transition-all appearance-none cursor-pointer",
+          "bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-[13px] text-gray-900 outline-none w-full min-w-0",
+          "focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/15 transition-all appearance-none cursor-pointer",
           className
         )}
       >
@@ -184,18 +186,18 @@ function Modal({ open, onClose, title, children, width = "max-w-[500px]" }) {
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-gray-900/45 backdrop-blur-sm p-0 sm:p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className={cn("bg-white rounded-t-2xl sm:rounded-2xl w-full shadow-2xl flex flex-col max-h-[90vh]", width)}>
+      <div className={cn("bg-white rounded-t-2xl sm:rounded-2xl w-full shadow-2xl flex flex-col max-h-[90vh] min-w-0", width)}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
-          <span className="font-bold text-[15px] text-gray-900">{title}</span>
+          <span className="font-bold text-[15px] text-gray-900 truncate min-w-0">{title}</span>
           <button
             onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors text-lg leading-none"
+            className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors text-lg leading-none shrink-0"
           >×</button>
         </div>
-        <div className="p-5 overflow-y-auto">{children}</div>
+        <div className="p-5 overflow-y-auto overflow-x-hidden min-w-0">{children}</div>
       </div>
     </div>
   );
@@ -213,30 +215,30 @@ function JobDetailModal({ jobId, open, onClose }) {
       ) : !job ? (
         <div className="py-8 text-center text-gray-400 text-[13px]">Job not found</div>
       ) : (
-        <div className="flex flex-col gap-4">
-          <div>
-            <div className="font-bold text-[17px] text-gray-900 mb-1">{job.title}</div>
-            {job.description && <div className="text-[13px] text-gray-500 leading-relaxed">{job.description}</div>}
+        <div className="flex flex-col gap-4 min-w-0">
+          <div className="min-w-0">
+            <div className="font-bold text-[17px] text-gray-900 mb-1 break-words">{job.title}</div>
+            {job.description && <div className="text-[13px] text-gray-500 leading-relaxed break-words">{job.description}</div>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-gray-50 rounded-xl p-3">
+            <div className="bg-gray-50 rounded-xl p-3 min-w-0">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Status</div>
               <Chip color={job.status === "in_progress" ? "blue" : job.status === "completed" ? "green" : job.status === "on_hold" ? "amber" : job.status === "cancelled" ? "red" : "gray"}>
                 {JOB_STATUS_META[job.status]?.label || job.status}
               </Chip>
             </div>
-            <div className="bg-gray-50 rounded-xl p-3">
+            <div className="bg-gray-50 rounded-xl p-3 min-w-0">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Priority</div>
               <Chip color={job.priority === "urgent" ? "brand" : job.priority === "high" ? "red" : job.priority === "medium" ? "amber" : "gray"}>
                 {PRIORITY_META[job.priority]?.label || job.priority}
               </Chip>
             </div>
-            <div className="bg-gray-50 rounded-xl p-3">
+            <div className="bg-gray-50 rounded-xl p-3 min-w-0">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Logged</div>
               <div className="text-[15px] font-bold text-[#730042]">{job.logged_hours_cache?.toFixed(1) || 0}h</div>
             </div>
-            <div className="bg-gray-50 rounded-xl p-3">
+            <div className="bg-gray-50 rounded-xl p-3 min-w-0">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Estimated</div>
               <div className="text-[15px] font-bold text-gray-900">{job.estimated_hours || 0}h</div>
             </div>
@@ -271,13 +273,13 @@ function JobDetailModal({ jobId, open, onClose }) {
               <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Work Items</div>
               <div className="flex flex-col gap-1.5">
                 {job.work_items.map((wi, i) => (
-                  <div key={i} className="flex items-center gap-2 text-[13px]">
+                  <div key={i} className="flex items-center gap-2 text-[13px] min-w-0">
                     <span className={cn("w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 text-[10px]",
                       wi.is_completed ? "bg-emerald-500 border-emerald-500 text-white" : "border-gray-300"
                     )}>
                       {wi.is_completed && "✓"}
                     </span>
-                    <span className={wi.is_completed ? "line-through text-gray-400" : "text-gray-700"}>{wi.name}</span>
+                    <span className={cn("min-w-0 break-words", wi.is_completed ? "line-through text-gray-400" : "text-gray-700")}>{wi.name}</span>
                   </div>
                 ))}
               </div>
@@ -355,27 +357,27 @@ function TimerSection({ assignedJobs, onTimerLog }) {
   return (
     <>
       <div className={cn(
-        "rounded-2xl overflow-hidden border transition-all",
+        "rounded-2xl overflow-hidden border transition-all min-w-0",
         isRunning
-          ? "border-[#730042]/20 bg-gradient-to-br from-[#730042] to-[#9a0058]"
+          ? "border-[#730042]/20 bg-gradient-to-br from-[#730042] to-[#CD166E] shadow-md shadow-[#730042]/15"
           : isPaused
           ? "border-amber-200 bg-amber-50"
-          : "border-gray-200 bg-white"
+          : "border-gray-200 bg-white shadow-sm"
       )}>
-        <div className="px-4 py-3 flex items-center gap-2.5">
+        <div className="px-4 py-3 flex items-center gap-2.5 min-w-0">
           {isRunning && (
-            <span className="relative flex h-2 w-2">
+            <span className="relative flex h-2 w-2 shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/60" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
             </span>
           )}
-          <span className={cn("text-[11px] font-bold uppercase tracking-wide",
+          <span className={cn("text-[11px] font-bold uppercase tracking-wide shrink-0",
             isRunning ? "text-white/80" : isPaused ? "text-amber-600" : "text-gray-400"
           )}>
             {isRunning ? "Timer Running" : isPaused ? "Timer Paused" : "No Active Timer"}
           </span>
           {timer?.job?.title && (
-            <span className={cn("ml-auto text-[11px] truncate max-w-[140px]",
+            <span className={cn("ml-auto text-[11px] truncate min-w-0",
               isRunning ? "text-white/60" : "text-gray-400"
             )}>
               {timer.job.title}
@@ -383,11 +385,9 @@ function TimerSection({ assignedJobs, onTimerLog }) {
           )}
         </div>
 
-        <div className={cn("px-5 py-4 flex items-center justify-between gap-4",
-          isRunning ? "" : ""
-        )}>
+        <div className="px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 min-w-0">
           <div className={cn(
-            "font-mono text-4xl font-extrabold tracking-widest tabular-nums select-none",
+            "font-mono text-3xl sm:text-4xl font-extrabold tracking-widest tabular-nums select-none",
             isRunning ? "text-white" : isPaused ? "text-amber-600" : "text-gray-200"
           )}>
             {fmtSeconds(displaySecs)}
@@ -395,7 +395,7 @@ function TimerSection({ assignedJobs, onTimerLog }) {
 
           <div className="flex gap-2 shrink-0 flex-wrap">
             {!timer ? (
-              <Btn onClick={() => setStartModal(true)} className="bg-[#730042] text-white hover:bg-[#5a0033]">
+              <Btn onClick={() => setStartModal(true)}>
                 ▶ Start
               </Btn>
             ) : (
@@ -449,7 +449,7 @@ function TimerSection({ assignedJobs, onTimerLog }) {
             value={startForm.note}
             onChange={(e) => setStartForm((p) => ({ ...p, note: e.target.value }))}
           />
-          <div className="flex gap-2 justify-end">
+          <div className="flex gap-2 justify-end flex-wrap">
             <Btn variant="ghost" onClick={() => setStartModal(false)}>Cancel</Btn>
             <Btn
               onClick={() => startTimer.mutate({ job: startForm.job, note: startForm.note }, {
@@ -465,7 +465,7 @@ function TimerSection({ assignedJobs, onTimerLog }) {
 
       <Modal open={stopModal} onClose={() => setStopModal(false)} title="Log Time">
         <div className="flex flex-col gap-4">
-          <div className="bg-[#730042]/[0.07] border border-[#730042]/20 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div className="bg-[#730042]/[0.07] border border-[#730042]/20 rounded-xl px-4 py-3 flex items-center justify-between gap-2">
             <span className="text-[12px] text-[#730042] font-semibold">Elapsed</span>
             <span className="font-mono font-extrabold text-xl text-[#730042]">{fmtSeconds(displaySecs)}</span>
           </div>
@@ -475,7 +475,7 @@ function TimerSection({ assignedJobs, onTimerLog }) {
             value={stopNote}
             onChange={(e) => setStopNote(e.target.value)}
           />
-          <div className="flex gap-2 justify-end">
+          <div className="flex gap-2 justify-end flex-wrap">
             <Btn variant="ghost" onClick={() => setStopModal(false)}>Cancel</Btn>
             <Btn
               variant="success"
@@ -507,96 +507,138 @@ function WeekGrid({ weekStart, weekDays, onAddLog, onEditLog, onDeleteLog }) {
   const todayISO = new Date().toISOString().slice(0, 10);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-      <div className="grid grid-cols-7 border-b border-gray-100 min-w-[560px]">
+    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm min-w-0">
+      {/* Mobile: stacked day list — sized to the viewport, never scrolls sideways */}
+      <div className="flex flex-col divide-y divide-gray-100 sm:hidden">
         {days.map((d, i) => {
           const iso = d.toISOString().slice(0, 10);
           const isToday = iso === todayISO;
           const mins = weekDays[iso]?.totalMinutes || 0;
           const otMins = weekDays[iso]?.overtimeMinutes || 0;
+          const logs = weekDays[iso]?.logs || [];
           return (
-            <div
-              key={iso}
-              className={cn(
-                "px-2 pt-3 pb-2 text-center",
-                i < 6 ? "border-r border-gray-100" : "",
-                isToday ? "bg-[#730042]/[0.05]" : ""
-              )}
-            >
-              <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{DAY_KEYS[i]}</div>
-              <div className={cn("text-lg font-extrabold mt-0.5", isToday ? "text-[#730042]" : "text-gray-800")}>
-                {d.getDate()}
+            <div key={iso} className={cn("p-3.5 min-w-0", isToday && "bg-[#730042]/[0.04]")}>
+              <div className="flex items-center justify-between gap-2 mb-2.5 min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={cn("text-[11px] font-bold uppercase tracking-wide shrink-0", isToday ? "text-[#730042]" : "text-gray-400")}>{DAY_KEYS[i]}</span>
+                  <span className={cn("text-[15px] font-extrabold shrink-0", isToday ? "text-[#730042]" : "text-gray-800")}>{d.getDate()}</span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {mins > 0 && <span className="text-[10px] font-bold text-[#730042] bg-[#730042]/[0.08] rounded-md px-1.5 py-0.5">{fmtDuration(mins)}</span>}
+                  {otMins > 0 && <span className="text-[9px] font-bold text-amber-700 bg-amber-100 rounded-md px-1.5 py-0.5">+{fmtDuration(otMins)} OT</span>}
+                </div>
               </div>
-              {mins > 0 ? (
-                <div className="mt-1 text-[10px] font-bold text-[#730042] bg-[#730042]/[0.08] rounded px-1 py-0.5">
-                  {fmtDuration(mins)}
-                </div>
-              ) : (
-                <div className="mt-1 h-[18px]" />
-              )}
-              {otMins > 0 && (
-                <div className="mt-1 text-[9px] font-bold text-amber-700 bg-amber-100 rounded px-1 py-0.5">
-                  +{fmtDuration(otMins)} OT
-                </div>
-              )}
+              <div className="flex flex-col gap-1.5 min-w-0">
+                {logs.map((log) => (
+                  <div key={log._id}
+                    className={cn("border rounded-lg px-2.5 py-2 flex items-center justify-between gap-2 min-w-0",
+                      log.billable ? "bg-emerald-50 border-emerald-200 border-l-[3px] border-l-emerald-500"
+                        : "bg-[#730042]/[0.05] border-[#730042]/15 border-l-[3px] border-l-[#730042]")}>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[12px] font-semibold text-gray-900 truncate">{log.job?.title || "—"}</div>
+                      <div className={cn("text-[11px] font-bold mt-0.5", log.billable ? "text-emerald-600" : "text-[#730042]")}>{fmtDuration(log.duration_minutes)}</div>
+                    </div>
+                    {log.status === "draft" && (
+                      <div className="flex gap-1 shrink-0">
+                        <button onClick={() => onEditLog(log)} className="w-6 h-6 flex items-center justify-center rounded-md text-gray-400 hover:text-blue-600 hover:bg-blue-50 text-[11px]">✎</button>
+                        <button onClick={() => onDeleteLog(log._id)} className="w-6 h-6 flex items-center justify-center rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 text-[12px]">×</button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <button
+                  onClick={() => onAddLog(iso)}
+                  className="w-full border border-dashed border-gray-200 rounded-lg py-2 text-[11px] font-semibold text-gray-400 hover:border-[#730042]/40 hover:text-[#730042]/70 transition-colors"
+                >
+                  + Add entry
+                </button>
+              </div>
             </div>
           );
         })}
       </div>
-      <div className="grid grid-cols-7 min-w-[560px]" style={{ minHeight: 120 }}>
-        {days.map((d, i) => {
-          const iso = d.toISOString().slice(0, 10);
-          const logs = weekDays[iso]?.logs || [];
-          const isToday = iso === todayISO;
-          return (
-            <div
-              key={iso}
-              className={cn(
-                "px-1.5 py-2 flex flex-col gap-1",
-                i < 6 ? "border-r border-gray-100" : "",
-                isToday ? "bg-[#730042]/[0.02]" : ""
-              )}
-            >
-              {logs.map((log) => (
-                <div
-                  key={log._id}
-                  className={cn(
-                    "border rounded-lg px-2 py-1.5 cursor-pointer group",
-                    log.billable
-                      ? "bg-emerald-50 border-emerald-200 border-l-[3px] border-l-emerald-500"
-                      : "bg-[#730042]/[0.06] border-[#730042]/20 border-l-[3px] border-l-[#730042]"
-                  )}
-                  title={`${log.job?.title || "—"} · ${fmtDuration(log.duration_minutes)}`}
-                >
-                  <div className="text-[11px] font-semibold text-gray-900 truncate leading-tight">{log.job?.title || "—"}</div>
-                  <div className="flex items-center justify-between mt-0.5">
-                    <span className={cn("text-[10px] font-bold", log.billable ? "text-emerald-600" : "text-[#730042]")}>
-                      {fmtDuration(log.duration_minutes)}
-                    </span>
-                    {log.status === "draft" && (
-                      <div className="hidden group-hover:flex gap-0.5">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); onEditLog(log); }}
-                          className="text-[10px] text-gray-400 hover:text-blue-600 px-1"
-                        >✎</button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); onDeleteLog(log._id); }}
-                          className="text-[10px] text-gray-400 hover:text-red-500 px-1"
-                        >×</button>
-                      </div>
-                    )}
-                  </div>
+
+      {/* Tablet/desktop: 7-column grid that fits the container width — no forced min-width */}
+      <div className="hidden sm:block min-w-0">
+        <div className="grid grid-cols-7 border-b border-gray-100">
+          {days.map((d, i) => {
+            const iso = d.toISOString().slice(0, 10);
+            const isToday = iso === todayISO;
+            const mins = weekDays[iso]?.totalMinutes || 0;
+            const otMins = weekDays[iso]?.overtimeMinutes || 0;
+            return (
+              <div key={iso} className={cn("px-1 sm:px-2 pt-3 pb-2 text-center min-w-0", i < 6 && "border-r border-gray-100", isToday && "bg-[#730042]/[0.05]")}>
+                <div className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wide">{DAY_KEYS[i]}</div>
+                <div className={cn("text-base sm:text-lg font-extrabold mt-0.5", isToday ? "text-[#730042]" : "text-gray-800")}>
+                  {d.getDate()}
                 </div>
-              ))}
-              <button
-                onClick={() => onAddLog(iso)}
-                className="mt-auto w-full border border-dashed border-gray-200 rounded-lg py-1 text-[11px] text-gray-300 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors"
+                {mins > 0 ? (
+                  <div className="mt-1 text-[9px] sm:text-[10px] font-bold text-[#730042] bg-[#730042]/[0.08] rounded px-1 py-0.5 truncate">
+                    {fmtDuration(mins)}
+                  </div>
+                ) : (
+                  <div className="mt-1 h-[18px]" />
+                )}
+                {otMins > 0 && (
+                  <div className="mt-1 text-[8px] sm:text-[9px] font-bold text-amber-700 bg-amber-100 rounded px-1 py-0.5 truncate">
+                    +{fmtDuration(otMins)} OT
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div className="grid grid-cols-7" style={{ minHeight: 120 }}>
+          {days.map((d, i) => {
+            const iso = d.toISOString().slice(0, 10);
+            const logs = weekDays[iso]?.logs || [];
+            const isToday = iso === todayISO;
+            return (
+              <div
+                key={iso}
+                className={cn("px-1 sm:px-1.5 py-2 flex flex-col gap-1 min-w-0", i < 6 && "border-r border-gray-100", isToday && "bg-[#730042]/[0.02]")}
               >
-                + Add
-              </button>
-            </div>
-          );
-        })}
+                {logs.map((log) => (
+                  <div
+                    key={log._id}
+                    className={cn(
+                      "border rounded-lg px-1.5 sm:px-2 py-1.5 cursor-pointer group min-w-0",
+                      log.billable
+                        ? "bg-emerald-50 border-emerald-200 border-l-[3px] border-l-emerald-500"
+                        : "bg-[#730042]/[0.05] border-[#730042]/15 border-l-[3px] border-l-[#730042]"
+                    )}
+                    title={`${log.job?.title || "—"} · ${fmtDuration(log.duration_minutes)}`}
+                  >
+                    <div className="text-[10px] sm:text-[11px] font-semibold text-gray-900 truncate leading-tight">{log.job?.title || "—"}</div>
+                    <div className="flex items-center justify-between mt-0.5 gap-1 min-w-0">
+                      <span className={cn("text-[9px] sm:text-[10px] font-bold truncate", log.billable ? "text-emerald-600" : "text-[#730042]")}>
+                        {fmtDuration(log.duration_minutes)}
+                      </span>
+                      {log.status === "draft" && (
+                        <div className="hidden group-hover:flex gap-0.5 shrink-0">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onEditLog(log); }}
+                            className="text-[9px] sm:text-[10px] text-gray-400 hover:text-blue-600 px-0.5"
+                          >✎</button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onDeleteLog(log._id); }}
+                            className="text-[9px] sm:text-[10px] text-gray-400 hover:text-red-500 px-0.5"
+                          >×</button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <button
+                  onClick={() => onAddLog(iso)}
+                  className="mt-auto w-full border border-dashed border-gray-200 rounded-lg py-1 text-[10px] sm:text-[11px] text-gray-300 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors"
+                >
+                  + Add
+                </button>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -604,10 +646,10 @@ function WeekGrid({ weekStart, weekDays, onAddLog, onEditLog, onDeleteLog }) {
 
 function StatCard({ label, value, sub, valueColor = "text-[#730042]" }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl px-4 py-4">
-      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">{label}</div>
-      <div className={cn("text-2xl font-extrabold leading-none", valueColor)}>{value}</div>
-      {sub && <div className="text-[11px] text-gray-400 mt-1">{sub}</div>}
+    <div className="bg-white border border-gray-200 rounded-2xl px-3 sm:px-4 py-3.5 sm:py-4 min-w-0 shadow-sm">
+      <div className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5 truncate">{label}</div>
+      <div className={cn("text-lg sm:text-2xl font-extrabold leading-none truncate", valueColor)}>{value}</div>
+      {sub && <div className="text-[10px] sm:text-[11px] text-gray-400 mt-1 truncate">{sub}</div>}
     </div>
   );
 }
@@ -726,31 +768,33 @@ export default function EmployeeTimesheet() {
     setJobDetailOpen(true);
   };
 
+  const rootRef = useRef(null);
+
   return (
-    <div className="min-h-screen bg-[#F5F6FA]" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-        <div className="max-w-[960px] mx-auto px-4">
-          <div className="flex items-center h-14 gap-4">
-            <div className="flex items-center gap-2.5 shrink-0">
-              <div className="w-7 h-7 rounded-lg bg-[#730042] flex items-center justify-center">
+    <div ref={rootRef} className="min-h-screen w-full bg-[#F9F8F2] overflow-x-hidden" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
+        <div className={CONTAINER}>
+          <div className="flex items-center h-14 gap-2 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#730042] to-[#CD166E] flex items-center justify-center shadow-sm">
                 <span className="text-white text-[11px] font-black">T</span>
               </div>
               <span className="font-bold text-[14px] text-gray-900 hidden sm:block">TorchX Timesheet</span>
             </div>
 
-            <nav className="flex items-center gap-0.5 flex-1">
+            <nav className="flex items-center gap-0.5 flex-1 min-w-0">
               {TABS.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => setTab(t.id)}
                   className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all whitespace-nowrap",
+                    "flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-[12px] sm:text-[13px] font-medium transition-all whitespace-nowrap shrink-0",
                     tab === t.id
                       ? "bg-[#730042]/10 text-[#730042] font-semibold"
                       : "text-gray-600 hover:bg-gray-100"
                   )}
                 >
-                  <span className="text-[12px]">{t.icon}</span>
+                  <span className="text-[11px] sm:text-[12px]">{t.icon}</span>
                   <span className="hidden sm:inline">{t.label}</span>
                   <span className="sm:hidden">{t.label.split(" ")[1] || t.label}</span>
                 </button>
@@ -771,26 +815,27 @@ export default function EmployeeTimesheet() {
                 size="sm"
                 onClick={() => openAddLog(new Date().toISOString().slice(0, 10))}
               >
-                + Log Time
+                <span className="hidden sm:inline">+ Log Time</span>
+                <span className="sm:hidden">+ Log</span>
               </Btn>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-[960px] mx-auto px-4 py-5">
+      <main className={cn(CONTAINER, "py-4 sm:py-6 lg:py-8 min-w-0")}>
 
         {tab === "work" && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 min-w-0">
             <div className="flex items-center gap-2 sm:hidden">
-              <button onClick={() => shiftWeek(-1)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-500 hover:text-gray-900 text-[15px]">‹</button>
-              <span className="text-[13px] font-semibold text-gray-700 flex-1 text-center">
+              <button onClick={() => shiftWeek(-1)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-500 hover:text-gray-900 text-[15px] shrink-0">‹</button>
+              <span className="text-[13px] font-semibold text-gray-700 flex-1 text-center min-w-0 truncate">
                 {fmtShort(weekStart)} – {fmtShort(weekEnd)}
               </span>
-              <button onClick={() => shiftWeek(1)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-500 hover:text-gray-900 text-[15px]">›</button>
+              <button onClick={() => shiftWeek(1)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-500 hover:text-gray-900 text-[15px] shrink-0">›</button>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
               <StatCard
                 label="This Week"
                 value={fmtDuration(totalWeekMins)}
@@ -805,12 +850,9 @@ export default function EmployeeTimesheet() {
               <StatCard
                 label="Overtime"
                 value={fmtDuration(totalOvertimeMins)}
-                sub={totalOvertimeMins > 0 ? "Pay is per company policy" : undefined}
+                sub={totalOvertimeMins > 0 ? "Per company policy" : undefined}
                 valueColor={totalOvertimeMins > 0 ? "text-amber-600" : "text-gray-600"}
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
               <StatCard
                 label="Billable"
                 value={fmtDuration(prodData?.billableMinutes || 0)}
@@ -825,27 +867,23 @@ export default function EmployeeTimesheet() {
 
             <TimerSection assignedJobs={assignedJobs} onTimerLog={refetchWeek} />
 
-            <div className="overflow-x-auto -mx-4 px-4">
-              <div className="min-w-[560px]">
-                <WeekGrid
-                  weekStart={weekStart}
-                  weekDays={weekDays}
-                  onAddLog={openAddLog}
-                  onEditLog={openEditLog}
-                  onDeleteLog={handleDeleteLog}
-                />
-              </div>
-            </div>
+            <WeekGrid
+              weekStart={weekStart}
+              weekDays={weekDays}
+              onAddLog={openAddLog}
+              onEditLog={openEditLog}
+              onDeleteLog={handleDeleteLog}
+            />
 
             {prodData?.byJob?.length > 0 && (
-              <div className="bg-white border border-gray-200 rounded-2xl p-4">
+              <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm min-w-0">
                 <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-3">Time by Job</div>
                 <div className="flex flex-col gap-2">
                   {prodData.byJob.map((b, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <div className="text-[13px] text-gray-700 flex-1 truncate">{b.title}</div>
+                    <div key={i} className="flex items-center gap-2 sm:gap-3 min-w-0">
+                      <div className="text-[13px] text-gray-700 flex-1 min-w-0 truncate">{b.title}</div>
                       <div className="text-[12px] font-semibold text-[#730042] shrink-0">{fmtDuration(b.minutes)}</div>
-                      <div className="w-20 h-1.5 bg-gray-100 rounded-full shrink-0">
+                      <div className="w-14 sm:w-20 h-1.5 bg-gray-100 rounded-full shrink-0">
                         <div
                           className="h-full bg-[#730042] rounded-full"
                           style={{ width: `${totalWeekMins > 0 ? Math.round((b.minutes / totalWeekMins) * 100) : 0}%` }}
@@ -857,24 +895,23 @@ export default function EmployeeTimesheet() {
               </div>
             )}
 
-            <div className="bg-white border border-gray-200 rounded-2xl p-4">
-              <div className="flex items-center justify-between">
-                <div>
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm min-w-0">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="min-w-0">
                   <div className="text-[13px] font-semibold text-gray-900">
                     Week of {fmtShort(weekStart)} – {fmtShort(weekEnd)}
                   </div>
-                  <div className="text-[12px] text-gray-400 mt-0.5">
+                  <div className="text-[12px] text-gray-400 mt-0.5 flex items-center gap-2 flex-wrap">
                     {currentWeekSheet
-                      ? `Timesheet: `
+                      ? <StatusBadge status={currentWeekSheet.status} />
                       : "No timesheet submitted for this week"
                     }
-                    {currentWeekSheet && <StatusBadge status={currentWeekSheet.status} />}
                   </div>
                   {currentWeekSheet?.remarks && (
-                    <div className="text-[12px] text-gray-500 italic mt-1">"{currentWeekSheet.remarks}"</div>
+                    <div className="text-[12px] text-gray-500 italic mt-1 break-words">"{currentWeekSheet.remarks}"</div>
                   )}
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex gap-2 shrink-0 flex-wrap">
                   {canRecall && (
                     <Btn
                       variant="ghost"
@@ -901,16 +938,16 @@ export default function EmployeeTimesheet() {
         )}
 
         {tab === "jobs" && (
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <div>
+          <div className="flex flex-col gap-3 min-w-0">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
                 <div className="font-bold text-[17px] text-gray-900">My Jobs</div>
                 <div className="text-[12px] text-gray-400 mt-0.5">{assignedJobs.length} jobs assigned to you</div>
               </div>
             </div>
 
             {assignedJobs.length === 0 ? (
-              <div className="bg-white border border-gray-200 rounded-2xl py-12 text-center">
+              <div className="bg-white border border-gray-200 rounded-2xl py-12 text-center shadow-sm px-4">
                 <div className="text-3xl mb-2">⬡</div>
                 <div className="font-semibold text-gray-700 mb-1">No jobs assigned yet</div>
                 <div className="text-[12px] text-gray-400">Jobs assigned to you will appear here</div>
@@ -925,13 +962,13 @@ export default function EmployeeTimesheet() {
                 return (
                   <div
                     key={job._id}
-                    className="bg-white border border-gray-200 rounded-2xl p-4 hover:border-[#730042]/20 transition-colors"
+                    className="bg-white border border-gray-200 rounded-2xl p-4 hover:border-[#730042]/25 hover:shadow-md transition-all shadow-sm min-w-0"
                   >
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 min-w-0">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1.5">
                           <button
-                            className="font-semibold text-[14px] text-gray-900 hover:text-[#730042] transition-colors text-left truncate max-w-full"
+                            className="font-semibold text-[14px] text-gray-900 hover:text-[#730042] transition-colors text-left break-words"
                             onClick={() => openJobDetail(job._id)}
                           >
                             {job.title}
@@ -961,11 +998,11 @@ export default function EmployeeTimesheet() {
 
                         {job.estimated_hours > 0 && (
                           <div className="mt-2.5">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-[11px] text-gray-400">
+                            <div className="flex items-center justify-between mb-1 gap-2">
+                              <span className="text-[11px] text-gray-400 truncate">
                                 {job.logged_hours_cache?.toFixed(1)}h / {job.estimated_hours}h
                               </span>
-                              <span className={cn("text-[11px] font-bold", job.overrun_flagged ? "text-red-600" : "text-gray-500")}>
+                              <span className={cn("text-[11px] font-bold shrink-0", job.overrun_flagged ? "text-red-600" : "text-gray-500")}>
                                 {pct}%
                               </span>
                             </div>
@@ -997,11 +1034,11 @@ export default function EmployeeTimesheet() {
         )}
 
         {tab === "timesheets" && (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 min-w-0">
             <div className="font-bold text-[17px] text-gray-900">My Timesheets</div>
 
             {timesheets.length === 0 ? (
-              <div className="bg-white border border-gray-200 rounded-2xl py-12 text-center">
+              <div className="bg-white border border-gray-200 rounded-2xl py-12 text-center shadow-sm px-4">
                 <div className="text-3xl mb-2">◈</div>
                 <div className="font-semibold text-gray-700 mb-1">No timesheets yet</div>
                 <div className="text-[12px] text-gray-400">Log time and submit a week to see timesheets</div>
@@ -1011,8 +1048,8 @@ export default function EmployeeTimesheet() {
               timesheets.map((ts) => {
                 const isPending = ["pending_manager", "pending_reporting_manager", "pending_admin", "pending_superadmin"].includes(ts.status);
                 return (
-                  <div key={ts._id} className="bg-white border border-gray-200 rounded-2xl p-4">
-                    <div className="flex items-start justify-between gap-3">
+                  <div key={ts._id} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm min-w-0">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 min-w-0">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1.5">
                           <span className="font-semibold text-[14px] text-gray-900">
@@ -1028,10 +1065,10 @@ export default function EmployeeTimesheet() {
                           {ts.billable_minutes > 0 && (
                             <span className="text-emerald-600">{fmtDuration(ts.billable_minutes)} billable</span>
                           )}
-                          <span>{fmtDate(ts.week_start)} – {fmtDate(ts.week_end)}</span>
+                          <span className="text-gray-400">{fmtDate(ts.week_start)} – {fmtDate(ts.week_end)}</span>
                         </div>
                         {ts.remarks && (
-                          <div className="mt-2 text-[12px] text-gray-500 italic bg-gray-50 rounded-lg px-3 py-2">
+                          <div className="mt-2 text-[12px] text-gray-500 italic bg-gray-50 rounded-lg px-3 py-2 break-words">
                             "{ts.remarks}"
                           </div>
                         )}
@@ -1042,6 +1079,7 @@ export default function EmployeeTimesheet() {
                           variant="ghost"
                           onClick={() => recallTS.mutate({ timesheetId: ts._id }, { onSuccess: refetchTS })}
                           disabled={recallTS.isPending}
+                          className="shrink-0"
                         >
                           Recall
                         </Btn>
@@ -1049,7 +1087,7 @@ export default function EmployeeTimesheet() {
                     </div>
 
                     {ts.status === "rejected" && (
-                      <div className="mt-3 flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-[12px] text-red-600">
+                      <div className="mt-3 flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-[12px] text-red-600 flex-wrap">
                         <span>✕</span>
                         <span>Rejected — recall and revise, then resubmit</span>
                         <button
@@ -1080,7 +1118,7 @@ export default function EmployeeTimesheet() {
               <option key={j._id} value={j._id}>{j.title}</option>
             ))}
           </Select>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label="Date"
               type="date"
@@ -1103,7 +1141,7 @@ export default function EmployeeTimesheet() {
             value={logForm.note}
             onChange={(e) => setLogForm((p) => ({ ...p, note: e.target.value }))}
           />
-          <div className="flex gap-2 justify-end pt-1">
+          <div className="flex gap-2 justify-end pt-1 flex-wrap">
             <Btn variant="ghost" onClick={() => setLogModal(false)}>Cancel</Btn>
             <Btn
               onClick={handleLogTime}
@@ -1117,11 +1155,11 @@ export default function EmployeeTimesheet() {
 
       <Modal open={!!editLog} onClose={() => setEditLog(null)} title="Edit Time Log">
         <div className="flex flex-col gap-3.5">
-          <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-[12px] text-gray-500">
+          <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-[12px] text-gray-500 min-w-0">
             <span className="font-semibold text-gray-700">{editLog?.job?.title || "—"}</span>
             {" · "}{fmtDate(editLog?.log_date)}
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label="Duration (minutes)"
               type="number"
@@ -1143,7 +1181,7 @@ export default function EmployeeTimesheet() {
             value={editForm.reason}
             onChange={(e) => setEditForm((p) => ({ ...p, reason: e.target.value }))}
           />
-          <div className="flex gap-2 justify-end pt-1">
+          <div className="flex gap-2 justify-end pt-1 flex-wrap">
             <Btn variant="ghost" onClick={() => setEditLog(null)}>Cancel</Btn>
             <Btn
               onClick={handleUpdateLog}
