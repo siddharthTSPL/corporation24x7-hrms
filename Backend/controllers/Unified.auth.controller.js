@@ -230,7 +230,7 @@ const unifiedLogin = async (req, res, next) => {
       { expiresIn: "15d" }
     );
     res.cookie("token", token, cookieOpts());
-    AdminModel.findByIdAndUpdate(admin._id, { status: "active", last_login: new Date(), isFirstLogin: false }).exec();
+    AdminModel.findByIdAndUpdate(admin._id, { status: "active", last_login: new Date() }).exec();
 
     return res.status(200).json({ success: true, message: "Login successful", role: admin.role, accountType: "admin", token });
   }
@@ -331,6 +331,24 @@ const unifiedLogin = async (req, res, next) => {
 
   // --- No match ---
   return next(Object.assign(new Error("No account found with this email"), { statusCode: 404 }));
+};
+
+const dismissWelcomeMessage = async (req, res, next) => {
+  if (!req.user || !req.actor) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  }
+
+  if ("isFirstLogin" in req.user && req.user.isFirstLogin) {
+    req.user.isFirstLogin = false;
+    await req.user.save({ validateBeforeSave: false });
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: "Welcome message dismissed",
+    role: req.actor.role,
+    isFirstLogin: false,
+  });
 };
 
 // --- Forgot password: send OTP (role auto-detected from email) ---
@@ -487,4 +505,5 @@ module.exports = {
   unifiedSendForgotPasswordOtp,
   unifiedVerifyForgotPasswordOtp,
   unifiedResetPassword,
+  dismissWelcomeMessage,
 };
