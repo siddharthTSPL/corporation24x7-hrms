@@ -126,8 +126,8 @@ function Modal({ open, onClose, title, children }) {
   }, [open]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/45 backdrop-blur-[6px]">
-      <div className="bg-white border border-[#E4E6EF] sm:rounded-[18px] w-full h-full sm:h-auto sm:w-[95vw] md:w-[80vw] lg:max-w-[520px] max-h-full sm:max-h-[90vh] flex flex-col min-w-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/45 backdrop-blur-[6px] overflow-hidden">
+      <div className="bg-white border border-[#E4E6EF] sm:rounded-[18px] w-full h-full sm:h-auto sm:w-[95vw] md:w-[80vw] lg:max-w-[520px] max-h-full sm:max-h-[90vh] flex flex-col min-w-0 overflow-hidden">
         <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#E4E6EF] shrink-0 min-w-0">
           <span className="font-bold text-[14px] sm:text-[15px] text-gray-900 truncate min-w-0">{title}</span>
           <button onClick={onClose} className="w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors text-xl leading-none shrink-0">×</button>
@@ -708,69 +708,12 @@ export default function SuperAdminTimesheet() {
   };
 
   const currentTabLabel = NAV_TABS.find(t => t.id === tab)?.label ?? "";
-  const rootRef = useRef(null);
-
-  // Lock every scrollable ancestor (html, body, and any wrapper div in the
-  // surrounding app shell — e.g. a sidebar layout container with its own
-  // overflow-auto) so nothing outside this component scrolls VERTICALLY.
-  // Horizontal overflow on ancestors is intentionally left alone here — this
-  // component's own content is fully responsive (nothing inside it needs
-  // horizontal scroll), so if a parent still scrolls sideways the fix
-  // belongs in that layout file, not here; hiding it blindly only clips
-  // content with no way to reach it. Everything is restored on unmount so
-  // other routes/pages using the same shell are unaffected.
-  useEffect(() => {
-    const locked = [];
-    const lock = (el) => {
-      if (!el) return;
-      locked.push({
-        el,
-        overflow: el.style.overflow,
-        overflowY: el.style.overflowY,
-        height: el.style.height,
-        maxHeight: el.style.maxHeight,
-        margin: el.style.margin,
-      });
-      el.style.overflow = "";
-      el.style.overflowY = "hidden";
-      el.style.height = "100%";
-      el.style.maxHeight = "100%";
-    };
-
-    lock(document.documentElement);
-    lock(document.body);
-    document.body.style.margin = "0";
-
-    // Walk up from this component's root, locking (vertically only) any
-    // ancestor that is actually scrolling vertically — this is what catches
-    // app-shell wrappers without touching their horizontal layout.
-    let el = rootRef.current ? rootRef.current.parentElement : null;
-    while (el && el !== document.body) {
-      const cs = window.getComputedStyle(el);
-      const isVerticallyScrollable =
-        el.scrollHeight > el.clientHeight + 1 ||
-        ["auto", "scroll"].includes(cs.overflowY) ||
-        ["auto", "scroll"].includes(cs.overflow);
-      if (isVerticallyScrollable) lock(el);
-      el = el.parentElement;
-    }
-
-    return () => {
-      locked.forEach(({ el, overflow, overflowY, height, maxHeight, margin }) => {
-        el.style.overflow = overflow;
-        el.style.overflowY = overflowY;
-        el.style.height = height;
-        el.style.maxHeight = maxHeight;
-        if (margin !== undefined) el.style.margin = margin;
-      });
-    };
-  }, []);
 
   return (
-    <div ref={rootRef} className="h-full w-full min-h-0 min-w-0 bg-[#F8F7FB] flex flex-col overflow-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
+    <div className="min-h-screen w-full max-w-full bg-[#F8F7FB] overflow-x-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      <header className="bg-white border-b border-[#E4E6EF] shrink-0 z-20 min-w-0">
-        <div className="flex items-center gap-2 px-3 sm:px-6 min-w-0">
+      <header className="bg-white border-b border-[#E4E6EF] sticky top-0 z-20 min-w-0 max-w-full overflow-hidden">
+        <div className="flex items-center gap-2 px-3 sm:px-6 min-w-0 max-w-full">
           <div className="flex items-center gap-2 sm:gap-2.5 pr-3 sm:pr-6 border-r border-[#E4E6EF] mr-1 sm:mr-2 shrink-0 py-2.5 sm:py-3">
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-[#730042] to-[#CD166E] flex items-center justify-center shrink-0 shadow-sm">
               <span className="text-white text-[12px] sm:text-[13px] font-black">S</span>
@@ -781,14 +724,16 @@ export default function SuperAdminTimesheet() {
             </div>
           </div>
 
-          <nav className="hidden md:flex items-center gap-0 flex-1 min-w-0 overflow-x-auto no-scrollbar">
+          <nav className="hidden md:flex items-center gap-1.5 lg:gap-2 flex-1 min-w-0 overflow-x-auto overscroll-x-contain no-scrollbar scroll-smooth py-2">
             {NAV_TABS.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)}
-                className={cn("relative px-3 lg:px-3.5 py-[18px] text-[12px] lg:text-[13px] whitespace-nowrap border-b-[2.5px] transition-all shrink-0",
-                  tab === t.id ? "font-bold text-[#730042] border-[#730042]" : "font-medium text-gray-600 border-transparent hover:text-gray-900")}>
+                className={cn("relative shrink-0 px-3.5 lg:px-4 py-2 rounded-full text-[12px] lg:text-[13px] whitespace-nowrap transition-all border",
+                  tab === t.id
+                    ? "font-bold text-white bg-gradient-to-r from-[#730042] to-[#8f0050] border-transparent shadow-sm"
+                    : "font-medium text-gray-600 border-transparent hover:bg-gray-100 hover:text-gray-900")}>
                 {t.label}
                 {t.id === "approvals" && approvals.length > 0 && (
-                  <span className="absolute top-3 right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] font-black flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] font-black flex items-center justify-center ring-2 ring-white">
                     {approvals.length}
                   </span>
                 )}
@@ -817,7 +762,7 @@ export default function SuperAdminTimesheet() {
         </div>
 
         {mobileNavOpen && (
-          <div className="md:hidden border-t border-[#E4E6EF] bg-white max-h-[70vh] overflow-y-auto">
+          <div className="md:hidden border-t border-[#E4E6EF] bg-white max-h-[70vh] overflow-y-auto overflow-x-hidden">
             {NAV_TABS.map(t => (
               <button key={t.id} onClick={() => { setTab(t.id); setMobileNavOpen(false); }}
                 className={cn("w-full flex items-center justify-between px-4 sm:px-5 py-3 text-[13px] font-medium border-b border-[#E4E6EF] last:border-0 transition-colors min-h-[44px]",
@@ -835,12 +780,12 @@ export default function SuperAdminTimesheet() {
         )}
       </header>
 
-      <div className="bg-[#730042]/[0.07] border-b border-[#730042]/[0.18] px-3 sm:px-6 py-1.5 flex items-center gap-2 shrink-0 overflow-hidden min-w-0">
+      <div className="bg-[#730042]/[0.07] border-b border-[#730042]/[0.18] px-3 sm:px-6 py-1.5 flex items-center gap-2 overflow-hidden min-w-0">
         <span className="text-[11px] font-bold text-[#730042] shrink-0">⬡ Super Admin</span>
         <span className="text-[11px] text-[#730042]/70 hidden sm:inline truncate">— Organisation-wide visibility across all roles</span>
       </div>
 
-      <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 sm:px-6 py-4 sm:py-7 w-full max-w-[1280px] mx-auto min-w-0">
+      <main className="px-3 sm:px-6 py-4 sm:py-7 w-full max-w-[1280px] mx-auto min-w-0">
 
         {tab === "overview" && (
           <div className="flex flex-col gap-4 sm:gap-5 min-w-0">
@@ -857,7 +802,7 @@ export default function SuperAdminTimesheet() {
                 {overrunJobs.length === 0 ? (
                   <EmptyState icon="✓" title="No jobs at risk" sub="All jobs within estimate" />
                 ) : (
-                  <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-0.5">
+                  <div className="flex flex-col gap-2 max-h-64 overflow-y-auto overflow-x-hidden pr-0.5">
                     {overrunJobs.map(job => (
                       <div key={job._id} className="flex items-center gap-3 px-3 sm:px-3.5 py-2.5 bg-[#F8F9FC] border border-[#E4E6EF] rounded-xl min-w-0">
                         <span className="text-[12px] font-black text-red-600 min-w-[36px] shrink-0">{job.riskPercent}%</span>
@@ -879,7 +824,7 @@ export default function SuperAdminTimesheet() {
                 {idleJobs.length === 0 ? (
                   <EmptyState icon="🚀" title="All jobs are active" sub="" />
                 ) : (
-                  <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-0.5">
+                  <div className="flex flex-col gap-2 max-h-64 overflow-y-auto overflow-x-hidden pr-0.5">
                     {idleJobs.map(job => (
                       <div key={job._id} className="flex items-center gap-3 px-3 sm:px-3.5 py-2.5 bg-[#F8F9FC] border border-[#E4E6EF] rounded-xl min-w-0">
                         <div className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
@@ -939,7 +884,7 @@ export default function SuperAdminTimesheet() {
                     <table className="w-full border-collapse text-[12px] table-fixed">
                       <thead>
                         <tr>
-                          <th className="text-left py-2 pr-4 pl-1 text-gray-400 font-semibold w-[140px]">Member</th>
+                          <th className="text-left py-2 pr-4 pl-1 text-gray-400 font-semibold w-[18%]">Member</th>
                           {DAY_NAMES.map(d => (
                             <th key={d} className="text-center py-2 px-1.5 text-gray-400 font-semibold">{d}</th>
                           ))}
@@ -1368,7 +1313,7 @@ export default function SuperAdminTimesheet() {
           <Input label="Default Hourly Rate" type="number" min="0" placeholder="0.00" value={projectForm.default_hourly_rate} onChange={e => setProjectForm(p => ({ ...p, default_hourly_rate: nonNegative(e.target.value) }))} />
           <div className="flex flex-col gap-1.5 min-w-0">
             <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Add Members (optional)</label>
-            <div className="border border-[#E4E6EF] rounded-[10px] max-h-[160px] overflow-y-auto p-2 flex flex-col gap-1">
+            <div className="border border-[#E4E6EF] rounded-[10px] max-h-[160px] overflow-y-auto overflow-x-hidden p-2 flex flex-col gap-1">
               {targets.length === 0 ? (
                 <div className="text-[12px] text-gray-400 px-1.5 py-1">No team members found</div>
               ) : targets.map(t => (
@@ -1421,7 +1366,7 @@ export default function SuperAdminTimesheet() {
           </div>
           <div className="flex flex-col gap-1.5 min-w-0">
             <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Add Members</label>
-            <div className="border border-[#E4E6EF] rounded-[10px] max-h-[160px] overflow-y-auto p-2 flex flex-col gap-1">
+            <div className="border border-[#E4E6EF] rounded-[10px] max-h-[160px] overflow-y-auto overflow-x-hidden p-2 flex flex-col gap-1">
               {targets
                 .filter(t => !(membersModal?.members || []).some(m => (m.member?._id || m.member || "").toString() === t.id.toString()))
                 .map(t => (
@@ -1555,6 +1500,9 @@ export default function SuperAdminTimesheet() {
       <style>{`
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        html, body { overflow-x: hidden !important; max-width: 100%; }
+        * { box-sizing: border-box; min-width: 0; word-break: break-word; }
+        table, img, svg { max-width: 100%; }
       `}</style>
     </div>
   );
