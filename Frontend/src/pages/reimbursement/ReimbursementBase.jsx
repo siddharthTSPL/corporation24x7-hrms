@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
+import { downloadCsv } from "../dashboard/Exportcsv";
 
 // ---------------------------------------------------------------------------
 // Shared design tokens — mirrors pages/payroll/Payroll.jsx so this module
@@ -60,6 +61,213 @@ function getErrorMessage(e) {
   return e?.response?.data?.message || e?.message || "Something went wrong";
 }
 
+function fmtDateTime(d) {
+  if (!d) return "";
+  return new Date(d).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function claimAmountSummary(claims) {
+  const totals = claims.reduce((acc, claim) => {
+    const currency = claim?.currency || "INR";
+    acc[currency] = (acc[currency] || 0) + (Number(claim?.amountClaimed) || 0);
+    return acc;
+  }, {});
+  const entries = Object.entries(totals);
+  if (!entries.length) return fmtMoney(0, "INR");
+  return entries.map(([currency, amount]) => fmtMoney(amount, currency)).join(" + ");
+}
+
+// ---------------------------------------------------------------------------
+// Filtering / sorting shared by the "Review Queue" and "All Claims" tabs
+// ---------------------------------------------------------------------------
+const DEFAULT_CLAIM_FILTERS = {
+  search: "",
+  role: "",
+  department: "",
+  designation: "",
+  type: "",
+  paymentMethod: "",
+  currency: "",
+  minAmount: "",
+  maxAmount: "",
+  dateFrom: "",
+  dateTo: "",
+  sortBy: "date_desc",
+};
+
+function applyClaimFilters(claims, filters) {
+  const term = filters.search.trim().toLowerCase();
+  return claims.filter((c) => {
+    if (term) {
+      const haystack = `${c.employeeName || ""} ${c.empid || ""} ${c.claimNumber || ""} ${c.description || ""}`.toLowerCase();
+      if (!haystack.includes(term)) return false;
+    }
+    if (filters.role && c.submitterModel !== filters.role) return false;
+    if (filters.department && c.department !== filters.department) return false;
+    if (filters.designation && c.designation !== filters.designation) return false;
+    if (filters.type && c.reimbursementType !== filters.type) return false;
+    if (filters.paymentMethod && c.paymentMethod !== filters.paymentMethod) return false;
+    if (filters.currency && (c.currency || "INR") !== filters.currency) return false;
+
+    const amount = Number(c.amountClaimed) || 0;
+    if (filters.minAmount !== "" && amount < Number(filters.minAmount)) return false;
+    if (filters.maxAmount !== "" && amount > Number(filters.maxAmount)) return false;
+
+    if (filters.dateFrom || filters.dateTo) {
+      const expDate = c.expenseDate ? new Date(c.expenseDate) : null;
+      if (!expDate) return false;
+      if (filters.dateFrom && expDate < new Date(filters.dateFrom)) return false;
+      if (filters.dateTo && expDate > new Date(`${filters.dateTo}T23:59:59`)) return false;
+    }
+
+    return true;
+  });
+}
+
+function sortClaims(claims, sortBy) {
+  const sorted = [...claims];
+  switch (sortBy) {
+    case "amount_desc":
+      sorted.sort((a, b) => (Number(b.amountClaimed) || 0) - (Number(a.amountClaimed) || 0));
+      break;
+    case "amount_asc":
+      sorted.sort((a, b) => (Number(a.amountClaimed) || 0) - (Number(b.amountClaimed) || 0));
+      break;
+    case "date_asc":
+      sorted.sort((a, b) => new Date(a.expenseDate || 0) - new Date(b.expenseDate || 0));
+      break;
+    case "date_desc":
+    default:
+      sorted.sort((a, b) => new Date(b.expenseDate || 0) - new Date(a.expenseDate || 0));
+  }
+  return sorted;
+}
+
+function countActiveFilters(filters) {
+  let n = 0;
+  if (filters.search.trim()) n++;
+  if (filters.role) n++;
+  if (filters.department) n++;
+  if (filters.designation) n++;
+  if (filters.type) n++;
+  if (filters.paymentMethod) n++;
+  if (filters.currency) n++;
+  if (filters.minAmount !== "") n++;
+  if (filters.maxAmount !== "") n++;
+  if (filters.dateFrom) n++;
+  if (filters.dateTo) n++;
+  return n;
+}
+
+const CLAIM_CSV_COLUMNS = [
+  { key: "claimNumber", label: "Claim Number" },
+  { key: "employeeName", label: "Employee" },
+  { key: "empid", label: "Employee ID" },
+  { key: "submitterModel", label: "Submitted By Role" },
+  { key: "department", label: "Department" },
+  { key: "designation", label: "Designation" },
+  { key: "reimbursementType", label: "Reimbursement Type" },
+  { key: "expenseDate", label: "Expense Date" },
+  { key: "amountClaimed", label: "Amount Claimed" },
+  { key: "currency", label: "Currency" },
+  { key: "project", label: "Project / Client" },
+  { key: "costCenter", label: "Cost Center" },
+  { key: "paymentMethod", label: "Payment Method" },
+  { key: "statusLabel", label: "Status" },
+  { key: "submissionDate", label: "Submitted On" },
+  { key: "approvedAt", label: "Approved On" },
+  { key: "rejectedAt", label: "Rejected On" },
+  { key: "paidAt", label: "Paid On" },
+  { key: "approverComments", label: "Approver Comments" },
+  { key: "rejectionReason", label: "Rejection Reason" },
+  { key: "financeNotes", label: "Finance Notes" },
+  { key: "paymentReference", label: "Payment Reference" },
+  { key: "description", label: "Description" },
+];
+
+function buildClaimCsvRows(claims) {
+  // Sort newest expense first so the exported file reads chronologically —
+  // easier to scan than raw API/insertion order.
+  const sorted = [...claims].sort((a, b) => {
+    const bd = new Date(b.expenseDate || b.createdAt || 0).getTime();
+    const ad = new Date(a.expenseDate || a.createdAt || 0).getTime();
+    return bd - ad;
+  });
+
+  const rows = sorted.map((claim) => ({
+    claimNumber: claim.claimNumber || "",
+    employeeName: claim.employeeName || "",
+    empid: claim.empid || "",
+    submitterModel: claim.submitterModel || "",
+    department: claim.department || "",
+    designation: claim.designation || "",
+    reimbursementType: claim.reimbursementType || "",
+    expenseDate: fmtDate(claim.expenseDate),
+    // Plain number (not a formatted currency string) so the column can be
+    // summed / pivoted directly in Excel/Sheets. Currency lives in its own
+    // column right next to it.
+    amountClaimed: (Number(claim.amountClaimed) || 0).toFixed(2),
+    currency: claim.currency || "INR",
+    project: claim.project || "",
+    costCenter: claim.costCenter || "",
+    paymentMethod: claim.paymentMethod || "",
+    statusLabel: STATUS_META[claim.status]?.label || claim.status || "",
+    submissionDate: fmtDateTime(claim.submissionDate || claim.createdAt),
+    approvedAt: fmtDateTime(claim.approvedAt),
+    rejectedAt: fmtDateTime(claim.rejectedAt),
+    paidAt: fmtDateTime(claim.paidAt),
+    approverComments: claim.approverComments || "",
+    rejectionReason: claim.rejectionReason || "",
+    financeNotes: claim.financeNotes || "",
+    paymentReference: claim.paymentReference || "",
+    description: claim.description || "",
+  }));
+
+  // Trailing totals row(s) — one per currency in the export, so a reader
+  // gets the grand total(s) without having to open a formula bar.
+  const totalsByCurrency = sorted.reduce((acc, claim) => {
+    const currency = claim.currency || "INR";
+    acc[currency] = (acc[currency] || 0) + (Number(claim.amountClaimed) || 0);
+    return acc;
+  }, {});
+
+  Object.entries(totalsByCurrency).forEach(([currency, total]) => {
+    rows.push({
+      claimNumber: "TOTAL",
+      employeeName: "",
+      empid: "",
+      submitterModel: "",
+      department: "",
+      designation: "",
+      reimbursementType: "",
+      expenseDate: "",
+      amountClaimed: total.toFixed(2),
+      currency,
+      project: "",
+      costCenter: "",
+      paymentMethod: "",
+      statusLabel: `${sorted.length} claim${sorted.length === 1 ? "" : "s"}`,
+      submissionDate: "",
+      approvedAt: "",
+      rejectedAt: "",
+      paidAt: "",
+      approverComments: "",
+      rejectionReason: "",
+      financeNotes: "",
+      paymentReference: "",
+      description: "",
+    });
+  });
+
+  return rows;
+}
+
 function Spinner({ size = 16, color = "#fff" }) {
   return (
     <div
@@ -98,7 +306,7 @@ function StatusBadge({ status }) {
   );
 }
 
-function Btn({ children, onClick, variant = "primary", disabled, loading, type = "button", style }) {
+function Btn({ children, onClick, variant = "primary", disabled, loading, type = "button", style, ...rest }) {
   const variants = {
     primary: { background: C.brand, color: "#fff", border: `1px solid ${C.brand}` },
     outline: { background: "#fff", color: C.brand, border: `1px solid ${C.brand}` },
@@ -111,6 +319,7 @@ function Btn({ children, onClick, variant = "primary", disabled, loading, type =
       type={type}
       onClick={onClick}
       disabled={disabled || loading}
+      {...rest}
       style={{
         ...variants[variant],
         padding: "8px 16px",
@@ -459,6 +668,106 @@ function ClaimsTable({ claims, onView, showSubmitter, emptyText }) {
 }
 
 // ---------------------------------------------------------------------------
+// Filter bar — search + role/department/designation/type/payment/currency
+// dropdowns + amount range + expense-date range + sort, with a clear button.
+// Shared by the "Review Queue" and "All Claims" tabs.
+// ---------------------------------------------------------------------------
+function FilterBar({ filters, setFilters, departments, designations, currencies, activeCount, onClear }) {
+  const set = (key) => (e) => setFilters((f) => ({ ...f, [key]: e.target.value }));
+  const selectStyle = { ...inputStyle, width: "auto", minWidth: 130 };
+  const narrowInput = { ...inputStyle, width: 110 };
+  const dateInput = { ...inputStyle, width: 150 };
+
+  return (
+    <div
+      style={{
+        background: C.slateBg,
+        border: `1px solid ${C.border}`,
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 14,
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+      }}
+    >
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <input
+          style={{ ...inputStyle, maxWidth: 240 }}
+          placeholder="Search name, employee ID, claim #…"
+          value={filters.search}
+          onChange={set("search")}
+        />
+        <select style={selectStyle} value={filters.role} onChange={set("role")}>
+          <option value="">All Roles</option>
+          <option value="Employee">Employee</option>
+          <option value="Manager">Manager</option>
+          <option value="Admin">Admin</option>
+        </select>
+        <select style={selectStyle} value={filters.department} onChange={set("department")}>
+          <option value="">All Departments</option>
+          {departments.map((d) => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
+        <select style={selectStyle} value={filters.designation} onChange={set("designation")}>
+          <option value="">All Designations</option>
+          {designations.map((d) => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
+        <select style={selectStyle} value={filters.type} onChange={set("type")}>
+          <option value="">All Types</option>
+          {TYPES.map((t) => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+        <select style={selectStyle} value={filters.paymentMethod} onChange={set("paymentMethod")}>
+          <option value="">All Payment Methods</option>
+          {PAYMENT_METHODS.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+        <select style={selectStyle} value={filters.currency} onChange={set("currency")}>
+          <option value="">All Currencies</option>
+          {currencies.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+      </div>
+
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <Field label="Min Amount">
+          <input type="number" min="0" style={narrowInput} value={filters.minAmount} onChange={set("minAmount")} placeholder="0" />
+        </Field>
+        <Field label="Max Amount">
+          <input type="number" min="0" style={narrowInput} value={filters.maxAmount} onChange={set("maxAmount")} placeholder="Any" />
+        </Field>
+        <Field label="Expense From">
+          <input type="date" style={dateInput} value={filters.dateFrom} onChange={set("dateFrom")} />
+        </Field>
+        <Field label="Expense To">
+          <input type="date" style={dateInput} value={filters.dateTo} onChange={set("dateTo")} />
+        </Field>
+        <Field label="Sort By">
+          <select style={{ ...inputStyle, width: 170 }} value={filters.sortBy} onChange={set("sortBy")}>
+            <option value="date_desc">Newest First</option>
+            <option value="date_asc">Oldest First</option>
+            <option value="amount_desc">Amount: High to Low</option>
+            <option value="amount_asc">Amount: Low to High</option>
+          </select>
+        </Field>
+        {activeCount > 0 && (
+          <Btn variant="ghost" onClick={onClear} style={{ background: "#fff" }}>
+            Clear Filters ({activeCount})
+          </Btn>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Decision modal — approve / reject / mark paid
 // ---------------------------------------------------------------------------
 function DecisionModal({ claim, mode, onClose, onApprove, onReject, onMarkPaid, deciding }) {
@@ -558,6 +867,7 @@ export default function ReimbursementBase({
   const [deciding, setDeciding] = useState(null);
   const [reviewFilter, setReviewFilter] = useState("submitted");
   const [banner, setBanner] = useState(null);
+  const [isExportHovered, setIsExportHovered] = useState(false);
 
   const { data: authData } = useAuth();
   const person =
@@ -615,6 +925,42 @@ export default function ReimbursementBase({
     return all.filter((c) => c.status === reviewFilter);
   }, [all, reviewFilter]);
 
+  const reviewBuckets = useMemo(
+    () =>
+      ["", "draft", "submitted", "approved", "rejected", "paid"].map((status) => {
+        const claims = status ? all.filter((claim) => claim.status === status) : all;
+        return {
+          key: status,
+          label: status ? STATUS_META[status].label : "All",
+          claims,
+          count: claims.length,
+          totalAmount: claimAmountSummary(claims),
+        };
+      }),
+    [all]
+  );
+
+  const selectedReviewBucket =
+    reviewBuckets.find((bucket) => bucket.key === reviewFilter) || reviewBuckets[0];
+
+  const handleExportAllClaims = () => {
+    if (!filteredAll.length) return;
+    const safeLabel = selectedReviewBucket.label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const filename = `reimbursements-${safeLabel}-${new Date().toISOString().slice(0, 10)}.csv`;
+    downloadCsv(filename, CLAIM_CSV_COLUMNS, buildClaimCsvRows(filteredAll));
+    flash(`${selectedReviewBucket.label} claims exported.`);
+  };
+
+  // Shared by the "My Claims" and "Review Queue" tabs — same column set,
+  // just a different source array and filename prefix.
+  const handleExportClaims = (claims, label) => {
+    if (!claims.length) return;
+    const safeLabel = label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const filename = `reimbursements-${safeLabel}-${new Date().toISOString().slice(0, 10)}.csv`;
+    downloadCsv(filename, CLAIM_CSV_COLUMNS, buildClaimCsvRows(claims));
+    flash(`${label} exported.`);
+  };
+
   const tabBtn = (key, label) => (
     <button
       onClick={() => setTab(key)}
@@ -668,6 +1014,17 @@ export default function ReimbursementBase({
               <div style={{ padding: 40, textAlign: "center", color: C.muted }}>Loading…</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {my.length > 0 && (
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <Btn
+                      variant="outline"
+                      onClick={() => handleExportClaims(my, "my-claims")}
+                      style={{ background: "#fff", color: C.brand }}
+                    >
+                      Export CSV
+                    </Btn>
+                  </div>
+                )}
                 <ClaimsTable claims={my} onView={(c) => { setViewClaim(c); setViewIsReview(false); }} emptyText="You haven't submitted any claims yet." />
               </div>
             )}
@@ -679,14 +1036,76 @@ export default function ReimbursementBase({
             {reviewQueue.pending?.isLoading ? (
               <div style={{ padding: 40, textAlign: "center", color: C.muted }}>Loading…</div>
             ) : (
-              <ClaimsTable claims={pending} onView={(c) => { setViewClaim(c); setViewIsReview(true); }} showSubmitter emptyText="Nothing pending review right now." />
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {pending.length > 0 && (
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <Btn
+                      variant="outline"
+                      onClick={() => handleExportClaims(pending, "review-queue")}
+                      style={{ background: "#fff", color: C.brand }}
+                    >
+                      Export CSV
+                    </Btn>
+                  </div>
+                )}
+                <ClaimsTable claims={pending} onView={(c) => { setViewClaim(c); setViewIsReview(true); }} showSubmitter emptyText="Nothing pending review right now." />
+              </div>
             )}
           </>
         )}
 
         {tab === "all" && reviewQueue && (
           <>
-            <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+                marginBottom: 16,
+                flexWrap: "wrap",
+              }}
+            >
+              <Btn
+                variant="outline"
+                onClick={handleExportAllClaims}
+                disabled={!filteredAll.length || reviewQueue.all?.isLoading}
+                onMouseEnter={() => setIsExportHovered(true)}
+                onMouseLeave={() => setIsExportHovered(false)}
+                style={{
+                  background: isExportHovered ? C.brand : "#fff",
+                  color: isExportHovered ? "#fff" : C.brand,
+                }}
+              >
+                Export CSV
+              </Btn>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  flexWrap: "wrap",
+                  marginLeft: "auto",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: C.brandDark,
+                    background: C.brandLight,
+                    padding: "7px 12px",
+                    borderRadius: 999,
+                  }}
+                >
+                  {selectedReviewBucket.label}: {selectedReviewBucket.totalAmount}
+                </span>
+                <span style={{ fontSize: 12, color: C.muted }}>
+                  {selectedReviewBucket.count} claim{selectedReviewBucket.count === 1 ? "" : "s"}
+                </span>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
               {["", "draft", "submitted", "approved", "rejected", "paid"].map((s) => (
                 <button
                   key={s || "any"}
