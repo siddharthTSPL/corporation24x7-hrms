@@ -54,6 +54,13 @@ const fmtSeconds = (s) => {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
 };
 
+const nonNegative = (v) => {
+  if (v === "") return "";
+  const n = Number(v);
+  if (Number.isNaN(n)) return v;
+  return n < 0 ? "0" : v;
+};
+
 const STATUS_STYLE = {
   draft: { text: "text-gray-400", bg: "bg-gray-50", label: "Draft" },
   pending_manager: { text: "text-amber-600", bg: "bg-amber-50", label: "Pending Manager" },
@@ -502,7 +509,7 @@ function CalendarWeekGrid({ weekStart, weekDays, onAddLog }) {
 
   return (
     <Card className="overflow-hidden">
-      <div className="sm:hidden flex flex-col divide-y divide-gray-200">
+      <div className="lg:hidden flex flex-col divide-y divide-gray-200">
         {days.map((d, i) => {
           const iso = d.toISOString().slice(0, 10);
           const isToday = iso === today;
@@ -539,7 +546,7 @@ function CalendarWeekGrid({ weekStart, weekDays, onAddLog }) {
         })}
       </div>
 
-      <div className="hidden sm:block overflow-x-auto">
+      <div className="hidden lg:block overflow-x-auto">
         <div className="grid grid-cols-7 border-b border-gray-200 min-w-[560px]">
           {days.map((d, i) => {
             const iso = d.toISOString().slice(0, 10);
@@ -727,21 +734,64 @@ export default function AdminTimesheet() {
     });
   };
 
+  const rootRef = useRef(null);
+
+  useEffect(() => {
+    const locked = [];
+    const lock = (el) => {
+      if (!el) return;
+      locked.push({
+        el,
+        overflow: el.style.overflow,
+        overflowY: el.style.overflowY,
+        height: el.style.height,
+        maxHeight: el.style.maxHeight,
+        margin: el.style.margin,
+      });
+      el.style.overflow = "";
+      el.style.overflowY = "hidden";
+      el.style.height = "100%";
+      el.style.maxHeight = "100%";
+    };
+
+    lock(document.documentElement);
+    lock(document.body);
+    document.body.style.margin = "0";
+
+    let el = rootRef.current ? rootRef.current.parentElement : null;
+    while (el && el !== document.body) {
+      const cs = window.getComputedStyle(el);
+      const isVerticallyScrollable =
+        el.scrollHeight > el.clientHeight + 1 ||
+        ["auto", "scroll"].includes(cs.overflowY) ||
+        ["auto", "scroll"].includes(cs.overflow);
+      if (isVerticallyScrollable) lock(el);
+      el = el.parentElement;
+    }
+
+    return () => {
+      locked.forEach(({ el, overflow, overflowY, height, maxHeight, margin }) => {
+        el.style.overflow = overflow;
+        el.style.overflowY = overflowY;
+        el.style.height = height;
+        el.style.maxHeight = maxHeight;
+        if (margin !== undefined) el.style.margin = margin;
+      });
+    };
+  }, []);
+
   return (
-    <div className="min-h-screen w-full max-w-[100vw] bg-[#F4F5F9] font-sans overflow-x-hidden">
-    <header className="sticky top-0 z-25 w-full bg-white border-b border-gray-200 shadow-sm">
+    <div ref={rootRef} className="h-full w-full min-h-0 min-w-0 bg-[#F4F5F9] font-sans flex flex-col overflow-hidden">
+    <header className="w-full bg-white border-b border-gray-200 shadow-sm shrink-0 z-20">
   <div className="w-full max-w-screen-2xl mx-auto px-3 sm:px-6 lg:px-8">
     <div className="flex items-center h-14 sm:h-16 gap-3">
 
-      {/* Logo */}
       <div className="flex-shrink-0">
         <TorchXLogo />
       </div>
 
-      {/* Divider */}
       <div className="hidden md:block w-px h-8 bg-gray-200 flex-shrink-0" />
 
-      {/* Navigation */}
       <div className="flex-1 min-w-0 overflow-hidden">
         <nav className="flex items-center gap-1 overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth">
           {TABS.map((t) => (
@@ -768,7 +818,6 @@ export default function AdminTimesheet() {
 
      
      
-      {/* Create Job Button */}
 <div className="flex-shrink-0">
   <button
     onClick={() => setJobModal(true)}
@@ -794,11 +843,11 @@ export default function AdminTimesheet() {
   </div>
 </header>
 
-      <main className="max-w-[1280px] mx-auto px-3 sm:px-6 py-5 sm:py-7 w-full min-w-0">
+      <main className="flex-1 min-h-0 overflow-y-auto overflow-x-auto max-w-[1280px] mx-auto px-3 sm:px-6 py-5 sm:py-7 w-full min-w-0">
 
         {tab === "overview" && (
           <div className="flex flex-col gap-5 min-w-0">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3.5">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-2.5 lg:gap-3.5">
               <StatCard label="Jobs Created" value={createdJobs.length} color="text-[#730042]" />
               <StatCard label="Pending Approvals" value={approvals.length} color="text-amber-600" />
               <StatCard label="Overrun Risk" value={overrunJobs.length} color="text-red-600" sub="≥75% estimate used" />
@@ -813,7 +862,7 @@ export default function AdminTimesheet() {
                   <Chip color="amber">{approvals.length} waiting</Chip>
                 </div>
                 {approvals.slice(0, 3).map((ts) => (
-                  <div key={ts._id} className="px-4 sm:px-[22px] py-3 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-3.5 min-w-0">
+                  <div key={ts._id} className="px-4 sm:px-[22px] py-3 border-b border-gray-200 flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-3.5 min-w-0">
                     <div className="flex items-center gap-3.5 flex-1 min-w-0">
                       <div className="w-9 h-9 bg-[#730042]/[0.07] rounded-[10px] flex items-center justify-center text-[13px] font-extrabold text-[#730042] flex-shrink-0">
                         {(ts.owner?.f_name?.[0] || "?")}
@@ -843,7 +892,7 @@ export default function AdminTimesheet() {
               <div className="px-4 sm:px-[22px] py-3.5 border-b border-gray-200">
                 <span className="text-sm font-bold text-gray-900">Jobs by Status</span>
               </div>
-              <div className="px-4 sm:px-[22px] py-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+              <div className="px-4 sm:px-[22px] py-4 grid grid-cols-1 lg:grid-cols-5 gap-2.5">
                 {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map((s) => {
                   const count = createdJobs.filter((j) => j.status === s).length;
                   const block = JOB_STATUS_BLOCK[s];
@@ -861,7 +910,7 @@ export default function AdminTimesheet() {
 
         {tab === "team-jobs" && (
           <div className="min-w-0">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-5 gap-3">
               <div className="min-w-0">
                 <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">Team Jobs</h1>
                 <p className="text-[13px] text-gray-400 mt-1 mb-0">{createdJobs.length} jobs created by you</p>
@@ -881,7 +930,7 @@ export default function AdminTimesheet() {
               ) : (
                 <div className="flex flex-col gap-2.5">
                   {assignedJobs.map((j) => (
-                    <Card key={j._id} className="px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-start gap-3.5">
+                    <Card key={j._id} className="px-4 sm:px-5 py-4 flex flex-col lg:flex-row lg:items-start gap-3.5">
                       <div className="flex gap-3.5 flex-1 min-w-0">
                         <div className={`w-1 rounded ${JOB_STATUS_DOT[j.status] || "bg-gray-400"} flex-shrink-0`} />
                         <div className="flex-1 min-w-0">
@@ -933,7 +982,7 @@ export default function AdminTimesheet() {
                 createdJobs.map((j) => {
                   const assigneeInfo = j.assigned_to_info;
                   return (
-                    <Card key={j._id} className="px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-start gap-3.5">
+                    <Card key={j._id} className="px-4 sm:px-5 py-4 flex flex-col lg:flex-row lg:items-start gap-3.5">
                       <div className="flex gap-3.5 flex-1 min-w-0">
                         <div className={`w-1 rounded ${JOB_STATUS_DOT[j.status] || "bg-gray-400"} flex-shrink-0`} />
                         <div className="flex-1 min-w-0">
@@ -998,7 +1047,7 @@ export default function AdminTimesheet() {
               <div className="flex flex-col gap-3">
                 {approvals.map((ts) => (
                   <Card key={ts._id} className="px-4 sm:px-6 py-5">
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                    <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
                       <div className="flex gap-3.5 min-w-0">
                         <div className="w-10 h-10 sm:w-[42px] sm:h-[42px] bg-[#730042]/[0.07] rounded-xl flex items-center justify-center text-base font-extrabold text-[#730042] flex-shrink-0">
                           {ts.owner?.f_name?.[0] || "?"}
@@ -1033,7 +1082,7 @@ export default function AdminTimesheet() {
 
         {tab === "insights" && (
           <div className="flex flex-col gap-5 min-w-0">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
               <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">Insights</h1>
               <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-[10px] px-2.5 py-1.5 self-start sm:self-auto">
                 <button onClick={() => shiftWeek(-1)} className="bg-transparent border-none cursor-pointer text-gray-700 text-base flex items-center min-h-[28px] min-w-[28px] justify-center">‹</button>
@@ -1054,7 +1103,7 @@ export default function AdminTimesheet() {
                   <div className="text-center text-gray-400 text-[13px] py-6">No team data for this week</div>
                 ) : (
                   <>
-                    <div className="sm:hidden flex flex-col gap-3">
+                    <div className="lg:hidden flex flex-col gap-3">
                       {heatmap.map((row, i) => {
                         const dayKeys = Array.from({ length: 7 }, (_, d) => {
                           const dt = new Date(weekStart);
@@ -1089,7 +1138,7 @@ export default function AdminTimesheet() {
                       })}
                     </div>
 
-                    <div className="hidden sm:block overflow-x-auto">
+                    <div className="hidden lg:block overflow-x-auto">
                       <div className="min-w-[480px]">
                         <div className="flex items-center gap-2.5 mb-2.5 pl-11">
                           {DAY_NAMES.map((d) => (
@@ -1169,7 +1218,7 @@ export default function AdminTimesheet() {
 
         {tab === "my-work" && (
           <div className="flex flex-col gap-4 min-w-0">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
               <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">My Work</h1>
               <div className="flex gap-2 items-center flex-wrap">
                 <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-[10px] px-2.5 py-1.5">
@@ -1225,7 +1274,7 @@ export default function AdminTimesheet() {
                   <Btn onClick={() => setTab("my-work")}>Go to My Work</Btn>
                 </Card>
               ) : timesheets.map((ts) => (
-                <Card key={ts._id} className="px-4 sm:px-6 py-4 sm:py-[18px] flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                <Card key={ts._id} className="px-4 sm:px-6 py-4 sm:py-[18px] flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-bold text-gray-900 mb-1.5">Week of {fmtDate(ts.week_start)}</div>
                     <div className="flex gap-2 flex-wrap">
@@ -1243,7 +1292,7 @@ export default function AdminTimesheet() {
 
         {tab === "org-logs" && (
           <div className="min-w-0">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-5 gap-3">
               <div className="min-w-0">
                 <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">All Time Logs — Organisation</h1>
                 <p className="text-xs text-gray-400 mt-1 mb-0">
@@ -1262,7 +1311,7 @@ export default function AdminTimesheet() {
               </Card>
             ) : (
               <>
-                <div className="sm:hidden flex flex-col gap-2.5">
+                <div className="lg:hidden flex flex-col gap-2.5">
                   {orgLogs.map(log => (
                     <Card key={log._id} className="px-3.5 py-3">
                       <div className="flex items-center justify-between mb-2 gap-2 min-w-0">
@@ -1286,7 +1335,7 @@ export default function AdminTimesheet() {
                   ))}
                 </div>
 
-                <Card className="hidden sm:block overflow-hidden">
+                <Card className="hidden lg:block overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full border-collapse text-[13px] min-w-[760px]">
                       <thead>
@@ -1321,7 +1370,7 @@ export default function AdminTimesheet() {
 
         {tab === "org-sheets" && (
           <div className="min-w-0">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-5 gap-3">
               <div className="min-w-0">
                 <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">All Timesheets — Organisation</h1>
                 <p className="text-xs text-gray-400 mt-1 mb-0">{orgSheets.length} timesheets</p>
@@ -1350,7 +1399,7 @@ export default function AdminTimesheet() {
               <div className="flex flex-col gap-2.5">
                 {orgSheets.map(ts => (
                   <Card key={ts._id} className="px-4 sm:px-6 py-4 sm:py-[18px]">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                    <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="font-bold text-[15px] text-gray-900 truncate">{ts.owner?.f_name} {ts.owner?.l_name}</span>
@@ -1406,14 +1455,14 @@ export default function AdminTimesheet() {
               <option value="high">High</option>
               <option value="urgent">Urgent</option>
             </Sel>
-            <Input label="Est. Hours" type="number" placeholder="0" value={jobForm.estimated_hours} onChange={(e) => setJobForm((p) => ({ ...p, estimated_hours: e.target.value }))} />
+            <Input label="Est. Hours" type="number" min="0" placeholder="0" value={jobForm.estimated_hours} onChange={(e) => setJobForm((p) => ({ ...p, estimated_hours: nonNegative(e.target.value) }))} />
           </div>
           <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
-            <Input label="Hourly Rate (₹)" type="number" placeholder="0" value={jobForm.hourly_rate} onChange={(e) => setJobForm((p) => ({ ...p, hourly_rate: e.target.value }))} />
+            <Input label="Hourly Rate (₹)" type="number" min="0" placeholder="0" value={jobForm.hourly_rate} onChange={(e) => setJobForm((p) => ({ ...p, hourly_rate: nonNegative(e.target.value) }))} />
             <Input label="Due Date" type="date" value={jobForm.due_date} onChange={(e) => setJobForm((p) => ({ ...p, due_date: e.target.value }))} />
           </div>
           <div>
-            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={jobForm.max_hours_per_day} onChange={(e) => setJobForm((p) => ({ ...p, max_hours_per_day: e.target.value }))} />
+            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={jobForm.max_hours_per_day} onChange={(e) => setJobForm((p) => ({ ...p, max_hours_per_day: nonNegative(e.target.value) }))} />
             <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day is counted as overtime. Leave blank to use the employee's shift hours instead.</p>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
@@ -1440,14 +1489,14 @@ export default function AdminTimesheet() {
               <option value="high">High</option>
               <option value="urgent">Urgent</option>
             </Sel>
-            <Input label="Est. Hours" type="number" placeholder="0" value={editJobForm.estimated_hours} onChange={(e) => setEditJobForm((p) => ({ ...p, estimated_hours: e.target.value }))} />
+            <Input label="Est. Hours" type="number" min="0" placeholder="0" value={editJobForm.estimated_hours} onChange={(e) => setEditJobForm((p) => ({ ...p, estimated_hours: nonNegative(e.target.value) }))} />
           </div>
           <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
-            <Input label="Hourly Rate (₹)" type="number" placeholder="0" value={editJobForm.hourly_rate} onChange={(e) => setEditJobForm((p) => ({ ...p, hourly_rate: e.target.value }))} />
+            <Input label="Hourly Rate (₹)" type="number" min="0" placeholder="0" value={editJobForm.hourly_rate} onChange={(e) => setEditJobForm((p) => ({ ...p, hourly_rate: nonNegative(e.target.value) }))} />
             <Input label="Due Date" type="date" value={editJobForm.due_date} onChange={(e) => setEditJobForm((p) => ({ ...p, due_date: e.target.value }))} />
           </div>
           <div>
-            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={editJobForm.max_hours_per_day} onChange={(e) => setEditJobForm((p) => ({ ...p, max_hours_per_day: e.target.value }))} />
+            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={editJobForm.max_hours_per_day} onChange={(e) => setEditJobForm((p) => ({ ...p, max_hours_per_day: nonNegative(e.target.value) }))} />
             <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day is counted as overtime. Leave blank to use the employee's shift hours instead.</p>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
@@ -1469,8 +1518,10 @@ export default function AdminTimesheet() {
             <option value="">Select job…</option>
             {assignedJobs.map((j) => <option key={j._id} value={j._id}>{j.title}</option>)}
           </Sel>
-          <Input label="Date" type="date" value={logForm.log_date} onChange={(e) => setLogForm((p) => ({ ...p, log_date: e.target.value }))} />
-          <Input label="Duration (minutes)" type="number" placeholder="e.g. 90" value={logForm.duration_minutes} onChange={(e) => setLogForm((p) => ({ ...p, duration_minutes: e.target.value }))} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input label="Date" type="date" value={logForm.log_date} onChange={(e) => setLogForm((p) => ({ ...p, log_date: e.target.value }))} />
+            <Input label="Duration (minutes)" type="number" min="1" placeholder="e.g. 90" value={logForm.duration_minutes} onChange={(e) => setLogForm((p) => ({ ...p, duration_minutes: nonNegative(e.target.value) }))} />
+          </div>
           <Input label="Note" placeholder="What did you work on?" value={logForm.note} onChange={(e) => setLogForm((p) => ({ ...p, note: e.target.value }))} />
           <div className="flex flex-col sm:flex-row gap-2 justify-end">
             <Btn variant="ghost" onClick={() => setLogModal(false)} className="w-full sm:w-auto">Cancel</Btn>
