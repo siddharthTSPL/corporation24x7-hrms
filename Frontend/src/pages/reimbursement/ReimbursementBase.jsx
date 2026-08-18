@@ -83,6 +83,88 @@ function claimAmountSummary(claims) {
   return entries.map(([currency, amount]) => fmtMoney(amount, currency)).join(" + ");
 }
 
+// ---------------------------------------------------------------------------
+// Filtering / sorting shared by the "Review Queue" and "All Claims" tabs
+// ---------------------------------------------------------------------------
+const DEFAULT_CLAIM_FILTERS = {
+  search: "",
+  role: "",
+  department: "",
+  designation: "",
+  type: "",
+  paymentMethod: "",
+  currency: "",
+  minAmount: "",
+  maxAmount: "",
+  dateFrom: "",
+  dateTo: "",
+  sortBy: "date_desc",
+};
+
+function applyClaimFilters(claims, filters) {
+  const term = filters.search.trim().toLowerCase();
+  return claims.filter((c) => {
+    if (term) {
+      const haystack = `${c.employeeName || ""} ${c.empid || ""} ${c.claimNumber || ""} ${c.description || ""}`.toLowerCase();
+      if (!haystack.includes(term)) return false;
+    }
+    if (filters.role && c.submitterModel !== filters.role) return false;
+    if (filters.department && c.department !== filters.department) return false;
+    if (filters.designation && c.designation !== filters.designation) return false;
+    if (filters.type && c.reimbursementType !== filters.type) return false;
+    if (filters.paymentMethod && c.paymentMethod !== filters.paymentMethod) return false;
+    if (filters.currency && (c.currency || "INR") !== filters.currency) return false;
+
+    const amount = Number(c.amountClaimed) || 0;
+    if (filters.minAmount !== "" && amount < Number(filters.minAmount)) return false;
+    if (filters.maxAmount !== "" && amount > Number(filters.maxAmount)) return false;
+
+    if (filters.dateFrom || filters.dateTo) {
+      const expDate = c.expenseDate ? new Date(c.expenseDate) : null;
+      if (!expDate) return false;
+      if (filters.dateFrom && expDate < new Date(filters.dateFrom)) return false;
+      if (filters.dateTo && expDate > new Date(`${filters.dateTo}T23:59:59`)) return false;
+    }
+
+    return true;
+  });
+}
+
+function sortClaims(claims, sortBy) {
+  const sorted = [...claims];
+  switch (sortBy) {
+    case "amount_desc":
+      sorted.sort((a, b) => (Number(b.amountClaimed) || 0) - (Number(a.amountClaimed) || 0));
+      break;
+    case "amount_asc":
+      sorted.sort((a, b) => (Number(a.amountClaimed) || 0) - (Number(b.amountClaimed) || 0));
+      break;
+    case "date_asc":
+      sorted.sort((a, b) => new Date(a.expenseDate || 0) - new Date(b.expenseDate || 0));
+      break;
+    case "date_desc":
+    default:
+      sorted.sort((a, b) => new Date(b.expenseDate || 0) - new Date(a.expenseDate || 0));
+  }
+  return sorted;
+}
+
+function countActiveFilters(filters) {
+  let n = 0;
+  if (filters.search.trim()) n++;
+  if (filters.role) n++;
+  if (filters.department) n++;
+  if (filters.designation) n++;
+  if (filters.type) n++;
+  if (filters.paymentMethod) n++;
+  if (filters.currency) n++;
+  if (filters.minAmount !== "") n++;
+  if (filters.maxAmount !== "") n++;
+  if (filters.dateFrom) n++;
+  if (filters.dateTo) n++;
+  return n;
+}
+
 const CLAIM_CSV_COLUMNS = [
   { key: "claimNumber", label: "Claim Number" },
   { key: "employeeName", label: "Employee" },
@@ -581,6 +663,106 @@ function ClaimsTable({ claims, onView, showSubmitter, emptyText }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Filter bar — search + role/department/designation/type/payment/currency
+// dropdowns + amount range + expense-date range + sort, with a clear button.
+// Shared by the "Review Queue" and "All Claims" tabs.
+// ---------------------------------------------------------------------------
+function FilterBar({ filters, setFilters, departments, designations, currencies, activeCount, onClear }) {
+  const set = (key) => (e) => setFilters((f) => ({ ...f, [key]: e.target.value }));
+  const selectStyle = { ...inputStyle, width: "auto", minWidth: 130 };
+  const narrowInput = { ...inputStyle, width: 110 };
+  const dateInput = { ...inputStyle, width: 150 };
+
+  return (
+    <div
+      style={{
+        background: C.slateBg,
+        border: `1px solid ${C.border}`,
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 14,
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+      }}
+    >
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <input
+          style={{ ...inputStyle, maxWidth: 240 }}
+          placeholder="Search name, employee ID, claim #…"
+          value={filters.search}
+          onChange={set("search")}
+        />
+        <select style={selectStyle} value={filters.role} onChange={set("role")}>
+          <option value="">All Roles</option>
+          <option value="Employee">Employee</option>
+          <option value="Manager">Manager</option>
+          <option value="Admin">Admin</option>
+        </select>
+        <select style={selectStyle} value={filters.department} onChange={set("department")}>
+          <option value="">All Departments</option>
+          {departments.map((d) => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
+        <select style={selectStyle} value={filters.designation} onChange={set("designation")}>
+          <option value="">All Designations</option>
+          {designations.map((d) => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
+        <select style={selectStyle} value={filters.type} onChange={set("type")}>
+          <option value="">All Types</option>
+          {TYPES.map((t) => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+        <select style={selectStyle} value={filters.paymentMethod} onChange={set("paymentMethod")}>
+          <option value="">All Payment Methods</option>
+          {PAYMENT_METHODS.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+        <select style={selectStyle} value={filters.currency} onChange={set("currency")}>
+          <option value="">All Currencies</option>
+          {currencies.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+      </div>
+
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <Field label="Min Amount">
+          <input type="number" min="0" style={narrowInput} value={filters.minAmount} onChange={set("minAmount")} placeholder="0" />
+        </Field>
+        <Field label="Max Amount">
+          <input type="number" min="0" style={narrowInput} value={filters.maxAmount} onChange={set("maxAmount")} placeholder="Any" />
+        </Field>
+        <Field label="Expense From">
+          <input type="date" style={dateInput} value={filters.dateFrom} onChange={set("dateFrom")} />
+        </Field>
+        <Field label="Expense To">
+          <input type="date" style={dateInput} value={filters.dateTo} onChange={set("dateTo")} />
+        </Field>
+        <Field label="Sort By">
+          <select style={{ ...inputStyle, width: 170 }} value={filters.sortBy} onChange={set("sortBy")}>
+            <option value="date_desc">Newest First</option>
+            <option value="date_asc">Oldest First</option>
+            <option value="amount_desc">Amount: High to Low</option>
+            <option value="amount_asc">Amount: Low to High</option>
+          </select>
+        </Field>
+        {activeCount > 0 && (
+          <Btn variant="ghost" onClick={onClear} style={{ background: "#fff" }}>
+            Clear Filters ({activeCount})
+          </Btn>
+        )}
+      </div>
     </div>
   );
 }
