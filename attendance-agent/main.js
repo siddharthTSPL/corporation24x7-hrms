@@ -26,6 +26,21 @@ const IDLE_THRESHOLD_SECONDS = 30;
 
 const store = new Store();
 
+// A persistent per-install id, same idea as the browser's per-tab
+// clientId (see attendance.api.js): if two agent processes ever end up
+// running against the same account (e.g. a reinstall that didn't kill the
+// old process, or the app running on two machines under one login), they
+// won't collide under one shared "agent" channel and clobber each other's
+// ping - each gets its own "agent:<id>" slot on the backend.
+function getAgentId() {
+  let id = store.get("agentId");
+  if (!id) {
+    id = `agent_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    store.set("agentId", id);
+  }
+  return id;
+}
+
 const logDir  = path.join(app.getPath("userData"), "logs");
 const logFile = path.join(logDir, "main.log");
 
@@ -81,7 +96,7 @@ async function sendPing() {
 
     await axios.post(
       `${API_BASE}/activity`,
-      { status },
+      { status, clientId: getAgentId() },
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
