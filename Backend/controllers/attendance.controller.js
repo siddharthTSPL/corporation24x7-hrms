@@ -13,16 +13,31 @@ const getUserId = (user) => user._id || user.id;
 // land in the wrong city. Reject those rather than silently storing them.
 const MAX_ACCEPTABLE_ACCURACY_M = 1500;
 
+// Admin/Manager accounts can carry sub-roles (senior_admin, senior_manager,
+// official) that don't exist in Attendance's role enum ["employee","manager",
+// "admin"] - saving/querying with the raw sub-role silently breaks checkin
+// (Mongoose validation error on create, or a query that matches nothing),
+// which is why cross-browser/companion never showed up for those accounts:
+// isCheckedIn stayed false forever since no Attendance record ever got made.
+// Mirrors the same admin/manager grouping already used by anyRoleAuth's
+// ROLE_CONFIG for the companion-link endpoint.
+const normalizeRole = (role) => {
+  if (role === "admin" || role === "senior_admin") return "admin";
+  if (role === "manager" || role === "senior_manager" || role === "official") return "manager";
+  if (role === "employee") return "employee";
+  return role;
+};
+
 const getOnModel = (role) => {
-  if (role === "manager") return "Manager";
-  if (role === "admin") return "Admin";
-  if (role === "employee") return "User";
+  const normalized = normalizeRole(role);
+  if (normalized === "manager") return "Manager";
+  if (normalized === "admin") return "Admin";
   return "User";
 };
 
 const resolveOrganisationId = async (user) => {
   if (user.organisation_id) return user.organisation_id;
-  if (user.role === "admin") {
+  if (normalizeRole(user.role) === "admin") {
     const admin = await AdminModel.findById(getUserId(user)).select("organisation_id").lean();
     return admin?.organisation_id || null;
   }
@@ -122,7 +137,7 @@ const checkin = async (req, res) => {
 
     const today = startOfDay(new Date()); // IST-based day boundary (see automatic/weekoffcalendar.js)
 
-    const attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
+    const attendance = await Attendance.findOne({ employee: userId, role: normalizeRole(user.role), date: today, organisation_id });
 
     if (attendance) {
       if (attendance.checkOut)
@@ -164,7 +179,7 @@ const checkin = async (req, res) => {
         organisation_id,
         employee: userId,
         onModel: getOnModel(user.role),
-        role: user.role,
+        role: normalizeRole(user.role),
         date: today,
         checkIn: new Date(),
         latitude,
@@ -183,7 +198,7 @@ const checkin = async (req, res) => {
       // record in the tiny window between our findOne above and this
       // create() - re-fetch instead of failing the check-in.
       if (createErr.code === 11000) {
-        newAttendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
+        newAttendance = await Attendance.findOne({ employee: userId, role: normalizeRole(user.role), date: today, organisation_id });
       } else {
         throw createErr;
       }
@@ -210,7 +225,7 @@ const activity = async (req, res) => {
 
     const today = startOfDay(new Date()); // IST-based day boundary (see automatic/weekoffcalendar.js)
 
-    let attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
+    let attendance = await Attendance.findOne({ employee: userId, role: normalizeRole(user.role), date: today, organisation_id });
 
     if (!attendance) {
       // A background agent ping on a holiday/week-off must NOT create an
@@ -236,7 +251,7 @@ const activity = async (req, res) => {
           organisation_id,
           employee: userId,
           onModel: getOnModel(user.role),
-          role: user.role,
+          role: normalizeRole(user.role),
           date: today,
           // Deliberately NOT setting checkIn here - an agent ping is just
           // background activity tracking, not a real check-in. Leaving
@@ -311,7 +326,7 @@ const activity = async (req, res) => {
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       const current = attempt === 0
         ? attendance
-        : await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
+        : await Attendance.findOne({ employee: userId, role: normalizeRole(user.role), date: today, organisation_id });
 
       if (!current) break; // record vanished (shouldn't happen); fall through to no-op response
       if (current.checkOut)
@@ -403,7 +418,7 @@ const checkout = async (req, res) => {
 
     const today = startOfDay(new Date()); // IST-based day boundary (see automatic/weekoffcalendar.js)
 
-    const attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
+    const attendance = await Attendance.findOne({ employee: userId, role: normalizeRole(user.role), date: today, organisation_id });
 
     if (!attendance)
       return res.status(404).json({ message: "Please check in first" });
@@ -483,7 +498,7 @@ const getToday = async (req, res) => {
 
     const today = startOfDay(new Date()); // IST-based day boundary (see automatic/weekoffcalendar.js)
 
-    const attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id }).lean();
+    const attendance = await Attendance.findOne({ employee: userId, role: normalizeRole(user.role), date: today, organisation_id }).lean();
 
     if (!attendance)
       return res.json({ attendance: null, isCheckedIn: false, isCheckedOut: false });
@@ -688,7 +703,7 @@ const getCalendarMeta = async (req, res) => {
     // isCheckedIn/isCheckedOut - this is specifically the cross-channel case.
     const todayAttendance = await Attendance.findOne({
       employee: userId,
-      role: user.role,
+      role: normalizeRole(user.role),
       date: today0,
       organisation_id,
     }).select("source checkOut checkIn").lean();
