@@ -5,13 +5,28 @@ const api = axios.create({
   withCredentials: true,
 });
 
+
+const CLIENT_ID_KEY = "attendance_client_id";
+const getClientId = () => {
+  try {
+    let id = localStorage.getItem(CLIENT_ID_KEY);
+    if (!id) {
+      id = (window.crypto?.randomUUID && window.crypto.randomUUID()) || `c_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      localStorage.setItem(CLIENT_ID_KEY, id);
+    }
+    return id;
+  } catch (_) {
+    return "unknown";
+  }
+};
+
 export const checkin = async (data) => {
   const res = await api.post("attendance/checkin", data);
   return res.data;
 };
 
 export const activity = async (status) => {
-  const res = await api.post("attendance/activity", { status });
+  const res = await api.post("attendance/activity", { status, clientId: getClientId() });
   return res.data;
 };
 
