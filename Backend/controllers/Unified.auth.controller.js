@@ -446,6 +446,97 @@ const unifiedVerifyForgotPasswordOtp = async (req, res, next) => {
   });
 };
 
+// --- Cross-browser sign-in link ("companion login") ---------------------
+// Cookies are scoped to a single browser by design (that's the whole point
+// of them), so a person who is logged into Talent on Chrome has no session
+// on Edge/Firefox until they sign in there too - which is exactly why
+// activity pings only ever showed up from whichever browser they actually
+// logged into. Retyping the password in every browser is annoying, so
+// instead: generate a short-lived, single-purpose link from an already
+// logged-in browser and open it in the other browser to sign in there too.
+// This is still an explicit, authenticated action (not silent session
+// sharing) - it just replaces "type your password again" with "open this
+// link", the same pattern already used for password-reset/verification
+// links elsewhere in this codebase.
+const COMPANION_TOKEN_TTL_MINUTES = 60;
+
+// Maps a JWT's `role` claim (senior_manager/official/senior_admin/etc) to
+// the coarse account-type bucket the frontend keeps in localStorage
+// ("employee" | "manager" | "admin" | "superadmin") so the redeemed
+// session is recognised correctly on first load in the new browser.
+const ACCOUNT_TYPE_BY_ROLE = {
+  employee: "employee",
+  manager: "manager",
+  senior_manager: "manager",
+  official: "manager",
+  admin: "admin",
+  senior_admin: "admin",
+  super_admin: "superadmin",
+};
+
+// GET /auth/companion-link - called from an already-authenticated browser
+// (any role, via anyRoleAuth) to mint a link that can be opened in another
+// browser to sign in there too.
+const generateCompanionLink = async (req, res, next) => {
+  if (!req.tokenPayload)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const { iat, exp, purpose, ...payload } = req.tokenPayload;
+
+  const companionToken = jwt.sign(
+    { ...payload, purpose: "companion" },
+    process.env.JWT_SECRET,
+    { expiresIn: `${COMPANION_TOKEN_TTL_MINUTES}m` }
+  );
+
+  const frontendUrl = (process.env.FRONTEND_URL || "").replace(/\/$/, "");
+  const link = `${frontendUrl}/companion-login?token=${companionToken}`;
+
+  res.status(200).json({
+    success: true,
+    link,
+    token: companionToken,
+    expiresInMinutes: COMPANION_TOKEN_TTL_MINUTES,
+  });
+};
+
+// POST /auth/companion-login - called (unauthenticated) from the SECOND
+// browser after opening the link above. Exchanges the short-lived
+// companion token for a normal session cookie on that browser.
+const redeemCompanionLink = async (req, res, next) => {
+  const token = req.body?.token || req.query?.token;
+  if (!token)
+    return next(Object.assign(new Error("Missing sign-in token"), { statusCode: 400 }));
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (error) {
+    return next(Object.assign(
+      new Error("This sign-in link is invalid or has expired. Generate a new one from the other browser."),
+      { statusCode: 401 }
+    ));
+  }
+
+  if (decoded.purpose !== "companion")
+    return next(Object.assign(new Error("Invalid sign-in link"), { statusCode: 400 }));
+
+  const accountType = ACCOUNT_TYPE_BY_ROLE[decoded.role];
+  if (!accountType)
+    return next(Object.assign(new Error("Unknown role in sign-in link"), { statusCode: 400 }));
+
+  const { purpose, iat, exp, ...payload } = decoded;
+  const sessionToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "15d" });
+  res.cookie("token", sessionToken, cookieOpts());
+
+  res.status(200).json({
+    success: true,
+    message: "Signed in on this browser",
+    role: decoded.role,
+    accountType,
+  });
+};
+
 const MODEL_BY_ACCOUNT_TYPE = {
   superadmin: SuperAdminModel,
   admin: AdminModel,
@@ -506,4 +597,6 @@ module.exports = {
   unifiedVerifyForgotPasswordOtp,
   unifiedResetPassword,
   dismissWelcomeMessage,
+  generateCompanionLink,
+  redeemCompanionLink,
 };
