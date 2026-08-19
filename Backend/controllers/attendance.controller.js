@@ -200,7 +200,7 @@ const checkin = async (req, res) => {
 
 const activity = async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status, clientId } = req.body;
     const user = req.user;
     const userId = getUserId(user);
     const organisation_id = await resolveOrganisationId(user);
@@ -271,11 +271,24 @@ const activity = async (req, res) => {
     // cookie; the desktop (.exe) agent authenticates via Bearer header (see
     // employee.middleware.js) - no change to either client needed, the
     // signal is already there in how they auth.
-    const channel = req.cookies?.token ? "browser" : "agent";
+    //
+    // A user can have Talent open in more than one browser at once (e.g.
+    // Chrome AND Edge), each pinging independently. Those used to share the
+    // single "browser" key, so whichever browser happened to ping last
+    // overwrote the other's status - if browser A was actively being used
+    // but browser B (idle in the background) pinged a moment later, the
+    // session got marked idle even though real work was happening. Keying
+    // by "browser:<clientId>" (clientId is a per-browser id the frontend
+    // generates once and keeps in localStorage - localStorage isn't shared
+    // across browsers, so each browser naturally gets its own id) gives
+    // every browser its own slot, same as the desktop agent already has.
+    // Older clients that don't send clientId fall back to a shared
+    // "browser:default" slot so nothing breaks.
+    const channel = req.cookies?.token ? `browser:${clientId || "default"}` : "agent";
 
     const now = Date.now();
 
-    if (!attendance.channelPings) attendance.channelPings = {};
+    if (!attendance.channelPings) attendance.channelPings = new Map();
 
     // Credit elapsed wall-clock time against ONE shared clock
     // (lastAccountedAt), not per-channel. The previous version accrued
@@ -291,26 +304,31 @@ const activity = async (req, res) => {
     //
     // Fix: only ONE clock ever advances and gets time credited against
     // it. Whichever channel's ping happens to arrive first for a given
-    // window claims that slice; the OTHER channel's still-fresh status
-    // (from channelPings, within CHANNEL_STALE_MS of its own last ping)
-    // is OR'd in purely to decide active-vs-idle for that slice, exactly
-    // like before - it just no longer ALSO adds its own separate slice of
-    // minutes on top.
+    // window claims that slice; every OTHER channel's still-fresh status
+    // (from channelPings, within CHANNEL_STALE_MS of its own last ping) is
+    // OR'd in purely to decide active-vs-idle for that slice, exactly like
+    // before - it just no longer ALSO adds its own separate slice of
+    // minutes on top. This now OR's across ALL known channels (every
+    // browser the user has Talent open in, plus the desktop agent), not
+    // just one fixed "other" channel, so activity in any single one of
+    // them is enough to count the slice as active.
     const prevAccountedAt = attendance.lastAccountedAt || attendance.lastUpdated || now;
     const elapsedMs = now - prevAccountedAt;
     const elapsedMinutes = Math.min(Math.max(elapsedMs, 0) / 60000, 3);
 
-    const otherChannel = channel === "browser" ? "agent" : "browser";
-    const other = attendance.channelPings[otherChannel];
-    const otherIsFresh = !!other?.lastUpdated && now - other.lastUpdated <= CHANNEL_STALE_MS;
-    const mergedStatus = status === "active" || (otherIsFresh && other.status === "active") ? "active" : "idle";
+    let mergedStatus = status;
+    for (const [key, ping] of attendance.channelPings.entries()) {
+      if (key === channel || mergedStatus === "active") continue;
+      const isFresh = !!ping?.lastUpdated && now - ping.lastUpdated <= CHANNEL_STALE_MS;
+      if (isFresh && ping.status === "active") mergedStatus = "active";
+    }
 
     if (attendance.source === "manual") {
       if (mergedStatus === "active") attendance.activeMinutes += elapsedMinutes;
       else attendance.idleMinutes += elapsedMinutes;
     }
 
-    attendance.channelPings[channel] = { lastUpdated: now, status };
+    attendance.channelPings.set(channel, { lastUpdated: now, status });
     attendance.lastAccountedAt = now;
     attendance.lastUpdated = now; // kept for display/back-compat only
     attendance.markModified("channelPings");
