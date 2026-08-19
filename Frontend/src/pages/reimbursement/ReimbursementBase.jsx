@@ -428,6 +428,58 @@ function Modal({ title, onClose, children, width = 460 }) {
   );
 }
 
+// Shows already-uploaded attachments as removable chips (used inside the
+// claim form when editing a draft, so a person can swap out or drop a
+// document without re-attaching everything else).
+function AttachmentChipList({ items, color, bg, onRemove }) {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 4 }}>
+      {items.map((item, i) => (
+        <span
+          key={item.fileId || i}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 12,
+            color,
+            background: bg,
+            padding: "4px 6px 4px 10px",
+            borderRadius: 6,
+          }}
+        >
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noreferrer"
+            style={{ color, textDecoration: "none" }}
+            title="Open attachment"
+          >
+            📎 {item.originalName || `File ${i + 1}`}
+          </a>
+          <button
+            type="button"
+            onClick={() => onRemove(item.fileId)}
+            title="Remove attachment"
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color,
+              fontWeight: 700,
+              fontSize: 13,
+              lineHeight: 1,
+              padding: 0,
+            }}
+          >
+            ✕
+          </button>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Apply / Edit claim form
 // ---------------------------------------------------------------------------
@@ -445,6 +497,13 @@ function ClaimForm({ onSubmit, submitting, initial, onCancel, bankDetailsAvailab
   });
   const [receipts, setReceipts] = useState([]);
   const [supportingDocuments, setSupportingDocuments] = useState([]);
+  // Attachments already saved on the claim (only relevant when editing).
+  // Removing one here just marks it for deletion — nothing is sent to the
+  // server until Save/Submit is pressed, so a person can undo a removal.
+  const [existingReceipts, setExistingReceipts] = useState(initial?.receipts || []);
+  const [existingSupportingDocuments, setExistingSupportingDocuments] = useState(
+    initial?.supportingDocuments || [],
+  );
   const [error, setError] = useState("");
 
   const update = (key) => (e) => {
@@ -452,14 +511,36 @@ function ClaimForm({ onSubmit, submitting, initial, onCancel, bankDetailsAvailab
     setForm((f) => ({ ...f, [key]: val }));
   };
 
+  const removeExistingReceipt = (fileId) =>
+    setExistingReceipts((list) => list.filter((r) => r.fileId !== fileId));
+  const removeExistingSupportingDocument = (fileId) =>
+    setExistingSupportingDocuments((list) => list.filter((r) => r.fileId !== fileId));
+
   const buildFormData = (status) => {
     const fd = new FormData();
     Object.entries(form).forEach(([k, v]) => fd.append(k, v));
     fd.append("status", status);
     receipts.forEach((f) => fd.append("receipts", f));
     supportingDocuments.forEach((f) => fd.append("supportingDocuments", f));
+    if (initial) {
+      // Tell the backend which previously-attached files were removed, so
+      // it can drop them from the claim (and delete them from storage).
+      const removedReceiptIds = (initial.receipts || [])
+        .filter((r) => !existingReceipts.some((e) => e.fileId === r.fileId))
+        .map((r) => r.fileId)
+        .filter(Boolean);
+      const removedSupportingDocumentIds = (initial.supportingDocuments || [])
+        .filter((r) => !existingSupportingDocuments.some((e) => e.fileId === r.fileId))
+        .map((r) => r.fileId)
+        .filter(Boolean);
+      if (removedReceiptIds.length) fd.append("removeReceiptIds", JSON.stringify(removedReceiptIds));
+      if (removedSupportingDocumentIds.length)
+        fd.append("removeSupportingDocumentIds", JSON.stringify(removedSupportingDocumentIds));
+    }
     return fd;
   };
+
+  const totalReceiptsAfterSave = existingReceipts.length + receipts.length;
 
   const handleSubmit = (status) => async () => {
     setError("");
@@ -472,7 +553,7 @@ function ClaimForm({ onSubmit, submitting, initial, onCancel, bankDetailsAvailab
         setError("Expense date, amount, and description are required.");
         return;
       }
-      if (!initial && receipts.length === 0) {
+      if (totalReceiptsAfterSave === 0) {
         setError("Attach at least one receipt/invoice to submit.");
         return;
       }
@@ -533,16 +614,19 @@ function ClaimForm({ onSubmit, submitting, initial, onCancel, bankDetailsAvailab
       </Field>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <Field label="Upload Receipt(s) / Invoice(s)" required={!initial}>
-          <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style={inputStyle} onChange={(e) => setReceipts(Array.from(e.target.files || []))} />
-          {receipts.length > 0 && <span style={{ fontSize: 12, color: C.muted }}>{receipts.length} file(s) selected</span>}
-          {initial?.receipts?.length > 0 && (
-            <span style={{ fontSize: 12, color: C.muted }}>{initial.receipts.length} already attached</span>
+        <Field label="Upload Receipt(s) / Invoice(s)" required={!initial && existingReceipts.length === 0}>
+          {existingReceipts.length > 0 && (
+            <AttachmentChipList items={existingReceipts} color={C.brand} bg={C.brandLight} onRemove={removeExistingReceipt} />
           )}
+          <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style={inputStyle} onChange={(e) => setReceipts(Array.from(e.target.files || []))} />
+          {receipts.length > 0 && <span style={{ fontSize: 12, color: C.muted }}>{receipts.length} new file(s) to add</span>}
         </Field>
         <Field label="Supporting Documents">
+          {existingSupportingDocuments.length > 0 && (
+            <AttachmentChipList items={existingSupportingDocuments} color={C.blue} bg={C.blueBg} onRemove={removeExistingSupportingDocument} />
+          )}
           <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style={inputStyle} onChange={(e) => setSupportingDocuments(Array.from(e.target.files || []))} />
-          {supportingDocuments.length > 0 && <span style={{ fontSize: 12, color: C.muted }}>{supportingDocuments.length} file(s) selected</span>}
+          {supportingDocuments.length > 0 && <span style={{ fontSize: 12, color: C.muted }}>{supportingDocuments.length} new file(s) to add</span>}
         </Field>
       </div>
 
