@@ -725,7 +725,7 @@ function ClaimDetail({ claim }) {
 // ---------------------------------------------------------------------------
 // Claims table
 // ---------------------------------------------------------------------------
-function ClaimsTable({ claims, onView, showSubmitter, emptyText }) {
+function ClaimsTable({ claims, onView, onEdit, onDelete, showSubmitter, emptyText }) {
   if (!claims?.length) {
     return (
       <div style={{ padding: "48px 16px", textAlign: "center", color: C.muted, fontSize: 14 }}>
@@ -762,7 +762,15 @@ function ClaimsTable({ claims, onView, showSubmitter, emptyText }) {
               <td style={{ padding: "10px 12px", fontWeight: 600 }}>{fmtMoney(c.amountClaimed, c.currency)}</td>
               <td style={{ padding: "10px 12px" }}><StatusBadge status={c.status} /></td>
               <td style={{ padding: "10px 12px", textAlign: "right" }}>
-                <Btn variant="outline" onClick={() => onView(c)} style={{ padding: "5px 12px" }}>View</Btn>
+                <div style={{ display: "inline-flex", gap: 6 }}>
+                  <Btn variant="outline" onClick={() => onView(c)} style={{ padding: "5px 12px" }}>View</Btn>
+                  {c.status === "draft" && onEdit && (
+                    <Btn variant="outline" onClick={() => onEdit(c)} style={{ padding: "5px 12px" }}>Edit</Btn>
+                  )}
+                  {c.status === "draft" && onDelete && (
+                    <Btn variant="red" onClick={() => onDelete(c)} style={{ padding: "5px 12px" }}>Delete</Btn>
+                  )}
+                </div>
               </td>
             </tr>
           ))}
@@ -1184,7 +1192,13 @@ export default function ReimbursementBase({
                     </Btn>
                   </div>
                 )}
-                <ClaimsTable claims={my} onView={(c) => { setViewClaim(c); setViewIsReview(false); }} emptyText="You haven't submitted any claims yet." />
+                <ClaimsTable
+                  claims={my}
+                  onView={(c) => { setViewClaim(c); setViewIsReview(false); }}
+                  onEdit={(c) => setEditClaim(c)}
+                  onDelete={handleDelete}
+                  emptyText="You haven't submitted any claims yet."
+                />
               </div>
             )}
           </>
