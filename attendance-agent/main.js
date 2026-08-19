@@ -1,5 +1,4 @@
-const { app, Tray, Menu, BrowserWindow, nativeImage, powerSaveBlocker } = require("electron");
-const { uIOhook } = require("uiohook-napi");
+const { app, Tray, Menu, BrowserWindow, nativeImage, powerSaveBlocker, powerMonitor } = require("electron");
 const axios  = require("axios");
 const http   = require("http");
 const fs     = require("fs");
@@ -19,6 +18,11 @@ const FRONTEND_URL = IS_DEV
 const AGENT_PORT     = 47821;
 const PING_INTERVAL  = 60_000;
 const MAX_LOG_BYTES  = 5 * 1024 * 1024;
+
+// Matches the browser side's own idle threshold (IDLE_DETECTION_MS in
+// useattendanctracker.jsx), so "active" means the same thing everywhere:
+// no input for this long counts as idle.
+const IDLE_THRESHOLD_SECONDS = 30;
 
 const store = new Store();
 
@@ -46,31 +50,28 @@ function log(...args) {
   }
 }
 
-let tray                = null;
-let wasActiveThisMinute = false;
-let pingInterval        = null;
-let isTracking          = false;
+let tray         = null;
+let pingInterval = null;
+let isTracking   = false;
 
-function startGlobalHook() {
-  uIOhook.on("mousemove", onActivity);
-  uIOhook.on("mousedown", onActivity);
-  uIOhook.on("keydown",   onActivity);
-  uIOhook.start();
-  log("[Agent] Global activity hook started");
-}
-
-function stopGlobalHook() {
-  try { uIOhook.stop(); } catch (_) {}
-  log("[Agent] Global activity hook stopped");
-}
-
-function onActivity() {
-  wasActiveThisMinute = true;
+// System-wide idle time (seconds since the OS last saw ANY mouse or
+// keyboard input, from any device, for any app) - this is what actually
+// makes tracking work "sabhi apps se, sabhi devices se": it's the OS
+// itself reporting last-input time, not a hook we have to catch every
+// event type for. It also removes the old uiohook-napi native dependency,
+// which needed a global input hook that antivirus/SmartScreen sometimes
+// blocked or flagged (silently breaking tracking for whoever it hit,
+// with no visible error) and which had to be rebuilt per Electron/OS
+// version. powerMonitor is built into Electron - nothing to install,
+// nothing for AV to flag, and no separate "which events did we hook"
+// list to maintain.
+function getStatus() {
+  const idleSeconds = powerMonitor.getSystemIdleTime();
+  return idleSeconds < IDLE_THRESHOLD_SECONDS ? "active" : "idle";
 }
 
 async function sendPing() {
-  const status = wasActiveThisMinute ? "active" : "idle";
-  wasActiveThisMinute = false;
+  const status = getStatus();
 
   log(`[Agent] Sending ping: ${status}`);
 
@@ -105,11 +106,10 @@ async function sendPing() {
 
 function startTracking() {
   if (isTracking) return;
-  isTracking          = true;
-  wasActiveThisMinute = true;
+  isTracking = true;
 
-  startGlobalHook();
   pingInterval = setInterval(sendPing, PING_INTERVAL);
+  sendPing(); // don't wait a full minute for the first ping
   updateTray("active");
   log("[Agent] Tracking started");
 }
@@ -121,7 +121,6 @@ function stopTracking() {
   clearInterval(pingInterval);
   pingInterval = null;
 
-  stopGlobalHook();
   updateTray("stopped");
   log("[Agent] Tracking stopped");
 }
