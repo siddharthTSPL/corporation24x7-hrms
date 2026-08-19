@@ -124,8 +124,8 @@ const updateClaim = async ({ actor, model, id, body, files }) => {
     submitterModel: model,
   });
   if (!claim) throw err("Reimbursement claim not found", 404);
-  if (claim.status !== "draft")
-    throw err("Only a draft claim can be edited", 400);
+  if (!["draft", "submitted"].includes(claim.status))
+    throw err("Only a draft or pending review claim can be edited", 400);
 
   const editable = [
     "reimbursementType",
@@ -179,8 +179,8 @@ const deleteClaim = async ({ actor, model, id }) => {
     submitterModel: model,
   });
   if (!claim) throw err("Reimbursement claim not found", 404);
-  if (claim.status !== "draft")
-    throw err("Only a draft claim can be deleted", 400);
+  if (!["draft", "submitted"].includes(claim.status))
+    throw err("Only a draft or pending review claim can be deleted", 400);
   await claim.deleteOne();
 };
 
