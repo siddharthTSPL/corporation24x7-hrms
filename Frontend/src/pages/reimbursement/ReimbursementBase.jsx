@@ -987,6 +987,12 @@ export default function ReimbursementBase({
     () => applyClaimFilters(statusFilteredAll, allClaimsFilters),
     [statusFilteredAll, allClaimsFilters]
   );
+  const allClaimsActiveFilterCount = countActiveClaimFilters(allClaimsFilters);
+  const allClaimsSummaryAmount = useMemo(() => claimAmountSummary(filteredAll), [filteredAll]);
+  const selectedReviewLabel = reviewFilter ? STATUS_META[reviewFilter].label : "All";
+  const allClaimsSummaryLabel = allClaimsActiveFilterCount
+    ? `Filtered Total${selectedReviewLabel !== "All" ? ` (${selectedReviewLabel})` : ""}`
+    : `${selectedReviewLabel} Total`;
 
   // "Review Queue" tab: same filter bar applied to the pending list.
   const filteredPending = useMemo(
@@ -1170,10 +1176,10 @@ export default function ReimbursementBase({
                     borderRadius: 999,
                   }}
                 >
-                  {selectedReviewBucket.label}: {selectedReviewBucket.totalAmount}
+                  {allClaimsSummaryLabel}: {allClaimsSummaryAmount}
                 </span>
                 <span style={{ fontSize: 12, color: C.muted }}>
-                  {selectedReviewBucket.count} claim{selectedReviewBucket.count === 1 ? "" : "s"}
+                  {filteredAll.length} claim{filteredAll.length === 1 ? "" : "s"}
                 </span>
               </div>
             </div>
