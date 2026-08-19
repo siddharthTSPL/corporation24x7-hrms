@@ -278,66 +278,117 @@ const activity = async (req, res) => {
     // overwrote the other's status - if browser A was actively being used
     // but browser B (idle in the background) pinged a moment later, the
     // session got marked idle even though real work was happening. Keying
-    // by "browser:<clientId>" (clientId is a per-browser id the frontend
-    // generates once and keeps in localStorage - localStorage isn't shared
-    // across browsers, so each browser naturally gets its own id) gives
-    // every browser its own slot, same as the desktop agent already has.
-    // Older clients that don't send clientId fall back to a shared
-    // "browser:default" slot so nothing breaks.
-    const channel = req.cookies?.token ? `browser:${clientId || "default"}` : "agent";
+    // by "browser:<clientId>" (clientId is a per-tab id the frontend
+    // generates once and keeps in sessionStorage - sessionStorage isn't
+    // shared across tabs or browsers, so each tab/browser naturally gets
+    // its own id) gives every tab its own slot, same as the desktop agent
+    // now also has: it sends its own persistent per-install clientId too,
+    // so two agent processes (e.g. a reinstall that left the old one
+    // running) don't collide under one shared "agent" slot either. Older
+    // clients that don't send clientId fall back to a shared
+    // "browser:default" / "agent:default" slot so nothing breaks.
+    const channel = req.cookies?.token
+      ? `browser:${clientId || "default"}`
+      : `agent:${clientId || "default"}`;
 
-    const now = Date.now();
+    // Concurrency: a user can easily have 2-3 channels pinging (multiple
+    // browsers + the desktop agent), all roughly every 60s but not
+    // synchronised - two of them can land within the same event-loop tick
+    // on the server. The old find-then-save pattern read the document once
+    // and wrote it back later; if a second ping's read/write interleaved
+    // with the first, the second save would overwrite the first's changes
+    // (its channelPings entry and its minute credit both silently lost -
+    // "lost update"). Fixed with optimistic concurrency: the write is
+    // conditioned on lastAccountedAt still matching what we just read
+    // (findOneAndUpdate returns null if someone else already advanced it
+    // in between), and on a null result we re-read and retry rather than
+    // blindly overwrite. checkOut is re-checked in the same filter too, so
+    // a checkout landing in that same window is never raced against by a
+    // stray ping crediting minutes after the session already ended.
+    const MAX_ATTEMPTS = 5;
+    let updated = null;
 
-    if (!attendance.channelPings) attendance.channelPings = new Map();
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const current = attempt === 0
+        ? attendance
+        : await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
 
-    // Credit elapsed wall-clock time against ONE shared clock
-    // (lastAccountedAt), not per-channel. The previous version accrued
-    // each channel's own elapsed-since-its-own-last-ping separately into
-    // the same activeMinutes/idleMinutes totals - that fixed the old
-    // "whichever ping lands last wins" race, but it meant that whenever
-    // both the browser tab AND the desktop (.exe) agent were pinging
-    // during the same session (the normal case, not an edge case), the
-    // same real minute got credited TWICE - once from each channel. That
-    // is why activeMinutes + idleMinutes could add up to well more than
-    // the actual session duration (e.g. 39m of active+idle inside a 29m
-    // session).
-    //
-    // Fix: only ONE clock ever advances and gets time credited against
-    // it. Whichever channel's ping happens to arrive first for a given
-    // window claims that slice; every OTHER channel's still-fresh status
-    // (from channelPings, within CHANNEL_STALE_MS of its own last ping) is
-    // OR'd in purely to decide active-vs-idle for that slice, exactly like
-    // before - it just no longer ALSO adds its own separate slice of
-    // minutes on top. This now OR's across ALL known channels (every
-    // browser the user has Talent open in, plus the desktop agent), not
-    // just one fixed "other" channel, so activity in any single one of
-    // them is enough to count the slice as active.
-    const prevAccountedAt = attendance.lastAccountedAt || attendance.lastUpdated || now;
-    const elapsedMs = now - prevAccountedAt;
-    const elapsedMinutes = Math.min(Math.max(elapsedMs, 0) / 60000, 3);
+      if (!current) break; // record vanished (shouldn't happen); fall through to no-op response
+      if (current.checkOut)
+        return res.status(400).json({ message: "Already checked out" });
 
-    let mergedStatus = status;
-    for (const [key, ping] of attendance.channelPings.entries()) {
-      if (key === channel || mergedStatus === "active") continue;
-      const isFresh = !!ping?.lastUpdated && now - ping.lastUpdated <= CHANNEL_STALE_MS;
-      if (isFresh && ping.status === "active") mergedStatus = "active";
+      const now = Date.now();
+      const prevLastAccountedAt = current.lastAccountedAt || 0;
+
+      // Credit elapsed wall-clock time against ONE shared clock
+      // (lastAccountedAt), not per-channel. The previous version accrued
+      // each channel's own elapsed-since-its-own-last-ping separately into
+      // the same activeMinutes/idleMinutes totals - that fixed the old
+      // "whichever ping lands last wins" race, but it meant that whenever
+      // both the browser tab AND the desktop (.exe) agent were pinging
+      // during the same session (the normal case, not an edge case), the
+      // same real minute got credited TWICE - once from each channel. That
+      // is why activeMinutes + idleMinutes could add up to well more than
+      // the actual session duration (e.g. 39m of active+idle inside a 29m
+      // session).
+      //
+      // Fix: only ONE clock ever advances and gets time credited against
+      // it. Whichever channel's ping happens to arrive first for a given
+      // window claims that slice; every OTHER channel's still-fresh status
+      // (from channelPings, within CHANNEL_STALE_MS of its own last ping) is
+      // OR'd in purely to decide active-vs-idle for that slice, exactly like
+      // before - it just no longer ALSO adds its own separate slice of
+      // minutes on top. This OR's across ALL known channels (every browser
+      // the user has Talent open in, plus the desktop agent), not just one
+      // fixed "other" channel, so activity in any single one of them is
+      // enough to count the slice as active.
+      const prevAccountedAt = prevLastAccountedAt || current.lastUpdated || now;
+      const elapsedMs = now - prevAccountedAt;
+      const elapsedMinutes = Math.min(Math.max(elapsedMs, 0) / 60000, 3);
+
+      let mergedStatus = status;
+      if (current.channelPings) {
+        for (const [key, ping] of current.channelPings.entries()) {
+          if (key === channel || mergedStatus === "active") continue;
+          const isFresh = !!ping?.lastUpdated && now - ping.lastUpdated <= CHANNEL_STALE_MS;
+          if (isFresh && ping.status === "active") mergedStatus = "active";
+        }
+      }
+
+      const activeInc = current.source === "manual" && mergedStatus === "active" ? elapsedMinutes : 0;
+      const idleInc = current.source === "manual" && mergedStatus === "idle" ? elapsedMinutes : 0;
+
+      updated = await Attendance.findOneAndUpdate(
+        { _id: current._id, lastAccountedAt: prevLastAccountedAt, checkOut: { $exists: false } },
+        {
+          $inc: { activeMinutes: activeInc, idleMinutes: idleInc },
+          $set: {
+            lastAccountedAt: now,
+            lastUpdated: now, // kept for display/back-compat only
+            [`channelPings.${channel}`]: { lastUpdated: now, status },
+          },
+        },
+        { new: true }
+      );
+
+      if (updated) break; // won the race for this slice
+      // Someone else's ping advanced lastAccountedAt (or checked out)
+      // between our read and write above - loop and retry against a
+      // fresh read rather than silently dropping this ping's data.
     }
 
-    if (attendance.source === "manual") {
-      if (mergedStatus === "active") attendance.activeMinutes += elapsedMinutes;
-      else attendance.idleMinutes += elapsedMinutes;
+    if (!updated) {
+      // Every retry lost the race (extremely unlikely - would need
+      // several channels landing within milliseconds of each other,
+      // repeatedly). No-op rather than error the client; the next ping
+      // 60s later picks up cleanly from whatever the winning channel left.
+      return res.json({ message: "Activity updated", activeMinutes: 0, idleMinutes: 0 });
     }
-
-    attendance.channelPings.set(channel, { lastUpdated: now, status });
-    attendance.lastAccountedAt = now;
-    attendance.lastUpdated = now; // kept for display/back-compat only
-    attendance.markModified("channelPings");
-    await attendance.save();
 
     res.json({
       message: "Activity updated",
-      activeMinutes: displayMinutes(attendance.activeMinutes),
-      idleMinutes: displayMinutes(attendance.idleMinutes),
+      activeMinutes: displayMinutes(updated.activeMinutes),
+      idleMinutes: displayMinutes(updated.idleMinutes),
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
