@@ -3,6 +3,7 @@ import { useAttendanceTracker } from "./useattendanctracker";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import { useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
 import SelfieCapture from "./selfietracker";
+import CompanionLoginModal from "./CompanionLoginModal";
 
 const formatTime = (date) =>
   date ? new Date(date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--:--";
@@ -307,6 +308,7 @@ export default function AttendancePage() {
   const [locationError,   setLocationError]   = useState("");
   const [acquiringLocation, setAcquiringLocation] = useState(false);
   const [showProfile,     setShowProfile]     = useState(false);
+  const [showCompanionModal, setShowCompanionModal] = useState(false);
 
   const startCheckin = useCallback(() => {
     setLocationError("");
@@ -617,6 +619,14 @@ export default function AttendancePage() {
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0 animate-pulse" />
                 <span className="text-[11px] text-gray-400 leading-relaxed">Browser activity tracking · Tab focus monitored · Syncing every 60s</span>
               </div>
+              <div className="h-px bg-gray-100" />
+              <button
+                onClick={() => setShowCompanionModal(true)}
+                className="w-full text-left flex items-center justify-between gap-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl px-3.5 py-2.5 cursor-pointer transition-colors"
+              >
+                <span className="text-[12px] text-gray-600 font-medium">🌐 Also using another browser or device?</span>
+                <span className="text-[11px] text-[#7B1C3E] font-bold whitespace-nowrap">Track it too →</span>
+              </button>
             </div>
 
             {!checkoutConfirm ? (
@@ -646,6 +656,8 @@ export default function AttendancePage() {
         )}
 
         {showSelfie && <SelfieCapture onCapture={onSelfieCapture} onCancel={onSelfieCancel} />}
+
+        {showCompanionModal && <CompanionLoginModal onClose={() => setShowCompanionModal(false)} />}
 
       </div>
 
