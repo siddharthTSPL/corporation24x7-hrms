@@ -89,21 +89,31 @@ const attendanceSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    // Per-channel ping tracking so the browser tab and the desktop (.exe)
-    // agent no longer clobber each other's timestamp. Each channel records
-    // its OWN latest status/ping-time here - used only to merge ("OR")
-    // the two channels' statuses together when crediting time against
-    // lastAccountedAt above. It is NOT used to accrue minutes on its own
-    // anymore (see activity() in attendance.controller.js).
+    // Per-channel ping tracking so no two pinging sources clobber each
+    // other's timestamp. Each channel records its OWN latest status/ping-
+    // time here - used only to merge ("OR") every channel's status
+    // together when crediting time against lastAccountedAt above. It is
+    // NOT used to accrue minutes on its own (see activity() in
+    // attendance.controller.js).
+    //
+    // A Map (not a fixed {browser, agent} shape) because a user can have
+    // the desktop agent PLUS Talent open in several different browsers at
+    // once, and each of those browsers needs its own key - "browser:<id>"
+    // per browser, "agent" for the desktop app - otherwise a second
+    // browser's idle ping overwrites the first browser's still-active
+    // status under the same shared "browser" key, which is what made
+    // some people's active time look wrong when they worked from more
+    // than one browser.
     channelPings: {
-      browser: {
-        lastUpdated: { type: Number, default: 0 },
-        status: { type: String, enum: ["active", "idle", null], default: null },
-      },
-      agent: {
-        lastUpdated: { type: Number, default: 0 },
-        status: { type: String, enum: ["active", "idle", null], default: null },
-      },
+      type: Map,
+      of: new mongoose.Schema(
+        {
+          lastUpdated: { type: Number, default: 0 },
+          status: { type: String, enum: ["active", "idle", null], default: null },
+        },
+        { _id: false }
+      ),
+      default: {},
     },
     source: {
       type: String,
