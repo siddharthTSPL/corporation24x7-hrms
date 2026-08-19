@@ -764,10 +764,10 @@ function ClaimsTable({ claims, onView, onEdit, onDelete, showSubmitter, emptyTex
               <td style={{ padding: "10px 12px", textAlign: "right" }}>
                 <div style={{ display: "inline-flex", gap: 6 }}>
                   <Btn variant="outline" onClick={() => onView(c)} style={{ padding: "5px 12px" }}>View</Btn>
-                  {c.status === "draft" && onEdit && (
+                  {(c.status === "draft" || c.status === "submitted") && onEdit && (
                     <Btn variant="outline" onClick={() => onEdit(c)} style={{ padding: "5px 12px" }}>Edit</Btn>
                   )}
-                  {c.status === "draft" && onDelete && (
+                  {(c.status === "draft" || c.status === "submitted") && onDelete && (
                     <Btn variant="red" onClick={() => onDelete(c)} style={{ padding: "5px 12px" }}>Delete</Btn>
                   )}
                 </div>
@@ -1062,9 +1062,9 @@ export default function ReimbursementBase({
   };
 
   const handleDelete = async (claim) => {
-    if (!window.confirm(`Delete draft claim ${claim.claimNumber}?`)) return;
+    if (!window.confirm(`Delete claim ${claim.claimNumber}?`)) return;
     await deleteMutation.mutateAsync(claim._id);
-    flash("Draft deleted.");
+    flash("Claim deleted.");
   };
 
   const statusFilteredAll = useMemo(() => {
@@ -1317,7 +1317,7 @@ export default function ReimbursementBase({
       {viewClaim && !viewIsReview && (
         <Modal title={`Claim ${viewClaim.claimNumber}`} onClose={() => { setViewClaim(null); setViewIsReview(false); }} width={520}>
           <ClaimDetail claim={viewClaim} />
-          {viewClaim.status === "draft" && (
+          {(viewClaim.status === "draft" || viewClaim.status === "submitted") && (
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
               <Btn variant="red" onClick={() => { handleDelete(viewClaim); setViewClaim(null); }}>Delete</Btn>
               <Btn variant="outline" onClick={() => { setEditClaim(viewClaim); setViewClaim(null); }}>Edit &amp; Submit</Btn>
