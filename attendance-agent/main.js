@@ -5,7 +5,7 @@ const {
   BrowserWindow,
   nativeImage,
   powerSaveBlocker,
-  powerMonitor,
+  powerMonitor
 } = require("electron");
 
 const axios = require("axios");
@@ -13,6 +13,11 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const Store = require("electron-store");
+
+
+// ============================================================
+// CONFIGURATION
+// ============================================================
 
 const IS_DEV = process.env.NODE_ENV === "development";
 
@@ -25,97 +30,50 @@ const FRONTEND_URL = IS_DEV
   : "https://torchxsuite.com/talent";
 
 const AGENT_PORT = 47821;
+
 const PING_INTERVAL = 60_000;
+
+// Maximum log file size = 5 MB
 const MAX_LOG_BYTES = 5 * 1024 * 1024;
 
-// Same idle threshold used by browser attendance tracker
+// Idle after 30 seconds without keyboard/mouse input
 const IDLE_THRESHOLD_SECONDS = 30;
+
+
+// ============================================================
+// ELECTRON STORE
+// ============================================================
 
 const store = new Store();
 
-/**
- * ============================================================
- * SINGLE INSTANCE LOCK
- * ============================================================
- *
- * This is very important.
- *
- * Without this, every time Chrome opens:
- *
- * torchx-attendance://...
- *
- * Windows can start another TorchX Attendance process.
- *
- * Every process then tries to use port 47821 and causes:
- *
- * EADDRINUSE: address already in use 127.0.0.1:47821
- *
- * Only ONE Electron instance is now allowed.
- */
-const gotTheLock = app.requestSingleInstanceLock();
 
-if (!gotTheLock) {
+// ============================================================
+// SINGLE INSTANCE LOCK
+// ============================================================
+//
+// This is VERY important.
+//
+// If the user opens the application multiple times,
+// only ONE main TorchX Attendance process will be allowed.
+//
+// This prevents:
+//
+// listen EADDRINUSE: address already in use
+// 127.0.0.1:47821
+//
+// ============================================================
+
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!gotSingleInstanceLock) {
+  console.log("[Agent] Another TorchX Attendance instance is already running.");
   app.quit();
 }
 
-/**
- * ============================================================
- * LOGGING
- * ============================================================
- */
 
-const logDir = path.join(app.getPath("userData"), "logs");
-const logFile = path.join(logDir, "main.log");
-
-function ensureLogFile() {
-  try {
-    if (!fs.existsSync(logDir)) {
-      fs.mkdirSync(logDir, { recursive: true });
-    }
-
-    if (
-      fs.existsSync(logFile) &&
-      fs.statSync(logFile).size > MAX_LOG_BYTES
-    ) {
-      fs.renameSync(
-        logFile,
-        path.join(logDir, `main.${Date.now()}.log`)
-      );
-    }
-  } catch (err) {
-    console.error(
-      "[Agent] Failed to prepare log file:",
-      err.message
-    );
-  }
-}
-
-function log(...args) {
-  const line = `[${new Date().toISOString()}] ${args.join(" ")}`;
-
-  console.log(line);
-
-  try {
-    if (!fs.existsSync(logDir)) {
-      fs.mkdirSync(logDir, { recursive: true });
-    }
-
-    fs.appendFileSync(logFile, line + "\n");
-  } catch (err) {
-    console.error(
-      "[Agent] Failed to write log:",
-      err.message
-    );
-  }
-}
-
-/**
- * ============================================================
- * AGENT ID
- * ============================================================
- *
- * Each installation gets a unique agent ID.
- */
+// ============================================================
+// AGENT ID
+// ============================================================
 
 function getAgentId() {
   let id = store.get("agentId");
@@ -126,192 +84,364 @@ function getAgentId() {
       .slice(2)}`;
 
     store.set("agentId", id);
-
-    log("[Agent] New agent ID created:", id);
   }
 
   return id;
 }
 
-/**
- * ============================================================
- * VARIABLES
- * ============================================================
- */
 
-let tray = null;
-let pingInterval = null;
-let isTracking = false;
+// ============================================================
+// LOGGING
+// ============================================================
 
-/**
- * ============================================================
- * SYSTEM IDLE STATUS
- * ============================================================
- *
- * Electron powerMonitor tells us how long the system has
- * been idle based on keyboard/mouse activity.
- */
+const logDir = path.join(app.getPath("userData"), "logs");
+const logFile = path.join(logDir, "main.log");
 
-function getStatus() {
-  const idleSeconds = powerMonitor.getSystemIdleTime();
 
-  return idleSeconds < IDLE_THRESHOLD_SECONDS
-    ? "active"
-    : "idle";
+function ensureLogFile() {
+  try {
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, {
+        recursive: true
+      });
+    }
+
+    if (
+      fs.existsSync(logFile) &&
+      fs.statSync(logFile).size > MAX_LOG_BYTES
+    ) {
+      const rotatedLog = path.join(
+        logDir,
+        `main.${Date.now()}.log`
+      );
+
+      fs.renameSync(logFile, rotatedLog);
+    }
+  } catch (err) {
+    console.error(
+      "[Agent] Failed to prepare log file:",
+      err.message
+    );
+  }
 }
 
-/**
- * ============================================================
- * SEND ATTENDANCE PING
- * ============================================================
- */
+
+function log(...args) {
+  const line =
+    `[${new Date().toISOString()}] ` +
+    args
+      .map((value) => {
+        if (typeof value === "object") {
+          try {
+            return JSON.stringify(value);
+          } catch {
+            return String(value);
+          }
+        }
+
+        return String(value);
+      })
+      .join(" ");
+
+  console.log(line);
+
+  try {
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, {
+        recursive: true
+      });
+    }
+
+    fs.appendFileSync(
+      logFile,
+      line + "\n",
+      "utf8"
+    );
+  } catch (err) {
+    console.error(
+      "[Agent] Failed to write log:",
+      err.message
+    );
+  }
+}
+
+
+// ============================================================
+// GLOBAL STATE
+// ============================================================
+
+let tray = null;
+
+let pingInterval = null;
+
+let isTracking = false;
+
+let tokenServer = null;
+
+let isQuitting = false;
+
+
+// ============================================================
+// SYSTEM IDLE STATUS
+// ============================================================
+
+function getStatus() {
+  try {
+    const idleSeconds =
+      powerMonitor.getSystemIdleTime();
+
+    return idleSeconds < IDLE_THRESHOLD_SECONDS
+      ? "active"
+      : "idle";
+
+  } catch (err) {
+    log(
+      "[Agent] Failed to get system idle time:",
+      err.message
+    );
+
+    // If we cannot determine idle time,
+    // consider user active rather than incorrectly idle.
+    return "active";
+  }
+}
+
+
+// ============================================================
+// SEND ACTIVITY PING
+// ============================================================
 
 async function sendPing() {
   const status = getStatus();
 
-  log(`[Agent] Sending ping: ${status}`);
+  log(
+    `[Agent] Sending ping: ${status}`
+  );
 
   try {
     const token = store.get("token");
 
     if (!token) {
-      log("[Agent] No token available. Ping skipped.");
+      log(
+        "[Agent] No token available, skipping ping"
+      );
+
       return;
     }
 
     const agentId = getAgentId();
 
+    log(
+      `[Agent] Agent ID: ${agentId}`
+    );
+
     await axios.post(
       `${API_BASE}/activity`,
       {
         status,
-        clientId: agentId,
+        clientId: agentId
       },
       {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${token}`
         },
-        timeout: 15_000,
+
+        timeout: 15_000
       }
     );
 
     updateTray(status);
 
     log(
-      `[Agent] Ping sent: ${status} at ${new Date().toLocaleTimeString()}`
+      `[Agent] Ping sent successfully: ${status}`
     );
+
   } catch (err) {
+
     if (err?.response?.status === 401) {
-      log("[Agent] Token expired, clearing...");
+
+      log(
+        "[Agent] Token expired. Clearing token."
+      );
 
       store.delete("token");
 
       stopTracking();
 
       updateTray("stopped");
-    } else if (err?.response?.status === 400) {
-      log("[Agent] Session ended, stopping pings");
+
+      return;
+    }
+
+
+    if (err?.response?.status === 400) {
+
+      log(
+        "[Agent] Session ended. Stopping tracking."
+      );
 
       stopTracking();
 
       updateTray("stopped");
+
+      return;
+    }
+
+
+    if (err?.response) {
+
+      log(
+        `[Agent] Ping failed: HTTP ${err.response.status}`
+      );
+
+      log(
+        `[Agent] Server response:`,
+        err.response.data
+      );
+
     } else {
+
       log(
         "[Agent] Ping failed:",
-        err?.message || "Unknown error"
+        err.message
       );
+
     }
   }
 }
 
-/**
- * ============================================================
- * START TRACKING
- * ============================================================
- */
+
+// ============================================================
+// START TRACKING
+// ============================================================
 
 function startTracking() {
+
   if (isTracking) {
-    log("[Agent] Tracking already running");
+    log(
+      "[Agent] Tracking already running."
+    );
+
     return;
   }
 
   const token = store.get("token");
 
   if (!token) {
-    log("[Agent] Cannot start tracking: no token");
+
+    log(
+      "[Agent] Cannot start tracking: no token."
+    );
+
     return;
   }
 
   isTracking = true;
 
-  log("[Agent] Tracking started");
 
-  // First ping immediately
+  pingInterval = setInterval(
+    sendPing,
+    PING_INTERVAL
+  );
+
+
+  // Send immediately
   sendPing();
 
-  // Then every 60 seconds
-  pingInterval = setInterval(() => {
-    sendPing();
-  }, PING_INTERVAL);
 
   updateTray("active");
+
+
+  log(
+    "[Agent] Tracking started."
+  );
+
+  log(
+    `[Agent] Ping interval: ${PING_INTERVAL} ms`
+  );
+
+  log(
+    `[Agent] Idle threshold: ${IDLE_THRESHOLD_SECONDS} seconds`
+  );
 }
 
-/**
- * ============================================================
- * STOP TRACKING
- * ============================================================
- */
+
+// ============================================================
+// STOP TRACKING
+// ============================================================
 
 function stopTracking() {
+
   if (!isTracking) {
     return;
   }
 
   isTracking = false;
 
+
   if (pingInterval) {
+
     clearInterval(pingInterval);
+
     pingInterval = null;
   }
 
+
   updateTray("stopped");
 
-  log("[Agent] Tracking stopped");
+
+  log(
+    "[Agent] Tracking stopped."
+  );
 }
 
-/**
- * ============================================================
- * TRAY
- * ============================================================
- */
+
+// ============================================================
+// TRAY
+// ============================================================
 
 function updateTray(status) {
+
   if (!tray) {
     return;
   }
 
+
   const labels = {
-    active: "Active — tracking",
-    idle: "Idle",
-    stopped: "Not tracking",
+
+    active:
+      "Active — tracking",
+
+    idle:
+      "Idle",
+
+    stopped:
+      "Not tracking"
   };
 
+
+  const currentLabel =
+    labels[status] || status;
+
+
   tray.setToolTip(
-    `TorchX Attendance\n${labels[status] ?? status}`
+    `TorchX Attendance\n${currentLabel}`
   );
+
 
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      {
-        label: labels[status] ?? status,
-        enabled: false,
-      },
 
       {
-        type: "separator",
+        label: currentLabel,
+        enabled: false
       },
+
+
+      {
+        type: "separator"
+      },
+
 
       {
         label: isTracking
@@ -319,541 +449,713 @@ function updateTray(status) {
           : "Start Tracking",
 
         click: () => {
+
           if (isTracking) {
+
             stopTracking();
+
           } else {
-            const token = store.get("token");
+
+            const token =
+              store.get("token");
 
             if (token) {
+
               startTracking();
+
             } else {
+
               openApp();
             }
           }
-        },
+        }
       },
 
+
       {
-        type: "separator",
+        type: "separator"
       },
+
 
       {
         label: "Open Dashboard",
-        click: openApp,
+
+        click: openApp
       },
 
+
       {
-        type: "separator",
+        type: "separator"
       },
+
 
       {
         label: "Quit Agent",
 
         click: () => {
+
+          isQuitting = true;
+
           stopTracking();
+
+          closeTokenServer();
+
           app.quit();
-        },
-      },
+        }
+      }
     ])
   );
 }
 
-/**
- * ============================================================
- * OPEN ATTENDANCE DASHBOARD
- * ============================================================
- */
+
+// ============================================================
+// OPEN DASHBOARD
+// ============================================================
 
 function openApp() {
-  const win = new BrowserWindow({
-    width: 430,
-    height: 750,
-
-    title: "TorchX Attendance",
-
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-    },
-  });
-
-  win.loadURL(`${FRONTEND_URL}/mark-attendance`);
-}
-
-/**
- * ============================================================
- * HANDLE TORCHX ATTENDANCE PROTOCOL
- * ============================================================
- *
- * Example:
- *
- * torchx-attendance://login?token=XXXXX
- *
- * The actual URL can vary. We look for a "token" query
- * parameter.
- */
-
-function handleProtocolUrl(url) {
-  if (!url) {
-    return;
-  }
-
-  log("[Agent] Protocol URL received");
 
   try {
-    const parsed = new URL(url);
 
-    log("[Agent] Protocol:", parsed.protocol);
-    log("[Agent] Protocol host:", parsed.hostname);
-    log("[Agent] Protocol path:", parsed.pathname);
+    const win = new BrowserWindow({
 
-    const token = parsed.searchParams.get("token");
+      width: 430,
 
-    if (!token) {
-      log("[Agent] No token found in protocol URL");
-      return;
-    }
+      height: 750,
 
-    log("[Agent] Token received via protocol");
+      title: "TorchX Attendance",
 
-    store.set("token", token);
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true
+      }
+    });
 
-    log("[Agent] Token saved successfully");
 
-    startTracking();
+    win.loadURL(
+      `${FRONTEND_URL}/mark-attendance`
+    );
 
-    updateTray("active");
 
-    log("[Agent] Tracking started from protocol");
+    win.webContents.on(
+      "did-fail-load",
+      (event, errorCode, errorDescription) => {
+
+        log(
+          `[Agent] Dashboard failed to load: ${errorCode} ${errorDescription}`
+        );
+      }
+    );
+
+
   } catch (err) {
+
     log(
-      "[Agent] Failed to process protocol URL:",
+      "[Agent] Failed to open dashboard:",
       err.message
     );
   }
 }
 
-/**
- * ============================================================
- * TOKEN SERVER
- * ============================================================
- *
- * Local server:
- *
- * http://127.0.0.1:47821
- *
- * POST:
- *
- * /set-token
- *
- * /clear-token
- *
- */
+
+// ============================================================
+// TOKEN SERVER
+// ============================================================
 
 function startTokenServer() {
-  const server = http.createServer((req, res) => {
-    res.setHeader(
-      "Access-Control-Allow-Origin",
-      "*"
+
+  if (tokenServer) {
+
+    log(
+      "[Agent] Token server already exists."
     );
 
-    res.setHeader(
-      "Access-Control-Allow-Methods",
-      "POST, GET, OPTIONS"
-    );
+    return;
+  }
 
-    res.setHeader(
-      "Access-Control-Allow-Headers",
-      "Content-Type, Authorization"
-    );
 
-    if (req.method === "OPTIONS") {
-      res.writeHead(200);
-      res.end();
-      return;
-    }
+  tokenServer = http.createServer(
+    (req, res) => {
 
-    /**
-     * ========================================================
-     * SET TOKEN
-     * ========================================================
-     */
+      // ------------------------------------------------------
+      // CORS
+      // ------------------------------------------------------
 
-    if (
-      req.method === "POST" &&
-      req.url === "/set-token"
-    ) {
-      let body = "";
+      res.setHeader(
+        "Access-Control-Allow-Origin",
+        "*"
+      );
 
-      req.on("data", (chunk) => {
-        body += chunk;
-      });
+      res.setHeader(
+        "Access-Control-Allow-Methods",
+        "POST, GET, OPTIONS"
+      );
 
-      req.on("end", () => {
-        try {
-          const data = JSON.parse(body);
+      res.setHeader(
+        "Access-Control-Allow-Headers",
+        "Content-Type, Authorization"
+      );
 
-          const token = data?.token;
+      res.setHeader(
+        "Content-Type",
+        "application/json"
+      );
 
-          if (!token) {
-            log(
-              "[Agent] /set-token called without token"
-            );
 
-            res.writeHead(400, {
-              "Content-Type": "application/json",
-            });
+      // ------------------------------------------------------
+      // OPTIONS
+      // ------------------------------------------------------
 
-            res.end(
-              JSON.stringify({
-                ok: false,
-                message: "Token is required",
-              })
-            );
+      if (req.method === "OPTIONS") {
 
-            return;
+        res.writeHead(200);
+
+        res.end(
+          JSON.stringify({
+            ok: true
+          })
+        );
+
+        return;
+      }
+
+
+      // ------------------------------------------------------
+      // HEALTH CHECK
+      // ------------------------------------------------------
+
+      if (
+        req.method === "GET" &&
+        req.url === "/"
+      ) {
+
+        res.writeHead(200);
+
+        res.end(
+          JSON.stringify({
+
+            ok: true,
+
+            status:
+              isTracking
+                ? "tracking"
+                : "stopped",
+
+            version:
+              app.getVersion(),
+
+            pid:
+              process.pid,
+
+            port:
+              AGENT_PORT
+          })
+        );
+
+        return;
+      }
+
+
+      // ------------------------------------------------------
+      // SET TOKEN
+      // ------------------------------------------------------
+
+      if (
+        req.method === "POST" &&
+        req.url === "/set-token"
+      ) {
+
+        let body = "";
+
+
+        req.on(
+          "data",
+          (chunk) => {
+
+            body += chunk;
+
+            // Prevent extremely large request body
+            if (body.length > 1_000_000) {
+
+              req.destroy();
+            }
           }
+        );
 
-          store.set("token", token);
 
-          log(
-            "[Agent] Token received through local server"
-          );
+        req.on(
+          "end",
+          () => {
 
-          startTracking();
+            try {
 
-          res.writeHead(200, {
-            "Content-Type": "application/json",
-          });
+              const data =
+                JSON.parse(body);
 
-          res.end(
-            JSON.stringify({
-              ok: true,
-            })
-          );
-        } catch (err) {
-          log(
-            "[Agent] Invalid /set-token request:",
-            err.message
-          );
 
-          res.writeHead(400, {
-            "Content-Type": "application/json",
-          });
+              const token =
+                data?.token;
 
-          res.end(
-            JSON.stringify({
-              ok: false,
-              message: "Invalid JSON",
-            })
-          );
-        }
-      });
 
-      return;
-    }
+              if (!token) {
 
-    /**
-     * ========================================================
-     * CLEAR TOKEN
-     * ========================================================
-     */
+                log(
+                  "[Agent] /set-token called without token."
+                );
 
-    if (
-      req.method === "POST" &&
-      req.url === "/clear-token"
-    ) {
-      store.delete("token");
 
-      stopTracking();
+                res.writeHead(400);
 
-      log(
-        "[Agent] Token cleared, tracking stopped"
-      );
+                res.end(
+                  JSON.stringify({
+                    ok: false,
+                    message:
+                      "Token is required"
+                  })
+                );
 
-      res.writeHead(200, {
-        "Content-Type": "application/json",
-      });
+                return;
+              }
+
+
+              store.set(
+                "token",
+                token
+              );
+
+
+              log(
+                "[Agent] Token received and saved."
+              );
+
+
+              startTracking();
+
+
+              log(
+                "[Agent] Tracking started after token."
+              );
+
+
+              res.writeHead(200);
+
+              res.end(
+                JSON.stringify({
+                  ok: true
+                })
+              );
+
+
+            } catch (err) {
+
+              log(
+                "[Agent] Invalid /set-token request:",
+                err.message
+              );
+
+
+              res.writeHead(400);
+
+              res.end(
+                JSON.stringify({
+                  ok: false,
+                  message:
+                    "Invalid JSON"
+                })
+              );
+            }
+          }
+        );
+
+
+        return;
+      }
+
+
+      // ------------------------------------------------------
+      // CLEAR TOKEN
+      // ------------------------------------------------------
+
+      if (
+        req.method === "POST" &&
+        req.url === "/clear-token"
+      ) {
+
+        store.delete("token");
+
+        stopTracking();
+
+
+        log(
+          "[Agent] Token cleared. Tracking stopped."
+        );
+
+
+        res.writeHead(200);
+
+        res.end(
+          JSON.stringify({
+            ok: true
+          })
+        );
+
+
+        return;
+      }
+
+
+      // ------------------------------------------------------
+      // 404
+      // ------------------------------------------------------
+
+      res.writeHead(404);
 
       res.end(
         JSON.stringify({
-          ok: true,
+          ok: false,
+          message: "Not found"
         })
-      );
-
-      return;
-    }
-
-    /**
-     * ========================================================
-     * STATUS
-     * ========================================================
-     */
-
-    if (
-      req.method === "GET" &&
-      req.url === "/"
-    ) {
-      res.writeHead(200, {
-        "Content-Type": "application/json",
-      });
-
-      res.end(
-        JSON.stringify({
-          ok: true,
-          status: isTracking
-            ? "tracking"
-            : "stopped",
-          version: app.getVersion(),
-          port: AGENT_PORT,
-        })
-      );
-
-      return;
-    }
-
-    /**
-     * ========================================================
-     * 404
-     * ========================================================
-     */
-
-    res.writeHead(404, {
-      "Content-Type": "application/json",
-    });
-
-    res.end(
-      JSON.stringify({
-        ok: false,
-        message: "Not found",
-      })
-    );
-  });
-
-  /**
-   * ==========================================================
-   * SERVER LISTEN
-   * ==========================================================
-   */
-
-  server.listen(
-    AGENT_PORT,
-    "127.0.0.1",
-    () => {
-      log(
-        `[Agent] Token server listening on port ${AGENT_PORT}`
       );
     }
   );
 
-  /**
-   * ==========================================================
-   * SERVER ERROR
-   * ==========================================================
-   */
 
-  server.on("error", (err) => {
-    log(
-      "[Agent] Server error:",
-      err.message
-    );
+  // ==========================================================
+  // SERVER LISTEN
+  // ==========================================================
 
-    if (err.code === "EADDRINUSE") {
+  tokenServer.listen(
+    AGENT_PORT,
+    "127.0.0.1",
+    () => {
+
       log(
-        `[Agent] Port ${AGENT_PORT} is already in use.`
+        `[Agent] Token server listening on 127.0.0.1:${AGENT_PORT}`
       );
 
       log(
-        "[Agent] This should not happen because single-instance lock is enabled."
+        `[Agent] Process PID: ${process.pid}`
+      );
+
+      log(
+        `[Agent] Agent ID: ${getAgentId()}`
       );
     }
-  });
-}
+  );
 
-/**
- * ============================================================
- * ELECTRON READY
- * ============================================================
- */
 
-if (gotTheLock) {
-  app.whenReady().then(() => {
-    /**
-     * Initialize log file
-     */
-    ensureLogFile();
+  // ==========================================================
+  // SERVER ERROR
+  // ==========================================================
 
-    log(
-      `[Agent] Started - version ${app.getVersion()}`
-    );
+  tokenServer.on(
+    "error",
+    (err) => {
 
-    /**
-     * Prevent Windows from suspending the application
-     */
-    powerSaveBlocker.start(
-      "prevent-app-suspension"
-    );
+      if (err.code === "EADDRINUSE") {
 
-    /**
-     * Start app automatically with Windows
-     */
-    app.setLoginItemSettings({
-      openAtLogin: true,
-    });
-
-    /**
-     * ========================================================
-     * TRAY
-     * ========================================================
-     */
-
-    const icon = nativeImage.createEmpty();
-
-    tray = new Tray(icon);
-
-    updateTray("stopped");
-
-    /**
-     * ========================================================
-     * TOKEN SERVER
-     * ========================================================
-     */
-
-    startTokenServer();
-
-    /**
-     * ========================================================
-     * CHECK INITIAL PROTOCOL URL
-     * ========================================================
-     *
-     * This handles:
-     *
-     * TorchX Attendance.exe "torchx-attendance://..."
-     */
-
-    const protocolUrl = process.argv.find((arg) =>
-      arg.startsWith("torchx-attendance://")
-    );
-
-    if (protocolUrl) {
-      log(
-        "[Agent] Initial protocol URL detected"
-      );
-
-      handleProtocolUrl(protocolUrl);
-    }
-
-    /**
-     * ========================================================
-     * SAVED TOKEN
-     * ========================================================
-     */
-
-    const savedToken = store.get("token");
-
-    if (savedToken) {
-      log(
-        "[Agent] Saved token found, resuming tracking"
-      );
-
-      startTracking();
-    } else {
-      log(
-        "[Agent] No token, waiting for login..."
-      );
-
-      updateTray("stopped");
-    }
-  });
-}
-
-/**
- * ============================================================
- * SECOND INSTANCE
- * ============================================================
- *
- * If Chrome or another process tries to launch:
- *
- * TorchX Attendance.exe "torchx-attendance://..."
- *
- * Windows does NOT create another running agent.
- *
- * Instead, this event is fired on the existing instance.
- */
-
-if (gotTheLock) {
-  app.on(
-    "second-instance",
-    (event, commandLine, workingDirectory) => {
-      log(
-        "[Agent] Second instance launch detected"
-      );
-
-      /**
-       * Find protocol URL from command line
-       */
-      const protocolUrl = commandLine.find((arg) =>
-        arg.startsWith("torchx-attendance://")
-      );
-
-      if (protocolUrl) {
         log(
-          "[Agent] Protocol URL received from second instance"
+          `[Agent] ERROR: Port ${AGENT_PORT} is already in use.`
         );
 
-        handleProtocolUrl(protocolUrl);
-      } else {
         log(
-          "[Agent] Second instance had no protocol URL"
+          "[Agent] This usually means another TorchX Attendance instance is running."
+        );
+
+        log(
+          `[Agent] Current process PID: ${process.pid}`
+        );
+
+      } else {
+
+        log(
+          "[Agent] Token server error:",
+          err.message
         );
       }
     }
   );
 }
 
-/**
- * ============================================================
- * WINDOWS PROTOCOL HANDLER
- * ============================================================
- *
- * On Windows, protocol URLs can sometimes arrive through
- * the "open-url" event depending on how the application
- * is launched.
- */
 
-app.on("open-url", (event, url) => {
-  event.preventDefault();
+// ============================================================
+// CLOSE TOKEN SERVER
+// ============================================================
 
-  log(
-    "[Agent] open-url event received"
+function closeTokenServer() {
+
+  if (!tokenServer) {
+    return;
+  }
+
+
+  try {
+
+    tokenServer.close(
+      () => {
+
+        log(
+          "[Agent] Token server closed."
+        );
+      }
+    );
+
+  } catch (err) {
+
+    log(
+      "[Agent] Error closing token server:",
+      err.message
+    );
+  }
+
+
+  tokenServer = null;
+}
+
+
+// ============================================================
+// ELECTRON READY
+// ============================================================
+
+if (gotSingleInstanceLock) {
+
+  app.whenReady().then(() => {
+
+    // --------------------------------------------------------
+    // LOG
+    // --------------------------------------------------------
+
+    ensureLogFile();
+
+
+    log(
+      "=================================================="
+    );
+
+    log(
+      `[Agent] Started - version ${app.getVersion()}`
+    );
+
+    log(
+      `[Agent] PID: ${process.pid}`
+    );
+
+    log(
+      `[Agent] Platform: ${process.platform}`
+    );
+
+    log(
+      `[Agent] Electron: ${process.versions.electron}`
+    );
+
+    log(
+      `[Agent] Node: ${process.versions.node}`
+    );
+
+    log(
+      "=================================================="
+    );
+
+
+    // --------------------------------------------------------
+    // PREVENT SYSTEM SUSPENSION
+    // --------------------------------------------------------
+
+    try {
+
+      const blockerId =
+        powerSaveBlocker.start(
+          "prevent-app-suspension"
+        );
+
+
+      log(
+        `[Agent] Power save blocker started: ${blockerId}`
+      );
+
+    } catch (err) {
+
+      log(
+        "[Agent] Power save blocker error:",
+        err.message
+      );
+    }
+
+
+    // --------------------------------------------------------
+    // START WITH WINDOWS
+    // --------------------------------------------------------
+
+    try {
+
+      app.setLoginItemSettings({
+        openAtLogin: true
+      });
+
+
+      log(
+        "[Agent] Windows startup enabled."
+      );
+
+    } catch (err) {
+
+      log(
+        "[Agent] Failed to configure startup:",
+        err.message
+      );
+    }
+
+
+    // --------------------------------------------------------
+    // TRAY
+    // --------------------------------------------------------
+
+    try {
+
+      const icon =
+        nativeImage.createEmpty();
+
+
+      tray = new Tray(icon);
+
+
+      updateTray("stopped");
+
+
+      log(
+        "[Agent] Tray initialized."
+      );
+
+    } catch (err) {
+
+      log(
+        "[Agent] Tray initialization failed:",
+        err.message
+      );
+    }
+
+
+    // --------------------------------------------------------
+    // TOKEN SERVER
+    // --------------------------------------------------------
+
+    startTokenServer();
+
+
+    // --------------------------------------------------------
+    // SAVED TOKEN
+    // --------------------------------------------------------
+
+    const savedToken =
+      store.get("token");
+
+
+    if (savedToken) {
+
+      log(
+        "[Agent] Saved token found."
+      );
+
+      log(
+        "[Agent] Resuming tracking."
+      );
+
+
+      startTracking();
+
+    } else {
+
+      log(
+        "[Agent] No token, waiting for login..."
+      );
+
+
+      updateTray("stopped");
+    }
+
+
+    log(
+      "[Agent] Initialization completed."
+    );
+  });
+
+
+  // ==========================================================
+  // SECOND INSTANCE
+  // ==========================================================
+
+  app.on(
+    "second-instance",
+    () => {
+
+      log(
+        "[Agent] Second launch detected."
+      );
+
+      log(
+        "[Agent] Existing instance will continue running."
+      );
+
+
+      // Open dashboard when user tries
+      // to launch the EXE again.
+      openApp();
+    }
   );
 
-  handleProtocolUrl(url);
-});
 
-/**
- * ============================================================
- * ALL WINDOWS CLOSED
- * ============================================================
- *
- * Keep tray/background agent running.
- */
+  // ==========================================================
+  // WINDOW ALL CLOSED
+  // ==========================================================
 
-app.on(
-  "window-all-closed",
-  (event) => {
-    event.preventDefault();
-  }
-);
+  app.on(
+    "window-all-closed",
+    (event) => {
 
-/**
- * ============================================================
- * BEFORE QUIT
- * ============================================================
- */
+      // Keep tray application running.
+      event.preventDefault();
+    }
+  );
 
-app.on("before-quit", () => {
-  log("[Agent] Application quitting");
 
-  stopTracking();
-});
+  // ==========================================================
+  // BEFORE QUIT
+  // ==========================================================
+
+  app.on(
+    "before-quit",
+    () => {
+
+      if (isQuitting) {
+        return;
+      }
+
+
+      isQuitting = true;
+
+
+      log(
+        "[Agent] Application shutting down..."
+      );
+
+
+      stopTracking();
+
+      closeTokenServer();
+    }
+  );
+
+
+  // ==========================================================
+  // WILL QUIT
+  // ==========================================================
+
+  app.on(
+    "will-quit",
+    () => {
+
+      log(
+        "[Agent] Application quit."
+      );
+    }
+  );
+}
