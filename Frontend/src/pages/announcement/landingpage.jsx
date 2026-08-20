@@ -9,7 +9,7 @@ import {
   FiUsers, FiStar, FiBarChart2,
   FiLogOut, FiSettings, FiMessageSquare
 } from 'react-icons/fi'
-import { FaXTwitter } from "react-icons/fa6";
+import { FaXTwitter, FaYoutube } from "react-icons/fa6";
 import { HiOutlineSparkles } from 'react-icons/hi'
 import { BsPeopleFill, BsGraphUp, BsPersonBadge } from 'react-icons/bs'
 import {
@@ -1049,10 +1049,10 @@ function Footer() {
     ] },
   ]
   const socials = [
-    { icon: <FiLinkedin />, href: 'https://www.linkedin.com/company/103362190/admin/dashboard/', label: 'LinkedIn' },
+    { icon: <FiLinkedin />, href: 'https://www.linkedin.com/company/torchx-talent/', label: 'LinkedIn' },
     { icon: <FiInstagram />, href: 'https://www.instagram.com/?hl=en', label: 'Instagram' },
     { icon: <FaXTwitter />, href: 'https://x.com/home', label: 'X' },
-    { icon: <FiMail />, href: '#', label: 'Email' },
+    { icon: <FaYoutube />,  href: 'https://www.youtube.com/@techtorch_sol', label: 'YouTube' },
   ]
   const [activeDoc, setActiveDoc] = useState(null)
 
