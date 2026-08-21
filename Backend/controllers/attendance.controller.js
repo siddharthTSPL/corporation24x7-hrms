@@ -13,16 +13,31 @@ const getUserId = (user) => user._id || user.id;
 // land in the wrong city. Reject those rather than silently storing them.
 const MAX_ACCEPTABLE_ACCURACY_M = 1500;
 
+// Admin/Manager accounts can carry sub-roles (senior_admin, senior_manager,
+// official) that don't exist in Attendance's role enum ["employee","manager",
+// "admin"] - saving/querying with the raw sub-role silently breaks checkin
+// (Mongoose validation error on create, or a query that matches nothing),
+// which is why cross-browser/companion never showed up for those accounts:
+// isCheckedIn stayed false forever since no Attendance record ever got made.
+// Mirrors the same admin/manager grouping already used by anyRoleAuth's
+// ROLE_CONFIG for the companion-link endpoint.
+const normalizeRole = (role) => {
+  if (role === "admin" || role === "senior_admin") return "admin";
+  if (role === "manager" || role === "senior_manager" || role === "official") return "manager";
+  if (role === "employee") return "employee";
+  return role;
+};
+
 const getOnModel = (role) => {
-  if (role === "manager") return "Manager";
-  if (role === "admin") return "Admin";
-  if (role === "employee") return "User";
+  const normalized = normalizeRole(role);
+  if (normalized === "manager") return "Manager";
+  if (normalized === "admin") return "Admin";
   return "User";
 };
 
 const resolveOrganisationId = async (user) => {
   if (user.organisation_id) return user.organisation_id;
-  if (user.role === "admin") {
+  if (normalizeRole(user.role) === "admin") {
     const admin = await AdminModel.findById(getUserId(user)).select("organisation_id").lean();
     return admin?.organisation_id || null;
   }
@@ -122,7 +137,7 @@ const checkin = async (req, res) => {
 
     const today = startOfDay(new Date()); // IST-based day boundary (see automatic/weekoffcalendar.js)
 
-    const attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
+    const attendance = await Attendance.findOne({ employee: userId, role: normalizeRole(user.role), date: today, organisation_id });
 
     if (attendance) {
       if (attendance.checkOut)
@@ -164,7 +179,7 @@ const checkin = async (req, res) => {
         organisation_id,
         employee: userId,
         onModel: getOnModel(user.role),
-        role: user.role,
+        role: normalizeRole(user.role),
         date: today,
         checkIn: new Date(),
         latitude,
@@ -183,7 +198,7 @@ const checkin = async (req, res) => {
       // record in the tiny window between our findOne above and this
       // create() - re-fetch instead of failing the check-in.
       if (createErr.code === 11000) {
-        newAttendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
+        newAttendance = await Attendance.findOne({ employee: userId, role: normalizeRole(user.role), date: today, organisation_id });
       } else {
         throw createErr;
       }
@@ -200,7 +215,7 @@ const checkin = async (req, res) => {
 
 const activity = async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status, clientId } = req.body;
     const user = req.user;
     const userId = getUserId(user);
     const organisation_id = await resolveOrganisationId(user);
@@ -210,7 +225,7 @@ const activity = async (req, res) => {
 
     const today = startOfDay(new Date()); // IST-based day boundary (see automatic/weekoffcalendar.js)
 
-    let attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
+    let attendance = await Attendance.findOne({ employee: userId, role: normalizeRole(user.role), date: today, organisation_id });
 
     if (!attendance) {
       // A background agent ping on a holiday/week-off must NOT create an
@@ -236,7 +251,7 @@ const activity = async (req, res) => {
           organisation_id,
           employee: userId,
           onModel: getOnModel(user.role),
-          role: user.role,
+          role: normalizeRole(user.role),
           date: today,
           // Deliberately NOT setting checkIn here - an agent ping is just
           // background activity tracking, not a real check-in. Leaving
@@ -271,55 +286,124 @@ const activity = async (req, res) => {
     // cookie; the desktop (.exe) agent authenticates via Bearer header (see
     // employee.middleware.js) - no change to either client needed, the
     // signal is already there in how they auth.
-    const channel = req.cookies?.token ? "browser" : "agent";
-
-    const now = Date.now();
-
-    if (!attendance.channelPings) attendance.channelPings = {};
-
-    // Credit elapsed wall-clock time against ONE shared clock
-    // (lastAccountedAt), not per-channel. The previous version accrued
-    // each channel's own elapsed-since-its-own-last-ping separately into
-    // the same activeMinutes/idleMinutes totals - that fixed the old
-    // "whichever ping lands last wins" race, but it meant that whenever
-    // both the browser tab AND the desktop (.exe) agent were pinging
-    // during the same session (the normal case, not an edge case), the
-    // same real minute got credited TWICE - once from each channel. That
-    // is why activeMinutes + idleMinutes could add up to well more than
-    // the actual session duration (e.g. 39m of active+idle inside a 29m
-    // session).
     //
-    // Fix: only ONE clock ever advances and gets time credited against
-    // it. Whichever channel's ping happens to arrive first for a given
-    // window claims that slice; the OTHER channel's still-fresh status
-    // (from channelPings, within CHANNEL_STALE_MS of its own last ping)
-    // is OR'd in purely to decide active-vs-idle for that slice, exactly
-    // like before - it just no longer ALSO adds its own separate slice of
-    // minutes on top.
-    const prevAccountedAt = attendance.lastAccountedAt || attendance.lastUpdated || now;
-    const elapsedMs = now - prevAccountedAt;
-    const elapsedMinutes = Math.min(Math.max(elapsedMs, 0) / 60000, 3);
+    // A user can have Talent open in more than one browser at once (e.g.
+    // Chrome AND Edge), each pinging independently. Those used to share the
+    // single "browser" key, so whichever browser happened to ping last
+    // overwrote the other's status - if browser A was actively being used
+    // but browser B (idle in the background) pinged a moment later, the
+    // session got marked idle even though real work was happening. Keying
+    // by "browser:<clientId>" (clientId is a per-tab id the frontend
+    // generates once and keeps in sessionStorage - sessionStorage isn't
+    // shared across tabs or browsers, so each tab/browser naturally gets
+    // its own id) gives every tab its own slot, same as the desktop agent
+    // now also has: it sends its own persistent per-install clientId too,
+    // so two agent processes (e.g. a reinstall that left the old one
+    // running) don't collide under one shared "agent" slot either. Older
+    // clients that don't send clientId fall back to a shared
+    // "browser:default" / "agent:default" slot so nothing breaks.
+    const channel = req.cookies?.token
+      ? `browser:${clientId || "default"}`
+      : `agent:${clientId || "default"}`;
 
-    const otherChannel = channel === "browser" ? "agent" : "browser";
-    const other = attendance.channelPings[otherChannel];
-    const otherIsFresh = !!other?.lastUpdated && now - other.lastUpdated <= CHANNEL_STALE_MS;
-    const mergedStatus = status === "active" || (otherIsFresh && other.status === "active") ? "active" : "idle";
+    // Concurrency: a user can easily have 2-3 channels pinging (multiple
+    // browsers + the desktop agent), all roughly every 60s but not
+    // synchronised - two of them can land within the same event-loop tick
+    // on the server. The old find-then-save pattern read the document once
+    // and wrote it back later; if a second ping's read/write interleaved
+    // with the first, the second save would overwrite the first's changes
+    // (its channelPings entry and its minute credit both silently lost -
+    // "lost update"). Fixed with optimistic concurrency: the write is
+    // conditioned on lastAccountedAt still matching what we just read
+    // (findOneAndUpdate returns null if someone else already advanced it
+    // in between), and on a null result we re-read and retry rather than
+    // blindly overwrite. checkOut is re-checked in the same filter too, so
+    // a checkout landing in that same window is never raced against by a
+    // stray ping crediting minutes after the session already ended.
+    const MAX_ATTEMPTS = 5;
+    let updated = null;
 
-    if (attendance.source === "manual") {
-      if (mergedStatus === "active") attendance.activeMinutes += elapsedMinutes;
-      else attendance.idleMinutes += elapsedMinutes;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const current = attempt === 0
+        ? attendance
+        : await Attendance.findOne({ employee: userId, role: normalizeRole(user.role), date: today, organisation_id });
+
+      if (!current) break; // record vanished (shouldn't happen); fall through to no-op response
+      if (current.checkOut)
+        return res.status(400).json({ message: "Already checked out" });
+
+      const now = Date.now();
+      const prevLastAccountedAt = current.lastAccountedAt || 0;
+
+      // Credit elapsed wall-clock time against ONE shared clock
+      // (lastAccountedAt), not per-channel. The previous version accrued
+      // each channel's own elapsed-since-its-own-last-ping separately into
+      // the same activeMinutes/idleMinutes totals - that fixed the old
+      // "whichever ping lands last wins" race, but it meant that whenever
+      // both the browser tab AND the desktop (.exe) agent were pinging
+      // during the same session (the normal case, not an edge case), the
+      // same real minute got credited TWICE - once from each channel. That
+      // is why activeMinutes + idleMinutes could add up to well more than
+      // the actual session duration (e.g. 39m of active+idle inside a 29m
+      // session).
+      //
+      // Fix: only ONE clock ever advances and gets time credited against
+      // it. Whichever channel's ping happens to arrive first for a given
+      // window claims that slice; every OTHER channel's still-fresh status
+      // (from channelPings, within CHANNEL_STALE_MS of its own last ping) is
+      // OR'd in purely to decide active-vs-idle for that slice, exactly like
+      // before - it just no longer ALSO adds its own separate slice of
+      // minutes on top. This OR's across ALL known channels (every browser
+      // the user has Talent open in, plus the desktop agent), not just one
+      // fixed "other" channel, so activity in any single one of them is
+      // enough to count the slice as active.
+      const prevAccountedAt = prevLastAccountedAt || current.lastUpdated || now;
+      const elapsedMs = now - prevAccountedAt;
+      const elapsedMinutes = Math.min(Math.max(elapsedMs, 0) / 60000, 3);
+
+      let mergedStatus = status;
+      if (current.channelPings) {
+        for (const [key, ping] of current.channelPings.entries()) {
+          if (key === channel || mergedStatus === "active") continue;
+          const isFresh = !!ping?.lastUpdated && now - ping.lastUpdated <= CHANNEL_STALE_MS;
+          if (isFresh && ping.status === "active") mergedStatus = "active";
+        }
+      }
+
+      const activeInc = current.source === "manual" && mergedStatus === "active" ? elapsedMinutes : 0;
+      const idleInc = current.source === "manual" && mergedStatus === "idle" ? elapsedMinutes : 0;
+
+      updated = await Attendance.findOneAndUpdate(
+        { _id: current._id, lastAccountedAt: prevLastAccountedAt, checkOut: { $exists: false } },
+        {
+          $inc: { activeMinutes: activeInc, idleMinutes: idleInc },
+          $set: {
+            lastAccountedAt: now,
+            lastUpdated: now, // kept for display/back-compat only
+            [`channelPings.${channel}`]: { lastUpdated: now, status },
+          },
+        },
+        { new: true }
+      );
+
+      if (updated) break; // won the race for this slice
+      // Someone else's ping advanced lastAccountedAt (or checked out)
+      // between our read and write above - loop and retry against a
+      // fresh read rather than silently dropping this ping's data.
     }
 
-    attendance.channelPings[channel] = { lastUpdated: now, status };
-    attendance.lastAccountedAt = now;
-    attendance.lastUpdated = now; // kept for display/back-compat only
-    attendance.markModified("channelPings");
-    await attendance.save();
+    if (!updated) {
+      // Every retry lost the race (extremely unlikely - would need
+      // several channels landing within milliseconds of each other,
+      // repeatedly). No-op rather than error the client; the next ping
+      // 60s later picks up cleanly from whatever the winning channel left.
+      return res.json({ message: "Activity updated", activeMinutes: 0, idleMinutes: 0 });
+    }
 
     res.json({
       message: "Activity updated",
-      activeMinutes: displayMinutes(attendance.activeMinutes),
-      idleMinutes: displayMinutes(attendance.idleMinutes),
+      activeMinutes: displayMinutes(updated.activeMinutes),
+      idleMinutes: displayMinutes(updated.idleMinutes),
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -334,7 +418,7 @@ const checkout = async (req, res) => {
 
     const today = startOfDay(new Date()); // IST-based day boundary (see automatic/weekoffcalendar.js)
 
-    const attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id });
+    const attendance = await Attendance.findOne({ employee: userId, role: normalizeRole(user.role), date: today, organisation_id });
 
     if (!attendance)
       return res.status(404).json({ message: "Please check in first" });
@@ -414,7 +498,7 @@ const getToday = async (req, res) => {
 
     const today = startOfDay(new Date()); // IST-based day boundary (see automatic/weekoffcalendar.js)
 
-    const attendance = await Attendance.findOne({ employee: userId, role: user.role, date: today, organisation_id }).lean();
+    const attendance = await Attendance.findOne({ employee: userId, role: normalizeRole(user.role), date: today, organisation_id }).lean();
 
     if (!attendance)
       return res.json({ attendance: null, isCheckedIn: false, isCheckedOut: false });
@@ -619,7 +703,7 @@ const getCalendarMeta = async (req, res) => {
     // isCheckedIn/isCheckedOut - this is specifically the cross-channel case.
     const todayAttendance = await Attendance.findOne({
       employee: userId,
-      role: user.role,
+      role: normalizeRole(user.role),
       date: today0,
       organisation_id,
     }).select("source checkOut checkIn").lean();

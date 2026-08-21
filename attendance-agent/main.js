@@ -1,14 +1,26 @@
-const { app, Tray, Menu, BrowserWindow, nativeImage, powerSaveBlocker } = require("electron");
-const { uIOhook } = require("uiohook-napi");
-const axios  = require("axios");
-const http   = require("http");
-const fs     = require("fs");
-const path   = require("path");
-const Store  = require("electron-store");
+const {
+  app,
+  Tray,
+  Menu,
+  BrowserWindow,
+  nativeImage,
+  powerSaveBlocker,
+  powerMonitor,
+} = require("electron");
+
+const axios = require("axios");
+const http = require("http");
+const fs = require("fs");
+const path = require("path");
+const Store = require("electron-store");
+
+// ============================================================
+// CONFIGURATION
+// ============================================================
 
 const IS_DEV = process.env.NODE_ENV === "development";
 
-const API_BASE    = IS_DEV
+const API_BASE = IS_DEV
   ? "http://localhost:5001/attendance"
   : "https://torchxsuite.com/talent/api/attendance";
 
@@ -16,20 +28,81 @@ const FRONTEND_URL = IS_DEV
   ? "http://localhost:5173"
   : "https://torchxsuite.com/talent";
 
-const AGENT_PORT     = 47821;
-const PING_INTERVAL  = 60_000;
-const MAX_LOG_BYTES  = 5 * 1024 * 1024;
+const AGENT_PORT = 47821;
+
+const PING_INTERVAL = 60_000;
+
+// Maximum log file size = 5 MB
+const MAX_LOG_BYTES = 5 * 1024 * 1024;
+
+// Idle after 30 seconds without keyboard/mouse input
+const IDLE_THRESHOLD_SECONDS = 30;
+
+// ============================================================
+// ELECTRON STORE
+// ============================================================
 
 const store = new Store();
 
-const logDir  = path.join(app.getPath("userData"), "logs");
+// ============================================================
+// SINGLE INSTANCE LOCK
+// ============================================================
+//
+// This is VERY important.
+//
+// If the user opens the application multiple times,
+// only ONE main TorchX Attendance process will be allowed.
+//
+// This prevents:
+//
+// listen EADDRINUSE: address already in use
+// 127.0.0.1:47821
+//
+// ============================================================
+
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!gotSingleInstanceLock) {
+  console.log("[Agent] Another TorchX Attendance instance is already running.");
+  app.quit();
+  process.exit(0);
+}
+
+// ============================================================
+// AGENT ID
+// ============================================================
+
+function getAgentId() {
+  let id = store.get("agentId");
+
+  if (!id) {
+    id = `agent_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+    store.set("agentId", id);
+  }
+
+  return id;
+}
+
+// ============================================================
+// LOGGING
+// ============================================================
+
+const logDir = path.join(app.getPath("userData"), "logs");
 const logFile = path.join(logDir, "main.log");
 
 function ensureLogFile() {
   try {
-    if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, {
+        recursive: true,
+      });
+    }
+
     if (fs.existsSync(logFile) && fs.statSync(logFile).size > MAX_LOG_BYTES) {
-      fs.renameSync(logFile, path.join(logDir, `main.${Date.now()}.log`));
+      const rotatedLog = path.join(logDir, `main.${Date.now()}.log`);
+
+      fs.renameSync(logFile, rotatedLog);
     }
   } catch (err) {
     console.error("[Agent] Failed to prepare log file:", err.message);
@@ -37,223 +110,792 @@ function ensureLogFile() {
 }
 
 function log(...args) {
-  const line = `[${new Date().toISOString()}] ${args.join(" ")}`;
+  const line =
+    `[${new Date().toISOString()}] ` +
+    args
+      .map((value) => {
+        if (typeof value === "object") {
+          try {
+            return JSON.stringify(value);
+          } catch {
+            return String(value);
+          }
+        }
+
+        return String(value);
+      })
+      .join(" ");
+
   console.log(line);
+
   try {
-    fs.appendFileSync(logFile, line + "\n");
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, {
+        recursive: true,
+      });
+    }
+
+    fs.appendFileSync(logFile, line + "\n", "utf8");
   } catch (err) {
     console.error("[Agent] Failed to write log:", err.message);
   }
 }
 
-let tray                = null;
-let wasActiveThisMinute = false;
-let pingInterval        = null;
-let isTracking          = false;
+// ============================================================
+// GLOBAL STATE
+// ============================================================
 
-function startGlobalHook() {
-  uIOhook.on("mousemove", onActivity);
-  uIOhook.on("mousedown", onActivity);
-  uIOhook.on("keydown",   onActivity);
-  uIOhook.start();
-  log("[Agent] Global activity hook started");
+let tray = null;
+
+let pingInterval = null;
+
+let isTracking = false;
+
+let tokenServer = null;
+
+let isQuitting = false;
+
+// ============================================================
+// PROTOCOL URL HANDLING (torchx-agent://)
+// ============================================================
+
+function findAgentUrlInArgs(args) {
+  return args.find((arg) => arg.startsWith("torchx-agent://"));
 }
 
-function stopGlobalHook() {
-  try { uIOhook.stop(); } catch (_) {}
-  log("[Agent] Global activity hook stopped");
+function parseAgentUrl(raw) {
+  if (!raw || !raw.startsWith("torchx-agent://")) {
+    return null;
+  }
+
+  try {
+    const parsedUrl = new URL(raw);
+
+    const action = (parsedUrl.hostname || parsedUrl.pathname.replace(/^\/+/, "")).toLowerCase();
+
+    if (action === "set-token") {
+      const token = parsedUrl.searchParams.get("token");
+
+      return token ? { action: "set-token", token } : null;
+    }
+
+    if (action === "clear-token") {
+      return { action: "clear-token" };
+    }
+  } catch (err) {
+    log("[Agent] Failed to parse protocol URL:", err.message);
+  }
+
+  return null;
 }
 
-function onActivity() {
-  wasActiveThisMinute = true;
+function handleAgentUrl(raw) {
+  const parsed = parseAgentUrl(raw);
+
+  if (!parsed) {
+    return false;
+  }
+
+  if (parsed.action === "set-token") {
+    store.set("token", parsed.token);
+
+    log("[Agent] Token received via protocol.");
+
+    startTracking();
+
+    return true;
+  }
+
+  if (parsed.action === "clear-token") {
+    store.delete("token");
+
+    stopTracking();
+
+    log("[Agent] Token cleared via protocol.");
+
+    return true;
+  }
+
+  return false;
 }
+
+// ============================================================
+// SYSTEM IDLE STATUS
+// ============================================================
+
+function getStatus() {
+  try {
+    const idleSeconds = powerMonitor.getSystemIdleTime();
+
+    return idleSeconds < IDLE_THRESHOLD_SECONDS ? "active" : "idle";
+  } catch (err) {
+    log("[Agent] Failed to get system idle time:", err.message);
+
+    // If we cannot determine idle time,
+    // consider user active rather than incorrectly idle.
+    return "active";
+  }
+}
+
+// ============================================================
+// SEND ACTIVITY PING
+// ============================================================
 
 async function sendPing() {
-  const status = wasActiveThisMinute ? "active" : "idle";
-  wasActiveThisMinute = false;
+  const status = getStatus();
 
   log(`[Agent] Sending ping: ${status}`);
 
   try {
     const token = store.get("token");
-    if (!token) return;
+
+    if (!token) {
+      log("[Agent] No token available, skipping ping");
+
+      return;
+    }
+
+    const agentId = getAgentId();
+
+    log(`[Agent] Agent ID: ${agentId}`);
 
     await axios.post(
       `${API_BASE}/activity`,
-      { status },
-      { headers: { Authorization: `Bearer ${token}` } }
+      {
+        status,
+        clientId: agentId,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+
+        timeout: 15_000,
+      },
     );
 
     updateTray(status);
-    log(`[Agent] Ping sent: ${status} at ${new Date().toLocaleTimeString()}`);
 
+    log(`[Agent] Ping sent successfully: ${status}`);
   } catch (err) {
     if (err?.response?.status === 401) {
-      log("[Agent] Token expired, clearing...");
+      log("[Agent] Token expired. Clearing token.");
+
       store.delete("token");
+
       stopTracking();
+
       updateTray("stopped");
-    } else if (err?.response?.status === 400) {
-      log("[Agent] Session ended, stopping pings");
+
+      return;
+    }
+
+    if (err?.response?.status === 400) {
+      log("[Agent] Session ended. Stopping tracking.");
+
       stopTracking();
+
       updateTray("stopped");
+
+      return;
+    }
+
+    if (err?.response) {
+      log(`[Agent] Ping failed: HTTP ${err.response.status}`);
+
+      log(`[Agent] Server response:`, err.response.data);
     } else {
       log("[Agent] Ping failed:", err.message);
     }
   }
 }
 
-function startTracking() {
-  if (isTracking) return;
-  isTracking          = true;
-  wasActiveThisMinute = true;
+// ============================================================
+// START TRACKING
+// ============================================================
 
-  startGlobalHook();
+function startTracking() {
+  if (isTracking) {
+    log("[Agent] Tracking already running.");
+
+    return;
+  }
+
+  const token = store.get("token");
+
+  if (!token) {
+    log("[Agent] Cannot start tracking: no token.");
+
+    return;
+  }
+
+  isTracking = true;
+
   pingInterval = setInterval(sendPing, PING_INTERVAL);
+
+  // Send immediately
+  sendPing();
+
   updateTray("active");
-  log("[Agent] Tracking started");
+
+  log("[Agent] Tracking started.");
+
+  log(`[Agent] Ping interval: ${PING_INTERVAL} ms`);
+
+  log(`[Agent] Idle threshold: ${IDLE_THRESHOLD_SECONDS} seconds`);
 }
+
+// ============================================================
+// STOP TRACKING
+// ============================================================
 
 function stopTracking() {
-  if (!isTracking) return;
+  if (!isTracking) {
+    return;
+  }
+
   isTracking = false;
 
-  clearInterval(pingInterval);
-  pingInterval = null;
+  if (pingInterval) {
+    clearInterval(pingInterval);
 
-  stopGlobalHook();
+    pingInterval = null;
+  }
+
   updateTray("stopped");
-  log("[Agent] Tracking stopped");
+
+  log("[Agent] Tracking stopped.");
 }
 
+// ============================================================
+// TRAY
+// ============================================================
+
 function updateTray(status) {
-  if (!tray) return;
+  if (!tray) {
+    return;
+  }
 
   const labels = {
-    active:  "Active — tracking",
-    idle:    "Idle",
+    active: "Active — tracking",
+
+    idle: "Idle",
+
     stopped: "Not tracking",
   };
 
-  tray.setToolTip(`TorchX Attendance\n${labels[status] ?? status}`);
-  tray.setContextMenu(Menu.buildFromTemplate([
-    { label: labels[status] ?? status, enabled: false },
-    { type: "separator" },
-    {
-      label: isTracking ? "Stop Tracking" : "Start Tracking",
-      click: () => {
-        if (isTracking) stopTracking();
-        else {
-          const token = store.get("token");
-          if (token) startTracking();
-          else openApp();
-        }
+  const currentLabel = labels[status] || status;
+
+  tray.setToolTip(`TorchX Attendance\n${currentLabel}`);
+
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: currentLabel,
+        enabled: false,
       },
-    },
-    { type: "separator" },
-    { label: "Open Dashboard", click: openApp },
-    { type: "separator" },
-    { label: "Quit Agent", click: () => { stopTracking(); app.quit(); } },
-  ]));
+
+      {
+        type: "separator",
+      },
+
+      {
+        label: isTracking ? "Stop Tracking" : "Start Tracking",
+
+        click: () => {
+          if (isTracking) {
+            stopTracking();
+          } else {
+            const token = store.get("token");
+
+            if (token) {
+              startTracking();
+            } else {
+              openApp();
+            }
+          }
+        },
+      },
+
+      {
+        type: "separator",
+      },
+
+      {
+        label: "Open Dashboard",
+
+        click: openApp,
+      },
+
+      {
+        type: "separator",
+      },
+
+      {
+        label: "Quit Agent",
+
+        click: () => {
+          isQuitting = true;
+
+          stopTracking();
+
+          closeTokenServer();
+
+          app.quit();
+        },
+      },
+    ]),
+  );
 }
+
+// ============================================================
+// OPEN DASHBOARD
+// ============================================================
 
 function openApp() {
-  const win = new BrowserWindow({
-    width: 430, height: 750,
-    title: "TorchX Attendance",
-    webPreferences: { nodeIntegration: false },
-  });
-  win.loadURL(`${FRONTEND_URL}/mark-attendance`);
+  try {
+    const win = new BrowserWindow({
+      width: 430,
+
+      height: 750,
+
+      title: "TorchX Attendance",
+
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+      },
+    });
+
+    win.loadURL(`${FRONTEND_URL}/mark-attendance`);
+
+    win.webContents.on(
+      "did-fail-load",
+      (event, errorCode, errorDescription) => {
+        log(
+          `[Agent] Dashboard failed to load: ${errorCode} ${errorDescription}`,
+        );
+      },
+    );
+  } catch (err) {
+    log("[Agent] Failed to open dashboard:", err.message);
+  }
 }
 
+// ============================================================
+// TOKEN SERVER
+// ============================================================
+
 function startTokenServer() {
-  const server = http.createServer((req, res) => {
+  if (tokenServer) {
+    log("[Agent] Token server already exists.");
+
+    return;
+  }
+
+  tokenServer = http.createServer((req, res) => {
+    // ------------------------------------------------------
+    // CORS
+    // ------------------------------------------------------
+
     res.setHeader("Access-Control-Allow-Origin", "*");
+
     res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization",
+    );
+
+    res.setHeader("Content-Type", "application/json");
+
+    // ------------------------------------------------------
+    // OPTIONS
+    // ------------------------------------------------------
 
     if (req.method === "OPTIONS") {
       res.writeHead(200);
-      res.end();
+
+      res.end(
+        JSON.stringify({
+          ok: true,
+        }),
+      );
+
       return;
     }
+
+    // ------------------------------------------------------
+    // HEALTH CHECK
+    // ------------------------------------------------------
+
+    if (req.method === "GET" && req.url === "/") {
+      res.writeHead(200);
+
+      res.end(
+        JSON.stringify({
+          ok: true,
+
+          status: isTracking ? "tracking" : "stopped",
+
+          version: app.getVersion(),
+
+          pid: process.pid,
+
+          port: AGENT_PORT,
+        }),
+      );
+
+      return;
+    }
+
+    // ------------------------------------------------------
+    // SET TOKEN
+    // ------------------------------------------------------
 
     if (req.method === "POST" && req.url === "/set-token") {
       let body = "";
-      req.on("data", chunk => (body += chunk));
-      req.on("end", () => {
-        try {
-          const { token } = JSON.parse(body);
-          if (token) {
-            store.set("token", token);
-            startTracking();
-            log("[Agent] Token received, tracking started");
-            res.writeHead(200);
-            res.end(JSON.stringify({ ok: true }));
-          } else {
-            res.writeHead(400);
-            res.end(JSON.stringify({ ok: false }));
-          }
-        } catch (e) {
-          res.writeHead(400);
-          res.end(JSON.stringify({ ok: false }));
+
+      req.on("data", (chunk) => {
+        body += chunk;
+
+        // Prevent extremely large request body
+        if (body.length > 1_000_000) {
+          req.destroy();
         }
       });
+
+      req.on("end", () => {
+        try {
+          const data = JSON.parse(body);
+
+          const token = data?.token;
+
+          if (!token) {
+            log("[Agent] /set-token called without token.");
+
+            res.writeHead(400);
+
+            res.end(
+              JSON.stringify({
+                ok: false,
+                message: "Token is required",
+              }),
+            );
+
+            return;
+          }
+
+          store.set("token", token);
+
+          log("[Agent] Token received and saved.");
+
+          startTracking();
+
+          log("[Agent] Tracking started after token.");
+
+          res.writeHead(200);
+
+          res.end(
+            JSON.stringify({
+              ok: true,
+            }),
+          );
+        } catch (err) {
+          log("[Agent] Invalid /set-token request:", err.message);
+
+          res.writeHead(400);
+
+          res.end(
+            JSON.stringify({
+              ok: false,
+              message: "Invalid JSON",
+            }),
+          );
+        }
+      });
+
       return;
     }
 
-    if (req.url === "/clear-token") {
+    // ------------------------------------------------------
+    // CLEAR TOKEN
+    // ------------------------------------------------------
+
+    if (req.method === "POST" && req.url === "/clear-token") {
       store.delete("token");
+
       stopTracking();
-      log("[Agent] Token cleared, tracking stopped");
+
+      log("[Agent] Token cleared. Tracking stopped.");
+
       res.writeHead(200);
-      res.end(JSON.stringify({ ok: true }));
+
+      res.end(
+        JSON.stringify({
+          ok: true,
+        }),
+      );
+
       return;
     }
 
-    if (req.url === "/") {
-      res.writeHead(200);
-      res.end(JSON.stringify({
-        ok: true,
-        status: isTracking ? "tracking" : "stopped",
-      }));
-      return;
-    }
+    // ------------------------------------------------------
+    // 404
+    // ------------------------------------------------------
 
     res.writeHead(404);
-    res.end(JSON.stringify({ ok: false }));
+
+    res.end(
+      JSON.stringify({
+        ok: false,
+        message: "Not found",
+      }),
+    );
   });
 
-  server.listen(AGENT_PORT, "127.0.0.1", () => {
-    log(`[Agent] Token server listening on port ${AGENT_PORT}`);
+  // ==========================================================
+  // SERVER LISTEN
+  // ==========================================================
+
+  tokenServer.listen(AGENT_PORT, "127.0.0.1", () => {
+    log(`[Agent] Token server listening on 127.0.0.1:${AGENT_PORT}`);
+
+    log(`[Agent] Process PID: ${process.pid}`);
+
+    log(`[Agent] Agent ID: ${getAgentId()}`);
   });
 
-  server.on("error", (err) => {
-    log("[Agent] Server error:", err.message);
+  // ==========================================================
+  // SERVER ERROR
+  // ==========================================================
+
+  tokenServer.on("error", (err) => {
+    if (err.code === "EADDRINUSE") {
+      log(`[Agent] ERROR: Port ${AGENT_PORT} is already in use.`);
+
+      log(
+        "[Agent] Another TorchX Attendance instance owns this port. Shutting this duplicate down.",
+      );
+
+      log(`[Agent] Current process PID: ${process.pid}`);
+
+      isQuitting = true;
+
+      stopTracking();
+
+      tokenServer = null;
+
+      app.quit();
+
+      setTimeout(() => process.exit(0), 500);
+    } else {
+      log("[Agent] Token server error:", err.message);
+    }
   });
 }
 
-app.whenReady().then(() => {
-  ensureLogFile();
-  log(`[Agent] Started - version ${app.getVersion()}`);
+// ============================================================
+// CLOSE TOKEN SERVER
+// ============================================================
 
-  powerSaveBlocker.start("prevent-app-suspension");
-  app.setLoginItemSettings({ openAtLogin: true });
-
-  const icon = nativeImage.createEmpty();
-  tray = new Tray(icon);
-  updateTray("stopped");
-
-  startTokenServer();
-
-  const savedToken = store.get("token");
-  if (savedToken) {
-    log("[Agent] Saved token found, resuming tracking");
-    startTracking();
-  } else {
-    log("[Agent] No token, waiting for login...");
-    updateTray("stopped");
+function closeTokenServer() {
+  if (!tokenServer) {
+    return;
   }
-});
 
-app.on("window-all-closed", (e) => e.preventDefault());
+  try {
+    tokenServer.close(() => {
+      log("[Agent] Token server closed.");
+    });
+  } catch (err) {
+    log("[Agent] Error closing token server:", err.message);
+  }
+
+  tokenServer = null;
+}
+
+// ============================================================
+// ELECTRON READY
+// ============================================================
+
+if (gotSingleInstanceLock) {
+  app.whenReady().then(() => {
+    // --------------------------------------------------------
+    // LOG
+    // --------------------------------------------------------
+
+    ensureLogFile();
+
+    log("==================================================");
+
+    log(`[Agent] Started - version ${app.getVersion()}`);
+
+    log(`[Agent] PID: ${process.pid}`);
+
+    log(`[Agent] Platform: ${process.platform}`);
+
+    log(`[Agent] Electron: ${process.versions.electron}`);
+
+    log(`[Agent] Node: ${process.versions.node}`);
+
+    log(`[Agent] argv: ${JSON.stringify(process.argv)}`);
+
+    log("==================================================");
+
+    // --------------------------------------------------------
+    // PROTOCOL CLIENT REGISTRATION
+    // --------------------------------------------------------
+
+    try {
+      if (process.defaultApp) {
+        if (process.argv.length >= 2) {
+          app.setAsDefaultProtocolClient("torchx-agent", process.execPath, [
+            path.resolve(process.argv[1]),
+          ]);
+        }
+      } else {
+        app.setAsDefaultProtocolClient("torchx-agent");
+      }
+
+      log("[Agent] Protocol client registered for torchx-agent://");
+    } catch (err) {
+      log("[Agent] Failed to register protocol client:", err.message);
+    }
+
+    // --------------------------------------------------------
+    // PREVENT SYSTEM SUSPENSION
+    // --------------------------------------------------------
+
+    try {
+      const blockerId = powerSaveBlocker.start("prevent-app-suspension");
+
+      log(`[Agent] Power save blocker started: ${blockerId}`);
+    } catch (err) {
+      log("[Agent] Power save blocker error:", err.message);
+    }
+
+    // --------------------------------------------------------
+    // START WITH WINDOWS
+    // --------------------------------------------------------
+
+    try {
+      app.setLoginItemSettings({
+        openAtLogin: true,
+      });
+
+      log("[Agent] Windows startup enabled.");
+    } catch (err) {
+      log("[Agent] Failed to configure startup:", err.message);
+    }
+
+    // --------------------------------------------------------
+    // TRAY
+    // --------------------------------------------------------
+
+    try {
+      const icon = nativeImage.createEmpty();
+
+      tray = new Tray(icon);
+
+      updateTray("stopped");
+
+      log("[Agent] Tray initialized.");
+    } catch (err) {
+      log("[Agent] Tray initialization failed:", err.message);
+    }
+
+    // --------------------------------------------------------
+    // TOKEN SERVER
+    // --------------------------------------------------------
+
+    startTokenServer();
+
+    // --------------------------------------------------------
+    // LAUNCH URL (cold start via torchx-agent:// protocol)
+    // --------------------------------------------------------
+
+    const launchUrl = findAgentUrlInArgs(process.argv);
+
+    if (launchUrl && handleAgentUrl(launchUrl)) {
+      log("[Agent] Token applied from cold-start protocol launch.");
+    } else {
+      // --------------------------------------------------------
+      // SAVED TOKEN
+      // --------------------------------------------------------
+
+      const savedToken = store.get("token");
+
+      if (savedToken) {
+        log("[Agent] Saved token found.");
+
+        log("[Agent] Resuming tracking.");
+
+        startTracking();
+      } else {
+        log("[Agent] No token, waiting for login...");
+
+        updateTray("stopped");
+      }
+    }
+
+    log("[Agent] Initialization completed.");
+  });
+
+  // ==========================================================
+  // SECOND INSTANCE
+  // ==========================================================
+
+  app.on("second-instance", (event, commandLine) => {
+    log("[Agent] Second launch detected.");
+
+    log(`[Agent] commandLine: ${JSON.stringify(commandLine)}`);
+
+    const launchUrl = findAgentUrlInArgs(commandLine);
+
+    if (launchUrl && handleAgentUrl(launchUrl)) {
+      log("[Agent] Protocol call handled by existing instance, no window opened.");
+
+      return;
+    }
+
+    log("[Agent] Existing instance will continue running.");
+
+    openApp();
+  });
+
+  // ==========================================================
+  // WINDOW ALL CLOSED
+  // ==========================================================
+
+  app.on("window-all-closed", (event) => {
+    // Keep tray application running.
+    event.preventDefault();
+  });
+
+  // ==========================================================
+  // BEFORE QUIT
+  // ==========================================================
+
+  app.on("before-quit", () => {
+    if (isQuitting) {
+      return;
+    }
+
+    isQuitting = true;
+
+    log("[Agent] Application shutting down...");
+
+    stopTracking();
+
+    closeTokenServer();
+  });
+
+  // ==========================================================
+  // WILL QUIT
+  // ==========================================================
+
+  app.on("will-quit", () => {
+    log("[Agent] Application quit.");
+  });
+}

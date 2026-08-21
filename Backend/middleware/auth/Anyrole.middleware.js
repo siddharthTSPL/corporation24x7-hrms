@@ -67,6 +67,11 @@ const anyRoleAuth = async (req, res, next) => {
       recipientModel: config.recipientModel,
       organisation_id,
     };
+    // Full decoded JWT claims, kept around so downstream handlers (e.g. the
+    // companion cross-browser sign-in link) can re-sign a fresh token with
+    // the exact same role-specific id field (adminid/managerid/superadminid/
+    // _id) without having to know which one applies for this role.
+    req.tokenPayload = decoded;
 
     next();
   } catch (error) {

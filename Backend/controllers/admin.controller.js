@@ -2765,7 +2765,9 @@ const getme = async (req, res, next) => {
   // getme feeds the dashboard's "Date of joining" / "Member since" cards,
   // which rely on createdAt — so keep it even though the shared EXCLUDE
   // list hides it from other admin-facing responses.
-  const GETME_SELECT = EXCLUDE.replace(" -createdAt", "");
+  const GETME_SELECT = EXCLUDE
+    .replace(" -createdAt", "")
+    .replace(" -isFirstLogin", "");
 
   const [admin, leaveBalance, reviews] = await Promise.all([
     Adminmodel.findById(req.admin._id).select(GETME_SELECT).lean(),
@@ -4040,7 +4042,7 @@ const getAllAdminsForOrg = async (req, res, next) => {
     const organisation_id = req.admin.organisation_id;
 
     const admins = await Adminmodel.find({ organisation_id, working_status: "working" })
-      .select("uid f_name l_name work_email role department designation office_location organisation_id")
+      .select("empid uid f_name l_name work_email role department designation office_location organisation_id")
       .lean();
 
     return res.status(200).json({

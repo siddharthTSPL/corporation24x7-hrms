@@ -113,3 +113,8 @@ export const updatePayrollStatus = async (id, status) => {
   const res = await api.patch(`admin/payroll/${id}/status`, { status });
   return res.data;
 };
+
+export const deletePayroll = async (id) => {
+  const res = await api.delete(`admin/payroll/${id}`);
+  return res.data;
+};

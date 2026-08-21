@@ -4,6 +4,7 @@ import {
   unifiedSendForgotPasswordOtp,
   unifiedVerifyForgotPasswordOtp,
   unifiedResetPassword,
+  dismissWelcomeMessage,
 } from "../../api/unifiedauth/unifiedauth.api";
 
 export const useUnifiedLogin = () =>
@@ -28,4 +29,10 @@ export const useUnifiedResetPassword = () =>
   useMutation({
     mutationKey: ["unified-forgot-password-reset-password"],
     mutationFn: unifiedResetPassword,
+  });
+
+export const useDismissWelcomeMessage = () =>
+  useMutation({
+    mutationKey: ["dismiss-welcome-message"],
+    mutationFn: dismissWelcomeMessage,
   });
