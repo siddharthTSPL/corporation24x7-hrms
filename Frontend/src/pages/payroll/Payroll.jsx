@@ -20,6 +20,7 @@ import {
   useGetAllEmployee,
   useGetAllAdmins,
 } from "../../auth/server-state/adminother/adminother.hook";
+import * as XLSX from "xlsx";
 
 const C = {
   brand: "#CD166E",
@@ -263,6 +264,173 @@ function statusBadge(status) {
   };
   const s = map[status] || { label: status, color: C.muted, bg: "#f2ece9" };
   return <Badge color={s.color} bg={s.bg}>{s.label}</Badge>;
+}
+
+function getPayrollRecordAmounts(payroll) {
+  const total = Number(payroll?.netSalary) || 0;
+  const paid = payroll?.status === "paid" ? total : 0;
+  const balance = Math.max(total - paid, 0);
+
+  return { total, paid, balance };
+}
+
+function slugifyLabel(value) {
+  return String(value || "")
+    .trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase();
+}
+
+function createPayrollExportFileName(filters) {
+  const parts = ["payroll-records"];
+  if (filters.month) parts.push(MONTH_NAMES[Number(filters.month) - 1]);
+  if (filters.year) parts.push(String(filters.year));
+  if (filters.employeeModel) parts.push(MODEL_LABEL[filters.employeeModel] || filters.employeeModel);
+  if (filters.status) parts.push(filters.status.replace("_", "-"));
+  parts.push(new Date().toISOString().slice(0, 10));
+  return `${parts.filter(Boolean).map(slugifyLabel).join("-")}.xlsx`;
+}
+
+function downloadPayrollWorkbook({ payrolls, directory, filters }) {
+  const earningLabels = [];
+  const deductionLabels = [];
+  const employerLabels = [];
+  const earningSet = new Set();
+  const deductionSet = new Set();
+  const employerSet = new Set();
+
+  const detailed = payrolls.map((payroll) => {
+    const snap = payroll.employeeSnapshot || {};
+    const person = directory.byId.get(String(payroll.employee));
+    const { total, paid, balance } = getPayrollRecordAmounts(payroll);
+    const { earnings, deductions, employerContribution } = getPayslipLineItems(payroll);
+
+    earnings.forEach(({ label }) => {
+      if (!earningSet.has(label)) {
+        earningSet.add(label);
+        earningLabels.push(label);
+      }
+    });
+    deductions.forEach(({ label }) => {
+      if (!deductionSet.has(label)) {
+        deductionSet.add(label);
+        deductionLabels.push(label);
+      }
+    });
+    employerContribution.forEach(({ label }) => {
+      if (!employerSet.has(label)) {
+        employerSet.add(label);
+        employerLabels.push(label);
+      }
+    });
+
+    return {
+      payroll,
+      employeeName: snap.name || person?.name || resolveName(directory, payroll.employee, payroll.employeeModel),
+      employeeId: snap.employeeId || person?.uid || "",
+      department: snap.department || "",
+      designation: snap.designation || "",
+      total,
+      paid,
+      balance,
+      earnings,
+      deductions,
+      employerContribution,
+    };
+  });
+
+  const baseHeaders = [
+    "Employee Name",
+    "Employee ID",
+    "Employee Type",
+    "Department",
+    "Designation",
+    "Period",
+    "Month",
+    "Year",
+    "Status",
+    "Organisation",
+    "CTC",
+    "Monthly Gross",
+    "Gross Earnings",
+    "Total Deductions",
+    "Net Salary",
+    "Total",
+    "Paid",
+    "Balance",
+    "Calendar Days",
+    "Working Days",
+    "Paid Days",
+    "LOP Days",
+    "Manual Attendance",
+    "Paid On",
+    "Remarks",
+  ];
+
+  const earningHeaders = earningLabels.map((label) => `Earning - ${label}`);
+  const deductionHeaders = deductionLabels.map((label) => `Deduction - ${label}`);
+  const employerHeaders = employerLabels.map((label) => `Employer Contribution - ${label}`);
+  const headers = [...baseHeaders, ...earningHeaders, ...deductionHeaders, ...employerHeaders];
+
+  const rows = detailed.map((item) => {
+    const att = item.payroll.attendance || {};
+    const row = {
+      "Employee Name": item.employeeName,
+      "Employee ID": item.employeeId,
+      "Employee Type": MODEL_LABEL[item.payroll.employeeModel] || item.payroll.employeeModel,
+      Department: item.department || "—",
+      Designation: item.designation || "—",
+      Period: `${MONTH_NAMES[item.payroll.month - 1]} ${item.payroll.year}`,
+      Month: MONTH_NAMES[item.payroll.month - 1],
+      Year: item.payroll.year,
+      Status: item.payroll.status,
+      Organisation: item.payroll.organisationSnapshot?.name || "",
+      CTC: Number(item.payroll.ctc) || 0,
+      "Monthly Gross": Number(item.payroll.breakup?.monthlyGross) || 0,
+      "Gross Earnings": Number(item.payroll.earnings?.totalEarnings) || 0,
+      "Total Deductions": Number(item.payroll.deductions?.totalDeductions) || 0,
+      "Net Salary": Number(item.payroll.netSalary) || 0,
+      Total: item.total,
+      Paid: item.paid,
+      Balance: item.balance,
+      "Calendar Days": att.calendarDays ?? att.daysInMonth ?? "",
+      "Working Days": att.workingDays ?? "",
+      "Paid Days": att.paidDays ?? "",
+      "LOP Days": att.lopDays ?? "",
+      "Manual Attendance": att.manualEntry ? "Yes" : "No",
+      "Paid On": item.payroll.paidOn ? new Date(item.payroll.paidOn).toLocaleDateString("en-IN") : "",
+      Remarks: item.payroll.remarks || "",
+    };
+
+    item.earnings.forEach(({ label, amount }) => {
+      row[`Earning - ${label}`] = Number(amount) || 0;
+    });
+    item.deductions.forEach(({ label, amount }) => {
+      row[`Deduction - ${label}`] = Number(amount) || 0;
+    });
+    item.employerContribution.forEach(({ label, amount }) => {
+      row[`Employer Contribution - ${label}`] = Number(amount) || 0;
+    });
+
+    return row;
+  });
+
+  const worksheet = XLSX.utils.json_to_sheet(rows, { header: headers });
+  worksheet["!cols"] = headers.map((header) => {
+    const maxLen = rows.reduce((max, row) => {
+      const value = row[header];
+      return Math.max(max, String(value ?? "").length);
+    }, header.length);
+    return { wch: Math.min(Math.max(maxLen + 2, 12), 28) };
+  });
+  worksheet["!freeze"] = { xSplit: 0, ySplit: 1 };
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Payroll Records");
+  XLSX.writeFile(workbook, createPayrollExportFileName(filters));
 }
 
 function PrimaryButton({ children, loading, ...rest }) {
@@ -1691,6 +1859,7 @@ function RecordsTab({ notify, directory }) {
   });
   const { mutate: updateStatus } = useUpdatePayrollStatus();
   const [selected, setSelected] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   const payrolls = data?.payrolls || [];
 
@@ -1702,6 +1871,23 @@ function RecordsTab({ notify, directory }) {
         onError: (err) => notify(getErrorMessage(err), "error"),
       }
     );
+  };
+
+  const handleExport = () => {
+    if (!payrolls.length) {
+      notify("No payroll records available for export", "error");
+      return;
+    }
+
+    try {
+      setExporting(true);
+      downloadPayrollWorkbook({ payrolls, directory, filters });
+      notify("Payroll sheet exported", "success");
+    } catch (err) {
+      notify(getErrorMessage(err), "error");
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -1725,6 +1911,9 @@ function RecordsTab({ notify, directory }) {
             <option value="paid">Paid</option>
             <option value="on_hold">On Hold</option>
           </Select>
+          <PrimaryButton onClick={handleExport} loading={exporting} disabled={isLoading || !payrolls.length}>
+            Export Payroll
+          </PrimaryButton>
         </div>
       }
     >
@@ -1734,22 +1923,29 @@ function RecordsTab({ notify, directory }) {
         <p style={{ color: C.muted, fontSize: 13 }}>No payroll records found for these filters.</p>
       ) : (
         <div className="overflow-x-auto overscroll-x-contain -mx-1">
-          <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 820 }}>
+          <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 1020 }}>
             <thead>
               <tr style={{ textAlign: "left", fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>
                 <th style={{ padding: "6px 10px" }}>Employee</th>
                 <th style={{ padding: "6px 10px" }}>Period</th>
-                <th style={{ padding: "6px 10px" }}>Net Salary</th>
+                <th style={{ padding: "6px 10px" }}>Total</th>
+                <th style={{ padding: "6px 10px" }}>Paid</th>
+                <th style={{ padding: "6px 10px" }}>Balance</th>
                 <th style={{ padding: "6px 10px" }}>Status</th>
                 <th style={{ padding: "6px 10px" }}></th>
               </tr>
             </thead>
             <tbody>
-              {payrolls.map((p) => (
-                <tr key={p._id} style={{ borderTop: `1px solid ${C.border}` }}>
+              {payrolls.map((p) => {
+                const { total, paid, balance } = getPayrollRecordAmounts(p);
+
+                return (
+                  <tr key={p._id} style={{ borderTop: `1px solid ${C.border}` }}>
                   <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>{resolveName(directory, p.employee, p.employeeModel)}</td>
                   <td style={{ padding: "8px 10px", fontSize: 12.5, color: C.muted }}>{MONTH_NAMES[p.month - 1]} {p.year}</td>
-                  <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 700, color: C.brandDark }}>{fmtINR(p.netSalary)}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 700, color: C.brandDark }}>{fmtINR(total)}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 700, color: paid > 0 ? C.green : C.muted }}>{fmtINR(paid)}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 700, color: balance > 0 ? C.red : C.green }}>{fmtINR(balance)}</td>
                   <td style={{ padding: "8px 10px" }}>{statusBadge(p.status)}</td>
                   <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
                     <GhostButton onClick={() => setSelected(p)} style={{ marginRight: 8 }}>View Payslip</GhostButton>
@@ -1777,8 +1973,9 @@ function RecordsTab({ notify, directory }) {
                     {p.status !== "on_hold" && p.status !== "paid" && <GhostButton onClick={() => handleStatus(p._id, "on_hold")}>Hold</GhostButton>}
                     {p.status === "on_hold" && <GhostButton onClick={() => handleStatus(p._id, "approved")}>Resume</GhostButton>}
                   </td>
-                </tr>
-              ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
