@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, Fragment } from "react";
+import { FaFileExcel } from "react-icons/fa";
 import {
   useGetPayrollPolicy,
   useSetPayrollPolicy,
@@ -21,7 +22,6 @@ import {
   useGetAllEmployee,
   useGetAllAdmins,
 } from "../../auth/server-state/adminother/adminother.hook";
-import * as XLSX from "xlsx";
 
 const C = {
   brand: "#CD166E",
@@ -276,173 +276,6 @@ function statusBadge(status) {
   };
   const s = map[status] || { label: status, color: C.muted, bg: "#f2ece9" };
   return <Badge color={s.color} bg={s.bg}>{s.label}</Badge>;
-}
-
-function getPayrollRecordAmounts(payroll) {
-  const total = Number(payroll?.netSalary) || 0;
-  const paid = payroll?.status === "paid" ? total : 0;
-  const balance = Math.max(total - paid, 0);
-
-  return { total, paid, balance };
-}
-
-function slugifyLabel(value) {
-  return String(value || "")
-    .trim()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .toLowerCase();
-}
-
-function createPayrollExportFileName(filters) {
-  const parts = ["payroll-records"];
-  if (filters.month) parts.push(MONTH_NAMES[Number(filters.month) - 1]);
-  if (filters.year) parts.push(String(filters.year));
-  if (filters.employeeModel) parts.push(MODEL_LABEL[filters.employeeModel] || filters.employeeModel);
-  if (filters.status) parts.push(filters.status.replace("_", "-"));
-  parts.push(new Date().toISOString().slice(0, 10));
-  return `${parts.filter(Boolean).map(slugifyLabel).join("-")}.xlsx`;
-}
-
-function downloadPayrollWorkbook({ payrolls, directory, filters }) {
-  const earningLabels = [];
-  const deductionLabels = [];
-  const employerLabels = [];
-  const earningSet = new Set();
-  const deductionSet = new Set();
-  const employerSet = new Set();
-
-  const detailed = payrolls.map((payroll) => {
-    const snap = payroll.employeeSnapshot || {};
-    const person = directory.byId.get(String(payroll.employee));
-    const { total, paid, balance } = getPayrollRecordAmounts(payroll);
-    const { earnings, deductions, employerContribution } = getPayslipLineItems(payroll);
-
-    earnings.forEach(({ label }) => {
-      if (!earningSet.has(label)) {
-        earningSet.add(label);
-        earningLabels.push(label);
-      }
-    });
-    deductions.forEach(({ label }) => {
-      if (!deductionSet.has(label)) {
-        deductionSet.add(label);
-        deductionLabels.push(label);
-      }
-    });
-    employerContribution.forEach(({ label }) => {
-      if (!employerSet.has(label)) {
-        employerSet.add(label);
-        employerLabels.push(label);
-      }
-    });
-
-    return {
-      payroll,
-      employeeName: snap.name || person?.name || resolveName(directory, payroll.employee, payroll.employeeModel),
-      employeeId: snap.employeeId || person?.uid || "",
-      department: snap.department || "",
-      designation: snap.designation || "",
-      total,
-      paid,
-      balance,
-      earnings,
-      deductions,
-      employerContribution,
-    };
-  });
-
-  const baseHeaders = [
-    "Employee Name",
-    "Employee ID",
-    "Employee Type",
-    "Department",
-    "Designation",
-    "Period",
-    "Month",
-    "Year",
-    "Status",
-    "Organisation",
-    "CTC",
-    "Monthly Gross",
-    "Gross Earnings",
-    "Total Deductions",
-    "Net Salary",
-    "Total",
-    "Paid",
-    "Balance",
-    "Calendar Days",
-    "Working Days",
-    "Paid Days",
-    "LOP Days",
-    "Manual Attendance",
-    "Paid On",
-    "Remarks",
-  ];
-
-  const earningHeaders = earningLabels.map((label) => `Earning - ${label}`);
-  const deductionHeaders = deductionLabels.map((label) => `Deduction - ${label}`);
-  const employerHeaders = employerLabels.map((label) => `Employer Contribution - ${label}`);
-  const headers = [...baseHeaders, ...earningHeaders, ...deductionHeaders, ...employerHeaders];
-
-  const rows = detailed.map((item) => {
-    const att = item.payroll.attendance || {};
-    const row = {
-      "Employee Name": item.employeeName,
-      "Employee ID": item.employeeId,
-      "Employee Type": MODEL_LABEL[item.payroll.employeeModel] || item.payroll.employeeModel,
-      Department: item.department || "—",
-      Designation: item.designation || "—",
-      Period: `${MONTH_NAMES[item.payroll.month - 1]} ${item.payroll.year}`,
-      Month: MONTH_NAMES[item.payroll.month - 1],
-      Year: item.payroll.year,
-      Status: item.payroll.status,
-      Organisation: item.payroll.organisationSnapshot?.name || "",
-      CTC: Number(item.payroll.ctc) || 0,
-      "Monthly Gross": Number(item.payroll.breakup?.monthlyGross) || 0,
-      "Gross Earnings": Number(item.payroll.earnings?.totalEarnings) || 0,
-      "Total Deductions": Number(item.payroll.deductions?.totalDeductions) || 0,
-      "Net Salary": Number(item.payroll.netSalary) || 0,
-      Total: item.total,
-      Paid: item.paid,
-      Balance: item.balance,
-      "Calendar Days": att.calendarDays ?? att.daysInMonth ?? "",
-      "Working Days": att.workingDays ?? "",
-      "Paid Days": att.paidDays ?? "",
-      "LOP Days": att.lopDays ?? "",
-      "Manual Attendance": att.manualEntry ? "Yes" : "No",
-      "Paid On": item.payroll.paidOn ? new Date(item.payroll.paidOn).toLocaleDateString("en-IN") : "",
-      Remarks: item.payroll.remarks || "",
-    };
-
-    item.earnings.forEach(({ label, amount }) => {
-      row[`Earning - ${label}`] = Number(amount) || 0;
-    });
-    item.deductions.forEach(({ label, amount }) => {
-      row[`Deduction - ${label}`] = Number(amount) || 0;
-    });
-    item.employerContribution.forEach(({ label, amount }) => {
-      row[`Employer Contribution - ${label}`] = Number(amount) || 0;
-    });
-
-    return row;
-  });
-
-  const worksheet = XLSX.utils.json_to_sheet(rows, { header: headers });
-  worksheet["!cols"] = headers.map((header) => {
-    const maxLen = rows.reduce((max, row) => {
-      const value = row[header];
-      return Math.max(max, String(value ?? "").length);
-    }, header.length);
-    return { wch: Math.min(Math.max(maxLen + 2, 12), 28) };
-  });
-  worksheet["!freeze"] = { xSplit: 0, ySplit: 1 };
-
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Payroll Records");
-  XLSX.writeFile(workbook, createPayrollExportFileName(filters));
 }
 
 function PrimaryButton({ children, loading, ...rest }) {
@@ -1908,6 +1741,109 @@ function ConfirmDialog({ open, title, message, confirmLabel = "Delete", onConfir
   );
 }
 
+// Computes what's actually been paid and what's still outstanding for a
+// payroll record. A record only counts as "Paid" once its status is paid;
+// generated/approved/on_hold records are fully outstanding.
+function getPaidAndBalance(p) {
+  const total = Number(p.netSalary) || 0;
+  const paid = p.status === "paid" ? total : 0;
+  const balance = total - paid;
+  return { total, paid, balance };
+}
+
+// Builds one export row per payroll record with every earning / deduction /
+// employer-contribution component as its own column. The column set is the
+// union across ALL records, so employees whose components differ still line
+// up correctly (missing components show as blank instead of breaking the
+// sheet). Reuses getPayslipLineItems() so the export never drifts out of
+// sync with what the payslip itself shows.
+function buildPayrollExportRows(payrolls, directory) {
+  const perRecord = payrolls.map((p) => {
+    const { earnings, deductions, employerContribution } = getPayslipLineItems(p);
+    const { total, paid, balance } = getPaidAndBalance(p);
+    const snap = p.employeeSnapshot || {};
+    const person = directory.byId.get(String(p.employee));
+    return {
+      p,
+      name: snap.name || person?.name || resolveName(directory, p.employee, p.employeeModel),
+      employeeId: snap.employeeId || person?.empid || "—",
+      department: departmentLabel(snap.department || person?.department || "—"),
+      designation: snap.designation || person?.designation || "—",
+      earnMap: Object.fromEntries(earnings.map((e) => [e.label, e.amount])),
+      dedMap: Object.fromEntries(deductions.map((d) => [d.label, d.amount])),
+      empMap: Object.fromEntries(employerContribution.map((c) => [c.label, c.amount])),
+      earnings, deductions, employerContribution,
+      total, paid, balance,
+    };
+  });
+
+  const earningKeys = [...new Set(perRecord.flatMap((r) => r.earnings.map((e) => e.label)))];
+  const deductionKeys = [...new Set(perRecord.flatMap((r) => r.deductions.map((d) => d.label)))];
+  const employerKeys = [...new Set(perRecord.flatMap((r) => r.employerContribution.map((c) => c.label)))];
+
+  const header = [
+    "Employee", "Employee ID", "Department", "Designation", "Month", "Year", "Status",
+    ...earningKeys.map((k) => `Earning: ${k}`),
+    "Gross Earnings",
+    ...deductionKeys.map((k) => `Deduction: ${k}`),
+    "Total Deductions",
+    ...employerKeys.map((k) => `Employer: ${k}`),
+    "Total", "Paid", "Balance",
+  ];
+
+  const rows = perRecord.map((r) => [
+    r.name, r.employeeId, r.department, r.designation,
+    MONTH_NAMES[r.p.month - 1], r.p.year, r.p.status,
+    ...earningKeys.map((k) => r.earnMap[k] ?? ""),
+    r.p.earnings?.totalEarnings ?? "",
+    ...deductionKeys.map((k) => r.dedMap[k] ?? ""),
+    r.p.deductions?.totalDeductions ?? "",
+    ...employerKeys.map((k) => r.empMap[k] ?? ""),
+    r.total, r.paid, r.balance,
+  ]);
+
+  // Grand-total row: sums every amount column across all filtered records.
+  // Only added to the CSV, not shown in the on-screen table.
+  const sumOf = (fn) => perRecord.reduce((s, r) => s + (Number(fn(r)) || 0), 0);
+  const totalsRow = [
+    "TOTAL", "", "", "", "", "", "",
+    ...earningKeys.map((k) => sumOf((r) => r.earnMap[k])),
+    sumOf((r) => r.p.earnings?.totalEarnings),
+    ...deductionKeys.map((k) => sumOf((r) => r.dedMap[k])),
+    sumOf((r) => r.p.deductions?.totalDeductions),
+    ...employerKeys.map((k) => sumOf((r) => r.empMap[k])),
+    sumOf((r) => r.total), sumOf((r) => r.paid), sumOf((r) => r.balance),
+  ];
+
+  return [header, ...rows, totalsRow];
+}
+
+// Escapes one CSV cell: wraps in quotes (and doubles any embedded quotes)
+// only when the value contains a comma, quote, or newline.
+function csvEscape(val) {
+  const s = String(val ?? "");
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+// Builds the full payroll sheet CSV (every component as its own column)
+// and triggers a browser download. No extra library needed — CSV opens
+// directly in Excel/Google Sheets.
+function exportPayrollCSV(payrolls, directory) {
+  const table = buildPayrollExportRows(payrolls, directory);
+  const csv = table.map((row) => row.map(csvEscape).join(",")).join("\r\n");
+  // UTF-8 BOM so Excel renders ₹ / non-ASCII names correctly.
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `Payroll Sheet - ${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
 function RecordsTab({ notify, directory }) {
   const now = new Date();
   const [filters, setFilters] = useState({ month: "", year: String(now.getFullYear()), employeeModel: "", status: "" });
@@ -1920,8 +1856,25 @@ function RecordsTab({ notify, directory }) {
   const { mutate: updateStatus } = useUpdatePayrollStatus();
   const { mutate: removePayroll } = useDeletePayroll();
   const [selected, setSelected] = useState(null);
+  const [confirmTarget, setConfirmTarget] = useState(null);
 
   const payrolls = data?.payrolls || [];
+
+  // Aggregate Total / Paid / Balance across whatever is currently filtered.
+  // Recomputes automatically whenever `payrolls` changes (i.e. whenever the
+  // filters above change and useListPayrolls refetches).
+  const summary = useMemo(() => {
+    return payrolls.reduce(
+      (acc, p) => {
+        const { total, paid, balance } = getPaidAndBalance(p);
+        acc.total += total;
+        acc.paid += paid;
+        acc.balance += balance;
+        return acc;
+      },
+      { total: 0, paid: 0, balance: 0 }
+    );
+  }, [payrolls]);
 
   const handleStatus = (id, status) => {
     updateStatus(
@@ -1931,6 +1884,21 @@ function RecordsTab({ notify, directory }) {
         onError: (err) => notify(getErrorMessage(err), "error"),
       }
     );
+  };
+
+  const handleDelete = (p) => {
+    if (p.status !== "generated") return;
+    setConfirmTarget(p);
+  };
+
+  const confirmDelete = () => {
+    if (!confirmTarget) return;
+    const id = confirmTarget._id;
+    setConfirmTarget(null);
+    removePayroll(id, {
+      onSuccess: () => notify("Payroll record deleted", "success"),
+      onError: (err) => notify(getErrorMessage(err), "error"),
+    });
   };
 
   return (
@@ -1954,9 +1922,16 @@ function RecordsTab({ notify, directory }) {
             <option value="paid">Paid</option>
             <option value="on_hold">On Hold</option>
           </Select>
-          <PrimaryButton onClick={handleExport} loading={exporting} disabled={isLoading || !payrolls.length}>
-            Export Payroll
-          </PrimaryButton>
+          <button
+           className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all w-auto ml-auto"
+            style={{ borderColor: "#085041", color: "#085041", background: "transparent", opacity: payrolls.length === 0 ? 0.5 : 1, cursor: payrolls.length === 0 ? "not-allowed" : "pointer" }}
+            onMouseEnter={(e) => { if (payrolls.length === 0) return; e.currentTarget.style.background = "#085041"; e.currentTarget.style.color = "#fff"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#085041"; }}
+            onClick={() => exportPayrollCSV(payrolls, directory)}
+            disabled={payrolls.length === 0}
+          >
+            <FaFileExcel size={12} /><span>Export CSV</span>
+          </button>
         </div>
       }
     >
@@ -1965,6 +1940,21 @@ function RecordsTab({ notify, directory }) {
       ) : payrolls.length === 0 ? (
         <p style={{ color: C.muted, fontSize: 13 }}>No payroll records found for these filters.</p>
       ) : (
+        <>
+        <div className="flex gap-3 flex-wrap" style={{ marginBottom: 16 }}>
+          <div style={{ flex: "1 1 160px", background: C.brandLight, borderRadius: 10, padding: "12px 14px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>Total ({payrolls.length} record{payrolls.length === 1 ? "" : "s"})</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: C.brandDark, marginTop: 2 }}>{fmtINR(summary.total)}</div>
+          </div>
+          <div style={{ flex: "1 1 160px", background: C.greenBg, borderRadius: 10, padding: "12px 14px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>Paid</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: C.green, marginTop: 2 }}>{fmtINR(summary.paid)}</div>
+          </div>
+          <div style={{ flex: "1 1 160px", background: summary.balance > 0 ? C.redBg : C.blueBg, borderRadius: 10, padding: "12px 14px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>Balance</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: summary.balance > 0 ? C.red : C.blue, marginTop: 2 }}>{fmtINR(summary.balance)}</div>
+          </div>
+        </div>
         <div className="overflow-x-auto overscroll-x-contain -mx-1">
           <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 1020 }}>
             <thead>
@@ -1979,16 +1969,20 @@ function RecordsTab({ notify, directory }) {
               </tr>
             </thead>
             <tbody>
-              {payrolls.map((p) => {
-                const { total, paid, balance } = getPayrollRecordAmounts(p);
-
-                return (
-                  <tr key={p._id} style={{ borderTop: `1px solid ${C.border}` }}>
+              {payrolls.map((p) => (
+                <tr key={p._id} style={{ borderTop: `1px solid ${C.border}` }}>
                   <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>{resolveName(directory, p.employee, p.employeeModel)}</td>
                   <td style={{ padding: "8px 10px", fontSize: 12.5, color: C.muted }}>{MONTH_NAMES[p.month - 1]} {p.year}</td>
-                  <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 700, color: C.brandDark }}>{fmtINR(total)}</td>
-                  <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 700, color: paid > 0 ? C.green : C.muted }}>{fmtINR(paid)}</td>
-                  <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 700, color: balance > 0 ? C.red : C.green }}>{fmtINR(balance)}</td>
+                  {(() => {
+                    const { total, paid, balance } = getPaidAndBalance(p);
+                    return (
+                      <>
+                        <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 700, color: C.brandDark }}>{fmtINR(total)}</td>
+                        <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.green }}>{fmtINR(paid)}</td>
+                        <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: balance > 0 ? C.red : C.muted }}>{fmtINR(balance)}</td>
+                      </>
+                    );
+                  })()}
                   <td style={{ padding: "8px 10px" }}>{statusBadge(p.status)}</td>
                   <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
                     <GhostButton onClick={() => setSelected(p)} style={{ marginRight: 8 }}>View Payslip</GhostButton>
@@ -2021,12 +2015,12 @@ function RecordsTab({ notify, directory }) {
                       </GhostButton>
                     )}
                   </td>
-                  </tr>
-                );
-              })}
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       <PayslipModal payroll={selected} directory={directory} onClose={() => setSelected(null)} />
