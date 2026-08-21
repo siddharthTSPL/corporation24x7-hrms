@@ -24,11 +24,11 @@ const getOrganisationSnapshot = async (organisation_id) => {
 const getEmployeeSnapshot = async (employeeModel, employeeId) => {
   const Model = EMPLOYEE_MODEL_MAP[employeeModel];
   if (!Model) return { name: "", employeeId: "", department: "", designation: "" };
-  const person = await Model.findById(employeeId).select("f_name l_name uid department designation").lean();
+  const person = await Model.findById(employeeId).select("f_name l_name empid uid department designation").lean();
   if (!person) return { name: "", employeeId: "", department: "", designation: "" };
   return {
     name: `${person.f_name || ""} ${person.l_name || ""}`.trim(),
-    employeeId: person.uid || "",
+    employeeId: person.empid || person.uid || "",
     department: person.department || "",
     designation: person.designation || "",
   };
@@ -443,6 +443,24 @@ const updatePayrollStatus = async (req, res) => {
   res.status(200).json({ success: true, payroll });
 };
 
+// Only a payroll still in "generated" state can be deleted — once it moves to
+// approved/paid/on_hold it's part of the official record and must be reversed
+// via status changes instead, never removed outright.
+const deletePayroll = async (req, res) => {
+  const organisation_id = req.admin.organisation_id;
+  const { id } = req.params;
+
+  const payroll = await Payroll.findOne({ _id: id, organisation_id });
+  if (!payroll) return res.status(404).json({ success: false, message: "Payroll not found" });
+
+  if (payroll.status !== "generated")
+    return res.status(400).json({ success: false, message: "Only payroll records in generated state can be deleted" });
+
+  await Payroll.deleteOne({ _id: id, organisation_id });
+
+  res.status(200).json({ success: true, message: "Payroll record deleted" });
+};
+
 module.exports = {
   setEmployeeCTC,
   reapplyPolicy,
@@ -453,4 +471,5 @@ module.exports = {
   listPayrolls,
   getPayslip,
   updatePayrollStatus,
+  deletePayroll,
 };
