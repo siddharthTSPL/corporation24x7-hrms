@@ -7,7 +7,7 @@ import {
   FaEllipsisV, FaEnvelope, FaPhone, FaBuilding, FaMapMarkerAlt, FaIdCard,
   FaStar, FaUser, FaBriefcase, FaUniversity, FaFileAlt, FaShieldAlt,
   FaToggleOn, FaToggleOff, FaKey, FaBan, FaCheck, FaExclamationTriangle,
-  FaEye, FaEyeSlash,
+  FaEye, FaEyeSlash, FaCalendarAlt,
 } from "react-icons/fa";
 import {
   useAddManager, useAddEmployee, useFindAllManagers, useFindAllManagerswithoutAdmin,
@@ -162,6 +162,15 @@ function generatePassword() {
 }
 
 const numericOnly = (value) => value.replace(/\D/g, "");
+
+const formatDate = (value) => {
+  if (!value || Number.isNaN(new Date(value).getTime())) return null;
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(value));
+};
 
 
 function exportToCSV(data) {
@@ -1207,6 +1216,7 @@ function AccountSummaryDrawer({
                     <InfoRow icon={<FaBriefcase size={10}/>} label="Designation" value={person.designation}/>
                     <InfoRow icon={<FaBuilding size={10}/>} label="Department" value={DEPT_FULL_FORMS[person.department]||person.department}/>
                     <InfoRow icon={<FaMapMarkerAlt size={10}/>} label="Office Location" value={person.office_location}/>
+                    <InfoRow icon={<FaCalendarAlt size={10}/>} label="Date of Joining" value={formatDate(person.date_of_joining || person.createdAt) || "—"}/>
                     <InfoRow icon={<FaUser size={10}/>} label="Gender" value={person.gender?person.gender.charAt(0).toUpperCase()+person.gender.slice(1):null}/>
                     <InfoRow icon={<FaUser size={10}/>} label="Marital Status" value={person.marital_status?person.marital_status.charAt(0).toUpperCase()+person.marital_status.slice(1):null}/>
                     {person.address&&<InfoRow icon={<FaMapMarkerAlt size={10}/>} label="Address" value={[person.address,person.city,person.state,person.pincode].filter(Boolean).join(", ")}/>}
