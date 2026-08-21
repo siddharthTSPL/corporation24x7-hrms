@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, Fragment } from "react";
+import { FaFileExcel } from "react-icons/fa";
 import {
   useGetPayrollPolicy,
   useSetPayrollPolicy,
@@ -15,6 +16,7 @@ import {
   useBulkGeneratePayroll,
   useListPayrolls,
   useUpdatePayrollStatus,
+  useDeletePayroll,
 } from "../../auth/server-state/payroll/payroll.hook";
 import {
   useGetAllEmployee,
@@ -66,6 +68,17 @@ const CALC_TYPES = [
 
 const MODEL_LABEL = { User: "Employee", Manager: "Manager", Admin: "Admin" };
 const MODELS = ["User", "Manager", "Admin"];
+const DEPARTMENT_LABEL = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+};
+function departmentLabel(code) {
+  if (!code || code === "—") return code || "—";
+  return DEPARTMENT_LABEL[code] || code;
+}
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -308,14 +321,16 @@ function useEmployeeDirectory() {
   return useMemo(() => {
     const users = (empData?.users || []).map((e) => ({
       _id: e._id,
-      name: `${e.f_name || ""} ${e.l_name || ""}`.trim() || e.uid,
+      name: `${e.f_name || ""} ${e.l_name || ""}`.trim() || e.empid || e.uid,
       uid: e.uid,
+      empid: e.empid || e.uid,
       model: e.type === "manager" ? "Manager" : "User",
     }));
     const admins = (adminData?.admins || []).map((a) => ({
       _id: a._id,
-      name: `${a.f_name || ""} ${a.l_name || ""}`.trim() || a.uid,
+      name: `${a.f_name || ""} ${a.l_name || ""}`.trim() || a.empid || a.uid,
       uid: a.uid,
+      empid: a.empid || a.uid,
       model: "Admin",
     }));
     const all = [...users, ...admins];
@@ -331,7 +346,7 @@ function useEmployeeDirectory() {
 
 function resolveName(directory, id, fallbackModel) {
   const person = directory.byId.get(String(id));
-  if (person) return `${person.name} (${person.uid})`;
+  if (person) return `${person.name} (${person.empid})`;
   return `${MODEL_LABEL[fallbackModel] || fallbackModel} — ${String(id).slice(-6)}`;
 }
 
@@ -1127,7 +1142,7 @@ function StructuresTab({ notify, directory }) {
           <Field label="Employee">
             <Select value={form.employee} onChange={(e) => setForm((p) => ({ ...p, employee: e.target.value }))} disabled={directory.loading}>
               <option value="">{directory.loading ? "Loading…" : "Select employee"}</option>
-              {people.map((p) => <option key={p._id} value={p._id}>{p.name} ({p.uid})</option>)}
+              {people.map((p) => <option key={p._id} value={p._id}>{p.name} ({p.empid})</option>)}
             </Select>
           </Field>
           <Field label="Fixed Annual CTC (₹)">
@@ -1295,7 +1310,7 @@ function GenerateTab({ notify, directory }) {
             <Field label="Employee">
               <Select value={single.employee} onChange={(e) => setSingle((p) => ({ ...p, employee: e.target.value }))}>
                 <option value="">Select employee</option>
-                {people.map((p) => <option key={p._id} value={p._id}>{p.name} ({p.uid})</option>)}
+                {people.map((p) => <option key={p._id} value={p._id}>{p.name} ({p.empid})</option>)}
               </Select>
             </Field>
             <Field label="Month">
@@ -1489,10 +1504,11 @@ function getPayslipLineItems(payroll) {
   return { earnings, deductions, employerContribution };
 }
 
-// Opens a print-formatted payslip in a new tab and triggers the browser's
-// print dialog, where "Save as PDF" gives a real downloadable file — no
-// extra PDF library/dependency needed.
-function downloadPayslip({ payroll, name, employeeId, department, designation }) {
+// Opens a print-formatted payslip in a new tab (via a Blob URL, not
+// document.write — see note below) and triggers the browser's print
+// dialog, where "Save as PDF" gives a real downloadable file — no extra
+// PDF library/dependency needed.
+function downloadPayslip({ payroll, name, employeeId, department, designation, orgName }) {
   const att = payroll.attendance || {};
   const { earnings, deductions, employerContribution } = getPayslipLineItems(payroll);
   const rowsHtml = (items) => items.map((r) => `<tr><td>${r.label}</td><td class="amt">${fmtINR(r.amount)}</td></tr>`).join("");
@@ -1502,11 +1518,12 @@ function downloadPayslip({ payroll, name, employeeId, department, designation })
 <html>
 <head>
 <meta charset="utf-8" />
-<title>Payslip - ${name} - ${period}</title>
+<title>${orgName ? orgName + " - " : ""}Payslip - ${name} - ${period}</title>
 <style>
   * { box-sizing: border-box; }
   body { font-family: Arial, Helvetica, sans-serif; color: #2a1a16; padding: 32px; max-width: 640px; margin: 0 auto; }
   h1 { font-size: 18px; margin: 0 0 4px; }
+  .org { font-size: 14px; font-weight: 700; color: #CD166E; margin: 0 0 2px; }
   .sub { color: #8a7a74; font-size: 12px; margin-bottom: 20px; }
   table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
   th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px; color: #8a7a74; padding: 4px 0; border-bottom: 1px solid #ede5e0; }
@@ -1522,13 +1539,14 @@ function downloadPayslip({ payroll, name, employeeId, department, designation })
 </style>
 </head>
 <body>
+  ${orgName ? `<p class="org">${orgName}</p>` : ""}
   <h1>Payslip</h1>
   <div class="sub">Pay Period: ${period}${payroll.status ? " · " + payroll.status.toUpperCase().replace("_", " ") : ""}</div>
 
   <div class="grid">
     <div><span class="lbl">Employee: </span>${name}</div>
     <div><span class="lbl">Employee ID: </span>${employeeId}</div>
-    <div><span class="lbl">Department: </span>${department}</div>
+    <div><span class="lbl">Department: </span>${departmentLabel(department)}</div>
     <div><span class="lbl">Designation: </span>${designation}</div>
     <div><span class="lbl">Paid Days: </span>${att.paidDays ?? "—"} / ${att.workingDays ?? "—"}</div>
     <div><span class="lbl">LOP Days: </span>${att.lopDays ?? "—"}</div>
@@ -1559,19 +1577,37 @@ function downloadPayslip({ payroll, name, employeeId, department, designation })
 </body>
 </html>`;
 
-  const win = window.open("", "_blank");
-  if (!win) return;
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
+  // Open via a Blob URL rather than window.open("") + document.write().
+  // The write-into-blank-tab approach breaks (leaves an empty "about:blank"
+  // tab) on browsers that enforce Cross-Origin-Opener-Policy, which severs
+  // the reference to the new tab right after it opens. A Blob URL is a real,
+  // same-document navigation target, so it always renders.
+  const blob = new Blob([html], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, "_blank");
+
+  if (!win) {
+    // Popup blocked entirely — fall back to a direct file download so the
+    // person still gets their payslip.
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Payslip - ${name} - ${period}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // Release the blob once the tab/download has had time to load it.
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 function PayslipModal({ payroll, directory, onClose }) {
   if (!payroll) return null;
+  const orgName = payroll.organisationSnapshot?.name || "";
   const snap = payroll.employeeSnapshot || {};
   const person = directory.byId.get(String(payroll.employee));
   const name = snap.name || person?.name || resolveName(directory, payroll.employee, payroll.employeeModel);
-  const employeeId = snap.employeeId || person?.uid || "—";
+  const employeeId = snap.employeeId || person?.empid || "—";
   const department = snap.department || "—";
   const designation = snap.designation || "—";
   const att = payroll.attendance || {};
@@ -1585,10 +1621,13 @@ function PayslipModal({ payroll, directory, onClose }) {
         style={{ background: "#fff", borderRadius: 14, maxWidth: 520, width: "100%", maxHeight: "88vh", overflowY: "auto" }}
       >
         <div className="flex items-center justify-between mb-3 gap-3">
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: C.text }}>Payslip</h3>
+          <div>
+            {orgName && <p style={{ margin: "0 0 2px", fontSize: 13, fontWeight: 700, color: C.brand }}>{orgName}</p>}
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: C.text }}>Payslip</h3>
+          </div>
           <div className="flex items-center gap-2">
             {payroll.status === "paid" && (
-              <GhostButton onClick={() => downloadPayslip({ payroll, name, employeeId, department, designation })}>
+              <GhostButton onClick={() => downloadPayslip({ payroll, name, employeeId, department, designation, orgName })}>
                 Download
               </GhostButton>
             )}
@@ -1600,7 +1639,7 @@ function PayslipModal({ payroll, directory, onClose }) {
         <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1.5 mb-3 pb-3" style={{ borderBottom: `1px dashed ${C.border}` }}>
           <PayslipRow label="Employee" value={<span className="break-words">{name}</span>} />
           <PayslipRow label="Employee ID" value={employeeId} />
-          <PayslipRow label="Department" value={department} />
+          <PayslipRow label="Department" value={departmentLabel(department)} />
           <PayslipRow label="Designation" value={designation} />
           <PayslipRow label="Pay Period" value={<span className="flex items-center gap-2 justify-end flex-wrap">{MONTH_NAMES[payroll.month - 1]} {payroll.year} {statusBadge(payroll.status)}</span>} />
         </div>
@@ -1656,6 +1695,155 @@ function PayslipModal({ payroll, directory, onClose }) {
   );
 }
 
+function ConfirmDialog({ open, title, message, confirmLabel = "Delete", onConfirm, onCancel }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[999] flex items-center justify-center p-3 sm:p-4" style={{ background: "rgba(0,0,0,0.45)" }} onClick={onCancel}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="p-5 sm:p-6"
+        style={{ background: "#fff", borderRadius: 16, maxWidth: 380, width: "100%", textAlign: "center" }}
+      >
+        <div
+          style={{
+            width: 48, height: 48, borderRadius: "50%", margin: "0 auto 14px",
+            background: C.redBg, display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M4 7h16M9 7V4h6v3m1 0l-.8 12.4A2 2 0 0114.2 21H9.8a2 2 0 01-2-1.6L7 7" stroke={C.red} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <h3 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 700, color: C.text }}>{title}</h3>
+        <p style={{ margin: "0 0 20px", fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{message}</p>
+        <div className="flex gap-2.5">
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1, padding: "10px 14px", borderRadius: 10, border: `1px solid ${C.border}`,
+              background: "#fff", color: C.text, fontSize: 13.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            style={{
+              flex: 1, padding: "10px 14px", borderRadius: 10, border: "none",
+              background: C.red, color: "#fff", fontSize: 13.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Computes what's actually been paid and what's still outstanding for a
+// payroll record. A record only counts as "Paid" once its status is paid;
+// generated/approved/on_hold records are fully outstanding.
+function getPaidAndBalance(p) {
+  const total = Number(p.netSalary) || 0;
+  const paid = p.status === "paid" ? total : 0;
+  const balance = total - paid;
+  return { total, paid, balance };
+}
+
+// Builds one export row per payroll record with every earning / deduction /
+// employer-contribution component as its own column. The column set is the
+// union across ALL records, so employees whose components differ still line
+// up correctly (missing components show as blank instead of breaking the
+// sheet). Reuses getPayslipLineItems() so the export never drifts out of
+// sync with what the payslip itself shows.
+function buildPayrollExportRows(payrolls, directory) {
+  const perRecord = payrolls.map((p) => {
+    const { earnings, deductions, employerContribution } = getPayslipLineItems(p);
+    const { total, paid, balance } = getPaidAndBalance(p);
+    const snap = p.employeeSnapshot || {};
+    const person = directory.byId.get(String(p.employee));
+    return {
+      p,
+      name: snap.name || person?.name || resolveName(directory, p.employee, p.employeeModel),
+      employeeId: snap.employeeId || person?.empid || "—",
+      department: departmentLabel(snap.department || person?.department || "—"),
+      designation: snap.designation || person?.designation || "—",
+      earnMap: Object.fromEntries(earnings.map((e) => [e.label, e.amount])),
+      dedMap: Object.fromEntries(deductions.map((d) => [d.label, d.amount])),
+      empMap: Object.fromEntries(employerContribution.map((c) => [c.label, c.amount])),
+      earnings, deductions, employerContribution,
+      total, paid, balance,
+    };
+  });
+
+  const earningKeys = [...new Set(perRecord.flatMap((r) => r.earnings.map((e) => e.label)))];
+  const deductionKeys = [...new Set(perRecord.flatMap((r) => r.deductions.map((d) => d.label)))];
+  const employerKeys = [...new Set(perRecord.flatMap((r) => r.employerContribution.map((c) => c.label)))];
+
+  const header = [
+    "Employee", "Employee ID", "Department", "Designation", "Month", "Year", "Status",
+    ...earningKeys.map((k) => `Earning: ${k}`),
+    "Gross Earnings",
+    ...deductionKeys.map((k) => `Deduction: ${k}`),
+    "Total Deductions",
+    ...employerKeys.map((k) => `Employer: ${k}`),
+    "Total", "Paid", "Balance",
+  ];
+
+  const rows = perRecord.map((r) => [
+    r.name, r.employeeId, r.department, r.designation,
+    MONTH_NAMES[r.p.month - 1], r.p.year, r.p.status,
+    ...earningKeys.map((k) => r.earnMap[k] ?? ""),
+    r.p.earnings?.totalEarnings ?? "",
+    ...deductionKeys.map((k) => r.dedMap[k] ?? ""),
+    r.p.deductions?.totalDeductions ?? "",
+    ...employerKeys.map((k) => r.empMap[k] ?? ""),
+    r.total, r.paid, r.balance,
+  ]);
+
+  // Grand-total row: sums every amount column across all filtered records.
+  // Only added to the CSV, not shown in the on-screen table.
+  const sumOf = (fn) => perRecord.reduce((s, r) => s + (Number(fn(r)) || 0), 0);
+  const totalsRow = [
+    "TOTAL", "", "", "", "", "", "",
+    ...earningKeys.map((k) => sumOf((r) => r.earnMap[k])),
+    sumOf((r) => r.p.earnings?.totalEarnings),
+    ...deductionKeys.map((k) => sumOf((r) => r.dedMap[k])),
+    sumOf((r) => r.p.deductions?.totalDeductions),
+    ...employerKeys.map((k) => sumOf((r) => r.empMap[k])),
+    sumOf((r) => r.total), sumOf((r) => r.paid), sumOf((r) => r.balance),
+  ];
+
+  return [header, ...rows, totalsRow];
+}
+
+// Escapes one CSV cell: wraps in quotes (and doubles any embedded quotes)
+// only when the value contains a comma, quote, or newline.
+function csvEscape(val) {
+  const s = String(val ?? "");
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+// Builds the full payroll sheet CSV (every component as its own column)
+// and triggers a browser download. No extra library needed — CSV opens
+// directly in Excel/Google Sheets.
+function exportPayrollCSV(payrolls, directory) {
+  const table = buildPayrollExportRows(payrolls, directory);
+  const csv = table.map((row) => row.map(csvEscape).join(",")).join("\r\n");
+  // UTF-8 BOM so Excel renders ₹ / non-ASCII names correctly.
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `Payroll Sheet - ${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
 function RecordsTab({ notify, directory }) {
   const now = new Date();
   const [filters, setFilters] = useState({ month: "", year: String(now.getFullYear()), employeeModel: "", status: "" });
@@ -1666,9 +1854,27 @@ function RecordsTab({ notify, directory }) {
     status: filters.status || undefined,
   });
   const { mutate: updateStatus } = useUpdatePayrollStatus();
+  const { mutate: removePayroll } = useDeletePayroll();
   const [selected, setSelected] = useState(null);
+  const [confirmTarget, setConfirmTarget] = useState(null);
 
   const payrolls = data?.payrolls || [];
+
+  // Aggregate Total / Paid / Balance across whatever is currently filtered.
+  // Recomputes automatically whenever `payrolls` changes (i.e. whenever the
+  // filters above change and useListPayrolls refetches).
+  const summary = useMemo(() => {
+    return payrolls.reduce(
+      (acc, p) => {
+        const { total, paid, balance } = getPaidAndBalance(p);
+        acc.total += total;
+        acc.paid += paid;
+        acc.balance += balance;
+        return acc;
+      },
+      { total: 0, paid: 0, balance: 0 }
+    );
+  }, [payrolls]);
 
   const handleStatus = (id, status) => {
     updateStatus(
@@ -1678,6 +1884,21 @@ function RecordsTab({ notify, directory }) {
         onError: (err) => notify(getErrorMessage(err), "error"),
       }
     );
+  };
+
+  const handleDelete = (p) => {
+    if (p.status !== "generated") return;
+    setConfirmTarget(p);
+  };
+
+  const confirmDelete = () => {
+    if (!confirmTarget) return;
+    const id = confirmTarget._id;
+    setConfirmTarget(null);
+    removePayroll(id, {
+      onSuccess: () => notify("Payroll record deleted", "success"),
+      onError: (err) => notify(getErrorMessage(err), "error"),
+    });
   };
 
   return (
@@ -1701,6 +1922,16 @@ function RecordsTab({ notify, directory }) {
             <option value="paid">Paid</option>
             <option value="on_hold">On Hold</option>
           </Select>
+          <button
+           className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all w-auto ml-auto"
+            style={{ borderColor: "#085041", color: "#085041", background: "transparent", opacity: payrolls.length === 0 ? 0.5 : 1, cursor: payrolls.length === 0 ? "not-allowed" : "pointer" }}
+            onMouseEnter={(e) => { if (payrolls.length === 0) return; e.currentTarget.style.background = "#085041"; e.currentTarget.style.color = "#fff"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#085041"; }}
+            onClick={() => exportPayrollCSV(payrolls, directory)}
+            disabled={payrolls.length === 0}
+          >
+            <FaFileExcel size={12} /><span>Export CSV</span>
+          </button>
         </div>
       }
     >
@@ -1709,13 +1940,30 @@ function RecordsTab({ notify, directory }) {
       ) : payrolls.length === 0 ? (
         <p style={{ color: C.muted, fontSize: 13 }}>No payroll records found for these filters.</p>
       ) : (
+        <>
+        <div className="flex gap-3 flex-wrap" style={{ marginBottom: 16 }}>
+          <div style={{ flex: "1 1 160px", background: C.brandLight, borderRadius: 10, padding: "12px 14px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>Total ({payrolls.length} record{payrolls.length === 1 ? "" : "s"})</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: C.brandDark, marginTop: 2 }}>{fmtINR(summary.total)}</div>
+          </div>
+          <div style={{ flex: "1 1 160px", background: C.greenBg, borderRadius: 10, padding: "12px 14px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>Paid</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: C.green, marginTop: 2 }}>{fmtINR(summary.paid)}</div>
+          </div>
+          <div style={{ flex: "1 1 160px", background: summary.balance > 0 ? C.redBg : C.blueBg, borderRadius: 10, padding: "12px 14px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>Balance</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: summary.balance > 0 ? C.red : C.blue, marginTop: 2 }}>{fmtINR(summary.balance)}</div>
+          </div>
+        </div>
         <div className="overflow-x-auto overscroll-x-contain -mx-1">
-          <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 820 }}>
+          <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 1020 }}>
             <thead>
               <tr style={{ textAlign: "left", fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>
                 <th style={{ padding: "6px 10px" }}>Employee</th>
                 <th style={{ padding: "6px 10px" }}>Period</th>
-                <th style={{ padding: "6px 10px" }}>Net Salary</th>
+                <th style={{ padding: "6px 10px" }}>Total</th>
+                <th style={{ padding: "6px 10px" }}>Paid</th>
+                <th style={{ padding: "6px 10px" }}>Balance</th>
                 <th style={{ padding: "6px 10px" }}>Status</th>
                 <th style={{ padding: "6px 10px" }}></th>
               </tr>
@@ -1725,7 +1973,16 @@ function RecordsTab({ notify, directory }) {
                 <tr key={p._id} style={{ borderTop: `1px solid ${C.border}` }}>
                   <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>{resolveName(directory, p.employee, p.employeeModel)}</td>
                   <td style={{ padding: "8px 10px", fontSize: 12.5, color: C.muted }}>{MONTH_NAMES[p.month - 1]} {p.year}</td>
-                  <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 700, color: C.brandDark }}>{fmtINR(p.netSalary)}</td>
+                  {(() => {
+                    const { total, paid, balance } = getPaidAndBalance(p);
+                    return (
+                      <>
+                        <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 700, color: C.brandDark }}>{fmtINR(total)}</td>
+                        <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.green }}>{fmtINR(paid)}</td>
+                        <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: balance > 0 ? C.red : C.muted }}>{fmtINR(balance)}</td>
+                      </>
+                    );
+                  })()}
                   <td style={{ padding: "8px 10px" }}>{statusBadge(p.status)}</td>
                   <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
                     <GhostButton onClick={() => setSelected(p)} style={{ marginRight: 8 }}>View Payslip</GhostButton>
@@ -1737,9 +1994,10 @@ function RecordsTab({ notify, directory }) {
                           downloadPayslip({
                             payroll: p,
                             name: snap.name || person?.name || resolveName(directory, p.employee, p.employeeModel),
-                            employeeId: snap.employeeId || person?.uid || "—",
+                            employeeId: snap.employeeId || person?.empid || "—",
                             department: snap.department || "—",
                             designation: snap.designation || "—",
+                            orgName: p.organisationSnapshot?.name || "",
                           });
                         }}
                         style={{ marginRight: 8 }}
@@ -1749,17 +2007,34 @@ function RecordsTab({ notify, directory }) {
                     )}
                     {p.status === "generated" && <GhostButton onClick={() => handleStatus(p._id, "approved")} style={{ marginRight: 8 }}>Approve</GhostButton>}
                     {p.status === "approved" && <GhostButton onClick={() => handleStatus(p._id, "paid")} style={{ marginRight: 8 }}>Mark Paid</GhostButton>}
-                    {p.status !== "on_hold" && p.status !== "paid" && <GhostButton onClick={() => handleStatus(p._id, "on_hold")}>Hold</GhostButton>}
-                    {p.status === "on_hold" && <GhostButton onClick={() => handleStatus(p._id, "approved")}>Resume</GhostButton>}
+                    {p.status !== "on_hold" && p.status !== "paid" && <GhostButton onClick={() => handleStatus(p._id, "on_hold")} style={{ marginRight: 8 }}>Hold</GhostButton>}
+                    {p.status === "on_hold" && <GhostButton onClick={() => handleStatus(p._id, "approved")} style={{ marginRight: 8 }}>Resume</GhostButton>}
+                    {p.status === "generated" && (
+                      <GhostButton onClick={() => handleDelete(p)} style={{ color: C.red, borderColor: C.red }}>
+                        Delete
+                      </GhostButton>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       <PayslipModal payroll={selected} directory={directory} onClose={() => setSelected(null)} />
+      <ConfirmDialog
+        open={Boolean(confirmTarget)}
+        title="Delete this payroll record?"
+        message={
+          confirmTarget
+            ? `This will permanently delete the ${MONTH_NAMES[confirmTarget.month - 1]} ${confirmTarget.year} payroll for ${resolveName(directory, confirmTarget.employee, confirmTarget.employeeModel)}. This cannot be undone.`
+            : ""
+        }
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirmTarget(null)}
+      />
     </Card>
   );
 }
@@ -1873,4 +2148,5 @@ export default function Payroll() {
       </div>
     </div>
   );
+  
 }

@@ -4,10 +4,19 @@ const AttendanceSummary = require("../Models/attendancesummary.model");
 const User = require("../Models/user.model");
 const Manager = require("../Models/manager.model");
 const Admin = require("../Models/Admin.model");
+const SuperAdmin = require("../Models/superadmin.model");
 const { getOrCreatePolicy } = require("./payrollpolicy.controller");
 const { calculateSalaryBreakup, calculatePayrollForMonth } = require("../utils/payroll.utils");
 
 const EMPLOYEE_MODEL_MAP = { User, Manager, Admin };
+
+// Snapshot of the org's display name, taken at generation time, so the
+// payslip keeps reading correctly even if the org is renamed later.
+// Never throws — a missing org just prints blank.
+const getOrganisationSnapshot = async (organisation_id) => {
+  const org = await SuperAdmin.findById(organisation_id).select("organisation_name").lean();
+  return { name: org?.organisation_name || "" };
+};
 
 // Small snapshot of who this payslip belongs to, taken at generation time,
 // so the payslip keeps reading correctly even if department/designation
@@ -15,11 +24,11 @@ const EMPLOYEE_MODEL_MAP = { User, Manager, Admin };
 const getEmployeeSnapshot = async (employeeModel, employeeId) => {
   const Model = EMPLOYEE_MODEL_MAP[employeeModel];
   if (!Model) return { name: "", employeeId: "", department: "", designation: "" };
-  const person = await Model.findById(employeeId).select("f_name l_name uid department designation").lean();
+  const person = await Model.findById(employeeId).select("f_name l_name empid uid department designation").lean();
   if (!person) return { name: "", employeeId: "", department: "", designation: "" };
   return {
     name: `${person.f_name || ""} ${person.l_name || ""}`.trim(),
-    employeeId: person.uid || "",
+    employeeId: person.empid || person.uid || "",
     department: person.department || "",
     designation: person.designation || "",
   };
@@ -218,6 +227,7 @@ const generatePayroll = async (req, res) => {
   });
 
   const employeeSnapshot = await getEmployeeSnapshot(employeeModel, employee);
+  const organisationSnapshot = await getOrganisationSnapshot(organisation_id);
 
   const payroll = await Payroll.findOneAndUpdate(
     { employee, month: Number(month), year: Number(year) },
@@ -226,6 +236,7 @@ const generatePayroll = async (req, res) => {
         organisation_id,
         employeeModel,
         employeeSnapshot,
+        organisationSnapshot,
         ctc: structure.ctc,
         ...result,
         policySnapshot: structure.policySnapshot,
@@ -283,6 +294,7 @@ const bulkGeneratePayroll = async (req, res) => {
 
   const policy = await getOrCreatePolicy(organisation_id);
   const role = model === "User" ? "employee" : model.toLowerCase();
+  const organisationSnapshot = await getOrganisationSnapshot(organisation_id);
 
   const employeeIds = structures.map((s) => s.employee);
   const summaries = await AttendanceSummary.find({
@@ -339,6 +351,7 @@ const bulkGeneratePayroll = async (req, res) => {
             organisation_id,
             employeeModel: model,
             employeeSnapshot,
+            organisationSnapshot,
             ctc: structure.ctc,
             ...result,
             policySnapshot: structure.policySnapshot,
@@ -377,6 +390,17 @@ const listPayrolls = async (req, res) => {
   if (status) filter.status = status;
 
   const payrolls = await Payroll.find(filter).sort({ year: -1, month: -1 }).lean();
+
+  // Backfill organisationSnapshot for records generated before this field
+  // existed, so older payslips also show the org name without needing to
+  // be regenerated.
+  if (payrolls.some((p) => !p.organisationSnapshot?.name)) {
+    const organisationSnapshot = await getOrganisationSnapshot(organisation_id);
+    for (const p of payrolls) {
+      if (!p.organisationSnapshot?.name) p.organisationSnapshot = organisationSnapshot;
+    }
+  }
+
   res.status(200).json({ success: true, count: payrolls.length, payrolls });
 };
 
@@ -389,6 +413,11 @@ const getPayslip = async (req, res) => {
 
   const payslip = await Payroll.findOne({ organisation_id, employee, month: Number(month), year: Number(year) }).lean();
   if (!payslip) return res.status(404).json({ success: false, message: "Payslip not found for this period" });
+
+  // Backfill for records generated before organisationSnapshot existed.
+  if (!payslip.organisationSnapshot?.name) {
+    payslip.organisationSnapshot = await getOrganisationSnapshot(organisation_id);
+  }
 
   res.status(200).json({ success: true, payslip });
 };
@@ -414,6 +443,24 @@ const updatePayrollStatus = async (req, res) => {
   res.status(200).json({ success: true, payroll });
 };
 
+// Only a payroll still in "generated" state can be deleted — once it moves to
+// approved/paid/on_hold it's part of the official record and must be reversed
+// via status changes instead, never removed outright.
+const deletePayroll = async (req, res) => {
+  const organisation_id = req.admin.organisation_id;
+  const { id } = req.params;
+
+  const payroll = await Payroll.findOne({ _id: id, organisation_id });
+  if (!payroll) return res.status(404).json({ success: false, message: "Payroll not found" });
+
+  if (payroll.status !== "generated")
+    return res.status(400).json({ success: false, message: "Only payroll records in generated state can be deleted" });
+
+  await Payroll.deleteOne({ _id: id, organisation_id });
+
+  res.status(200).json({ success: true, message: "Payroll record deleted" });
+};
+
 module.exports = {
   setEmployeeCTC,
   reapplyPolicy,
@@ -424,4 +471,5 @@ module.exports = {
   listPayrolls,
   getPayslip,
   updatePayrollStatus,
+  deletePayroll,
 };

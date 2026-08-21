@@ -17,6 +17,7 @@ import {
   listPayrolls,
   getPayslip,
   updatePayrollStatus,
+  deletePayroll,
 } from "../../api/payroll/payroll.api";
 
 // ── Policy ───────────────────────────────────────────────────────────────────
@@ -191,6 +192,16 @@ export const useUpdatePayrollStatus = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, status }) => updatePayrollStatus(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payrolls"] });
+    },
+  });
+};
+
+export const useDeletePayroll = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => deletePayroll(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payrolls"] });
     },

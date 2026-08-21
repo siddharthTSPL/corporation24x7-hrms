@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
+import { downloadCsv } from "../dashboard/Exportcsv";
 
 // ---------------------------------------------------------------------------
 // Shared design tokens — mirrors pages/payroll/Payroll.jsx so this module
@@ -60,6 +61,234 @@ function getErrorMessage(e) {
   return e?.response?.data?.message || e?.message || "Something went wrong";
 }
 
+function fmtDateTime(d) {
+  if (!d) return "";
+  return new Date(d).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function claimAmountSummary(claims) {
+  const totals = claims.reduce((acc, claim) => {
+    const currency = claim?.currency || "INR";
+    acc[currency] = (acc[currency] || 0) + (Number(claim?.amountClaimed) || 0);
+    return acc;
+  }, {});
+  const entries = Object.entries(totals);
+  if (!entries.length) return fmtMoney(0, "INR");
+  return entries.map(([currency, amount]) => fmtMoney(amount, currency)).join(" + ");
+}
+
+const CLAIM_CSV_COLUMNS = [
+  { key: "claimNumber", label: "Claim Number" },
+  { key: "employeeName", label: "Employee" },
+  { key: "empid", label: "Employee ID" },
+  { key: "submitterModel", label: "Submitted By Role" },
+  { key: "department", label: "Department" },
+  { key: "designation", label: "Designation" },
+  { key: "reimbursementType", label: "Reimbursement Type" },
+  { key: "expenseDate", label: "Expense Date" },
+  { key: "amountClaimed", label: "Amount Claimed" },
+  { key: "currency", label: "Currency" },
+  { key: "project", label: "Project / Client" },
+  { key: "costCenter", label: "Cost Center" },
+  { key: "paymentMethod", label: "Payment Method" },
+  { key: "statusLabel", label: "Status" },
+  { key: "submissionDate", label: "Submitted On" },
+  { key: "approvedAt", label: "Approved On" },
+  { key: "rejectedAt", label: "Rejected On" },
+  { key: "paidAt", label: "Paid On" },
+  { key: "approverComments", label: "Approver Comments" },
+  { key: "rejectionReason", label: "Rejection Reason" },
+  { key: "financeNotes", label: "Finance Notes" },
+  { key: "paymentReference", label: "Payment Reference" },
+  { key: "description", label: "Description" },
+];
+
+function buildClaimCsvRows(claims) {
+  // Sort newest expense first so the exported file reads chronologically —
+  // easier to scan than raw API/insertion order.
+  const sorted = [...claims].sort((a, b) => {
+    const bd = new Date(b.expenseDate || b.createdAt || 0).getTime();
+    const ad = new Date(a.expenseDate || a.createdAt || 0).getTime();
+    return bd - ad;
+  });
+
+  const rows = sorted.map((claim) => ({
+    claimNumber: claim.claimNumber || "",
+    employeeName: claim.employeeName || "",
+    empid: claim.empid || "",
+    submitterModel: claim.submitterModel || "",
+    department: claim.department || "",
+    designation: claim.designation || "",
+    reimbursementType: claim.reimbursementType || "",
+    expenseDate: fmtDate(claim.expenseDate),
+    // Plain number (not a formatted currency string) so the column can be
+    // summed / pivoted directly in Excel/Sheets. Currency lives in its own
+    // column right next to it.
+    amountClaimed: (Number(claim.amountClaimed) || 0).toFixed(2),
+    currency: claim.currency || "INR",
+    project: claim.project || "",
+    costCenter: claim.costCenter || "",
+    paymentMethod: claim.paymentMethod || "",
+    statusLabel: STATUS_META[claim.status]?.label || claim.status || "",
+    submissionDate: fmtDateTime(claim.submissionDate || claim.createdAt),
+    approvedAt: fmtDateTime(claim.approvedAt),
+    rejectedAt: fmtDateTime(claim.rejectedAt),
+    paidAt: fmtDateTime(claim.paidAt),
+    approverComments: claim.approverComments || "",
+    rejectionReason: claim.rejectionReason || "",
+    financeNotes: claim.financeNotes || "",
+    paymentReference: claim.paymentReference || "",
+    description: claim.description || "",
+  }));
+
+  // Trailing totals row(s) — one per currency in the export, so a reader
+  // gets the grand total(s) without having to open a formula bar.
+  const totalsByCurrency = sorted.reduce((acc, claim) => {
+    const currency = claim.currency || "INR";
+    acc[currency] = (acc[currency] || 0) + (Number(claim.amountClaimed) || 0);
+    return acc;
+  }, {});
+
+  Object.entries(totalsByCurrency).forEach(([currency, total]) => {
+    rows.push({
+      claimNumber: "TOTAL",
+      employeeName: "",
+      empid: "",
+      submitterModel: "",
+      department: "",
+      designation: "",
+      reimbursementType: "",
+      expenseDate: "",
+      amountClaimed: total.toFixed(2),
+      currency,
+      project: "",
+      costCenter: "",
+      paymentMethod: "",
+      statusLabel: `${sorted.length} claim${sorted.length === 1 ? "" : "s"}`,
+      submissionDate: "",
+      approvedAt: "",
+      rejectedAt: "",
+      paidAt: "",
+      approverComments: "",
+      rejectionReason: "",
+      financeNotes: "",
+      paymentReference: "",
+      description: "",
+    });
+  });
+
+  return rows;
+}
+
+// ---------------------------------------------------------------------------
+// Filtering / sorting helpers — used by the "Review Queue" and "All Claims"
+// filter bars below. Kept pure so they're easy to unit test / reuse.
+// ---------------------------------------------------------------------------
+const DEFAULT_CLAIM_FILTERS = {
+  search: "",
+  role: "",
+  department: "",
+  designation: "",
+  type: "",
+  paymentMethod: "",
+  currency: "",
+  amountMin: "",
+  amountMax: "",
+  dateFrom: "",
+  dateTo: "",
+  sortBy: "newest", // newest | oldest | amount_desc | amount_asc
+};
+
+// Submitter roles a claim can come from. Kept as a fixed list (rather than
+// deriving purely from the currently loaded claims) so the Role dropdown
+// always offers every possible role, even when the current data set happens
+// to only contain claims from one of them (e.g. Review Queue showing only
+// Manager submissions right now shouldn't hide the Employee/Admin options).
+const SUBMITTER_ROLES = ["Employee", "Manager", "Admin"];
+
+function getUniqueValues(claims, key) {
+  return Array.from(new Set((claims || []).map((c) => c?.[key]).filter(Boolean))).sort((a, b) =>
+    String(a).localeCompare(String(b))
+  );
+}
+
+function sortClaims(claims, sortBy) {
+  const sorted = [...claims];
+  switch (sortBy) {
+    case "oldest":
+      sorted.sort((a, b) => new Date(a.expenseDate || a.createdAt || 0) - new Date(b.expenseDate || b.createdAt || 0));
+      break;
+    case "amount_desc":
+      sorted.sort((a, b) => (Number(b.amountClaimed) || 0) - (Number(a.amountClaimed) || 0));
+      break;
+    case "amount_asc":
+      sorted.sort((a, b) => (Number(a.amountClaimed) || 0) - (Number(b.amountClaimed) || 0));
+      break;
+    case "newest":
+    default:
+      sorted.sort((a, b) => new Date(b.expenseDate || b.createdAt || 0) - new Date(a.expenseDate || a.createdAt || 0));
+  }
+  return sorted;
+}
+
+function applyClaimFilters(claims, filters) {
+  const f = { ...DEFAULT_CLAIM_FILTERS, ...filters };
+  const result = (claims || []).filter((c) => {
+    if (f.search) {
+      const q = f.search.trim().toLowerCase();
+      const hay = `${c.employeeName || ""} ${c.empid || ""} ${c.claimNumber || ""}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (f.role && c.submitterModel !== f.role) return false;
+    if (f.department && c.department !== f.department) return false;
+    if (f.designation && c.designation !== f.designation) return false;
+    if (f.type && c.reimbursementType !== f.type) return false;
+    if (f.paymentMethod && c.paymentMethod !== f.paymentMethod) return false;
+    if (f.currency && (c.currency || "INR") !== f.currency) return false;
+
+    const amount = Number(c.amountClaimed) || 0;
+    if (f.amountMin !== "" && f.amountMin != null && amount < Number(f.amountMin)) return false;
+    if (f.amountMax !== "" && f.amountMax != null && amount > Number(f.amountMax)) return false;
+
+    if (f.dateFrom) {
+      const d = new Date(c.expenseDate);
+      if (isNaN(d) || d < new Date(f.dateFrom)) return false;
+    }
+    if (f.dateTo) {
+      const d = new Date(c.expenseDate);
+      const to = new Date(f.dateTo);
+      to.setHours(23, 59, 59, 999);
+      if (isNaN(d) || d > to) return false;
+    }
+    return true;
+  });
+
+  return sortClaims(result, f.sortBy);
+}
+
+function countActiveClaimFilters(filters) {
+  const f = { ...DEFAULT_CLAIM_FILTERS, ...filters };
+  let n = 0;
+  if (f.search) n++;
+  if (f.role) n++;
+  if (f.department) n++;
+  if (f.designation) n++;
+  if (f.type) n++;
+  if (f.paymentMethod) n++;
+  if (f.currency) n++;
+  if (f.amountMin !== "") n++;
+  if (f.amountMax !== "") n++;
+  if (f.dateFrom) n++;
+  if (f.dateTo) n++;
+  return n;
+}
+
 function Spinner({ size = 16, color = "#fff" }) {
   return (
     <div
@@ -98,7 +327,7 @@ function StatusBadge({ status }) {
   );
 }
 
-function Btn({ children, onClick, variant = "primary", disabled, loading, type = "button", style }) {
+function Btn({ children, onClick, variant = "primary", disabled, loading, type = "button", style, ...rest }) {
   const variants = {
     primary: { background: C.brand, color: "#fff", border: `1px solid ${C.brand}` },
     outline: { background: "#fff", color: C.brand, border: `1px solid ${C.brand}` },
@@ -111,6 +340,7 @@ function Btn({ children, onClick, variant = "primary", disabled, loading, type =
       type={type}
       onClick={onClick}
       disabled={disabled || loading}
+      {...rest}
       style={{
         ...variants[variant],
         padding: "8px 16px",
@@ -198,6 +428,58 @@ function Modal({ title, onClose, children, width = 460 }) {
   );
 }
 
+// Shows already-uploaded attachments as removable chips (used inside the
+// claim form when editing a draft, so a person can swap out or drop a
+// document without re-attaching everything else).
+function AttachmentChipList({ items, color, bg, onRemove }) {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 4 }}>
+      {items.map((item, i) => (
+        <span
+          key={item.fileId || i}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 12,
+            color,
+            background: bg,
+            padding: "4px 6px 4px 10px",
+            borderRadius: 6,
+          }}
+        >
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noreferrer"
+            style={{ color, textDecoration: "none" }}
+            title="Open attachment"
+          >
+            📎 {item.originalName || `File ${i + 1}`}
+          </a>
+          <button
+            type="button"
+            onClick={() => onRemove(item.fileId)}
+            title="Remove attachment"
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color,
+              fontWeight: 700,
+              fontSize: 13,
+              lineHeight: 1,
+              padding: 0,
+            }}
+          >
+            ✕
+          </button>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Apply / Edit claim form
 // ---------------------------------------------------------------------------
@@ -215,6 +497,13 @@ function ClaimForm({ onSubmit, submitting, initial, onCancel, bankDetailsAvailab
   });
   const [receipts, setReceipts] = useState([]);
   const [supportingDocuments, setSupportingDocuments] = useState([]);
+  // Attachments already saved on the claim (only relevant when editing).
+  // Removing one here just marks it for deletion — nothing is sent to the
+  // server until Save/Submit is pressed, so a person can undo a removal.
+  const [existingReceipts, setExistingReceipts] = useState(initial?.receipts || []);
+  const [existingSupportingDocuments, setExistingSupportingDocuments] = useState(
+    initial?.supportingDocuments || [],
+  );
   const [error, setError] = useState("");
 
   const update = (key) => (e) => {
@@ -222,14 +511,36 @@ function ClaimForm({ onSubmit, submitting, initial, onCancel, bankDetailsAvailab
     setForm((f) => ({ ...f, [key]: val }));
   };
 
+  const removeExistingReceipt = (fileId) =>
+    setExistingReceipts((list) => list.filter((r) => r.fileId !== fileId));
+  const removeExistingSupportingDocument = (fileId) =>
+    setExistingSupportingDocuments((list) => list.filter((r) => r.fileId !== fileId));
+
   const buildFormData = (status) => {
     const fd = new FormData();
     Object.entries(form).forEach(([k, v]) => fd.append(k, v));
     fd.append("status", status);
     receipts.forEach((f) => fd.append("receipts", f));
     supportingDocuments.forEach((f) => fd.append("supportingDocuments", f));
+    if (initial) {
+      // Tell the backend which previously-attached files were removed, so
+      // it can drop them from the claim (and delete them from storage).
+      const removedReceiptIds = (initial.receipts || [])
+        .filter((r) => !existingReceipts.some((e) => e.fileId === r.fileId))
+        .map((r) => r.fileId)
+        .filter(Boolean);
+      const removedSupportingDocumentIds = (initial.supportingDocuments || [])
+        .filter((r) => !existingSupportingDocuments.some((e) => e.fileId === r.fileId))
+        .map((r) => r.fileId)
+        .filter(Boolean);
+      if (removedReceiptIds.length) fd.append("removeReceiptIds", JSON.stringify(removedReceiptIds));
+      if (removedSupportingDocumentIds.length)
+        fd.append("removeSupportingDocumentIds", JSON.stringify(removedSupportingDocumentIds));
+    }
     return fd;
   };
+
+  const totalReceiptsAfterSave = existingReceipts.length + receipts.length;
 
   const handleSubmit = (status) => async () => {
     setError("");
@@ -242,7 +553,7 @@ function ClaimForm({ onSubmit, submitting, initial, onCancel, bankDetailsAvailab
         setError("Expense date, amount, and description are required.");
         return;
       }
-      if (!initial && receipts.length === 0) {
+      if (totalReceiptsAfterSave === 0) {
         setError("Attach at least one receipt/invoice to submit.");
         return;
       }
@@ -303,16 +614,19 @@ function ClaimForm({ onSubmit, submitting, initial, onCancel, bankDetailsAvailab
       </Field>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <Field label="Upload Receipt(s) / Invoice(s)" required={!initial}>
-          <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style={inputStyle} onChange={(e) => setReceipts(Array.from(e.target.files || []))} />
-          {receipts.length > 0 && <span style={{ fontSize: 12, color: C.muted }}>{receipts.length} file(s) selected</span>}
-          {initial?.receipts?.length > 0 && (
-            <span style={{ fontSize: 12, color: C.muted }}>{initial.receipts.length} already attached</span>
+        <Field label="Upload Receipt(s) / Invoice(s)" required={!initial && existingReceipts.length === 0}>
+          {existingReceipts.length > 0 && (
+            <AttachmentChipList items={existingReceipts} color={C.brand} bg={C.brandLight} onRemove={removeExistingReceipt} />
           )}
+          <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style={inputStyle} onChange={(e) => setReceipts(Array.from(e.target.files || []))} />
+          {receipts.length > 0 && <span style={{ fontSize: 12, color: C.muted }}>{receipts.length} new file(s) to add</span>}
         </Field>
         <Field label="Supporting Documents">
+          {existingSupportingDocuments.length > 0 && (
+            <AttachmentChipList items={existingSupportingDocuments} color={C.blue} bg={C.blueBg} onRemove={removeExistingSupportingDocument} />
+          )}
           <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style={inputStyle} onChange={(e) => setSupportingDocuments(Array.from(e.target.files || []))} />
-          {supportingDocuments.length > 0 && <span style={{ fontSize: 12, color: C.muted }}>{supportingDocuments.length} file(s) selected</span>}
+          {supportingDocuments.length > 0 && <span style={{ fontSize: 12, color: C.muted }}>{supportingDocuments.length} new file(s) to add</span>}
         </Field>
       </div>
 
@@ -411,7 +725,7 @@ function ClaimDetail({ claim }) {
 // ---------------------------------------------------------------------------
 // Claims table
 // ---------------------------------------------------------------------------
-function ClaimsTable({ claims, onView, showSubmitter, emptyText }) {
+function ClaimsTable({ claims, onView, onEdit, onDelete, showSubmitter, emptyText }) {
   if (!claims?.length) {
     return (
       <div style={{ padding: "48px 16px", textAlign: "center", color: C.muted, fontSize: 14 }}>
@@ -448,12 +762,150 @@ function ClaimsTable({ claims, onView, showSubmitter, emptyText }) {
               <td style={{ padding: "10px 12px", fontWeight: 600 }}>{fmtMoney(c.amountClaimed, c.currency)}</td>
               <td style={{ padding: "10px 12px" }}><StatusBadge status={c.status} /></td>
               <td style={{ padding: "10px 12px", textAlign: "right" }}>
-                <Btn variant="outline" onClick={() => onView(c)} style={{ padding: "5px 12px" }}>View</Btn>
+                <div style={{ display: "inline-flex", gap: 6 }}>
+                  <Btn variant="outline" onClick={() => onView(c)} style={{ padding: "5px 12px" }}>View</Btn>
+                  {(c.status === "draft" || c.status === "submitted") && onEdit && (
+                    <Btn variant="outline" onClick={() => onEdit(c)} style={{ padding: "5px 12px" }}>Edit</Btn>
+                  )}
+                  {(c.status === "draft" || c.status === "submitted") && onDelete && (
+                    <Btn variant="red" onClick={() => onDelete(c)} style={{ padding: "5px 12px" }}>Delete</Btn>
+                  )}
+                </div>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Filter bar — search + dropdowns (role, dept, designation, type, payment
+// method, currency) + amount range + expense-date range + sort. Options for
+// role/department/designation/currency are derived dynamically from the
+// claims currently in view so the dropdowns never show stale/irrelevant
+// values.
+// ---------------------------------------------------------------------------
+function FilterBar({ claims, filters, onChange }) {
+  // Role options: fixed list ∪ anything unexpected found in the data, so the
+  // dropdown always shows all roles but still surfaces any extra value the
+  // backend sends that isn't one of the three standard roles.
+  const roles = useMemo(() => {
+    const extra = getUniqueValues(claims, "submitterModel").filter((r) => !SUBMITTER_ROLES.includes(r));
+    return [...SUBMITTER_ROLES, ...extra];
+  }, [claims]);
+  const departments = useMemo(() => getUniqueValues(claims, "department"), [claims]);
+  const designations = useMemo(() => getUniqueValues(claims, "designation"), [claims]);
+  const currencies = useMemo(() => getUniqueValues(claims, "currency"), [claims]);
+  const activeCount = countActiveClaimFilters(filters);
+
+  const set = (key) => (e) => onChange({ ...filters, [key]: e.target.value });
+  const selectStyle = { ...inputStyle, cursor: "pointer" };
+
+  return (
+    <div
+      style={{
+        background: C.slateBg,
+        borderRadius: 12,
+        border: `1px solid ${C.border}`,
+        padding: 14,
+        marginBottom: 16,
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      }}
+    >
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <input
+          style={{ ...inputStyle, flex: "2 1 220px", minWidth: 200, background: "#fff" }}
+          placeholder="Search by name, employee ID, or claim #"
+          value={filters.search}
+          onChange={set("search")}
+        />
+        <select style={{ ...selectStyle, flex: "1 1 140px", minWidth: 130 }} value={filters.role} onChange={set("role")}>
+          <option value="">All Roles</option>
+          {roles.map((r) => (
+            <option key={r} value={r}>{r}</option>
+          ))}
+        </select>
+        <select style={{ ...selectStyle, flex: "1 1 150px", minWidth: 140 }} value={filters.department} onChange={set("department")}>
+          <option value="">All Departments</option>
+          {departments.map((d) => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
+        <select style={{ ...selectStyle, flex: "1 1 150px", minWidth: 140 }} value={filters.designation} onChange={set("designation")}>
+          <option value="">All Designations</option>
+          {designations.map((d) => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
+        <select style={{ ...selectStyle, flex: "1 1 150px", minWidth: 140 }} value={filters.type} onChange={set("type")}>
+          <option value="">All Types</option>
+          {TYPES.map((t) => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+        <select style={{ ...selectStyle, flex: "1 1 160px", minWidth: 150 }} value={filters.paymentMethod} onChange={set("paymentMethod")}>
+          <option value="">All Payment Methods</option>
+          {PAYMENT_METHODS.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+        <select style={{ ...selectStyle, flex: "1 1 120px", minWidth: 110 }} value={filters.currency} onChange={set("currency")}>
+          <option value="">All Currencies</option>
+          {currencies.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+      </div>
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <Field label="Amount Min">
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            style={{ ...inputStyle, width: 110, background: "#fff" }}
+            value={filters.amountMin}
+            onChange={set("amountMin")}
+            placeholder="0"
+          />
+        </Field>
+        <Field label="Amount Max">
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            style={{ ...inputStyle, width: 110, background: "#fff" }}
+            value={filters.amountMax}
+            onChange={set("amountMax")}
+            placeholder="Any"
+          />
+        </Field>
+        <Field label="Expense From">
+          <input type="date" style={{ ...inputStyle, width: 150, background: "#fff" }} value={filters.dateFrom} onChange={set("dateFrom")} />
+        </Field>
+        <Field label="Expense To">
+          <input type="date" style={{ ...inputStyle, width: 150, background: "#fff" }} value={filters.dateTo} onChange={set("dateTo")} />
+        </Field>
+        <Field label="Sort By">
+          <select style={{ ...selectStyle, width: 170, background: "#fff" }} value={filters.sortBy} onChange={set("sortBy")}>
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+            <option value="amount_desc">Amount: High to Low</option>
+            <option value="amount_asc">Amount: Low to High</option>
+          </select>
+        </Field>
+        <Btn
+          variant="outline"
+          onClick={() => onChange(DEFAULT_CLAIM_FILTERS)}
+          style={{ background: "#fff", color: C.brand, height: 38 }}
+        >
+          Clear Filters{activeCount ? ` (${activeCount})` : ""}
+        </Btn>
+      </div>
     </div>
   );
 }
@@ -558,6 +1010,11 @@ export default function ReimbursementBase({
   const [deciding, setDeciding] = useState(null);
   const [reviewFilter, setReviewFilter] = useState("submitted");
   const [banner, setBanner] = useState(null);
+  const [isExportHovered, setIsExportHovered] = useState(false);
+  // Separate filter state per tab — Review Queue and All Claims are viewed
+  // independently, so clearing one shouldn't reset the other.
+  const [reviewQueueFilters, setReviewQueueFilters] = useState(DEFAULT_CLAIM_FILTERS);
+  const [allClaimsFilters, setAllClaimsFilters] = useState(DEFAULT_CLAIM_FILTERS);
 
   const { data: authData } = useAuth();
   const person =
@@ -605,15 +1062,71 @@ export default function ReimbursementBase({
   };
 
   const handleDelete = async (claim) => {
-    if (!window.confirm(`Delete draft claim ${claim.claimNumber}?`)) return;
+    if (!window.confirm(`Delete claim ${claim.claimNumber}?`)) return;
     await deleteMutation.mutateAsync(claim._id);
-    flash("Draft deleted.");
+    flash("Claim deleted.");
   };
 
-  const filteredAll = useMemo(() => {
+  const statusFilteredAll = useMemo(() => {
     if (!reviewFilter) return all;
     return all.filter((c) => c.status === reviewFilter);
   }, [all, reviewFilter]);
+
+  // "All Claims" tab: status pill filter, then the full filter bar (search,
+  // role, department, designation, type, payment method, currency, amount
+  // range, expense-date range, sort).
+  const filteredAll = useMemo(
+    () => applyClaimFilters(statusFilteredAll, allClaimsFilters),
+    [statusFilteredAll, allClaimsFilters]
+  );
+  const allClaimsActiveFilterCount = countActiveClaimFilters(allClaimsFilters);
+  const allClaimsSummaryAmount = useMemo(() => claimAmountSummary(filteredAll), [filteredAll]);
+  const selectedReviewLabel = reviewFilter ? STATUS_META[reviewFilter].label : "All";
+  const allClaimsSummaryLabel = allClaimsActiveFilterCount
+    ? `Filtered Total${selectedReviewLabel !== "All" ? ` (${selectedReviewLabel})` : ""}`
+    : `${selectedReviewLabel} Total`;
+
+  // "Review Queue" tab: same filter bar applied to the pending list.
+  const filteredPending = useMemo(
+    () => applyClaimFilters(pending, reviewQueueFilters),
+    [pending, reviewQueueFilters]
+  );
+
+  const reviewBuckets = useMemo(
+    () =>
+      ["", "draft", "submitted", "approved", "rejected", "paid"].map((status) => {
+        const claims = status ? all.filter((claim) => claim.status === status) : all;
+        return {
+          key: status,
+          label: status ? STATUS_META[status].label : "All",
+          claims,
+          count: claims.length,
+          totalAmount: claimAmountSummary(claims),
+        };
+      }),
+    [all]
+  );
+
+  const selectedReviewBucket =
+    reviewBuckets.find((bucket) => bucket.key === reviewFilter) || reviewBuckets[0];
+
+  const handleExportAllClaims = () => {
+    if (!filteredAll.length) return;
+    const safeLabel = selectedReviewBucket.label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const filename = `reimbursements-${safeLabel}-${new Date().toISOString().slice(0, 10)}.csv`;
+    downloadCsv(filename, CLAIM_CSV_COLUMNS, buildClaimCsvRows(filteredAll));
+    flash(`${selectedReviewBucket.label} claims exported.`);
+  };
+
+  // Shared by the "My Claims" and "Review Queue" tabs — same column set,
+  // just a different source array and filename prefix.
+  const handleExportClaims = (claims, label) => {
+    if (!claims.length) return;
+    const safeLabel = label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const filename = `reimbursements-${safeLabel}-${new Date().toISOString().slice(0, 10)}.csv`;
+    downloadCsv(filename, CLAIM_CSV_COLUMNS, buildClaimCsvRows(claims));
+    flash(`${label} exported.`);
+  };
 
   const tabBtn = (key, label) => (
     <button
@@ -668,7 +1181,24 @@ export default function ReimbursementBase({
               <div style={{ padding: 40, textAlign: "center", color: C.muted }}>Loading…</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <ClaimsTable claims={my} onView={(c) => { setViewClaim(c); setViewIsReview(false); }} emptyText="You haven't submitted any claims yet." />
+                {my.length > 0 && (
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <Btn
+                      variant="outline"
+                      onClick={() => handleExportClaims(my, "my-claims")}
+                      style={{ background: "#fff", color: C.brand }}
+                    >
+                      Export CSV
+                    </Btn>
+                  </div>
+                )}
+                <ClaimsTable
+                  claims={my}
+                  onView={(c) => { setViewClaim(c); setViewIsReview(false); }}
+                  onEdit={(c) => setEditClaim(c)}
+                  onDelete={handleDelete}
+                  emptyText="You haven't submitted any claims yet."
+                />
               </div>
             )}
           </>
@@ -679,14 +1209,79 @@ export default function ReimbursementBase({
             {reviewQueue.pending?.isLoading ? (
               <div style={{ padding: 40, textAlign: "center", color: C.muted }}>Loading…</div>
             ) : (
-              <ClaimsTable claims={pending} onView={(c) => { setViewClaim(c); setViewIsReview(true); }} showSubmitter emptyText="Nothing pending review right now." />
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 12, color: C.muted }}>
+                    Showing {filteredPending.length} of {pending.length} pending claim{pending.length === 1 ? "" : "s"}
+                  </span>
+                  <Btn
+                    variant="outline"
+                    onClick={() => handleExportClaims(filteredPending, "review-queue")}
+                    disabled={!filteredPending.length}
+                    style={{ background: "#fff", color: C.brand }}
+                  >
+                    Export CSV
+                  </Btn>
+                </div>
+                <FilterBar claims={pending} filters={reviewQueueFilters} onChange={setReviewQueueFilters} />
+                <ClaimsTable claims={filteredPending} onView={(c) => { setViewClaim(c); setViewIsReview(true); }} showSubmitter emptyText="Nothing pending review right now." />
+              </div>
             )}
           </>
         )}
 
         {tab === "all" && reviewQueue && (
           <>
-            <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+                marginBottom: 16,
+                flexWrap: "wrap",
+              }}
+            >
+              <Btn
+                variant="outline"
+                onClick={handleExportAllClaims}
+                disabled={!filteredAll.length || reviewQueue.all?.isLoading}
+                onMouseEnter={() => setIsExportHovered(true)}
+                onMouseLeave={() => setIsExportHovered(false)}
+                style={{
+                  background: isExportHovered ? C.brand : "#fff",
+                  color: isExportHovered ? "#fff" : C.brand,
+                }}
+              >
+                Export CSV
+              </Btn>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  flexWrap: "wrap",
+                  marginLeft: "auto",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: C.brandDark,
+                    background: C.brandLight,
+                    padding: "7px 12px",
+                    borderRadius: 999,
+                  }}
+                >
+                  {allClaimsSummaryLabel}: {allClaimsSummaryAmount}
+                </span>
+                <span style={{ fontSize: 12, color: C.muted }}>
+                  {filteredAll.length} claim{filteredAll.length === 1 ? "" : "s"}
+                </span>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
               {["", "draft", "submitted", "approved", "rejected", "paid"].map((s) => (
                 <button
                   key={s || "any"}
@@ -706,6 +1301,10 @@ export default function ReimbursementBase({
                 </button>
               ))}
             </div>
+            <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>
+              Showing {filteredAll.length} of {statusFilteredAll.length} claim{statusFilteredAll.length === 1 ? "" : "s"}
+            </div>
+            <FilterBar claims={statusFilteredAll} filters={allClaimsFilters} onChange={setAllClaimsFilters} />
             {reviewQueue.all?.isLoading ? (
               <div style={{ padding: 40, textAlign: "center", color: C.muted }}>Loading…</div>
             ) : (
@@ -718,7 +1317,7 @@ export default function ReimbursementBase({
       {viewClaim && !viewIsReview && (
         <Modal title={`Claim ${viewClaim.claimNumber}`} onClose={() => { setViewClaim(null); setViewIsReview(false); }} width={520}>
           <ClaimDetail claim={viewClaim} />
-          {viewClaim.status === "draft" && (
+          {(viewClaim.status === "draft" || viewClaim.status === "submitted") && (
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
               <Btn variant="red" onClick={() => { handleDelete(viewClaim); setViewClaim(null); }}>Delete</Btn>
               <Btn variant="outline" onClick={() => { setEditClaim(viewClaim); setViewClaim(null); }}>Edit &amp; Submit</Btn>

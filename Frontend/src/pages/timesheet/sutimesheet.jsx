@@ -34,6 +34,15 @@ const fmtSeconds = (s) => {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
 };
 
+// Guard used on numeric inputs (Estimated Hours / Hourly Rate / Default Hourly Rate)
+// so a user can never type or paste a negative number into these fields.
+const nonNegative = (v) => {
+  if (v === "") return "";
+  const n = Number(v);
+  if (Number.isNaN(n)) return v;
+  return n < 0 ? "0" : v;
+};
+
 const STATUS_STYLE = {
   draft:                     { tw: "text-gray-400 bg-gray-100 border-gray-200",              label: "Draft" },
   pending_manager:           { tw: "text-amber-600 bg-amber-50 border-amber-200",            label: "Pending Manager" },
@@ -82,7 +91,7 @@ function fmtRate(rate, currency) {
 
 function Badge({ tw = "text-gray-400 bg-gray-100 border-gray-200", children }) {
   return (
-    <span className={cn("inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap", tw)}>
+    <span className={cn("inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap shrink-0", tw)}>
       {children}
     </span>
   );
@@ -92,7 +101,7 @@ function Card({ children, className = "", onClick }) {
   return (
     <div
       onClick={onClick}
-      className={cn("bg-white border border-[#E4E6EF] rounded-2xl overflow-hidden", onClick && "cursor-pointer hover:border-[#730042]/30 transition-colors", className)}
+      className={cn("bg-white border border-[#E4E6EF] rounded-2xl shadow-sm min-w-0 overflow-hidden", onClick && "cursor-pointer hover:border-[#730042]/30 transition-colors", className)}
     >
       {children}
     </div>
@@ -101,10 +110,10 @@ function Card({ children, className = "", onClick }) {
 
 function StatTile({ label, value, sub, colorClass = "text-[#730042]" }) {
   return (
-    <Card className="px-4 py-4 sm:px-6 sm:py-5">
-      <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1.5 truncate">{label}</div>
-      <div className={cn("text-2xl sm:text-3xl lg:text-4xl font-extrabold leading-none mb-1 truncate", colorClass)}>{value}</div>
-      {sub && <div className="text-[11px] sm:text-[12px] text-gray-400 truncate">{sub}</div>}
+    <Card className="px-3 sm:px-6 py-3.5 sm:py-5">
+      <div className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1.5 sm:mb-1.5 truncate">{label}</div>
+      <div className={cn("text-lg sm:text-3xl lg:text-4xl font-extrabold leading-none mb-1 truncate", colorClass)}>{value}</div>
+      {sub && <div className="text-[10px] sm:text-[12px] text-gray-400 truncate">{sub}</div>}
     </Card>
   );
 }
@@ -117,13 +126,13 @@ function Modal({ open, onClose, title, children }) {
   }, [open]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/45 backdrop-blur-[6px]">
-      <div className="bg-white border border-[#E4E6EF] sm:rounded-[18px] w-full h-full sm:h-auto sm:w-[95vw] md:w-[80vw] lg:max-w-[520px] max-h-full sm:max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#E4E6EF] shrink-0">
-          <span className="font-bold text-[14px] sm:text-[15px] text-gray-900">{title}</span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/45 backdrop-blur-[6px] overflow-hidden">
+      <div className="bg-white border border-[#E4E6EF] sm:rounded-[18px] w-full h-full sm:h-auto sm:w-[95vw] md:w-[80vw] lg:max-w-[520px] max-h-full sm:max-h-[90vh] flex flex-col min-w-0 overflow-hidden">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#E4E6EF] shrink-0 min-w-0">
+          <span className="font-bold text-[14px] sm:text-[15px] text-gray-900 truncate min-w-0">{title}</span>
           <button onClick={onClose} className="w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors text-xl leading-none shrink-0">×</button>
         </div>
-        <div className="p-4 sm:p-6 overflow-y-auto">{children}</div>
+        <div className="p-4 sm:p-6 overflow-y-auto overflow-x-hidden min-w-0">{children}</div>
       </div>
     </div>
   );
@@ -131,18 +140,18 @@ function Modal({ open, onClose, title, children }) {
 
 function Input({ label, className = "", ...props }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5 min-w-0">
       {label && <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{label}</label>}
-      <input {...props} className={cn("bg-[#F8F9FC] border border-[#E4E6EF] rounded-[10px] px-3.5 py-2.5 text-[13px] text-gray-900 outline-none w-full focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/15 transition-colors placeholder:text-gray-300 min-h-[44px]", className)} />
+      <input {...props} className={cn("bg-[#F8F9FC] border border-[#E4E6EF] rounded-[10px] px-3.5 py-2.5 text-[13px] text-gray-900 outline-none w-full min-w-0 focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/15 transition-colors placeholder:text-gray-300 min-h-[44px]", className)} />
     </div>
   );
 }
 
 function Select({ label, children, className = "", ...props }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5 min-w-0">
       {label && <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{label}</label>}
-      <select {...props} className={cn("bg-[#F8F9FC] border border-[#E4E6EF] rounded-[10px] px-3.5 py-2.5 text-[13px] text-gray-900 outline-none w-full appearance-none cursor-pointer focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/15 transition-colors min-h-[44px]", className)}>
+      <select {...props} className={cn("bg-[#F8F9FC] border border-[#E4E6EF] rounded-[10px] px-3.5 py-2.5 text-[13px] text-gray-900 outline-none w-full min-w-0 appearance-none cursor-pointer focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/15 transition-colors min-h-[44px]", className)}>
         {children}
       </select>
     </div>
@@ -150,9 +159,9 @@ function Select({ label, children, className = "", ...props }) {
 }
 
 function Btn({ children, variant = "primary", onClick, disabled, type = "button", className = "" }) {
-  const base = "inline-flex items-center justify-center rounded-[10px] px-4 py-2.5 text-[13px] font-semibold whitespace-nowrap transition-opacity disabled:opacity-55 disabled:cursor-not-allowed min-h-[44px]";
+  const base = "inline-flex items-center justify-center rounded-[10px] px-4 py-2.5 text-[13px] font-semibold whitespace-nowrap transition-all disabled:opacity-55 disabled:cursor-not-allowed min-h-[44px]";
   const variants = {
-    primary: "bg-[#730042] text-white hover:bg-[#8B0050]",
+    primary: "bg-gradient-to-r from-[#730042] to-[#8f0050] text-white shadow-sm hover:shadow-md hover:brightness-110",
     ghost:   "bg-transparent text-gray-600 border border-[#E4E6EF] hover:bg-gray-50",
     danger:  "bg-red-50 text-red-600 border border-red-200 hover:bg-red-100",
     success: "bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100",
@@ -167,12 +176,12 @@ function Btn({ children, variant = "primary", onClick, disabled, type = "button"
 
 function SectionHeader({ title, sub, action }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4 sm:mb-5">
+    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4 sm:mb-5 min-w-0">
       <div className="min-w-0">
         <div className="text-[15px] sm:text-[16px] font-bold text-gray-900 truncate">{title}</div>
         {sub && <div className="text-[12px] text-gray-400 mt-0.5 truncate">{sub}</div>}
       </div>
-      {action && <div className="shrink-0 w-full sm:w-auto">{action}</div>}
+      {action && <div className="shrink-0 w-full sm:w-auto min-w-0">{action}</div>}
     </div>
   );
 }
@@ -199,8 +208,8 @@ function JobDetailModal({ jobId, open, onClose }) {
       ) : !job ? (
         <div className="py-8 text-center text-gray-400 text-[13px]">Job not found</div>
       ) : (
-        <div className="flex flex-col gap-4">
-          <div>
+        <div className="flex flex-col gap-4 min-w-0">
+          <div className="min-w-0">
             <div className="font-bold text-[16px] sm:text-[17px] text-gray-900 mb-1 break-words">{job.title}</div>
             {job.description && <div className="text-[13px] text-gray-500 leading-relaxed break-words">{job.description}</div>}
           </div>
@@ -235,7 +244,7 @@ function JobDetailModal({ jobId, open, onClose }) {
             </div>
           </div>
           {job.estimated_hours > 0 && (
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[11px] text-gray-400">Progress</span>
                 <span className={cn("text-[11px] font-bold", job.overrun_flagged ? "text-red-600" : "text-gray-600")}>
@@ -254,15 +263,15 @@ function JobDetailModal({ jobId, open, onClose }) {
             <div className="text-[12px] text-gray-500">Due: <span className="font-semibold text-gray-700">{fmtDate(job.due_date)}</span></div>
           )}
           {job.work_items?.length > 0 && (
-            <div>
+            <div className="min-w-0">
               <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Work Items</div>
               <div className="flex flex-col gap-1.5">
                 {job.work_items.map((wi, i) => (
-                  <div key={i} className="flex items-center gap-2 text-[13px]">
+                  <div key={i} className="flex items-center gap-2 text-[13px] min-w-0">
                     <span className={cn("w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 text-[10px]", wi.is_completed ? "bg-emerald-500 border-emerald-500 text-white" : "border-gray-300")}>
                       {wi.is_completed && "✓"}
                     </span>
-                    <span className={cn("break-words", wi.is_completed ? "line-through text-gray-400" : "text-gray-700")}>{wi.name}</span>
+                    <span className={cn("break-words min-w-0", wi.is_completed ? "line-through text-gray-400" : "text-gray-700")}>{wi.name}</span>
                   </div>
                 ))}
               </div>
@@ -331,27 +340,27 @@ function TimerWidget({ assignedJobs }) {
 
   return (
     <>
-      <div className={cn("rounded-2xl overflow-hidden border transition-all",
-        isRunning ? "border-[#730042]/20 bg-gradient-to-br from-[#730042] to-[#9a0058]"
+      <div className={cn("rounded-2xl overflow-hidden border transition-all min-w-0",
+        isRunning ? "border-[#730042]/20 bg-gradient-to-br from-[#730042] to-[#9a0058] shadow-md shadow-[#730042]/15"
         : isPaused ? "border-amber-200 bg-amber-50"
-        : "border-[#E4E6EF] bg-white")}>
-        <div className="px-4 py-3 flex items-center gap-2.5">
+        : "border-[#E4E6EF] bg-white shadow-sm")}>
+        <div className="px-4 py-3 flex items-center gap-2.5 min-w-0">
           {isRunning && (
             <span className="relative flex h-2 w-2 shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/60" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
             </span>
           )}
-          <span className={cn("text-[11px] font-bold uppercase tracking-wide",
+          <span className={cn("text-[11px] font-bold uppercase tracking-wide shrink-0",
             isRunning ? "text-white/80" : isPaused ? "text-amber-600" : "text-gray-400")}>
             {isRunning ? "Timer Running" : isPaused ? "Timer Paused" : "No Active Timer"}
           </span>
           {timer?.job?.title && (
-            <span className={cn("ml-auto text-[11px] truncate max-w-[100px] sm:max-w-[140px]",
+            <span className={cn("ml-auto text-[11px] truncate min-w-0",
               isRunning ? "text-white/60" : "text-gray-400")}>{timer.job.title}</span>
           )}
         </div>
-        <div className="px-4 sm:px-5 py-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="px-4 sm:px-5 py-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 min-w-0">
           <div className={cn("font-mono text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-widest tabular-nums select-none text-center sm:text-left",
             isRunning ? "text-white" : isPaused ? "text-amber-600" : "text-gray-200")}>
             {fmtSeconds(displaySecs)}
@@ -419,42 +428,76 @@ function WeekGrid({ weekStart, weekDays, onAddLog }) {
   const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(weekStart); d.setDate(d.getDate() + i); return d; });
   const todayISO = new Date().toISOString().slice(0, 10);
   return (
-    <div className="bg-white border border-[#E4E6EF] rounded-2xl overflow-hidden">
-      <div className="overflow-x-auto">
-        <div className="grid grid-cols-7 border-b border-[#E4E6EF] min-w-[560px]">
+    <div className="bg-white border border-[#E4E6EF] rounded-2xl overflow-hidden shadow-sm min-w-0">
+      {/* Mobile: stacked day-by-day list — no horizontal scroll needed */}
+      <div className="flex flex-col divide-y divide-[#E4E6EF] sm:hidden">
+        {days.map((d, i) => {
+          const iso = d.toISOString().slice(0, 10);
+          const isToday = iso === todayISO;
+          const mins = weekDays[iso]?.totalMinutes || 0;
+          const logs = weekDays[iso]?.logs || [];
+          return (
+            <div key={iso} className={cn("p-3 min-w-0", isToday ? "bg-[#730042]/[0.04]" : "")}>
+              <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={cn("text-[11px] font-bold uppercase tracking-wide shrink-0", isToday ? "text-[#730042]" : "text-gray-400")}>{DAY_NAMES[i]}</span>
+                  <span className={cn("text-[14px] font-extrabold shrink-0", isToday ? "text-[#730042]" : "text-gray-800")}>{d.getDate()}</span>
+                </div>
+                {mins > 0 && <span className="text-[10px] font-bold text-[#730042] bg-[#730042]/[0.08] rounded px-1.5 py-0.5 shrink-0">{fmtDuration(mins)}</span>}
+              </div>
+              <div className="flex flex-col gap-1.5 min-w-0">
+                {logs.map((log) => (
+                  <div key={log._id}
+                    className={cn("border rounded-lg px-2.5 py-2 flex items-center justify-between gap-2 min-w-0",
+                      log.billable ? "bg-emerald-50 border-emerald-200 border-l-[3px] border-l-emerald-500"
+                        : "bg-[#730042]/[0.06] border-[#730042]/20 border-l-[3px] border-l-[#730042]")}>
+                    <div className="text-[12px] font-semibold text-gray-900 truncate min-w-0">{log.job?.title || "—"}</div>
+                    <div className={cn("text-[11px] font-bold shrink-0", log.billable ? "text-emerald-600" : "text-[#730042]")}>{fmtDuration(log.duration_minutes)}</div>
+                  </div>
+                ))}
+                <button onClick={() => onAddLog(iso)} className="w-full border border-dashed border-gray-200 rounded-lg py-1.5 text-[11px] text-gray-400 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors min-h-[32px]">+ Add</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Tablet/desktop: 7-column grid */}
+      <div className="hidden sm:block min-w-0">
+        <div className="grid grid-cols-7 border-b border-[#E4E6EF]">
           {days.map((d, i) => {
             const iso = d.toISOString().slice(0, 10);
             const isToday = iso === todayISO;
             const mins = weekDays[iso]?.totalMinutes || 0;
             return (
-              <div key={iso} className={cn("px-2 pt-3 pb-2 text-center", i < 6 ? "border-r border-[#E4E6EF]" : "", isToday ? "bg-[#730042]/[0.05]" : "")}>
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{DAY_NAMES[i]}</div>
-                <div className={cn("text-lg font-extrabold mt-0.5", isToday ? "text-[#730042]" : "text-gray-800")}>{d.getDate()}</div>
+              <div key={iso} className={cn("px-1 sm:px-2 pt-3 pb-2 text-center min-w-0", i < 6 ? "border-r border-[#E4E6EF]" : "", isToday ? "bg-[#730042]/[0.05]" : "")}>
+                <div className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wide">{DAY_NAMES[i]}</div>
+                <div className={cn("text-base sm:text-lg font-extrabold mt-0.5", isToday ? "text-[#730042]" : "text-gray-800")}>{d.getDate()}</div>
                 {mins > 0
-                  ? <div className="mt-1 text-[10px] font-bold text-[#730042] bg-[#730042]/[0.08] rounded px-1 py-0.5">{fmtDuration(mins)}</div>
+                  ? <div className="mt-1 text-[9px] sm:text-[10px] font-bold text-[#730042] bg-[#730042]/[0.08] rounded px-1 py-0.5 truncate">{fmtDuration(mins)}</div>
                   : <div className="mt-1 h-[18px]" />}
               </div>
             );
           })}
         </div>
-        <div className="grid grid-cols-7 min-w-[560px]" style={{ minHeight: 120 }}>
+        <div className="grid grid-cols-7 min-h-[120px]">
           {days.map((d, i) => {
             const iso = d.toISOString().slice(0, 10);
             const logs = weekDays[iso]?.logs || [];
             const isToday = iso === todayISO;
             return (
-              <div key={iso} className={cn("px-1.5 py-2 flex flex-col gap-1", i < 6 ? "border-r border-[#E4E6EF]" : "", isToday ? "bg-[#730042]/[0.02]" : "")}>
+              <div key={iso} className={cn("px-1 sm:px-1.5 py-2 flex flex-col gap-1 min-w-0", i < 6 ? "border-r border-[#E4E6EF]" : "", isToday ? "bg-[#730042]/[0.02]" : "")}>
                 {logs.map((log) => (
                   <div key={log._id}
-                    className={cn("border rounded-lg px-2 py-1.5 cursor-default",
+                    className={cn("border rounded-lg px-1.5 sm:px-2 py-1.5 cursor-default min-w-0",
                       log.billable ? "bg-emerald-50 border-emerald-200 border-l-[3px] border-l-emerald-500"
                         : "bg-[#730042]/[0.06] border-[#730042]/20 border-l-[3px] border-l-[#730042]")}
                     title={`${log.job?.title || "—"} · ${fmtDuration(log.duration_minutes)}`}>
-                    <div className="text-[11px] font-semibold text-gray-900 truncate leading-tight">{log.job?.title || "—"}</div>
-                    <div className={cn("text-[10px] font-bold mt-0.5", log.billable ? "text-emerald-600" : "text-[#730042]")}>{fmtDuration(log.duration_minutes)}</div>
+                    <div className="text-[10px] sm:text-[11px] font-semibold text-gray-900 truncate leading-tight">{log.job?.title || "—"}</div>
+                    <div className={cn("text-[9px] sm:text-[10px] font-bold mt-0.5", log.billable ? "text-emerald-600" : "text-[#730042]")}>{fmtDuration(log.duration_minutes)}</div>
                   </div>
                 ))}
-                <button onClick={() => onAddLog(iso)} className="mt-auto w-full border border-dashed border-gray-200 rounded-lg py-1 text-[11px] text-gray-300 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors min-h-[28px]">+ Add</button>
+                <button onClick={() => onAddLog(iso)} className="mt-auto w-full border border-dashed border-gray-200 rounded-lg py-1 text-[10px] sm:text-[11px] text-gray-300 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors min-h-[28px]">+ Add</button>
               </div>
             );
           })}
@@ -667,12 +710,12 @@ export default function SuperAdminTimesheet() {
   const currentTabLabel = NAV_TABS.find(t => t.id === tab)?.label ?? "";
 
   return (
-    <div className="min-h-screen bg-[#F4F5F9]" style={{ fontFamily: "'Inter', sans-serif" }}>
+    <div className="min-h-screen w-full max-w-full bg-[#F8F7FB] overflow-x-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      <header className="bg-white border-b border-[#E4E6EF] sticky top-0 z-20">
-        <div className="flex items-center gap-0 px-3 sm:px-6 overflow-x-auto scrollbar-none">
+      <header className="bg-white border-b border-[#E4E6EF] sticky top-0 z-20 min-w-0 max-w-full overflow-hidden">
+        <div className="flex items-center gap-2 px-3 sm:px-6 min-w-0 max-w-full">
           <div className="flex items-center gap-2 sm:gap-2.5 pr-3 sm:pr-6 border-r border-[#E4E6EF] mr-1 sm:mr-2 shrink-0 py-2.5 sm:py-3">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-[#730042] flex items-center justify-center shrink-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-[#730042] to-[#CD166E] flex items-center justify-center shrink-0 shadow-sm">
               <span className="text-white text-[12px] sm:text-[13px] font-black">S</span>
             </div>
             <div className="hidden sm:block">
@@ -681,14 +724,16 @@ export default function SuperAdminTimesheet() {
             </div>
           </div>
 
-          <nav className="hidden md:flex items-center gap-0 flex-1 overflow-x-auto scrollbar-none">
+          <nav className="hidden md:flex items-center gap-1.5 lg:gap-2 flex-1 min-w-0 overflow-x-auto overscroll-x-contain no-scrollbar scroll-smooth py-2">
             {NAV_TABS.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)}
-                className={cn("relative px-3 lg:px-3.5 py-[18px] text-[12px] lg:text-[13px] whitespace-nowrap border-b-[2.5px] transition-all shrink-0",
-                  tab === t.id ? "font-bold text-[#730042] border-[#730042]" : "font-medium text-gray-600 border-transparent hover:text-gray-900")}>
+                className={cn("relative shrink-0 px-3.5 lg:px-4 py-2 rounded-full text-[12px] lg:text-[13px] whitespace-nowrap transition-all border",
+                  tab === t.id
+                    ? "font-bold text-white bg-gradient-to-r from-[#730042] to-[#8f0050] border-transparent shadow-sm"
+                    : "font-medium text-gray-600 border-transparent hover:bg-gray-100 hover:text-gray-900")}>
                 {t.label}
                 {t.id === "approvals" && approvals.length > 0 && (
-                  <span className="absolute top-3 right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] font-black flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] font-black flex items-center justify-center ring-2 ring-white">
                     {approvals.length}
                   </span>
                 )}
@@ -696,10 +741,10 @@ export default function SuperAdminTimesheet() {
             ))}
           </nav>
 
-          <div className="md:hidden flex items-center gap-2 flex-1 pl-2 sm:pl-3 min-w-0">
+          <div className="md:hidden flex items-center gap-2 flex-1 min-w-0">
             <button onClick={() => setMobileNavOpen(v => !v)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#E4E6EF] text-[13px] font-semibold text-gray-700 bg-[#F8F9FC] min-h-[40px]">
-              <span className="truncate max-w-[140px] sm:max-w-none">{currentTabLabel}</span>
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#E4E6EF] text-[13px] font-semibold text-gray-700 bg-[#F8F9FC] min-h-[40px] max-w-full min-w-0">
+              <span className="truncate min-w-0">{currentTabLabel}</span>
               <svg className="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 16 16">
                 <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -717,13 +762,13 @@ export default function SuperAdminTimesheet() {
         </div>
 
         {mobileNavOpen && (
-          <div className="md:hidden border-t border-[#E4E6EF] bg-white max-h-[70vh] overflow-y-auto">
+          <div className="md:hidden border-t border-[#E4E6EF] bg-white max-h-[70vh] overflow-y-auto overflow-x-hidden">
             {NAV_TABS.map(t => (
               <button key={t.id} onClick={() => { setTab(t.id); setMobileNavOpen(false); }}
                 className={cn("w-full flex items-center justify-between px-4 sm:px-5 py-3 text-[13px] font-medium border-b border-[#E4E6EF] last:border-0 transition-colors min-h-[44px]",
                   tab === t.id ? "text-[#730042] bg-[#730042]/[0.04] font-bold" : "text-gray-700 hover:bg-gray-50")}>
                 {t.label}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   {t.id === "approvals" && approvals.length > 0 && (
                     <span className="w-5 h-5 bg-red-500 text-white rounded-full text-[10px] font-black flex items-center justify-center">{approvals.length}</span>
                   )}
@@ -735,16 +780,16 @@ export default function SuperAdminTimesheet() {
         )}
       </header>
 
-      <div className="bg-[#730042]/[0.07] border-b border-[#730042]/[0.18] px-3 sm:px-6 py-1.5 flex items-center gap-2 overflow-hidden">
+      <div className="bg-[#730042]/[0.07] border-b border-[#730042]/[0.18] px-3 sm:px-6 py-1.5 flex items-center gap-2 overflow-hidden min-w-0">
         <span className="text-[11px] font-bold text-[#730042] shrink-0">⬡ Super Admin</span>
         <span className="text-[11px] text-[#730042]/70 hidden sm:inline truncate">— Organisation-wide visibility across all roles</span>
       </div>
 
-      <main className="px-3 sm:px-6 py-4 sm:py-7 max-w-[1280px] mx-auto">
+      <main className="px-3 sm:px-6 py-4 sm:py-7 w-full max-w-[1280px] mx-auto min-w-0">
 
         {tab === "overview" && (
-          <div className="flex flex-col gap-4 sm:gap-5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="flex flex-col gap-4 sm:gap-5 min-w-0">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
               <StatTile label="Total Projects"  value={projects.length}                                     sub="Across all teams"           colorClass="text-[#730042]"    />
               <StatTile label="Active Jobs"     value={jobs.filter(j => j.status === "in_progress").length} sub={`${completedJobs} completed`} colorClass="text-blue-600"  />
               <StatTile label="Hours Logged"    value={`${totalHours.toFixed(0)}h`}                        sub={`${billableJobs} billable jobs`} colorClass="text-emerald-600" />
@@ -757,10 +802,10 @@ export default function SuperAdminTimesheet() {
                 {overrunJobs.length === 0 ? (
                   <EmptyState icon="✓" title="No jobs at risk" sub="All jobs within estimate" />
                 ) : (
-                  <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-0.5">
+                  <div className="flex flex-col gap-2 max-h-64 overflow-y-auto overflow-x-hidden pr-0.5">
                     {overrunJobs.map(job => (
-                      <div key={job._id} className="flex items-center gap-3 px-3 sm:px-3.5 py-2.5 bg-[#F8F9FC] border border-[#E4E6EF] rounded-xl">
-                        <span className="text-[12px] font-black text-red-600 min-w-[36px]">{job.riskPercent}%</span>
+                      <div key={job._id} className="flex items-center gap-3 px-3 sm:px-3.5 py-2.5 bg-[#F8F9FC] border border-[#E4E6EF] rounded-xl min-w-0">
+                        <span className="text-[12px] font-black text-red-600 min-w-[36px] shrink-0">{job.riskPercent}%</span>
                         <div className="flex-1 min-w-0">
                           <div className="text-[12px] font-semibold truncate">{job.title}</div>
                           <div className="text-[11px] text-gray-400">{job.logged_hours_cache}h / {job.estimated_hours}h est.</div>
@@ -779,9 +824,9 @@ export default function SuperAdminTimesheet() {
                 {idleJobs.length === 0 ? (
                   <EmptyState icon="🚀" title="All jobs are active" sub="" />
                 ) : (
-                  <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-0.5">
+                  <div className="flex flex-col gap-2 max-h-64 overflow-y-auto overflow-x-hidden pr-0.5">
                     {idleJobs.map(job => (
-                      <div key={job._id} className="flex items-center gap-3 px-3 sm:px-3.5 py-2.5 bg-[#F8F9FC] border border-[#E4E6EF] rounded-xl">
+                      <div key={job._id} className="flex items-center gap-3 px-3 sm:px-3.5 py-2.5 bg-[#F8F9FC] border border-[#E4E6EF] rounded-xl min-w-0">
                         <div className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
                         <div className="flex-1 min-w-0">
                           <div className="text-[12px] font-semibold truncate">{job.title}</div>
@@ -802,51 +847,85 @@ export default function SuperAdminTimesheet() {
               {heatmap.length === 0 ? (
                 <EmptyState icon="◎" title="No team data" sub="No time logs found for this week" />
               ) : (
-                <div className="overflow-x-auto -mx-1">
-                  <table className="w-full border-collapse text-[12px] min-w-[480px]">
-                    <thead>
-                      <tr>
-                        <th className="text-left py-2 pr-4 pl-1 text-gray-400 font-semibold sticky left-0 bg-white">Member</th>
-                        {DAY_NAMES.map(d => (
-                          <th key={d} className="text-center py-2 px-1.5 text-gray-400 font-semibold">{d}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {heatmap.map((row, i) => {
-                        const days = Array.from({ length: 7 }, (_, idx) => {
-                          const d = new Date(weekStart);
-                          d.setDate(d.getDate() + idx);
-                          return row.days?.[d.toISOString().slice(0, 10)];
-                        });
-                        const memberName = row.name || row.member_name || `Member ${i + 1}`;
-                        return (
-                          <tr key={i} className="border-t border-[#E4E6EF]">
-                            <td className="py-2.5 pr-4 pl-1 text-gray-700 font-medium truncate max-w-[100px] sticky left-0 bg-white">{memberName}</td>
+                <>
+                  {/* Below lg: one card per member, 7 cells laid out with CSS grid so they always fit the screen width — no horizontal scroll */}
+                  <div className="flex flex-col gap-3 lg:hidden">
+                    {heatmap.map((row, i) => {
+                      const days = Array.from({ length: 7 }, (_, idx) => {
+                        const d = new Date(weekStart);
+                        d.setDate(d.getDate() + idx);
+                        return row.days?.[d.toISOString().slice(0, 10)];
+                      });
+                      const memberName = row.name || row.member_name || `Member ${i + 1}`;
+                      return (
+                        <div key={i} className="min-w-0">
+                          <div className="text-[12px] font-semibold text-gray-700 truncate mb-1.5">{memberName}</div>
+                          <div className="grid grid-cols-7 gap-1">
                             {days.map((day, j) => {
                               const pct = day?.loadPercent ?? 0;
                               const cellClass = pct === 0 ? "bg-[#F8F9FC] text-gray-400" : pct < 50 ? "bg-emerald-50 text-emerald-600" : pct < 80 ? "bg-amber-50 text-amber-600" : "bg-red-50 text-red-600";
                               return (
-                                <td key={j} className="text-center py-1.5 px-1.5">
-                                  <div className={cn("rounded-lg py-1.5 px-1 text-[11px] font-bold", cellClass)}>
+                                <div key={j} className="min-w-0 text-center">
+                                  <div className="text-[8px] font-bold text-gray-400 mb-0.5">{DAY_NAMES[j][0]}</div>
+                                  <div className={cn("rounded-md py-1 px-0.5 text-[9px] font-bold truncate", cellClass)}>
                                     {pct > 0 ? `${pct}%` : "—"}
                                   </div>
-                                </td>
+                                </div>
                               );
                             })}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* lg+: full table, fits the container width — no forced min-width */}
+                  <div className="hidden lg:block min-w-0">
+                    <table className="w-full border-collapse text-[12px] table-fixed">
+                      <thead>
+                        <tr>
+                          <th className="text-left py-2 pr-4 pl-1 text-gray-400 font-semibold w-[18%]">Member</th>
+                          {DAY_NAMES.map(d => (
+                            <th key={d} className="text-center py-2 px-1.5 text-gray-400 font-semibold">{d}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {heatmap.map((row, i) => {
+                          const days = Array.from({ length: 7 }, (_, idx) => {
+                            const d = new Date(weekStart);
+                            d.setDate(d.getDate() + idx);
+                            return row.days?.[d.toISOString().slice(0, 10)];
+                          });
+                          const memberName = row.name || row.member_name || `Member ${i + 1}`;
+                          return (
+                            <tr key={i} className="border-t border-[#E4E6EF]">
+                              <td className="py-2.5 pr-4 pl-1 text-gray-700 font-medium truncate">{memberName}</td>
+                              {days.map((day, j) => {
+                                const pct = day?.loadPercent ?? 0;
+                                const cellClass = pct === 0 ? "bg-[#F8F9FC] text-gray-400" : pct < 50 ? "bg-emerald-50 text-emerald-600" : pct < 80 ? "bg-amber-50 text-amber-600" : "bg-red-50 text-red-600";
+                                return (
+                                  <td key={j} className="text-center py-1.5 px-1.5">
+                                    <div className={cn("rounded-lg py-1.5 px-1 text-[11px] font-bold", cellClass)}>
+                                      {pct > 0 ? `${pct}%` : "—"}
+                                    </div>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </Card>
           </div>
         )}
 
         {tab === "projects" && (
-          <div>
+          <div className="min-w-0">
             <SectionHeader title="All Projects" sub={`${projects.length} total`} action={<Btn onClick={() => setCreateProjectOpen(true)} className="w-full sm:w-auto">＋ New Project</Btn>} />
             {projects.length === 0 ? (
               <Card><EmptyState icon="⬡" title="No projects yet" sub="Create your first project" action={<Btn onClick={() => setCreateProjectOpen(true)}>Create Project</Btn>} /></Card>
@@ -854,11 +933,11 @@ export default function SuperAdminTimesheet() {
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                 {projects.map(p => (
                   <Card key={p._id} className="p-4 sm:p-5">
-                    <div className="flex items-center gap-3 mb-3">
+                    <div className="flex items-center gap-3 mb-3 min-w-0">
                       <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-[10px] shrink-0 border-2" style={{ background: (p.color_tag || "#730042") + "22", borderColor: p.color_tag || "#730042" }} />
                       <div className="min-w-0">
                         <div className="font-bold text-[14px] truncate text-gray-900">{p.name}</div>
-                        <div className="text-[11px] text-gray-400">{p.code || "—"} · {p.billing_type}</div>
+                        <div className="text-[11px] text-gray-400 truncate">{p.code || "—"} · {p.billing_type}</div>
                       </div>
                     </div>
                     <div className="flex gap-1.5 flex-wrap">
@@ -866,7 +945,7 @@ export default function SuperAdminTimesheet() {
                       <Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{p.visibility}</Badge>
                       <Badge tw="text-amber-600 bg-amber-50 border-amber-200">{p.members?.length || 0} members</Badge>
                     </div>
-                    {p.description && <div className="text-[12px] text-gray-400 mt-3 line-clamp-2">{p.description}</div>}
+                    {p.description && <div className="text-[12px] text-gray-400 mt-3 line-clamp-2 break-words">{p.description}</div>}
                     <Btn variant="ghost" onClick={() => openMembersModal(p)} className="mt-3 w-full text-[12px]">Manage Members</Btn>
                   </Card>
                 ))}
@@ -876,7 +955,7 @@ export default function SuperAdminTimesheet() {
         )}
 
         {tab === "jobs" && (
-          <div>
+          <div className="min-w-0">
             <SectionHeader title="Jobs Created by Me" sub={`${jobs.length} total`} action={<Btn onClick={() => setCreateJobOpen(true)} className="w-full sm:w-auto">＋ New Job</Btn>} />
             <div className="flex flex-col gap-2.5">
               {jobs.length === 0 ? (
@@ -885,7 +964,7 @@ export default function SuperAdminTimesheet() {
                 const assigneeInfo = job.assigned_to_info;
                 return (
                   <Card key={job._id} className="p-3.5 sm:p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 min-w-0">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <button className="font-bold text-[13px] sm:text-[14px] text-gray-900 hover:text-[#730042] transition-colors text-left break-words" onClick={() => openJobDetail(job._id)}>
@@ -907,7 +986,7 @@ export default function SuperAdminTimesheet() {
                           {job.due_date && <span>Due {fmtDate(job.due_date)}</span>}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap">
                         <button onClick={() => openJobDetail(job._id)} className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-2.5 py-2 text-[11px] font-semibold text-gray-700 cursor-pointer min-h-[36px]">View</button>
                         <button onClick={() => openEditJob(job)} className="bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-2 text-[11px] font-semibold text-blue-600 cursor-pointer min-h-[36px]">Edit</button>
                         <select value={job.status} onChange={e => updateJobStatus.mutate({ id: job._id, status: e.target.value }, { onSuccess: refetchJobs })}
@@ -933,7 +1012,7 @@ export default function SuperAdminTimesheet() {
         )}
 
         {tab === "approvals" && (
-          <div>
+          <div className="min-w-0">
             <SectionHeader title="Pending Timesheets" sub={`${approvals.length} awaiting your review`} />
             {approvals.length === 0 ? (
               <Card><EmptyState icon="✦" title="All clear" sub="No timesheets pending review" /></Card>
@@ -941,7 +1020,7 @@ export default function SuperAdminTimesheet() {
               <div className="flex flex-col gap-3">
                 {approvals.map(ts => (
                   <Card key={ts._id} className="p-4 sm:p-5">
-                    <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-start gap-4 min-w-0">
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-[15px] text-gray-900 truncate">{ts.owner?.f_name} {ts.owner?.l_name}</div>
                         <div className="text-[12px] text-gray-400 mt-0.5 truncate">{ts.owner?.work_email} · {ts.owner_model === "User" ? "Employee" : ts.owner_model}</div>
@@ -966,7 +1045,7 @@ export default function SuperAdminTimesheet() {
         )}
 
         {tab === "my-work" && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 min-w-0">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">My Work</h1>
               <div className="flex gap-2 items-center flex-wrap">
@@ -997,7 +1076,7 @@ export default function SuperAdminTimesheet() {
             <WeekGrid weekStart={weekStart} weekDays={weekDays}
               onAddLog={(date) => { setLogForm({ job: "", log_date: date, duration_minutes: "", note: "" }); setLogModal(true); }} />
 
-            <div className="bg-white border border-[#E4E6EF] rounded-2xl p-4">
+            <div className="bg-white border border-[#E4E6EF] rounded-2xl p-4 shadow-sm min-w-0">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-[13px] font-semibold text-gray-900">Week of {fmtShort(weekStart)} – {fmtShort(weekEnd)}</div>
@@ -1024,15 +1103,15 @@ export default function SuperAdminTimesheet() {
         )}
 
         {tab === "org-logs" && (
-          <div>
+          <div className="min-w-0">
             <SectionHeader
               title="All Time Logs — Organisation"
               sub={`${orgLogs.length} entries · ${fmtDuration(orgLogsData?.totalMinutes || 0)} total`}
               action={
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <input type="date" value={logsWeek} onChange={e => setLogsWeek(e.target.value)}
-                    className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-3 py-2 text-[12px] text-gray-900 outline-none focus:border-[#730042] transition-colors min-h-[40px] flex-1 sm:flex-initial" />
-                  <span className="text-[11px] text-gray-400 hidden sm:inline">week of</span>
+                    className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-3 py-2 text-[12px] text-gray-900 outline-none min-w-0 focus:border-[#730042] transition-colors min-h-[40px] flex-1 sm:flex-initial" />
+                  <span className="text-[11px] text-gray-400 hidden sm:inline shrink-0">week of</span>
                 </div>
               }
             />
@@ -1040,41 +1119,43 @@ export default function SuperAdminTimesheet() {
               <Card><EmptyState icon="📋" title="No logs found" sub="No time entries for this week across the org" /></Card>
             ) : (
               <>
-                <Card className="overflow-hidden hidden sm:block">
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse text-[13px] min-w-[640px]">
-                      <thead>
-                        <tr className="bg-[#F8F9FC] border-b border-[#E4E6EF] sticky top-0 z-[1]">
-                          {["Member", "Role", "Job", "Date", "Duration", "Mode", "Status"].map(h => (
-                            <th key={h} className="text-left px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
-                          ))}
+                <Card className="hidden lg:block">
+                  <table className="w-full border-collapse text-[13px] table-fixed">
+                    <thead>
+                      <tr className="bg-[#F8F9FC] border-b border-[#E4E6EF]">
+                        <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider w-[16%]">Member</th>
+                        <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider w-[12%]">Role</th>
+                        <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider w-[26%]">Job</th>
+                        <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider w-[14%]">Date</th>
+                        <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider w-[12%]">Duration</th>
+                        <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider w-[10%]">Mode</th>
+                        <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider w-[10%]">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orgLogs.map(log => (
+                        <tr key={log._id} className="border-b border-[#E4E6EF] hover:bg-[#F8F9FC] transition-colors">
+                          <td className="px-4 py-3 font-semibold text-gray-900 truncate">{log.logged_by?.f_name || "—"} {log.logged_by?.l_name || ""}</td>
+                          <td className="px-4 py-3"><Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{log.logged_by_model === "User" ? "Employee" : log.logged_by_model}</Badge></td>
+                          <td className="px-4 py-3 truncate text-gray-700">{log.job?.title || "—"}</td>
+                          <td className="px-4 py-3 text-gray-400 truncate">{fmtDate(log.log_date)}</td>
+                          <td className="px-4 py-3 font-semibold text-emerald-600 truncate">{fmtDuration(log.duration_minutes)}</td>
+                          <td className="px-4 py-3">
+                            <Badge tw={log.entry_mode === "timer" ? "text-blue-600 bg-blue-50 border-blue-200" : "text-gray-400 bg-gray-100 border-gray-200"}>{log.entry_mode}</Badge>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge tw={(STATUS_STYLE[log.status] || STATUS_STYLE.draft).tw}>{(STATUS_STYLE[log.status] || STATUS_STYLE.draft).label}</Badge>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {orgLogs.map(log => (
-                          <tr key={log._id} className="border-b border-[#E4E6EF] hover:bg-[#F8F9FC] transition-colors">
-                            <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">{log.logged_by?.f_name || "—"} {log.logged_by?.l_name || ""}</td>
-                            <td className="px-4 py-3"><Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{log.logged_by_model === "User" ? "Employee" : log.logged_by_model}</Badge></td>
-                            <td className="px-4 py-3 max-w-[180px] truncate text-gray-700">{log.job?.title || "—"}</td>
-                            <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{fmtDate(log.log_date)}</td>
-                            <td className="px-4 py-3 font-semibold text-emerald-600 whitespace-nowrap">{fmtDuration(log.duration_minutes)}</td>
-                            <td className="px-4 py-3">
-                              <Badge tw={log.entry_mode === "timer" ? "text-blue-600 bg-blue-50 border-blue-200" : "text-gray-400 bg-gray-100 border-gray-200"}>{log.entry_mode}</Badge>
-                            </td>
-                            <td className="px-4 py-3">
-                              <Badge tw={(STATUS_STYLE[log.status] || STATUS_STYLE.draft).tw}>{(STATUS_STYLE[log.status] || STATUS_STYLE.draft).label}</Badge>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      ))}
+                    </tbody>
+                  </table>
                 </Card>
 
-                <div className="flex flex-col gap-2.5 sm:hidden">
+                <div className="flex flex-col gap-2.5 lg:hidden">
                   {orgLogs.map(log => (
                     <Card key={log._id} className="p-3.5">
-                      <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-start justify-between gap-2 mb-2 min-w-0">
                         <div className="min-w-0">
                           <div className="font-bold text-[13px] text-gray-900 truncate">{log.logged_by?.f_name || "—"} {log.logged_by?.l_name || ""}</div>
                           <div className="text-[11px] text-gray-400 truncate">{log.job?.title || "—"}</div>
@@ -1082,8 +1163,8 @@ export default function SuperAdminTimesheet() {
                         <Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{log.logged_by_model === "User" ? "Employee" : log.logged_by_model}</Badge>
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-[11px] text-gray-500 mb-2">
-                        <div>Date: <span className="font-semibold text-gray-700">{fmtDate(log.log_date)}</span></div>
-                        <div>Duration: <span className="font-semibold text-emerald-600">{fmtDuration(log.duration_minutes)}</span></div>
+                        <div className="truncate">Date: <span className="font-semibold text-gray-700">{fmtDate(log.log_date)}</span></div>
+                        <div className="truncate">Duration: <span className="font-semibold text-emerald-600">{fmtDuration(log.duration_minutes)}</span></div>
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge tw={log.entry_mode === "timer" ? "text-blue-600 bg-blue-50 border-blue-200" : "text-gray-400 bg-gray-100 border-gray-200"}>{log.entry_mode}</Badge>
@@ -1098,19 +1179,19 @@ export default function SuperAdminTimesheet() {
         )}
 
         {tab === "org-sheets" && (
-          <div>
+          <div className="min-w-0">
             <SectionHeader
               title="All Timesheets — Organisation"
               sub={`${orgSheets.length} timesheets`}
               action={
                 <div className="flex gap-2 flex-wrap">
                   <select value={sheetsStatus} onChange={e => setSheetsStatus(e.target.value)}
-                    className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-3 py-2 text-[12px] text-gray-900 outline-none focus:border-[#730042] transition-colors cursor-pointer appearance-none min-h-[40px] flex-1 sm:flex-initial">
+                    className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-3 py-2 text-[12px] text-gray-900 outline-none focus:border-[#730042] transition-colors cursor-pointer appearance-none min-h-[40px] flex-1 sm:flex-initial min-w-0">
                     <option value="">All Statuses</option>
                     {Object.entries(STATUS_STYLE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                   </select>
                   <select value={sheetsOwnerModel} onChange={e => setSheetsOwnerModel(e.target.value)}
-                    className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-3 py-2 text-[12px] text-gray-900 outline-none focus:border-[#730042] transition-colors cursor-pointer appearance-none min-h-[40px] flex-1 sm:flex-initial">
+                    className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-3 py-2 text-[12px] text-gray-900 outline-none focus:border-[#730042] transition-colors cursor-pointer appearance-none min-h-[40px] flex-1 sm:flex-initial min-w-0">
                     <option value="">All Roles</option>
                     <option value="User">Employee</option>
                     <option value="Manager">Manager</option>
@@ -1127,7 +1208,7 @@ export default function SuperAdminTimesheet() {
                   const ss = STATUS_STYLE[ts.status] || STATUS_STYLE.draft;
                   return (
                     <Card key={ts._id} className="p-4 sm:p-5">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 min-w-0">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
                             <span className="font-bold text-[14px] text-gray-900 truncate">{ts.owner?.f_name} {ts.owner?.l_name}</span>
@@ -1159,8 +1240,8 @@ export default function SuperAdminTimesheet() {
         )}
 
         {tab === "analytics" && (
-          <div className="flex flex-col gap-4 sm:gap-5">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="flex flex-col gap-4 sm:gap-5 min-w-0">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
               <StatTile label="Total Hours"   value={`${totalHours.toFixed(0)}h`} sub="All time logged"       colorClass="text-[#730042]"   />
               <StatTile label="Billable Jobs" value={billableJobs}                sub={`of ${jobs.length} total`} colorClass="text-emerald-600" />
               <StatTile label="Overrun Jobs"  value={overrunJobs.length}          sub="Exceeding estimate"    colorClass="text-red-600"     />
@@ -1172,9 +1253,9 @@ export default function SuperAdminTimesheet() {
                 {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map(s => {
                   const count = jobs.filter(j => j.status === s).length;
                   return (
-                    <div key={s} className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-xl p-3 sm:p-4 text-center">
+                    <div key={s} className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-xl p-3 sm:p-4 text-center min-w-0">
                       <div className={cn("text-2xl sm:text-3xl font-extrabold", JOB_STATUS_TW[s] || "text-gray-400")}>{count}</div>
-                      <div className="text-[11px] text-gray-400 mt-1 capitalize">{s.replace(/_/g, " ")}</div>
+                      <div className="text-[11px] text-gray-400 mt-1 capitalize truncate">{s.replace(/_/g, " ")}</div>
                     </div>
                   );
                 })}
@@ -1229,17 +1310,17 @@ export default function SuperAdminTimesheet() {
               <option value="EUR">EUR</option>
             </Select>
           </div>
-          <Input label="Default Hourly Rate" type="number" placeholder="0.00" value={projectForm.default_hourly_rate} onChange={e => setProjectForm(p => ({ ...p, default_hourly_rate: e.target.value }))} />
-          <div className="flex flex-col gap-1.5">
+          <Input label="Default Hourly Rate" type="number" min="0" placeholder="0.00" value={projectForm.default_hourly_rate} onChange={e => setProjectForm(p => ({ ...p, default_hourly_rate: nonNegative(e.target.value) }))} />
+          <div className="flex flex-col gap-1.5 min-w-0">
             <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Add Members (optional)</label>
-            <div className="border border-[#E4E6EF] rounded-[10px] max-h-[160px] overflow-y-auto p-2 flex flex-col gap-1">
+            <div className="border border-[#E4E6EF] rounded-[10px] max-h-[160px] overflow-y-auto overflow-x-hidden p-2 flex flex-col gap-1">
               {targets.length === 0 ? (
                 <div className="text-[12px] text-gray-400 px-1.5 py-1">No team members found</div>
               ) : targets.map(t => (
-                <label key={t.id} className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer min-h-[32px]">
+                <label key={t.id} className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer min-h-[32px] min-w-0">
                   <input
                     type="checkbox"
-                    className="w-4 h-4 accent-[#730042]"
+                    className="w-4 h-4 accent-[#730042] shrink-0"
                     checked={projectForm.member_ids.includes(t.id.toString())}
                     onChange={() => setProjectForm(p => ({
                       ...p,
@@ -1248,7 +1329,7 @@ export default function SuperAdminTimesheet() {
                         : [...p.member_ids, t.id.toString()],
                     }))}
                   />
-                  <span className="text-[13px] text-gray-700 truncate">{t.name} — {t.model === "User" ? "Employee" : (t.role || t.model)}</span>
+                  <span className="text-[13px] text-gray-700 truncate min-w-0">{t.name} — {t.model === "User" ? "Employee" : (t.role || t.model)}</span>
                 </label>
               ))}
             </div>
@@ -1264,7 +1345,7 @@ export default function SuperAdminTimesheet() {
 
       <Modal open={!!membersModal} onClose={() => { setMembersModal(null); setMembersSelection([]); }} title={`Manage Members — ${membersModal?.name || ""}`}>
         <div className="flex flex-col gap-3.5">
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5 min-w-0">
             <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Current Members</label>
             {(!membersModal?.members || membersModal.members.length === 0) ? (
               <div className="text-[12px] text-gray-400 px-1">No members yet</div>
@@ -1274,24 +1355,24 @@ export default function SuperAdminTimesheet() {
                   const mid = (m.member?._id || m.member || "").toString();
                   const info = targets.find(t => t.id.toString() === mid);
                   return (
-                    <div key={mid} className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-[#F8F9FC] border border-[#E4E6EF]">
-                      <span className="text-[13px] text-gray-700 truncate">{info?.name || mid} — {m.member_model}</span>
-                      <button onClick={() => handleRemoveMember(mid)} className="text-red-500 hover:text-red-700 text-[12px] font-semibold ml-2 shrink-0">Remove</button>
+                    <div key={mid} className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-[#F8F9FC] border border-[#E4E6EF] min-w-0">
+                      <span className="text-[13px] text-gray-700 truncate min-w-0">{info?.name || mid} — {m.member_model}</span>
+                      <button onClick={() => handleRemoveMember(mid)} className="text-red-500 hover:text-red-700 text-[12px] font-semibold shrink-0">Remove</button>
                     </div>
                   );
                 })}
               </div>
             )}
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5 min-w-0">
             <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Add Members</label>
-            <div className="border border-[#E4E6EF] rounded-[10px] max-h-[160px] overflow-y-auto p-2 flex flex-col gap-1">
+            <div className="border border-[#E4E6EF] rounded-[10px] max-h-[160px] overflow-y-auto overflow-x-hidden p-2 flex flex-col gap-1">
               {targets
                 .filter(t => !(membersModal?.members || []).some(m => (m.member?._id || m.member || "").toString() === t.id.toString()))
                 .map(t => (
-                  <label key={t.id} className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer min-h-[32px]">
-                    <input type="checkbox" className="w-4 h-4 accent-[#730042]" checked={membersSelection.includes(t.id.toString())} onChange={() => toggleMemberSelection(t.id.toString())} />
-                    <span className="text-[13px] text-gray-700 truncate">{t.name} — {t.model === "User" ? "Employee" : (t.role || t.model)}</span>
+                  <label key={t.id} className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer min-h-[32px] min-w-0">
+                    <input type="checkbox" className="w-4 h-4 accent-[#730042] shrink-0" checked={membersSelection.includes(t.id.toString())} onChange={() => toggleMemberSelection(t.id.toString())} />
+                    <span className="text-[13px] text-gray-700 truncate min-w-0">{t.name} — {t.model === "User" ? "Employee" : (t.role || t.model)}</span>
                   </label>
                 ))}
             </div>
@@ -1328,10 +1409,10 @@ export default function SuperAdminTimesheet() {
               <option value="high">High</option>
               <option value="urgent">Urgent</option>
             </Select>
-            <Input label="Estimated Hours" type="number" placeholder="0" value={jobForm.estimated_hours} onChange={e => setJobForm(p => ({ ...p, estimated_hours: e.target.value }))} />
+            <Input label="Estimated Hours" type="number" min="0" placeholder="0" value={jobForm.estimated_hours} onChange={e => setJobForm(p => ({ ...p, estimated_hours: nonNegative(e.target.value) }))} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <Input label="Hourly Rate" type="number" placeholder="0.00" value={jobForm.hourly_rate} onChange={e => setJobForm(p => ({ ...p, hourly_rate: e.target.value }))} />
+            <Input label="Hourly Rate" type="number" min="0" placeholder="0.00" value={jobForm.hourly_rate} onChange={e => setJobForm(p => ({ ...p, hourly_rate: nonNegative(e.target.value) }))} />
             <Select label="Currency" value={jobForm.currency} onChange={e => setJobForm(p => ({ ...p, currency: e.target.value }))}>
               <option value="INR">INR</option>
               <option value="USD">USD</option>
@@ -1339,11 +1420,11 @@ export default function SuperAdminTimesheet() {
             </Select>
           </div>
           <div>
-            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={jobForm.max_hours_per_day} onChange={e => setJobForm(p => ({ ...p, max_hours_per_day: e.target.value }))} />
+            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={jobForm.max_hours_per_day} onChange={e => setJobForm(p => ({ ...p, max_hours_per_day: nonNegative(e.target.value) }))} />
             <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day counts as overtime. Leave blank to use the employee's shift hours instead.</p>
           </div>
           <label className="flex items-center gap-2.5 cursor-pointer min-h-[24px]">
-            <input type="checkbox" checked={jobForm.billable} onChange={e => setJobForm(p => ({ ...p, billable: e.target.checked }))} className="w-4 h-4 accent-[#730042]" />
+            <input type="checkbox" checked={jobForm.billable} onChange={e => setJobForm(p => ({ ...p, billable: e.target.checked }))} className="w-4 h-4 accent-[#730042] shrink-0" />
             <span className="text-[13px] text-gray-600">Billable job</span>
           </label>
           <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-1">
@@ -1366,10 +1447,10 @@ export default function SuperAdminTimesheet() {
               <option value="high">High</option>
               <option value="urgent">Urgent</option>
             </Select>
-            <Input label="Estimated Hours" type="number" placeholder="0" value={editJobForm.estimated_hours} onChange={e => setEditJobForm(p => ({ ...p, estimated_hours: e.target.value }))} />
+            <Input label="Estimated Hours" type="number" min="0" placeholder="0" value={editJobForm.estimated_hours} onChange={e => setEditJobForm(p => ({ ...p, estimated_hours: nonNegative(e.target.value) }))} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <Input label="Hourly Rate" type="number" placeholder="0.00" value={editJobForm.hourly_rate} onChange={e => setEditJobForm(p => ({ ...p, hourly_rate: e.target.value }))} />
+            <Input label="Hourly Rate" type="number" min="0" placeholder="0.00" value={editJobForm.hourly_rate} onChange={e => setEditJobForm(p => ({ ...p, hourly_rate: nonNegative(e.target.value) }))} />
             <Select label="Currency" value={editJobForm.currency} onChange={e => setEditJobForm(p => ({ ...p, currency: e.target.value }))}>
               <option value="INR">INR</option>
               <option value="USD">USD</option>
@@ -1378,11 +1459,11 @@ export default function SuperAdminTimesheet() {
           </div>
           <Input label="Due Date" type="date" value={editJobForm.due_date} onChange={e => setEditJobForm(p => ({ ...p, due_date: e.target.value }))} />
           <div>
-            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={editJobForm.max_hours_per_day} onChange={e => setEditJobForm(p => ({ ...p, max_hours_per_day: e.target.value }))} />
+            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={editJobForm.max_hours_per_day} onChange={e => setEditJobForm(p => ({ ...p, max_hours_per_day: nonNegative(e.target.value) }))} />
             <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day counts as overtime. Leave blank to use the employee's shift hours instead.</p>
           </div>
           <label className="flex items-center gap-2.5 cursor-pointer min-h-[24px]">
-            <input type="checkbox" checked={editJobForm.billable} onChange={e => setEditJobForm(p => ({ ...p, billable: e.target.checked }))} className="w-4 h-4 accent-[#730042]" />
+            <input type="checkbox" checked={editJobForm.billable} onChange={e => setEditJobForm(p => ({ ...p, billable: e.target.checked }))} className="w-4 h-4 accent-[#730042] shrink-0" />
             <span className="text-[13px] text-gray-600">Billable job</span>
           </label>
           <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-1">
@@ -1402,7 +1483,7 @@ export default function SuperAdminTimesheet() {
           </Select>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Date" type="date" value={logForm.log_date} onChange={e => setLogForm(p => ({ ...p, log_date: e.target.value }))} />
-            <Input label="Duration (minutes)" type="number" placeholder="e.g. 90" min="1" value={logForm.duration_minutes} onChange={e => setLogForm(p => ({ ...p, duration_minutes: e.target.value }))} />
+            <Input label="Duration (minutes)" type="number" placeholder="e.g. 90" min="1" value={logForm.duration_minutes} onChange={e => setLogForm(p => ({ ...p, duration_minutes: nonNegative(e.target.value) }))} />
           </div>
           <Input label="Note (optional)" placeholder="What did you work on?" value={logForm.note} onChange={e => setLogForm(p => ({ ...p, note: e.target.value }))} />
           <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-1">
@@ -1415,6 +1496,14 @@ export default function SuperAdminTimesheet() {
       </Modal>
 
       <JobDetailModal jobId={selectedJobId} open={jobDetailOpen} onClose={() => setJobDetailOpen(false)} />
+
+      <style>{`
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        html, body { overflow-x: hidden !important; max-width: 100%; }
+        * { box-sizing: border-box; min-width: 0; word-break: break-word; }
+        table, img, svg { max-width: 100%; }
+      `}</style>
     </div>
   );
 }

@@ -34,6 +34,13 @@ const payrollSchema = new mongoose.Schema(
       designation: { type: String, default: "" },
     },
 
+    // Snapshot of the organisation's name at generation time, so the
+    // payslip keeps reading correctly even if the org's name is renamed
+    // later. Sourced from SuperAdmin.organisation_name automatically.
+    organisationSnapshot: {
+      name: { type: String, default: "" },
+    },
+
     ctc: { type: Number, required: true },
 
     breakup: {

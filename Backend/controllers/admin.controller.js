@@ -37,6 +37,7 @@ const { isEmailTaken, isEmpidTaken } = require("../utils/emailAvailability.utils
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
+const PROFILE_EXCLUDE = EXCLUDE.replace(" -createdAt", "");
 
 const verifyAdmin = async (req, res, next) => {
   const { token } = req.params;
@@ -522,6 +523,7 @@ const addmanager = async (req, res, next) => {
       is_fresher, total_experience, previous_company, previous_designation, bank_name,
       account_holder_name, account_number, ifsc_code, resume, aadhaar_card, pan_card,
       experience_letter,
+      date_of_joining: new Date(),
     });
 
     const token = jwt.sign(
@@ -614,6 +616,7 @@ const addemployee = async (req, res, next) => {
       aadhaar_number, pan_number, address, city, state, pincode, country, role, designation, office_location,
       is_fresher, total_experience, previous_company, previous_designation, bank_name,
       account_holder_name, account_number, ifsc_code, resume, aadhaar_card, pan_card, experience_letter,
+      date_of_joining: new Date(),
     });
 
     const token = jwt.sign({ userid: newuser._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
@@ -2009,7 +2012,7 @@ const getperticularemployee = async (req, res, next) => {
   const [user, leaveBalance, reviews] = await Promise.all([
     Usermodel.findOne({ _id: id, organisation_id })
       .populate({ path: "Under_manager", select: "empid uid f_name l_name work_email role" })
-      .select(EXCLUDE)
+      .select(PROFILE_EXCLUDE)
       .lean(),
     leavebalanceModel.findOne({ employee: id, organisation_id }).lean(),
     reviewModel
@@ -2048,7 +2051,7 @@ const getperticularemanager = async (req, res, next) => {
 
   const [manager, leaveBalance, reviews] = await Promise.all([
     Managermodel.findOne({ _id: id, organisation_id })
-      .select(EXCLUDE)
+      .select(PROFILE_EXCLUDE)
       .populate("reporting_manager", "empid uid f_name l_name work_email role")
       .lean(),
     leavebalanceModel.findOne({ employee: id, organisation_id }).lean(),
@@ -2765,7 +2768,9 @@ const getme = async (req, res, next) => {
   // getme feeds the dashboard's "Date of joining" / "Member since" cards,
   // which rely on createdAt — so keep it even though the shared EXCLUDE
   // list hides it from other admin-facing responses.
-  const GETME_SELECT = EXCLUDE.replace(" -createdAt", "");
+  const GETME_SELECT = EXCLUDE
+    .replace(" -createdAt", "")
+    .replace(" -isFirstLogin", "");
 
   const [admin, leaveBalance, reviews] = await Promise.all([
     Adminmodel.findById(req.admin._id).select(GETME_SELECT).lean(),
@@ -4040,7 +4045,7 @@ const getAllAdminsForOrg = async (req, res, next) => {
     const organisation_id = req.admin.organisation_id;
 
     const admins = await Adminmodel.find({ organisation_id, working_status: "working" })
-      .select("uid f_name l_name work_email role department designation office_location organisation_id")
+      .select("empid uid f_name l_name work_email role department designation office_location organisation_id")
       .lean();
 
     return res.status(200).json({
