@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, Fragment } from "react";
+import { FaFileExcel } from "react-icons/fa";
 import {
   useGetPayrollPolicy,
   useSetPayrollPolicy,
@@ -1740,6 +1741,109 @@ function ConfirmDialog({ open, title, message, confirmLabel = "Delete", onConfir
   );
 }
 
+// Computes what's actually been paid and what's still outstanding for a
+// payroll record. A record only counts as "Paid" once its status is paid;
+// generated/approved/on_hold records are fully outstanding.
+function getPaidAndBalance(p) {
+  const total = Number(p.netSalary) || 0;
+  const paid = p.status === "paid" ? total : 0;
+  const balance = total - paid;
+  return { total, paid, balance };
+}
+
+// Builds one export row per payroll record with every earning / deduction /
+// employer-contribution component as its own column. The column set is the
+// union across ALL records, so employees whose components differ still line
+// up correctly (missing components show as blank instead of breaking the
+// sheet). Reuses getPayslipLineItems() so the export never drifts out of
+// sync with what the payslip itself shows.
+function buildPayrollExportRows(payrolls, directory) {
+  const perRecord = payrolls.map((p) => {
+    const { earnings, deductions, employerContribution } = getPayslipLineItems(p);
+    const { total, paid, balance } = getPaidAndBalance(p);
+    const snap = p.employeeSnapshot || {};
+    const person = directory.byId.get(String(p.employee));
+    return {
+      p,
+      name: snap.name || person?.name || resolveName(directory, p.employee, p.employeeModel),
+      employeeId: snap.employeeId || person?.empid || "—",
+      department: departmentLabel(snap.department || person?.department || "—"),
+      designation: snap.designation || person?.designation || "—",
+      earnMap: Object.fromEntries(earnings.map((e) => [e.label, e.amount])),
+      dedMap: Object.fromEntries(deductions.map((d) => [d.label, d.amount])),
+      empMap: Object.fromEntries(employerContribution.map((c) => [c.label, c.amount])),
+      earnings, deductions, employerContribution,
+      total, paid, balance,
+    };
+  });
+
+  const earningKeys = [...new Set(perRecord.flatMap((r) => r.earnings.map((e) => e.label)))];
+  const deductionKeys = [...new Set(perRecord.flatMap((r) => r.deductions.map((d) => d.label)))];
+  const employerKeys = [...new Set(perRecord.flatMap((r) => r.employerContribution.map((c) => c.label)))];
+
+  const header = [
+    "Employee", "Employee ID", "Department", "Designation", "Month", "Year", "Status",
+    ...earningKeys.map((k) => `Earning: ${k}`),
+    "Gross Earnings",
+    ...deductionKeys.map((k) => `Deduction: ${k}`),
+    "Total Deductions",
+    ...employerKeys.map((k) => `Employer: ${k}`),
+    "Total", "Paid", "Balance",
+  ];
+
+  const rows = perRecord.map((r) => [
+    r.name, r.employeeId, r.department, r.designation,
+    MONTH_NAMES[r.p.month - 1], r.p.year, r.p.status,
+    ...earningKeys.map((k) => r.earnMap[k] ?? ""),
+    r.p.earnings?.totalEarnings ?? "",
+    ...deductionKeys.map((k) => r.dedMap[k] ?? ""),
+    r.p.deductions?.totalDeductions ?? "",
+    ...employerKeys.map((k) => r.empMap[k] ?? ""),
+    r.total, r.paid, r.balance,
+  ]);
+
+  // Grand-total row: sums every amount column across all filtered records.
+  // Only added to the CSV, not shown in the on-screen table.
+  const sumOf = (fn) => perRecord.reduce((s, r) => s + (Number(fn(r)) || 0), 0);
+  const totalsRow = [
+    "TOTAL", "", "", "", "", "", "",
+    ...earningKeys.map((k) => sumOf((r) => r.earnMap[k])),
+    sumOf((r) => r.p.earnings?.totalEarnings),
+    ...deductionKeys.map((k) => sumOf((r) => r.dedMap[k])),
+    sumOf((r) => r.p.deductions?.totalDeductions),
+    ...employerKeys.map((k) => sumOf((r) => r.empMap[k])),
+    sumOf((r) => r.total), sumOf((r) => r.paid), sumOf((r) => r.balance),
+  ];
+
+  return [header, ...rows, totalsRow];
+}
+
+// Escapes one CSV cell: wraps in quotes (and doubles any embedded quotes)
+// only when the value contains a comma, quote, or newline.
+function csvEscape(val) {
+  const s = String(val ?? "");
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+// Builds the full payroll sheet CSV (every component as its own column)
+// and triggers a browser download. No extra library needed — CSV opens
+// directly in Excel/Google Sheets.
+function exportPayrollCSV(payrolls, directory) {
+  const table = buildPayrollExportRows(payrolls, directory);
+  const csv = table.map((row) => row.map(csvEscape).join(",")).join("\r\n");
+  // UTF-8 BOM so Excel renders ₹ / non-ASCII names correctly.
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `Payroll Sheet - ${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
 function RecordsTab({ notify, directory }) {
   const now = new Date();
   const [filters, setFilters] = useState({ month: "", year: String(now.getFullYear()), employeeModel: "", status: "" });
@@ -1755,6 +1859,22 @@ function RecordsTab({ notify, directory }) {
   const [confirmTarget, setConfirmTarget] = useState(null);
 
   const payrolls = data?.payrolls || [];
+
+  // Aggregate Total / Paid / Balance across whatever is currently filtered.
+  // Recomputes automatically whenever `payrolls` changes (i.e. whenever the
+  // filters above change and useListPayrolls refetches).
+  const summary = useMemo(() => {
+    return payrolls.reduce(
+      (acc, p) => {
+        const { total, paid, balance } = getPaidAndBalance(p);
+        acc.total += total;
+        acc.paid += paid;
+        acc.balance += balance;
+        return acc;
+      },
+      { total: 0, paid: 0, balance: 0 }
+    );
+  }, [payrolls]);
 
   const handleStatus = (id, status) => {
     updateStatus(
@@ -1802,6 +1922,16 @@ function RecordsTab({ notify, directory }) {
             <option value="paid">Paid</option>
             <option value="on_hold">On Hold</option>
           </Select>
+          <button
+           className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all w-full sm:w-auto sm:ml-auto"
+            style={{ borderColor: "#085041", color: "#085041", background: "transparent", opacity: payrolls.length === 0 ? 0.5 : 1, cursor: payrolls.length === 0 ? "not-allowed" : "pointer" }}
+            onMouseEnter={(e) => { if (payrolls.length === 0) return; e.currentTarget.style.background = "#085041"; e.currentTarget.style.color = "#fff"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#085041"; }}
+            onClick={() => exportPayrollCSV(payrolls, directory)}
+            disabled={payrolls.length === 0}
+          >
+            <FaFileExcel size={12} /><span>Export CSV</span>
+          </button>
         </div>
       }
     >
@@ -1810,13 +1940,30 @@ function RecordsTab({ notify, directory }) {
       ) : payrolls.length === 0 ? (
         <p style={{ color: C.muted, fontSize: 13 }}>No payroll records found for these filters.</p>
       ) : (
+        <>
+        <div className="flex gap-3 flex-wrap" style={{ marginBottom: 16 }}>
+          <div style={{ flex: "1 1 160px", background: C.brandLight, borderRadius: 10, padding: "12px 14px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>Total ({payrolls.length} record{payrolls.length === 1 ? "" : "s"})</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: C.brandDark, marginTop: 2 }}>{fmtINR(summary.total)}</div>
+          </div>
+          <div style={{ flex: "1 1 160px", background: C.greenBg, borderRadius: 10, padding: "12px 14px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>Paid</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: C.green, marginTop: 2 }}>{fmtINR(summary.paid)}</div>
+          </div>
+          <div style={{ flex: "1 1 160px", background: summary.balance > 0 ? C.redBg : C.blueBg, borderRadius: 10, padding: "12px 14px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>Balance</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: summary.balance > 0 ? C.red : C.blue, marginTop: 2 }}>{fmtINR(summary.balance)}</div>
+          </div>
+        </div>
         <div className="overflow-x-auto overscroll-x-contain -mx-1">
-          <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 820 }}>
+          <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 1020 }}>
             <thead>
               <tr style={{ textAlign: "left", fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>
                 <th style={{ padding: "6px 10px" }}>Employee</th>
                 <th style={{ padding: "6px 10px" }}>Period</th>
-                <th style={{ padding: "6px 10px" }}>Net Salary</th>
+                <th style={{ padding: "6px 10px" }}>Total</th>
+                <th style={{ padding: "6px 10px" }}>Paid</th>
+                <th style={{ padding: "6px 10px" }}>Balance</th>
                 <th style={{ padding: "6px 10px" }}>Status</th>
                 <th style={{ padding: "6px 10px" }}></th>
               </tr>
@@ -1826,7 +1973,16 @@ function RecordsTab({ notify, directory }) {
                 <tr key={p._id} style={{ borderTop: `1px solid ${C.border}` }}>
                   <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>{resolveName(directory, p.employee, p.employeeModel)}</td>
                   <td style={{ padding: "8px 10px", fontSize: 12.5, color: C.muted }}>{MONTH_NAMES[p.month - 1]} {p.year}</td>
-                  <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 700, color: C.brandDark }}>{fmtINR(p.netSalary)}</td>
+                  {(() => {
+                    const { total, paid, balance } = getPaidAndBalance(p);
+                    return (
+                      <>
+                        <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 700, color: C.brandDark }}>{fmtINR(total)}</td>
+                        <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.green }}>{fmtINR(paid)}</td>
+                        <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: balance > 0 ? C.red : C.muted }}>{fmtINR(balance)}</td>
+                      </>
+                    );
+                  })()}
                   <td style={{ padding: "8px 10px" }}>{statusBadge(p.status)}</td>
                   <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
                     <GhostButton onClick={() => setSelected(p)} style={{ marginRight: 8 }}>View Payslip</GhostButton>
@@ -1864,6 +2020,7 @@ function RecordsTab({ notify, directory }) {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       <PayslipModal payroll={selected} directory={directory} onClose={() => setSelected(null)} />
